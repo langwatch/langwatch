@@ -10,6 +10,7 @@ import type {
 import type {
   NormalizedAttributes,
   NormalizedEvent,
+  NormalizedLink,
   NormalizedSpan,
 } from "../../event-sourcing/pipelines/trace-processing/schemas/spans";
 import { IdUtils } from "../../event-sourcing/pipelines/trace-processing/utils/id.utils";
@@ -17,6 +18,81 @@ import { TraceRequestUtils } from "../../event-sourcing/pipelines/trace-processi
 import { EventUtils } from "../../event-sourcing/utils/event.utils";
 import type { CanonicalizeSpanAttributesService } from "./canonicalisation";
 import { ATTR_KEYS } from "./canonicalisation/extractors/_constants";
+
+/** Decodes the timing and parent/trace-context fields shared by span id derivation and the span body. */
+function decodeOtlpSpanTiming(otlpSpan: OtlpSpan): {
+  traceId: string;
+  spanId: string;
+  startTimeUnixMs: number;
+  endTimeUnixMs: number;
+  durationMs: number;
+  parentAndTraceContext: ReturnType<
+    typeof TraceRequestUtils.normalizeOtlpParentAndTraceContext
+  >;
+} {
+  const { traceId, spanId } = TraceRequestUtils.normalizeOtlpSpanIds(otlpSpan);
+  const startTimeUnixNano = TraceRequestUtils.normalizeOtlpUnixNano(
+    otlpSpan.startTimeUnixNano,
+  );
+  const endTimeUnixNano = TraceRequestUtils.normalizeOtlpUnixNano(
+    otlpSpan.endTimeUnixNano,
+  );
+  const startTimeUnixMs =
+    TraceRequestUtils.convertUnixNanoToUnixMs(startTimeUnixNano);
+  const endTimeUnixMs =
+    TraceRequestUtils.convertUnixNanoToUnixMs(endTimeUnixNano);
+  const durationMs = Math.max(0, endTimeUnixMs - startTimeUnixMs);
+  const parentAndTraceContext =
+    TraceRequestUtils.normalizeOtlpParentAndTraceContext(
+      otlpSpan.parentSpanId,
+      otlpSpan.traceState,
+      otlpSpan.flags,
+    );
+
+  return {
+    traceId,
+    spanId,
+    startTimeUnixMs,
+    endTimeUnixMs,
+    durationMs,
+    parentAndTraceContext,
+  };
+}
+
+function normalizeOtlpSpanEvents(
+  events: OtlpSpan["events"],
+): NormalizedEvent[] {
+  return events
+    .filter((e) => Boolean(e))
+    .map((event) => {
+      const timeUnixNano = TraceRequestUtils.normalizeOtlpUnixNano(
+        event.timeUnixNano,
+      );
+      const attributes = TraceRequestUtils.normalizeOtlpAttributes(
+        event.attributes,
+      );
+
+      return {
+        name: event.name,
+        timeUnixMs: TraceRequestUtils.convertUnixNanoToUnixMs(timeUnixNano),
+        attributes: attributes,
+      };
+    });
+}
+
+function normalizeOtlpSpanLinks(links: OtlpSpan["links"]): NormalizedLink[] {
+  return links
+    .filter((l) => Boolean(l))
+    .map((link) => {
+      const traceId = TraceRequestUtils.normalizeOtlpId(link.traceId);
+      const spanId = TraceRequestUtils.normalizeOtlpId(link.spanId);
+      const attributes = TraceRequestUtils.normalizeOtlpAttributes(
+        link.attributes,
+      );
+
+      return { traceId, spanId, attributes };
+    });
+}
 
 export class SpanNormalizationPipelineService {
   private readonly logger = createLogger(
@@ -99,26 +175,14 @@ export class SpanNormalizationPipelineService {
     otlpResource: OtlpResource | null;
     otlpInstrumentationScope: OtlpInstrumentationScope | null;
   }): NormalizedSpan {
-    // decode span data
-    const { traceId, spanId } =
-      TraceRequestUtils.normalizeOtlpSpanIds(otlpSpan);
-    const startTimeUnixNano = TraceRequestUtils.normalizeOtlpUnixNano(
-      otlpSpan.startTimeUnixNano,
-    );
-    const endTimeUnixNano = TraceRequestUtils.normalizeOtlpUnixNano(
-      otlpSpan.endTimeUnixNano,
-    );
-    const startTimeUnixMs =
-      TraceRequestUtils.convertUnixNanoToUnixMs(startTimeUnixNano);
-    const endTimeUnixMs =
-      TraceRequestUtils.convertUnixNanoToUnixMs(endTimeUnixNano);
-    const durationMs = Math.max(0, endTimeUnixMs - startTimeUnixMs);
-    const parentAndTraceContext =
-      TraceRequestUtils.normalizeOtlpParentAndTraceContext(
-        otlpSpan.parentSpanId,
-        otlpSpan.traceState,
-        otlpSpan.flags,
-      );
+    const {
+      traceId,
+      spanId,
+      startTimeUnixMs,
+      endTimeUnixMs,
+      durationMs,
+      parentAndTraceContext,
+    } = decodeOtlpSpanTiming(otlpSpan);
 
     return {
       id: IdUtils.generateDeterministicSpanRecordIdFromData({
@@ -160,34 +224,8 @@ export class SpanNormalizationPipelineService {
         otlpSpan.attributes,
       ),
 
-      events: otlpSpan.events
-        .filter((e) => Boolean(e))
-        .map((event) => {
-          const timeUnixNano = TraceRequestUtils.normalizeOtlpUnixNano(
-            event.timeUnixNano,
-          );
-          const attributes = TraceRequestUtils.normalizeOtlpAttributes(
-            event.attributes,
-          );
-
-          return {
-            name: event.name,
-            timeUnixMs: TraceRequestUtils.convertUnixNanoToUnixMs(timeUnixNano),
-            attributes: attributes,
-          };
-        }),
-
-      links: otlpSpan.links
-        .filter((l) => Boolean(l))
-        .map((link) => {
-          const traceId = TraceRequestUtils.normalizeOtlpId(link.traceId);
-          const spanId = TraceRequestUtils.normalizeOtlpId(link.spanId);
-          const attributes = TraceRequestUtils.normalizeOtlpAttributes(
-            link.attributes,
-          );
-
-          return { traceId, spanId, attributes };
-        }),
+      events: normalizeOtlpSpanEvents(otlpSpan.events),
+      links: normalizeOtlpSpanLinks(otlpSpan.links),
 
       droppedAttributesCount: 0,
       droppedEventsCount: 0,

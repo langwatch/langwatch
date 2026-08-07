@@ -166,6 +166,41 @@ function evalRollupAggExpression(
   }
 }
 
+/**
+ * Build the `<expr> AS <alias>` select fragment for one series. Split out of
+ * `buildEvalRollupTimeseriesQuery` — this is the per-series validation +
+ * aggregation-expression assembly, called once per entry in `input.series`.
+ */
+function buildEvalRollupSeriesSelectExpr(
+  s: AnalyticsTimeseriesBuilderInput["series"][number],
+  index: number,
+): string {
+  if (!isEvalRollupMetricKey(s.metric)) {
+    throw new Error(
+      `Eval rollup builder cannot serve metric "${s.metric}". The router should have routed this to slim or evaluation_runs.`,
+    );
+  }
+  if (!isEvalRollupAggregation(s.aggregation)) {
+    throw new Error(
+      `Eval rollup builder cannot serve aggregation "${s.aggregation}". Percentiles + uniq go to slim.`,
+    );
+  }
+  if (s.key !== undefined) {
+    throw new Error(
+      `Eval rollup builder cannot serve series with key="${s.key}" — the router should have routed this to slim or evaluation_runs (no EvaluatorId column on evaluation_analytics_rollup; see migration 00039).`,
+    );
+  }
+  const alias = buildMetricAlias({
+    index,
+    metric: s.metric,
+    aggregation: s.aggregation,
+    key: s.key,
+    subkey: s.subkey,
+  });
+  const expr = evalRollupAggExpression(s.metric, s.aggregation);
+  return `${expr} AS ${alias}`;
+}
+
 export function buildEvalRollupTimeseriesQuery(
   input: AnalyticsTimeseriesBuilderInput,
 ): BuiltAnalyticsQuery {
@@ -196,31 +231,7 @@ export function buildEvalRollupTimeseriesQuery(
   // expressed here. The router must therefore keep keyed eval series off the
   // rollup; see `rollupHandlesSeries` in `routing/route-table.ts`.
   for (let i = 0; i < input.series.length; i++) {
-    const s = input.series[i]!;
-    if (!isEvalRollupMetricKey(s.metric)) {
-      throw new Error(
-        `Eval rollup builder cannot serve metric "${s.metric}". The router should have routed this to slim or evaluation_runs.`,
-      );
-    }
-    if (!isEvalRollupAggregation(s.aggregation)) {
-      throw new Error(
-        `Eval rollup builder cannot serve aggregation "${s.aggregation}". Percentiles + uniq go to slim.`,
-      );
-    }
-    if (s.key !== undefined) {
-      throw new Error(
-        `Eval rollup builder cannot serve series with key="${s.key}" — the router should have routed this to slim or evaluation_runs (no EvaluatorId column on evaluation_analytics_rollup; see migration 00039).`,
-      );
-    }
-    const alias = buildMetricAlias({
-      index: i,
-      metric: s.metric,
-      aggregation: s.aggregation,
-      key: s.key,
-      subkey: s.subkey,
-    });
-    const expr = evalRollupAggExpression(s.metric, s.aggregation);
-    selectExprs.push(`${expr} AS ${alias}`);
+    selectExprs.push(buildEvalRollupSeriesSelectExpr(input.series[i]!, i));
   }
 
   const groupByExprs: string[] = ["period"];

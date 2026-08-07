@@ -15,17 +15,18 @@ import { walkAST } from "./walk";
  * 422. Returning the error here lets the SearchBar surface red-border feedback
  * and prevents the doomed query from being committed and re-fired by polling.
  */
+function validateTagAst(
+  ast: Extract<LiqeQuery, { type: "Tag" }>,
+): string | null {
+  if (ast.expression.type !== "EmptyExpression") return null;
+  const fieldName = ast.field.type === "ImplicitField" ? "" : ast.field.name;
+  return fieldName
+    ? `Missing value after \`${fieldName}:\``
+    : "Missing value after `:`";
+}
+
 export function validateAst(ast: LiqeQuery): string | null {
-  if (ast.type === "Tag") {
-    if (ast.expression.type === "EmptyExpression") {
-      const fieldName =
-        ast.field.type === "ImplicitField" ? "" : ast.field.name;
-      return fieldName
-        ? `Missing value after \`${fieldName}:\``
-        : "Missing value after `:`";
-    }
-    return null;
-  }
+  if (ast.type === "Tag") return validateTagAst(ast);
   if (ast.type === "UnaryOperator") return validateAst(ast.operand);
   if (ast.type === "LogicalExpression") {
     return validateAst(ast.left) ?? validateAst(ast.right);
@@ -40,6 +41,15 @@ export function validateAst(ast: LiqeQuery): string | null {
  * Walk the AST and extract all Tag nodes for a given field name.
  * Returns include (non-negated) and exclude (negated) values.
  */
+/** The literal value of a Tag matching `fieldName`, or null when the node doesn't match. */
+function facetTagValue(node: LiqeQuery, fieldName: string): string | null {
+  if (node.type !== "Tag") return null;
+  if (node.field.type === "ImplicitField") return null;
+  if (node.field.name !== fieldName) return null;
+  if (node.expression.type !== "LiteralExpression") return null;
+  return String(node.expression.value);
+}
+
 export function getFacetValues(
   ast: LiqeQuery,
   fieldName: string,
@@ -48,11 +58,8 @@ export function getFacetValues(
   const exclude: string[] = [];
 
   walkAST(ast, (node, negated) => {
-    if (node.type !== "Tag") return;
-    if (node.field.type === "ImplicitField") return;
-    if (node.field.name !== fieldName) return;
-    if (node.expression.type !== "LiteralExpression") return;
-    const value = String(node.expression.value);
+    const value = facetTagValue(node, fieldName);
+    if (value === null) return;
     if (negated) {
       exclude.push(value);
     } else {
@@ -99,6 +106,39 @@ export function buildFacetStateLookup(
   return map;
 }
 
+/** The `{ from?, to? }` bounds a literal comparison operator carries, or null. */
+function deriveRangeFromComparison(
+  op: string,
+  raw: unknown,
+): { from?: number; to?: number } | null {
+  if (op === ":") return null;
+  const num = typeof raw === "number" ? raw : parseFloat(String(raw));
+  if (!Number.isFinite(num)) return null;
+  if (op === ":>" || op === ":>=") return { from: num };
+  if (op === ":<" || op === ":<=") return { to: num };
+  return null;
+}
+
+/** The range/comparison bounds carried by a Tag matching `fieldName`, or null. */
+function deriveRangeFromTag(
+  node: LiqeQuery,
+  fieldName: string,
+): { from?: number; to?: number } | null {
+  if (node.type !== "Tag") return null;
+  if (node.field.type === "ImplicitField") return null;
+  if (node.field.name !== fieldName) return null;
+
+  if (node.expression.type === "RangeExpression") {
+    return { from: node.expression.range.min, to: node.expression.range.max };
+  }
+
+  if (node.expression.type !== "LiteralExpression") return null;
+  return deriveRangeFromComparison(
+    node.operator.operator,
+    node.expression.value,
+  );
+}
+
 /**
  * Get a range value for a field. Last matching node wins — the AST is
  * expected to hold a single range/comparison per field after a setRange call.
@@ -111,26 +151,8 @@ export function getRangeValue(
 
   walkAST(ast, (node, negated) => {
     if (negated) return;
-    if (node.type !== "Tag") return;
-    if (node.field.type === "ImplicitField") return;
-    if (node.field.name !== fieldName) return;
-
-    if (node.expression.type === "RangeExpression") {
-      result = {
-        from: node.expression.range.min,
-        to: node.expression.range.max,
-      };
-      return;
-    }
-
-    if (node.expression.type !== "LiteralExpression") return;
-    const op = node.operator.operator;
-    if (op === ":") return;
-    const raw = node.expression.value;
-    const num = typeof raw === "number" ? raw : parseFloat(String(raw));
-    if (!Number.isFinite(num)) return;
-    if (op === ":>" || op === ":>=") result = { from: num };
-    else if (op === ":<" || op === ":<=") result = { to: num };
+    const derived = deriveRangeFromTag(node, fieldName);
+    if (derived) result = derived;
   });
 
   return result;
@@ -194,6 +216,62 @@ function memberKey(field: string, value: string): string {
   return `${field}|${value}`;
 }
 
+interface OrGroupsState {
+  groups: OrGroup[];
+  memberToGroupId: Map<string, string>;
+  fieldToGroupIds: Map<string, string[]>;
+}
+
+/** Record a located OR group and index its members/fields into `state`. */
+function recordOrGroup(
+  node: Extract<LiqeQuery, { type: "LogicalExpression" }>,
+  members: OrGroupMember[],
+  state: OrGroupsState,
+): void {
+  const id = `or-${node.location.start}-${node.location.end}`;
+  const fields = new Set(members.map((m) => m.field));
+  state.groups.push({
+    id,
+    fields,
+    members,
+    start: node.location.start,
+    end: node.location.end,
+  });
+  for (const m of members) {
+    state.memberToGroupId.set(memberKey(m.field, m.value), id);
+  }
+  for (const f of fields) {
+    const existing = state.fieldToGroupIds.get(f);
+    if (existing) {
+      if (!existing.includes(id)) existing.push(id);
+    } else {
+      state.fieldToGroupIds.set(f, [id]);
+    }
+  }
+}
+
+function visitForOrGroups(node: LiqeQuery, state: OrGroupsState): void {
+  if (node.type === "LogicalExpression") {
+    if (node.operator.operator === "OR") {
+      const members = collectOrMembers(node);
+      if (members.length > 1) {
+        recordOrGroup(node, members, state);
+        return;
+      }
+    }
+    visitForOrGroups(node.left, state);
+    visitForOrGroups(node.right, state);
+    return;
+  }
+  if (node.type === "UnaryOperator") {
+    visitForOrGroups(node.operand, state);
+    return;
+  }
+  if (node.type === "ParenthesizedExpression") {
+    visitForOrGroups(node.expression, state);
+  }
+}
+
 /**
  * Walk the AST and produce a structured map of every OR group. A
  * group is any `LogicalExpression` (op = OR) with two or more Tag
@@ -206,53 +284,33 @@ function memberKey(field: string, value: string): string {
  * distinguish `(a OR b OR c)` from `((a OR b) OR c)`.
  */
 export function analyzeOrGroups(ast: LiqeQuery): OrGroupAnalysis {
-  const groups: OrGroup[] = [];
-  const memberToGroupId = new Map<string, string>();
-  const fieldToGroupIds = new Map<string, string[]>();
-
-  const visit = (node: LiqeQuery): void => {
-    if (node.type === "LogicalExpression") {
-      if (node.operator.operator === "OR") {
-        const members = collectOrMembers(node);
-        if (members.length > 1) {
-          const id = `or-${node.location.start}-${node.location.end}`;
-          const fields = new Set(members.map((m) => m.field));
-          groups.push({
-            id,
-            fields,
-            members,
-            start: node.location.start,
-            end: node.location.end,
-          });
-          for (const m of members) {
-            memberToGroupId.set(memberKey(m.field, m.value), id);
-          }
-          for (const f of fields) {
-            const existing = fieldToGroupIds.get(f);
-            if (existing) {
-              if (!existing.includes(id)) existing.push(id);
-            } else {
-              fieldToGroupIds.set(f, [id]);
-            }
-          }
-          return;
-        }
-      }
-      visit(node.left);
-      visit(node.right);
-      return;
-    }
-    if (node.type === "UnaryOperator") {
-      visit(node.operand);
-      return;
-    }
-    if (node.type === "ParenthesizedExpression") {
-      visit(node.expression);
-    }
+  const state: OrGroupsState = {
+    groups: [],
+    memberToGroupId: new Map<string, string>(),
+    fieldToGroupIds: new Map<string, string[]>(),
   };
-  visit(ast);
 
-  return { groups, memberToGroupId, fieldToGroupIds };
+  visitForOrGroups(ast, state);
+
+  return state;
+}
+
+/** The single-Tag OR member `node` represents, or [] when it can't be one. */
+function tagToOrMember(
+  node: Extract<LiqeQuery, { type: "Tag" }>,
+  negated: boolean,
+): OrGroupMember[] {
+  if (node.field.type === "ImplicitField") return [];
+  if (node.expression.type !== "LiteralExpression") return [];
+  return [
+    {
+      field: (node.field as { name: string }).name,
+      value: String(node.expression.value),
+      negated,
+      start: node.location.start,
+      end: node.location.end,
+    },
+  ];
 }
 
 function collectOrMembers(node: LiqeQuery, negated = false): OrGroupMember[] {
@@ -278,17 +336,7 @@ function collectOrMembers(node: LiqeQuery, negated = false): OrGroupMember[] {
     return collectOrMembers(node.operand, negated !== isNeg);
   }
   if (node.type === "Tag") {
-    if (node.field.type === "ImplicitField") return [];
-    if (node.expression.type !== "LiteralExpression") return [];
-    return [
-      {
-        field: (node.field as { name: string }).name,
-        value: String(node.expression.value),
-        negated,
-        start: node.location.start,
-        end: node.location.end,
-      },
-    ];
+    return tagToOrMember(node, negated);
   }
   return [];
 }

@@ -220,6 +220,101 @@ export interface CompatRouter {
   isFallback: boolean;
 }
 
+// For query-only strings ("?foo=bar"), strip route param keys that
+// leaked in from router.query spreads. Components do:
+//   router.replace("?" + qs.stringify({ ...router.query, newKey: "val" }))
+// which includes route params like `project` in the query string.
+function stripRouteParamsFromQueryOnlyUrl({
+  url,
+  routeParamKeys,
+  effectivePathname,
+}: {
+  url: string;
+  routeParamKeys?: Set<string>;
+  effectivePathname: string;
+}): string {
+  if (!url.startsWith("?") || !routeParamKeys?.size) return url;
+  const searchParams = new URLSearchParams(url.slice(1));
+  for (const key of routeParamKeys) {
+    searchParams.delete(key);
+  }
+  const cleaned = searchParams.toString();
+  return cleaned ? `?${cleaned}` : effectivePathname;
+}
+
+// Resolve Next.js-style [param] and [[...param]] in pathname using query values.
+// Components do router.push({ pathname: router.pathname, query: {...} }) where
+// router.pathname is "/[project]/messages". We need to replace [project] with
+// the actual value from query before navigating.
+function resolvePathPlaceholders(
+  pathname: string,
+  query: Record<string, any>,
+  resolvedKeys: Set<string>,
+): string {
+  return pathname
+    .replace(/\[\[\.\.\.(\w+)\]\]/g, (_match, key) => {
+      resolvedKeys.add(key);
+      const val = query[key];
+      if (Array.isArray(val)) return val.join("/");
+      return val != null ? String(val) : "";
+    })
+    .replace(/\[(\w+)\]/g, (_match, key) => {
+      resolvedKeys.add(key);
+      const val = query[key];
+      return val != null ? String(Array.isArray(val) ? val[0] : val) : "";
+    });
+}
+
+// Replace [param] placeholders in pathname with values from query.
+// resolvePathname returns Next.js-style patterns like /[project]/analytics/custom/[id],
+// but React Router needs the actual path segments.
+function substituteRouteParams(
+  pathname: string,
+  query: Record<string, any>,
+  routeParamKeys?: Set<string>,
+): string {
+  if (!routeParamKeys) return pathname;
+  let substituted = pathname;
+  for (const key of routeParamKeys) {
+    const value = query[key];
+    if (value !== undefined && value !== null) {
+      substituted = substituted.replace(`[${key}]`, String(value));
+    }
+  }
+  return substituted;
+}
+
+function appendQueryValue(
+  params: URLSearchParams,
+  key: string,
+  value: unknown,
+): void {
+  if (Array.isArray(value)) {
+    for (const v of value) params.append(key, String(v));
+  } else {
+    params.set(key, String(value));
+  }
+}
+
+function buildQueryString({
+  query,
+  routeParamKeys,
+  resolvedKeys,
+}: {
+  query: Record<string, any>;
+  routeParamKeys?: Set<string>;
+  resolvedKeys: Set<string>;
+}): string {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(query)) {
+    if (value === undefined || value === null) continue;
+    // Skip route params and resolved [param] keys — they're in the URL path
+    if (routeParamKeys?.has(key) || resolvedKeys.has(key)) continue;
+    appendQueryValue(params, key, value);
+  }
+  return params.toString();
+}
+
 /** @internal Exported for testing only */
 export function buildUrl(
   url: string | { pathname?: string; query?: Record<string, any> },
@@ -232,70 +327,26 @@ export function buildUrl(
   // wrong under MemoryRouter / race conditions.
   const effectivePathname = currentPathname ?? window.location.pathname;
   if (typeof url === "string") {
-    // For query-only strings ("?foo=bar"), strip route param keys that
-    // leaked in from router.query spreads. Components do:
-    //   router.replace("?" + qs.stringify({ ...router.query, newKey: "val" }))
-    // which includes route params like `project` in the query string.
-    if (url.startsWith("?") && routeParamKeys?.size) {
-      const searchParams = new URLSearchParams(url.slice(1));
-      for (const key of routeParamKeys) {
-        searchParams.delete(key);
-      }
-      const cleaned = searchParams.toString();
-      return cleaned ? `?${cleaned}` : effectivePathname;
-    }
-    return url;
+    return stripRouteParamsFromQueryOnlyUrl({
+      url,
+      routeParamKeys,
+      effectivePathname,
+    });
   }
   // If pathname is omitted, use the current URL path (Next.js behavior)
   let pathname = url.pathname ?? effectivePathname;
   const { query } = url;
 
-  // Resolve Next.js-style [param] and [[...param]] in pathname using query values.
-  // Components do router.push({ pathname: router.pathname, query: {...} }) where
-  // router.pathname is "/[project]/messages". We need to replace [project] with
-  // the actual value from query before navigating.
   const resolvedKeys = new Set<string>();
   if (query && pathname.includes("[")) {
-    pathname = pathname
-      .replace(/\[\[\.\.\.(\w+)\]\]/g, (_match, key) => {
-        resolvedKeys.add(key);
-        const val = query[key];
-        if (Array.isArray(val)) return val.join("/");
-        return val != null ? String(val) : "";
-      })
-      .replace(/\[(\w+)\]/g, (_match, key) => {
-        resolvedKeys.add(key);
-        const val = query[key];
-        return val != null ? String(Array.isArray(val) ? val[0] : val) : "";
-      });
+    pathname = resolvePathPlaceholders(pathname, query, resolvedKeys);
   }
 
   if (!query || Object.keys(query).length === 0) return pathname;
 
-  // Replace [param] placeholders in pathname with values from query.
-  // resolvePathname returns Next.js-style patterns like /[project]/analytics/custom/[id],
-  // but React Router needs the actual path segments.
-  if (routeParamKeys) {
-    for (const key of routeParamKeys) {
-      const value = query[key];
-      if (value !== undefined && value !== null) {
-        pathname = pathname.replace(`[${key}]`, String(value));
-      }
-    }
-  }
+  pathname = substituteRouteParams(pathname, query, routeParamKeys);
 
-  const params = new URLSearchParams();
-  for (const [key, value] of Object.entries(query)) {
-    if (value === undefined || value === null) continue;
-    // Skip route params and resolved [param] keys — they're in the URL path
-    if (routeParamKeys?.has(key) || resolvedKeys.has(key)) continue;
-    if (Array.isArray(value)) {
-      for (const v of value) params.append(key, String(v));
-    } else {
-      params.set(key, String(value));
-    }
-  }
-  const qs = params.toString();
+  const qs = buildQueryString({ query, routeParamKeys, resolvedKeys });
   return qs ? `${pathname}?${qs}` : pathname;
 }
 
@@ -320,21 +371,30 @@ export function setRouterInstance(r: ImperativeRouter) {
   _routerInstance = r;
 }
 
+// A repeated key accumulates into an array, matching Next.js query semantics.
+function mergeQueryValue(
+  query: Record<string, string | string[] | undefined>,
+  key: string,
+  value: string,
+): void {
+  const existing = query[key];
+  if (existing !== undefined) {
+    if (Array.isArray(existing)) {
+      existing.push(value);
+    } else {
+      query[key] = [existing as string, value];
+    }
+  } else {
+    query[key] = value;
+  }
+}
+
 class RouterSingleton {
   get query(): Record<string, string | string[] | undefined> {
     const params = new URLSearchParams(window.location.search);
     const query: Record<string, string | string[] | undefined> = {};
     params.forEach((value, key) => {
-      const existing = query[key];
-      if (existing !== undefined) {
-        if (Array.isArray(existing)) {
-          existing.push(value);
-        } else {
-          query[key] = [existing as string, value];
-        }
-      } else {
-        query[key] = value;
-      }
+      mergeQueryValue(query, key, value);
     });
     return query;
   }
@@ -411,6 +471,66 @@ class RouterSingleton {
 const Router = new RouterSingleton();
 export default Router;
 
+type RouteParams = Readonly<Record<string, string | undefined>>;
+
+// Merge route params and search params into query object (Next.js style)
+function routeParamsToQuery(
+  params: RouteParams,
+): Record<string, string | string[] | undefined> {
+  const query: Record<string, string | string[] | undefined> = {
+    ...params,
+  };
+  // Convert React Router catch-all (*) to Next.js-style array param (path)
+  if (query["*"] !== undefined) {
+    const catchAll = query["*"] as string;
+    query.path = catchAll ? catchAll.split("/") : [];
+    delete query["*"];
+  }
+  return query;
+}
+
+// Track which keys come from route params so we don't double-merge them.
+// Include "path" (the renamed catch-all) so it's filtered from query strings.
+function toRouteParamKeys(params: RouteParams): Set<string> {
+  const keys = new Set(Object.keys(params));
+  if (keys.has("*")) {
+    keys.delete("*");
+    keys.add("path");
+  }
+  return keys;
+}
+
+function mergeSearchParamsIntoQuery({
+  query,
+  searchParams,
+  routeParamKeys,
+}: {
+  query: Record<string, string | string[] | undefined>;
+  searchParams: URLSearchParams;
+  routeParamKeys: Set<string>;
+}): void {
+  searchParams.forEach((value, key) => {
+    // Skip search params that shadow route params — the route param
+    // already has the canonical value. Without this guard, `project`
+    // (a route param) leaks into the query string and accumulates
+    // on every navigation (`project=x&project[0]=x&project[1]=x`).
+    if (routeParamKeys.has(key)) return;
+    mergeQueryValue(query, key, value);
+  });
+}
+
+function toAsPath(location: {
+  pathname?: string;
+  search?: string;
+  hash?: string;
+}): string {
+  return (
+    (location.pathname ?? "/") +
+    (location.search ? location.search : "") +
+    (location.hash ? location.hash : "")
+  );
+}
+
 export function useRouter(): CompatRouter {
   const navigate = useNavigate();
   const location = useLocation();
@@ -425,54 +545,19 @@ export function useRouter(): CompatRouter {
   }, [location.pathname, location.search]);
 
   return useMemo(() => {
-    // Merge route params and search params into query object (Next.js style)
-    const query: Record<string, string | string[] | undefined> = {
-      ...params,
-    };
-    // Convert React Router catch-all (*) to Next.js-style array param (path)
-    if (query["*"] !== undefined) {
-      const catchAll = query["*"] as string;
-      query.path = catchAll ? catchAll.split("/") : [];
-      delete query["*"];
-    }
-    // Track which keys come from route params so we don't double-merge them.
-    // Include "path" (the renamed catch-all) so it's filtered from query strings.
-    const routeParamKeySet = new Set(Object.keys(params));
-    if (routeParamKeySet.has("*")) {
-      routeParamKeySet.delete("*");
-      routeParamKeySet.add("path");
-    }
-    searchParams.forEach((value, key) => {
-      // Skip search params that shadow route params — the route param
-      // already has the canonical value. Without this guard, `project`
-      // (a route param) leaks into the query string and accumulates
-      // on every navigation (`project=x&project[0]=x&project[1]=x`).
-      if (routeParamKeySet.has(key)) return;
-      const existing = query[key];
-      if (existing !== undefined) {
-        if (Array.isArray(existing)) {
-          existing.push(value);
-        } else {
-          query[key] = [existing as string, value];
-        }
-      } else {
-        query[key] = value;
-      }
+    const query = routeParamsToQuery(params);
+    mergeSearchParamsIntoQuery({
+      query,
+      searchParams,
+      routeParamKeys: toRouteParamKeys(params),
     });
 
     const pathname = resolvePathname(location.pathname) ?? location.pathname;
-    const asPath =
-      (location.pathname ?? "/") +
-      (location.search ? location.search : "") +
-      (location.hash ? location.hash : "");
+    const asPath = toAsPath(location);
 
     // Track which keys are route params (vs query string params).
     // Mirror the * → path rename so buildUrl filters "path" from query strings.
-    const routeParamKeys = new Set(Object.keys(params));
-    if (routeParamKeys.has("*")) {
-      routeParamKeys.delete("*");
-      routeParamKeys.add("path");
-    }
+    const routeParamKeys = toRouteParamKeys(params);
 
     return {
       query,

@@ -57,6 +57,115 @@ export interface LlmConfigWithLatestVersion extends LlmPromptConfig {
   } | null;
 }
 
+type NormalizedConfigData = LatestConfigVersionSchema["configData"];
+
+/**
+ * Narrows a version lookup to a specific version number or version id.
+ * Specifying both is a caller mistake and is rejected.
+ */
+const buildVersionSelector = (params: {
+  version?: number;
+  versionId?: string;
+}): Prisma.LlmPromptConfigVersionWhereInput => {
+  const where: Prisma.LlmPromptConfigVersionWhereInput = {};
+
+  if (params.version) {
+    where.version = params.version;
+  }
+
+  if (params.versionId) {
+    where.id = params.versionId;
+  }
+
+  if (params.version && params.versionId) {
+    throw new Error("Cannot specify both version and versionId");
+  }
+
+  return where;
+};
+
+const missingVersionError = (params: {
+  idOrHandle: string;
+  version?: number;
+  versionId?: string;
+}): NotFoundError => {
+  if (params.version) {
+    return new NotFoundError(
+      `Prompt version ${params.version} not found for prompt ${params.idOrHandle}`,
+    );
+  }
+  if (params.versionId) {
+    return new NotFoundError(
+      `Prompt version ID ${params.versionId} not found for prompt ${params.idOrHandle}`,
+    );
+  }
+  return new NotFoundError(
+    `Prompt config has no versions. ID: ${params.idOrHandle}`,
+  );
+};
+
+const collectValidationFailures = (
+  parseResult1: { success: boolean; error?: { message: string } },
+  parseResult2: { success: boolean; error?: { message: string } },
+): string[] => {
+  const differences: string[] = [];
+  if (!parseResult1.success) {
+    differences.push(
+      "config1 validation failed: " + parseResult1.error?.message,
+    );
+  }
+  if (!parseResult2.success) {
+    differences.push(
+      "config2 validation failed: " + parseResult2.error?.message,
+    );
+  }
+  return differences;
+};
+
+// Enhanced difference detection using normalized configs
+// TODO: move this to a more git diff kinda of approach
+const collectConfigDifferences = (
+  normalized1: NormalizedConfigData,
+  normalized2: NormalizedConfigData,
+): string[] => {
+  const differences: string[] = [];
+
+  if (normalized1.model !== normalized2.model) {
+    differences.push(`model: ${normalized1.model} → ${normalized2.model}`);
+  }
+  if (normalized1.prompt !== normalized2.prompt) {
+    differences.push("prompt content differs");
+  }
+  if (
+    JSON.stringify(normalized1.messages) !==
+    JSON.stringify(normalized2.messages)
+  ) {
+    differences.push("messages differ");
+  }
+  if (
+    JSON.stringify(normalized1.inputs) !== JSON.stringify(normalized2.inputs)
+  ) {
+    differences.push("inputs differ");
+  }
+  if (
+    JSON.stringify(normalized1.outputs) !== JSON.stringify(normalized2.outputs)
+  ) {
+    differences.push("outputs differ");
+  }
+  if (normalized1.temperature !== normalized2.temperature) {
+    differences.push(
+      `temperature: ${normalized1.temperature} → ${normalized2.temperature}`,
+    );
+  }
+  if (normalized1.max_tokens !== normalized2.max_tokens) {
+    differences.push(
+      `max_tokens: ${normalized1.max_tokens} → ${normalized2.max_tokens}`,
+    );
+  }
+
+  return differences;
+};
+
 /**
  * Repository for managing LLM Configurations
  * Follows Single Responsibility Principle by focusing only on LLM config data access
@@ -145,6 +254,48 @@ export class LlmConfigRepository {
   }
 
   /**
+   * Matches a config either by raw id or by its fully qualified handle, at
+   * project level or (for org-scoped prompts) at organization level.
+   */
+  private idOrHandleAlternatives(params: {
+    idOrHandle: string;
+    projectId: string;
+    organizationId: string;
+  }): Prisma.LlmPromptConfigWhereInput[] {
+    const { idOrHandle, projectId, organizationId } = params;
+
+    return [
+      {
+        projectId,
+        OR: [
+          { id: idOrHandle },
+          {
+            handle: this.createHandle({
+              handle: idOrHandle,
+              scope: "PROJECT",
+              projectId,
+            }),
+          },
+        ],
+      },
+      {
+        organizationId,
+        scope: "ORGANIZATION",
+        OR: [
+          { id: idOrHandle },
+          {
+            handle: this.createHandle({
+              handle: idOrHandle,
+              scope: "ORGANIZATION",
+              organizationId,
+            }),
+          },
+        ],
+      },
+    ];
+  }
+
+  /**
    * Get prompt by id or handle
    */
   async getPromptByIdOrHandle(params: {
@@ -156,35 +307,11 @@ export class LlmConfigRepository {
 
     return await this.prisma.llmPromptConfig.findFirst({
       where: {
-        OR: [
-          {
-            projectId,
-            OR: [
-              { id: idOrHandle },
-              {
-                handle: this.createHandle({
-                  handle: idOrHandle,
-                  scope: "PROJECT",
-                  projectId,
-                }),
-              },
-            ],
-          },
-          {
-            organizationId,
-            scope: "ORGANIZATION",
-            OR: [
-              { id: idOrHandle },
-              {
-                handle: this.createHandle({
-                  handle: idOrHandle,
-                  scope: "ORGANIZATION",
-                  organizationId,
-                }),
-              },
-            ],
-          },
-        ],
+        OR: this.idOrHandleAlternatives({
+          idOrHandle,
+          projectId,
+          organizationId,
+        }),
       },
     });
   }
@@ -200,52 +327,16 @@ export class LlmConfigRepository {
     versionId?: string;
   }): Promise<LlmConfigWithLatestVersion | null> {
     const { idOrHandle, projectId, organizationId } = params;
-    const where: Prisma.LlmPromptConfigVersionWhereInput = {};
-
-    if (params.version) {
-      where.version = params.version;
-    }
-
-    if (params.versionId) {
-      where.id = params.versionId;
-    }
-
-    if (params.version && params.versionId) {
-      throw new Error("Cannot specify both version and versionId");
-    }
+    const where = buildVersionSelector(params);
 
     const config = await this.prisma.llmPromptConfig.findFirst({
       where: {
         deletedAt: null,
-        OR: [
-          {
-            projectId,
-            OR: [
-              { id: idOrHandle },
-              {
-                handle: this.createHandle({
-                  handle: idOrHandle,
-                  scope: "PROJECT",
-                  projectId,
-                }),
-              },
-            ],
-          },
-          {
-            organizationId,
-            scope: "ORGANIZATION",
-            OR: [
-              { id: idOrHandle },
-              {
-                handle: this.createHandle({
-                  handle: idOrHandle,
-                  scope: "ORGANIZATION",
-                  organizationId,
-                }),
-              },
-            ],
-          },
-        ],
+        OR: this.idOrHandleAlternatives({
+          idOrHandle,
+          projectId,
+          organizationId,
+        }),
       },
       include: {
         versions: {
@@ -262,19 +353,7 @@ export class LlmConfigRepository {
 
     // This should never happen, but if it does, we want to know about it
     if (!config.versions[0]) {
-      if (params.version) {
-        throw new NotFoundError(
-          `Prompt version ${params.version} not found for prompt ${idOrHandle}`,
-        );
-      } else if (params.versionId) {
-        throw new NotFoundError(
-          `Prompt version ID ${params.versionId} not found for prompt ${idOrHandle}`,
-        );
-      } else {
-        throw new NotFoundError(
-          `Prompt config has no versions. ID: ${idOrHandle}`,
-        );
-      }
+      throw missingVersionError(params);
     }
 
     config.handle = this.removeHandlePrefixes(
@@ -498,48 +577,11 @@ export class LlmConfigRepository {
           scope: configData.scope,
         },
       });
-      // Resolve the project's DEFAULT model via the cascade, but only on
-      // the paths that actually need one: no version data at all, or a
-      // version without a model. A prompt that ships its own model, like
-      // every prompt pushed by the CLI's sync, must not require the
-      // project to have a default model configured. We let
-      // ModelNotConfiguredError propagate so the missing-model toast
-      // fires; only swallow resolver-internal crashes and fall back to
-      // DEFAULT_MODEL as a last-resort placeholder.
-      const resolveDefaultModel = async (): Promise<string> => {
-        try {
-          const resolved = await resolveModelForFeature(
-            "prompt.create_default",
-            { prisma: this.prisma, projectId: configData.projectId },
-          );
-          return resolved.model;
-        } catch (err) {
-          if (err instanceof ModelNotConfiguredError) throw err;
-          return DEFAULT_MODEL;
-        }
-      };
 
-      // Set the version data to the provided version data, or undefined if no version data is provided.
-      let newVersionData: Partial<CreateLlmConfigVersionParams> | undefined =
-        versionData;
-
-      // If no version data is provided, we'll create a default (draft) version.
-      if (!newVersionData) {
-        const configData = this.buildDefaultVersionConfigData({
-          model: await resolveDefaultModel(),
-        });
-
-        newVersionData = {
-          configData,
-          schemaVersion: LATEST_SCHEMA_VERSION,
-          commitMessage: "Initial version",
-        };
-      }
-
-      // Ensure a model is set if configData is provided
-      if (newVersionData.configData && !newVersionData.configData.model) {
-        newVersionData.configData.model = await resolveDefaultModel();
-      }
+      const newVersionData = await this.resolveInitialVersionData({
+        versionData,
+        projectId: configData.projectId,
+      });
 
       const newVersion = await tx.llmPromptConfigVersion.create({
         data: {
@@ -578,6 +620,64 @@ export class LlmConfigRepository {
         },
       };
     });
+  }
+
+  /**
+   * Resolve the project's DEFAULT model via the cascade, but only on
+   * the paths that actually need one: no version data at all, or a
+   * version without a model. A prompt that ships its own model, like
+   * every prompt pushed by the CLI's sync, must not require the
+   * project to have a default model configured. We let
+   * ModelNotConfiguredError propagate so the missing-model toast
+   * fires; only swallow resolver-internal crashes and fall back to
+   * DEFAULT_MODEL as a last-resort placeholder.
+   */
+  private async resolveDefaultModel(projectId: string): Promise<string> {
+    try {
+      const resolved = await resolveModelForFeature("prompt.create_default", {
+        prisma: this.prisma,
+        projectId,
+      });
+      return resolved.model;
+    } catch (err) {
+      if (err instanceof ModelNotConfiguredError) throw err;
+      return DEFAULT_MODEL;
+    }
+  }
+
+  /**
+   * The version data the initial version is created from: the caller's own
+   * data when given, otherwise a default (draft) version.
+   */
+  private async resolveInitialVersionData(params: {
+    versionData?: Partial<CreateLlmConfigVersionParams>;
+    projectId: string;
+  }): Promise<Partial<CreateLlmConfigVersionParams>> {
+    // Set the version data to the provided version data, or undefined if no version data is provided.
+    let newVersionData: Partial<CreateLlmConfigVersionParams> | undefined =
+      params.versionData;
+
+    // If no version data is provided, we'll create a default (draft) version.
+    if (!newVersionData) {
+      const configData = this.buildDefaultVersionConfigData({
+        model: await this.resolveDefaultModel(params.projectId),
+      });
+
+      newVersionData = {
+        configData,
+        schemaVersion: LATEST_SCHEMA_VERSION,
+        commitMessage: "Initial version",
+      };
+    }
+
+    // Ensure a model is set if configData is provided
+    if (newVersionData.configData && !newVersionData.configData.model) {
+      newVersionData.configData.model = await this.resolveDefaultModel(
+        params.projectId,
+      );
+    }
+
+    return newVersionData;
   }
 
   /**
@@ -705,98 +805,7 @@ export class LlmConfigRepository {
     config2: unknown,
   ): { isEqual: boolean; differences?: string[] } {
     try {
-      // Get the configData schema for normalization
-      const schemaValidator = getSchemaValidator(SchemaVersion.V1_0);
-      const configDataSchema = schemaValidator.shape.configData;
-
-      // Normalize both configs using Zod parsing - this ensures:
-      // 1. Consistent field ordering
-      // 2. Type coercion and validation
-      // 3. Removal of extra fields not in schema
-      // 4. Default value application
-      const parseResult1 = configDataSchema.safeParse(config1);
-      const parseResult2 = configDataSchema.safeParse(config2);
-
-      // If either config fails validation, they can't be equal
-      if (!parseResult1.success || !parseResult2.success) {
-        const differences: string[] = [];
-        if (!parseResult1.success) {
-          differences.push(
-            "config1 validation failed: " + parseResult1.error.message,
-          );
-        }
-        if (!parseResult2.success) {
-          differences.push(
-            "config2 validation failed: " + parseResult2.error.message,
-          );
-        }
-        return { isEqual: false, differences };
-      }
-
-      const normalized1 = parseResult1.data;
-      const normalized2 = parseResult2.data;
-
-      // Strip response_format before comparison — it is derived from outputs
-      // at read time and never stored in new data. Older CLIs may still send it
-      // alongside outputs, causing a false diff against the server's
-      // remoteConfigData which never includes it.
-      delete normalized1.response_format;
-      delete normalized2.response_format;
-
-      // Compare normalized configs using deterministic JSON serialization
-      // Deep-sort all keys so nested objects (messages, inputs, outputs)
-      // are compared correctly regardless of property order.
-      const json1 = JSON.stringify(sortKeysDeep(normalized1));
-      const json2 = JSON.stringify(sortKeysDeep(normalized2));
-
-      const isEqual = json1 === json2;
-
-      if (!isEqual) {
-        // Enhanced difference detection using normalized configs
-        const differences: string[] = [];
-
-        // TODO: move this to a more git diff kinda of approach
-        if (normalized1.model !== normalized2.model) {
-          differences.push(
-            `model: ${normalized1.model} → ${normalized2.model}`,
-          );
-        }
-        if (normalized1.prompt !== normalized2.prompt) {
-          differences.push("prompt content differs");
-        }
-        if (
-          JSON.stringify(normalized1.messages) !==
-          JSON.stringify(normalized2.messages)
-        ) {
-          differences.push("messages differ");
-        }
-        if (
-          JSON.stringify(normalized1.inputs) !==
-          JSON.stringify(normalized2.inputs)
-        ) {
-          differences.push("inputs differ");
-        }
-        if (
-          JSON.stringify(normalized1.outputs) !==
-          JSON.stringify(normalized2.outputs)
-        ) {
-          differences.push("outputs differ");
-        }
-        if (normalized1.temperature !== normalized2.temperature) {
-          differences.push(
-            `temperature: ${normalized1.temperature} → ${normalized2.temperature}`,
-          );
-        }
-        if (normalized1.max_tokens !== normalized2.max_tokens) {
-          differences.push(
-            `max_tokens: ${normalized1.max_tokens} → ${normalized2.max_tokens}`,
-          );
-        }
-
-        return { isEqual: false, differences };
-      }
-
-      return { isEqual: true };
+      return this.compareNormalizedConfigContent(config1, config2);
     } catch (error) {
       logger.error({ error }, "Error comparing config content");
       // If comparison fails, assume they're different
@@ -808,6 +817,58 @@ export class LlmConfigRepository {
         ],
       };
     }
+  }
+
+  private compareNormalizedConfigContent(
+    config1: unknown,
+    config2: unknown,
+  ): { isEqual: boolean; differences?: string[] } {
+    // Get the configData schema for normalization
+    const schemaValidator = getSchemaValidator(SchemaVersion.V1_0);
+    const configDataSchema = schemaValidator.shape.configData;
+
+    // Normalize both configs using Zod parsing - this ensures:
+    // 1. Consistent field ordering
+    // 2. Type coercion and validation
+    // 3. Removal of extra fields not in schema
+    // 4. Default value application
+    const parseResult1 = configDataSchema.safeParse(config1);
+    const parseResult2 = configDataSchema.safeParse(config2);
+
+    // If either config fails validation, they can't be equal
+    if (!parseResult1.success || !parseResult2.success) {
+      return {
+        isEqual: false,
+        differences: collectValidationFailures(parseResult1, parseResult2),
+      };
+    }
+
+    const normalized1 = parseResult1.data;
+    const normalized2 = parseResult2.data;
+
+    // Strip response_format before comparison — it is derived from outputs
+    // at read time and never stored in new data. Older CLIs may still send it
+    // alongside outputs, causing a false diff against the server's
+    // remoteConfigData which never includes it.
+    delete normalized1.response_format;
+    delete normalized2.response_format;
+
+    // Compare normalized configs using deterministic JSON serialization
+    // Deep-sort all keys so nested objects (messages, inputs, outputs)
+    // are compared correctly regardless of property order.
+    const json1 = JSON.stringify(sortKeysDeep(normalized1));
+    const json2 = JSON.stringify(sortKeysDeep(normalized2));
+
+    const isEqual = json1 === json2;
+
+    if (!isEqual) {
+      return {
+        isEqual: false,
+        differences: collectConfigDifferences(normalized1, normalized2),
+      };
+    }
+
+    return { isEqual: true };
   }
 
   /**

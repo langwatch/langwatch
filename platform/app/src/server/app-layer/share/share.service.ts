@@ -31,6 +31,21 @@ export function isShareViewExhausted(
   return share.maxViews != null && share.viewCount >= share.maxViews;
 }
 
+/**
+ * Sharing kill switch: effective sharing = org AND project. Off at either
+ * level makes every trace link stop resolving — indistinguishable from a
+ * bad token by design. See ADR-057.
+ */
+function isTraceSharingKillSwitched(share: ShareWithProject): boolean {
+  return (
+    share.resourceType === "TRACE" &&
+    !(
+      share.project.team.organization.traceSharingEnabled &&
+      share.project.traceSharingEnabled
+    )
+  );
+}
+
 export interface ShareViewer {
   isOrgMember: (organizationId: string) => Promise<boolean>;
   isProjectMember: (projectId: string) => Promise<boolean>;
@@ -94,18 +109,7 @@ export class ShareService {
     const share = await this.repo.findByToken(token);
     if (!share) throw new ShareLinkNotFoundError();
 
-    // Sharing kill switch: effective sharing = org AND project. Off at either
-    // level makes every trace link stop resolving — indistinguishable from a
-    // bad token by design. See ADR-057.
-    if (
-      share.resourceType === "TRACE" &&
-      !(
-        share.project.team.organization.traceSharingEnabled &&
-        share.project.traceSharingEnabled
-      )
-    ) {
-      throw new ShareLinkNotFoundError();
-    }
+    if (isTraceSharingKillSwitched(share)) throw new ShareLinkNotFoundError();
 
     // Audience before expiry: an out-of-audience viewer (including an
     // anonymous prober holding a leaked ORGANIZATION/PROJECT token) learns
@@ -119,12 +123,8 @@ export class ShareService {
     // window must not be locked out by the view THEY already consumed. That
     // is the whole point — a single-view link should survive its recipient
     // pressing refresh.
-    if (viewerKey && this.deps.viewDedupe) {
-      const isNewViewing = await this.deps.viewDedupe.isNewViewing({
-        shareId: share.id,
-        viewerKey,
-      });
-      if (!isNewViewing) return share;
+    if (viewerKey && (await this.isRepeatViewing({ share, viewerKey }))) {
+      return share;
     }
 
     // Fast path: an already-spent link answers without attempting a write. The
@@ -139,6 +139,22 @@ export class ShareService {
     if (!consumed) throw new ShareLinkExhaustedError();
 
     return share;
+  }
+
+  /**
+   * Resolves whether a `viewerKey`'s re-open falls inside the dedupe window
+   * (no `viewDedupe` configured means every request counts as a new viewing).
+   */
+  private async isRepeatViewing(params: {
+    share: ShareWithProject;
+    viewerKey: string;
+  }): Promise<boolean> {
+    if (!this.deps.viewDedupe) return false;
+    const isNewViewing = await this.deps.viewDedupe.isNewViewing({
+      shareId: params.share.id,
+      viewerKey: params.viewerKey,
+    });
+    return !isNewViewing;
   }
 
   private async checkAudience(

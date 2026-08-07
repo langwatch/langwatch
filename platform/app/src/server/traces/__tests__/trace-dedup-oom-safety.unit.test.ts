@@ -93,11 +93,17 @@ describe("trace dedup OOM safety", () => {
       traceServiceSource,
       "fetchTracesWithPagination",
     );
+    // The count/id query SQL lives in this helper now (lint-driven
+    // decomposition of fetchTracesWithPagination) — see clickhouse-trace.service.ts.
+    const paginationQueriesBody = extractMethodBody(
+      traceServiceSource,
+      "buildTracePaginationQueries",
+    );
     const summaryBody = extractMethodBody(
       traceServiceSource,
       "fetchTraceSummaryRows",
     );
-    const body = paginationBody + summaryBody;
+    const body = paginationBody + paginationQueriesBody + summaryBody;
 
     describe("when the pagination query SQL is inspected", () => {
       it("does not use LIMIT 1 BY for deduplication", () => {
@@ -119,10 +125,13 @@ describe("trace dedup OOM safety", () => {
   // clickhouse-trace.service.ts: fetchTracesWithSpansJoined
   // ---------------------------------------------------------------------------
   describe("fetchTracesWithSpansJoined()", () => {
-    const body = extractMethodBody(
-      traceServiceSource,
-      "fetchTracesWithSpansJoined",
-    );
+    // The summary/span query SQL now lives in these helpers (lint-driven
+    // decomposition of fetchTracesWithSpansJoined's runBatch closure) — see
+    // clickhouse-trace.service.ts.
+    const body =
+      extractMethodBody(traceServiceSource, "fetchTracesWithSpansJoined") +
+      extractMethodBody(traceServiceSource, "fetchJoinedSummaryRows") +
+      extractMethodBody(traceServiceSource, "fetchJoinedSpanRows");
 
     describe("when the trace summary query SQL is inspected", () => {
       it("does not use LIMIT 1 BY for trace_summaries dedup", () => {

@@ -98,6 +98,44 @@ interface WalkState {
   unsupportedFields: string[];
 }
 
+function evaluateTagNode({
+  tag,
+  negated,
+  trace,
+  state,
+}: {
+  tag: TagToken;
+  negated: boolean;
+  trace: InMemoryTrace;
+  state: WalkState;
+}): boolean | Unsupported {
+  const result = evaluateTag(tag, negated, trace);
+  if (result === UNSUPPORTED && tag.field.type !== "ImplicitField") {
+    state.unsupportedFields.push(tag.field.name);
+  }
+  return result;
+}
+
+function evaluateLogicalExpressionNode({
+  logExpr,
+  negated,
+  trace,
+  state,
+}: {
+  logExpr: LogicalExpressionToken;
+  negated: boolean;
+  trace: InMemoryTrace;
+  state: WalkState;
+}): boolean | Unsupported {
+  // Negation threads down unchanged and the operator stays as-is — the
+  // exact shape `translateNode` compiles, so both sides always agree.
+  const left = evaluateNode({ node: logExpr.left, negated, trace, state });
+  if (left === UNSUPPORTED) return UNSUPPORTED;
+  const right = evaluateNode({ node: logExpr.right, negated, trace, state });
+  if (right === UNSUPPORTED) return UNSUPPORTED;
+  return logExpr.operator.operator === "OR" ? left || right : left && right;
+}
+
 function evaluateNode({
   node,
   negated,
@@ -116,30 +154,16 @@ function evaluateNode({
     case "EmptyExpression":
       return true;
 
-    case "Tag": {
-      const tag = node as TagToken;
-      const result = evaluateTag(tag, negated, trace);
-      if (result === UNSUPPORTED && tag.field.type !== "ImplicitField") {
-        state.unsupportedFields.push(tag.field.name);
-      }
-      return result;
-    }
+    case "Tag":
+      return evaluateTagNode({ tag: node as TagToken, negated, trace, state });
 
-    case "LogicalExpression": {
-      const logExpr = node as LogicalExpressionToken;
-      // Negation threads down unchanged and the operator stays as-is — the
-      // exact shape `translateNode` compiles, so both sides always agree.
-      const left = evaluateNode({ node: logExpr.left, negated, trace, state });
-      if (left === UNSUPPORTED) return UNSUPPORTED;
-      const right = evaluateNode({
-        node: logExpr.right,
+    case "LogicalExpression":
+      return evaluateLogicalExpressionNode({
+        logExpr: node as LogicalExpressionToken,
         negated,
         trace,
         state,
       });
-      if (right === UNSUPPORTED) return UNSUPPORTED;
-      return logExpr.operator.operator === "OR" ? left || right : left && right;
-    }
 
     case "UnaryOperator": {
       const unary = node as UnaryOperatorToken;
@@ -357,6 +381,45 @@ function collectNeeds(node: LiqeQuery, needs: Set<FieldNeeds>): void {
   }
 }
 
+/**
+ * Resolve an attribute-prefixed field name to its need, mirroring
+ * `evaluateTag`'s routing order. `matched: false` means the field isn't one
+ * of the attribute-prefix forms, so the caller falls through to the
+ * has/none and `FieldDef.needs` lookups below.
+ */
+function attributePrefixNeed(
+  fieldName: string,
+): { matched: true; need?: FieldNeeds } | { matched: false } {
+  if (fieldName.startsWith(TRACE_ATTRIBUTE_PREFIX)) return { matched: true };
+  if (fieldName.startsWith(SPAN_ATTRIBUTE_PREFIX)) {
+    return { matched: true, need: "spans" };
+  }
+  if (fieldName.startsWith(EVENT_ATTRIBUTE_PREFIX)) {
+    return { matched: true, need: "events" };
+  }
+  if (fieldName.startsWith(TRACE_ATTRIBUTE_PREFIX_LEGACY)) {
+    return { matched: true };
+  }
+  if (
+    fieldName.startsWith(EVENT_ATTRIBUTE_PREFIX_LEGACY) &&
+    fieldName !== "event"
+  ) {
+    return { matched: true, need: "events" };
+  }
+  return { matched: false };
+}
+
+// has/none are value-polymorphic — resolve the referenced collection (if any)
+// from the value rather than a static `FieldDef.needs`.
+function hasNoneNeed(tag: TagToken): FieldNeeds | null {
+  try {
+    return existenceNeeds(extractStringValue(tag)) ?? null;
+  } catch {
+    // Non-literal value — nothing to resolve.
+    return null;
+  }
+}
+
 function collectTagNeeds(tag: TagToken, needs: Set<FieldNeeds>): void {
   // Free text reaches span names through a `stored_spans` subquery, so the
   // in-memory mirror needs the span rows to answer it without failing closed.
@@ -366,33 +429,15 @@ function collectTagNeeds(tag: TagToken, needs: Set<FieldNeeds>): void {
   }
   const fieldName = tag.field.name;
 
-  if (fieldName.startsWith(TRACE_ATTRIBUTE_PREFIX)) return;
-  if (fieldName.startsWith(SPAN_ATTRIBUTE_PREFIX)) {
-    needs.add("spans");
-    return;
-  }
-  if (fieldName.startsWith(EVENT_ATTRIBUTE_PREFIX)) {
-    needs.add("events");
-    return;
-  }
-  if (fieldName.startsWith(TRACE_ATTRIBUTE_PREFIX_LEGACY)) return;
-  if (
-    fieldName.startsWith(EVENT_ATTRIBUTE_PREFIX_LEGACY) &&
-    fieldName !== "event"
-  ) {
-    needs.add("events");
+  const prefixResult = attributePrefixNeed(fieldName);
+  if (prefixResult.matched) {
+    if (prefixResult.need) needs.add(prefixResult.need);
     return;
   }
 
-  // has/none are value-polymorphic — resolve the referenced collection (if any)
-  // from the value rather than a static `FieldDef.needs`.
   if (fieldName === "has" || fieldName === "none") {
-    try {
-      const need = existenceNeeds(extractStringValue(tag));
-      if (need) needs.add(need);
-    } catch {
-      // Non-literal value — nothing to resolve.
-    }
+    const need = hasNoneNeed(tag);
+    if (need) needs.add(need);
     return;
   }
 

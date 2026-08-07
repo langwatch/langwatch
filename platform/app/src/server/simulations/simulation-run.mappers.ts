@@ -104,66 +104,9 @@ export function mapClickHouseRowToScenarioRunData(
     now,
   });
 
-  const verdictEnum = mapVerdict(row.Verdict);
-
-  // Reconstruct messages from parallel Nested arrays; parse `Rest` back into fields.
-  // If `restFields.content` is an array, the message had structured AG-UI parts
-  // (e.g. inline media that was externalized by the stored-objects pipeline)
-  // and the flat Messages.Content column is empty — surface the parts array
-  // to the renderer instead.
-  const roles = row["Messages.Role"] ?? [];
-  const messages = roles.map((role, i) => {
-    const restStr = row["Messages.Rest"]?.[i];
-    const restFields = restStr
-      ? (() => {
-          try {
-            return JSON.parse(restStr) as Record<string, unknown>;
-          } catch {
-            return {};
-          }
-        })()
-      : {};
-    const { content: restContent, ...restWithoutContent } = restFields;
-    const content = Array.isArray(restContent)
-      ? restContent
-      : (row["Messages.Content"]?.[i] ?? null);
-    return {
-      ...restWithoutContent,
-      id: row["Messages.Id"]?.[i] || undefined,
-      role,
-      content,
-      trace_id: row["Messages.TraceId"]?.[i] || undefined,
-    };
-  }) as ScenarioMessages;
-
-  const metCriteria = row.MetCriteria ?? [];
-  const unmetCriteria = row.UnmetCriteria ?? [];
-
-  const results =
-    verdictEnum != null
-      ? {
-          verdict: verdictEnum,
-          reasoning: row.Reasoning ?? undefined,
-          metCriteria,
-          unmetCriteria,
-          error: row.Error ?? undefined,
-        }
-      : null;
-
-  const metadata = row.Metadata
-    ? (() => {
-        try {
-          const parsed: unknown = JSON.parse(row.Metadata);
-          return parsed != null &&
-            typeof parsed === "object" &&
-            !Array.isArray(parsed)
-            ? (parsed as Record<string, unknown>)
-            : null;
-        } catch {
-          return null;
-        }
-      })()
-    : null;
+  const messages = mapMessages(row);
+  const results = mapResults(row);
+  const metadata = parseMetadata(row.Metadata);
 
   return {
     scenarioId: row.ScenarioId,
@@ -187,13 +130,77 @@ export function mapClickHouseRowToScenarioRunData(
         ? finishedAt - startTimestamp
         : updatedAt - startTimestamp),
     totalCost: row.TotalCost ?? undefined,
-    roleCosts:
-      row.RoleCosts && Object.keys(row.RoleCosts).length > 0
-        ? row.RoleCosts
-        : undefined,
-    roleLatencies:
-      row.RoleLatencies && Object.keys(row.RoleLatencies).length > 0
-        ? row.RoleLatencies
-        : undefined,
+    roleCosts: nonEmptyRecord(row.RoleCosts),
+    roleLatencies: nonEmptyRecord(row.RoleLatencies),
   };
+}
+
+function nonEmptyRecord(
+  value: Record<string, number[]>,
+): Record<string, number[]> | undefined {
+  return value && Object.keys(value).length > 0 ? value : undefined;
+}
+
+function parseMessageRest(
+  restStr: string | undefined,
+): Record<string, unknown> {
+  if (!restStr) return {};
+  try {
+    return JSON.parse(restStr) as Record<string, unknown>;
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * Reconstruct messages from parallel Nested arrays; parse `Rest` back into fields.
+ * If `restFields.content` is an array, the message had structured AG-UI parts
+ * (e.g. inline media that was externalized by the stored-objects pipeline)
+ * and the flat Messages.Content column is empty — surface the parts array
+ * to the renderer instead.
+ */
+function mapMessages(row: ClickHouseSimulationRunRow): ScenarioMessages {
+  const roles = row["Messages.Role"] ?? [];
+  return roles.map((role, i) => {
+    const restFields = parseMessageRest(row["Messages.Rest"]?.[i]);
+    const { content: restContent, ...restWithoutContent } = restFields;
+    const content = Array.isArray(restContent)
+      ? restContent
+      : (row["Messages.Content"]?.[i] ?? null);
+    return {
+      ...restWithoutContent,
+      id: row["Messages.Id"]?.[i] || undefined,
+      role,
+      content,
+      trace_id: row["Messages.TraceId"]?.[i] || undefined,
+    };
+  }) as ScenarioMessages;
+}
+
+function mapResults(row: ClickHouseSimulationRunRow) {
+  const verdictEnum = mapVerdict(row.Verdict);
+  if (verdictEnum == null) return null;
+  return {
+    verdict: verdictEnum,
+    reasoning: row.Reasoning ?? undefined,
+    metCriteria: row.MetCriteria ?? [],
+    unmetCriteria: row.UnmetCriteria ?? [],
+    error: row.Error ?? undefined,
+  };
+}
+
+function parseMetadata(
+  metadataJson: string | null,
+): Record<string, unknown> | null {
+  if (!metadataJson) return null;
+  try {
+    const parsed: unknown = JSON.parse(metadataJson);
+    return parsed != null &&
+      typeof parsed === "object" &&
+      !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>)
+      : null;
+  } catch {
+    return null;
+  }
 }

@@ -7,12 +7,26 @@ import {
   type FeatureFlagStorePostgres,
   getFeatureFlagStore,
 } from "./featureFlagStore.postgres";
-import type { FeatureFlagKey } from "./registry";
+import type { FeatureFlagDefinition, FeatureFlagKey } from "./registry";
 import { resolveFlagDefinition } from "./registry";
 import type {
   FeatureFlagEvaluateOptions,
   FeatureFlagServiceInterface,
 } from "./types";
+
+/** True if the FEATURE_FLAG_FORCE_ENABLE env override list names this flag. */
+const isFlagForceEnabled = (flagKey: string): boolean => {
+  const forceOn = (process.env.FEATURE_FLAG_FORCE_ENABLE ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  return forceOn.includes(flagKey);
+};
+
+interface FeatureFlagStoreContext {
+  projectId?: string;
+  organizationId?: string;
+}
 
 /**
  * Main feature flag service.
@@ -87,7 +101,7 @@ export class FeatureFlagService implements FeatureFlagServiceInterface {
     flagKey: FeatureFlagKey,
     opts: FeatureFlagEvaluateOptions,
   ): Promise<boolean> {
-    const { distinctId, defaultValue = false } = opts;
+    const { defaultValue = false } = opts;
     const definition = resolveFlagDefinition(flagKey);
 
     if (definition?.envOverridable !== false) {
@@ -99,42 +113,21 @@ export class FeatureFlagService implements FeatureFlagServiceInterface {
         return envOverride;
       }
     }
-    const forceOn = (process.env.FEATURE_FLAG_FORCE_ENABLE ?? "")
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean);
-    if (forceOn.includes(flagKey)) {
+    if (isFlagForceEnabled(flagKey)) {
       return true;
     }
 
-    const storeCtx = {
+    const storeCtx: FeatureFlagStoreContext = {
       projectId: opts.projectId,
       organizationId: opts.organizationId,
     };
 
     if (definition?.scope === "SYSTEM") {
-      const stored = await this.store.get(flagKey, storeCtx);
-      if (stored !== null) return stored;
-      return definition.defaultValue;
+      return this.resolveSystemFlag({ flagKey, definition, storeCtx });
     }
 
     if (definition?.scope === "PRODUCT") {
-      // Operator override via /ops/feature-flags wins. The store
-      // evaluates per-org/per-project targeting rules first; if any
-      // rule matches the calling context we use that result and never
-      // touch PostHog. With no rule match and no row, fall through to
-      // the legacy backend (PostHog when configured, memory otherwise).
-      // Both legacy backends catch their own failures and return the
-      // registry default, so checking the store first is also what
-      // keeps the Ops UI usable during PostHog outages or quota caps.
-      const stored = await this.store.get(flagKey, storeCtx);
-      if (stored !== null) return stored;
-
-      return await this.legacy.isEnabled(flagKey, {
-        ...opts,
-        distinctId,
-        defaultValue: definition.defaultValue,
-      });
+      return this.resolveProductFlag({ flagKey, definition, opts, storeCtx });
     }
 
     // Unregistered keys reach the legacy backend for back-compat with
@@ -143,6 +136,51 @@ export class FeatureFlagService implements FeatureFlagServiceInterface {
     // interface-level `FeatureFlagKey` constraint still gates new
     // callers without blocking runtime back-compat.
     return this.legacy.isEnabled(flagKey, { ...opts, defaultValue });
+  }
+
+  private async resolveSystemFlag({
+    flagKey,
+    definition,
+    storeCtx,
+  }: {
+    flagKey: FeatureFlagKey;
+    definition: FeatureFlagDefinition;
+    storeCtx: FeatureFlagStoreContext;
+  }): Promise<boolean> {
+    const stored = await this.store.get(flagKey, storeCtx);
+    if (stored !== null) return stored;
+    return definition.defaultValue;
+  }
+
+  /**
+   * Operator override via /ops/feature-flags wins. The store evaluates
+   * per-org/per-project targeting rules first; if any rule matches the
+   * calling context we use that result and never touch PostHog. With no
+   * rule match and no row, fall through to the legacy backend (PostHog
+   * when configured, memory otherwise). Both legacy backends catch their
+   * own failures and return the registry default, so checking the store
+   * first is also what keeps the Ops UI usable during PostHog outages or
+   * quota caps.
+   */
+  private async resolveProductFlag({
+    flagKey,
+    definition,
+    opts,
+    storeCtx,
+  }: {
+    flagKey: FeatureFlagKey;
+    definition: FeatureFlagDefinition;
+    opts: FeatureFlagEvaluateOptions;
+    storeCtx: FeatureFlagStoreContext;
+  }): Promise<boolean> {
+    const stored = await this.store.get(flagKey, storeCtx);
+    if (stored !== null) return stored;
+
+    return await this.legacy.isEnabled(flagKey, {
+      ...opts,
+      distinctId: opts.distinctId,
+      defaultValue: definition.defaultValue,
+    });
   }
 
   private createLegacyService(): FeatureFlagServiceInterface {

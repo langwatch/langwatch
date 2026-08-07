@@ -32,9 +32,11 @@
 
 import { createLogger } from "@langwatch/observability";
 import { SpanKind } from "@opentelemetry/api";
-import { getLangWatchTracer } from "langwatch";
+import { getLangWatchTracer, type LangWatchSpan } from "langwatch";
 import { resolveRawPcmFormat, wrapRawPcmToWav } from "~/shared/audio/pcmToWav";
 import {
+  type BinaryPart,
+  type ContentSource,
   parseBase64DataUri,
   visitContentPartAsync,
 } from "~/shared/content-parts/visit-content-part";
@@ -66,6 +68,378 @@ export interface ExtractedRef {
 // Internal helpers
 // ---------------------------------------------------------------------------
 
+type ProcessPartOut = { part: unknown; ref: ExtractedRef | null };
+
+interface ProcessPartContext {
+  part: unknown;
+  projectId: string;
+  purpose: string;
+  ownerKind: string;
+  ownerId: string;
+  service: StoredObjectsService;
+}
+
+function makeExtractedRef({
+  stored,
+  purpose,
+  ownerKind,
+  ownerId,
+}: {
+  stored: { id: string; isDuplicate: boolean };
+  purpose: string;
+  ownerKind: string;
+  ownerId: string;
+}): ExtractedRef {
+  return {
+    id: stored.id,
+    isDuplicate: stored.isDuplicate,
+    purpose,
+    ownerKind,
+    ownerId,
+  };
+}
+
+async function extractMediaSourcePart(
+  mediaPart: {
+    type: "image" | "audio" | "video" | "document";
+    source: ContentSource;
+  },
+  ctx: ProcessPartContext,
+): Promise<ProcessPartOut> {
+  const noOp: ProcessPartOut = { part: ctx.part, ref: null };
+  if (mediaPart.source.type !== "data") return noOp;
+
+  const { value: base64, mimeType } = mediaPart.source;
+  // The dispatcher casts `source` from wire data without validating the
+  // payload type — a non-string `value` (arbitrary object walked by the
+  // generic value extractor) is not an inline media part.
+  if (typeof base64 !== "string" || typeof mimeType !== "string") {
+    return noOp;
+  }
+
+  // For document parts, reject MIME types the read path can't faithfully
+  // serve. The /api/files route downgrades anything outside the allowlist to
+  // application/octet-stream, so text/csv, application/json, etc. would
+  // ingest silently but come back as a blob download. Pass through unchanged
+  // rather than corrupt the round-trip.
+  if (mediaPart.type === "document" && !isReadbackSafe(mimeType)) {
+    logger.debug(
+      { mimeType },
+      "document part has an unsafe MIME type — passing through unchanged",
+    );
+    return noOp;
+  }
+
+  const bytes = Buffer.from(base64, "base64");
+  const stored = await ctx.service.storeFromBytes({
+    projectId: ctx.projectId,
+    purpose: ctx.purpose,
+    ownerKind: ctx.ownerKind,
+    ownerId: ctx.ownerId,
+    mediaType: mimeType,
+    bytes,
+  });
+
+  const ref = makeExtractedRef({
+    stored,
+    purpose: ctx.purpose,
+    ownerKind: ctx.ownerKind,
+    ownerId: ctx.ownerId,
+  });
+
+  const rewrittenPart = {
+    ...(ctx.part as Record<string, unknown>),
+    source: {
+      type: "url",
+      value: `/api/files/${ctx.projectId}/${stored.id}`,
+      mimeType,
+    },
+  };
+
+  return { part: rewrittenPart, ref };
+}
+
+async function extractBinaryPart(
+  binPart: BinaryPart,
+  ctx: ProcessPartContext,
+): Promise<ProcessPartOut> {
+  const noOp: ProcessPartOut = { part: ctx.part, ref: null };
+
+  // Unlike the media/document handler above, this path deliberately has
+  // no isReadbackSafe gate: binary parts render as a download chip, not
+  // inline, so a non-allowlisted type (text/csv, application/json, ...)
+  // coming back as application/octet-stream still round-trips the exact
+  // bytes — and the chip carries the original filename for the save.
+  //
+  // Enforce exactly-one-of(data, url, id) at the boundary before touching.
+  // AG-UI's InputContentSchema permits the ambiguous cases; rejecting them
+  // here matches the runtime invariant the extractor depends on.
+  const refined = binaryInputPartSchema.safeParse(binPart);
+  if (!refined.success) {
+    logger.debug(
+      { error: refined.error.message },
+      "binary part violates exactly-one-of(data,url,id); passing through unchanged",
+    );
+    return noOp;
+  }
+
+  if (
+    binPart.data === undefined ||
+    binPart.id !== undefined ||
+    binPart.url !== undefined
+  ) {
+    return noOp;
+  }
+
+  const { data, mimeType } = binPart;
+  const bytes = Buffer.from(data, "base64");
+  const stored = await ctx.service.storeFromBytes({
+    projectId: ctx.projectId,
+    purpose: ctx.purpose,
+    ownerKind: ctx.ownerKind,
+    ownerId: ctx.ownerId,
+    mediaType: mimeType,
+    bytes,
+  });
+
+  const ref = makeExtractedRef({
+    stored,
+    purpose: ctx.purpose,
+    ownerKind: ctx.ownerKind,
+    ownerId: ctx.ownerId,
+  });
+
+  const original = ctx.part as Record<string, unknown>;
+  // File shapes (AI-SDK `{type:"file", mediaType, data}` and OpenAI
+  // `{type:"file", file:{file_data, filename}}`) are dispatched here by
+  // the visitor when the mime type is not audio/*. Normalise to a clean
+  // `binary` shape (the same canonical form the inputAudio handler
+  // produces for the audio path) so the rewrite is not a chimera of
+  // `type:"file"` + binary externalised fields. The filename comes from
+  // the dispatched part — the visitor already resolved it from whichever
+  // nesting the wire shape used.
+  const isFileShape = original.type === "file";
+  const rewrittenPart = isFileShape
+    ? {
+        type: "binary",
+        mimeType,
+        id: stored.id,
+        url: `/api/files/${ctx.projectId}/${stored.id}`,
+        data: undefined,
+        ...(typeof binPart.filename === "string"
+          ? { filename: binPart.filename }
+          : {}),
+      }
+    : {
+        ...original,
+        id: stored.id,
+        url: `/api/files/${ctx.projectId}/${stored.id}`,
+        data: undefined,
+      };
+
+  return { part: rewrittenPart, ref };
+}
+
+// Production scenario messages use the OpenAI-shaped image_url variant.
+// Extract when the URL is a base64 data: URI; pass through http(s) URLs
+// unchanged (already externalized by the SDK, or pointing at an
+// external CDN we shouldn't re-host).
+async function extractImageUrlPart(
+  url: string,
+  ctx: ProcessPartContext,
+): Promise<ProcessPartOut> {
+  const noOp: ProcessPartOut = { part: ctx.part, ref: null };
+  const parsed = parseBase64DataUri(url);
+  if (!parsed) return noOp;
+
+  const { mimeType, base64 } = parsed;
+  const bytes = Buffer.from(base64, "base64");
+  const stored = await ctx.service.storeFromBytes({
+    projectId: ctx.projectId,
+    purpose: ctx.purpose,
+    ownerKind: ctx.ownerKind,
+    ownerId: ctx.ownerId,
+    mediaType: mimeType,
+    bytes,
+  });
+
+  const ref = makeExtractedRef({
+    stored,
+    purpose: ctx.purpose,
+    ownerKind: ctx.ownerKind,
+    ownerId: ctx.ownerId,
+  });
+
+  const original = ctx.part as Record<string, unknown>;
+  const originalImageUrl =
+    typeof original.image_url === "object" && original.image_url !== null
+      ? (original.image_url as Record<string, unknown>)
+      : {};
+  const rewrittenPart = {
+    ...original,
+    image_url: {
+      ...originalImageUrl,
+      url: `/api/files/${ctx.projectId}/${stored.id}`,
+    },
+  };
+
+  return { part: rewrittenPart, ref };
+}
+
+// Mime type resolution priority for OpenAI Realtime API audio parts:
+// explicit `mimeType` (set by the file-part dispatch path in
+// visit-content-part for AI-SDK `audio/pcm16` etc.) > this format-to-
+// mimeType allowlist > a final `application/octet-stream` fallback when
+// neither is recognised.
+const AUDIO_FORMAT_MIME_TYPES: Record<string, string> = {
+  wav: "audio/wav",
+  mp3: "audio/mpeg",
+  flac: "audio/flac",
+  ogg: "audio/ogg",
+  webm: "audio/webm",
+};
+
+function resolveAudioMimeType({
+  explicitMimeType,
+  format,
+}: {
+  explicitMimeType: string | undefined;
+  format: string | undefined;
+}): string {
+  return (
+    explicitMimeType ??
+    (format ? AUDIO_FORMAT_MIME_TYPES[format] : undefined) ??
+    "application/octet-stream"
+  );
+}
+
+// OpenAI Realtime API: {type:"input_audio", input_audio:{data:"<base64>", format:"wav"}}.
+// This is the shape the langwatch python-sdk emits for scenario audio
+// turns today, and the shape the typescript-sdk's
+// convert-core-messages-to-agui-messages translates AI-SDK file+audio
+// parts to.
+async function extractInputAudioPart(
+  audioPart: {
+    data?: string;
+    url?: string;
+    format?: string;
+    mimeType?: string;
+  },
+  ctx: ProcessPartContext,
+): Promise<ProcessPartOut> {
+  const noOp: ProcessPartOut = { part: ctx.part, ref: null };
+  // Already-externalized: nothing to extract, pass through unchanged.
+  if (!audioPart.data) return noOp;
+
+  const format = audioPart.format?.toLowerCase();
+  let mimeType = resolveAudioMimeType({
+    explicitMimeType: audioPart.mimeType,
+    format,
+  });
+
+  let bytes = Buffer.from(audioPart.data, "base64");
+
+  // Raw, header-less realtime formats (pcm16, G.711) are unplayable when
+  // served back as-is — no container, so <audio> rejects them. Wrap them
+  // into a WAV container AT STORE TIME so the externalized reference is
+  // plain playable audio/wav everywhere. Applies identically on the
+  // scenario and trace extraction paths, so the same recording still
+  // hashes to one stored object.
+  const rawFormat = resolveRawPcmFormat(format, mimeType);
+  if (rawFormat) {
+    const wrapped = wrapRawPcmToWav(new Uint8Array(bytes), rawFormat);
+    if (wrapped) {
+      bytes = Buffer.from(wrapped);
+      mimeType = "audio/wav";
+    }
+  }
+
+  const stored = await ctx.service.storeFromBytes({
+    projectId: ctx.projectId,
+    purpose: ctx.purpose,
+    ownerKind: ctx.ownerKind,
+    ownerId: ctx.ownerId,
+    mediaType: mimeType,
+    bytes,
+  });
+
+  const ref = makeExtractedRef({
+    stored,
+    purpose: ctx.purpose,
+    ownerKind: ctx.ownerKind,
+    ownerId: ctx.ownerId,
+  });
+
+  const original = ctx.part as Record<string, unknown>;
+  const isFileShape = original.type === "file";
+  const originalInputAudio =
+    typeof original.input_audio === "object" && original.input_audio !== null
+      ? (original.input_audio as Record<string, unknown>)
+      : {};
+
+  // Rewrite to the canonical externalised `input_audio` shape so the UI
+  // MediaPart renders a playable reference. When the inbound part was an
+  // AI-SDK `file` shape (`{type:"file", mediaType, data}`), drop the
+  // file-specific discriminants so the rewritten part is a clean
+  // input_audio reference rather than a chimera of both shapes.
+  const rewrittenPart = isFileShape
+    ? {
+        type: "input_audio",
+        input_audio: {
+          data: undefined,
+          url: `/api/files/${ctx.projectId}/${stored.id}`,
+          mimeType,
+        },
+      }
+    : {
+        ...original,
+        input_audio: {
+          ...originalInputAudio,
+          data: undefined,
+          url: `/api/files/${ctx.projectId}/${stored.id}`,
+          mimeType,
+        },
+      };
+
+  return { part: rewrittenPart, ref };
+}
+
+// Bare {image: "data:..."} is rare in production but seen in some
+// older fixtures. Handle the data-URI case symmetrically.
+async function extractBareImagePart(
+  src: string,
+  ctx: ProcessPartContext,
+): Promise<ProcessPartOut> {
+  const noOp: ProcessPartOut = { part: ctx.part, ref: null };
+  const parsed = parseBase64DataUri(src);
+  if (!parsed) return noOp;
+
+  const { mimeType, base64 } = parsed;
+  const bytes = Buffer.from(base64, "base64");
+  const stored = await ctx.service.storeFromBytes({
+    projectId: ctx.projectId,
+    purpose: ctx.purpose,
+    ownerKind: ctx.ownerKind,
+    ownerId: ctx.ownerId,
+    mediaType: mimeType,
+    bytes,
+  });
+
+  const ref = makeExtractedRef({
+    stored,
+    purpose: ctx.purpose,
+    ownerKind: ctx.ownerKind,
+    ownerId: ctx.ownerId,
+  });
+
+  const rewrittenPart = {
+    ...(ctx.part as Record<string, unknown>),
+    image: `/api/files/${ctx.projectId}/${stored.id}`,
+  };
+
+  return { part: rewrittenPart, ref };
+}
+
 /**
  * Rewrites a single content part, storing any inline bytes via the service.
  * Returns the (possibly new) part and an optional ref. `part` is unknown
@@ -91,316 +465,25 @@ export async function processContentPart({
   ownerId: string;
   service: StoredObjectsService;
 }): Promise<{ part: unknown; ref: ExtractedRef | null }> {
-  type Out = { part: unknown; ref: ExtractedRef | null };
-  const noOp: Out = { part, ref: null };
+  const noOp: ProcessPartOut = { part, ref: null };
+  const ctx: ProcessPartContext = {
+    part,
+    projectId,
+    purpose,
+    ownerKind,
+    ownerId,
+    service,
+  };
 
-  const result = await visitContentPartAsync<Out>(part, {
+  const result = await visitContentPartAsync<ProcessPartOut>(part, {
     text: () => noOp,
     toolCall: () => noOp,
     toolResult: () => noOp,
-
-    async media(mediaPart) {
-      if (mediaPart.source.type !== "data") return noOp;
-
-      const { value: base64, mimeType } = mediaPart.source;
-      // The dispatcher casts `source` from wire data without validating the
-      // payload type — a non-string `value` (arbitrary object walked by the
-      // generic value extractor) is not an inline media part.
-      if (typeof base64 !== "string" || typeof mimeType !== "string") {
-        return noOp;
-      }
-
-      // For document parts, reject MIME types the read path can't faithfully
-      // serve. The /api/files route downgrades anything outside the allowlist to
-      // application/octet-stream, so text/csv, application/json, etc. would
-      // ingest silently but come back as a blob download. Pass through unchanged
-      // rather than corrupt the round-trip.
-      if (mediaPart.type === "document" && !isReadbackSafe(mimeType)) {
-        logger.debug(
-          { mimeType },
-          "document part has an unsafe MIME type — passing through unchanged",
-        );
-        return noOp;
-      }
-
-      const bytes = Buffer.from(base64, "base64");
-      const stored = await service.storeFromBytes({
-        projectId,
-        purpose,
-        ownerKind,
-        ownerId,
-        mediaType: mimeType,
-        bytes,
-      });
-
-      const ref: ExtractedRef = {
-        id: stored.id,
-        isDuplicate: stored.isDuplicate,
-        purpose,
-        ownerKind,
-        ownerId,
-      };
-
-      const rewrittenPart = {
-        ...(part as Record<string, unknown>),
-        source: {
-          type: "url",
-          value: `/api/files/${projectId}/${stored.id}`,
-          mimeType,
-        },
-      };
-
-      return { part: rewrittenPart, ref };
-    },
-
-    async binary(binPart) {
-      // Unlike the media/document handler above, this path deliberately has
-      // no isReadbackSafe gate: binary parts render as a download chip, not
-      // inline, so a non-allowlisted type (text/csv, application/json, ...)
-      // coming back as application/octet-stream still round-trips the exact
-      // bytes — and the chip carries the original filename for the save.
-      //
-      // Enforce exactly-one-of(data, url, id) at the boundary before touching.
-      // AG-UI's InputContentSchema permits the ambiguous cases; rejecting them
-      // here matches the runtime invariant the extractor depends on.
-      const refined = binaryInputPartSchema.safeParse(binPart);
-      if (!refined.success) {
-        logger.debug(
-          { error: refined.error.message },
-          "binary part violates exactly-one-of(data,url,id); passing through unchanged",
-        );
-        return noOp;
-      }
-
-      if (
-        binPart.data === undefined ||
-        binPart.id !== undefined ||
-        binPart.url !== undefined
-      ) {
-        return noOp;
-      }
-
-      const { data, mimeType } = binPart;
-      const bytes = Buffer.from(data, "base64");
-      const stored = await service.storeFromBytes({
-        projectId,
-        purpose,
-        ownerKind,
-        ownerId,
-        mediaType: mimeType,
-        bytes,
-      });
-
-      const ref: ExtractedRef = {
-        id: stored.id,
-        isDuplicate: stored.isDuplicate,
-        purpose,
-        ownerKind,
-        ownerId,
-      };
-
-      const original = part as Record<string, unknown>;
-      // File shapes (AI-SDK `{type:"file", mediaType, data}` and OpenAI
-      // `{type:"file", file:{file_data, filename}}`) are dispatched here by
-      // the visitor when the mime type is not audio/*. Normalise to a clean
-      // `binary` shape (the same canonical form the inputAudio handler
-      // produces for the audio path) so the rewrite is not a chimera of
-      // `type:"file"` + binary externalised fields. The filename comes from
-      // the dispatched part — the visitor already resolved it from whichever
-      // nesting the wire shape used.
-      const isFileShape = original.type === "file";
-      const rewrittenPart = isFileShape
-        ? {
-            type: "binary",
-            mimeType,
-            id: stored.id,
-            url: `/api/files/${projectId}/${stored.id}`,
-            data: undefined,
-            ...(typeof binPart.filename === "string"
-              ? { filename: binPart.filename }
-              : {}),
-          }
-        : {
-            ...original,
-            id: stored.id,
-            url: `/api/files/${projectId}/${stored.id}`,
-            data: undefined,
-          };
-
-      return { part: rewrittenPart, ref };
-    },
-
-    // Production scenario messages use the OpenAI-shaped image_url variant.
-    // Extract when the URL is a base64 data: URI; pass through http(s) URLs
-    // unchanged (already externalized by the SDK, or pointing at an
-    // external CDN we shouldn't re-host).
-    async imageUrl(url) {
-      const parsed = parseBase64DataUri(url);
-      if (!parsed) return noOp;
-
-      const { mimeType, base64 } = parsed;
-      const bytes = Buffer.from(base64, "base64");
-      const stored = await service.storeFromBytes({
-        projectId,
-        purpose,
-        ownerKind,
-        ownerId,
-        mediaType: mimeType,
-        bytes,
-      });
-
-      const ref: ExtractedRef = {
-        id: stored.id,
-        isDuplicate: stored.isDuplicate,
-        purpose,
-        ownerKind,
-        ownerId,
-      };
-
-      const original = part as Record<string, unknown>;
-      const originalImageUrl =
-        typeof original.image_url === "object" && original.image_url !== null
-          ? (original.image_url as Record<string, unknown>)
-          : {};
-      const rewrittenPart = {
-        ...original,
-        image_url: {
-          ...originalImageUrl,
-          url: `/api/files/${projectId}/${stored.id}`,
-        },
-      };
-
-      return { part: rewrittenPart, ref };
-    },
-
-    // OpenAI Realtime API: {type:"input_audio", input_audio:{data:"<base64>", format:"wav"}}.
-    // This is the shape the langwatch python-sdk emits for scenario audio
-    // turns today, and the shape the typescript-sdk's
-    // convert-core-messages-to-agui-messages translates AI-SDK file+audio
-    // parts to. Mime type resolution priority: explicit `mimeType` (set by
-    // the file-part dispatch path in visit-content-part for AI-SDK
-    // `audio/pcm16` etc.) > format-to-mimeType allowlist > a final
-    // `application/octet-stream` fallback when neither is recognised.
-    async inputAudio(audioPart) {
-      // Already-externalized: nothing to extract, pass through unchanged.
-      if (!audioPart.data) return noOp;
-
-      const format = audioPart.format?.toLowerCase();
-      let mimeType =
-        audioPart.mimeType ??
-        (format === "wav"
-          ? "audio/wav"
-          : format === "mp3"
-            ? "audio/mpeg"
-            : format === "flac"
-              ? "audio/flac"
-              : format === "ogg"
-                ? "audio/ogg"
-                : format === "webm"
-                  ? "audio/webm"
-                  : "application/octet-stream");
-
-      let bytes = Buffer.from(audioPart.data, "base64");
-
-      // Raw, header-less realtime formats (pcm16, G.711) are unplayable when
-      // served back as-is — no container, so <audio> rejects them. Wrap them
-      // into a WAV container AT STORE TIME so the externalized reference is
-      // plain playable audio/wav everywhere. Applies identically on the
-      // scenario and trace extraction paths, so the same recording still
-      // hashes to one stored object.
-      const rawFormat = resolveRawPcmFormat(format, mimeType);
-      if (rawFormat) {
-        const wrapped = wrapRawPcmToWav(new Uint8Array(bytes), rawFormat);
-        if (wrapped) {
-          bytes = Buffer.from(wrapped);
-          mimeType = "audio/wav";
-        }
-      }
-
-      const stored = await service.storeFromBytes({
-        projectId,
-        purpose,
-        ownerKind,
-        ownerId,
-        mediaType: mimeType,
-        bytes,
-      });
-
-      const ref: ExtractedRef = {
-        id: stored.id,
-        isDuplicate: stored.isDuplicate,
-        purpose,
-        ownerKind,
-        ownerId,
-      };
-
-      const original = part as Record<string, unknown>;
-      const isFileShape = original.type === "file";
-      const originalInputAudio =
-        typeof original.input_audio === "object" &&
-        original.input_audio !== null
-          ? (original.input_audio as Record<string, unknown>)
-          : {};
-
-      // Rewrite to the canonical externalised `input_audio` shape so the UI
-      // MediaPart renders a playable reference. When the inbound part was an
-      // AI-SDK `file` shape (`{type:"file", mediaType, data}`), drop the
-      // file-specific discriminants so the rewritten part is a clean
-      // input_audio reference rather than a chimera of both shapes.
-      const rewrittenPart = isFileShape
-        ? {
-            type: "input_audio",
-            input_audio: {
-              data: undefined,
-              url: `/api/files/${projectId}/${stored.id}`,
-              mimeType,
-            },
-          }
-        : {
-            ...original,
-            input_audio: {
-              ...originalInputAudio,
-              data: undefined,
-              url: `/api/files/${projectId}/${stored.id}`,
-              mimeType,
-            },
-          };
-
-      return { part: rewrittenPart, ref };
-    },
-
-    // Bare {image: "data:..."} is rare in production but seen in some
-    // older fixtures. Handle the data-URI case symmetrically.
-    async bareImage(src) {
-      const parsed = parseBase64DataUri(src);
-      if (!parsed) return noOp;
-
-      const { mimeType, base64 } = parsed;
-      const bytes = Buffer.from(base64, "base64");
-      const stored = await service.storeFromBytes({
-        projectId,
-        purpose,
-        ownerKind,
-        ownerId,
-        mediaType: mimeType,
-        bytes,
-      });
-
-      const ref: ExtractedRef = {
-        id: stored.id,
-        isDuplicate: stored.isDuplicate,
-        purpose,
-        ownerKind,
-        ownerId,
-      };
-
-      const rewrittenPart = {
-        ...(part as Record<string, unknown>),
-        image: `/api/files/${projectId}/${stored.id}`,
-      };
-
-      return { part: rewrittenPart, ref };
-    },
+    media: (mediaPart) => extractMediaSourcePart(mediaPart, ctx),
+    binary: (binPart) => extractBinaryPart(binPart, ctx),
+    imageUrl: (url) => extractImageUrlPart(url, ctx),
+    inputAudio: (audioPart) => extractInputAudioPart(audioPart, ctx),
+    bareImage: (src) => extractBareImagePart(src, ctx),
   });
 
   return result ?? noOp;
@@ -489,6 +572,56 @@ async function rewriteMessageArray(
   return { messages: out, refs: allRefs, changed };
 }
 
+function isSingleMessageShape(eventObj: Record<string, unknown>): boolean {
+  return (
+    !!eventObj.message &&
+    typeof eventObj.message === "object" &&
+    !Array.isArray(eventObj.message)
+  );
+}
+
+// Shape A: `event.message` is a single message object.
+async function extractFromSingleMessageEvent({
+  event,
+  eventObj,
+  params,
+  span,
+}: {
+  event: unknown;
+  eventObj: Record<string, unknown>;
+  params: ExtractionParams;
+  span: LangWatchSpan;
+}): Promise<{ rewrittenEvent: unknown; refs: ExtractedRef[] }> {
+  const original = eventObj.message as Record<string, unknown>;
+  const { message, refs } = await rewriteMessage(original, params);
+  span.setAttribute("stored_objects.refs_extracted", refs.length);
+  if (message === original) {
+    return { rewrittenEvent: event, refs };
+  }
+  return { rewrittenEvent: { ...eventObj, message }, refs };
+}
+
+// Shape B: `event.messages` is an array of message objects.
+async function extractFromMessageArrayEvent({
+  event,
+  eventObj,
+  params,
+  span,
+}: {
+  event: unknown;
+  eventObj: Record<string, unknown>;
+  params: ExtractionParams;
+  span: LangWatchSpan;
+}): Promise<{ rewrittenEvent: unknown; refs: ExtractedRef[] }> {
+  const { messages, refs, changed } = await rewriteMessageArray(
+    eventObj.messages as unknown[],
+    params,
+  );
+  span.setAttribute("stored_objects.refs_extracted", refs.length);
+  if (!changed) return { rewrittenEvent: event, refs };
+  return { rewrittenEvent: { ...eventObj, messages }, refs };
+}
+
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
@@ -555,30 +688,12 @@ export async function extractInlineMediaFromEvent({
       };
       const eventObj = event as Record<string, unknown>;
 
-      // Shape A: `event.message` is a single message object.
-      if (
-        eventObj.message &&
-        typeof eventObj.message === "object" &&
-        !Array.isArray(eventObj.message)
-      ) {
-        const original = eventObj.message as Record<string, unknown>;
-        const { message, refs } = await rewriteMessage(original, params);
-        span.setAttribute("stored_objects.refs_extracted", refs.length);
-        if (message === original) {
-          return { rewrittenEvent: event, refs };
-        }
-        return { rewrittenEvent: { ...eventObj, message }, refs };
+      if (isSingleMessageShape(eventObj)) {
+        return extractFromSingleMessageEvent({ event, eventObj, params, span });
       }
 
-      // Shape B: `event.messages` is an array of message objects.
       if (Array.isArray(eventObj.messages)) {
-        const { messages, refs, changed } = await rewriteMessageArray(
-          eventObj.messages,
-          params,
-        );
-        span.setAttribute("stored_objects.refs_extracted", refs.length);
-        if (!changed) return { rewrittenEvent: event, refs };
-        return { rewrittenEvent: { ...eventObj, messages }, refs };
+        return extractFromMessageArrayEvent({ event, eventObj, params, span });
       }
 
       span.setAttribute("stored_objects.refs_extracted", 0);

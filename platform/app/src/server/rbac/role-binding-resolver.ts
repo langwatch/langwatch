@@ -231,6 +231,101 @@ async function collectBindingsForApiKey({
 // ============================================================================
 
 /**
+ * The permissions a custom role lists, or none when it is missing, empty or
+ * malformed.
+ *
+ * Uses the shared parser so shape validation is consistent with the
+ * API-key-create ceiling path. On malformed data we fail safe here (the
+ * caller is a permission check — deny, log, move on) rather than
+ * bubbling the error up, because unrelated principals should not be
+ * blocked by one corrupted custom role.
+ */
+async function readCustomRolePermissions({
+  prisma,
+  customRoleId,
+}: {
+  prisma: PrismaClient;
+  customRoleId: string;
+}): Promise<string[]> {
+  const customRole = await prisma.customRole.findUnique({
+    where: { id: customRoleId },
+    select: { permissions: true },
+  });
+  if (!customRole) return [];
+
+  try {
+    return parseCustomRolePermissions({
+      customRoleId,
+      permissions: customRole.permissions,
+    });
+  } catch (err) {
+    if (err instanceof MalformedCustomRolePermissionsError) {
+      logger.warn(
+        { err, customRoleId },
+        "custom role has malformed permissions; treating as no-grant",
+      );
+      return [];
+    }
+    throw err;
+  }
+}
+
+/** Org-scoped bindings: ADMIN grants everything; MEMBER grants org-level permissions only */
+function organizationBindingGrants({
+  role,
+  permission,
+}: {
+  role: TeamUserRole;
+  permission: Permission;
+}): boolean {
+  if (role === TeamUserRole.ADMIN) return true;
+  return organizationRoleHasPermission(OrganizationUserRole.MEMBER, permission);
+}
+
+/** Whether this one binding, on its own, grants the requested permission. */
+async function bindingGrantsPermission({
+  prisma,
+  binding,
+  permission,
+}: {
+  prisma: PrismaClient;
+  binding: ResolvedBinding;
+  permission: Permission;
+}): Promise<boolean> {
+  // A team/project binding can never grant an org-exclusive permission,
+  // even via a custom role that lists it (ADR-021). Stays in sync with
+  // checkPermissionFromBindings() in rbac.ts.
+  if (!bindingScopeCanGrant(binding.scopeType, permission)) return false;
+
+  // Custom role — look up its permissions
+  if (binding.role === TeamUserRole.CUSTOM && binding.customRoleId) {
+    const perms = await readCustomRolePermissions({
+      prisma,
+      customRoleId: binding.customRoleId,
+    });
+    if (perms.length > 0) {
+      // Non-empty custom role is authoritative — skip VIEWER baseline.
+      // See also resolveBindingPermission() in rbac.ts which must stay
+      // in sync with this logic.
+      return hasPermissionWithHierarchy(perms, permission);
+    }
+    // Empty/missing/malformed custom role — fall through to the built-in
+    // CUSTOM permission set below (VIEWER-equivalent baseline). This
+    // preserves backward compatibility for legacy CUSTOM bindings that
+    // were created before fine-grained permissions existed.
+  }
+
+  if (
+    binding.scopeType === RoleBindingScopeType.ORGANIZATION &&
+    binding.role !== TeamUserRole.CUSTOM
+  ) {
+    return organizationBindingGrants({ role: binding.role, permission });
+  }
+
+  return teamRoleHasPermission(binding.role, permission);
+}
+
+/**
  * Checks whether a principal has a specific permission at a given scope.
  *
  * All matching bindings across ancestor scopes are evaluated and their
@@ -267,69 +362,7 @@ export async function checkRoleBindingPermission({
   });
 
   for (const binding of bindings) {
-    // A team/project binding can never grant an org-exclusive permission,
-    // even via a custom role that lists it (ADR-021). Stays in sync with
-    // checkPermissionFromBindings() in rbac.ts.
-    if (!bindingScopeCanGrant(binding.scopeType, permission)) continue;
-
-    // Custom role — look up its permissions
-    if (binding.role === TeamUserRole.CUSTOM && binding.customRoleId) {
-      const customRole = await prisma.customRole.findUnique({
-        where: { id: binding.customRoleId },
-        select: { permissions: true },
-      });
-      // Use the shared parser so shape validation is consistent with the
-      // API-key-create ceiling path. On malformed data we fail safe here (the
-      // caller is a permission check — deny, log, move on) rather than
-      // bubbling the error up, because unrelated principals should not be
-      // blocked by one corrupted custom role.
-      let perms: string[] = [];
-      if (customRole) {
-        try {
-          perms = parseCustomRolePermissions({
-            customRoleId: binding.customRoleId,
-            permissions: customRole.permissions,
-          });
-        } catch (err) {
-          if (err instanceof MalformedCustomRolePermissionsError) {
-            logger.warn(
-              { err, customRoleId: binding.customRoleId },
-              "custom role has malformed permissions; treating as no-grant",
-            );
-          } else {
-            throw err;
-          }
-        }
-      }
-      if (perms.length > 0) {
-        if (hasPermissionWithHierarchy(perms, permission)) {
-          return true;
-        }
-        // Non-empty custom role is authoritative — skip VIEWER baseline.
-        // See also resolveBindingPermission() in rbac.ts which must stay
-        // in sync with this logic.
-        continue;
-      }
-      // Empty/missing/malformed custom role — fall through to the built-in
-      // CUSTOM permission set below (VIEWER-equivalent baseline). This
-      // preserves backward compatibility for legacy CUSTOM bindings that
-      // were created before fine-grained permissions existed.
-    }
-
-    // Org-scoped bindings: ADMIN grants everything; MEMBER grants org-level permissions only
-    if (
-      binding.scopeType === RoleBindingScopeType.ORGANIZATION &&
-      binding.role !== TeamUserRole.CUSTOM
-    ) {
-      if (binding.role === TeamUserRole.ADMIN) return true;
-      if (
-        organizationRoleHasPermission(OrganizationUserRole.MEMBER, permission)
-      )
-        return true;
-      continue;
-    }
-
-    if (teamRoleHasPermission(binding.role, permission)) {
+    if (await bindingGrantsPermission({ prisma, binding, permission })) {
       return true;
     }
   }

@@ -253,23 +253,25 @@ export class ClaudeCodeExtractor implements CanonicalAttributesExtractor {
 export function extractAssistantTextFromResponseBody(
   raw: unknown,
 ): string | null {
-  if (raw === null || raw === undefined) return null;
-  // The upstream attribute bag (`parseJsonStringValues`) eagerly
-  // JSON.parses string attributes that look like JSON, so we may
-  // receive either the raw string OR the pre-parsed object here.
-  // Accept both.
-  let parsed: unknown = raw;
-  if (typeof raw === "string") {
-    if (raw.length === 0) return null;
-    try {
-      parsed = JSON.parse(raw);
-    } catch {
-      return null;
-    }
-  }
-  if (!parsed || typeof parsed !== "object") return null;
-  const content = (parsed as { content?: unknown }).content;
+  // parseJsonBody accepts both the raw JSON string and the pre-parsed
+  // object — the upstream attribute bag (`parseJsonStringValues`) eagerly
+  // JSON.parses string attributes that look like JSON.
+  const parsed = parseJsonBody(raw);
+  if (!parsed) return null;
+  const content = parsed.content;
   if (!Array.isArray(content)) return null;
+  const parts = textBlocksFromContent(content);
+  if (parts.length === 0) return null;
+  // Defence-in-depth payload-size guard. claude-code 2.x caps each
+  // api_response_body inline at ~60KB upstream. This cap bounds the
+  // ComputedOutput / langwatch.output value specifically, in case
+  // a future claude release lifts the 60KB inline cap or a different
+  // emitter ships an api_response_body without one.
+  return capPayloadString(parts.join("\n\n"), undefined, "assistant_output");
+}
+
+/** Concatenatable text blocks (`type === "text"`) out of a content array. */
+function textBlocksFromContent(content: unknown[]): string[] {
   const parts: string[] = [];
   for (const c of content) {
     if (!c || typeof c !== "object") continue;
@@ -279,13 +281,7 @@ export function extractAssistantTextFromResponseBody(
     if (block.text.length === 0) continue;
     parts.push(block.text);
   }
-  if (parts.length === 0) return null;
-  // Defence-in-depth payload-size guard. claude-code 2.x caps each
-  // api_response_body inline at ~60KB upstream. This cap bounds the
-  // ComputedOutput / langwatch.output value specifically, in case
-  // a future claude release lifts the 60KB inline cap or a different
-  // emitter ships an api_response_body without one.
-  return capPayloadString(parts.join("\n\n"), undefined, "assistant_output");
+  return parts;
 }
 
 /**
@@ -361,33 +357,45 @@ export function extractAssistantOutputFromResponseBody(
   if (!parsed) return null;
   const content = parsed.content;
   if (!Array.isArray(content)) return null;
-  const parts: string[] = [];
-  for (const c of content) {
-    if (!c || typeof c !== "object") continue;
-    const block = c as {
-      type?: unknown;
-      text?: unknown;
-      name?: unknown;
-      input?: unknown;
-    };
-    if (block.type === "text") {
-      if (typeof block.text === "string" && block.text.length > 0) {
-        parts.push(block.text);
-      }
-    } else if (block.type === "tool_use" && typeof block.name === "string") {
-      const args =
-        block.input !== undefined && block.input !== null
-          ? safeStringify(block.input)
-          : "";
-      parts.push(
-        args
-          ? `[tool_use: ${block.name}]\n${args}`
-          : `[tool_use: ${block.name}]`,
-      );
-    }
-  }
+  const parts = content
+    .map(outputTextFromBlock)
+    .filter((text): text is string => text !== null);
   if (parts.length === 0) return null;
   return capPayloadString(parts.join("\n\n"), undefined, "assistant_output");
+}
+
+/** The output text (or `[tool_use: name]` marker) for one response block. */
+function outputTextFromBlock(c: unknown): string | null {
+  if (!c || typeof c !== "object") return null;
+  const block = c as {
+    type?: unknown;
+    text?: unknown;
+    name?: unknown;
+    input?: unknown;
+  };
+  if (block.type === "text") return outputTextFromTextBlock(block);
+  if (block.type === "tool_use") return outputTextFromToolUseBlock(block);
+  return null;
+}
+
+function outputTextFromTextBlock(block: { text?: unknown }): string | null {
+  return typeof block.text === "string" && block.text.length > 0
+    ? block.text
+    : null;
+}
+
+function outputTextFromToolUseBlock(block: {
+  name?: unknown;
+  input?: unknown;
+}): string | null {
+  if (typeof block.name !== "string") return null;
+  const args =
+    block.input !== undefined && block.input !== null
+      ? safeStringify(block.input)
+      : "";
+  return args
+    ? `[tool_use: ${block.name}]\n${args}`
+    : `[tool_use: ${block.name}]`;
 }
 
 /** JSON.stringify that never throws on a circular/odd value. */
@@ -409,29 +417,43 @@ function safeStringify(value: unknown): string {
 function contentToText(content: unknown): string {
   if (typeof content === "string") return content;
   if (!Array.isArray(content)) return "";
-  const parts: string[] = [];
-  for (const block of content) {
-    if (typeof block === "string") {
-      if (block.length > 0) parts.push(block);
-      continue;
-    }
-    if (!block || typeof block !== "object") continue;
-    const b = block as {
-      type?: unknown;
-      text?: unknown;
-      name?: unknown;
-      content?: unknown;
-    };
-    if (b.type === "text" && typeof b.text === "string") {
-      if (b.text.length > 0) parts.push(b.text);
-    } else if (b.type === "tool_result") {
-      const nested = contentToText(b.content);
-      if (nested.length > 0) parts.push(nested);
-    } else if (b.type === "tool_use" && typeof b.name === "string") {
-      parts.push(`[tool_use: ${b.name}]`);
-    }
-  }
+  const parts = content
+    .map(claudeContentBlockToText)
+    .filter((text): text is string => text !== null);
   return parts.join("\n\n");
+}
+
+/** One Anthropic content block flattened to display text, or null to drop it. */
+function claudeContentBlockToText(block: unknown): string | null {
+  if (typeof block === "string") {
+    return block.length > 0 ? block : null;
+  }
+  if (!block || typeof block !== "object") return null;
+  const b = block as {
+    type?: unknown;
+    text?: unknown;
+    name?: unknown;
+    content?: unknown;
+  };
+  if (b.type === "text") return textFromClaudeTextBlock(b);
+  if (b.type === "tool_result") return textFromClaudeToolResultBlock(b);
+  if (b.type === "tool_use") return textFromClaudeToolUseBlock(b);
+  return null;
+}
+
+function textFromClaudeTextBlock(b: { text?: unknown }): string | null {
+  return typeof b.text === "string" && b.text.length > 0 ? b.text : null;
+}
+
+function textFromClaudeToolResultBlock(b: {
+  content?: unknown;
+}): string | null {
+  const nested = contentToText(b.content);
+  return nested.length > 0 ? nested : null;
+}
+
+function textFromClaudeToolUseBlock(b: { name?: unknown }): string | null {
+  return typeof b.name === "string" ? `[tool_use: ${b.name}]` : null;
 }
 
 /**
@@ -451,44 +473,42 @@ export function extractToolResultsFromRequestBody(
   raw: unknown,
 ): Map<string, string> {
   const out = new Map<string, string>();
-  if (raw === null || raw === undefined) return out;
-  let parsed: unknown = raw;
-  if (typeof raw === "string") {
-    if (raw.length === 0) return out;
-    try {
-      parsed = JSON.parse(raw);
-    } catch {
-      return out;
-    }
-  }
-  if (!parsed || typeof parsed !== "object") return out;
-  const obj = parsed as { messages?: unknown };
-  if (!Array.isArray(obj.messages)) return out;
-  for (const m of obj.messages) {
-    if (!m || typeof m !== "object") continue;
-    const content = (m as { content?: unknown }).content;
-    if (!Array.isArray(content)) continue;
-    for (const block of content) {
-      if (!block || typeof block !== "object") continue;
-      const b = block as {
-        type?: unknown;
-        tool_use_id?: unknown;
-        content?: unknown;
-      };
-      if (b.type !== "tool_result" || typeof b.tool_use_id !== "string") {
-        continue;
-      }
-      if (out.has(b.tool_use_id)) continue;
-      const text = contentToText(b.content);
-      if (text.length > 0) {
-        out.set(
-          b.tool_use_id,
-          capPayloadString(text, undefined, "tool_result"),
-        );
-      }
-    }
+  const parsed = parseJsonBody(raw);
+  if (!parsed) return out;
+  const messages = parsed.messages;
+  if (!Array.isArray(messages)) return out;
+  for (const m of messages) {
+    collectToolResultsFromMessage(m, out);
   }
   return out;
+}
+
+/** Harvests every `tool_result` block's text out of one request message. */
+function collectToolResultsFromMessage(
+  m: unknown,
+  out: Map<string, string>,
+): void {
+  if (!m || typeof m !== "object") return;
+  const content = (m as { content?: unknown }).content;
+  if (!Array.isArray(content)) return;
+  for (const block of content) {
+    applyToolResultBlock(block, out);
+  }
+}
+
+function applyToolResultBlock(block: unknown, out: Map<string, string>): void {
+  if (!block || typeof block !== "object") return;
+  const b = block as {
+    type?: unknown;
+    tool_use_id?: unknown;
+    content?: unknown;
+  };
+  if (b.type !== "tool_result" || typeof b.tool_use_id !== "string") return;
+  if (out.has(b.tool_use_id)) return;
+  const text = contentToText(b.content);
+  if (text.length > 0) {
+    out.set(b.tool_use_id, capPayloadString(text, undefined, "tool_result"));
+  }
 }
 
 /**
@@ -509,21 +529,26 @@ export function buildInputMessagesFromRequestBody(
   raw: unknown,
 ): Array<{ role: string; content: string }> | null {
   if (raw === null || raw === undefined) return null;
-  let parsed: unknown = raw;
-  if (typeof raw === "string") {
-    if (raw.length === 0) return null;
-    try {
-      parsed = JSON.parse(raw);
-    } catch {
-      // claude caps the body at ~60KB inline, cutting the JSON mid-string -
-      // and Anthropic's request layout puts `system` and `tools` AFTER the
-      // rolling message history, so the cut destroys exactly the context the
-      // reader most wants. Salvage every complete leading message plus
-      // whatever of the system prompt survived, instead of throwing the body
-      // away (which used to collapse the whole input to the bare user_prompt).
-      return salvageTruncatedRequestBody(raw);
-    }
+  if (typeof raw !== "string") {
+    return buildInputMessagesFromParsedRequestBody(raw);
   }
+  if (raw.length === 0) return null;
+  try {
+    return buildInputMessagesFromParsedRequestBody(JSON.parse(raw));
+  } catch {
+    // claude caps the body at ~60KB inline, cutting the JSON mid-string -
+    // and Anthropic's request layout puts `system` and `tools` AFTER the
+    // rolling message history, so the cut destroys exactly the context the
+    // reader most wants. Salvage every complete leading message plus
+    // whatever of the system prompt survived, instead of throwing the body
+    // away (which used to collapse the whole input to the bare user_prompt).
+    return salvageTruncatedRequestBody(raw);
+  }
+}
+
+function buildInputMessagesFromParsedRequestBody(
+  parsed: unknown,
+): Array<{ role: string; content: string }> | null {
   if (!parsed || typeof parsed !== "object") return null;
   const obj = parsed as {
     system?: unknown;
@@ -534,17 +559,32 @@ export function buildInputMessagesFromRequestBody(
 
   const out: Array<{ role: string; content: string }> = [];
 
-  if (obj.system !== undefined) {
-    const systemText = contentToText(obj.system);
-    if (systemText.length > 0) {
-      out.push({ role: "system", content: systemText });
-    }
-  }
+  const systemMessage = systemMessageFromRequestBody(obj.system);
+  if (systemMessage !== null) out.push(systemMessage);
 
   const toolsMessage = toolDefinitionsMessage(obj.tools);
   if (toolsMessage !== null) out.push(toolsMessage);
 
-  for (const m of obj.messages) {
+  out.push(...historyMessagesFromRequestBody(obj.messages));
+
+  return out.length > 0 ? out : null;
+}
+
+/** The request's `system` value, flattened to a system-role message. */
+function systemMessageFromRequestBody(
+  system: unknown,
+): { role: string; content: string } | null {
+  if (system === undefined) return null;
+  const systemText = contentToText(system);
+  return systemText.length > 0 ? { role: "system", content: systemText } : null;
+}
+
+/** Every request message flattened to `{ role, content }`, empties dropped. */
+function historyMessagesFromRequestBody(
+  messages: unknown[],
+): Array<{ role: string; content: string }> {
+  const out: Array<{ role: string; content: string }> = [];
+  for (const m of messages) {
     if (!m || typeof m !== "object") continue;
     const message = m as { role?: unknown; content?: unknown };
     const role = typeof message.role === "string" ? message.role : "user";
@@ -552,8 +592,7 @@ export function buildInputMessagesFromRequestBody(
     if (content.length === 0) continue;
     out.push({ role, content });
   }
-
-  return out.length > 0 ? out : null;
+  return out;
 }
 
 /**

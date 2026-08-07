@@ -1,6 +1,6 @@
 import { createLogger } from "@langwatch/observability";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
-import type { Command, CommandHandler } from "../../../";
+import type { Command, CommandHandler, TenantId } from "../../../";
 import { createTenantId, defineCommandSchema, EventUtils } from "../../../";
 import type { FoldProjectionStore } from "../../../projections/foldProjection.types";
 import type { ComputeRunMetricsCommandData } from "../schemas/commands";
@@ -71,6 +71,109 @@ export class ComputeRunMetricsCommand
 
   constructor(private readonly deps: ComputeRunMetricsDeps) {}
 
+  private async retryOrGiveUp({
+    data,
+    tenantId,
+    scenarioRunId,
+    traceId,
+    debugMessage,
+    warnMessage,
+  }: {
+    data: ComputeRunMetricsCommandData;
+    tenantId: TenantId;
+    scenarioRunId: string;
+    traceId: string;
+    debugMessage: string;
+    warnMessage: string;
+  }): Promise<void> {
+    logger.debug(
+      { tenantId, scenarioRunId, traceId, retryCount: data.retryCount },
+      debugMessage,
+    );
+
+    if (data.retryCount < MAX_RETRIES) {
+      await this.deps.scheduleRetry({
+        ...data,
+        retryCount: data.retryCount + 1,
+        occurredAt: Date.now(),
+      });
+    } else {
+      logger.warn({ tenantId, scenarioRunId, traceId }, warnMessage);
+    }
+  }
+
+  private async resolvePullModeMetrics({
+    tenantId,
+    tenantIdStr,
+    scenarioRunId,
+    traceId,
+    data,
+  }: {
+    tenantId: TenantId;
+    tenantIdStr: string;
+    scenarioRunId: string;
+    traceId: string;
+    data: ComputeRunMetricsCommandData;
+  }): Promise<NonNullable<ComputeRunMetricsCommandData["metrics"]> | null> {
+    const traceSummary = await this.deps.traceSummaryStore.get(traceId, {
+      tenantId,
+      aggregateId: traceId,
+    });
+
+    if (!traceSummary) {
+      await this.retryOrGiveUp({
+        data,
+        tenantId,
+        scenarioRunId,
+        traceId,
+        debugMessage: "Trace summary not available yet",
+        warnMessage:
+          "Max retries reached for trace metrics computation, giving up",
+      });
+      return null;
+    }
+
+    // Role cost/latency are derived from stored_spans (not carried on the
+    // summary anymore); totalCost is still a summary scalar.
+    const {
+      scenarioRoleCosts: roleCosts,
+      scenarioRoleLatencies: roleLatencies,
+    } = await this.deps.deriveScenarioRoleMetrics({
+      tenantId: tenantIdStr,
+      traceId,
+      occurredAtMs: traceSummary.occurredAt,
+      foldVersion: traceSummary.spanCount,
+    });
+
+    // Summary exists but not yet populated (cost enrichment still in progress).
+    // Treat like missing summary — schedule retry so we pick it up later.
+    // Role latency is enough on its own: a scenario trace can have
+    // role-bearing spans with latency but no cost (totalCost null, roleCosts
+    // empty), and those metrics are still worth emitting.
+    if (
+      Object.keys(roleCosts).length === 0 &&
+      Object.keys(roleLatencies).length === 0 &&
+      traceSummary.totalCost === null
+    ) {
+      await this.retryOrGiveUp({
+        data,
+        tenantId,
+        scenarioRunId,
+        traceId,
+        debugMessage: "Trace summary exists but has no metrics yet",
+        warnMessage:
+          "Max retries reached for trace metrics (summary empty), giving up",
+      });
+      return null;
+    }
+
+    return {
+      totalCost: traceSummary.totalCost ?? 0,
+      roleCosts,
+      roleLatencies,
+    };
+  }
+
   async handle(
     command: Command<ComputeRunMetricsCommandData>,
   ): Promise<SimulationProcessingEvent[]> {
@@ -89,87 +192,18 @@ export class ComputeRunMetricsCommand
       "Handling compute run metrics command",
     );
 
-    // ECST path: metrics provided in payload
-    let metrics = data.metrics;
-
-    // Pull fallback: read from trace summary store
-    if (!metrics) {
-      const traceSummary = await this.deps.traceSummaryStore.get(traceId, {
+    // ECST path: metrics provided in payload. Pull fallback otherwise.
+    const metrics =
+      data.metrics ??
+      (await this.resolvePullModeMetrics({
         tenantId,
-        aggregateId: traceId,
-      });
-
-      if (!traceSummary) {
-        logger.debug(
-          { tenantId, scenarioRunId, traceId, retryCount: data.retryCount },
-          "Trace summary not available yet",
-        );
-
-        if (data.retryCount < MAX_RETRIES) {
-          await this.deps.scheduleRetry({
-            ...data,
-            retryCount: data.retryCount + 1,
-            occurredAt: Date.now(),
-          });
-        } else {
-          logger.warn(
-            { tenantId, scenarioRunId, traceId },
-            "Max retries reached for trace metrics computation, giving up",
-          );
-        }
-
-        return [];
-      }
-
-      // Role cost/latency are derived from stored_spans (not carried on the
-      // summary anymore); totalCost is still a summary scalar.
-      const {
-        scenarioRoleCosts: roleCosts,
-        scenarioRoleLatencies: roleLatencies,
-      } = await this.deps.deriveScenarioRoleMetrics({
-        tenantId: tenantIdStr,
+        tenantIdStr,
+        scenarioRunId,
         traceId,
-        occurredAtMs: traceSummary.occurredAt,
-        foldVersion: traceSummary.spanCount,
-      });
+        data,
+      }));
 
-      // Summary exists but not yet populated (cost enrichment still in progress).
-      // Treat like missing summary — schedule retry so we pick it up later.
-      // Role latency is enough on its own: a scenario trace can have
-      // role-bearing spans with latency but no cost (totalCost null, roleCosts
-      // empty), and those metrics are still worth emitting.
-      if (
-        Object.keys(roleCosts).length === 0 &&
-        Object.keys(roleLatencies).length === 0 &&
-        traceSummary.totalCost === null
-      ) {
-        logger.debug(
-          { tenantId, scenarioRunId, traceId, retryCount: data.retryCount },
-          "Trace summary exists but has no metrics yet",
-        );
-
-        if (data.retryCount < MAX_RETRIES) {
-          await this.deps.scheduleRetry({
-            ...data,
-            retryCount: data.retryCount + 1,
-            occurredAt: Date.now(),
-          });
-        } else {
-          logger.warn(
-            { tenantId, scenarioRunId, traceId },
-            "Max retries reached for trace metrics (summary empty), giving up",
-          );
-        }
-
-        return [];
-      }
-
-      metrics = {
-        totalCost: traceSummary.totalCost ?? 0,
-        roleCosts,
-        roleLatencies,
-      };
-    }
+    if (!metrics) return [];
 
     const eventData: SimulationRunMetricsComputedEventData = {
       scenarioRunId,

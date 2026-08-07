@@ -44,6 +44,26 @@ import { EventRepositoryMemory } from "./stores/repositories/eventRepositoryMemo
 
 const logger = createLogger("langwatch:event-sourcing");
 
+// ADR-052 cutover tombstone: the legacy ReactorOutbox stack staged
+// settle/cadence/graphEval payloads onto the global queue. A deploy can race
+// jobs staged by the previous release, so recognize the legacy shape and
+// ACK-drop it with a log instead of parsing it as an event (which would
+// poison-retry). Removable after one release.
+// Intentionally loose for that one-release bridge: old payload revisions
+// did not share reliable routing metadata, so a matching top-level stage
+// is enough. Remove this stage-only matcher with the tombstone next release.
+const isLegacyOutboxPayload = (payload: Record<string, unknown>): boolean =>
+  payload.stage === "settle" ||
+  payload.stage === "cadence" ||
+  payload.stage === "graphEval";
+
+const dropLegacyOutboxPayload = (payload: Record<string, unknown>): void => {
+  logger.warn(
+    { stage: payload.stage, projectId: payload.projectId },
+    "Dropping legacy ReactorOutbox-era queue payload staged before the ADR-052 cutover",
+  );
+};
+
 /**
  * Options for constructing an EventSourcing instance.
  */
@@ -233,102 +253,175 @@ export class EventSourcing {
           "pipeline.aggregate_type": definition.metadata.aggregateType,
         },
       },
-      () => {
-        this._definitions.push(definition);
-
-        type ReturnType = PipelineWithCommandHandlers<
-          RegisteredPipeline<EventType, ProjectionTypes>,
-          [Commands] extends [NoCommands]
-            ? Record<string, EventSourcedQueueProcessor<any>>
-            : CommandsToProcessors<Commands>
-        >;
-
-        if (!this._enabled || !this.eventStore) {
-          logger.warn(
-            {
-              pipeline: definition.metadata.name,
-              isEnabled: this._enabled,
-              hasEventStore: !!this.eventStore,
-            },
-            "Returning DisabledPipeline - commands will be silently dropped",
-          );
-          this.logDisabledWarning({
-            pipeline: definition.metadata.name,
-          });
-          const disabled = new DisabledPipeline<EventType, ProjectionTypes>(
-            definition.metadata.name,
-            definition.metadata.aggregateType,
-            definition.metadata,
-          ) as ReturnType;
-          this.pipelines.set(definition.metadata.name, disabled);
-          return disabled;
-        }
-
-        const eventStore = this.eventStore as EventStore<EventType>;
-
-        const serviceOptions = buildServiceOptions(definition);
-
-        // Process managers consume their declaring pipeline's committed
-        // events directly through generated live subscribers.
-        if (definition.processManagers.size > 0) {
-          const artifacts = this.processRuntime.registerPipeline<EventType>({
-            pipelineName: definition.metadata.name,
-            processManagers: definition.processManagers,
-          });
-          if (artifacts.subscribers.length > 0) {
-            serviceOptions.subscribers = [
-              ...(serviceOptions.subscribers ?? []),
-              ...artifacts.subscribers,
-            ];
-          }
-        }
-
-        // Initialize the projection registry if it has projections and hasn't been initialized yet
-        if (
-          this.projectionRegistry.hasProjections &&
-          !this.projectionRegistry.isInitialized &&
-          this._globalQueue
-        ) {
-          this.projectionRegistry.initialize(
-            this._globalQueue,
-            this._globalJobRegistry,
-            this._processRole,
-          );
-        }
-
-        // Create the pipeline
-        const pipeline = new EventSourcingPipeline<EventType, ProjectionTypes>({
-          name: definition.metadata.name,
-          aggregateType: definition.metadata.aggregateType,
-          eventStore,
-          ...serviceOptions,
-          globalQueue: this._globalQueue,
-          globalJobRegistry: this._globalJobRegistry,
-          metadata: definition.metadata,
-          featureFlagService: definition.featureFlagService,
-          globalRegistry: this.projectionRegistry,
-          processRole: this._processRole,
-          replayMarkerChecker: this._redis
-            ? new RedisReplayMarkerChecker(this._redis)
-            : undefined,
-          retentionPolicyResolver: this._retentionPolicyResolver,
-        });
-
-        // Get command dispatchers
-        const commandProcessors = pipeline.service.getCommandQueues();
-        const dispatchers: Record<string, EventSourcedQueueProcessor<any>> = {};
-        for (const [commandName, processor] of commandProcessors.entries()) {
-          dispatchers[commandName] = processor;
-        }
-
-        const result = Object.assign(pipeline, {
-          commands: dispatchers,
-        }) as ReturnType;
-
-        this.pipelines.set(definition.metadata.name, result);
-        return result;
-      },
+      () => this.registerDefinition(definition),
     );
+  }
+
+  private registerDefinition<
+    EventType extends Event,
+    ProjectionTypes extends Record<string, Projection>,
+    Commands extends RegisteredCommand = NoCommands,
+  >(
+    definition: StaticPipelineDefinition<EventType, ProjectionTypes, Commands>,
+  ): PipelineWithCommandHandlers<
+    RegisteredPipeline<EventType, ProjectionTypes>,
+    [Commands] extends [NoCommands]
+      ? Record<string, EventSourcedQueueProcessor<any>>
+      : CommandsToProcessors<Commands>
+  > {
+    this._definitions.push(definition);
+
+    type ReturnType = PipelineWithCommandHandlers<
+      RegisteredPipeline<EventType, ProjectionTypes>,
+      [Commands] extends [NoCommands]
+        ? Record<string, EventSourcedQueueProcessor<any>>
+        : CommandsToProcessors<Commands>
+    >;
+
+    if (!this._enabled || !this.eventStore) {
+      return this.registerDisabledPipeline<
+        EventType,
+        ProjectionTypes,
+        Commands
+      >(definition) as ReturnType;
+    }
+
+    const eventStore = this.eventStore as EventStore<EventType>;
+    const serviceOptions = buildServiceOptions(definition);
+
+    this.wireProcessManagerSubscribers({ definition, serviceOptions });
+    this.ensureProjectionRegistryInitialized();
+
+    return this.finalizePipelineRegistration({
+      definition,
+      eventStore,
+      serviceOptions,
+    }) as ReturnType;
+  }
+
+  private registerDisabledPipeline<
+    EventType extends Event,
+    ProjectionTypes extends Record<string, Projection>,
+    Commands extends RegisteredCommand,
+  >(
+    definition: StaticPipelineDefinition<EventType, ProjectionTypes, Commands>,
+  ): DisabledPipeline<EventType, ProjectionTypes> {
+    logger.warn(
+      {
+        pipeline: definition.metadata.name,
+        isEnabled: this._enabled,
+        hasEventStore: !!this.eventStore,
+      },
+      "Returning DisabledPipeline - commands will be silently dropped",
+    );
+    this.logDisabledWarning({ pipeline: definition.metadata.name });
+    const disabled = new DisabledPipeline<EventType, ProjectionTypes>(
+      definition.metadata.name,
+      definition.metadata.aggregateType,
+      definition.metadata,
+    );
+    this.pipelines.set(definition.metadata.name, disabled);
+    return disabled;
+  }
+
+  /**
+   * Process managers consume their declaring pipeline's committed
+   * events directly through generated live subscribers.
+   */
+  private wireProcessManagerSubscribers<
+    EventType extends Event,
+    ProjectionTypes extends Record<string, Projection>,
+    Commands extends RegisteredCommand,
+  >({
+    definition,
+    serviceOptions,
+  }: {
+    definition: StaticPipelineDefinition<EventType, ProjectionTypes, Commands>;
+    serviceOptions: ReturnType<
+      typeof buildServiceOptions<EventType, ProjectionTypes>
+    >;
+  }): void {
+    if (definition.processManagers.size === 0) return;
+    const artifacts = this.processRuntime.registerPipeline<EventType>({
+      pipelineName: definition.metadata.name,
+      processManagers: definition.processManagers,
+    });
+    if (artifacts.subscribers.length > 0) {
+      serviceOptions.subscribers = [
+        ...(serviceOptions.subscribers ?? []),
+        ...artifacts.subscribers,
+      ];
+    }
+  }
+
+  private ensureProjectionRegistryInitialized(): void {
+    if (
+      this.projectionRegistry.hasProjections &&
+      !this.projectionRegistry.isInitialized &&
+      this._globalQueue
+    ) {
+      this.projectionRegistry.initialize(
+        this._globalQueue,
+        this._globalJobRegistry,
+        this._processRole,
+      );
+    }
+  }
+
+  private finalizePipelineRegistration<
+    EventType extends Event,
+    ProjectionTypes extends Record<string, Projection>,
+    Commands extends RegisteredCommand,
+  >({
+    definition,
+    eventStore,
+    serviceOptions,
+  }: {
+    definition: StaticPipelineDefinition<EventType, ProjectionTypes, Commands>;
+    eventStore: EventStore<EventType>;
+    serviceOptions: ReturnType<
+      typeof buildServiceOptions<EventType, ProjectionTypes>
+    >;
+  }): PipelineWithCommandHandlers<
+    RegisteredPipeline<EventType, ProjectionTypes>,
+    [Commands] extends [NoCommands]
+      ? Record<string, EventSourcedQueueProcessor<any>>
+      : CommandsToProcessors<Commands>
+  > {
+    const pipeline = new EventSourcingPipeline<EventType, ProjectionTypes>({
+      name: definition.metadata.name,
+      aggregateType: definition.metadata.aggregateType,
+      eventStore,
+      ...serviceOptions,
+      globalQueue: this._globalQueue,
+      globalJobRegistry: this._globalJobRegistry,
+      metadata: definition.metadata,
+      featureFlagService: definition.featureFlagService,
+      globalRegistry: this.projectionRegistry,
+      processRole: this._processRole,
+      replayMarkerChecker: this._redis
+        ? new RedisReplayMarkerChecker(this._redis)
+        : undefined,
+      retentionPolicyResolver: this._retentionPolicyResolver,
+    });
+
+    const commandProcessors = pipeline.service.getCommandQueues();
+    const dispatchers: Record<string, EventSourcedQueueProcessor<any>> = {};
+    for (const [commandName, processor] of commandProcessors.entries()) {
+      dispatchers[commandName] = processor;
+    }
+
+    const result = Object.assign(pipeline, {
+      commands: dispatchers,
+    }) as PipelineWithCommandHandlers<
+      RegisteredPipeline<EventType, ProjectionTypes>,
+      [Commands] extends [NoCommands]
+        ? Record<string, EventSourcedQueueProcessor<any>>
+        : CommandsToProcessors<Commands>
+    >;
+
+    this.pipelines.set(definition.metadata.name, result);
+    return result;
   }
 
   /**
@@ -519,99 +612,22 @@ export class EventSourcing {
   private createGlobalQueue(): void {
     const queueName = makeQueueName("event-sourcing/jobs");
 
-    // ADR-052 cutover tombstone: the legacy ReactorOutbox stack staged
-    // settle/cadence/graphEval payloads onto this queue. A deploy can race
-    // jobs staged by the previous release, so recognize the legacy shape and
-    // ACK-drop it with a log instead of parsing it as an event (which would
-    // poison-retry). Removable after one release.
-    // Intentionally loose for that one-release bridge: old payload revisions
-    // did not share reliable routing metadata, so a matching top-level stage
-    // is enough. Remove this stage-only matcher with the tombstone next release.
-    const isLegacyOutboxPayload = (payload: Record<string, unknown>): boolean =>
-      payload.stage === "settle" ||
-      payload.stage === "cadence" ||
-      payload.stage === "graphEval";
-    const dropLegacyOutboxPayload = (payload: Record<string, unknown>) => {
-      logger.warn(
-        { stage: payload.stage, projectId: payload.projectId },
-        "Dropping legacy ReactorOutbox-era queue payload staged before the ADR-052 cutover",
-      );
-    };
-
     const definition = {
       name: queueName,
-      groupKey: (payload: Record<string, unknown>) => {
-        if (isLegacyOutboxPayload(payload)) return "__legacy_outbox__";
-        const result = this.lookupEntry(payload);
-        if (!result) return "__unknown__";
-        return result.entry.groupKeyFn(result.clean);
-      },
-      score: (payload: Record<string, unknown>) => {
-        const result = this.lookupEntry(payload);
-        if (!result) return Date.now();
-        return result.entry.scoreFn(result.clean);
-      },
-      spanAttributes: (payload: Record<string, unknown>) => {
-        const result = this.lookupEntry(payload);
-        if (!result) return {};
-        if (!result.entry.spanAttributes) return {};
-        return result.entry.spanAttributes(result.clean);
-      },
-      process: async (payload: Record<string, unknown>) => {
-        if (isLegacyOutboxPayload(payload)) {
-          dropLegacyOutboxPayload(payload);
-          return;
-        }
-        const result = this.lookupEntry(payload);
-        if (!result) {
-          this.rejectUnroutableJob(payload, queueName);
-        }
-        await result.entry.process(result.clean);
-      },
-      coalesceMaxBatch: (payload: Record<string, unknown>) => {
-        const result = this.lookupEntry(payload);
-        if (!result) return 1;
-        // `clean`, not `payload`: a resolver sees the same shape the handler
-        // will, without this queue's routing metadata.
-        return resolveCoalesceMaxBatch(result.entry, result.clean);
-      },
-      coalesceMaxBytes: (payload: Record<string, unknown>) => {
-        // Resolve the same way as coalesceMaxBatch: per-job via routing meta.
-        // undefined falls back to the GroupQueue's DEFAULT_COALESCE_MAX_BYTES.
-        const result = this.lookupEntry(payload);
-        return result?.entry.coalesceMaxBytes;
-      },
-      processBatch: async (payloads: Record<string, unknown>[]) => {
-        if (payloads.length === 0) return;
-        // A coalesced batch is always one group → one registry entry. Resolve
-        // every payload and guard against a mixed/unknown batch (should never
-        // happen — the GroupQueue only coalesces same-group jobs — but a stray
-        // payload must never be misrouted to the wrong handler). On any mismatch
-        // fall back to per-item processing.
-        const survivors = payloads.filter((p) => {
-          if (isLegacyOutboxPayload(p)) {
-            dropLegacyOutboxPayload(p);
-            return false;
-          }
-          return true;
-        });
-        if (survivors.length === 0) return;
-        const first = this.lookupEntry(survivors[0]!);
-        const resolved = survivors.map((payload) => this.lookupEntry(payload));
-        const homogeneous =
-          !!first?.entry.processBatch &&
-          resolved.every((r) => r?.entry === first.entry);
-        if (!homogeneous) {
-          for (const [index, result] of resolved.entries()) {
-            if (!result) {
-              this.rejectUnroutableJob(survivors[index]!, queueName);
-            }
-            await result.entry.process(result.clean);
-          }
-          return;
-        }
-        await first.entry.processBatch!(resolved.map((r) => r!.clean));
-      },
+      groupKey: (payload: Record<string, unknown>) =>
+        this.globalQueueGroupKey(payload),
+      score: (payload: Record<string, unknown>) =>
+        this.globalQueueScore(payload),
+      spanAttributes: (payload: Record<string, unknown>) =>
+        this.globalQueueSpanAttributes(payload),
+      process: (payload: Record<string, unknown>) =>
+        this.processGlobalQueueJob({ payload, queueName }),
+      coalesceMaxBatch: (payload: Record<string, unknown>) =>
+        this.globalQueueCoalesceMaxBatch(payload),
+      coalesceMaxBytes: (payload: Record<string, unknown>) =>
+        this.globalQueueCoalesceMaxBytes(payload),
+      processBatch: (payloads: Record<string, unknown>[]) =>
+        this.processGlobalQueueBatch({ payloads, queueName }),
     };
 
     const effectiveRedis = this._redis;
@@ -623,6 +639,119 @@ export class EventSourcing {
       });
     } else {
       this._globalQueue = new EventSourcedQueueProcessorMemory(definition);
+    }
+  }
+
+  private globalQueueGroupKey(payload: Record<string, unknown>): string {
+    if (isLegacyOutboxPayload(payload)) return "__legacy_outbox__";
+    const result = this.lookupEntry(payload);
+    if (!result) return "__unknown__";
+    return result.entry.groupKeyFn(result.clean);
+  }
+
+  private globalQueueScore(payload: Record<string, unknown>): number {
+    const result = this.lookupEntry(payload);
+    if (!result) return Date.now();
+    return result.entry.scoreFn(result.clean);
+  }
+
+  private globalQueueSpanAttributes(payload: Record<string, unknown>) {
+    const result = this.lookupEntry(payload);
+    if (!result) return {};
+    if (!result.entry.spanAttributes) return {};
+    return result.entry.spanAttributes(result.clean);
+  }
+
+  private async processGlobalQueueJob({
+    payload,
+    queueName,
+  }: {
+    payload: Record<string, unknown>;
+    queueName: string;
+  }): Promise<void> {
+    if (isLegacyOutboxPayload(payload)) {
+      dropLegacyOutboxPayload(payload);
+      return;
+    }
+    const result = this.lookupEntry(payload);
+    if (!result) {
+      this.rejectUnroutableJob(payload, queueName);
+    }
+    await result.entry.process(result.clean);
+  }
+
+  private globalQueueCoalesceMaxBatch(
+    payload: Record<string, unknown>,
+  ): number {
+    const result = this.lookupEntry(payload);
+    if (!result) return 1;
+    // `clean`, not `payload`: a resolver sees the same shape the handler
+    // will, without this queue's routing metadata.
+    return resolveCoalesceMaxBatch(result.entry, result.clean);
+  }
+
+  private globalQueueCoalesceMaxBytes(
+    payload: Record<string, unknown>,
+  ): number | undefined {
+    // Resolve the same way as coalesceMaxBatch: per-job via routing meta.
+    // undefined falls back to the GroupQueue's DEFAULT_COALESCE_MAX_BYTES.
+    const result = this.lookupEntry(payload);
+    return result?.entry.coalesceMaxBytes;
+  }
+
+  /**
+   * A coalesced batch is always one group → one registry entry. Resolve
+   * every payload and guard against a mixed/unknown batch (should never
+   * happen — the GroupQueue only coalesces same-group jobs — but a stray
+   * payload must never be misrouted to the wrong handler). On any mismatch
+   * fall back to per-item processing.
+   */
+  private async processGlobalQueueBatch({
+    payloads,
+    queueName,
+  }: {
+    payloads: Record<string, unknown>[];
+    queueName: string;
+  }): Promise<void> {
+    if (payloads.length === 0) return;
+    const survivors = payloads.filter((p) => {
+      if (isLegacyOutboxPayload(p)) {
+        dropLegacyOutboxPayload(p);
+        return false;
+      }
+      return true;
+    });
+    if (survivors.length === 0) return;
+    const first = this.lookupEntry(survivors[0]!);
+    const resolved = survivors.map((payload) => this.lookupEntry(payload));
+    const homogeneous =
+      !!first?.entry.processBatch &&
+      resolved.every((r) => r?.entry === first.entry);
+    if (!homogeneous) {
+      await this.processGlobalQueueBatchIndividually({
+        survivors,
+        resolved,
+        queueName,
+      });
+      return;
+    }
+    await first.entry.processBatch!(resolved.map((r) => r!.clean));
+  }
+
+  private async processGlobalQueueBatchIndividually({
+    survivors,
+    resolved,
+    queueName,
+  }: {
+    survivors: Record<string, unknown>[];
+    resolved: ReturnType<EventSourcing["lookupEntry"]>[];
+    queueName: string;
+  }): Promise<void> {
+    for (const [index, result] of resolved.entries()) {
+      if (!result) {
+        this.rejectUnroutableJob(survivors[index]!, queueName);
+      }
+      await result.entry.process(result.clean);
     }
   }
 

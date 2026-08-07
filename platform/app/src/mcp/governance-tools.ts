@@ -77,17 +77,20 @@ interface ResolvedContext {
   callerUserId?: string;
 }
 
+const text = (value: string) => ({
+  content: [{ type: "text" as const, text: value }],
+});
+const json = (value: unknown) => text(JSON.stringify(value, null, 2));
+
 /**
- * Registers the 11 governance MCP tools on the given session-scoped
- * McpServer. Resolves the caller's organization from the apiKey lazily on
- * the first tool invocation and caches per-session.
+ * Resolves the caller's organization from the apiKey lazily on the first tool
+ * invocation and caches it per-session.
  */
-export function registerGovernanceMcpTools(
-  server: McpServerLike,
+function createOrganizationResolver(
   ctx: GovernanceMcpContext,
-): void {
+): () => Promise<ResolvedContext> {
   let resolvedPromise: Promise<ResolvedContext> | null = null;
-  const resolve = async (): Promise<ResolvedContext> => {
+  return async (): Promise<ResolvedContext> => {
     if (!resolvedPromise) {
       resolvedPromise = (async () => {
         const project = await ctx.prisma.project.findUnique({
@@ -107,60 +110,76 @@ export function registerGovernanceMcpTools(
     }
     return resolvedPromise;
   };
+}
 
-  const requirePermission = async (
-    rctx: ResolvedContext,
-    permission: Permission,
-  ): Promise<string | null> => {
-    if (!rctx.callerUserId) {
-      return `${NEEDS_OAUTH_PREFIX}This governance MCP tool requires an OAuth-authenticated session (mint via /api/mcp/authorize). Project-apiKey-only sessions can use read tools but cannot perform writes.`;
-    }
-    const allowed = await hasOrganizationPermission(
-      {
-        prisma: ctx.prisma,
-        session: { user: { id: rctx.callerUserId } } as any,
-      },
-      rctx.organizationId,
-      permission,
-    );
-    if (!allowed) {
-      return `${FORBIDDEN_PREFIX}caller lacks permission '${permission}' on organization ${rctx.organizationId}`;
-    }
-    return null;
-  };
+/** Returns the FORBIDDEN message when the caller lacks the permission, null otherwise. */
+async function denyUnlessPermitted({
+  ctx,
+  rctx,
+  permission,
+}: {
+  ctx: GovernanceMcpContext;
+  rctx: ResolvedContext;
+  permission: Permission;
+}): Promise<string | null> {
+  const allowed = await hasOrganizationPermission(
+    {
+      prisma: ctx.prisma,
+      session: { user: { id: rctx.callerUserId } } as any,
+    },
+    rctx.organizationId,
+    permission,
+  );
+  if (!allowed) {
+    return `${FORBIDDEN_PREFIX}caller lacks permission '${permission}' on organization ${rctx.organizationId}`;
+  }
+  return null;
+}
 
-  const requireRead = async (
-    rctx: ResolvedContext,
-    permission: Permission,
-  ): Promise<string | null> => {
+type PermissionGuard = (
+  rctx: ResolvedContext,
+  permission: Permission,
+) => Promise<string | null>;
+
+interface GovernanceGuards {
+  resolve: () => Promise<ResolvedContext>;
+  requirePermission: PermissionGuard;
+  requireRead: PermissionGuard;
+}
+
+function createGovernanceGuards(ctx: GovernanceMcpContext): GovernanceGuards {
+  return {
+    resolve: createOrganizationResolver(ctx),
+    requirePermission: async (rctx, permission) => {
+      if (!rctx.callerUserId) {
+        return `${NEEDS_OAUTH_PREFIX}This governance MCP tool requires an OAuth-authenticated session (mint via /api/mcp/authorize). Project-apiKey-only sessions can use read tools but cannot perform writes.`;
+      }
+      return denyUnlessPermitted({ ctx, rctx, permission });
+    },
     // Read tools may run without callerUserId (project-apiKey sessions),
     // since the legacy MCP auth path is project-scoped and the org is
     // implicit. Only enforce permission when a userId is present.
-    if (!rctx.callerUserId) return null;
-    const allowed = await hasOrganizationPermission(
-      {
-        prisma: ctx.prisma,
-        session: { user: { id: rctx.callerUserId } } as any,
-      },
-      rctx.organizationId,
-      permission,
-    );
-    if (!allowed) {
-      return `${FORBIDDEN_PREFIX}caller lacks permission '${permission}' on organization ${rctx.organizationId}`;
-    }
-    return null;
+    requireRead: async (rctx, permission) => {
+      if (!rctx.callerUserId) return null;
+      return denyUnlessPermitted({ ctx, rctx, permission });
+    },
   };
+}
 
-  const templateService = IngestionTemplateService.create(ctx.prisma);
-  const ingestionKeyService = IngestionKeyService.create(ctx.prisma);
+interface GovernanceToolDeps extends GovernanceGuards {
+  server: McpServerLike;
+  templateService: IngestionTemplateService;
+  ingestionKeyService: IngestionKeyService;
+}
 
-  const text = (value: string) => ({
-    content: [{ type: "text" as const, text: value }],
-  });
-  const json = (value: unknown) => text(JSON.stringify(value, null, 2));
+// ── IngestionTemplate ────────────────────────────────────────────────
 
-  // ── IngestionTemplate ────────────────────────────────────────────────
-
+function registerTemplatesListTool({
+  server,
+  resolve,
+  requireRead,
+  templateService,
+}: GovernanceToolDeps): void {
   server.tool(
     "governance_ingestion_templates_list",
     "List the user-visible ingestion templates for the caller's organization. Returns the union of platform-published defaults and any org-authored rows; excludes the OTTL source. Mirrors GET /api/governance/ingestion-templates.",
@@ -175,7 +194,14 @@ export function registerGovernanceMcpTools(
       return json(rows);
     },
   );
+}
 
+function registerTemplatesAdminListTool({
+  server,
+  resolve,
+  requirePermission,
+  templateService,
+}: GovernanceToolDeps): void {
   server.tool(
     "governance_ingestion_templates_admin_list",
     "Admin catalog read — same union as the user-visible list but INCLUDES ottlRules. Requires aiTools:manage. Mirrors GET /api/governance/ingestion-templates/admin.",
@@ -193,7 +219,14 @@ export function registerGovernanceMcpTools(
       return json(rows);
     },
   );
+}
 
+function registerTemplatesGetTool({
+  server,
+  resolve,
+  requireRead,
+  templateService,
+}: GovernanceToolDeps): void {
   server.tool(
     "governance_ingestion_templates_get",
     "Fetch a single ingestion template by id. Cross-org probes return null. Mirrors GET /api/governance/ingestion-templates/:id.",
@@ -209,7 +242,14 @@ export function registerGovernanceMcpTools(
       return json(row);
     },
   );
+}
 
+function registerTemplatesCreateTool({
+  server,
+  resolve,
+  requirePermission,
+  templateService,
+}: GovernanceToolDeps): void {
   server.tool(
     "governance_ingestion_templates_create",
     "Author a new org-scoped ingestion template. The slug is auto-generated from displayName + a random suffix. Requires aiTools:manage. Mirrors POST /api/governance/ingestion-templates.",
@@ -243,7 +283,14 @@ export function registerGovernanceMcpTools(
       return json(row);
     },
   );
+}
 
+function registerTemplatesUpdateOttlRulesTool({
+  server,
+  resolve,
+  requirePermission,
+  templateService,
+}: GovernanceToolDeps): void {
   server.tool(
     "governance_ingestion_templates_update_ottl_rules",
     "Update the ottlRules of an org-authored template. Platform rows are immutable. Requires aiTools:manage. Mirrors PATCH /api/governance/ingestion-templates/:id/ottl-rules.",
@@ -267,7 +314,14 @@ export function registerGovernanceMcpTools(
       return json(row);
     },
   );
+}
 
+function registerTemplatesCloneFromPlatformTool({
+  server,
+  resolve,
+  requirePermission,
+  templateService,
+}: GovernanceToolDeps): void {
   server.tool(
     "governance_ingestion_templates_clone_from_platform",
     "Clone a platform-published template into an editable org-authored row. Requires aiTools:manage. Mirrors POST /api/governance/ingestion-templates/:id/clone.",
@@ -285,7 +339,14 @@ export function registerGovernanceMcpTools(
       return json(row);
     },
   );
+}
 
+function registerTemplatesArchiveTool({
+  server,
+  resolve,
+  requirePermission,
+  templateService,
+}: GovernanceToolDeps): void {
   server.tool(
     "governance_ingestion_templates_archive",
     "Soft-archive an org-authored template. Existing ingestion keys continue to land traces; new installs are blocked. Requires aiTools:manage. Mirrors DELETE /api/governance/ingestion-templates/:id.",
@@ -303,9 +364,16 @@ export function registerGovernanceMcpTools(
       return text(`archived ${id}`);
     },
   );
+}
 
-  // ── Ingestion keys ──────────────────────────────────────────────────
+// ── Ingestion keys ──────────────────────────────────────────────────
 
+function registerIngestionKeysListTool({
+  server,
+  resolve,
+  requireRead,
+  ingestionKeyService,
+}: GovernanceToolDeps): void {
   server.tool(
     "governance_ingestion_keys_list",
     "List the caller's live ingestion keys (one per connected source) in their personal project. Requires OAuth-authenticated session + organization:view.",
@@ -326,7 +394,14 @@ export function registerGovernanceMcpTools(
       return json(rows);
     },
   );
+}
 
+function registerIngestionKeysMintTool({
+  server,
+  resolve,
+  requirePermission,
+  ingestionKeyService,
+}: GovernanceToolDeps): void {
   server.tool(
     "governance_ingestion_keys_mint",
     "Mint (rotating in place) an ingestion key for the caller's personal project + source_type, returning the sk-lw-* token (shown ONCE). Requires OAuth-authenticated session + organization:view.",
@@ -347,4 +422,31 @@ export function registerGovernanceMcpTools(
       return json(result);
     },
   );
+}
+
+/**
+ * Registers the 11 governance MCP tools on the given session-scoped
+ * McpServer. Resolves the caller's organization from the apiKey lazily on
+ * the first tool invocation and caches per-session.
+ */
+export function registerGovernanceMcpTools(
+  server: McpServerLike,
+  ctx: GovernanceMcpContext,
+): void {
+  const deps: GovernanceToolDeps = {
+    server,
+    ...createGovernanceGuards(ctx),
+    templateService: IngestionTemplateService.create(ctx.prisma),
+    ingestionKeyService: IngestionKeyService.create(ctx.prisma),
+  };
+
+  registerTemplatesListTool(deps);
+  registerTemplatesAdminListTool(deps);
+  registerTemplatesGetTool(deps);
+  registerTemplatesCreateTool(deps);
+  registerTemplatesUpdateOttlRulesTool(deps);
+  registerTemplatesCloneFromPlatformTool(deps);
+  registerTemplatesArchiveTool(deps);
+  registerIngestionKeysListTool(deps);
+  registerIngestionKeysMintTool(deps);
 }

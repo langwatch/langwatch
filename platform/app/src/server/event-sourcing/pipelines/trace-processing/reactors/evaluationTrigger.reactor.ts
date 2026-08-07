@@ -58,6 +58,106 @@ function isDispatchableEvaluationEvent(event: TraceProcessingEvent): boolean {
 }
 
 /**
+ * Oversized-trace guard (2026-05-28 incident follow-up). Past the same
+ * processing cap the fold uses to stop deriving the summary
+ * (MAX_PROCESSED_SPANS), a trace is a runaway / reused trace_id and is too
+ * large to keep evaluating: re-running every ON_MESSAGE monitor per span
+ * on a 26k-span trace is pure amplification for no added signal.
+ */
+function isOverProcessingCap(foldState: TraceSummaryData): boolean {
+  return foldState.spanCount >= MAX_PROCESSED_SPANS;
+}
+
+/**
+ * Log once, on the first crossing only. A runaway trace would otherwise
+ * emit thousands of identical warns — the very per-span amplification the
+ * oversized-trace guard exists to avoid. This stays in `handle`, not in the
+ * pre-enqueue `shouldReact`, so the warn fires once: `shouldReact` runs per
+ * event of a coalesced batch, and would multiply the log by the batch size.
+ */
+function warnIfProcessingCapJustCrossed({
+  tenantId,
+  traceId,
+  foldState,
+}: {
+  tenantId: string;
+  traceId: string;
+  foldState: TraceSummaryData;
+}): void {
+  if (foldState.spanCount !== MAX_PROCESSED_SPANS) return;
+  logger.warn(
+    {
+      tenantId,
+      observedTraceId: traceId,
+      spanCount: foldState.spanCount,
+      cap: MAX_PROCESSED_SPANS,
+    },
+    "Skipping evaluation dispatch: trace reached the processing cap (spans still stored)",
+  );
+}
+
+/**
+ * Infinite-loop prevention (post-2026-05-11 incident). See
+ * specs/monitors/online-evaluator-loop-prevention.feature.
+ *
+ * Depth-only per-span check (origin remains a user-configurable
+ * precondition, not a hardcoded reactor rule): if the inbound
+ * span's own `langwatch.reserved.causality_depth` attribute is
+ * >= 1, it was emitted by an evaluator workflow (or downstream
+ * of one). Skip dispatch.
+ *
+ * A fresh app-origin span on the same trace (depth 0) still
+ * triggers normally — re-runs are allowed, only eval spans are
+ * blocked.
+ *
+ * The primary guarantee that every eval-emitted span carries the
+ * attribute is the nlpgo-side BaggageAttributeProcessor (stamps
+ * every span at OnStart from a single baggage entry on context).
+ *
+ * Kill-switch: SYSTEM flag `ops_es_causality_loop_guard_disabled`
+ * bypasses the check (emergency rollback without redeploy).
+ * Resolved through featureFlagService so operators can flip it
+ * from the Ops UI without restarting pods; the legacy
+ * `LANGWATCH_DISABLE_CAUSALITY_LOOP_GUARD=1` env var still works
+ * via the standard env-override path (uppercased flag key).
+ */
+async function shouldSkipForCausalityLoop({
+  event,
+  tenantId,
+  traceId,
+}: {
+  event: TraceProcessingEvent;
+  tenantId: string;
+  traceId: string;
+}): Promise<boolean> {
+  const guardDisabled = await featureFlagService.isEnabled(
+    CAUSALITY_LOOP_GUARD_DISABLED_FLAG,
+    { distinctId: tenantId, defaultValue: false },
+  );
+
+  if (!guardDisabled && isSpanReceivedEvent(event)) {
+    const reason = detectCausalityLoop({
+      spanAttributes: event.data.span.attributes,
+    });
+    if (reason) {
+      recordLoopBlocked(reason);
+      logger.warn(
+        { tenantId, observedTraceId: traceId, reason },
+        "Skipping evaluation dispatch — causality loop guard fired",
+      );
+      return true;
+    }
+  } else if (guardDisabled) {
+    logger.warn(
+      { tenantId, observedTraceId: traceId },
+      "ops_es_causality_loop_guard_disabled is on, loop guard bypassed",
+    );
+  }
+
+  return false;
+}
+
+/**
  * Dispatches evaluation commands for traces that have a resolved origin.
  *
  * Fires on every trace event (via traceSummary fold). If origin is absent,
@@ -75,82 +175,13 @@ export function createEvaluationTriggerReactor(
     async handle(event, context) {
       const { tenantId, aggregateId: traceId, foldState } = context;
 
-      // Oversized-trace guard (2026-05-28 incident follow-up). Past the same
-      // processing cap the fold uses to stop deriving the summary
-      // (MAX_PROCESSED_SPANS), a trace is a runaway / reused trace_id and is too
-      // large to keep evaluating: re-running every ON_MESSAGE monitor per span
-      // on a 26k-span trace is pure amplification for no added signal. Skip the
-      // eval dispatch (lighter processing). The span itself is still stored and
-      // the trace stays fully queryable: we drop the WORK, never the DATA.
-      //
-      // This stays in `handle`, not in the pre-enqueue `shouldReact`, so the
-      // once-per-crossing warn below fires once: `shouldReact` runs per event of
-      // a coalesced batch, and would multiply the log by the batch size. The
-      // enqueue it no longer skips is already collapsed to one job per batch by
-      // the router's dedup-id collapse, so there is nothing left to save.
-      if (foldState.spanCount >= MAX_PROCESSED_SPANS) {
-        // Log once, on the first crossing only. A runaway trace would otherwise
-        // emit thousands of identical warns — the very per-span amplification we
-        // are skipping the eval to avoid.
-        if (foldState.spanCount === MAX_PROCESSED_SPANS) {
-          logger.warn(
-            {
-              tenantId,
-              observedTraceId: traceId,
-              spanCount: foldState.spanCount,
-              cap: MAX_PROCESSED_SPANS,
-            },
-            "Skipping evaluation dispatch: trace reached the processing cap (spans still stored)",
-          );
-        }
+      if (isOverProcessingCap(foldState)) {
+        warnIfProcessingCapJustCrossed({ tenantId, traceId, foldState });
         return;
       }
 
-      // Infinite-loop prevention (post-2026-05-11 incident). See
-      // specs/monitors/online-evaluator-loop-prevention.feature.
-      //
-      // Depth-only per-span check (origin remains a user-configurable
-      // precondition, not a hardcoded reactor rule): if the inbound
-      // span's own `langwatch.reserved.causality_depth` attribute is
-      // >= 1, it was emitted by an evaluator workflow (or downstream
-      // of one). Skip dispatch.
-      //
-      // A fresh app-origin span on the same trace (depth 0) still
-      // triggers normally — re-runs are allowed, only eval spans are
-      // blocked.
-      //
-      // The primary guarantee that every eval-emitted span carries the
-      // attribute is the nlpgo-side BaggageAttributeProcessor (stamps
-      // every span at OnStart from a single baggage entry on context).
-      //
-      // Kill-switch: SYSTEM flag `ops_es_causality_loop_guard_disabled`
-      // bypasses the check (emergency rollback without redeploy).
-      // Resolved through featureFlagService so operators can flip it
-      // from the Ops UI without restarting pods; the legacy
-      // `LANGWATCH_DISABLE_CAUSALITY_LOOP_GUARD=1` env var still works
-      // via the standard env-override path (uppercased flag key).
-      const guardDisabled = await featureFlagService.isEnabled(
-        CAUSALITY_LOOP_GUARD_DISABLED_FLAG,
-        { distinctId: tenantId, defaultValue: false },
-      );
-
-      if (!guardDisabled && isSpanReceivedEvent(event)) {
-        const reason = detectCausalityLoop({
-          spanAttributes: event.data.span.attributes,
-        });
-        if (reason) {
-          recordLoopBlocked(reason);
-          logger.warn(
-            { tenantId, observedTraceId: traceId, reason },
-            "Skipping evaluation dispatch — causality loop guard fired",
-          );
-          return;
-        }
-      } else if (guardDisabled) {
-        logger.warn(
-          { tenantId, observedTraceId: traceId },
-          "ops_es_causality_loop_guard_disabled is on, loop guard bypassed",
-        );
+      if (await shouldSkipForCausalityLoop({ event, tenantId, traceId })) {
+        return;
       }
 
       // Origin is known — dispatch to monitors, precondition matchers filter by origin.
@@ -180,6 +211,25 @@ export function detectCausalityLoop(params: {
 }
 
 /**
+ * Handle OTLP AnyValue: { intValue?, stringValue?, doubleValue? }
+ */
+function unwrapOtlpAnyValue(value: unknown): unknown {
+  if (value && typeof value === "object") {
+    const anyValue = value as Record<string, unknown>;
+    return (
+      anyValue.intValue ?? anyValue.stringValue ?? anyValue.doubleValue ?? value
+    );
+  }
+  return value;
+}
+
+function coerceToFiniteNumber(raw: unknown): number {
+  if (typeof raw === "number") return raw;
+  if (typeof raw === "string") return Number.parseInt(raw, 10);
+  return NaN;
+}
+
+/**
  * OTLP spans deliver attributes as `[{key, value: AnyValue}]` arrays.
  * AnyValue is a union — string/int/bool/double/array. We accept any
  * encoding that parses to a positive finite integer.
@@ -190,22 +240,7 @@ function extractCausalityDepthFromOtlpAttrs(
   if (!Array.isArray(attrs)) return 0;
   for (const attr of attrs) {
     if (attr?.key !== CAUSALITY_DEPTH_ATTR) continue;
-    const v = attr.value as Record<string, unknown> | number | string | null;
-    let raw: unknown = v;
-    if (v && typeof v === "object") {
-      // Handle OTLP AnyValue: { intValue?, stringValue?, doubleValue? }
-      raw =
-        (v as Record<string, unknown>).intValue ??
-        (v as Record<string, unknown>).stringValue ??
-        (v as Record<string, unknown>).doubleValue ??
-        v;
-    }
-    const n =
-      typeof raw === "number"
-        ? raw
-        : typeof raw === "string"
-          ? Number.parseInt(raw, 10)
-          : NaN;
+    const n = coerceToFiniteNumber(unwrapOtlpAnyValue(attr.value));
     if (Number.isFinite(n) && n > 0) return n;
   }
   return 0;
@@ -221,6 +256,154 @@ function recordLoopBlocked(reason: string): void {
 // Internal helpers
 // ---------------------------------------------------------------------------
 
+/**
+ * Additional metadata for expanded precondition matching, derived once per
+ * trace and shared across every monitor's dispatch below.
+ */
+function buildEvaluationDispatchContext({
+  foldState,
+}: {
+  foldState: TraceSummaryData;
+}) {
+  const attrs = foldState.attributes ?? {};
+  return {
+    threadId: attrs["gen_ai.conversation.id"],
+    userId: attrs["langwatch.user_id"],
+    customerId: attrs["langwatch.customer_id"],
+    labels: parseLabels(attrs["langwatch.labels"]),
+    origin: attrs["langwatch.origin"],
+    hasError: foldState.containsErrorStatus,
+    promptIds: parseLabels(attrs["langwatch.prompt_ids"]),
+    topicId: foldState.topicId ?? undefined,
+    subTopicId: foldState.subTopicId ?? undefined,
+    spanModels: foldState.models.length > 0 ? foldState.models : undefined,
+    customMetadata: extractCustomMetadata(attrs),
+    computedInput: foldState.computedInput ?? undefined,
+    computedOutput: foldState.computedOutput ?? undefined,
+  };
+}
+
+function buildExecuteEvaluationPayload({
+  tenantId,
+  traceId,
+  evaluationId,
+  occurredAt,
+  monitor,
+  dispatchContext,
+}: {
+  tenantId: string;
+  traceId: string;
+  evaluationId: string;
+  occurredAt: number;
+  monitor: Awaited<
+    ReturnType<MonitorService["getEnabledOnMessageMonitors"]>
+  >[number];
+  dispatchContext: ReturnType<typeof buildEvaluationDispatchContext>;
+}): ExecuteEvaluationCommandData {
+  return {
+    tenantId,
+    traceId,
+    evaluationId,
+    evaluatorId: monitor.id,
+    evaluatorType: monitor.checkType,
+    evaluatorName: monitor.evaluator?.name ?? monitor.name,
+    isGuardrail: false,
+    occurredAt,
+    threadIdleTimeout: monitor.threadIdleTimeout ?? undefined,
+    ...dispatchContext,
+  };
+}
+
+function buildEvaluationSendOptions({
+  monitor,
+  threadId,
+}: {
+  monitor: Awaited<
+    ReturnType<MonitorService["getEnabledOnMessageMonitors"]>
+  >[number];
+  threadId: string | undefined;
+}): QueueSendOptions<ExecuteEvaluationCommandData> {
+  const isThreadLevel =
+    monitor.threadIdleTimeout && monitor.threadIdleTimeout > 0 && threadId;
+
+  if (isThreadLevel) {
+    return {
+      delay: monitor.threadIdleTimeout! * 1000,
+      deduplication: {
+        makeId: ExecuteEvaluationCommand.makeJobId,
+        ttlMs: monitor.threadIdleTimeout! * 1000,
+        // Defensive on this branch: the thread dedup TTL roughly equals the
+        // dispatch delay (both = threadIdleTimeout), so the post-dispatch
+        // squash window is ~0. The load-bearing fix is the trace-level
+        // deferred branch below (6-min TTL >> dispatch latency) (#3912).
+        shouldSurviveDispatch: true,
+      },
+    };
+  }
+
+  return {
+    deduplication: {
+      makeId: ExecuteEvaluationCommand.makeJobId,
+      // 6 min — outlasts the 5-min deferred origin resolution window
+      // so that if the reactor fires twice (once from a late span,
+      // once from the deferred OriginResolvedEvent), the second
+      // dispatch is squashed by the dedup key.
+      ttlMs: DEFERRED_CHECK_DELAY_MS + 60_000,
+      // Honor the still-alive dedup key even after the first command was
+      // dispatched, so the second trigger is squashed rather than
+      // DEL+restaged into a duplicate evaluation run (#3912).
+      shouldSurviveDispatch: true,
+    },
+  };
+}
+
+async function dispatchToMonitor({
+  deps,
+  tenantId,
+  traceId,
+  occurredAt,
+  monitor,
+  dispatchContext,
+}: {
+  deps: EvaluationTriggerReactorDeps;
+  tenantId: string;
+  traceId: string;
+  occurredAt: number;
+  monitor: Awaited<
+    ReturnType<MonitorService["getEnabledOnMessageMonitors"]>
+  >[number];
+  dispatchContext: ReturnType<typeof buildEvaluationDispatchContext>;
+}): Promise<void> {
+  const evaluationId = generate(KSUID_RESOURCES.EVALUATION).toString();
+  try {
+    const payload = buildExecuteEvaluationPayload({
+      tenantId,
+      traceId,
+      evaluationId,
+      occurredAt,
+      monitor,
+      dispatchContext,
+    });
+    const sendOptions = buildEvaluationSendOptions({
+      monitor,
+      threadId: dispatchContext.threadId,
+    });
+
+    await deps.evaluation(payload, sendOptions);
+  } catch (error) {
+    logger.error(
+      {
+        tenantId,
+        traceId,
+        evaluationId,
+        evaluatorId: monitor.id,
+        error: error instanceof Error ? error.message : String(error),
+      },
+      "Failed to send executeEvaluation command",
+    );
+  }
+}
+
 async function dispatchEvaluations({
   deps,
   tenantId,
@@ -234,104 +417,23 @@ async function dispatchEvaluations({
   foldState: TraceSummaryData;
   occurredAt: number;
 }): Promise<void> {
-  const attrs = foldState.attributes ?? {};
-
   // Read all enabled ON_MESSAGE monitors for this project
   const monitors = await deps.monitors.getEnabledOnMessageMonitors(tenantId);
 
   if (monitors.length === 0) return;
 
+  const dispatchContext = buildEvaluationDispatchContext({ foldState });
+
   // Send executeEvaluation command per monitor (dedup + 30s delay handles the rest)
-  const threadId = attrs["gen_ai.conversation.id"];
-  const userId = attrs["langwatch.user_id"];
-  const customerId = attrs["langwatch.customer_id"];
-  const labels = parseLabels(attrs["langwatch.labels"]);
-  const origin = attrs["langwatch.origin"];
-  const hasError = foldState.containsErrorStatus;
-  const promptIds = parseLabels(attrs["langwatch.prompt_ids"]);
-
-  // Additional metadata for expanded precondition matching
-  const topicId = foldState.topicId ?? undefined;
-  const subTopicId = foldState.subTopicId ?? undefined;
-  const spanModels = foldState.models.length > 0 ? foldState.models : undefined;
-  const customMetadata = extractCustomMetadata(attrs);
-  const computedInput = foldState.computedInput ?? undefined;
-  const computedOutput = foldState.computedOutput ?? undefined;
-
   for (const monitor of monitors) {
-    const evaluationId = generate(KSUID_RESOURCES.EVALUATION).toString();
-    try {
-      const payload: ExecuteEvaluationCommandData = {
-        tenantId,
-        traceId,
-        evaluationId,
-        evaluatorId: monitor.id,
-        evaluatorType: monitor.checkType,
-        evaluatorName: monitor.evaluator?.name ?? monitor.name,
-        isGuardrail: false,
-        occurredAt,
-        threadIdleTimeout: monitor.threadIdleTimeout ?? undefined,
-        threadId,
-        userId,
-        customerId,
-        labels,
-        origin,
-        hasError,
-        promptIds,
-        topicId,
-        subTopicId,
-        customMetadata,
-        spanModels,
-        computedInput,
-        computedOutput,
-      };
-
-      const isThreadLevel =
-        monitor.threadIdleTimeout && monitor.threadIdleTimeout > 0 && threadId;
-
-      const sendOptions:
-        | QueueSendOptions<ExecuteEvaluationCommandData>
-        | undefined = isThreadLevel
-        ? {
-            delay: monitor.threadIdleTimeout! * 1000,
-            deduplication: {
-              makeId: ExecuteEvaluationCommand.makeJobId,
-              ttlMs: monitor.threadIdleTimeout! * 1000,
-              // Defensive on this branch: the thread dedup TTL roughly equals the
-              // dispatch delay (both = threadIdleTimeout), so the post-dispatch
-              // squash window is ~0. The load-bearing fix is the trace-level
-              // deferred branch below (6-min TTL >> dispatch latency) (#3912).
-              shouldSurviveDispatch: true,
-            },
-          }
-        : {
-            deduplication: {
-              makeId: ExecuteEvaluationCommand.makeJobId,
-              // 6 min — outlasts the 5-min deferred origin resolution window
-              // so that if the reactor fires twice (once from a late span,
-              // once from the deferred OriginResolvedEvent), the second
-              // dispatch is squashed by the dedup key.
-              ttlMs: DEFERRED_CHECK_DELAY_MS + 60_000,
-              // Honor the still-alive dedup key even after the first command was
-              // dispatched, so the second trigger is squashed rather than
-              // DEL+restaged into a duplicate evaluation run (#3912).
-              shouldSurviveDispatch: true,
-            },
-          };
-
-      await deps.evaluation(payload, sendOptions);
-    } catch (error) {
-      logger.error(
-        {
-          tenantId,
-          traceId,
-          evaluationId,
-          evaluatorId: monitor.id,
-          error: error instanceof Error ? error.message : String(error),
-        },
-        "Failed to send executeEvaluation command",
-      );
-    }
+    await dispatchToMonitor({
+      deps,
+      tenantId,
+      traceId,
+      occurredAt,
+      monitor,
+      dispatchContext,
+    });
   }
 
   logger.debug(

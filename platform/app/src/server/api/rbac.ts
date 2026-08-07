@@ -786,6 +786,148 @@ export const checkOrganizationPermission =
 // ============================================================================
 
 /**
+ * Whether a single ORG-scoped, non-CUSTOM-role binding grants the permission
+ * via the ORG fast path: ADMIN grants everything; MEMBER grants org-level
+ * permissions only. ORG-scoped MEMBER bindings do NOT imply any team- or
+ * project-level access — team/project access requires a TEAM- or
+ * PROJECT-scoped binding. Only org:* permissions are checked here.
+ *
+ * Defense-in-depth: EXTERNAL (Lite Member) users must never be promoted by
+ * this fast path even if an ORG-scoped MEMBER binding exists — the
+ * OrganizationUser role is authoritative for EXTERNAL restrictions.
+ */
+function orgBindingFastPathGrants({
+  binding,
+  organizationRole,
+  permission,
+}: {
+  binding: { role: TeamUserRole };
+  organizationRole: OrganizationUserRole | null;
+  permission: Permission;
+}): boolean {
+  if (organizationRole === OrganizationUserRole.EXTERNAL) return false;
+  if (binding.role === TeamUserRole.ADMIN) return true;
+  return organizationRoleHasPermission(OrganizationUserRole.MEMBER, permission);
+}
+
+/** Does this ONE binding, from the union set, grant the permission? */
+async function bindingGrantsPermission({
+  binding,
+  organizationRole,
+  permission,
+  prisma,
+}: {
+  binding: {
+    role: TeamUserRole;
+    customRoleId: string | null;
+    scopeType: RoleBindingScopeType;
+  };
+  organizationRole: OrganizationUserRole | null;
+  permission: Permission;
+  prisma: PrismaClient;
+}): Promise<boolean> {
+  // A team/project binding can never grant an org-exclusive permission,
+  // even via a custom role that lists it (ADR-021).
+  if (!bindingScopeCanGrant(binding.scopeType, permission)) return false;
+
+  if (
+    binding.scopeType === RoleBindingScopeType.ORGANIZATION &&
+    binding.role !== TeamUserRole.CUSTOM
+  ) {
+    return orgBindingFastPathGrants({ binding, organizationRole, permission });
+  }
+
+  return resolveBindingPermission({
+    binding,
+    organizationRole,
+    permission,
+    prisma,
+  });
+}
+
+/**
+ * Union permissions across ALL matching bindings — permitted if any grants
+ * it. The per-permission decision `checkPermissionFromBindings` makes once
+ * it has bindings for the scopes in question.
+ */
+async function unionBindingsGrantPermission({
+  bindings,
+  organizationRole,
+  permission,
+  prisma,
+}: {
+  bindings: Array<{
+    role: TeamUserRole;
+    customRoleId: string | null;
+    scopeType: RoleBindingScopeType;
+  }>;
+  organizationRole: OrganizationUserRole | null;
+  permission: Permission;
+  prisma: PrismaClient;
+}): Promise<boolean> {
+  for (const binding of bindings) {
+    const permitted = await bindingGrantsPermission({
+      binding,
+      organizationRole,
+      permission,
+      prisma,
+    });
+    if (permitted) return true;
+  }
+
+  return false;
+}
+
+/**
+ * Fall back to legacy TeamUser for users not yet migrated to RoleBindings.
+ * Gated on current org membership too: a stale cross-org TeamUser row must
+ * not confer access any more than a stale RoleBinding.
+ */
+async function checkLegacyTeamUserPermission({
+  prisma,
+  userId,
+  scopes,
+  organizationRole,
+  permission,
+}: {
+  prisma: PrismaClient;
+  userId: string;
+  scopes: Array<{ scopeType: RoleBindingScopeType; scopeId: string }>;
+  organizationRole: OrganizationUserRole | null;
+  permission: Permission;
+}): Promise<boolean> {
+  const teamScope = scopes.find(
+    (s) => s.scopeType === RoleBindingScopeType.TEAM,
+  );
+  if (!teamScope) return false;
+
+  const teamUser = await prisma.teamUser.findFirst({
+    where: {
+      userId,
+      teamId: teamScope.scopeId,
+      team: { organization: { members: { some: { userId } } } },
+    },
+    select: { role: true, assignedRoleId: true },
+  });
+
+  if (!teamUser) return false;
+  // Legacy team membership is a TEAM-scoped grant, so it can't confer an
+  // org-exclusive permission even through a custom role (ADR-021).
+  if (!bindingScopeCanGrant(RoleBindingScopeType.TEAM, permission)) {
+    return false;
+  }
+  return resolveBindingPermission({
+    binding: {
+      role: teamUser.role,
+      customRoleId: teamUser.assignedRoleId ?? null,
+    },
+    organizationRole,
+    permission,
+    prisma,
+  });
+}
+
+/**
  * Checks whether any of the user's RoleBindings at the given scopes grants the
  * requested permission. All matching bindings are evaluated and their permission
  * sets are unioned — a user is permitted if ANY binding grants the permission.
@@ -834,75 +976,21 @@ async function checkPermissionFromBindings({
   });
 
   if (bindings.length === 0) {
-    // Fall back to legacy TeamUser for users not yet migrated to RoleBindings
-    const teamScope = scopes.find(
-      (s) => s.scopeType === RoleBindingScopeType.TEAM,
-    );
-    if (!teamScope) return false;
-
-    const teamUser = await prisma.teamUser.findFirst({
-      // Gate the legacy fallback on org membership too: a stale cross-org
-      // TeamUser row must not confer access any more than a stale RoleBinding.
-      where: {
-        userId,
-        teamId: teamScope.scopeId,
-        team: { organization: { members: { some: { userId } } } },
-      },
-      select: { role: true, assignedRoleId: true },
-    });
-
-    if (!teamUser) return false;
-    // Legacy team membership is a TEAM-scoped grant, so it can't confer an
-    // org-exclusive permission even through a custom role (ADR-021).
-    if (!bindingScopeCanGrant(RoleBindingScopeType.TEAM, permission)) {
-      return false;
-    }
-    return resolveBindingPermission({
-      binding: {
-        role: teamUser.role,
-        customRoleId: teamUser.assignedRoleId ?? null,
-      },
+    return checkLegacyTeamUserPermission({
+      prisma,
+      userId,
+      scopes,
       organizationRole,
       permission,
-      prisma,
     });
   }
 
-  // Union permissions across ALL matching bindings — permitted if any grants it
-  for (const binding of bindings) {
-    // A team/project binding can never grant an org-exclusive permission,
-    // even via a custom role that lists it (ADR-021).
-    if (!bindingScopeCanGrant(binding.scopeType, permission)) continue;
-
-    // Org-scoped bindings: ADMIN grants everything; MEMBER grants org-level permissions only.
-    // ORG-scoped MEMBER bindings do NOT imply any team- or project-level access — team/project
-    // access requires a TEAM- or PROJECT-scoped binding. Only org:* permissions are checked here.
-    if (
-      binding.scopeType === RoleBindingScopeType.ORGANIZATION &&
-      binding.role !== TeamUserRole.CUSTOM
-    ) {
-      // Defense-in-depth: EXTERNAL (Lite Member) users must never be promoted
-      // by this fast path even if an ORG-scoped MEMBER binding exists — the
-      // OrganizationUser role is authoritative for EXTERNAL restrictions.
-      if (organizationRole === OrganizationUserRole.EXTERNAL) continue;
-      if (binding.role === TeamUserRole.ADMIN) return true;
-      if (
-        organizationRoleHasPermission(OrganizationUserRole.MEMBER, permission)
-      )
-        return true;
-      continue;
-    }
-
-    const permitted = await resolveBindingPermission({
-      binding,
-      organizationRole,
-      permission,
-      prisma,
-    });
-    if (permitted) return true;
-  }
-
-  return false;
+  return unionBindingsGrantPermission({
+    bindings,
+    organizationRole,
+    permission,
+    prisma,
+  });
 }
 
 /**
@@ -1284,6 +1372,83 @@ const scopeKey = (scopeType: RoleBindingScopeType, scopeId: string) =>
   `${scopeType}::${scopeId}`;
 
 /**
+ * The RoleBindings covering the given scopes, for this user (direct or via
+ * group membership). Non-membership already short-circuits the caller, but
+ * the direct branch is gated on current org membership too so this query is
+ * safe on its own if that early return is ever refactored away.
+ */
+async function loadRoleBindingsForScopes({
+  prisma,
+  organizationId,
+  scopeIds,
+  groupIds,
+  userId,
+}: {
+  prisma: PrismaClient;
+  organizationId: string;
+  scopeIds: string[];
+  groupIds: string[];
+  userId: string;
+}): Promise<ResolvedBinding[]> {
+  if (scopeIds.length === 0) return [];
+  return prisma.roleBinding.findMany({
+    where: {
+      organizationId,
+      scopeId: { in: scopeIds },
+      OR: [
+        { userId, user: { orgMemberships: { some: { organizationId } } } },
+        ...(groupIds.length > 0 ? [{ groupId: { in: groupIds } }] : []),
+      ],
+    },
+    select: { role: true, customRoleId: true, scopeType: true, scopeId: true },
+  });
+}
+
+function groupBindingsByScope(
+  bindings: ResolvedBinding[],
+): Map<string, ResolvedBinding[]> {
+  const bindingsByScope = new Map<string, ResolvedBinding[]>();
+  for (const b of bindings) {
+    const key = scopeKey(b.scopeType, b.scopeId);
+    const list = bindingsByScope.get(key) ?? [];
+    list.push(b);
+    bindingsByScope.set(key, list);
+  }
+  return bindingsByScope;
+}
+
+/**
+ * Legacy fallback: a user with NO RoleBindings anywhere in the org falls back
+ * to their TeamUser role. Mirrored here so the batch paths keep exact parity
+ * with the per-call helpers.
+ */
+async function loadLegacyTeamUserFallback({
+  prisma,
+  userId,
+  organizationId,
+  needsLegacyFallback,
+}: {
+  prisma: PrismaClient;
+  userId: string;
+  organizationId: string;
+  needsLegacyFallback: boolean;
+}): Promise<
+  Map<string, { role: TeamUserRole; assignedRoleId: string | null }>
+> {
+  if (!needsLegacyFallback) return new Map();
+  const legacyTeamUser = await prisma.teamUser.findMany({
+    where: { userId, team: { organizationId } },
+    select: { teamId: true, role: true, assignedRoleId: true },
+  });
+  return new Map(
+    legacyTeamUser.map((t) => [
+      t.teamId,
+      { role: t.role, assignedRoleId: t.assignedRoleId },
+    ]),
+  );
+}
+
+/**
  * Loads everything a scoped permission decision needs, in ~4 queries, for ANY
  * number of permissions and scopes. Returns null when the caller is not a member
  * of the organization at all — the "no" that short-circuits every question.
@@ -1311,35 +1476,13 @@ async function loadScopeResolution(
   const groupIds = groupMemberships.map((m) => m.groupId);
 
   const scopeIds = [args.organizationId, ...args.scopeIds];
-  const bindings: ResolvedBinding[] =
-    scopeIds.length > 0
-      ? await ctx.prisma.roleBinding.findMany({
-          where: {
-            organizationId: args.organizationId,
-            scopeId: { in: scopeIds },
-            // Non-membership already short-circuits above, but gate the direct
-            // branch on membership too so this query is safe on its own if the
-            // early return is ever refactored away.
-            OR: [
-              {
-                userId,
-                user: {
-                  orgMemberships: {
-                    some: { organizationId: args.organizationId },
-                  },
-                },
-              },
-              ...(groupIds.length > 0 ? [{ groupId: { in: groupIds } }] : []),
-            ],
-          },
-          select: {
-            role: true,
-            customRoleId: true,
-            scopeType: true,
-            scopeId: true,
-          },
-        })
-      : [];
+  const bindings = await loadRoleBindingsForScopes({
+    prisma: ctx.prisma,
+    organizationId: args.organizationId,
+    scopeIds,
+    groupIds,
+    userId,
+  });
 
   const customRoleIds = Array.from(
     new Set(
@@ -1354,37 +1497,56 @@ async function loadScopeResolution(
         })
       : [];
 
-  const bindingsByScope = new Map<string, ResolvedBinding[]>();
-  for (const b of bindings) {
-    const key = scopeKey(b.scopeType, b.scopeId);
-    const list = bindingsByScope.get(key) ?? [];
-    list.push(b);
-    bindingsByScope.set(key, list);
-  }
-
-  // Legacy fallback: a user with NO RoleBindings anywhere in the org falls back
-  // to their TeamUser role. Mirrored here so the batch paths keep exact parity
-  // with the per-call helpers.
   const needsLegacyFallback = bindings.length === 0;
-  const legacyTeamUser = needsLegacyFallback
-    ? await ctx.prisma.teamUser.findMany({
-        where: { userId, team: { organizationId: args.organizationId } },
-        select: { teamId: true, role: true, assignedRoleId: true },
-      })
-    : [];
+  const legacyByTeam = await loadLegacyTeamUserFallback({
+    prisma: ctx.prisma,
+    userId,
+    organizationId: args.organizationId,
+    needsLegacyFallback,
+  });
 
   return {
     organizationRole,
-    bindingsByScope,
+    bindingsByScope: groupBindingsByScope(bindings),
     customRoleById: new Map(customRoles.map((c) => [c.id, c])),
     needsLegacyFallback,
-    legacyByTeam: new Map(
-      legacyTeamUser.map((t) => [
-        t.teamId,
-        { role: t.role, assignedRoleId: t.assignedRoleId },
-      ]),
-    ),
+    legacyByTeam,
   };
+}
+
+/**
+ * Whether a binding's custom role settles the grant. Returns `undefined`
+ * (not settled — fall through to the scope-type rules below) when the
+ * binding has no custom role, the role wasn't found, or it lists no
+ * permissions.
+ */
+function evaluateCustomRoleGrant(
+  resolution: ScopeResolution,
+  customRoleId: string | null,
+  permission: Permission,
+): boolean | undefined {
+  if (!customRoleId) return undefined;
+  const custom = resolution.customRoleById.get(customRoleId);
+  if (!custom) return undefined;
+  const perms = Array.isArray(custom.permissions)
+    ? (custom.permissions as string[])
+    : [];
+  if (perms.length === 0) return undefined;
+  return hasPermissionWithHierarchy(perms, permission);
+}
+
+/** An ORGANIZATION-scoped, non-custom-role binding's grant: CUSTOM never reaches here settled; EXTERNAL is never promoted; ADMIN grants everything; MEMBER grants org-level permissions only. */
+function orgScopeBindingGrants(
+  resolution: ScopeResolution,
+  role: TeamUserRole,
+  permission: Permission,
+): boolean {
+  if (role === TeamUserRole.CUSTOM) return false;
+  if (resolution.organizationRole === OrganizationUserRole.EXTERNAL) {
+    return false;
+  }
+  if (role === TeamUserRole.ADMIN) return true;
+  return organizationRoleHasPermission(OrganizationUserRole.MEMBER, permission);
 }
 
 /**
@@ -1406,28 +1568,15 @@ function bindingGrants(
   // a custom role that lists it (ADR-021).
   if (!bindingScopeCanGrant(binding.scopeType, permission)) return false;
 
-  if (binding.customRoleId) {
-    const custom = resolution.customRoleById.get(binding.customRoleId);
-    if (custom) {
-      const perms = Array.isArray(custom.permissions)
-        ? (custom.permissions as string[])
-        : [];
-      if (perms.length > 0) {
-        return hasPermissionWithHierarchy(perms, permission);
-      }
-    }
-  }
+  const customVerdict = evaluateCustomRoleGrant(
+    resolution,
+    binding.customRoleId,
+    permission,
+  );
+  if (customVerdict !== undefined) return customVerdict;
 
   if (binding.scopeType === RoleBindingScopeType.ORGANIZATION) {
-    if (binding.role === TeamUserRole.CUSTOM) return false;
-    if (resolution.organizationRole === OrganizationUserRole.EXTERNAL) {
-      return false;
-    }
-    if (binding.role === TeamUserRole.ADMIN) return true;
-    return organizationRoleHasPermission(
-      OrganizationUserRole.MEMBER,
-      permission,
-    );
+    return orgScopeBindingGrants(resolution, binding.role, permission);
   }
 
   if (resolution.organizationRole === OrganizationUserRole.EXTERNAL) {

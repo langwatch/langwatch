@@ -71,6 +71,157 @@ export function createDefaultModelEnvResolver(): ModelEnvResolver {
   };
 }
 
+type ModelProviderRecord = Awaited<
+  ReturnType<typeof getProjectModelProviders>
+>[string];
+
+/**
+ * Resolves and validates the configured provider for `model`. Throws
+ * `EvaluatorConfigError` when the provider is missing or disabled.
+ */
+async function resolveEnabledModelProvider({
+  model,
+  projectId,
+}: {
+  model: string;
+  projectId: string;
+}): Promise<{ provider: string; modelProvider: ModelProviderRecord }> {
+  const modelProviders = await getProjectModelProviders(projectId);
+  const provider = model.split("/")[0]!;
+  const modelProvider = modelProviders[provider];
+
+  if (!modelProvider) {
+    throw new EvaluatorConfigError(`Provider ${provider} is not configured`);
+  }
+  if (!modelProvider.enabled) {
+    throw new EvaluatorConfigError(`Provider ${provider} is not enabled`);
+  }
+
+  return { provider, modelProvider };
+}
+
+/**
+ * Confirms `modelName` is servable by `modelProvider`, either via its own
+ * model list or a custom model entry. When neither lists it, falls back to
+ * a cross-row lookup before rejecting — see inline note for why.
+ */
+async function assertModelIsServable({
+  modelProvider,
+  modelName,
+  embeddings,
+  projectId,
+  provider,
+}: {
+  modelProvider: ModelProviderRecord;
+  modelName: string;
+  embeddings: boolean;
+  projectId: string;
+  provider: string;
+}): Promise<void> {
+  const modelList = embeddings
+    ? modelProvider.embeddingsModels
+    : modelProvider.models;
+
+  const customModelList = embeddings
+    ? modelProvider.customEmbeddingsModels
+    : modelProvider.customModels;
+  const isCustomModel = customModelList?.some((m) => m.modelId === modelName);
+
+  if (
+    !modelList ||
+    modelList.length === 0 ||
+    modelList.includes(modelName) ||
+    isCustomModel
+  ) {
+    return;
+  }
+
+  // The collapse winner for the provider key is not necessarily the row
+  // that serves this model: with multi-instance providers the model may
+  // come from a wider-scope row's custom catalog, and
+  // prepareLitellmParams below swaps to that row. Only reject when no
+  // accessible enabled row serves the model at all. The lookup is a
+  // rescue attempt — if it fails, reject with the config error rather
+  // than masking it behind an infrastructure error.
+  let servingRow = null;
+  try {
+    servingRow = await ModelProviderService.create(prisma).findRowServingModel({
+      projectId,
+      provider,
+      bareModel: modelName,
+    });
+  } catch {
+    // fall through to the config error below
+  }
+  if (!servingRow) {
+    throw new EvaluatorConfigError(
+      `Model ${modelName} is not in the ${
+        embeddings ? "embedding models" : "models"
+      } list for ${provider}, please select another model for running this evaluation`,
+    );
+  }
+}
+
+const GENERATION_PARAMS = [
+  "temperature",
+  "max_tokens",
+  "top_p",
+  "frequency_penalty",
+  "presence_penalty",
+  "seed",
+  "reasoning_effort",
+] as const;
+
+// Clamps a max_tokens value to the provider's ceiling; every other
+// generation param passes through unchanged.
+function normalizeGenerationParamValue({
+  param,
+  value,
+  maxTokensCeiling,
+}: {
+  param: (typeof GENERATION_PARAMS)[number];
+  value: unknown;
+  maxTokensCeiling: number | undefined;
+}): unknown {
+  if (param === "max_tokens" && typeof value === "number") {
+    return clampMaxTokens(value, maxTokensCeiling);
+  }
+  return value;
+}
+
+// Overlays whitelisted generation params (temperature, max_tokens, etc.) from
+// the evaluator settings onto the litellm env block, clamping max_tokens to
+// the provider's ceiling.
+function applyGenerationParams({
+  envResult,
+  settings,
+  model,
+  modelProvider,
+  embeddings,
+}: {
+  envResult: Record<string, string>;
+  settings: Record<string, unknown> | undefined;
+  model: string;
+  modelProvider: ModelProviderRecord;
+  embeddings: boolean;
+}): void {
+  const maxTokensCeiling = resolveMaxTokensCeiling(model, modelProvider);
+  for (const param of GENERATION_PARAMS) {
+    const rawValue = settings?.[param];
+    if (rawValue === undefined || rawValue === null) continue;
+
+    const value = normalizeGenerationParamValue({
+      param,
+      value: rawValue,
+      maxTokensCeiling,
+    });
+    const envKey = embeddings
+      ? `X_LITELLM_EMBEDDINGS_${param}`
+      : `X_LITELLM_${param}`;
+    envResult[envKey] = String(value);
+  }
+}
+
 /**
  * Builds the X_LITELLM_* env block for an evaluator that needs to call a
  * specific model. Validates the provider is configured + enabled, projects
@@ -91,60 +242,19 @@ export async function setupModelEnv({
   projectId: string;
   settings?: Record<string, unknown>;
 }): Promise<Record<string, string>> {
-  const modelProviders = await getProjectModelProviders(projectId);
-  const provider = model.split("/")[0]!;
-  const modelProvider = modelProviders[provider];
-
-  if (!modelProvider) {
-    throw new EvaluatorConfigError(`Provider ${provider} is not configured`);
-  }
-  if (!modelProvider.enabled) {
-    throw new EvaluatorConfigError(`Provider ${provider} is not enabled`);
-  }
+  const { provider, modelProvider } = await resolveEnabledModelProvider({
+    model,
+    projectId,
+  });
 
   const modelName = model.split("/").slice(1).join("/");
-  const modelList = embeddings
-    ? modelProvider.embeddingsModels
-    : modelProvider.models;
-
-  const customModelList = embeddings
-    ? modelProvider.customEmbeddingsModels
-    : modelProvider.customModels;
-  const isCustomModel = customModelList?.some((m) => m.modelId === modelName);
-
-  if (
-    modelList &&
-    modelList.length > 0 &&
-    !modelList.includes(modelName) &&
-    !isCustomModel
-  ) {
-    // The collapse winner for the provider key is not necessarily the row
-    // that serves this model: with multi-instance providers the model may
-    // come from a wider-scope row's custom catalog, and
-    // prepareLitellmParams below swaps to that row. Only reject when no
-    // accessible enabled row serves the model at all. The lookup is a
-    // rescue attempt — if it fails, reject with the config error rather
-    // than masking it behind an infrastructure error.
-    let servingRow = null;
-    try {
-      servingRow = await ModelProviderService.create(
-        prisma,
-      ).findRowServingModel({
-        projectId,
-        provider,
-        bareModel: modelName,
-      });
-    } catch {
-      // fall through to the config error below
-    }
-    if (!servingRow) {
-      throw new EvaluatorConfigError(
-        `Model ${modelName} is not in the ${
-          embeddings ? "embedding models" : "models"
-        } list for ${provider}, please select another model for running this evaluation`,
-      );
-    }
-  }
+  await assertModelIsServable({
+    modelProvider,
+    modelName,
+    embeddings,
+    projectId,
+    provider,
+  });
 
   const litellmParams = await prepareLitellmParams({
     model,
@@ -159,29 +269,13 @@ export async function setupModelEnv({
     ]),
   );
 
-  // Generation params (temperature, max_tokens, etc.)
-  const generationParams = [
-    "temperature",
-    "max_tokens",
-    "top_p",
-    "frequency_penalty",
-    "presence_penalty",
-    "seed",
-    "reasoning_effort",
-  ];
-  const maxTokensCeiling = resolveMaxTokensCeiling(model, modelProvider);
-  for (const param of generationParams) {
-    let value = settings?.[param];
-    if (value !== undefined && value !== null) {
-      if (param === "max_tokens" && typeof value === "number") {
-        value = clampMaxTokens(value, maxTokensCeiling);
-      }
-      const envKey = embeddings
-        ? `X_LITELLM_EMBEDDINGS_${param}`
-        : `X_LITELLM_${param}`;
-      envResult[envKey] = String(value);
-    }
-  }
+  applyGenerationParams({
+    envResult,
+    settings,
+    model,
+    modelProvider,
+    embeddings,
+  });
 
   if (embeddings) {
     envResult = { ...envResult, ...prepareEnvKeys(modelProvider) };

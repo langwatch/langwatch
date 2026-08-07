@@ -49,6 +49,38 @@ import { sendInviteEmail } from "../mailer/inviteEmail";
 const logger = createLogger("langwatch:invites");
 
 /**
+ * Derives the per-team role assignments for an accepted invite: the
+ * explicit `teamAssignments` when present, otherwise one entry per
+ * deduplicated `teamIds` entry using the org role's default team role.
+ */
+const deriveTeamMembershipData = (
+  invite: OrganizationInvite,
+): TeamAssignmentInput[] => {
+  if (invite.teamAssignments && Array.isArray(invite.teamAssignments)) {
+    const assignments =
+      invite.teamAssignments as unknown as TeamAssignmentInput[];
+    return assignments.map((a) => ({
+      teamId: a.teamId,
+      role: a.role,
+      customRoleId: a.customRoleId,
+    }));
+  }
+
+  const dedupedTeamIds = Array.from(
+    new Set(
+      invite.teamIds
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean),
+    ),
+  );
+  return dedupedTeamIds.map((teamId) => ({
+    teamId,
+    role: ORGANIZATION_TO_TEAM_ROLE_MAP[invite.role],
+  }));
+};
+
+/**
  * Team assignment input for invite creation.
  */
 interface TeamAssignmentInput {
@@ -599,6 +631,32 @@ export class InviteService {
       throw new InviteNotReadyError(invite.id, invite.status);
     }
 
+    await this.writeOrganizationMembership({ userId, invite });
+
+    const teamMembershipData = await this.filterAssignableTeamMemberships({
+      teamMembershipData: deriveTeamMembershipData(invite),
+      invite,
+    });
+    await this.writeTeamRoleBindings({ userId, invite, teamMembershipData });
+
+    await this.prisma.organizationInvite.update({
+      where: { id: invite.id, organizationId: invite.organizationId },
+      data: { status: "ACCEPTED" },
+    });
+  }
+
+  /**
+   * Writes the OrganizationUser row and, for non-EXTERNAL roles, the
+   * ORGANIZATION-scoped RoleBinding (delete-then-create to tolerate prior
+   * partial state).
+   */
+  private async writeOrganizationMembership({
+    userId,
+    invite,
+  }: {
+    userId: string;
+    invite: OrganizationInvite;
+  }): Promise<void> {
     await this.prisma.organizationUser.createMany({
       data: [
         {
@@ -630,64 +688,59 @@ export class InviteService {
         },
       });
     }
+  }
 
-    let teamMembershipData: Array<{
-      teamId: string;
-      role: TeamUserRole;
-      customRoleId?: string;
-    }> = [];
+  /**
+   * Drops team assignments pointing at custom roles that are no longer
+   * assignable (e.g. deleted or out of scope), logging what was dropped.
+   * No-op when there's no role service or no custom-role assignments.
+   */
+  private async filterAssignableTeamMemberships({
+    teamMembershipData,
+    invite,
+  }: {
+    teamMembershipData: TeamAssignmentInput[];
+    invite: OrganizationInvite;
+  }): Promise<TeamAssignmentInput[]> {
+    if (!this.roleService) return teamMembershipData;
 
-    if (invite.teamAssignments && Array.isArray(invite.teamAssignments)) {
-      const assignments = invite.teamAssignments as unknown as Array<{
-        teamId: string;
-        role: TeamUserRole;
-        customRoleId?: string;
-      }>;
-      teamMembershipData = assignments.map((a) => ({
-        teamId: a.teamId,
-        role: a.role,
-        customRoleId: a.customRoleId,
-      }));
-    } else {
-      const dedupedTeamIds = Array.from(
-        new Set(
-          invite.teamIds
-            .split(",")
-            .map((s) => s.trim())
-            .filter(Boolean),
-        ),
+    const customRoleIds = teamMembershipData
+      .filter((m) => m.role === TeamUserRole.CUSTOM && m.customRoleId)
+      .map((m) => m.customRoleId!);
+    if (customRoleIds.length === 0) return teamMembershipData;
+
+    const validRoles = await this.roleService.filterAssignableRoleIds({
+      roleIds: customRoleIds,
+      organizationId: invite.organizationId,
+    });
+    const validIds = new Set(validRoles);
+    const invalidAssignments = teamMembershipData.filter(
+      (m) => m.customRoleId && !validIds.has(m.customRoleId),
+    );
+    if (invalidAssignments.length > 0) {
+      logger.warn(
+        { inviteId: invite.id, invalidAssignments },
+        "dropping team assignments with invalid/non-assignable custom roles at invite accept",
       );
-      teamMembershipData = dedupedTeamIds.map((teamId) => ({
-        teamId,
-        role: ORGANIZATION_TO_TEAM_ROLE_MAP[invite.role],
-      }));
     }
+    return teamMembershipData.filter(
+      (m) => !m.customRoleId || validIds.has(m.customRoleId),
+    );
+  }
 
-    if (this.roleService) {
-      const customRoleIds = teamMembershipData
-        .filter((m) => m.role === TeamUserRole.CUSTOM && m.customRoleId)
-        .map((m) => m.customRoleId!);
-      if (customRoleIds.length > 0) {
-        const validRoles = await this.roleService.filterAssignableRoleIds({
-          roleIds: customRoleIds,
-          organizationId: invite.organizationId,
-        });
-        const validIds = new Set(validRoles);
-        const invalidAssignments = teamMembershipData.filter(
-          (m) => m.customRoleId && !validIds.has(m.customRoleId),
-        );
-        if (invalidAssignments.length > 0) {
-          logger.warn(
-            { inviteId: invite.id, invalidAssignments },
-            "dropping team assignments with invalid/non-assignable custom roles at invite accept",
-          );
-        }
-        teamMembershipData = teamMembershipData.filter(
-          (m) => !m.customRoleId || validIds.has(m.customRoleId),
-        );
-      }
-    }
-
+  /**
+   * Writes each team's RoleBinding (delete-then-create to tolerate prior
+   * partial state).
+   */
+  private async writeTeamRoleBindings({
+    userId,
+    invite,
+    teamMembershipData,
+  }: {
+    userId: string;
+    invite: OrganizationInvite;
+    teamMembershipData: TeamAssignmentInput[];
+  }): Promise<void> {
     for (const member of teamMembershipData) {
       await this.prisma.roleBinding.deleteMany({
         where: {
@@ -709,11 +762,6 @@ export class InviteService {
         },
       });
     }
-
-    await this.prisma.organizationInvite.update({
-      where: { id: invite.id, organizationId: invite.organizationId },
-      data: { status: "ACCEPTED" },
-    });
   }
 
   /**

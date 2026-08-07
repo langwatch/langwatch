@@ -8,6 +8,7 @@ import type { SchedulerRegistry } from "./scheduler.registry";
 import type {
   ScheduledJobRecord,
   ScheduledJobRepository,
+  SchedulerHandler,
 } from "./scheduler.types";
 
 /**
@@ -331,25 +332,76 @@ export class SchedulerService {
     // is what `findDue` read and what a racing worker would also condition on.
     const claimAt = job.nextRunAt;
 
-    // Derive the slot to fire and the next calendar marker (both DST-correct in
-    // the job's own zone). Computed up front so a poison cron/tz deactivates the
-    // row *before* leasing (a bad row can't wedge the loop).
+    const derived = await this.deriveFireSlot({ job, now });
+    if (!derived) return;
+    const { slot, nextSlot } = derived;
+
+    // ATOMIC LEASE. Only one worker's conditional UPDATE wins; every other
+    // worker sees a lost claim and skips. The winner pushes `nextRunAt` a lease
+    // window into the future WITHOUT advancing the calendar or `lastSlot`, so
+    // the slot is hidden from `findDue` for the handler run but is NOT yet
+    // marked delivered — a failure retries it, a crash re-fires it on lease
+    // expiry. This is the exactly-once guarantee for concurrent workers.
+    const leaseUntil = new Date(now.getTime() + LEASE_MS);
+    const won = await this.claimSlot({ job, claimAt, slot, leaseUntil });
+    if (!won) return;
+
+    // We hold the lease. An unknown targetType has NOTHING to retry, so release
+    // the lease by advancing to the next cron instant (leaving `lastSlot`
+    // untouched — nothing was delivered) rather than leaving the row parked for
+    // the whole lease window. Phase 1 registers no consumers, so the loop must
+    // not crash on an orphan row (a report handler arrives in a later phase).
+    const handler = this.registry.get(job.targetType);
+    if (!handler) {
+      await this.releaseUnhandledSlot({ job, leaseUntil, nextSlot });
+      return;
+    }
+
+    // Run the handler. On SUCCESS, advance the calendar and stamp `lastSlot =
+    // slot` (the "delivered" marker), clearing retry state. On FAILURE, hand to
+    // the retry policy — the slot is retried, never silently lost.
     //
-    //  - RETRY / crash-refire (`currentSlot` pinned): re-fire that EXACT slot —
-    //    catch-up must not move a slot already in flight. Advance honestly to
-    //    the next instant after it, only fast-forwarding past `now` if a long
-    //    retry sequence outran a whole cron period (so a completed retry never
-    //    re-arms in the past).
-    //  - FRESH fire: apply the ADR-044 `runLatest` catch-up. On time this is a
-    //    no-op (fire `nextRunAt`, advance to the next instant); after an outage
-    //    it fires ONE catch-up for the newest missed slot and fast-forwards to
-    //    the first future instant, instead of replaying every missed slot.
-    let slot: Date;
-    let nextSlot: Date;
+    // Report delivery is therefore AT-LEAST-ONCE: a crash AFTER the handler's
+    // provider send but BEFORE this settle re-leases the slot on lease expiry
+    // and re-fires it, so a duplicate report can go out. That is an accepted
+    // ADR-044 tradeoff — vastly better than the previous silent zero-delivery —
+    // and a distributed dedup ledger is deliberately OUT OF SCOPE here.
+    await this.runHandlerAndSettle({
+      job,
+      handler,
+      slot,
+      nextSlot,
+      leaseUntil,
+    });
+  }
+
+  /**
+   * Derives the slot to fire and the next calendar marker (both DST-correct
+   * in the job's own zone). Computed up front so a poison cron/tz deactivates
+   * the row *before* leasing (a bad row can't wedge the loop). Returns `null`
+   * after deactivating when the cron/timezone is invalid.
+   *
+   *  - RETRY / crash-refire (`currentSlot` pinned): re-fire that EXACT slot —
+   *    catch-up must not move a slot already in flight. Advance honestly to
+   *    the next instant after it, only fast-forwarding past `now` if a long
+   *    retry sequence outran a whole cron period (so a completed retry never
+   *    re-arms in the past).
+   *  - FRESH fire: apply the ADR-044 `runLatest` catch-up. On time this is a
+   *    no-op (fire `nextRunAt`, advance to the next instant); after an outage
+   *    it fires ONE catch-up for the newest missed slot and fast-forwards to
+   *    the first future instant, instead of replaying every missed slot.
+   */
+  private async deriveFireSlot({
+    job,
+    now,
+  }: {
+    job: ScheduledJobRecord;
+    now: Date;
+  }): Promise<{ slot: Date; nextSlot: Date } | null> {
     try {
       if (job.currentSlot) {
-        slot = job.currentSlot;
-        nextSlot = computeNextRunAt({
+        const slot = job.currentSlot;
+        let nextSlot = computeNextRunAt({
           cron: job.cron,
           timezone: job.timezone,
           after: slot,
@@ -361,16 +413,15 @@ export class SchedulerService {
             after: now,
           });
         }
-      } else {
-        const catchUp = computeCatchUp({
-          cron: job.cron,
-          timezone: job.timezone,
-          slot: job.nextRunAt,
-          now,
-        });
-        slot = catchUp.catchUpSlot;
-        nextSlot = catchUp.nextRunAt;
+        return { slot, nextSlot };
       }
+      const catchUp = computeCatchUp({
+        cron: job.cron,
+        timezone: job.timezone,
+        slot: job.nextRunAt,
+        now,
+      });
+      return { slot: catchUp.catchUpSlot, nextSlot: catchUp.nextRunAt };
     } catch (error) {
       this.logger.error(
         {
@@ -391,16 +442,22 @@ export class SchedulerService {
         targetType: job.targetType,
         targetId: job.targetId,
       });
-      return;
+      return null;
     }
+  }
 
-    // ATOMIC LEASE. Only one worker's conditional UPDATE wins; every other
-    // worker sees a lost claim and skips. The winner pushes `nextRunAt` a lease
-    // window into the future WITHOUT advancing the calendar or `lastSlot`, so
-    // the slot is hidden from `findDue` for the handler run but is NOT yet
-    // marked delivered — a failure retries it, a crash re-fires it on lease
-    // expiry. This is the exactly-once guarantee for concurrent workers.
-    const leaseUntil = new Date(now.getTime() + LEASE_MS);
+  /** Attempts the atomic lease claim for `slot`; logs and returns false if lost. */
+  private async claimSlot({
+    job,
+    claimAt,
+    slot,
+    leaseUntil,
+  }: {
+    job: ScheduledJobRecord;
+    claimAt: Date;
+    slot: Date;
+    leaseUntil: Date;
+  }): Promise<boolean> {
     const won = await this.repo.claim({
       id: job.id,
       projectId: job.projectId,
@@ -415,42 +472,50 @@ export class SchedulerService {
         { jobId: job.id, slot: slot.toISOString() },
         "SchedulerService: slot already claimed by another worker, skipping",
       );
-      return;
     }
+    return won;
+  }
 
-    // We hold the lease. An unknown targetType has NOTHING to retry, so release
-    // the lease by advancing to the next cron instant (leaving `lastSlot`
-    // untouched — nothing was delivered) rather than leaving the row parked for
-    // the whole lease window. Phase 1 registers no consumers, so the loop must
-    // not crash on an orphan row (a report handler arrives in a later phase).
-    const handler = this.registry.get(job.targetType);
-    if (!handler) {
-      this.logger.warn(
-        { jobId: job.id, targetType: job.targetType },
-        "SchedulerService: no handler registered for targetType, releasing slot",
-      );
-      await this.settle({
-        job,
-        leaseUntil,
-        nextRunAt: nextSlot,
-        lastSlot: job.lastSlot,
-        currentSlot: null,
-        attempts: 0,
-        lastError: null,
-        context: "release-unknown-handler",
-      });
-      return;
-    }
+  /** Releases a leased slot that has no registered handler for its targetType. */
+  private async releaseUnhandledSlot({
+    job,
+    leaseUntil,
+    nextSlot,
+  }: {
+    job: ScheduledJobRecord;
+    leaseUntil: Date;
+    nextSlot: Date;
+  }): Promise<void> {
+    this.logger.warn(
+      { jobId: job.id, targetType: job.targetType },
+      "SchedulerService: no handler registered for targetType, releasing slot",
+    );
+    await this.settle({
+      job,
+      leaseUntil,
+      nextRunAt: nextSlot,
+      lastSlot: job.lastSlot,
+      currentSlot: null,
+      attempts: 0,
+      lastError: null,
+      context: "release-unknown-handler",
+    });
+  }
 
-    // Run the handler. On SUCCESS, advance the calendar and stamp `lastSlot =
-    // slot` (the "delivered" marker), clearing retry state. On FAILURE, hand to
-    // the retry policy — the slot is retried, never silently lost.
-    //
-    // Report delivery is therefore AT-LEAST-ONCE: a crash AFTER the handler's
-    // provider send but BEFORE this settle re-leases the slot on lease expiry
-    // and re-fires it, so a duplicate report can go out. That is an accepted
-    // ADR-044 tradeoff — vastly better than the previous silent zero-delivery —
-    // and a distributed dedup ledger is deliberately OUT OF SCOPE here.
+  /** Runs the registered handler for the leased slot and settles the outcome. */
+  private async runHandlerAndSettle({
+    job,
+    handler,
+    slot,
+    nextSlot,
+    leaseUntil,
+  }: {
+    job: ScheduledJobRecord;
+    handler: SchedulerHandler;
+    slot: Date;
+    nextSlot: Date;
+    leaseUntil: Date;
+  }): Promise<void> {
     try {
       await handler({
         projectId: job.projectId,

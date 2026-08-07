@@ -26,6 +26,33 @@ export interface TraceSummaryFullResolutionDeps {
   ioExtractionService: TraceIOExtractionService;
 }
 
+function isBeforeVisibilityCutoff(
+  occurredAt: number,
+  cutoff: number | null | undefined,
+): boolean {
+  return cutoff !== null && cutoff !== undefined && occurredAt < cutoff;
+}
+
+/**
+ * Gated reads get a teaser regardless — resolving the full value only
+ * to redact it would be a wasted spans + event_log read.
+ */
+function teaserRedact(result: TraceSummaryData): TraceSummaryData {
+  return {
+    ...result,
+    computedInput: result.computedInput
+      ? teaserOf(result.computedInput)
+      : result.computedInput,
+    computedOutput: result.computedOutput
+      ? teaserOf(result.computedOutput)
+      : result.computedOutput,
+    errorMessage: result.errorMessage
+      ? teaserOf(result.errorMessage)
+      : result.errorMessage,
+    redactedByVisibilityWindow: true,
+  };
+}
+
 export class TraceSummaryService {
   private readonly logger = createLogger(
     "langwatch:traces:trace-summary-service",
@@ -66,22 +93,8 @@ export class TraceSummaryService {
     if (!result) throw new TraceNotFoundError(traceId);
 
     const cutoff = options?.visibilityCutoffMs;
-    if (cutoff !== null && cutoff !== undefined && result.occurredAt < cutoff) {
-      // Gated reads get a teaser regardless — resolving the full value only
-      // to redact it would be a wasted spans + event_log read.
-      return {
-        ...result,
-        computedInput: result.computedInput
-          ? teaserOf(result.computedInput)
-          : result.computedInput,
-        computedOutput: result.computedOutput
-          ? teaserOf(result.computedOutput)
-          : result.computedOutput,
-        errorMessage: result.errorMessage
-          ? teaserOf(result.errorMessage)
-          : result.errorMessage,
-        redactedByVisibilityWindow: true,
-      };
+    if (isBeforeVisibilityCutoff(result.occurredAt, cutoff)) {
+      return teaserRedact(result);
     }
 
     if (options?.full && this.fullResolutionDeps) {

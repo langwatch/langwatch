@@ -1,6 +1,7 @@
 import { generate } from "@langwatch/ksuid";
 import {
   OrganizationUserRole,
+  type Prisma,
   type PrismaClient,
   RoleBindingScopeType,
   TeamUserRole,
@@ -57,6 +58,108 @@ function foldScopeRows({ orgs, teams, projects }: ScopeRows): {
   return { scopeNames, personalScopeIds };
 }
 
+/** A binding as the access breakdown reads it. */
+type AccessBinding = {
+  id: string;
+  userId: string | null;
+  groupId: string | null;
+  role: TeamUserRole;
+  scopeType: RoleBindingScopeType;
+  scopeId: string;
+  customRole: { name: string; permissions: unknown } | null;
+};
+
+/** The permissions a custom role lists, ignoring anything that is not one. */
+function customRolePermissionList(permissions: unknown): string[] {
+  return Array.isArray(permissions)
+    ? permissions.filter((p): p is string => typeof p === "string")
+    : [];
+}
+
+function organizationScopePermissions(role: TeamUserRole): string[] {
+  if (role === TeamUserRole.ADMIN) {
+    return getOrganizationRolePermissions(OrganizationUserRole.ADMIN);
+  }
+  if (role === TeamUserRole.MEMBER) {
+    return getOrganizationRolePermissions(OrganizationUserRole.MEMBER);
+  }
+  // VIEWER or CUSTOM (with no resolvable customRole) at the ORG scope:
+  // fall back to the minimal EXTERNAL permission set rather than silently
+  // elevating to MEMBER. Today nothing writes these bindings, but this
+  // prevents accidental promotion if that ever changes.
+  return getOrganizationRolePermissions(OrganizationUserRole.EXTERNAL);
+}
+
+function bindingPermissions(binding: {
+  role: TeamUserRole;
+  scopeType: RoleBindingScopeType;
+  customRole: { permissions: unknown } | null;
+}): string[] {
+  if (binding.role === TeamUserRole.CUSTOM && binding.customRole) {
+    return customRolePermissionList(binding.customRole.permissions);
+  }
+  if (binding.scopeType === RoleBindingScopeType.ORGANIZATION) {
+    return organizationScopePermissions(binding.role);
+  }
+  return getTeamRolePermissions(binding.role);
+}
+
+function toBindingSummary({
+  binding,
+  scopeNames,
+}: {
+  binding: AccessBinding;
+  scopeNames: Map<string, string>;
+}) {
+  return {
+    id: binding.id,
+    role: binding.role as string,
+    customRoleName: binding.customRole?.name ?? null,
+    scopeType: binding.scopeType,
+    scopeId: binding.scopeId,
+    scopeName: scopeNames.get(binding.scopeId) ?? null,
+    permissions: bindingPermissions(binding),
+  };
+}
+
+/** A batch of edits applied to one group in a single transaction. */
+type GroupEdits = {
+  organizationId: string;
+  groupId: string;
+  rename?: { name: string; slug: string } | null;
+  bindingIdsToDelete: string[];
+  bindingsToCreate: Array<{
+    role: TeamUserRole;
+    customRoleId?: string | null;
+    scopeType: RoleBindingScopeType;
+    scopeId: string;
+  }>;
+  memberUserIdsToAdd: string[];
+  memberUserIdsToRemove: string[];
+};
+
+/**
+ * One step of a group edit: the transaction it runs in, the whole batch, and
+ * the group's SCIM source, which several steps refuse a manual edit on.
+ */
+type GroupEditStep = {
+  tx: Prisma.TransactionClient;
+  edits: GroupEdits;
+  scimSource: string | null;
+};
+
+function groupBindingsByGroup(
+  bindings: AccessBinding[],
+): Map<string, AccessBinding[]> {
+  const byGroupId = new Map<string, AccessBinding[]>();
+  for (const b of bindings.filter((b) => b.groupId != null)) {
+    const gid = b.groupId!;
+    if (!byGroupId.has(gid)) byGroupId.set(gid, []);
+    byGroupId.get(gid)!.push(b);
+  }
+  return byGroupId;
+}
+
 export class RoleBindingService {
   constructor(
     // TODO: complex queries (listForUser, listForOrg, etc.) should be moved to the repository
@@ -91,6 +194,30 @@ export class RoleBindingService {
       roleIds: customRoleIds,
       organizationId,
     });
+  }
+
+  /** Every check a batch of new bindings has to pass before it is written. */
+  private async validateBindingsToCreate({
+    organizationId,
+    bindings,
+  }: {
+    organizationId: string;
+    bindings: Array<{
+      role: TeamUserRole;
+      customRoleId?: string | null;
+      scopeType: RoleBindingScopeType;
+      scopeId: string;
+    }>;
+  }) {
+    for (const b of bindings) {
+      await this.repo.validateScopeInOrg({
+        organizationId,
+        scopeType: b.scopeType,
+        scopeId: b.scopeId,
+      });
+    }
+    await assertNoPersonalTeamScope({ client: this.prisma, scopes: bindings });
+    await this.validateCustomRolesAssignable({ organizationId, bindings });
   }
 
   private async validatePrincipalInOrganization({
@@ -298,16 +425,13 @@ export class RoleBindingService {
     }));
   }
 
-  async getMyAccessBreakdown({
+  /** The member's own organization role and group memberships. */
+  private async findAccessPrincipal({
     organizationId,
     userId,
-    userName,
-    userEmail,
   }: {
     organizationId: string;
     userId: string;
-    userName: string | null;
-    userEmail: string | null;
   }) {
     const [orgMember, groupMemberships] = await Promise.all([
       this.prisma.organizationUser.findFirst({
@@ -324,9 +448,20 @@ export class RoleBindingService {
       }),
     ]);
 
-    const groupIds = groupMemberships.map((gm) => gm.groupId);
+    return { orgMember, groupMemberships };
+  }
 
-    const allBindings = await this.prisma.roleBinding.findMany({
+  /** Every binding the member holds directly or through one of their groups. */
+  private async findAccessBindings({
+    organizationId,
+    userId,
+    groupIds,
+  }: {
+    organizationId: string;
+    userId: string;
+    groupIds: string[];
+  }) {
+    return this.prisma.roleBinding.findMany({
       where: {
         organizationId,
         OR: [
@@ -340,16 +475,22 @@ export class RoleBindingService {
       },
       orderBy: { createdAt: "asc" },
     });
+  }
 
-    const orgScopeIds = allBindings
-      .filter((b) => b.scopeType === RoleBindingScopeType.ORGANIZATION)
-      .map((b) => b.scopeId);
-    const teamScopeIds = allBindings
-      .filter((b) => b.scopeType === RoleBindingScopeType.TEAM)
-      .map((b) => b.scopeId);
-    const projectScopeIds = allBindings
-      .filter((b) => b.scopeType === RoleBindingScopeType.PROJECT)
-      .map((b) => b.scopeId);
+  /** The display name of every scope these bindings name. */
+  private async resolveAccessScopeNames({
+    bindings,
+    organizationId,
+  }: {
+    bindings: Array<{ scopeType: RoleBindingScopeType; scopeId: string }>;
+    organizationId: string;
+  }): Promise<Map<string, string>> {
+    const idsOfType = (scopeType: RoleBindingScopeType) =>
+      bindings.filter((b) => b.scopeType === scopeType).map((b) => b.scopeId);
+
+    const orgScopeIds = idsOfType(RoleBindingScopeType.ORGANIZATION);
+    const teamScopeIds = idsOfType(RoleBindingScopeType.TEAM);
+    const projectScopeIds = idsOfType(RoleBindingScopeType.PROJECT);
 
     const [orgs, teams, projects] = await Promise.all([
       orgScopeIds.length > 0
@@ -380,54 +521,43 @@ export class RoleBindingService {
     for (const t of teams) scopeNames.set(t.id, t.name);
     for (const p of projects) scopeNames.set(p.id, p.name);
 
-    const resolvePermissions = (
-      binding: (typeof allBindings)[number],
-    ): string[] => {
-      if (binding.role === TeamUserRole.CUSTOM && binding.customRole) {
-        const perms = binding.customRole.permissions;
-        return Array.isArray(perms)
-          ? perms.filter((p): p is string => typeof p === "string")
-          : [];
-      }
-      if (binding.scopeType === RoleBindingScopeType.ORGANIZATION) {
-        if (binding.role === TeamUserRole.ADMIN) {
-          return getOrganizationRolePermissions(OrganizationUserRole.ADMIN);
-        }
-        if (binding.role === TeamUserRole.MEMBER) {
-          return getOrganizationRolePermissions(OrganizationUserRole.MEMBER);
-        }
-        // VIEWER or CUSTOM (with no resolvable customRole) at the ORG scope:
-        // fall back to the minimal EXTERNAL permission set rather than silently
-        // elevating to MEMBER. Today nothing writes these bindings, but this
-        // prevents accidental promotion if that ever changes.
-        return getOrganizationRolePermissions(OrganizationUserRole.EXTERNAL);
-      }
-      return getTeamRolePermissions(binding.role);
-    };
+    return scopeNames;
+  }
 
-    const toBindingSummary = (b: (typeof allBindings)[number]) => ({
-      id: b.id,
-      role: b.role as string,
-      customRoleName: b.customRole?.name ?? null,
-      scopeType: b.scopeType,
-      scopeId: b.scopeId,
-      scopeName: scopeNames.get(b.scopeId) ?? null,
-      permissions: resolvePermissions(b),
+  async getMyAccessBreakdown({
+    organizationId,
+    userId,
+    userName,
+    userEmail,
+  }: {
+    organizationId: string;
+    userId: string;
+    userName: string | null;
+    userEmail: string | null;
+  }) {
+    const { orgMember, groupMemberships } = await this.findAccessPrincipal({
+      organizationId,
+      userId,
+    });
+
+    const groupIds = groupMemberships.map((gm) => gm.groupId);
+
+    const allBindings = await this.findAccessBindings({
+      organizationId,
+      userId,
+      groupIds,
+    });
+
+    const scopeNames = await this.resolveAccessScopeNames({
+      bindings: allBindings,
+      organizationId,
     });
 
     const directBindings = allBindings
       .filter((b) => b.userId === userId)
-      .map(toBindingSummary);
+      .map((binding) => toBindingSummary({ binding, scopeNames }));
 
-    const groupBindingsByGroupId = new Map<
-      string,
-      (typeof allBindings)[number][]
-    >();
-    for (const b of allBindings.filter((b) => b.groupId != null)) {
-      const gid = b.groupId!;
-      if (!groupBindingsByGroupId.has(gid)) groupBindingsByGroupId.set(gid, []);
-      groupBindingsByGroupId.get(gid)!.push(b);
-    }
+    const groupBindingsByGroupId = groupBindingsByGroup(allBindings);
 
     // The router gates this on `organization:view`, so `orgMember` is always
     // present in practice. The fallback is defensive only.
@@ -447,7 +577,7 @@ export class RoleBindingService {
         slug: gm.group.slug,
         scimSource: gm.group.scimSource,
         bindings: (groupBindingsByGroupId.get(gm.groupId) ?? []).map(
-          toBindingSummary,
+          (binding) => toBindingSummary({ binding, scopeNames }),
         ),
       })),
       directBindings,
@@ -588,18 +718,7 @@ export class RoleBindingService {
     // Validate scopes and role assignability up front so a bad input fails
     // the whole batch before we open the transaction.
     await assertUsersInOrganization(this.prisma, organizationId, [userId]);
-    for (const b of bindingsToCreate) {
-      await this.repo.validateScopeInOrg({
-        organizationId,
-        scopeType: b.scopeType,
-        scopeId: b.scopeId,
-      });
-    }
-    await assertNoPersonalTeamScope({
-      client: this.prisma,
-      scopes: bindingsToCreate,
-    });
-    await this.validateCustomRolesAssignable({
+    await this.validateBindingsToCreate({
       organizationId,
       bindings: bindingsToCreate,
     });
@@ -647,143 +766,141 @@ export class RoleBindingService {
    * additions/removals, and member additions/removals. Wraps everything in a
    * single transaction so the UI never observes a partial save.
    */
-  async applyGroupEdits({
-    organizationId,
-    groupId,
-    rename,
-    bindingIdsToDelete,
-    bindingsToCreate,
-    memberUserIdsToAdd,
-    memberUserIdsToRemove,
+  async applyGroupEdits(edits: GroupEdits) {
+    await this.validateBindingsToCreate({
+      organizationId: edits.organizationId,
+      bindings: edits.bindingsToCreate,
+    });
+
+    return this.prisma.$transaction((tx) => this.runGroupEdits({ tx, edits }));
+  }
+
+  private async runGroupEdits({
+    tx,
+    edits,
   }: {
-    organizationId: string;
-    groupId: string;
-    rename?: { name: string; slug: string } | null;
-    bindingIdsToDelete: string[];
-    bindingsToCreate: Array<{
-      role: TeamUserRole;
-      customRoleId?: string | null;
-      scopeType: RoleBindingScopeType;
-      scopeId: string;
-    }>;
-    memberUserIdsToAdd: string[];
-    memberUserIdsToRemove: string[];
+    tx: Prisma.TransactionClient;
+    edits: GroupEdits;
   }) {
-    for (const b of bindingsToCreate) {
-      await this.repo.validateScopeInOrg({
-        organizationId,
-        scopeType: b.scopeType,
-        scopeId: b.scopeId,
+    const group = await tx.group.findFirst({
+      where: { id: edits.groupId, organizationId: edits.organizationId },
+      select: { id: true, scimSource: true },
+    });
+    if (!group) {
+      throw new TRPCError({ code: "NOT_FOUND", message: "Group not found" });
+    }
+
+    const step: GroupEditStep = { tx, edits, scimSource: group.scimSource };
+    await this.renameGroup(step);
+    await this.deleteGroupBindings(step);
+    await this.createGroupBindings(step);
+    await this.removeGroupMembers(step);
+    await this.addGroupMembers(step);
+
+    return { success: true };
+  }
+
+  private async renameGroup({ tx, edits, scimSource }: GroupEditStep) {
+    const { rename, groupId } = edits;
+    if (!rename) return;
+
+    if (scimSource) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "SCIM-managed groups cannot be renamed",
       });
     }
-    await assertNoPersonalTeamScope({
-      client: this.prisma,
-      scopes: bindingsToCreate,
+    await tx.group.update({
+      where: { id: groupId },
+      data: { name: rename.name, slug: rename.slug },
     });
-    await this.validateCustomRolesAssignable({
-      organizationId,
-      bindings: bindingsToCreate,
-    });
+  }
 
-    return this.prisma.$transaction(async (tx) => {
-      const group = await tx.group.findFirst({
-        where: { id: groupId, organizationId },
-        select: { id: true, scimSource: true },
+  private async deleteGroupBindings({ tx, edits }: GroupEditStep) {
+    const { organizationId, groupId, bindingIdsToDelete } = edits;
+    if (bindingIdsToDelete.length === 0) return;
+
+    const existing = await tx.roleBinding.findMany({
+      where: {
+        id: { in: bindingIdsToDelete },
+        organizationId,
+        groupId,
+      },
+      select: { id: true, scopeType: true, scopeId: true },
+    });
+    if (existing.length !== bindingIdsToDelete.length) {
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: "One or more bindings not found",
       });
-      if (!group) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "Group not found" });
-      }
+    }
+    await assertNoPersonalTeamScope({ client: tx, scopes: existing });
+    await tx.roleBinding.deleteMany({
+      where: { id: { in: bindingIdsToDelete }, organizationId, groupId },
+    });
+  }
 
-      if (rename) {
-        if (group.scimSource) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: "SCIM-managed groups cannot be renamed",
-          });
-        }
-        await tx.group.update({
-          where: { id: groupId },
-          data: { name: rename.name, slug: rename.slug },
-        });
-      }
+  private async createGroupBindings({ tx, edits }: GroupEditStep) {
+    const { organizationId, groupId, bindingsToCreate } = edits;
+    if (bindingsToCreate.length === 0) return;
 
-      if (bindingIdsToDelete.length > 0) {
-        const existing = await tx.roleBinding.findMany({
-          where: {
-            id: { in: bindingIdsToDelete },
-            organizationId,
-            groupId,
-          },
-          select: { id: true, scopeType: true, scopeId: true },
-        });
-        if (existing.length !== bindingIdsToDelete.length) {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "One or more bindings not found",
-          });
-        }
-        await assertNoPersonalTeamScope({ client: tx, scopes: existing });
-        await tx.roleBinding.deleteMany({
-          where: { id: { in: bindingIdsToDelete }, organizationId, groupId },
-        });
-      }
+    await tx.roleBinding.createMany({
+      data: bindingsToCreate.map((b) => ({
+        id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+        organizationId,
+        userId: null,
+        groupId,
+        role: b.role,
+        customRoleId:
+          b.role === TeamUserRole.CUSTOM ? (b.customRoleId ?? null) : null,
+        scopeType: b.scopeType,
+        scopeId: b.scopeId,
+      })),
+    });
+  }
 
-      if (bindingsToCreate.length > 0) {
-        await tx.roleBinding.createMany({
-          data: bindingsToCreate.map((b) => ({
-            id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-            organizationId,
-            userId: null,
-            groupId,
-            role: b.role,
-            customRoleId:
-              b.role === TeamUserRole.CUSTOM ? (b.customRoleId ?? null) : null,
-            scopeType: b.scopeType,
-            scopeId: b.scopeId,
-          })),
-        });
-      }
+  private async removeGroupMembers({ tx, edits, scimSource }: GroupEditStep) {
+    const { groupId, memberUserIdsToRemove } = edits;
+    if (memberUserIdsToRemove.length === 0) return;
 
-      if (memberUserIdsToRemove.length > 0) {
-        if (group.scimSource) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: "Cannot manually remove members from a SCIM-managed group",
-          });
-        }
-        await tx.groupMembership.deleteMany({
-          where: { groupId, userId: { in: memberUserIdsToRemove } },
-        });
-      }
+    if (scimSource) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "Cannot manually remove members from a SCIM-managed group",
+      });
+    }
+    await tx.groupMembership.deleteMany({
+      where: { groupId, userId: { in: memberUserIdsToRemove } },
+    });
+  }
 
-      if (memberUserIdsToAdd.length > 0) {
-        if (group.scimSource) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: "Cannot manually add members to a SCIM-managed group",
-          });
-        }
-        const orgMembers = await tx.organizationUser.findMany({
-          where: {
-            organizationId,
-            userId: { in: memberUserIdsToAdd },
-          },
-          select: { userId: true },
-        });
-        if (orgMembers.length !== memberUserIdsToAdd.length) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message:
-              "All users must belong to the organization before joining a group",
-          });
-        }
-        await tx.groupMembership.createMany({
-          data: memberUserIdsToAdd.map((userId) => ({ groupId, userId })),
-          skipDuplicates: true,
-        });
-      }
+  private async addGroupMembers({ tx, edits, scimSource }: GroupEditStep) {
+    const { organizationId, groupId, memberUserIdsToAdd } = edits;
+    if (memberUserIdsToAdd.length === 0) return;
 
-      return { success: true };
+    if (scimSource) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "Cannot manually add members to a SCIM-managed group",
+      });
+    }
+    const orgMembers = await tx.organizationUser.findMany({
+      where: {
+        organizationId,
+        userId: { in: memberUserIdsToAdd },
+      },
+      select: { userId: true },
+    });
+    if (orgMembers.length !== memberUserIdsToAdd.length) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message:
+          "All users must belong to the organization before joining a group",
+      });
+    }
+    await tx.groupMembership.createMany({
+      data: memberUserIdsToAdd.map((userId) => ({ groupId, userId })),
+      skipDuplicates: true,
     });
   }
 }

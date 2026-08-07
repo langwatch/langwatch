@@ -32,6 +32,32 @@ const hasModel = (value: unknown): boolean => {
 };
 
 /**
+ * The project's cascade-resolved `workflows.create_default` model, falling
+ * back to `DEFAULT_MODEL` when nothing is configured at any scope.
+ */
+const resolveFallbackLlm = async ({
+  prisma,
+  projectId,
+}: {
+  prisma: PrismaClient;
+  projectId: string;
+}): Promise<LLMConfig> => {
+  let resolvedModel: string | undefined;
+  try {
+    const resolved = await resolveModelForFeature("workflows.create_default", {
+      prisma,
+      projectId,
+    });
+    resolvedModel = resolved.model;
+  } catch (error) {
+    // Only "nothing configured at any scope" falls back to the registry
+    // flagship — infrastructure failures must not silently pin a model.
+    if (!(error instanceof ModelNotConfiguredError)) throw error;
+  }
+  return { model: resolvedModel ?? DEFAULT_MODEL };
+};
+
+/**
  * Every LLM node owns its config: there is no workflow-level default at
  * execution time. This is the persistence chokepoint that guarantees it —
  * any llm parameter arriving without a model is filled in before the
@@ -70,22 +96,9 @@ export const materializeNodeLlmConfigs = async ({
     return;
   }
 
-  let fallback: LLMConfig | undefined = legacyDefault;
-  if (!fallback) {
-    let resolvedModel: string | undefined;
-    try {
-      const resolved = await resolveModelForFeature(
-        "workflows.create_default",
-        { prisma, projectId },
-      );
-      resolvedModel = resolved.model;
-    } catch (error) {
-      // Only "nothing configured at any scope" falls back to the registry
-      // flagship — infrastructure failures must not silently pin a model.
-      if (!(error instanceof ModelNotConfiguredError)) throw error;
-    }
-    fallback = { model: resolvedModel ?? DEFAULT_MODEL };
-  }
+  const fallback: LLMConfig = legacyDefault
+    ? legacyDefault
+    : await resolveFallbackLlm({ prisma, projectId });
 
   for (const param of modellessParams) {
     const value = (param.value ?? {}) as Partial<LLMConfig>;

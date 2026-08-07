@@ -12,7 +12,10 @@ import {
   consumeEmailCapSlot,
   consumeTenantEmailCapSlot,
 } from "~/server/app-layer/automations/dispatch/emailCaps";
-import { dispatchGraphAlertAction } from "~/server/app-layer/automations/dispatch/graphAlertActionDispatch";
+import {
+  dispatchGraphAlertAction,
+  type GraphAlertDispatchDeps,
+} from "~/server/app-layer/automations/dispatch/graphAlertActionDispatch";
 import type { EmailSuppressionService } from "~/server/app-layer/automations/emailSuppression.service";
 import {
   evaluateGraphTrigger,
@@ -65,62 +68,45 @@ export interface AutomationDispatchPorts {
   pruneWebhookDeliveries: () => Promise<number>;
 }
 
-export function buildAutomationDispatchPorts({
-  prisma,
-  redis,
-  triggers,
-  emailSuppressions,
-  projects,
-  evaluations,
-  traces,
-  traceSummaryRepository,
-  resolveClickHouseClient,
-}: {
-  prisma: PrismaClient;
-  redis: Redis | Cluster | null;
-  triggers: TriggerService;
-  emailSuppressions: EmailSuppressionService;
-  projects: ProjectService;
-  evaluations: { runs: EvaluationRunService };
-  traces: { spans: SpanStorageService };
-  traceSummaryRepository: TraceSummaryRepository;
-  /** The composition root's ClickHouse resolver — the heartbeat's recency
-   *  probe reads through it. Passed down, never imported. */
-  resolveClickHouseClient: ClickHouseClientResolver;
-}): AutomationDispatchPorts {
-  // Fail loud if BASE_HOST is missing: every alert dispatch interpolates it
-  // into deep links; an empty baseHost silently ships broken links.
+function resolveBaseHost(): string {
   const baseHost = env.BASE_HOST;
   if (!baseHost) {
     throw new Error(
       "BASE_HOST is unset — automation dispatch cannot render deep links (email + Slack alert templates interpolate baseHost). Set env.BASE_HOST before booting the worker.",
     );
   }
+  return baseHost;
+}
 
-  // Shared trace fold store — dispatch re-reads it for the settle confirm.
-  // RedisCachedFoldStore takes a standalone `Redis` client; a Cluster
-  // client falls back to the uncached store.
-  const traceSummaryStore: FoldProjectionStore<TraceSummaryData> =
-    redis && !(redis instanceof Cluster)
-      ? new RedisCachedFoldStore(
-          new TraceSummaryStore(traceSummaryRepository),
-          redis,
-          { keyPrefix: "trace_summaries" },
-        )
-      : new TraceSummaryStore(traceSummaryRepository);
+// Shared trace fold store — dispatch re-reads it for the settle confirm.
+// RedisCachedFoldStore takes a standalone `Redis` client; a Cluster client
+// falls back to the uncached store.
+function buildTraceSummaryStore({
+  redis,
+  traceSummaryRepository,
+}: {
+  redis: Redis | Cluster | null;
+  traceSummaryRepository: TraceSummaryRepository;
+}): FoldProjectionStore<TraceSummaryData> {
+  return redis && !(redis instanceof Cluster)
+    ? new RedisCachedFoldStore(
+        new TraceSummaryStore(traceSummaryRepository),
+        redis,
+        { keyPrefix: "trace_summaries" },
+      )
+    : new TraceSummaryStore(traceSummaryRepository);
+}
 
-  const traceReadDerivation = new TraceReadDerivationService(traces.spans);
-
-  // Constructed once — `traceById` runs per trace per digest on the hot
-  // path. Concurrent lookups within one dispatch share a single in-flight
-  // protections query per project; the entry drops once settled so
-  // protections aren't cached stale across dispatches.
-  const traceService = TraceService.create(prisma);
+// Constructed once — `traceById` runs per trace per digest on the hot path.
+// Concurrent lookups within one dispatch share a single in-flight
+// protections query per project; the entry drops once settled so
+// protections aren't cached stale across dispatches.
+function createProtectionsDeduper(prisma: PrismaClient) {
   const protectionsInFlight = new Map<
     string,
     ReturnType<typeof getProtectionsForProject>
   >();
-  const getProtectionsDeduped = (projectId: string) => {
+  return (projectId: string) => {
     let promise = protectionsInFlight.get(projectId);
     if (!promise) {
       promise = getProtectionsForProject(prisma, { projectId }).finally(() => {
@@ -130,23 +116,82 @@ export function buildAutomationDispatchPorts({
     }
     return promise;
   };
+}
 
-  // ADR-034 Phase 5/8.1: shared evaluator deps. The notifier dispatches via
-  // the Liquid pipeline (`dispatchGraphAlertAction`) so per-trigger custom
-  // templates and the alert-default Liquid templates both apply. The
-  // TriggerSent repo mirrors the legacy dedup pattern exactly.
-  const graphTriggerSentRepo = new PrismaGraphTriggerSentRepository(prisma);
-  // ADR-040 §6: one delivery-log writer shared by the digest dispatch and
-  // the graph-alert path.
-  const webhookDeliveries = WebhookDeliveryService.create(prisma);
-  const recordWebhookDelivery = (
-    input: Parameters<typeof webhookDeliveries.record>[0],
-  ) => webhookDeliveries.record(input);
-  // Graph-config loads go through the automations-owned service, not raw
-  // prisma — same query shape, service/repository layering (no direct
-  // prisma in composition-root closures).
-  const customGraphs = AutomationCustomGraphService.create(prisma);
-  const graphTriggerEvalDeps: GraphTriggerEvaluationDeps = {
+// ADR-031: honour the same suppression list + hard caps the digest path
+// consumes; claims keyed on the fire digest so a retry re-reads the count
+// instead of burning a second slot.
+function buildGraphAlertNotifierDeps({
+  emailSuppressions,
+  triggers,
+  recordWebhookDelivery,
+}: {
+  emailSuppressions: EmailSuppressionService;
+  triggers: TriggerService;
+  recordWebhookDelivery: GraphAlertDispatchDeps["recordWebhookDelivery"];
+}): GraphAlertDispatchDeps {
+  return {
+    sendEmail: sendRenderedTriggerEmail,
+    sendSlack: sendRenderedSlackMessage,
+    sendSlackBot: postSlackChatMessage,
+    sendWebhook,
+    recordWebhookDelivery,
+    filterSuppressedRecipients: ({ projectId, triggerId, emails }) =>
+      emailSuppressions.filterSuppressed({ projectId, triggerId, emails }),
+    consumeEmailCapSlot: ({ projectId, triggerId, now, dedupKey }) =>
+      consumeEmailCapSlot({
+        projectId,
+        triggerId,
+        now,
+        cap: env.TRIGGER_EMAIL_HOURLY_CAP,
+        dedupKey,
+      }),
+    emailHourlyCap: env.TRIGGER_EMAIL_HOURLY_CAP,
+    consumeTenantEmailCapSlot: ({
+      projectId,
+      now,
+      cap,
+      recipientCount,
+      dedupKey,
+    }) =>
+      consumeTenantEmailCapSlot({
+        projectId,
+        now,
+        cap,
+        recipientCount,
+        dedupKey,
+      }),
+    tenantDailyCap: env.TRIGGER_EMAIL_TENANT_DAILY_CAP,
+    // ADR-031 per-recipient at-most-once ledger — the SAME TriggerSent
+    // claim store the digest dispatch threads in.
+    isRecipientSent: (params) => triggers.isSendClaimed(params),
+    recordRecipientSent: async (params) => {
+      await triggers.claimSend(params);
+    },
+  };
+}
+
+// ADR-034 Phase 5/8.1: shared evaluator deps. The notifier dispatches via the
+// Liquid pipeline (`dispatchGraphAlertAction`) so per-trigger custom
+// templates and the alert-default Liquid templates both apply.
+function buildGraphTriggerEvalDeps({
+  triggers,
+  customGraphs,
+  projects,
+  graphTriggerSentRepo,
+  emailSuppressions,
+  recordWebhookDelivery,
+  baseHost,
+}: {
+  triggers: TriggerService;
+  customGraphs: AutomationCustomGraphService;
+  projects: ProjectService;
+  graphTriggerSentRepo: PrismaGraphTriggerSentRepository;
+  emailSuppressions: EmailSuppressionService;
+  recordWebhookDelivery: GraphAlertDispatchDeps["recordWebhookDelivery"];
+  baseHost: string;
+}): GraphTriggerEvaluationDeps {
+  return {
     loadTrigger: async ({ triggerId, projectId }) =>
       triggers.getById({ triggerId, projectId }),
     loadCustomGraph: async ({ customGraphId, projectId }) =>
@@ -160,80 +205,50 @@ export function buildAutomationDispatchPorts({
     notifier: {
       dispatch: async (input) =>
         dispatchGraphAlertAction({
-          deps: {
-            sendEmail: sendRenderedTriggerEmail,
-            sendSlack: sendRenderedSlackMessage,
-            sendSlackBot: postSlackChatMessage,
-            sendWebhook,
+          deps: buildGraphAlertNotifierDeps({
+            emailSuppressions,
+            triggers,
             recordWebhookDelivery,
-            // ADR-031: honour the same suppression list + hard caps the
-            // digest path consumes; claims keyed on the fire digest so a
-            // retry re-reads the count instead of burning a second slot.
-            filterSuppressedRecipients: ({ projectId, triggerId, emails }) =>
-              emailSuppressions.filterSuppressed({
-                projectId,
-                triggerId,
-                emails,
-              }),
-            consumeEmailCapSlot: ({ projectId, triggerId, now, dedupKey }) =>
-              consumeEmailCapSlot({
-                projectId,
-                triggerId,
-                now,
-                cap: env.TRIGGER_EMAIL_HOURLY_CAP,
-                dedupKey,
-              }),
-            emailHourlyCap: env.TRIGGER_EMAIL_HOURLY_CAP,
-            consumeTenantEmailCapSlot: ({
-              projectId,
-              now,
-              cap,
-              recipientCount,
-              dedupKey,
-            }) =>
-              consumeTenantEmailCapSlot({
-                projectId,
-                now,
-                cap,
-                recipientCount,
-                dedupKey,
-              }),
-            tenantDailyCap: env.TRIGGER_EMAIL_TENANT_DAILY_CAP,
-            // ADR-031 per-recipient at-most-once ledger — the SAME
-            // TriggerSent claim store the digest dispatch threads in.
-            isRecipientSent: (params) => triggers.isSendClaimed(params),
-            recordRecipientSent: async (params) => {
-              await triggers.claimSend(params);
-            },
-          },
+          }),
           input,
         }),
     },
     baseHost,
     now: () => new Date(),
   };
+}
 
-  const boundEvaluateGraphTrigger = async (params: {
-    triggerId: string;
-    projectId: string;
-    reason: GraphTriggerEvaluationReason;
-  }) => {
-    await evaluateGraphTrigger({
-      deps: graphTriggerEvalDeps,
-      triggerId: params.triggerId,
-      projectId: params.projectId,
-      reason: params.reason,
-    });
-  };
-
-  const heartbeatDeps = defaultGraphTriggerHeartbeatDeps({
-    triggers,
-    prisma,
-    resolveClickHouseClient,
-  });
-  const heartbeatSources = defaultCandidateSources(prisma);
-
-  const settlementDeps: TriggerSettlementDispatchDeps = {
+// ADR-030/031/035/036/040/041: the settled-dispatch deps, mirroring the
+// legacy outbox dispatcher's contract minus queue transport — the
+// ProcessManagerOutbox owns retry now.
+function buildSettlementDeps({
+  prisma,
+  triggers,
+  projects,
+  baseHost,
+  traceSummaryStore,
+  evaluations,
+  traceReadDerivation,
+  getProtectionsDeduped,
+  traceService,
+  emailSuppressions,
+  recordWebhookDelivery,
+}: {
+  prisma: PrismaClient;
+  triggers: TriggerService;
+  projects: ProjectService;
+  baseHost: string;
+  traceSummaryStore: FoldProjectionStore<TraceSummaryData>;
+  evaluations: { runs: EvaluationRunService };
+  traceReadDerivation: TraceReadDerivationService;
+  getProtectionsDeduped: (
+    projectId: string,
+  ) => ReturnType<typeof getProtectionsForProject>;
+  traceService: TraceService;
+  emailSuppressions: EmailSuppressionService;
+  recordWebhookDelivery: GraphAlertDispatchDeps["recordWebhookDelivery"];
+}): TriggerSettlementDispatchDeps {
+  return {
     triggers,
     projects,
     baseHost,
@@ -278,6 +293,94 @@ export function buildAutomationDispatchPorts({
     },
     recordWebhookDelivery,
   };
+}
+
+export function buildAutomationDispatchPorts({
+  prisma,
+  redis,
+  triggers,
+  emailSuppressions,
+  projects,
+  evaluations,
+  traces,
+  traceSummaryRepository,
+  resolveClickHouseClient,
+}: {
+  prisma: PrismaClient;
+  redis: Redis | Cluster | null;
+  triggers: TriggerService;
+  emailSuppressions: EmailSuppressionService;
+  projects: ProjectService;
+  evaluations: { runs: EvaluationRunService };
+  traces: { spans: SpanStorageService };
+  traceSummaryRepository: TraceSummaryRepository;
+  /** The composition root's ClickHouse resolver — the heartbeat's recency
+   *  probe reads through it. Passed down, never imported. */
+  resolveClickHouseClient: ClickHouseClientResolver;
+}): AutomationDispatchPorts {
+  const baseHost = resolveBaseHost();
+  const traceSummaryStore = buildTraceSummaryStore({
+    redis,
+    traceSummaryRepository,
+  });
+  const traceReadDerivation = new TraceReadDerivationService(traces.spans);
+  const traceService = TraceService.create(prisma);
+  const getProtectionsDeduped = createProtectionsDeduper(prisma);
+
+  const graphTriggerSentRepo = new PrismaGraphTriggerSentRepository(prisma);
+  // ADR-040 §6: one delivery-log writer shared by the digest dispatch and
+  // the graph-alert path.
+  const webhookDeliveries = WebhookDeliveryService.create(prisma);
+  const recordWebhookDelivery = (
+    input: Parameters<typeof webhookDeliveries.record>[0],
+  ) => webhookDeliveries.record(input);
+  // Graph-config loads go through the automations-owned service, not raw
+  // prisma — same query shape, service/repository layering (no direct
+  // prisma in composition-root closures).
+  const customGraphs = AutomationCustomGraphService.create(prisma);
+  const graphTriggerEvalDeps = buildGraphTriggerEvalDeps({
+    triggers,
+    customGraphs,
+    projects,
+    graphTriggerSentRepo,
+    emailSuppressions,
+    recordWebhookDelivery,
+    baseHost,
+  });
+
+  const boundEvaluateGraphTrigger = async (params: {
+    triggerId: string;
+    projectId: string;
+    reason: GraphTriggerEvaluationReason;
+  }) => {
+    await evaluateGraphTrigger({
+      deps: graphTriggerEvalDeps,
+      triggerId: params.triggerId,
+      projectId: params.projectId,
+      reason: params.reason,
+    });
+  };
+
+  const heartbeatDeps = defaultGraphTriggerHeartbeatDeps({
+    triggers,
+    prisma,
+    resolveClickHouseClient,
+  });
+  const heartbeatSources = defaultCandidateSources(prisma);
+
+  const settlementDeps = buildSettlementDeps({
+    prisma,
+    triggers,
+    projects,
+    baseHost,
+    traceSummaryStore,
+    evaluations,
+    traceReadDerivation,
+    getProtectionsDeduped,
+    traceService,
+    emailSuppressions,
+    recordWebhookDelivery,
+  });
 
   return {
     settlementDeps,

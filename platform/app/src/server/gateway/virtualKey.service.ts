@@ -296,66 +296,17 @@ export class VirtualKeyService {
     const id = this.nextVirtualKeyId();
 
     const created = await this.prisma
-      .$transaction(async (tx) => {
-        const vk = await this.repository.create(
-          {
-            id,
-            organizationId: input.organizationId,
-            name: input.name,
-            description: input.description,
-            hashedSecret,
-            displayPrefix,
-            principalUserId: input.principalUserId,
-            config: config as Prisma.InputJsonValue,
-            externalId: input.externalId ?? null,
-            metadata: metadataPatch(input.metadata),
-            createdById: input.actorUserId,
-            scopes: input.scopes,
-            traceProjectId: input.traceProjectId ?? null,
-            routingPolicyId: input.routingPolicyId ?? null,
-            routingMode,
-            purpose: input.purpose,
-          },
+      .$transaction((tx) =>
+        this.persistNewVirtualKey({
+          input,
+          id,
+          config,
+          hashedSecret,
+          displayPrefix,
+          routingMode,
           tx,
-        );
-        await this.assertTraceProjectResolvable(vk, tx);
-        await this.assertProvidersAllowedReachable(
-          vk,
-          config.providersAllowed,
-          tx,
-        );
-        if (input.budget) {
-          await this.upsertKeyBudget(
-            {
-              virtualKey: vk,
-              budget: input.budget,
-              actorUserId: input.actorUserId,
-            },
-            tx,
-          );
-        }
-        await this.changeEvents.append(
-          {
-            organizationId: input.organizationId,
-            kind: "VK_CREATED",
-            virtualKeyId: vk.id,
-          },
-          tx,
-        );
-        await this.auditLog.append(
-          {
-            organizationId: input.organizationId,
-            projectId: null,
-            actorUserId: input.actorUserId,
-            action: "gateway.virtual_key.created",
-            targetKind: "virtual_key",
-            targetId: vk.id,
-            after: serialiseForAudit(vk),
-          },
-          tx,
-        );
-        return vk;
-      })
+        }),
+      )
       // The unique index is what actually decides whether the external id was
       // free, so the refusal is read off its violation rather than off a
       // pre-flight SELECT that two concurrent creates would both pass.
@@ -365,6 +316,79 @@ export class VirtualKeyService {
 
     await emitVkLifecycle(this.prisma, { vk: created, action: "created" });
     return { virtualKey: created, secret };
+  }
+
+  private async persistNewVirtualKey({
+    input,
+    id,
+    config,
+    hashedSecret,
+    displayPrefix,
+    routingMode,
+    tx,
+  }: {
+    input: CreateVirtualKeyInput;
+    id: string;
+    config: VirtualKeyConfig;
+    hashedSecret: string;
+    displayPrefix: string;
+    routingMode: VirtualKeyRoutingMode;
+    tx: Prisma.TransactionClient;
+  }): Promise<VirtualKeyWithScopes> {
+    const vk = await this.repository.create(
+      {
+        id,
+        organizationId: input.organizationId,
+        name: input.name,
+        description: input.description,
+        hashedSecret,
+        displayPrefix,
+        principalUserId: input.principalUserId,
+        config: config as Prisma.InputJsonValue,
+        externalId: input.externalId ?? null,
+        metadata: metadataPatch(input.metadata),
+        createdById: input.actorUserId,
+        scopes: input.scopes,
+        traceProjectId: input.traceProjectId ?? null,
+        routingPolicyId: input.routingPolicyId ?? null,
+        routingMode,
+        purpose: input.purpose,
+      },
+      tx,
+    );
+    await this.assertTraceProjectResolvable(vk, tx);
+    await this.assertProvidersAllowedReachable(vk, config.providersAllowed, tx);
+    if (input.budget) {
+      await this.upsertKeyBudget(
+        {
+          virtualKey: vk,
+          budget: input.budget,
+          actorUserId: input.actorUserId,
+        },
+        tx,
+      );
+    }
+    await this.changeEvents.append(
+      {
+        organizationId: input.organizationId,
+        kind: "VK_CREATED",
+        virtualKeyId: vk.id,
+      },
+      tx,
+    );
+    await this.auditLog.append(
+      {
+        organizationId: input.organizationId,
+        projectId: null,
+        actorUserId: input.actorUserId,
+        action: "gateway.virtual_key.created",
+        targetKind: "virtual_key",
+        targetId: vk.id,
+        after: serialiseForAudit(vk),
+      },
+      tx,
+    );
+    return vk;
   }
 
   async update(input: UpdateVirtualKeyInput): Promise<VirtualKeyWithScopes> {
@@ -396,138 +420,158 @@ export class VirtualKeyService {
         input.organizationId,
       );
     }
-    const nextRoutingPolicyId =
-      input.routingPolicyId !== undefined
-        ? input.routingPolicyId
-        : input.routingMode !== undefined && input.routingMode !== "POLICY"
-          ? // An explicit switch away from POLICY retires the stored
-            // reference rather than tripping the pairing check below: the
-            // caller stated the whole routing decision, and keeping the
-            // old id would reject an update that is not contradictory.
-            null
-          : existing.routingPolicyId;
-    const routingMode =
-      input.routingMode !== undefined || input.routingPolicyId !== undefined
-        ? resolveRoutingMode(
-            input.routingMode ?? existing.routingMode,
-            nextRoutingPolicyId,
-          )
-        : existing.routingMode;
+    const routingMode = resolveUpdatedRoutingMode({ input, existing });
     assertProvidersAllowedShape(input.config?.providersAllowed);
 
     const updated = await this.prisma
-      .$transaction(async (tx) => {
-        if (input.scopes) {
-          if (input.scopes.length === 0) {
-            throw new TRPCError({
-              code: "BAD_REQUEST",
-              message: "At least one scope is required",
-            });
-          }
-          await this.repository.replaceScopes(input.id, input.scopes, tx);
-        }
-
-        const vk = await tx.virtualKey.update({
-          where: { id: input.id, organizationId: input.organizationId },
-          data: {
-            name: input.name ?? existing.name,
-            description: input.description ?? existing.description,
-            config: config as Prisma.InputJsonValue,
-            ...identityPatchData(input),
-            ...(input.routingPolicyId !== undefined
-              ? { routingPolicyId: input.routingPolicyId }
-              : {}),
-            ...(input.traceProjectId !== undefined
-              ? { traceProjectId: input.traceProjectId }
-              : {}),
-            routingMode,
-            revision: { increment: 1n },
-          },
-          include: { scopes: true },
-        });
-
-        await this.assertTraceProjectResolvable(vk, tx);
-        await this.assertProvidersAllowedReachable(
-          vk,
-          config.providersAllowed,
+      .$transaction((tx) =>
+        this.applyVirtualKeyUpdate({
+          input,
+          existing,
+          config,
+          before,
+          guardrailDelta,
+          routingMode,
           tx,
-        );
-
-        if (input.budget !== undefined) {
-          if (input.budget) {
-            await this.upsertKeyBudget(
-              {
-                virtualKey: vk,
-                budget: input.budget,
-                actorUserId: input.actorUserId,
-              },
-              tx,
-            );
-          } else {
-            await this.archiveKeyBudgets(vk, input.actorUserId, tx);
-          }
-        }
-
-        await this.changeEvents.append(
-          {
-            organizationId: input.organizationId,
-            kind: "VK_CONFIG_UPDATED",
-            virtualKeyId: vk.id,
-          },
-          tx,
-        );
-        await this.auditLog.append(
-          {
-            organizationId: input.organizationId,
-            projectId: null,
-            actorUserId: input.actorUserId,
-            action: "gateway.virtual_key.updated",
-            targetKind: "virtual_key",
-            targetId: vk.id,
-            before,
-            after: serialiseForAudit(vk),
-          },
-          tx,
-        );
-        // Guardrail attach/detach are governance events distinct from a
-        // generic config edit; the AuditLog target stays the VK (the row
-        // that opted in), not the guardrail. One row per added / removed
-        // guardrail id so SIEM exports see each wire change individually.
-        for (const a of guardrailDelta.attached) {
-          await this.auditLog.append(
-            {
-              organizationId: input.organizationId,
-              projectId: null,
-              actorUserId: input.actorUserId,
-              action: "gateway.virtual_key.guardrail_attached",
-              targetKind: "virtual_key",
-              targetId: vk.id,
-              after: { direction: a.direction, guardrailId: a.guardrailId },
-            },
-            tx,
-          );
-        }
-        for (const d of guardrailDelta.detached) {
-          await this.auditLog.append(
-            {
-              organizationId: input.organizationId,
-              projectId: null,
-              actorUserId: input.actorUserId,
-              action: "gateway.virtual_key.guardrail_detached",
-              targetKind: "virtual_key",
-              targetId: vk.id,
-              before: { direction: d.direction, guardrailId: d.guardrailId },
-            },
-            tx,
-          );
-        }
-        return vk;
-      })
+        }),
+      )
       .catch((error: unknown) =>
         translateExternalIdConflict(error, "virtual_key", input.externalId),
       );
 
     return updated;
+  }
+
+  private async applyVirtualKeyUpdate({
+    input,
+    existing,
+    config,
+    before,
+    guardrailDelta,
+    routingMode,
+    tx,
+  }: {
+    input: UpdateVirtualKeyInput;
+    existing: VirtualKeyWithScopes;
+    config: VirtualKeyConfig;
+    before: ReturnType<typeof serialiseForAudit>;
+    guardrailDelta: ReturnType<typeof diffGuardrailAttachments>;
+    routingMode: VirtualKeyRoutingMode;
+    tx: Prisma.TransactionClient;
+  }): Promise<VirtualKeyWithScopes> {
+    await this.replaceScopesIfProvided(input, tx);
+
+    const vk = await tx.virtualKey.update({
+      where: { id: input.id, organizationId: input.organizationId },
+      data: virtualKeyUpdateData({ input, existing, config, routingMode }),
+      include: { scopes: true },
+    });
+
+    await this.assertTraceProjectResolvable(vk, tx);
+    await this.assertProvidersAllowedReachable(vk, config.providersAllowed, tx);
+
+    if (input.budget !== undefined) {
+      if (input.budget) {
+        await this.upsertKeyBudget(
+          {
+            virtualKey: vk,
+            budget: input.budget,
+            actorUserId: input.actorUserId,
+          },
+          tx,
+        );
+      } else {
+        await this.archiveKeyBudgets(vk, input.actorUserId, tx);
+      }
+    }
+
+    await this.changeEvents.append(
+      {
+        organizationId: input.organizationId,
+        kind: "VK_CONFIG_UPDATED",
+        virtualKeyId: vk.id,
+      },
+      tx,
+    );
+    await this.auditLog.append(
+      {
+        organizationId: input.organizationId,
+        projectId: null,
+        actorUserId: input.actorUserId,
+        action: "gateway.virtual_key.updated",
+        targetKind: "virtual_key",
+        targetId: vk.id,
+        before,
+        after: serialiseForAudit(vk),
+      },
+      tx,
+    );
+    await this.appendGuardrailAuditRows({
+      input,
+      guardrailDelta,
+      virtualKeyId: vk.id,
+      tx,
+    });
+    return vk;
+  }
+
+  private async replaceScopesIfProvided(
+    input: UpdateVirtualKeyInput,
+    tx: Prisma.TransactionClient,
+  ): Promise<void> {
+    if (!input.scopes) return;
+    if (input.scopes.length === 0) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "At least one scope is required",
+      });
+    }
+    await this.repository.replaceScopes(input.id, input.scopes, tx);
+  }
+
+  // Guardrail attach/detach are governance events distinct from a
+  // generic config edit; the AuditLog target stays the VK (the row
+  // that opted in), not the guardrail. One row per added / removed
+  // guardrail id so SIEM exports see each wire change individually.
+  private async appendGuardrailAuditRows({
+    input,
+    guardrailDelta,
+    virtualKeyId,
+    tx,
+  }: {
+    input: UpdateVirtualKeyInput;
+    guardrailDelta: ReturnType<typeof diffGuardrailAttachments>;
+    virtualKeyId: string;
+    tx: Prisma.TransactionClient;
+  }): Promise<void> {
+    for (const a of guardrailDelta.attached) {
+      await this.auditLog.append(
+        {
+          organizationId: input.organizationId,
+          projectId: null,
+          actorUserId: input.actorUserId,
+          action: "gateway.virtual_key.guardrail_attached",
+          targetKind: "virtual_key",
+          targetId: virtualKeyId,
+          after: { direction: a.direction, guardrailId: a.guardrailId },
+        },
+        tx,
+      );
+    }
+    for (const d of guardrailDelta.detached) {
+      await this.auditLog.append(
+        {
+          organizationId: input.organizationId,
+          projectId: null,
+          actorUserId: input.actorUserId,
+          action: "gateway.virtual_key.guardrail_detached",
+          targetKind: "virtual_key",
+          targetId: virtualKeyId,
+          before: { direction: d.direction, guardrailId: d.guardrailId },
+        },
+        tx,
+      );
+    }
   }
 
   async rotate(input: RotateVirtualKeyInput): Promise<CreatedVirtualKey> {
@@ -1022,6 +1066,63 @@ function resolveRoutingMode(
     });
   }
   return mode;
+}
+
+/**
+ * The routing mode an update settles on. Only stated when the caller
+ * touched either half of the pair; otherwise the stored mode stands.
+ */
+function resolveUpdatedRoutingMode({
+  input,
+  existing,
+}: {
+  input: UpdateVirtualKeyInput;
+  existing: VirtualKeyWithScopes;
+}): VirtualKeyRoutingMode {
+  const nextRoutingPolicyId =
+    input.routingPolicyId !== undefined
+      ? input.routingPolicyId
+      : input.routingMode !== undefined && input.routingMode !== "POLICY"
+        ? // An explicit switch away from POLICY retires the stored
+          // reference rather than tripping the pairing check below: the
+          // caller stated the whole routing decision, and keeping the
+          // old id would reject an update that is not contradictory.
+          null
+        : existing.routingPolicyId;
+  return input.routingMode !== undefined || input.routingPolicyId !== undefined
+    ? resolveRoutingMode(
+        input.routingMode ?? existing.routingMode,
+        nextRoutingPolicyId,
+      )
+    : existing.routingMode;
+}
+
+/** Columns an update writes; every omitted field keeps the stored value. */
+function virtualKeyUpdateData({
+  input,
+  existing,
+  config,
+  routingMode,
+}: {
+  input: UpdateVirtualKeyInput;
+  existing: VirtualKeyWithScopes;
+  config: VirtualKeyConfig;
+  routingMode: VirtualKeyRoutingMode;
+}) {
+  return {
+    name: input.name ?? existing.name,
+    description: input.description ?? existing.description,
+    config: config as Prisma.InputJsonValue,
+    ...identityPatchData(input),
+    ...(input.routingPolicyId !== undefined
+      ? { routingPolicyId: input.routingPolicyId }
+      : {}),
+    ...(input.traceProjectId !== undefined
+      ? { traceProjectId: input.traceProjectId }
+      : {}),
+    routingMode,
+    revision: { increment: 1n },
+  };
 }
 
 /**

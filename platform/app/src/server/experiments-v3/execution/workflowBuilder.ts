@@ -185,6 +185,104 @@ type LoadedTargetData = {
 };
 
 /**
+ * Builds a prompt target's node: local config if available, otherwise the
+ * loaded prompt.
+ */
+const buildPromptTargetNode = ({
+  targetConfig,
+  loadedData,
+  cell,
+  targetNodeId,
+}: {
+  targetConfig: TargetConfig;
+  loadedData: LoadedTargetData;
+  cell: ExecutionCell;
+  targetNodeId: string;
+}): Node<Signature | Code | HttpNodeData | Evaluator> => {
+  if (targetConfig.localPromptConfig) {
+    // Get name from loaded prompt if available, fall back to target ID
+    const name =
+      loadedData.prompt?.handle ?? loadedData.prompt?.name ?? targetConfig.id;
+    return buildSignatureNodeFromLocalConfig({
+      nodeId: targetNodeId,
+      name,
+      localConfig: targetConfig.localPromptConfig,
+      targetConfig,
+      cell,
+      // The base prompt this draft started from (may be undefined for a
+      // brand-new local prompt with no saved base).
+      basePrompt: loadedData.prompt,
+    });
+  }
+  if (loadedData.prompt) {
+    return buildSignatureNodeFromPrompt({
+      nodeId: targetNodeId,
+      prompt: loadedData.prompt,
+      targetConfig,
+      cell,
+    });
+  }
+  throw new Error(
+    `Prompt target ${targetConfig.id} has no local config and no loaded prompt`,
+  );
+};
+
+/** Builds an agent target's node, dispatching on the loaded agent's type. */
+const buildAgentTargetNode = ({
+  targetConfig,
+  loadedData,
+  cell,
+  targetNodeId,
+}: {
+  targetConfig: TargetConfig;
+  loadedData: LoadedTargetData;
+  cell: ExecutionCell;
+  targetNodeId: string;
+}): Node<Signature | Code | HttpNodeData | Evaluator> => {
+  if (!loadedData.agent) {
+    throw new Error(`Agent target ${targetConfig.id} has no loaded agent`);
+  }
+
+  switch (loadedData.agent.type) {
+    case "http":
+      return buildHttpNodeFromAgent({
+        nodeId: targetNodeId,
+        agent: loadedData.agent,
+        targetConfig,
+        cell,
+      });
+    case "signature":
+      return buildSignatureNodeFromAgent({
+        nodeId: targetNodeId,
+        agent: loadedData.agent,
+        targetConfig,
+        cell,
+      });
+    case "code":
+      return buildCodeNodeFromAgent({
+        nodeId: targetNodeId,
+        agent: loadedData.agent,
+        targetConfig,
+        cell,
+      });
+    case "workflow":
+      // A workflow-type agent has no code of its own — the orchestrator
+      // must resolve its linked workflow and dispatch it to
+      // executeWorkflowCell before ever reaching buildTargetNode. Reaching
+      // here means that resolution was skipped (e.g. the linked workflow
+      // failed to load), so fail loudly instead of silently building an
+      // empty code node.
+      throw new Error(
+        `Workflow agent target ${targetConfig.id} has no loaded workflow — it must be dispatched to executeWorkflowCell, not buildTargetNode`,
+      );
+    default: {
+      const _exhaustive: never = loadedData.agent.type;
+      throw new Error(`Unknown agent type: ${_exhaustive}`);
+    }
+  }
+};
+
+/**
  * Builds the target node based on whether it's a prompt, agent, or evaluator.
  */
 const buildTargetNode = ({
@@ -204,41 +302,18 @@ const buildTargetNode = ({
   const targetNodeId = targetConfig.id;
 
   if (targetConfig.type === "prompt") {
-    // Use local config if available, otherwise use loaded prompt
-    if (targetConfig.localPromptConfig) {
-      // Get name from loaded prompt if available, fall back to target ID
-      const name =
-        loadedData.prompt?.handle ?? loadedData.prompt?.name ?? targetConfig.id;
-      return {
-        targetNode: buildSignatureNodeFromLocalConfig({
-          nodeId: targetNodeId,
-          name,
-          localConfig: targetConfig.localPromptConfig,
-          targetConfig,
-          cell,
-          // The base prompt this draft started from (may be undefined for a
-          // brand-new local prompt with no saved base).
-          basePrompt: loadedData.prompt,
-        }),
+    return {
+      targetNode: buildPromptTargetNode({
+        targetConfig,
+        loadedData,
+        cell,
         targetNodeId,
-      };
-    } else if (loadedData.prompt) {
-      return {
-        targetNode: buildSignatureNodeFromPrompt({
-          nodeId: targetNodeId,
-          prompt: loadedData.prompt,
-          targetConfig,
-          cell,
-        }),
-        targetNodeId,
-      };
-    } else {
-      throw new Error(
-        `Prompt target ${targetConfig.id} has no local config and no loaded prompt`,
-      );
-    }
-  } else if (targetConfig.type === "evaluator") {
-    // Evaluator target - build evaluator node with target ID
+      }),
+      targetNodeId,
+    };
+  }
+
+  if (targetConfig.type === "evaluator") {
     return {
       targetNode: buildEvaluatorTargetNode({
         nodeId: targetNodeId,
@@ -248,59 +323,17 @@ const buildTargetNode = ({
       }),
       targetNodeId,
     };
-  } else {
-    // Agent target - dispatch based on agent type
-    if (loadedData.agent) {
-      switch (loadedData.agent.type) {
-        case "http":
-          return {
-            targetNode: buildHttpNodeFromAgent({
-              nodeId: targetNodeId,
-              agent: loadedData.agent,
-              targetConfig,
-              cell,
-            }),
-            targetNodeId,
-          };
-        case "signature":
-          return {
-            targetNode: buildSignatureNodeFromAgent({
-              nodeId: targetNodeId,
-              agent: loadedData.agent,
-              targetConfig,
-              cell,
-            }),
-            targetNodeId,
-          };
-        case "code":
-          return {
-            targetNode: buildCodeNodeFromAgent({
-              nodeId: targetNodeId,
-              agent: loadedData.agent,
-              targetConfig,
-              cell,
-            }),
-            targetNodeId,
-          };
-        case "workflow":
-          // A workflow-type agent has no code of its own — the orchestrator
-          // must resolve its linked workflow and dispatch it to
-          // executeWorkflowCell before ever reaching buildTargetNode. Reaching
-          // here means that resolution was skipped (e.g. the linked workflow
-          // failed to load), so fail loudly instead of silently building an
-          // empty code node.
-          throw new Error(
-            `Workflow agent target ${targetConfig.id} has no loaded workflow — it must be dispatched to executeWorkflowCell, not buildTargetNode`,
-          );
-        default: {
-          const _exhaustive: never = loadedData.agent.type;
-          throw new Error(`Unknown agent type: ${_exhaustive}`);
-        }
-      }
-    } else {
-      throw new Error(`Agent target ${targetConfig.id} has no loaded agent`);
-    }
   }
+
+  return {
+    targetNode: buildAgentTargetNode({
+      targetConfig,
+      loadedData,
+      cell,
+      targetNodeId,
+    }),
+    targetNodeId,
+  };
 };
 
 /**
@@ -784,28 +817,13 @@ export const buildCodeNodeFromAgent = ({
  */
 const HTTP_AGENT_FIXED_INPUTS = ["threadId", "messages", "input"] as const;
 
-/**
- * Builds an HTTP node from a TypedAgent with type "http".
- * The HTTP config is read directly from the agent, not duplicated on the target.
- *
- * HTTP config is stored in `parameters` like other node types (Code, Signature, etc.)
- * This ensures consistent handling in the Python parser via parse_fields().
- */
-export const buildHttpNodeFromAgent = ({
-  nodeId,
-  agent,
+const buildHttpAgentInputs = ({
   targetConfig,
   cell,
 }: {
-  nodeId: string;
-  agent: TypedAgent;
   targetConfig: TargetConfig;
   cell: ExecutionCell;
-}): Node<HttpNodeData> => {
-  // The agent.type === "http" check is done before calling this function,
-  // so we can safely cast the config to HttpComponentConfig
-  const config = agent.config as HttpComponentConfig;
-
+}): Field[] => {
   // Start with the fixed HTTP agent inputs (threadId, messages, input)
   // These are always available for mapping regardless of what's stored
   const fixedInputs = HTTP_AGENT_FIXED_INPUTS.map((identifier) => ({
@@ -828,12 +846,66 @@ export const buildHttpNodeFromAgent = ({
       value: getInputValue(input.identifier, targetConfig, cell),
     }));
 
-  const inputs = [...fixedInputs, ...customInputs];
+  return [...fixedInputs, ...customInputs];
+};
 
-  // HTTP agents always have a single "output" output
-  const outputs = [{ identifier: "output", type: "str" as const }];
+const buildHttpAgentAuthParameters = (
+  auth: HttpComponentConfig["auth"],
+): Field[] => {
+  if (!auth || auth.type === "none") return [];
 
-  // Build parameters array with HTTP config (consistent with other node types)
+  const parameters: Field[] = [
+    { identifier: "auth_type", type: "str", value: auth.type },
+  ];
+
+  if (auth.type === "bearer" && "token" in auth) {
+    parameters.push({
+      identifier: "auth_token",
+      type: "str",
+      value: auth.token,
+    });
+  } else if (auth.type === "api_key" && "header" in auth) {
+    parameters.push({
+      identifier: "auth_header",
+      type: "str",
+      value: auth.header,
+    });
+    parameters.push({
+      identifier: "auth_value",
+      type: "str",
+      value: auth.value,
+    });
+  } else if (auth.type === "basic" && "username" in auth) {
+    parameters.push({
+      identifier: "auth_username",
+      type: "str",
+      value: auth.username,
+    });
+    parameters.push({
+      identifier: "auth_password",
+      type: "str",
+      value: auth.password,
+    });
+  }
+
+  return parameters;
+};
+
+/** Converts the config's array of {key, value} headers to a dict. */
+const buildHeadersDict = (
+  headers: HttpComponentConfig["headers"],
+): Record<string, string> => {
+  const headersDict: Record<string, string> = {};
+  for (const h of headers ?? []) {
+    if (h.key) {
+      headersDict[h.key] = h.value ?? "";
+    }
+  }
+  return headersDict;
+};
+
+/** Builds the HTTP config `parameters` array (consistent with other node types). */
+const buildHttpAgentParameters = (config: HttpComponentConfig): Field[] => {
   const parameters: Field[] = [
     { identifier: "url", type: "str", value: config.url },
     { identifier: "method", type: "str", value: config.method ?? "POST" },
@@ -856,17 +928,10 @@ export const buildHttpNodeFromAgent = ({
   }
 
   if (config.headers && config.headers.length > 0) {
-    // Convert array of {key, value} to dict
-    const headersDict: Record<string, string> = {};
-    for (const h of config.headers) {
-      if (h.key) {
-        headersDict[h.key] = h.value ?? "";
-      }
-    }
     parameters.push({
       identifier: "headers",
       type: "dict",
-      value: headersDict,
+      value: buildHeadersDict(config.headers),
     });
   }
 
@@ -879,43 +944,39 @@ export const buildHttpNodeFromAgent = ({
   }
 
   // Add auth params if configured
-  if (config.auth && config.auth.type !== "none") {
-    parameters.push({
-      identifier: "auth_type",
-      type: "str",
-      value: config.auth.type,
-    });
+  parameters.push(...buildHttpAgentAuthParameters(config.auth));
 
-    if (config.auth.type === "bearer" && "token" in config.auth) {
-      parameters.push({
-        identifier: "auth_token",
-        type: "str",
-        value: config.auth.token,
-      });
-    } else if (config.auth.type === "api_key" && "header" in config.auth) {
-      parameters.push({
-        identifier: "auth_header",
-        type: "str",
-        value: config.auth.header,
-      });
-      parameters.push({
-        identifier: "auth_value",
-        type: "str",
-        value: config.auth.value,
-      });
-    } else if (config.auth.type === "basic" && "username" in config.auth) {
-      parameters.push({
-        identifier: "auth_username",
-        type: "str",
-        value: config.auth.username,
-      });
-      parameters.push({
-        identifier: "auth_password",
-        type: "str",
-        value: config.auth.password,
-      });
-    }
-  }
+  return parameters;
+};
+
+/**
+ * Builds an HTTP node from a TypedAgent with type "http".
+ * The HTTP config is read directly from the agent, not duplicated on the target.
+ *
+ * HTTP config is stored in `parameters` like other node types (Code, Signature, etc.)
+ * This ensures consistent handling in the Python parser via parse_fields().
+ */
+export const buildHttpNodeFromAgent = ({
+  nodeId,
+  agent,
+  targetConfig,
+  cell,
+}: {
+  nodeId: string;
+  agent: TypedAgent;
+  targetConfig: TargetConfig;
+  cell: ExecutionCell;
+}): Node<HttpNodeData> => {
+  // The agent.type === "http" check is done before calling this function,
+  // so we can safely cast the config to HttpComponentConfig
+  const config = agent.config as HttpComponentConfig;
+
+  const inputs = buildHttpAgentInputs({ targetConfig, cell });
+
+  // HTTP agents always have a single "output" output
+  const outputs = [{ identifier: "output", type: "str" as const }];
+
+  const parameters = buildHttpAgentParameters(config);
 
   return {
     id: nodeId,
@@ -1067,6 +1128,112 @@ export const buildEvaluatorNode = ({
 // ============================================================================
 
 /**
+ * Resolves a column name to its column ID.
+ * sourceField in mappings is the column name, but entry node uses column ID.
+ */
+const resolveColumnId = (
+  columnName: string,
+  datasetColumns: Array<{ id: string; name: string; type: string }>,
+): string => {
+  const column = datasetColumns.find((c) => c.name === columnName);
+  return column?.id ?? columnName; // Fall back to columnName if not found
+};
+
+/** Builds edges from entry to target based on target mappings. */
+const buildTargetMappingEdges = ({
+  entryNodeId,
+  targetNodeId,
+  targetConfig,
+  datasetId,
+  datasetColumns,
+}: {
+  entryNodeId: string;
+  targetNodeId: string;
+  targetConfig: TargetConfig;
+  datasetId: string | undefined;
+  datasetColumns: Array<{ id: string; name: string; type: string }>;
+}): Edge[] => {
+  const targetMappings = datasetId
+    ? (targetConfig.mappings[datasetId] ?? {})
+    : {};
+
+  const edges: Edge[] = [];
+  // Python NLP expects handles in format "outputs.field" and "inputs.field"
+  for (const [inputField, mapping] of Object.entries(targetMappings)) {
+    if (mapping.type === "source" && mapping.source === "dataset") {
+      const columnId = resolveColumnId(mapping.sourceField, datasetColumns);
+      edges.push({
+        id: `${entryNodeId}->${targetNodeId}.${inputField}`,
+        source: entryNodeId,
+        sourceHandle: `outputs.${columnId}`,
+        target: targetNodeId,
+        targetHandle: `inputs.${inputField}`,
+        type: "default",
+      });
+    }
+  }
+  return edges;
+};
+
+/**
+ * Builds edges into one evaluator's node, sourced from either the dataset
+ * entry or the target's output.
+ */
+const buildEvaluatorMappingEdges = ({
+  entryNodeId,
+  targetNodeId,
+  targetConfig,
+  evaluator,
+  evaluatorNodeId,
+  datasetId,
+  datasetColumns,
+}: {
+  entryNodeId: string;
+  targetNodeId: string;
+  targetConfig: TargetConfig;
+  evaluator: EvaluatorConfig;
+  evaluatorNodeId: string;
+  datasetId: string | undefined;
+  datasetColumns: Array<{ id: string; name: string; type: string }>;
+}): Edge[] => {
+  const evaluatorMappings = datasetId
+    ? (evaluator.mappings[datasetId]?.[targetConfig.id] ?? {})
+    : {};
+
+  const edges: Edge[] = [];
+  for (const [inputField, mapping] of Object.entries(evaluatorMappings)) {
+    if (mapping.type !== "source") continue;
+
+    if (mapping.source === "dataset") {
+      // From dataset entry - use column ID, not name
+      const columnId = resolveColumnId(mapping.sourceField, datasetColumns);
+      edges.push({
+        id: `${entryNodeId}->${evaluatorNodeId}.${inputField}`,
+        source: entryNodeId,
+        sourceHandle: `outputs.${columnId}`,
+        target: evaluatorNodeId,
+        targetHandle: `inputs.${inputField}`,
+        type: "default",
+      });
+    } else if (
+      mapping.source === "target" &&
+      mapping.sourceId === targetConfig.id
+    ) {
+      // From target output
+      edges.push({
+        id: `${targetNodeId}->${evaluatorNodeId}.${inputField}`,
+        source: targetNodeId,
+        sourceHandle: `outputs.${mapping.sourceField}`,
+        target: evaluatorNodeId,
+        targetHandle: `inputs.${inputField}`,
+        type: "default",
+      });
+    }
+  }
+  return edges;
+};
+
+/**
  * Builds edges connecting entry -> target and target/entry -> evaluators.
  */
 const buildEdges = ({
@@ -1086,74 +1253,32 @@ const buildEdges = ({
   cell: ExecutionCell;
   datasetColumns: Array<{ id: string; name: string; type: string }>;
 }): Edge[] => {
-  const edges: Edge[] = [];
   const datasetId = cell.datasetEntry._datasetId as string | undefined;
 
-  // Helper to resolve column name to column ID
-  // sourceField in mappings is the column name, but entry node uses column ID
-  const getColumnId = (columnName: string): string => {
-    const column = datasetColumns.find((c) => c.name === columnName);
-    return column?.id ?? columnName; // Fall back to columnName if not found
-  };
-
-  // Build edges from entry to target based on target mappings
-  const targetMappings = datasetId
-    ? (targetConfig.mappings[datasetId] ?? {})
-    : {};
-
-  // Python NLP expects handles in format "outputs.field" and "inputs.field"
-  for (const [inputField, mapping] of Object.entries(targetMappings)) {
-    if (mapping.type === "source" && mapping.source === "dataset") {
-      const columnId = getColumnId(mapping.sourceField);
-      edges.push({
-        id: `${entryNodeId}->${targetNodeId}.${inputField}`,
-        source: entryNodeId,
-        sourceHandle: `outputs.${columnId}`,
-        target: targetNodeId,
-        targetHandle: `inputs.${inputField}`,
-        type: "default",
-      });
-    }
-  }
+  const edges = buildTargetMappingEdges({
+    entryNodeId,
+    targetNodeId,
+    targetConfig,
+    datasetId,
+    datasetColumns,
+  });
 
   // Build edges to evaluators
   for (const evaluator of evaluatorConfigs) {
     const evaluatorNodeId = evaluatorNodeIds[evaluator.id];
     if (!evaluatorNodeId) continue;
 
-    const evaluatorMappings = datasetId
-      ? (evaluator.mappings[datasetId]?.[targetConfig.id] ?? {})
-      : {};
-
-    for (const [inputField, mapping] of Object.entries(evaluatorMappings)) {
-      if (mapping.type === "source") {
-        if (mapping.source === "dataset") {
-          // From dataset entry - use column ID, not name
-          const columnId = getColumnId(mapping.sourceField);
-          edges.push({
-            id: `${entryNodeId}->${evaluatorNodeId}.${inputField}`,
-            source: entryNodeId,
-            sourceHandle: `outputs.${columnId}`,
-            target: evaluatorNodeId,
-            targetHandle: `inputs.${inputField}`,
-            type: "default",
-          });
-        } else if (
-          mapping.source === "target" &&
-          mapping.sourceId === targetConfig.id
-        ) {
-          // From target output
-          edges.push({
-            id: `${targetNodeId}->${evaluatorNodeId}.${inputField}`,
-            source: targetNodeId,
-            sourceHandle: `outputs.${mapping.sourceField}`,
-            target: evaluatorNodeId,
-            targetHandle: `inputs.${inputField}`,
-            type: "default",
-          });
-        }
-      }
-    }
+    edges.push(
+      ...buildEvaluatorMappingEdges({
+        entryNodeId,
+        targetNodeId,
+        targetConfig,
+        evaluator,
+        evaluatorNodeId,
+        datasetId,
+        datasetColumns,
+      }),
+    );
   }
 
   return edges;

@@ -25,6 +25,114 @@ export interface CustomerIoSimulationSyncReactorDeps {
   simulationCountFn: (organizationId: string) => Promise<number | null>;
 }
 
+async function resolveSyncContext({
+  deps,
+  projectId,
+}: {
+  deps: CustomerIoSimulationSyncReactorDeps;
+  projectId: string;
+}): Promise<{ userId: string; existingCount: number } | null> {
+  const { userId, organizationId } =
+    await deps.projects.resolveOrgAdmin(projectId);
+
+  if (!userId || !organizationId) {
+    logger.warn(
+      { projectId },
+      "No admin user found for project — skipping CIO simulation sync",
+    );
+    return null;
+  }
+
+  const rawCount = await deps.simulationCountFn(organizationId);
+  if (rawCount === null) {
+    logger.warn(
+      { projectId },
+      "Could not determine simulation count — skipping CIO simulation sync",
+    );
+    return null;
+  }
+
+  // The fold projection persists before reactors fire, so the current
+  // simulation is already counted — subtract 1 to get prior count.
+  return { userId, existingCount: Math.max(0, rawCount - 1) };
+}
+
+function trackFirstSimulation({
+  deps,
+  projectId,
+  userId,
+  now,
+}: {
+  deps: CustomerIoSimulationSyncReactorDeps;
+  projectId: string;
+  userId: string;
+  now: string;
+}): void {
+  // Fire-and-forget: do not block reactor processing
+  void deps.nurturing
+    .identifyUser({
+      userId,
+      traits: {
+        has_simulations: true,
+        simulation_count: 1,
+        first_simulation_at: now,
+      },
+    })
+    .catch((error) => {
+      logger.error(
+        { projectId, error },
+        "Failed to identify user for first simulation",
+      );
+      captureException(toError(error));
+    });
+  void deps.nurturing
+    .trackEvent({
+      userId,
+      event: "first_simulation_ran",
+      properties: {
+        project_id: projectId,
+      },
+    })
+    .catch((error) => {
+      logger.error(
+        { projectId, error },
+        "Failed to track first_simulation_ran event",
+      );
+      captureException(toError(error));
+    });
+}
+
+function trackSubsequentSimulation({
+  deps,
+  projectId,
+  userId,
+  now,
+  newCount,
+}: {
+  deps: CustomerIoSimulationSyncReactorDeps;
+  projectId: string;
+  userId: string;
+  now: string;
+  newCount: number;
+}): void {
+  // Fire-and-forget: do not block reactor processing
+  void deps.nurturing
+    .identifyUser({
+      userId,
+      traits: {
+        simulation_count: newCount,
+        last_simulation_at: now,
+      },
+    })
+    .catch((error) => {
+      logger.error(
+        { projectId, error },
+        "Failed to identify user for simulation update",
+      );
+      captureException(toError(error));
+    });
+}
+
 /**
  * Reactor that syncs simulation milestones and metrics to Customer.io.
  *
@@ -64,83 +172,22 @@ export function createCustomerIoSimulationSyncReactor(
       const { tenantId: projectId } = context;
 
       try {
-        const { userId, organizationId } =
-          await deps.projects.resolveOrgAdmin(projectId);
+        const syncContext = await resolveSyncContext({ deps, projectId });
+        if (!syncContext) return;
 
-        if (!userId || !organizationId) {
-          logger.warn(
-            { projectId },
-            "No admin user found for project — skipping CIO simulation sync",
-          );
-          return;
-        }
-
+        const { userId, existingCount } = syncContext;
         const now = new Date(event.occurredAt).toISOString();
 
-        const rawCount = await deps.simulationCountFn(organizationId);
-        if (rawCount === null) {
-          logger.warn(
-            { projectId },
-            "Could not determine simulation count — skipping CIO simulation sync",
-          );
-          return;
-        }
-        // The fold projection persists before reactors fire, so the current
-        // simulation is already counted — subtract 1 to get prior count.
-        const existingCount = Math.max(0, rawCount - 1);
-        const isFirstSimulation = existingCount === 0;
-
-        if (isFirstSimulation) {
-          // Fire-and-forget: do not block reactor processing
-          void deps.nurturing
-            .identifyUser({
-              userId,
-              traits: {
-                has_simulations: true,
-                simulation_count: 1,
-                first_simulation_at: now,
-              },
-            })
-            .catch((error) => {
-              logger.error(
-                { projectId, error },
-                "Failed to identify user for first simulation",
-              );
-              captureException(toError(error));
-            });
-          void deps.nurturing
-            .trackEvent({
-              userId,
-              event: "first_simulation_ran",
-              properties: {
-                project_id: projectId,
-              },
-            })
-            .catch((error) => {
-              logger.error(
-                { projectId, error },
-                "Failed to track first_simulation_ran event",
-              );
-              captureException(toError(error));
-            });
+        if (existingCount === 0) {
+          trackFirstSimulation({ deps, projectId, userId, now });
         } else {
-          const newCount = existingCount + 1;
-          // Fire-and-forget: do not block reactor processing
-          void deps.nurturing
-            .identifyUser({
-              userId,
-              traits: {
-                simulation_count: newCount,
-                last_simulation_at: now,
-              },
-            })
-            .catch((error) => {
-              logger.error(
-                { projectId, error },
-                "Failed to identify user for simulation update",
-              );
-              captureException(toError(error));
-            });
+          trackSubsequentSimulation({
+            deps,
+            projectId,
+            userId,
+            now,
+            newCount: existingCount + 1,
+          });
         }
       } catch (error) {
         logger.error(

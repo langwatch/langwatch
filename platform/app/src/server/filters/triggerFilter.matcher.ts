@@ -132,31 +132,50 @@ function buildPreconditionEvents(
 ): PreconditionTraceData["events"] {
   if (!events || events.length === 0) return null;
 
-  return events.map((e) => {
-    const metrics: Array<{ key: string; value: number }> = [];
-    const eventDetails: Array<{ key: string; value: string }> = [];
+  return events.map(toPreconditionEvent);
+}
 
-    for (const [key, value] of Object.entries(e.attributes)) {
-      if (key.startsWith("event.metrics.")) {
-        const metricKey = key.slice("event.metrics.".length);
-        const num = Number(value);
-        if (metricKey && Number.isFinite(num)) {
-          metrics.push({ key: metricKey, value: num });
-        }
-      } else if (key.startsWith("event.details.")) {
-        const detailKey = key.slice("event.details.".length);
-        if (detailKey) {
-          eventDetails.push({ key: detailKey, value });
-        }
-      }
+function parseEventMetricAttribute(
+  key: string,
+  value: string,
+): { key: string; value: number } | null {
+  if (!key.startsWith("event.metrics.")) return null;
+  const metricKey = key.slice("event.metrics.".length);
+  const num = Number(value);
+  if (metricKey && Number.isFinite(num)) return { key: metricKey, value: num };
+  return null;
+}
+
+function parseEventDetailAttribute(
+  key: string,
+  value: string,
+): { key: string; value: string } | null {
+  if (!key.startsWith("event.details.")) return null;
+  const detailKey = key.slice("event.details.".length);
+  return detailKey ? { key: detailKey, value } : null;
+}
+
+function toPreconditionEvent(
+  event: DerivedTraceEvent,
+): NonNullable<PreconditionTraceData["events"]>[number] {
+  const metrics: Array<{ key: string; value: number }> = [];
+  const eventDetails: Array<{ key: string; value: string }> = [];
+
+  for (const [key, value] of Object.entries(event.attributes)) {
+    const metric = parseEventMetricAttribute(key, value);
+    if (metric) {
+      metrics.push(metric);
+      continue;
     }
+    const detail = parseEventDetailAttribute(key, value);
+    if (detail) eventDetails.push(detail);
+  }
 
-    return {
-      event_type: e.name,
-      metrics,
-      event_details: eventDetails,
-    };
-  });
+  return {
+    event_type: event.name,
+    metrics,
+    event_details: eventDetails,
+  };
 }
 
 /**
@@ -186,21 +205,28 @@ export function matchesTriggerFilters(
   ][]) {
     if (!filterValue) continue;
 
-    // A non-empty condition on a field we cannot positively evaluate
-    // (evaluation field or unsupported key-selector/phantom field) must NOT
-    // skip-to-pass — that is the #4805 fire-on-everything defect. Empty
-    // conditions are vacuous and skipped.
-    if (EVALUATION_FIELDS.has(field) || UNSUPPORTED_FIELDS.has(field)) {
-      if (filterValueHasActionableCondition(filterValue)) return false;
-      continue;
-    }
-
-    if (!matchField(traceData, field, filterValue)) {
+    if (!triggerFilterFieldPasses(traceData, field, filterValue)) {
       return false;
     }
   }
 
   return true;
+}
+
+function triggerFilterFieldPasses(
+  traceData: PreconditionTraceData,
+  field: FilterField,
+  filterValue: TriggerFilterValue,
+): boolean {
+  // A non-empty condition on a field we cannot positively evaluate
+  // (evaluation field or unsupported key-selector/phantom field) must NOT
+  // skip-to-pass — that is the #4805 fire-on-everything defect. Empty
+  // conditions are vacuous and skipped.
+  if (EVALUATION_FIELDS.has(field) || UNSUPPORTED_FIELDS.has(field)) {
+    return !filterValueHasActionableCondition(filterValue);
+  }
+
+  return matchField(traceData, field, filterValue);
 }
 
 /**
@@ -215,14 +241,18 @@ function filterValueHasActionableCondition(
     return filterValue.length > 0;
   }
 
-  for (const subValue of Object.values(filterValue)) {
-    if (Array.isArray(subValue)) {
-      if (subValue.length > 0) return true;
-    } else if (typeof subValue === "object" && subValue !== null) {
-      for (const values of Object.values(subValue)) {
-        if (Array.isArray(values) && values.length > 0) return true;
-      }
-    }
+  return Object.values(filterValue).some(subValueHasActionableCondition);
+}
+
+function subValueHasActionableCondition(subValue: unknown): boolean {
+  if (Array.isArray(subValue)) {
+    return subValue.length > 0;
+  }
+
+  if (typeof subValue === "object" && subValue !== null) {
+    return Object.values(subValue).some(
+      (values) => Array.isArray(values) && values.length > 0,
+    );
   }
 
   return false;
@@ -253,37 +283,101 @@ function matchField(
   }
 
   // Nested object: OR across keys (matches ClickHouse filter generation)
+  return matchKeyedFilterValue({ traceData, field, filterValue });
+}
+
+/**
+ * OR across every key of a nested filter value. Passes vacuously when no key
+ * carried an actionable (non-empty) condition.
+ */
+function matchKeyedFilterValue({
+  traceData,
+  field,
+  filterValue,
+}: {
+  traceData: PreconditionTraceData;
+  field: FilterField;
+  filterValue: Exclude<TriggerFilterValue, string[]>;
+}): boolean {
   let hasActionableCondition = false;
 
   for (const [key, subValue] of Object.entries(filterValue)) {
-    if (Array.isArray(subValue)) {
-      // Record<string, string[]> — resolve with key
-      if (subValue.length === 0) continue;
-      hasActionableCondition = true;
-      if (matchSimpleArray({ traceData, field, filterValues: subValue, key })) {
-        return true;
-      }
-    } else if (typeof subValue === "object" && subValue !== null) {
-      // Record<string, Record<string, string[]>> — resolve with key + subkey
-      for (const [subkey, values] of Object.entries(subValue)) {
-        if (!Array.isArray(values) || values.length === 0) continue;
-        hasActionableCondition = true;
-        if (
-          matchSimpleArray({
-            traceData,
-            field,
-            filterValues: values,
-            key,
-            subkey,
-          })
-        ) {
-          return true;
-        }
-      }
-    }
+    const { matched, actionable } = matchKeyedFilterEntry({
+      traceData,
+      field,
+      key,
+      subValue,
+    });
+    if (matched) return true;
+    if (actionable) hasActionableCondition = true;
   }
 
   return !hasActionableCondition;
+}
+
+function matchKeyedFilterEntry({
+  traceData,
+  field,
+  key,
+  subValue,
+}: {
+  traceData: PreconditionTraceData;
+  field: FilterField;
+  key: string;
+  subValue: unknown;
+}): { matched: boolean; actionable: boolean } {
+  if (Array.isArray(subValue)) {
+    // Record<string, string[]> — resolve with key
+    if (subValue.length === 0) return { matched: false, actionable: false };
+    return {
+      matched: matchSimpleArray({
+        traceData,
+        field,
+        filterValues: subValue,
+        key,
+      }),
+      actionable: true,
+    };
+  }
+
+  if (typeof subValue === "object" && subValue !== null) {
+    // Record<string, Record<string, string[]>> — resolve with key + subkey
+    return matchSubkeyedFilterEntry({ traceData, field, key, subValue });
+  }
+
+  return { matched: false, actionable: false };
+}
+
+function matchSubkeyedFilterEntry({
+  traceData,
+  field,
+  key,
+  subValue,
+}: {
+  traceData: PreconditionTraceData;
+  field: FilterField;
+  key: string;
+  subValue: object;
+}): { matched: boolean; actionable: boolean } {
+  let actionable = false;
+
+  for (const [subkey, values] of Object.entries(subValue)) {
+    if (!Array.isArray(values) || values.length === 0) continue;
+    actionable = true;
+    if (
+      matchSimpleArray({
+        traceData,
+        field,
+        filterValues: values,
+        key,
+        subkey,
+      })
+    ) {
+      return { matched: true, actionable };
+    }
+  }
+
+  return { matched: false, actionable };
 }
 
 /**
@@ -356,49 +450,79 @@ function matchEventMetricRange(
   }
 
   const events = traceData.events;
-  let matched = false;
 
   for (const [eventType, metricMap] of Object.entries(filterValue)) {
     if (typeof metricMap !== "object" || metricMap === null) continue;
-
-    for (const [metricKey, values] of Object.entries(metricMap)) {
-      if (!Array.isArray(values) || values.length === 0) continue;
-
-      // A non-empty range is actionable. If it is malformed (fewer than two
-      // values, non-numeric, or min > max) the CH builder emits `1=0` (never
-      // matches); in-memory that means this condition cannot pass — it must not
-      // skip-to-vacuous-pass, which would re-open the #4805 fire-on-everything
-      // hole. So mark it actionable and contribute no match.
-      if (values.length < 2) continue;
-
-      const min = parseFloat(values[0] ?? "");
-      const max = parseFloat(values[1] ?? "");
-      if (!Number.isFinite(min) || !Number.isFinite(max) || min > max) {
-        continue;
-      }
-
-      if (
-        (events ?? []).some(
-          (event) =>
-            event.event_type === eventType &&
-            event.metrics.some(
-              (metric) =>
-                metric.key === metricKey &&
-                metric.value >= min &&
-                metric.value <= max,
-            ),
-        )
-      ) {
-        matched = true;
-        break;
-      }
-    }
-    if (matched) break;
+    if (matchesAnyMetricRange({ events, eventType, metricMap })) return true;
   }
 
   // No actionable range → vacuous (pass). Actionable ranges present but none
   // matched → no match. Reuse the shared predicate for a single source of truth.
-  return matched || !filterValueHasActionableCondition(filterValue);
+  return !filterValueHasActionableCondition(filterValue);
+}
+
+/** OR across every metric key of one event type's range map. */
+function matchesAnyMetricRange({
+  events,
+  eventType,
+  metricMap,
+}: {
+  events: PreconditionTraceData["events"];
+  eventType: string;
+  metricMap: object;
+}): boolean {
+  for (const [metricKey, values] of Object.entries(metricMap)) {
+    const range = parseMetricRange(values);
+    if (!range) continue;
+    if (someEventMetricInRange({ events, eventType, metricKey, range })) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
+ * A non-empty range is actionable. If it is malformed (fewer than two values,
+ * non-numeric, or min > max) the CH builder emits `1=0` (never matches);
+ * in-memory that means this condition cannot pass — it must not
+ * skip-to-vacuous-pass, which would re-open the #4805 fire-on-everything hole.
+ * So it stays actionable (via filterValueHasActionableCondition) and contributes
+ * no match here.
+ */
+function parseMetricRange(
+  values: unknown,
+): { min: number; max: number } | null {
+  if (!Array.isArray(values) || values.length < 2) return null;
+
+  const min = parseFloat(values[0] ?? "");
+  const max = parseFloat(values[1] ?? "");
+  if (!Number.isFinite(min) || !Number.isFinite(max) || min > max) return null;
+
+  return { min, max };
+}
+
+function someEventMetricInRange({
+  events,
+  eventType,
+  metricKey,
+  range,
+}: {
+  events: PreconditionTraceData["events"];
+  eventType: string;
+  metricKey: string;
+  range: { min: number; max: number };
+}): boolean {
+  return (events ?? []).some(
+    (event) =>
+      event.event_type === eventType &&
+      event.metrics.some(
+        (metric) =>
+          metric.key === metricKey &&
+          metric.value >= range.min &&
+          metric.value <= range.max,
+      ),
+  );
 }
 
 /**
@@ -451,21 +575,59 @@ function matchEvaluationField(
     );
     if (evalsForEvaluator.length === 0) return false;
 
-    if (Array.isArray(subValue)) {
-      // Record<string, string[]> — e.g., evaluations.passed: { "eval-1": ["true"] }
-      if (subValue.length === 0) continue;
-      if (!matchEvaluationValues(evalsForEvaluator, field, subValue)) {
-        return false;
-      }
-    } else if (typeof subValue === "object" && subValue !== null) {
-      // Record<string, Record<string, string[]>> — evaluations.score: { "eval-1": { "score": ["0.5"] } }
-      for (const [, values] of Object.entries(subValue)) {
-        if (!Array.isArray(values) || values.length === 0) continue;
-        if (!matchEvaluationValues(evalsForEvaluator, field, values)) {
-          return false;
-        }
-      }
+    if (
+      !matchEvaluatorSubValue({
+        evaluations: evalsForEvaluator,
+        field,
+        subValue,
+      })
+    ) {
+      return false;
     }
+  }
+
+  return true;
+}
+
+function matchEvaluatorSubValue({
+  evaluations,
+  field,
+  subValue,
+}: {
+  evaluations: EvaluationRunData[];
+  field: FilterField;
+  subValue: unknown;
+}): boolean {
+  if (Array.isArray(subValue)) {
+    // Record<string, string[]> — e.g., evaluations.passed: { "eval-1": ["true"] }
+    if (subValue.length === 0) return true;
+    return matchEvaluationValues(evaluations, field, subValue);
+  }
+
+  if (typeof subValue === "object" && subValue !== null) {
+    // Record<string, Record<string, string[]>> — evaluations.score: { "eval-1": { "score": ["0.5"] } }
+    return matchEveryEvaluationValueGroup({
+      evaluations,
+      field,
+      groups: subValue,
+    });
+  }
+
+  return true;
+}
+
+function matchEveryEvaluationValueGroup({
+  evaluations,
+  field,
+  groups,
+}: {
+  evaluations: EvaluationRunData[];
+  field: FilterField;
+  groups: object;
+}): boolean {
+  for (const [, values] of Object.entries(groups)) {
+    if (!Array.isArray(values) || values.length === 0) continue;
+    if (!matchEvaluationValues(evaluations, field, values)) return false;
   }
 
   return true;
@@ -594,16 +756,26 @@ const BARE_KEY_EXCLUDED_PREFIXES = [
   "otel.",
 ];
 
-function resolveCustomMetadataKey(key: string): {
-  customKey: string;
-  priority: number;
-} | null {
+type CustomMetadataKey = { customKey: string; priority: number };
+
+function resolveCanonicalMetadataKey(key: string): CustomMetadataKey | null {
+  if (RESERVED_KEYS.has(key)) return null;
+  if (RESERVED_PREFIXES.some((p) => key.startsWith(p))) return null;
+  const customKey = key.slice("metadata.".length);
+  return customKey ? { customKey, priority: 3 } : null;
+}
+
+function hasSkippedKeyPrefix(key: string): boolean {
+  return (
+    RESERVED_PREFIXES.some((p) => key.startsWith(p)) ||
+    BARE_KEY_EXCLUDED_PREFIXES.some((p) => key.startsWith(p))
+  );
+}
+
+function resolveCustomMetadataKey(key: string): CustomMetadataKey | null {
   // Priority 3: canonical "metadata.{key}" (from Python SDK canonicalization)
   if (key.startsWith("metadata.")) {
-    if (RESERVED_KEYS.has(key)) return null;
-    if (RESERVED_PREFIXES.some((p) => key.startsWith(p))) return null;
-    const customKey = key.slice("metadata.".length);
-    return customKey ? { customKey, priority: 3 } : null;
+    return resolveCanonicalMetadataKey(key);
   }
 
   // Priority 2: legacy "langwatch.metadata.{key}" (legacy REST collector)
@@ -613,8 +785,7 @@ function resolveCustomMetadataKey(key: string): {
   }
 
   // Skip all other known prefixes
-  if (RESERVED_PREFIXES.some((p) => key.startsWith(p))) return null;
-  if (BARE_KEY_EXCLUDED_PREFIXES.some((p) => key.startsWith(p))) return null;
+  if (hasSkippedKeyPrefix(key)) return null;
 
   // Priority 1: bare OTEL resource attribute (legacy)
   if (key.length === 0) return null;

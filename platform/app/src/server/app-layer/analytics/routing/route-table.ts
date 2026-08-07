@@ -479,6 +479,51 @@ export interface PickAnalyticsTableInput {
 }
 
 /**
+ * Determine the single metric source shared by every series, or `undefined`
+ * if the series list is mixed-source or every series is source-unknown.
+ * Split out of `pickAnalyticsTable`.
+ */
+function resolveSeriesSource(
+  series: SeriesInputType[],
+): AnalyticsMetricSource | undefined {
+  const sources = new Set<AnalyticsMetricSource | undefined>();
+  for (const s of series) {
+    sources.add(getMetricSource(s.metric));
+  }
+  // Mixed source or unknown → conservative fallback to the legacy trace
+  // table; the legacy builder is the only path that can mix trace + eval
+  // reads (and unknown-source metrics route through it today).
+  if (sources.size !== 1) return undefined;
+  return Array.from(sources)[0];
+}
+
+/** ---------- Rollup eligibility ----------  Split out of `pickAnalyticsTable`. */
+function isRollupEligible(
+  input: PickAnalyticsTableInput,
+  source: AnalyticsMetricSource,
+  hasPipeline: boolean,
+): boolean {
+  return (
+    !hasPipeline &&
+    rollupHandlesAllSeries(input.series, source, input.groupBy) &&
+    rollupHandlesGroupBy(input.groupBy, source) &&
+    rollupHandlesFilters(input.filters, source)
+  );
+}
+
+/** ---------- Slim eligibility ----------  Split out of `pickAnalyticsTable`. */
+function isSlimEligible(
+  input: PickAnalyticsTableInput,
+  source: AnalyticsMetricSource,
+): boolean {
+  return (
+    slimHandlesAllSeries(input.series, source) &&
+    slimHandlesGroupBy(input.groupBy, source) &&
+    slimHandlesFilters(input.filters, source)
+  );
+}
+
+/**
  * Decide which ClickHouse table should serve a `getTimeseries` query.
  *
  * Source-aware (ADR-034 Phase 6): a query's metric source is determined by
@@ -500,15 +545,7 @@ export function pickAnalyticsTable(
   if (!input.series || input.series.length === 0) return "trace_summaries";
 
   // Determine the source. All series must agree.
-  const sources = new Set<AnalyticsMetricSource | undefined>();
-  for (const s of input.series) {
-    sources.add(getMetricSource(s.metric));
-  }
-  // Mixed source or unknown → conservative fallback to the legacy trace
-  // table; the legacy builder is the only path that can mix trace + eval
-  // reads (and unknown-source metrics route through it today).
-  if (sources.size !== 1) return "trace_summaries";
-  const source = Array.from(sources)[0];
+  const source = resolveSeriesSource(input.series);
   if (source === undefined) return "trace_summaries";
 
   // Pipeline (per-user/per-thread/per-customer) aggregations require
@@ -540,20 +577,11 @@ export function pickAnalyticsTable(
   // Attributes map and only survive on the legacy table.
   if (filtersHitBlocklist(input.filters)) return legacyFallbackFor(source);
 
-  // ---------- Rollup eligibility ----------
-  const rollupOk =
-    !hasPipeline &&
-    rollupHandlesAllSeries(input.series, source, input.groupBy) &&
-    rollupHandlesGroupBy(input.groupBy, source) &&
-    rollupHandlesFilters(input.filters, source);
-  if (rollupOk) return rollupTableFor(source);
+  if (isRollupEligible(input, source, hasPipeline)) {
+    return rollupTableFor(source);
+  }
 
-  // ---------- Slim eligibility ----------
-  const slimOk =
-    slimHandlesAllSeries(input.series, source) &&
-    slimHandlesGroupBy(input.groupBy, source) &&
-    slimHandlesFilters(input.filters, source);
-  if (slimOk) return slimTableFor(source);
+  if (isSlimEligible(input, source)) return slimTableFor(source);
 
   // ---------- Default safe fallback ----------
   return legacyFallbackFor(source);
@@ -693,30 +721,39 @@ function slimHandlesFilters(
  * service's blocklist; if a user is filtering on `gen_ai.prompt` we MUST
  * fall back because slim dropped the key at write time.
  */
+function hasBlocklistedMetadataKey(
+  metadataKey: NonNullable<PickAnalyticsTableInput["filters"]>["metadata.key"],
+): boolean {
+  if (!metadataKey) return false;
+  const keys = collectStringValues(metadataKey);
+  return keys.some(isBlocklisted);
+}
+
+// metadata.value is keyed by the underlying metadata key — if the key on
+// the outer record is blocklisted we cannot read the value off slim either.
+function hasBlocklistedMetadataValueKey(
+  metadataValue: NonNullable<
+    PickAnalyticsTableInput["filters"]
+  >["metadata.value"],
+): boolean {
+  if (
+    !metadataValue ||
+    typeof metadataValue !== "object" ||
+    Array.isArray(metadataValue)
+  ) {
+    return false;
+  }
+  return Object.keys(metadataValue).some(isBlocklisted);
+}
+
 function filtersHitBlocklist(
   filters: PickAnalyticsTableInput["filters"],
 ): boolean {
   if (!filters) return false;
-  const metadataKey = filters["metadata.key"];
-  if (metadataKey) {
-    const keys = collectStringValues(metadataKey);
-    for (const k of keys) {
-      if (isBlocklisted(k)) return true;
-    }
-  }
-  // metadata.value is keyed by the underlying metadata key — if the key on
-  // the outer record is blocklisted we cannot read the value off slim either.
-  const metadataValue = filters["metadata.value"];
-  if (
-    metadataValue &&
-    typeof metadataValue === "object" &&
-    !Array.isArray(metadataValue)
-  ) {
-    for (const outerKey of Object.keys(metadataValue)) {
-      if (isBlocklisted(outerKey)) return true;
-    }
-  }
-  return false;
+  return (
+    hasBlocklistedMetadataKey(filters["metadata.key"]) ||
+    hasBlocklistedMetadataValueKey(filters["metadata.value"])
+  );
 }
 
 function isBlocklisted(key: string): boolean {

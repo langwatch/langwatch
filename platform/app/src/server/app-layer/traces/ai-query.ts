@@ -249,6 +249,82 @@ function sanitizeLlmOutput(raw: string): string {
  * any other, rather than as an in-band `{ ok: false }` payload the UI had to
  * know how to word.
  */
+type TraceActionAttemptResult =
+  | { kind: "success"; action: z.infer<typeof aiActionSchema> }
+  | { kind: "provider_error"; message: string; error: unknown }
+  | { kind: "validation_error"; query: string; error: string };
+
+async function attemptTraceAction({
+  model,
+  systemPrompt,
+  prompt,
+  attempt,
+  lastFailure,
+  lastQuery,
+  lastError,
+}: {
+  model: Awaited<ReturnType<typeof getVercelAIModel>>;
+  systemPrompt: string;
+  prompt: string;
+  attempt: number;
+  lastFailure: "provider" | "validation" | null;
+  lastQuery: string;
+  lastError: string;
+}): Promise<TraceActionAttemptResult> {
+  let parsedAction: z.infer<typeof aiActionSchema>;
+  try {
+    const { object } = await generateObject({
+      model,
+      schemaName: "TraceAction",
+      schemaDescription:
+        "Either an apply_query (filter the current view) or a create_lens (create a saved view) action with a trace query language string.",
+      schema: aiActionSchema,
+      // Only inject the retry-context blurb when the previous failure
+      // was a parse/validation issue. After a provider/SDK throw,
+      // `lastQuery` is "" and `lastError` is a stack-y SDK message —
+      // splicing those into a "previous attempt produced query X
+      // which failed to parse: Y" sentence misleads the model into
+      // thinking it produced an empty query that won't parse.
+      system:
+        attempt === 1 || lastFailure !== "validation"
+          ? systemPrompt
+          : `${systemPrompt}\n\nThe previous attempt produced query "${lastQuery}" which failed to parse: ${lastError}\nReturn a valid query this time.`,
+      prompt,
+      maxRetries: 1,
+    });
+    parsedAction = object;
+  } catch (e) {
+    return {
+      kind: "provider_error",
+      error: e,
+      message: e instanceof Error ? e.message : "Unknown generation error.",
+    };
+  }
+
+  const validation = validateQuery(parsedAction.query);
+  if (validation.ok) {
+    return { kind: "success", action: parsedAction };
+  }
+  return {
+    kind: "validation_error",
+    query: parsedAction.query,
+    error: validation.error,
+  };
+}
+
+function actionResultFromParsed(
+  action: z.infer<typeof aiActionSchema>,
+): AiActionResult {
+  return action.kind === "apply_query"
+    ? { ok: true, kind: "apply_query", query: action.query }
+    : {
+        ok: true,
+        kind: "create_lens",
+        name: action.name,
+        query: action.query,
+      };
+}
+
 export async function generateTraceAction(
   input: AiQueryInput,
 ): Promise<AiActionResult> {
@@ -269,53 +345,34 @@ export async function generateTraceAction(
   let lastFailure: "provider" | "validation" | null = null;
   let lastProviderError: unknown = null;
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-    let parsedAction: z.infer<typeof aiActionSchema>;
-    try {
-      const { object } = await generateObject({
-        model,
-        schemaName: "TraceAction",
-        schemaDescription:
-          "Either an apply_query (filter the current view) or a create_lens (create a saved view) action with a trace query language string.",
-        schema: aiActionSchema,
-        // Only inject the retry-context blurb when the previous failure
-        // was a parse/validation issue. After a provider/SDK throw,
-        // `lastQuery` is "" and `lastError` is a stack-y SDK message —
-        // splicing those into a "previous attempt produced query X
-        // which failed to parse: Y" sentence misleads the model into
-        // thinking it produced an empty query that won't parse.
-        system:
-          attempt === 1 || lastFailure !== "validation"
-            ? systemPrompt
-            : `${systemPrompt}\n\nThe previous attempt produced query "${lastQuery}" which failed to parse: ${lastError}\nReturn a valid query this time.`,
-        prompt: input.prompt,
-        maxRetries: 1,
-      });
-      parsedAction = object;
-    } catch (e) {
+    const result = await attemptTraceAction({
+      model,
+      systemPrompt,
+      prompt: input.prompt,
+      attempt,
+      lastFailure,
+      lastQuery,
+      lastError,
+    });
+
+    if (result.kind === "provider_error") {
       lastFailure = "provider";
-      lastProviderError = e;
-      lastError = e instanceof Error ? e.message : "Unknown generation error.";
+      lastProviderError = result.error;
+      lastError = result.message;
       logger.error(
-        { projectId: input.projectId, attempt, lastError, err: e },
+        { projectId: input.projectId, attempt, lastError, err: result.error },
         "AI action generation failed",
       );
       continue;
     }
 
-    lastQuery = parsedAction.query;
-    const validation = validateQuery(parsedAction.query);
-    if (validation.ok) {
-      return parsedAction.kind === "apply_query"
-        ? { ok: true, kind: "apply_query", query: parsedAction.query }
-        : {
-            ok: true,
-            kind: "create_lens",
-            name: parsedAction.name,
-            query: parsedAction.query,
-          };
+    if (result.kind === "success") {
+      return actionResultFromParsed(result.action);
     }
+
+    lastQuery = result.query;
     lastFailure = "validation";
-    lastError = validation.error;
+    lastError = result.error;
     logger.info(
       { projectId: input.projectId, attempt, lastError, lastQuery },
       "AI action query failed validation, retrying",
@@ -366,43 +423,72 @@ export async function generateTraceAction(
  * sentence on the customer's screen as if we had written it. The headline is
  * the registry's job now; this function only fills the disclosure.
  */
-export function summarizeProviderError(
-  err: unknown,
-  context?: { model?: string },
-): AiActionErrorDetails {
+/** Strips stack-trace lines from an SDK/provider error message. */
+function cleanedProviderErrorMessage(err: unknown): string {
   const raw = err instanceof Error ? err.message : String(err ?? "");
-  const cleaned = raw
+  return raw
     .split("\n")
     .filter((line) => !/^\s*at\s+/.test(line))
     .join("\n")
     .trim();
+}
 
-  // `statusCode` only. The AI SDK's APICallError also carries `responseBody`,
-  // which is the provider's raw failure body — it was read here to mine a
-  // message out of, and there is nothing else in it we want.
+// `statusCode` only. The AI SDK's APICallError also carries `responseBody`,
+// which is the provider's raw failure body — it was read here to mine a
+// message out of, and there is nothing else in it we want.
+function structuredHttpStatus(err: unknown): number | undefined {
   const structured = err as { statusCode?: unknown } | null | undefined;
-  const structuredStatus =
-    typeof structured?.statusCode === "number"
-      ? structured.statusCode
-      : undefined;
+  return typeof structured?.statusCode === "number"
+    ? structured.statusCode
+    : undefined;
+}
 
+function httpStatusFromMessage(cleaned: string): number | undefined {
   const statusMatch =
     cleaned.match(/status[_\s]*code[:\s]+(\d{3})/i) ??
     cleaned.match(/\b(?:HTTP\s+)?(\d{3})\b/);
-  const httpStatus =
-    structuredStatus ?? (statusMatch ? Number(statusMatch[1]) : undefined);
+  return statusMatch ? Number(statusMatch[1]) : undefined;
+}
 
+function providerFromMessage({
+  cleaned,
+  fallbackModel,
+}: {
+  cleaned: string;
+  fallbackModel?: string;
+}): string | undefined {
   const providerMatch = cleaned.match(
     /(?:litellm\.|\b)(OpenAI|Azure|Anthropic|Gemini|Google|Cohere|Mistral|Groq|Together|Bedrock|Vertex)(?:Exception|Error|APIError)/i,
   );
-  const provider =
-    providerMatch?.[1]?.toLowerCase() ?? context?.model?.split("/")[0];
+  return providerMatch?.[1]?.toLowerCase() ?? fallbackModel?.split("/")[0];
+}
 
+function modelFromMessage({
+  cleaned,
+  fallbackModel,
+}: {
+  cleaned: string;
+  fallbackModel?: string;
+}): string | undefined {
   const modelMatch =
     cleaned.match(
       /model\s+["']?([\w./:-]+)["']?\s+(?:does\s+not\s+exist|not\s+found|is\s+invalid)/i,
     ) ?? cleaned.match(/Unknown\s+model[:\s]+([\w./:-]+)/i);
-  const model = modelMatch ? modelMatch[1] : context?.model;
+  return modelMatch ? modelMatch[1] : fallbackModel;
+}
+
+export function summarizeProviderError(
+  err: unknown,
+  context?: { model?: string },
+): AiActionErrorDetails {
+  const cleaned = cleanedProviderErrorMessage(err);
+  const httpStatus =
+    structuredHttpStatus(err) ?? httpStatusFromMessage(cleaned);
+  const provider = providerFromMessage({
+    cleaned,
+    fallbackModel: context?.model,
+  });
+  const model = modelFromMessage({ cleaned, fallbackModel: context?.model });
 
   // No `reason` on this exit, deliberately.
   //

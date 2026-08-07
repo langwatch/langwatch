@@ -126,6 +126,213 @@ function buildReqShim(req: Request): any {
   } as any;
 }
 
+/** Extracts the tRPC procedure path from the SSE request URL.
+ *  `/api/sse/traces.onTraceUpdate` or `/api/sse/traces/onTraceUpdate` both
+ *  resolve to `traces.onTraceUpdate` (the `/api/sse/` prefix is stripped and
+ *  remaining segments join with "."). */
+function sseProcedurePath(url: URL): string {
+  const pathAfterSse = url.pathname.replace(/^\/api\/sse\/?/, "");
+  return pathAfterSse.replace(/\//g, ".");
+}
+
+/** Resolves the tRPC procedure a request names, building the same inner
+ *  context the tRPC route builds. Returns `null` when the path does not
+ *  resolve to a callable procedure. */
+async function resolveSseProcedure({
+  raw,
+  path,
+}: {
+  raw: Request;
+  path: string;
+}): Promise<((input: unknown) => unknown) | null> {
+  const reqShim = buildReqShim(raw);
+  const session = await getServerAuthSession({
+    req: raw as unknown as Parameters<typeof getServerAuthSession>[0]["req"],
+  });
+  const ctx = createInnerTRPCContext({
+    req: reqShim,
+    res: undefined,
+    session,
+    permissionChecked: false,
+    publiclyShared: false,
+    // Subscriptions await an event that may never come; without this they stay
+    // suspended after the browser is gone, holding their emitter listener and
+    // skipping their own cleanup. Closing the stream cannot interrupt a
+    // pending `await` from the outside, so the signal has to reach the
+    // procedure itself.
+    signal: raw.signal,
+  });
+
+  const router = await getAppRouter();
+  const caller = router.createCaller(ctx);
+  const procedure = path
+    .split(".")
+    .reduce<any>((obj, key) => obj?.[key], caller);
+
+  return typeof procedure === "function" ? procedure : null;
+}
+
+/** The write/end/ping plumbing for one SSE connection, decoupled from what
+ *  gets streamed through it. */
+function createSseChannel(controller: ReadableStreamDefaultController) {
+  const encoder = new TextEncoder();
+  let ended = false;
+  let unsubscribe: (() => void) | null = null;
+  let ping: ReturnType<typeof setInterval> | null = null;
+
+  const write = (text: string) => {
+    if (ended) return;
+    try {
+      controller.enqueue(encoder.encode(text));
+    } catch {
+      // Stream already closed
+      end();
+    }
+  };
+
+  const writeData = (value: unknown) => {
+    if (ended) return;
+    const payload = superjson.stringify(value);
+    for (const line of payload.split(/\r?\n/)) {
+      write(`data: ${line}\n`);
+    }
+    write("\n");
+  };
+
+  const end = () => {
+    if (ended) return;
+    ended = true;
+    if (ping) clearInterval(ping);
+    try {
+      unsubscribe?.();
+    } catch {
+      // Ignore cleanup errors
+    }
+    unsubscribe = null;
+    try {
+      controller.close();
+    } catch {
+      // Stream already closed
+    }
+  };
+
+  // Keep-alive ping every 25 seconds
+  const startPing = () => {
+    ping = setInterval(() => {
+      if (ended) {
+        end();
+      } else {
+        write(": ping\n\n");
+      }
+    }, 25_000);
+  };
+
+  return {
+    write,
+    writeData,
+    end,
+    isEnded: () => ended,
+    setUnsubscribe: (fn: (() => void) | null) => {
+      unsubscribe = fn;
+    },
+    startPing,
+  };
+}
+
+type SseChannel = ReturnType<typeof createSseChannel>;
+
+/** Streams an AsyncIterable result to completion, one item at a time. */
+async function drainAsyncIterableResult({
+  result,
+  channel,
+}: {
+  result: AsyncIterable<unknown>;
+  channel: SseChannel;
+}): Promise<void> {
+  for await (const data of result) {
+    if (channel.isEnded()) break;
+    channel.writeData(data);
+  }
+  channel.writeData({ type: "complete" });
+  channel.end();
+}
+
+/** Subscribes to an Observable-like (tRPC subscription) result, wiring its
+ *  unsubscribe back onto the channel so `channel.end()` tears it down. */
+function subscribeObservableResult({
+  result,
+  channel,
+  path,
+}: {
+  result: { subscribe: (observer: unknown) => unknown };
+  channel: SseChannel;
+  path: string;
+}): void {
+  const sub = result.subscribe({
+    next: (data: unknown) => channel.writeData(data),
+    complete: () => {
+      channel.writeData({ type: "complete" });
+      channel.end();
+    },
+    error: (err: unknown) => {
+      logSseError(err, { err, path }, "SSE observable error");
+      channel.writeData(sseErrorFrame(err));
+      channel.end();
+    },
+  });
+
+  if (typeof sub === "function") channel.setUnsubscribe(sub as () => void);
+  else if (sub && typeof (sub as any).unsubscribe === "function")
+    channel.setUnsubscribe(() => (sub as any).unsubscribe());
+}
+
+/** Runs the resolved procedure and forwards its result to the channel,
+ *  supporting AsyncIterable results, Observable-like (tRPC subscription)
+ *  results, and plain non-streaming results. */
+async function runSseProcedure({
+  procedure,
+  input,
+  channel,
+  path,
+}: {
+  procedure: (input: unknown) => unknown;
+  input: unknown;
+  channel: SseChannel;
+  path: string;
+}): Promise<void> {
+  try {
+    const result = await procedure(input);
+
+    if (result && typeof (result as any)[Symbol.asyncIterator] === "function") {
+      await drainAsyncIterableResult({
+        result: result as AsyncIterable<unknown>,
+        channel,
+      });
+      return;
+    }
+
+    if (result && typeof (result as any).subscribe === "function") {
+      subscribeObservableResult({
+        result: result as { subscribe: (observer: unknown) => unknown },
+        channel,
+        path,
+      });
+      return; // Keep connection open for observable
+    }
+
+    // Non-streaming result
+    channel.writeData(result);
+    channel.writeData({ type: "complete" });
+    channel.end();
+  } catch (error) {
+    // No `input` here: it is the raw request payload, which may carry
+    // PII — same contract as the observable error path above.
+    logSseError(error, { error, path }, "SSE handler error");
+    channel.writeData(sseErrorFrame(error));
+    channel.end();
+  }
+}
+
 secured
   .access(
     handlerManagedAuth({
@@ -138,12 +345,7 @@ secured
   .get("/sse/*", async (c) => {
     const raw = c.req.raw;
     const url = new URL(raw.url);
-
-    // Extract the procedure path from the URL.
-    // The URL path is /api/sse/traces.onTraceUpdate or /api/sse/traces/onTraceUpdate.
-    // We strip the /api/sse/ prefix and join remaining segments with ".".
-    const pathAfterSse = url.pathname.replace(/^\/api\/sse\/?/, "");
-    const path = pathAfterSse.replace(/\//g, ".");
+    const path = sseProcedurePath(url);
 
     if (!path) {
       return c.json({ message: "Missing trpc path" }, 400);
@@ -153,33 +355,8 @@ secured
     const inputParam = url.searchParams.get("input") ?? undefined;
     const input = inputParam ? superjson.parse(inputParam) : undefined;
 
-    // Build context
-    const reqShim = buildReqShim(raw);
-    const session = await getServerAuthSession({
-      req: raw as unknown as Parameters<typeof getServerAuthSession>[0]["req"],
-    });
-    const ctx = createInnerTRPCContext({
-      req: reqShim,
-      res: undefined,
-      session,
-      permissionChecked: false,
-      publiclyShared: false,
-      // Subscriptions await an event that may never come; without this they stay
-      // suspended after the browser is gone, holding their emitter listener and
-      // skipping their own cleanup. Closing the stream cannot interrupt a
-      // pending `await` from the outside, so the signal has to reach the
-      // procedure itself.
-      signal: raw.signal,
-    });
-
-    // Create caller and resolve the procedure
-    const router = await getAppRouter();
-    const caller = router.createCaller(ctx);
-    const procedure = path
-      .split(".")
-      .reduce<any>((obj, key) => obj?.[key], caller);
-
-    if (typeof procedure !== "function") {
+    const procedure = await resolveSseProcedure({ raw, path });
+    if (!procedure) {
       return c.json({ message: "Procedure not found" }, 404);
     }
 
@@ -191,114 +368,20 @@ secured
 
     const body = new ReadableStream({
       start(controller) {
-        const encoder = new TextEncoder();
-        let ended = false;
-        let unsubscribe: (() => void) | null = null;
-
-        const write = (text: string) => {
-          if (ended) return;
-          try {
-            controller.enqueue(encoder.encode(text));
-          } catch {
-            // Stream already closed
-            end();
-          }
-        };
-
-        const writeData = (value: unknown) => {
-          if (ended) return;
-          const payload = superjson.stringify(value);
-          for (const line of payload.split(/\r?\n/)) {
-            write(`data: ${line}\n`);
-          }
-          write("\n");
-        };
-
-        const end = () => {
-          if (ended) return;
-          ended = true;
-          clearInterval(ping);
-          try {
-            unsubscribe?.();
-          } catch {
-            // Ignore cleanup errors
-          }
-          unsubscribe = null;
-          try {
-            controller.close();
-          } catch {
-            // Stream already closed
-          }
-        };
-
-        // Keep-alive ping every 25 seconds
-        const ping = setInterval(() => {
-          if (ended) {
-            end();
-          } else {
-            write(": ping\n\n");
-          }
-        }, 25_000);
+        const channel = createSseChannel(controller);
+        channel.startPing();
 
         // Send connected event
-        writeData({ type: "connected" });
+        channel.writeData({ type: "connected" });
 
         // Call the procedure and handle the result. Deliberately fire-and-forget:
-        // the stream stays open while this runs, and the catch below is the only
-        // place a rejection can surface.
-        void (async () => {
-          try {
-            const result = await procedure(input);
-
-            // AsyncIterable
-            if (result && typeof result[Symbol.asyncIterator] === "function") {
-              for await (const data of result as AsyncIterable<unknown>) {
-                if (ended) break;
-                writeData(data);
-              }
-              writeData({ type: "complete" });
-              end();
-              return;
-            }
-
-            // Observable-like (tRPC subscriptions)
-            if (result && typeof (result as any).subscribe === "function") {
-              const sub = (result as any).subscribe({
-                next: (data: unknown) => writeData(data),
-                complete: () => {
-                  writeData({ type: "complete" });
-                  end();
-                },
-                error: (err: unknown) => {
-                  logSseError(err, { err, path }, "SSE observable error");
-                  writeData(sseErrorFrame(err));
-                  end();
-                },
-              });
-
-              if (typeof sub === "function") unsubscribe = sub;
-              else if (sub && typeof sub.unsubscribe === "function")
-                unsubscribe = () => sub.unsubscribe();
-
-              return; // Keep connection open for observable
-            }
-
-            // Non-streaming result
-            writeData(result);
-            writeData({ type: "complete" });
-            end();
-          } catch (error) {
-            // No `input` here: it is the raw request payload, which may carry
-            // PII — same contract as the observable error path above.
-            logSseError(error, { error, path }, "SSE handler error");
-            writeData(sseErrorFrame(error));
-            end();
-          }
-        })();
+        // the stream stays open while this runs, and the catch inside
+        // `runSseProcedure` is the only place a rejection can surface.
+        void runSseProcedure({ procedure, input, channel, path });
 
         // Handle client disconnect via AbortSignal on the request
         raw.signal?.addEventListener("abort", () => {
-          end();
+          channel.end();
         });
       },
     });

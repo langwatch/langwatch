@@ -51,6 +51,60 @@ export interface SuiteRunState extends Projection<SuiteRunStateData> {
   data: SuiteRunStateData;
 }
 
+function computeCompletionCounts(
+  state: SuiteRunStateData,
+  isFailure: boolean,
+): { completedCount: number; failedCount: number } {
+  return isFailure
+    ? {
+        completedCount: state.CompletedCount,
+        failedCount: state.FailedCount + 1,
+      }
+    : {
+        completedCount: state.CompletedCount + 1,
+        failedCount: state.FailedCount,
+      };
+}
+
+function computeGradingCounts(
+  state: SuiteRunStateData,
+  verdict: SuiteRunItemCompletedEvent["data"]["verdict"],
+): { passedCount: number; gradedCount: number } {
+  if (!verdict) {
+    return { passedCount: state.PassedCount, gradedCount: state.GradedCount };
+  }
+  const gradedCount = state.GradedCount + 1;
+  const passedCount =
+    verdict === "success" ? state.PassedCount + 1 : state.PassedCount;
+  return { passedCount, gradedCount };
+}
+
+function computePassRateBps(
+  passedCount: number,
+  gradedCount: number,
+): number | null {
+  return gradedCount > 0
+    ? Math.round((passedCount / gradedCount) * 10000)
+    : null;
+}
+
+function computeFinalization(params: {
+  state: SuiteRunStateData;
+  progress: number;
+  failedCount: number;
+  occurredAt: number;
+}): { status: string; finishedAt: number | null } {
+  const { state, progress, failedCount, occurredAt } = params;
+  const allDone = state.Total > 0 && progress >= state.Total;
+  if (!allDone) {
+    return { status: state.Status, finishedAt: state.FinishedAt };
+  }
+  return {
+    status: failedCount > 0 ? "FAILURE" : "SUCCESS",
+    finishedAt: occurredAt,
+  };
+}
+
 const suiteRunEvents = [
   SuiteRunStartedEventSchema,
   SuiteRunItemStartedEventSchema,
@@ -133,35 +187,23 @@ export class SuiteRunStateFoldProjection
     const isFailure =
       event.data.status === "FAILURE" || event.data.status === "ERROR";
 
-    let completedCount = state.CompletedCount;
-    let failedCount = state.FailedCount;
-
-    if (isFailure) {
-      failedCount += 1;
-    } else {
-      completedCount += 1;
-    }
-
-    let { PassedCount: passedCount, GradedCount: gradedCount } = state;
-    if (event.data.verdict) {
-      gradedCount += 1;
-      if (event.data.verdict === "success") {
-        passedCount += 1;
-      }
-    }
-
-    const passRateBps =
-      gradedCount > 0 ? Math.round((passedCount / gradedCount) * 10000) : null;
+    const { completedCount, failedCount } = computeCompletionCounts(
+      state,
+      isFailure,
+    );
+    const { passedCount, gradedCount } = computeGradingCounts(
+      state,
+      event.data.verdict,
+    );
+    const passRateBps = computePassRateBps(passedCount, gradedCount);
 
     const progress = completedCount + failedCount;
-    const allDone = state.Total > 0 && progress >= state.Total;
-
-    let status = state.Status;
-    let finishedAt = state.FinishedAt;
-    if (allDone) {
-      finishedAt = event.occurredAt;
-      status = failedCount > 0 ? "FAILURE" : "SUCCESS";
-    }
+    const { status, finishedAt } = computeFinalization({
+      state,
+      progress,
+      failedCount,
+      occurredAt: event.occurredAt,
+    });
 
     return {
       ...state,

@@ -3,7 +3,10 @@
 import { createLogger } from "@langwatch/observability";
 import { randomUUID } from "crypto";
 import { env } from "~/env.mjs";
-import { createReplayRuntime } from "~/server/event-sourcing/replay/replayPreset";
+import {
+  createReplayRuntime,
+  type ReplayRuntime,
+} from "~/server/event-sourcing/replay/replayPreset";
 import type { ReplayProgress } from "~/server/event-sourcing/replay/types";
 import type {
   ReplayHistoryEntry,
@@ -14,6 +17,9 @@ import type {
 const logger = createLogger("langwatch:ops:replay-service");
 
 const REPLAY_LOCK_TTL_SECONDS = 3600;
+
+/** How often the progress callback re-polls the cancel flag between events. */
+const CANCEL_CHECK_INTERVAL_MS = 3000;
 
 /**
  * How often the running replay re-extends its lock on a standalone heartbeat
@@ -27,6 +33,79 @@ export const LOCK_REFRESH_INTERVAL_MS = 60_000;
 class ReplayCancelledError extends Error {
   constructor() {
     super("Replay cancelled");
+  }
+}
+
+/** Mutable, shared between the heartbeat and the progress callback. */
+type CancellationState = { cancelled: boolean };
+
+type ProjectionSelection = {
+  selectedProjections: ReplayRuntime["projections"];
+  selectedMapProjections: ReplayRuntime["mapProjections"];
+  selectedStateProjections: ReplayRuntime["stateProjections"];
+};
+
+function selectProjections({
+  runtime,
+  projectionNames,
+}: {
+  runtime: ReplayRuntime;
+  projectionNames: string[];
+}): ProjectionSelection {
+  return {
+    selectedProjections: runtime.projections.filter((p) =>
+      projectionNames.includes(p.projectionName),
+    ),
+    selectedMapProjections: runtime.mapProjections.filter((p) =>
+      projectionNames.includes(p.projectionName),
+    ),
+    selectedStateProjections: runtime.stateProjections.filter((p) =>
+      projectionNames.includes(p.projectionName),
+    ),
+  };
+}
+
+function hasNoSelectedProjections(selection: ProjectionSelection): boolean {
+  return (
+    selection.selectedProjections.length === 0 &&
+    selection.selectedMapProjections.length === 0 &&
+    selection.selectedStateProjections.length === 0
+  );
+}
+
+/**
+ * Under the replay lock and before discovery: drop the markers a resume
+ * would consult, so no aggregate is skipped as already done. See the
+ * fullRebuild doc on startReplay for when this is required. A failure here
+ * aborts the run rather than replaying against stale markers, which is the
+ * silent-skip this flag exists to prevent.
+ */
+async function clearReplayMarkersForFullRebuild({
+  runtime,
+  runId,
+  selection,
+}: {
+  runtime: ReplayRuntime;
+  runId: string;
+  selection: ProjectionSelection;
+}): Promise<void> {
+  for (const projection of [
+    ...selection.selectedProjections,
+    ...selection.selectedMapProjections,
+    ...selection.selectedStateProjections,
+  ]) {
+    const projectionName = projection.projectionName;
+    const cleared = await runtime.service.checkPreviousRun(projectionName);
+    await runtime.service.cleanup(projectionName);
+    logger.info(
+      {
+        runId,
+        projectionName,
+        completedMarkersCleared: cleared.completedCount,
+        inFlightMarkersCleared: cleared.markerCount,
+      },
+      "Cleared replay markers for full rebuild",
+    );
   }
 }
 
@@ -141,42 +220,15 @@ export class ReplayService {
     description: string;
     userName: string;
   }): Promise<void> {
-    const redisUrl = env.REDIS_URL;
-    if (!redisUrl) {
-      await this.finalizeWithError({
-        runId: params.runId,
-        errorMessage: "REDIS_URL is not configured",
-      });
-      return;
-    }
-
-    let runtime;
-    try {
-      runtime = createReplayRuntime({ redisUrl });
-    } catch (err) {
-      await this.finalizeWithError({
-        runId: params.runId,
-        errorMessage: err instanceof Error ? err.message : String(err),
-      });
-      return;
-    }
+    const runtime = await this.resolveReplayRuntime({ runId: params.runId });
+    if (!runtime) return;
 
     try {
-      const selectedProjections = runtime.projections.filter((p) =>
-        params.projectionNames.includes(p.projectionName),
-      );
-      const selectedMapProjections = runtime.mapProjections.filter((p) =>
-        params.projectionNames.includes(p.projectionName),
-      );
-      const selectedStateProjections = runtime.stateProjections.filter((p) =>
-        params.projectionNames.includes(p.projectionName),
-      );
-
-      if (
-        selectedProjections.length === 0 &&
-        selectedMapProjections.length === 0 &&
-        selectedStateProjections.length === 0
-      ) {
+      const selection = selectProjections({
+        runtime,
+        projectionNames: params.projectionNames,
+      });
+      if (hasNoSelectedProjections(selection)) {
         await this.finalizeWithError({
           runId: params.runId,
           errorMessage: "No matching projections found",
@@ -194,192 +246,278 @@ export class ReplayService {
       }
 
       if (params.fullRebuild) {
-        // Under the replay lock and before discovery: drop the markers a
-        // resume would consult, so no aggregate is skipped as already done.
-        // See the fullRebuild doc on startReplay for when this is required.
-        // A failure here aborts the run rather than replaying against stale
-        // markers, which is the silent-skip this flag exists to prevent.
-        for (const projection of [
-          ...selectedProjections,
-          ...selectedMapProjections,
-          ...selectedStateProjections,
-        ]) {
-          const projectionName = projection.projectionName;
-          const cleared =
-            await runtime.service.checkPreviousRun(projectionName);
-          await runtime.service.cleanup(projectionName);
-          logger.info(
-            {
-              runId: params.runId,
-              projectionName,
-              completedMarkersCleared: cleared.completedCount,
-              inFlightMarkersCleared: cleared.markerCount,
-            },
-            "Cleared replay markers for full rebuild",
-          );
-        }
-      }
-
-      let cancelledFlag = false;
-      let lastCancelCheck = Date.now();
-      const CANCEL_CHECK_INTERVAL_MS = 3000;
-
-      const heartbeatTick = () => {
-        this.repo
-          .refreshLock({
-            runId: params.runId,
-            ttlSeconds: REPLAY_LOCK_TTL_SECONDS,
-          })
-          .then((stillHeld) => {
-            if (!stillHeld) {
-              // Lock expired and another run took over — abort this stale
-              // run via the existing cancellation path so it stops touching
-              // the shared projection pause keys. Warn once and stop the
-              // heartbeat: the lock is confirmed gone, so there is nothing
-              // left to refresh and no point re-warning every interval.
-              logger.warn(
-                { runId: params.runId },
-                "Replay lock lost to another run; aborting stale replay",
-              );
-              cancelledFlag = true;
-              clearInterval(heartbeat);
-            }
-          })
-          .catch((err) => {
-            logger.warn({ error: err }, "Failed to refresh replay lock");
-          });
-
-        // Poll the cancel flag from the heartbeat too, so a cancel request
-        // is picked up even during batch phases that emit no callbacks for
-        // longer than the progress-driven check interval.
-        this.repo
-          .isCancelled()
-          .then((cancelled) => {
-            if (cancelled) cancelledFlag = true;
-          })
-          .catch((err) => {
-            logger.warn({ error: err }, "Failed to poll replay cancel flag");
-          });
-      };
-
-      // Heartbeat: refresh the lock on a standalone timer for the duration
-      // of the runtime call, so the lock survives runs longer than its TTL
-      // even when a single batch phase emits no callbacks for that long.
-      const heartbeat = setInterval(heartbeatTick, LOCK_REFRESH_INTERVAL_MS);
-      heartbeat.unref();
-
-      let result;
-      try {
-        const replayConfig = {
-          projections: selectedProjections,
-          mapProjections: selectedMapProjections,
-          stateProjections: selectedStateProjections,
-          tenantIds: params.tenantIds,
-          since: params.since,
-          aggregateIds: params.aggregateIds,
-        };
-        const replayCallbacks = {
-          onProgress: (progress: ReplayProgress) => {
-            this.updateProgress({ runId: params.runId, progress }).catch(
-              (err) => {
-                logger.warn({ error: err }, "Failed to update replay progress");
-              },
-            );
-
-            const now = Date.now();
-            if (now - lastCancelCheck > CANCEL_CHECK_INTERVAL_MS) {
-              lastCancelCheck = now;
-              this.repo
-                .isCancelled()
-                .then((cancelled) => {
-                  if (cancelled) cancelledFlag = true;
-                })
-                .catch(() => {});
-            }
-
-            if (cancelledFlag) {
-              throw new ReplayCancelledError();
-            }
-          },
-        };
-        result =
-          selectedStateProjections.length > 0
-            ? await runtime.service.replay(replayConfig, replayCallbacks)
-            : await runtime.service.replayOptimized(
-                replayConfig,
-                replayCallbacks,
-              );
-      } finally {
-        clearInterval(heartbeat);
-      }
-
-      // Mirror the catch-path guard: only a takeover by ANOTHER run skips
-      // finalization. A null holder (lock expired, no successor) still
-      // finalizes so a completed run is never left stuck in "running".
-      const lockHolder = await this.repo.getLockHolder();
-      if (lockHolder !== null && lockHolder !== params.runId) return;
-
-      if (result.batchErrors > 0) {
-        await this.finalizeWithError({
+        await clearReplayMarkersForFullRebuild({
+          runtime,
           runId: params.runId,
-          errorMessage: result.firstError ?? "Unknown batch error",
-          historyCtx: params,
-        });
-      } else {
-        const completedAt = new Date().toISOString();
-        const status = await this.repo.getStatus();
-        await this.repo.writeStatus({
-          status: {
-            ...status,
-            state: "completed",
-            completedAt,
-            aggregatesProcessed: result.aggregatesReplayed,
-            eventsProcessed: result.totalEvents,
-          },
-        });
-        await this.repo.pushToHistory({
-          entry: {
-            runId: params.runId,
-            projectionNames: params.projectionNames,
-            since: params.since,
-            tenantIds: params.tenantIds,
-            description: params.description,
-            startedAt: status.startedAt ?? completedAt,
-            completedAt,
-            state: "completed",
-            userName: params.userName,
-            aggregatesProcessed: result.aggregatesReplayed,
-            eventsProcessed: result.totalEvents,
-          },
+          selection,
         });
       }
+
+      await this.runSelectedReplay({ runtime, selection, params });
     } catch (err) {
-      // If another run has taken the lock over, it owns the status row now —
-      // finalizing here would overwrite the successor's "running" status with
-      // this stale run's cancelled/failed state. A null holder (expired, no
-      // successor) still finalizes so the run's end state stays observable.
-      const lockHolder = await this.repo.getLockHolder();
-      if (lockHolder !== null && lockHolder !== params.runId) {
-        logger.warn(
-          { runId: params.runId, lockHolder },
-          "Skipping replay finalization: lock now held by another run",
-        );
-      } else if (err instanceof ReplayCancelledError) {
-        await this.finalizeCancelled({
-          runId: params.runId,
-          historyCtx: params,
-        });
-      } else {
-        await this.finalizeWithError({
-          runId: params.runId,
-          errorMessage: err instanceof Error ? err.message : String(err),
-          historyCtx: params,
-        });
-      }
+      await this.finalizeAfterFailure({ err, params });
     } finally {
       await runtime.close();
       await this.repo.releaseLock({ runId: params.runId });
     }
+  }
+
+  /** Resolves the replay runtime, finalizing the run with an error and returning `null` on failure. */
+  private async resolveReplayRuntime({
+    runId,
+  }: {
+    runId: string;
+  }): Promise<ReplayRuntime | null> {
+    const redisUrl = env.REDIS_URL;
+    if (!redisUrl) {
+      await this.finalizeWithError({
+        runId,
+        errorMessage: "REDIS_URL is not configured",
+      });
+      return null;
+    }
+    try {
+      return createReplayRuntime({ redisUrl });
+    } catch (err) {
+      await this.finalizeWithError({
+        runId,
+        errorMessage: err instanceof Error ? err.message : String(err),
+      });
+      return null;
+    }
+  }
+
+  /**
+   * If another run has taken the lock over, it owns the status row now —
+   * finalizing here would overwrite the successor's "running" status with
+   * this stale run's cancelled/failed state. A null holder (expired, no
+   * successor) still finalizes so the run's end state stays observable.
+   */
+  private async finalizeAfterFailure({
+    err,
+    params,
+  }: {
+    err: unknown;
+    params: {
+      runId: string;
+      projectionNames: string[];
+      since: string;
+      tenantIds: string[];
+      description: string;
+      userName: string;
+    };
+  }): Promise<void> {
+    const lockHolder = await this.repo.getLockHolder();
+    if (lockHolder !== null && lockHolder !== params.runId) {
+      logger.warn(
+        { runId: params.runId, lockHolder },
+        "Skipping replay finalization: lock now held by another run",
+      );
+    } else if (err instanceof ReplayCancelledError) {
+      await this.finalizeCancelled({
+        runId: params.runId,
+        historyCtx: params,
+      });
+    } else {
+      await this.finalizeWithError({
+        runId: params.runId,
+        errorMessage: err instanceof Error ? err.message : String(err),
+        historyCtx: params,
+      });
+    }
+  }
+
+  /**
+   * Runs the replay call against the selected projections under a refresh
+   * heartbeat, then finalizes success/failure. Mirrors the executeReplay
+   * catch-path guard: only a takeover by ANOTHER run skips finalization — a
+   * null holder (lock expired, no successor) still finalizes so a completed
+   * run is never left stuck in "running".
+   */
+  private async runSelectedReplay({
+    runtime,
+    selection,
+    params,
+  }: {
+    runtime: ReplayRuntime;
+    selection: ProjectionSelection;
+    params: {
+      runId: string;
+      projectionNames: string[];
+      since: string;
+      tenantIds: string[];
+      aggregateIds?: string[];
+      description: string;
+      userName: string;
+    };
+  }): Promise<void> {
+    const { heartbeat, state: cancellation } = this.startCancellationHeartbeat({
+      runId: params.runId,
+    });
+
+    let result;
+    try {
+      const replayConfig = {
+        projections: selection.selectedProjections,
+        mapProjections: selection.selectedMapProjections,
+        stateProjections: selection.selectedStateProjections,
+        tenantIds: params.tenantIds,
+        since: params.since,
+        aggregateIds: params.aggregateIds,
+      };
+      const replayCallbacks = this.buildReplayCallbacks({
+        runId: params.runId,
+        cancellation,
+      });
+      result =
+        selection.selectedStateProjections.length > 0
+          ? await runtime.service.replay(replayConfig, replayCallbacks)
+          : await runtime.service.replayOptimized(
+              replayConfig,
+              replayCallbacks,
+            );
+    } finally {
+      clearInterval(heartbeat);
+    }
+
+    const lockHolder = await this.repo.getLockHolder();
+    if (lockHolder !== null && lockHolder !== params.runId) return;
+
+    if (result.batchErrors > 0) {
+      await this.finalizeWithError({
+        runId: params.runId,
+        errorMessage: result.firstError ?? "Unknown batch error",
+        historyCtx: params,
+      });
+    } else {
+      await this.finalizeSuccess({ params, result });
+    }
+  }
+
+  /**
+   * Heartbeat: refresh the lock on a standalone timer for the duration of
+   * the runtime call, so the lock survives runs longer than its TTL even
+   * when a single batch phase emits no callbacks for that long. Also polls
+   * the cancel flag, so a cancel request is picked up even during batch
+   * phases that emit no progress callbacks for a long time.
+   */
+  private startCancellationHeartbeat({ runId }: { runId: string }): {
+    heartbeat: NodeJS.Timeout;
+    state: CancellationState;
+  } {
+    const state: CancellationState = { cancelled: false };
+
+    const heartbeatTick = () => {
+      this.repo
+        .refreshLock({ runId, ttlSeconds: REPLAY_LOCK_TTL_SECONDS })
+        .then((stillHeld) => {
+          if (!stillHeld) {
+            // Lock expired and another run took over — abort this stale
+            // run via the existing cancellation path so it stops touching
+            // the shared projection pause keys. Warn once and stop the
+            // heartbeat: the lock is confirmed gone, so there is nothing
+            // left to refresh and no point re-warning every interval.
+            logger.warn(
+              { runId },
+              "Replay lock lost to another run; aborting stale replay",
+            );
+            state.cancelled = true;
+            clearInterval(heartbeat);
+          }
+        })
+        .catch((err) => {
+          logger.warn({ error: err }, "Failed to refresh replay lock");
+        });
+
+      this.repo
+        .isCancelled()
+        .then((cancelled) => {
+          if (cancelled) state.cancelled = true;
+        })
+        .catch((err) => {
+          logger.warn({ error: err }, "Failed to poll replay cancel flag");
+        });
+    };
+
+    const heartbeat = setInterval(heartbeatTick, LOCK_REFRESH_INTERVAL_MS);
+    heartbeat.unref();
+    return { heartbeat, state };
+  }
+
+  /** Builds the replay-service progress callback, throwing to abort on cancellation. */
+  private buildReplayCallbacks({
+    runId,
+    cancellation,
+  }: {
+    runId: string;
+    cancellation: CancellationState;
+  }): { onProgress: (progress: ReplayProgress) => void } {
+    let lastCancelCheck = Date.now();
+    return {
+      onProgress: (progress: ReplayProgress) => {
+        this.updateProgress({ runId, progress }).catch((err) => {
+          logger.warn({ error: err }, "Failed to update replay progress");
+        });
+
+        const now = Date.now();
+        if (now - lastCancelCheck > CANCEL_CHECK_INTERVAL_MS) {
+          lastCancelCheck = now;
+          this.repo
+            .isCancelled()
+            .then((cancelled) => {
+              if (cancelled) cancellation.cancelled = true;
+            })
+            .catch(() => {});
+        }
+
+        if (cancellation.cancelled) {
+          throw new ReplayCancelledError();
+        }
+      },
+    };
+  }
+
+  /** Writes the completed status + history entry for a successful replay run. */
+  private async finalizeSuccess({
+    params,
+    result,
+  }: {
+    params: {
+      runId: string;
+      projectionNames: string[];
+      since: string;
+      tenantIds: string[];
+      description: string;
+      userName: string;
+    };
+    result: { aggregatesReplayed: number; totalEvents: number };
+  }): Promise<void> {
+    const completedAt = new Date().toISOString();
+    const status = await this.repo.getStatus();
+    await this.repo.writeStatus({
+      status: {
+        ...status,
+        state: "completed",
+        completedAt,
+        aggregatesProcessed: result.aggregatesReplayed,
+        eventsProcessed: result.totalEvents,
+      },
+    });
+    await this.repo.pushToHistory({
+      entry: {
+        runId: params.runId,
+        projectionNames: params.projectionNames,
+        since: params.since,
+        tenantIds: params.tenantIds,
+        description: params.description,
+        startedAt: status.startedAt ?? completedAt,
+        completedAt,
+        state: "completed",
+        userName: params.userName,
+        aggregatesProcessed: result.aggregatesReplayed,
+        eventsProcessed: result.totalEvents,
+      },
+    });
   }
 
   private async updateProgress(params: {

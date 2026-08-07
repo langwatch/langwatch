@@ -193,6 +193,7 @@ import type { AppendStore } from "./projections/mapProjection.types";
 import { RedisCachedFoldStore } from "./projections/redisCachedFoldStore";
 import { RepositoryFoldStore } from "./projections/repositoryFoldStore";
 import type { StateProjectionStore } from "./projections/stateProjection.types";
+import type { EventSourcedQueueProcessor } from "./queues";
 import { BlobSweeper } from "./queues/groupQueue/blobSweeper";
 import {
   generateKillSwitchKey,
@@ -200,6 +201,28 @@ import {
 } from "./utils/killSwitch";
 
 const logger = createLogger("langwatch:event-sourcing:pipeline-registry");
+
+function unrefTimer(timer: ReturnType<typeof setTimeout>): void {
+  if (typeof timer === "object" && "unref" in timer) timer.unref();
+}
+
+async function runDeferredProcess<P>({
+  payload,
+  process,
+  logContext,
+  errorMessage,
+}: {
+  payload: P;
+  process: (payload: P) => Promise<void>;
+  logContext: (payload: P) => Record<string, unknown>;
+  errorMessage: string;
+}): Promise<void> {
+  try {
+    await process(payload);
+  } catch (error) {
+    logger.error({ ...logContext(payload), error }, errorMessage);
+  }
+}
 
 /**
  * Creates an in-memory setTimeout-based fallback for deferred job processing.
@@ -225,23 +248,25 @@ function createInMemoryDeferredFallback<P>({
       if (pending.has(dedupKey)) return;
       const timer = setTimeout(async () => {
         pending.delete(dedupKey);
-        try {
-          await process(payload);
-        } catch (error) {
-          logger.error({ ...logContext(payload), error }, errorMessage);
-        }
+        await runDeferredProcess({
+          payload,
+          process,
+          logContext,
+          errorMessage,
+        });
       }, delayMs);
-      if (typeof timer === "object" && "unref" in timer) timer.unref();
+      unrefTimer(timer);
       pending.set(dedupKey, timer);
     } else {
       const timer = setTimeout(async () => {
-        try {
-          await process(payload);
-        } catch (error) {
-          logger.error({ ...logContext(payload), error }, errorMessage);
-        }
+        await runDeferredProcess({
+          payload,
+          process,
+          logContext,
+          errorMessage,
+        });
       }, delayMs);
-      if (typeof timer === "object" && "unref" in timer) timer.unref();
+      unrefTimer(timer);
     }
   };
 }
@@ -348,6 +373,97 @@ export interface PipelineRegistryDeps {
   retentionPolicyResolver?: RetentionPolicyResolver;
 }
 
+type LangyFailTurnArgs = {
+  projectId: string;
+  conversationId: string;
+  turnId: string;
+  error: string;
+};
+
+type LangySaveTitleArgs = {
+  projectId: string;
+  conversationId: string;
+  turnId: string;
+  title: string;
+  model: string;
+};
+
+function createLangyConversationReader(
+  conversationStore: StateProjectionStore<LangyConversationStateData>,
+) {
+  return {
+    read: async ({
+      projectId,
+      conversationId,
+    }: {
+      projectId: string;
+      conversationId: string;
+    }) => {
+      const projection = await conversationStore.load(conversationId, {
+        tenantId: createTenantId(projectId),
+        aggregateId: conversationId,
+      });
+      if (!projection) return null;
+      return {
+        cursor: projection.cursor,
+        status: projection.state.Status,
+        currentTurnId: projection.state.CurrentTurnId,
+        lastActivityAtMs: projection.state.LastActivityAt,
+        ownerUserId: projection.state.UserId,
+        isShared: projection.state.IsShared,
+      };
+    },
+  };
+}
+
+// Late-bound reference for experiment metrics sync reactor.
+// The experiment pipeline is registered after the trace pipeline,
+// so computeExperimentRunMetrics is wired after experiment pipeline registration.
+function createExperimentMetricsLinkage() {
+  let expComputeRunMetrics:
+    | ((data: ComputeExperimentRunMetricsCommandData) => Promise<void>)
+    | null = null;
+  let expLookupExperimentId:
+    | ((tenantId: string, runId: string) => Promise<string | null>)
+    | null = null;
+
+  const experimentMetricsSyncReactor = createExperimentMetricsSyncReactor({
+    computeExperimentRunMetrics: async (data) => {
+      if (!expComputeRunMetrics) {
+        logger.warn(
+          "experiment computeExperimentRunMetrics not yet initialized, skipping",
+        );
+        return;
+      }
+      return expComputeRunMetrics(data);
+    },
+    lookupExperimentId: async (tenantId, runId) => {
+      if (!expLookupExperimentId) {
+        logger.warn(
+          "experiment lookupExperimentId not yet initialized, skipping",
+        );
+        return null;
+      }
+      return expLookupExperimentId(tenantId, runId);
+    },
+  });
+
+  const wireExperimentDeps = (deps: {
+    computeExperimentRunMetrics: (
+      data: ComputeExperimentRunMetricsCommandData,
+    ) => Promise<void>;
+    lookupExperimentId: (
+      tenantId: string,
+      runId: string,
+    ) => Promise<string | null>;
+  }) => {
+    expComputeRunMetrics = deps.computeExperimentRunMetrics;
+    expLookupExperimentId = deps.lookupExperimentId;
+  };
+
+  return { experimentMetricsSyncReactor, wireExperimentDeps };
+}
+
 /**
  * Composition root for all event-sourcing pipelines.
  *
@@ -384,6 +500,67 @@ export class PipelineRegistry {
     // See: customerIoTraceSyncReactor, customerIoEvaluationSyncReactor,
     //      customerIoSimulationSyncReactor
 
+    const { traceSummaryStore, automationCommands, graphActivityHandler } =
+      this.registerFoundationPipelines();
+
+    const {
+      evalPipeline,
+      codingAgentPipeline,
+      codingAgentCommands,
+      metricPipeline,
+      logPipeline,
+    } = this.registerEvaluationAndCodingAgentPipelines({
+      traceSummaryStore,
+      automationCommands,
+      graphActivityHandler,
+    });
+
+    const {
+      tracePipeline,
+      suiteRunPipeline,
+      simulationPipeline,
+      scenarioExecutionHandle,
+      experimentRunPipeline,
+    } = this.registerTraceAndRunPipelines({
+      evalPipeline,
+      traceSummaryStore,
+      automationCommands,
+      graphActivityHandler,
+      codingAgentCommands,
+    });
+
+    const { pipeline: langyConversationPipeline } =
+      this.registerLangyConversationPipeline();
+    const { pipeline: topicClusteringPipeline } =
+      this.registerTopicClusteringPipeline();
+    const enterprisePipelines = registerEnterprisePipelineSet({
+      ...this.deps.enterprisePipelines,
+      eventSourcing: this.deps.eventSourcing,
+    });
+    const billingPipeline = this.registerBillingReportingPipeline();
+
+    logger.info("All pipelines registered");
+
+    return {
+      traces: mapCommands(tracePipeline.commands),
+      metrics: mapCommands(metricPipeline.commands),
+      logs: mapCommands(logPipeline.commands),
+      codingAgents: mapCommands(codingAgentPipeline.commands),
+      evaluations: mapCommands(evalPipeline.commands),
+      experimentRuns: mapCommands(experimentRunPipeline.commands),
+      simulations: mapCommands(simulationPipeline.commands),
+      suiteRuns: mapCommands(suiteRunPipeline.commands),
+      langy: mapCommands(langyConversationPipeline.commands),
+      topicClustering: mapCommands(topicClusteringPipeline.commands),
+      ...enterprisePipelines.commands,
+      billing: mapCommands(billingPipeline.commands),
+      automations: automationCommands,
+      /** Late-bind the execution pool for scenario execution reactor. */
+      scenarioExecutionHandle,
+    };
+  }
+
+  private registerFoundationPipelines() {
     const traceSummaryStore = this.cached<TraceSummaryData>(
       new TraceSummaryStore(this.deps.repositories.traceSummaryFold),
       "trace_summaries",
@@ -439,6 +616,23 @@ export class PipelineRegistry {
     );
 
     const automationCommands = mapCommands(automationPipeline.commands);
+
+    return { traceSummaryStore, automationCommands, graphActivityHandler };
+  }
+
+  private registerEvaluationAndCodingAgentPipelines({
+    traceSummaryStore,
+    automationCommands,
+    graphActivityHandler,
+  }: {
+    traceSummaryStore: ReturnType<
+      PipelineRegistry["registerFoundationPipelines"]
+    >["traceSummaryStore"];
+    automationCommands: ReturnType<
+      PipelineRegistry["registerFoundationPipelines"]
+    >["automationCommands"];
+    graphActivityHandler: ReturnType<typeof createGraphTriggerActivityHandler>;
+  }) {
     const evalPipeline = this.registerEvaluationPipeline({
       automations: {
         triggerMatchHandler: createEvaluationAlertTriggerMatchHandler({
@@ -474,6 +668,37 @@ export class PipelineRegistry {
         }),
       ],
     });
+
+    return {
+      evalPipeline,
+      codingAgentPipeline,
+      codingAgentCommands,
+      metricPipeline,
+      logPipeline,
+    };
+  }
+
+  private registerTraceAndRunPipelines({
+    evalPipeline,
+    traceSummaryStore,
+    automationCommands,
+    graphActivityHandler,
+    codingAgentCommands,
+  }: {
+    evalPipeline: ReturnType<
+      PipelineRegistry["registerEvaluationAndCodingAgentPipelines"]
+    >["evalPipeline"];
+    traceSummaryStore: ReturnType<
+      PipelineRegistry["registerFoundationPipelines"]
+    >["traceSummaryStore"];
+    automationCommands: ReturnType<
+      PipelineRegistry["registerFoundationPipelines"]
+    >["automationCommands"];
+    graphActivityHandler: ReturnType<typeof createGraphTriggerActivityHandler>;
+    codingAgentCommands: ReturnType<
+      PipelineRegistry["registerEvaluationAndCodingAgentPipelines"]
+    >["codingAgentCommands"];
+  }) {
     const {
       pipeline: tracePipeline,
       simComputeRunMetrics,
@@ -509,34 +734,13 @@ export class PipelineRegistry {
     const experimentRunPipeline = this.registerExperimentRunPipeline({
       wireExperimentDeps,
     });
-    const { pipeline: langyConversationPipeline } =
-      this.registerLangyConversationPipeline();
-    const { pipeline: topicClusteringPipeline } =
-      this.registerTopicClusteringPipeline();
-    const enterprisePipelines = registerEnterprisePipelineSet({
-      ...this.deps.enterprisePipelines,
-      eventSourcing: this.deps.eventSourcing,
-    });
-    const billingPipeline = this.registerBillingReportingPipeline();
-
-    logger.info("All pipelines registered");
 
     return {
-      traces: mapCommands(tracePipeline.commands),
-      metrics: mapCommands(metricPipeline.commands),
-      logs: mapCommands(logPipeline.commands),
-      codingAgents: mapCommands(codingAgentPipeline.commands),
-      evaluations: mapCommands(evalPipeline.commands),
-      experimentRuns: mapCommands(experimentRunPipeline.commands),
-      simulations: mapCommands(simulationPipeline.commands),
-      suiteRuns: mapCommands(suiteRunPipeline.commands),
-      langy: mapCommands(langyConversationPipeline.commands),
-      topicClustering: mapCommands(topicClusteringPipeline.commands),
-      ...enterprisePipelines.commands,
-      billing: mapCommands(billingPipeline.commands),
-      automations: automationCommands,
-      /** Late-bind the execution pool for scenario execution reactor. */
+      tracePipeline,
+      suiteRunPipeline,
+      simulationPipeline,
       scenarioExecutionHandle,
+      experimentRunPipeline,
     };
   }
 
@@ -603,25 +807,52 @@ export class PipelineRegistry {
   /** Langy writes its low-latency operational projections directly to Postgres. */
   private registerLangyConversationPipeline() {
     const conversationStore = this.deps.repositories.langyConversationState;
-    const failTurn = new Deferred<
-      (args: {
-        projectId: string;
-        conversationId: string;
-        turnId: string;
-        error: string;
-      }) => Promise<void>
-    >("langyFailTurn");
-    const saveTitle = new Deferred<
-      (args: {
-        projectId: string;
-        conversationId: string;
-        turnId: string;
-        title: string;
-        model: string;
-      }) => Promise<void>
-    >("langyGenerateTitle");
+    const failTurn = new Deferred<(args: LangyFailTurnArgs) => Promise<void>>(
+      "langyFailTurn",
+    );
+    const saveTitle = new Deferred<(args: LangySaveTitleArgs) => Promise<void>>(
+      "langyGenerateTitle",
+    );
 
-    const effectPorts = createLangyEffectPorts({
+    const effectPorts = this.createLangyConversationEffectPorts({
+      failTurn,
+      saveTitle,
+    });
+    const conversationReader = createLangyConversationReader(conversationStore);
+    const subscribers = this.createLangyConversationSubscribers({
+      conversationReader,
+      failTurn,
+    });
+
+    const pipeline = this.deps.eventSourcing.register(
+      createLangyConversationProcessingPipeline({
+        langyConversationProjectionStore: conversationStore,
+        langyConversationTurnProjectionStore:
+          this.deps.repositories.langyConversationTurnState,
+        langyMessageProjectionStore: this.deps.repositories.langyMessageStorage,
+        langyAnalyticsEventProjectionStore:
+          this.deps.repositories.langyAnalyticsEventStorage,
+        langyProcessPorts: effectPorts,
+        subscribers,
+      }),
+    );
+
+    this.resolveLangyConversationDeferreds({ pipeline, failTurn, saveTitle });
+
+    // The outbox worker, dispatcher and process service are owned by
+    // ProcessRuntime now that the process is declared on the pipeline; the
+    // registry no longer constructs or starts them.
+    return { pipeline };
+  }
+
+  private createLangyConversationEffectPorts({
+    failTurn,
+    saveTitle,
+  }: {
+    failTurn: Deferred<(args: LangyFailTurnArgs) => Promise<void>>;
+    saveTitle: Deferred<(args: LangySaveTitleArgs) => Promise<void>>;
+  }) {
+    return createLangyEffectPorts({
       handoffStore: this.deps.langy.handoffStore,
       worker: this.deps.langy.worker,
       mintSessionKey: ({ userId, projectId, organizationId }) =>
@@ -642,30 +873,15 @@ export class PipelineRegistry {
       failTurn: { failTurn: (args) => failTurn.fn(args) },
       markError: (args) => this.deps.langy.buffer.markError(args),
     });
-    const conversationReader = {
-      read: async ({
-        projectId,
-        conversationId,
-      }: {
-        projectId: string;
-        conversationId: string;
-      }) => {
-        const projection = await conversationStore.load(conversationId, {
-          tenantId: createTenantId(projectId),
-          aggregateId: conversationId,
-        });
-        if (!projection) return null;
-        return {
-          cursor: projection.cursor,
-          status: projection.state.Status,
-          currentTurnId: projection.state.CurrentTurnId,
-          lastActivityAtMs: projection.state.LastActivityAt,
-          ownerUserId: projection.state.UserId,
-          isShared: projection.state.IsShared,
-        };
-      },
-    };
+  }
 
+  private createLangyConversationSubscribers({
+    conversationReader,
+    failTurn,
+  }: {
+    conversationReader: ReturnType<typeof createLangyConversationReader>;
+    failTurn: Deferred<(args: LangyFailTurnArgs) => Promise<void>>;
+  }) {
     const livenessSubscriber = createAgentTurnLivenessSubscriber({
       buffer: this.deps.langy.buffer,
       conversations: conversationReader,
@@ -683,23 +899,22 @@ export class PipelineRegistry {
         admissions: this.deps.repositories.langyTurnAdmission,
       });
 
-    const pipeline = this.deps.eventSourcing.register(
-      createLangyConversationProcessingPipeline({
-        langyConversationProjectionStore: conversationStore,
-        langyConversationTurnProjectionStore:
-          this.deps.repositories.langyConversationTurnState,
-        langyMessageProjectionStore: this.deps.repositories.langyMessageStorage,
-        langyAnalyticsEventProjectionStore:
-          this.deps.repositories.langyAnalyticsEventStorage,
-        langyProcessPorts: effectPorts,
-        subscribers: [
-          livenessSubscriber,
-          broadcastSubscriber,
-          admissionLifecycleSubscriber,
-        ],
-      }),
-    );
+    return [
+      livenessSubscriber,
+      broadcastSubscriber,
+      admissionLifecycleSubscriber,
+    ];
+  }
 
+  private resolveLangyConversationDeferreds({
+    pipeline,
+    failTurn,
+    saveTitle,
+  }: {
+    pipeline: { commands: Record<string, EventSourcedQueueProcessor<any>> };
+    failTurn: Deferred<(args: LangyFailTurnArgs) => Promise<void>>;
+    saveTitle: Deferred<(args: LangySaveTitleArgs) => Promise<void>>;
+  }): void {
     const commands = mapCommands(pipeline.commands);
     failTurn.resolve((args) =>
       commands.failAgentResponse({
@@ -721,10 +936,6 @@ export class PipelineRegistry {
         model: args.model,
       }),
     );
-    // The outbox worker, dispatcher and process service are owned by
-    // ProcessRuntime now that the process is declared on the pipeline; the
-    // registry no longer constructs or starts them.
-    return { pipeline };
   }
 
   private registerMetricPipeline({
@@ -940,8 +1151,6 @@ export class PipelineRegistry {
     automations: TraceProcessingPipelineDeps["automations"];
     codingAgentSubscribers: TraceProcessingPipelineDeps["subscribers"];
   }) {
-    const evalCommands = mapCommands(evalPipeline.commands);
-
     // Deferred dispatchers — resolved after pipeline registration.
     const resolveOrigin = new Deferred<
       CommandDispatcher<ResolveOriginCommandData>
@@ -952,6 +1161,68 @@ export class PipelineRegistry {
     const simComputeRunMetrics = new Deferred<
       CommandDispatcher<ComputeRunMetricsCommandData>
     >("simComputeRunMetrics");
+
+    const reactors = this.createTraceReactors({
+      evalPipeline,
+      scheduleDeferred,
+      simComputeRunMetrics,
+    });
+
+    // Late-bound reference for experiment metrics sync reactor.
+    // The experiment pipeline is registered after the trace pipeline,
+    // so computeExperimentRunMetrics is wired after experiment pipeline registration.
+    const { experimentMetricsSyncReactor, wireExperimentDeps } =
+      createExperimentMetricsLinkage();
+
+    const { governanceKpisSyncReactor, governanceOcsfEventsSyncReactor } =
+      this.createGovernanceReactors();
+
+    const tracePipeline = this.registerTraceProcessingPipeline({
+      traceSummaryStore,
+      automations,
+      codingAgentSubscribers,
+      reactors,
+      experimentMetricsSyncReactor,
+      governanceKpisSyncReactor,
+      governanceOcsfEventsSyncReactor,
+    });
+
+    this.wireDeferredOriginResolution({
+      tracePipeline,
+      resolveOrigin,
+      scheduleDeferred,
+    });
+
+    this.registerDatasetNormalizeJob({ tracePipeline });
+
+    return {
+      pipeline: tracePipeline,
+      traceSummaryStore,
+      /** Cross-pipeline deferred — resolved by registerSimulationPipeline. */
+      simComputeRunMetrics,
+      /**
+       * Wires late-bound experiment computeExperimentRunMetrics and
+       * lookupExperimentId into the trace-side experimentMetricsSync reactor.
+       * Called after the experiment pipeline is registered.
+       */
+      wireExperimentDeps,
+    };
+  }
+
+  private createTraceReactors({
+    evalPipeline,
+    scheduleDeferred,
+    simComputeRunMetrics,
+  }: {
+    evalPipeline: ReturnType<PipelineRegistry["registerEvaluationPipeline"]>;
+    scheduleDeferred: Deferred<
+      (payload: DeferredOriginPayload) => Promise<void>
+    >;
+    simComputeRunMetrics: Deferred<
+      CommandDispatcher<ComputeRunMetricsCommandData>
+    >;
+  }) {
+    const evalCommands = mapCommands(evalPipeline.commands);
 
     const originGateReactor = createOriginGateReactor({
       scheduleDeferred: scheduleDeferred.fn,
@@ -986,37 +1257,18 @@ export class PipelineRegistry {
       computeRunMetrics: simComputeRunMetrics.fn,
     });
 
-    // Late-bound reference for experiment metrics sync reactor.
-    // The experiment pipeline is registered after the trace pipeline,
-    // so computeExperimentRunMetrics is wired after experiment pipeline registration.
-    let expComputeRunMetrics:
-      | ((data: ComputeExperimentRunMetricsCommandData) => Promise<void>)
-      | null = null;
-    let expLookupExperimentId:
-      | ((tenantId: string, runId: string) => Promise<string | null>)
-      | null = null;
+    return {
+      originGateReactor,
+      evaluationTriggerReactor,
+      customEvaluationSyncReactor,
+      traceUpdateBroadcastReactor,
+      spanStorageBroadcastReactor,
+      projectMetadataReactor,
+      simulationMetricsSyncReactor,
+    };
+  }
 
-    const experimentMetricsSyncReactor = createExperimentMetricsSyncReactor({
-      computeExperimentRunMetrics: async (data) => {
-        if (!expComputeRunMetrics) {
-          logger.warn(
-            "experiment computeExperimentRunMetrics not yet initialized, skipping",
-          );
-          return;
-        }
-        return expComputeRunMetrics(data);
-      },
-      lookupExperimentId: async (tenantId, runId) => {
-        if (!expLookupExperimentId) {
-          logger.warn(
-            "experiment lookupExperimentId not yet initialized, skipping",
-          );
-          return null;
-        }
-        return expLookupExperimentId(tenantId, runId);
-      },
-    });
-
+  private createGovernanceReactors() {
     const governanceKpisSyncReactor = this.deps.governanceKpisSync
       ? createGovernanceKpisSyncReactor(this.deps.governanceKpisSync)
       : undefined;
@@ -1027,7 +1279,33 @@ export class PipelineRegistry {
         )
       : undefined;
 
-    const tracePipeline = this.deps.eventSourcing.register(
+    return { governanceKpisSyncReactor, governanceOcsfEventsSyncReactor };
+  }
+
+  private registerTraceProcessingPipeline({
+    traceSummaryStore,
+    automations,
+    codingAgentSubscribers,
+    reactors,
+    experimentMetricsSyncReactor,
+    governanceKpisSyncReactor,
+    governanceOcsfEventsSyncReactor,
+  }: {
+    traceSummaryStore: FoldProjectionStore<TraceSummaryData>;
+    automations: TraceProcessingPipelineDeps["automations"];
+    codingAgentSubscribers: TraceProcessingPipelineDeps["subscribers"];
+    reactors: ReturnType<PipelineRegistry["createTraceReactors"]>;
+    experimentMetricsSyncReactor: ReturnType<
+      typeof createExperimentMetricsSyncReactor
+    >;
+    governanceKpisSyncReactor: ReturnType<
+      PipelineRegistry["createGovernanceReactors"]
+    >["governanceKpisSyncReactor"];
+    governanceOcsfEventsSyncReactor: ReturnType<
+      PipelineRegistry["createGovernanceReactors"]
+    >["governanceOcsfEventsSyncReactor"];
+  }) {
+    return this.deps.eventSourcing.register(
       createTraceProcessingPipeline({
         spanAppendStore: new SpanAppendStore(this.deps.traces.spans.repository),
         traceAnalyticsRollupAppendStore: new TraceAnalyticsRollupAppendStore(
@@ -1042,15 +1320,15 @@ export class PipelineRegistry {
           "trace_analytics",
         ),
         traceSummaryStore,
-        originGateReactor,
-        evaluationTriggerReactor,
+        originGateReactor: reactors.originGateReactor,
+        evaluationTriggerReactor: reactors.evaluationTriggerReactor,
         automations,
-        customEvaluationSyncReactor,
-        traceUpdateBroadcastReactor,
-        projectMetadataReactor,
-        simulationMetricsSyncReactor,
+        customEvaluationSyncReactor: reactors.customEvaluationSyncReactor,
+        traceUpdateBroadcastReactor: reactors.traceUpdateBroadcastReactor,
+        projectMetadataReactor: reactors.projectMetadataReactor,
+        simulationMetricsSyncReactor: reactors.simulationMetricsSyncReactor,
         experimentMetricsSyncReactor,
-        spanStorageBroadcastReactor,
+        spanStorageBroadcastReactor: reactors.spanStorageBroadcastReactor,
         // ADR-022: Wire BlobStore so RecordSpanCommand can reconstitute
         // oversized commands and best-effort delete the transient S3 spool.
         blobStore: this.deps.blobStore,
@@ -1065,7 +1343,21 @@ export class PipelineRegistry {
         subscribers: codingAgentSubscribers,
       }),
     );
+  }
 
+  private wireDeferredOriginResolution({
+    tracePipeline,
+    resolveOrigin,
+    scheduleDeferred,
+  }: {
+    tracePipeline: ReturnType<
+      PipelineRegistry["registerTraceProcessingPipeline"]
+    >;
+    resolveOrigin: Deferred<CommandDispatcher<ResolveOriginCommandData>>;
+    scheduleDeferred: Deferred<
+      (payload: DeferredOriginPayload) => Promise<void>
+    >;
+  }): void {
     // Resolve self-referencing commands now that the pipeline is registered
     const traceCommands = mapCommands(tracePipeline.commands);
     resolveOrigin.resolve(traceCommands.resolveOrigin);
@@ -1105,7 +1397,15 @@ export class PipelineRegistry {
         }),
       );
     }
+  }
 
+  private registerDatasetNormalizeJob({
+    tracePipeline,
+  }: {
+    tracePipeline: ReturnType<
+      PipelineRegistry["registerTraceProcessingPipeline"]
+    >;
+  }): void {
     // ADR-032 D5: register the standalone `datasetNormalize` GroupQueue job
     // (pure Postgres + S3, no fold/reactor). Per-group concurrency is inherent
     // and the group key is the datasetId (framework prepends tenantId=projectId)
@@ -1133,30 +1433,6 @@ export class PipelineRegistry {
     }
     // No else: when the global queue is absent the dataset module falls back to
     // running the handler inline at enqueue time (dev/test without a worker).
-
-    return {
-      pipeline: tracePipeline,
-      traceSummaryStore,
-      /** Cross-pipeline deferred — resolved by registerSimulationPipeline. */
-      simComputeRunMetrics,
-      /**
-       * Wires late-bound experiment computeExperimentRunMetrics and
-       * lookupExperimentId into the trace-side experimentMetricsSync reactor.
-       * Called after the experiment pipeline is registered.
-       */
-      wireExperimentDeps: (deps: {
-        computeExperimentRunMetrics: (
-          data: ComputeExperimentRunMetricsCommandData,
-        ) => Promise<void>;
-        lookupExperimentId: (
-          tenantId: string,
-          runId: string,
-        ) => Promise<string | null>;
-      }) => {
-        expComputeRunMetrics = deps.computeExperimentRunMetrics;
-        expLookupExperimentId = deps.lookupExperimentId;
-      },
-    };
   }
 
   private registerSuiteRunPipeline() {
@@ -1183,6 +1459,33 @@ export class PipelineRegistry {
     simComputeRunMetrics: Deferred<
       CommandDispatcher<ComputeRunMetricsCommandData>
     >;
+  }) {
+    const deps = this.createSimulationPipelineDeps({
+      suiteRunPipeline,
+      traceSummaryStore,
+    });
+
+    const simulationPipeline = this.registerSimulationProcessingPipeline(deps);
+
+    this.wireSimulationComputeRunMetrics({
+      simulationPipeline,
+      selfComputeRunMetrics: deps.selfComputeRunMetrics,
+      simComputeRunMetrics,
+      scheduleRetry: deps.scheduleRetry,
+    });
+
+    return {
+      pipeline: simulationPipeline,
+      scenarioExecutionHandle: deps.scenarioExecutionHandle,
+    };
+  }
+
+  private createSimulationPipelineDeps({
+    suiteRunPipeline,
+    traceSummaryStore,
+  }: {
+    suiteRunPipeline: ReturnType<PipelineRegistry["registerSuiteRunPipeline"]>;
+    traceSummaryStore: FoldProjectionStore<TraceSummaryData>;
   }) {
     const simulationRunStore = this.cached<SimulationRunStateData>(
       new RepositoryFoldStore<SimulationRunStateData>(
@@ -1232,18 +1535,54 @@ export class PipelineRegistry {
       computeRunMetrics: selfComputeRunMetrics.fn,
     });
 
-    const simulationPipeline = this.deps.eventSourcing.register(
+    return {
+      simulationRunStore,
+      snapshotUpdateBroadcastReactor,
+      cancellationBroadcastReactor,
+      scenarioExecutionHandle,
+      suiteRunSyncReactor,
+      selfComputeRunMetrics,
+      scheduleRetry,
+      computeRunMetricsCommand,
+      traceMetricsSyncReactor,
+    };
+  }
+
+  private registerSimulationProcessingPipeline(
+    deps: ReturnType<PipelineRegistry["createSimulationPipelineDeps"]>,
+  ) {
+    return this.deps.eventSourcing.register(
       createSimulationProcessingPipeline({
-        simulationRunStore,
-        snapshotUpdateBroadcastReactor,
-        cancellationBroadcastReactor,
-        scenarioExecutionReactor: scenarioExecutionHandle.reactor,
-        suiteRunSyncReactor,
-        traceMetricsSyncReactor,
-        computeRunMetricsCommand,
+        simulationRunStore: deps.simulationRunStore,
+        snapshotUpdateBroadcastReactor: deps.snapshotUpdateBroadcastReactor,
+        cancellationBroadcastReactor: deps.cancellationBroadcastReactor,
+        scenarioExecutionReactor: deps.scenarioExecutionHandle.reactor,
+        suiteRunSyncReactor: deps.suiteRunSyncReactor,
+        traceMetricsSyncReactor: deps.traceMetricsSyncReactor,
+        computeRunMetricsCommand: deps.computeRunMetricsCommand,
       }),
     );
+  }
 
+  private wireSimulationComputeRunMetrics({
+    simulationPipeline,
+    selfComputeRunMetrics,
+    simComputeRunMetrics,
+    scheduleRetry,
+  }: {
+    simulationPipeline: ReturnType<
+      PipelineRegistry["registerSimulationProcessingPipeline"]
+    >;
+    selfComputeRunMetrics: Deferred<
+      CommandDispatcher<ComputeRunMetricsCommandData>
+    >;
+    simComputeRunMetrics: Deferred<
+      CommandDispatcher<ComputeRunMetricsCommandData>
+    >;
+    scheduleRetry: Deferred<
+      (payload: ComputeRunMetricsCommandData) => Promise<void>
+    >;
+  }): void {
     // Resolve self-referencing command
     const simCommands = mapCommands(simulationPipeline.commands);
     selfComputeRunMetrics.resolve(simCommands.computeRunMetrics);
@@ -1292,8 +1631,6 @@ export class PipelineRegistry {
         }),
       );
     }
-
-    return { pipeline: simulationPipeline, scenarioExecutionHandle };
   }
 
   private registerBillingReportingPipeline() {

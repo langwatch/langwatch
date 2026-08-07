@@ -1,4 +1,5 @@
 import { createLogger } from "@langwatch/observability";
+import type { DejaViewProjection } from "~/server/event-sourcing/pipelineRegistry";
 import {
   getDejaViewProjections,
   getProjectionMetadata,
@@ -6,9 +7,72 @@ import {
 import type {
   AggregateSearchResult,
   EventExplorerRepository,
+  RawEventRow,
 } from "./repositories/event-explorer.repository";
 
 const logger = createLogger("langwatch:ops:event-explorer");
+
+/**
+ * Replays a DejaView projection's `apply` over the given rows in order,
+ * skipping (and logging) any event that throws rather than aborting the
+ * whole computation — one bad event should not hide the state of every
+ * event before it.
+ */
+function applyEventsToProjection({
+  dejaViewProj,
+  rows,
+  aggregateId,
+  tenantId,
+  aggregateType,
+  projectionName,
+}: {
+  dejaViewProj: DejaViewProjection;
+  rows: RawEventRow[];
+  aggregateId: string;
+  tenantId: string;
+  aggregateType: string;
+  projectionName: string;
+}): { state: unknown; appliedCount: number } {
+  let state = dejaViewProj.init();
+  let appliedCount = 0;
+  for (const row of rows) {
+    let parsedPayload: unknown;
+    try {
+      parsedPayload =
+        typeof row.payload === "string" ? JSON.parse(row.payload) : row.payload;
+    } catch {
+      parsedPayload = {};
+    }
+    const timestampMs = parseInt(row.eventTimestamp, 10);
+    const event = {
+      id: row.eventId,
+      aggregateId,
+      aggregateType,
+      tenantId,
+      createdAt: timestampMs,
+      occurredAt: timestampMs,
+      type: row.eventType,
+      version: "",
+      data: parsedPayload,
+    };
+    if (dejaViewProj.eventTypes.includes(row.eventType)) {
+      try {
+        state = dejaViewProj.apply(state, event);
+        appliedCount++;
+      } catch (err) {
+        logger.warn(
+          {
+            error: err,
+            eventId: row.eventId,
+            projectionName,
+          },
+          "Skipping event that failed to apply during projection state computation",
+        );
+      }
+    }
+  }
+  return { state, appliedCount };
+}
 
 export class EventExplorerService {
   constructor(readonly repo: EventExplorerRepository) {}
@@ -172,46 +236,14 @@ export class EventExplorerService {
       };
     }
 
-    let state = dejaViewProj.init();
-    let appliedCount = 0;
-    for (const row of rows) {
-      let parsedPayload: unknown;
-      try {
-        parsedPayload =
-          typeof row.payload === "string"
-            ? JSON.parse(row.payload)
-            : row.payload;
-      } catch {
-        parsedPayload = {};
-      }
-      const timestampMs = parseInt(row.eventTimestamp, 10);
-      const event = {
-        id: row.eventId,
-        aggregateId: params.aggregateId,
-        aggregateType: projection.aggregateType,
-        tenantId: params.tenantId,
-        createdAt: timestampMs,
-        occurredAt: timestampMs,
-        type: row.eventType,
-        version: "",
-        data: parsedPayload,
-      };
-      if (dejaViewProj.eventTypes.includes(row.eventType)) {
-        try {
-          state = dejaViewProj.apply(state, event);
-          appliedCount++;
-        } catch (err) {
-          logger.warn(
-            {
-              error: err,
-              eventId: row.eventId,
-              projectionName: params.projectionName,
-            },
-            "Skipping event that failed to apply during projection state computation",
-          );
-        }
-      }
-    }
+    const { state, appliedCount } = applyEventsToProjection({
+      dejaViewProj,
+      rows,
+      aggregateId: params.aggregateId,
+      tenantId: params.tenantId,
+      aggregateType: projection.aggregateType,
+      projectionName: params.projectionName,
+    });
 
     return {
       state,

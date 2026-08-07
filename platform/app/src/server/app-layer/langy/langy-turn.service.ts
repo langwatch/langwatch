@@ -25,7 +25,10 @@ import type { LangyMessagePart } from "@langwatch/langy";
 import { LANGY_CONVERSATION_STATUS } from "@langwatch/langy";
 import { createLogger } from "@langwatch/observability";
 import { trace } from "@opentelemetry/api";
-import type { LangyCredentialService } from "~/server/app-layer/langy/LangyCredentialService";
+import type {
+  LangyCredentialService,
+  LangyCredentials,
+} from "~/server/app-layer/langy/LangyCredentialService";
 import { LangySessionKeyScopeError } from "~/server/app-layer/langy/langyApiKey";
 import {
   extractLangyConversationMemory,
@@ -354,6 +357,55 @@ async function reconstructPartialAnswer(
   return text;
 }
 
+/** The subset of `worker.probe`'s args that come straight off resolved turn state. */
+interface ProbeWorkerArgs {
+  worker: NonNullable<LangyTurnServiceDeps["worker"]>;
+  projectId: string;
+  userId: string;
+  conversationId: string;
+  turnModel: string;
+  credentials: LangyCredentials;
+}
+
+/**
+ * The turn identity resolved once admission accepts the send — carried
+ * through every phase of `runAdmittedLangyTurn` so each phase's own params
+ * stay short. `credentials` and `attempt` are mutable references shared
+ * across phases (attempt accumulates what to roll back; credentials may lose
+ * its GitHub fields under the PR cap) — the SAME objects the original
+ * inlined code closed over, not copies.
+ */
+interface AdmittedTurnCore {
+  worker: NonNullable<LangyTurnServiceDeps["worker"]>;
+  projectId: string;
+  userId: string;
+  conversation: { id: string; isNew: boolean };
+  turnId: string;
+  turnModel: string;
+  credentials: LangyCredentials;
+  attempt: LangyTurnAttempt;
+}
+
+/** What the batched conversation-scoped reads (+ their validated runToken) resolve to. */
+interface TurnReads {
+  mintedRunToken: string | null;
+  probeArgs: ProbeWorkerArgs;
+  earlyWorkerProbe: Promise<boolean> | null;
+  runToken: string;
+  handoffResult: PromiseSettledResult<{ token: string; turnId: string } | null>;
+  memoryResult: PromiseSettledResult<LangyMessageRow[]>;
+  overrideResult: PromiseSettledResult<ResolvedLangyTurnOverride>;
+}
+
+/** The composed dispatch payload, ready to persist and hand to the worker. */
+interface TurnPayload {
+  permit: { reserved: boolean; allowed: boolean; resetAt: number };
+  prompt: string;
+  system: string;
+  historySeed: string;
+  pendingHandoff: { token: string; turnId: string } | null;
+}
+
 export class LangyTurnService {
   private constructor(private readonly deps: LangyTurnServiceDeps) {}
 
@@ -457,38 +509,32 @@ export class LangyTurnService {
     ]);
   }
 
-  /**
-   * Start (or continue) an agent turn on a conversation. Returns the ids the
-   * client subscribes with. A relocation of the route's Phases 2–N — see the
-   * file header for why the ordering is exact.
-   */
-  async startConversationTurn(
-    input: StartConversationTurnInput,
-  ): Promise<{ conversationId: string; turnId: string }> {
-    const {
-      projectId,
-      idempotencyKey,
-      session,
-      requestedConversationId,
-      messages,
-      modelOverride,
-      isRetry,
-      turnContext,
-    } = input;
-    const userId = session.user.id;
+  /** Env / infra preconditions the route used to 503 on. Split out of `startConversationTurn`. */
+  private assertTurnGate(): {
+    worker: NonNullable<LangyTurnServiceDeps["worker"]>;
+    accessStore: NonNullable<LangyTurnServiceDeps["accessStore"]>;
+    handoffStore: NonNullable<LangyTurnServiceDeps["handoffStore"]>;
+  } {
     const { worker, accessStore, handoffStore } = this.deps;
-
-    // Env / infra preconditions the route used to 503 on.
     if (!worker) {
       throw new LangyAgentUnavailableError("Agent not configured");
     }
     if (!accessStore || !handoffStore) {
       throw new LangyAgentUnavailableError();
     }
+    return { worker, accessStore, handoffStore };
+  }
 
-    // Reject content-free sends BEFORE anything durable happens: an admitted
-    // empty turn is one the agent can only 422, and a permanently rejected
-    // dispatch used to poison the process outbox with endless retries.
+  /**
+   * Reject content-free sends BEFORE anything durable happens: an admitted
+   * empty turn is one the agent can only 422, and a permanently rejected
+   * dispatch used to poison the process outbox with endless retries. Split
+   * out of `startConversationTurn`.
+   */
+  private rejectIfEmptyMessage(messages: LangyChatMessageInput[]): {
+    lastUserMessage: LangyChatMessageInput | undefined;
+    userText: string;
+  } {
     const lastUserMessage = messages[messages.length - 1];
     const userText = extractTextFromParts(lastUserMessage?.parts);
     if (!userText.trim()) {
@@ -497,45 +543,79 @@ export class LangyTurnService {
       getLangyTurnsCounter("rejected").inc();
       throw new LangyEmptyMessageError();
     }
+    return { lastUserMessage, userText };
+  }
 
-    const identity = langyTurnIdentity({
-      userId,
-      idempotencyKey,
-      messages,
-      ...(modelOverride ? { modelOverride } : {}),
-    });
+  /** Split out of `startConversationTurn`; combines the two gates above. */
+  private assertTurnAdmissible({
+    session,
+    messages,
+  }: {
+    session: Session;
+    messages: LangyChatMessageInput[];
+  }): {
+    userId: string;
+    lastUserMessage: LangyChatMessageInput | undefined;
+    userText: string;
+  } {
+    this.assertTurnGate();
+    const { lastUserMessage, userText } = this.rejectIfEmptyMessage(messages);
+    return { userId: session.user.id, lastUserMessage, userText };
+  }
 
-    const conversationService = this.deps.conversations;
-    const credentialService = this.deps.credentials;
-
-    const { speculativeConversation, credentials, resolvedModel } =
-      await resolveLangyTurnBaseDependencies({
-        deps: this.deps,
-        projectId,
-        userId,
-        session,
-        requestedConversationId,
-        ...(modelOverride ? { modelOverride } : {}),
-      });
-
-    // The model this turn runs on: the per-send override when the user picked
-    // one, the project's configured Langy model otherwise. Forwarded to the
-    // worker on every path (probe, handoff, dispatch) so the worker never
-    // falls back to its own built-in default (ADR-065).
+  /**
+   * The model this turn runs on: the per-send override when the user picked
+   * one, the project's configured Langy model otherwise. Forwarded to the
+   * worker on every path (probe, handoff, dispatch) so the worker never
+   * falls back to its own built-in default (ADR-065). Split out of
+   * `startConversationTurn`.
+   */
+  private resolveTurnModel({
+    modelOverride,
+    resolvedModel,
+  }: {
+    modelOverride?: string;
+    resolvedModel: string | null;
+  }): string {
     const turnModel = modelOverride ?? resolvedModel;
     if (!turnModel) {
       throw new LangyModelNotConfiguredError();
     }
+    return turnModel;
+  }
 
-    // The receipt and active-turn row are the authoritative admission boundary.
-    // Stable ids make every sibling write and every later request replay collapse
-    // to the same logical send.
+  /**
+   * The receipt and active-turn row are the authoritative admission boundary.
+   * Stable ids make every sibling write and every later request replay
+   * collapse to the same logical send. Split out of `startConversationTurn`.
+   */
+  private async admitTurn({
+    projectId,
+    userId,
+    idempotencyKey,
+    speculativeConversation,
+    turnId: candidateTurnId,
+  }: {
+    projectId: string;
+    userId: string;
+    idempotencyKey: string;
+    speculativeConversation: { id: string; isNew: boolean };
+    turnId: string;
+  }): Promise<
+    | { outcome: "replay"; conversationId: string; turnId: string }
+    | {
+        outcome: "accepted";
+        conversation: { id: string; isNew: boolean };
+        turnId: string;
+        attempt: LangyTurnAttempt;
+      }
+  > {
     const admission = await this.deps.admission.claim({
       projectId,
       userId,
       idempotencyKey,
       conversationId: speculativeConversation.id,
-      turnId: identity.turnId,
+      turnId: candidateTurnId,
     });
     if (admission.kind === "mismatch") {
       getLangyTurnsCounter("mismatch").inc();
@@ -544,6 +624,7 @@ export class LangyTurnService {
     if (admission.kind === "replay") {
       getLangyTurnsCounter("replay").inc();
       return {
+        outcome: "replay",
         conversationId: admission.conversationId,
         turnId: admission.turnId,
       };
@@ -591,431 +672,1031 @@ export class LangyTurnService {
       this.deps,
     );
 
-    try {
-      const questionParts = lastUserMessage?.parts ?? [];
-      const title =
-        extractTextFromParts(messages[0]?.parts).slice(0, 80) || null;
+    return { outcome: "accepted", conversation, turnId, attempt };
+  }
 
-      // The per-conversation frame-signing key is created from resolved
-      // conversation state, never from a caller-supplied "new" flag.
-      const mintedRunToken = conversation.isNew ? mintRunToken() : null;
+  private probeWorker({
+    worker,
+    projectId,
+    userId,
+    conversationId,
+    turnModel,
+    credentials,
+  }: ProbeWorkerArgs): Promise<boolean> {
+    return worker.probe({
+      projectId,
+      actorUserId: userId,
+      conversationId,
+      // The model is part of the worker signature, so a model change —
+      // override or configured default — is a probe MISS and the worker
+      // re-provisions rather than running on the model it booted with.
+      model: turnModel,
+      hasGithubAuth: !!credentials.githubToken,
+      ...(credentials.githubRepoScopeKey
+        ? { githubRepoScopeKey: credentials.githubRepoScopeKey }
+        : {}),
+      ...(credentials.egressAllowlist
+        ? { egressAllowlist: credentials.egressAllowlist }
+        : {}),
+      // ADR-061 mirror tier is part of the worker signature, so a tier
+      // change must be a probe MISS (re-warm) rather than a stale mirror.
+      ...(credentials.mirrorTier ? { mirrorTier: credentials.mirrorTier } : {}),
+    });
+  }
 
-      const probeWorker = () =>
-        worker.probe({
-          projectId,
-          actorUserId: userId,
-          conversationId: conversation.id,
-          // The model is part of the worker signature, so a model change —
-          // override or configured default — is a probe MISS and the worker
-          // re-provisions rather than running on the model it booted with.
-          model: turnModel,
-          hasGithubAuth: !!credentials.githubToken,
-          ...(credentials.githubRepoScopeKey
-            ? { githubRepoScopeKey: credentials.githubRepoScopeKey }
-            : {}),
-          ...(credentials.egressAllowlist
-            ? { egressAllowlist: credentials.egressAllowlist }
-            : {}),
-          // ADR-061 mirror tier is part of the worker signature, so a tier
-          // change must be a probe MISS (re-warm) rather than a stale mirror.
-          ...(credentials.mirrorTier
-            ? { mirrorTier: credentials.mirrorTier }
-            : {}),
-        });
-
-      // With no GitHub capability, the signature is already final; overlap the
-      // cheap probe with the conversation-scoped reads.
-      const earlyWorkerProbe = credentials.githubToken ? null : probeWorker();
-
-      const [
-        currentResult,
-        handoffResult,
-        runTokenResult,
-        modelsAllowedResult,
-        memoryResult,
-        overrideResult,
-      ] = await Promise.allSettled([
-        conversationService.findByIdVisible({
-          id: conversation.id,
-          projectId,
-          userId,
-        }),
-        conversationService.getPendingHandoff({
-          projectId,
-          conversationId: conversation.id,
-        }),
-        mintedRunToken
-          ? Promise.resolve(mintedRunToken)
-          : conversationService.getRunToken({
-              projectId,
-              conversationId: conversation.id,
-            }),
-        credentialService.getModelsAllowed({
-          projectId,
-          organizationId: credentials.organizationId,
-        }),
-        // The conversation's own history. Overlapped with the reads above so
-        // remembering costs no extra latency window. A fresh conversation has
-        // nothing to read, so it does not pay for the round trip either. The
-        // OWNERSHIP gate is already behind us: `ensureConversation` accepted
-        // this id only because this user owns it.
-        conversation.isNew || !this.deps.messages
-          ? Promise.resolve<LangyMessageRow[]>([])
-          : this.deps.messages.findAllByConversation({
-              conversationId: conversation.id,
-              projectId,
-            }),
-        // The system-block override (ADR-050). It depends on nothing computed
-        // after `resolveLangyTurnBaseDependencies`, so it belongs in this
-        // batch: awaiting it on its own at the composition site put two serial
-        // Prisma round trips (`getPromptByIdOrHandle` resolves the org, then
-        // reads the config) in front of time-to-first-token on EVERY turn, for
-        // a value that is the same for every tenant. Unconfigured (the default)
-        // resolves synchronously and costs nothing here either.
-        resolveLangyTurnOverride(this.deps),
-      ]);
-
-      // The runToken IS the frame-signing key, and a turn without one is
-      // refused here. Be precise about what that buys and what it costs.
-      //
-      // WITHOUT the token the turn does NOT hang. The worker's relay client
-      // returns `ErrRelayDisabled` for an empty runToken
-      // (`adapters/controlplane/relay.go`), so no frame is ever signed with an
-      // empty key and none is ever rejected on the verify side; `frameSink`
-      // simply runs with a nil stream. The turn executes to completion and
-      // `finalizeCompletedTurn` posts the durable final to
-      // `/api/internal/langy` unconditionally. The user still gets their
-      // answer — it just lands in one piece at the end, with no live stream to
-      // watch, no progress, and no Stop.
-      //
-      // WHY REFUSE ANYWAY: silently downgrading a turn to no-live-edge is not
-      // the product. The panel is built around a stream the user can watch and
-      // stop, and a conversation that has lost its signing key will stay lost
-      // for every following turn. A card the user can act on beats an
-      // indefinite spinner that resolves minutes later, or a Stop button that
-      // does nothing.
-      //
-      // WHAT IT COSTS, plainly: `langyRecoveryPolicy` classifies
-      // `langy_agent_unavailable` as terminal with no auto-retry. So a
-      // transient Postgres blip on the `getRunToken` read now ends as a dead
-      // "unavailable" card and NO answer, where the degraded path would have
-      // delivered one. We take that trade deliberately — never a half-visible
-      // turn, at the price of a hard fail on a read blip — and it is the
-      // reason to keep this branch loud in the logs.
-      if (runTokenResult.status === "rejected") {
-        logger.error(
-          {
-            error: runTokenResult.reason,
+  /**
+   * Fire every conversation-scoped read this turn needs in one latency
+   * window. Split out of `prepareTurnReads` — the same allSettled-overlap
+   * rationale as `resolveLangyTurnBaseDependencies`.
+   */
+  private async fetchTurnPreparationBatch({
+    conversationService,
+    credentialService,
+    projectId,
+    userId,
+    conversation,
+    mintedRunToken,
+    organizationId,
+  }: {
+    conversationService: LangyConversationService;
+    credentialService: LangyCredentialService;
+    projectId: string;
+    userId: string;
+    conversation: { id: string; isNew: boolean };
+    mintedRunToken: string | null;
+    organizationId: string;
+  }) {
+    return Promise.allSettled([
+      conversationService.findByIdVisible({
+        id: conversation.id,
+        projectId,
+        userId,
+      }),
+      conversationService.getPendingHandoff({
+        projectId,
+        conversationId: conversation.id,
+      }),
+      mintedRunToken
+        ? Promise.resolve(mintedRunToken)
+        : conversationService.getRunToken({
             projectId,
             conversationId: conversation.id,
-            turnId,
-          },
-          "could not read the langy runToken; refusing to start an unsignable turn",
-        );
-        throw new LangyAgentUnavailableError("Agent request failed");
-      }
-      const runToken = runTokenResult.value;
-      if (!runToken) {
-        logger.error(
-          { projectId, conversationId: conversation.id, turnId },
-          "langy conversation has no runToken; refusing to start an unsignable turn",
-        );
-        throw new LangyAgentUnavailableError("Agent request failed");
-      }
+          }),
+      credentialService.getModelsAllowed({
+        projectId,
+        organizationId,
+      }),
+      // The conversation's own history. Overlapped with the reads above so
+      // remembering costs no extra latency window. A fresh conversation has
+      // nothing to read, so it does not pay for the round trip either. The
+      // OWNERSHIP gate is already behind us: `ensureConversation` accepted
+      // this id only because this user owns it.
+      conversation.isNew || !this.deps.messages
+        ? Promise.resolve<LangyMessageRow[]>([])
+        : this.deps.messages.findAllByConversation({
+            conversationId: conversation.id,
+            projectId,
+          }),
+      // The system-block override (ADR-050). It depends on nothing computed
+      // after `resolveLangyTurnBaseDependencies`, so it belongs in this
+      // batch: awaiting it on its own at the composition site put two serial
+      // Prisma round trips (`getPromptByIdOrHandle` resolves the org, then
+      // reads the config) in front of time-to-first-token on EVERY turn, for
+      // a value that is the same for every tenant. Unconfigured (the default)
+      // resolves synchronously and costs nothing here either.
+      resolveLangyTurnOverride(this.deps),
+    ]);
+  }
 
-      // The project's Langy allowlist is the ONLY runnable-set gate, and it
-      // covers the effective model on BOTH paths — a per-send override and
-      // the configured default alike — so a disallowed model is a clean card
-      // at turn start, never a mid-turn gateway rejection. The engine itself
-      // is provider-blind: whatever passes here is dispatched with its full
-      // provider-prefixed id and the gateway's prefix routing picks the
-      // provider.
-      if (modelsAllowedResult.status === "rejected") {
-        throw modelsAllowedResult.reason;
-      }
-      const modelsAllowed = modelsAllowedResult.value;
-      if (modelsAllowed && !modelsAllowed.includes(turnModel)) {
-        logger.warn(
-          { projectId, turnModel, allowedCount: modelsAllowed.length },
-          "turn model not in VK allowlist — rejecting",
-        );
-        throw new LangyModelNotAllowedError(turnModel);
-      }
-
-      // Projection read is only a rollout/back-compat hint. The Postgres
-      // admission claim above is the concurrency authority.
-      const current =
-        currentResult.status === "fulfilled" ? currentResult.value : null;
-      if (currentResult.status === "rejected") {
-        logger.warn(
-          { error: currentResult.reason, conversationId: conversation.id },
-          "busy projection read failed after authoritative admission",
-        );
-      }
-      if (current?.status === LANGY_CONVERSATION_STATUS.RUNNING) {
-        throw new LangyTurnInProgressError();
-      }
-
-      const permit = credentials.githubToken
-        ? await this.deps.reservePermit({ userId })
-        : { reserved: false, allowed: true, resetAt: 0 };
-      attempt.retainPermit(permit.reserved);
-      const capReachedNote = !permit.allowed
-        ? [
-            "",
-            "USER PR CAP REACHED — the user has already opened the per-day maximum",
-            "of",
-            String(this.deps.perDayPrCap),
-            "GitHub pull requests via Langy today.",
-            "If the user asks you to open a PR, refuse politely, say the daily cap",
-            "is reached, and that it resets at",
-            new Date(permit.resetAt).toISOString(),
-            "UTC.",
-            "Do not call any tool that opens a PR.",
-          ].join(" ")
-        : "";
-      if (!permit.allowed) {
-        delete (credentials as { githubToken?: string }).githubToken;
-        delete (credentials as { githubLogin?: string }).githubLogin;
-      }
-
-      const workerIsLive = await (earlyWorkerProbe ?? probeWorker());
-
-      if (!workerIsLive) {
-        const minted = await this.deps.mintSessionKey({
-          session,
+  /**
+   * The runToken IS the frame-signing key, and a turn without one is
+   * refused here. Be precise about what that buys and what it costs.
+   *
+   * WITHOUT the token the turn does NOT hang. The worker's relay client
+   * returns `ErrRelayDisabled` for an empty runToken
+   * (`adapters/controlplane/relay.go`), so no frame is ever signed with an
+   * empty key and none is ever rejected on the verify side; `frameSink`
+   * simply runs with a nil stream. The turn executes to completion and
+   * `finalizeCompletedTurn` posts the durable final to
+   * `/api/internal/langy` unconditionally. The user still gets their
+   * answer — it just lands in one piece at the end, with no live stream to
+   * watch, no progress, and no Stop.
+   *
+   * WHY REFUSE ANYWAY: silently downgrading a turn to no-live-edge is not
+   * the product. The panel is built around a stream the user can watch and
+   * stop, and a conversation that has lost its signing key will stay lost
+   * for every following turn. A card the user can act on beats an
+   * indefinite spinner that resolves minutes later, or a Stop button that
+   * does nothing.
+   *
+   * WHAT IT COSTS, plainly: `langyRecoveryPolicy` classifies
+   * `langy_agent_unavailable` as terminal with no auto-retry. So a
+   * transient Postgres blip on the `getRunToken` read now ends as a dead
+   * "unavailable" card and NO answer, where the degraded path would have
+   * delivered one. We take that trade deliberately — never a half-visible
+   * turn, at the price of a hard fail on a read blip — and it is the
+   * reason to keep this branch loud in the logs. Split out of
+   * `prepareTurnReads`.
+   */
+  private resolveRunTokenOrThrow({
+    runTokenResult,
+    projectId,
+    conversationId,
+    turnId,
+  }: {
+    runTokenResult: PromiseSettledResult<string | null>;
+    projectId: string;
+    conversationId: string;
+    turnId: string;
+  }): string {
+    if (runTokenResult.status === "rejected") {
+      logger.error(
+        {
+          error: runTokenResult.reason,
           projectId,
-          organizationId: credentials.organizationId,
-        });
-        credentials.langwatchApiKey = minted.token;
-        credentials.langwatchApiKeyId = minted.apiKeyId;
-        attempt.retainSessionKey(minted.apiKeyId);
-      }
-
-      // A turn that cannot read its own history still runs — degraded, and said
-      // so once in the logs, rather than 500ing over a memory aid.
-      if (memoryResult.status === "rejected") {
-        logger.warn(
-          { error: memoryResult.reason, conversationId: conversation.id },
-          "failed to read langy conversation memory — the turn runs without it",
-        );
-      }
-      const durableMessages =
-        memoryResult.status === "fulfilled" ? memoryResult.value : [];
-      const conversationTranscript = renderLangyConversationTranscript({
-        messages: durableMessages,
-        currentPrompt: userText,
-      });
-      const conversationMemory = renderLangyConversationMemory(
-        extractLangyConversationMemory({ messages: durableMessages }),
+          conversationId,
+          turnId,
+        },
+        "could not read the langy runToken; refusing to start an unsignable turn",
       );
+      throw new LangyAgentUnavailableError("Agent request failed");
+    }
+    const runToken = runTokenResult.value;
+    if (!runToken) {
+      logger.error(
+        { projectId, conversationId, turnId },
+        "langy conversation has no runToken; refusing to start an unsignable turn",
+      );
+      throw new LangyAgentUnavailableError("Agent request failed");
+    }
+    return runToken;
+  }
 
-      // THE SPLIT IS THE POINT (provider prompt caching). The system lane
-      // carries only the two constants, byte-identical across a conversation's
-      // turns: anything varying per turn inside it would shift the provider's
-      // cache breakpoint and re-write the whole prefix at the write premium
-      // every turn instead of reading it. Everything volatile rides the turn's
-      // USER message instead: the history seed below, and the per-turn context
-      // inside the composed prompt.
-      // ADR-050: the override text is a VERSIONED registry row when an operator
-      // has pointed us at the system project that holds it, and the in-repo
-      // constant otherwise. `resolveLangyPrompt` never throws — a miss, an
-      // empty row or a read error all yield usable text — so the registry can
-      // never keep a turn from starting. With no system project configured the
-      // registry is skipped entirely and this is byte-identical to the constant,
-      // which is what makes turning it on a no-op until a row is promoted.
-      //
-      // The one thing it must NOT do is swap the block mid-conversation over a
-      // transient failure, which would rewrite the cache prefix above and
-      // change the model's instructions between turns of one chat. A read error
-      // therefore resolves to the process's last good registry text
-      // (`source: "cached"`); only a genuine miss falls to the constant.
-      //
-      // This seam existed, seeded and documented, with NO caller: `pnpm
-      // seed:langy-prompts` + promoting to `production` changed nothing at
-      // runtime. It is wired here because that is where the system block is
-      // composed (#5881).
-      const override: ResolvedLangyTurnOverride =
-        overrideResult.status === "fulfilled"
-          ? overrideResult.value
-          : { text: LANGY_OVERRIDE, source: "fallback" };
-      if (overrideResult.status === "rejected") {
-        logger.warn(
-          { error: overrideResult.reason, conversationId: conversation.id },
-          "langy system-block override resolution failed — using the in-repo constant",
-        );
-      }
-      // Which path the system block took, on the turn's own span: the swap this
-      // guards against is otherwise invisible except as a warn line in the
-      // registry loader, and "turn 5 of this conversation ran on different
-      // instructions" is exactly the question a trace should answer.
-      trace
-        .getActiveSpan()
-        ?.setAttribute("langy.prompt.override.source", override.source);
-      const system = [override.text, LANGY_REFERENT_POLICY].join("\n\n");
+  /**
+   * The project's Langy allowlist is the ONLY runnable-set gate, and it
+   * covers the effective model on BOTH paths — a per-send override and
+   * the configured default alike — so a disallowed model is a clean card
+   * at turn start, never a mid-turn gateway rejection. The engine itself
+   * is provider-blind: whatever passes here is dispatched with its full
+   * provider-prefixed id and the gateway's prefix routing picks the
+   * provider. Split out of `prepareTurnReads`.
+   */
+  private assertModelAllowed({
+    modelsAllowedResult,
+    projectId,
+    turnModel,
+  }: {
+    modelsAllowedResult: PromiseSettledResult<string[] | null>;
+    projectId: string;
+    turnModel: string;
+  }): void {
+    if (modelsAllowedResult.status === "rejected") {
+      throw modelsAllowedResult.reason;
+    }
+    const modelsAllowed = modelsAllowedResult.value;
+    if (modelsAllowed && !modelsAllowed.includes(turnModel)) {
+      logger.warn(
+        { projectId, turnModel, allowedCount: modelsAllowed.length },
+        "turn model not in VK allowlist — rejecting",
+      );
+      throw new LangyModelNotAllowedError(turnModel);
+    }
+  }
 
-      // The history seed rides EVERY dispatch, not just the one after a probe
-      // miss, because the worker serving the turn is disposable at any point
-      // between here and the model call: recycled by a model switch, reaped on
-      // idle, dead by the time the outbox or liveness re-dispatches this same
-      // stashed payload to a fresh one. The manager holds the ground truth of
-      // session freshness and folds the seed into the session's FIRST message
-      // only; once in, it persists in the session's own transcript (and in the
-      // provider's cached prefix) for every later turn.
-      const historySeed = [conversationTranscript, conversationMemory]
-        .filter((block): block is string => !!block && block.trim().length > 0)
-        .join("\n\n");
+  /**
+   * Projection read is only a rollout/back-compat hint. The Postgres
+   * admission claim above is the concurrency authority. Split out of
+   * `prepareTurnReads`.
+   */
+  private assertNotAlreadyRunning({
+    currentResult,
+    conversationId,
+  }: {
+    currentResult: PromiseSettledResult<{ status: string } | null>;
+    conversationId: string;
+  }): void {
+    const current =
+      currentResult.status === "fulfilled" ? currentResult.value : null;
+    if (currentResult.status === "rejected") {
+      logger.warn(
+        { error: currentResult.reason, conversationId },
+        "busy projection read failed after authoritative admission",
+      );
+    }
+    if (current?.status === LANGY_CONVERSATION_STATUS.RUNNING) {
+      throw new LangyTurnInProgressError();
+    }
+  }
 
-      // The per-turn user-message lane: what the user is looking at and the
-      // turn-scoped cap note precede a clearly labelled ask, so the model
-      // reads the DATA before the message that may refer to it.
-      const prompt = composeLangyTurnPrompt({
-        contextBlock: renderLangyTurnContext(turnContext),
-        capNote: capReachedNote,
-        hasHistorySeed: historySeed.length > 0,
-        userText,
+  /**
+   * Fire the conversation-scoped batch, resolve the frame-signing runToken,
+   * and validate the model + busy-projection gates. Split out of
+   * `runAdmittedLangyTurn`.
+   */
+  private async prepareTurnReads({
+    core,
+    conversationService,
+    credentialService,
+  }: {
+    core: AdmittedTurnCore;
+    conversationService: LangyConversationService;
+    credentialService: LangyCredentialService;
+  }): Promise<TurnReads> {
+    const {
+      worker,
+      projectId,
+      userId,
+      conversation,
+      turnId,
+      turnModel,
+      credentials,
+    } = core;
+
+    // The per-conversation frame-signing key is created from resolved
+    // conversation state, never from a caller-supplied "new" flag.
+    const mintedRunToken = conversation.isNew ? mintRunToken() : null;
+
+    const probeArgs: ProbeWorkerArgs = {
+      worker,
+      projectId,
+      userId,
+      conversationId: conversation.id,
+      turnModel,
+      credentials,
+    };
+    // With no GitHub capability, the signature is already final; overlap the
+    // cheap probe with the conversation-scoped reads.
+    const earlyWorkerProbe = credentials.githubToken
+      ? null
+      : this.probeWorker(probeArgs);
+
+    const [
+      currentResult,
+      handoffResult,
+      runTokenResult,
+      modelsAllowedResult,
+      memoryResult,
+      overrideResult,
+    ] = await this.fetchTurnPreparationBatch({
+      conversationService,
+      credentialService,
+      projectId,
+      userId,
+      conversation,
+      mintedRunToken,
+      organizationId: credentials.organizationId,
+    });
+
+    const runToken = this.resolveRunTokenOrThrow({
+      runTokenResult,
+      projectId,
+      conversationId: conversation.id,
+      turnId,
+    });
+    this.assertModelAllowed({ modelsAllowedResult, projectId, turnModel });
+    this.assertNotAlreadyRunning({
+      currentResult,
+      conversationId: conversation.id,
+    });
+
+    return {
+      mintedRunToken,
+      probeArgs,
+      earlyWorkerProbe,
+      runToken,
+      handoffResult,
+      memoryResult,
+      overrideResult,
+    };
+  }
+
+  private async reserveTurnPermit({
+    credentials,
+    userId,
+    attempt,
+  }: {
+    credentials: LangyCredentials;
+    userId: string;
+    attempt: LangyTurnAttempt;
+  }): Promise<{
+    permit: { reserved: boolean; allowed: boolean; resetAt: number };
+    capReachedNote: string;
+  }> {
+    const permit = credentials.githubToken
+      ? await this.deps.reservePermit({ userId })
+      : { reserved: false, allowed: true, resetAt: 0 };
+    attempt.retainPermit(permit.reserved);
+    const capReachedNote = !permit.allowed
+      ? [
+          "",
+          "USER PR CAP REACHED — the user has already opened the per-day maximum",
+          "of",
+          String(this.deps.perDayPrCap),
+          "GitHub pull requests via Langy today.",
+          "If the user asks you to open a PR, refuse politely, say the daily cap",
+          "is reached, and that it resets at",
+          new Date(permit.resetAt).toISOString(),
+          "UTC.",
+          "Do not call any tool that opens a PR.",
+        ].join(" ")
+      : "";
+    if (!permit.allowed) {
+      delete (credentials as { githubToken?: string }).githubToken;
+      delete (credentials as { githubLogin?: string }).githubLogin;
+    }
+    return { permit, capReachedNote };
+  }
+
+  private async ensureWorkerLive({
+    earlyWorkerProbe,
+    probeArgs,
+    session,
+    credentials,
+    attempt,
+  }: {
+    earlyWorkerProbe: Promise<boolean> | null;
+    probeArgs: ProbeWorkerArgs;
+    session: Session;
+    credentials: LangyCredentials;
+    attempt: LangyTurnAttempt;
+  }): Promise<void> {
+    const workerIsLive = await (earlyWorkerProbe ??
+      this.probeWorker(probeArgs));
+
+    if (!workerIsLive) {
+      const minted = await this.deps.mintSessionKey({
+        session,
+        projectId: probeArgs.projectId,
+        organizationId: credentials.organizationId,
       });
+      credentials.langwatchApiKey = minted.token;
+      credentials.langwatchApiKeyId = minted.apiKeyId;
+      attempt.retainSessionKey(minted.apiKeyId);
+    }
+  }
 
-      if (handoffResult.status === "rejected") {
-        logger.warn(
-          { error: handoffResult.reason, conversationId: conversation.id },
-          "failed to read pending langy handoff — cold-starting",
-        );
-      }
-      const pendingHandoff =
-        handoffResult.status === "fulfilled" ? handoffResult.value : null;
+  /**
+   * A turn that cannot read its own history still runs — degraded, and said
+   * so once in the logs, rather than 500ing over a memory aid. Split out of
+   * `prepareTurnPayload`.
+   */
+  private buildTurnMemory({
+    memoryResult,
+    conversationId,
+    userText,
+  }: {
+    memoryResult: PromiseSettledResult<LangyMessageRow[]>;
+    conversationId: string;
+    userText: string;
+  }): {
+    conversationTranscript: string | null;
+    conversationMemory: string | null;
+  } {
+    if (memoryResult.status === "rejected") {
+      logger.warn(
+        { error: memoryResult.reason, conversationId },
+        "failed to read langy conversation memory — the turn runs without it",
+      );
+    }
+    const durableMessages =
+      memoryResult.status === "fulfilled" ? memoryResult.value : [];
+    const conversationTranscript = renderLangyConversationTranscript({
+      messages: durableMessages,
+      currentPrompt: userText,
+    });
+    const conversationMemory = renderLangyConversationMemory(
+      extractLangyConversationMemory({ messages: durableMessages }),
+    );
+    return { conversationTranscript, conversationMemory };
+  }
 
-      // These Redis writes must precede the durable acceptance because its
-      // process intent may dispatch immediately. They are independent, so only
-      // one network-latency window enters the critical path.
-      try {
-        await Promise.all([
-          accessStore.grant({
-            projectId,
-            conversationId: conversation.id,
-            turnId,
-            userId,
-          }),
-          handoffStore.stash({
-            projectId,
-            conversationId: conversation.id,
-            turnId,
-            actorUserId: userId,
-            prompt,
-            system,
-            ...(historySeed ? { historySeed } : {}),
-            modelOverride: turnModel,
-            credentials,
-            runToken,
-            permitReserved: permit.reserved,
-            ...(pendingHandoff ? { resumeToken: pendingHandoff.token } : {}),
-          }),
-        ]);
-      } catch (error) {
-        logger.error(
-          { error, projectId, conversationId: conversation.id, turnId },
-          "failed to prepare the langy turn",
-        );
-        throw new LangyAgentUnavailableError("Agent request failed");
-      }
+  /**
+   * THE SPLIT IS THE POINT (provider prompt caching). The system lane
+   * carries only the two constants, byte-identical across a conversation's
+   * turns: anything varying per turn inside it would shift the provider's
+   * cache breakpoint and re-write the whole prefix at the write premium
+   * every turn instead of reading it. Everything volatile rides the turn's
+   * USER message instead: the history seed below, and the per-turn context
+   * inside the composed prompt.
+   * ADR-050: the override text is a VERSIONED registry row when an operator
+   * has pointed us at the system project that holds it, and the in-repo
+   * constant otherwise. `resolveLangyPrompt` never throws — a miss, an
+   * empty row or a read error all yield usable text — so the registry can
+   * never keep a turn from starting. With no system project configured the
+   * registry is skipped entirely and this is byte-identical to the constant,
+   * which is what makes turning it on a no-op until a row is promoted.
+   *
+   * The one thing it must NOT do is swap the block mid-conversation over a
+   * transient failure, which would rewrite the cache prefix above and
+   * change the model's instructions between turns of one chat. A read error
+   * therefore resolves to the process's last good registry text
+   * (`source: "cached"`); only a genuine miss falls to the constant.
+   *
+   * This seam existed, seeded and documented, with NO caller: `pnpm
+   * seed:langy-prompts` + promoting to `production` changed nothing at
+   * runtime. It is wired here because that is where the system block is
+   * composed (#5881). Split out of `prepareTurnPayload`.
+   */
+  private resolveSystemBlock({
+    overrideResult,
+    conversationId,
+  }: {
+    overrideResult: PromiseSettledResult<ResolvedLangyTurnOverride>;
+    conversationId: string;
+  }): string {
+    const override: ResolvedLangyTurnOverride =
+      overrideResult.status === "fulfilled"
+        ? overrideResult.value
+        : { text: LANGY_OVERRIDE, source: "fallback" };
+    if (overrideResult.status === "rejected") {
+      logger.warn(
+        { error: overrideResult.reason, conversationId },
+        "langy system-block override resolution failed — using the in-repo constant",
+      );
+    }
+    // Which path the system block took, on the turn's own span: the swap this
+    // guards against is otherwise invisible except as a warn line in the
+    // registry loader, and "turn 5 of this conversation ran on different
+    // instructions" is exactly the question a trace should answer.
+    trace
+      .getActiveSpan()
+      ?.setAttribute("langy.prompt.override.source", override.source);
+    return [override.text, LANGY_REFERENT_POLICY].join("\n\n");
+  }
 
-      try {
-        await conversationService.acceptTurn({
+  /**
+   * The history seed rides EVERY dispatch, not just the one after a probe
+   * miss, because the worker serving the turn is disposable at any point
+   * between here and the model call: recycled by a model switch, reaped on
+   * idle, dead by the time the outbox or liveness re-dispatches this same
+   * stashed payload to a fresh one. The manager holds the ground truth of
+   * session freshness and folds the seed into the session's FIRST message
+   * only; once in, it persists in the session's own transcript (and in the
+   * provider's cached prefix) for every later turn. Split out of
+   * `prepareTurnPayload`.
+   */
+  private composeHistorySeed({
+    conversationTranscript,
+    conversationMemory,
+  }: {
+    conversationTranscript: string | null;
+    conversationMemory: string | null;
+  }): string {
+    return [conversationTranscript, conversationMemory]
+      .filter((block): block is string => !!block && block.trim().length > 0)
+      .join("\n\n");
+  }
+
+  /** Split out of `prepareTurnPayload`. */
+  private resolvePendingHandoff({
+    handoffResult,
+    conversationId,
+  }: {
+    handoffResult: PromiseSettledResult<{
+      token: string;
+      turnId: string;
+    } | null>;
+    conversationId: string;
+  }): { token: string; turnId: string } | null {
+    if (handoffResult.status === "rejected") {
+      logger.warn(
+        { error: handoffResult.reason, conversationId },
+        "failed to read pending langy handoff — cold-starting",
+      );
+    }
+    return handoffResult.status === "fulfilled" ? handoffResult.value : null;
+  }
+
+  /**
+   * Reserve the PR permit, ensure the worker is live (minting a session key
+   * on a probe miss), rebuild the conversation's memory, and compose the
+   * system block + prompt the dispatch will carry. Split out of
+   * `runAdmittedLangyTurn`.
+   */
+  private async prepareTurnPayload({
+    core,
+    reads,
+    session,
+    turnContext,
+    userText,
+  }: {
+    core: AdmittedTurnCore;
+    reads: TurnReads;
+    session: Session;
+    turnContext: LangyTurnContext;
+    userText: string;
+  }): Promise<TurnPayload> {
+    const { credentials, userId, attempt, conversation } = core;
+    const conversationId = conversation.id;
+
+    const { permit, capReachedNote } = await this.reserveTurnPermit({
+      credentials,
+      userId,
+      attempt,
+    });
+
+    await this.ensureWorkerLive({
+      earlyWorkerProbe: reads.earlyWorkerProbe,
+      probeArgs: reads.probeArgs,
+      session,
+      credentials,
+      attempt,
+    });
+
+    const { conversationTranscript, conversationMemory } = this.buildTurnMemory(
+      {
+        memoryResult: reads.memoryResult,
+        conversationId,
+        userText,
+      },
+    );
+    const system = this.resolveSystemBlock({
+      overrideResult: reads.overrideResult,
+      conversationId,
+    });
+    const historySeed = this.composeHistorySeed({
+      conversationTranscript,
+      conversationMemory,
+    });
+
+    // The per-turn user-message lane: what the user is looking at and the
+    // turn-scoped cap note precede a clearly labelled ask, so the model
+    // reads the DATA before the message that may refer to it.
+    const prompt = composeLangyTurnPrompt({
+      contextBlock: renderLangyTurnContext(turnContext),
+      capNote: capReachedNote,
+      hasHistorySeed: historySeed.length > 0,
+      userText,
+    });
+
+    const pendingHandoff = this.resolvePendingHandoff({
+      handoffResult: reads.handoffResult,
+      conversationId,
+    });
+
+    return { permit, prompt, system, historySeed, pendingHandoff };
+  }
+
+  /**
+   * These Redis writes must precede the durable acceptance because its
+   * process intent may dispatch immediately. They are independent, so only
+   * one network-latency window enters the critical path. Split out of
+   * `finalizeTurn`.
+   */
+  private async persistTurnHandoff({
+    accessStore,
+    handoffStore,
+    projectId,
+    conversation,
+    turnId,
+    userId,
+    prompt,
+    system,
+    historySeed,
+    turnModel,
+    credentials,
+    runToken,
+    permit,
+    pendingHandoff,
+  }: {
+    accessStore: NonNullable<LangyTurnServiceDeps["accessStore"]>;
+    handoffStore: NonNullable<LangyTurnServiceDeps["handoffStore"]>;
+    projectId: string;
+    conversation: { id: string; isNew: boolean };
+    turnId: string;
+    userId: string;
+    prompt: string;
+    system: string;
+    historySeed: string;
+    turnModel: string;
+    credentials: LangyCredentials;
+    runToken: string;
+    permit: { reserved: boolean };
+    pendingHandoff: { token: string; turnId: string } | null;
+  }): Promise<void> {
+    try {
+      await Promise.all([
+        accessStore.grant({
           projectId,
           conversationId: conversation.id,
           turnId,
-          questionParts,
-          ...(conversation.isNew
-            ? {
-                conversationStart: {
-                  userId,
-                  title,
-                  ...(mintedRunToken ? { runToken: mintedRunToken } : {}),
-                },
-              }
-            : {}),
-          ...(!isRetry && lastUserMessage?.role === "user"
-            ? {
-                userMessage: {
-                  userId,
-                  messageId: identity.messageId,
-                  role: lastUserMessage.role,
-                  parts: lastUserMessage.parts,
-                  title,
-                },
-              }
-            : {}),
-          ...(pendingHandoff
-            ? { consumeHandoffTurnId: pendingHandoff.turnId }
-            : {}),
-        });
-      } catch (error) {
-        logger.error(
-          { error, projectId, conversationId: conversation.id, turnId },
-          "failed to commit langy AcceptAgentTurn",
-        );
-        throw new LangyAgentUnavailableError("Agent request failed");
-      }
-
-      // Idempotency wins over the last few milliseconds: do not eagerly launch
-      // the worker until the Postgres replay receipt is confirmed. If the commit
-      // cannot be confirmed, the already-durable process outbox remains the sole
-      // recovery path for this attempt.
-      const admissionCommitted = await attempt.commit();
-      if (admissionCommitted) {
-        // Fast-path dispatch begins at the first safe instant. The process
-        // outbox remains the at-least-once recovery path; Go's turnId claim
-        // makes its later duplicate a benign no-op.
-        void worker
-          .dispatch({
-            intent: pendingHandoff
-              ? "revive"
-              : credentials.langwatchApiKey
-                ? "create"
-                : "continue",
-            projectId,
-            userId,
-            runToken,
-            turnId,
-            prompt,
-            system,
-            ...(historySeed ? { historySeed } : {}),
-            conversationId: conversation.id,
-            credentials,
-            modelOverride: turnModel,
-            ...(pendingHandoff ? { resumeToken: pendingHandoff.token } : {}),
-          })
-          .then((outcome) => {
-            if (outcome !== "accepted") {
-              logger.warn(
-                { outcome, conversationId: conversation.id, turnId },
-                "fast-path Langy dispatch was not accepted; outbox will retry",
-              );
-            }
-          })
-          .catch((error) => {
-            logger.warn(
-              { error, conversationId: conversation.id, turnId },
-              "fast-path Langy dispatch failed; outbox will retry",
-            );
-          });
-      }
-
-      getLangyTurnsCounter("accepted").inc();
-      return { conversationId: conversation.id, turnId };
+          userId,
+        }),
+        handoffStore.stash({
+          projectId,
+          conversationId: conversation.id,
+          turnId,
+          actorUserId: userId,
+          prompt,
+          system,
+          ...(historySeed ? { historySeed } : {}),
+          modelOverride: turnModel,
+          credentials,
+          runToken,
+          permitReserved: permit.reserved,
+          ...(pendingHandoff ? { resumeToken: pendingHandoff.token } : {}),
+        }),
+      ]);
     } catch (error) {
-      getLangyTurnsCounter(
-        error instanceof LangyTurnInProgressError
-          ? "busy"
-          : error instanceof LangyAgentUnavailableError
-            ? "rejected"
-            : "error",
-      ).inc();
-      await attempt.abort();
-      if (error instanceof LangySessionKeyScopeError) {
-        throw new LangyInsufficientScopeError(error.message);
-      }
-      throw error;
+      logger.error(
+        { error, projectId, conversationId: conversation.id, turnId },
+        "failed to prepare the langy turn",
+      );
+      throw new LangyAgentUnavailableError("Agent request failed");
+    }
+  }
+
+  /** Split out of `finalizeTurn`. */
+  private async commitTurnAcceptance({
+    conversationService,
+    projectId,
+    conversation,
+    turnId,
+    userId,
+    questionParts,
+    isRetry,
+    lastUserMessage,
+    identity,
+    title,
+    mintedRunToken,
+    pendingHandoff,
+  }: {
+    conversationService: LangyConversationService;
+    projectId: string;
+    conversation: { id: string; isNew: boolean };
+    turnId: string;
+    userId: string;
+    questionParts: LangyMessagePart[];
+    isRetry: boolean;
+    lastUserMessage: LangyChatMessageInput | undefined;
+    identity: { turnId: string; messageId: string };
+    title: string | null;
+    mintedRunToken: string | null;
+    pendingHandoff: { token: string; turnId: string } | null;
+  }): Promise<void> {
+    try {
+      await conversationService.acceptTurn({
+        projectId,
+        conversationId: conversation.id,
+        turnId,
+        questionParts,
+        ...(conversation.isNew
+          ? {
+              conversationStart: {
+                userId,
+                title,
+                ...(mintedRunToken ? { runToken: mintedRunToken } : {}),
+              },
+            }
+          : {}),
+        ...(!isRetry && lastUserMessage?.role === "user"
+          ? {
+              userMessage: {
+                userId,
+                messageId: identity.messageId,
+                role: lastUserMessage.role,
+                parts: lastUserMessage.parts,
+                title,
+              },
+            }
+          : {}),
+        ...(pendingHandoff
+          ? { consumeHandoffTurnId: pendingHandoff.turnId }
+          : {}),
+      });
+    } catch (error) {
+      logger.error(
+        { error, projectId, conversationId: conversation.id, turnId },
+        "failed to commit langy AcceptAgentTurn",
+      );
+      throw new LangyAgentUnavailableError("Agent request failed");
+    }
+  }
+
+  /**
+   * Idempotency wins over the last few milliseconds: do not eagerly launch
+   * the worker until the Postgres replay receipt is confirmed. If the commit
+   * cannot be confirmed, the already-durable process outbox remains the sole
+   * recovery path for this attempt. Split out of `finalizeTurn`.
+   */
+  private async dispatchTurnIfCommitted({
+    worker,
+    attempt,
+    projectId,
+    userId,
+    runToken,
+    turnId,
+    prompt,
+    system,
+    historySeed,
+    conversation,
+    credentials,
+    turnModel,
+    pendingHandoff,
+  }: {
+    worker: NonNullable<LangyTurnServiceDeps["worker"]>;
+    attempt: LangyTurnAttempt;
+    projectId: string;
+    userId: string;
+    runToken: string;
+    turnId: string;
+    prompt: string;
+    system: string;
+    historySeed: string;
+    conversation: { id: string; isNew: boolean };
+    credentials: LangyCredentials;
+    turnModel: string;
+    pendingHandoff: { token: string; turnId: string } | null;
+  }): Promise<void> {
+    const admissionCommitted = await attempt.commit();
+    if (!admissionCommitted) return;
+
+    // Fast-path dispatch begins at the first safe instant. The process
+    // outbox remains the at-least-once recovery path; Go's turnId claim
+    // makes its later duplicate a benign no-op.
+    void worker
+      .dispatch({
+        intent: pendingHandoff
+          ? "revive"
+          : credentials.langwatchApiKey
+            ? "create"
+            : "continue",
+        projectId,
+        userId,
+        runToken,
+        turnId,
+        prompt,
+        system,
+        ...(historySeed ? { historySeed } : {}),
+        conversationId: conversation.id,
+        credentials,
+        modelOverride: turnModel,
+        ...(pendingHandoff ? { resumeToken: pendingHandoff.token } : {}),
+      })
+      .then((outcome) => {
+        if (outcome !== "accepted") {
+          logger.warn(
+            { outcome, conversationId: conversation.id, turnId },
+            "fast-path Langy dispatch was not accepted; outbox will retry",
+          );
+        }
+      })
+      .catch((error) => {
+        logger.warn(
+          { error, conversationId: conversation.id, turnId },
+          "fast-path Langy dispatch failed; outbox will retry",
+        );
+      });
+  }
+
+  /**
+   * Persist the handoff, commit the durable acceptance, and — once
+   * committed — fire the fast-path dispatch. Split out of
+   * `runAdmittedLangyTurn`.
+   */
+  private async finalizeTurn({
+    core,
+    accessStore,
+    handoffStore,
+    conversationService,
+    identity,
+    isRetry,
+    lastUserMessage,
+    questionParts,
+    title,
+    reads,
+    payload,
+  }: {
+    core: AdmittedTurnCore;
+    accessStore: NonNullable<LangyTurnServiceDeps["accessStore"]>;
+    handoffStore: NonNullable<LangyTurnServiceDeps["handoffStore"]>;
+    conversationService: LangyConversationService;
+    identity: { turnId: string; messageId: string };
+    isRetry: boolean;
+    lastUserMessage: LangyChatMessageInput | undefined;
+    questionParts: LangyMessagePart[];
+    title: string | null;
+    reads: TurnReads;
+    payload: TurnPayload;
+  }): Promise<{ conversationId: string; turnId: string }> {
+    const {
+      worker,
+      projectId,
+      userId,
+      conversation,
+      turnId,
+      turnModel,
+      credentials,
+      attempt,
+    } = core;
+
+    await this.persistTurnHandoff({
+      accessStore,
+      handoffStore,
+      projectId,
+      conversation,
+      turnId,
+      userId,
+      prompt: payload.prompt,
+      system: payload.system,
+      historySeed: payload.historySeed,
+      turnModel,
+      credentials,
+      runToken: reads.runToken,
+      permit: payload.permit,
+      pendingHandoff: payload.pendingHandoff,
+    });
+
+    await this.commitTurnAcceptance({
+      conversationService,
+      projectId,
+      conversation,
+      turnId,
+      userId,
+      questionParts,
+      isRetry,
+      lastUserMessage,
+      identity,
+      title,
+      mintedRunToken: reads.mintedRunToken,
+      pendingHandoff: payload.pendingHandoff,
+    });
+
+    await this.dispatchTurnIfCommitted({
+      worker,
+      attempt,
+      projectId,
+      userId,
+      runToken: reads.runToken,
+      turnId,
+      prompt: payload.prompt,
+      system: payload.system,
+      historySeed: payload.historySeed,
+      conversation,
+      credentials,
+      turnModel,
+      pendingHandoff: payload.pendingHandoff,
+    });
+
+    getLangyTurnsCounter("accepted").inc();
+    return { conversationId: conversation.id, turnId };
+  }
+
+  /**
+   * The admitted turn's full preparation-through-dispatch pipeline, in the
+   * exact original order: batched reads, permit + worker-liveness + memory +
+   * system/prompt composition, then persist + commit + dispatch. Split out
+   * of `startConversationTurn` (which wraps this in the try/catch that maps
+   * a failure here to the turn-outcome metric and aborts the admission).
+   */
+  private async runAdmittedLangyTurn(ctx: {
+    input: StartConversationTurnInput;
+    identity: { turnId: string; messageId: string };
+    conversation: { id: string; isNew: boolean };
+    turnId: string;
+    turnModel: string;
+    credentials: LangyCredentials;
+    attempt: LangyTurnAttempt;
+    lastUserMessage: LangyChatMessageInput | undefined;
+    userText: string;
+  }): Promise<{ conversationId: string; turnId: string }> {
+    const { projectId, session, isRetry, turnContext, messages } = ctx.input;
+    const userId = session.user.id;
+    const { worker, accessStore, handoffStore } = this.assertTurnGate();
+    const conversationService = this.deps.conversations;
+    const credentialService = this.deps.credentials;
+
+    const core: AdmittedTurnCore = {
+      worker,
+      projectId,
+      userId,
+      conversation: ctx.conversation,
+      turnId: ctx.turnId,
+      turnModel: ctx.turnModel,
+      credentials: ctx.credentials,
+      attempt: ctx.attempt,
+    };
+
+    const questionParts = ctx.lastUserMessage?.parts ?? [];
+    const title = extractTextFromParts(messages[0]?.parts).slice(0, 80) || null;
+
+    const reads = await this.prepareTurnReads({
+      core,
+      conversationService,
+      credentialService,
+    });
+    const payload = await this.prepareTurnPayload({
+      core,
+      reads,
+      session,
+      turnContext,
+      userText: ctx.userText,
+    });
+
+    return this.finalizeTurn({
+      core,
+      accessStore,
+      handoffStore,
+      conversationService,
+      identity: ctx.identity,
+      isRetry,
+      lastUserMessage: ctx.lastUserMessage,
+      questionParts,
+      title,
+      reads,
+      payload,
+    });
+  }
+
+  private classifyTurnStartFailureMetric(
+    error: unknown,
+  ): "busy" | "rejected" | "error" {
+    if (error instanceof LangyTurnInProgressError) return "busy";
+    if (error instanceof LangyAgentUnavailableError) return "rejected";
+    return "error";
+  }
+
+  private async handleTurnStartFailure(
+    error: unknown,
+    attempt: LangyTurnAttempt,
+  ): Promise<never> {
+    getLangyTurnsCounter(this.classifyTurnStartFailureMetric(error)).inc();
+    await attempt.abort();
+    if (error instanceof LangySessionKeyScopeError) {
+      throw new LangyInsufficientScopeError(error.message);
+    }
+    throw error;
+  }
+
+  /**
+   * Start (or continue) an agent turn on a conversation. Returns the ids the
+   * client subscribes with. A relocation of the route's Phases 2–N — see the
+   * file header for why the ordering is exact.
+   */
+  async startConversationTurn(
+    input: StartConversationTurnInput,
+  ): Promise<{ conversationId: string; turnId: string }> {
+    const {
+      projectId,
+      idempotencyKey,
+      session,
+      requestedConversationId,
+      messages,
+      modelOverride,
+    } = input;
+    const { userId, lastUserMessage, userText } = this.assertTurnAdmissible({
+      session,
+      messages,
+    });
+
+    const identity = langyTurnIdentity({
+      userId,
+      idempotencyKey,
+      messages,
+      ...(modelOverride ? { modelOverride } : {}),
+    });
+
+    const { speculativeConversation, credentials, resolvedModel } =
+      await resolveLangyTurnBaseDependencies({
+        deps: this.deps,
+        projectId,
+        userId,
+        session,
+        requestedConversationId,
+        ...(modelOverride ? { modelOverride } : {}),
+      });
+
+    const turnModel = this.resolveTurnModel({ modelOverride, resolvedModel });
+
+    const admission = await this.admitTurn({
+      projectId,
+      userId,
+      idempotencyKey,
+      speculativeConversation,
+      turnId: identity.turnId,
+    });
+    if (admission.outcome === "replay") {
+      return {
+        conversationId: admission.conversationId,
+        turnId: admission.turnId,
+      };
+    }
+    const { conversation, turnId, attempt } = admission;
+
+    try {
+      return await this.runAdmittedLangyTurn({
+        input,
+        identity,
+        conversation,
+        turnId,
+        turnModel,
+        credentials,
+        attempt,
+        lastUserMessage,
+        userText,
+      });
+    } catch (error) {
+      return this.handleTurnStartFailure(error, attempt);
     }
   }
 }

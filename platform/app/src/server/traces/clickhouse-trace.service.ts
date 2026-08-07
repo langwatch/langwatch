@@ -32,6 +32,7 @@ import type {
 import { generateClickHouseFilterConditions } from "~/server/filters/clickhouse";
 import type { Event, Span, Trace } from "~/server/tracer/types";
 import type { Protections } from "~/server/traces/protections";
+import type { PromptLookupSpan } from "./findPromptReferenceInAncestors";
 import { findPromptReferenceInAncestors } from "./findPromptReferenceInAncestors";
 import {
   applyEventProtections,
@@ -697,6 +698,68 @@ export class ClickHouseTraceService {
    * @returns Array of Trace objects with spans
    * @throws ClickHouseClientUnavailableError when no ClickHouse client resolves
    */
+  /**
+   * Queries trace_summaries for distinct TraceIds whose thread_id (stored
+   * under the `gen_ai.conversation.id` attribute key) matches one of
+   * `threadIds`.
+   */
+  private async fetchTraceIdsForThreadIds({
+    clickHouseClient,
+    projectId,
+    threadIds,
+  }: {
+    clickHouseClient: ClickHouseClient;
+    projectId: string;
+    threadIds: string[];
+  }): Promise<string[]> {
+    const result = await clickHouseClient.query({
+      query: `
+        SELECT DISTINCT TraceId
+        FROM trace_summaries
+        WHERE TenantId = {tenantId:String}
+          AND Attributes['gen_ai.conversation.id'] IN ({threadIds:Array(String)})
+        ORDER BY CreatedAt ASC
+        LIMIT 1000
+      `,
+      query_params: {
+        tenantId: projectId,
+        threadIds,
+      },
+      format: "JSONEachRow",
+    });
+
+    const rows = (await result.json()) as Array<{ TraceId: string }>;
+    return rows.map((r) => r.TraceId);
+  }
+
+  /**
+   * Third flattening catch on this class, and it sits ABOVE
+   * getTracesWithSpans — so a contract violation re-thrown unwrapped by that
+   * method lands here and would be flattened again. Allowlist it, same as
+   * the other two. (Live path: called with resolveBlobs from the thread
+   * router and the evaluation-execution service.)
+   */
+  private handleThreadIdsFetchError({
+    projectId,
+    threadIds,
+    error,
+  }: {
+    projectId: string;
+    threadIds: string[];
+    error: unknown;
+  }): never {
+    if (error instanceof TraceSpansBatchResolverContractError) throw error;
+    this.logger.error(
+      {
+        projectId,
+        threadIds,
+        error: error instanceof Error ? error.message : error,
+      },
+      "Failed to fetch traces by thread IDs from ClickHouse",
+    );
+    throw new Error("Failed to fetch traces by thread IDs");
+  }
+
   async getTracesWithSpansByThreadIds({
     projectId,
     threadIds,
@@ -729,26 +792,11 @@ export class ClickHouseTraceService {
         );
 
         try {
-          // Query trace_summaries for traces with matching thread_ids
-          // Thread ID can be stored under different attribute keys
-          const result = await clickHouseClient.query({
-            query: `
-              SELECT DISTINCT TraceId
-              FROM trace_summaries
-              WHERE TenantId = {tenantId:String}
-                AND Attributes['gen_ai.conversation.id'] IN ({threadIds:Array(String)})
-              ORDER BY CreatedAt ASC
-              LIMIT 1000
-            `,
-            query_params: {
-              tenantId: projectId,
-              threadIds,
-            },
-            format: "JSONEachRow",
+          const traceIds = await this.fetchTraceIdsForThreadIds({
+            clickHouseClient,
+            projectId,
+            threadIds,
           });
-
-          const rows = (await result.json()) as Array<{ TraceId: string }>;
-          const traceIds = rows.map((r) => r.TraceId);
 
           if (traceIds.length === 0) {
             return [];
@@ -772,25 +820,498 @@ export class ClickHouseTraceService {
           );
           return traces;
         } catch (error) {
-          // Third flattening catch on this class, and it sits ABOVE
-          // getTracesWithSpans — so a contract violation re-thrown unwrapped by
-          // that method lands here and would be flattened again. Allowlist it,
-          // same as the other two. (Live path: called with resolveBlobs from the
-          // thread router and the evaluation-execution service.)
-          if (error instanceof TraceSpansBatchResolverContractError)
-            throw error;
-          this.logger.error(
-            {
-              projectId,
-              threadIds,
-              error: error instanceof Error ? error.message : error,
-            },
-            "Failed to fetch traces by thread IDs from ClickHouse",
-          );
-          throw new Error("Failed to fetch traces by thread IDs");
+          this.handleThreadIdsFetchError({ projectId, threadIds, error });
         }
       },
     );
+  }
+
+  /**
+   * Validates a freshly-parsed cursor against the current request
+   * (sortDirection/pageSize/dateField), warning and returning null on the
+   * first mismatch. A falsy `cursor` (e.g. `JSON.parse` yielding `null`)
+   * passes through unchanged.
+   */
+  private validateParsedCursor({
+    cursor,
+    sortDirection,
+    pageSize,
+    dateField,
+  }: {
+    cursor: ClickHouseScrollCursor | null;
+    sortDirection: "asc" | "desc";
+    pageSize: number;
+    dateField: TraceDateField;
+  }): ClickHouseScrollCursor | null {
+    if (!cursor) return cursor;
+
+    if (cursor.sortDirection !== sortDirection) {
+      this.logger.warn(
+        {
+          cursorSortDirection: cursor.sortDirection,
+          requestSortDirection: sortDirection,
+        },
+        "Sort direction mismatch in cursor, ignoring cursor",
+      );
+      return null;
+    }
+    if (cursor.pageSize !== pageSize) {
+      this.logger.warn(
+        {
+          cursorPageSize: cursor.pageSize,
+          requestPageSize: pageSize,
+        },
+        "Page size mismatch in cursor, ignoring cursor",
+      );
+      return null;
+    }
+    if ((cursor.dateField ?? "occurred") !== dateField) {
+      this.logger.warn(
+        {
+          cursorDateField: cursor.dateField ?? "occurred",
+          requestDateField: dateField,
+        },
+        "Date axis mismatch in cursor, ignoring cursor",
+      );
+      return null;
+    }
+    return cursor;
+  }
+
+  /**
+   * Parses and validates the scrollId cursor for {@link getAllTracesForProject}.
+   * Returns null when absent, invalid JSON, or its recorded axis/shape no
+   * longer matches the current request (sortDirection/pageSize/dateField).
+   */
+  private parseScrollCursor({
+    scrollId,
+    sortDirection,
+    pageSize,
+    dateField,
+  }: {
+    scrollId: string | null | undefined;
+    sortDirection: "asc" | "desc";
+    pageSize: number;
+    dateField: TraceDateField;
+  }): ClickHouseScrollCursor | null {
+    if (!scrollId) {
+      this.logger.debug("No scrollId provided in request");
+      return null;
+    }
+
+    this.logger.debug({ scrollId }, "Parsing scrollId from request");
+
+    let cursor: ClickHouseScrollCursor | null = null;
+    try {
+      const parsed: ClickHouseScrollCursor = JSON.parse(
+        Buffer.from(scrollId, "base64").toString("utf-8"),
+      );
+      cursor = this.validateParsedCursor({
+        cursor: parsed,
+        sortDirection,
+        pageSize,
+        dateField,
+      });
+
+      this.logger.debug(
+        {
+          cursorParsed: !!cursor,
+          cursorLastTimestamp: cursor?.lastTimestamp,
+          cursorLastTraceId: cursor?.lastTraceId,
+          cursorSortDirection: cursor?.sortDirection,
+          cursorPageSize: cursor?.pageSize,
+        },
+        "Cursor parsing and validation result",
+      );
+    } catch (e) {
+      this.logger.warn(
+        {
+          scrollId,
+          error: e instanceof Error ? e.message : e,
+        },
+        "Invalid scrollId, starting from beginning",
+      );
+    }
+
+    return cursor;
+  }
+
+  /**
+   * Generates filter conditions from input.filters. Passes the dashboard time
+   * window so span/event filters bound their stored_spans EXISTS subqueries
+   * to the same window the outer trace_summaries query uses, pruning
+   * partitions instead of cold-scanning the S3-tiered tail.
+   */
+  private buildProjectFilterConditions({
+    filters,
+    startDate,
+    endDate,
+  }: {
+    filters: GetAllTracesForProjectInput["filters"];
+    startDate?: number;
+    endDate?: number;
+  }) {
+    const { conditions, params, hasUnsupportedFilters } =
+      generateClickHouseFilterConditions(filters ?? {}, {
+        startDate,
+        endDate,
+      });
+
+    if (hasUnsupportedFilters) {
+      throw new Error("Filters contain unsupported fields for ClickHouse");
+    }
+
+    return { conditions, params };
+  }
+
+  // Spans are fetched when the caller wants them OR when it wants full
+  // IO — because those are not the same thing.
+  //
+  // Blob resolution lives inside the span read: the full (>64 KB) value
+  // is recoverable ONLY by de-offloading the spans' eventref pointers
+  // and recomputing trace IO from them. trace_summaries holds nothing
+  // but the 64 KB preview. So a content-consuming SUMMARY read — a
+  // summary-mode export, a spans-less download — must still fetch and
+  // resolve spans, then throw them away.
+  //
+  // Gating the fetch on includeSpans alone (as this did) made
+  // resolveBlobs INERT for exactly those callers: the flag was set, no
+  // event_log read was ever issued, and the truncated preview shipped
+  // silently. That is #4991 AC1's bug, surviving on the paths the fix
+  // was supposed to cover.
+  //
+  // resolveBlobs stays opt-in, so the list/search grid and the
+  // aggregations still issue ZERO event_log reads (#4888 AC2 /
+  // ADR-022 — AC5): they never ask for full IO, so nothing resolves,
+  // whether or not they ask for spans.
+  private async applySpansEnrichmentIfRequested({
+    traces,
+    projectId,
+    protections,
+    options,
+  }: {
+    traces: Trace[];
+    projectId: string;
+    protections: Protections;
+    options: GetAllTracesForProjectOptions;
+  }): Promise<Trace[]> {
+    const wantsSpans = options.includeSpans === true;
+    const wantsFullIo = options.resolveBlobs === true;
+
+    if (!(wantsSpans || wantsFullIo) || traces.length === 0) {
+      return traces;
+    }
+
+    const enriched = await this.enrichTracesWithSpans({
+      traces,
+      projectId,
+      protections,
+      resolveBlobs: wantsFullIo,
+    });
+
+    // A summary caller keeps the recomputed trace-level IO but not the
+    // spans it never asked for — the payload shape stays exactly as it
+    // was before this branch could run for them.
+    return wantsSpans
+      ? enriched
+      : enriched.map((trace) => ({ ...trace, spans: [] }));
+  }
+
+  /**
+   * Generates the next scrollId from the last trace of a full page. The
+   * cursor seeks on the axis we paged by: OccurredAt (started_at) or, for the
+   * updated axis, the latest-version UpdatedAt — and records the axis so the
+   * next page rejects a cursor from a different axis.
+   */
+  private buildNextScrollId({
+    lastTrace,
+    tracesCount,
+    pageSize,
+    sortDirection,
+    dateField,
+  }: {
+    lastTrace: Trace | null;
+    tracesCount: number;
+    pageSize: number;
+    sortDirection: "asc" | "desc";
+    dateField: TraceDateField;
+  }): string | undefined {
+    if (!lastTrace || tracesCount !== pageSize) {
+      return undefined;
+    }
+
+    const lastSortTimestamp =
+      dateField === "updated"
+        ? lastTrace.timestamps.updated_at
+        : lastTrace.timestamps.started_at;
+    const newCursor: ClickHouseScrollCursor = {
+      lastTimestamp: lastSortTimestamp,
+      lastTraceId: lastTrace.trace_id,
+      pageSize,
+      sortDirection,
+      dateField,
+    };
+    const newScrollId = Buffer.from(JSON.stringify(newCursor)).toString(
+      "base64",
+    );
+
+    this.logger.debug(
+      {
+        lastTraceTimestamp: lastTrace.timestamps.started_at,
+        lastTraceId: lastTrace.trace_id,
+        tracesCount,
+        pageSize,
+        newScrollId,
+      },
+      "Generated new scrollId",
+    );
+
+    return newScrollId;
+  }
+
+  /**
+   * Fetches trace-level evaluations for a page's trace IDs — direct
+   * ClickHouse query, no extra isClickHouseEnabled roundtrip — grouped by
+   * trace and mapped to the legacy Evaluation shape.
+   */
+  private async fetchTraceChecksForTraceIds({
+    clickHouseClient,
+    projectId,
+    traceIds,
+  }: {
+    clickHouseClient: ClickHouseClient;
+    projectId: string;
+    traceIds: string[];
+  }): Promise<TracesForProjectResult["traceChecks"]> {
+    if (traceIds.length === 0) {
+      return {};
+    }
+
+    const evalRows = await this.fetchEvaluationRows({
+      clickHouseClient,
+      projectId,
+      traceIds,
+    });
+
+    const grouped: Record<
+      string,
+      ReturnType<typeof mapClickHouseEvaluationToTraceEvaluation>[]
+    > = {};
+    for (const id of traceIds) {
+      grouped[id] = [];
+    }
+    for (const row of evalRows) {
+      if (row.TraceId && grouped[row.TraceId]) {
+        grouped[row.TraceId]!.push(
+          mapClickHouseEvaluationToTraceEvaluation(row),
+        );
+      }
+    }
+
+    return mapTraceEvaluationsToLegacyEvaluations(grouped);
+  }
+
+  /**
+   * Projection JOINs — attaches child collections the legacy read path does
+   * not carry, scoped to this page's traces (never table-wide). Evaluations
+   * already flow through traceChecks; events and annotations are fetched
+   * here on demand. The compiled projector reads trace.events /
+   * trace.annotations off these same objects.
+   */
+  private async enrichGroupsForProjection({
+    projection,
+    clickHouseClient,
+    projectId,
+    groups,
+    protections,
+  }: {
+    projection: GetAllTracesForProjectOptions["projection"];
+    clickHouseClient: ClickHouseClient;
+    projectId: string;
+    groups: TraceWithGuardrail[][];
+    protections: Protections;
+  }): Promise<void> {
+    if (!projection?.needsEvents && !projection?.needsAnnotations) {
+      return;
+    }
+
+    const pageTraces = groups.flat() as unknown as ProjectableTrace[];
+    if (projection.needsEvents) {
+      await this.enrichTracesWithEventsForProjection({
+        clickHouseClient,
+        projectId,
+        traces: pageTraces,
+        protections,
+      });
+    }
+    if (projection.needsAnnotations) {
+      await this.enrichTracesWithAnnotationsForProjection({
+        projectId,
+        traces: pageTraces,
+      });
+    }
+  }
+
+  /**
+   * Resolves the projection-driven query plan: which heavy Computed* columns
+   * to fetch and which time axis to page on.
+   *
+   * Projection DSL plan (from/select). When absent, behavior is the legacy
+   * full-trace response. When present, it drives heavy-column pruning and
+   * which child collections are JOINed (events, annotations). Each heavy
+   * Computed* column is fetched only when the legacy path runs or the
+   * projection selects that io field — independently, so an output-only
+   * select never materializes ComputedInput.
+   *
+   * Time axis: the date window + keyset cursor page on. Default "occurred"
+   * keeps the legacy OccurredAt behavior; "updated" pages by last mutation
+   * time for incremental ETL (CDC) pulls.
+   */
+  private resolveTraceQueryPlan(options: GetAllTracesForProjectOptions) {
+    const projection = options.projection;
+    const fetchInput = !projection || projection.needsInput;
+    const fetchOutput = !projection || projection.needsOutput;
+    const dateField: TraceDateField = options.dateField ?? "occurred";
+
+    return { projection, fetchInput, fetchOutput, dateField };
+  }
+
+  /**
+   * Fetches one keyset-paginated page of traces, then enriches it with spans
+   * / full IO when the caller wants either (see
+   * {@link applySpansEnrichmentIfRequested}).
+   */
+  private async fetchAndEnrichTracesPage({
+    input,
+    protections,
+    options,
+    pageSize,
+    sortDirection,
+    dateField,
+    fetchInput,
+    fetchOutput,
+    cursor,
+    filterConditions,
+    filterParams,
+  }: {
+    input: GetAllTracesForProjectInput;
+    protections: Protections;
+    options: GetAllTracesForProjectOptions;
+    pageSize: number;
+    sortDirection: "asc" | "desc";
+    dateField: TraceDateField;
+    fetchInput: boolean;
+    fetchOutput: boolean;
+    cursor: ClickHouseScrollCursor | null;
+    filterConditions: string[];
+    filterParams: Record<string, unknown>;
+  }): Promise<{ traces: Trace[]; totalHits: number; lastTrace: Trace | null }> {
+    const { traces, totalHits, lastTrace } =
+      await this.fetchTracesWithPagination({
+        projectId: input.projectId,
+        pageSize,
+        sortDirection,
+        cursor,
+        protections,
+        startDate: input.startDate,
+        endDate: input.endDate,
+        filterConditions,
+        filterParams,
+        traceIds: input.traceIds,
+        query: input.query,
+        fetchInput,
+        fetchOutput,
+        dateField,
+      });
+
+    const enrichedTraces = await this.applySpansEnrichmentIfRequested({
+      traces,
+      projectId: input.projectId,
+      protections,
+      options,
+    });
+
+    return { traces: enrichedTraces, totalHits, lastTrace };
+  }
+
+  /**
+   * Finishes assembling {@link getAllTracesForProject}'s result from a
+   * fetched page: next-page scrollId, grouping + guardrail transform,
+   * evaluations, and projection JOINs.
+   */
+  private async finalizeTracesPage({
+    input,
+    protections,
+    clickHouseClient,
+    traces,
+    totalHits,
+    lastTrace,
+    pageSize,
+    sortDirection,
+    dateField,
+    projection,
+  }: {
+    input: GetAllTracesForProjectInput;
+    protections: Protections;
+    clickHouseClient: ClickHouseClient;
+    traces: Trace[];
+    totalHits: number;
+    lastTrace: Trace | null;
+    pageSize: number;
+    sortDirection: "asc" | "desc";
+    dateField: TraceDateField;
+    projection: GetAllTracesForProjectOptions["projection"];
+  }): Promise<TracesForProjectResult> {
+    const newScrollId = this.buildNextScrollId({
+      lastTrace,
+      tracesCount: traces.length,
+      pageSize,
+      sortDirection,
+      dateField,
+    });
+
+    // Group traces (for now, single-trace groups unless groupBy is specified)
+    const rawGroups = this.groupTraces(traces, input.groupBy);
+
+    // Transform traces to include guardrail information
+    const groups = rawGroups.map((group) =>
+      transformTracesWithGuardrails(group),
+    );
+
+    this.logger.debug(
+      {
+        tracesReturned: traces.length,
+        totalHits,
+        hasScrollId: !!newScrollId,
+        firstTraceId: traces[0]?.trace_id,
+        firstTraceTimestamp: traces[0]?.timestamps.started_at,
+        lastTraceId: traces[traces.length - 1]?.trace_id,
+        lastTraceTimestamp: traces[traces.length - 1]?.timestamps.started_at,
+      },
+      "Returning traces result",
+    );
+
+    const traceIds = groups.flat().map((t) => t.trace_id);
+    const traceChecks = await this.fetchTraceChecksForTraceIds({
+      clickHouseClient,
+      projectId: input.projectId,
+      traceIds,
+    });
+
+    await this.enrichGroupsForProjection({
+      projection,
+      clickHouseClient,
+      projectId: input.projectId,
+      groups,
+      protections,
+    });
+
+    return {
+      groups,
+      totalHits,
+      traceChecks,
+      scrollId: newScrollId,
+    };
   }
 
   /**
@@ -819,278 +1340,51 @@ export class ClickHouseTraceService {
           const sortDirection =
             (input.sortDirection as "asc" | "desc") ?? "desc";
 
-          // Projection DSL plan (from/select). When absent, behavior is the
-          // legacy full-trace response. When present, it drives heavy-column
-          // pruning and which child collections are JOINed (events, annotations).
-          const projection = options.projection;
-          // Fetch each heavy Computed* column only when the legacy path runs
-          // or the projection selects that io field — independently, so an
-          // output-only select never materializes ComputedInput.
-          const fetchInput = !projection || projection.needsInput;
-          const fetchOutput = !projection || projection.needsOutput;
-
-          // Time axis the date window + keyset cursor page on. Default "occurred"
-          // keeps the legacy OccurredAt behavior; "updated" pages by last
-          // mutation time for incremental ETL (CDC) pulls.
-          const dateField: TraceDateField = options.dateField ?? "occurred";
+          const { projection, fetchInput, fetchOutput, dateField } =
+            this.resolveTraceQueryPlan(options);
 
           // Parse cursor from scrollId if present (matches ES service contract)
-          let cursor: ClickHouseScrollCursor | null = null;
-          if (options.scrollId) {
-            this.logger.debug(
-              { scrollId: options.scrollId },
-              "Parsing scrollId from request",
-            );
-            try {
-              cursor = JSON.parse(
-                Buffer.from(options.scrollId, "base64").toString("utf-8"),
-              );
-
-              // Validate that cursor parameters match current request
-              if (cursor && cursor.sortDirection !== sortDirection) {
-                this.logger.warn(
-                  {
-                    cursorSortDirection: cursor.sortDirection,
-                    requestSortDirection: sortDirection,
-                  },
-                  "Sort direction mismatch in cursor, ignoring cursor",
-                );
-                cursor = null;
-              } else if (cursor && cursor.pageSize !== pageSize) {
-                this.logger.warn(
-                  {
-                    cursorPageSize: cursor.pageSize,
-                    requestPageSize: pageSize,
-                  },
-                  "Page size mismatch in cursor, ignoring cursor",
-                );
-                cursor = null;
-              } else if (
-                cursor &&
-                (cursor.dateField ?? "occurred") !== dateField
-              ) {
-                this.logger.warn(
-                  {
-                    cursorDateField: cursor.dateField ?? "occurred",
-                    requestDateField: dateField,
-                  },
-                  "Date axis mismatch in cursor, ignoring cursor",
-                );
-                cursor = null;
-              }
-
-              this.logger.debug(
-                {
-                  cursorParsed: !!cursor,
-                  cursorLastTimestamp: cursor?.lastTimestamp,
-                  cursorLastTraceId: cursor?.lastTraceId,
-                  cursorSortDirection: cursor?.sortDirection,
-                  cursorPageSize: cursor?.pageSize,
-                },
-                "Cursor parsing and validation result",
-              );
-            } catch (e) {
-              this.logger.warn(
-                {
-                  scrollId: options.scrollId,
-                  error: e instanceof Error ? e.message : e,
-                },
-                "Invalid scrollId, starting from beginning",
-              );
-            }
-          } else {
-            this.logger.debug("No scrollId provided in request");
-          }
-
-          // Generate filter conditions from input.filters. Pass the dashboard
-          // time window so span/event filters bound their stored_spans EXISTS
-          // subqueries to the same window the outer trace_summaries query uses,
-          // pruning partitions instead of cold-scanning the S3-tiered tail.
-          const {
-            conditions: filterConditions,
-            params: filterParams,
-            hasUnsupportedFilters,
-          } = generateClickHouseFilterConditions(input.filters ?? {}, {
-            startDate: input.startDate,
-            endDate: input.endDate,
+          const cursor = this.parseScrollCursor({
+            scrollId: options.scrollId,
+            sortDirection,
+            pageSize,
+            dateField,
           });
 
-          if (hasUnsupportedFilters) {
-            throw new Error(
-              "Filters contain unsupported fields for ClickHouse",
-            );
-          }
-
-          // Build the query with keyset pagination
-          let { traces, totalHits, lastTrace } =
-            await this.fetchTracesWithPagination({
-              projectId: input.projectId,
-              pageSize,
-              sortDirection,
-              cursor,
-              protections,
+          const { conditions: filterConditions, params: filterParams } =
+            this.buildProjectFilterConditions({
+              filters: input.filters,
               startDate: input.startDate,
               endDate: input.endDate,
-              filterConditions,
-              filterParams,
-              traceIds: input.traceIds,
-              query: input.query,
-              fetchInput,
-              fetchOutput,
-              dateField,
             });
 
-          // Spans are fetched when the caller wants them OR when it wants full
-          // IO — because those are not the same thing.
-          //
-          // Blob resolution lives inside the span read: the full (>64 KB) value
-          // is recoverable ONLY by de-offloading the spans' eventref pointers
-          // and recomputing trace IO from them. trace_summaries holds nothing
-          // but the 64 KB preview. So a content-consuming SUMMARY read — a
-          // summary-mode export, a spans-less download — must still fetch and
-          // resolve spans, then throw them away.
-          //
-          // Gating the fetch on includeSpans alone (as this did) made
-          // resolveBlobs INERT for exactly those callers: the flag was set, no
-          // event_log read was ever issued, and the truncated preview shipped
-          // silently. That is #4991 AC1's bug, surviving on the paths the fix
-          // was supposed to cover.
-          //
-          // resolveBlobs stays opt-in, so the list/search grid and the
-          // aggregations still issue ZERO event_log reads (#4888 AC2 /
-          // ADR-022 — AC5): they never ask for full IO, so nothing resolves,
-          // whether or not they ask for spans.
-          const wantsSpans = options.includeSpans === true;
-          const wantsFullIo = options.resolveBlobs === true;
-
-          if ((wantsSpans || wantsFullIo) && traces.length > 0) {
-            const enriched = await this.enrichTracesWithSpans({
-              traces,
-              projectId: input.projectId,
+          const { traces, totalHits, lastTrace } =
+            await this.fetchAndEnrichTracesPage({
+              input,
               protections,
-              resolveBlobs: wantsFullIo,
-            });
-
-            // A summary caller keeps the recomputed trace-level IO but not the
-            // spans it never asked for — the payload shape stays exactly as it
-            // was before this branch could run for them.
-            traces = wantsSpans
-              ? enriched
-              : enriched.map((trace) => ({ ...trace, spans: [] }));
-          }
-
-          // Generate new scrollId from last trace. The cursor seeks on the
-          // axis we paged by: OccurredAt (started_at) or, for the updated axis,
-          // the latest-version UpdatedAt — and records the axis so the next
-          // page rejects a cursor from a different axis.
-          let newScrollId: string | undefined;
-          if (lastTrace && traces.length === pageSize) {
-            const lastSortTimestamp =
-              dateField === "updated"
-                ? lastTrace.timestamps.updated_at
-                : lastTrace.timestamps.started_at;
-            const newCursor: ClickHouseScrollCursor = {
-              lastTimestamp: lastSortTimestamp,
-              lastTraceId: lastTrace.trace_id,
+              options,
               pageSize,
               sortDirection,
               dateField,
-            };
-            newScrollId = Buffer.from(JSON.stringify(newCursor)).toString(
-              "base64",
-            );
-
-            this.logger.debug(
-              {
-                lastTraceTimestamp: lastTrace.timestamps.started_at,
-                lastTraceId: lastTrace.trace_id,
-                tracesCount: traces.length,
-                pageSize,
-                newScrollId,
-              },
-              "Generated new scrollId",
-            );
-          }
-
-          // Group traces (for now, single-trace groups unless groupBy is specified)
-          const rawGroups = this.groupTraces(traces, input.groupBy);
-
-          // Transform traces to include guardrail information
-          const groups = rawGroups.map((group) =>
-            transformTracesWithGuardrails(group),
-          );
-
-          this.logger.debug(
-            {
-              tracesReturned: traces.length,
-              totalHits,
-              hasScrollId: !!newScrollId,
-              firstTraceId: traces[0]?.trace_id,
-              firstTraceTimestamp: traces[0]?.timestamps.started_at,
-              lastTraceId: traces[traces.length - 1]?.trace_id,
-              lastTraceTimestamp:
-                traces[traces.length - 1]?.timestamps.started_at,
-            },
-            "Returning traces result",
-          );
-
-          // Enrich with evaluations — direct ClickHouse query, no extra isClickHouseEnabled roundtrip
-          const traceIds = groups.flat().map((t) => t.trace_id);
-          let traceChecks: TracesForProjectResult["traceChecks"] = {};
-          if (traceIds.length > 0) {
-            const evalRows = await this.fetchEvaluationRows({
-              clickHouseClient,
-              projectId: input.projectId,
-              traceIds,
+              fetchInput,
+              fetchOutput,
+              cursor,
+              filterConditions,
+              filterParams,
             });
 
-            const grouped: Record<
-              string,
-              ReturnType<typeof mapClickHouseEvaluationToTraceEvaluation>[]
-            > = {};
-            for (const id of traceIds) {
-              grouped[id] = [];
-            }
-            for (const row of evalRows) {
-              if (row.TraceId && grouped[row.TraceId]) {
-                grouped[row.TraceId]!.push(
-                  mapClickHouseEvaluationToTraceEvaluation(row),
-                );
-              }
-            }
-
-            traceChecks = mapTraceEvaluationsToLegacyEvaluations(grouped);
-          }
-
-          // Projection JOINs — attach child collections the legacy read path
-          // does not carry, scoped to this page's traces (never table-wide).
-          // Evaluations already flow through traceChecks; events and annotations
-          // are fetched here on demand. The compiled projector reads
-          // trace.events / trace.annotations off these same objects.
-          if (projection?.needsEvents || projection?.needsAnnotations) {
-            const pageTraces = groups.flat() as unknown as ProjectableTrace[];
-            if (projection.needsEvents) {
-              await this.enrichTracesWithEventsForProjection({
-                clickHouseClient,
-                projectId: input.projectId,
-                traces: pageTraces,
-                protections,
-              });
-            }
-            if (projection.needsAnnotations) {
-              await this.enrichTracesWithAnnotationsForProjection({
-                projectId: input.projectId,
-                traces: pageTraces,
-              });
-            }
-          }
-
-          return {
-            groups,
+          return await this.finalizeTracesPage({
+            input,
+            protections,
+            clickHouseClient,
+            traces,
             totalHits,
-            traceChecks,
-            scrollId: newScrollId,
-          };
+            lastTrace,
+            pageSize,
+            sortDirection,
+            dateField,
+            projection,
+          });
         } catch (error) {
           this.logger.error(
             {
@@ -1104,6 +1398,63 @@ export class ClickHouseTraceService {
         }
       },
     );
+  }
+
+  /**
+   * Builds the `TenantId = ... [AND CreatedAt >= ...] [AND CreatedAt <= ...]`
+   * WHERE clause shared by the aggregation queries (topic counts, customers
+   * and labels).
+   */
+  private buildDateRangeWhereClause({
+    startDate,
+    endDate,
+  }: {
+    startDate?: number;
+    endDate?: number;
+  }): string {
+    const conditions: string[] = ["TenantId = {tenantId:String}"];
+    if (startDate) {
+      conditions.push(
+        "CreatedAt >= fromUnixTimestamp64Milli({startDate:UInt64})",
+      );
+    }
+    if (endDate) {
+      conditions.push(
+        "CreatedAt <= fromUnixTimestamp64Milli({endDate:UInt64})",
+      );
+    }
+    return conditions.join(" AND ");
+  }
+
+  /** Aggregates topic/subtopic counts from {@link getTopicCounts} rows into count maps. */
+  private aggregateTopicCounts(
+    rows: Array<{
+      TopicId: string | null;
+      SubTopicId: string | null;
+      count: string;
+    }>,
+  ): {
+    topicCountsMap: Map<string, number>;
+    subtopicCountsMap: Map<string, number>;
+  } {
+    const topicCountsMap = new Map<string, number>();
+    const subtopicCountsMap = new Map<string, number>();
+
+    for (const row of rows) {
+      if (row.TopicId) {
+        const current = topicCountsMap.get(row.TopicId) ?? 0;
+        topicCountsMap.set(row.TopicId, current + parseInt(row.count, 10));
+      }
+      if (row.SubTopicId) {
+        const current = subtopicCountsMap.get(row.SubTopicId) ?? 0;
+        subtopicCountsMap.set(
+          row.SubTopicId,
+          current + parseInt(row.count, 10),
+        );
+      }
+    }
+
+    return { topicCountsMap, subtopicCountsMap };
   }
 
   /**
@@ -1123,20 +1474,10 @@ export class ClickHouseTraceService {
         const clickHouseClient = await this.resolveClient(input.projectId);
 
         try {
-          // Build date filter conditions
-          const conditions: string[] = ["TenantId = {tenantId:String}"];
-          if (input.startDate) {
-            conditions.push(
-              "CreatedAt >= fromUnixTimestamp64Milli({startDate:UInt64})",
-            );
-          }
-          if (input.endDate) {
-            conditions.push(
-              "CreatedAt <= fromUnixTimestamp64Milli({endDate:UInt64})",
-            );
-          }
-
-          const whereClause = conditions.join(" AND ");
+          const whereClause = this.buildDateRangeWhereClause({
+            startDate: input.startDate,
+            endDate: input.endDate,
+          });
 
           const result = await clickHouseClient.query({
             query: `
@@ -1164,26 +1505,8 @@ export class ClickHouseTraceService {
             count: string;
           }>;
 
-          // Aggregate counts by topic and subtopic
-          const topicCountsMap = new Map<string, number>();
-          const subtopicCountsMap = new Map<string, number>();
-
-          for (const row of rows) {
-            if (row.TopicId) {
-              const current = topicCountsMap.get(row.TopicId) ?? 0;
-              topicCountsMap.set(
-                row.TopicId,
-                current + parseInt(row.count, 10),
-              );
-            }
-            if (row.SubTopicId) {
-              const current = subtopicCountsMap.get(row.SubTopicId) ?? 0;
-              subtopicCountsMap.set(
-                row.SubTopicId,
-                current + parseInt(row.count, 10),
-              );
-            }
-          }
+          const { topicCountsMap, subtopicCountsMap } =
+            this.aggregateTopicCounts(rows);
 
           return {
             topicCounts: Array.from(topicCountsMap.entries()).map(
@@ -1207,6 +1530,117 @@ export class ClickHouseTraceService {
     );
   }
 
+  /** Queries unique customer IDs (`langwatch.customer_id`) in the date range. */
+  private async fetchDistinctCustomerIds({
+    clickHouseClient,
+    projectId,
+    whereClause,
+    startDate,
+    endDate,
+  }: {
+    clickHouseClient: ClickHouseClient;
+    projectId: string;
+    whereClause: string;
+    startDate?: number;
+    endDate?: number;
+  }): Promise<string[]> {
+    const customerResult = await clickHouseClient.query({
+      query: `
+        SELECT DISTINCT Attributes['langwatch.customer_id'] as customer_id
+        FROM trace_summaries
+        WHERE ${whereClause}
+          AND Attributes['langwatch.customer_id'] != ''
+        LIMIT 10000
+      `,
+      query_params: {
+        tenantId: projectId,
+        startDate: startDate ?? 0,
+        endDate: endDate ?? Date.now(),
+      },
+      format: "JSONEachRow",
+    });
+
+    const customerRows = (await customerResult.json()) as Array<{
+      customer_id: string;
+    }>;
+    return customerRows.map((r) => r.customer_id);
+  }
+
+  /**
+   * Queries the raw `langwatch.labels` JSON-array attribute values (one per
+   * trace) in the date range, for {@link parseDistinctLabels} to flatten.
+   */
+  private async fetchLabelsJsonRows({
+    clickHouseClient,
+    projectId,
+    whereClause,
+    startDate,
+    endDate,
+  }: {
+    clickHouseClient: ClickHouseClient;
+    projectId: string;
+    whereClause: string;
+    startDate?: number;
+    endDate?: number;
+  }): Promise<Array<{ labels_json: string }>> {
+    const labelsResult = await clickHouseClient.query({
+      query: `
+        SELECT DISTINCT Attributes['langwatch.labels'] as labels_json
+        FROM trace_summaries
+        WHERE ${whereClause}
+          AND Attributes['langwatch.labels'] != ''
+        LIMIT 10000
+      `,
+      query_params: {
+        tenantId: projectId,
+        startDate: startDate ?? 0,
+        endDate: endDate ?? Date.now(),
+      },
+      format: "JSONEachRow",
+    });
+
+    return (await labelsResult.json()) as Array<{ labels_json: string }>;
+  }
+
+  /**
+   * Parses one row's `langwatch.labels` JSON array into `labelsSet` —
+   * falling back to treating the raw value as a single label when it isn't
+   * valid JSON.
+   */
+  private addLabelsFromRow(
+    row: { labels_json: string },
+    labelsSet: Set<string>,
+  ): void {
+    try {
+      const labels = JSON.parse(row.labels_json);
+      if (Array.isArray(labels)) {
+        for (const label of labels) {
+          if (typeof label === "string") {
+            labelsSet.add(label);
+          }
+        }
+      }
+    } catch {
+      // If not valid JSON, treat as single label
+      labelsSet.add(row.labels_json);
+    }
+  }
+
+  /**
+   * Parses each row's `langwatch.labels` JSON array — falling back to
+   * treating the raw value as a single label when it isn't valid JSON —
+   * into a flat set of distinct labels.
+   */
+  private parseDistinctLabels(
+    rows: Array<{ labels_json: string }>,
+  ): Set<string> {
+    const labelsSet = new Set<string>();
+    for (const row of rows) {
+      this.addLabelsFromRow(row, labelsSet);
+    }
+    return labelsSet;
+  }
+
   /**
    * Get unique customers and labels for a project.
    *
@@ -1224,84 +1658,30 @@ export class ClickHouseTraceService {
         const clickHouseClient = await this.resolveClient(input.projectId);
 
         try {
-          // Build date filter conditions
-          const conditions: string[] = ["TenantId = {tenantId:String}"];
-          if (input.startDate) {
-            conditions.push(
-              "CreatedAt >= fromUnixTimestamp64Milli({startDate:UInt64})",
-            );
-          }
-          if (input.endDate) {
-            conditions.push(
-              "CreatedAt <= fromUnixTimestamp64Milli({endDate:UInt64})",
-            );
-          }
-
-          const whereClause = conditions.join(" AND ");
-
-          // Query for unique customer IDs
-          const customerResult = await clickHouseClient.query({
-            query: `
-              SELECT DISTINCT Attributes['langwatch.customer_id'] as customer_id
-              FROM trace_summaries
-              WHERE ${whereClause}
-                AND Attributes['langwatch.customer_id'] != ''
-              LIMIT 10000
-            `,
-            query_params: {
-              tenantId: input.projectId,
-              startDate: input.startDate ?? 0,
-              endDate: input.endDate ?? Date.now(),
-            },
-            format: "JSONEachRow",
+          const whereClause = this.buildDateRangeWhereClause({
+            startDate: input.startDate,
+            endDate: input.endDate,
           });
 
-          const customerRows = (await customerResult.json()) as Array<{
-            customer_id: string;
-          }>;
-
-          // Query for unique labels
-          // Labels are stored as JSON array in langwatch.labels attribute
-          const labelsResult = await clickHouseClient.query({
-            query: `
-              SELECT DISTINCT Attributes['langwatch.labels'] as labels_json
-              FROM trace_summaries
-              WHERE ${whereClause}
-                AND Attributes['langwatch.labels'] != ''
-              LIMIT 10000
-            `,
-            query_params: {
-              tenantId: input.projectId,
-              startDate: input.startDate ?? 0,
-              endDate: input.endDate ?? Date.now(),
-            },
-            format: "JSONEachRow",
+          const customers = await this.fetchDistinctCustomerIds({
+            clickHouseClient,
+            projectId: input.projectId,
+            whereClause,
+            startDate: input.startDate,
+            endDate: input.endDate,
           });
 
-          const labelsRows = (await labelsResult.json()) as Array<{
-            labels_json: string;
-          }>;
-
-          // Parse labels from JSON arrays
-          const labelsSet = new Set<string>();
-          for (const row of labelsRows) {
-            try {
-              const labels = JSON.parse(row.labels_json);
-              if (Array.isArray(labels)) {
-                for (const label of labels) {
-                  if (typeof label === "string") {
-                    labelsSet.add(label);
-                  }
-                }
-              }
-            } catch {
-              // If not valid JSON, treat as single label
-              labelsSet.add(row.labels_json);
-            }
-          }
+          const labelsRows = await this.fetchLabelsJsonRows({
+            clickHouseClient,
+            projectId: input.projectId,
+            whereClause,
+            startDate: input.startDate,
+            endDate: input.endDate,
+          });
+          const labelsSet = this.parseDistinctLabels(labelsRows);
 
           return {
-            customers: customerRows.map((r) => r.customer_id),
+            customers,
             labels: Array.from(labelsSet),
           };
         } catch (error) {
@@ -1316,6 +1696,62 @@ export class ClickHouseTraceService {
         }
       },
     );
+  }
+
+  /**
+   * Resolves the requested spanId to the LLM span whose data the playground
+   * should load: the span itself when it already is an LLM span, otherwise
+   * the nearest LLM span found via {@link findNearestLlm} (the caller may
+   * have clicked "Open in Playground" from a non-llm sibling like
+   * `Prompt.compile` or `PromptApiService.get`). Null when the spanId isn't
+   * in `allRows`, or the trace has no LLM span at all.
+   */
+  private resolveTargetLlmRow<T extends PromptStudioCandidateRow>({
+    allRows,
+    spanId,
+  }: {
+    allRows: T[];
+    spanId: string;
+  }): T | null {
+    const requestedRow = allRows.find((r) => r.SpanId === spanId);
+    if (!requestedRow) return null;
+
+    const requestedType = requestedRow.SpanAttributes["langwatch.span.type"] as
+      | string
+      | undefined;
+    return requestedType === "llm"
+      ? requestedRow
+      : (findNearestLlm(allRows, requestedRow) ?? null);
+  }
+
+  /**
+   * If the LLM span itself doesn't have a prompt reference, searches
+   * ancestors and their siblings to find it (SDK sets it on sibling spans
+   * like Prompt.compile or PromptApiService.get) and, when found, stamps it
+   * onto `result` in place.
+   */
+  private applyAncestorPromptReferenceIfMissing({
+    result,
+    allRows,
+    targetSpanId,
+  }: {
+    result: PromptStudioSpanResult;
+    allRows: PromptStudioCandidateRow[];
+    targetSpanId: string;
+  }): void {
+    if (result.promptHandle) return;
+
+    const ancestorSpans = allRows.map(buildPromptLookupSpan);
+    const ancestorRef = findPromptReferenceInAncestors({
+      targetSpanId,
+      spans: ancestorSpans,
+    });
+    if (ancestorRef?.promptHandle) {
+      result.promptHandle = ancestorRef.promptHandle;
+      result.promptVersionNumber = ancestorRef.promptVersionNumber;
+      result.promptTag = ancestorRef.promptTag;
+      result.promptVariables = ancestorRef.promptVariables;
+    }
   }
 
   /**
@@ -1387,26 +1823,7 @@ export class ClickHouseTraceService {
             StatusMessage: string | null;
           }>;
 
-          const requestedRow = allRows.find((r) => r.SpanId === spanId);
-          if (!requestedRow) {
-            return null;
-          }
-
-          // If the caller pointed us at a non-llm span (e.g. the user
-          // clicked "Open in Playground" from the Prompt.compile or
-          // PromptApiService.get span, or from the Prompts tab usage
-          // card), resolve to the nearest llm in the trace that the
-          // operator most likely meant: a descendant first, then a
-          // sibling that started at or after the requested span. The
-          // playground form needs an llm span's messages + llm config —
-          // anything else lands as "No prompts open".
-          const requestedType = requestedRow.SpanAttributes[
-            "langwatch.span.type"
-          ] as string | undefined;
-          const row =
-            requestedType === "llm"
-              ? requestedRow
-              : (findNearestLlm(allRows, requestedRow) ?? null);
+          const row = this.resolveTargetLlmRow({ allRows, spanId });
           if (!row) {
             return null;
           }
@@ -1420,40 +1837,11 @@ export class ClickHouseTraceService {
           // If the LLM span itself doesn't have a prompt reference,
           // search ancestors and their siblings to find it (SDK sets it on
           // sibling spans like Prompt.compile or PromptApiService.get)
-          if (!result.promptHandle) {
-            const ancestorSpans = allRows.map((r) => {
-              const attributes: Record<string, unknown> = {};
-              const promptId = r.SpanAttributes["langwatch.prompt.id"];
-              if (promptId) attributes["langwatch.prompt.id"] = promptId;
-              const promptVars = r.SpanAttributes["langwatch.prompt.variables"];
-              if (promptVars)
-                attributes["langwatch.prompt.variables"] = promptVars;
-              const promptHandle = r.SpanAttributes["langwatch.prompt.handle"];
-              if (promptHandle)
-                attributes["langwatch.prompt.handle"] = promptHandle;
-              const promptVersion =
-                r.SpanAttributes["langwatch.prompt.version.number"];
-              if (promptVersion)
-                attributes["langwatch.prompt.version.number"] = promptVersion;
-              return {
-                spanId: r.SpanId,
-                parentSpanId: r.ParentSpanId ?? null,
-                startTime: r.StartTime,
-                attributes,
-              };
-            });
-
-            const ancestorRef = findPromptReferenceInAncestors({
-              targetSpanId: row.SpanId,
-              spans: ancestorSpans,
-            });
-            if (ancestorRef?.promptHandle) {
-              result.promptHandle = ancestorRef.promptHandle;
-              result.promptVersionNumber = ancestorRef.promptVersionNumber;
-              result.promptTag = ancestorRef.promptTag;
-              result.promptVariables = ancestorRef.promptVariables;
-            }
-          }
+          this.applyAncestorPromptReferenceIfMissing({
+            result,
+            allRows,
+            targetSpanId: row.SpanId,
+          });
 
           return result;
         } catch (error) {
@@ -1475,6 +1863,44 @@ export class ClickHouseTraceService {
    * Extract prompt studio data from ClickHouse span row.
    * @internal
    */
+  /** Builds llmConfig from a fixed base shape plus every LLM_PARAMETER_MAP attribute present on the span. */
+  private buildPromptStudioLlmConfig({
+    attrs,
+    model,
+    messages,
+  }: {
+    attrs: Record<string, unknown>;
+    model: string | null;
+    messages: PromptStudioSpanResult["messages"];
+  }): PromptStudioSpanResult["llmConfig"] {
+    const llmConfig: PromptStudioSpanResult["llmConfig"] = {
+      model,
+      systemPrompt: messages.find((m) => m.role === "system")?.content,
+      temperature: null,
+      maxTokens: null,
+      topP: null,
+      frequencyPenalty: null,
+      presencePenalty: null,
+      seed: null,
+      topK: null,
+      minP: null,
+      repetitionPenalty: null,
+      reasoning: null,
+      verbosity: null,
+      litellmParams: {},
+    };
+
+    for (const param of LLM_PARAMETER_MAP) {
+      if (param.otelAttr === null) continue;
+      const raw = attrs[param.otelAttr];
+      if (raw != null) {
+        (llmConfig as Record<string, unknown>)[param.formField] = raw;
+      }
+    }
+
+    return llmConfig;
+  }
+
   private extractPromptStudioDataFromClickHouse(
     row: {
       SpanId: string;
@@ -1507,30 +1933,11 @@ export class ClickHouseTraceService {
     const vendor = (attrs["gen_ai.system"] as string) ?? null;
 
     // Build llmConfig dynamically from the parameter map
-    const llmConfig: PromptStudioSpanResult["llmConfig"] = {
+    const llmConfig = this.buildPromptStudioLlmConfig({
+      attrs,
       model,
-      systemPrompt: messages.find((m) => m.role === "system")?.content,
-      temperature: null,
-      maxTokens: null,
-      topP: null,
-      frequencyPenalty: null,
-      presencePenalty: null,
-      seed: null,
-      topK: null,
-      minP: null,
-      repetitionPenalty: null,
-      reasoning: null,
-      verbosity: null,
-      litellmParams: {},
-    };
-
-    for (const param of LLM_PARAMETER_MAP) {
-      if (param.otelAttr === null) continue;
-      const raw = attrs[param.otelAttr];
-      if (raw != null) {
-        (llmConfig as Record<string, unknown>)[param.formField] = raw;
-      }
-    }
+      messages,
+    });
 
     // Extract metrics
     const promptTokens = attrs["gen_ai.usage.prompt_tokens"] as
@@ -1703,6 +2110,492 @@ export class ClickHouseTraceService {
     );
   }
 
+  private static readonly OCCURRED_WINDOW_CLAUSE =
+    " AND ts.OccurredAt >= fromUnixTimestamp64Milli({startDate:UInt64}) AND ts.OccurredAt <= fromUnixTimestamp64Milli({endDate:UInt64})";
+  private static readonly UPDATED_WINDOW_CLAUSE =
+    " AND ts.UpdatedAt >= fromUnixTimestamp64Milli({startDate:UInt64}) AND ts.UpdatedAt <= fromUnixTimestamp64Milli({endDate:UInt64})";
+  /**
+   * Collapses ts to each trace's latest version (global max UpdatedAt) so
+   * the updated-axis window/filters/cursor evaluate on the latest row.
+   */
+  private static readonly LATEST_VERSION_ONLY_CLAUSE =
+    " AND (ts.TenantId, ts.TraceId, ts.UpdatedAt) IN (SELECT TenantId, TraceId, max(UpdatedAt) FROM trace_summaries WHERE TenantId = {tenantId:String} GROUP BY TenantId, TraceId)";
+
+  /**
+   * Computes the trace_summaries WHERE fragments {@link fetchTracesWithPagination}
+   * builds its count/id queries from: the already-parameterized filter
+   * conditions, an explicit trace-ID allowlist, and the free-text search
+   * query (ignored below 3 chars — too short to be a useful ngram probe).
+   */
+  private computeTraceFilterFragments({
+    filterConditions,
+    traceIds,
+    query,
+  }: {
+    filterConditions?: string[];
+    traceIds?: string[];
+    query?: string;
+  }): {
+    extraFilters: string;
+    traceIdFilter: string;
+    effectiveQuery: string | undefined;
+  } {
+    const extraFilters =
+      filterConditions && filterConditions.length > 0
+        ? " AND " + filterConditions.join(" AND ")
+        : "";
+
+    const traceIdFilter =
+      traceIds && traceIds.length > 0
+        ? " AND ts.TraceId IN ({traceIds:Array(String)})"
+        : "";
+
+    const effectiveQuery = query && query.length >= 3 ? query : undefined;
+
+    return { extraFilters, traceIdFilter, effectiveQuery };
+  }
+
+  /** Builds the query_params shared by the Step-1 count and id queries. */
+  private buildTracePaginationSharedParams({
+    projectId,
+    startDate,
+    endDate,
+    filterParams,
+    traceIds,
+    effectiveQuery,
+  }: {
+    projectId: string;
+    startDate?: number;
+    endDate?: number;
+    filterParams?: Record<string, unknown>;
+    traceIds?: string[];
+    effectiveQuery: string | undefined;
+  }): Record<string, unknown> {
+    return {
+      tenantId: projectId,
+      startDate: startDate ?? 0,
+      endDate: endDate ?? Date.now(),
+      ...filterParams,
+      ...(traceIds && traceIds.length > 0 ? { traceIds } : {}),
+      ...(effectiveQuery
+        ? {
+            searchQuery: `%${effectiveQuery.replace(/[%_\\]/g, "\\$&").toLowerCase()}%`,
+          }
+        : {}),
+    };
+  }
+
+  /**
+   * Assembles everything {@link fetchTracesWithPagination} needs to run its
+   * Step-1 count/id queries: the filter fragments, the RBAC search gate, the
+   * search filter, the date-axis plan, and the two built queries + their
+   * params. Returns `{ blocked: true }` when the RBAC gate forbids the
+   * search (see {@link isTraceSearchBlockedByProtections}).
+   */
+  private buildTracePaginationPlan({
+    projectId,
+    sortDirection,
+    cursor,
+    protections,
+    startDate,
+    endDate,
+    filterConditions,
+    filterParams,
+    traceIds,
+    query,
+    dateField,
+  }: {
+    projectId: string;
+    sortDirection: "asc" | "desc";
+    cursor: ClickHouseScrollCursor | null;
+    protections: Protections;
+    startDate?: number;
+    endDate?: number;
+    filterConditions?: string[];
+    filterParams?: Record<string, unknown>;
+    traceIds?: string[];
+    query?: string;
+    dateField: TraceDateField;
+  }):
+    | { blocked: true }
+    | {
+        blocked: false;
+        countQuery: string;
+        idQuery: string;
+        sharedParams: Record<string, unknown>;
+        cursorParams: { lastTimestamp: number; lastTraceId: string };
+        dateColumn: string;
+        orderDirection: "DESC" | "ASC";
+      } {
+    const { extraFilters, traceIdFilter, effectiveQuery } =
+      this.computeTraceFilterFragments({ filterConditions, traceIds, query });
+
+    if (
+      this.isTraceSearchBlockedByProtections({ effectiveQuery, protections })
+    ) {
+      return { blocked: true };
+    }
+
+    const searchFilter = this.buildTraceSearchFilter({
+      effectiveQuery,
+      protections,
+    });
+
+    const {
+      isUpdatedAxis,
+      dateColumn,
+      orderDirection,
+      occurredCursor,
+      updatedCursor,
+    } = this.buildTracePaginationAxisPlan({ dateField, sortDirection, cursor });
+
+    const sharedParams = this.buildTracePaginationSharedParams({
+      projectId,
+      startDate,
+      endDate,
+      filterParams,
+      traceIds,
+      effectiveQuery,
+    });
+
+    const cursorParams = {
+      lastTimestamp: cursor?.lastTimestamp ?? 0,
+      lastTraceId: cursor?.lastTraceId ?? "",
+    };
+
+    const { countQuery, idQuery } = this.buildTracePaginationQueries({
+      isUpdatedAxis,
+      extraFilters,
+      traceIdFilter,
+      searchFilter,
+      occurredCursor,
+      updatedCursor,
+      orderDirection,
+    });
+
+    return {
+      blocked: false,
+      countQuery,
+      idQuery,
+      sharedParams,
+      cursorParams,
+      dateColumn,
+      orderDirection,
+    };
+  }
+
+  /** If the user can't see input/output, searching their content is not allowed. */
+  private isTraceSearchBlockedByProtections({
+    effectiveQuery,
+    protections,
+  }: {
+    effectiveQuery: string | undefined;
+    protections: Protections;
+  }): boolean {
+    return (
+      !!effectiveQuery &&
+      protections.canSeeCapturedInput === false &&
+      protections.canSeeCapturedOutput === false
+    );
+  }
+
+  /**
+   * Trace and span names are operation names rather than captured
+   * content, and a tool or agent identifier is often only there, so free
+   * text has to reach them too. They ride alongside the I/O columns
+   * instead of replacing them, and `searchQuery` is already lowercased
+   * and LIKE-escaped, so `lower(...)` on each side is the whole contract.
+   * Whether captured I/O may be searched at all is decided by
+   * {@link isTraceSearchBlockedByProtections}.
+   */
+  private buildTraceSearchFilter({
+    effectiveQuery,
+    protections,
+  }: {
+    effectiveQuery: string | undefined;
+    protections: Protections;
+  }): string {
+    const searchableColumns = [
+      ...(protections.canSeeCapturedInput !== false
+        ? ["lower(ifNull(ts.ComputedInput, ''))"]
+        : []),
+      ...(protections.canSeeCapturedOutput !== false
+        ? ["lower(ifNull(ts.ComputedOutput, ''))"]
+        : []),
+      "lower(ifNull(ts.TraceName, ''))",
+    ];
+
+    // Non-root span names live in `stored_spans`, probed with the same
+    // correlated EXISTS shape the span filters in `filter-conditions.ts`
+    // use. The StartTime bound keeps it partition-pruned instead of
+    // cold-scanning every weekly partition, matching `buildSpanTimeBound`.
+    const spanNameSearch = `EXISTS (
+                    SELECT 1 FROM stored_spans sp
+                    WHERE sp.TenantId = ts.TenantId
+                      AND sp.TraceId = ts.TraceId
+                      AND sp.StartTime >= fromUnixTimestamp64Milli({startDate:UInt64})
+                      AND sp.StartTime <= fromUnixTimestamp64Milli({endDate:UInt64})
+                      AND lower(sp.SpanName) LIKE {searchQuery:String}
+                  )`;
+
+    return effectiveQuery
+      ? ` AND (${[
+          ...searchableColumns.map((col) => `${col} LIKE {searchQuery:String}`),
+          spanNameSearch,
+        ].join(" OR ")})`
+      : "";
+  }
+
+  /**
+   * Date axis.
+   *  occurred (default): windows + seeks on the immutable OccurredAt in
+   *    WHERE (prunes partitions). Keeps the pre-existing filter-then-dedup
+   *    structure verbatim — changing it would alter results for every
+   *    current client, so it stays byte-identical for backwards-compat.
+   *  updated (CDC): restricts ts to each trace's LATEST version first
+   *    (global max UpdatedAt, no window), THEN applies the window +
+   *    filters + cursor to THAT row. So a stale version can never satisfy
+   *    a filter the latest version doesn't, and "updated in [start,end]"
+   *    means the trace's TRUE last modification (adjacent CDC windows stay
+   *    mutually exclusive).
+   */
+  private buildTracePaginationAxisPlan({
+    dateField,
+    sortDirection,
+    cursor,
+  }: {
+    dateField: TraceDateField;
+    sortDirection: "asc" | "desc";
+    cursor: ClickHouseScrollCursor | null;
+  }): {
+    isUpdatedAxis: boolean;
+    dateColumn: string;
+    orderDirection: "DESC" | "ASC";
+    occurredCursor: string;
+    updatedCursor: string;
+  } {
+    const isUpdatedAxis = dateField === "updated";
+    const dateColumn = isUpdatedAxis ? "UpdatedAt" : "OccurredAt";
+    const cmp = sortDirection === "desc" ? "<" : ">";
+    const orderDirection = sortDirection === "desc" ? "DESC" : "ASC";
+
+    let occurredCursor = "";
+    let updatedCursor = "";
+    if (cursor) {
+      occurredCursor = ` AND (toUnixTimestamp64Milli(ts.OccurredAt), ts.TraceId) ${cmp} ({lastTimestamp:UInt64}, {lastTraceId:String})`;
+      updatedCursor = ` AND (toUnixTimestamp64Milli(ts.UpdatedAt), ts.TraceId) ${cmp} ({lastTimestamp:UInt64}, {lastTraceId:String})`;
+    }
+
+    return {
+      isUpdatedAxis,
+      dateColumn,
+      orderDirection,
+      occurredCursor,
+      updatedCursor,
+    };
+  }
+
+  /**
+   * Builds the Step-1 count + id queries. The ID query is lightweight (no
+   * heavy columns). occurred counts with HyperLogLog (~2% error, fine for
+   * display); updated counts traces whose global max(UpdatedAt) falls in
+   * the window (exact, via the aggregate).
+   */
+  private buildTracePaginationQueries({
+    isUpdatedAxis,
+    extraFilters,
+    traceIdFilter,
+    searchFilter,
+    occurredCursor,
+    updatedCursor,
+    orderDirection,
+  }: {
+    isUpdatedAxis: boolean;
+    extraFilters: string;
+    traceIdFilter: string;
+    searchFilter: string;
+    occurredCursor: string;
+    updatedCursor: string;
+    orderDirection: "DESC" | "ASC";
+  }): { countQuery: string; idQuery: string } {
+    const occurredWindow = ClickHouseTraceService.OCCURRED_WINDOW_CLAUSE;
+    const updatedWindow = ClickHouseTraceService.UPDATED_WINDOW_CLAUSE;
+    const latestVersionOnly = ClickHouseTraceService.LATEST_VERSION_ONLY_CLAUSE;
+
+    const countQuery = isUpdatedAxis
+      ? `
+              SELECT count() AS total
+              FROM (
+                SELECT ts.TraceId
+                FROM trace_summaries ts
+                WHERE ts.TenantId = {tenantId:String}
+                  ${latestVersionOnly}
+                  ${updatedWindow}
+                  ${extraFilters}
+                  ${traceIdFilter}
+                  ${searchFilter}
+                GROUP BY ts.TraceId
+              )
+            `
+      : `
+              SELECT uniq(ts.TraceId) as total
+              FROM trace_summaries ts
+              WHERE ts.TenantId = {tenantId:String}
+                ${occurredWindow}
+                ${extraFilters}
+                ${traceIdFilter}
+                ${searchFilter}
+            `;
+    const idQuery = isUpdatedAxis
+      ? `
+              SELECT ts.TraceId
+              FROM trace_summaries ts
+              WHERE ts.TenantId = {tenantId:String}
+                ${latestVersionOnly}
+                ${updatedWindow}
+                ${extraFilters}
+                ${traceIdFilter}
+                ${searchFilter}
+                ${updatedCursor}
+              GROUP BY ts.TraceId
+              ORDER BY max(toUnixTimestamp64Milli(ts.UpdatedAt)) ${orderDirection}, ts.TraceId ${orderDirection}
+              LIMIT {pageSize:UInt32}
+            `
+      : `
+              SELECT s.TraceId
+              FROM (
+                SELECT ts.TraceId AS TraceId,
+                       argMax(ts.OccurredAt, ts.UpdatedAt) AS _oa
+                FROM trace_summaries ts
+                WHERE ts.TenantId = {tenantId:String}
+                  ${occurredWindow}
+                  ${extraFilters}
+                  ${traceIdFilter}
+                  ${searchFilter}
+                  ${occurredCursor}
+                GROUP BY ts.TraceId
+              ) s
+              ORDER BY s._oa ${orderDirection}, s.TraceId ${orderDirection}
+              LIMIT {pageSize:UInt32}
+            `;
+
+    return { countQuery, idQuery };
+  }
+
+  /** Runs the Step-1 count + id queries in parallel and parses their rows. */
+  private async runTracePageQueries({
+    clickHouseClient,
+    countQuery,
+    idQuery,
+    sharedParams,
+    cursorParams,
+    pageSize,
+  }: {
+    clickHouseClient: ClickHouseClient;
+    countQuery: string;
+    idQuery: string;
+    sharedParams: Record<string, unknown>;
+    cursorParams: { lastTimestamp: number; lastTraceId: string };
+    pageSize: number;
+  }): Promise<{ totalHits: number; pageTraceIds: string[] }> {
+    const [countResult, idsResult] = await Promise.all([
+      clickHouseClient.query({
+        query: countQuery,
+        query_params: sharedParams,
+        format: "JSONEachRow",
+      }),
+      clickHouseClient.query({
+        query: idQuery,
+        query_params: {
+          ...sharedParams,
+          ...cursorParams,
+          pageSize,
+        },
+        format: "JSONEachRow",
+      }),
+    ]);
+
+    const [countRows, idRows] = await Promise.all([
+      countResult.json() as Promise<Array<{ total: string }>>,
+      idsResult.json() as Promise<Array<{ TraceId: string }>>,
+    ]);
+
+    const totalHits = parseInt(countRows[0]?.total ?? "0", 10);
+    const pageTraceIds = idRows.map((r) => r.TraceId);
+
+    return { totalHits, pageTraceIds };
+  }
+
+  /**
+   * Step 2: fetches full summary data for just the page's trace IDs (the
+   * dedup subquery is scoped to `pageTraceIds` so it only reads N traces
+   * instead of the entire table), maps to redaction-applied Trace objects,
+   * and derives `lastTrace` for the next scrollId.
+   */
+  private async fetchTracePageDetails({
+    clickHouseClient,
+    projectId,
+    startDate,
+    endDate,
+    pageTraceIds,
+    orderDirection,
+    fetchInput,
+    fetchOutput,
+    dateColumn,
+    protections,
+  }: {
+    clickHouseClient: ClickHouseClient;
+    projectId: string;
+    startDate?: number;
+    endDate?: number;
+    pageTraceIds: string[];
+    orderDirection: "DESC" | "ASC";
+    fetchInput: boolean;
+    fetchOutput: boolean;
+    dateColumn: string;
+    protections: Protections;
+  }): Promise<{ traces: Trace[]; lastTrace: Trace | null }> {
+    const summaryRows = await this.fetchTraceSummaryRows({
+      clickHouseClient,
+      projectId,
+      startDate: startDate ?? 0,
+      endDate: endDate ?? Date.now(),
+      traceIds: pageTraceIds,
+      orderDirection,
+      fetchInput,
+      fetchOutput,
+      dateColumn,
+    });
+
+    const traces = this.assembleTracesFromSummaryRows({
+      summaryRows,
+      projectId,
+      protections,
+    });
+
+    const lastTrace =
+      traces.length > 0 ? (traces[traces.length - 1] ?? null) : null;
+
+    return { traces, lastTrace };
+  }
+
+  /** Maps Step-2 summary rows to redaction-applied Trace objects (no spans). */
+  private assembleTracesFromSummaryRows({
+    summaryRows,
+    projectId,
+    protections,
+  }: {
+    summaryRows: TraceSummaryRow[];
+    projectId: string;
+    protections: Protections;
+  }): Trace[] {
+    return summaryRows.map((row) => {
+      const summary = this.rowToTraceSummaryData(row);
+      const trace = mapTraceSummaryToTrace(summary, [], projectId);
+      return applyTraceProtections(trace, protections);
+    });
+  }
+
   /**
    * Fetch traces with keyset pagination.
    * @internal
@@ -1749,230 +2642,50 @@ export class ClickHouseTraceService {
       async (_span) => {
         const clickHouseClient = await this.resolveClient(projectId);
 
-        // Additional filter conditions (already parameterized by the filter module)
-        const extraFilters =
-          filterConditions && filterConditions.length > 0
-            ? " AND " + filterConditions.join(" AND ")
-            : "";
+        // Step 1: Find page trace IDs + count in parallel.
+        const plan = this.buildTracePaginationPlan({
+          projectId,
+          sortDirection,
+          cursor,
+          protections,
+          startDate,
+          endDate,
+          filterConditions,
+          filterParams,
+          traceIds,
+          query,
+          dateField,
+        });
 
-        // Explicit trace ID filter — when callers provide specific trace IDs
-        const traceIdFilter =
-          traceIds && traceIds.length > 0
-            ? " AND ts.TraceId IN ({traceIds:Array(String)})"
-            : "";
-
-        // Text search on computed I/O — lower(ifNull(...)) matches the ngrambf_v1 indexed expression
-        const effectiveQuery = query && query.length >= 3 ? query : undefined;
-
-        // If the user can't see input/output, searching their content is not allowed
-        if (
-          effectiveQuery &&
-          protections.canSeeCapturedInput === false &&
-          protections.canSeeCapturedOutput === false
-        ) {
+        if (plan.blocked) {
           return { traces: [], totalHits: 0, lastTrace: null };
         }
 
-        // Trace and span names are operation names rather than captured
-        // content, and a tool or agent identifier is often only there, so free
-        // text has to reach them too. They ride alongside the I/O columns
-        // instead of replacing them, and `searchQuery` is already lowercased
-        // and LIKE-escaped, so `lower(...)` on each side is the whole contract.
-        // Whether captured I/O may be searched at all is still decided above.
-        const searchableColumns = [
-          ...(protections.canSeeCapturedInput !== false
-            ? ["lower(ifNull(ts.ComputedInput, ''))"]
-            : []),
-          ...(protections.canSeeCapturedOutput !== false
-            ? ["lower(ifNull(ts.ComputedOutput, ''))"]
-            : []),
-          "lower(ifNull(ts.TraceName, ''))",
-        ];
-
-        // Non-root span names live in `stored_spans`, probed with the same
-        // correlated EXISTS shape the span filters in `filter-conditions.ts`
-        // use. The StartTime bound keeps it partition-pruned instead of
-        // cold-scanning every weekly partition, matching `buildSpanTimeBound`.
-        const spanNameSearch = `EXISTS (
-                    SELECT 1 FROM stored_spans sp
-                    WHERE sp.TenantId = ts.TenantId
-                      AND sp.TraceId = ts.TraceId
-                      AND sp.StartTime >= fromUnixTimestamp64Milli({startDate:UInt64})
-                      AND sp.StartTime <= fromUnixTimestamp64Milli({endDate:UInt64})
-                      AND lower(sp.SpanName) LIKE {searchQuery:String}
-                  )`;
-
-        const searchFilter = effectiveQuery
-          ? ` AND (${[
-              ...searchableColumns.map(
-                (col) => `${col} LIKE {searchQuery:String}`,
-              ),
-              spanNameSearch,
-            ].join(" OR ")})`
-          : "";
-
-        // Date axis.
-        //  occurred (default): windows + seeks on the immutable OccurredAt in
-        //    WHERE (prunes partitions). Keeps the pre-existing filter-then-dedup
-        //    structure verbatim — changing it would alter results for every
-        //    current client, so it stays byte-identical for backwards-compat.
-        //  updated (CDC): restricts ts to each trace's LATEST version first
-        //    (global max UpdatedAt, no window), THEN applies the window +
-        //    filters + cursor to THAT row. So a stale version can never satisfy
-        //    a filter the latest version doesn't, and "updated in [start,end]"
-        //    means the trace's TRUE last modification (adjacent CDC windows stay
-        //    mutually exclusive).
-        const isUpdatedAxis = dateField === "updated";
-        const dateColumn = isUpdatedAxis ? "UpdatedAt" : "OccurredAt";
-        const cmp = sortDirection === "desc" ? "<" : ">";
-        const orderDirection = sortDirection === "desc" ? "DESC" : "ASC";
-
-        const occurredWindow =
-          " AND ts.OccurredAt >= fromUnixTimestamp64Milli({startDate:UInt64}) AND ts.OccurredAt <= fromUnixTimestamp64Milli({endDate:UInt64})";
-        const updatedWindow =
-          " AND ts.UpdatedAt >= fromUnixTimestamp64Milli({startDate:UInt64}) AND ts.UpdatedAt <= fromUnixTimestamp64Milli({endDate:UInt64})";
-        // Collapses ts to each trace's latest version (global max UpdatedAt) so
-        // the updated-axis window/filters/cursor evaluate on the latest row.
-        const latestVersionOnly =
-          " AND (ts.TenantId, ts.TraceId, ts.UpdatedAt) IN (SELECT TenantId, TraceId, max(UpdatedAt) FROM trace_summaries WHERE TenantId = {tenantId:String} GROUP BY TenantId, TraceId)";
-
-        let occurredCursor = "";
-        let updatedCursor = "";
-        if (cursor) {
-          occurredCursor = ` AND (toUnixTimestamp64Milli(ts.OccurredAt), ts.TraceId) ${cmp} ({lastTimestamp:UInt64}, {lastTraceId:String})`;
-          updatedCursor = ` AND (toUnixTimestamp64Milli(ts.UpdatedAt), ts.TraceId) ${cmp} ({lastTimestamp:UInt64}, {lastTraceId:String})`;
-        }
-
-        const sharedParams = {
-          tenantId: projectId,
-          startDate: startDate ?? 0,
-          endDate: endDate ?? Date.now(),
-          ...filterParams,
-          ...(traceIds && traceIds.length > 0 ? { traceIds } : {}),
-          ...(effectiveQuery
-            ? {
-                searchQuery: `%${effectiveQuery.replace(/[%_\\]/g, "\\$&").toLowerCase()}%`,
-              }
-            : {}),
-        };
-
-        const cursorParams = {
-          lastTimestamp: cursor?.lastTimestamp ?? 0,
-          lastTraceId: cursor?.lastTraceId ?? "",
-        };
-
-        // Step 1: Find page trace IDs + count in parallel.
-        // The ID query is lightweight (no heavy columns). occurred counts with
-        // HyperLogLog (~2% error, fine for display); updated counts traces whose
-        // global max(UpdatedAt) falls in the window (exact, via the aggregate).
-        const countQuery = isUpdatedAxis
-          ? `
-              SELECT count() AS total
-              FROM (
-                SELECT ts.TraceId
-                FROM trace_summaries ts
-                WHERE ts.TenantId = {tenantId:String}
-                  ${latestVersionOnly}
-                  ${updatedWindow}
-                  ${extraFilters}
-                  ${traceIdFilter}
-                  ${searchFilter}
-                GROUP BY ts.TraceId
-              )
-            `
-          : `
-              SELECT uniq(ts.TraceId) as total
-              FROM trace_summaries ts
-              WHERE ts.TenantId = {tenantId:String}
-                ${occurredWindow}
-                ${extraFilters}
-                ${traceIdFilter}
-                ${searchFilter}
-            `;
-        const idQuery = isUpdatedAxis
-          ? `
-              SELECT ts.TraceId
-              FROM trace_summaries ts
-              WHERE ts.TenantId = {tenantId:String}
-                ${latestVersionOnly}
-                ${updatedWindow}
-                ${extraFilters}
-                ${traceIdFilter}
-                ${searchFilter}
-                ${updatedCursor}
-              GROUP BY ts.TraceId
-              ORDER BY max(toUnixTimestamp64Milli(ts.UpdatedAt)) ${orderDirection}, ts.TraceId ${orderDirection}
-              LIMIT {pageSize:UInt32}
-            `
-          : `
-              SELECT s.TraceId
-              FROM (
-                SELECT ts.TraceId AS TraceId,
-                       argMax(ts.OccurredAt, ts.UpdatedAt) AS _oa
-                FROM trace_summaries ts
-                WHERE ts.TenantId = {tenantId:String}
-                  ${occurredWindow}
-                  ${extraFilters}
-                  ${traceIdFilter}
-                  ${searchFilter}
-                  ${occurredCursor}
-                GROUP BY ts.TraceId
-              ) s
-              ORDER BY s._oa ${orderDirection}, s.TraceId ${orderDirection}
-              LIMIT {pageSize:UInt32}
-            `;
-        const [countResult, idsResult] = await Promise.all([
-          clickHouseClient.query({
-            query: countQuery,
-            query_params: sharedParams,
-            format: "JSONEachRow",
-          }),
-          clickHouseClient.query({
-            query: idQuery,
-            query_params: {
-              ...sharedParams,
-              ...cursorParams,
-              pageSize,
-            },
-            format: "JSONEachRow",
-          }),
-        ]);
-
-        const [countRows, idRows] = await Promise.all([
-          countResult.json() as Promise<Array<{ total: string }>>,
-          idsResult.json() as Promise<Array<{ TraceId: string }>>,
-        ]);
-
-        const totalHits = parseInt(countRows[0]?.total ?? "0", 10);
-        const pageTraceIds = idRows.map((r) => r.TraceId);
+        const { totalHits, pageTraceIds } = await this.runTracePageQueries({
+          clickHouseClient,
+          countQuery: plan.countQuery,
+          idQuery: plan.idQuery,
+          sharedParams: plan.sharedParams,
+          cursorParams: plan.cursorParams,
+          pageSize,
+        });
 
         if (pageTraceIds.length === 0) {
           return { traces: [], totalHits, lastTrace: null };
         }
 
-        // Step 2: Fetch full data for just the page's trace IDs.
-        // The dedup subquery is scoped to pageTraceIds so it only reads
-        // N traces instead of the entire table.
-        const summaryRows = await this.fetchTraceSummaryRows({
+        const { traces, lastTrace } = await this.fetchTracePageDetails({
           clickHouseClient,
           projectId,
-          startDate: startDate ?? 0,
-          endDate: endDate ?? Date.now(),
-          traceIds: pageTraceIds,
-          orderDirection,
+          startDate,
+          endDate,
+          pageTraceIds,
+          orderDirection: plan.orderDirection,
           fetchInput,
           fetchOutput,
-          dateColumn,
+          dateColumn: plan.dateColumn,
+          protections,
         });
-
-        const traces: Trace[] = summaryRows.map((row) => {
-          const summary = this.rowToTraceSummaryData(row);
-          const trace = mapTraceSummaryToTrace(summary, [], projectId);
-          return applyTraceProtections(trace, protections);
-        });
-
-        const lastTrace =
-          traces.length > 0 ? (traces[traces.length - 1] ?? null) : null;
 
         return { traces, totalHits, lastTrace };
       },
@@ -2099,34 +2812,58 @@ export class ClickHouseTraceService {
         throw error;
       }
 
-      this.logger.warn(
-        `Summary query OOM for ${traceIds.length} traces, retrying in batches of ${ClickHouseTraceService.SUMMARY_BATCH_SIZE}`,
-      );
-
-      const allRows: TraceSummaryRow[] = [];
-      for (
-        let i = 0;
-        i < traceIds.length;
-        i += ClickHouseTraceService.SUMMARY_BATCH_SIZE
-      ) {
-        const batch = traceIds.slice(
-          i,
-          i + ClickHouseTraceService.SUMMARY_BATCH_SIZE,
-        );
-        const batchRows = await runQuery(batch);
-        allRows.push(...batchRows);
-      }
-
-      const dir = orderDirection === "DESC" ? -1 : 1;
-      allRows.sort((a, b) => {
-        const timeDiff = a[sortColumn] - b[sortColumn];
-        if (timeDiff !== 0) return timeDiff * dir;
-        if (a.ts_TraceId === b.ts_TraceId) return 0;
-        return a.ts_TraceId < b.ts_TraceId ? -dir : dir;
+      return await this.retryTraceSummaryRowsInBatches({
+        traceIds,
+        orderDirection,
+        sortColumn,
+        runQuery,
       });
-
-      return allRows;
     }
+  }
+
+  /**
+   * Retries a batch-OOM'd {@link fetchTraceSummaryRows} query in fixed-size
+   * batches of {@link ClickHouseTraceService.SUMMARY_BATCH_SIZE}, then
+   * re-sorts the combined rows to restore the single-query ordering.
+   */
+  private async retryTraceSummaryRowsInBatches({
+    traceIds,
+    orderDirection,
+    sortColumn,
+    runQuery,
+  }: {
+    traceIds: string[];
+    orderDirection: string;
+    sortColumn: "ts_OccurredAt" | "ts_UpdatedAt";
+    runQuery: (ids: string[]) => Promise<TraceSummaryRow[]>;
+  }): Promise<TraceSummaryRow[]> {
+    this.logger.warn(
+      `Summary query OOM for ${traceIds.length} traces, retrying in batches of ${ClickHouseTraceService.SUMMARY_BATCH_SIZE}`,
+    );
+
+    const allRows: TraceSummaryRow[] = [];
+    for (
+      let i = 0;
+      i < traceIds.length;
+      i += ClickHouseTraceService.SUMMARY_BATCH_SIZE
+    ) {
+      const batch = traceIds.slice(
+        i,
+        i + ClickHouseTraceService.SUMMARY_BATCH_SIZE,
+      );
+      const batchRows = await runQuery(batch);
+      allRows.push(...batchRows);
+    }
+
+    const dir = orderDirection === "DESC" ? -1 : 1;
+    allRows.sort((a, b) => {
+      const timeDiff = a[sortColumn] - b[sortColumn];
+      if (timeDiff !== 0) return timeDiff * dir;
+      if (a.ts_TraceId === b.ts_TraceId) return 0;
+      return a.ts_TraceId < b.ts_TraceId ? -dir : dir;
+    });
+
+    return allRows;
   }
 
   /**
@@ -2213,6 +2950,24 @@ export class ClickHouseTraceService {
     });
 
     const rows = (await result.json()) as EventSpanRow[];
+    const byTrace = this.groupEventRowsByTrace({ rows, projectId });
+    this.applyEventProjectionRedactions({ traces, byTrace, protections });
+  }
+
+  /**
+   * Groups query rows into events-per-trace. The `LIMIT {maxEvents} BY
+   * t.TraceId` cap silently clips a trace's events, so this also warns (same
+   * posture as the span-cap) when any trace hit the per-trace cap, so
+   * callers know the projected events[] is truncated rather than silently
+   * incomplete.
+   */
+  private groupEventRowsByTrace({
+    rows,
+    projectId,
+  }: {
+    rows: EventSpanRow[];
+    projectId: string;
+  }): Map<string, Event[]> {
     const byTrace = new Map<string, Event[]>();
     for (const row of rows) {
       const event = mapEventAttrsToEvent({ row, projectId });
@@ -2221,9 +2976,6 @@ export class ClickHouseTraceService {
       list.push(event);
       byTrace.set(row.TraceId, list);
     }
-    // The `LIMIT {maxEvents} BY t.TraceId` cap silently clips a trace's events.
-    // Surface it (same posture as the span-cap) so callers know the projected
-    // events[] is truncated rather than silently incomplete.
     const truncated = [...byTrace.entries()]
       .filter(([, events]) => events.length >= MAX_EVENTS_PER_TRACE)
       .map(([traceId]) => traceId);
@@ -2233,10 +2985,24 @@ export class ClickHouseTraceService {
         `Projected events[] hit the per-trace cap (${MAX_EVENTS_PER_TRACE}); some events were not returned`,
       );
     }
-    // RBAC parity with the legacy read path: events attach AFTER
-    // applyTraceProtections ran, so they must get the same treatment —
-    // event_details are blanked when captured input is not visible, and
-    // otherwise scrubbed of any substring mirroring the trace's redacted io.
+    return byTrace;
+  }
+
+  /**
+   * RBAC parity with the legacy read path: events attach AFTER
+   * applyTraceProtections ran, so they must get the same treatment —
+   * event_details are blanked when captured input is not visible, and
+   * otherwise scrubbed of any substring mirroring the trace's redacted io.
+   */
+  private applyEventProjectionRedactions({
+    traces,
+    byTrace,
+    protections,
+  }: {
+    traces: ProjectableTrace[];
+    byTrace: Map<string, Event[]>;
+    protections: Protections;
+  }): void {
     for (const trace of traces) {
       const rawEvents = byTrace.get(trace.trace_id) ?? [];
       const redactions = new Set<string>([
@@ -2429,6 +3195,17 @@ export class ClickHouseTraceService {
     };
   }
 
+  /** Resolves the grouping key for one trace under the given `groupBy` field. */
+  private resolveGroupKey(trace: Trace, groupBy: string): string | null {
+    if (groupBy === "user_id") {
+      return trace.metadata.user_id ?? null;
+    }
+    if (groupBy === "thread_id") {
+      return trace.metadata.thread_id ?? null;
+    }
+    return null;
+  }
+
   /**
    * Group traces by the specified field.
    * @internal
@@ -2441,13 +3218,7 @@ export class ClickHouseTraceService {
     const groups: Map<string, Trace[]> = new Map();
 
     for (const trace of traces) {
-      let key: string | null = null;
-
-      if (groupBy === "user_id") {
-        key = trace.metadata.user_id ?? null;
-      } else if (groupBy === "thread_id") {
-        key = trace.metadata.thread_id ?? null;
-      }
+      const key = this.resolveGroupKey(trace, groupBy);
 
       if (key) {
         const group = groups.get(key) ?? [];
@@ -2532,54 +3303,7 @@ export class ClickHouseTraceService {
         spansPerTrace,
       );
 
-      // ResolveTraceSpansBatchFn is INJECTED, so "one resolution per input
-      // trace, in input order" is a convention its type cannot enforce. Today's
-      // resolver honours it via .map, but a future resolver (or a test double)
-      // that drops or reorders entries would silently pair the wrong resolved
-      // spans with the wrong trace summary on this hot bulk-read path — shared
-      // by export, thread, and the dataset/sample builders. Fail loudly at the
-      // boundary, where the offending resolver is still nameable, instead of
-      // letting a downstream non-null assertion crash with no context (or not
-      // crash at all, and just scatter the wrong IO onto the wrong span).
-      if (resolutions.length !== spansPerTrace.length) {
-        throw TraceSpansBatchResolverContractError.cardinality({
-          got: resolutions.length,
-          expected: spansPerTrace.length,
-        });
-      }
-
-      // Cardinality alone does NOT catch the silent-corruption case: a resolver
-      // that returns the right COUNT in the wrong ORDER scatters each trace's IO
-      // onto its neighbour. Both resolvers derive resolvedSpans by mapping over
-      // the input spans, so a conforming resolution carries (a) the same span
-      // count and (b) the trace identity the ResolvedTraceSpans type itself
-      // lacks. Check both: a trace CAN legitimately have zero spans (the read
-      // builds its map from summary rows), and such a trace has no identity to
-      // compare — but the span count still catches it being swapped with a
-      // spans-ful one, which is the case that would otherwise silently strip a
-      // real trace's spans. Two span-less traces transposed stay invisible, and
-      // are harmless: their resolutions are empty and interchangeable.
-      for (const [index, spans] of spansPerTrace.entries()) {
-        const resolution = resolutions[index];
-
-        if (resolution?.resolvedSpans.length !== spans.length) {
-          throw TraceSpansBatchResolverContractError.misaligned({
-            index,
-            expected: `${spans.length} span(s)${spans[0] ? ` for trace "${spans[0].traceId}"` : ""}`,
-            got: `${resolution?.resolvedSpans.length ?? 0} span(s)`,
-          });
-        }
-
-        const expected = spans[0]?.traceId;
-        const got = resolution.resolvedSpans[0]?.traceId;
-        if (expected !== undefined && got !== undefined && expected !== got) {
-          throw TraceSpansBatchResolverContractError.misaligned({
-            index,
-            expected: `trace "${expected}"`,
-            got: `trace "${got}"`,
-          });
-        }
-      }
+      this.validateBulkResolutions({ resolutions, spansPerTrace });
 
       return resolutions;
     }
@@ -2599,6 +3323,83 @@ export class ClickHouseTraceService {
       recomputedOutput: null,
       anyResolved: false,
     }));
+  }
+
+  /**
+   * Validates a bulk resolver's output against its input.
+   *
+   * ResolveTraceSpansBatchFn is INJECTED, so "one resolution per input
+   * trace, in input order" is a convention its type cannot enforce. Today's
+   * resolver honours it via .map, but a future resolver (or a test double)
+   * that drops or reorders entries would silently pair the wrong resolved
+   * spans with the wrong trace summary on this hot bulk-read path — shared
+   * by export, thread, and the dataset/sample builders. Fail loudly at the
+   * boundary, where the offending resolver is still nameable, instead of
+   * letting a downstream non-null assertion crash with no context (or not
+   * crash at all, and just scatter the wrong IO onto the wrong span).
+   *
+   * Cardinality alone does NOT catch the silent-corruption case: a resolver
+   * that returns the right COUNT in the wrong ORDER scatters each trace's IO
+   * onto its neighbour. Both resolvers derive resolvedSpans by mapping over
+   * the input spans, so a conforming resolution carries (a) the same span
+   * count and (b) the trace identity the ResolvedTraceSpans type itself
+   * lacks. Check both: a trace CAN legitimately have zero spans (the read
+   * builds its map from summary rows), and such a trace has no identity to
+   * compare — but the span count still catches it being swapped with a
+   * spans-ful one, which is the case that would otherwise silently strip a
+   * real trace's spans. Two span-less traces transposed stay invisible, and
+   * are harmless: their resolutions are empty and interchangeable.
+   */
+  private validateBulkResolutions({
+    resolutions,
+    spansPerTrace,
+  }: {
+    resolutions: ResolvedTraceSpans[];
+    spansPerTrace: NormalizedSpan[][];
+  }): void {
+    if (resolutions.length !== spansPerTrace.length) {
+      throw TraceSpansBatchResolverContractError.cardinality({
+        got: resolutions.length,
+        expected: spansPerTrace.length,
+      });
+    }
+
+    for (const [index, spans] of spansPerTrace.entries()) {
+      this.validateResolutionAlignment({
+        resolution: resolutions[index],
+        spans,
+        index,
+      });
+    }
+  }
+
+  /** Per-index check backing {@link validateBulkResolutions}: span count, then trace identity. */
+  private validateResolutionAlignment({
+    resolution,
+    spans,
+    index,
+  }: {
+    resolution: ResolvedTraceSpans | undefined;
+    spans: NormalizedSpan[];
+    index: number;
+  }): void {
+    if (resolution?.resolvedSpans.length !== spans.length) {
+      throw TraceSpansBatchResolverContractError.misaligned({
+        index,
+        expected: `${spans.length} span(s)${spans[0] ? ` for trace "${spans[0].traceId}"` : ""}`,
+        got: `${resolution?.resolvedSpans.length ?? 0} span(s)`,
+      });
+    }
+
+    const expected = spans[0]?.traceId;
+    const got = resolution.resolvedSpans[0]?.traceId;
+    if (expected !== undefined && got !== undefined && expected !== got) {
+      throw TraceSpansBatchResolverContractError.misaligned({
+        index,
+        expected: `trace "${expected}"`,
+        got: `trace "${got}"`,
+      });
+    }
   }
 
   /**
@@ -2774,118 +3575,74 @@ export class ClickHouseTraceService {
   }
 
   /**
-   * Fetch trace summaries with their spans using a JOIN query.
-   * This is more efficient than two separate queries.
+   * When the caller knows the traces' approximate time, bound the summary
+   * read to those weekly partitions. trace_summaries is partitioned on
+   * OccurredAt, so a TraceId-only filter cannot prune partitions and scans
+   * every part (incl. cold S3) to locate the rows. A ±2-day margin around
+   * the caller's range is safe headroom; without a hint we keep the
+   * original unbounded read.
    *
-   * The query joins trace_summaries with stored_spans on TenantId and TraceId,
-   * returning all data needed to construct Trace objects.
-   *
-   * @internal
+   * resolveOccurredAtRange yields a RANGE (min/max OccurredAt), not a
+   * point, so map it onto queryWindowed's centre+half-width form: centre
+   * on the range midpoint and grow the half-width to cover half the range
+   * PLUS the ±2-day margin. The emitted fragment's bounds then land on
+   * exactly [from - 2d, to + 2d] — the same predicate the old local
+   * constant produced.
    */
-  private async fetchTracesWithSpansJoined(
-    projectId: string,
-    traceIds: string[],
-    occurredAt?: OccurredAtRange,
-  ): Promise<
-    Map<string, { summary: TraceSummaryData; spans: NormalizedSpan[] }>
-  > {
-    return await this.tracer.withActiveSpan(
-      "ClickHouseTraceService.fetchTracesWithSpansJoined",
-      {
-        attributes: { "tenant.id": projectId },
-      },
-      async (_span) => {
-        const clickHouseClient = await this.resolveClient(projectId);
+  private computeJoinedSummaryWindowPlan(
+    effectiveOccurredAt: OccurredAtRange | undefined,
+  ): { hasSummaryWindow: boolean; hintMs: number | null; windowMs: number } {
+    const hasSummaryWindow =
+      effectiveOccurredAt !== undefined &&
+      effectiveOccurredAt.from > 0 &&
+      effectiveOccurredAt.to > 0;
+    const hintMs = hasSummaryWindow
+      ? (effectiveOccurredAt.from + effectiveOccurredAt.to) / 2
+      : null;
+    const windowMs = hasSummaryWindow
+      ? (effectiveOccurredAt.to - effectiveOccurredAt.from) / 2 +
+        DEFAULT_PARTITION_WINDOW_MS
+      : DEFAULT_PARTITION_WINDOW_MS;
 
-        // Callers that already know the traces' time pass `occurredAt`; the
-        // thread-view paths (getTracesByThreadId / getTracesWithSpansByThreadIds)
-        // only have trace ids. Without a window the summary read below filters on
-        // TraceId alone, which cannot prune partitions (trace_summaries is
-        // partitioned on OccurredAt) and so opens every weekly part incl. cold
-        // S3. Resolve the OccurredAt span from a cheap sort-key seek (light
-        // column only) and reuse it to bound the heavy read. Same resolve-from-
-        // sort-key shape as the single-trace read in the trace-summary repo.
-        const effectiveOccurredAt =
-          occurredAt ??
-          (await this.resolveOccurredAtRange({
-            client: clickHouseClient,
-            projectId,
-            traceIds,
-          }).catch((error) => {
-            // Fail open: the resolve is a pure optimization, so a transient
-            // failure must not break a read that previously succeeded. Fall
-            // back to the unbounded (slower but correct) summary read.
-            this.logger.warn(
-              {
-                projectId,
-                error: error instanceof Error ? error.message : error,
-              },
-              "OccurredAt resolve for batch trace read failed; falling back to unbounded summary read",
-            );
-            return undefined;
-          }));
+    return { hasSummaryWindow, hintMs, windowMs };
+  }
 
-        // The summary + span reads pull heavy columns (ComputedInput/Output,
-        // Attributes, SpanAttributes/Events/Links) for the whole trace list, so a
-        // large list can exceed the per-query memory cap and fail with
-        // MEMORY_LIMIT_EXCEEDED. Run the list as one query on the happy path, and
-        // on OOM retry in fixed-size batches (same fallback as fetchTraceSummaryRows
-        // / fetchEvaluationRows) so peak memory is bounded without dropping data.
-        const runBatch = async (
-          batchTraceIds: string[],
-        ): Promise<
-          Map<string, { summary: TraceSummaryData; spans: NormalizedSpan[] }>
-        > => {
-          // When the caller knows the traces' approximate time, bound the
-          // summary read to those weekly partitions. trace_summaries is
-          // partitioned on OccurredAt, so a TraceId-only filter cannot prune
-          // partitions and scans every part (incl. cold S3) to locate the rows.
-          // A ±2-day margin around the caller's range is safe headroom; without
-          // a hint we keep the original unbounded read.
-          //
-          // resolveOccurredAtRange yields a RANGE (min/max OccurredAt), not a
-          // point, so map it onto queryWindowed's centre+half-width form: centre
-          // on the range midpoint and grow the half-width to cover half the range
-          // PLUS the ±2-day margin. The emitted fragment's bounds then land on
-          // exactly [from - 2d, to + 2d] — the same predicate the old local
-          // constant produced. Fallback "none": a resolve failure already left
-          // effectiveOccurredAt undefined (hint null -> unbounded read, warn
-          // logged at the resolve site), and a hinted-but-empty summary read is
-          // never widened here — an empty result is authoritative and the caller
-          // below skips the span scan.
-          const hasSummaryWindow =
-            effectiveOccurredAt !== undefined &&
-            effectiveOccurredAt.from > 0 &&
-            effectiveOccurredAt.to > 0;
-          const summaryHintMs = hasSummaryWindow
-            ? (effectiveOccurredAt.from + effectiveOccurredAt.to) / 2
-            : null;
-          const summaryWindowMs = hasSummaryWindow
-            ? (effectiveOccurredAt.to - effectiveOccurredAt.from) / 2 +
-              DEFAULT_PARTITION_WINDOW_MS
-            : DEFAULT_PARTITION_WINDOW_MS;
-
-          // Summaries first (light, one row per trace): they carry OccurredAt,
-          // which bounds the heavy stored_spans scan below to the traces' weekly
-          // partitions instead of cold-scanning every partition on S3. A span's
-          // StartTime always falls within its trace's lifetime, so a ±2-day window
-          // around the summaries' OccurredAt range is safe headroom; when no
-          // summary row is found we fall back to an unbounded span scan.
-          const summaryRows = await queryWindowed<TraceSummaryRow[]>({
-            table: "trace_summaries",
-            hintMs: summaryHintMs,
-            windowMs: summaryWindowMs,
-            fallback: "none",
-            isEmpty: (rows) => rows.length === 0,
-            run: async (window) => {
-              const summaryTimeFilterOuter = window
-                ? window.sqlFor("t.OccurredAt")
-                : "";
-              const summaryTimeFilterInner = window
-                ? window.sqlFor("OccurredAt")
-                : "";
-              const summaryResult = await clickHouseClient.query({
-                query: `
+  /**
+   * Summaries first (light, one row per trace): they carry OccurredAt,
+   * which bounds the heavy stored_spans scan below to the traces' weekly
+   * partitions instead of cold-scanning every partition on S3. A span's
+   * StartTime always falls within its trace's lifetime, so a ±2-day window
+   * around the summaries' OccurredAt range is safe headroom; when no
+   * summary row is found we fall back to an unbounded span scan.
+   */
+  private async fetchJoinedSummaryRows({
+    clickHouseClient,
+    projectId,
+    batchTraceIds,
+    hintMs,
+    windowMs,
+  }: {
+    clickHouseClient: ClickHouseClient;
+    projectId: string;
+    batchTraceIds: string[];
+    hintMs: number | null;
+    windowMs: number;
+  }): Promise<TraceSummaryRow[]> {
+    return queryWindowed<TraceSummaryRow[]>({
+      table: "trace_summaries",
+      hintMs,
+      windowMs,
+      fallback: "none",
+      isEmpty: (rows) => rows.length === 0,
+      run: async (window) => {
+        const summaryTimeFilterOuter = window
+          ? window.sqlFor("t.OccurredAt")
+          : "";
+        const summaryTimeFilterInner = window
+          ? window.sqlFor("OccurredAt")
+          : "";
+        const summaryResult = await clickHouseClient.query({
+          query: `
         SELECT
           TraceId AS ts_TraceId,
           SpanCount AS ts_SpanCount,
@@ -2930,119 +3687,112 @@ export class ClickHouseTraceService {
           )
         ORDER BY t.TraceId
       `,
-                query_params: {
-                  tenantId: projectId,
-                  traceIds: batchTraceIds,
-                  ...(window?.params ?? {}),
-                },
-                format: "JSONEachRow",
-              });
-              return (await summaryResult.json()) as TraceSummaryRow[];
-            },
-          });
+          query_params: {
+            tenantId: projectId,
+            traceIds: batchTraceIds,
+            ...(window?.params ?? {}),
+          },
+          format: "JSONEachRow",
+        });
+        return (await summaryResult.json()) as TraceSummaryRow[];
+      },
+    });
+  }
 
-          // No matched summaries: the result map is built solely from summary
-          // rows, so the spans would be discarded anyway. Return early to skip the
-          // (otherwise unbounded) stored_spans scan — the very cold scan this path
-          // is meant to avoid.
-          if (summaryRows.length === 0) {
-            return new Map();
+  /**
+   * Bound the stored_spans scan to the weeks the matched traces occurred in
+   * (the cold-scan cost driver). Same range->window mapping as the summary
+   * read: centre on the range midpoint, half-width = half that range + the
+   * ±2-day margin, so the fragment lands on exactly [min - 2d, max + 2d].
+   *
+   * Three sources, in order, and the last one cannot fail — which is the
+   * point (ADR-087). This used to be one source: the matched summaries'
+   * positive OccurredAts. When none survived, `hasWindow` was false, the
+   * hint was null, `fallback: "none"` produced a null fragment and BOTH
+   * filter strings rendered empty — so this read pulled every heavy span
+   * column with no partition predicate at all, over every weekly part
+   * including cold S3. That is the read prod died on with
+   * MEMORY_LIMIT_EXCEEDED (code 241).
+   *
+   *   1. The matched summaries' own anchors. Post-ADR-087 every row has
+   *      one; this stays the tightest window and the normal path.
+   *   2. `effectiveOccurredAt` — the caller's own paging range, or the
+   *      range resolved from trace_summaries for callers that only have
+   *      trace ids. Preferred over a floor because it is derived from
+   *      the traces actually being read.
+   *   3. A retention floor ({@link SPAN_READ_FLOOR_LOOKBACK_MS}), via the
+   *      `{ lookbackMs }` fallback, which renders `now - 90d … now + 2d`.
+   *      Never null, so the filter string is never empty.
+   *
+   * `fallback: "none"` still applies whenever there IS a hint: a
+   * hinted-but-empty span read is authoritative and must not be widened.
+   */
+  private computeJoinedSpanWindowPlan({
+    summaryRows,
+    hasSummaryWindow,
+    effectiveOccurredAt,
+  }: {
+    summaryRows: TraceSummaryRow[];
+    hasSummaryWindow: boolean;
+    effectiveOccurredAt: OccurredAtRange | undefined;
+  }): {
+    hintMs: number | null;
+    windowMs: number;
+    fallback: "none" | { lookbackMs: number };
+  } {
+    const occurredAts = summaryRows
+      .map((r) => r.ts_OccurredAt)
+      .filter((t): t is number => typeof t === "number" && t > 0);
+    const spanRange =
+      occurredAts.length > 0
+        ? {
+            from: Math.min(...occurredAts),
+            to: Math.max(...occurredAts),
           }
+        : hasSummaryWindow
+          ? effectiveOccurredAt
+          : undefined;
+    const hintMs = spanRange ? (spanRange.from + spanRange.to) / 2 : null;
+    const windowMs = spanRange
+      ? (spanRange.to - spanRange.from) / 2 + DEFAULT_PARTITION_WINDOW_MS
+      : DEFAULT_PARTITION_WINDOW_MS;
+    const fallback: "none" | { lookbackMs: number } = spanRange
+      ? "none"
+      : { lookbackMs: SPAN_READ_FLOOR_LOOKBACK_MS };
 
-          // Parse spans
-          type SpanRow = {
-            SpanId: string;
-            TraceId: string;
-            TenantId: string;
-            ParentSpanId: string | null;
-            ParentTraceId: string | null;
-            ParentIsRemote: boolean | null;
-            Sampled: boolean;
-            StartTime: number;
-            EndTime: number;
-            DurationMs: number;
-            SpanName: string;
-            SpanKind: number;
-            ResourceAttributes: Record<string, unknown>;
-            SpanAttributes: Record<string, unknown>;
-            StatusCode: number | null;
-            StatusMessage: string | null;
-            ScopeName: string | null;
-            ScopeVersion: string | null;
-            Events_Timestamp: number[];
-            Events_Name: string[];
-            Events_Attributes: Record<string, unknown>[];
-            Links_TraceId: string[];
-            Links_SpanId: string[];
-            Links_Attributes: Record<string, unknown>[];
-          };
+    return { hintMs, windowMs, fallback };
+  }
 
-          // Bound the stored_spans scan to the weeks the matched traces occurred
-          // in (the cold-scan cost driver). Same range->window mapping as the
-          // summary read above: centre on the range midpoint, half-width = half
-          // that range + the ±2-day margin, so the fragment lands on exactly
-          // [min - 2d, max + 2d].
-          //
-          // Three sources, in order, and the last one cannot fail — which is the
-          // point (ADR-087). This used to be one source: the matched summaries'
-          // positive OccurredAts. When none survived, `hasWindow` was false, the
-          // hint was null, `fallback: "none"` produced a null fragment and BOTH
-          // filter strings rendered empty — so this read pulled every heavy span
-          // column with no partition predicate at all, over every weekly part
-          // including cold S3. That is the read prod died on with
-          // MEMORY_LIMIT_EXCEEDED (code 241).
-          //
-          //   1. The matched summaries' own anchors. Post-ADR-087 every row has
-          //      one; this stays the tightest window and the normal path.
-          //   2. `effectiveOccurredAt` — the caller's own paging range, or the
-          //      range resolved from trace_summaries for callers that only have
-          //      trace ids. Preferred over a floor because it is derived from
-          //      the traces actually being read.
-          //   3. A retention floor ({@link SPAN_READ_FLOOR_LOOKBACK_MS}), via the
-          //      `{ lookbackMs }` fallback, which renders `now - 90d … now + 2d`.
-          //      Never null, so the filter string is never empty.
-          //
-          // `fallback: "none"` still applies whenever there IS a hint: a
-          // hinted-but-empty span read is authoritative and must not be widened.
-          const occurredAts = summaryRows
-            .map((r) => r.ts_OccurredAt)
-            .filter((t): t is number => typeof t === "number" && t > 0);
-          const spanRange =
-            occurredAts.length > 0
-              ? {
-                  from: Math.min(...occurredAts),
-                  to: Math.max(...occurredAts),
-                }
-              : hasSummaryWindow
-                ? effectiveOccurredAt
-                : undefined;
-          const spanHintMs = spanRange
-            ? (spanRange.from + spanRange.to) / 2
-            : null;
-          const spanWindowMs = spanRange
-            ? (spanRange.to - spanRange.from) / 2 + DEFAULT_PARTITION_WINDOW_MS
-            : DEFAULT_PARTITION_WINDOW_MS;
-
-          const spanRows = await queryWindowed<SpanRow[]>({
-            table: "stored_spans",
-            hintMs: spanHintMs,
-            windowMs: spanWindowMs,
-            fallback: spanRange
-              ? "none"
-              : { lookbackMs: SPAN_READ_FLOOR_LOOKBACK_MS },
-            isEmpty: (rows) => rows.length === 0,
-            run: async (window) => {
-              // Always present now: a hint yields the hinted fragment, and the
-              // hint-less path yields the retention floor's fragment. The null
-              // arm is kept only because the shared contract permits it.
-              const spanTimeFilterOuter = window
-                ? window.sqlFor("t.StartTime")
-                : "";
-              const spanTimeFilterInner = window
-                ? window.sqlFor("StartTime")
-                : "";
-              const spansResult = await clickHouseClient.query({
-                query: `
+  /** Fetches the stored_spans half of the join, bounded by {@link computeJoinedSpanWindowPlan}. */
+  private async fetchJoinedSpanRows({
+    clickHouseClient,
+    projectId,
+    batchTraceIds,
+    hintMs,
+    windowMs,
+    fallback,
+  }: {
+    clickHouseClient: ClickHouseClient;
+    projectId: string;
+    batchTraceIds: string[];
+    hintMs: number | null;
+    windowMs: number;
+    fallback: "none" | { lookbackMs: number };
+  }): Promise<JoinedBatchSpanRow[]> {
+    return queryWindowed<JoinedBatchSpanRow[]>({
+      table: "stored_spans",
+      hintMs,
+      windowMs,
+      fallback,
+      isEmpty: (rows) => rows.length === 0,
+      run: async (window) => {
+        // Always present now: a hint yields the hinted fragment, and the
+        // hint-less path yields the retention floor's fragment. The null
+        // arm is kept only because the shared contract permits it.
+        const spanTimeFilterOuter = window ? window.sqlFor("t.StartTime") : "";
+        const spanTimeFilterInner = window ? window.sqlFor("StartTime") : "";
+        const spansResult = await clickHouseClient.query({
+          query: `
         SELECT
           SpanId,
           TraceId,
@@ -3083,59 +3833,259 @@ export class ClickHouseTraceService {
         ORDER BY t.TraceId, t.StartTime ASC
         LIMIT ${MAX_SPANS_PER_TRACE} BY t.TraceId
       `,
-                query_params: {
-                  tenantId: projectId,
-                  traceIds: batchTraceIds,
-                  ...(window?.params ?? {}),
-                },
-                clickhouse_settings: JOINED_SPAN_READ_SETTINGS,
-                format: "JSONEachRow",
-              });
-              return (await spansResult.json()) as SpanRow[];
-            },
+          query_params: {
+            tenantId: projectId,
+            traceIds: batchTraceIds,
+            ...(window?.params ?? {}),
+          },
+          clickhouse_settings: JOINED_SPAN_READ_SETTINGS,
+          format: "JSONEachRow",
+        });
+        return (await spansResult.json()) as JoinedBatchSpanRow[];
+      },
+    });
+  }
+
+  /**
+   * Groups spans by TraceId and surfaces (rather than silently swallows)
+   * traces large enough to hit the per-trace span cap — their span list may
+   * be truncated.
+   */
+  private groupAndWarnJoinedSpans({
+    spanRows,
+    projectId,
+  }: {
+    spanRows: JoinedBatchSpanRow[];
+    projectId: string;
+  }): Map<string, NormalizedSpan[]> {
+    const spansByTrace = new Map<string, NormalizedSpan[]>();
+    for (const row of spanRows) {
+      const spans = spansByTrace.get(row.TraceId) ?? [];
+      spans.push(this.mapSpanRow(row, projectId));
+      spansByTrace.set(row.TraceId, spans);
+    }
+
+    for (const [traceId, spans] of spansByTrace) {
+      if (spans.length >= MAX_SPANS_PER_TRACE) {
+        this.logger.warn(
+          {
+            projectId,
+            traceId,
+            spanCount: spans.length,
+            cap: MAX_SPANS_PER_TRACE,
+          },
+          "Trace reached the per-trace span cap; span list may be truncated",
+        );
+      }
+    }
+
+    return spansByTrace;
+  }
+
+  /**
+   * Runs one batch of {@link fetchTracesWithSpansJoined}: fetches the
+   * summary rows (bounded by {@link computeJoinedSummaryWindowPlan}), and —
+   * unless no summaries matched — the span rows (bounded by
+   * {@link computeJoinedSpanWindowPlan}), then combines them into the
+   * tracesMap.
+   */
+  private async runJoinedTracesBatch({
+    clickHouseClient,
+    projectId,
+    batchTraceIds,
+    effectiveOccurredAt,
+  }: {
+    clickHouseClient: ClickHouseClient;
+    projectId: string;
+    batchTraceIds: string[];
+    effectiveOccurredAt: OccurredAtRange | undefined;
+  }): Promise<
+    Map<string, { summary: TraceSummaryData; spans: NormalizedSpan[] }>
+  > {
+    const { hasSummaryWindow, hintMs, windowMs } =
+      this.computeJoinedSummaryWindowPlan(effectiveOccurredAt);
+
+    const summaryRows = await this.fetchJoinedSummaryRows({
+      clickHouseClient,
+      projectId,
+      batchTraceIds,
+      hintMs,
+      windowMs,
+    });
+
+    // No matched summaries: the result map is built solely from summary
+    // rows, so the spans would be discarded anyway. Return early to skip the
+    // (otherwise unbounded) stored_spans scan — the very cold scan this path
+    // is meant to avoid.
+    if (summaryRows.length === 0) {
+      return new Map();
+    }
+
+    const spanWindowPlan = this.computeJoinedSpanWindowPlan({
+      summaryRows,
+      hasSummaryWindow,
+      effectiveOccurredAt,
+    });
+
+    const spanRows = await this.fetchJoinedSpanRows({
+      clickHouseClient,
+      projectId,
+      batchTraceIds,
+      hintMs: spanWindowPlan.hintMs,
+      windowMs: spanWindowPlan.windowMs,
+      fallback: spanWindowPlan.fallback,
+    });
+
+    const spansByTrace = this.groupAndWarnJoinedSpans({ spanRows, projectId });
+
+    // Build the tracesMap by combining summaries + spans
+    const tracesMap = new Map<
+      string,
+      { summary: TraceSummaryData; spans: NormalizedSpan[] }
+    >();
+
+    for (const row of summaryRows) {
+      const traceId = row.ts_TraceId;
+      const summary = this.rowToTraceSummaryData(row);
+      tracesMap.set(traceId, {
+        summary,
+        spans: spansByTrace.get(traceId) ?? [],
+      });
+    }
+
+    return tracesMap;
+  }
+
+  /**
+   * Callers that already know the traces' time pass `occurredAt`; the
+   * thread-view paths (getTracesByThreadId / getTracesWithSpansByThreadIds)
+   * only have trace ids. Without a window the summary read below filters on
+   * TraceId alone, which cannot prune partitions (trace_summaries is
+   * partitioned on OccurredAt) and so opens every weekly part incl. cold
+   * S3. Resolve the OccurredAt span from a cheap sort-key seek (light
+   * column only) and reuse it to bound the heavy read. Same resolve-from-
+   * sort-key shape as the single-trace read in the trace-summary repo.
+   */
+  private async resolveEffectiveOccurredAt({
+    clickHouseClient,
+    projectId,
+    traceIds,
+    occurredAt,
+  }: {
+    clickHouseClient: ClickHouseClient;
+    projectId: string;
+    traceIds: string[];
+    occurredAt: OccurredAtRange | undefined;
+  }): Promise<OccurredAtRange | undefined> {
+    return (
+      occurredAt ??
+      (await this.resolveOccurredAtRange({
+        client: clickHouseClient,
+        projectId,
+        traceIds,
+      }).catch((error) => {
+        // Fail open: the resolve is a pure optimization, so a transient
+        // failure must not break a read that previously succeeded. Fall
+        // back to the unbounded (slower but correct) summary read.
+        this.logger.warn(
+          {
+            projectId,
+            error: error instanceof Error ? error.message : error,
+          },
+          "OccurredAt resolve for batch trace read failed; falling back to unbounded summary read",
+        );
+        return undefined;
+      }))
+    );
+  }
+
+  /**
+   * OOM retry for {@link fetchTracesWithSpansJoined}: runs `runBatch` in
+   * fixed-size batches of {@link ClickHouseTraceService.SUMMARY_BATCH_SIZE}
+   * and merges the results.
+   */
+  private async retryJoinedTracesInBatches({
+    traceIds,
+    runBatch,
+  }: {
+    traceIds: string[];
+    runBatch: (
+      batchTraceIds: string[],
+    ) => Promise<
+      Map<string, { summary: TraceSummaryData; spans: NormalizedSpan[] }>
+    >;
+  }): Promise<
+    Map<string, { summary: TraceSummaryData; spans: NormalizedSpan[] }>
+  > {
+    this.logger.warn(
+      `Traces-with-spans join OOM for ${traceIds.length} traces, retrying in batches of ${ClickHouseTraceService.SUMMARY_BATCH_SIZE}`,
+    );
+
+    const merged = new Map<
+      string,
+      { summary: TraceSummaryData; spans: NormalizedSpan[] }
+    >();
+    for (
+      let i = 0;
+      i < traceIds.length;
+      i += ClickHouseTraceService.SUMMARY_BATCH_SIZE
+    ) {
+      const batch = traceIds.slice(
+        i,
+        i + ClickHouseTraceService.SUMMARY_BATCH_SIZE,
+      );
+      const batchMap = await runBatch(batch);
+      for (const [traceId, value] of batchMap) {
+        merged.set(traceId, value);
+      }
+    }
+    return merged;
+  }
+
+  /**
+   * Fetch trace summaries with their spans using a JOIN query.
+   * This is more efficient than two separate queries.
+   *
+   * The query joins trace_summaries with stored_spans on TenantId and TraceId,
+   * returning all data needed to construct Trace objects.
+   *
+   * @internal
+   */
+  private async fetchTracesWithSpansJoined(
+    projectId: string,
+    traceIds: string[],
+    occurredAt?: OccurredAtRange,
+  ): Promise<
+    Map<string, { summary: TraceSummaryData; spans: NormalizedSpan[] }>
+  > {
+    return await this.tracer.withActiveSpan(
+      "ClickHouseTraceService.fetchTracesWithSpansJoined",
+      {
+        attributes: { "tenant.id": projectId },
+      },
+      async (_span) => {
+        const clickHouseClient = await this.resolveClient(projectId);
+
+        const effectiveOccurredAt = await this.resolveEffectiveOccurredAt({
+          clickHouseClient,
+          projectId,
+          traceIds,
+          occurredAt,
+        });
+
+        // The summary + span reads pull heavy columns (ComputedInput/Output,
+        // Attributes, SpanAttributes/Events/Links) for the whole trace list, so a
+        // large list can exceed the per-query memory cap and fail with
+        // MEMORY_LIMIT_EXCEEDED. Run the list as one query on the happy path, and
+        // on OOM retry in fixed-size batches (same fallback as fetchTraceSummaryRows
+        // / fetchEvaluationRows) so peak memory is bounded without dropping data.
+        const runBatch = (batchTraceIds: string[]) =>
+          this.runJoinedTracesBatch({
+            clickHouseClient,
+            projectId,
+            batchTraceIds,
+            effectiveOccurredAt,
           });
-
-          // Group spans by TraceId
-          const spansByTrace = new Map<string, NormalizedSpan[]>();
-          for (const row of spanRows) {
-            const spans = spansByTrace.get(row.TraceId) ?? [];
-            spans.push(this.mapSpanRow(row, projectId));
-            spansByTrace.set(row.TraceId, spans);
-          }
-
-          // Surface (rather than silently swallow) traces large enough to hit the
-          // per-trace span cap — their span list may be truncated.
-          for (const [traceId, spans] of spansByTrace) {
-            if (spans.length >= MAX_SPANS_PER_TRACE) {
-              this.logger.warn(
-                {
-                  projectId,
-                  traceId,
-                  spanCount: spans.length,
-                  cap: MAX_SPANS_PER_TRACE,
-                },
-                "Trace reached the per-trace span cap; span list may be truncated",
-              );
-            }
-          }
-
-          // Build the tracesMap by combining summaries + spans
-          const tracesMap = new Map<
-            string,
-            { summary: TraceSummaryData; spans: NormalizedSpan[] }
-          >();
-
-          for (const row of summaryRows) {
-            const traceId = row.ts_TraceId;
-            const summary = this.rowToTraceSummaryData(row);
-            tracesMap.set(traceId, {
-              summary,
-              spans: spansByTrace.get(traceId) ?? [],
-            });
-          }
-
-          return tracesMap;
-        };
 
         try {
           return await runBatch(traceIds);
@@ -3144,29 +4094,7 @@ export class ClickHouseTraceService {
             throw error;
           }
 
-          this.logger.warn(
-            `Traces-with-spans join OOM for ${traceIds.length} traces, retrying in batches of ${ClickHouseTraceService.SUMMARY_BATCH_SIZE}`,
-          );
-
-          const merged = new Map<
-            string,
-            { summary: TraceSummaryData; spans: NormalizedSpan[] }
-          >();
-          for (
-            let i = 0;
-            i < traceIds.length;
-            i += ClickHouseTraceService.SUMMARY_BATCH_SIZE
-          ) {
-            const batch = traceIds.slice(
-              i,
-              i + ClickHouseTraceService.SUMMARY_BATCH_SIZE,
-            );
-            const batchMap = await runBatch(batch);
-            for (const [traceId, value] of batchMap) {
-              merged.set(traceId, value);
-            }
-          }
-          return merged;
+          return await this.retryJoinedTracesInBatches({ traceIds, runBatch });
         }
       },
     );
@@ -3353,6 +4281,34 @@ interface TraceSummaryRow {
   ts_UpdatedAt: number;
 }
 
+/** Row shape for the stored_spans half of {@link ClickHouseTraceService.fetchJoinedSpanRows}. */
+interface JoinedBatchSpanRow {
+  SpanId: string;
+  TraceId: string;
+  TenantId: string;
+  ParentSpanId: string | null;
+  ParentTraceId: string | null;
+  ParentIsRemote: boolean | null;
+  Sampled: boolean;
+  StartTime: number;
+  EndTime: number;
+  DurationMs: number;
+  SpanName: string;
+  SpanKind: number;
+  ResourceAttributes: Record<string, unknown>;
+  SpanAttributes: Record<string, unknown>;
+  StatusCode: number | null;
+  StatusMessage: string | null;
+  ScopeName: string | null;
+  ScopeVersion: string | null;
+  Events_Timestamp: number[];
+  Events_Name: string[];
+  Events_Attributes: Record<string, unknown>[];
+  Links_TraceId: string[];
+  Links_SpanId: string[];
+  Links_Attributes: Record<string, unknown>[];
+}
+
 /**
  * Split a summary row's two times back apart (ADR-087).
  *
@@ -3437,6 +4393,102 @@ export function isClickHouseMemoryLimitError(error: unknown): boolean {
 }
 
 /**
+ * Reduces one span row's prompt-relevant SpanAttributes into the flat shape
+ * {@link findPromptReferenceInAncestors} expects. Only attributes actually
+ * present on the row are carried over (an absent attribute is omitted, not
+ * stamped as `undefined`).
+ */
+function buildPromptLookupSpan(r: PromptStudioCandidateRow): PromptLookupSpan {
+  const attributes: Record<string, unknown> = {};
+  const promptId = r.SpanAttributes["langwatch.prompt.id"];
+  if (promptId) attributes["langwatch.prompt.id"] = promptId;
+  const promptVars = r.SpanAttributes["langwatch.prompt.variables"];
+  if (promptVars) attributes["langwatch.prompt.variables"] = promptVars;
+  const promptHandle = r.SpanAttributes["langwatch.prompt.handle"];
+  if (promptHandle) attributes["langwatch.prompt.handle"] = promptHandle;
+  const promptVersion = r.SpanAttributes["langwatch.prompt.version.number"];
+  if (promptVersion)
+    attributes["langwatch.prompt.version.number"] = promptVersion;
+  return {
+    spanId: r.SpanId,
+    parentSpanId: r.ParentSpanId ?? null,
+    startTime: r.StartTime,
+    attributes,
+  };
+}
+
+function isLlmSpan<T extends PromptStudioCandidateRow>(r: T): boolean {
+  return (
+    (r.SpanAttributes["langwatch.span.type"] as string | undefined) === "llm"
+  );
+}
+
+/** Builds a parent-spanId -> children index, generic over the candidate row shape. */
+function buildSpanChildrenIndex<T extends PromptStudioCandidateRow>(
+  rows: T[],
+): Map<string, T[]> {
+  const childrenByParent = new Map<string, T[]>();
+  for (const r of rows) {
+    if (!r.ParentSpanId) continue;
+    const list = childrenByParent.get(r.ParentSpanId);
+    if (list) list.push(r);
+    else childrenByParent.set(r.ParentSpanId, [r]);
+  }
+  return childrenByParent;
+}
+
+/** Step 1 of {@link findNearestLlm}: closest descendant llm under `requested` (BFS, smallest depth diff wins). */
+function findClosestDescendantLlm<T extends PromptStudioCandidateRow>({
+  requested,
+  childrenByParent,
+}: {
+  requested: T;
+  childrenByParent: Map<string, T[]>;
+}): T | null {
+  const visited = new Set<string>();
+  const queue: T[] = [requested];
+  while (queue.length > 0) {
+    const current = queue.shift()!;
+    if (visited.has(current.SpanId)) continue;
+    visited.add(current.SpanId);
+    const children = childrenByParent.get(current.SpanId) ?? [];
+    for (const child of children) {
+      if (isLlmSpan(child)) return child;
+      queue.push(child);
+    }
+  }
+  return null;
+}
+
+/**
+ * Step 2 of {@link findNearestLlm}: sibling llm under the same parent (or
+ * root-level peer if the requested span has no parent) that started
+ * at/after the requested span. Earliest qualifying sibling wins, so we land
+ * on the *next* call rather than one further down the chain. Siblings that
+ * started *before* the requested span do NOT count — those belong to an
+ * earlier turn and would open an unrelated playground context — so the
+ * search falls through to step 3 instead.
+ */
+function findNextSiblingLlm<T extends PromptStudioCandidateRow>({
+  rows,
+  requested,
+  childrenByParent,
+}: {
+  rows: T[];
+  requested: T;
+  childrenByParent: Map<string, T[]>;
+}): T | null {
+  const siblingPool =
+    requested.ParentSpanId == null
+      ? rows.filter((r) => r.ParentSpanId == null)
+      : (childrenByParent.get(requested.ParentSpanId) ?? []);
+  const siblings = siblingPool
+    .filter((s) => s.SpanId !== requested.SpanId && isLlmSpan(s))
+    .sort((a, b) => a.StartTime - b.StartTime);
+  return siblings.find((s) => s.StartTime >= requested.StartTime) ?? null;
+}
+
+/**
  * Given a non-llm span the operator clicked "Open in Playground" from
  * (typically `Prompt.compile` or `PromptApiService.get`), find the
  * nearest llm in the same trace to load instead. Preference order:
@@ -3451,49 +4503,16 @@ function findNearestLlm<T extends PromptStudioCandidateRow>(
   rows: T[],
   requested: T,
 ): T | null {
-  const isLlm = (r: T) =>
-    (r.SpanAttributes["langwatch.span.type"] as string | undefined) === "llm";
-
-  const llmRows = rows.filter(isLlm);
+  const llmRows = rows.filter(isLlmSpan);
   if (llmRows.length === 0) return null;
 
-  // 1. Descendant llm closest to the requested span (smallest depth diff).
-  const childrenByParent = new Map<string, T[]>();
-  for (const r of rows) {
-    if (!r.ParentSpanId) continue;
-    const list = childrenByParent.get(r.ParentSpanId);
-    if (list) list.push(r);
-    else childrenByParent.set(r.ParentSpanId, [r]);
-  }
-  const visited = new Set<string>();
-  const queue: T[] = [requested];
-  while (queue.length > 0) {
-    const current = queue.shift()!;
-    if (visited.has(current.SpanId)) continue;
-    visited.add(current.SpanId);
-    const children = childrenByParent.get(current.SpanId) ?? [];
-    for (const child of children) {
-      if (isLlm(child)) return child;
-      queue.push(child);
-    }
-  }
+  const childrenByParent = buildSpanChildrenIndex(rows);
 
-  // 2. Sibling llm under the same parent (or root-level peer if the
-  //    requested span has no parent) that started at/after the requested
-  //    span. Earliest qualifying sibling wins, so we land on the *next*
-  //    call rather than one further down the chain. Siblings that
-  //    started *before* the requested span do NOT count — those belong
-  //    to an earlier turn and would open an unrelated playground
-  //    context — so the search falls through to step 3 instead.
-  const siblingPool =
-    requested.ParentSpanId == null
-      ? rows.filter((r) => r.ParentSpanId == null)
-      : (childrenByParent.get(requested.ParentSpanId) ?? []);
-  const siblings = siblingPool
-    .filter((s) => s.SpanId !== requested.SpanId && isLlm(s))
-    .sort((a, b) => a.StartTime - b.StartTime);
-  const nextOrSame = siblings.find((s) => s.StartTime >= requested.StartTime);
-  if (nextOrSame) return nextOrSame;
+  const descendant = findClosestDescendantLlm({ requested, childrenByParent });
+  if (descendant) return descendant;
+
+  const nextSibling = findNextSiblingLlm({ rows, requested, childrenByParent });
+  if (nextSibling) return nextSibling;
 
   // 3. Earliest llm in the trace.
   return llmRows.sort((a, b) => a.StartTime - b.StartTime)[0] ?? null;

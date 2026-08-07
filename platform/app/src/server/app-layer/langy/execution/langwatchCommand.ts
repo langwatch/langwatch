@@ -67,62 +67,126 @@ const ENV_ASSIGNMENT = /^[A-Za-z_][A-Za-z0-9_]*=/;
  * as standalone tokens. Not a shell parser — just enough structure to find a
  * program in command position and read the words after it.
  */
-function tokenize(command: string): string[] {
-  const tokens: string[] = [];
-  let current = "";
-  let quote: '"' | "'" | null = null;
+interface TokenizerState {
+  tokens: string[];
+  current: string;
+  quote: '"' | "'" | null;
+}
 
-  const flush = () => {
-    if (current.length > 0) {
-      tokens.push(current);
-      current = "";
-    }
-  };
-
-  for (let i = 0; i < command.length; i++) {
-    const char = command[i]!;
-
-    if (quote) {
-      if (char === "\\" && quote === '"' && i + 1 < command.length) {
-        current += command[++i]!;
-      } else if (char === quote) {
-        quote = null;
-      } else {
-        current += char;
-      }
-      continue;
-    }
-
-    if (char === '"' || char === "'") {
-      quote = char;
-      continue;
-    }
-    if (char === "\\" && i + 1 < command.length) {
-      // A line continuation folds away; any other escape keeps the next char.
-      const next = command[++i]!;
-      if (next !== "\n") current += next;
-      continue;
-    }
-    if (char === "\n" || char === ";" || char === "(" || char === ")") {
-      flush();
-      tokens.push(char === "\n" ? "\n" : char);
-      continue;
-    }
-    if (char === "&" || char === "|") {
-      flush();
-      const doubled = command[i + 1] === char;
-      tokens.push(doubled ? char + char : char);
-      if (doubled) i++;
-      continue;
-    }
-    if (/\s/.test(char)) {
-      flush();
-      continue;
-    }
-    current += char;
+function flushToken(state: TokenizerState): void {
+  if (state.current.length > 0) {
+    state.tokens.push(state.current);
+    state.current = "";
   }
-  flush();
-  return tokens;
+}
+
+/**
+ * Consume the character at `i` while inside a quoted string. Returns the
+ * index of the last character consumed (the caller's `for` loop advances
+ * past it). Split out of `tokenize`.
+ */
+function consumeQuotedChar(
+  command: string,
+  i: number,
+  state: TokenizerState,
+): number {
+  const char = command[i]!;
+  if (char === "\\" && state.quote === '"' && i + 1 < command.length) {
+    state.current += command[i + 1]!;
+    return i + 1;
+  }
+  if (char === state.quote) {
+    state.quote = null;
+    return i;
+  }
+  state.current += char;
+  return i;
+}
+
+function isQuoteChar(char: string): char is '"' | "'" {
+  return char === '"' || char === "'";
+}
+
+/** A char that ends the current token and stands as its own separator token. */
+function isLineBreakingChar(char: string): boolean {
+  return char === "\n" || char === ";" || char === "(" || char === ")";
+}
+
+function isAmpersandOrPipe(char: string): boolean {
+  return char === "&" || char === "|";
+}
+
+/** A line continuation folds away; any other escape keeps the next char. */
+function consumeBackslashChar(
+  command: string,
+  i: number,
+  state: TokenizerState,
+): number {
+  const next = command[i + 1]!;
+  if (next !== "\n") state.current += next;
+  return i + 1;
+}
+
+function consumeAmpersandOrPipeChar({
+  command,
+  i,
+  char,
+  state,
+}: {
+  command: string;
+  i: number;
+  char: string;
+  state: TokenizerState;
+}): number {
+  flushToken(state);
+  const doubled = command[i + 1] === char;
+  state.tokens.push(doubled ? char + char : char);
+  return doubled ? i + 1 : i;
+}
+
+/**
+ * Consume the character at `i` outside any quoted string. Returns the index
+ * of the last character consumed. Split out of `tokenize`.
+ */
+function consumeUnquotedChar(
+  command: string,
+  i: number,
+  state: TokenizerState,
+): number {
+  const char = command[i]!;
+
+  if (isQuoteChar(char)) {
+    state.quote = char;
+    return i;
+  }
+  if (char === "\\" && i + 1 < command.length) {
+    return consumeBackslashChar(command, i, state);
+  }
+  if (isLineBreakingChar(char)) {
+    flushToken(state);
+    state.tokens.push(char === "\n" ? "\n" : char);
+    return i;
+  }
+  if (isAmpersandOrPipe(char)) {
+    return consumeAmpersandOrPipeChar({ command, i, char, state });
+  }
+  if (/\s/.test(char)) {
+    flushToken(state);
+    return i;
+  }
+  state.current += char;
+  return i;
+}
+
+function tokenize(command: string): string[] {
+  const state: TokenizerState = { tokens: [], current: "", quote: null };
+  for (let i = 0; i < command.length; i++) {
+    i = state.quote
+      ? consumeQuotedChar(command, i, state)
+      : consumeUnquotedChar(command, i, state);
+  }
+  flushToken(state);
+  return state.tokens;
 }
 
 /**
@@ -179,6 +243,38 @@ const VALUE_TAKING_GLOBAL_FLAGS = new Set(["--output", "-o", "--jq"]);
  * carries what the agent asked for, not a re-validated schema — so values stay
  * strings, repeats become arrays, and unknown flags are kept, never dropped.
  */
+/**
+ * Read the flag token at `i` — its (kebab) name, its value, and the index of
+ * the next unconsumed token (1 past it, or 2 past it when a following
+ * non-flag token was consumed as the value). `null` for a bare `--`. Split
+ * out of `parseArgs`.
+ */
+function consumeFlagToken(
+  tokens: string[],
+  i: number,
+): { name: string; value: unknown; nextIndex: number } | null {
+  const token = tokens[i]!;
+  const equals = token.indexOf("=");
+  const name = (equals === -1 ? token : token.slice(0, equals)).replace(
+    /^-+/,
+    "",
+  );
+  if (!name) return null; // a bare `--`
+
+  if (equals !== -1) {
+    return { name, value: token.slice(equals + 1), nextIndex: i + 1 };
+  }
+  const next = tokens[i + 1];
+  if (
+    next !== undefined &&
+    !COMMAND_SEPARATORS.has(next) &&
+    !isFlagToken(next)
+  ) {
+    return { name, value: next, nextIndex: i + 2 };
+  }
+  return { name, value: true, nextIndex: i + 1 };
+}
+
 function parseArgs(tokens: string[], from: number): Record<string, unknown> {
   const args: Record<string, unknown> = {};
   const positionals: string[] = [];
@@ -190,37 +286,24 @@ function parseArgs(tokens: string[], from: number): Record<string, unknown> {
     else args[name] = [existing, value];
   };
 
-  for (let i = from; i < tokens.length; i++) {
+  let i = from;
+  while (i < tokens.length) {
     const token = tokens[i]!;
     if (COMMAND_SEPARATORS.has(token)) break;
 
     if (!isFlagToken(token)) {
       positionals.push(token);
-      continue;
-    }
-
-    const equals = token.indexOf("=");
-    const name = (equals === -1 ? token : token.slice(0, equals)).replace(
-      /^-+/,
-      "",
-    );
-    if (!name) continue; // a bare `--`
-
-    if (equals !== -1) {
-      put(name, token.slice(equals + 1));
-      continue;
-    }
-    const next = tokens[i + 1];
-    if (
-      next !== undefined &&
-      !COMMAND_SEPARATORS.has(next) &&
-      !isFlagToken(next)
-    ) {
-      put(name, next);
       i++;
-    } else {
-      put(name, true);
+      continue;
     }
+
+    const flag = consumeFlagToken(tokens, i);
+    if (!flag) {
+      i++;
+      continue;
+    }
+    put(flag.name, flag.value);
+    i = flag.nextIndex;
   }
 
   if (positionals.length > 0) args._ = positionals;
@@ -235,6 +318,56 @@ function parseArgs(tokens: string[], from: number): Record<string, unknown> {
  * docs integration/python`. Those carry no capability, so the caller leaves the
  * frame as the shell call it was.
  */
+/**
+ * Skip root-position global flags before the resource, starting at `from`.
+ * `lw --output json monitor list` is the spelling the CLI's own help text
+ * teaches (the root's copies are what render under "Global Options:"), and
+ * reading `--output` as the resource failed the identifier test and threw
+ * away the whole command rather than the flag.
+ *
+ * Which flags take a value is read from a list rather than guessed from "the
+ * next token is not a flag": guessing swallows the resource whenever a
+ * BOOLEAN global precedes it (`lw --agent monitor list` would read `list` as
+ * the resource and find no verb). Split out of `parseLangwatchCommand`.
+ */
+function skipGlobalFlags(tokens: string[], from: number): number {
+  let at = from;
+  while (at < tokens.length && isFlagToken(tokens[at]!)) {
+    const flag = tokens[at]!;
+    const name = flag.includes("=") ? flag.slice(0, flag.indexOf("=")) : flag;
+    const takesValue =
+      !flag.includes("=") && VALUE_TAKING_GLOBAL_FLAGS.has(name);
+    const next = tokens[at + 1];
+    at +=
+      takesValue &&
+      next !== undefined &&
+      !isFlagToken(next) &&
+      !COMMAND_SEPARATORS.has(next)
+        ? 2
+        : 1;
+  }
+  return at;
+}
+
+/**
+ * The command at the FIRST langwatch program token found at or after `i`
+ * (the caller has already confirmed `tokens[i]` is that token, in command
+ * position) — skipping its global flags, then reading resource + verb.
+ * Split out of `parseLangwatchCommand`.
+ */
+function commandAfterProgramToken(
+  tokens: string[],
+  i: number,
+): LangwatchCommand | null {
+  const at = skipGlobalFlags(tokens, i + 1);
+
+  const resource = tokens[at];
+  const verb = tokens[at + 1];
+  if (!resource || !verb) return null;
+  if (!IDENTIFIER.test(resource) || !IDENTIFIER.test(verb)) return null;
+  return { resource, verb, args: parseArgs(tokens, at + 2) };
+}
+
 export function parseLangwatchCommand(
   command: string,
 ): LangwatchCommand | null {
@@ -244,38 +377,7 @@ export function parseLangwatchCommand(
   for (let i = 0; i < tokens.length; i++) {
     if (!isLangwatchProgram(tokens[i]!)) continue;
     if (!isInCommandPosition(tokens, i)) continue;
-
-    // Skip root-position global flags before the resource. `lw --output json
-    // monitor list` is the spelling the CLI's own help text teaches (the root's
-    // copies are what render under "Global Options:"), and reading `--output`
-    // as the resource failed the identifier test and threw away the whole
-    // command rather than the flag.
-    //
-    // Which flags take a value is read from a list rather than guessed from
-    // "the next token is not a flag": guessing swallows the resource whenever a
-    // BOOLEAN global precedes it (`lw --agent monitor list` would read `list`
-    // as the resource and find no verb).
-    let at = i + 1;
-    while (at < tokens.length && isFlagToken(tokens[at]!)) {
-      const flag = tokens[at]!;
-      const name = flag.includes("=") ? flag.slice(0, flag.indexOf("=")) : flag;
-      const takesValue =
-        !flag.includes("=") && VALUE_TAKING_GLOBAL_FLAGS.has(name);
-      const next = tokens[at + 1];
-      at +=
-        takesValue &&
-        next !== undefined &&
-        !isFlagToken(next) &&
-        !COMMAND_SEPARATORS.has(next)
-          ? 2
-          : 1;
-    }
-
-    const resource = tokens[at];
-    const verb = tokens[at + 1];
-    if (!resource || !verb) return null;
-    if (!IDENTIFIER.test(resource) || !IDENTIFIER.test(verb)) return null;
-    return { resource, verb, args: parseArgs(tokens, at + 2) };
+    return commandAfterProgramToken(tokens, i);
   }
   return null;
 }
@@ -288,20 +390,29 @@ export function parseLangwatchCommand(
  * single token to the tokenizer, so `echo "langwatch navigate open x"` yields
  * nothing.
  */
+/**
+ * The `langwatch <resource> <verb>` command starting at token `i`, if the
+ * program there is one. Split out of `parseAllLangwatchCommands`.
+ */
+function commandAt(tokens: string[], i: number): LangwatchCommand | null {
+  if (!isLangwatchProgram(tokens[i]!)) return null;
+  if (!isInCommandPosition(tokens, i)) return null;
+
+  const resource = tokens[i + 1];
+  const verb = tokens[i + 2];
+  if (!resource || !verb) return null;
+  if (!IDENTIFIER.test(resource) || !IDENTIFIER.test(verb)) return null;
+  return { resource, verb, args: parseArgs(tokens, i + 3) };
+}
+
 export function parseAllLangwatchCommands(command: string): LangwatchCommand[] {
   if (typeof command !== "string" || !command.trim()) return [];
 
   const tokens = tokenize(command);
   const found: LangwatchCommand[] = [];
   for (let i = 0; i < tokens.length; i++) {
-    if (!isLangwatchProgram(tokens[i]!)) continue;
-    if (!isInCommandPosition(tokens, i)) continue;
-
-    const resource = tokens[i + 1];
-    const verb = tokens[i + 2];
-    if (!resource || !verb) continue;
-    if (!IDENTIFIER.test(resource) || !IDENTIFIER.test(verb)) continue;
-    found.push({ resource, verb, args: parseArgs(tokens, i + 3) });
+    const parsed = commandAt(tokens, i);
+    if (parsed) found.push(parsed);
   }
   return found;
 }

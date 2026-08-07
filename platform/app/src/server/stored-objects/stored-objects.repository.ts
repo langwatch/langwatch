@@ -14,6 +14,52 @@ const TABLE_NAME = "stored_objects" as const;
 
 const tracer = getLangWatchTracer("langwatch.stored-objects.repository");
 
+/** Row shape returned by the `sumSizeBytesByProject` aggregate query. */
+interface SizeSumRow {
+  total_bytes: string | number | null;
+  object_count: string | number | null;
+}
+
+function toSizeSumResult(raw: SizeSumRow | undefined): {
+  totalBytes: number;
+  objectCount: number;
+} {
+  return {
+    totalBytes: raw?.total_bytes != null ? Number(raw.total_bytes) : 0,
+    objectCount: raw?.object_count != null ? Number(raw.object_count) : 0,
+  };
+}
+
+function buildSumSizeBytesQuery({
+  projectId,
+  purpose,
+}: {
+  projectId: string;
+  purpose: string | undefined;
+}): { query: string; query_params: Record<string, string> } {
+  const purposePredicate = purpose ? "AND t.purpose = {purpose:String}" : "";
+  const innerPurposePredicate = purpose ? "AND purpose = {purpose:String}" : "";
+
+  return {
+    query: `
+      SELECT
+        sum(t.size_bytes) AS total_bytes,
+        count()           AS object_count
+      FROM ${TABLE_NAME} AS t
+      WHERE t.project_id = {projectId:String}
+        ${purposePredicate}
+        AND (t.project_id, t.id, t.inserted_at) IN (
+          SELECT project_id, id, max(inserted_at)
+          FROM ${TABLE_NAME}
+          WHERE project_id = {projectId:String}
+            ${innerPurposePredicate}
+          GROUP BY project_id, id
+        )
+    `,
+    query_params: purpose ? { projectId, purpose } : { projectId },
+  };
+}
+
 /**
  * ClickHouse repository for stored_objects rows.
  *
@@ -283,42 +329,13 @@ export class StoredObjectsRepository {
           );
         }
 
-        const purposePredicate = purpose
-          ? "AND t.purpose = {purpose:String}"
-          : "";
-        const innerPurposePredicate = purpose
-          ? "AND purpose = {purpose:String}"
-          : "";
-
         const result = await client.query({
-          query: `
-            SELECT
-              sum(t.size_bytes) AS total_bytes,
-              count()           AS object_count
-            FROM ${TABLE_NAME} AS t
-            WHERE t.project_id = {projectId:String}
-              ${purposePredicate}
-              AND (t.project_id, t.id, t.inserted_at) IN (
-                SELECT project_id, id, max(inserted_at)
-                FROM ${TABLE_NAME}
-                WHERE project_id = {projectId:String}
-                  ${innerPurposePredicate}
-                GROUP BY project_id, id
-              )
-          `,
-          query_params: purpose ? { projectId, purpose } : { projectId },
+          ...buildSumSizeBytesQuery({ projectId, purpose }),
           format: "JSONEachRow",
         });
 
-        const rows = await result.json<{
-          total_bytes: string | number | null;
-          object_count: string | number | null;
-        }>();
-        const raw = rows[0];
-        const totalBytes =
-          raw?.total_bytes != null ? Number(raw.total_bytes) : 0;
-        const objectCount =
-          raw?.object_count != null ? Number(raw.object_count) : 0;
+        const rows = await result.json<SizeSumRow>();
+        const { totalBytes, objectCount } = toSizeSumResult(rows[0]);
         span.setAttribute("stored_objects.total_bytes", totalBytes);
         span.setAttribute("stored_objects.object_count", objectCount);
         return { totalBytes, objectCount };

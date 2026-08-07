@@ -489,12 +489,103 @@ export function assertPayloadWithinCap(
   }
 }
 
-export async function encodeJobEnvelope({
+/**
+ * GQ2: content-addressed, tenant-namespaced, tiered offload encode. Only
+ * called once the composition root supplied both a tiered store and the
+ * job's tenant — see {@link encodeJobEnvelope}.
+ */
+async function encodeJobEnvelopeGQ2({
+  jobData,
+  tieredBlobs,
+  projectId,
+  queueName,
+  logger,
+}: {
+  jobData: Record<string, unknown>;
+  tieredBlobs: TieredBlobStore;
+  projectId: TenantId;
+  queueName?: string;
+  logger?: Logger;
+}): Promise<string> {
+  const header = routingHeader(jobData, 2);
+  // Lift queue machinery into the header so it doesn't perturb the content
+  // hash. Without this, N reactors fanning out the same event produce N
+  // different hashes because each carries its own __jobName / __attempt
+  // (ADR-029). The body now contains only the user payload.
+  const { machinery, payload } = splitMachineryFromBody(jobData);
+  // The routing trio is already in header.p/t/n via routingHeader(); drop
+  // the duplicate copy from m so the wire format isn't ~50 bytes heavier
+  // per envelope and the two can't drift.
+  delete machinery.__pipelineName;
+  delete machinery.__jobType;
+  delete machinery.__jobName;
+  if (Object.keys(machinery).length > 0) {
+    header.m = machinery;
+  }
+
+  // GQ2 never serializes `jobData` as a whole — only the payload. The old
+  // `JSON.stringify(jobData)` above this branch was a second full pass whose
+  // result this path then threw away.
+  const {
+    bytes,
+    codec,
+    json: payloadJson,
+  } = encodePayload(payload, {
+    msgpackEnabled: msgpackWritesEnabled(),
+  });
+  const payloadBytes = bytes.length;
+  assertPayloadWithinCap(payloadBytes, { projectId, queueName, logger });
+  // Recorded on every envelope, not just offloaded ones: an inline body over
+  // COMPRESSION_THRESHOLD_BYTES is stored compressed, so `#value` understates
+  // it too. See EnvelopeHeader.s.
+  header.s = payloadBytes;
+
+  if (payloadBytes > INLINE_CEILING_BYTES) {
+    const compression = writeCompression();
+    const ref = await tieredBlobs.put({
+      projectId,
+      data: await compress(bytes, compression),
+      // Hash the RAW payload, never the compressed output — the dedup key must
+      // not depend on gzip/zstd determinism (library version/level; ADR-030
+      // §1). The codec is folded in so a JSON-encoded and a msgpack-encoded
+      // copy of the same payload can't collide on one key with different bytes
+      // mid-rollout.
+      hashSource: contentHashSource({ codec, json: payloadJson, bytes }),
+      mediaType: compressionMediaType(compression),
+    });
+    header.e = ref.tier;
+    header.ref = ref;
+    // Per-stage lease holder identity for this staged
+    // occupancy. Lives in the (inline) header, never in the content-addressed
+    // body, so it doesn't perturb the blob hash that collapses the fan-out.
+    header.h = randomUUID();
+    return finalize(ENVELOPE_PREFIX_V2, header, "");
+  }
+
+  // Inline bodies are under INLINE_CEILING_BYTES (4KB) and msgpack only
+  // engages above MSGPACK_MIN_BYTES (100KB), so an inline body is always JSON.
+  return finalize(
+    ENVELOPE_PREFIX_V2,
+    header,
+    await inlineBody(
+      payloadJson ?? bytes.toString("utf-8"),
+      payloadBytes,
+      header,
+    ),
+  );
+}
+
+/**
+ * GQ1 fallback encode: reached when writes are disabled, or the caller
+ * opted into writes but didn't supply BOTH a tiered store and a projectId.
+ * See {@link encodeJobEnvelope}.
+ */
+async function encodeJobEnvelopeGQ1({
   jobData,
   blobs,
   tieredBlobs,
   projectId,
-  writesEnabled,
+  enabled,
   queueName,
   logger,
 }: {
@@ -502,94 +593,10 @@ export async function encodeJobEnvelope({
   blobs?: JobBlobStore;
   tieredBlobs?: TieredBlobStore;
   projectId?: TenantId;
-  /**
-   * Explicit override of the format-rollout gate. When omitted, the encoder
-   * falls back to the `GROUP_QUEUE_ENVELOPE_WRITES_ENABLED` env var (call-time
-   * read, so tests can toggle without module reload). Composition roots should
-   * thread this through explicitly so a partial fleet rollout doesn't put
-   * mixed GQ1/GQ2 values in the same group's hash space until every pod cycles.
-   */
-  writesEnabled?: boolean;
-  /** Optional queue name for observability labels. */
+  enabled: boolean;
   queueName?: string;
-  /** Optional logger for tenant-attributed warn on cap / downgrade. */
   logger?: Logger;
 }): Promise<string> {
-  const enabled = writesEnabled ?? envelopeWritesEnabled();
-
-  // GQ2: content-addressed, tenant-namespaced, tiered offload. Active only once
-  // the composition root supplies a tiered store and the job's tenant. If
-  // either is missing we fall back to GQ1 — noisy so a regression in the
-  // composition root can't ship a silently-downgraded pipeline.
-  if (enabled && tieredBlobs && projectId) {
-    const header = routingHeader(jobData, 2);
-    // Lift queue machinery into the header so it doesn't perturb the content
-    // hash. Without this, N reactors fanning out the same event produce N
-    // different hashes because each carries its own __jobName / __attempt
-    // (ADR-029). The body now contains only the user payload.
-    const { machinery, payload } = splitMachineryFromBody(jobData);
-    // The routing trio is already in header.p/t/n via routingHeader(); drop
-    // the duplicate copy from m so the wire format isn't ~50 bytes heavier
-    // per envelope and the two can't drift.
-    delete machinery.__pipelineName;
-    delete machinery.__jobType;
-    delete machinery.__jobName;
-    if (Object.keys(machinery).length > 0) {
-      header.m = machinery;
-    }
-
-    // GQ2 never serializes `jobData` as a whole — only the payload. The old
-    // `JSON.stringify(jobData)` above this branch was a second full pass whose
-    // result this path then threw away.
-    const {
-      bytes,
-      codec,
-      json: payloadJson,
-    } = encodePayload(payload, {
-      msgpackEnabled: msgpackWritesEnabled(),
-    });
-    const payloadBytes = bytes.length;
-    assertPayloadWithinCap(payloadBytes, { projectId, queueName, logger });
-    // Recorded on every envelope, not just offloaded ones: an inline body over
-    // COMPRESSION_THRESHOLD_BYTES is stored compressed, so `#value` understates
-    // it too. See EnvelopeHeader.s.
-    header.s = payloadBytes;
-
-    if (payloadBytes > INLINE_CEILING_BYTES) {
-      const compression = writeCompression();
-      const ref = await tieredBlobs.put({
-        projectId,
-        data: await compress(bytes, compression),
-        // Hash the RAW payload, never the compressed output — the dedup key must
-        // not depend on gzip/zstd determinism (library version/level; ADR-030
-        // §1). The codec is folded in so a JSON-encoded and a msgpack-encoded
-        // copy of the same payload can't collide on one key with different bytes
-        // mid-rollout.
-        hashSource: contentHashSource({ codec, json: payloadJson, bytes }),
-        mediaType: compressionMediaType(compression),
-      });
-      header.e = ref.tier;
-      header.ref = ref;
-      // Per-stage lease holder identity for this staged
-      // occupancy. Lives in the (inline) header, never in the content-addressed
-      // body, so it doesn't perturb the blob hash that collapses the fan-out.
-      header.h = randomUUID();
-      return finalize(ENVELOPE_PREFIX_V2, header, "");
-    }
-
-    // Inline bodies are under INLINE_CEILING_BYTES (4KB) and msgpack only
-    // engages above MSGPACK_MIN_BYTES (100KB), so an inline body is always JSON.
-    return finalize(
-      ENVELOPE_PREFIX_V2,
-      header,
-      await inlineBody(
-        payloadJson ?? bytes.toString("utf-8"),
-        payloadBytes,
-        header,
-      ),
-    );
-  }
-
   const json = JSON.stringify(jobData);
   if (!enabled) {
     return json;
@@ -629,6 +636,150 @@ export async function encodeJobEnvelope({
   );
 }
 
+export async function encodeJobEnvelope({
+  jobData,
+  blobs,
+  tieredBlobs,
+  projectId,
+  writesEnabled,
+  queueName,
+  logger,
+}: {
+  jobData: Record<string, unknown>;
+  blobs?: JobBlobStore;
+  tieredBlobs?: TieredBlobStore;
+  projectId?: TenantId;
+  /**
+   * Explicit override of the format-rollout gate. When omitted, the encoder
+   * falls back to the `GROUP_QUEUE_ENVELOPE_WRITES_ENABLED` env var (call-time
+   * read, so tests can toggle without module reload). Composition roots should
+   * thread this through explicitly so a partial fleet rollout doesn't put
+   * mixed GQ1/GQ2 values in the same group's hash space until every pod cycles.
+   */
+  writesEnabled?: boolean;
+  /** Optional queue name for observability labels. */
+  queueName?: string;
+  /** Optional logger for tenant-attributed warn on cap / downgrade. */
+  logger?: Logger;
+}): Promise<string> {
+  const enabled = writesEnabled ?? envelopeWritesEnabled();
+
+  // GQ2: content-addressed, tenant-namespaced, tiered offload. Active only once
+  // the composition root supplies a tiered store and the job's tenant. If
+  // either is missing we fall back to GQ1 — noisy so a regression in the
+  // composition root can't ship a silently-downgraded pipeline.
+  if (enabled && tieredBlobs && projectId) {
+    return encodeJobEnvelopeGQ2({
+      jobData,
+      tieredBlobs,
+      projectId,
+      queueName,
+      logger,
+    });
+  }
+
+  return encodeJobEnvelopeGQ1({
+    jobData,
+    blobs,
+    tieredBlobs,
+    projectId,
+    enabled,
+    queueName,
+    logger,
+  });
+}
+
+/** GQ2: content-addressed tiered blob. See {@link decodeJobEnvelope}. */
+async function decodeTieredBlobBody({
+  header,
+  tieredBlobs,
+  readMode,
+}: {
+  header: EnvelopeHeader;
+  tieredBlobs?: TieredBlobStore;
+  readMode: "get" | "peek";
+}): Promise<Record<string, unknown>> {
+  if (!header.ref) {
+    throw new DecodeFailureError({
+      message: "Malformed job envelope: tiered body without a blob ref",
+      reason: "malformed_envelope",
+    });
+  }
+  if (!tieredBlobs) {
+    throw new Error(
+      "Job envelope references a tiered blob but no tiered store was provided",
+    );
+  }
+  const data =
+    readMode === "peek"
+      ? await tieredBlobs.peek(header.ref)
+      : await tieredBlobs.get(header.ref);
+  if (!data) {
+    throw new DecodeFailureError({
+      message: "Job envelope tiered blob is missing (deleted or expired)",
+      reason: "missing_blob",
+    });
+  }
+  const parsedBody = await decodeBody(data);
+  return mergeMachinery(parsedBody, header);
+}
+
+/** GQ1: randomUUID offloaded blob. See {@link decodeJobEnvelope}. */
+async function decodeOffloadedBlobBody({
+  header,
+  blobs,
+  readMode,
+}: {
+  header: EnvelopeHeader;
+  blobs?: JobBlobStore;
+  readMode: "get" | "peek";
+}): Promise<Record<string, unknown>> {
+  if (typeof header.r !== "string" || header.r.length === 0) {
+    throw new DecodeFailureError({
+      message: "Malformed job envelope: ref body without a blob id",
+      reason: "malformed_envelope",
+    });
+  }
+  if (!blobs) {
+    throw new Error(
+      "Job envelope references an offloaded blob but no blob store was provided",
+    );
+  }
+  const data =
+    readMode === "peek"
+      ? await blobs.peek({ id: header.r })
+      : await blobs.get({ id: header.r });
+  if (!data) {
+    throw new DecodeFailureError({
+      message: `Job envelope blob ${header.r} is missing (deleted or expired)`,
+      reason: "missing_blob",
+    });
+  }
+  return await decodeBody(data);
+}
+
+/** Inline (possibly compressed) body — the fallthrough case. See {@link decodeJobEnvelope}. */
+async function decodeInlineEnvelopeBody({
+  header,
+  body,
+}: {
+  header: EnvelopeHeader;
+  body: string;
+}): Promise<Record<string, unknown>> {
+  // Raw inline bodies never went through the bounded decompressor, so cap them
+  // before the synchronous parse; compressed bodies are bounded by
+  // boundedDecompress itself.
+  if (header.e !== "gz") {
+    assertDecodeWithinCap(Buffer.byteLength(body, "utf8"));
+  }
+  const parsedBody =
+    header.e === "gz"
+      ? await decodeBody(Buffer.from(body, "base64"))
+      : parseInlineBody(body);
+  // GQ2 inline lifted machinery into header.m too; GQ1 (v=1) never did.
+  return header.v === 2 ? mergeMachinery(parsedBody, header) : parsedBody;
+}
+
 export async function decodeJobEnvelope({
   value,
   blobs,
@@ -662,69 +813,34 @@ export async function decodeJobEnvelope({
 
   // GQ2: content-addressed tiered blob.
   if (header.e === "redis" || header.e === "s3") {
-    if (!header.ref) {
-      throw new DecodeFailureError({
-        message: "Malformed job envelope: tiered body without a blob ref",
-        reason: "malformed_envelope",
-      });
-    }
-    if (!tieredBlobs) {
-      throw new Error(
-        "Job envelope references a tiered blob but no tiered store was provided",
-      );
-    }
-    const data =
-      readMode === "peek"
-        ? await tieredBlobs.peek(header.ref)
-        : await tieredBlobs.get(header.ref);
-    if (!data) {
-      throw new DecodeFailureError({
-        message: "Job envelope tiered blob is missing (deleted or expired)",
-        reason: "missing_blob",
-      });
-    }
-    const parsedBody = await decodeBody(data);
-    return mergeMachinery(parsedBody, header);
+    return decodeTieredBlobBody({ header, tieredBlobs, readMode });
   }
 
   // GQ1: randomUUID offloaded blob.
   if (header.e === "ref") {
-    if (typeof header.r !== "string" || header.r.length === 0) {
-      throw new DecodeFailureError({
-        message: "Malformed job envelope: ref body without a blob id",
-        reason: "malformed_envelope",
-      });
-    }
-    if (!blobs) {
-      throw new Error(
-        "Job envelope references an offloaded blob but no blob store was provided",
-      );
-    }
-    const data =
-      readMode === "peek"
-        ? await blobs.peek({ id: header.r })
-        : await blobs.get({ id: header.r });
-    if (!data) {
-      throw new DecodeFailureError({
-        message: `Job envelope blob ${header.r} is missing (deleted or expired)`,
-        reason: "missing_blob",
-      });
-    }
-    return await decodeBody(data);
+    return decodeOffloadedBlobBody({ header, blobs, readMode });
   }
 
-  // Raw inline bodies never went through the bounded decompressor, so cap them
-  // before the synchronous parse; compressed bodies are bounded by
-  // boundedDecompress itself.
-  if (header.e !== "gz") {
-    assertDecodeWithinCap(Buffer.byteLength(body, "utf8"));
-  }
-  const parsedBody =
-    header.e === "gz"
-      ? await decodeBody(Buffer.from(body, "base64"))
-      : parseInlineBody(body);
-  // GQ2 inline lifted machinery into header.m too; GQ1 (v=1) never did.
-  return header.v === 2 ? mergeMachinery(parsedBody, header) : parsedBody;
+  return decodeInlineEnvelopeBody({ header, body });
+}
+
+function routingMetaFromHeader(header: EnvelopeHeader): JobRoutingMeta {
+  return {
+    pipelineName: typeof header.p === "string" ? header.p : null,
+    jobType: typeof header.t === "string" ? header.t : null,
+    jobName: typeof header.n === "string" ? header.n : null,
+  };
+}
+
+function routingMetaFromLegacyJson(
+  parsed: Record<string, unknown>,
+): JobRoutingMeta {
+  return {
+    pipelineName:
+      typeof parsed.__pipelineName === "string" ? parsed.__pipelineName : null,
+    jobType: typeof parsed.__jobType === "string" ? parsed.__jobType : null,
+    jobName: typeof parsed.__jobName === "string" ? parsed.__jobName : null,
+  };
 }
 
 /**
@@ -735,21 +851,11 @@ export function readJobRoutingMeta(value: string): JobRoutingMeta {
   try {
     if (isEnvelope(value)) {
       const { header } = splitEnvelope(value);
-      return {
-        pipelineName: typeof header.p === "string" ? header.p : null,
-        jobType: typeof header.t === "string" ? header.t : null,
-        jobName: typeof header.n === "string" ? header.n : null,
-      };
+      return routingMetaFromHeader(header);
     }
-    const parsed = JSON.parse(value) as Record<string, unknown>;
-    return {
-      pipelineName:
-        typeof parsed.__pipelineName === "string"
-          ? parsed.__pipelineName
-          : null,
-      jobType: typeof parsed.__jobType === "string" ? parsed.__jobType : null,
-      jobName: typeof parsed.__jobName === "string" ? parsed.__jobName : null,
-    };
+    return routingMetaFromLegacyJson(
+      JSON.parse(value) as Record<string, unknown>,
+    );
   } catch {
     return { pipelineName: null, jobType: null, jobName: null };
   }

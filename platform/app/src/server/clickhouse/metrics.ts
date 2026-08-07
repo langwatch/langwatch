@@ -390,15 +390,58 @@ const MONITORED_TABLES = [
  * Absent" alert despite backups being healthy. system.backup_log is a persistent
  * system table that retains entries across restarts.
  */
+interface BackupStats {
+  status: string;
+  cnt: string;
+  last_success_time: string;
+  last_success_size: string;
+}
+
+function recordBackupStatusRow(row: BackupStats): void {
+  setClickHouseBackupStatusCount(row.status, parseInt(row.cnt, 10));
+
+  if (row.status === "BACKUP_CREATED" && row.last_success_time) {
+    const ts = new Date(row.last_success_time).getTime() / 1000;
+    if (!isNaN(ts) && ts > 0) {
+      setClickHouseBackupLastSuccessTimestamp(ts);
+    }
+    const size = parseInt(row.last_success_size, 10);
+    if (!isNaN(size)) {
+      setClickHouseBackupLastSizeBytes(size);
+    }
+  }
+}
+
+function logBackupStatsRecovered(): void {
+  if (backupStatsCollectionFailing) {
+    logger.info(
+      "ClickHouse backup stats collection recovered from previous failure",
+    );
+    backupStatsCollectionFailing = false;
+  }
+}
+
+// Even where backups ARE configured the table can be transiently unavailable
+// (a CH restart mid-tick), so a failure is handled, not fatal. Only
+// deployments that opted in reach here, and they care — surface it
+// edge-triggered, once, until it recovers.
+function logBackupStatsFailure(backupError: unknown): void {
+  if (!backupStatsCollectionFailing) {
+    logger.warn(
+      { error: backupError },
+      "Failed to collect ClickHouse backup stats from system.backup_log (further failures suppressed until recovery)",
+    );
+    backupStatsCollectionFailing = true;
+  } else {
+    logger.debug(
+      { error: backupError },
+      "Failed to collect ClickHouse backup stats from system.backup_log",
+    );
+  }
+}
+
 async function collectBackupStats(client: ClickHouseClient): Promise<void> {
   try {
-    interface BackupStats {
-      status: string;
-      cnt: string;
-      last_success_time: string;
-      last_success_size: string;
-    }
-
     const backupResult = await client.query({
       query: `
         SELECT
@@ -415,43 +458,12 @@ async function collectBackupStats(client: ClickHouseClient): Promise<void> {
 
     ensureBackupStatusTotal().reset();
     for (const row of backupRows.data) {
-      setClickHouseBackupStatusCount(row.status, parseInt(row.cnt, 10));
-
-      if (row.status === "BACKUP_CREATED" && row.last_success_time) {
-        const ts = new Date(row.last_success_time).getTime() / 1000;
-        if (!isNaN(ts) && ts > 0) {
-          setClickHouseBackupLastSuccessTimestamp(ts);
-        }
-        const size = parseInt(row.last_success_size, 10);
-        if (!isNaN(size)) {
-          setClickHouseBackupLastSizeBytes(size);
-        }
-      }
+      recordBackupStatusRow(row);
     }
 
-    if (backupStatsCollectionFailing) {
-      logger.info(
-        "ClickHouse backup stats collection recovered from previous failure",
-      );
-      backupStatsCollectionFailing = false;
-    }
+    logBackupStatsRecovered();
   } catch (backupError) {
-    // Even where backups ARE configured the table can be transiently unavailable
-    // (a CH restart mid-tick), so a failure is handled, not fatal. Only
-    // deployments that opted in reach here, and they care — surface it
-    // edge-triggered, once, until it recovers.
-    if (!backupStatsCollectionFailing) {
-      logger.warn(
-        { error: backupError },
-        "Failed to collect ClickHouse backup stats from system.backup_log (further failures suppressed until recovery)",
-      );
-      backupStatsCollectionFailing = true;
-    } else {
-      logger.debug(
-        { error: backupError },
-        "Failed to collect ClickHouse backup stats from system.backup_log",
-      );
-    }
+    logBackupStatsFailure(backupError);
   }
 }
 

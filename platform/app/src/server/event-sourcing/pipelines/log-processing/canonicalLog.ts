@@ -74,6 +74,16 @@ function longBitsToBigInt(value: UnknownRecord): bigint {
   return BigInt.asUintN(64, (high << 32n) | low);
 }
 
+function decimalFromValue(value: unknown, label: string): string {
+  if (typeof value === "bigint") return value.toString();
+  if (typeof value === "string") return value;
+  if (typeof value === "number") return String(value);
+  if (isRecord(value) && "low" in value && "high" in value) {
+    return longBitsToBigInt(value).toString();
+  }
+  throw new Error(`${label} is not an integer`);
+}
+
 function integerDecimal(value: unknown, label: string, max: bigint): string {
   if (
     typeof value === "number" &&
@@ -81,15 +91,7 @@ function integerDecimal(value: unknown, label: string, max: bigint): string {
   ) {
     throw new Error(`${label} is not a safely represented unsigned integer`);
   }
-  let decimal: string;
-  if (typeof value === "bigint") decimal = value.toString();
-  else if (typeof value === "string") decimal = value;
-  else if (typeof value === "number") decimal = String(value);
-  else if (isRecord(value) && "low" in value && "high" in value) {
-    decimal = longBitsToBigInt(value).toString();
-  } else {
-    throw new Error(`${label} is not an integer`);
-  }
+  const decimal = decimalFromValue(value, label);
   if (!/^\d+$/.test(decimal)) throw new Error(`${label} is not an integer`);
   const parsed = BigInt(decimal);
   if (parsed > max) throw new Error(`${label} is outside its OTLP range`);
@@ -115,98 +117,126 @@ function timestampMs(timestamp: string): number {
   return ms;
 }
 
-function canonicalAnyValue(value: unknown): unknown {
-  if (!isRecord(value)) return { type: "empty" };
-  const present = [
-    "stringValue",
-    "boolValue",
-    "intValue",
-    "doubleValue",
-    "bytesValue",
-    "arrayValue",
-    "kvlistValue",
-  ].filter((key) => value[key] !== undefined && value[key] !== null);
-  if (present.length === 0) return { type: "empty" };
-  if (present.length > 1)
-    throw new Error("OTLP AnyValue contains multiple values");
-  const kind = present[0]!;
-  if (kind === "stringValue") {
-    if (typeof value.stringValue !== "string") {
-      throw new Error("stringValue must be a string");
-    }
-    return { type: "string", value: value.stringValue };
+const ANY_VALUE_KEYS = [
+  "stringValue",
+  "boolValue",
+  "intValue",
+  "doubleValue",
+  "bytesValue",
+  "arrayValue",
+  "kvlistValue",
+] as const;
+
+function presentAnyValueKeys(value: UnknownRecord): string[] {
+  return ANY_VALUE_KEYS.filter(
+    (key) => value[key] !== undefined && value[key] !== null,
+  );
+}
+
+function canonicalStringValue(value: UnknownRecord): unknown {
+  if (typeof value.stringValue !== "string") {
+    throw new Error("stringValue must be a string");
   }
-  if (kind === "boolValue") {
-    const bool = value.boolValue;
-    if (typeof bool === "boolean") return { type: "bool", value: bool };
-    if (bool === "true" || bool === "false") {
-      return { type: "bool", value: bool === "true" };
-    }
-    throw new Error("boolValue must be a boolean");
+  return { type: "string", value: value.stringValue };
+}
+
+function canonicalBoolValue(value: UnknownRecord): unknown {
+  const bool = value.boolValue;
+  if (typeof bool === "boolean") return { type: "bool", value: bool };
+  if (bool === "true" || bool === "false") {
+    return { type: "bool", value: bool === "true" };
   }
-  if (kind === "intValue") {
-    const raw = value.intValue;
-    if (typeof raw === "number" && !Number.isSafeInteger(raw)) {
-      throw new Error("intValue is not safely represented");
-    }
-    if (isRecord(raw) && "low" in raw && "high" in raw) {
-      const low = BigInt(Number(raw.low ?? 0) >>> 0);
-      const high = BigInt(Number(raw.high ?? 0) >>> 0);
-      return {
-        type: "int",
-        value: BigInt.asIntN(64, (high << 32n) | low).toString(),
-      };
-    }
-    const decimal = String(raw);
-    if (!/^-?\d+$/.test(decimal)) throw new Error("intValue is not an integer");
-    return { type: "int", value: BigInt(decimal).toString() };
+  throw new Error("boolValue must be a boolean");
+}
+
+function canonicalIntValue(value: UnknownRecord): unknown {
+  const raw = value.intValue;
+  if (typeof raw === "number" && !Number.isSafeInteger(raw)) {
+    throw new Error("intValue is not safely represented");
   }
-  if (kind === "doubleValue") {
-    const number = Number(value.doubleValue);
-    if (!Number.isFinite(number)) throw new Error("doubleValue must be finite");
-    return { type: "double", value: number };
-  }
-  if (kind === "bytesValue") {
-    const raw = value.bytesValue;
-    if (typeof raw === "string") {
-      const unpadded = raw.replace(/=+$/, "");
-      const roundTrip = Buffer.from(raw, "base64")
-        .toString("base64")
-        .replace(/=+$/, "");
-      if (!/^[A-Za-z0-9+/]*={0,2}$/.test(raw) || roundTrip !== unpadded) {
-        throw new Error("bytesValue is not valid base64");
-      }
-    }
-    const bytes =
-      raw instanceof Uint8Array
-        ? raw
-        : typeof raw === "string"
-          ? Buffer.from(raw, "base64")
-          : isRecord(raw)
-            ? Buffer.from(
-                Object.entries(raw)
-                  .sort(([left], [right]) => Number(left) - Number(right))
-                  .map(([, byte]) => Number(byte)),
-              )
-            : null;
-    if (!bytes) throw new Error("bytesValue is malformed");
-    return { type: "bytes", value: Buffer.from(bytes).toString("base64") };
-  }
-  if (kind === "arrayValue") {
-    const array = value.arrayValue;
-    if (!isRecord(array) || !Array.isArray(array.values)) {
-      throw new Error("arrayValue is malformed");
-    }
+  if (isRecord(raw) && "low" in raw && "high" in raw) {
+    const low = BigInt(Number(raw.low ?? 0) >>> 0);
+    const high = BigInt(Number(raw.high ?? 0) >>> 0);
     return {
-      type: "array",
-      value: array.values.map((item) => canonicalAnyValue(item)),
+      type: "int",
+      value: BigInt.asIntN(64, (high << 32n) | low).toString(),
     };
   }
+  const decimal = String(raw);
+  if (!/^-?\d+$/.test(decimal)) throw new Error("intValue is not an integer");
+  return { type: "int", value: BigInt(decimal).toString() };
+}
+
+function canonicalDoubleValue(value: UnknownRecord): unknown {
+  const number = Number(value.doubleValue);
+  if (!Number.isFinite(number)) throw new Error("doubleValue must be finite");
+  return { type: "double", value: number };
+}
+
+function assertValidBase64BytesValue(raw: string): void {
+  const unpadded = raw.replace(/=+$/, "");
+  const roundTrip = Buffer.from(raw, "base64")
+    .toString("base64")
+    .replace(/=+$/, "");
+  if (!/^[A-Za-z0-9+/]*={0,2}$/.test(raw) || roundTrip !== unpadded) {
+    throw new Error("bytesValue is not valid base64");
+  }
+}
+
+function decodeBytesValue(raw: unknown): Uint8Array | Buffer | null {
+  if (raw instanceof Uint8Array) return raw;
+  if (typeof raw === "string") return Buffer.from(raw, "base64");
+  if (isRecord(raw)) {
+    return Buffer.from(
+      Object.entries(raw)
+        .sort(([left], [right]) => Number(left) - Number(right))
+        .map(([, byte]) => Number(byte)),
+    );
+  }
+  return null;
+}
+
+function canonicalBytesValue(value: UnknownRecord): unknown {
+  const raw = value.bytesValue;
+  if (typeof raw === "string") assertValidBase64BytesValue(raw);
+  const bytes = decodeBytesValue(raw);
+  if (!bytes) throw new Error("bytesValue is malformed");
+  return { type: "bytes", value: Buffer.from(bytes).toString("base64") };
+}
+
+function canonicalArrayValue(value: UnknownRecord): unknown {
+  const array = value.arrayValue;
+  if (!isRecord(array) || !Array.isArray(array.values)) {
+    throw new Error("arrayValue is malformed");
+  }
+  return {
+    type: "array",
+    value: array.values.map((item) => canonicalAnyValue(item)),
+  };
+}
+
+function canonicalKvlistValue(value: UnknownRecord): unknown {
   const list = value.kvlistValue;
   if (!isRecord(list) || !Array.isArray(list.values)) {
     throw new Error("kvlistValue is malformed");
   }
   return { type: "kvlist", value: canonicalAttributes(list.values) };
+}
+
+function canonicalAnyValue(value: unknown): unknown {
+  if (!isRecord(value)) return { type: "empty" };
+  const present = presentAnyValueKeys(value);
+  if (present.length === 0) return { type: "empty" };
+  if (present.length > 1)
+    throw new Error("OTLP AnyValue contains multiple values");
+  const kind = present[0]!;
+  if (kind === "stringValue") return canonicalStringValue(value);
+  if (kind === "boolValue") return canonicalBoolValue(value);
+  if (kind === "intValue") return canonicalIntValue(value);
+  if (kind === "doubleValue") return canonicalDoubleValue(value);
+  if (kind === "bytesValue") return canonicalBytesValue(value);
+  if (kind === "arrayValue") return canonicalArrayValue(value);
+  return canonicalKvlistValue(value);
 }
 
 function canonicalAttributes(
@@ -295,6 +325,57 @@ function validSpanId(value: string): boolean {
   return /^[a-f0-9]{16}$/.test(value) && !/^0+$/.test(value);
 }
 
+function resolveProviderKind(
+  scopeName: string,
+  eventName: string,
+): LogProviderKind {
+  if (scopeName === CLAUDE_CODE_EVENT_SCOPE) return "claude_code";
+  if (eventName.startsWith(CODEX_EVENT_NAME_PREFIX)) return "codex";
+  return "generic";
+}
+
+function synthesizeClaudeCodeCorrelation(args: {
+  wireTraceId: string;
+  wireSpanId: string;
+  eventName: string;
+  attributes: Record<string, string>;
+}): { traceId: string; spanId: string; source: LogCorrelationSource } | null {
+  const { wireTraceId, wireSpanId, eventName, attributes } = args;
+  const sessionId = attributes["session.id"] ?? "";
+  if (!sessionId) return null;
+  const promptId = attributes["prompt.id"] ?? "";
+  const turnKey = promptId ? `${sessionId}:${promptId}` : sessionId;
+  const traceId = validTraceId(wireTraceId)
+    ? wireTraceId
+    : sha256(turnKey).slice(0, 32);
+  const spanId = validSpanId(wireSpanId)
+    ? wireSpanId
+    : sha256(
+        `${sessionId}:${promptId}:${eventName}:${attributes["event.sequence"] ?? ""}`,
+      ).slice(0, 16);
+  return { traceId, spanId, source: "claude_synthesized" };
+}
+
+function synthesizeCodexCorrelation(args: {
+  wireTraceId: string;
+  wireSpanId: string;
+  eventName: string;
+  attributes: Record<string, string>;
+}): { traceId: string; spanId: string; source: LogCorrelationSource } | null {
+  const { wireTraceId, wireSpanId, eventName, attributes } = args;
+  const conversationId = attributes["conversation.id"] ?? "";
+  if (!conversationId) return null;
+  const traceId = validTraceId(wireTraceId)
+    ? wireTraceId
+    : sha256(conversationId).slice(0, 32);
+  const spanId = validSpanId(wireSpanId)
+    ? wireSpanId
+    : sha256(
+        `${conversationId}:${eventName}:${attributes["event.sequence"] ?? ""}`,
+      ).slice(0, 16);
+  return { traceId, spanId, source: "codex_synthesized" };
+}
+
 function synthesizeCorrelation(args: {
   scopeName: string;
   wireTraceId: string;
@@ -307,14 +388,8 @@ function synthesizeCorrelation(args: {
   source: LogCorrelationSource;
   providerKind: LogProviderKind;
 } {
-  const { wireTraceId, wireSpanId, attributes } = args;
-  const eventName = args.eventName;
-  const providerKind: LogProviderKind =
-    args.scopeName === CLAUDE_CODE_EVENT_SCOPE
-      ? "claude_code"
-      : eventName.startsWith(CODEX_EVENT_NAME_PREFIX)
-        ? "codex"
-        : "generic";
+  const { wireTraceId, wireSpanId, attributes, eventName } = args;
+  const providerKind = resolveProviderKind(args.scopeName, eventName);
   if (validTraceId(wireTraceId) && validSpanId(wireSpanId)) {
     return {
       traceId: wireTraceId,
@@ -324,44 +399,22 @@ function synthesizeCorrelation(args: {
     };
   }
   if (providerKind === "claude_code") {
-    const sessionId = attributes["session.id"] ?? "";
-    if (sessionId) {
-      const promptId = attributes["prompt.id"] ?? "";
-      const turnKey = promptId ? `${sessionId}:${promptId}` : sessionId;
-      const traceId = validTraceId(wireTraceId)
-        ? wireTraceId
-        : sha256(turnKey).slice(0, 32);
-      const spanId = validSpanId(wireSpanId)
-        ? wireSpanId
-        : sha256(
-            `${sessionId}:${promptId}:${eventName}:${attributes["event.sequence"] ?? ""}`,
-          ).slice(0, 16);
-      return {
-        traceId,
-        spanId,
-        source: "claude_synthesized",
-        providerKind,
-      };
-    }
+    const synthesized = synthesizeClaudeCodeCorrelation({
+      wireTraceId,
+      wireSpanId,
+      eventName,
+      attributes,
+    });
+    if (synthesized) return { ...synthesized, providerKind };
   }
   if (providerKind === "codex") {
-    const conversationId = attributes["conversation.id"] ?? "";
-    if (conversationId) {
-      const traceId = validTraceId(wireTraceId)
-        ? wireTraceId
-        : sha256(conversationId).slice(0, 32);
-      const spanId = validSpanId(wireSpanId)
-        ? wireSpanId
-        : sha256(
-            `${conversationId}:${eventName}:${attributes["event.sequence"] ?? ""}`,
-          ).slice(0, 16);
-      return {
-        traceId,
-        spanId,
-        source: "codex_synthesized",
-        providerKind,
-      };
-    }
+    const synthesized = synthesizeCodexCorrelation({
+      wireTraceId,
+      wireSpanId,
+      eventName,
+      attributes,
+    });
+    if (synthesized) return { ...synthesized, providerKind };
   }
   return { traceId: "", spanId: "", source: "none", providerKind };
 }
@@ -380,15 +433,11 @@ function bodyText(body: unknown): string | null {
   return null;
 }
 
-function buildRecord(args: {
-  tenantId: string;
-  organizationId: string;
+function deriveLogAttributes(args: {
   resourceLog: UnknownRecord;
   scopeLog: UnknownRecord;
   logRecord: UnknownRecord;
-  piiRedactionLevel: PIIRedactionLevel;
-  acceptedAt: number;
-}): PreparedCanonicalLogRecord {
+}) {
   const resource = isRecord(args.resourceLog.resource)
     ? args.resourceLog.resource
     : {};
@@ -412,18 +461,33 @@ function buildRecord(args: {
   const flatResourceAttributes = normalizeOtlpAttributeMap(
     resource.attributes as OtlpKeyValue[],
   );
-  const wireTraceId = normalizeId(log.traceId);
-  const wireSpanId = normalizeId(log.spanId);
-  const correlation = synthesizeCorrelation({
+
+  return {
+    resource,
+    scope,
+    log,
     scopeName,
-    wireTraceId,
-    wireSpanId,
+    scopeVersion,
+    resourceAttributes,
+    scopeAttributes,
+    attributes,
+    flatAttributes,
+    flatResourceAttributes,
     eventName,
-    attributes: flatAttributes,
-  });
-  const timeUnixNano = optionalTimestamp(log.timeUnixNano, "timeUnixNano");
+  };
+}
+
+function resolveLogTimestamps(args: {
+  log: UnknownRecord;
+  acceptedAt: number;
+}): {
+  timeUnixNano: string;
+  observedTimeUnixNano: string;
+  effectiveTimestamp: string;
+} {
+  const timeUnixNano = optionalTimestamp(args.log.timeUnixNano, "timeUnixNano");
   const observedTimeUnixNano = optionalTimestamp(
-    log.observedTimeUnixNano,
+    args.log.observedTimeUnixNano,
     "observedTimeUnixNano",
   );
   const effectiveTimestamp =
@@ -432,55 +496,168 @@ function buildRecord(args: {
       : observedTimeUnixNano !== "0"
         ? observedTimeUnixNano
         : String(BigInt(args.acceptedAt) * 1_000_000n);
-  const flags = uint32Number(log.flags, "flags");
-  const severityNumber = Number(
-    integerDecimal(log.severityNumber ?? 0, "severityNumber", 255n),
-  );
-  const canonicalBody = canonicalAnyValue(log.body);
-  const canonicalPayloadValue = {
+  return { timeUnixNano, observedTimeUnixNano, effectiveTimestamp };
+}
+
+function deriveLogTimingAndScalars(args: {
+  log: UnknownRecord;
+  acceptedAt: number;
+}): {
+  timeUnixNano: string;
+  observedTimeUnixNano: string;
+  effectiveTimestamp: string;
+  flags: number;
+  severityNumber: number;
+  canonicalBody: unknown;
+} {
+  return {
+    ...resolveLogTimestamps(args),
+    ...deriveLogScalars(args.log),
+  };
+}
+
+function buildCanonicalPayloadValue(args: {
+  resourceLog: UnknownRecord;
+  scopeLog: UnknownRecord;
+  derived: ReturnType<typeof deriveLogAttributes>;
+  wireTraceId: string;
+  wireSpanId: string;
+  metrics: ReturnType<typeof deriveLogTimingAndScalars>;
+}) {
+  const { derived, metrics } = args;
+  return {
     resource: {
       schemaUrl:
         typeof args.resourceLog.schemaUrl === "string"
           ? args.resourceLog.schemaUrl
           : "",
       droppedAttributesCount: uint32Number(
-        resource.droppedAttributesCount,
+        derived.resource.droppedAttributesCount,
         "resource.droppedAttributesCount",
       ),
-      attributes: resourceAttributes,
+      attributes: derived.resourceAttributes,
     },
     scope: {
       schemaUrl:
         typeof args.scopeLog.schemaUrl === "string"
           ? args.scopeLog.schemaUrl
           : "",
-      name: scopeName,
-      version: scopeVersion,
+      name: derived.scopeName,
+      version: derived.scopeVersion,
       droppedAttributesCount: uint32Number(
-        scope.droppedAttributesCount,
+        derived.scope.droppedAttributesCount,
         "scope.droppedAttributesCount",
       ),
-      attributes: scopeAttributes,
+      attributes: derived.scopeAttributes,
     },
     log: {
-      wireTraceId,
-      wireSpanId,
-      timeUnixNano,
-      observedTimeUnixNano,
-      severityNumber,
+      wireTraceId: args.wireTraceId,
+      wireSpanId: args.wireSpanId,
+      timeUnixNano: metrics.timeUnixNano,
+      observedTimeUnixNano: metrics.observedTimeUnixNano,
+      severityNumber: metrics.severityNumber,
       severityText:
-        typeof log.severityText === "string" ? log.severityText : "",
-      body: canonicalBody,
-      attributes,
+        typeof derived.log.severityText === "string"
+          ? derived.log.severityText
+          : "",
+      body: metrics.canonicalBody,
+      attributes: derived.attributes,
       droppedAttributesCount: uint32Number(
-        log.droppedAttributesCount,
+        derived.log.droppedAttributesCount,
         "log.droppedAttributesCount",
       ),
-      flags,
-      eventName,
+      flags: metrics.flags,
+      eventName: derived.eventName,
     },
   };
-  const canonicalPayload = stableStringify(canonicalPayloadValue);
+}
+
+function buildCanonicalLogRecordRow(args: {
+  tenantId: string;
+  organizationId: string;
+  recordId: string;
+  canonicalPayloadValue: ReturnType<typeof buildCanonicalPayloadValue>;
+  derived: ReturnType<typeof deriveLogAttributes>;
+  wireTraceId: string;
+  wireSpanId: string;
+  correlation: ReturnType<typeof synthesizeCorrelation>;
+  metrics: ReturnType<typeof deriveLogTimingAndScalars>;
+  piiRedactionLevel: PIIRedactionLevel;
+  canonicalPayload: string;
+  canonicalSizeBytes: number;
+  acceptedAt: number;
+}): CanonicalLogRecord {
+  const { derived, metrics } = args;
+  return {
+    tenantId: args.tenantId,
+    organizationId: args.organizationId,
+    recordId: args.recordId,
+    resourceSchemaUrl: args.canonicalPayloadValue.resource.schemaUrl,
+    resourceAttributesJson: stableStringify(derived.resourceAttributes),
+    resourceAttributesFlatJson: stableStringify(derived.flatResourceAttributes),
+    resourceAttributeKeys: [
+      ...new Set(derived.resourceAttributes.map((a) => a.key)),
+    ],
+    resourceDroppedAttributesCount:
+      args.canonicalPayloadValue.resource.droppedAttributesCount,
+    scopeSchemaUrl: args.canonicalPayloadValue.scope.schemaUrl,
+    scopeName: derived.scopeName,
+    scopeVersion: derived.scopeVersion,
+    scopeAttributesJson: stableStringify(derived.scopeAttributes),
+    scopeAttributeKeys: [...new Set(derived.scopeAttributes.map((a) => a.key))],
+    scopeDroppedAttributesCount:
+      args.canonicalPayloadValue.scope.droppedAttributesCount,
+    wireTraceId: args.wireTraceId,
+    wireSpanId: args.wireSpanId,
+    correlationTraceId: args.correlation.traceId,
+    correlationSpanId: args.correlation.spanId,
+    correlationSource: args.correlation.source,
+    timeUnixNano: metrics.timeUnixNano,
+    observedTimeUnixNano: metrics.observedTimeUnixNano,
+    timeUnixMs: timestampMs(metrics.effectiveTimestamp),
+    severityNumber: metrics.severityNumber,
+    severityText: args.canonicalPayloadValue.log.severityText,
+    bodyType: bodyType(metrics.canonicalBody),
+    bodyJson: stableStringify(metrics.canonicalBody),
+    bodyText: bodyText(metrics.canonicalBody),
+    attributesJson: stableStringify(derived.attributes),
+    attributesFlatJson: stableStringify(derived.flatAttributes),
+    attributeKeys: [...new Set(derived.attributes.map((a) => a.key))],
+    droppedAttributesCount:
+      args.canonicalPayloadValue.log.droppedAttributesCount,
+    flags: metrics.flags,
+    eventName: derived.eventName,
+    providerKind: args.correlation.providerKind,
+    // Deliberately empty. This once carried the claude span-kind
+    // (model/tool/turn) that the log-to-span converter classified logs by;
+    // that converter is retired (ADR-056) and agent-specific vocabulary now
+    // lives in the coding-agent pipeline's normalization, not in the generic
+    // log pipeline (§7). The column stays (migration 00050 is deployed) but
+    // has no populating source or reader.
+    providerEventKind: "",
+    providerEventSequence: derived.flatAttributes["event.sequence"] ?? "",
+    providerSessionId: derived.flatAttributes["session.id"] ?? "",
+    providerConversationId: derived.flatAttributes["conversation.id"] ?? "",
+    providerPromptId: derived.flatAttributes["prompt.id"] ?? "",
+    piiRedactionLevel: args.piiRedactionLevel,
+    canonicalPayload: args.canonicalPayload,
+    canonicalSizeBytes: args.canonicalSizeBytes,
+    occurredAt: timestampMs(metrics.effectiveTimestamp),
+    acceptedAt: args.acceptedAt,
+  };
+}
+
+function sealCanonicalPayload(args: {
+  tenantId: string;
+  canonicalPayloadValue: ReturnType<typeof buildCanonicalPayloadValue>;
+  canonicalBody: unknown;
+}): {
+  canonicalPayload: string;
+  canonicalSizeBytes: number;
+  recordId: string;
+  normalizedBody: string;
+} {
+  const canonicalPayload = stableStringify(args.canonicalPayloadValue);
   const canonicalSizeBytes = Buffer.byteLength(canonicalPayload, "utf8");
   if (canonicalSizeBytes > MAX_CANONICAL_LOG_PAYLOAD_BYTES) {
     throw new RangeError(
@@ -489,76 +666,206 @@ function buildRecord(args: {
   }
   const recordId = sha256(`${args.tenantId}\0${canonicalPayload}`);
   const normalizedBody =
-    bodyText(canonicalBody) ?? stableStringify(canonicalBody);
-  const record: CanonicalLogRecord = {
+    bodyText(args.canonicalBody) ?? stableStringify(args.canonicalBody);
+  return { canonicalPayload, canonicalSizeBytes, recordId, normalizedBody };
+}
+
+function buildNormalizedLogAttributes(args: {
+  flatAttributes: Record<string, string>;
+  eventName: string;
+}): Record<string, string> {
+  return {
+    ...args.flatAttributes,
+    ...(args.eventName && !("event.name" in args.flatAttributes)
+      ? { "event.name": args.eventName }
+      : {}),
+  };
+}
+
+function resolveWireIds(log: UnknownRecord): {
+  wireTraceId: string;
+  wireSpanId: string;
+} {
+  return {
+    wireTraceId: normalizeId(log.traceId),
+    wireSpanId: normalizeId(log.spanId),
+  };
+}
+
+function deriveLogScalars(log: UnknownRecord): {
+  flags: number;
+  severityNumber: number;
+  canonicalBody: unknown;
+} {
+  return {
+    flags: uint32Number(log.flags, "flags"),
+    severityNumber: Number(
+      integerDecimal(log.severityNumber ?? 0, "severityNumber", 255n),
+    ),
+    canonicalBody: canonicalAnyValue(log.body),
+  };
+}
+
+function buildRecord(args: {
+  tenantId: string;
+  organizationId: string;
+  resourceLog: UnknownRecord;
+  scopeLog: UnknownRecord;
+  logRecord: UnknownRecord;
+  piiRedactionLevel: PIIRedactionLevel;
+  acceptedAt: number;
+}): PreparedCanonicalLogRecord {
+  const derived = deriveLogAttributes({
+    resourceLog: args.resourceLog,
+    scopeLog: args.scopeLog,
+    logRecord: args.logRecord,
+  });
+  const { wireTraceId, wireSpanId } = resolveWireIds(derived.log);
+  const correlation = synthesizeCorrelation({
+    scopeName: derived.scopeName,
+    wireTraceId,
+    wireSpanId,
+    eventName: derived.eventName,
+    attributes: derived.flatAttributes,
+  });
+  const metrics = deriveLogTimingAndScalars({
+    log: derived.log,
+    acceptedAt: args.acceptedAt,
+  });
+  const canonicalPayloadValue = buildCanonicalPayloadValue({
+    resourceLog: args.resourceLog,
+    scopeLog: args.scopeLog,
+    derived,
+    wireTraceId,
+    wireSpanId,
+    metrics,
+  });
+  const { canonicalPayload, canonicalSizeBytes, recordId, normalizedBody } =
+    sealCanonicalPayload({
+      tenantId: args.tenantId,
+      canonicalPayloadValue,
+      canonicalBody: metrics.canonicalBody,
+    });
+  const record = buildCanonicalLogRecordRow({
     tenantId: args.tenantId,
     organizationId: args.organizationId,
     recordId,
-    resourceSchemaUrl: canonicalPayloadValue.resource.schemaUrl,
-    resourceAttributesJson: stableStringify(resourceAttributes),
-    resourceAttributesFlatJson: stableStringify(flatResourceAttributes),
-    resourceAttributeKeys: [...new Set(resourceAttributes.map((a) => a.key))],
-    resourceDroppedAttributesCount:
-      canonicalPayloadValue.resource.droppedAttributesCount,
-    scopeSchemaUrl: canonicalPayloadValue.scope.schemaUrl,
-    scopeName,
-    scopeVersion,
-    scopeAttributesJson: stableStringify(scopeAttributes),
-    scopeAttributeKeys: [...new Set(scopeAttributes.map((a) => a.key))],
-    scopeDroppedAttributesCount:
-      canonicalPayloadValue.scope.droppedAttributesCount,
+    canonicalPayloadValue,
+    derived,
     wireTraceId,
     wireSpanId,
-    correlationTraceId: correlation.traceId,
-    correlationSpanId: correlation.spanId,
-    correlationSource: correlation.source,
-    timeUnixNano,
-    observedTimeUnixNano,
-    timeUnixMs: timestampMs(effectiveTimestamp),
-    severityNumber,
-    severityText: canonicalPayloadValue.log.severityText,
-    bodyType: bodyType(canonicalBody),
-    bodyJson: stableStringify(canonicalBody),
-    bodyText: bodyText(canonicalBody),
-    attributesJson: stableStringify(attributes),
-    attributesFlatJson: stableStringify(flatAttributes),
-    attributeKeys: [...new Set(attributes.map((a) => a.key))],
-    droppedAttributesCount: canonicalPayloadValue.log.droppedAttributesCount,
-    flags,
-    eventName,
-    providerKind: correlation.providerKind,
-    // Deliberately empty. This once carried the claude span-kind
-    // (model/tool/turn) that the log-to-span converter classified logs by;
-    // that converter is retired (ADR-056) and agent-specific vocabulary now
-    // lives in the coding-agent pipeline's normalization, not in the generic
-    // log pipeline (§7). The column stays (migration 00050 is deployed) but
-    // has no populating source or reader.
-    providerEventKind: "",
-    providerEventSequence: flatAttributes["event.sequence"] ?? "",
-    providerSessionId: flatAttributes["session.id"] ?? "",
-    providerConversationId: flatAttributes["conversation.id"] ?? "",
-    providerPromptId: flatAttributes["prompt.id"] ?? "",
+    correlation,
+    metrics,
     piiRedactionLevel: args.piiRedactionLevel,
     canonicalPayload,
     canonicalSizeBytes,
-    occurredAt: timestampMs(effectiveTimestamp),
     acceptedAt: args.acceptedAt,
-  };
+  });
   return {
     record,
     normalized: {
       body: normalizedBody,
-      attributes: {
-        ...flatAttributes,
-        ...(eventName && !("event.name" in flatAttributes)
-          ? { "event.name": eventName }
-          : {}),
-      },
-      resourceAttributes: flatResourceAttributes,
-      scopeName,
-      scopeVersion: scopeVersion || null,
+      attributes: buildNormalizedLogAttributes({
+        flatAttributes: derived.flatAttributes,
+        eventName: derived.eventName,
+      }),
+      resourceAttributes: derived.flatResourceAttributes,
+      scopeName: derived.scopeName,
+      scopeVersion: derived.scopeVersion || null,
     },
   };
+}
+
+async function processLogRecord(args: {
+  tenantId: string;
+  organizationId: string;
+  resourceLog: UnknownRecord;
+  scopeLog: UnknownRecord;
+  resourceTemplate: UnknownRecord;
+  scopeTemplate: UnknownRecord;
+  logRecordRaw: unknown;
+  piiRedactionLevel: PIIRedactionLevel;
+  redactionService: LogRedactionService;
+  acceptedAt: number;
+}): Promise<{ accepted?: PreparedCanonicalLogRecord; error?: string }> {
+  if (!isRecord(args.logRecordRaw)) {
+    return { error: "log record is malformed" };
+  }
+  const resource = structuredClone(args.resourceTemplate);
+  const scope = structuredClone(args.scopeTemplate);
+  const logRecord = structuredClone(args.logRecordRaw);
+  try {
+    await redactTypedLog({
+      resourceAttributes: resource.attributes,
+      scopeAttributes: scope.attributes,
+      logAttributes: logRecord.attributes,
+      body: logRecord.body,
+      redactionService: args.redactionService,
+      piiRedactionLevel: args.piiRedactionLevel,
+      tenantId: args.tenantId,
+    });
+    const accepted = buildRecord({
+      tenantId: args.tenantId,
+      organizationId: args.organizationId,
+      resourceLog: { ...args.resourceLog, resource },
+      scopeLog: { ...args.scopeLog, scope },
+      logRecord,
+      piiRedactionLevel: args.piiRedactionLevel,
+      acceptedAt: args.acceptedAt,
+    });
+    return { accepted };
+  } catch (error) {
+    return {
+      error: `log record: ${error instanceof Error ? error.message : String(error)}`,
+    };
+  }
+}
+
+async function processScopeLog(args: {
+  tenantId: string;
+  organizationId: string;
+  resourceLog: UnknownRecord;
+  resourceTemplate: UnknownRecord;
+  scopeLogRaw: unknown;
+  piiRedactionLevel: PIIRedactionLevel;
+  redactionService: LogRedactionService;
+  acceptedAt: number;
+}): Promise<{
+  accepted: PreparedCanonicalLogRecord[];
+  rejected: number;
+  errors: string[];
+}> {
+  const accepted: PreparedCanonicalLogRecord[] = [];
+  const errors: string[] = [];
+  let rejected = 0;
+  if (!args.scopeLogRaw) {
+    return { accepted, rejected, errors };
+  }
+  const scopeLog = structuredClone(args.scopeLogRaw) as UnknownRecord;
+  const scopeTemplate = isRecord(scopeLog.scope) ? scopeLog.scope : {};
+  const logRecords = Array.isArray(scopeLog.logRecords)
+    ? scopeLog.logRecords
+    : [];
+  for (const logRecordRaw of logRecords) {
+    const result = await processLogRecord({
+      tenantId: args.tenantId,
+      organizationId: args.organizationId,
+      resourceLog: args.resourceLog,
+      scopeLog,
+      resourceTemplate: args.resourceTemplate,
+      scopeTemplate,
+      logRecordRaw,
+      piiRedactionLevel: args.piiRedactionLevel,
+      redactionService: args.redactionService,
+      acceptedAt: args.acceptedAt,
+    });
+    if (result.accepted) accepted.push(result.accepted);
+    if (result.error) {
+      rejected++;
+      errors.push(result.error);
+    }
+  }
+  return { accepted, rejected, errors };
 }
 
 export async function prepareCanonicalLogRecords(args: {
@@ -581,49 +888,19 @@ export async function prepareCanonicalLogRecords(args: {
       ? resourceLog.resource
       : {};
     for (const scopeLogRaw of (resourceLog.scopeLogs as unknown[]) ?? []) {
-      if (!scopeLogRaw) continue;
-      const scopeLog = structuredClone(scopeLogRaw) as UnknownRecord;
-      const scopeTemplate = isRecord(scopeLog.scope) ? scopeLog.scope : {};
-      const logRecords = Array.isArray(scopeLog.logRecords)
-        ? scopeLog.logRecords
-        : [];
-      for (const logRecordRaw of logRecords) {
-        if (!isRecord(logRecordRaw)) {
-          rejectedLogRecords++;
-          errors.push("log record is malformed");
-          continue;
-        }
-        const resource = structuredClone(resourceTemplate);
-        const scope = structuredClone(scopeTemplate);
-        const logRecord = structuredClone(logRecordRaw);
-        try {
-          await redactTypedLog({
-            resourceAttributes: resource.attributes,
-            scopeAttributes: scope.attributes,
-            logAttributes: logRecord.attributes,
-            body: logRecord.body,
-            redactionService: args.redactionService,
-            piiRedactionLevel: args.piiRedactionLevel,
-            tenantId: args.tenantId,
-          });
-          accepted.push(
-            buildRecord({
-              tenantId: args.tenantId,
-              organizationId: args.organizationId,
-              resourceLog: { ...resourceLog, resource },
-              scopeLog: { ...scopeLog, scope },
-              logRecord,
-              piiRedactionLevel: args.piiRedactionLevel,
-              acceptedAt,
-            }),
-          );
-        } catch (error) {
-          rejectedLogRecords++;
-          errors.push(
-            `log record: ${error instanceof Error ? error.message : String(error)}`,
-          );
-        }
-      }
+      const result = await processScopeLog({
+        tenantId: args.tenantId,
+        organizationId: args.organizationId,
+        resourceLog,
+        resourceTemplate,
+        scopeLogRaw,
+        piiRedactionLevel: args.piiRedactionLevel,
+        redactionService: args.redactionService,
+        acceptedAt,
+      });
+      accepted.push(...result.accepted);
+      rejectedLogRecords += result.rejected;
+      errors.push(...result.errors);
     }
   }
   return { accepted, rejectedLogRecords, errors };

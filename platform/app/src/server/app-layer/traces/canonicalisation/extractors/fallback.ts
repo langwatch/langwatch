@@ -17,9 +17,50 @@
  * 3. LLM/GenAI indicators → llm
  */
 
+import type { AttributeBag } from "../attributeBag";
 import { ATTR_KEYS } from "./_constants";
 import { extractErrorInfo, inferSpanTypeIfAbsent } from "./_extraction";
 import type { CanonicalAttributesExtractor, ExtractorContext } from "./_types";
+
+// Tool call indicators (Vercel AI SDK, OTEL GenAI spec)
+const hasToolCallSignal = (attrs: AttributeBag): boolean =>
+  attrs.get(ATTR_KEYS.OPERATION_NAME) === "ai.toolCall" ||
+  attrs.has(ATTR_KEYS.AI_TOOL_CALL_NAME) ||
+  attrs.get(ATTR_KEYS.GEN_AI_OPERATION_NAME) === "tool";
+
+const hasAgentSignal = (attrs: AttributeBag): boolean =>
+  attrs.has(ATTR_KEYS.GEN_AI_AGENT_NAME) ||
+  attrs.has(ATTR_KEYS.AGENT_NAME) ||
+  attrs.has(ATTR_KEYS.GEN_AI_AGENT);
+
+// Modern GenAI semantic conventions
+const hasGenAiSignals = (attrs: AttributeBag): boolean =>
+  attrs.has(ATTR_KEYS.GEN_AI_REQUEST_MODEL) ||
+  attrs.has(ATTR_KEYS.GEN_AI_RESPONSE_MODEL) ||
+  attrs.has(ATTR_KEYS.GEN_AI_INPUT_MESSAGES) ||
+  attrs.has(ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES) ||
+  attrs.has(ATTR_KEYS.GEN_AI_PROMPT) ||
+  attrs.has(ATTR_KEYS.GEN_AI_COMPLETION) ||
+  attrs.has(ATTR_KEYS.GEN_AI_OPERATION_NAME);
+
+// Vercel AI SDK signals
+const hasVercelSignals = (attrs: AttributeBag): boolean =>
+  attrs.has(ATTR_KEYS.AI_PROMPT) ||
+  attrs.has(ATTR_KEYS.AI_RESPONSE) ||
+  attrs.has(ATTR_KEYS.AI_MODEL) ||
+  attrs.has(ATTR_KEYS.AI_USAGE);
+
+// Legacy LLM namespace signals
+const hasLegacyLlmSignals = (attrs: AttributeBag): boolean =>
+  attrs.has(ATTR_KEYS.LLM_MODEL_NAME) ||
+  attrs.has(ATTR_KEYS.LLM_INVOCATION_PARAMETERS) ||
+  attrs.has(ATTR_KEYS.LLM_INPUT_MESSAGES) ||
+  attrs.has(ATTR_KEYS.LLM_OUTPUT_MESSAGES);
+
+const hasLlmSignal = (attrs: AttributeBag): boolean =>
+  hasGenAiSignals(attrs) ||
+  hasVercelSignals(attrs) ||
+  hasLegacyLlmSignals(attrs);
 
 export class FallbackExtractor implements CanonicalAttributesExtractor {
   readonly id = "fallback";
@@ -40,11 +81,7 @@ export class FallbackExtractor implements CanonicalAttributesExtractor {
     // Tool Call Detection
     // Check for tool call indicators (Vercel AI SDK, OTEL GenAI spec)
     // ─────────────────────────────────────────────────────────────────────────
-    if (
-      attrs.get(ATTR_KEYS.OPERATION_NAME) === "ai.toolCall" ||
-      attrs.has(ATTR_KEYS.AI_TOOL_CALL_NAME) ||
-      attrs.get(ATTR_KEYS.GEN_AI_OPERATION_NAME) === "tool"
-    ) {
+    if (hasToolCallSignal(attrs)) {
       ctx.setAttr(ATTR_KEYS.SPAN_TYPE, "tool");
       ctx.recordRule(`${this.id}:tool`);
       return;
@@ -54,11 +91,7 @@ export class FallbackExtractor implements CanonicalAttributesExtractor {
     // Agent Detection
     // Check for agent-related attributes
     // ─────────────────────────────────────────────────────────────────────────
-    if (
-      attrs.has(ATTR_KEYS.GEN_AI_AGENT_NAME) ||
-      attrs.has(ATTR_KEYS.AGENT_NAME) ||
-      attrs.has(ATTR_KEYS.GEN_AI_AGENT)
-    ) {
+    if (hasAgentSignal(attrs)) {
       ctx.setAttr(ATTR_KEYS.SPAN_TYPE, "agent");
       ctx.recordRule(`${this.id}:agent`);
       return;
@@ -68,32 +101,7 @@ export class FallbackExtractor implements CanonicalAttributesExtractor {
     // LLM Detection
     // Check for various LLM-related signals
     // ─────────────────────────────────────────────────────────────────────────
-
-    // Modern GenAI semantic conventions
-    const hasGenAiSignals =
-      attrs.has(ATTR_KEYS.GEN_AI_REQUEST_MODEL) ||
-      attrs.has(ATTR_KEYS.GEN_AI_RESPONSE_MODEL) ||
-      attrs.has(ATTR_KEYS.GEN_AI_INPUT_MESSAGES) ||
-      attrs.has(ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES) ||
-      attrs.has(ATTR_KEYS.GEN_AI_PROMPT) ||
-      attrs.has(ATTR_KEYS.GEN_AI_COMPLETION) ||
-      attrs.has(ATTR_KEYS.GEN_AI_OPERATION_NAME);
-
-    // Vercel AI SDK signals
-    const hasVercelSignals =
-      attrs.has(ATTR_KEYS.AI_PROMPT) ||
-      attrs.has(ATTR_KEYS.AI_RESPONSE) ||
-      attrs.has(ATTR_KEYS.AI_MODEL) ||
-      attrs.has(ATTR_KEYS.AI_USAGE);
-
-    // Legacy LLM namespace signals
-    const hasLegacyLlmSignals =
-      attrs.has(ATTR_KEYS.LLM_MODEL_NAME) ||
-      attrs.has(ATTR_KEYS.LLM_INVOCATION_PARAMETERS) ||
-      attrs.has(ATTR_KEYS.LLM_INPUT_MESSAGES) ||
-      attrs.has(ATTR_KEYS.LLM_OUTPUT_MESSAGES);
-
-    if (hasGenAiSignals || hasVercelSignals || hasLegacyLlmSignals) {
+    if (hasLlmSignal(attrs)) {
       inferSpanTypeIfAbsent(ctx, "llm", `${this.id}:llm`);
     }
 

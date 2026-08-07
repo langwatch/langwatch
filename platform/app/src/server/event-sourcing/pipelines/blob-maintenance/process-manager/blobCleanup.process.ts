@@ -51,44 +51,59 @@ export const blobCleanupWake: WakeHandler<
   intents: [ctx.intents.sweep(`sweep:${ctx.at}`, { scheduledFor: ctx.at })],
 });
 
+function logSweepReclaim(report: BlobSweepReport): void {
+  if (report.totals.reclaimed > 0 || report.totals.repaired > 0) {
+    logger.info(
+      {
+        scanned: report.totals.scanned,
+        repaired: report.totals.repaired,
+        reclaimed: report.totals.reclaimed,
+        bookkeeping: report.totals.bookkeeping,
+        durationMs: report.durationMs,
+      },
+      "Blob cleanup sweep reclaimed unreferenced blobs",
+    );
+  }
+}
+
+// Partial coverage looks exactly like full coverage in the totals, so it gets
+// its own line rather than a field nobody filters. The next tick resumes
+// from this one's cursor, so this is progress reporting on a keyspace bigger
+// than one tick's ceiling, not a failure.
+function logSweepTruncation(report: BlobSweepReport): void {
+  if (report.totals.truncated) {
+    logger.info(
+      { scanned: report.totals.scanned },
+      "Blob cleanup hit its per-queue scan ceiling; resuming from this cursor next tick",
+    );
+  }
+}
+
+async function pruneDispatchedOutboxRows(
+  deps: BlobCleanupDeps,
+  startedAt: number,
+): Promise<void> {
+  try {
+    await deps.deleteDispatchedBefore({
+      processName: BLOB_CLEANUP_PROCESS_NAME,
+      before: startedAt - CLEANUP_ROW_RETENTION_MS,
+    });
+  } catch (error) {
+    logger.warn(
+      { error: error instanceof Error ? error.message : String(error) },
+      "Blob cleanup outbox retention failed",
+    );
+  }
+}
+
 export function runBlobCleanup(deps: BlobCleanupDeps) {
   return async (): Promise<void> => {
     const startedAt = (deps.now ?? Date.now)();
     const report = await deps.sweep();
 
-    if (report.totals.reclaimed > 0 || report.totals.repaired > 0) {
-      logger.info(
-        {
-          scanned: report.totals.scanned,
-          repaired: report.totals.repaired,
-          reclaimed: report.totals.reclaimed,
-          bookkeeping: report.totals.bookkeeping,
-          durationMs: report.durationMs,
-        },
-        "Blob cleanup sweep reclaimed unreferenced blobs",
-      );
-    }
-    // Partial coverage looks exactly like full coverage in the totals, so it
-    // gets its own line rather than a field nobody filters. The next tick
-    // resumes from this one's cursor, so this is progress reporting on a
-    // keyspace bigger than one tick's ceiling, not a failure.
-    if (report.totals.truncated) {
-      logger.info(
-        { scanned: report.totals.scanned },
-        "Blob cleanup hit its per-queue scan ceiling; resuming from this cursor next tick",
-      );
-    }
+    logSweepReclaim(report);
+    logSweepTruncation(report);
 
-    try {
-      await deps.deleteDispatchedBefore({
-        processName: BLOB_CLEANUP_PROCESS_NAME,
-        before: startedAt - CLEANUP_ROW_RETENTION_MS,
-      });
-    } catch (error) {
-      logger.warn(
-        { error: error instanceof Error ? error.message : String(error) },
-        "Blob cleanup outbox retention failed",
-      );
-    }
+    await pruneDispatchedOutboxRows(deps, startedAt);
   };
 }

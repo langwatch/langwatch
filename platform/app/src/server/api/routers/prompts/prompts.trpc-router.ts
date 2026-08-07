@@ -17,6 +17,256 @@ import { TagValidationError } from "~/server/prompt-config/repositories/llm-conf
 import { checkProjectPermission, hasProjectPermission } from "../../rbac";
 import { createTRPCRouter, protectedProcedure } from "../../trpc";
 
+type SyncSourcePrompt = NonNullable<
+  Awaited<ReturnType<PromptService["getPromptByIdOrHandle"]>>
+>;
+type PromptUpdateData = Parameters<PromptService["updatePrompt"]>[0]["data"];
+
+// Resolves the copy's source config, ensuring it's still a copy with a
+// live, versioned source to sync from.
+async function resolveSyncSourcePrompt({
+  ctx,
+  promptId,
+}: {
+  ctx: { prisma: ConstructorParameters<typeof PromptService>[0] };
+  promptId: string;
+}) {
+  const promptConfig = await ctx.prisma.llmPromptConfig.findUnique({
+    where: { id: promptId },
+    select: { copiedFromPromptId: true },
+  });
+
+  if (!promptConfig?.copiedFromPromptId) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "This prompt is not a copy and has no source to sync from",
+    });
+  }
+
+  const sourcePromptRaw = await ctx.prisma.llmPromptConfig.findUnique({
+    where: { id: promptConfig.copiedFromPromptId },
+    include: {
+      versions: {
+        orderBy: { createdAt: "desc" },
+        take: 1,
+      },
+    },
+  });
+
+  if (!sourcePromptRaw || sourcePromptRaw.deletedAt) {
+    throw new TRPCError({
+      code: "NOT_FOUND",
+      message: "Source prompt has been deleted",
+    });
+  }
+
+  if (!sourcePromptRaw.versions[0]) {
+    throw new TRPCError({
+      code: "NOT_FOUND",
+      message: "Source prompt or its latest version not found",
+    });
+  }
+
+  return sourcePromptRaw;
+}
+
+async function assertSourcePromptViewPermission({
+  ctx,
+  sourceProjectId,
+}: {
+  ctx: Parameters<typeof hasProjectPermission>[0];
+  sourceProjectId: string;
+}) {
+  const hasSourcePermission = await hasProjectPermission(
+    ctx,
+    sourceProjectId,
+    "prompts:view",
+  );
+
+  if (!hasSourcePermission) {
+    throw new TRPCError({
+      code: "UNAUTHORIZED",
+      message:
+        "You do not have permission to view prompts in the source project",
+    });
+  }
+}
+
+// Included only when defined, so a field the source never set doesn't
+// clobber the target with an unintended null.
+function includeIfDefined<K extends string, V>(
+  key: K,
+  value: V | null | undefined,
+): Partial<Record<K, V>> {
+  return value != null ? ({ [key]: value } as Record<K, V>) : {};
+}
+
+// The optional sampling / reasoning parameters, included only when the
+// source actually set them.
+function buildOptionalSamplingFields(sourcePrompt: SyncSourcePrompt) {
+  return {
+    ...includeIfDefined("maxTokens", sourcePrompt.maxTokens),
+    // Traditional sampling parameters
+    ...includeIfDefined("topP", sourcePrompt.topP),
+    ...includeIfDefined("frequencyPenalty", sourcePrompt.frequencyPenalty),
+    ...includeIfDefined("presencePenalty", sourcePrompt.presencePenalty),
+    // Other sampling parameters
+    ...includeIfDefined("seed", sourcePrompt.seed),
+    ...includeIfDefined("topK", sourcePrompt.topK),
+    ...includeIfDefined("minP", sourcePrompt.minP),
+    ...includeIfDefined("repetitionPenalty", sourcePrompt.repetitionPenalty),
+    // Reasoning parameter (canonical/unified field)
+    ...includeIfDefined("reasoning", sourcePrompt.reasoning),
+    ...includeIfDefined("verbosity", sourcePrompt.verbosity),
+    ...includeIfDefined("promptingTechnique", sourcePrompt.promptingTechnique),
+  };
+}
+
+// Normalizes prompt/messages to avoid a system-prompt conflict, then shapes
+// the source's data into an update payload.
+function buildSyncedPromptUpdateData({
+  sourcePrompt,
+  authorId,
+}: {
+  sourcePrompt: SyncSourcePrompt;
+  authorId: string | undefined;
+}): PromptUpdateData {
+  const { prompt: normalizedPrompt, messages: normalizedMessages } =
+    hoistSystemMessage({
+      prompt: sourcePrompt.prompt,
+      messages: sourcePrompt.messages,
+    });
+
+  return {
+    commitMessage: `Updated from source prompt "${
+      sourcePrompt.handle ?? sourcePrompt.id
+    }"`,
+    prompt: normalizedPrompt,
+    messages: normalizedMessages,
+    inputs: sourcePrompt.inputs,
+    outputs: sourcePrompt.outputs,
+    model: sourcePrompt.model,
+    temperature: sourcePrompt.temperature,
+    ...buildOptionalSamplingFields(sourcePrompt),
+    demonstrations: sourcePrompt.demonstrations,
+    parameters: sourcePrompt.parameters,
+    authorId,
+  };
+}
+
+// Resolves the copies to push to: the source's live copies, optionally
+// narrowed to a caller-selected subset.
+async function resolveCopiesToPush({
+  ctx,
+  sourcePromptId,
+  copyIds,
+}: {
+  ctx: { prisma: ConstructorParameters<typeof PromptService>[0] };
+  sourcePromptId: string;
+  copyIds: string[] | undefined;
+}) {
+  const sourcePromptRaw = await ctx.prisma.llmPromptConfig.findUnique({
+    where: { id: sourcePromptId },
+    select: {
+      id: true,
+      handle: true,
+      copiedPrompts: {
+        where: { deletedAt: null },
+        select: { id: true, projectId: true, handle: true },
+      },
+    },
+  });
+
+  if (!sourcePromptRaw) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Prompt not found" });
+  }
+
+  if (sourcePromptRaw.copiedPrompts.length === 0) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "This prompt has no copies to push to",
+    });
+  }
+
+  const copiesToPush = copyIds
+    ? sourcePromptRaw.copiedPrompts.filter((copy) => copyIds.includes(copy.id))
+    : sourcePromptRaw.copiedPrompts;
+
+  if (copiesToPush.length === 0) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "No valid copies selected to push to",
+    });
+  }
+
+  return { sourcePromptRaw, copiesToPush };
+}
+
+// Normalizes prompt/messages to avoid a system-prompt conflict, then shapes
+// the source's data into a push payload for one copy.
+function buildPushedPromptUpdateData({
+  sourcePrompt,
+  authorId,
+}: {
+  sourcePrompt: SyncSourcePrompt;
+  authorId: string | undefined;
+}): PromptUpdateData {
+  const { prompt: normalizedPrompt, messages: normalizedMessages } =
+    hoistSystemMessage({
+      prompt: sourcePrompt.prompt,
+      messages: sourcePrompt.messages,
+    });
+
+  return {
+    commitMessage: `Pushed from source prompt "${
+      sourcePrompt.handle ?? sourcePrompt.id
+    }"`,
+    prompt: normalizedPrompt,
+    messages: normalizedMessages,
+    inputs: sourcePrompt.inputs,
+    outputs: sourcePrompt.outputs,
+    model: sourcePrompt.model,
+    temperature: sourcePrompt.temperature,
+    ...buildOptionalSamplingFields(sourcePrompt),
+    demonstrations: sourcePrompt.demonstrations,
+    parameters: sourcePrompt.parameters,
+    ...includeIfDefined("responseFormat", sourcePrompt.responseFormat),
+    authorId,
+  };
+}
+
+// Pushes the source's data to one copy. Returns null (rather than throwing)
+// when the caller lacks permission on the copy's project, so the caller can
+// skip it and keep pushing to the rest.
+async function pushPromptToCopy({
+  ctx,
+  service,
+  copy,
+  sourcePrompt,
+  authorId,
+}: {
+  ctx: Parameters<typeof hasProjectPermission>[0];
+  service: PromptService;
+  copy: { id: string; projectId: string; handle: string | null };
+  sourcePrompt: SyncSourcePrompt;
+  authorId: string | undefined;
+}) {
+  const hasCopyPermission = await hasProjectPermission(
+    ctx,
+    copy.projectId,
+    "prompts:update",
+  );
+  if (!hasCopyPermission) return null;
+
+  const updated = await service.updatePrompt({
+    idOrHandle: copy.id,
+    projectId: copy.projectId,
+    data: buildPushedPromptUpdateData({ sourcePrompt, authorId }),
+  });
+
+  return { copyId: copy.id, copyName: copy.handle ?? copy.id, prompt: updated };
+}
+
 /**
  * Router for handling prompts - the business-facing interface
  */
@@ -478,58 +728,15 @@ export const promptsRouter = createTRPCRouter({
         });
       }
 
-      // Get the raw config to check copiedFromPromptId
-      const promptConfig = await ctx.prisma.llmPromptConfig.findUnique({
-        where: { id: prompt.id },
-        select: { copiedFromPromptId: true },
-      });
-
-      if (!promptConfig?.copiedFromPromptId) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "This prompt is not a copy and has no source to sync from",
-        });
-      }
-
-      // Get the source prompt
-      const sourcePromptRaw = await ctx.prisma.llmPromptConfig.findUnique({
-        where: { id: promptConfig.copiedFromPromptId },
-        include: {
-          versions: {
-            orderBy: { createdAt: "desc" },
-            take: 1,
-          },
-        },
-      });
-
-      if (!sourcePromptRaw || sourcePromptRaw.deletedAt) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Source prompt has been deleted",
-        });
-      }
-
-      if (!sourcePromptRaw.versions[0]) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Source prompt or its latest version not found",
-        });
-      }
-
-      // Check permissions on source project
-      const hasSourcePermission = await hasProjectPermission(
+      const sourcePromptRaw = await resolveSyncSourcePrompt({
         ctx,
-        sourcePromptRaw.projectId,
-        "prompts:view",
-      );
+        promptId: prompt.id,
+      });
 
-      if (!hasSourcePermission) {
-        throw new TRPCError({
-          code: "UNAUTHORIZED",
-          message:
-            "You do not have permission to view prompts in the source project",
-        });
-      }
+      await assertSourcePromptViewPermission({
+        ctx,
+        sourceProjectId: sourcePromptRaw.projectId,
+      });
 
       // Get source prompt using service to get properly formatted data
       const sourcePrompt = await service.getPromptByIdOrHandle({
@@ -544,59 +751,11 @@ export const promptsRouter = createTRPCRouter({
         });
       }
 
-      // Normalize prompt/messages to avoid system prompt conflict
-      const { prompt: normalizedPrompt, messages: normalizedMessages } =
-        hoistSystemMessage({
-          prompt: sourcePrompt.prompt,
-          messages: sourcePrompt.messages,
-        });
-
       // Update the copy with source's data
       return await service.updatePrompt({
         idOrHandle: input.idOrHandle,
         projectId: input.projectId,
-        data: {
-          commitMessage: `Updated from source prompt "${
-            sourcePrompt.handle ?? sourcePrompt.id
-          }"`,
-          prompt: normalizedPrompt,
-          messages: normalizedMessages,
-          inputs: sourcePrompt.inputs,
-          outputs: sourcePrompt.outputs,
-          model: sourcePrompt.model,
-          temperature: sourcePrompt.temperature,
-          ...(sourcePrompt.maxTokens != null && {
-            maxTokens: sourcePrompt.maxTokens,
-          }),
-          // Traditional sampling parameters
-          ...(sourcePrompt.topP != null && { topP: sourcePrompt.topP }),
-          ...(sourcePrompt.frequencyPenalty != null && {
-            frequencyPenalty: sourcePrompt.frequencyPenalty,
-          }),
-          ...(sourcePrompt.presencePenalty != null && {
-            presencePenalty: sourcePrompt.presencePenalty,
-          }),
-          // Other sampling parameters
-          ...(sourcePrompt.seed != null && { seed: sourcePrompt.seed }),
-          ...(sourcePrompt.topK != null && { topK: sourcePrompt.topK }),
-          ...(sourcePrompt.minP != null && { minP: sourcePrompt.minP }),
-          ...(sourcePrompt.repetitionPenalty != null && {
-            repetitionPenalty: sourcePrompt.repetitionPenalty,
-          }),
-          // Reasoning parameter (canonical/unified field)
-          ...(sourcePrompt.reasoning != null && {
-            reasoning: sourcePrompt.reasoning,
-          }),
-          ...(sourcePrompt.verbosity != null && {
-            verbosity: sourcePrompt.verbosity,
-          }),
-          ...(sourcePrompt.promptingTechnique != null && {
-            promptingTechnique: sourcePrompt.promptingTechnique,
-          }),
-          demonstrations: sourcePrompt.demonstrations,
-          parameters: sourcePrompt.parameters,
-          authorId,
-        },
+        data: buildSyncedPromptUpdateData({ sourcePrompt, authorId }),
       });
     }),
 
@@ -629,126 +788,23 @@ export const promptsRouter = createTRPCRouter({
         });
       }
 
-      // Get copies using raw Prisma query
-      const sourcePromptRaw = await ctx.prisma.llmPromptConfig.findUnique({
-        where: { id: sourcePrompt.id },
-        select: {
-          id: true,
-          handle: true,
-          copiedPrompts: {
-            where: { deletedAt: null },
-            select: { id: true, projectId: true, handle: true },
-          },
-        },
+      const { sourcePromptRaw, copiesToPush } = await resolveCopiesToPush({
+        ctx,
+        sourcePromptId: sourcePrompt.id,
+        copyIds: input.copyIds,
       });
 
-      if (!sourcePromptRaw) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Prompt not found",
-        });
-      }
-
-      if (sourcePromptRaw.copiedPrompts.length === 0) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "This prompt has no copies to push to",
-        });
-      }
-
-      // Filter copies if copyIds is provided
-      const copiesToPush = input.copyIds
-        ? sourcePromptRaw.copiedPrompts.filter((copy) =>
-            input.copyIds!.includes(copy.id),
-          )
-        : sourcePromptRaw.copiedPrompts;
-
-      if (copiesToPush.length === 0) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "No valid copies selected to push to",
-        });
-      }
-
       const results = [];
-
-      // Push to each copy
       for (const copy of copiesToPush) {
-        // Check permissions on copy's project
-        const hasCopyPermission = await hasProjectPermission(
+        const pushed = await pushPromptToCopy({
           ctx,
-          copy.projectId,
-          "prompts:update",
-        );
-
-        if (!hasCopyPermission) {
-          // Skip copies where user doesn't have permission
-          continue;
-        }
-
-        // Normalize prompt/messages to avoid system prompt conflict
-        const { prompt: normalizedPrompt, messages: normalizedMessages } =
-          hoistSystemMessage({
-            prompt: sourcePrompt.prompt,
-            messages: sourcePrompt.messages,
-          });
-
-        // Update the copy with source's data
-        const updated = await service.updatePrompt({
-          idOrHandle: copy.id,
-          projectId: copy.projectId,
-          data: {
-            commitMessage: `Pushed from source prompt "${
-              sourcePrompt.handle ?? sourcePrompt.id
-            }"`,
-            prompt: normalizedPrompt,
-            messages: normalizedMessages,
-            inputs: sourcePrompt.inputs,
-            outputs: sourcePrompt.outputs,
-            model: sourcePrompt.model,
-            temperature: sourcePrompt.temperature,
-            ...(sourcePrompt.maxTokens != null && {
-              maxTokens: sourcePrompt.maxTokens,
-            }),
-            // Traditional sampling parameters
-            ...(sourcePrompt.topP != null && { topP: sourcePrompt.topP }),
-            ...(sourcePrompt.frequencyPenalty != null && {
-              frequencyPenalty: sourcePrompt.frequencyPenalty,
-            }),
-            ...(sourcePrompt.presencePenalty != null && {
-              presencePenalty: sourcePrompt.presencePenalty,
-            }),
-            // Other sampling parameters
-            ...(sourcePrompt.seed != null && { seed: sourcePrompt.seed }),
-            ...(sourcePrompt.topK != null && { topK: sourcePrompt.topK }),
-            ...(sourcePrompt.minP != null && { minP: sourcePrompt.minP }),
-            ...(sourcePrompt.repetitionPenalty != null && {
-              repetitionPenalty: sourcePrompt.repetitionPenalty,
-            }),
-            // Reasoning parameter (canonical/unified field)
-            ...(sourcePrompt.reasoning != null && {
-              reasoning: sourcePrompt.reasoning,
-            }),
-            ...(sourcePrompt.verbosity != null && {
-              verbosity: sourcePrompt.verbosity,
-            }),
-            ...(sourcePrompt.promptingTechnique != null && {
-              promptingTechnique: sourcePrompt.promptingTechnique,
-            }),
-            demonstrations: sourcePrompt.demonstrations,
-            parameters: sourcePrompt.parameters,
-            ...(sourcePrompt.responseFormat != null && {
-              responseFormat: sourcePrompt.responseFormat,
-            }),
-            authorId,
-          },
+          service,
+          copy,
+          sourcePrompt,
+          authorId,
         });
-
-        results.push({
-          copyId: copy.id,
-          copyName: copy.handle ?? copy.id,
-          prompt: updated,
-        });
+        // Skip copies where the user doesn't have permission.
+        if (pushed) results.push(pushed);
       }
 
       if (results.length === 0) {

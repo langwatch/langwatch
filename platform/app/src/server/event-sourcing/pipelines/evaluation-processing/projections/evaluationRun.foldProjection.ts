@@ -28,6 +28,54 @@ export interface EvaluationRun extends Projection<EvaluationRunData> {
   data: EvaluationRunData;
 }
 
+function evaluationReportedIdentityFields(
+  event: EvaluationReportedEvent,
+): Pick<
+  EvaluationRunData,
+  | "evaluationId"
+  | "evaluatorId"
+  | "evaluatorType"
+  | "evaluatorName"
+  | "traceId"
+  | "isGuardrail"
+> {
+  return {
+    evaluationId: event.data.evaluationId,
+    evaluatorId: event.data.evaluatorId,
+    evaluatorType: event.data.evaluatorType,
+    evaluatorName: event.data.evaluatorName ?? null,
+    traceId: event.data.traceId ?? null,
+    isGuardrail: event.data.isGuardrail ?? false,
+  };
+}
+
+function evaluationReportedResultFields(
+  event: EvaluationReportedEvent,
+): Pick<
+  EvaluationRunData,
+  | "status"
+  | "score"
+  | "passed"
+  | "label"
+  | "details"
+  | "inputs"
+  | "error"
+  | "errorDetails"
+  | "costId"
+> {
+  return {
+    status: event.data.status,
+    score: typeof event.data.score === "number" ? event.data.score : null,
+    passed: event.data.passed ?? null,
+    label: event.data.label ?? null,
+    details: event.data.details ?? null,
+    inputs: event.data.inputs ?? null,
+    error: event.data.error ?? null,
+    errorDetails: event.data.errorDetails ?? null,
+    costId: event.data.costId ?? null,
+  };
+}
+
 const evaluationRunEvents = [
   evaluationScheduledEventSchema,
   evaluationStartedEventSchema,
@@ -158,21 +206,8 @@ export class EvaluationRunFoldProjection
   ): EvaluationRunData {
     return {
       ...state,
-      evaluationId: event.data.evaluationId,
-      evaluatorId: event.data.evaluatorId,
-      evaluatorType: event.data.evaluatorType,
-      evaluatorName: event.data.evaluatorName ?? null,
-      traceId: event.data.traceId ?? null,
-      isGuardrail: event.data.isGuardrail ?? false,
-      status: event.data.status,
-      score: typeof event.data.score === "number" ? event.data.score : null,
-      passed: event.data.passed ?? null,
-      label: event.data.label ?? null,
-      details: event.data.details ?? null,
-      inputs: event.data.inputs ?? null,
-      error: event.data.error ?? null,
-      errorDetails: event.data.errorDetails ?? null,
-      costId: event.data.costId ?? null,
+      ...evaluationReportedIdentityFields(event),
+      ...evaluationReportedResultFields(event),
       startedAt: event.occurredAt,
       completedAt: event.occurredAt,
     };

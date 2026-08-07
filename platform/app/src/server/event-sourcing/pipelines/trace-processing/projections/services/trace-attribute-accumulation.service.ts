@@ -154,6 +154,355 @@ export const STAMPED_MODELS_ATTRIBUTE = "metadata.models";
 export const MODEL_METADATA_STAMPED_MARKER =
   "langwatch.reserved.model_metadata_stamped";
 
+function hoistResourceAttrMappings(
+  resourceAttrs: Record<string, unknown>,
+  result: Record<string, string>,
+): void {
+  for (const [source, dest] of RESOURCE_ATTR_MAPPINGS) {
+    const v = resourceAttrs[source];
+    if (typeof v === "string") result[dest] = v;
+  }
+}
+
+function isStandardOrExcludedResourceKey(key: string): boolean {
+  return (
+    STANDARD_RESOURCE_PREFIXES.some((p) => key.startsWith(p)) ||
+    NON_HOISTED_RESOURCE_KEYS.has(key)
+  );
+}
+
+/** Normalizes langwatch.metadata.* resource attributes to metadata.* canonical form. */
+function normalizeResourceKey(key: string): string {
+  return key.startsWith("langwatch.metadata.")
+    ? key.replace("langwatch.metadata.", "metadata.")
+    : key;
+}
+
+function stringifyPrimitiveAttrValue(value: unknown): string | undefined {
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean")
+    return String(value);
+  return undefined;
+}
+
+/**
+ * Normalizes and hoists every non-standard resource attribute, so custom
+ * resource-level metadata reaches the trace's attribute map.
+ */
+function hoistNonStandardResourceAttrs(
+  resourceAttrs: Record<string, unknown>,
+  result: Record<string, string>,
+): void {
+  for (const [key, value] of Object.entries(resourceAttrs)) {
+    if (isStandardOrExcludedResourceKey(key)) continue;
+    const stringified = stringifyPrimitiveAttrValue(value);
+    if (stringified !== undefined)
+      result[normalizeResourceKey(key)] = stringified;
+  }
+}
+
+/**
+ * Promotes resource-level identity attrs (thread/user/customer) to their
+ * canonical trace-summary keys. Runs BEFORE hoistSpanAttrMappings so a
+ * span-level value still wins when both are present.
+ */
+function hoistCanonicalIdentityAttrs(
+  resourceAttrs: Record<string, unknown>,
+  result: Record<string, string>,
+): void {
+  for (const { sources, dest } of RESOURCE_ATTR_CANONICAL_MAPPINGS) {
+    if (result[dest]) continue;
+    for (const source of sources) {
+      const v = resourceAttrs[source] ?? result[source];
+      if (typeof v === "string" && v.length > 0) {
+        result[dest] = v;
+        break;
+      }
+    }
+  }
+}
+
+function hoistSpanAttrMappings(
+  spanAttrs: Record<string, unknown>,
+  result: Record<string, string>,
+): void {
+  for (const [source, dest] of SPAN_ATTR_MAPPINGS) {
+    const v = spanAttrs[source];
+    if (typeof v === "string") result[dest] = v;
+  }
+}
+
+function hoistOriginAndRunIds(
+  spanAttrs: Record<string, unknown>,
+  result: Record<string, string>,
+): void {
+  const origin = stringAttr(spanAttrs, "langwatch.origin");
+  if (origin) result["langwatch.origin"] = origin;
+
+  const scenarioRunId = stringAttr(spanAttrs, "scenario.run_id");
+  if (scenarioRunId) result["scenario.run_id"] = scenarioRunId;
+
+  const evaluationRunId = stringAttr(spanAttrs, "evaluation.run_id");
+  if (evaluationRunId) result["evaluation.run_id"] = evaluationRunId;
+}
+
+/**
+ * Labels may arrive on span attrs (OTLP-direct path, where
+ * otelAttributesToNestedAttributes JSON-parses the string to an array)
+ * or on resource attrs (POST /api/collector and
+ * PATCH /api/traces/{id}/metadata, where buildResource writes
+ * JSON.stringify(labels) and parseJsonStringValues later converts it
+ * back to an array). Honor both sources so labels sent via the
+ * documented REST endpoints actually reach the trace's attribute map
+ * and the labels facet SQL. Mirrors the tag.tags handling below.
+ */
+function hoistLabels(
+  spanAttrs: Record<string, unknown>,
+  resourceAttrs: Record<string, unknown>,
+  result: Record<string, string>,
+): void {
+  const labels =
+    spanAttrs[ATTR_KEYS.LANGWATCH_LABELS] ??
+    resourceAttrs[ATTR_KEYS.LANGWATCH_LABELS];
+  if (typeof labels === "string") result["langwatch.labels"] = labels;
+  else if (Array.isArray(labels))
+    result["langwatch.labels"] = JSON.stringify(labels);
+}
+
+/**
+ * `tag.tags` is the reserved labels key of the legacy OTLP path
+ * (otel.traces.ts maps it to reservedTraceMetadata.labels) and what the
+ * Langy worker emits via OPENCODE_RESOURCE_ATTRIBUTES (tag.tags=langy).
+ * Honor the same contract here: fold span- or resource-level tag.tags
+ * (comma-separated string or array) into langwatch.labels so the trace
+ * actually carries the tag in the UI/filters. langwatch.labels wins on
+ * conflict; tag.tags values are unioned in.
+ */
+function hoistTagTagsIntoLabels(
+  spanAttrs: Record<string, unknown>,
+  resourceAttrs: Record<string, unknown>,
+  result: Record<string, string>,
+): void {
+  const tagTags = spanAttrs["tag.tags"] ?? resourceAttrs["tag.tags"];
+  const tagList = Array.isArray(tagTags)
+    ? tagTags.filter((t): t is string => typeof t === "string")
+    : typeof tagTags === "string"
+      ? tagTags
+          .split(",")
+          .map((t) => t.trim())
+          .filter(Boolean)
+      : [];
+  if (tagList.length > 0) {
+    const existing = parseJsonStringArray(result["langwatch.labels"]);
+    result["langwatch.labels"] = JSON.stringify([
+      ...new Set([...existing, ...tagList]),
+    ]);
+  }
+}
+
+function hoistPromptId(
+  spanAttrs: Record<string, unknown>,
+  result: Record<string, string>,
+): void {
+  const promptId = stringAttr(spanAttrs, "langwatch.prompt.id");
+  if (promptId?.includes(":")) {
+    result["langwatch.prompt.id"] = promptId;
+  }
+}
+
+function stringifyMetadataAttrValue(value: unknown): string | undefined {
+  if (typeof value === "string") return value;
+  if (value === null || value === undefined) return undefined;
+  return typeof value === "object" ? JSON.stringify(value) : String(value);
+}
+
+function hoistMetadataAttrs(
+  spanAttrs: Record<string, unknown>,
+  result: Record<string, string>,
+): void {
+  for (const [key, value] of Object.entries(spanAttrs)) {
+    if (!key.startsWith("metadata.")) continue;
+    const stringified = stringifyMetadataAttrValue(value);
+    if (stringified !== undefined) result[key] = stringified;
+  }
+}
+
+/** Labels: union across spans. */
+function unionLabels(
+  state: TraceSummaryData,
+  spanAttrs: Record<string, string>,
+  merged: Record<string, string>,
+): void {
+  const existingLabels = state.attributes["langwatch.labels"];
+  const newLabels = spanAttrs["langwatch.labels"];
+  if (existingLabels || newLabels) {
+    const union = [
+      ...new Set([
+        ...parseJsonStringArray(existingLabels),
+        ...parseJsonStringArray(newLabels),
+      ]),
+    ];
+    if (union.length > 0) merged["langwatch.labels"] = JSON.stringify(union);
+  }
+}
+
+/**
+ * Prompt IDs: union across spans. Removes the per-span key so it doesn't
+ * leak into trace-level attributes.
+ */
+function unionPromptIds(
+  state: TraceSummaryData,
+  spanAttrs: Record<string, string>,
+  merged: Record<string, string>,
+): void {
+  const existingPromptIds = state.attributes["langwatch.prompt_ids"];
+  const newPromptId = spanAttrs["langwatch.prompt.id"];
+  if (existingPromptIds || newPromptId) {
+    const union = [
+      ...new Set([
+        ...parseJsonStringArray(existingPromptIds),
+        ...(newPromptId ? [newPromptId] : []),
+      ]),
+    ];
+    if (union.length > 0)
+      merged["langwatch.prompt_ids"] = JSON.stringify(union);
+  }
+  delete merged["langwatch.prompt.id"];
+}
+
+function isPlainJsonObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/** Deep-merges two JSON object strings, or undefined if either isn't a plain JSON object. */
+function mergeMetadataJsonPair(prev: string, next: string): string | undefined {
+  try {
+    const prevObj: unknown = JSON.parse(prev);
+    const nextObj: unknown = JSON.parse(next);
+    if (isPlainJsonObject(prevObj) && isPlainJsonObject(nextObj)) {
+      return JSON.stringify({ ...nextObj, ...prevObj });
+    }
+    return undefined;
+  } catch {
+    /* not JSON - keep first-wins */
+    return undefined;
+  }
+}
+
+/** Metadata: deep-merge JSON objects, first-wins for primitives. */
+function deepMergeMetadata(
+  state: TraceSummaryData,
+  spanAttrs: Record<string, string>,
+  merged: Record<string, string>,
+): void {
+  for (const key of Object.keys(merged)) {
+    if (!key.startsWith("metadata.")) continue;
+    const prev = state.attributes[key];
+    const next = spanAttrs[key];
+    if (!prev || !next) continue;
+    const mergedValue = mergeMetadataJsonPair(prev, next);
+    if (mergedValue !== undefined) merged[key] = mergedValue;
+  }
+}
+
+/**
+ * User-provided model metadata wins over an earlier fold's stamp. The
+ * existing-wins merge in deepMergeMetadata keeps the STAMPED values when a
+ * later span carries user `metadata.model` / `metadata.models`, which would
+ * silently drop the user's value. Apply the incoming user keys and clear the
+ * marker so stamping stops for good. (Our own stamp never appears in
+ * spanAttrs: extractAttributes reads the span, the stamp lives on state.)
+ */
+function reconcileModelMetadataOverride(
+  spanAttrs: Record<string, string>,
+  merged: Record<string, string>,
+): void {
+  if (merged[MODEL_METADATA_STAMPED_MARKER] !== "true") return;
+  const incomingModel = spanAttrs[STAMPED_MODEL_ATTRIBUTE];
+  const incomingModels = spanAttrs[STAMPED_MODELS_ATTRIBUTE];
+  if (incomingModel === undefined && incomingModels === undefined) return;
+
+  delete merged[MODEL_METADATA_STAMPED_MARKER];
+  if (incomingModel !== undefined) {
+    merged[STAMPED_MODEL_ATTRIBUTE] = incomingModel;
+  } else {
+    delete merged[STAMPED_MODEL_ATTRIBUTE];
+  }
+  if (incomingModels !== undefined) {
+    merged[STAMPED_MODELS_ATTRIBUTE] = incomingModels;
+  } else {
+    delete merged[STAMPED_MODELS_ATTRIBUTE];
+  }
+}
+
+function applyOutputSourceFlags({
+  merged,
+  outputSource,
+  inputIsFallback,
+  outputIsFallback,
+}: {
+  merged: Record<string, string>;
+  outputSource: string;
+  inputIsFallback: boolean;
+  outputIsFallback: boolean;
+}): void {
+  merged["langwatch.reserved.output_source"] = outputSource;
+  if (inputIsFallback) {
+    merged["langwatch.reserved.input_is_fallback"] = "true";
+  } else {
+    delete merged["langwatch.reserved.input_is_fallback"];
+  }
+  if (outputIsFallback) {
+    merged["langwatch.reserved.output_is_fallback"] = "true";
+  } else {
+    delete merged["langwatch.reserved.output_is_fallback"];
+  }
+}
+
+/**
+ * Media refs ride the summary so the trace list and drawer summary can
+ * render thumbnails/players without reloading span payloads. They follow
+ * the same winner as ComputedInput/Output (see TraceIOAccumulationService).
+ */
+function applyMediaRefs({
+  merged,
+  inputMediaRefs,
+  outputMediaRefs,
+}: {
+  merged: Record<string, string>;
+  inputMediaRefs: string | null;
+  outputMediaRefs: string | null;
+}): void {
+  if (inputMediaRefs) {
+    merged[RESERVED_INPUT_MEDIA_REFS] = inputMediaRefs;
+  } else {
+    delete merged[RESERVED_INPUT_MEDIA_REFS];
+  }
+  if (outputMediaRefs) {
+    merged[RESERVED_OUTPUT_MEDIA_REFS] = outputMediaRefs;
+  } else {
+    delete merged[RESERVED_OUTPUT_MEDIA_REFS];
+  }
+}
+
+/** PII redaction status tracking - accumulate span IDs by severity. */
+function trackPiiRedactionStatus(
+  span: NormalizedSpan,
+  merged: Record<string, string>,
+): void {
+  const piiStatus =
+    span.spanAttributes[ATTR_KEYS.LANGWATCH_RESERVED_PII_REDACTION_STATUS];
+  if (piiStatus === "partial" || piiStatus === "none") {
+    const key =
+      piiStatus === "partial"
+        ? ATTR_KEYS.LANGWATCH_RESERVED_PII_REDACTION_PARTIAL_SPAN_IDS
+        : ATTR_KEYS.LANGWATCH_RESERVED_PII_REDACTION_SKIPPED_SPAN_IDS;
+    const ids = parseJsonStringArray(merged[key]);
+    ids.push(span.spanId);
+    merged[key] = JSON.stringify(ids);
+  }
+}
+
 /**
  * Extracts per-span attributes and merges them into trace-level attributes,
  * handling labels union, prompt ID collection, metadata deep-merge,
@@ -167,102 +516,15 @@ export class TraceAttributeAccumulationService {
     const spanAttrs = span.spanAttributes;
     const resourceAttrs = span.resourceAttributes;
 
-    for (const [source, dest] of RESOURCE_ATTR_MAPPINGS) {
-      const v = resourceAttrs[source];
-      if (typeof v === "string") result[dest] = v;
-    }
-
-    for (const [key, value] of Object.entries(resourceAttrs)) {
-      if (STANDARD_RESOURCE_PREFIXES.some((p) => key.startsWith(p))) continue;
-      if (NON_HOISTED_RESOURCE_KEYS.has(key)) continue;
-      // Normalize langwatch.metadata.* resource attributes to metadata.* canonical form
-      const normalizedKey = key.startsWith("langwatch.metadata.")
-        ? key.replace("langwatch.metadata.", "metadata.")
-        : key;
-      if (typeof value === "string") result[normalizedKey] = value;
-      else if (typeof value === "number" || typeof value === "boolean")
-        result[normalizedKey] = String(value);
-    }
-
-    // Promote resource-level identity attrs (thread/user/customer) to
-    // their canonical trace-summary keys. Runs BEFORE SPAN_ATTR_MAPPINGS
-    // so a span-level value still wins when both are present.
-    for (const { sources, dest } of RESOURCE_ATTR_CANONICAL_MAPPINGS) {
-      if (result[dest]) continue;
-      for (const source of sources) {
-        const v = resourceAttrs[source] ?? result[source];
-        if (typeof v === "string" && v.length > 0) {
-          result[dest] = v;
-          break;
-        }
-      }
-    }
-
-    for (const [source, dest] of SPAN_ATTR_MAPPINGS) {
-      const v = spanAttrs[source];
-      if (typeof v === "string") result[dest] = v;
-    }
-
-    const origin = stringAttr(spanAttrs, "langwatch.origin");
-    if (origin) result["langwatch.origin"] = origin;
-
-    const scenarioRunId = stringAttr(spanAttrs, "scenario.run_id");
-    if (scenarioRunId) result["scenario.run_id"] = scenarioRunId;
-
-    const evaluationRunId = stringAttr(spanAttrs, "evaluation.run_id");
-    if (evaluationRunId) result["evaluation.run_id"] = evaluationRunId;
-
-    // Labels may arrive on span attrs (OTLP-direct path, where
-    // otelAttributesToNestedAttributes JSON-parses the string to an array)
-    // or on resource attrs (POST /api/collector and
-    // PATCH /api/traces/{id}/metadata, where buildResource writes
-    // JSON.stringify(labels) and parseJsonStringValues later converts it
-    // back to an array). Honor both sources so labels sent via the
-    // documented REST endpoints actually reach the trace's attribute map
-    // and the labels facet SQL. Mirrors the tag.tags handling below.
-    const labels =
-      spanAttrs[ATTR_KEYS.LANGWATCH_LABELS] ??
-      resourceAttrs[ATTR_KEYS.LANGWATCH_LABELS];
-    if (typeof labels === "string") result["langwatch.labels"] = labels;
-    else if (Array.isArray(labels))
-      result["langwatch.labels"] = JSON.stringify(labels);
-
-    // `tag.tags` is the reserved labels key of the legacy OTLP path
-    // (otel.traces.ts maps it to reservedTraceMetadata.labels) and what the
-    // Langy worker emits via OPENCODE_RESOURCE_ATTRIBUTES (tag.tags=langy).
-    // Honor the same contract here: fold span- or resource-level tag.tags
-    // (comma-separated string or array) into langwatch.labels so the trace
-    // actually carries the tag in the UI/filters. langwatch.labels wins on
-    // conflict; tag.tags values are unioned in.
-    const tagTags = spanAttrs["tag.tags"] ?? resourceAttrs["tag.tags"];
-    const tagList = Array.isArray(tagTags)
-      ? tagTags.filter((t): t is string => typeof t === "string")
-      : typeof tagTags === "string"
-        ? tagTags
-            .split(",")
-            .map((t) => t.trim())
-            .filter(Boolean)
-        : [];
-    if (tagList.length > 0) {
-      const existing = parseJsonStringArray(result["langwatch.labels"]);
-      result["langwatch.labels"] = JSON.stringify([
-        ...new Set([...existing, ...tagList]),
-      ]);
-    }
-
-    const promptId = stringAttr(spanAttrs, "langwatch.prompt.id");
-    if (promptId?.includes(":")) {
-      result["langwatch.prompt.id"] = promptId;
-    }
-
-    for (const [key, value] of Object.entries(spanAttrs)) {
-      if (!key.startsWith("metadata.")) continue;
-      if (typeof value === "string") result[key] = value;
-      else if (value !== null && value !== undefined) {
-        result[key] =
-          typeof value === "object" ? JSON.stringify(value) : String(value);
-      }
-    }
+    hoistResourceAttrMappings(resourceAttrs, result);
+    hoistNonStandardResourceAttrs(resourceAttrs, result);
+    hoistCanonicalIdentityAttrs(resourceAttrs, result);
+    hoistSpanAttrMappings(spanAttrs, result);
+    hoistOriginAndRunIds(spanAttrs, result);
+    hoistLabels(spanAttrs, resourceAttrs, result);
+    hoistTagTagsIntoLabels(spanAttrs, resourceAttrs, result);
+    hoistPromptId(spanAttrs, result);
+    hoistMetadataAttrs(spanAttrs, result);
 
     return result;
   }
@@ -288,82 +550,10 @@ export class TraceAttributeAccumulationService {
     const spanAttrs = this.extractAttributes(span);
     const merged = { ...spanAttrs, ...state.attributes };
 
-    // Labels: union across spans
-    const existingLabels = state.attributes["langwatch.labels"];
-    const newLabels = spanAttrs["langwatch.labels"];
-    if (existingLabels || newLabels) {
-      const union = [
-        ...new Set([
-          ...parseJsonStringArray(existingLabels),
-          ...parseJsonStringArray(newLabels),
-        ]),
-      ];
-      if (union.length > 0) merged["langwatch.labels"] = JSON.stringify(union);
-    }
-
-    // Prompt IDs: union across spans
-    const existingPromptIds = state.attributes["langwatch.prompt_ids"];
-    const newPromptId = spanAttrs["langwatch.prompt.id"];
-    if (existingPromptIds || newPromptId) {
-      const union = [
-        ...new Set([
-          ...parseJsonStringArray(existingPromptIds),
-          ...(newPromptId ? [newPromptId] : []),
-        ]),
-      ];
-      if (union.length > 0)
-        merged["langwatch.prompt_ids"] = JSON.stringify(union);
-    }
-    // Remove the per-span key so it doesn't leak into trace-level attributes
-    delete merged["langwatch.prompt.id"];
-
-    // Metadata: deep-merge JSON objects, first-wins for primitives
-    for (const key of Object.keys(merged)) {
-      if (!key.startsWith("metadata.")) continue;
-      const prev = state.attributes[key];
-      const next = spanAttrs[key];
-      if (!prev || !next) continue;
-      try {
-        const prevObj: unknown = JSON.parse(prev);
-        const nextObj: unknown = JSON.parse(next);
-        if (
-          typeof prevObj === "object" &&
-          prevObj &&
-          !Array.isArray(prevObj) &&
-          typeof nextObj === "object" &&
-          nextObj &&
-          !Array.isArray(nextObj)
-        ) {
-          merged[key] = JSON.stringify({ ...nextObj, ...prevObj });
-        }
-      } catch {
-        /* not JSON - keep first-wins */
-      }
-    }
-
-    // User-provided model metadata wins over an earlier fold's stamp. The
-    // existing-wins merge above keeps the STAMPED values when a later span
-    // carries user `metadata.model` / `metadata.models`, which would silently
-    // drop the user's value. Apply the incoming user keys and clear the
-    // marker so stamping stops for good. (Our own stamp never appears in
-    // spanAttrs: extractAttributes reads the span, the stamp lives on state.)
-    if (merged[MODEL_METADATA_STAMPED_MARKER] === "true") {
-      const incomingModel = spanAttrs[STAMPED_MODEL_ATTRIBUTE];
-      const incomingModels = spanAttrs[STAMPED_MODELS_ATTRIBUTE];
-      if (incomingModel !== undefined || incomingModels !== undefined) {
-        delete merged[MODEL_METADATA_STAMPED_MARKER];
-        if (incomingModel !== undefined) {
-          merged[STAMPED_MODEL_ATTRIBUTE] = incomingModel;
-        } else {
-          delete merged[STAMPED_MODEL_ATTRIBUTE];
-        }
-        if (incomingModels !== undefined) {
-          merged[STAMPED_MODELS_ATTRIBUTE] = incomingModels;
-        } else {
-          delete merged[STAMPED_MODELS_ATTRIBUTE];
-        }
-      }
-    }
+    unionLabels(state, spanAttrs, merged);
+    unionPromptIds(state, spanAttrs, merged);
+    deepMergeMetadata(state, spanAttrs, merged);
+    reconcileModelMetadataOverride(spanAttrs, merged);
 
     this.traceOriginService.stripLegacyMarkers(merged);
     this.traceOriginService.hoistOrigin({
@@ -377,44 +567,14 @@ export class TraceAttributeAccumulationService {
       mergedAttributes: merged,
     });
 
-    merged["langwatch.reserved.output_source"] = outputSource;
-    if (inputIsFallback) {
-      merged["langwatch.reserved.input_is_fallback"] = "true";
-    } else {
-      delete merged["langwatch.reserved.input_is_fallback"];
-    }
-    if (outputIsFallback) {
-      merged["langwatch.reserved.output_is_fallback"] = "true";
-    } else {
-      delete merged["langwatch.reserved.output_is_fallback"];
-    }
-
-    // Media refs ride the summary so the trace list and drawer summary can
-    // render thumbnails/players without reloading span payloads. They follow
-    // the same winner as ComputedInput/Output (see TraceIOAccumulationService).
-    if (inputMediaRefs) {
-      merged[RESERVED_INPUT_MEDIA_REFS] = inputMediaRefs;
-    } else {
-      delete merged[RESERVED_INPUT_MEDIA_REFS];
-    }
-    if (outputMediaRefs) {
-      merged[RESERVED_OUTPUT_MEDIA_REFS] = outputMediaRefs;
-    } else {
-      delete merged[RESERVED_OUTPUT_MEDIA_REFS];
-    }
-
-    // PII redaction status tracking - accumulate span IDs by severity
-    const piiStatus =
-      span.spanAttributes[ATTR_KEYS.LANGWATCH_RESERVED_PII_REDACTION_STATUS];
-    if (piiStatus === "partial" || piiStatus === "none") {
-      const key =
-        piiStatus === "partial"
-          ? ATTR_KEYS.LANGWATCH_RESERVED_PII_REDACTION_PARTIAL_SPAN_IDS
-          : ATTR_KEYS.LANGWATCH_RESERVED_PII_REDACTION_SKIPPED_SPAN_IDS;
-      const ids = parseJsonStringArray(merged[key]);
-      ids.push(span.spanId);
-      merged[key] = JSON.stringify(ids);
-    }
+    applyOutputSourceFlags({
+      merged,
+      outputSource,
+      inputIsFallback,
+      outputIsFallback,
+    });
+    applyMediaRefs({ merged, inputMediaRefs, outputMediaRefs });
+    trackPiiRedactionStatus(span, merged);
 
     return merged;
   }

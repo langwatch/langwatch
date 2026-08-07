@@ -114,6 +114,42 @@ function isStoredObjectUrl(url: string): boolean {
   return url.startsWith("/api/files/") && !url.includes("..");
 }
 
+function inputAudioToMediaData(p: {
+  data?: string;
+  url?: string;
+  format?: string;
+  mimeType?: string;
+}): MediaPartData | null {
+  // Raw, header-less realtime formats aren't playable as a bare data: URI.
+  // Wrap them into a playable WAV: pcm16 gets a header as-is, the
+  // companded G.711 formats are decoded to linear PCM first (browser WAV
+  // decoders are PCM-only). Only inline `data` needs wrapping here:
+  // externalized `url` references are WAV-wrapped at store time by the
+  // content extractor and served as playable audio/wav.
+  const rawFormat = resolveRawPcmFormat(p.format, p.mimeType);
+  if (p.data && rawFormat) {
+    const wav = rawPcmBase64ToWavBase64(p.data, rawFormat);
+    if (wav)
+      return {
+        type: "audio",
+        source: { type: "data", value: wav, mimeType: "audio/wav" },
+      };
+    return null;
+  }
+  const mimeType = p.mimeType ?? audioFormatToMimeType(p.format);
+  if (p.url)
+    return {
+      type: "audio",
+      source: { type: "url", value: p.url, mimeType },
+    };
+  if (p.data)
+    return {
+      type: "audio",
+      source: { type: "data", value: p.data, mimeType },
+    };
+  return null;
+}
+
 /** Map a single raw content part to `MediaPartData`, or null when it is not media. */
 export function mediaPartToMediaData(part: unknown): MediaPartData | null {
   const result = visitContentPart<MediaPartData | null>(part, {
@@ -173,36 +209,7 @@ export function mediaPartToMediaData(part: unknown): MediaPartData | null {
       type: "image",
       source: { type: "url", value: src },
     }),
-    inputAudio: (p) => {
-      // Raw, header-less realtime formats aren't playable as a bare data: URI.
-      // Wrap them into a playable WAV: pcm16 gets a header as-is, the
-      // companded G.711 formats are decoded to linear PCM first (browser WAV
-      // decoders are PCM-only). Only inline `data` needs wrapping here:
-      // externalized `url` references are WAV-wrapped at store time by the
-      // content extractor and served as playable audio/wav.
-      const rawFormat = resolveRawPcmFormat(p.format, p.mimeType);
-      if (p.data && rawFormat) {
-        const wav = rawPcmBase64ToWavBase64(p.data, rawFormat);
-        if (wav)
-          return {
-            type: "audio",
-            source: { type: "data", value: wav, mimeType: "audio/wav" },
-          };
-        return null;
-      }
-      const mimeType = p.mimeType ?? audioFormatToMimeType(p.format);
-      if (p.url)
-        return {
-          type: "audio",
-          source: { type: "url", value: p.url, mimeType },
-        };
-      if (p.data)
-        return {
-          type: "audio",
-          source: { type: "data", value: p.data, mimeType },
-        };
-      return null;
-    },
+    inputAudio: inputAudioToMediaData,
     unknown: () => null,
   });
   return result ?? null;
@@ -281,27 +288,29 @@ function containsRenderableMediaHints(value: string): boolean {
  * This is how a bare data-URI span attribute (no JSON around it) surfaces,
  * and how the bare reference string the extractor rewrites it to renders.
  */
+function dataUriToMediaData(uri: string): MediaPartData | null {
+  const parsed = parseBase64DataUri(uri);
+  if (!parsed) return null;
+  const mime = parsed.mimeType;
+  if (mime.startsWith("image/"))
+    return { type: "image", source: { type: "url", value: uri } };
+  if (mime.startsWith("audio/"))
+    return {
+      type: "audio",
+      source: { type: "url", value: uri, mimeType: mime },
+    };
+  if (mime.startsWith("video/"))
+    return {
+      type: "video",
+      source: { type: "url", value: uri, mimeType: mime },
+    };
+  return { type: "binary", mimeType: mime, url: uri };
+}
+
 function bareStringToMediaData(value: string): MediaPartData | null {
   const trimmed = value.trim();
   if (trimmed.length === 0 || /\s/.test(trimmed)) return null;
-  if (trimmed.startsWith("data:")) {
-    const parsed = parseBase64DataUri(trimmed);
-    if (!parsed) return null;
-    const mime = parsed.mimeType;
-    if (mime.startsWith("image/"))
-      return { type: "image", source: { type: "url", value: trimmed } };
-    if (mime.startsWith("audio/"))
-      return {
-        type: "audio",
-        source: { type: "url", value: trimmed, mimeType: mime },
-      };
-    if (mime.startsWith("video/"))
-      return {
-        type: "video",
-        source: { type: "url", value: trimmed, mimeType: mime },
-      };
-    return { type: "binary", mimeType: mime, url: trimmed };
-  }
+  if (trimmed.startsWith("data:")) return dataUriToMediaData(trimmed);
   if (isStoredObjectUrl(trimmed)) {
     // Kind and mime are unknown from the URL alone — surface it as a chip;
     // the MediaPart existence probe resolves the stored mime on demand.
@@ -338,19 +347,7 @@ function collectInto(
   if (value == null || depth > MAX_MEDIA_WALK_DEPTH) return;
 
   if (typeof value === "string") {
-    const bare = bareStringToMediaData(value);
-    if (bare) {
-      if (isRenderableCollectedMedia(bare)) out.push(bare);
-      return;
-    }
-    if (!containsRenderableMediaHints(value)) return;
-    const trimmed = value.trim();
-    if (!trimmed.startsWith("{") && !trimmed.startsWith("[")) return;
-    try {
-      collectInto(JSON.parse(trimmed), depth + 1, out);
-    } catch {
-      // not JSON — nothing to collect
-    }
+    collectFromString(value, depth, out);
     return;
   }
 
@@ -360,19 +357,47 @@ function collectInto(
   }
 
   if (typeof value === "object") {
-    // Part-first: if this object IS a media part, surface it and stop — same
-    // rule as the extractor, which rewrites the part and never descends into
-    // it. Non-media objects (message envelopes, typed values, tool results)
-    // resolve to null here and are walked generically below.
-    const media = mediaPartToMediaData(value);
-    if (media) {
-      if (isRenderableCollectedMedia(media)) out.push(media);
-      return;
-    }
-    const obj = value as Record<string, unknown>;
-    for (const key of Object.keys(obj)) {
-      collectInto(obj[key], depth + 1, out);
-    }
+    collectFromObject(value, depth, out);
+  }
+}
+
+function collectFromString(
+  value: string,
+  depth: number,
+  out: MediaPartData[],
+): void {
+  const bare = bareStringToMediaData(value);
+  if (bare) {
+    if (isRenderableCollectedMedia(bare)) out.push(bare);
+    return;
+  }
+  if (!containsRenderableMediaHints(value)) return;
+  const trimmed = value.trim();
+  if (!trimmed.startsWith("{") && !trimmed.startsWith("[")) return;
+  try {
+    collectInto(JSON.parse(trimmed), depth + 1, out);
+  } catch {
+    // not JSON — nothing to collect
+  }
+}
+
+function collectFromObject(
+  value: unknown,
+  depth: number,
+  out: MediaPartData[],
+): void {
+  // Part-first: if this object IS a media part, surface it and stop — same
+  // rule as the extractor, which rewrites the part and never descends into
+  // it. Non-media objects (message envelopes, typed values, tool results)
+  // resolve to null here and are walked generically below.
+  const media = mediaPartToMediaData(value);
+  if (media) {
+    if (isRenderableCollectedMedia(media)) out.push(media);
+    return;
+  }
+  const obj = value as Record<string, unknown>;
+  for (const key of Object.keys(obj)) {
+    collectInto(obj[key], depth + 1, out);
   }
 }
 

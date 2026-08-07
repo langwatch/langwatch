@@ -31,8 +31,24 @@ export interface BinaryPart {
   filename?: string;
 }
 
+/** The `input_audio` payload every audio-carrying part shape resolves to. */
+interface InputAudioPart {
+  data?: string;
+  url?: string;
+  format?: string;
+  mimeType?: string;
+}
+
+/** Media part — image/audio/video/document with a typed source (AG-UI shape). */
+interface MediaContentPart {
+  type: "image" | "audio" | "video" | "document";
+  source: ContentSource;
+}
+
 /**
- * Synchronous visitor over the production message content-part union.
+ * Visitor over the production message content-part union, parameterised by
+ * what a handler returns — `R` for the synchronous visitor, `R | Promise<R>`
+ * for the async one. One shape, so both dispatchers share a single walker.
  *
  * - `text` — {type:"text", text:"..."} or bare string
  * - `media` — image/audio/video/document with a typed source (AG-UI shape)
@@ -45,26 +61,21 @@ export interface BinaryPart {
  * - `toolResult` — tool_result shape
  * - `unknown` — anything unrecognised (optional, defaults to no-op)
  */
-export type ContentPartVisitor<R> = {
-  text(text: string): R;
-  media(part: {
-    type: "image" | "audio" | "video" | "document";
-    source: ContentSource;
-  }): R;
-  binary(part: BinaryPart): R;
-  toolCall(part: { name: string; arguments: unknown }): R;
-  toolResult(part: { result: unknown }): R;
-  imageUrl?(url: string): R;
-  bareImage?(src: string): R;
+type ContentPartVisitorOf<Returned> = {
+  text(text: string): Returned;
+  media(part: MediaContentPart): Returned;
+  binary(part: BinaryPart): Returned;
+  toolCall(part: { name: string; arguments: unknown }): Returned;
+  toolResult(part: { result: unknown }): Returned;
+  imageUrl?(url: string): Returned;
+  bareImage?(src: string): Returned;
   // OpenAI Realtime API audio: {type:"input_audio", input_audio:{data, format?}}
-  inputAudio?(part: {
-    data?: string;
-    url?: string;
-    format?: string;
-    mimeType?: string;
-  }): R;
-  unknown?(value: unknown): R;
+  inputAudio?(part: InputAudioPart): Returned;
+  unknown?(value: unknown): Returned;
 };
+
+/** Synchronous visitor over the production message content-part union. */
+export type ContentPartVisitor<R> = ContentPartVisitorOf<R>;
 
 /**
  * Async-capable visitor over the production message content-part union.
@@ -72,29 +83,290 @@ export type ContentPartVisitor<R> = {
  * Each handler may return `R` or `Promise<R>`. Use with `visitContentPartAsync`
  * when the visitor needs to perform I/O (e.g. uploading bytes to object storage).
  */
-export type AsyncContentPartVisitor<R> = {
-  text(text: string): R | Promise<R>;
-  media(part: {
-    type: "image" | "audio" | "video" | "document";
-    source: ContentSource;
-  }): R | Promise<R>;
-  binary(part: BinaryPart): R | Promise<R>;
-  toolCall(part: { name: string; arguments: unknown }): R | Promise<R>;
-  toolResult(part: { result: unknown }): R | Promise<R>;
-  imageUrl?(url: string): R | Promise<R>;
-  bareImage?(src: string): R | Promise<R>;
-  inputAudio?(part: {
-    data?: string;
-    url?: string;
-    format?: string;
-    mimeType?: string;
-  }): R | Promise<R>;
-  unknown?(value: unknown): R | Promise<R>;
-};
+export type AsyncContentPartVisitor<R> = ContentPartVisitorOf<R | Promise<R>>;
 
 // ---------------------------------------------------------------------------
 // Dispatcher
 // ---------------------------------------------------------------------------
+
+/**
+ * The visitor branch a raw part resolves to, carrying that branch's argument.
+ * Matching is pure and returns one of these; `applyContentPartDispatch` makes
+ * the single visitor call. Splitting the two is what lets the sync and async
+ * dispatchers share one walker.
+ */
+type ContentPartDispatch =
+  | { kind: "text"; text: string }
+  | { kind: "media"; media: MediaContentPart }
+  | { kind: "binary"; binary: BinaryPart }
+  | { kind: "inputAudio"; audio: InputAudioPart }
+  | { kind: "toolCall"; toolCall: { name: string; arguments: unknown } }
+  | { kind: "toolResult"; toolResult: { result: unknown } }
+  | { kind: "imageUrl"; url: string }
+  | { kind: "bareImage"; src: string }
+  | { kind: "unknown" };
+
+// text parts: {type:"text", text/content:"..."} or {text:"..."} (no type)
+function matchTextPart(o: Record<string, unknown>): ContentPartDispatch | null {
+  if (o.type === "text" || (!o.type && o.text)) {
+    return { kind: "text", text: (o.text ?? o.content ?? "") as string };
+  }
+  return null;
+}
+
+// media parts: image / audio / video / document with a source object
+function matchMediaPart(
+  o: Record<string, unknown>,
+): ContentPartDispatch | null {
+  if (
+    (o.type === "image" ||
+      o.type === "audio" ||
+      o.type === "video" ||
+      o.type === "document") &&
+    o.source
+  ) {
+    return {
+      kind: "media",
+      media: {
+        type: o.type as "image" | "audio" | "video" | "document",
+        source: o.source as ContentSource,
+      },
+    };
+  }
+  return null;
+}
+
+// OpenAI Realtime API audio: {type:"input_audio", input_audio:{data, format?}}
+// After server-side extraction the part has {url, mimeType} instead of
+// {data} — both shapes flow through this branch so the renderer can play
+// either an inline base64 turn (pre-extraction) or an externalized
+// /api/files/<id> reference.
+function matchInputAudioPart(
+  o: Record<string, unknown>,
+): ContentPartDispatch | null {
+  if (
+    o.type !== "input_audio" ||
+    typeof o.input_audio !== "object" ||
+    o.input_audio === null
+  ) {
+    return null;
+  }
+  const ia = o.input_audio as Record<string, unknown>;
+  const data = typeof ia.data === "string" ? ia.data : undefined;
+  const url = typeof ia.url === "string" ? ia.url : undefined;
+  if (!data && !url) return null;
+  return {
+    kind: "inputAudio",
+    audio: {
+      data,
+      url,
+      format: typeof ia.format === "string" ? ia.format : undefined,
+      mimeType: typeof ia.mimeType === "string" ? ia.mimeType : undefined,
+    },
+  };
+}
+
+// AI-SDK file part: {type:"file", mediaType:"audio/...", data:"<base64>"}.
+// The TypeScript scenario SDK emits this shape from `createAudioMessage`
+// (see voice/messages.ts in langwatch/scenario). Newer SDK builds translate
+// audio file parts to `input_audio` before sending, but older SDKs and
+// first-party non-scenario callers may still ship the raw `file` shape;
+// routing it here means the extractor externalises the bytes to stored-
+// objects the same way it already does for `input_audio`, instead of
+// dropping into the no-op `unknown` branch and letting full base64
+// payloads land in ClickHouse Messages.Content. Audio mediaTypes go to
+// `inputAudio` (preserves a playable shape downstream); other file payloads
+// go to `binary` (generic externalisation by mimeType).
+function matchAiSdkFilePart(
+  o: Record<string, unknown>,
+): ContentPartDispatch | null {
+  if (o.type !== "file" || typeof o.mediaType !== "string") return null;
+  // MIME types are case-insensitive per RFC 2045 §5.1, so an `Audio/WAV`
+  // file part routes the same as `audio/wav`. The dispatched part carries
+  // the lowercased type — the readback allowlist and storage Content-Type
+  // both expect the canonical form.
+  const mimeType = o.mediaType.toLowerCase();
+  const data = typeof o.data === "string" ? o.data : undefined;
+  const url = typeof o.url === "string" ? o.url : undefined;
+  if (!data && !url) return null;
+  if (mimeType.startsWith("audio/")) {
+    return {
+      kind: "inputAudio",
+      audio: { data, url, format: mediaTypeToAudioFormat(mimeType), mimeType },
+    };
+  }
+  return {
+    kind: "binary",
+    binary: {
+      type: "binary",
+      mimeType,
+      data,
+      url,
+      id: typeof o.id === "string" ? o.id : undefined,
+      filename: typeof o.filename === "string" ? o.filename : undefined,
+    },
+  };
+}
+
+// OpenAI ChatCompletion file part: {type:"file", file:{filename?, file_data?, file_id?}}.
+// The scenario multimodal-files docs instruct exactly this shape for
+// document attachments in simulated user messages. Bytes dispatch to
+// `binary` (or `inputAudio` for audio mime types, keeping a playable shape
+// downstream) so the extractor externalises them; a `file_id`-only part
+// references a provider-hosted file with no bytes, so it falls through to
+// `unknown` and passes along unchanged.
+function matchOpenAiFilePart(
+  o: Record<string, unknown>,
+): ContentPartDispatch | null {
+  if (o.type !== "file" || typeof o.file !== "object" || o.file === null) {
+    return null;
+  }
+  const binPart = openAiFilePayloadToBinaryPart(
+    o.file as Record<string, unknown>,
+  );
+  if (binPart?.mimeType.startsWith("audio/")) {
+    return {
+      kind: "inputAudio",
+      audio: {
+        data: binPart.data,
+        format: mediaTypeToAudioFormat(binPart.mimeType),
+        mimeType: binPart.mimeType,
+      },
+    };
+  }
+  if (binPart) {
+    return { kind: "binary", binary: binPart };
+  }
+  return { kind: "unknown" };
+}
+
+// binary parts
+function matchBinaryPart(
+  o: Record<string, unknown>,
+): ContentPartDispatch | null {
+  if (o.type !== "binary" || !o.mimeType) return null;
+  return {
+    kind: "binary",
+    binary: {
+      type: "binary",
+      mimeType: o.mimeType as string,
+      data: o.data as string | undefined,
+      url: o.url as string | undefined,
+      id: o.id as string | undefined,
+      filename: o.filename as string | undefined,
+    },
+  };
+}
+
+// tool_use / tool_call, then tool_result
+function matchToolPart(o: Record<string, unknown>): ContentPartDispatch | null {
+  if (o.type === "tool_use" || o.type === "tool_call") {
+    return {
+      kind: "toolCall",
+      toolCall: {
+        name: (o.name ?? o.toolName ?? "tool") as string,
+        arguments: o.arguments ?? o.input ?? o.args,
+      },
+    };
+  }
+  if (o.type === "tool_result") {
+    return {
+      kind: "toolResult",
+      toolResult: { result: o.content ?? o.result },
+    };
+  }
+  return null;
+}
+
+// OpenAI-shaped image: {type:"image_url", image_url:{url:"..."}} or the
+// shorthand string form {type:"image_url", image_url:"..."}.
+// (production shapes; data: URI extraction handled by visitor)
+function matchImagePart(
+  o: Record<string, unknown>,
+): ContentPartDispatch | null {
+  const url = imageUrlFromPart(o);
+  if (url !== null) {
+    return { kind: "imageUrl", url };
+  }
+  // Bare {image:"..."} shape (rare; some fixtures). The value must be a
+  // string — the generic value walker dispatches arbitrary objects here, and
+  // a non-string `image` property (e.g. {image: {width}}) is not a part.
+  if (typeof o.image === "string" && o.image) {
+    return { kind: "bareImage", src: o.image };
+  }
+  return null;
+}
+
+/**
+ * Resolves a raw content-part to its visitor branch. The probes are chained in
+ * wire-shape priority order — the first that recognises the part wins, and a
+ * part no probe claims is `unknown`.
+ */
+function matchContentPart(part: unknown): ContentPartDispatch {
+  // Bare string
+  if (typeof part === "string") {
+    return { kind: "text", text: part };
+  }
+
+  if (typeof part !== "object" || part === null) {
+    return { kind: "unknown" };
+  }
+
+  const o = part as Record<string, unknown>;
+
+  return (
+    matchTextPart(o) ??
+    matchMediaPart(o) ??
+    matchInputAudioPart(o) ??
+    matchAiSdkFilePart(o) ??
+    matchOpenAiFilePart(o) ??
+    matchBinaryPart(o) ??
+    matchToolPart(o) ??
+    matchImagePart(o) ?? { kind: "unknown" }
+  );
+}
+
+/**
+ * Calls the one visitor handler the matched branch names. Branches whose
+ * handler is optional fall back to `unknown`, which is itself optional — an
+ * absent handler is a no-op returning `undefined`.
+ */
+function applyContentPartDispatch<Returned>({
+  dispatch,
+  part,
+  visitor,
+}: {
+  dispatch: ContentPartDispatch;
+  part: unknown;
+  visitor: ContentPartVisitorOf<Returned>;
+}): Returned | undefined {
+  switch (dispatch.kind) {
+    case "text":
+      return visitor.text(dispatch.text);
+    case "media":
+      return visitor.media(dispatch.media);
+    case "binary":
+      return visitor.binary(dispatch.binary);
+    case "inputAudio":
+      return visitor.inputAudio
+        ? visitor.inputAudio(dispatch.audio)
+        : visitor.unknown?.(part);
+    case "toolCall":
+      return visitor.toolCall(dispatch.toolCall);
+    case "toolResult":
+      return visitor.toolResult(dispatch.toolResult);
+    case "imageUrl":
+      return visitor.imageUrl
+        ? visitor.imageUrl(dispatch.url)
+        : visitor.unknown?.(part);
+    case "bareImage":
+      return visitor.bareImage
+        ? visitor.bareImage(dispatch.src)
+        : visitor.unknown?.(part);
+    case "unknown":
+      return visitor.unknown?.(part);
+  }
+}
 
 /**
  * Dispatches a single raw content-part (from an AG-UI content array) to the
@@ -109,173 +381,11 @@ export function visitContentPart<R>(
   part: unknown,
   visitor: ContentPartVisitor<R>,
 ): R | undefined {
-  // Bare string
-  if (typeof part === "string") {
-    return visitor.text(part);
-  }
-
-  if (typeof part !== "object" || part === null) {
-    return visitor.unknown?.(part);
-  }
-
-  const o = part as Record<string, unknown>;
-
-  // text parts: {type:"text", text/content:"..."} or {text:"..."} (no type)
-  if (o.type === "text" || (!o.type && o.text)) {
-    const text = (o.text ?? o.content ?? "") as string;
-    return visitor.text(text);
-  }
-
-  // media parts: image / audio / video / document with a source object
-  if (
-    (o.type === "image" ||
-      o.type === "audio" ||
-      o.type === "video" ||
-      o.type === "document") &&
-    o.source
-  ) {
-    return visitor.media({
-      type: o.type as "image" | "audio" | "video" | "document",
-      source: o.source as ContentSource,
-    });
-  }
-
-  // OpenAI Realtime API audio: {type:"input_audio", input_audio:{data, format?}}
-  // After server-side extraction the part has {url, mimeType} instead of
-  // {data} — both shapes flow through this branch so the renderer can play
-  // either an inline base64 turn (pre-extraction) or an externalized
-  // /api/files/<id> reference.
-  if (
-    o.type === "input_audio" &&
-    typeof o.input_audio === "object" &&
-    o.input_audio !== null
-  ) {
-    const ia = o.input_audio as Record<string, unknown>;
-    const data = typeof ia.data === "string" ? ia.data : undefined;
-    const url = typeof ia.url === "string" ? ia.url : undefined;
-    if (data || url) {
-      return visitor.inputAudio
-        ? visitor.inputAudio({
-            data,
-            url,
-            format: typeof ia.format === "string" ? ia.format : undefined,
-            mimeType: typeof ia.mimeType === "string" ? ia.mimeType : undefined,
-          })
-        : visitor.unknown?.(part);
-    }
-  }
-
-  // AI-SDK file part: {type:"file", mediaType:"audio/...", data:"<base64>"}.
-  // The TypeScript scenario SDK emits this shape from `createAudioMessage`
-  // (see voice/messages.ts in langwatch/scenario). Newer SDK builds translate
-  // audio file parts to `input_audio` before sending, but older SDKs and
-  // first-party non-scenario callers may still ship the raw `file` shape;
-  // routing it here means the extractor externalises the bytes to stored-
-  // objects the same way it already does for `input_audio`, instead of
-  // dropping into the no-op `unknown` branch and letting full base64
-  // payloads land in ClickHouse Messages.Content. Audio mediaTypes go to
-  // `inputAudio` (preserves a playable shape downstream); other file payloads
-  // go to `binary` (generic externalisation by mimeType).
-  if (o.type === "file" && typeof o.mediaType === "string") {
-    // MIME types are case-insensitive per RFC 2045 §5.1, so an `Audio/WAV`
-    // file part routes the same as `audio/wav`. The dispatched part carries
-    // the lowercased type — the readback allowlist and storage Content-Type
-    // both expect the canonical form.
-    const mimeType = o.mediaType.toLowerCase();
-    const data = typeof o.data === "string" ? o.data : undefined;
-    const url = typeof o.url === "string" ? o.url : undefined;
-    if (data || url) {
-      if (mimeType.startsWith("audio/")) {
-        return visitor.inputAudio
-          ? visitor.inputAudio({
-              data,
-              url,
-              format: mediaTypeToAudioFormat(mimeType),
-              mimeType,
-            })
-          : visitor.unknown?.(part);
-      }
-      return visitor.binary({
-        type: "binary",
-        mimeType,
-        data,
-        url,
-        id: typeof o.id === "string" ? o.id : undefined,
-        filename: typeof o.filename === "string" ? o.filename : undefined,
-      });
-    }
-  }
-
-  // OpenAI ChatCompletion file part: {type:"file", file:{filename?, file_data?, file_id?}}.
-  // The scenario multimodal-files docs instruct exactly this shape for
-  // document attachments in simulated user messages. Bytes dispatch to
-  // `binary` (or `inputAudio` for audio mime types, keeping a playable shape
-  // downstream) so the extractor externalises them; a `file_id`-only part
-  // references a provider-hosted file with no bytes, so it falls through to
-  // `unknown` and passes along unchanged.
-  if (o.type === "file" && typeof o.file === "object" && o.file !== null) {
-    const binPart = openAiFilePayloadToBinaryPart(
-      o.file as Record<string, unknown>,
-    );
-    if (binPart?.mimeType.startsWith("audio/")) {
-      return visitor.inputAudio
-        ? visitor.inputAudio({
-            data: binPart.data,
-            format: mediaTypeToAudioFormat(binPart.mimeType),
-            mimeType: binPart.mimeType,
-          })
-        : visitor.unknown?.(part);
-    }
-    if (binPart) {
-      return visitor.binary(binPart);
-    }
-    return visitor.unknown?.(part);
-  }
-
-  // binary parts
-  if (o.type === "binary" && o.mimeType) {
-    return visitor.binary({
-      type: "binary",
-      mimeType: o.mimeType as string,
-      data: o.data as string | undefined,
-      url: o.url as string | undefined,
-      id: o.id as string | undefined,
-      filename: o.filename as string | undefined,
-    });
-  }
-
-  // tool_use / tool_call
-  if (o.type === "tool_use" || o.type === "tool_call") {
-    return visitor.toolCall({
-      name: (o.name ?? o.toolName ?? "tool") as string,
-      arguments: o.arguments ?? o.input ?? o.args,
-    });
-  }
-
-  // tool_result
-  if (o.type === "tool_result") {
-    return visitor.toolResult({ result: o.content ?? o.result });
-  }
-
-  // OpenAI-shaped image: {type:"image_url", image_url:{url:"..."}} or the
-  // shorthand string form {type:"image_url", image_url:"..."}.
-  // (production shapes; data: URI extraction handled by visitor)
-  {
-    const url = imageUrlFromPart(o);
-    if (url !== null) {
-      return visitor.imageUrl ? visitor.imageUrl(url) : visitor.unknown?.(part);
-    }
-  }
-
-  // Bare {image:"..."} shape (rare; some fixtures). The value must be a
-  // string — the generic value walker dispatches arbitrary objects here, and
-  // a non-string `image` property (e.g. {image: {width}}) is not a part.
-  if (typeof o.image === "string" && o.image) {
-    const src = o.image;
-    return visitor.bareImage ? visitor.bareImage(src) : visitor.unknown?.(part);
-  }
-
-  return visitor.unknown?.(part);
+  return applyContentPartDispatch({
+    dispatch: matchContentPart(part),
+    part,
+    visitor,
+  });
 }
 
 /**
@@ -313,173 +423,11 @@ export async function visitContentPartAsync<R>(
   part: unknown,
   visitor: AsyncContentPartVisitor<R>,
 ): Promise<R | undefined> {
-  // Bare string
-  if (typeof part === "string") {
-    return visitor.text(part);
-  }
-
-  if (typeof part !== "object" || part === null) {
-    return visitor.unknown?.(part);
-  }
-
-  const o = part as Record<string, unknown>;
-
-  // text parts: {type:"text", text/content:"..."} or {text:"..."} (no type)
-  if (o.type === "text" || (!o.type && o.text)) {
-    const text = (o.text ?? o.content ?? "") as string;
-    return visitor.text(text);
-  }
-
-  // media parts: image / audio / video / document with a source object
-  if (
-    (o.type === "image" ||
-      o.type === "audio" ||
-      o.type === "video" ||
-      o.type === "document") &&
-    o.source
-  ) {
-    return visitor.media({
-      type: o.type as "image" | "audio" | "video" | "document",
-      source: o.source as ContentSource,
-    });
-  }
-
-  // OpenAI Realtime API audio: {type:"input_audio", input_audio:{data, format?}}
-  // After server-side extraction the part has {url, mimeType} instead of
-  // {data} — both shapes flow through this branch so the renderer can play
-  // either an inline base64 turn (pre-extraction) or an externalized
-  // /api/files/<id> reference.
-  if (
-    o.type === "input_audio" &&
-    typeof o.input_audio === "object" &&
-    o.input_audio !== null
-  ) {
-    const ia = o.input_audio as Record<string, unknown>;
-    const data = typeof ia.data === "string" ? ia.data : undefined;
-    const url = typeof ia.url === "string" ? ia.url : undefined;
-    if (data || url) {
-      return visitor.inputAudio
-        ? visitor.inputAudio({
-            data,
-            url,
-            format: typeof ia.format === "string" ? ia.format : undefined,
-            mimeType: typeof ia.mimeType === "string" ? ia.mimeType : undefined,
-          })
-        : visitor.unknown?.(part);
-    }
-  }
-
-  // AI-SDK file part: {type:"file", mediaType:"audio/...", data:"<base64>"}.
-  // The TypeScript scenario SDK emits this shape from `createAudioMessage`
-  // (see voice/messages.ts in langwatch/scenario). Newer SDK builds translate
-  // audio file parts to `input_audio` before sending, but older SDKs and
-  // first-party non-scenario callers may still ship the raw `file` shape;
-  // routing it here means the extractor externalises the bytes to stored-
-  // objects the same way it already does for `input_audio`, instead of
-  // dropping into the no-op `unknown` branch and letting full base64
-  // payloads land in ClickHouse Messages.Content. Audio mediaTypes go to
-  // `inputAudio` (preserves a playable shape downstream); other file payloads
-  // go to `binary` (generic externalisation by mimeType).
-  if (o.type === "file" && typeof o.mediaType === "string") {
-    // MIME types are case-insensitive per RFC 2045 §5.1, so an `Audio/WAV`
-    // file part routes the same as `audio/wav`. The dispatched part carries
-    // the lowercased type — the readback allowlist and storage Content-Type
-    // both expect the canonical form.
-    const mimeType = o.mediaType.toLowerCase();
-    const data = typeof o.data === "string" ? o.data : undefined;
-    const url = typeof o.url === "string" ? o.url : undefined;
-    if (data || url) {
-      if (mimeType.startsWith("audio/")) {
-        return visitor.inputAudio
-          ? visitor.inputAudio({
-              data,
-              url,
-              format: mediaTypeToAudioFormat(mimeType),
-              mimeType,
-            })
-          : visitor.unknown?.(part);
-      }
-      return visitor.binary({
-        type: "binary",
-        mimeType,
-        data,
-        url,
-        id: typeof o.id === "string" ? o.id : undefined,
-        filename: typeof o.filename === "string" ? o.filename : undefined,
-      });
-    }
-  }
-
-  // OpenAI ChatCompletion file part: {type:"file", file:{filename?, file_data?, file_id?}}.
-  // The scenario multimodal-files docs instruct exactly this shape for
-  // document attachments in simulated user messages. Bytes dispatch to
-  // `binary` (or `inputAudio` for audio mime types, keeping a playable shape
-  // downstream) so the extractor externalises them; a `file_id`-only part
-  // references a provider-hosted file with no bytes, so it falls through to
-  // `unknown` and passes along unchanged.
-  if (o.type === "file" && typeof o.file === "object" && o.file !== null) {
-    const binPart = openAiFilePayloadToBinaryPart(
-      o.file as Record<string, unknown>,
-    );
-    if (binPart?.mimeType.startsWith("audio/")) {
-      return visitor.inputAudio
-        ? visitor.inputAudio({
-            data: binPart.data,
-            format: mediaTypeToAudioFormat(binPart.mimeType),
-            mimeType: binPart.mimeType,
-          })
-        : visitor.unknown?.(part);
-    }
-    if (binPart) {
-      return visitor.binary(binPart);
-    }
-    return visitor.unknown?.(part);
-  }
-
-  // binary parts
-  if (o.type === "binary" && o.mimeType) {
-    return visitor.binary({
-      type: "binary",
-      mimeType: o.mimeType as string,
-      data: o.data as string | undefined,
-      url: o.url as string | undefined,
-      id: o.id as string | undefined,
-      filename: o.filename as string | undefined,
-    });
-  }
-
-  // tool_use / tool_call
-  if (o.type === "tool_use" || o.type === "tool_call") {
-    return visitor.toolCall({
-      name: (o.name ?? o.toolName ?? "tool") as string,
-      arguments: o.arguments ?? o.input ?? o.args,
-    });
-  }
-
-  // tool_result
-  if (o.type === "tool_result") {
-    return visitor.toolResult({ result: o.content ?? o.result });
-  }
-
-  // OpenAI-shaped image: {type:"image_url", image_url:{url:"..."}} or the
-  // shorthand string form {type:"image_url", image_url:"..."}.
-  // (production shapes; data: URI extraction handled by visitor)
-  {
-    const url = imageUrlFromPart(o);
-    if (url !== null) {
-      return visitor.imageUrl ? visitor.imageUrl(url) : visitor.unknown?.(part);
-    }
-  }
-
-  // Bare {image:"..."} shape (rare; some fixtures). The value must be a
-  // string — the generic value walker dispatches arbitrary objects here, and
-  // a non-string `image` property (e.g. {image: {width}}) is not a part.
-  if (typeof o.image === "string" && o.image) {
-    const src = o.image;
-    return visitor.bareImage ? visitor.bareImage(src) : visitor.unknown?.(part);
-  }
-
-  return visitor.unknown?.(part);
+  return applyContentPartDispatch<R | Promise<R>>({
+    dispatch: matchContentPart(part),
+    part,
+    visitor,
+  });
 }
 
 /**

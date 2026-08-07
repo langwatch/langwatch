@@ -63,21 +63,42 @@ export class SerializedWorkflowAgentAdapter extends AgentAdapter {
         ? this.config.inputs
         : [{ identifier: "input", type: "str" }];
 
-    if (
-      this.config.scenarioMappings &&
-      Object.keys(this.config.scenarioMappings).length > 0
-    ) {
-      const resolved = resolveFieldMappings({
-        fieldMappings: this.config.scenarioMappings,
-        agentInput,
-      });
-      const record: Record<string, string> = {};
-      for (const inp of declaredInputs) {
-        record[inp.identifier] = resolved[inp.identifier] ?? "";
-      }
-      return record;
+    if (this.hasScenarioMappings()) {
+      return this.resolveInputsFromMappings(agentInput, declaredInputs);
     }
 
+    return this.resolveInputsLegacy(agentInput, declaredInputs);
+  }
+
+  private hasScenarioMappings(): boolean {
+    return !!(
+      this.config.scenarioMappings &&
+      Object.keys(this.config.scenarioMappings).length > 0
+    );
+  }
+
+  /** Resolve each declared agent input from its mapping. Orphan mappings for
+   * inputs that don't exist on the agent are ignored. */
+  private resolveInputsFromMappings(
+    agentInput: AgentInput,
+    declaredInputs: WorkflowAgentData["inputs"],
+  ): Record<string, string> {
+    const resolved = resolveFieldMappings({
+      fieldMappings: this.config.scenarioMappings!,
+      agentInput,
+    });
+    const record: Record<string, string> = {};
+    for (const inp of declaredInputs) {
+      record[inp.identifier] = resolved[inp.identifier] ?? "";
+    }
+    return record;
+  }
+
+  /** Legacy behavior: first input = last user message, rest = "" */
+  private resolveInputsLegacy(
+    agentInput: AgentInput,
+    declaredInputs: WorkflowAgentData["inputs"],
+  ): Record<string, string> {
     const lastUserMessage = agentInput.messages.findLast(
       (m) => m.role === "user",
     );
@@ -100,21 +121,91 @@ export class SerializedWorkflowAgentAdapter extends AgentAdapter {
    * synthesizes a minimal entry→code→end workflow). The NLP service injects
    * the inputs dict into the entry node when evaluating the graph.
    */
-  private async executeOnNlpService(
-    inputRecord: Record<string, string>,
-  ): Promise<Record<string, unknown> | null> {
-    // Merge pre-fetched project secrets into the DSL so `secrets.NAME` works
-    // inside code nodes of the published workflow. Any secrets already embedded
-    // in the DSL (there shouldn't be any — they're stripped on save) are
-    // overwritten by the fresh values to avoid leaking stale/decrypted data.
+  // Merge pre-fetched project secrets into the DSL so `secrets.NAME` works
+  // inside code nodes of the published workflow. Any secrets already embedded
+  // in the DSL (there shouldn't be any — they're stripped on save) are
+  // overwritten by the fresh values to avoid leaking stale/decrypted data.
+  private buildWorkflowForExecution(): Record<string, unknown> {
     const existingSecrets =
       (this.config.workflow.secrets as Record<string, string> | undefined) ??
       {};
-    const workflow = {
+    return {
       ...this.config.workflow,
       api_key: this.apiKey,
       secrets: { ...existingSecrets, ...this.config.secrets },
     };
+  }
+
+  private async sendWorkflowExecutionRequest({
+    event,
+    signal,
+  }: {
+    event: unknown;
+    signal: AbortSignal;
+  }): Promise<Response> {
+    const url = `${this.nlpServiceUrl}/go/studio/execute_sync`;
+    try {
+      return await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(event),
+        signal,
+      });
+    } catch (fetchError) {
+      const cause =
+        fetchError instanceof Error && "cause" in fetchError
+          ? ` (cause: ${String(
+              (fetchError as Error & { cause?: unknown }).cause,
+            )})`
+          : "";
+      throw new Error(
+        `Workflow execution failed: fetch to ${url} failed - ${
+          fetchError instanceof Error ? fetchError.message : String(fetchError)
+        }${cause}`,
+      );
+    }
+  }
+
+  private async extractWorkflowErrorMessage(
+    response: Response,
+  ): Promise<string> {
+    try {
+      const bodyStr = await response.text();
+      try {
+        const errorBody = JSON.parse(bodyStr) as { detail?: string };
+        return errorBody.detail ?? bodyStr;
+      } catch {
+        return bodyStr;
+      }
+    } catch {
+      return "";
+    }
+  }
+
+  private async handleWorkflowExecutionResponse(
+    response: Response,
+  ): Promise<Record<string, unknown> | null> {
+    if (!response.ok) {
+      const errorMessage = await this.extractWorkflowErrorMessage(response);
+      throw new Error(
+        `Workflow execution failed: HTTP ${response.status}${
+          errorMessage ? ` - ${errorMessage}` : ""
+        }`,
+      );
+    }
+
+    const result = (await response.json()) as {
+      trace_id: string;
+      status: string;
+      result: Record<string, unknown> | null;
+    };
+    return result.result;
+  }
+
+  private async executeOnNlpService(
+    inputRecord: Record<string, string>,
+  ): Promise<Record<string, unknown> | null> {
+    const workflow = this.buildWorkflowForExecution();
 
     const event = {
       type: "execute_flow" as const,
@@ -132,56 +223,11 @@ export class SerializedWorkflowAgentAdapter extends AgentAdapter {
     const timeout = setTimeout(() => controller.abort(), NLP_FETCH_TIMEOUT_MS);
 
     try {
-      let response: Response;
-      try {
-        response = await fetch(`${this.nlpServiceUrl}/go/studio/execute_sync`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(event),
-          signal: controller.signal,
-        });
-      } catch (fetchError) {
-        const cause =
-          fetchError instanceof Error && "cause" in fetchError
-            ? ` (cause: ${String(
-                (fetchError as Error & { cause?: unknown }).cause,
-              )})`
-            : "";
-        throw new Error(
-          `Workflow execution failed: fetch to ${this.nlpServiceUrl}/go/studio/execute_sync failed - ${
-            fetchError instanceof Error
-              ? fetchError.message
-              : String(fetchError)
-          }${cause}`,
-        );
-      }
-
-      if (!response.ok) {
-        let errorMessage = "";
-        try {
-          const bodyStr = await response.text();
-          try {
-            const errorBody = JSON.parse(bodyStr) as { detail?: string };
-            errorMessage = errorBody.detail ?? bodyStr;
-          } catch {
-            errorMessage = bodyStr;
-          }
-        } catch {
-          errorMessage = "";
-        }
-        throw new Error(
-          `Workflow execution failed: HTTP ${response.status}${
-            errorMessage ? ` - ${errorMessage}` : ""
-          }`,
-        );
-      }
-
-      const result = (await response.json()) as {
-        trace_id: string;
-        status: string;
-        result: Record<string, unknown> | null;
-      };
-      return result.result;
+      const response = await this.sendWorkflowExecutionRequest({
+        event,
+        signal: controller.signal,
+      });
+      return await this.handleWorkflowExecutionResponse(response);
     } finally {
       clearTimeout(timeout);
     }

@@ -49,56 +49,75 @@ const join = (prefix: string, key: string): string =>
 const indexKey = (prefix: string, i: number): string =>
   prefix ? `${prefix}${SEP}${i}` : String(i);
 
-const scalar = (v: OtlpAnyValue): AttributeScalar | undefined => {
-  if ("stringValue" in v && typeof v.stringValue === "string") {
-    return v.stringValue;
+const stringScalar = (v: OtlpAnyValue): string | undefined =>
+  "stringValue" in v && typeof v.stringValue === "string"
+    ? v.stringValue
+    : void 0;
+
+const arrayScalar = (v: OtlpAnyValue): string | undefined => {
+  if (
+    !("arrayValue" in v) ||
+    !v.arrayValue ||
+    !Array.isArray(v.arrayValue?.values)
+  ) {
+    return void 0;
+  }
+  return JSON.stringify(
+    v.arrayValue.values.map((item) => scalar(item) ?? item),
+  );
+};
+
+const bytesScalar = (v: OtlpAnyValue): Uint8Array | undefined => {
+  if (!("bytesValue" in v) || !v.bytesValue) return void 0;
+  if (typeof v.bytesValue === "string") {
+    return Buffer.from(v.bytesValue, "base64");
+  }
+  return v.bytesValue;
+};
+
+const boolScalar = (v: OtlpAnyValue): boolean | undefined => {
+  if (!("boolValue" in v) || v.boolValue === null) return void 0;
+  if (typeof v.boolValue === "string") {
+    return (v.boolValue as string).toLowerCase() === "true";
+  }
+  return v.boolValue;
+};
+
+const intFromHighLow = (high: number, low: number): number =>
+  Number((BigInt(high) << 32n) | (BigInt(low) & 0xffffffffn));
+
+const intScalar = (v: OtlpAnyValue): number | undefined => {
+  if (!("intValue" in v) || !v.intValue) return void 0;
+  if (typeof v.intValue === "string") {
+    return parseInt(v.intValue, 10);
   }
   if (
-    "arrayValue" in v &&
-    v.arrayValue &&
-    Array.isArray(v.arrayValue?.values)
+    typeof v.intValue === "object" &&
+    v.intValue !== null &&
+    "high" in v.intValue &&
+    "low" in v.intValue
   ) {
-    return JSON.stringify(
-      v.arrayValue.values.map((item) => scalar(item) ?? item),
-    );
+    const { high, low } = v.intValue;
+    return intFromHighLow(high, low);
   }
-  if ("bytesValue" in v && v.bytesValue) {
-    if (typeof v.bytesValue === "string") {
-      return Buffer.from(v.bytesValue, "base64");
-    }
-    return v.bytesValue;
-  }
-  if ("boolValue" in v && v.boolValue !== null) {
-    if (typeof v.boolValue === "string") {
-      return (v.boolValue as string).toLowerCase() === "true";
-    }
-    return v.boolValue;
-  }
-  if ("intValue" in v && v.intValue) {
-    if (typeof v.intValue === "string") {
-      return parseInt(v.intValue, 10);
-    }
-    if (
-      typeof v.intValue === "object" &&
-      v.intValue !== null &&
-      "high" in v.intValue &&
-      "low" in v.intValue
-    ) {
-      const { high, low } = v.intValue;
-
-      return Number((BigInt(high) << 32n) | (BigInt(low) & 0xffffffffn));
-    }
-    return v.intValue;
-  }
-  if ("doubleValue" in v && v.doubleValue) {
-    if (typeof v.doubleValue === "string") {
-      return parseFloat(v.doubleValue);
-    }
-    return v.doubleValue;
-  }
-
-  return void 0;
+  return v.intValue;
 };
+
+const doubleScalar = (v: OtlpAnyValue): number | undefined => {
+  if (!("doubleValue" in v) || !v.doubleValue) return void 0;
+  if (typeof v.doubleValue === "string") {
+    return parseFloat(v.doubleValue);
+  }
+  return v.doubleValue;
+};
+
+const scalar = (v: OtlpAnyValue): AttributeScalar | undefined =>
+  stringScalar(v) ??
+  arrayScalar(v) ??
+  bytesScalar(v) ??
+  boolScalar(v) ??
+  intScalar(v) ??
+  doubleScalar(v);
 
 const isScalar = (v: OtlpAnyValue): boolean => scalar(v) !== void 0;
 
@@ -206,6 +225,36 @@ const normalizeOtlpAnyValue = (
     out[k] = v; // last write wins
   };
 
+  const walkKvlistValue = (
+    kvlistValue: NonNullable<OtlpAnyValue["kvlistValue"]>,
+    prefix: string,
+  ) => {
+    for (const { key, value } of kvlistValue.values) {
+      walk(value, join(prefix, key));
+    }
+  };
+
+  const walkArrayValue = (
+    arrayValue: NonNullable<OtlpAnyValue["arrayValue"]>,
+    prefix: string,
+  ) => {
+    const values = (arrayValue.values ?? []).filter(Boolean);
+
+    if (values.every(isScalar)) {
+      set(
+        prefix,
+        values
+          .map((x) => scalar(x)!)
+          .filter((x): x is AttributeScalar => x !== void 0),
+      );
+      return;
+    }
+
+    for (const [i, child] of values.entries()) {
+      walk(child, indexKey(prefix, i));
+    }
+  };
+
   const walk = (v: OtlpAnyValue, prefix: string) => {
     const s = scalar(v);
     if (s !== void 0) {
@@ -214,30 +263,12 @@ const normalizeOtlpAnyValue = (
     }
 
     if ("kvlistValue" in v && v.kvlistValue) {
-      for (const { key, value } of v.kvlistValue.values)
-        walk(value, join(prefix, key));
-
+      walkKvlistValue(v.kvlistValue, prefix);
       return;
     }
 
     if ("arrayValue" in v && v.arrayValue) {
-      const vsRaw = v.arrayValue.values ?? [];
-      const vs = vsRaw.filter(Boolean);
-
-      if (vs.every(isScalar)) {
-        set(
-          prefix,
-          vs
-            .map((x) => scalar(x)!)
-            .filter((x): x is AttributeScalar => x !== void 0),
-        );
-        return;
-      }
-
-      for (const [i, child] of vs.entries()) {
-        walk(child, indexKey(prefix, i));
-      }
-
+      walkArrayValue(v.arrayValue, prefix);
       return;
     }
 
@@ -255,42 +286,39 @@ const normalizeOtlpAnyValue = (
   return out;
 };
 
+const isNormalizableScalar = (
+  v: unknown,
+): v is string | boolean | number | bigint =>
+  typeof v === "string" ||
+  typeof v === "boolean" ||
+  typeof v === "number" ||
+  typeof v === "bigint";
+
+const normalizeOtlpAttributeArray = (
+  v: AttributeScalar[],
+): Array<string | boolean | number | bigint> => {
+  const out: Array<string | boolean | number | bigint> = [];
+
+  for (const item of v) {
+    if (item instanceof Uint8Array) {
+      out.push(Buffer.from(item).toString("hex"));
+      continue;
+    }
+
+    if (isNormalizableScalar(item)) {
+      out.push(item);
+    }
+  }
+
+  return out;
+};
+
 const normalizeOtlpAttributeValue = (
   v: AttributeValue,
 ): Exclude<NormalizedAttributes[string], undefined> | undefined => {
   if (v instanceof Uint8Array) return Buffer.from(v).toString("hex");
-
-  if (Array.isArray(v)) {
-    const out: Array<string | boolean | number | bigint> = [];
-
-    for (const item of v) {
-      if (item instanceof Uint8Array) {
-        out.push(Buffer.from(item).toString("hex"));
-        continue;
-      }
-
-      if (
-        typeof item === "string" ||
-        typeof item === "boolean" ||
-        typeof item === "number" ||
-        typeof item === "bigint"
-      ) {
-        out.push(item);
-      }
-    }
-
-    return out;
-  }
-
-  if (
-    typeof v === "string" ||
-    typeof v === "boolean" ||
-    typeof v === "number" ||
-    typeof v === "bigint"
-  ) {
-    return v;
-  }
-
+  if (Array.isArray(v)) return normalizeOtlpAttributeArray(v);
+  if (isNormalizableScalar(v)) return v;
   return void 0;
 };
 
@@ -395,6 +423,26 @@ const unflattenObject = (
   return safeUnflatten(record);
 };
 
+/** Invalid pattern — copy its original flattened keys back unchanged. */
+function copyInvalidPatternKeys(
+  prefix: string,
+  indexMap: Map<number, Map<string, unknown>>,
+  result: NormalizedAttributes,
+): void {
+  for (const [index, relativeMap] of indexMap) {
+    for (const [relativePath, value] of relativeMap) {
+      result[`${prefix}${SEP}${index}${SEP}${relativePath}`] = value;
+    }
+  }
+}
+
+function buildReconstructedArray(
+  indexMap: Map<number, Map<string, unknown>>,
+): Record<string, unknown>[] {
+  const indices = Array.from(indexMap.keys()).sort((a, b) => a - b);
+  return indices.map((index) => unflattenObject(indexMap.get(index)!));
+}
+
 /**
  * Post-processes normalized attributes to reconstruct flattened arrays.
  *
@@ -415,7 +463,6 @@ const reconstructFlattenedArrays = (
   if (patterns.size === 0) return attrs;
 
   const result: NormalizedAttributes = {};
-  const processedPrefixes = new Set<string>();
 
   // Copy over non-matched keys
   for (const [key, value] of Object.entries(attrs)) {
@@ -427,29 +474,12 @@ const reconstructFlattenedArrays = (
   // Process each detected array pattern
   for (const [prefix, indexMap] of patterns) {
     if (!isValidArrayPattern(indexMap)) {
-      // Invalid pattern - copy original keys back
-      for (const [index, relativeMap] of indexMap) {
-        for (const [relativePath, value] of relativeMap) {
-          result[`${prefix}${SEP}${index}${SEP}${relativePath}`] = value;
-        }
-      }
+      copyInvalidPatternKeys(prefix, indexMap, result);
       continue;
     }
 
-    processedPrefixes.add(prefix);
-
-    // Build the array
-    const indices = Array.from(indexMap.keys()).sort((a, b) => a - b);
-    const arrayItems: Record<string, unknown>[] = [];
-
-    for (const index of indices) {
-      const relativeMap = indexMap.get(index)!;
-      const item = unflattenObject(relativeMap);
-      arrayItems.push(item);
-    }
-
     // Store as real array (not JSON string)
-    result[prefix] = arrayItems;
+    result[prefix] = buildReconstructedArray(indexMap);
   }
 
   return result;
@@ -475,6 +505,36 @@ export function sanitizeInvalidJsonEscapes(json: string): string {
   return json.replace(/\\([<>])/g, "$1");
 }
 
+const looksLikeJson = (trimmed: string): boolean =>
+  (trimmed.startsWith("{") && trimmed.endsWith("}")) ||
+  (trimmed.startsWith("[") && trimmed.endsWith("]"));
+
+/**
+ * Parses a single string value if it looks like small-enough JSON. Falls
+ * back to fixing PII-redaction escapes on a parse failure, then to the
+ * original string if nothing parses.
+ */
+function parseIfJson(value: string) {
+  const trimmed = value.trim();
+  if (trimmed.length < 2 || trimmed.length > MAX_JSON_PARSE_SIZE) return value;
+  if (!looksLikeJson(trimmed)) return value;
+
+  try {
+    return JSON.parse(trimmed);
+  } catch {
+    // PII redaction can introduce invalid JSON escapes like \<US_DRIVER_LICENSE>
+    // because it replaces content with <PII_TYPE> tokens inside JSON strings.
+    // Try to fix known invalid escapes before giving up.
+    const sanitized = sanitizeInvalidJsonEscapes(trimmed);
+    if (sanitized === trimmed) return value;
+    try {
+      return JSON.parse(sanitized);
+    } catch {
+      return value;
+    }
+  }
+}
+
 /**
  * Parses string values that look like JSON into their parsed form.
  * Scalars and already-parsed values pass through unchanged.
@@ -488,43 +548,7 @@ export const parseJsonStringValues = (
   const result: NormalizedAttributes = {};
 
   for (const [key, value] of Object.entries(attrs)) {
-    if (typeof value !== "string") {
-      result[key] = value;
-      continue;
-    }
-
-    const trimmed = value.trim();
-    if (trimmed.length < 2 || trimmed.length > MAX_JSON_PARSE_SIZE) {
-      result[key] = value;
-      continue;
-    }
-
-    const looksJson =
-      (trimmed.startsWith("{") && trimmed.endsWith("}")) ||
-      (trimmed.startsWith("[") && trimmed.endsWith("]"));
-
-    if (!looksJson) {
-      result[key] = value;
-      continue;
-    }
-
-    try {
-      result[key] = JSON.parse(trimmed);
-    } catch {
-      // PII redaction can introduce invalid JSON escapes like \<US_DRIVER_LICENSE>
-      // because it replaces content with <PII_TYPE> tokens inside JSON strings.
-      // Try to fix known invalid escapes before giving up.
-      const sanitized = sanitizeInvalidJsonEscapes(trimmed);
-      if (sanitized !== trimmed) {
-        try {
-          result[key] = JSON.parse(sanitized);
-          continue;
-        } catch {
-          // still broken, fall through
-        }
-      }
-      result[key] = value;
-    }
+    result[key] = typeof value === "string" ? parseIfJson(value) : value;
   }
 
   return result;
@@ -618,6 +642,30 @@ const parseTraceState = (
   };
 };
 
+/** Guards against malformed OTLP data: only valid `{key, value}` entries. */
+const isOtlpKeyValueEntry = (attr: unknown): attr is OtlpKeyValue =>
+  typeof attr === "object" && attr !== null && "key" in attr && "value" in attr;
+
+function stringifyNormalizedAttributeValue(
+  value: NormalizedAttributes[string],
+): string | undefined {
+  if (value === null || value === undefined) return void 0;
+  if (typeof value === "string") return value;
+  if (
+    typeof value === "number" ||
+    typeof value === "boolean" ||
+    typeof value === "bigint"
+  ) {
+    return String(value);
+  }
+  try {
+    const serialized = JSON.stringify(value);
+    return typeof serialized === "string" ? serialized : void 0;
+  } catch {
+    return void 0;
+  }
+}
+
 /**
  * Normalizes raw OTLP attribute arrays into serialized string maps.
  * Shared utility for log and metric collection services.
@@ -627,37 +675,17 @@ export function normalizeOtlpAttributeMap(
 ): Record<string, string> {
   if (!Array.isArray(attributes)) return {};
 
-  // Filter to only valid {key, value} entries to guard against malformed OTLP data
-  const validEntries = attributes.filter(
-    (attr): attr is OtlpKeyValue =>
-      typeof attr === "object" &&
-      attr !== null &&
-      "key" in attr &&
-      "value" in attr,
-  );
+  const validEntries = attributes.filter(isOtlpKeyValueEntry);
   const normalized = normalizeOtlpAttributes(validEntries);
   const result: Record<string, string> = {};
+
   for (const [key, value] of Object.entries(normalized)) {
-    if (value === null || value === undefined) continue;
-    if (typeof value === "string") {
-      result[key] = value;
-    } else if (
-      typeof value === "number" ||
-      typeof value === "boolean" ||
-      typeof value === "bigint"
-    ) {
-      result[key] = String(value);
-    } else {
-      try {
-        const serialized = JSON.stringify(value);
-        if (typeof serialized === "string") {
-          result[key] = serialized;
-        }
-      } catch {
-        // Skip unserializable values
-      }
+    const stringified = stringifyNormalizedAttributeValue(value);
+    if (stringified !== void 0) {
+      result[key] = stringified;
     }
   }
+
   return result;
 }
 

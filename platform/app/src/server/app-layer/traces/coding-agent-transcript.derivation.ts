@@ -437,58 +437,81 @@ function isFailed(logContent: CodexToolLogContent | undefined): boolean {
   return logContent?.failed ?? false;
 }
 
+/** The first key (in priority order) that resolves to a number, or null. */
+function firstNumber(
+  params: Record<string, unknown> | null | undefined,
+  keys: string[],
+): number | null {
+  for (const key of keys) {
+    const value = readNumber(params, key);
+    if (value !== null) return value;
+  }
+  return null;
+}
+
+function tokensForModelCall({
+  span,
+  inputTokens,
+  outputTokens,
+}: {
+  span: SpanDetail;
+  inputTokens: number;
+  outputTokens: number;
+}): number {
+  const metricTokens =
+    (span.metrics?.promptTokens ?? 0) + (span.metrics?.completionTokens ?? 0);
+  if (metricTokens > 0) return metricTokens;
+  return (
+    readNumber(span.params, "codex.turn.token_usage.total_tokens") ??
+    inputTokens + outputTokens
+  );
+}
+
 function modelCallEntry(span: SpanDetail): TranscriptEntry & {
   kind: "model_call";
 } {
   const inputTokens =
-    readNumber(span.params, "input_tokens") ??
-    readNumber(span.params, "gen_ai.usage.input_tokens") ??
-    // opencode instruments through the Vercel AI SDK (v5 names).
-    readNumber(span.params, "ai.usage.inputTokens") ??
-    // codex reports per-turn usage under its own namespace.
-    readNumber(span.params, "codex.turn.token_usage.non_cached_input_tokens") ??
-    0;
+    firstNumber(span.params, [
+      "input_tokens",
+      "gen_ai.usage.input_tokens",
+      // opencode instruments through the Vercel AI SDK (v5 names).
+      "ai.usage.inputTokens",
+      // codex reports per-turn usage under its own namespace.
+      "codex.turn.token_usage.non_cached_input_tokens",
+    ]) ?? 0;
   const outputTokens =
-    readNumber(span.params, "output_tokens") ??
-    readNumber(span.params, "gen_ai.usage.output_tokens") ??
-    readNumber(span.params, "ai.usage.outputTokens") ??
-    readNumber(span.params, "codex.turn.token_usage.output_tokens") ??
-    0;
-  const metricTokens =
-    (span.metrics?.promptTokens ?? 0) + (span.metrics?.completionTokens ?? 0);
-  const tokens =
-    metricTokens > 0
-      ? metricTokens
-      : (readNumber(span.params, "codex.turn.token_usage.total_tokens") ??
-        inputTokens + outputTokens);
+    firstNumber(span.params, [
+      "output_tokens",
+      "gen_ai.usage.output_tokens",
+      "ai.usage.outputTokens",
+      "codex.turn.token_usage.output_tokens",
+    ]) ?? 0;
+  const cacheReadTokens =
+    firstNumber(span.params, [
+      "cache_read_tokens",
+      "gen_ai.usage.cache_read.input_tokens",
+    ]) ?? 0;
+  const cacheCreationTokens =
+    firstNumber(span.params, [
+      "cache_creation_tokens",
+      "gen_ai.usage.cache_creation.input_tokens",
+      // codex spells cache creation "cache_write", on both its span shapes.
+      "gen_ai.usage.cache_write.input_tokens",
+      "codex.turn.token_usage.cache_write_input_tokens",
+    ]) ?? 0;
 
   return {
     kind: "model_call",
     atMs: span.startTimeMs,
     model: modelOf(span),
-    tokens,
+    tokens: tokensForModelCall({ span, inputTokens, outputTokens }),
     costUsd: span.metrics?.cost ?? 0,
-    durationMs:
-      span.endTimeMs && span.startTimeMs
-        ? span.endTimeMs - span.startTimeMs
-        : null,
+    durationMs: spanDurationMs(span),
     spanId: span.spanId,
     inputTokens,
     outputTokens,
-    cacheReadTokens:
-      readNumber(span.params, "cache_read_tokens") ??
-      readNumber(span.params, "gen_ai.usage.cache_read.input_tokens") ??
-      0,
-    cacheCreationTokens:
-      readNumber(span.params, "cache_creation_tokens") ??
-      readNumber(span.params, "gen_ai.usage.cache_creation.input_tokens") ??
-      // codex spells cache creation "cache_write", on both its span shapes.
-      readNumber(span.params, "gen_ai.usage.cache_write.input_tokens") ??
-      readNumber(
-        span.params,
-        "codex.turn.token_usage.cache_write_input_tokens",
-      ) ??
-      0,
+    cacheReadTokens,
+    cacheCreationTokens,
   };
 }
 
@@ -523,6 +546,305 @@ function collectLogEntries(
   return { entries, sessionId };
 }
 
+/** Context a single log-entry handler needs to build (or decline) an entry. */
+interface LogEntryContext {
+  attrs: Record<string, unknown>;
+  atMs: number;
+  event: string;
+  claimedToolCallIds: Set<string>;
+}
+
+function userPromptEntry({ attrs, atMs }: LogEntryContext): TranscriptEntry {
+  const text = readString(attrs, "prompt");
+  return {
+    kind: "user_prompt",
+    atMs,
+    text,
+    chars: text?.length ?? readNumber(attrs, "prompt_length") ?? 0,
+  };
+}
+
+function assistantResponseEntry({
+  attrs,
+  atMs,
+}: LogEntryContext): TranscriptEntry {
+  return {
+    kind: "assistant_message",
+    atMs,
+    text: readString(attrs, "response"),
+    model: readString(attrs, "model"),
+  };
+}
+
+// Gemini's reply rides `response_text` on its api_response event, as the raw
+// candidates JSON. Claude's api_response events carry no response_text, so
+// this case is inert for them. Gemini also runs utility calls (its model
+// router) whose "reply" is internal JSON; the `role` attr separates those
+// from the conversation - only `main` answers the user, mirroring claude's
+// query_source gate.
+function apiResponseEntry({
+  attrs,
+  atMs,
+}: LogEntryContext): TranscriptEntry | null {
+  const role = readString(attrs, "role");
+  if (role !== null && role !== "main") return null;
+  const text = geminiResponseText(readString(attrs, "response_text"));
+  if (text === null) return null;
+  return {
+    kind: "assistant_message",
+    atMs,
+    text,
+    model: readString(attrs, "model"),
+  };
+}
+
+// codex tool_result logs (recognised by their call_id + arguments shape) are
+// the CONTENT record of a codex tool run. When a tool span claimed the
+// call_id, the span entry already carries this log's content; unclaimed
+// calls (the model-facing harness call, MCP calls without spans, span-less
+// wires) render from the log alone.
+function codexToolResultEntry({
+  attrs,
+  atMs,
+  claimedToolCallIds,
+  callId,
+}: LogEntryContext & { callId: string }): TranscriptEntry | null {
+  if (claimedToolCallIds.has(callId)) return null;
+  const codexToolName = readString(attrs, "tool_name");
+  if (codexToolName === null) return null;
+  const mcpServer = readString(attrs, "mcp_server");
+  return {
+    kind: "tool",
+    atMs,
+    name: codexToolName,
+    mcpServer: mcpServer ?? parseMcpToolName(codexToolName)?.server ?? null,
+    input: parseMaybeJson(readString(attrs, "arguments")),
+    output: readString(attrs, "output"),
+    durationMs: readNumber(attrs, "duration_ms"),
+    failed: readString(attrs, "success") === "false",
+    agentId: null,
+    spanId: "",
+  };
+}
+
+// Gemini tools exist only as this log event (its tool_call, which the
+// vocabulary maps here): no span exists for them. A rejected decision means
+// the human said no and nothing ran. Claude tool_result logs carry no
+// function_name, so they fall through to null and claude tools keep coming
+// from their spans.
+function genericToolResultEntry({
+  attrs,
+  atMs,
+}: LogEntryContext): TranscriptEntry | null {
+  const name = readString(attrs, "function_name");
+  if (name === null) return null;
+  const decision = readString(attrs, "decision");
+  if (decision === "reject") {
+    return { kind: "tool_rejected", atMs, name, reason: decision };
+  }
+  return {
+    kind: "tool",
+    atMs,
+    name,
+    mcpServer: parseMcpToolName(name)?.server ?? null,
+    input: null,
+    output: null,
+    durationMs: readNumber(attrs, "duration_ms"),
+    failed: readString(attrs, "success") === "false",
+    agentId: null,
+    spanId: "",
+  };
+}
+
+function toolResultEntry(ctx: LogEntryContext): TranscriptEntry | null {
+  const callId = readString(ctx.attrs, "call_id");
+  if (
+    callId !== null &&
+    readString(ctx.attrs, "event.name") === "codex.tool_result"
+  ) {
+    return codexToolResultEntry({ ...ctx, callId });
+  }
+  return genericToolResultEntry(ctx);
+}
+
+// The ONLY record of a tool the human refused: it never ran, so no span for
+// it exists anywhere in the trace.
+function toolDecisionEntry({
+  attrs,
+  atMs,
+}: LogEntryContext): TranscriptEntry | null {
+  const decision = readString(attrs, "decision");
+  if (decision === null || decision === "accept") return null;
+  return {
+    kind: "tool_rejected",
+    atMs,
+    name: readString(attrs, "tool_name"),
+    reason: readString(attrs, "source") ?? decision,
+  };
+}
+
+function compactionEntry({
+  attrs,
+  atMs,
+  event,
+}: LogEntryContext): TranscriptEntry {
+  const pre = readNumber(attrs, "pre_tokens");
+  const post = readNumber(attrs, "post_tokens");
+  const trigger = readString(attrs, "trigger") ?? "auto";
+  return {
+    kind: "note",
+    atMs,
+    level: "info",
+    event,
+    text:
+      pre !== null && post !== null
+        ? `Context compacted (${trigger}): ${formatTokenCount(pre)} → ${formatTokenCount(post)} tokens`
+        : `Context compacted (${trigger})`,
+  };
+}
+
+function permissionModeChangedEntry({
+  attrs,
+  atMs,
+  event,
+}: LogEntryContext): TranscriptEntry {
+  return {
+    kind: "note",
+    atMs,
+    level: "warning",
+    event,
+    text: `Approval mode changed to ${readString(attrs, "to_mode") ?? "unknown"}.`,
+  };
+}
+
+// A 429 is worth telling apart from every other failure: it is time spent
+// waiting, not working.
+function apiErrorEntry({
+  attrs,
+  atMs,
+  event,
+}: LogEntryContext): TranscriptEntry {
+  const status = readString(attrs, "status_code");
+  return {
+    kind: "note",
+    atMs,
+    level: "error",
+    event,
+    text:
+      status === "429"
+        ? "Rate limited by the provider."
+        : `The request failed${status ? ` (${status})` : ""}.`,
+  };
+}
+
+function retriesExhaustedEntry({
+  atMs,
+  event,
+}: LogEntryContext): TranscriptEntry {
+  return {
+    kind: "note",
+    atMs,
+    level: "error",
+    event,
+    text: "Gave up after retrying — whatever this was doing did not happen.",
+  };
+}
+
+function sessionErrorEntry({
+  attrs,
+  atMs,
+  event,
+}: LogEntryContext): TranscriptEntry {
+  return {
+    kind: "note",
+    atMs,
+    level: "error",
+    event,
+    text: readString(attrs, "error") ?? "The session hit an error.",
+  };
+}
+
+function apiRefusalEntry({ atMs, event }: LogEntryContext): TranscriptEntry {
+  return {
+    kind: "note",
+    atMs,
+    level: "error",
+    event,
+    text: "The model refused to answer.",
+  };
+}
+
+function subtaskInvokedEntry({
+  attrs,
+  atMs,
+  event,
+}: LogEntryContext): TranscriptEntry {
+  const description = readString(attrs, "description");
+  return {
+    kind: "note",
+    atMs,
+    level: "info",
+    event,
+    text: description
+      ? `Sub-agent spawned: ${description}`
+      : "A sub-agent was spawned.",
+  };
+}
+
+function commitEntry({ attrs, atMs, event }: LogEntryContext): TranscriptEntry {
+  const message = readString(attrs, "message");
+  return {
+    kind: "note",
+    atMs,
+    level: "info",
+    event,
+    text: message ? `Commit created: ${message}` : "A commit was created.",
+  };
+}
+
+function skillActivatedEntry({
+  attrs,
+  atMs,
+  event,
+}: LogEntryContext): TranscriptEntry {
+  const skill = readString(attrs, "skill_name") ?? readString(attrs, "skill");
+  return {
+    kind: "note",
+    atMs,
+    level: "info",
+    event,
+    text: skill ? `Skill activated: ${skill}` : "A skill was activated.",
+  };
+}
+
+// Deliberately NOT transcript entries (absent from the table below):
+// `api_request` (the request side is already the model_call span — a second
+// line per call would double every beat), `session_created` / `session_idle`
+// (lifecycle bookkeeping, no conversational content), and
+// `mcp_server_connection` / `hook_execution_complete` / `at_mention` (session
+// setup and input mechanics — the fold counts them; a replay of the
+// conversation does not relive them).
+const LOG_ENTRY_HANDLERS: Record<
+  string,
+  (ctx: LogEntryContext) => TranscriptEntry | null
+> = {
+  user_prompt: userPromptEntry,
+  assistant_response: assistantResponseEntry,
+  api_response: apiResponseEntry,
+  tool_result: toolResultEntry,
+  tool_decision: toolDecisionEntry,
+  compaction: compactionEntry,
+  permission_mode_changed: permissionModeChangedEntry,
+  api_error: apiErrorEntry,
+  retries_exhausted: retriesExhaustedEntry,
+  session_error: sessionErrorEntry,
+  internal_error: sessionErrorEntry,
+  api_refusal: apiRefusalEntry,
+  subtask_invoked: subtaskInvokedEntry,
+  commit: commitEntry,
+  skill_activated: skillActivatedEntry,
+};
+
 function logToEntry({
   event,
   log,
@@ -532,230 +854,14 @@ function logToEntry({
   log: TranscriptLogRecord;
   claimedToolCallIds: Set<string>;
 }): TranscriptEntry | null {
-  const attrs = log.attributes;
-  const atMs = log.timestampMs;
-
-  switch (event) {
-    case "user_prompt": {
-      const text = readString(attrs, "prompt");
-      return {
-        kind: "user_prompt",
-        atMs,
-        text,
-        chars: text?.length ?? readNumber(attrs, "prompt_length") ?? 0,
-      };
-    }
-
-    case "assistant_response":
-      return {
-        kind: "assistant_message",
-        atMs,
-        text: readString(attrs, "response"),
-        model: readString(attrs, "model"),
-      };
-
-    case "api_response": {
-      // Gemini's reply rides `response_text` on its api_response event, as
-      // the raw candidates JSON. Claude's api_response events carry no
-      // response_text, so this case is inert for them. Gemini also runs
-      // utility calls (its model router) whose "reply" is internal JSON; the
-      // `role` attr separates those from the conversation - only `main`
-      // answers the user, mirroring claude's query_source gate.
-      const role = readString(attrs, "role");
-      if (role !== null && role !== "main") return null;
-      const text = geminiResponseText(readString(attrs, "response_text"));
-      if (text === null) return null;
-      return {
-        kind: "assistant_message",
-        atMs,
-        text,
-        model: readString(attrs, "model"),
-      };
-    }
-
-    case "tool_result": {
-      // codex tool_result logs (recognised by their call_id + arguments
-      // shape) are the CONTENT record of a codex tool run. When a tool span
-      // claimed the call_id, the span entry already carries this log's
-      // content; unclaimed calls (the model-facing harness call, MCP calls
-      // without spans, span-less wires) render from the log alone.
-      const callId = readString(attrs, "call_id");
-      if (
-        callId !== null &&
-        readString(attrs, "event.name") === "codex.tool_result"
-      ) {
-        if (claimedToolCallIds.has(callId)) return null;
-        const codexToolName = readString(attrs, "tool_name");
-        if (codexToolName === null) return null;
-        const mcpServer = readString(attrs, "mcp_server");
-        return {
-          kind: "tool",
-          atMs,
-          name: codexToolName,
-          mcpServer:
-            mcpServer ?? parseMcpToolName(codexToolName)?.server ?? null,
-          input: parseMaybeJson(readString(attrs, "arguments")),
-          output: readString(attrs, "output"),
-          durationMs: readNumber(attrs, "duration_ms"),
-          failed: readString(attrs, "success") === "false",
-          agentId: null,
-          spanId: "",
-        };
-      }
-
-      // Gemini tools exist only as this log event (its tool_call, which the
-      // vocabulary maps here): no span exists for them. A rejected decision
-      // means the human said no and nothing ran. Claude tool_result logs
-      // carry no function_name, so they fall through to null and claude
-      // tools keep coming from their spans.
-      const name = readString(attrs, "function_name");
-      if (name === null) return null;
-      const decision = readString(attrs, "decision");
-      if (decision === "reject") {
-        return { kind: "tool_rejected", atMs, name, reason: decision };
-      }
-      return {
-        kind: "tool",
-        atMs,
-        name,
-        mcpServer: parseMcpToolName(name)?.server ?? null,
-        input: null,
-        output: null,
-        durationMs: readNumber(attrs, "duration_ms"),
-        failed: readString(attrs, "success") === "false",
-        agentId: null,
-        spanId: "",
-      };
-    }
-
-    case "tool_decision": {
-      // The ONLY record of a tool the human refused: it never ran, so no span
-      // for it exists anywhere in the trace.
-      const decision = readString(attrs, "decision");
-      if (decision === null || decision === "accept") return null;
-      return {
-        kind: "tool_rejected",
-        atMs,
-        name: readString(attrs, "tool_name"),
-        reason: readString(attrs, "source") ?? decision,
-      };
-    }
-
-    case "compaction": {
-      const pre = readNumber(attrs, "pre_tokens");
-      const post = readNumber(attrs, "post_tokens");
-      const trigger = readString(attrs, "trigger") ?? "auto";
-      return {
-        kind: "note",
-        atMs,
-        level: "info",
-        event,
-        text:
-          pre !== null && post !== null
-            ? `Context compacted (${trigger}): ${formatTokenCount(pre)} → ${formatTokenCount(post)} tokens`
-            : `Context compacted (${trigger})`,
-      };
-    }
-
-    case "permission_mode_changed":
-      return {
-        kind: "note",
-        atMs,
-        level: "warning",
-        event,
-        text: `Approval mode changed to ${readString(attrs, "to_mode") ?? "unknown"}.`,
-      };
-
-    case "api_error": {
-      const status = readString(attrs, "status_code");
-      return {
-        kind: "note",
-        atMs,
-        level: "error",
-        event,
-        // A 429 is worth telling apart from every other failure: it is time
-        // spent waiting, not working.
-        text:
-          status === "429"
-            ? "Rate limited by the provider."
-            : `The request failed${status ? ` (${status})` : ""}.`,
-      };
-    }
-
-    case "retries_exhausted":
-      return {
-        kind: "note",
-        atMs,
-        level: "error",
-        event,
-        text: "Gave up after retrying — whatever this was doing did not happen.",
-      };
-
-    case "session_error":
-    case "internal_error":
-      return {
-        kind: "note",
-        atMs,
-        level: "error",
-        event,
-        text: readString(attrs, "error") ?? "The session hit an error.",
-      };
-
-    case "api_refusal":
-      return {
-        kind: "note",
-        atMs,
-        level: "error",
-        event,
-        text: "The model refused to answer.",
-      };
-
-    case "subtask_invoked": {
-      const description = readString(attrs, "description");
-      return {
-        kind: "note",
-        atMs,
-        level: "info",
-        event,
-        text: description
-          ? `Sub-agent spawned: ${description}`
-          : "A sub-agent was spawned.",
-      };
-    }
-
-    case "commit": {
-      const message = readString(attrs, "message");
-      return {
-        kind: "note",
-        atMs,
-        level: "info",
-        event,
-        text: message ? `Commit created: ${message}` : "A commit was created.",
-      };
-    }
-
-    case "skill_activated": {
-      const skill =
-        readString(attrs, "skill_name") ?? readString(attrs, "skill");
-      return {
-        kind: "note",
-        atMs,
-        level: "info",
-        event,
-        text: skill ? `Skill activated: ${skill}` : "A skill was activated.",
-      };
-    }
-
-    // Deliberately NOT transcript entries: `api_request` (the request side is
-    // already the model_call span — a second line per call would double every
-    // beat), `session_created` / `session_idle` (lifecycle bookkeeping, no
-    // conversational content), and `mcp_server_connection` /
-    // `hook_execution_complete` / `at_mention` (session setup and input
-    // mechanics — the fold counts them; a replay of the conversation does not
-    // relive them).
-    default:
-      return null;
-  }
+  const handler = LOG_ENTRY_HANDLERS[event];
+  if (!handler) return null;
+  return handler({
+    attrs: log.attributes,
+    atMs: log.timestampMs,
+    event,
+    claimedToolCallIds,
+  });
 }
 
 function detectAgentFrom({
@@ -815,26 +921,36 @@ export function isModelCallSpan(spanName: string): boolean {
  * For chat_messages the LAST assistant text wins — the final answer, not the
  * mid-run tool chatter.
  */
+function outputContainerText(io: {
+  type?: unknown;
+  value?: unknown;
+}): string | null {
+  if (io.type === "text" && typeof io.value === "string") {
+    return io.value.length > 0 ? io.value : null;
+  }
+  if (io.type === "chat_messages" && Array.isArray(io.value)) {
+    return messagesReplyText(io.value);
+  }
+  return null;
+}
+
+function parsedOutputText(parsed: unknown): string | null {
+  if (typeof parsed === "string") return parsed.length > 0 ? parsed : null;
+  // A bare chat array ([{role, content}]) is how the read path serializes
+  // an extracted conversation output.
+  if (Array.isArray(parsed)) return messagesReplyText(parsed);
+  if (parsed && typeof parsed === "object") {
+    return outputContainerText(parsed as { type?: unknown; value?: unknown });
+  }
+  return null;
+}
+
 function extractedOutputText(output: string | null | undefined): string | null {
   if (typeof output !== "string" || output.trim().length === 0) return null;
   const raw = output.trim();
   if (!raw.startsWith("{") && !raw.startsWith("[")) return raw;
   try {
-    const parsed: unknown = JSON.parse(raw);
-    if (typeof parsed === "string") return parsed.length > 0 ? parsed : null;
-    // A bare chat array ([{role, content}]) is how the read path serializes
-    // an extracted conversation output.
-    if (Array.isArray(parsed)) return messagesReplyText(parsed);
-    if (parsed && typeof parsed === "object") {
-      const io = parsed as { type?: unknown; value?: unknown };
-      if (io.type === "text" && typeof io.value === "string") {
-        return io.value.length > 0 ? io.value : null;
-      }
-      if (io.type === "chat_messages" && Array.isArray(io.value)) {
-        return messagesReplyText(io.value);
-      }
-    }
-    return null;
+    return parsedOutputText(JSON.parse(raw));
   } catch {
     return raw;
   }
@@ -853,22 +969,35 @@ function extractedOutputText(output: string | null | undefined): string | null {
  * reached telemetry (claude cuts the body at 60KB, and the system field
  * serializes after the message history) still shows what filled the window.
  */
+/** The system-text parts accumulated across a chat's messages, in order. */
+interface SystemTextAccumulator {
+  parts: string[];
+  firstUserReminders: string | null;
+}
+
+function collectSystemTextFromMessage(
+  message: unknown,
+  acc: SystemTextAccumulator,
+): void {
+  const m = message as { role?: unknown; content?: unknown } | null;
+  if (typeof m?.content !== "string" || m.content.length === 0) return;
+  if (m.role === "system") {
+    acc.parts.push(m.content);
+  } else if (m.role === "user" && acc.firstUserReminders === null) {
+    acc.firstUserReminders = systemReminderText(m.content);
+  }
+}
+
 function extractedSystemText(input: string | null | undefined): string | null {
   const messages = parsedChatMessages(input);
   if (messages === null) return null;
 
-  const parts: string[] = [];
-  let firstUserReminders: string | null = null;
+  const acc: SystemTextAccumulator = { parts: [], firstUserReminders: null };
   for (const message of messages) {
-    const m = message as { role?: unknown; content?: unknown } | null;
-    if (typeof m?.content !== "string" || m.content.length === 0) continue;
-    if (m.role === "system") parts.push(m.content);
-    else if (m.role === "user" && firstUserReminders === null) {
-      firstUserReminders = systemReminderText(m.content);
-    }
+    collectSystemTextFromMessage(message, acc);
   }
-  if (firstUserReminders !== null) parts.push(firstUserReminders);
-  return parts.length > 0 ? parts.join("\n\n") : null;
+  if (acc.firstUserReminders !== null) acc.parts.push(acc.firstUserReminders);
+  return acc.parts.length > 0 ? acc.parts.join("\n\n") : null;
 }
 
 /**
@@ -986,48 +1115,59 @@ function outputMessagesText(raw: string | null): string | null {
  * `parts` (where `thought: true` marks thinking and empty thoughtSignature
  * entries pad the tail).
  */
+function isAssistantLikeRole(role: unknown): boolean {
+  return role === undefined || role === "assistant" || role === "model";
+}
+
+/** Gemini's `parts` shape: `thought: true` marks thinking, filtered by {@link isReplyTextPart}. */
+function textFromParts(parts: unknown[]): string | null {
+  const texts: string[] = [];
+  for (const part of parts) {
+    const p = part as { text?: unknown; thought?: unknown };
+    if (isReplyTextPart(p)) texts.push(p.text);
+  }
+  return texts.length > 0 ? texts.join("\n") : null;
+}
+
+/** The `content` array shape: only untagged/`text`/`output_text` parts are the reply. */
+function textFromContentParts(content: unknown[]): string | null {
+  const texts: string[] = [];
+  for (const part of content) {
+    const p = part as { text?: unknown; type?: unknown };
+    const partType = p.type;
+    if (
+      (partType === undefined ||
+        partType === "text" ||
+        partType === "output_text") &&
+      isReplyTextPart(p)
+    ) {
+      texts.push(p.text);
+    }
+  }
+  return texts.length > 0 ? texts.join("\n") : null;
+}
+
+function replyTextFromMessage(message: unknown): string | null {
+  const m = message as {
+    role?: unknown;
+    content?: unknown;
+    parts?: unknown;
+  } | null;
+  if (!m) return null;
+  if (!isAssistantLikeRole(m.role)) return null;
+  if (typeof m.content === "string" && m.content.length > 0) return m.content;
+  if (Array.isArray(m.parts)) {
+    const fromParts = textFromParts(m.parts);
+    if (fromParts !== null) return fromParts;
+  }
+  if (Array.isArray(m.content)) return textFromContentParts(m.content);
+  return null;
+}
+
 function messagesReplyText(messages: unknown[]): string | null {
   for (let i = messages.length - 1; i >= 0; i--) {
-    const message = messages[i] as {
-      role?: unknown;
-      content?: unknown;
-      parts?: unknown;
-    } | null;
-    if (!message) continue;
-    if (
-      message.role !== undefined &&
-      message.role !== "assistant" &&
-      message.role !== "model"
-    ) {
-      continue;
-    }
-    if (typeof message.content === "string" && message.content.length > 0) {
-      return message.content;
-    }
-    if (Array.isArray(message.parts)) {
-      const texts: string[] = [];
-      for (const part of message.parts) {
-        const p = part as { text?: unknown; thought?: unknown };
-        if (isReplyTextPart(p)) texts.push(p.text);
-      }
-      if (texts.length > 0) return texts.join("\n");
-    }
-    if (Array.isArray(message.content)) {
-      const texts: string[] = [];
-      for (const part of message.content) {
-        const p = part as { text?: unknown; type?: unknown };
-        const partType = p.type;
-        if (
-          (partType === undefined ||
-            partType === "text" ||
-            partType === "output_text") &&
-          isReplyTextPart(p)
-        ) {
-          texts.push(p.text);
-        }
-      }
-      if (texts.length > 0) return texts.join("\n");
-    }
+    const text = replyTextFromMessage(messages[i]);
+    if (text !== null) return text;
   }
   return null;
 }
@@ -1038,6 +1178,31 @@ function messagesReplyText(messages: unknown[]): string | null {
  * (`thought: true`), empty thoughtSignature padding, and the actual reply.
  * Only untagged, non-empty text parts are the reply.
  */
+function pushGeminiPartsText(parts: unknown[], texts: string[]): void {
+  for (const part of parts) {
+    const p = part as { text?: unknown; thought?: unknown };
+    if (isReplyTextPart(p)) texts.push(p.text);
+  }
+}
+
+function pushGeminiCandidatesText(
+  candidates: unknown[],
+  texts: string[],
+): void {
+  for (const candidate of candidates) {
+    const parts = (candidate as { content?: { parts?: unknown } })?.content
+      ?.parts;
+    if (!Array.isArray(parts)) continue;
+    pushGeminiPartsText(parts, texts);
+  }
+}
+
+function pushGeminiRootText(root: unknown, texts: string[]): void {
+  const candidates = (root as { candidates?: unknown })?.candidates;
+  if (!Array.isArray(candidates)) return;
+  pushGeminiCandidatesText(candidates, texts);
+}
+
 function geminiResponseText(raw: string | null): string | null {
   if (raw === null) return null;
   try {
@@ -1045,17 +1210,7 @@ function geminiResponseText(raw: string | null): string | null {
     const roots = Array.isArray(parsed) ? parsed : [parsed];
     const texts: string[] = [];
     for (const root of roots) {
-      const candidates = (root as { candidates?: unknown })?.candidates;
-      if (!Array.isArray(candidates)) continue;
-      for (const candidate of candidates) {
-        const parts = (candidate as { content?: { parts?: unknown } })?.content
-          ?.parts;
-        if (!Array.isArray(parts)) continue;
-        for (const part of parts) {
-          const p = part as { text?: unknown; thought?: unknown };
-          if (isReplyTextPart(p)) texts.push(p.text);
-        }
-      }
+      pushGeminiRootText(root, texts);
     }
     return texts.length > 0 ? texts.join("\n") : null;
   } catch {

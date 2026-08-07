@@ -12,6 +12,82 @@ import type {
 } from "~/server/event-sourcing/projections/stateProjection.types";
 import { KSUID_RESOURCES } from "~/utils/constants";
 
+// Parents before subtopics — LOAD-BEARING: relationMode = "prisma" makes the
+// client emulate the Topic self-relation (no DB FK), so a child upserted
+// before its parent exists is rejected.
+const orderTopicsParentsFirst = (
+  topics: ProjectedTopic[],
+): ProjectedTopic[] => [
+  ...topics.filter((t) => t.parentId === null),
+  ...topics.filter((t) => t.parentId !== null),
+];
+
+// Fail-safe: no event can legitimately fold the model to zero topics (replace
+// requires a non-empty list, seeds skip empty projects), so an empty state
+// must never reconcile the table — `notIn: []` would delete every row for
+// the project. Advancing the cursor while leaving the rows is the
+// recoverable direction.
+//
+// Two phases, children then parents: the client-emulated Subtopics relation
+// (relationMode = "prisma") refuses to delete a parent that still has
+// children — even when the same deleteMany removes both. A batch replace
+// drops the whole previous model at once, so a single-phase reconcile would
+// fail on every re-cluster.
+const buildReconcileDeletes = ({
+  prisma,
+  projectId,
+  keptIds,
+}: {
+  prisma: PrismaClient;
+  projectId: string;
+  keptIds: string[];
+}) => {
+  if (keptIds.length === 0) return [];
+  return [
+    prisma.topic.deleteMany({
+      where: {
+        projectId,
+        parentId: { not: null },
+        id: { notIn: keptIds },
+      },
+    }),
+    prisma.topic.deleteMany({
+      where: { projectId, id: { notIn: keptIds } },
+    }),
+  ];
+};
+
+const buildTopicUpsertArgs = ({
+  topic,
+  projectId,
+}: {
+  topic: ProjectedTopic;
+  projectId: string;
+}) => {
+  const data = {
+    projectId,
+    name: topic.name,
+    parentId: topic.parentId,
+    embeddings_model: topic.embeddingsModel,
+    centroid: topic.centroid,
+    p95Distance: topic.p95Distance,
+    automaticallyGenerated: topic.automaticallyGenerated,
+    // The batch cadence gate reads the newest topic's age from
+    // createdAt; keep it deterministic under replay.
+    createdAt: new Date(topic.firstRecordedAt),
+    lastEventId: topic.recordedByEventId,
+  };
+  return {
+    // Topic ids are globally-unique nanoids minted by clustering or
+    // carried from seed events; projectId rides along both to satisfy
+    // the tenancy guard and so a forged cross-project id could never
+    // update another tenant's row.
+    where: { id: topic.id, projectId },
+    create: { id: topic.id, ...data },
+    update: data,
+  };
+};
+
 /**
  * Write-through store for the topic model projection: the cursor lives in
  * `TopicModelProjection` (one row per project), the model itself lives in
@@ -89,13 +165,7 @@ export class PrismaTopicModelProjectionRepository
       "id" | "projectId"
     >;
 
-    // Parents before subtopics — LOAD-BEARING: relationMode = "prisma"
-    // makes the client emulate the Topic self-relation (no DB FK), so a
-    // child upserted before its parent exists is rejected.
-    const ordered = [
-      ...topics.filter((t) => t.parentId === null),
-      ...topics.filter((t) => t.parentId !== null),
-    ];
+    const ordered = orderTopicsParentsFirst(topics);
 
     await this.prisma.$transaction([
       this.prisma.topicModelProjection.upsert({
@@ -107,64 +177,9 @@ export class PrismaTopicModelProjectionRepository
         },
         update: cursorData,
       }),
-      // Fail-safe: no event can legitimately fold the model to zero topics
-      // (replace requires a non-empty list, seeds skip empty projects), so
-      // an empty state must never reconcile the table — `notIn: []` would
-      // delete every row for the project. Advancing the cursor while
-      // leaving the rows is the recoverable direction.
-      //
-      // Two phases, children then parents: the client-emulated Subtopics
-      // relation (relationMode = "prisma") refuses to delete a parent that
-      // still has children — even when the same deleteMany removes both.
-      // A batch replace drops the whole previous model at once, so a
-      // single-phase reconcile would fail on every re-cluster.
-      ...(keptIds.length > 0
-        ? [
-            this.prisma.topic.deleteMany({
-              where: {
-                projectId,
-                parentId: { not: null },
-                id: { notIn: keptIds },
-              },
-            }),
-            this.prisma.topic.deleteMany({
-              where: { projectId, id: { notIn: keptIds } },
-            }),
-          ]
-        : []),
+      ...buildReconcileDeletes({ prisma: this.prisma, projectId, keptIds }),
       ...ordered.map((topic) =>
-        this.prisma.topic.upsert({
-          // Topic ids are globally-unique nanoids minted by clustering or
-          // carried from seed events; projectId rides along both to satisfy
-          // the tenancy guard and so a forged cross-project id could never
-          // update another tenant's row.
-          where: { id: topic.id, projectId },
-          create: {
-            id: topic.id,
-            projectId,
-            name: topic.name,
-            parentId: topic.parentId,
-            embeddings_model: topic.embeddingsModel,
-            centroid: topic.centroid,
-            p95Distance: topic.p95Distance,
-            automaticallyGenerated: topic.automaticallyGenerated,
-            createdAt: new Date(topic.firstRecordedAt),
-            lastEventId: topic.recordedByEventId,
-          },
-          update: {
-            projectId,
-            name: topic.name,
-            parentId: topic.parentId,
-            embeddings_model: topic.embeddingsModel,
-            centroid: topic.centroid,
-            p95Distance: topic.p95Distance,
-            automaticallyGenerated: topic.automaticallyGenerated,
-            // The batch cadence gate reads the newest topic's age from
-            // createdAt; keep it deterministic under replay.
-            createdAt: new Date(topic.firstRecordedAt),
-            lastEventId: topic.recordedByEventId,
-          },
-        }),
+        this.prisma.topic.upsert(buildTopicUpsertArgs({ topic, projectId })),
       ),
     ]);
   }

@@ -516,6 +516,39 @@ export abstract class AbstractEventStore<EventType extends Event = Event>
     );
   }
 
+  /**
+   * Validates every event in a `storeEvents` batch before any of it is
+   * persisted — an undefined slot, a tenant/aggregate-type mismatch, or a
+   * structurally invalid event throws and aborts the whole write.
+   */
+  private validateEventsForStorage(
+    events: readonly EventType[],
+    context: EventStoreReadContext<EventType>,
+    aggregateType: AggregateType,
+  ): void {
+    for (let i = 0; i < events.length; i++) {
+      const event = events[i];
+      if (!event) {
+        throw new ValidationError({
+          reason: `Event at index ${i} is undefined`,
+          field: "event",
+          value: void 0,
+          context: { index: i },
+        });
+      }
+      validateEventTenant(event, context, i);
+      validateEventAggregateType(event, aggregateType, i);
+      if (!EventUtils.isValidEvent(event)) {
+        throw new ValidationError({
+          reason: `Invalid event at index ${i}: event must have id, aggregateId, timestamp, type, and data`,
+          field: "event",
+          value: event,
+          context: { index: i },
+        });
+      }
+    }
+  }
+
   async storeEvents(
     events: readonly EventType[],
     context: EventStoreReadContext<EventType>,
@@ -540,27 +573,7 @@ export abstract class AbstractEventStore<EventType extends Event = Event>
           }
 
           // Validate all events before storage
-          for (let i = 0; i < events.length; i++) {
-            const event = events[i];
-            if (!event) {
-              throw new ValidationError({
-                reason: `Event at index ${i} is undefined`,
-                field: "event",
-                value: void 0,
-                context: { index: i },
-              });
-            }
-            validateEventTenant(event, context, i);
-            validateEventAggregateType(event, aggregateType, i);
-            if (!EventUtils.isValidEvent(event)) {
-              throw new ValidationError({
-                reason: `Invalid event at index ${i}: event must have id, aggregateId, timestamp, type, and data`,
-                field: "event",
-                value: event,
-                context: { index: i },
-              });
-            }
-          }
+          this.validateEventsForStorage(events, context, aggregateType);
 
           // Transform events to records, then apply optional per-batch
           // enrichment (e.g. retention stamping) before handing to the repo.

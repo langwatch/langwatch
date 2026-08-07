@@ -46,24 +46,19 @@ const MAP_TARGET_TABLE: Record<string, string> = {
 /** Pipelines with no fold store whose map projections still replay. */
 const STORELESS_REPLAYABLE = new Set(["metric_processing", "log_processing"]);
 
-/**
- * Create a replay runtime using the app's tenant-aware ClickHouse resolver.
- * Every CH query routes through `getApp().clickhouse.resolveClient` — the
- * same resolver every other repository is built from — which resolves
- * project → org → private CH instance (or shared fallback).
- *
- * Iterates the live pipeline definitions from the EventSourcing runtime and
- * re-creates each fold projection with a raw CH store (no Redis cache).
- */
-export function createReplayRuntime(config: {
-  redisUrl: string;
-}): ReplayRuntime {
-  const redis = new IORedis(config.redisUrl, { maxRetriesPerRequest: null });
+type ClickHouseClientResolver = ReturnType<
+  typeof getApp
+>["clickhouse"]["resolveClient"];
+type PipelineDefinitions = NonNullable<
+  ReturnType<typeof getApp>["eventSourcing"]
+>["definitions"];
+type PipelineDefinition = PipelineDefinitions[number];
 
-  const clientResolver = getApp().clickhouse.resolveClient;
-
-  // Raw CH stores (no Redis cache) — keyed by pipeline name
-  const storeByPipeline = new Map<string, FoldProjectionStore<any>>([
+/** Raw CH stores (no Redis cache) — keyed by pipeline name. */
+function buildStoreByPipeline(
+  clientResolver: ClickHouseClientResolver,
+): Map<string, FoldProjectionStore<any>> {
+  return new Map<string, FoldProjectionStore<any>>([
     [
       "trace_processing",
       new TraceSummaryStore(
@@ -97,15 +92,17 @@ export function createReplayRuntime(config: {
       ),
     ],
   ]);
+}
 
-  const definitions = getApp().eventSourcing?.definitions ?? [];
-  const projections: RegisteredFoldProjection[] = [];
-  const mapProjections: RegisteredMapProjection[] = [];
+/**
+ * State projections read the SAME canonical event_log as folds, but write to
+ * their own (Postgres) StateProjectionStore rather than a CH fold store — so
+ * discovery is independent of the CH-store map.
+ */
+function discoverStateProjections(
+  definitions: PipelineDefinitions,
+): RegisteredStateProjection[] {
   const stateProjections: RegisteredStateProjection[] = [];
-
-  // State projections read the SAME canonical event_log as folds, but write to
-  // their own (Postgres) StateProjectionStore rather than a CH fold store — so
-  // discovery is independent of the CH-store map above.
   for (const def of definitions) {
     const { name: pipelineName, aggregateType } = def.metadata;
     for (const [, stateDef] of def.stateProjections ?? []) {
@@ -121,6 +118,72 @@ export function createReplayRuntime(config: {
       });
     }
   }
+  return stateProjections;
+}
+
+function discoverFoldProjections(params: {
+  def: PipelineDefinition;
+  pipelineName: string;
+  aggregateType: string;
+  store: FoldProjectionStore<any>;
+}): RegisteredFoldProjection[] {
+  const { def, pipelineName, aggregateType, store } = params;
+  const projections: RegisteredFoldProjection[] = [];
+  for (const [, { definition: foldDef }] of def.foldProjections) {
+    // Clone the projection with the raw CH store instead of the Redis-cached one
+    const replayDef = Object.create(foldDef, {
+      store: { value: store, writable: true },
+    });
+    projections.push({
+      projectionName: foldDef.name,
+      pipelineName,
+      aggregateType,
+      source: "pipeline",
+      definition: replayDef,
+      // Folds enqueue with `__jobType=projection`; pause middle segment matches.
+      pauseKey: `${pipelineName}/projection/${foldDef.name}`,
+      kind: "fold",
+    });
+  }
+  return projections;
+}
+
+function discoverMapProjections(params: {
+  def: PipelineDefinition;
+  pipelineName: string;
+  aggregateType: string;
+}): RegisteredMapProjection[] {
+  const { def, pipelineName, aggregateType } = params;
+  const mapProjections: RegisteredMapProjection[] = [];
+  for (const [, { definition: mapDef }] of def.mapProjections) {
+    // Map projections use their own AppendStore directly — it writes straight
+    // to ClickHouse with no Redis-cache layer to swap out, unlike folds.
+    mapProjections.push({
+      projectionName: mapDef.name,
+      pipelineName,
+      aggregateType,
+      source: "pipeline",
+      definition: mapDef,
+      // Maps enqueue with `__jobType=handler`; the dispatcher Lua script
+      // checks `{pipeline}/handler/{name}`, so the pauseKey must follow suit.
+      pauseKey: `${pipelineName}/handler/${mapDef.name}`,
+      kind: "map",
+      targetTable: MAP_TARGET_TABLE[mapDef.name],
+    });
+  }
+  return mapProjections;
+}
+
+function discoverFoldAndMapProjections(params: {
+  definitions: PipelineDefinitions;
+  storeByPipeline: Map<string, FoldProjectionStore<any>>;
+}): {
+  projections: RegisteredFoldProjection[];
+  mapProjections: RegisteredMapProjection[];
+} {
+  const { definitions, storeByPipeline } = params;
+  const projections: RegisteredFoldProjection[] = [];
+  const mapProjections: RegisteredMapProjection[] = [];
 
   for (const def of definitions) {
     const { name: pipelineName, aggregateType } = def.metadata;
@@ -128,41 +191,41 @@ export function createReplayRuntime(config: {
     if (!store && !STORELESS_REPLAYABLE.has(pipelineName)) continue;
 
     if (store) {
-      for (const [, { definition: foldDef }] of def.foldProjections) {
-        // Clone the projection with the raw CH store instead of the Redis-cached one
-        const replayDef = Object.create(foldDef, {
-          store: { value: store, writable: true },
-        });
-        projections.push({
-          projectionName: foldDef.name,
-          pipelineName,
-          aggregateType,
-          source: "pipeline",
-          definition: replayDef,
-          // Folds enqueue with `__jobType=projection`; pause middle segment matches.
-          pauseKey: `${pipelineName}/projection/${foldDef.name}`,
-          kind: "fold",
-        });
-      }
+      projections.push(
+        ...discoverFoldProjections({ def, pipelineName, aggregateType, store }),
+      );
     }
-
-    for (const [, { definition: mapDef }] of def.mapProjections) {
-      // Map projections use their own AppendStore directly — it writes straight
-      // to ClickHouse with no Redis-cache layer to swap out, unlike folds.
-      mapProjections.push({
-        projectionName: mapDef.name,
-        pipelineName,
-        aggregateType,
-        source: "pipeline",
-        definition: mapDef,
-        // Maps enqueue with `__jobType=handler`; the dispatcher Lua script
-        // checks `{pipeline}/handler/{name}`, so the pauseKey must follow suit.
-        pauseKey: `${pipelineName}/handler/${mapDef.name}`,
-        kind: "map",
-        targetTable: MAP_TARGET_TABLE[mapDef.name],
-      });
-    }
+    mapProjections.push(
+      ...discoverMapProjections({ def, pipelineName, aggregateType }),
+    );
   }
+
+  return { projections, mapProjections };
+}
+
+/**
+ * Create a replay runtime using the app's tenant-aware ClickHouse resolver.
+ * Every CH query routes through `getApp().clickhouse.resolveClient` — the
+ * same resolver every other repository is built from — which resolves
+ * project → org → private CH instance (or shared fallback).
+ *
+ * Iterates the live pipeline definitions from the EventSourcing runtime and
+ * re-creates each fold projection with a raw CH store (no Redis cache).
+ */
+export function createReplayRuntime(config: {
+  redisUrl: string;
+}): ReplayRuntime {
+  const redis = new IORedis(config.redisUrl, { maxRetriesPerRequest: null });
+
+  const clientResolver = getApp().clickhouse.resolveClient;
+  const storeByPipeline = buildStoreByPipeline(clientResolver);
+  const definitions = getApp().eventSourcing?.definitions ?? [];
+
+  const stateProjections = discoverStateProjections(definitions);
+  const { projections, mapProjections } = discoverFoldAndMapProjections({
+    definitions,
+    storeByPipeline,
+  });
 
   const service = new ReplayService({
     clickhouseClientResolver: clientResolver,

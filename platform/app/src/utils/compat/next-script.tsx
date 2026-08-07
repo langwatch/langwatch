@@ -54,6 +54,49 @@ function runWhenIdle(callback: () => void): () => void {
   };
 }
 
+function applyExtraAttributes(
+  script: HTMLScriptElement,
+  rest: Record<string, any>,
+): void {
+  for (const [key, value] of Object.entries(rest)) {
+    if (key !== "dangerouslySetInnerHTML") {
+      script.setAttribute(key, String(value));
+    }
+  }
+}
+
+function createScriptElement({
+  id,
+  src,
+  children,
+  onLoad,
+  onError,
+  rest,
+}: {
+  id?: string;
+  src?: string;
+  children?: ReactNode;
+  onLoad?: () => void;
+  onError?: () => void;
+  rest: Record<string, any>;
+}): HTMLScriptElement {
+  const script = document.createElement("script");
+  if (id) script.id = id;
+
+  if (src) {
+    script.src = src;
+    script.async = true;
+    if (onLoad) script.onload = onLoad;
+    if (onError) script.onerror = onError;
+  } else if (typeof children === "string") {
+    script.textContent = children;
+  }
+
+  applyExtraAttributes(script, rest);
+
+  return script;
+}
+
 export default function Script({
   id,
   src,
@@ -77,25 +120,9 @@ export default function Script({
     const inject = () => {
       hasInjectedRef.current = true;
 
-      const script = document.createElement("script");
-      if (id) script.id = id;
-
-      if (src) {
-        script.src = src;
-        script.async = true;
-        if (onLoad) script.onload = onLoad;
-        if (onError) script.onerror = onError;
-      } else if (typeof children === "string") {
-        script.textContent = children;
-      }
-
-      for (const [key, value] of Object.entries(rest)) {
-        if (key !== "dangerouslySetInnerHTML") {
-          script.setAttribute(key, String(value));
-        }
-      }
-
-      document.head.appendChild(script);
+      document.head.appendChild(
+        createScriptElement({ id, src, children, onLoad, onError, rest }),
+      );
     };
 
     if (strategy === "beforeInteractive") {

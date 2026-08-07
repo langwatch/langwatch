@@ -81,6 +81,106 @@ export class RecentItemsService {
     return null;
   }
 
+  private async hydratePrompt({
+    id,
+    projectId,
+    timestamp,
+  }: {
+    id: string;
+    projectId: string;
+    timestamp: Date;
+  }): Promise<RecentItem | null> {
+    const prompt = await this.repository.getPromptById(id, projectId);
+    if (!prompt || prompt.deletedAt) return null;
+    return {
+      id: prompt.id,
+      type: "prompt",
+      name: prompt.name,
+      href: `/${prompt.project.slug}/prompts?prompt=${prompt.id}`,
+      updatedAt: timestamp,
+    };
+  }
+
+  private async hydrateWorkflow({
+    id,
+    projectId,
+    timestamp,
+  }: {
+    id: string;
+    projectId: string;
+    timestamp: Date;
+  }): Promise<RecentItem | null> {
+    const workflow = await this.repository.getWorkflowById(id, projectId);
+    if (!workflow || workflow.archivedAt) return null;
+    return {
+      id: workflow.id,
+      type: "workflow",
+      name: workflow.name,
+      href: `/${workflow.project.slug}/studio/${workflow.id}`,
+      updatedAt: timestamp,
+    };
+  }
+
+  private async hydrateDataset({
+    id,
+    projectId,
+    timestamp,
+  }: {
+    id: string;
+    projectId: string;
+    timestamp: Date;
+  }): Promise<RecentItem | null> {
+    const dataset = await this.repository.getDatasetById(id, projectId);
+    if (!dataset || dataset.archivedAt) return null;
+    return {
+      id: dataset.id,
+      type: "dataset",
+      name: dataset.name,
+      href: `/${dataset.project.slug}/datasets/${dataset.id}`,
+      updatedAt: timestamp,
+    };
+  }
+
+  private async hydrateEvaluation({
+    id,
+    projectId,
+    timestamp,
+  }: {
+    id: string;
+    projectId: string;
+    timestamp: Date;
+  }): Promise<RecentItem | null> {
+    const monitor = await this.repository.getMonitorById(id, projectId);
+    if (!monitor) return null;
+    return {
+      id: monitor.id,
+      type: "evaluation",
+      name: monitor.name,
+      href: `/${monitor.project.slug}/online-evaluations`,
+      updatedAt: timestamp,
+    };
+  }
+
+  private async hydrateAnnotation({
+    id,
+    projectId,
+    timestamp,
+  }: {
+    id: string;
+    projectId: string;
+    timestamp: Date;
+  }): Promise<RecentItem | null> {
+    const queue = await this.repository.getAnnotationQueueById(id, projectId);
+    if (!queue) return null;
+    return {
+      id: queue.id,
+      type: "annotation",
+      name: queue.name,
+      href: `/${queue.project.slug}/annotations/${queue.slug}`,
+      updatedAt: timestamp,
+    };
+  }
+
   /**
    * Hydrate an entity with its details
    */
@@ -96,69 +196,20 @@ export class RecentItemsService {
     projectId: string;
   }): Promise<RecentItem | null> {
     switch (type) {
-      case "prompt": {
-        const prompt = await this.repository.getPromptById(id, projectId);
-        if (!prompt || prompt.deletedAt) return null;
-        return {
-          id: prompt.id,
-          type: "prompt",
-          name: prompt.name,
-          href: `/${prompt.project.slug}/prompts?prompt=${prompt.id}`,
-          updatedAt: timestamp,
-        };
-      }
-      case "workflow": {
-        const workflow = await this.repository.getWorkflowById(id, projectId);
-        if (!workflow || workflow.archivedAt) return null;
-        return {
-          id: workflow.id,
-          type: "workflow",
-          name: workflow.name,
-          href: `/${workflow.project.slug}/studio/${workflow.id}`,
-          updatedAt: timestamp,
-        };
-      }
-      case "dataset": {
-        const dataset = await this.repository.getDatasetById(id, projectId);
-        if (!dataset || dataset.archivedAt) return null;
-        return {
-          id: dataset.id,
-          type: "dataset",
-          name: dataset.name,
-          href: `/${dataset.project.slug}/datasets/${dataset.id}`,
-          updatedAt: timestamp,
-        };
-      }
-      case "evaluation": {
-        const monitor = await this.repository.getMonitorById(id, projectId);
-        if (!monitor) return null;
-        return {
-          id: monitor.id,
-          type: "evaluation",
-          name: monitor.name,
-          href: `/${monitor.project.slug}/online-evaluations`,
-          updatedAt: timestamp,
-        };
-      }
-      case "annotation": {
-        const queue = await this.repository.getAnnotationQueueById(
-          id,
-          projectId,
-        );
-        if (!queue) return null;
-        return {
-          id: queue.id,
-          type: "annotation",
-          name: queue.name,
-          href: `/${queue.project.slug}/annotations/${queue.slug}`,
-          updatedAt: timestamp,
-        };
-      }
-      case "simulation": {
+      case "prompt":
+        return this.hydratePrompt({ id, projectId, timestamp });
+      case "workflow":
+        return this.hydrateWorkflow({ id, projectId, timestamp });
+      case "dataset":
+        return this.hydrateDataset({ id, projectId, timestamp });
+      case "evaluation":
+        return this.hydrateEvaluation({ id, projectId, timestamp });
+      case "annotation":
+        return this.hydrateAnnotation({ id, projectId, timestamp });
+      case "simulation":
         // Simulations are stored in ClickHouse, not Prisma
         // For now, we don't hydrate them but return a placeholder
         return null; // TODO: Implement when scenario set details are needed
-      }
       default:
         return null;
     }

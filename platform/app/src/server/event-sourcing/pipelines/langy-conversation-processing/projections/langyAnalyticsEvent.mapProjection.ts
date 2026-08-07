@@ -75,6 +75,52 @@ const analyticsEvents = [
   LangyConversationTitleGeneratedEventSchema,
 ] as const;
 
+function deriveTurnId(
+  data: LangyConversationProcessingEvent["data"],
+): string | null {
+  return "turnId" in data ? (data.turnId ?? null) : null;
+}
+
+function deriveUserId(
+  data: LangyConversationProcessingEvent["data"],
+): string | null {
+  return "userId" in data ? data.userId : null;
+}
+
+function deriveRole(
+  data: LangyConversationProcessingEvent["data"],
+): string | null {
+  return "role" in data ? data.role : null;
+}
+
+function deriveToolName(
+  data: LangyConversationProcessingEvent["data"],
+): string | null {
+  return "toolName" in data ? data.toolName : null;
+}
+
+function deriveDurationMs(
+  data: LangyConversationProcessingEvent["data"],
+): number | null {
+  return "durationMs" in data ? (data.durationMs ?? null) : null;
+}
+
+function deriveOutcome(event: LangyConversationProcessingEvent): string | null {
+  if (event.type === LANGY_CONVERSATION_EVENT_TYPES.AGENT_RESPONDED) {
+    return event.data.outcome;
+  }
+  if (event.type === LANGY_CONVERSATION_EVENT_TYPES.AGENT_RESPONSE_FAILED) {
+    return "failed";
+  }
+  return null;
+}
+
+function deriveModel(event: LangyConversationProcessingEvent): string | null {
+  return event.type === LANGY_CONVERSATION_EVENT_TYPES.TITLE_GENERATED
+    ? event.data.model
+    : null;
+}
+
 /**
  * One content-free ClickHouse analytics row per canonical Langy event.
  * This projection is a pure map: it never reads a prior row or projection.
@@ -188,21 +234,13 @@ export class LangyAnalyticsEventMapProjection
       eventType: event.type,
       eventVersion: event.version,
       aggregateId: event.aggregateId,
-      turnId: "turnId" in data ? (data.turnId ?? null) : null,
-      userId: "userId" in data ? data.userId : null,
-      role: "role" in data ? data.role : null,
-      toolName: "toolName" in data ? data.toolName : null,
-      outcome:
-        event.type === LANGY_CONVERSATION_EVENT_TYPES.AGENT_RESPONDED
-          ? event.data.outcome
-          : event.type === LANGY_CONVERSATION_EVENT_TYPES.AGENT_RESPONSE_FAILED
-            ? "failed"
-            : null,
-      model:
-        event.type === LANGY_CONVERSATION_EVENT_TYPES.TITLE_GENERATED
-          ? event.data.model
-          : null,
-      durationMs: "durationMs" in data ? (data.durationMs ?? null) : null,
+      turnId: deriveTurnId(data),
+      userId: deriveUserId(data),
+      role: deriveRole(data),
+      toolName: deriveToolName(data),
+      outcome: deriveOutcome(event),
+      model: deriveModel(event),
+      durationMs: deriveDurationMs(data),
       occurredAtMs: event.occurredAt,
       acceptedAtMs: event.createdAt,
     };

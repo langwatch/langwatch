@@ -31,6 +31,53 @@ export interface RecordTriggerMatchPort {
   ): Promise<void>;
 }
 
+const TERMINAL_EVALUATION_STATUSES = new Set<EvaluationRunData["status"]>([
+  "processed",
+  "error",
+  "skipped",
+]);
+
+function isTerminalEvaluation(status: EvaluationRunData["status"]): boolean {
+  return TERMINAL_EVALUATION_STATUSES.has(status);
+}
+
+// Same idempotency contract as traceAlertTriggerMatch.subscriber: all
+// idempotency-key inputs (triggerId, traceId, occurredAt) derive from the
+// committed event or trigger config — never wall-clock at handling time —
+// so redelivery re-sends identical, store-deduped commands.
+async function recordEvaluationTriggerMatches({
+  deps,
+  context,
+  event,
+  traceId,
+}: {
+  deps: {
+    triggers: TriggerService;
+    recordTriggerMatch: RecordTriggerMatchPort;
+  };
+  context: TriggerContext<EvaluationRunData>;
+  event: EvaluationProcessingEvent;
+  traceId: string;
+}): Promise<void> {
+  const triggers = await deps.triggers.getActiveTraceTriggersForProject(
+    context.tenantId,
+  );
+  for (const trigger of triggers.filter(triggerReadsEvaluations)) {
+    await deps.recordTriggerMatch.send({
+      tenantId: context.tenantId,
+      occurredAt: event.occurredAt,
+      triggerId: trigger.id,
+      traceId,
+      action: trigger.action,
+      actionClass: NOTIFY_TRIGGER_ACTIONS.has(trigger.action)
+        ? "notify"
+        : "persist",
+      traceDebounceMs: trigger.traceDebounceMs,
+      notificationCadence: trigger.notificationCadence,
+    });
+  }
+}
+
 export function createEvaluationAlertTriggerMatchHandler(deps: {
   triggers: TriggerService;
   traceSummaryStore: FoldProjectionStore<TraceSummaryData>;
@@ -42,13 +89,7 @@ export function createEvaluationAlertTriggerMatchHandler(deps: {
   ): Promise<void> => {
     if (event.occurredAt < Date.now() - 60 * 60 * 1000) return;
     const evaluation = context.state;
-    if (
-      evaluation.status !== "processed" &&
-      evaluation.status !== "error" &&
-      evaluation.status !== "skipped"
-    ) {
-      return;
-    }
+    if (!isTerminalEvaluation(evaluation.status)) return;
     if (!evaluation.traceId) return;
     const traceId = evaluation.traceId;
     const traceSummary = await deps.traceSummaryStore.get(traceId, {
@@ -62,26 +103,6 @@ export function createEvaluationAlertTriggerMatchHandler(deps: {
       );
       return;
     }
-    const triggers = await deps.triggers.getActiveTraceTriggersForProject(
-      context.tenantId,
-    );
-    for (const trigger of triggers.filter(triggerReadsEvaluations)) {
-      // Same idempotency contract as traceAlertTriggerMatch.subscriber: all
-      // idempotency-key inputs (triggerId, traceId, occurredAt) derive from
-      // the committed event or trigger config — never wall-clock at handling
-      // time — so redelivery re-sends identical, store-deduped commands.
-      await deps.recordTriggerMatch.send({
-        tenantId: context.tenantId,
-        occurredAt: event.occurredAt,
-        triggerId: trigger.id,
-        traceId,
-        action: trigger.action,
-        actionClass: NOTIFY_TRIGGER_ACTIONS.has(trigger.action)
-          ? "notify"
-          : "persist",
-        traceDebounceMs: trigger.traceDebounceMs,
-        notificationCadence: trigger.notificationCadence,
-      });
-    }
+    await recordEvaluationTriggerMatches({ deps, context, event, traceId });
   };
 }

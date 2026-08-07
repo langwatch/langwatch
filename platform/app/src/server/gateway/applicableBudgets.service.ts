@@ -160,69 +160,112 @@ async function loadSpend({
   }
 }
 
-async function loadScopeLabels(
+type ScopeLabelEntry = [id: string, label: string];
+
+async function loadOrganizationLabels(
   prisma: PrismaClient,
+  ids: string[],
+): Promise<ScopeLabelEntry[]> {
+  const rows = await prisma.organization.findMany({
+    where: { id: { in: ids } },
+    select: { id: true, name: true },
+  });
+  return rows.map((r) => [r.id, r.name]);
+}
+
+async function loadTeamLabels(
+  prisma: PrismaClient,
+  ids: string[],
+): Promise<ScopeLabelEntry[]> {
+  const rows = await prisma.team.findMany({
+    where: { id: { in: ids } },
+    select: { id: true, name: true },
+  });
+  return rows.map((r) => [r.id, r.name]);
+}
+
+async function loadProjectLabels(
+  prisma: PrismaClient,
+  ids: string[],
+): Promise<ScopeLabelEntry[]> {
+  const rows = await prisma.project.findMany({
+    where: { id: { in: ids } },
+    select: { id: true, name: true },
+  });
+  return rows.map((r) => [r.id, r.name]);
+}
+
+async function loadGroupLabels(
+  prisma: PrismaClient,
+  ids: string[],
+): Promise<ScopeLabelEntry[]> {
+  const rows = await prisma.group.findMany({
+    where: { id: { in: ids } },
+    select: { id: true, name: true },
+  });
+  return rows.map((r) => [r.id, r.name]);
+}
+
+async function loadPrincipalLabels(
+  prisma: PrismaClient,
+  ids: string[],
+): Promise<ScopeLabelEntry[]> {
+  const rows = await prisma.user.findMany({
+    where: { id: { in: ids } },
+    select: { id: true, name: true, email: true },
+  });
+  return rows.map((r) => [r.id, r.name ?? r.email ?? r.id]);
+}
+
+async function loadVirtualKeyLabels(
+  prisma: PrismaClient,
+  ids: string[],
+): Promise<ScopeLabelEntry[]> {
+  const rows = await prisma.virtualKey.findMany({
+    where: { id: { in: ids } },
+    select: { id: true, name: true },
+  });
+  return rows.map((r) => [r.id, r.name]);
+}
+
+// Queried in this order, one round-trip per scope type that actually
+// appears in the resolution.
+const scopeLabelLoaders: [
+  scopeType: string,
+  load: (prisma: PrismaClient, ids: string[]) => Promise<ScopeLabelEntry[]>,
+][] = [
+  ["ORGANIZATION", loadOrganizationLabels],
+  ["TEAM", loadTeamLabels],
+  ["PROJECT", loadProjectLabels],
+  ["GROUP", loadGroupLabels],
+  ["PRINCIPAL", loadPrincipalLabels],
+  ["VIRTUAL_KEY", loadVirtualKeyLabels],
+];
+
+function groupScopeIdsByType(
   resolved: Awaited<ReturnType<typeof resolveApplicableBudgets>>,
-): Promise<Map<string, string>> {
+): Map<string, string[]> {
   const idsByType = new Map<string, string[]>();
   for (const { budget } of resolved) {
     const list = idsByType.get(budget.scopeType) ?? [];
     list.push(budget.scopeId);
     idsByType.set(budget.scopeType, list);
   }
-  const labels = new Map<string, string>();
-  const put = (type: string, id: string, label: string) =>
-    labels.set(`${type}:${id}`, label);
+  return idsByType;
+}
 
-  const orgIds = idsByType.get("ORGANIZATION") ?? [];
-  if (orgIds.length > 0) {
-    const rows = await prisma.organization.findMany({
-      where: { id: { in: orgIds } },
-      select: { id: true, name: true },
-    });
-    for (const r of rows) put("ORGANIZATION", r.id, r.name);
-  }
-  const teamIds = idsByType.get("TEAM") ?? [];
-  if (teamIds.length > 0) {
-    const rows = await prisma.team.findMany({
-      where: { id: { in: teamIds } },
-      select: { id: true, name: true },
-    });
-    for (const r of rows) put("TEAM", r.id, r.name);
-  }
-  const projectIds = idsByType.get("PROJECT") ?? [];
-  if (projectIds.length > 0) {
-    const rows = await prisma.project.findMany({
-      where: { id: { in: projectIds } },
-      select: { id: true, name: true },
-    });
-    for (const r of rows) put("PROJECT", r.id, r.name);
-  }
-  const groupIds = idsByType.get("GROUP") ?? [];
-  if (groupIds.length > 0) {
-    const rows = await prisma.group.findMany({
-      where: { id: { in: groupIds } },
-      select: { id: true, name: true },
-    });
-    for (const r of rows) put("GROUP", r.id, r.name);
-  }
-  const userIds = idsByType.get("PRINCIPAL") ?? [];
-  if (userIds.length > 0) {
-    const rows = await prisma.user.findMany({
-      where: { id: { in: userIds } },
-      select: { id: true, name: true, email: true },
-    });
-    for (const r of rows) {
-      put("PRINCIPAL", r.id, r.name ?? r.email ?? r.id);
+async function loadScopeLabels(
+  prisma: PrismaClient,
+  resolved: Awaited<ReturnType<typeof resolveApplicableBudgets>>,
+): Promise<Map<string, string>> {
+  const idsByType = groupScopeIdsByType(resolved);
+  const labels = new Map<string, string>();
+  for (const [scopeType, load] of scopeLabelLoaders) {
+    const ids = idsByType.get(scopeType) ?? [];
+    if (ids.length === 0) continue;
+    for (const [id, label] of await load(prisma, ids)) {
+      labels.set(`${scopeType}:${id}`, label);
     }
-  }
-  const vkIds = idsByType.get("VIRTUAL_KEY") ?? [];
-  if (vkIds.length > 0) {
-    const rows = await prisma.virtualKey.findMany({
-      where: { id: { in: vkIds } },
-      select: { id: true, name: true },
-    });
-    for (const r of rows) put("VIRTUAL_KEY", r.id, r.name);
   }
   return labels;
 }

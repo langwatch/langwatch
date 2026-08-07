@@ -109,6 +109,30 @@ const checkForRequiredLLMKeys = (
   return true;
 };
 
+/**
+ * Coerces the loose score/passed shapes an evaluator workflow can return
+ * into the numeric/boolean forms the evaluation pipeline expects.
+ * Mutates `result` in place.
+ */
+function normalizeEvaluationResultInPlace(result: {
+  score?: any;
+  passed?: any;
+}): void {
+  if (
+    "score" in result &&
+    (typeof result.score === "number" || typeof result.score === "string")
+  ) {
+    const parsedScore = parseFloat(result.score + "");
+    result.score = isNaN(parsedScore) ? 0 : parsedScore;
+  }
+  if (
+    "passed" in result &&
+    (typeof result.passed === "boolean" || typeof result.passed === "string")
+  ) {
+    result.passed = result.passed === true || result.passed + "" === "true";
+  }
+}
+
 export async function runEvaluationWorkflow({
   workflowId,
   projectId,
@@ -155,22 +179,7 @@ export async function runEvaluationWorkflow({
 
     // Process the result
     if (data.result) {
-      if (
-        "score" in data.result &&
-        (typeof data.result.score === "number" ||
-          typeof data.result.score === "string")
-      ) {
-        const parsedScore = parseFloat(data.result.score + "");
-        data.result.score = isNaN(parsedScore) ? 0 : parsedScore;
-      }
-      if (
-        "passed" in data.result &&
-        (typeof data.result.passed === "boolean" ||
-          typeof data.result.passed === "string")
-      ) {
-        data.result.passed =
-          data.result.passed === true || data.result.passed + "" === "true";
-      }
+      normalizeEvaluationResultInPlace(data.result);
     }
 
     return data;
@@ -187,27 +196,23 @@ export async function runEvaluationWorkflow({
   }
 }
 
-export async function runWorkflow({
+type StripTargetWorkflow = Parameters<
+  typeof stripUnsupportedLLMParamsFromWorkflow
+>[0]["workflow"];
+
+/**
+ * Loads the workflow version to dispatch: the caller's version when given,
+ * otherwise the published one.
+ */
+async function loadWorkflowVersionToRun({
   workflowId,
   projectId,
-  inputs,
   versionId,
-  do_not_trace,
-  run_evaluations,
-  origin = "workflow",
-  causalityDepth,
-  parentTrace,
 }: {
   workflowId: string;
   projectId: string;
-  inputs: Record<string, string>;
   versionId?: string;
-  do_not_trace?: boolean;
-  run_evaluations?: boolean;
-  origin?: NLPOrigin;
-  causalityDepth?: number;
-  parentTrace?: { traceId: string; parentSpanId: string };
-}) {
+}): Promise<Workflow> {
   const workflow = await prisma.workflow.findUnique({
     where: { id: workflowId, projectId },
   });
@@ -241,56 +246,47 @@ export async function runWorkflow({
   // (spec_version 1.5): migrate on read so legacy workflows whose nodes
   // relied on the old workflow-level default_llm still dispatch with a
   // model on every LLM node.
-  const workflowData = migrateDSLVersion(
-    publishedWorkflowVersion.dsl as unknown as Workflow,
-  );
-  const modelProviders = await getProjectModelProviders(projectId);
+  return migrateDSLVersion(publishedWorkflowVersion.dsl as unknown as Workflow);
+}
 
-  // Validate inputs and LLM keys
-  checkForRequiredInputs(workflowData, inputs);
-  checkForRequiredLLMKeys(
-    workflowData,
-    modelProviders as unknown as MaybeStoredModelProvider[],
-  );
+const resolveDoNotTrace = (
+  do_not_trace: boolean | undefined,
+  inputs: Record<string, string>,
+): boolean =>
+  typeof do_not_trace === "boolean"
+    ? do_not_trace
+    : typeof inputs.do_not_trace === "boolean"
+      ? inputs.do_not_trace
+      : false;
 
-  const trace_id = inputs.trace_id ?? `trace_${nanoid()}`;
-  const messageWithoutEnvs: StudioClientEvent = {
-    type: "execute_flow",
-    payload: {
-      trace_id,
-      workflow: getWorkFlow(workflowData),
-      inputs: [inputs],
-      manual_execution_mode: false,
-      do_not_trace:
-        typeof do_not_trace === "boolean"
-          ? do_not_trace
-          : typeof inputs.do_not_trace === "boolean"
-            ? inputs.do_not_trace
-            : false,
-      ...(typeof run_evaluations === "boolean" && { run_evaluations }),
-      origin,
-    },
-  };
-
-  // Strip every sampling parameter from each LLM block that the resolved
-  // model does not list as supported. The Studio path (POST
-  // /api/workflows/post_event) already does this; this is the parallel
-  // chokepoint for every server-driven dispatch (online evaluators,
-  // evaluator-as-evaluator chains, scheduled runs). Without it, a
-  // published workflow that carries a stale top_p from before the
-  // operator disabled it on their custom-model config still ships the
-  // field to the gateway, and Bedrock newer-Claude rejects the combo
-  // with `temperature and top_p cannot both be specified`. Customer
-  // dogfood 2026-05-31 surfaced exactly this path on
-  // us.anthropic.claude-haiku-4-5-* as an online evaluator. Best-effort
-  // so a registry-lookup miss never blocks the run.
+/**
+ * Strip every sampling parameter from each LLM block that the resolved
+ * model does not list as supported. The Studio path (POST
+ * /api/workflows/post_event) already does this; this is the parallel
+ * chokepoint for every server-driven dispatch (online evaluators,
+ * evaluator-as-evaluator chains, scheduled runs). Without it, a
+ * published workflow that carries a stale top_p from before the
+ * operator disabled it on their custom-model config still ships the
+ * field to the gateway, and Bedrock newer-Claude rejects the combo
+ * with `temperature and top_p cannot both be specified`. Customer
+ * dogfood 2026-05-31 surfaced exactly this path on
+ * us.anthropic.claude-haiku-4-5-* as an online evaluator. Best-effort
+ * so a registry-lookup miss never blocks the run.
+ */
+async function stripUnsupportedLLMParamsBestEffort({
+  projectId,
+  workflowId,
+  workflow,
+}: {
+  projectId: string;
+  workflowId: string;
+  workflow: StripTargetWorkflow;
+}): Promise<void> {
   try {
     await stripUnsupportedLLMParamsFromWorkflow({
       prisma,
       projectId,
-      workflow: messageWithoutEnvs.payload.workflow as Parameters<
-        typeof stripUnsupportedLLMParamsFromWorkflow
-      >[0]["workflow"],
+      workflow,
     });
   } catch (filterError) {
     logger.warn(
@@ -298,9 +294,23 @@ export async function runWorkflow({
       "stripUnsupportedLLMParamsFromWorkflow failed; forwarding original payload",
     );
   }
+}
 
-  const event = await addEnvs(messageWithoutEnvs, projectId);
-
+async function executeWorkflowSync({
+  projectId,
+  workflowId,
+  event,
+  origin,
+  causalityDepth,
+  parentTrace,
+}: {
+  projectId: string;
+  workflowId: string;
+  event: StudioClientEvent;
+  origin: NLPOrigin;
+  causalityDepth?: number;
+  parentTrace?: { traceId: string; parentSpanId: string };
+}) {
   const response = await nlpgoFetch<{
     result: any;
     status: ExecutionStatus;
@@ -327,4 +337,71 @@ export async function runWorkflow({
   }
 
   return await response.json();
+}
+
+export async function runWorkflow({
+  workflowId,
+  projectId,
+  inputs,
+  versionId,
+  do_not_trace,
+  run_evaluations,
+  origin = "workflow",
+  causalityDepth,
+  parentTrace,
+}: {
+  workflowId: string;
+  projectId: string;
+  inputs: Record<string, string>;
+  versionId?: string;
+  do_not_trace?: boolean;
+  run_evaluations?: boolean;
+  origin?: NLPOrigin;
+  causalityDepth?: number;
+  parentTrace?: { traceId: string; parentSpanId: string };
+}) {
+  const workflowData = await loadWorkflowVersionToRun({
+    workflowId,
+    projectId,
+    versionId,
+  });
+  const modelProviders = await getProjectModelProviders(projectId);
+
+  // Validate inputs and LLM keys
+  checkForRequiredInputs(workflowData, inputs);
+  checkForRequiredLLMKeys(
+    workflowData,
+    modelProviders as unknown as MaybeStoredModelProvider[],
+  );
+
+  const trace_id = inputs.trace_id ?? `trace_${nanoid()}`;
+  const messageWithoutEnvs: StudioClientEvent = {
+    type: "execute_flow",
+    payload: {
+      trace_id,
+      workflow: getWorkFlow(workflowData),
+      inputs: [inputs],
+      manual_execution_mode: false,
+      do_not_trace: resolveDoNotTrace(do_not_trace, inputs),
+      ...(typeof run_evaluations === "boolean" && { run_evaluations }),
+      origin,
+    },
+  };
+
+  await stripUnsupportedLLMParamsBestEffort({
+    projectId,
+    workflowId,
+    workflow: messageWithoutEnvs.payload.workflow as StripTargetWorkflow,
+  });
+
+  const event = await addEnvs(messageWithoutEnvs, projectId);
+
+  return await executeWorkflowSync({
+    projectId,
+    workflowId,
+    event,
+    origin,
+    causalityDepth,
+    parentTrace,
+  });
 }

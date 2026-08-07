@@ -129,6 +129,29 @@ export function createEvaluationCompletedEvent(
   } as unknown as EvaluationCompletedEvent;
 }
 
+function reportedIdentityData(options: IdentityOptions & OutcomeOptions) {
+  return {
+    evaluationId: options.evaluationId ?? DEFAULT_EVALUATION_ID,
+    evaluatorId: options.evaluatorId ?? "monitor-y",
+    evaluatorType: options.evaluatorType ?? "langevals/custom",
+    evaluatorName: options.evaluatorName ?? "Custom",
+    traceId: options.traceId ?? "trace-9",
+    isGuardrail: options.isGuardrail ?? true,
+  };
+}
+
+function reportedOutcomeData(options: OutcomeOptions) {
+  return {
+    status: options.status ?? "error",
+    score: options.score === undefined ? null : options.score,
+    passed: options.passed === undefined ? null : options.passed,
+    label: options.label === undefined ? null : options.label,
+    error: options.error ?? "boom",
+    errorDetails: options.errorDetails ?? "(stack trace)",
+    ...(options.costId === undefined ? {} : { costId: options.costId }),
+  };
+}
+
 export function createEvaluationReportedEvent(
   options: IdentityOptions & OutcomeOptions = {},
 ): EvaluationReportedEvent {
@@ -139,19 +162,8 @@ export function createEvaluationReportedEvent(
       fallbackEventId: "evt-r",
     }),
     data: {
-      evaluationId: options.evaluationId ?? DEFAULT_EVALUATION_ID,
-      evaluatorId: options.evaluatorId ?? "monitor-y",
-      evaluatorType: options.evaluatorType ?? "langevals/custom",
-      evaluatorName: options.evaluatorName ?? "Custom",
-      traceId: options.traceId ?? "trace-9",
-      isGuardrail: options.isGuardrail ?? true,
-      status: options.status ?? "error",
-      score: options.score === undefined ? null : options.score,
-      passed: options.passed === undefined ? null : options.passed,
-      label: options.label === undefined ? null : options.label,
-      error: options.error ?? "boom",
-      errorDetails: options.errorDetails ?? "(stack trace)",
-      ...(options.costId === undefined ? {} : { costId: options.costId }),
+      ...reportedIdentityData(options),
+      ...reportedOutcomeData(options),
     },
   } as unknown as EvaluationReportedEvent;
 }

@@ -157,6 +157,51 @@ export function dedupeHeaders(headers: string[]): string[] {
   });
 }
 
+function convertNumberValue(value: unknown): unknown {
+  if (!value && value !== 0) return null;
+  return !isNaN(value as number) ? parseFloat(String(value)) : value;
+}
+
+const TRUE_BOOLEAN_TOKENS = new Set(["true", "1", "yes", "y", "on", "ok"]);
+const FALSE_BOOLEAN_TOKENS = new Set([
+  "false",
+  "0",
+  "null",
+  "undefined",
+  "nan",
+  "inf",
+  "no",
+  "n",
+  "off",
+]);
+
+function convertBooleanValue(value: unknown): unknown {
+  const strValue = `${value ?? ""}`.toLowerCase();
+  if (TRUE_BOOLEAN_TOKENS.has(strValue)) return true;
+  if (FALSE_BOOLEAN_TOKENS.has(strValue)) return false;
+  return value;
+}
+
+function convertDateValue(value: unknown): unknown {
+  // Preserve empty/missing cells: `new Date(null)` is the Unix epoch, which
+  // would silently rewrite a nullable date column's blanks to 1970-01-01.
+  if (value === null || value === undefined || value === "") return value;
+  const dateAttempt = new Date(value as string);
+  return dateAttempt.toString() !== "Invalid Date"
+    ? dateAttempt.toISOString().split("T")[0]
+    : value;
+}
+
+// list / json / spans / chat_messages / annotations / evaluations — parse JSON,
+// keeping the original value if it isn't valid JSON.
+function convertJsonLikeValue(value: unknown): unknown {
+  try {
+    return JSON.parse(value as string);
+  } catch {
+    return value;
+  }
+}
+
 /**
  * Convert one raw cell value to its declared column type (ADR-032 v19). The
  * single-value core of `convertRowsToColumnTypes` / the frontend
@@ -172,50 +217,14 @@ export function convertValueToColumnType(
   value: unknown,
   type: DatasetColumns[number]["type"],
 ): unknown {
-  if (type === "number") {
-    if (!value && value !== 0) return null;
-    return !isNaN(value as number) ? parseFloat(String(value)) : value;
-  }
-  if (type === "boolean") {
-    const strValue = `${value ?? ""}`.toLowerCase();
-    if (["true", "1", "yes", "y", "on", "ok"].includes(strValue)) return true;
-    if (
-      [
-        "false",
-        "0",
-        "null",
-        "undefined",
-        "nan",
-        "inf",
-        "no",
-        "n",
-        "off",
-      ].includes(strValue)
-    ) {
-      return false;
-    }
-    return value;
-  }
-  if (type === "date") {
-    // Preserve empty/missing cells: `new Date(null)` is the Unix epoch, which
-    // would silently rewrite a nullable date column's blanks to 1970-01-01.
-    if (value === null || value === undefined || value === "") return value;
-    const dateAttempt = new Date(value as string);
-    return dateAttempt.toString() !== "Invalid Date"
-      ? dateAttempt.toISOString().split("T")[0]
-      : value;
-  }
+  if (type === "number") return convertNumberValue(value);
+  if (type === "boolean") return convertBooleanValue(value);
+  if (type === "date") return convertDateValue(value);
   // Image is a URL string; string passes through unchanged.
   if (type === "image" || type === "string" || type === undefined) {
     return value;
   }
-  // list / json / spans / chat_messages / annotations / evaluations — parse JSON,
-  // keeping the original value if it isn't valid JSON.
-  try {
-    return JSON.parse(value as string);
-  } catch {
-    return value;
-  }
+  return convertJsonLikeValue(value);
 }
 
 /**

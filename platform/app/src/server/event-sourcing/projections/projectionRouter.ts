@@ -99,6 +99,68 @@ const LIVE_DISPATCH_IS_REPLAY = false;
  */
 type ReactorDelivery<E extends Event> = { event: E; foldState: unknown };
 
+type ReactorQueueDef<E extends Event> = {
+  name: string;
+  parentProjection: string;
+  parentType: "fold" | "map";
+  handler: {
+    handle: (payload: { event: E; foldState: unknown }) => Promise<void>;
+  };
+  groupKeyFn?: (payload: { event: E; foldState: unknown }) => string;
+  options?: {
+    killSwitch?: KillSwitchOptions;
+    disabled?: boolean;
+    delay?: number;
+    deduplication?: DeduplicationStrategy<{ event: E; foldState: unknown }>;
+  };
+};
+
+const buildReactorQueueDef = <E extends Event>({
+  reactor,
+  parentProjection,
+  parentType,
+}: {
+  reactor: ReactorDefinition<E>;
+  parentProjection: string;
+  parentType: "fold" | "map";
+}): ReactorQueueDef<E> => ({
+  name: reactor.name,
+  parentProjection,
+  parentType,
+  handler: {
+    handle: async (payload) => {
+      await reactor.handle(payload.event, {
+        tenantId: payload.event.tenantId,
+        aggregateId: String(payload.event.aggregateId),
+        foldState: payload.foldState,
+        isReplay: LIVE_DISPATCH_IS_REPLAY,
+      });
+    },
+  },
+  groupKeyFn: reactor.options?.groupKeyFn,
+  options: {
+    killSwitch: reactor.options?.killSwitch,
+    disabled: reactor.options?.disabled,
+    delay: reactor.options?.delay,
+    deduplication:
+      reactor.options?.deduplication ??
+      (reactor.options?.makeJobId
+        ? { makeId: reactor.options.makeJobId, ttlMs: reactor.options.ttl }
+        : undefined),
+  },
+});
+
+const compareByAcceptedAtThenId = (a: Event, b: Event): number => {
+  if (a.createdAt !== b.createdAt) {
+    return a.createdAt - b.createdAt;
+  }
+  return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+};
+
+const compareByOccurredAt = (a: Event, b: Event): number =>
+  (((a as Record<string, unknown>).occurredAt as number) ?? 0) -
+  (((b as Record<string, unknown>).occurredAt as number) ?? 0);
+
 /**
  * Central router that registers fold and map projections and dispatches events.
  *
@@ -403,138 +465,74 @@ export class ProjectionRouter<
     if (this.reactorsForFold.size === 0 && this.reactorsForMap.size === 0)
       return;
 
-    const reactorDefs: Record<
-      string,
-      {
-        name: string;
-        parentProjection: string;
-        parentType: "fold" | "map";
-        handler: {
-          handle: (payload: {
-            event: EventType;
-            foldState: unknown;
-          }) => Promise<void>;
-        };
-        groupKeyFn?: (payload: {
-          event: EventType;
-          foldState: unknown;
-        }) => string;
-        options?: {
-          killSwitch?: KillSwitchOptions;
-          disabled?: boolean;
-          delay?: number;
-          deduplication?: DeduplicationStrategy<{
-            event: EventType;
-            foldState: unknown;
-          }>;
-        };
-      }
-    > = {};
-
-    for (const [foldName, reactors] of this.reactorsForFold) {
-      for (const reactor of reactors) {
-        if (this.isReactorExcluded(reactor)) continue;
-        reactorDefs[reactor.name] = {
-          name: reactor.name,
-          parentProjection: foldName,
-          parentType: "fold" as const,
-          handler: {
-            handle: async (payload: {
-              event: EventType;
-              foldState: unknown;
-            }) => {
-              await reactor.handle(payload.event, {
-                tenantId: payload.event.tenantId,
-                aggregateId: String(payload.event.aggregateId),
-                foldState: payload.foldState,
-                isReplay: LIVE_DISPATCH_IS_REPLAY,
-              });
-            },
-          },
-          groupKeyFn: reactor.options?.groupKeyFn,
-          options: {
-            killSwitch: reactor.options?.killSwitch,
-            disabled: reactor.options?.disabled,
-            delay: reactor.options?.delay,
-            deduplication:
-              reactor.options?.deduplication ??
-              (reactor.options?.makeJobId
-                ? {
-                    makeId: reactor.options.makeJobId,
-                    ttlMs: reactor.options.ttl,
-                  }
-                : undefined),
-          },
-        };
-      }
-    }
-
-    for (const [mapName, reactors] of this.reactorsForMap) {
-      for (const reactor of reactors) {
-        if (this.isReactorExcluded(reactor)) continue;
-        reactorDefs[reactor.name] = {
-          name: reactor.name,
-          parentProjection: mapName,
-          parentType: "map" as const,
-          handler: {
-            handle: async (payload: {
-              event: EventType;
-              foldState: unknown;
-            }) => {
-              await reactor.handle(payload.event, {
-                tenantId: payload.event.tenantId,
-                aggregateId: String(payload.event.aggregateId),
-                foldState: payload.foldState,
-                isReplay: LIVE_DISPATCH_IS_REPLAY,
-              });
-            },
-          },
-          groupKeyFn: reactor.options?.groupKeyFn,
-          options: {
-            killSwitch: reactor.options?.killSwitch,
-            disabled: reactor.options?.disabled,
-            delay: reactor.options?.delay,
-            deduplication:
-              reactor.options?.deduplication ??
-              (reactor.options?.makeJobId
-                ? {
-                    makeId: reactor.options.makeJobId,
-                    ttlMs: reactor.options.ttl,
-                  }
-                : undefined),
-          },
-        };
-      }
-    }
+    const reactorDefs: Record<string, ReactorQueueDef<EventType>> = {};
+    this.collectReactorDefs({
+      reactorsByParent: this.reactorsForFold,
+      parentType: "fold",
+      reactorDefs,
+    });
+    this.collectReactorDefs({
+      reactorsByParent: this.reactorsForMap,
+      parentType: "map",
+      reactorDefs,
+    });
 
     this.queueManager.initializeReactorQueues(
       reactorDefs,
-      async (reactorName, payload, _context) => {
-        const reactorDef = reactorDefs[reactorName];
-        if (!reactorDef) {
-          throw new ConfigurationError(
-            "ProjectionRouter",
-            `Reactor "${reactorName}" not found`,
-            { reactorName },
-          );
-        }
-        await withMetrics({
-          fn: () => reactorDef.handler.handle(payload),
-          onComplete: (ms) => {
-            incrementEsReactorTotal(
-              this.pipelineName,
-              reactorName,
-              "completed",
-            );
-            observeEsReactorDuration(this.pipelineName, reactorName, ms);
-          },
-          onFail: (ms) => {
-            incrementEsReactorTotal(this.pipelineName, reactorName, "failed");
-            observeEsReactorDuration(this.pipelineName, reactorName, ms);
-          },
-        });
-      },
+      (reactorName, payload, _context) =>
+        this.runReactorQueueJob({ reactorName, payload, reactorDefs }),
     );
+  }
+
+  private collectReactorDefs({
+    reactorsByParent,
+    parentType,
+    reactorDefs,
+  }: {
+    reactorsByParent: Map<string, ReactorDefinition<EventType>[]>;
+    parentType: "fold" | "map";
+    reactorDefs: Record<string, ReactorQueueDef<EventType>>;
+  }): void {
+    for (const [parentProjection, reactors] of reactorsByParent) {
+      for (const reactor of reactors) {
+        if (this.isReactorExcluded(reactor)) continue;
+        reactorDefs[reactor.name] = buildReactorQueueDef({
+          reactor,
+          parentProjection,
+          parentType,
+        });
+      }
+    }
+  }
+
+  private async runReactorQueueJob({
+    reactorName,
+    payload,
+    reactorDefs,
+  }: {
+    reactorName: string;
+    payload: { event: EventType; foldState: unknown };
+    reactorDefs: Record<string, ReactorQueueDef<EventType>>;
+  }): Promise<void> {
+    const reactorDef = reactorDefs[reactorName];
+    if (!reactorDef) {
+      throw new ConfigurationError(
+        "ProjectionRouter",
+        `Reactor "${reactorName}" not found`,
+        { reactorName },
+      );
+    }
+    await withMetrics({
+      fn: () => reactorDef.handler.handle(payload),
+      onComplete: (ms) => {
+        incrementEsReactorTotal(this.pipelineName, reactorName, "completed");
+        observeEsReactorDuration(this.pipelineName, reactorName, ms);
+      },
+      onFail: (ms) => {
+        incrementEsReactorTotal(this.pipelineName, reactorName, "failed");
+        observeEsReactorDuration(this.pipelineName, reactorName, ms);
+      },
+    });
   }
 
   /**
@@ -720,130 +718,9 @@ export class ProjectionRouter<
       handlerDefs[name] = {
         name,
         handler: {
-          handle: async (event: EventType) => {
-            // Defer or skip if projection-replay is active for this aggregate.
-            // Mirrors the fold projection replay-marker check.
-            if (this.replayMarkerChecker) {
-              const decision = await this.replayMarkerChecker.check(
-                name,
-                event,
-              );
-              if (decision === "skip") return;
-            }
-
-            const context = await this.buildStoreContext(event);
-            const record = await withMetrics({
-              fn: () => this.mapExecutor.execute(mapProj, event, context),
-              onComplete: (ms) => {
-                incrementEsMapProjectionTotal({
-                  pipelineName: this.pipelineName,
-                  projectionName: name,
-                  status: "completed",
-                });
-                observeEsMapProjectionDuration({
-                  pipelineName: this.pipelineName,
-                  projectionName: name,
-                  durationMs: ms,
-                });
-              },
-              onFail: (ms) => {
-                incrementEsMapProjectionTotal({
-                  pipelineName: this.pipelineName,
-                  projectionName: name,
-                  status: "failed",
-                });
-                observeEsMapProjectionDuration({
-                  pipelineName: this.pipelineName,
-                  projectionName: name,
-                  durationMs: ms,
-                });
-              },
-            });
-
-            // Dispatch to map reactors after map execute succeeds
-            const mapReactors = this.reactorsForMap.get(name);
-            if (record !== null && mapReactors && mapReactors.length > 0) {
-              await this.dispatchToReactors({
-                foldName: name,
-                reactors: mapReactors,
-                deliveries: [{ event, foldState: record }],
-              });
-            }
-          },
-          handleBatch: async (events: EventType[]) => {
-            const toApply: EventType[] = [];
-            for (const event of events) {
-              if (this.replayMarkerChecker) {
-                const decision = await this.replayMarkerChecker.check(
-                  name,
-                  event,
-                );
-                if (decision === "skip") continue;
-              }
-              toApply.push(event);
-            }
-            if (toApply.length === 0) return;
-
-            const firstContext = await this.buildStoreContext(toApply[0]!);
-            const contexts = toApply.map((event) => ({
-              ...firstContext,
-              aggregateId: String(event.aggregateId),
-              // Per-event tenantId keeps the executor's cross-tenant guard honest.
-              tenantId: event.tenantId,
-            }));
-            const mapped = await withMetrics({
-              fn: () =>
-                this.mapExecutor.executeBatch(mapProj, toApply, contexts),
-              onComplete: (ms) => {
-                for (const _event of toApply) {
-                  incrementEsMapProjectionTotal({
-                    pipelineName: this.pipelineName,
-                    projectionName: name,
-                    status: "completed",
-                  });
-                }
-                observeEsMapProjectionDuration({
-                  pipelineName: this.pipelineName,
-                  projectionName: name,
-                  durationMs: ms,
-                });
-              },
-              onFail: (ms) => {
-                for (const _event of toApply) {
-                  incrementEsMapProjectionTotal({
-                    pipelineName: this.pipelineName,
-                    projectionName: name,
-                    status: "failed",
-                  });
-                }
-                observeEsMapProjectionDuration({
-                  pipelineName: this.pipelineName,
-                  projectionName: name,
-                  durationMs: ms,
-                });
-              },
-            });
-
-            const mapReactors = this.reactorsForMap.get(name);
-            if (mapReactors && mapReactors.length > 0) {
-              // One dispatch for the whole batch, not one per mapped event.
-              // Dispatching per event put each send in its own call, so the
-              // per-reactor collapse only ever saw a single event and could
-              // never fire — a drained batch sent one job per event for
-              // reactors keyed on the aggregate, and the queue then squashed
-              // all but the last. Each delivery keeps its own record, so a
-              // reactor that reads one still sees the record its event
-              // produced.
-              await this.dispatchToReactors({
-                foldName: name,
-                reactors: mapReactors,
-                deliveries: mapped.map(({ event, record }) => ({
-                  event,
-                  foldState: record,
-                })),
-              });
-            }
-          },
+          handle: (event) => this.handleMapEvent({ name, mapProj, event }),
+          handleBatch: (events) =>
+            this.handleMapEventBatch({ name, mapProj, events }),
         },
         options: {
           eventTypes: mapProj.eventTypes as readonly string[],
@@ -883,6 +760,142 @@ export class ProjectionRouter<
     );
   }
 
+  private emitMapProjectionMetrics({
+    name,
+    status,
+    durationMs,
+    count,
+  }: {
+    name: string;
+    status: "completed" | "failed";
+    durationMs: number;
+    count: number;
+  }): void {
+    for (let i = 0; i < count; i++) {
+      incrementEsMapProjectionTotal({
+        pipelineName: this.pipelineName,
+        projectionName: name,
+        status,
+      });
+    }
+    observeEsMapProjectionDuration({
+      pipelineName: this.pipelineName,
+      projectionName: name,
+      durationMs,
+    });
+  }
+
+  private async handleMapEvent({
+    name,
+    mapProj,
+    event,
+  }: {
+    name: string;
+    mapProj: MapProjectionDefinition<any, EventType>;
+    event: EventType;
+  }): Promise<void> {
+    // Defer or skip if projection-replay is active for this aggregate.
+    // Mirrors the fold projection replay-marker check.
+    if (this.replayMarkerChecker) {
+      const decision = await this.replayMarkerChecker.check(name, event);
+      if (decision === "skip") return;
+    }
+
+    const context = await this.buildStoreContext(event);
+    const record = await withMetrics({
+      fn: () => this.mapExecutor.execute(mapProj, event, context),
+      onComplete: (ms) =>
+        this.emitMapProjectionMetrics({
+          name,
+          status: "completed",
+          durationMs: ms,
+          count: 1,
+        }),
+      onFail: (ms) =>
+        this.emitMapProjectionMetrics({
+          name,
+          status: "failed",
+          durationMs: ms,
+          count: 1,
+        }),
+    });
+
+    // Dispatch to map reactors after map execute succeeds
+    const mapReactors = this.reactorsForMap.get(name);
+    if (record !== null && mapReactors && mapReactors.length > 0) {
+      await this.dispatchToReactors({
+        foldName: name,
+        reactors: mapReactors,
+        deliveries: [{ event, foldState: record }],
+      });
+    }
+  }
+
+  private async handleMapEventBatch({
+    name,
+    mapProj,
+    events,
+  }: {
+    name: string;
+    mapProj: MapProjectionDefinition<any, EventType>;
+    events: EventType[];
+  }): Promise<void> {
+    const toApply: EventType[] = [];
+    for (const event of events) {
+      if (this.replayMarkerChecker) {
+        const decision = await this.replayMarkerChecker.check(name, event);
+        if (decision === "skip") continue;
+      }
+      toApply.push(event);
+    }
+    if (toApply.length === 0) return;
+
+    const firstContext = await this.buildStoreContext(toApply[0]!);
+    const contexts = toApply.map((event) => ({
+      ...firstContext,
+      aggregateId: String(event.aggregateId),
+      // Per-event tenantId keeps the executor's cross-tenant guard honest.
+      tenantId: event.tenantId,
+    }));
+    const mapped = await withMetrics({
+      fn: () => this.mapExecutor.executeBatch(mapProj, toApply, contexts),
+      onComplete: (ms) =>
+        this.emitMapProjectionMetrics({
+          name,
+          status: "completed",
+          durationMs: ms,
+          count: toApply.length,
+        }),
+      onFail: (ms) =>
+        this.emitMapProjectionMetrics({
+          name,
+          status: "failed",
+          durationMs: ms,
+          count: toApply.length,
+        }),
+    });
+
+    const mapReactors = this.reactorsForMap.get(name);
+    if (mapReactors && mapReactors.length > 0) {
+      // One dispatch for the whole batch, not one per mapped event.
+      // Dispatching per event put each send in its own call, so the
+      // per-reactor collapse only ever saw a single event and could
+      // never fire — a drained batch sent one job per event for
+      // reactors keyed on the aggregate, and the queue then squashed
+      // all but the last. Each delivery keeps its own record, so a
+      // reactor that reads one still sees the record its event
+      // produced.
+      await this.dispatchToReactors({
+        foldName: name,
+        reactors: mapReactors,
+        deliveries: mapped.map(({ event, record }) => ({
+          event,
+          foldState: record,
+        })),
+      });
+    }
+  }
+
   /**
    * Dispatches events to all matching fold and map projections.
    */
@@ -911,55 +924,35 @@ export class ProjectionRouter<
 
         // Dispatch to fold projections
         if (this.foldProjections.size > 0) {
-          try {
-            await this.dispatchToFoldProjections(events, context);
-          } catch (e) {
-            if (e instanceof AggregateError) {
-              errors.push(...(e.errors as Error[]));
-            } else {
-              errors.push(toError(e));
-            }
-          }
+          await this.runDispatchStage({
+            errors,
+            run: () => this.dispatchToFoldProjections(events, context),
+          });
         }
 
         // Default state projections are independent operational read models.
         if (this.stateProjections.size > 0) {
-          try {
-            await this.dispatchToStateProjections(events, context);
-          } catch (e) {
-            if (e instanceof AggregateError) {
-              errors.push(...(e.errors as Error[]));
-            } else {
-              errors.push(toError(e));
-            }
-          }
+          await this.runDispatchStage({
+            errors,
+            run: () => this.dispatchToStateProjections(events, context),
+          });
         }
 
         // Dispatch to map projections
         if (this.mapProjections.size > 0) {
-          try {
-            await this.dispatchToMapProjections(events, context);
-          } catch (e) {
-            if (e instanceof AggregateError) {
-              errors.push(...(e.errors as Error[]));
-            } else {
-              errors.push(toError(e));
-            }
-          }
+          await this.runDispatchStage({
+            errors,
+            run: () => this.dispatchToMapProjections(events, context),
+          });
         }
 
         // Subscribers receive the same committed event envelope and are not
         // coupled to either projection's state or completion.
         if (this.eventSubscribers.size > 0) {
-          try {
-            await this.dispatchToEventSubscribers(events);
-          } catch (e) {
-            if (e instanceof AggregateError) {
-              errors.push(...(e.errors as Error[]));
-            } else {
-              errors.push(toError(e));
-            }
-          }
+          await this.runDispatchStage({
+            errors,
+            run: () => this.dispatchToEventSubscribers(events),
+          });
         }
 
         if (errors.length > 0) {
@@ -972,82 +965,34 @@ export class ProjectionRouter<
     );
   }
 
+  private async runDispatchStage({
+    errors,
+    run,
+  }: {
+    errors: Error[];
+    run: () => Promise<void>;
+  }): Promise<void> {
+    try {
+      await run();
+    } catch (e) {
+      if (e instanceof AggregateError) {
+        errors.push(...(e.errors as Error[]));
+      } else {
+        errors.push(toError(e));
+      }
+    }
+  }
+
   private async dispatchToFoldProjections(
     events: readonly EventType[],
     context: EventStoreReadContext<EventType>,
   ): Promise<void> {
-    const hasProjectionQueues = this.queueManager.hasProjectionQueues();
     const errors: Error[] = [];
 
-    if (hasProjectionQueues) {
-      // Async dispatch via queues using batching
-      for (const [projectionName, fold] of this.foldProjections) {
-        const matching =
-          fold.eventTypes.length > 0
-            ? events.filter((e) => fold.eventTypes.includes(e.type))
-            : [...events];
-        const filtered =
-          fold.options?.eventOrdering === "acceptedAt"
-            ? [...matching].sort((a, b) => {
-                if (a.createdAt !== b.createdAt) {
-                  return a.createdAt - b.createdAt;
-                }
-                return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
-              })
-            : matching;
-        if (filtered.length === 0) continue;
-
-        const queueProcessor =
-          this.queueManager.getProjectionQueue(projectionName);
-        if (queueProcessor) {
-          try {
-            await queueProcessor.sendBatch(filtered);
-          } catch (error) {
-            this.logger.error(
-              {
-                projectionName,
-                eventCount: filtered.length,
-                error: error instanceof Error ? error.message : String(error),
-              },
-              "Failed to dispatch batch of events to fold projection queue",
-            );
-            errors.push(toError(error));
-          }
-        }
-      }
+    if (this.queueManager.hasProjectionQueues()) {
+      await this.dispatchFoldProjectionsViaQueue({ events, errors });
     } else {
-      // Inline sync processing
-      for (const event of events) {
-        for (const [projectionName, fold] of this.foldProjections) {
-          if (
-            fold.eventTypes.length > 0 &&
-            !fold.eventTypes.includes(event.type)
-          ) {
-            continue;
-          }
-          try {
-            await this.processFoldProjectionEvent({
-              projectionName,
-              fold,
-              event,
-              context,
-            });
-          } catch (error) {
-            const category = categorizeError(error);
-            handleError({
-              error,
-              category,
-              logger: this.logger,
-              context: {
-                projectionName,
-                aggregateId: String(event.aggregateId),
-                tenantId: context.tenantId,
-              },
-            });
-            errors.push(toError(error));
-          }
-        }
-      }
+      await this.dispatchFoldProjectionsInline({ events, context, errors });
     }
 
     if (errors.length > 0) {
@@ -1058,6 +1003,119 @@ export class ProjectionRouter<
     }
   }
 
+  private filterFoldMatchingEvents({
+    fold,
+    events,
+  }: {
+    fold: FoldProjectionDefinition<any, EventType>;
+    events: readonly EventType[];
+  }): EventType[] {
+    const matching =
+      fold.eventTypes.length > 0
+        ? events.filter((e) => fold.eventTypes.includes(e.type))
+        : [...events];
+    return fold.options?.eventOrdering === "acceptedAt"
+      ? [...matching].sort(compareByAcceptedAtThenId)
+      : matching;
+  }
+
+  // Async dispatch via queues using batching
+  private async dispatchFoldProjectionsViaQueue({
+    events,
+    errors,
+  }: {
+    events: readonly EventType[];
+    errors: Error[];
+  }): Promise<void> {
+    for (const [projectionName, fold] of this.foldProjections) {
+      const filtered = this.filterFoldMatchingEvents({ fold, events });
+      if (filtered.length === 0) continue;
+      await this.sendFoldProjectionBatch({ projectionName, filtered, errors });
+    }
+  }
+
+  private async sendFoldProjectionBatch({
+    projectionName,
+    filtered,
+    errors,
+  }: {
+    projectionName: string;
+    filtered: EventType[];
+    errors: Error[];
+  }): Promise<void> {
+    const queueProcessor = this.queueManager.getProjectionQueue(projectionName);
+    if (!queueProcessor) return;
+
+    try {
+      await queueProcessor.sendBatch(filtered);
+    } catch (error) {
+      this.logger.error(
+        {
+          projectionName,
+          eventCount: filtered.length,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        "Failed to dispatch batch of events to fold projection queue",
+      );
+      errors.push(toError(error));
+    }
+  }
+
+  // Inline sync processing
+  private async dispatchFoldProjectionsInline({
+    events,
+    context,
+    errors,
+  }: {
+    events: readonly EventType[];
+    context: EventStoreReadContext<EventType>;
+    errors: Error[];
+  }): Promise<void> {
+    for (const event of events) {
+      for (const [projectionName, fold] of this.foldProjections) {
+        if (
+          fold.eventTypes.length > 0 &&
+          !fold.eventTypes.includes(event.type)
+        ) {
+          continue;
+        }
+        try {
+          await this.processFoldProjectionEvent({
+            projectionName,
+            fold,
+            event,
+            context,
+          });
+        } catch (error) {
+          const category = categorizeError(error);
+          handleError({
+            error,
+            category,
+            logger: this.logger,
+            context: {
+              projectionName,
+              aggregateId: String(event.aggregateId),
+              tenantId: context.tenantId,
+            },
+          });
+          errors.push(toError(error));
+        }
+      }
+    }
+  }
+
+  private filterStateProjectionMatchingEvents({
+    projection,
+    events,
+  }: {
+    projection: StateProjectionDefinition<any, EventType>;
+    events: readonly EventType[];
+  }): EventType[] {
+    return projection.eventTypes.length === 0
+      ? [...events]
+      : events.filter((event) => projection.eventTypes.includes(event.type));
+  }
+
   private async dispatchToStateProjections(
     events: readonly EventType[],
     context: EventStoreReadContext<EventType>,
@@ -1066,31 +1124,20 @@ export class ProjectionRouter<
     const errors: Error[] = [];
 
     for (const [name, projection] of this.stateProjections) {
-      const matching =
-        projection.eventTypes.length === 0
-          ? [...events]
-          : events.filter((event) =>
-              projection.eventTypes.includes(event.type),
-            );
+      const matching = this.filterStateProjectionMatchingEvents({
+        projection,
+        events,
+      });
       if (matching.length === 0) continue;
 
       try {
-        if (queued) {
-          const queue = this.queueManager.getStateProjectionQueue(name);
-          if (queue) {
-            await queue.sendBatch(matching);
-            continue;
-          }
-        }
-
-        for (const event of matching) {
-          await this.processStateProjectionEvents({
-            projectionName: name,
-            projection,
-            events: [event],
-            context,
-          });
-        }
+        await this.dispatchStateProjectionMatch({
+          name,
+          projection,
+          matching,
+          context,
+          queued,
+        });
       } catch (error) {
         this.logger.error(
           {
@@ -1112,150 +1159,47 @@ export class ProjectionRouter<
     }
   }
 
+  private async dispatchStateProjectionMatch({
+    name,
+    projection,
+    matching,
+    context,
+    queued,
+  }: {
+    name: string;
+    projection: StateProjectionDefinition<any, EventType>;
+    matching: EventType[];
+    context: EventStoreReadContext<EventType>;
+    queued: boolean;
+  }): Promise<void> {
+    if (queued) {
+      const queue = this.queueManager.getStateProjectionQueue(name);
+      if (queue) {
+        await queue.sendBatch(matching);
+        return;
+      }
+    }
+
+    for (const event of matching) {
+      await this.processStateProjectionEvents({
+        projectionName: name,
+        projection,
+        events: [event],
+        context,
+      });
+    }
+  }
+
   private async dispatchToMapProjections(
     events: readonly EventType[],
     context: EventStoreReadContext<EventType>,
   ): Promise<void> {
-    const hasHandlerQueues = this.queueManager.hasHandlerQueues();
     const errors: Error[] = [];
 
-    if (hasHandlerQueues) {
-      // Async dispatch via queues using batching per handler
-      for (const [name, mapProj] of this.mapProjections) {
-        if (mapProj.options?.disabled) continue;
-
-        // Filter events for this handler
-        const filteredEvents = [];
-        for (const event of events) {
-          const disabled = await isComponentDisabled({
-            featureFlagService: this.featureFlagService,
-            aggregateType: this.aggregateType,
-            componentType: "mapProjection",
-            componentName: name,
-            tenantId: event.tenantId,
-            customKey: mapProj.options?.killSwitch?.customKey,
-            logger: this.logger,
-          });
-          if (disabled) continue;
-
-          // Filter by event type
-          if (
-            mapProj.eventTypes.length > 0 &&
-            !mapProj.eventTypes.includes(event.type)
-          ) {
-            continue;
-          }
-          filteredEvents.push(event);
-        }
-
-        if (filteredEvents.length === 0) continue;
-
-        const queueProcessor = this.queueManager.getHandlerQueue(name);
-        if (queueProcessor) {
-          try {
-            await queueProcessor.sendBatch(filteredEvents);
-          } catch (error) {
-            this.logger.error(
-              {
-                handlerName: name,
-                eventCount: filteredEvents.length,
-                error: error instanceof Error ? error.message : String(error),
-              },
-              "Failed to dispatch batch of events to map projection queue",
-            );
-            errors.push(toError(error));
-          }
-        }
-      }
+    if (this.queueManager.hasHandlerQueues()) {
+      await this.dispatchMapProjectionsViaQueue({ events, errors });
     } else {
-      // Inline sync processing
-      for (const event of events) {
-        for (const [name, mapProj] of this.mapProjections) {
-          if (mapProj.options?.disabled) continue;
-
-          const disabled = await isComponentDisabled({
-            featureFlagService: this.featureFlagService,
-            aggregateType: this.aggregateType,
-            componentType: "mapProjection",
-            componentName: name,
-            tenantId: event.tenantId,
-            customKey: mapProj.options?.killSwitch?.customKey,
-            logger: this.logger,
-          });
-          if (disabled) continue;
-
-          if (
-            mapProj.eventTypes.length > 0 &&
-            !mapProj.eventTypes.includes(event.type)
-          ) {
-            continue;
-          }
-
-          try {
-            // Defer or skip if projection-replay is active for this aggregate.
-            // Mirrors the fold projection replay-marker check.
-            if (this.replayMarkerChecker) {
-              const decision = await this.replayMarkerChecker.check(
-                name,
-                event,
-              );
-              if (decision === "skip") continue;
-            }
-
-            const storeContext = await this.buildStoreContext(event);
-            const record = await withMetrics({
-              fn: () => this.mapExecutor.execute(mapProj, event, storeContext),
-              onComplete: (ms) => {
-                incrementEsMapProjectionTotal({
-                  pipelineName: this.pipelineName,
-                  projectionName: name,
-                  status: "completed",
-                });
-                observeEsMapProjectionDuration({
-                  pipelineName: this.pipelineName,
-                  projectionName: name,
-                  durationMs: ms,
-                });
-              },
-              onFail: (ms) => {
-                incrementEsMapProjectionTotal({
-                  pipelineName: this.pipelineName,
-                  projectionName: name,
-                  status: "failed",
-                });
-                observeEsMapProjectionDuration({
-                  pipelineName: this.pipelineName,
-                  projectionName: name,
-                  durationMs: ms,
-                });
-              },
-            });
-
-            // Dispatch to map reactors after map execute succeeds
-            const mapReactors = this.reactorsForMap.get(name);
-            if (record !== null && mapReactors && mapReactors.length > 0) {
-              await this.dispatchToReactors({
-                foldName: name,
-                reactors: mapReactors,
-                deliveries: [{ event, foldState: record }],
-              });
-            }
-          } catch (error) {
-            handleError({
-              error,
-              category: categorizeError(error),
-              logger: this.logger,
-              context: {
-                handlerName: name,
-                eventType: event.type,
-                aggregateId: String(event.aggregateId),
-                tenantId: event.tenantId,
-              },
-            });
-            errors.push(toError(error));
-          }
-        }
-      }
+      await this.dispatchMapProjectionsInline({ events, errors });
     }
 
     if (errors.length > 0) {
@@ -1263,6 +1207,158 @@ export class ProjectionRouter<
         errors,
         `${errors.length} map projection(s) failed during dispatch`,
       );
+    }
+  }
+
+  private async filterMapEventsForHandler({
+    name,
+    mapProj,
+    events,
+  }: {
+    name: string;
+    mapProj: MapProjectionDefinition<any, EventType>;
+    events: readonly EventType[];
+  }): Promise<EventType[]> {
+    const filteredEvents: EventType[] = [];
+    for (const event of events) {
+      const disabled = await isComponentDisabled({
+        featureFlagService: this.featureFlagService,
+        aggregateType: this.aggregateType,
+        componentType: "mapProjection",
+        componentName: name,
+        tenantId: event.tenantId,
+        customKey: mapProj.options?.killSwitch?.customKey,
+        logger: this.logger,
+      });
+      if (disabled) continue;
+
+      // Filter by event type
+      if (
+        mapProj.eventTypes.length > 0 &&
+        !mapProj.eventTypes.includes(event.type)
+      ) {
+        continue;
+      }
+      filteredEvents.push(event);
+    }
+    return filteredEvents;
+  }
+
+  // Async dispatch via queues using batching per handler
+  private async dispatchMapProjectionsViaQueue({
+    events,
+    errors,
+  }: {
+    events: readonly EventType[];
+    errors: Error[];
+  }): Promise<void> {
+    for (const [name, mapProj] of this.mapProjections) {
+      if (mapProj.options?.disabled) continue;
+
+      const filteredEvents = await this.filterMapEventsForHandler({
+        name,
+        mapProj,
+        events,
+      });
+      if (filteredEvents.length === 0) continue;
+
+      await this.sendMapProjectionBatch({ name, filteredEvents, errors });
+    }
+  }
+
+  private async sendMapProjectionBatch({
+    name,
+    filteredEvents,
+    errors,
+  }: {
+    name: string;
+    filteredEvents: EventType[];
+    errors: Error[];
+  }): Promise<void> {
+    const queueProcessor = this.queueManager.getHandlerQueue(name);
+    if (!queueProcessor) return;
+
+    try {
+      await queueProcessor.sendBatch(filteredEvents);
+    } catch (error) {
+      this.logger.error(
+        {
+          handlerName: name,
+          eventCount: filteredEvents.length,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        "Failed to dispatch batch of events to map projection queue",
+      );
+      errors.push(toError(error));
+    }
+  }
+
+  // Inline sync processing
+  private async dispatchMapProjectionsInline({
+    events,
+    errors,
+  }: {
+    events: readonly EventType[];
+    errors: Error[];
+  }): Promise<void> {
+    for (const event of events) {
+      for (const [name, mapProj] of this.mapProjections) {
+        await this.dispatchMapEventToHandlerInline({
+          name,
+          mapProj,
+          event,
+          errors,
+        });
+      }
+    }
+  }
+
+  private async dispatchMapEventToHandlerInline({
+    name,
+    mapProj,
+    event,
+    errors,
+  }: {
+    name: string;
+    mapProj: MapProjectionDefinition<any, EventType>;
+    event: EventType;
+    errors: Error[];
+  }): Promise<void> {
+    if (mapProj.options?.disabled) return;
+
+    const disabled = await isComponentDisabled({
+      featureFlagService: this.featureFlagService,
+      aggregateType: this.aggregateType,
+      componentType: "mapProjection",
+      componentName: name,
+      tenantId: event.tenantId,
+      customKey: mapProj.options?.killSwitch?.customKey,
+      logger: this.logger,
+    });
+    if (disabled) return;
+
+    if (
+      mapProj.eventTypes.length > 0 &&
+      !mapProj.eventTypes.includes(event.type)
+    ) {
+      return;
+    }
+
+    try {
+      await this.handleMapEvent({ name, mapProj, event });
+    } catch (error) {
+      handleError({
+        error,
+        category: categorizeError(error),
+        logger: this.logger,
+        context: {
+          handlerName: name,
+          eventType: event.type,
+          aggregateId: String(event.aggregateId),
+          tenantId: event.tenantId,
+        },
+      });
+      errors.push(toError(error));
     }
   }
 
@@ -1274,132 +1370,13 @@ export class ProjectionRouter<
 
     for (const [name, subscriber] of this.eventSubscribers) {
       if (subscriber.options?.disabled) continue;
-      const matching =
-        subscriber.eventTypes.length === 0
-          ? events
-          : events.filter((event) =>
-              subscriber.eventTypes.includes(event.type),
-            );
-
-      const enqueue = subscriber.options?.enqueue;
-
-      // Kill switch, resolved BEFORE the enqueue hooks so a killed subscriber
-      // does no work at all. Every other dispatch path has one; without it the
-      // enqueue filter — which DROPS events irreversibly, since subscriber
-      // fan-out is never replayed — could only be stopped by shipping a revert.
-      //
-      // Resolved once per distinct tenant in the batch rather than once per
-      // event. `isComponentDisabled` is a cache lookup wrapped in a span, and
-      // the highest-volume subscribers match every span_received, so a per-event
-      // resolution put a lookup on the hottest path in the product to answer a
-      // question whose answer cannot change within one batch — the opposite of
-      // the "an irrelevant event costs nothing" doctrine this seam exists for.
-      const killedByTenant = new Map<string, boolean>();
-      const isKilledFor = async (tenantId: string): Promise<boolean> => {
-        const cached = killedByTenant.get(tenantId);
-        if (cached !== undefined) return cached;
-        const disabled = await isComponentDisabled({
-          featureFlagService: this.featureFlagService,
-          aggregateType: this.aggregateType,
-          componentType: "subscriber",
-          componentName: name,
-          tenantId,
-          customKey: subscriber.options?.killSwitch?.customKey,
-          logger: this.logger,
-        });
-        killedByTenant.set(tenantId, disabled);
-        return disabled;
-      };
-
-      for (const event of matching) {
-        try {
-          if (await isKilledFor(event.tenantId)) {
-            // Counted, not skipped silently. A kill is permanent data loss for
-            // this subscriber, and an operator has to be able to tell it apart
-            // from a quiet subscriber — precisely when they are looking.
-            incrementEsSubscriberEnqueueTotal({
-              pipelineName: this.pipelineName,
-              subscriberName: name,
-              outcome: "killed",
-            });
-            continue;
-          }
-
-          // Enqueue-time filter (ADR-069 invariant 4): a declined event never
-          // mints a job. A throw here is deliberately NOT caught as `false` —
-          // it falls through to the catch below, so the failure is reported
-          // rather than silently read as "not relevant". The routing path has
-          // no retry (see EnqueueDispatchOptions), so the hook must be total:
-          // if it throws, this subscriber loses its job for this event.
-          if (enqueue?.filter && !enqueue.filter(event)) {
-            incrementEsSubscriberEnqueueTotal({
-              pipelineName: this.pipelineName,
-              subscriberName: name,
-              outcome: "filtered",
-            });
-            continue;
-          }
-
-          // Claim-check staging (ADR-069): the subscriber may swap the staged
-          // payload for a small reference event mirroring the source event's
-          // scheduling identity. Total field-picks only — like the filter's, a
-          // throw here is reported and counted `failed`, and permanently loses
-          // this subscriber's job for this event. There is no routing retry:
-          // eventSourcingService catches and logs the dispatch AggregateError
-          // without rethrowing.
-          //
-          // Note the deploy-order dependency this creates: a reference is a
-          // different event type, and a worker running the previous build
-          // silently COMPLETES a job it cannot decode. See
-          // `EnqueueDispatchOptions.stage` and ADR-069.
-          const staged = enqueue?.stage
-            ? (enqueue.stage(event) as EventType)
-            : event;
-
-          const queue = queued
-            ? this.queueManager.getSubscriberQueue(name)
-            : undefined;
-          if (queue) {
-            await queue.send(staged);
-          } else {
-            await this.handleSubscriber(subscriber, staged);
-          }
-
-          // Counted only once the handoff succeeded. A failed send throws to
-          // the catch below, so a queue outage never inflates `staged` or
-          // `referenced` — the outcome split stays an honest picture of what
-          // the seam did.
-          // A reference is a DIFFERENT event type by construction, which is
-          // what the split means to an operator. Reference identity would count
-          // a `stage` that rebuilt the same event as "referenced".
-          incrementEsSubscriberEnqueueTotal({
-            pipelineName: this.pipelineName,
-            subscriberName: name,
-            outcome: staged.type === event.type ? "staged" : "referenced",
-          });
-        } catch (error) {
-          // The seam has no retry, so this job is gone. Count it: without this
-          // a thrown filter/stage/send moved no series at all, and a permanent
-          // drop looked exactly like a quiet day.
-          incrementEsSubscriberEnqueueTotal({
-            pipelineName: this.pipelineName,
-            subscriberName: name,
-            outcome: "failed",
-          });
-          this.logger.error(
-            {
-              subscriberName: name,
-              eventId: event.id,
-              eventType: event.type,
-              aggregateId: String(event.aggregateId),
-              tenantId: event.tenantId,
-              error: error instanceof Error ? error.message : String(error),
-            },
-            "Event subscriber dispatch failed",
-          );
-          errors.push(toError(error));
-        }
-      }
+      await this.dispatchEventsToSubscriber({
+        name,
+        subscriber,
+        events,
+        queued,
+        errors,
+      });
     }
 
     if (errors.length > 0) {
@@ -1408,6 +1385,165 @@ export class ProjectionRouter<
         `${errors.length} event subscriber(s) failed during dispatch`,
       );
     }
+  }
+
+  private async dispatchEventsToSubscriber({
+    name,
+    subscriber,
+    events,
+    queued,
+    errors,
+  }: {
+    name: string;
+    subscriber: EventSubscriberDefinition<EventType>;
+    events: readonly EventType[];
+    queued: boolean;
+    errors: Error[];
+  }): Promise<void> {
+    const matching =
+      subscriber.eventTypes.length === 0
+        ? events
+        : events.filter((event) => subscriber.eventTypes.includes(event.type));
+
+    // Kill switch, resolved BEFORE the enqueue hooks so a killed subscriber
+    // does no work at all. Every other dispatch path has one; without it the
+    // enqueue filter — which DROPS events irreversibly, since subscriber
+    // fan-out is never replayed — could only be stopped by shipping a revert.
+    //
+    // Resolved once per distinct tenant in the batch rather than once per
+    // event. `isComponentDisabled` is a cache lookup wrapped in a span, and
+    // the highest-volume subscribers match every span_received, so a per-event
+    // resolution put a lookup on the hottest path in the product to answer a
+    // question whose answer cannot change within one batch — the opposite of
+    // the "an irrelevant event costs nothing" doctrine this seam exists for.
+    const killedByTenant = new Map<string, boolean>();
+    const isKilledFor = async (tenantId: string): Promise<boolean> => {
+      const cached = killedByTenant.get(tenantId);
+      if (cached !== undefined) return cached;
+      const disabled = await isComponentDisabled({
+        featureFlagService: this.featureFlagService,
+        aggregateType: this.aggregateType,
+        componentType: "subscriber",
+        componentName: name,
+        tenantId,
+        customKey: subscriber.options?.killSwitch?.customKey,
+        logger: this.logger,
+      });
+      killedByTenant.set(tenantId, disabled);
+      return disabled;
+    };
+
+    for (const event of matching) {
+      try {
+        await this.enqueueSubscriberEvent({
+          name,
+          subscriber,
+          event,
+          queued,
+          isKilledFor,
+        });
+      } catch (error) {
+        // The seam has no retry, so this job is gone. Count it: without this
+        // a thrown filter/stage/send moved no series at all, and a permanent
+        // drop looked exactly like a quiet day.
+        incrementEsSubscriberEnqueueTotal({
+          pipelineName: this.pipelineName,
+          subscriberName: name,
+          outcome: "failed",
+        });
+        this.logger.error(
+          {
+            subscriberName: name,
+            eventId: event.id,
+            eventType: event.type,
+            aggregateId: String(event.aggregateId),
+            tenantId: event.tenantId,
+            error: error instanceof Error ? error.message : String(error),
+          },
+          "Event subscriber dispatch failed",
+        );
+        errors.push(toError(error));
+      }
+    }
+  }
+
+  private async enqueueSubscriberEvent({
+    name,
+    subscriber,
+    event,
+    queued,
+    isKilledFor,
+  }: {
+    name: string;
+    subscriber: EventSubscriberDefinition<EventType>;
+    event: EventType;
+    queued: boolean;
+    isKilledFor: (tenantId: string) => Promise<boolean>;
+  }): Promise<void> {
+    if (await isKilledFor(event.tenantId)) {
+      // Counted, not skipped silently. A kill is permanent data loss for
+      // this subscriber, and an operator has to be able to tell it apart
+      // from a quiet subscriber — precisely when they are looking.
+      incrementEsSubscriberEnqueueTotal({
+        pipelineName: this.pipelineName,
+        subscriberName: name,
+        outcome: "killed",
+      });
+      return;
+    }
+
+    const enqueue = subscriber.options?.enqueue;
+
+    // Enqueue-time filter (ADR-069 invariant 4): a declined event never
+    // mints a job. A throw here is deliberately NOT caught as `false` —
+    // it falls through to the catch below, so the failure is reported
+    // rather than silently read as "not relevant". The routing path has
+    // no retry (see EnqueueDispatchOptions), so the hook must be total:
+    // if it throws, this subscriber loses its job for this event.
+    if (enqueue?.filter && !enqueue.filter(event)) {
+      incrementEsSubscriberEnqueueTotal({
+        pipelineName: this.pipelineName,
+        subscriberName: name,
+        outcome: "filtered",
+      });
+      return;
+    }
+
+    // Claim-check staging (ADR-069): the subscriber may swap the staged
+    // payload for a small reference event mirroring the source event's
+    // scheduling identity. Total field-picks only — like the filter's, a
+    // throw here is reported and counted `failed`, and permanently loses
+    // this subscriber's job for this event. There is no routing retry:
+    // eventSourcingService catches and logs the dispatch AggregateError
+    // without rethrowing.
+    //
+    // Note the deploy-order dependency this creates: a reference is a
+    // different event type, and a worker running the previous build
+    // silently COMPLETES a job it cannot decode. See
+    // `EnqueueDispatchOptions.stage` and ADR-069.
+    const staged = enqueue?.stage ? (enqueue.stage(event) as EventType) : event;
+
+    const queue = queued
+      ? this.queueManager.getSubscriberQueue(name)
+      : undefined;
+    if (queue) {
+      await queue.send(staged);
+    } else {
+      await this.handleSubscriber(subscriber, staged);
+    }
+
+    // Counted only once the handoff succeeded. A failed send throws to
+    // the catch below, so a queue outage never inflates `staged` or
+    // `referenced` — the outcome split stays an honest picture of what
+    // the seam did.
+    // A reference is a DIFFERENT event type by construction, which is
+    // what the split means to an operator. Reference identity would count
+    // a `stage` that rebuilt the same event as "referenced".
+    incrementEsSubscriberEnqueueTotal({
+      pipelineName: this.pipelineName,
+      subscriberName: name,
+      outcome: staged.type === event.type ? "staged" : "referenced",
+    });
   }
 
   private async handleSubscriber(
@@ -1533,18 +1669,10 @@ export class ProjectionRouter<
         });
         if (disabled) return;
 
-        let toApply = events;
-        if (this.replayMarkerChecker) {
-          const kept: EventType[] = [];
-          for (const event of events) {
-            const decision = await this.replayMarkerChecker.check(
-              projectionName,
-              event,
-            );
-            if (decision !== "skip") kept.push(event);
-          }
-          toApply = kept;
-        }
+        const toApply = await this.filterReplaySkipped({
+          projectionName,
+          events,
+        });
         if (toApply.length === 0) return;
 
         const key = projection.key ? projection.key(toApply[0]!) : undefined;
@@ -1560,61 +1688,82 @@ export class ProjectionRouter<
               events: toApply,
               context: storeContext,
             }),
-          onComplete: (ms) => {
-            incrementEsProjectionTotal({
-              pipelineName: this.pipelineName,
-              projectionKind: "state",
+          onComplete: (ms) =>
+            this.recordStateProjectionMetrics({
               projectionName,
               status: "completed",
-            });
-            observeEsProjectionDuration({
-              pipelineName: this.pipelineName,
-              projectionKind: "state",
-              projectionName,
               durationMs: ms,
-            });
-            if (ms >= SLOW_PROJECTION_OPERATION_MS) {
-              this.logger.warn(
-                {
-                  pipelineName: this.pipelineName,
-                  projectionKind: "state",
-                  projectionName,
-                  eventCount: toApply.length,
-                  durationMs: Math.round(ms),
-                },
-                "State projection execution is slow",
-              );
-            }
-          },
-          onFail: (ms) => {
-            incrementEsProjectionTotal({
-              pipelineName: this.pipelineName,
-              projectionKind: "state",
+              eventCount: toApply.length,
+            }),
+          onFail: (ms) =>
+            this.recordStateProjectionMetrics({
               projectionName,
               status: "failed",
-            });
-            observeEsProjectionDuration({
-              pipelineName: this.pipelineName,
-              projectionKind: "state",
-              projectionName,
               durationMs: ms,
-            });
-            if (ms >= SLOW_PROJECTION_OPERATION_MS) {
-              this.logger.warn(
-                {
-                  pipelineName: this.pipelineName,
-                  projectionKind: "state",
-                  projectionName,
-                  eventCount: toApply.length,
-                  durationMs: Math.round(ms),
-                },
-                "Failed state projection execution was slow",
-              );
-            }
-          },
+              eventCount: toApply.length,
+            }),
         });
       },
     );
+  }
+
+  private async filterReplaySkipped({
+    projectionName,
+    events,
+  }: {
+    projectionName: string;
+    events: EventType[];
+  }): Promise<EventType[]> {
+    if (!this.replayMarkerChecker) return events;
+
+    const kept: EventType[] = [];
+    for (const event of events) {
+      const decision = await this.replayMarkerChecker.check(
+        projectionName,
+        event,
+      );
+      if (decision !== "skip") kept.push(event);
+    }
+    return kept;
+  }
+
+  private recordStateProjectionMetrics({
+    projectionName,
+    status,
+    durationMs,
+    eventCount,
+  }: {
+    projectionName: string;
+    status: "completed" | "failed";
+    durationMs: number;
+    eventCount: number;
+  }): void {
+    incrementEsProjectionTotal({
+      pipelineName: this.pipelineName,
+      projectionKind: "state",
+      projectionName,
+      status,
+    });
+    observeEsProjectionDuration({
+      pipelineName: this.pipelineName,
+      projectionKind: "state",
+      projectionName,
+      durationMs,
+    });
+    if (durationMs >= SLOW_PROJECTION_OPERATION_MS) {
+      this.logger.warn(
+        {
+          pipelineName: this.pipelineName,
+          projectionKind: "state",
+          projectionName,
+          eventCount,
+          durationMs: Math.round(durationMs),
+        },
+        status === "completed"
+          ? "State projection execution is slow"
+          : "Failed state projection execution was slow",
+      );
+    }
   }
 
   /**
@@ -1838,28 +1987,16 @@ export class ProjectionRouter<
         if (disabled) return;
 
         // Defer or skip events for which projection-replay is active.
-        let toApply = events;
-        if (this.replayMarkerChecker) {
-          const kept: EventType[] = [];
-          for (const event of events) {
-            const decision = await this.replayMarkerChecker.check(
-              projectionName,
-              event,
-            );
-            if (decision !== "skip") kept.push(event);
-          }
-          toApply = kept;
-        }
-        if (toApply.length === 0) return;
+        const replayed = await this.filterReplaySkipped({
+          projectionName,
+          events,
+        });
+        if (replayed.length === 0) return;
 
         // Apply (and dispatch reactors) in occurredAt order — the same order
         // executeBatch folds in — so reactor metadata and the final state are
         // consistent regardless of the order events were drained/dispatched in.
-        toApply = [...toApply].sort(
-          (a, b) =>
-            (((a as Record<string, unknown>).occurredAt as number) ?? 0) -
-            (((b as Record<string, unknown>).occurredAt as number) ?? 0),
-        );
+        const toApply = [...replayed].sort(compareByOccurredAt);
 
         const first = toApply[0]!;
         const key = fold.key ? fold.key(first) : undefined;
@@ -1871,30 +2008,18 @@ export class ProjectionRouter<
 
         const foldState = await withMetrics({
           fn: () => this.foldExecutor.executeBatch(fold, toApply, storeContext),
-          onComplete: (ms) => {
-            incrementEsFoldProjectionTotal({
-              pipelineName: this.pipelineName,
+          onComplete: (ms) =>
+            this.recordFoldProjectionMetrics({
               projectionName,
               status: "completed",
-            });
-            observeEsFoldProjectionDuration({
-              pipelineName: this.pipelineName,
-              projectionName,
               durationMs: ms,
-            });
-          },
-          onFail: (ms) => {
-            incrementEsFoldProjectionTotal({
-              pipelineName: this.pipelineName,
+            }),
+          onFail: (ms) =>
+            this.recordFoldProjectionMetrics({
               projectionName,
               status: "failed",
-            });
-            observeEsFoldProjectionDuration({
-              pipelineName: this.pipelineName,
-              projectionName,
               durationMs: ms,
-            });
-          },
+            }),
         });
 
         // Dispatch reactors for the whole batch, with the final fold state.
@@ -1916,6 +2041,27 @@ export class ProjectionRouter<
         });
       },
     );
+  }
+
+  private recordFoldProjectionMetrics({
+    projectionName,
+    status,
+    durationMs,
+  }: {
+    projectionName: string;
+    status: "completed" | "failed";
+    durationMs: number;
+  }): void {
+    incrementEsFoldProjectionTotal({
+      pipelineName: this.pipelineName,
+      projectionName,
+      status,
+    });
+    observeEsFoldProjectionDuration({
+      pipelineName: this.pipelineName,
+      projectionName,
+      durationMs,
+    });
   }
 
   /**
@@ -2065,16 +2211,7 @@ export class ProjectionRouter<
       if (reactor.options?.disabled) continue;
       if (this.isReactorExcluded(reactor)) continue;
 
-      const relevant: ReactorDelivery<EventType>[] = [];
-      for (const delivery of deliveries) {
-        if (
-          this.reactorShouldReact(reactor, delivery.event, delivery.foldState)
-        ) {
-          relevant.push(delivery);
-        } else {
-          incrementEsReactorTotal(this.pipelineName, reactor.name, "skipped");
-        }
-      }
+      const relevant = this.filterRelevantDeliveries({ reactor, deliveries });
       if (relevant.length === 0) continue;
 
       for (const { event, foldState } of this.collapseByJobId({
@@ -2099,6 +2236,26 @@ export class ProjectionRouter<
     }
   }
 
+  private filterRelevantDeliveries({
+    reactor,
+    deliveries,
+  }: {
+    reactor: ReactorDefinition<EventType>;
+    deliveries: ReactorDelivery<EventType>[];
+  }): ReactorDelivery<EventType>[] {
+    const relevant: ReactorDelivery<EventType>[] = [];
+    for (const delivery of deliveries) {
+      if (
+        this.reactorShouldReact(reactor, delivery.event, delivery.foldState)
+      ) {
+        relevant.push(delivery);
+      } else {
+        incrementEsReactorTotal(this.pipelineName, reactor.name, "skipped");
+      }
+    }
+    return relevant;
+  }
+
   /**
    * Sends one event to one reactor, collecting rather than throwing failures so
    * a single bad reactor can't skip the ones after it.
@@ -2117,111 +2274,103 @@ export class ProjectionRouter<
     errors: Error[];
   }): Promise<void> {
     const hasReactorQueues = this.queueManager.hasReactorQueues();
+    const queueProcessor = hasReactorQueues
+      ? this.queueManager.getReactorQueue(reactor.name)
+      : undefined;
 
-    if (hasReactorQueues) {
-      const queueProcessor = this.queueManager.getReactorQueue(reactor.name);
-      if (queueProcessor) {
-        try {
-          await queueProcessor.send({ event, foldState });
-        } catch (error) {
-          this.logger.error(
-            {
-              reactorName: reactor.name,
-              foldName,
-              eventId: event.id,
-              error: error instanceof Error ? error.message : String(error),
-            },
-            "Failed to dispatch event to reactor queue",
-          );
-          errors.push(toError(error));
-        }
-      } else {
-        // Queue expected but not found — fall back to inline execution
-        this.logger.warn(
-          {
-            reactorName: reactor.name,
-            foldName,
-            eventId: event.id,
-          },
-          "Reactor queue not found, falling back to inline execution",
-        );
-        try {
-          await withMetrics({
-            fn: () =>
-              reactor.handle(
-                event,
-                this.buildReactorContext({ event, foldState }),
-              ),
-            onComplete: (ms) => {
-              incrementEsReactorTotal(
-                this.pipelineName,
-                reactor.name,
-                "completed",
-              );
-              observeEsReactorDuration(this.pipelineName, reactor.name, ms);
-            },
-            onFail: (ms) => {
-              incrementEsReactorTotal(
-                this.pipelineName,
-                reactor.name,
-                "failed",
-              );
-              observeEsReactorDuration(this.pipelineName, reactor.name, ms);
-            },
-          });
-        } catch (error) {
-          this.logger.error(
-            {
-              reactorName: reactor.name,
-              foldName,
-              eventId: event.id,
-              eventType: event.type,
-              aggregateId: String(event.aggregateId),
-              tenantId: event.tenantId,
-              error: error instanceof Error ? error.message : String(error),
-            },
-            "Reactor failed during inline fallback execution",
-          );
-          errors.push(toError(error));
-        }
-      }
-    } else {
-      // Inline mode: call reactor directly
+    if (queueProcessor) {
       try {
-        await withMetrics({
-          fn: () =>
-            reactor.handle(
-              event,
-              this.buildReactorContext({ event, foldState }),
-            ),
-          onComplete: (ms) => {
-            incrementEsReactorTotal(
-              this.pipelineName,
-              reactor.name,
-              "completed",
-            );
-            observeEsReactorDuration(this.pipelineName, reactor.name, ms);
-          },
-          onFail: (ms) => {
-            incrementEsReactorTotal(this.pipelineName, reactor.name, "failed");
-            observeEsReactorDuration(this.pipelineName, reactor.name, ms);
-          },
-        });
+        await queueProcessor.send({ event, foldState });
       } catch (error) {
         this.logger.error(
           {
             reactorName: reactor.name,
             foldName,
             eventId: event.id,
-            eventType: event.type,
-            aggregateId: String(event.aggregateId),
-            tenantId: event.tenantId,
             error: error instanceof Error ? error.message : String(error),
           },
-          "Reactor failed during inline execution — fold state persisted in CH but reactor side-effect (e.g. ES sync) was lost",
+          "Failed to dispatch event to reactor queue",
         );
         errors.push(toError(error));
       }
+      return;
+    }
+
+    if (hasReactorQueues) {
+      // Queue expected but not found — fall back to inline execution
+      this.logger.warn(
+        {
+          reactorName: reactor.name,
+          foldName,
+          eventId: event.id,
+        },
+        "Reactor queue not found, falling back to inline execution",
+      );
+      await this.runReactorInline({
+        foldName,
+        reactor,
+        event,
+        foldState,
+        errors,
+        failureMessage: "Reactor failed during inline fallback execution",
+      });
+      return;
+    }
+
+    // Inline mode: call reactor directly
+    await this.runReactorInline({
+      foldName,
+      reactor,
+      event,
+      foldState,
+      errors,
+      failureMessage:
+        "Reactor failed during inline execution — fold state persisted in CH but reactor side-effect (e.g. ES sync) was lost",
+    });
+  }
+
+  private async runReactorInline({
+    foldName,
+    reactor,
+    event,
+    foldState,
+    errors,
+    failureMessage,
+  }: {
+    foldName: string;
+    reactor: ReactorDefinition<EventType>;
+    event: EventType;
+    foldState: unknown;
+    errors: Error[];
+    failureMessage: string;
+  }): Promise<void> {
+    try {
+      await withMetrics({
+        fn: () =>
+          reactor.handle(event, this.buildReactorContext({ event, foldState })),
+        onComplete: (ms) => {
+          incrementEsReactorTotal(this.pipelineName, reactor.name, "completed");
+          observeEsReactorDuration(this.pipelineName, reactor.name, ms);
+        },
+        onFail: (ms) => {
+          incrementEsReactorTotal(this.pipelineName, reactor.name, "failed");
+          observeEsReactorDuration(this.pipelineName, reactor.name, ms);
+        },
+      });
+    } catch (error) {
+      this.logger.error(
+        {
+          reactorName: reactor.name,
+          foldName,
+          eventId: event.id,
+          eventType: event.type,
+          aggregateId: String(event.aggregateId),
+          tenantId: event.tenantId,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        failureMessage,
+      );
+      errors.push(toError(error));
     }
   }
 

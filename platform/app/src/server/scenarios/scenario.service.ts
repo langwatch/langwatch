@@ -181,33 +181,46 @@ export class ScenarioService {
           "Batch archiving scenarios",
         );
 
-        const archived: string[] = [];
-        const failed: { id: string; error: string }[] = [];
-
         const results = await Promise.allSettled(
           params.ids.map((id) =>
             this.repository.archive({ id, projectId: params.projectId }),
           ),
         );
 
-        for (let i = 0; i < params.ids.length; i++) {
-          const id = params.ids[i]!;
-          const result = results[i]!;
-          if (result.status === "fulfilled" && result.value) {
-            archived.push(id);
-          } else {
-            const error =
-              result.status === "rejected"
-                ? String(result.reason)
-                : "Not found";
-            failed.push({ id, error });
-          }
-        }
+        const { archived, failed } = this.classifyBatchArchiveResults({
+          ids: params.ids,
+          results,
+        });
 
         span.setAttribute("result.archived", archived.length);
         span.setAttribute("result.failed", failed.length);
         return { archived, failed };
       },
     );
+  }
+
+  private classifyBatchArchiveResults({
+    ids,
+    results,
+  }: {
+    ids: string[];
+    results: PromiseSettledResult<Scenario | null>[];
+  }): { archived: string[]; failed: { id: string; error: string }[] } {
+    const archived: string[] = [];
+    const failed: { id: string; error: string }[] = [];
+
+    for (let i = 0; i < ids.length; i++) {
+      const id = ids[i]!;
+      const result = results[i]!;
+      if (result.status === "fulfilled" && result.value) {
+        archived.push(id);
+      } else {
+        const error =
+          result.status === "rejected" ? String(result.reason) : "Not found";
+        failed.push({ id, error });
+      }
+    }
+
+    return { archived, failed };
   }
 }

@@ -431,6 +431,570 @@ function resolveRetryCount({
   return legacy > 0 ? legacy : null;
 }
 
+/** Number of pipeline commands `fetchGroupPipelineResults` issues per group. */
+const SCAN_GROUP_PIPELINE_CMDS_PER_GROUP = 7;
+
+function buildScanQueueKeys(queueName: string): {
+  displayName: string;
+  prefix: string;
+  readyKey: string;
+  blockedKey: string;
+  dlqKey: string;
+  totalPendingKey: string;
+  parkedTenantsKey: string;
+} {
+  const displayName = stripHashTag(queueName);
+  const prefix = `${queueName}:gq:`;
+  return {
+    displayName,
+    prefix,
+    readyKey: `${prefix}ready`,
+    blockedKey: `${prefix}blocked`,
+    dlqKey: `${prefix}dlq`,
+    totalPendingKey: `${prefix}stats:total-pending`,
+    parkedTenantsKey: `${prefix}parked-tenants`,
+  };
+}
+
+/**
+ * Merge the top and bottom samples of the ready zset into a deduped id list.
+ *
+ * The zset is scored by dispatch eligibility, so its ends hold the two
+ * distinct stuck-group classes — see the call site in
+ * {@link QueueRedisRepository.fetchQueueOverview}. When the zset fits in the
+ * sampled range the two ends coincide and dedup makes this identical to a
+ * single-ended sample.
+ */
+function collectReadyGroupIds(params: {
+  topReadyMembers: string[];
+  bottomReadyMembers: string[];
+}): { groupIds: string[]; readyScores: Map<string, number> } {
+  const groupIds: string[] = [];
+  const readyScores = new Map<string, number>();
+  for (const members of [params.topReadyMembers, params.bottomReadyMembers]) {
+    for (let i = 0; i < members.length; i += 2) {
+      const groupId = members[i]!;
+      if (readyScores.has(groupId)) continue;
+      const score = parseFloat(members[i + 1]!);
+      groupIds.push(groupId);
+      readyScores.set(groupId, score);
+    }
+  }
+  return { groupIds, readyScores };
+}
+
+function extractFirstJobIds(params: {
+  pipelineResults: Awaited<ReturnType<ChainableCommander["exec"]>>;
+  allGroupIds: string[];
+}): Array<{ groupId: string; jobId: string | null }> {
+  const firstJobIds: Array<{ groupId: string; jobId: string | null }> = [];
+  for (let i = 0; i < params.allGroupIds.length; i++) {
+    const base = i * SCAN_GROUP_PIPELINE_CMDS_PER_GROUP;
+    const oldestArr =
+      (params.pipelineResults?.[base + 2]?.[1] as string[]) ?? [];
+    firstJobIds.push({
+      groupId: params.allGroupIds[i]!,
+      jobId: oldestArr[0] ?? null,
+    });
+  }
+  return firstJobIds;
+}
+
+type GroupErrorInfo = { message: string; stack: string; timestamp: string };
+
+/** The raw per-group fields decoded from `fetchGroupPipelineResults`'s pipeline slots. */
+function extractGroupPipelineFields(params: {
+  pipelineResults: Awaited<ReturnType<ChainableCommander["exec"]>>;
+  index: number;
+}): {
+  pendingJobs: number;
+  activeJobId: string | null;
+  isBlocked: boolean;
+  oldestJobMs: number | null;
+  newestJobMs: number | null;
+  activeKeyTtlSec: number | null;
+  attemptRaw: string | null;
+} {
+  const base = params.index * SCAN_GROUP_PIPELINE_CMDS_PER_GROUP;
+  const results = params.pipelineResults;
+  const oldestArr = (results?.[base + 2]?.[1] as string[]) ?? [];
+  const newestArr = (results?.[base + 3]?.[1] as string[]) ?? [];
+  const activeKeyTtlSecRaw = (results?.[base + 5]?.[1] as number) ?? -2;
+
+  return {
+    pendingJobs: (results?.[base]?.[1] as number) ?? 0,
+    activeJobId: (results?.[base + 1]?.[1] as string) ?? null,
+    isBlocked: (results?.[base + 4]?.[1] as number) === 1,
+    oldestJobMs: oldestArr.length >= 2 ? parseFloat(oldestArr[1]!) : null,
+    newestJobMs: newestArr.length >= 2 ? parseFloat(newestArr[1]!) : null,
+    activeKeyTtlSec: activeKeyTtlSecRaw > 0 ? activeKeyTtlSecRaw : null,
+    attemptRaw: (results?.[base + 6]?.[1] as string) ?? null,
+  };
+}
+
+/**
+ * Resolve the head job's routing metadata, threading `dataIdx` forward.
+ *
+ * `dataResults` only has an entry for groups whose first job id was truthy
+ * (see `fetchFirstJobData`), so the index into it advances independently of
+ * the group loop's own index — callers must feed the returned `nextDataIdx`
+ * back in on the following iteration.
+ */
+function resolveGroupJobMeta(params: {
+  jobId: string | null;
+  dataResults: Awaited<ReturnType<ChainableCommander["exec"]>>;
+  dataIdx: number;
+}): {
+  pipelineName: string | null;
+  jobType: string | null;
+  jobName: string | null;
+  nextDataIdx: number;
+} {
+  if (!params.jobId) {
+    return {
+      pipelineName: null,
+      jobType: null,
+      jobName: null,
+      nextDataIdx: params.dataIdx,
+    };
+  }
+
+  const rawData = (params.dataResults?.[params.dataIdx]?.[1] as string) ?? null;
+  const nextDataIdx = params.dataIdx + 1;
+  if (!rawData) {
+    return { pipelineName: null, jobType: null, jobName: null, nextDataIdx };
+  }
+
+  const meta = readJobRoutingMeta(rawData);
+  return {
+    pipelineName: meta.pipelineName,
+    jobType: meta.jobType,
+    jobName: meta.jobName,
+    nextDataIdx,
+  };
+}
+
+function buildGroupInfoList(params: {
+  allGroupIds: string[];
+  pipelineResults: Awaited<ReturnType<ChainableCommander["exec"]>>;
+  firstJobIds: Array<{ groupId: string; jobId: string | null }>;
+  dataResults: Awaited<ReturnType<ChainableCommander["exec"]>>;
+  groupErrors: Map<string, GroupErrorInfo>;
+  readyScores: Map<string, number>;
+}): { groups: GroupInfo[]; activeGroupCount: number } {
+  let dataIdx = 0;
+  const groups: GroupInfo[] = [];
+  let activeGroupCount = 0;
+
+  for (let i = 0; i < params.allGroupIds.length; i++) {
+    const groupId = params.allGroupIds[i]!;
+    const jobId = params.firstJobIds[i]!.jobId;
+    const fields = extractGroupPipelineFields({
+      pipelineResults: params.pipelineResults,
+      index: i,
+    });
+    const jobMeta = resolveGroupJobMeta({
+      jobId,
+      dataResults: params.dataResults,
+      dataIdx,
+    });
+    dataIdx = jobMeta.nextDataIdx;
+
+    const errorInfo = params.groupErrors.get(groupId);
+    if (fields.activeJobId !== null) activeGroupCount++;
+
+    groups.push({
+      groupId,
+      pendingJobs: fields.pendingJobs,
+      score: params.readyScores.get(groupId) ?? 0,
+      hasActiveJob: fields.activeJobId !== null,
+      activeJobId: fields.activeJobId,
+      isBlocked: fields.isBlocked,
+      oldestJobMs: fields.oldestJobMs,
+      newestJobMs: fields.newestJobMs,
+      isStaleBlock:
+        fields.isBlocked &&
+        fields.pendingJobs === 0 &&
+        fields.activeJobId === null,
+      pipelineName: jobMeta.pipelineName,
+      jobType: jobMeta.jobType,
+      jobName: jobMeta.jobName,
+      errorMessage: errorInfo?.message ?? null,
+      errorStack: errorInfo?.stack ?? null,
+      errorTimestamp: errorInfo?.timestamp
+        ? parseFloat(errorInfo.timestamp)
+        : null,
+      retryCount: resolveRetryCount({ attemptRaw: fields.attemptRaw, jobId }),
+      activeKeyTtlSec: fields.activeKeyTtlSec,
+      processingDurationMs: null,
+    });
+  }
+
+  return { groups, activeGroupCount };
+}
+
+function resolveTotalPendingJobs(params: {
+  totalPendingRaw: string | null;
+  groups: GroupInfo[];
+}): number {
+  if (params.totalPendingRaw !== null) {
+    return Math.max(0, parseInt(params.totalPendingRaw, 10) || 0);
+  }
+  let totalPendingJobs = 0;
+  for (const g of params.groups) {
+    totalPendingJobs += g.pendingJobs;
+  }
+  return totalPendingJobs;
+}
+
+// The key list + trailing (groupId, nowMs) argv that UNBLOCK_LUA expects,
+// in the exact order the script's KEYS/ARGV read them. Shared verbatim by
+// every bulk unblock path (unblockAll, canaryUnblock) so the key shape only
+// has to match the script in one place.
+function buildUnblockScriptArgs(params: {
+  prefix: string;
+  groupId: string;
+}): string[] {
+  const { prefix, groupId } = params;
+  return [
+    `${prefix}blocked`,
+    `${prefix}group:${groupId}:active`,
+    `${prefix}group:${groupId}:jobs`,
+    `${prefix}ready`,
+    `${prefix}signal`,
+    `${prefix}group:${groupId}:error`,
+    `${prefix}group:${groupId}:strikes`,
+    `${prefix}group:${groupId}:attempt`,
+    `${prefix}group:${groupId}:failstreak`,
+    groupId,
+    String(Date.now()),
+  ];
+}
+
+// The key list + trailing (groupId, ttl) argv MOVE_TO_DLQ_LUA expects, in the
+// script's KEYS/ARGV order.
+function buildMoveToDlqArgs(params: {
+  prefix: string;
+  groupId: string;
+}): string[] {
+  const { prefix, groupId } = params;
+  return [
+    `${prefix}group:${groupId}:jobs`,
+    `${prefix}group:${groupId}:data`,
+    `${prefix}group:${groupId}:active`,
+    `${prefix}ready`,
+    `${prefix}blocked`,
+    `${prefix}signal`,
+    `${prefix}group:${groupId}:error`,
+    `${prefix}dlq:${groupId}:jobs`,
+    `${prefix}dlq:${groupId}:data`,
+    `${prefix}dlq:${groupId}:error`,
+    `${prefix}dlq`,
+    `${prefix}group:${groupId}:strikes`,
+    `${prefix}group:${groupId}:attempt`,
+    `${prefix}group:${groupId}:failstreak`,
+    groupId,
+    String(DLQ_TTL_SECONDS),
+  ];
+}
+
+function collectMoveToDlqResults(
+  results: Awaited<ReturnType<typeof execWithNoScriptRecovery>>,
+): { movedCount: number; jobsMoved: number } {
+  let movedCount = 0;
+  let jobsMoved = 0;
+  if (results) {
+    for (const [err, result] of results) {
+      if (!err) {
+        const moved = Number(result);
+        if (moved >= 0) {
+          movedCount++;
+          jobsMoved += moved;
+        }
+      }
+    }
+  }
+  return { movedCount, jobsMoved };
+}
+
+// The key list + trailing (groupId, nowMs) argv REPLAY_FROM_DLQ_LUA expects,
+// in the script's KEYS/ARGV order. Shared verbatim by replayAllFromDlq and
+// canaryRedrive.
+function buildReplayFromDlqArgs(params: {
+  prefix: string;
+  groupId: string;
+}): string[] {
+  const { prefix, groupId } = params;
+  return [
+    `${prefix}dlq:${groupId}:jobs`,
+    `${prefix}dlq:${groupId}:data`,
+    `${prefix}dlq:${groupId}:error`,
+    `${prefix}group:${groupId}:jobs`,
+    `${prefix}group:${groupId}:data`,
+    `${prefix}ready`,
+    `${prefix}signal`,
+    `${prefix}dlq`,
+    groupId,
+    String(Date.now()),
+  ];
+}
+
+/**
+ * Build a groupId → pipelineName lookup from a batch of `hget ...:data` reads.
+ *
+ * `dataRequests[i]` and `jobDataResults[i]` are always the same length and
+ * index-aligned — every caller builds them together in one pass over the same
+ * member list — so this only ever reads a decoded value against the request
+ * that produced it.
+ */
+function buildPipelineNameMap(params: {
+  dataRequests: { groupId: string }[];
+  jobDataResults: Awaited<ReturnType<ChainableCommander["exec"]>>;
+}): Map<string, string> {
+  const pipelineNames = new Map<string, string>();
+  for (let i = 0; i < params.dataRequests.length; i++) {
+    const raw = params.jobDataResults?.[i]?.[1] as string | null;
+    if (raw) {
+      const pipelineName = readJobRoutingMeta(raw).pipelineName;
+      if (pipelineName) {
+        pipelineNames.set(params.dataRequests[i]!.groupId, pipelineName);
+      }
+    }
+  }
+  return pipelineNames;
+}
+
+function buildDlqGroupInfos(params: {
+  members: string[];
+  results: Awaited<ReturnType<ChainableCommander["exec"]>>;
+  groupPipelines: Map<string, string>;
+}): DlqGroupInfo[] {
+  const groups: DlqGroupInfo[] = [];
+  for (let i = 0; i < params.members.length; i++) {
+    const groupId = params.members[i]!;
+    const errorHash = params.results?.[i * 3]?.[1] as Record<
+      string,
+      string
+    > | null;
+    const jobCount = (params.results?.[i * 3 + 1]?.[1] as number) ?? 0;
+
+    groups.push({
+      groupId,
+      error: errorHash?.message ?? null,
+      errorStack: errorHash?.stack ?? null,
+      pipelineName: params.groupPipelines.get(groupId) ?? null,
+      jobCount,
+      movedAt: errorHash?.timestamp ? parseFloat(errorHash.timestamp) : null,
+    });
+  }
+  return groups;
+}
+
+/**
+ * Tally one blocked-group page into the drain preview's running totals,
+ * honoring the optional error/pipeline filters. Returns the count of groups
+ * this page contributed to `totalAffected`, so the caller can accumulate it.
+ */
+function passesDrainPreviewFilters(params: {
+  msg: string;
+  pName: string;
+  pipelineFilter?: string;
+  errorFilter?: string;
+}): boolean {
+  if (
+    params.errorFilter &&
+    !params.msg.toLowerCase().includes(params.errorFilter.toLowerCase())
+  ) {
+    return false;
+  }
+  if (params.pipelineFilter && params.pName !== params.pipelineFilter) {
+    return false;
+  }
+  return true;
+}
+
+function accumulateDrainPreview(params: {
+  members: string[];
+  results: Awaited<ReturnType<ChainableCommander["exec"]>>;
+  groupPipelines: Map<string, string>;
+  pipelineFilter?: string;
+  errorFilter?: string;
+  pipelineCounts: Map<string, number>;
+  errorCounts: Map<string, number>;
+}): number {
+  let affected = 0;
+  for (let i = 0; i < params.members.length; i++) {
+    const groupId = params.members[i]!;
+    const errorHash = params.results?.[i * 2]?.[1] as Record<
+      string,
+      string
+    > | null;
+    const msg = errorHash?.message ?? "Unknown error";
+    const pName = params.groupPipelines.get(groupId) ?? "unknown";
+
+    if (
+      !passesDrainPreviewFilters({
+        msg,
+        pName,
+        pipelineFilter: params.pipelineFilter,
+        errorFilter: params.errorFilter,
+      })
+    ) {
+      continue;
+    }
+
+    affected++;
+    params.pipelineCounts.set(
+      pName,
+      (params.pipelineCounts.get(pName) ?? 0) + 1,
+    );
+
+    const normalizedMsg = normalizeErrorMessage(msg);
+    params.errorCounts.set(
+      normalizedMsg,
+      (params.errorCounts.get(normalizedMsg) ?? 0) + 1,
+    );
+  }
+  return affected;
+}
+
+// Insert-or-update a single error cluster's aggregate, capping the sample
+// group ids at 5 the same way whether the cluster is new or already seen.
+function upsertErrorCluster(params: {
+  clusterMap: Map<string, ErrorCluster>;
+  clusterKey: string;
+  groupId: string;
+  normalizedMessage: string;
+  message: string;
+  stack: string | null;
+  pipelineName: string | null;
+  queueName: string;
+}): void {
+  const existing = params.clusterMap.get(params.clusterKey);
+  if (existing) {
+    existing.count++;
+    if (existing.sampleGroupIds.length < 5) {
+      existing.sampleGroupIds.push(params.groupId);
+    }
+    return;
+  }
+  params.clusterMap.set(params.clusterKey, {
+    normalizedMessage: params.normalizedMessage,
+    sampleMessage: params.message,
+    sampleStack: params.stack,
+    count: 1,
+    pipelineName: params.pipelineName,
+    queueName: params.queueName,
+    sampleGroupIds: [params.groupId],
+  });
+}
+
+function resolveMatchingPipelineGroups(params: {
+  dataRequests: { groupId: string }[];
+  dataResults: Awaited<ReturnType<ChainableCommander["exec"]>>;
+  pipelineFilter: string;
+}): Set<string> {
+  const matchingGroups = new Set<string>();
+  for (let i = 0; i < params.dataRequests.length; i++) {
+    const raw = params.dataResults?.[i]?.[1] as string | null;
+    if (raw) {
+      if (readJobRoutingMeta(raw).pipelineName === params.pipelineFilter) {
+        matchingGroups.add(params.dataRequests[i]!.groupId);
+      }
+    }
+  }
+  return matchingGroups;
+}
+
+function passesGroupErrorFilter(params: {
+  index: number;
+  filterResults: Awaited<ReturnType<ChainableCommander["exec"]>>;
+  errorFilter?: string;
+}): boolean {
+  if (!params.errorFilter) return true;
+  const errorHash = params.filterResults?.[params.index * 2]?.[1] as Record<
+    string,
+    string
+  > | null;
+  const msg = errorHash?.message ?? "";
+  return msg.toLowerCase().includes(params.errorFilter.toLowerCase());
+}
+
+function passesGroupPipelineFilter(params: {
+  groupId: string;
+  jobDataMap: Map<string, number>;
+  jobDataResults: Awaited<ReturnType<ChainableCommander["exec"]>>;
+  pipelineFilter?: string;
+}): boolean {
+  if (!params.pipelineFilter) return true;
+  const fetchIdx = params.jobDataMap.get(params.groupId);
+  if (fetchIdx === undefined) return false;
+  const raw = params.jobDataResults?.[fetchIdx]?.[1] as string | null;
+  if (!raw) return false;
+  return readJobRoutingMeta(raw).pipelineName === params.pipelineFilter;
+}
+
+// Shared by filterBlockedGroups and filterDlqGroups' `.filter()` predicates —
+// both fetch the same shape of data (error hash + first job id per member,
+// then job data keyed by a jobDataMap index), differing only in whether the
+// keys live under `group:` or `dlq:`, which is already baked into the maps
+// passed in by the time this runs.
+function matchesGroupFilters(params: {
+  groupId: string;
+  index: number;
+  filterResults: Awaited<ReturnType<ChainableCommander["exec"]>>;
+  jobDataMap: Map<string, number>;
+  jobDataResults: Awaited<ReturnType<ChainableCommander["exec"]>>;
+  pipelineFilter?: string;
+  errorFilter?: string;
+}): boolean {
+  return (
+    passesGroupErrorFilter({
+      index: params.index,
+      filterResults: params.filterResults,
+      errorFilter: params.errorFilter,
+    }) &&
+    passesGroupPipelineFilter({
+      groupId: params.groupId,
+      jobDataMap: params.jobDataMap,
+      jobDataResults: params.jobDataResults,
+      pipelineFilter: params.pipelineFilter,
+    })
+  );
+}
+
+function buildLegacyPendingLegs(params: {
+  prefix: string;
+  parkedTenants: Set<string>;
+}): { key: string; type: "zset" | "set" }[] {
+  return [
+    { key: `${params.prefix}ready`, type: "zset" },
+    { key: `${params.prefix}blocked`, type: "set" },
+    ...Array.from(params.parkedTenants, (tenantId) => ({
+      key: `${params.prefix}parked:${tenantId}`,
+      type: "zset" as const,
+    })),
+  ];
+}
+
+// `members` alternates [groupId, score, groupId, score, ...] — collect just
+// the groupIds that match the tenant prefix (and the optional
+// groupIdContains fragment, if set).
+function filterTenantGroupIds(params: {
+  members: string[];
+  tenantPrefix: string;
+  contains: string | null;
+}): string[] {
+  const matched: string[] = [];
+  for (let i = 0; i < params.members.length; i += 2) {
+    const groupId = params.members[i]!;
+    if (!groupId.startsWith(params.tenantPrefix)) continue;
+    if (params.contains && !groupId.includes(params.contains)) continue;
+    matched.push(groupId);
+  }
+  return matched;
+}
+
 // ── Repository Implementation ────────────────────────────────────────
 
 export class QueueRedisRepository implements QueueRepository {
@@ -501,23 +1065,91 @@ export class QueueRedisRepository implements QueueRepository {
     limit: number,
     offset = 0,
   ): Promise<QueueInfo> {
-    const displayName = stripHashTag(queueName);
-    const prefix = `${queueName}:gq:`;
+    const keys = buildScanQueueKeys(queueName);
+    const overview = await this.fetchQueueOverview({ keys, limit, offset });
+    const parkedGroupCount = await this.sumParkedGroupCount({
+      prefix: keys.prefix,
+      parkedTenants: overview.parkedTenants,
+    });
 
-    const readyKey = `${prefix}ready`;
-    const blockedKey = `${prefix}blocked`;
-    const dlqKey = `${prefix}dlq`;
-    const totalPendingKey = `${prefix}stats:total-pending`;
-    const parkedTenantsKey = `${prefix}parked-tenants`;
+    const { groupIds, readyScores } = collectReadyGroupIds({
+      topReadyMembers: overview.topReadyMembers,
+      bottomReadyMembers: overview.bottomReadyMembers,
+    });
+    const blockedGroupIds = await this.fetchBlockedGroupIds({
+      blockedKey: keys.blockedKey,
+      blockedCount: overview.blockedCount,
+      limit,
+      readyGroupIdSet: new Set(groupIds),
+    });
+    const allGroupIds = [...groupIds, ...blockedGroupIds];
 
-    // Sample BOTH ends of the ready zset. The zset is scored by dispatch
-    // eligibility, so its ends hold the two distinct stuck-group classes: the
-    // high end is the most-deferred groups (in-flight, retry backoff — where a
-    // failing group hides between attempts), the low end is the most-eligible
-    // ones (an old due head the dispatcher is starving). A single-ended
-    // ZREVRANGE sampled only the deferred end, so an aged eligible backlog past
-    // `limit` never appeared in the dashboard at all. When the zset fits in
-    // `limit` the two ranges coincide and dedup makes this identical to before.
+    const pipelineResults = await this.fetchGroupPipelineResults({
+      prefix: keys.prefix,
+      blockedKey: keys.blockedKey,
+      allGroupIds,
+    });
+    const firstJobIds = extractFirstJobIds({ pipelineResults, allGroupIds });
+    const dataResults = await this.fetchFirstJobData({
+      prefix: keys.prefix,
+      firstJobIds,
+    });
+    const groupErrors = await this.fetchGroupErrors({
+      prefix: keys.prefix,
+      allGroupIds,
+    });
+
+    const { groups, activeGroupCount } = buildGroupInfoList({
+      allGroupIds,
+      pipelineResults,
+      firstJobIds,
+      dataResults,
+      groupErrors,
+      readyScores,
+    });
+
+    groups.sort((a, b) => b.pendingJobs - a.pendingJobs);
+
+    const totalPendingJobs = resolveTotalPendingJobs({
+      totalPendingRaw: overview.totalPendingRaw,
+      groups,
+    });
+
+    return {
+      name: queueName,
+      displayName: keys.displayName,
+      pendingGroupCount: overview.readyCount,
+      blockedGroupCount: overview.blockedCount,
+      activeGroupCount,
+      totalPendingJobs,
+      dlqCount: overview.dlqCount,
+      parkedGroupCount,
+      groups,
+    };
+  }
+
+  // Sample BOTH ends of the ready zset. The zset is scored by dispatch
+  // eligibility, so its ends hold the two distinct stuck-group classes: the
+  // high end is the most-deferred groups (in-flight, retry backoff — where a
+  // failing group hides between attempts), the low end is the most-eligible
+  // ones (an old due head the dispatcher is starving). A single-ended
+  // ZREVRANGE sampled only the deferred end, so an aged eligible backlog past
+  // `limit` never appeared in the dashboard at all. When the zset fits in
+  // `limit` the two ranges coincide and dedup makes this identical to before.
+  private async fetchQueueOverview(params: {
+    keys: ReturnType<typeof buildScanQueueKeys>;
+    limit: number;
+    offset: number;
+  }): Promise<{
+    readyCount: number;
+    blockedCount: number;
+    dlqCount: number;
+    topReadyMembers: string[];
+    bottomReadyMembers: string[];
+    totalPendingRaw: string | null;
+    parkedTenants: string[];
+  }> {
+    const { keys, limit, offset } = params;
     const [
       readyCount,
       blockedCount,
@@ -527,205 +1159,133 @@ export class QueueRedisRepository implements QueueRepository {
       totalPendingRaw,
       parkedTenants,
     ] = await Promise.all([
-      this.redis.zcard(readyKey),
-      this.redis.scard(blockedKey),
-      this.redis.scard(dlqKey),
-      this.redis.zrevrange(readyKey, offset, offset + limit - 1, "WITHSCORES"),
-      this.redis.zrange(readyKey, offset, offset + limit - 1, "WITHSCORES"),
-      this.redis.get(totalPendingKey),
-      this.redis.smembers(parkedTenantsKey),
+      this.redis.zcard(keys.readyKey),
+      this.redis.scard(keys.blockedKey),
+      this.redis.scard(keys.dlqKey),
+      this.redis.zrevrange(
+        keys.readyKey,
+        offset,
+        offset + limit - 1,
+        "WITHSCORES",
+      ),
+      this.redis.zrange(
+        keys.readyKey,
+        offset,
+        offset + limit - 1,
+        "WITHSCORES",
+      ),
+      this.redis.get(keys.totalPendingKey),
+      this.redis.smembers(keys.parkedTenantsKey),
     ]);
+    return {
+      readyCount,
+      blockedCount,
+      dlqCount,
+      topReadyMembers,
+      bottomReadyMembers,
+      totalPendingRaw,
+      parkedTenants,
+    };
+  }
 
-    // Sum parked depth across the tenants currently over cap. The registry set
-    // is tiny (one entry per over-cap tenant), so this is a single SMEMBERS plus
-    // one ZCARD per parked tenant — effectively free in the cap=0 steady state
-    // where the registry is empty.
+  // Sum parked depth across the tenants currently over cap. The registry set
+  // is tiny (one entry per over-cap tenant), so this is a single SMEMBERS plus
+  // one ZCARD per parked tenant — effectively free in the cap=0 steady state
+  // where the registry is empty.
+  private async sumParkedGroupCount(params: {
+    prefix: string;
+    parkedTenants: string[];
+  }): Promise<number> {
     let parkedGroupCount = 0;
-    if (parkedTenants.length > 0) {
+    if (params.parkedTenants.length > 0) {
       const parkedPipeline = this.redis.pipeline();
-      for (const tenantId of parkedTenants) {
-        parkedPipeline.zcard(`${prefix}parked:${tenantId}`);
+      for (const tenantId of params.parkedTenants) {
+        parkedPipeline.zcard(`${params.prefix}parked:${tenantId}`);
       }
       const parkedResults = await parkedPipeline.exec();
       for (const [err, val] of parkedResults ?? []) {
         if (!err) parkedGroupCount += Number(val) || 0;
       }
     }
+    return parkedGroupCount;
+  }
 
-    const groupIds: string[] = [];
-    const readyScores = new Map<string, number>();
-    for (const members of [topReadyMembers, bottomReadyMembers]) {
-      for (let i = 0; i < members.length; i += 2) {
-        const groupId = members[i]!;
-        if (readyScores.has(groupId)) continue;
-        const score = parseFloat(members[i + 1]!);
-        groupIds.push(groupId);
-        readyScores.set(groupId, score);
-      }
-    }
-
+  private async fetchBlockedGroupIds(params: {
+    blockedKey: string;
+    blockedCount: number;
+    limit: number;
+    readyGroupIdSet: Set<string>;
+  }): Promise<string[]> {
     const blockedMembers =
-      blockedCount > 0
+      params.blockedCount > 0
         ? await this.redis.srandmember(
-            blockedKey,
-            Math.min(limit, blockedCount),
+            params.blockedKey,
+            Math.min(params.limit, params.blockedCount),
           )
         : [];
-    const readyGroupIdSet = new Set(groupIds);
-    const blockedGroupIds = (blockedMembers ?? []).filter(
-      (id): id is string => id !== null && !readyGroupIdSet.has(id),
+    return (blockedMembers ?? []).filter(
+      (id): id is string => id !== null && !params.readyGroupIdSet.has(id),
     );
+  }
 
-    const allGroupIds = [...groupIds, ...blockedGroupIds];
-
-    const CMDS_PER_GROUP = 7;
+  private async fetchGroupPipelineResults(params: {
+    prefix: string;
+    blockedKey: string;
+    allGroupIds: string[];
+  }) {
     const pipeline = this.redis.pipeline();
-    for (const groupId of allGroupIds) {
-      const jobsKey = `${prefix}group:${groupId}:jobs`;
-      const activeKey = `${prefix}group:${groupId}:active`;
+    for (const groupId of params.allGroupIds) {
+      const jobsKey = `${params.prefix}group:${groupId}:jobs`;
+      const activeKey = `${params.prefix}group:${groupId}:active`;
       pipeline.zcard(jobsKey);
       pipeline.get(activeKey);
       pipeline.zrange(jobsKey, 0, 0, "WITHSCORES");
       pipeline.zrange(jobsKey, -1, -1, "WITHSCORES");
-      pipeline.sismember(blockedKey, groupId);
-      pipeline.ttl(`${prefix}group:${groupId}:active`);
-      pipeline.get(`${prefix}group:${groupId}:attempt`);
+      pipeline.sismember(params.blockedKey, groupId);
+      pipeline.ttl(`${params.prefix}group:${groupId}:active`);
+      pipeline.get(`${params.prefix}group:${groupId}:attempt`);
     }
+    return pipeline.exec();
+  }
 
-    const pipelineResults = await pipeline.exec();
-
-    const firstJobIds: Array<{ groupId: string; jobId: string | null }> = [];
-    for (let i = 0; i < allGroupIds.length; i++) {
-      const base = i * CMDS_PER_GROUP;
-      const oldestArr = (pipelineResults?.[base + 2]?.[1] as string[]) ?? [];
-      firstJobIds.push({
-        groupId: allGroupIds[i]!,
-        jobId: oldestArr[0] ?? null,
-      });
-    }
-
+  private async fetchFirstJobData(params: {
+    prefix: string;
+    firstJobIds: Array<{ groupId: string; jobId: string | null }>;
+  }) {
     const dataPipeline = this.redis.pipeline();
     let dataFetchCount = 0;
-    for (const { groupId, jobId } of firstJobIds) {
+    for (const { groupId, jobId } of params.firstJobIds) {
       if (jobId) {
-        dataPipeline.hget(`${prefix}group:${groupId}:data`, jobId);
+        dataPipeline.hget(`${params.prefix}group:${groupId}:data`, jobId);
         dataFetchCount++;
       }
     }
-    const dataResults = dataFetchCount > 0 ? await dataPipeline.exec() : [];
+    return dataFetchCount > 0 ? await dataPipeline.exec() : [];
+  }
 
+  private async fetchGroupErrors(params: {
+    prefix: string;
+    allGroupIds: string[];
+  }): Promise<Map<string, GroupErrorInfo>> {
     const errorPipeline = this.redis.pipeline();
-    for (const groupId of allGroupIds) {
-      errorPipeline.hgetall(`${prefix}group:${groupId}:error`);
+    for (const groupId of params.allGroupIds) {
+      errorPipeline.hgetall(`${params.prefix}group:${groupId}:error`);
     }
     const errorResults =
-      allGroupIds.length > 0 ? await errorPipeline.exec() : [];
+      params.allGroupIds.length > 0 ? await errorPipeline.exec() : [];
 
-    const groupErrors = new Map<
-      string,
-      { message: string; stack: string; timestamp: string }
-    >();
-    for (let i = 0; i < allGroupIds.length; i++) {
+    const groupErrors = new Map<string, GroupErrorInfo>();
+    for (let i = 0; i < params.allGroupIds.length; i++) {
       const errorHash = errorResults?.[i]?.[1] as Record<string, string> | null;
       if (errorHash?.message) {
-        groupErrors.set(allGroupIds[i]!, {
+        groupErrors.set(params.allGroupIds[i]!, {
           message: errorHash.message,
           stack: errorHash.stack ?? "",
           timestamp: errorHash.timestamp ?? "",
         });
       }
     }
-
-    let dataIdx = 0;
-    const groups: GroupInfo[] = [];
-    let activeGroupCount = 0;
-
-    for (let i = 0; i < allGroupIds.length; i++) {
-      const groupId = allGroupIds[i]!;
-      const base = i * CMDS_PER_GROUP;
-
-      const pendingJobs = (pipelineResults?.[base]?.[1] as number) ?? 0;
-      const activeJobId = (pipelineResults?.[base + 1]?.[1] as string) ?? null;
-      const oldestArr = (pipelineResults?.[base + 2]?.[1] as string[]) ?? [];
-      const newestArr = (pipelineResults?.[base + 3]?.[1] as string[]) ?? [];
-      const isBlocked = (pipelineResults?.[base + 4]?.[1] as number) === 1;
-      const activeKeyTtlSec =
-        (pipelineResults?.[base + 5]?.[1] as number) ?? -2;
-      const attemptRaw = (pipelineResults?.[base + 6]?.[1] as string) ?? null;
-
-      const oldestJobMs =
-        oldestArr.length >= 2 ? parseFloat(oldestArr[1]!) : null;
-      const newestJobMs =
-        newestArr.length >= 2 ? parseFloat(newestArr[1]!) : null;
-
-      let pipelineName: string | null = null;
-      let jobType: string | null = null;
-      let jobName: string | null = null;
-
-      if (firstJobIds[i]!.jobId) {
-        const rawData = (dataResults?.[dataIdx]?.[1] as string) ?? null;
-        dataIdx++;
-        if (rawData) {
-          const meta = readJobRoutingMeta(rawData);
-          pipelineName = meta.pipelineName;
-          jobType = meta.jobType;
-          jobName = meta.jobName;
-        }
-      }
-
-      const errorInfo = groupErrors.get(groupId);
-      if (activeJobId !== null) activeGroupCount++;
-
-      groups.push({
-        groupId,
-        pendingJobs,
-        score: readyScores.get(groupId) ?? 0,
-        hasActiveJob: activeJobId !== null,
-        activeJobId,
-        isBlocked,
-        oldestJobMs,
-        newestJobMs,
-        isStaleBlock: isBlocked && pendingJobs === 0 && activeJobId === null,
-        pipelineName,
-        jobType,
-        jobName,
-        errorMessage: errorInfo?.message ?? null,
-        errorStack: errorInfo?.stack ?? null,
-        errorTimestamp: errorInfo?.timestamp
-          ? parseFloat(errorInfo.timestamp)
-          : null,
-        retryCount: resolveRetryCount({
-          attemptRaw,
-          jobId: firstJobIds[i]!.jobId,
-        }),
-        activeKeyTtlSec: activeKeyTtlSec > 0 ? activeKeyTtlSec : null,
-        processingDurationMs: null,
-      });
-    }
-
-    groups.sort((a, b) => b.pendingJobs - a.pendingJobs);
-
-    let totalPendingJobs: number;
-    if (totalPendingRaw !== null) {
-      totalPendingJobs = Math.max(0, parseInt(totalPendingRaw, 10) || 0);
-    } else {
-      totalPendingJobs = 0;
-      for (const g of groups) {
-        totalPendingJobs += g.pendingJobs;
-      }
-    }
-
-    return {
-      name: queueName,
-      displayName,
-      pendingGroupCount: readyCount,
-      blockedGroupCount: blockedCount,
-      activeGroupCount,
-      totalPendingJobs,
-      dlqCount,
-      parkedGroupCount,
-      groups,
-    };
+    return groupErrors;
   }
 
   // ── Job Browsing ────────────────────────────────────────────────
@@ -834,70 +1394,22 @@ export class QueueRedisRepository implements QueueRepository {
 
         if (members.length === 0) continue;
 
-        const pipeline = this.redis.pipeline();
-        for (const groupId of members) {
-          pipeline.hgetall(`${prefix}group:${groupId}:error`);
-          pipeline.zrange(`${prefix}group:${groupId}:jobs`, 0, 0);
-        }
-        const results = await pipeline.exec();
-
-        const jobDataPipeline = this.redis.pipeline();
-        const jobDataRequests: { groupId: string; jobId: string }[] = [];
-        for (let i = 0; i < members.length; i++) {
-          const jobArr = (results?.[i * 2 + 1]?.[1] as string[]) ?? [];
-          if (jobArr[0]) {
-            jobDataPipeline.hget(
-              `${prefix}group:${members[i]!}:data`,
-              jobArr[0],
-            );
-            jobDataRequests.push({ groupId: members[i]!, jobId: jobArr[0] });
-          }
-        }
-        const jobDataResults =
-          jobDataRequests.length > 0 ? await jobDataPipeline.exec() : [];
-
-        const pipelineNames = new Map<string, string>();
-        for (let i = 0; i < jobDataRequests.length; i++) {
-          const raw = jobDataResults?.[i]?.[1] as string | null;
-          if (raw) {
-            const pipelineName = readJobRoutingMeta(raw).pipelineName;
-            if (pipelineName) {
-              pipelineNames.set(jobDataRequests[i]!.groupId, pipelineName);
-            }
-          }
-        }
-
-        for (let i = 0; i < members.length; i++) {
-          const groupId = members[i]!;
-          const errorHash = results?.[i * 2]?.[1] as Record<
-            string,
-            string
-          > | null;
-          const message = errorHash?.message ?? "Unknown error";
-          const stack = errorHash?.stack ?? null;
-          const pipelineName = pipelineNames.get(groupId) ?? null;
-
-          const normalized = normalizeErrorMessage(message);
-          const clusterKey = `${pipelineName ?? ""}::${normalized}`;
-
-          const existing = clusterMap.get(clusterKey);
-          if (existing) {
-            existing.count++;
-            if (existing.sampleGroupIds.length < 5) {
-              existing.sampleGroupIds.push(groupId);
-            }
-          } else {
-            clusterMap.set(clusterKey, {
-              normalizedMessage: normalized,
-              sampleMessage: message,
-              sampleStack: stack,
-              count: 1,
-              pipelineName,
-              queueName,
-              sampleGroupIds: [groupId],
-            });
-          }
-        }
+        const results = await this.fetchBlockedGroupPipelineData({
+          prefix,
+          members,
+        });
+        const pipelineNames = await this.fetchBlockedGroupPipelineNames({
+          prefix,
+          members,
+          results,
+        });
+        this.accumulateBlockedClusters({
+          queueName,
+          members,
+          results,
+          pipelineNames,
+          clusterMap,
+        });
       } while (cursor !== "0");
     }
 
@@ -906,6 +1418,85 @@ export class QueueRedisRepository implements QueueRepository {
     );
 
     return { totalBlocked, clusters };
+  }
+
+  private async fetchBlockedGroupPipelineData(params: {
+    prefix: string;
+    members: string[];
+  }) {
+    const pipeline = this.redis.pipeline();
+    for (const groupId of params.members) {
+      pipeline.hgetall(`${params.prefix}group:${groupId}:error`);
+      pipeline.zrange(`${params.prefix}group:${groupId}:jobs`, 0, 0);
+    }
+    return pipeline.exec();
+  }
+
+  private queueBlockedGroupDataFetches(params: {
+    prefix: string;
+    members: string[];
+    results: Awaited<ReturnType<ChainableCommander["exec"]>>;
+  }): {
+    dataPipeline: ChainableCommander;
+    dataRequests: { groupId: string; jobId: string }[];
+  } {
+    const dataPipeline = this.redis.pipeline();
+    const dataRequests: { groupId: string; jobId: string }[] = [];
+    for (let i = 0; i < params.members.length; i++) {
+      const jobArr = (params.results?.[i * 2 + 1]?.[1] as string[]) ?? [];
+      if (jobArr[0]) {
+        dataPipeline.hget(
+          `${params.prefix}group:${params.members[i]!}:data`,
+          jobArr[0],
+        );
+        dataRequests.push({ groupId: params.members[i]!, jobId: jobArr[0] });
+      }
+    }
+    return { dataPipeline, dataRequests };
+  }
+
+  private async fetchBlockedGroupPipelineNames(params: {
+    prefix: string;
+    members: string[];
+    results: Awaited<ReturnType<ChainableCommander["exec"]>>;
+  }): Promise<Map<string, string>> {
+    const { dataPipeline, dataRequests } =
+      this.queueBlockedGroupDataFetches(params);
+    const jobDataResults =
+      dataRequests.length > 0 ? await dataPipeline.exec() : [];
+    return buildPipelineNameMap({ dataRequests, jobDataResults });
+  }
+
+  private accumulateBlockedClusters(params: {
+    queueName: string;
+    members: string[];
+    results: Awaited<ReturnType<ChainableCommander["exec"]>>;
+    pipelineNames: Map<string, string>;
+    clusterMap: Map<string, ErrorCluster>;
+  }): void {
+    for (let i = 0; i < params.members.length; i++) {
+      const groupId = params.members[i]!;
+      const errorHash = params.results?.[i * 2]?.[1] as Record<
+        string,
+        string
+      > | null;
+      const message = errorHash?.message ?? "Unknown error";
+      const stack = errorHash?.stack ?? null;
+      const pipelineName = params.pipelineNames.get(groupId) ?? null;
+      const normalized = normalizeErrorMessage(message);
+      const clusterKey = `${pipelineName ?? ""}::${normalized}`;
+
+      upsertErrorCluster({
+        clusterMap: params.clusterMap,
+        clusterKey,
+        groupId,
+        normalizedMessage: normalized,
+        message,
+        stack,
+        pipelineName,
+        queueName: params.queueName,
+      });
+    }
   }
 
   // ── Actions ─────────────────────────────────────────────────────
@@ -952,34 +1543,44 @@ export class QueueRedisRepository implements QueueRepository {
 
       if (members.length === 0) continue;
 
-      const pipeline = this.redis.pipeline();
-      const argsByIndex = members.map((groupId) => [
-        `${prefix}blocked`,
-        `${prefix}group:${groupId}:active`,
-        `${prefix}group:${groupId}:jobs`,
-        `${prefix}ready`,
-        `${prefix}signal`,
-        `${prefix}group:${groupId}:error`,
-        `${prefix}group:${groupId}:strikes`,
-        `${prefix}group:${groupId}:attempt`,
-        `${prefix}group:${groupId}:failstreak`,
-        groupId,
-        String(Date.now()),
-      ]);
-      for (const args of argsByIndex) {
-        unblockScript.queue(pipeline, 9, ...args);
-      }
-      const results = await execWithNoScriptRecovery(pipeline, (index) =>
-        unblockScript.run(this.redis, 9, ...argsByIndex[index]!),
-      );
-      if (results) {
-        for (const [err, result] of results) {
-          if (!err && result === 1) unblockedCount++;
-        }
-      }
+      unblockedCount += await this.unblockGroupsPage({
+        prefix,
+        groupIds: members,
+      });
     } while (cursor !== "0");
 
     return { unblockedCount };
+  }
+
+  private async runUnblockPipeline(params: {
+    prefix: string;
+    groupIds: string[];
+  }) {
+    const { prefix, groupIds } = params;
+    const pipeline = this.redis.pipeline();
+    const argsByIndex = groupIds.map((groupId) =>
+      buildUnblockScriptArgs({ prefix, groupId }),
+    );
+    for (const args of argsByIndex) {
+      unblockScript.queue(pipeline, 9, ...args);
+    }
+    return execWithNoScriptRecovery(pipeline, (index) =>
+      unblockScript.run(this.redis, 9, ...argsByIndex[index]!),
+    );
+  }
+
+  private async unblockGroupsPage(params: {
+    prefix: string;
+    groupIds: string[];
+  }): Promise<number> {
+    const results = await this.runUnblockPipeline(params);
+    let unblockedCount = 0;
+    if (results) {
+      for (const [err, result] of results) {
+        if (!err && result === 1) unblockedCount++;
+      }
+    }
+    return unblockedCount;
   }
 
   async drainGroup(params: {
@@ -1123,50 +1724,74 @@ export class QueueRedisRepository implements QueueRepository {
       );
       cursor = next;
 
-      // members alternates [groupId, score, groupId, score, ...] — collect
-      // just the groupIds that match our tenant prefix (and the optional
-      // groupIdContains fragment, if set).
-      const matched: string[] = [];
-      for (let i = 0; i < members.length; i += 2) {
-        const groupId = members[i]!;
-        if (!groupId.startsWith(tenantPrefix)) continue;
-        if (contains && !groupId.includes(contains)) continue;
-        matched.push(groupId);
-      }
+      const matched = filterTenantGroupIds({ members, tenantPrefix, contains });
       if (matched.length === 0) continue;
 
-      // Pipeline all the drains for this page into a single network round-trip.
-      // Each call is independent; ioredis batches them and returns results in
-      // the same order.
-      const pipeline = this.redis.pipeline();
-      const argsByIndex = matched.map((groupId) => [
-        `${prefix}group:${groupId}:jobs`,
-        `${prefix}group:${groupId}:data`,
-        `${prefix}group:${groupId}:active`,
+      const page = await this.drainMatchedGroupsPage({
+        prefix,
         readyKey,
-        `${prefix}blocked`,
-        `${prefix}signal`,
-        `${prefix}group:${groupId}:error`,
         totalPendingKey,
-        `${prefix}group:${groupId}:strikes`,
-        `${prefix}group:${groupId}:attempt`,
-        `${prefix}group:${groupId}:failstreak`,
-        groupId,
-      ]);
-      for (const args of argsByIndex) {
-        drainGroupScript.queue(pipeline, 11, ...args);
-      }
-      const results = await execWithNoScriptRecovery(pipeline, (index) =>
-        drainGroupScript.run(this.redis, 11, ...argsByIndex[index]!),
-      );
-      if (!results) continue;
+        matched,
+      });
+      groupsDrained += page.groupsDrained;
+      jobsDrained += page.jobsDrained;
+    } while (cursor !== "0");
+
+    return { groupsDrained, jobsDrained };
+  }
+
+  private buildDrainGroupArgs(params: {
+    prefix: string;
+    readyKey: string;
+    totalPendingKey: string;
+    groupId: string;
+  }): string[] {
+    const { prefix, readyKey, totalPendingKey, groupId } = params;
+    return [
+      `${prefix}group:${groupId}:jobs`,
+      `${prefix}group:${groupId}:data`,
+      `${prefix}group:${groupId}:active`,
+      readyKey,
+      `${prefix}blocked`,
+      `${prefix}signal`,
+      `${prefix}group:${groupId}:error`,
+      totalPendingKey,
+      `${prefix}group:${groupId}:strikes`,
+      `${prefix}group:${groupId}:attempt`,
+      `${prefix}group:${groupId}:failstreak`,
+      groupId,
+    ];
+  }
+
+  // Pipeline all the drains for this page into a single network round-trip.
+  // Each call is independent; ioredis batches them and returns results in
+  // the same order.
+  private async drainMatchedGroupsPage(params: {
+    prefix: string;
+    readyKey: string;
+    totalPendingKey: string;
+    matched: string[];
+  }): Promise<{ groupsDrained: number; jobsDrained: number }> {
+    const { prefix, readyKey, totalPendingKey, matched } = params;
+    const pipeline = this.redis.pipeline();
+    const argsByIndex = matched.map((groupId) =>
+      this.buildDrainGroupArgs({ prefix, readyKey, totalPendingKey, groupId }),
+    );
+    for (const args of argsByIndex) {
+      drainGroupScript.queue(pipeline, 11, ...args);
+    }
+    const results = await execWithNoScriptRecovery(pipeline, (index) =>
+      drainGroupScript.run(this.redis, 11, ...argsByIndex[index]!),
+    );
+    let groupsDrained = 0;
+    let jobsDrained = 0;
+    if (results) {
       for (const [err, value] of results) {
         if (err) continue;
         groupsDrained++;
         jobsDrained += Number(value);
       }
-    } while (cursor !== "0");
-
+    }
     return { groupsDrained, jobsDrained };
   }
 
@@ -1234,45 +1859,30 @@ export class QueueRedisRepository implements QueueRepository {
 
       if (groupsToMove.length === 0) continue;
 
-      const pipeline = this.redis.pipeline();
-      const argsByIndex = groupsToMove.map((groupId) => [
-        `${prefix}group:${groupId}:jobs`,
-        `${prefix}group:${groupId}:data`,
-        `${prefix}group:${groupId}:active`,
-        `${prefix}ready`,
-        `${prefix}blocked`,
-        `${prefix}signal`,
-        `${prefix}group:${groupId}:error`,
-        `${prefix}dlq:${groupId}:jobs`,
-        `${prefix}dlq:${groupId}:data`,
-        `${prefix}dlq:${groupId}:error`,
-        `${prefix}dlq`,
-        `${prefix}group:${groupId}:strikes`,
-        `${prefix}group:${groupId}:attempt`,
-        `${prefix}group:${groupId}:failstreak`,
-        groupId,
-        String(DLQ_TTL_SECONDS),
-      ]);
-      for (const args of argsByIndex) {
-        moveToDlqScript.queue(pipeline, 14, ...args);
-      }
-      const results = await execWithNoScriptRecovery(pipeline, (index) =>
-        moveToDlqScript.run(this.redis, 14, ...argsByIndex[index]!),
-      );
-      if (results) {
-        for (const [err, result] of results) {
-          if (!err) {
-            const moved = Number(result);
-            if (moved >= 0) {
-              movedCount++;
-              jobsMoved += moved;
-            }
-          }
-        }
-      }
+      const page = await this.moveBlockedGroupsPage({ prefix, groupsToMove });
+      movedCount += page.movedCount;
+      jobsMoved += page.jobsMoved;
     } while (cursor !== "0");
 
     return { movedCount, jobsMoved };
+  }
+
+  private async moveBlockedGroupsPage(params: {
+    prefix: string;
+    groupsToMove: string[];
+  }): Promise<{ movedCount: number; jobsMoved: number }> {
+    const { prefix, groupsToMove } = params;
+    const pipeline = this.redis.pipeline();
+    const argsByIndex = groupsToMove.map((groupId) =>
+      buildMoveToDlqArgs({ prefix, groupId }),
+    );
+    for (const args of argsByIndex) {
+      moveToDlqScript.queue(pipeline, 14, ...args);
+    }
+    const results = await execWithNoScriptRecovery(pipeline, (index) =>
+      moveToDlqScript.run(this.redis, 14, ...argsByIndex[index]!),
+    );
+    return collectMoveToDlqResults(results);
   }
 
   async replayFromDlq(params: {
@@ -1331,38 +1941,52 @@ export class QueueRedisRepository implements QueueRepository {
 
       if (groupsToReplay.length === 0) continue;
 
-      const pipeline = this.redis.pipeline();
-      const argsByIndex = groupsToReplay.map((groupId) => [
-        `${prefix}dlq:${groupId}:jobs`,
-        `${prefix}dlq:${groupId}:data`,
-        `${prefix}dlq:${groupId}:error`,
-        `${prefix}group:${groupId}:jobs`,
-        `${prefix}group:${groupId}:data`,
-        `${prefix}ready`,
-        `${prefix}signal`,
-        `${prefix}dlq`,
-        groupId,
-        String(Date.now()),
-      ]);
-      for (const args of argsByIndex) {
-        replayFromDlqScript.queue(pipeline, 8, ...args);
-      }
-      const results = await execWithNoScriptRecovery(pipeline, (index) =>
-        replayFromDlqScript.run(this.redis, 8, ...argsByIndex[index]!),
-      );
-      if (results) {
-        for (const [err, result] of results) {
-          if (!err) {
-            const replayed = Number(result);
-            if (replayed > 0) {
-              replayedCount++;
-              jobsReplayed += replayed;
-            }
+      const page = await this.replayGroupsPage({ prefix, groupsToReplay });
+      replayedCount += page.replayedCount;
+      jobsReplayed += page.jobsReplayed;
+    } while (cursor !== "0");
+
+    return { replayedCount, jobsReplayed };
+  }
+
+  private async runReplayFromDlqPipeline(params: {
+    prefix: string;
+    groupIds: string[];
+  }) {
+    const { prefix, groupIds } = params;
+    const pipeline = this.redis.pipeline();
+    const argsByIndex = groupIds.map((groupId) =>
+      buildReplayFromDlqArgs({ prefix, groupId }),
+    );
+    for (const args of argsByIndex) {
+      replayFromDlqScript.queue(pipeline, 8, ...args);
+    }
+    return execWithNoScriptRecovery(pipeline, (index) =>
+      replayFromDlqScript.run(this.redis, 8, ...argsByIndex[index]!),
+    );
+  }
+
+  private async replayGroupsPage(params: {
+    prefix: string;
+    groupsToReplay: string[];
+  }): Promise<{ replayedCount: number; jobsReplayed: number }> {
+    const results = await this.runReplayFromDlqPipeline({
+      prefix: params.prefix,
+      groupIds: params.groupsToReplay,
+    });
+    let replayedCount = 0;
+    let jobsReplayed = 0;
+    if (results) {
+      for (const [err, result] of results) {
+        if (!err) {
+          const replayed = Number(result);
+          if (replayed > 0) {
+            replayedCount++;
+            jobsReplayed += replayed;
           }
         }
       }
-    } while (cursor !== "0");
-
+    }
     return { replayedCount, jobsReplayed };
   }
 
@@ -1401,38 +2025,29 @@ export class QueueRedisRepository implements QueueRepository {
     groupsToRedrive = groupsToRedrive.slice(0, count);
     if (groupsToRedrive.length === 0) return { redrivenCount: 0, groupIds: [] };
 
-    const pipeline = this.redis.pipeline();
-    const argsByIndex = groupsToRedrive.map((groupId) => [
-      `${prefix}dlq:${groupId}:jobs`,
-      `${prefix}dlq:${groupId}:data`,
-      `${prefix}dlq:${groupId}:error`,
-      `${prefix}group:${groupId}:jobs`,
-      `${prefix}group:${groupId}:data`,
-      `${prefix}ready`,
-      `${prefix}signal`,
-      `${prefix}dlq`,
-      groupId,
-      String(Date.now()),
-    ]);
-    for (const args of argsByIndex) {
-      replayFromDlqScript.queue(pipeline, 8, ...args);
-    }
-    const results = await execWithNoScriptRecovery(pipeline, (index) =>
-      replayFromDlqScript.run(this.redis, 8, ...argsByIndex[index]!),
-    );
+    const results = await this.runReplayFromDlqPipeline({
+      prefix,
+      groupIds: groupsToRedrive,
+    });
 
+    return this.collectRedriveResults({ results, groupsToRedrive });
+  }
+
+  private collectRedriveResults(params: {
+    results: Awaited<ReturnType<typeof execWithNoScriptRecovery>>;
+    groupsToRedrive: string[];
+  }): { redrivenCount: number; groupIds: string[] } {
     let redrivenCount = 0;
     const redrivenIds: string[] = [];
-    if (results) {
-      for (let i = 0; i < results.length; i++) {
-        const [err, result] = results[i]!;
+    if (params.results) {
+      for (let i = 0; i < params.results.length; i++) {
+        const [err, result] = params.results[i]!;
         if (!err && Number(result) > 0) {
           redrivenCount++;
-          redrivenIds.push(groupsToRedrive[i]!);
+          redrivenIds.push(params.groupsToRedrive[i]!);
         }
       }
     }
-
     return { redrivenCount, groupIds: redrivenIds };
   }
 
@@ -1464,39 +2079,29 @@ export class QueueRedisRepository implements QueueRepository {
     if (groupsToUnblock.length === 0)
       return { unblockedCount: 0, groupIds: [] };
 
-    const unblockPipeline = this.redis.pipeline();
-    const argsByIndex = groupsToUnblock.map((groupId) => [
-      `${prefix}blocked`,
-      `${prefix}group:${groupId}:active`,
-      `${prefix}group:${groupId}:jobs`,
-      `${prefix}ready`,
-      `${prefix}signal`,
-      `${prefix}group:${groupId}:error`,
-      `${prefix}group:${groupId}:strikes`,
-      `${prefix}group:${groupId}:attempt`,
-      `${prefix}group:${groupId}:failstreak`,
-      groupId,
-      String(Date.now()),
-    ]);
-    for (const args of argsByIndex) {
-      unblockScript.queue(unblockPipeline, 9, ...args);
-    }
-    const results = await execWithNoScriptRecovery(unblockPipeline, (index) =>
-      unblockScript.run(this.redis, 9, ...argsByIndex[index]!),
-    );
+    const results = await this.runUnblockPipeline({
+      prefix,
+      groupIds: groupsToUnblock,
+    });
 
+    return this.collectUnblockResults({ results, groupsToUnblock });
+  }
+
+  private collectUnblockResults(params: {
+    results: Awaited<ReturnType<typeof execWithNoScriptRecovery>>;
+    groupsToUnblock: string[];
+  }): { unblockedCount: number; groupIds: string[] } {
     let unblockedCount = 0;
     const unblockedIds: string[] = [];
-    if (results) {
-      for (let i = 0; i < results.length; i++) {
-        const [err, result] = results[i]!;
+    if (params.results) {
+      for (let i = 0; i < params.results.length; i++) {
+        const [err, result] = params.results[i]!;
         if (!err && result === 1) {
           unblockedCount++;
-          unblockedIds.push(groupsToUnblock[i]!);
+          unblockedIds.push(params.groupsToUnblock[i]!);
         }
       }
     }
-
     return { unblockedCount, groupIds: unblockedIds };
   }
 
@@ -1519,60 +2124,58 @@ export class QueueRedisRepository implements QueueRepository {
 
       if (members.length === 0) continue;
 
-      const pipeline = this.redis.pipeline();
-      for (const groupId of members) {
-        pipeline.hgetall(`${prefix}dlq:${groupId}:error`);
-        pipeline.zcard(`${prefix}dlq:${groupId}:jobs`);
-        pipeline.zrange(`${prefix}dlq:${groupId}:jobs`, 0, 0);
-      }
-      const results = await pipeline.exec();
-
-      const dataPipeline = this.redis.pipeline();
-      const dataRequests: { groupId: string; idx: number }[] = [];
-      for (let i = 0; i < members.length; i++) {
-        const jobArr = (results?.[i * 3 + 2]?.[1] as string[]) ?? [];
-        if (jobArr[0]) {
-          dataPipeline.hget(`${prefix}dlq:${members[i]!}:data`, jobArr[0]);
-          dataRequests.push({ groupId: members[i]!, idx: i });
-        }
-      }
-      const dataResults =
-        dataRequests.length > 0 ? await dataPipeline.exec() : [];
-
-      const groupPipelines = new Map<string, string>();
-      for (let j = 0; j < dataRequests.length; j++) {
-        const raw = dataResults?.[j]?.[1] as string | null;
-        if (raw) {
-          const pipelineName = readJobRoutingMeta(raw).pipelineName;
-          if (pipelineName) {
-            groupPipelines.set(dataRequests[j]!.groupId, pipelineName);
-          }
-        }
-      }
-
-      for (let i = 0; i < members.length; i++) {
-        const groupId = members[i]!;
-        const errorHash = results?.[i * 3]?.[1] as Record<
-          string,
-          string
-        > | null;
-        const jobCount = (results?.[i * 3 + 1]?.[1] as number) ?? 0;
-
-        groups.push({
-          groupId,
-          error: errorHash?.message ?? null,
-          errorStack: errorHash?.stack ?? null,
-          pipelineName: groupPipelines.get(groupId) ?? null,
-          jobCount,
-          movedAt: errorHash?.timestamp
-            ? parseFloat(errorHash.timestamp)
-            : null,
-        });
-      }
+      const results = await this.fetchDlqGroupPipelineData({
+        prefix,
+        members,
+      });
+      const groupPipelines = await this.fetchDlqGroupPipelineNames({
+        prefix,
+        members,
+        results,
+      });
+      groups.push(...buildDlqGroupInfos({ members, results, groupPipelines }));
     } while (cursor !== "0");
 
     groups.sort((a, b) => (b.movedAt ?? 0) - (a.movedAt ?? 0));
     return groups;
+  }
+
+  private async fetchDlqGroupPipelineData(params: {
+    prefix: string;
+    members: string[];
+  }) {
+    const pipeline = this.redis.pipeline();
+    for (const groupId of params.members) {
+      pipeline.hgetall(`${params.prefix}dlq:${groupId}:error`);
+      pipeline.zcard(`${params.prefix}dlq:${groupId}:jobs`);
+      pipeline.zrange(`${params.prefix}dlq:${groupId}:jobs`, 0, 0);
+    }
+    return pipeline.exec();
+  }
+
+  private async fetchDlqGroupPipelineNames(params: {
+    prefix: string;
+    members: string[];
+    results: Awaited<ReturnType<ChainableCommander["exec"]>>;
+  }): Promise<Map<string, string>> {
+    const dataPipeline = this.redis.pipeline();
+    const dataRequests: { groupId: string; idx: number }[] = [];
+    for (let i = 0; i < params.members.length; i++) {
+      const jobArr = (params.results?.[i * 3 + 2]?.[1] as string[]) ?? [];
+      if (jobArr[0]) {
+        dataPipeline.hget(
+          `${params.prefix}dlq:${params.members[i]!}:data`,
+          jobArr[0],
+        );
+        dataRequests.push({ groupId: params.members[i]!, idx: i });
+      }
+    }
+    const jobDataResults =
+      dataRequests.length > 0 ? await dataPipeline.exec() : [];
+    return buildPipelineNameMap({
+      dataRequests,
+      jobDataResults,
+    });
   }
 
   // ── Preview ─────────────────────────────────────────────────────
@@ -1600,61 +2203,24 @@ export class QueueRedisRepository implements QueueRepository {
 
       if (members.length === 0) continue;
 
-      const pipeline = this.redis.pipeline();
-      for (const groupId of members) {
-        pipeline.hgetall(`${prefix}group:${groupId}:error`);
-        pipeline.zrange(`${prefix}group:${groupId}:jobs`, 0, 0);
-      }
-      const results = await pipeline.exec();
-
-      const jobDataPipeline = this.redis.pipeline();
-      const jobDataRequests: { groupId: string }[] = [];
-      for (let i = 0; i < members.length; i++) {
-        const jobArr = (results?.[i * 2 + 1]?.[1] as string[]) ?? [];
-        if (jobArr[0]) {
-          jobDataPipeline.hget(`${prefix}group:${members[i]!}:data`, jobArr[0]);
-          jobDataRequests.push({ groupId: members[i]! });
-        }
-      }
-      const jobDataResults =
-        jobDataRequests.length > 0 ? await jobDataPipeline.exec() : [];
-
-      const groupPipelines = new Map<string, string>();
-      for (let j = 0; j < jobDataRequests.length; j++) {
-        const raw = jobDataResults?.[j]?.[1] as string | null;
-        if (raw) {
-          const pipelineName = readJobRoutingMeta(raw).pipelineName;
-          if (pipelineName) {
-            groupPipelines.set(jobDataRequests[j]!.groupId, pipelineName);
-          }
-        }
-      }
-
-      for (let i = 0; i < members.length; i++) {
-        const groupId = members[i]!;
-        const errorHash = results?.[i * 2]?.[1] as Record<
-          string,
-          string
-        > | null;
-        const msg = errorHash?.message ?? "Unknown error";
-        const pName = groupPipelines.get(groupId) ?? "unknown";
-
-        if (
-          params.errorFilter &&
-          !msg.toLowerCase().includes(params.errorFilter.toLowerCase())
-        )
-          continue;
-        if (params.pipelineFilter && pName !== params.pipelineFilter) continue;
-
-        totalAffected++;
-        pipelineCounts.set(pName, (pipelineCounts.get(pName) ?? 0) + 1);
-
-        const normalizedMsg = normalizeErrorMessage(msg);
-        errorCounts.set(
-          normalizedMsg,
-          (errorCounts.get(normalizedMsg) ?? 0) + 1,
-        );
-      }
+      const results = await this.fetchBlockedGroupPipelineData({
+        prefix,
+        members,
+      });
+      const groupPipelines = await this.fetchBlockedGroupPipelineNames({
+        prefix,
+        members,
+        results,
+      });
+      totalAffected += accumulateDrainPreview({
+        members,
+        results,
+        groupPipelines,
+        pipelineFilter: params.pipelineFilter,
+        errorFilter: params.errorFilter,
+        pipelineCounts,
+        errorCounts,
+      });
     } while (cursor !== "0");
 
     return {
@@ -1847,38 +2413,23 @@ export class QueueRedisRepository implements QueueRepository {
     // TODO(cleanup): the lifecycle legs below exist only for groups the index has
     // not learned about yet. Removable once no queue predates the index and no pod
     // predates the writers.
-    const legacyLegs: { key: string; type: "zset" | "set" }[] = [
-      { key: `${prefix}ready`, type: "zset" },
-      { key: `${prefix}blocked`, type: "set" },
-      ...Array.from(parkedTenants, (tenantId) => ({
-        key: `${prefix}parked:${tenantId}`,
-        type: "zset" as const,
-      })),
-    ];
-
-    for (const leg of legacyLegs) {
-      const held = await this.collectIndexMembers({
-        key: leg.key,
-        type: leg.type,
-        into: groupIds,
-        refreshLease,
-      });
-      if (!held) return null;
-    }
+    const legacyHeld = await this.collectLegacyLegMembers({
+      legs: buildLegacyPendingLegs({ prefix, parkedTenants }),
+      into: groupIds,
+      refreshLease,
+    });
+    if (!legacyHeld) return null;
 
     // The lifecycle legs only cover a group the pass actually saw, and a group
     // moving between them mid-read is seen by neither. The keyspace sweep is what
     // covers those, because it reads key existence rather than membership.
-    let sweptUnindexed: number | null = null;
-    if (await this.isKeyspaceSweepDue(prefix)) {
-      const swept = await this.sweepKeyspaceForGroups({ prefix, refreshLease });
-      if (swept === null) return null;
-      sweptUnindexed = 0;
-      for (const groupId of swept) {
-        groupIds.add(groupId);
-        if (!alreadyIndexed.has(groupId)) sweptUnindexed += 1;
-      }
-    }
+    const sweepResult = await this.runKeyspaceSweepIfDue({
+      prefix,
+      groupIds,
+      alreadyIndexed,
+      refreshLease,
+    });
+    if (sweepResult.status === "lease-lost") return null;
 
     const toAdopt = Array.from(groupIds).filter(
       (id) => !alreadyIndexed.has(id),
@@ -1893,11 +2444,55 @@ export class QueueRedisRepository implements QueueRepository {
     // Only a pass that actually swept may move the deadline. Rescheduling on
     // every pass would push it out by a fresh backstop each time and the sweep
     // would never come due again — the deadline would outrun the clock.
-    if (sweptUnindexed !== null) {
-      await this.recordSweepOutcome({ prefix, adopted: sweptUnindexed });
+    if (sweepResult.status === "ok") {
+      await this.recordSweepOutcome({ prefix, adopted: sweepResult.unindexed });
     }
 
     return groupIds;
+  }
+
+  private async collectLegacyLegMembers(params: {
+    legs: { key: string; type: "zset" | "set" }[];
+    into: Set<string>;
+    refreshLease: () => Promise<boolean>;
+  }): Promise<boolean> {
+    for (const leg of params.legs) {
+      const held = await this.collectIndexMembers({
+        key: leg.key,
+        type: leg.type,
+        into: params.into,
+        refreshLease: params.refreshLease,
+      });
+      if (!held) return false;
+    }
+    return true;
+  }
+
+  private async runKeyspaceSweepIfDue(params: {
+    prefix: string;
+    groupIds: Set<string>;
+    alreadyIndexed: Set<string>;
+    refreshLease: () => Promise<boolean>;
+  }): Promise<
+    | { status: "not-due" }
+    | { status: "lease-lost" }
+    | { status: "ok"; unindexed: number }
+  > {
+    if (!(await this.isKeyspaceSweepDue(params.prefix))) {
+      return { status: "not-due" };
+    }
+    const swept = await this.sweepKeyspaceForGroups({
+      prefix: params.prefix,
+      refreshLease: params.refreshLease,
+    });
+    if (swept === null) return { status: "lease-lost" };
+
+    let unindexed = 0;
+    for (const groupId of swept) {
+      params.groupIds.add(groupId);
+      if (!params.alreadyIndexed.has(groupId)) unindexed += 1;
+    }
+    return { status: "ok", unindexed };
   }
 
   /**
@@ -2245,12 +2840,11 @@ export class QueueRedisRepository implements QueueRepository {
 
   // ── Private Filter Helpers ──────────────────────────────────────
 
-  private async filterByPipelineName(params: {
+  private async fetchFirstJobIdsForGroups(params: {
     prefix: string;
-    members: string[];
-    pipelineFilter: string;
     keyPrefix: "group" | "dlq";
-  }): Promise<string[]> {
+    members: string[];
+  }) {
     const jobIdPipeline = this.redis.pipeline();
     for (const groupId of params.members) {
       jobIdPipeline.zrange(
@@ -2259,12 +2853,22 @@ export class QueueRedisRepository implements QueueRepository {
         0,
       );
     }
-    const jobIdResults = await jobIdPipeline.exec();
+    return jobIdPipeline.exec();
+  }
 
+  private async fetchGroupDataForFirstJobs(params: {
+    prefix: string;
+    keyPrefix: "group" | "dlq";
+    members: string[];
+    jobIdResults: Awaited<ReturnType<ChainableCommander["exec"]>>;
+  }): Promise<{
+    dataRequests: { groupId: string }[];
+    dataResults: Awaited<ReturnType<ChainableCommander["exec"]>>;
+  }> {
     const dataPipeline = this.redis.pipeline();
     const dataRequests: { groupId: string }[] = [];
     for (let i = 0; i < params.members.length; i++) {
-      const jobArr = (jobIdResults?.[i]?.[1] as string[]) ?? [];
+      const jobArr = (params.jobIdResults?.[i]?.[1] as string[]) ?? [];
       if (jobArr[0]) {
         dataPipeline.hget(
           `${params.prefix}${params.keyPrefix}:${params.members[i]!}:data`,
@@ -2275,16 +2879,33 @@ export class QueueRedisRepository implements QueueRepository {
     }
     const dataResults =
       dataRequests.length > 0 ? await dataPipeline.exec() : [];
+    return { dataRequests, dataResults };
+  }
 
-    const matchingGroups = new Set<string>();
-    for (let i = 0; i < dataRequests.length; i++) {
-      const raw = dataResults?.[i]?.[1] as string | null;
-      if (raw) {
-        if (readJobRoutingMeta(raw).pipelineName === params.pipelineFilter) {
-          matchingGroups.add(dataRequests[i]!.groupId);
-        }
-      }
-    }
+  private async filterByPipelineName(params: {
+    prefix: string;
+    members: string[];
+    pipelineFilter: string;
+    keyPrefix: "group" | "dlq";
+  }): Promise<string[]> {
+    const jobIdResults = await this.fetchFirstJobIdsForGroups({
+      prefix: params.prefix,
+      keyPrefix: params.keyPrefix,
+      members: params.members,
+    });
+    const { dataRequests, dataResults } = await this.fetchGroupDataForFirstJobs(
+      {
+        prefix: params.prefix,
+        keyPrefix: params.keyPrefix,
+        members: params.members,
+        jobIdResults,
+      },
+    );
+    const matchingGroups = resolveMatchingPipelineGroups({
+      dataRequests,
+      dataResults,
+      pipelineFilter: params.pipelineFilter,
+    });
     return params.members.filter((id) => matchingGroups.has(id));
   }
 
@@ -2316,28 +2937,17 @@ export class QueueRedisRepository implements QueueRepository {
     }
     const jobDataResults = jobFetchIdx > 0 ? await jobDataPipeline.exec() : [];
 
-    return params.members.filter((groupId, i) => {
-      if (params.errorFilter) {
-        const errorHash = filterResults?.[i * 2]?.[1] as Record<
-          string,
-          string
-        > | null;
-        const msg = errorHash?.message ?? "";
-        if (!msg.toLowerCase().includes(params.errorFilter.toLowerCase()))
-          return false;
-      }
-      if (params.pipelineFilter) {
-        const fetchIdx = jobDataMap.get(groupId);
-        if (fetchIdx !== undefined) {
-          const raw = jobDataResults?.[fetchIdx]?.[1] as string | null;
-          if (raw) {
-            if (readJobRoutingMeta(raw).pipelineName !== params.pipelineFilter)
-              return false;
-          } else return false;
-        } else return false;
-      }
-      return true;
-    });
+    return params.members.filter((groupId, i) =>
+      matchesGroupFilters({
+        groupId,
+        index: i,
+        filterResults,
+        jobDataMap,
+        jobDataResults,
+        pipelineFilter: params.pipelineFilter,
+        errorFilter: params.errorFilter,
+      }),
+    );
   }
 
   private async filterDlqGroups(params: {
@@ -2368,27 +2978,16 @@ export class QueueRedisRepository implements QueueRepository {
     }
     const jobDataResults = jobFetchIdx > 0 ? await jobDataPipeline.exec() : [];
 
-    return params.members.filter((groupId, i) => {
-      if (params.errorFilter) {
-        const errorHash = filterResults?.[i * 2]?.[1] as Record<
-          string,
-          string
-        > | null;
-        const msg = errorHash?.message ?? "";
-        if (!msg.toLowerCase().includes(params.errorFilter.toLowerCase()))
-          return false;
-      }
-      if (params.pipelineFilter) {
-        const fetchIdx = jobDataMap.get(groupId);
-        if (fetchIdx !== undefined) {
-          const raw = jobDataResults?.[fetchIdx]?.[1] as string | null;
-          if (raw) {
-            if (readJobRoutingMeta(raw).pipelineName !== params.pipelineFilter)
-              return false;
-          } else return false;
-        } else return false;
-      }
-      return true;
-    });
+    return params.members.filter((groupId, i) =>
+      matchesGroupFilters({
+        groupId,
+        index: i,
+        filterResults,
+        jobDataMap,
+        jobDataResults,
+        pipelineFilter: params.pipelineFilter,
+        errorFilter: params.errorFilter,
+      }),
+    );
   }
 }

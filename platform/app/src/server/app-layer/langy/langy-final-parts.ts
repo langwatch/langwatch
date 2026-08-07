@@ -58,6 +58,28 @@ const cliEnvelope = LangyCliEnvelopeService.create();
  * first therefore produces identical parts, so the turnId-idempotent dedupe at
  * the event store collapses the two without any content divergence.
  */
+/**
+ * The durable tool part for one finalized tool call, run through the CLI
+ * envelope first. Split out of `buildFinalAssistantParts` (hoisted to module
+ * scope — it captures nothing but the module-level `cliEnvelope`).
+ */
+function buildFinalToolPart(rawCall: LangyFinalToolCall): LangyMessagePart {
+  const call = cliEnvelope.normalizeToolFrame({
+    frame: { ...rawCall, phase: "end" },
+  });
+  return langyMessagePartSchema.parse({
+    type: `tool-${call.name}`,
+    toolCallId: call.id,
+    state: call.isError ? "output-error" : "output-available",
+    ...(call.input !== undefined ? { input: call.input } : {}),
+    ...(call.digest !== undefined ? { digest: call.digest } : {}),
+    ...(call.result !== undefined ? { result: call.result } : {}),
+    ...(call.isError
+      ? { errorText: call.output ?? "Tool call failed" }
+      : { output: call.output ?? "" }),
+  });
+}
+
 export function buildFinalAssistantParts({
   text,
   toolCalls = [],
@@ -65,22 +87,7 @@ export function buildFinalAssistantParts({
   text: string;
   toolCalls?: LangyFinalToolCall[];
 }): LangyMessagePart[] {
-  const toolParts: LangyMessagePart[] = toolCalls.map((rawCall) => {
-    const call = cliEnvelope.normalizeToolFrame({
-      frame: { ...rawCall, phase: "end" },
-    });
-    return langyMessagePartSchema.parse({
-      type: `tool-${call.name}`,
-      toolCallId: call.id,
-      state: call.isError ? "output-error" : "output-available",
-      ...(call.input !== undefined ? { input: call.input } : {}),
-      ...(call.digest !== undefined ? { digest: call.digest } : {}),
-      ...(call.result !== undefined ? { result: call.result } : {}),
-      ...(call.isError
-        ? { errorText: call.output ?? "Tool call failed" }
-        : { output: call.output ?? "" }),
-    });
-  });
+  const toolParts: LangyMessagePart[] = toolCalls.map(buildFinalToolPart);
   return [...toolParts, ...assistantTextParts(text)];
 }
 

@@ -2,6 +2,7 @@ import { createLogger } from "@langwatch/observability";
 import type { EventSubscriberDefinition } from "../../../subscribers/eventSubscriber.types";
 import { CANONICAL_LOG_RECORD_RECEIVED_EVENT_TYPE } from "../../log-processing/schemas/constants";
 import type { LogProcessingEvent } from "../../log-processing/schemas/events";
+import type { CanonicalLogRecord } from "../../log-processing/schemas/logRecord";
 import type { ContributeLogFactsCommandData } from "../schemas/commands";
 import {
   detectCodingAgent,
@@ -10,6 +11,111 @@ import {
 } from "../services/coding-agent-normalization";
 
 const logger = createLogger("langwatch:coding-agent:log-facts-dispatch");
+
+/** The canonical preparation extracts `eventName` into its own column and
+ * some agents only spell it there. */
+function withEventNameFallback(
+  attributes: Record<string, unknown>,
+  record: CanonicalLogRecord,
+): Record<string, unknown> {
+  if (record.eventName && attributes["event.name"] === undefined) {
+    attributes["event.name"] = record.eventName;
+  }
+  return attributes;
+}
+
+function resolveServiceIdentity(
+  resourceAttributes: Record<string, unknown> | null,
+): { serviceName: string | null; serviceVersion: string | null } {
+  const rawServiceName = resourceAttributes?.["service.name"];
+  const serviceName =
+    typeof rawServiceName === "string" && rawServiceName.length > 0
+      ? rawServiceName
+      : null;
+
+  const rawServiceVersion = resourceAttributes?.["service.version"];
+  const serviceVersion =
+    typeof rawServiceVersion === "string" && rawServiceVersion.length > 0
+      ? rawServiceVersion
+      : null;
+
+  return { serviceName, serviceVersion };
+}
+
+/** No session key and no correlation: there is nothing to aggregate under.
+ * The canonical row still holds the record. */
+function resolveSessionIdentity({
+  attributes,
+  record,
+}: {
+  attributes: Record<string, unknown>;
+  record: CanonicalLogRecord;
+}): {
+  sessionId: string | null;
+  sessionKeySource: "provider" | "trace_fallback";
+  correlationTraceId: string | null;
+  correlationSpanId: string | null;
+} {
+  const sessionKey =
+    resolveConversationKey(attributes) ?? (record.providerSessionId || null);
+  const correlationTraceId =
+    record.correlationSource !== "none" && record.correlationTraceId
+      ? record.correlationTraceId
+      : null;
+  const correlationSpanId =
+    record.correlationSource !== "none" && record.correlationSpanId
+      ? record.correlationSpanId
+      : null;
+
+  return {
+    sessionId: sessionKey ?? correlationTraceId,
+    sessionKeySource: sessionKey !== null ? "provider" : "trace_fallback",
+    correlationTraceId,
+    correlationSpanId,
+  };
+}
+
+function toContributeLogFactsCommand({
+  record,
+  facts,
+  attributes,
+  serviceName,
+  sessionIdentity,
+}: {
+  record: CanonicalLogRecord;
+  facts: Record<string, string | number | boolean>;
+  attributes: Record<string, unknown>;
+  serviceName: string | null;
+  sessionIdentity: {
+    sessionId: string;
+    sessionKeySource: "provider" | "trace_fallback";
+    correlationTraceId: string | null;
+    correlationSpanId: string | null;
+  };
+}): ContributeLogFactsCommandData {
+  return {
+    tenantId: record.tenantId,
+    sessionId: sessionIdentity.sessionId,
+    sessionKeySource: sessionIdentity.sessionKeySource,
+    agent: detectCodingAgent({
+      scopeName: record.scopeName,
+      recordName:
+        typeof attributes["event.name"] === "string"
+          ? (attributes["event.name"] as string)
+          : null,
+      serviceName,
+    }),
+    occurredAt: record.occurredAt,
+    recordId: record.recordId,
+    traceId: sessionIdentity.correlationTraceId,
+    spanId: sessionIdentity.correlationSpanId,
+    timeUnixMs: record.timeUnixMs,
+    severityNumber: record.severityNumber,
+    providerKind: record.providerKind,
+    scopeName: record.scopeName || null,
+    facts,
+  };
+}
 
 /**
  * The log→session dispatcher (ADR-056 §2): a subscriber on log-processing's
@@ -36,13 +142,9 @@ export function createCodingAgentLogFactsDispatchSubscriber(deps: {
     },
     handle: async (event) => {
       const record = event.data;
-      const attributes = parseFlatAttributes(record.attributesFlatJson);
-      if (attributes === null) return;
-      // The canonical preparation extracts `eventName` into its own column
-      // and some agents only spell it there.
-      if (record.eventName && attributes["event.name"] === undefined) {
-        attributes["event.name"] = record.eventName;
-      }
+      const rawAttributes = parseFlatAttributes(record.attributesFlatJson);
+      if (rawAttributes === null) return;
+      const attributes = withEventNameFallback(rawAttributes, record);
 
       // Two-phase detection, so an ordinary application log costs one cheap
       // name/scope check and never a resource-attributes parse. Cowork's
@@ -56,58 +158,28 @@ export function createCodingAgentLogFactsDispatchSubscriber(deps: {
       });
       if (facts === null) return;
 
-      const resourceAttributes = parseFlatAttributes(
-        record.resourceAttributesFlatJson,
+      const { serviceName, serviceVersion } = resolveServiceIdentity(
+        parseFlatAttributes(record.resourceAttributesFlatJson),
       );
-      const rawServiceName = resourceAttributes?.["service.name"];
-      const serviceName =
-        typeof rawServiceName === "string" && rawServiceName.length > 0
-          ? rawServiceName
-          : null;
-
-      const serviceVersion = resourceAttributes?.["service.version"];
-      if (typeof serviceVersion === "string" && serviceVersion.length > 0) {
+      if (serviceVersion !== null) {
         facts["service.version"] = serviceVersion;
       }
 
-      const sessionKey =
-        resolveConversationKey(attributes) ??
-        (record.providerSessionId || null);
-      const correlationTraceId =
-        record.correlationSource !== "none" && record.correlationTraceId
-          ? record.correlationTraceId
-          : null;
+      const sessionIdentity = resolveSessionIdentity({ attributes, record });
+      if (sessionIdentity.sessionId === null) return;
 
-      // No session key and no correlation: there is nothing to aggregate
-      // under. The canonical row still holds the record.
-      const sessionId = sessionKey ?? correlationTraceId;
-      if (sessionId === null) return;
-
-      await deps.contributeLogFacts({
-        tenantId: record.tenantId,
-        sessionId,
-        sessionKeySource: sessionKey !== null ? "provider" : "trace_fallback",
-        agent: detectCodingAgent({
-          scopeName: record.scopeName,
-          recordName:
-            typeof attributes["event.name"] === "string"
-              ? (attributes["event.name"] as string)
-              : null,
+      await deps.contributeLogFacts(
+        toContributeLogFactsCommand({
+          record,
+          facts,
+          attributes,
           serviceName,
+          sessionIdentity: {
+            ...sessionIdentity,
+            sessionId: sessionIdentity.sessionId,
+          },
         }),
-        occurredAt: record.occurredAt,
-        recordId: record.recordId,
-        traceId: correlationTraceId,
-        spanId:
-          record.correlationSource !== "none" && record.correlationSpanId
-            ? record.correlationSpanId
-            : null,
-        timeUnixMs: record.timeUnixMs,
-        severityNumber: record.severityNumber,
-        providerKind: record.providerKind,
-        scopeName: record.scopeName || null,
-        facts,
-      });
+      );
     },
   };
 }

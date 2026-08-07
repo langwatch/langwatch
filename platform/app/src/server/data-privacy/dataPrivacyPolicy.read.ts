@@ -99,71 +99,121 @@ export async function getDataPrivacySnapshot(
   const organizationName = project?.team?.organization?.name ?? null;
 
   if (!organizationId) {
-    // Personal-account project (no org/team): only its own PROJECT scope.
-    const canWrite = await hasProjectPermission(
-      ctx as AuthedCtx,
-      projectId,
-      "project:update",
-    );
-    const name =
-      (
-        await ctx.prisma.project.findUnique({
-          where: { id: projectId },
-          select: { name: true },
-        })
-      )?.name ?? projectId;
-    return {
+    return await personalProjectSnapshot({
+      ctx,
       projectId,
       effective,
-      effectiveTeam: null,
-      effectiveOrganization: null,
-      rules: [],
-      available: {
-        organization: null,
-        departments: [],
-        teams: [],
-        projects: canWrite
-          ? [{ id: projectId, name, teamId: project?.teamId ?? "" }]
-          : [],
-      },
-      audienceOptions: { groups: [] },
-    };
+      teamId: project?.teamId ?? "",
+    });
   }
 
-  const [orgDepartments, orgTeams, orgProjects, orgGroups, rows, canManageOrg] =
-    await Promise.all([
-      ctx.prisma.department.findMany({
-        where: { organizationId },
-        select: { id: true, name: true, archivedAt: true },
-        orderBy: { name: "asc" },
-      }),
-      ctx.prisma.team.findMany({
-        where: { organizationId },
-        select: { id: true, name: true },
-        orderBy: { name: "asc" },
-      }),
-      ctx.prisma.project.findMany({
-        where: { team: { organizationId } },
-        select: { id: true, name: true, teamId: true },
-        orderBy: { name: "asc" },
-      }),
-      ctx.prisma.group.findMany({
-        where: { organizationId },
-        select: { id: true, name: true },
-        orderBy: { name: "asc" },
-      }),
-      service.listOrganizationRules({ organizationId }),
-      hasOrganizationPermission(
-        ctx as AuthedCtx,
-        organizationId,
-        "organization:manage",
-      ),
-    ]);
+  return await organizationSnapshot({
+    ctx,
+    service,
+    projectId,
+    effective,
+    organizationId,
+    organizationName,
+    teamId: project?.teamId ?? "",
+  });
+}
 
+/** Personal-account project (no org/team): only its own PROJECT scope. */
+async function personalProjectSnapshot({
+  ctx,
+  projectId,
+  effective,
+  teamId,
+}: {
+  ctx: ReadCtx;
+  projectId: string;
+  effective: ResolvedDataPrivacy;
+  teamId: string;
+}): Promise<DataPrivacySnapshot> {
+  const canWrite = await hasProjectPermission(
+    ctx as AuthedCtx,
+    projectId,
+    "project:update",
+  );
+  const name =
+    (
+      await ctx.prisma.project.findUnique({
+        where: { id: projectId },
+        select: { name: true },
+      })
+    )?.name ?? projectId;
+  return {
+    projectId,
+    effective,
+    effectiveTeam: null,
+    effectiveOrganization: null,
+    rules: [],
+    available: {
+      organization: null,
+      departments: [],
+      teams: [],
+      projects: canWrite ? [{ id: projectId, name, teamId }] : [],
+    },
+    audienceOptions: { groups: [] },
+  };
+}
+
+type PolicyService = ReturnType<typeof getDataPrivacyPolicyService>;
+
+function loadOrganizationScopes({
+  ctx,
+  service,
+  organizationId,
+}: {
+  ctx: ReadCtx;
+  service: PolicyService;
+  organizationId: string;
+}) {
+  return Promise.all([
+    ctx.prisma.department.findMany({
+      where: { organizationId },
+      select: { id: true, name: true, archivedAt: true },
+      orderBy: { name: "asc" },
+    }),
+    ctx.prisma.team.findMany({
+      where: { organizationId },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    }),
+    ctx.prisma.project.findMany({
+      where: { team: { organizationId } },
+      select: { id: true, name: true, teamId: true },
+      orderBy: { name: "asc" },
+    }),
+    ctx.prisma.group.findMany({
+      where: { organizationId },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    }),
+    service.listOrganizationRules({ organizationId }),
+    hasOrganizationPermission(
+      ctx as AuthedCtx,
+      organizationId,
+      "organization:manage",
+    ),
+  ]);
+}
+
+function loadScopePermissions({
+  ctx,
+  organizationId,
+  orgTeams,
+  orgProjects,
+}: {
+  ctx: ReadCtx;
+  organizationId: string;
+  orgTeams: { id: string }[];
+  orgProjects: { id: string; teamId: string }[];
+}) {
   const projectTeamId: Record<string, string> = {};
   for (const p of orgProjects) projectTeamId[p.id] = p.teamId;
 
-  const [teamManage, projectUpdate] = await Promise.all([
+  return Promise.all([
     batchScopePermissions(ctx, {
       organizationId,
       teamIds: orgTeams.map((t) => t.id),
@@ -179,37 +229,39 @@ export async function getDataPrivacySnapshot(
       permission: "project:update",
     }),
   ]);
+}
 
-  const departmentName = new Map(orgDepartments.map((d) => [d.id, d.name]));
-  const teamName = new Map(orgTeams.map((t) => [t.id, t.name]));
-  const projectName = new Map(orgProjects.map((p) => [p.id, p.name]));
+type OrgScopes = Awaited<ReturnType<typeof loadOrganizationScopes>>;
+type ScopePermissions = Awaited<ReturnType<typeof loadScopePermissions>>;
 
-  const canReadScope = (
-    scopeType: DataPrivacyScopeTier,
-    scopeId: string,
-  ): boolean => {
-    if (scopeType === "ORGANIZATION" || scopeType === "DEPARTMENT") {
-      return canManageOrg;
-    }
-    if (scopeType === "TEAM") return teamManage.teams.get(scopeId) === true;
-    return projectUpdate.projects.get(scopeId) === true;
-  };
+type ScopeAccess = {
+  canManageOrg: boolean;
+  teamManage: ScopePermissions[0];
+  projectUpdate: ScopePermissions[1];
+};
 
-  const scopeName = (
-    scopeType: DataPrivacyScopeTier,
-    scopeId: string,
-  ): string => {
-    if (scopeType === "ORGANIZATION") return organizationName ?? scopeId;
-    if (scopeType === "DEPARTMENT") {
-      return departmentName.get(scopeId) ?? scopeId;
-    }
-    if (scopeType === "TEAM") return teamName.get(scopeId) ?? scopeId;
-    return projectName.get(scopeId) ?? scopeId;
-  };
+function canReadScope({
+  scopeType,
+  scopeId,
+  access,
+}: {
+  scopeType: DataPrivacyScopeTier;
+  scopeId: string;
+  access: ScopeAccess;
+}): boolean {
+  if (scopeType === "ORGANIZATION" || scopeType === "DEPARTMENT") {
+    return access.canManageOrg;
+  }
+  if (scopeType === "TEAM") {
+    return access.teamManage.teams.get(scopeId) === true;
+  }
+  return access.projectUpdate.projects.get(scopeId) === true;
+}
 
-  // Parse every row once. A row whose stored config no longer parses is
-  // unrenderable and unresolvable; the repository already warns about it on the
-  // resolution path, so the snapshot just leaves it out.
+/** Parse every row once. A row whose stored config no longer parses is
+ *  unrenderable and unresolvable; the repository already warns about it on the
+ *  resolution path, so the snapshot just leaves it out. */
+function parseRuleRows(rows: OrgScopes[4]): DataPrivacyRow[] {
   const allRows: DataPrivacyRow[] = [];
   for (const row of rows) {
     const parsed = dataPrivacyConfigSchema.safeParse(row.config);
@@ -221,18 +273,31 @@ export async function getDataPrivacySnapshot(
       config: parsed.data,
     });
   }
+  return allRows;
+}
 
-  // The rule LIST is RBAC-filtered (a project-only viewer never sees org rules),
-  // but the effective BASELINES are resolved from every row: a team/org baseline
-  // is exactly what already folds into the project effective the viewer can see,
-  // so it leaks nothing new. The TEAM baseline is the cascade stopping at the
-  // project's team (non-personal); the ORGANIZATION baseline keeps only org
-  // rules. Synthetic facts with empty narrower ids make those tiers no-ops.
+/**
+ * The rule LIST is RBAC-filtered (a project-only viewer never sees org rules),
+ * but the effective BASELINES are resolved from every row: a team/org baseline
+ * is exactly what already folds into the project effective the viewer can see,
+ * so it leaks nothing new. The TEAM baseline is the cascade stopping at the
+ * project's team (non-personal); the ORGANIZATION baseline keeps only org
+ * rules. Synthetic facts with empty narrower ids make those tiers no-ops.
+ */
+function resolveBaselines({
+  allRows,
+  organizationId,
+  teamId,
+}: {
+  allRows: DataPrivacyRow[];
+  organizationId: string;
+  teamId: string;
+}) {
   const effectiveTeam = resolveDataPrivacy({
     rows: allRows,
     facts: {
       organizationId,
-      teamId: project?.teamId ?? "",
+      teamId,
       projectId: "",
       departmentId: null,
       isPersonal: false,
@@ -248,20 +313,66 @@ export async function getDataPrivacySnapshot(
       isPersonal: false,
     },
   });
+  return { effectiveTeam, effectiveOrganization };
+}
+
+function buildReadableRules({
+  allRows,
+  scopes,
+  organizationName,
+  access,
+}: {
+  allRows: DataPrivacyRow[];
+  scopes: OrgScopes;
+  organizationName: string | null;
+  access: ScopeAccess;
+}): DataPrivacyRule[] {
+  const [orgDepartments, orgTeams, orgProjects] = scopes;
+  const departmentName = new Map(orgDepartments.map((d) => [d.id, d.name]));
+  const teamName = new Map(orgTeams.map((t) => [t.id, t.name]));
+  const projectName = new Map(orgProjects.map((p) => [p.id, p.name]));
+
+  const scopeName = (
+    scopeType: DataPrivacyScopeTier,
+    scopeId: string,
+  ): string => {
+    if (scopeType === "ORGANIZATION") return organizationName ?? scopeId;
+    if (scopeType === "DEPARTMENT") {
+      return departmentName.get(scopeId) ?? scopeId;
+    }
+    if (scopeType === "TEAM") return teamName.get(scopeId) ?? scopeId;
+    return projectName.get(scopeId) ?? scopeId;
+  };
 
   const rules: DataPrivacyRule[] = [];
   for (const row of allRows) {
-    if (!canReadScope(row.scopeType, row.scopeId)) continue;
+    const { scopeType, scopeId } = row;
+    if (!canReadScope({ scopeType, scopeId, access })) continue;
     rules.push({
-      scopeType: row.scopeType,
-      scopeId: row.scopeId,
-      name: scopeName(row.scopeType, row.scopeId),
+      scopeType,
+      scopeId,
+      name: scopeName(scopeType, scopeId),
       personalOnly: row.personalOnly,
       config: row.config,
     });
   }
+  return rules;
+}
 
-  const available: DataPrivacyScopeAvailable = {
+function buildAvailableScopes({
+  organizationId,
+  organizationName,
+  scopes,
+  access,
+}: {
+  organizationId: string;
+  organizationName: string | null;
+  scopes: OrgScopes;
+  access: ScopeAccess;
+}): DataPrivacyScopeAvailable {
+  const [orgDepartments, orgTeams, orgProjects] = scopes;
+  const { canManageOrg, teamManage, projectUpdate } = access;
+  return {
     organization: canManageOrg
       ? { id: organizationId, name: organizationName ?? organizationId }
       : null,
@@ -280,10 +391,58 @@ export async function getDataPrivacySnapshot(
       .filter((p) => projectUpdate.projects.get(p.id))
       .map(({ id, name, teamId }) => ({ id, name, teamId })),
   };
+}
 
-  const audienceOptions: DataPrivacyAudienceOptions = {
-    groups: orgGroups,
-  };
+type OrganizationSnapshotArgs = {
+  ctx: ReadCtx;
+  service: PolicyService;
+  projectId: string;
+  effective: ResolvedDataPrivacy;
+  organizationId: string;
+  organizationName: string | null;
+  teamId: string;
+};
+
+async function organizationSnapshot({
+  ctx,
+  service,
+  projectId,
+  effective,
+  organizationId,
+  organizationName,
+  teamId,
+}: OrganizationSnapshotArgs): Promise<DataPrivacySnapshot> {
+  const scopes = await loadOrganizationScopes({ ctx, service, organizationId });
+  const [, orgTeams, orgProjects, orgGroups, rows, canManageOrg] = scopes;
+
+  const [teamManage, projectUpdate] = await loadScopePermissions({
+    ctx,
+    organizationId,
+    orgTeams,
+    orgProjects,
+  });
+  const access: ScopeAccess = { canManageOrg, teamManage, projectUpdate };
+
+  const allRows = parseRuleRows(rows);
+  const { effectiveTeam, effectiveOrganization } = resolveBaselines({
+    allRows,
+    organizationId,
+    teamId,
+  });
+
+  const rules = buildReadableRules({
+    allRows,
+    scopes,
+    organizationName,
+    access,
+  });
+  const available = buildAvailableScopes({
+    organizationId,
+    organizationName,
+    scopes,
+    access,
+  });
+  const audienceOptions: DataPrivacyAudienceOptions = { groups: orgGroups };
 
   return {
     projectId,

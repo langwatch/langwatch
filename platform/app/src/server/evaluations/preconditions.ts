@@ -283,6 +283,77 @@ export function preconditionsNeedEvents(
 /**
  * Build PreconditionTraceData from a legacy collector trace + spans.
  */
+function extractCustomMetadata(
+  metadata: ElasticSearchTrace["metadata"] | undefined,
+): Record<string, string | null> | null {
+  const customMetadata: Record<string, string | null> = {};
+  if (metadata?.custom) {
+    for (const [key, val] of Object.entries(metadata.custom)) {
+      customMetadata[key] = val != null ? String(val) : null;
+    }
+  }
+  return Object.keys(customMetadata).length > 0 ? customMetadata : null;
+}
+
+function extractSpanModels(spans: Span[]): string[] {
+  return spans
+    .map((span) => (span as LLMSpan).model)
+    .filter(
+      (model): model is string => typeof model === "string" && model !== "",
+    );
+}
+
+function mapPreconditionEvents(
+  events: ElasticSearchTrace["events"] | undefined,
+): PreconditionTraceData["events"] {
+  return (
+    events?.map((e) => ({
+      event_type: e.event_type,
+      metrics: e.metrics ?? [],
+      event_details: e.event_details ?? [],
+    })) ?? null
+  );
+}
+
+type PreconditionMetadataFields = Pick<
+  PreconditionTraceData,
+  | "userId"
+  | "threadId"
+  | "customerId"
+  | "labels"
+  | "promptIds"
+  | "topicId"
+  | "subTopicId"
+>;
+
+function extractTraceMetadataFields(
+  metadata: ElasticSearchTrace["metadata"] | undefined,
+): PreconditionMetadataFields {
+  return {
+    userId: metadata?.user_id ?? null,
+    threadId: metadata?.thread_id ?? null,
+    customerId: metadata?.customer_id ?? null,
+    labels: metadata?.labels ?? null,
+    promptIds: metadata?.prompt_ids ?? null,
+    topicId: metadata?.topic_id ?? null,
+    subTopicId: metadata?.subtopic_id ?? null,
+  };
+}
+
+function extractCommandMetadataFields(
+  data: ExecuteEvaluationCommandData,
+): PreconditionMetadataFields {
+  return {
+    userId: data.userId ?? null,
+    threadId: data.threadId ?? null,
+    customerId: data.customerId ?? null,
+    labels: data.labels ?? null,
+    promptIds: data.promptIds ?? null,
+    topicId: data.topicId ?? null,
+    subTopicId: data.subTopicId ?? null,
+  };
+}
+
 export function buildPreconditionTraceDataFromTrace({
   trace,
   spans,
@@ -299,40 +370,17 @@ export function buildPreconditionTraceDataFromTrace({
   spans: Span[];
   events?: ElasticSearchTrace["events"];
 }): PreconditionTraceData {
-  const customMetadata: Record<string, string | null> = {};
-  if (trace.metadata?.custom) {
-    for (const [key, val] of Object.entries(trace.metadata.custom)) {
-      customMetadata[key] = val != null ? String(val) : null;
-    }
-  }
-
   return {
     input: trace.input?.value ?? null,
     output: trace.output?.value ?? null,
     origin: trace.origin ?? null,
     hasError: trace.error ? true : false,
-    userId: trace.metadata?.user_id ?? null,
-    threadId: trace.metadata?.thread_id ?? null,
-    customerId: trace.metadata?.customer_id ?? null,
-    labels: trace.metadata?.labels ?? null,
-    promptIds: trace.metadata?.prompt_ids ?? null,
-    topicId: trace.metadata?.topic_id ?? null,
-    subTopicId: trace.metadata?.subtopic_id ?? null,
+    ...extractTraceMetadataFields(trace.metadata),
     spanTypes: spans.map((span) => span.type),
-    spanModels: spans
-      .map((span) => (span as LLMSpan).model)
-      .filter(
-        (model): model is string => typeof model === "string" && model !== "",
-      ),
-    customMetadata:
-      Object.keys(customMetadata).length > 0 ? customMetadata : null,
+    spanModels: extractSpanModels(spans),
+    customMetadata: extractCustomMetadata(trace.metadata),
     annotationIds: [], // Not available in legacy collector path
-    events:
-      events?.map((e) => ({
-        event_type: e.event_type,
-        metrics: e.metrics ?? [],
-        event_details: e.event_details ?? [],
-      })) ?? null,
+    events: mapPreconditionEvents(events),
   };
 }
 
@@ -353,21 +401,9 @@ export function buildPreconditionTraceDataFromCommand({
     output: data.computedOutput ?? null,
     origin: data.origin ?? null,
     hasError: data.hasError ?? false,
-    userId: data.userId ?? null,
-    threadId: data.threadId ?? null,
-    customerId: data.customerId ?? null,
-    labels: data.labels ?? null,
-    promptIds: data.promptIds ?? null,
-    topicId: data.topicId ?? null,
-    subTopicId: data.subTopicId ?? null,
+    ...extractCommandMetadataFields(data),
     spanTypes: data.spanTypes ?? spans.map((span) => span.type),
-    spanModels:
-      data.spanModels ??
-      spans
-        .map((span) => (span as LLMSpan).model)
-        .filter(
-          (model): model is string => typeof model === "string" && model !== "",
-        ),
+    spanModels: data.spanModels ?? extractSpanModels(spans),
     customMetadata: data.customMetadata ?? null,
     annotationIds: [], // Not available at command time
     events: events ?? null,

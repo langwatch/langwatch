@@ -139,6 +139,37 @@ function validateAction(action: CacheRuleAction): void {
   }
 }
 
+/** Every omitted field of an update keeps the value the stored row already had. */
+function mergeCacheRuleUpdate({
+  input,
+  existing,
+}: {
+  input: UpdateCacheRuleInput;
+  existing: GatewayCacheRule;
+}) {
+  return {
+    name: input.name ?? existing.name,
+    description:
+      input.description === undefined
+        ? existing.description
+        : input.description,
+    priority: input.priority ?? existing.priority,
+    enabled: input.enabled ?? existing.enabled,
+    matchers:
+      input.matchers !== undefined
+        ? (input.matchers as Prisma.InputJsonValue)
+        : (existing.matchers as Prisma.InputJsonValue),
+    action:
+      input.action !== undefined
+        ? (input.action as Prisma.InputJsonValue)
+        : (existing.action as Prisma.InputJsonValue),
+    modeEnum:
+      input.action !== undefined
+        ? actionToEnum(input.action.mode)
+        : existing.modeEnum,
+  };
+}
+
 /** The sort key of the last cache rule served: (priority, createdAt, id). */
 export interface CacheRuleCursor {
   priority: number;
@@ -262,27 +293,7 @@ export class GatewayCacheRuleService {
     return this.prisma.$transaction(async (tx) => {
       const updated = await tx.gatewayCacheRule.update({
         where: { id: input.id },
-        data: {
-          name: input.name ?? existing.name,
-          description:
-            input.description === undefined
-              ? existing.description
-              : input.description,
-          priority: input.priority ?? existing.priority,
-          enabled: input.enabled ?? existing.enabled,
-          matchers:
-            input.matchers !== undefined
-              ? (input.matchers as Prisma.InputJsonValue)
-              : (existing.matchers as Prisma.InputJsonValue),
-          action:
-            input.action !== undefined
-              ? (input.action as Prisma.InputJsonValue)
-              : (existing.action as Prisma.InputJsonValue),
-          modeEnum:
-            input.action !== undefined
-              ? actionToEnum(input.action.mode)
-              : existing.modeEnum,
-        },
+        data: mergeCacheRuleUpdate({ input, existing }),
       });
       await this.changeEvents.append(
         {

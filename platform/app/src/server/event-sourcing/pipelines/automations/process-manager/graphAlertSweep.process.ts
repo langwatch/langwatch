@@ -50,40 +50,55 @@ export const graphAlertSweepWake: WakeHandler<
   ],
 });
 
+async function evaluateSweepCandidates(
+  deps: GraphAlertSweepDeps,
+  candidates: GraphTriggerSweepCandidate[],
+): Promise<number> {
+  let failures = 0;
+  for (const candidate of candidates) {
+    try {
+      await deps.evaluateGraphTrigger(candidate);
+    } catch (error) {
+      failures++;
+      logger.error(
+        {
+          projectId: candidate.projectId,
+          triggerId: candidate.triggerId,
+          reason: candidate.reason,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        "Graph-alert sweep candidate failed; the next sweep retries it",
+      );
+    }
+  }
+  return failures;
+}
+
+async function pruneSweepOutbox(
+  deps: GraphAlertSweepDeps,
+  startedAt: number,
+): Promise<void> {
+  try {
+    await deps.deleteDispatchedBefore({
+      processName: GRAPH_ALERT_SWEEP_PROCESS_NAME,
+      before: startedAt - SWEEP_ROW_RETENTION_MS,
+    });
+  } catch (error) {
+    logger.warn(
+      { error: error instanceof Error ? error.message : String(error) },
+      "Graph-alert sweep outbox retention failed",
+    );
+  }
+}
+
 export function runGraphAlertSweep(deps: GraphAlertSweepDeps) {
   return async (): Promise<void> => {
     const startedAt = (deps.now ?? Date.now)();
     const candidates = await deps.decideSweepCandidates({
       now: new Date(startedAt),
     });
-    let failures = 0;
-    for (const candidate of candidates) {
-      try {
-        await deps.evaluateGraphTrigger(candidate);
-      } catch (error) {
-        failures++;
-        logger.error(
-          {
-            projectId: candidate.projectId,
-            triggerId: candidate.triggerId,
-            reason: candidate.reason,
-            error: error instanceof Error ? error.message : String(error),
-          },
-          "Graph-alert sweep candidate failed; the next sweep retries it",
-        );
-      }
-    }
-    try {
-      await deps.deleteDispatchedBefore({
-        processName: GRAPH_ALERT_SWEEP_PROCESS_NAME,
-        before: startedAt - SWEEP_ROW_RETENTION_MS,
-      });
-    } catch (error) {
-      logger.warn(
-        { error: error instanceof Error ? error.message : String(error) },
-        "Graph-alert sweep outbox retention failed",
-      );
-    }
+    const failures = await evaluateSweepCandidates(deps, candidates);
+    await pruneSweepOutbox(deps, startedAt);
     if (failures > 0) {
       logger.warn(
         { failures, candidates: candidates.length },

@@ -338,20 +338,31 @@ export class FoldProjectionExecutor {
     return fresh;
   }
 
-  async execute<State, E extends Event>(
-    projection: FoldProjectionDefinition<State, E>,
-    event: E,
-    context: ProjectionStoreContext,
-  ): Promise<State> {
-    if (!this.matchesEventTypes(projection, event)) {
-      return projection.init();
-    }
-
-    const key = context.key ?? context.aggregateId;
-    // Anchor the store read to the event's business time. A fold that declared
-    // a read window gets its backing read bounded to occurredAt ± widthMs, with
-    // the executor retrying unwindowed on a miss (see loadWithApplied).
-    const loadContext = withReadHints({ context, event, projection });
+  /**
+   * Loads existing fold state and, on a miss, attempts the store-miss re-fold
+   * path (see the class docs). Shared by `execute()` and `executeBatch()` —
+   * both call this with the exact same step order (load, undecodable guard,
+   * trusted-absent shortcut, refold attempt, commit-on-refold) and differ only
+   * in what `delivered`/`freshIds` are for a single event vs. a batch.
+   */
+  private async loadOrRefoldOnMiss<State, E extends Event>({
+    projection,
+    key,
+    loadContext,
+    context,
+    delivered,
+    freshIds,
+  }: {
+    projection: FoldProjectionDefinition<State, E>;
+    key: string;
+    loadContext: ProjectionStoreContext;
+    context: ProjectionStoreContext;
+    delivered: E[];
+    freshIds: readonly string[];
+  }): Promise<
+    | { refolded: true; state: State }
+    | { refolded: false; state: State | null; appliedEventIds: string[] }
+  > {
     const {
       state: loaded,
       appliedEventIds,
@@ -383,7 +394,7 @@ export class FoldProjectionExecutor {
     ) {
       const refolded = await this.refoldUpToDelivered(
         projection,
-        [event],
+        delivered,
         context,
       );
       // The ADR-066 transitional net, made observable: its deletion condition is
@@ -401,28 +412,77 @@ export class FoldProjectionExecutor {
             this.appliedIdsForCommit({
               context,
               loadedAppliedIds: appliedEventIds,
-              freshIds: [event.id],
+              freshIds,
             }),
           ),
         );
-        return refolded;
+        return { refolded: true, state: refolded };
       }
       this.assertUndecodableWasRebuilt(projection, miss);
     }
 
-    // A redelivery of an event already folded into the loaded state: the state
-    // is already correct, so there is nothing to apply and nothing to write.
-    if (
-      this.dropAlreadyApplied({
-        projectionName: projection.name,
-        events: [event],
-        appliedEventIds,
-        context,
-      }).length === 0
-    ) {
-      return loaded ?? projection.init();
-    }
+    return { refolded: false, state: loaded, appliedEventIds };
+  }
 
+  /**
+   * Re-folds an aggregate from scratch via `eventLoader`, logging the
+   * recovery first (so the count reflects what is about to be folded).
+   * Shared tail of the out-of-order paths in `execute()` and `executeBatch()`.
+   */
+  private async refoldOutOfOrder<State, E extends Event>({
+    projection,
+    context,
+    occurredAtMs,
+    logMessage,
+    logExtra,
+  }: {
+    projection: FoldProjectionDefinition<State, E>;
+    context: ProjectionStoreContext;
+    occurredAtMs: number;
+    logMessage: string;
+    logExtra: Record<string, unknown>;
+  }): Promise<State> {
+    // CanRefold returns false without an eventLoader.
+    const allEvents = await projection.eventLoader!({
+      tenantId: context.tenantId,
+      aggregateId: context.aggregateId,
+      occurredAtMs,
+    });
+
+    logger.info(
+      {
+        projection: projection.name,
+        aggregateId: context.aggregateId,
+        tenantId: context.tenantId,
+        ...logExtra,
+        refoldEventCount: allEvents.length,
+      },
+      logMessage,
+    );
+
+    let state = projection.init();
+    for (const e of allEvents) {
+      state = projection.apply(state, e as E);
+    }
+    return state;
+  }
+
+  /**
+   * Applies the single delivered event on top of the loaded state, then
+   * detects business-time out-of-order delivery and re-folds from scratch
+   * when the projection admits it (see {@link canRefold}).
+   */
+  private async applyEventAndRefoldIfOutOfOrder<State, E extends Event>({
+    projection,
+    context,
+    event,
+    loaded,
+  }: {
+    projection: FoldProjectionDefinition<State, E>;
+    context: ProjectionStoreContext;
+    event: E;
+    loaded: State | null;
+  }): Promise<State> {
     const loadedState = loaded ?? projection.init();
 
     // Capture the highest occurredAt before applying the new event.
@@ -431,7 +491,7 @@ export class FoldProjectionExecutor {
         projection.LastEventOccurredAtKey
       ] ?? 0;
 
-    let state = projection.apply(loadedState, event);
+    const state = projection.apply(loadedState, event);
 
     // Detect out-of-order: event's occurredAt is STRICTLY LESS than what we've already seen.
     // Same occurredAt (==) does NOT trigger re-fold — arrival order is the correct
@@ -447,31 +507,123 @@ export class FoldProjectionExecutor {
       eventOccurredAt < prevLastOccurred &&
       canRefold(projection, context)
     ) {
-      // CanRefold returns false without an eventLoader.
-      const allEvents = await projection.eventLoader!({
-        tenantId: context.tenantId,
-        aggregateId: context.aggregateId,
+      return this.refoldOutOfOrder({
+        projection,
+        context,
         occurredAtMs: eventOccurredAt,
+        logMessage: "Out-of-order event detected, re-folding from scratch",
+        logExtra: { eventType: event.type, eventOccurredAt, prevLastOccurred },
       });
-
-      logger.info(
-        {
-          projection: projection.name,
-          aggregateId: context.aggregateId,
-          tenantId: context.tenantId,
-          eventType: event.type,
-          eventOccurredAt,
-          prevLastOccurred,
-          refoldEventCount: allEvents.length,
-        },
-        "Out-of-order event detected, re-folding from scratch",
-      );
-
-      state = projection.init();
-      for (const e of allEvents) {
-        state = projection.apply(state, e as E);
-      }
     }
+
+    return state;
+  }
+
+  /**
+   * Applies the batch's fresh events on top of the loaded state, then
+   * detects business-time out-of-order delivery and re-folds from scratch
+   * when the projection admits it (see {@link canRefold}).
+   */
+  private async applyBatchAndRefoldIfOutOfOrder<State, E extends Event>({
+    projection,
+    context,
+    ordered,
+    fresh,
+    loaded,
+  }: {
+    projection: FoldProjectionDefinition<State, E>;
+    context: ProjectionStoreContext;
+    ordered: E[];
+    fresh: E[];
+    loaded: State | null;
+  }): Promise<State> {
+    const loadedState = loaded ?? projection.init();
+
+    const prevLastOccurred =
+      (loadedState as Record<string, unknown>)[
+        projection.LastEventOccurredAtKey
+      ] ?? 0;
+    const earliestOccurredAt = (fresh[0] as Record<string, unknown>).occurredAt;
+
+    // Out-of-order vs the persisted checkpoint: the batch starts earlier than
+    // what we've already folded. Re-fold from scratch when we can load the full
+    // history AND the projection still gains something by replaying it;
+    // otherwise apply the batch on top (matches the single-event executor's
+    // degraded behavior when no eventLoader exists).
+    const isOutOfOrder =
+      projection.options?.eventOrdering !== "acceptedAt" &&
+      typeof earliestOccurredAt === "number" &&
+      earliestOccurredAt > 0 &&
+      typeof prevLastOccurred === "number" &&
+      earliestOccurredAt < prevLastOccurred;
+
+    if (isOutOfOrder && canRefold(projection, context)) {
+      return this.refoldOutOfOrder({
+        projection,
+        context,
+        occurredAtMs: earliestOccurredAt,
+        logMessage: "Out-of-order batch detected, re-folding from scratch",
+        logExtra: {
+          batchSize: ordered.length,
+          earliestOccurredAt,
+          prevLastOccurred,
+        },
+      });
+    }
+
+    let state = loadedState;
+    for (const event of fresh) {
+      state = projection.apply(state, event);
+    }
+    return state;
+  }
+
+  async execute<State, E extends Event>(
+    projection: FoldProjectionDefinition<State, E>,
+    event: E,
+    context: ProjectionStoreContext,
+  ): Promise<State> {
+    if (!this.matchesEventTypes(projection, event)) {
+      return projection.init();
+    }
+
+    const key = context.key ?? context.aggregateId;
+    // Anchor the store read to the event's business time. A fold that declared
+    // a read window gets its backing read bounded to occurredAt ± widthMs, with
+    // the executor retrying unwindowed on a miss (see loadWithApplied).
+    const loadContext = withReadHints({ context, event, projection });
+    const loadResult = await this.loadOrRefoldOnMiss({
+      projection,
+      key,
+      loadContext,
+      context,
+      delivered: [event],
+      freshIds: [event.id],
+    });
+    if (loadResult.refolded) {
+      return loadResult.state;
+    }
+    const { state: loaded, appliedEventIds } = loadResult;
+
+    // A redelivery of an event already folded into the loaded state: the state
+    // is already correct, so there is nothing to apply and nothing to write.
+    if (
+      this.dropAlreadyApplied({
+        projectionName: projection.name,
+        events: [event],
+        appliedEventIds,
+        context,
+      }).length === 0
+    ) {
+      return loaded ?? projection.init();
+    }
+
+    const state = await this.applyEventAndRefoldIfOutOfOrder({
+      projection,
+      context,
+      event,
+      loaded,
+    });
 
     await projection.store.store(
       state,
@@ -534,55 +686,18 @@ export class FoldProjectionExecutor {
       event: ordered[0]!,
       projection,
     });
-    const {
-      state: loaded,
-      appliedEventIds,
-      miss,
-    } = await this.loadWithApplied({
+    const loadResult = await this.loadOrRefoldOnMiss({
       projection,
       key,
-      context: loadContext,
+      loadContext,
+      context,
+      delivered: ordered,
+      freshIds: ordered.map((event) => event.id),
     });
-    if (loaded === null) this.assertUndecodableIsRecoverable(projection, miss);
-
-    // Same trusted-absent shortcut as the single-event path above.
-    const absentTrusted =
-      loaded === null && miss === "absent" && this.trustsAbsentMiss(projection);
-    if (absentTrusted && this.shouldRefoldOnMiss(projection)) {
-      incrementEsFoldAbsentMissTrustedTotal(projection.name, "refold");
+    if (loadResult.refolded) {
+      return loadResult.state;
     }
-
-    if (
-      loaded === null &&
-      !absentTrusted &&
-      this.shouldRefoldOnMiss(projection)
-    ) {
-      const refolded = await this.refoldUpToDelivered(
-        projection,
-        ordered,
-        context,
-      );
-      // Counted as on the single-event path above.
-      incrementEsFoldRefoldOnMissTotal(
-        projection.name,
-        refolded === null ? "absent" : "performed",
-      );
-      if (refolded !== null) {
-        await projection.store.store(
-          refolded,
-          withAppliedEventIds(
-            context,
-            this.appliedIdsForCommit({
-              context,
-              loadedAppliedIds: appliedEventIds,
-              freshIds: ordered.map((event) => event.id),
-            }),
-          ),
-        );
-        return refolded;
-      }
-      this.assertUndecodableWasRebuilt(projection, miss);
-    }
+    const { state: loaded, appliedEventIds } = loadResult;
 
     const fresh = this.dropAlreadyApplied({
       projectionName: projection.name,
@@ -596,55 +711,13 @@ export class FoldProjectionExecutor {
       return loaded ?? projection.init();
     }
 
-    const loadedState = loaded ?? projection.init();
-
-    const prevLastOccurred =
-      (loadedState as Record<string, unknown>)[
-        projection.LastEventOccurredAtKey
-      ] ?? 0;
-    const earliestOccurredAt = (fresh[0] as Record<string, unknown>).occurredAt;
-
-    // Out-of-order vs the persisted checkpoint: the batch starts earlier than
-    // what we've already folded. Re-fold from scratch when we can load the full
-    // history AND the projection still gains something by replaying it;
-    // otherwise apply the batch on top (matches the single-event executor's
-    // degraded behavior when no eventLoader exists).
-    const isOutOfOrder =
-      projection.options?.eventOrdering !== "acceptedAt" &&
-      typeof earliestOccurredAt === "number" &&
-      earliestOccurredAt > 0 &&
-      typeof prevLastOccurred === "number" &&
-      earliestOccurredAt < prevLastOccurred;
-
-    let state = loadedState;
-    if (isOutOfOrder && canRefold(projection, context)) {
-      // CanRefold returns false without an eventLoader.
-      const allEvents = await projection.eventLoader!({
-        tenantId: context.tenantId,
-        aggregateId: context.aggregateId,
-        occurredAtMs: earliestOccurredAt,
-      });
-      logger.info(
-        {
-          projection: projection.name,
-          aggregateId: context.aggregateId,
-          tenantId: context.tenantId,
-          batchSize: ordered.length,
-          earliestOccurredAt,
-          prevLastOccurred,
-          refoldEventCount: allEvents.length,
-        },
-        "Out-of-order batch detected, re-folding from scratch",
-      );
-      state = projection.init();
-      for (const e of allEvents) {
-        state = projection.apply(state, e as E);
-      }
-    } else {
-      for (const event of fresh) {
-        state = projection.apply(state, event);
-      }
-    }
+    const state = await this.applyBatchAndRefoldIfOutOfOrder({
+      projection,
+      context,
+      ordered,
+      fresh,
+      loaded,
+    });
 
     await projection.store.store(
       state,
@@ -856,18 +929,46 @@ export class FoldProjectionExecutor {
    * - Missing delivered: any delivered event the history read did not return
    *   (event-log read lag) is applied on top, as the array path does.
    */
-  private async streamRefoldUpToDelivered<State, E extends Event>({
+  /** Folds one page's events into `state`, deduping against `seen` in place. */
+  private foldPageInto<State, E extends Event>({
     projection,
-    delivered,
-    context,
-    upToEvent,
+    page,
+    seen,
+    state,
   }: {
     projection: FoldProjectionDefinition<State, E>;
-    delivered: E[];
+    page: readonly E[];
+    seen: Set<string>;
+    state: State;
+  }): { state: State; appliedCount: number } {
+    let nextState = state;
+    let appliedCount = 0;
+    for (const event of page) {
+      const dedupKey = event.idempotencyKey || event.id;
+      if (seen.has(dedupKey)) continue;
+      seen.add(dedupKey);
+      nextState = projection.apply(nextState, event);
+      appliedCount++;
+    }
+    return { state: nextState, appliedCount };
+  }
+
+  /**
+   * Pages the aggregate's history via `eventLoaderUpToPaged`, folding each
+   * page as it arrives. See {@link streamRefoldUpToDelivered} for the memory
+   * rationale and the `seen` dedup contract.
+   */
+  private async foldAllPages<State, E extends Event>({
+    projection,
+    context,
+    upToEvent,
+    pageSize,
+  }: {
+    projection: FoldProjectionDefinition<State, E>;
     context: ProjectionStoreContext;
     upToEvent: E;
-  }): Promise<State | null> {
-    const PAGE_SIZE = this.refoldPageSize;
+    pageSize: number;
+  }): Promise<{ state: State; seen: Set<string>; refoldEventCount: number }> {
     // Safety net only: the paged loader's cursor is expected to strictly
     // advance every call. If that contract is ever violated (e.g. a
     // non-advancing cursor from a repository bug), this bounds the loop
@@ -892,22 +993,43 @@ export class FoldProjectionExecutor {
         aggregateId: context.aggregateId,
         upToEvent,
         after,
-        limit: PAGE_SIZE,
+        limit: pageSize,
       });
       if (page.length === 0) break;
 
-      for (const event of page) {
-        const dedupKey = event.idempotencyKey || event.id;
-        if (seen.has(dedupKey)) continue;
-        seen.add(dedupKey);
-        state = projection.apply(state, event as E);
-        refoldEventCount++;
-      }
+      const folded = this.foldPageInto({ projection, page, seen, state });
+      state = folded.state;
+      refoldEventCount += folded.appliedCount;
 
       const last = page[page.length - 1]!;
       after = { timestamp: last.createdAt, eventId: last.id };
-      if (page.length < PAGE_SIZE) break;
+      if (page.length < pageSize) break;
     }
+
+    return { state, seen, refoldEventCount };
+  }
+
+  private async streamRefoldUpToDelivered<State, E extends Event>({
+    projection,
+    delivered,
+    context,
+    upToEvent,
+  }: {
+    projection: FoldProjectionDefinition<State, E>;
+    delivered: E[];
+    context: ProjectionStoreContext;
+    upToEvent: E;
+  }): Promise<State | null> {
+    const {
+      state: pagedState,
+      seen,
+      refoldEventCount,
+    } = await this.foldAllPages({
+      projection,
+      context,
+      upToEvent,
+      pageSize: this.refoldPageSize,
+    });
 
     if (refoldEventCount === 0) return null;
 
@@ -923,6 +1045,7 @@ export class FoldProjectionExecutor {
       "Store miss with refoldOnStoreMiss — streamed re-fold from the event log",
     );
 
+    let state = pagedState;
     for (const event of delivered) {
       const dedupKey = event.idempotencyKey || event.id;
       if (seen.has(dedupKey)) continue;

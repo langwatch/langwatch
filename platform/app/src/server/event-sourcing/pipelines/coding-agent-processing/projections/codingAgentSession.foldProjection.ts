@@ -461,6 +461,275 @@ export interface CodingAgentSessionRow {
   lastEventOccurredAt: number;
 }
 
+function rowIdentityFields({
+  state,
+  tenantId,
+  sessionId,
+  version,
+}: {
+  state: CodingAgentSessionState;
+  tenantId: string;
+  sessionId: string;
+  version: string;
+}): Pick<
+  CodingAgentSessionRow,
+  | "tenantId"
+  | "sessionId"
+  | "sessionKeySource"
+  | "version"
+  | "startedAtMs"
+  | "agent"
+  | "agentVersion"
+  | "traceIds"
+  | "finalRequestId"
+  | "userId"
+  | "terminalType"
+  | "entrypoint"
+> {
+  return {
+    tenantId,
+    sessionId,
+    sessionKeySource: state.sessionKeySource,
+    version,
+    startedAtMs: state.startedAtMs,
+
+    agent: state.agent ?? "",
+    agentVersion: state.agentVersion ?? "",
+    traceIds: state.traceIds,
+    finalRequestId: state.finalRequestId ?? "",
+    userId: state.userId ?? "",
+    terminalType: state.terminalType ?? "",
+    entrypoint: state.entrypoint ?? "",
+  };
+}
+
+function rowActivityFields(
+  state: CodingAgentSessionState,
+): Pick<
+  CodingAgentSessionRow,
+  | "modelCalls"
+  | "toolCalls"
+  | "subAgents"
+  | "prompts"
+  | "promptChars"
+  | "responseChars"
+  | "steps"
+  | "toolCounts"
+  | "toolDurationMs"
+  | "filesTouched"
+  | "skills"
+  | "subAgentTypes"
+  | "slashCommands"
+  | "models"
+  | "mcpServers"
+  | "mcpTools"
+> {
+  return {
+    modelCalls: state.modelCalls,
+    toolCalls: state.toolCalls,
+    subAgents: state.subAgents,
+    prompts: state.prompts,
+    promptChars: state.promptChars,
+    responseChars: state.responseChars,
+    steps: state.steps.map((s) => [s.name, s.count, s.failed]),
+
+    toolCounts: state.toolCounts,
+    toolDurationMs: state.toolDurationMs,
+    filesTouched: state.filesTouched,
+    skills: state.skills,
+    subAgentTypes: state.subAgentTypes,
+    slashCommands: state.slashCommands,
+    models: state.models,
+    mcpServers: state.mcpServers,
+    mcpTools: state.mcpTools,
+  };
+}
+
+function rowTokenFields(
+  state: CodingAgentSessionState,
+): Pick<
+  CodingAgentSessionRow,
+  | "inputTokens"
+  | "outputTokens"
+  | "cacheReadTokens"
+  | "cacheCreationTokens"
+  | "costUsd"
+> {
+  return {
+    inputTokens: state.inputTokens,
+    outputTokens: state.outputTokens,
+    cacheReadTokens: state.cacheReadTokens,
+    cacheCreationTokens: state.cacheCreationTokens,
+    costUsd: state.costUsd,
+  };
+}
+
+function rowTimingFields(
+  state: CodingAgentSessionState,
+): Pick<
+  CodingAgentSessionRow,
+  | "modelCallMs"
+  | "toolMs"
+  | "ttftMsTotal"
+  | "ttftSamples"
+  | "blockedOnUserMs"
+  | "activeTimeUserSec"
+  | "activeTimeCliSec"
+> {
+  return {
+    modelCallMs: state.modelCallMs,
+    toolMs: state.toolMs,
+    ttftMsTotal: state.ttftMsTotal,
+    ttftSamples: state.ttftSamples,
+    blockedOnUserMs: state.blockedOnUserMs,
+    activeTimeUserSec: state.activeTimeUserSec,
+    activeTimeCliSec: state.activeTimeCliSec,
+  };
+}
+
+function rowContextStatsFields(
+  state: CodingAgentSessionState,
+): Pick<
+  CodingAgentSessionRow,
+  | "toolResultBytes"
+  | "toolInputBytes"
+  | "compactions"
+  | "compactionTokensBefore"
+  | "compactionTokensAfter"
+  | "peakContextTokens"
+  | "cacheRebuildCount"
+  | "largestCacheRebuildTokens"
+> {
+  return {
+    toolResultBytes: state.toolResultBytes,
+    toolInputBytes: state.toolInputBytes,
+    compactions: state.compactions,
+    compactionTokensBefore: state.compactionTokensBefore,
+    compactionTokensAfter: state.compactionTokensAfter,
+    peakContextTokens: state.peakContextTokens,
+    cacheRebuildCount: state.cacheRebuildCount,
+    largestCacheRebuildTokens: state.largestCacheRebuildTokens,
+  };
+}
+
+function rowErrorFields(
+  state: CodingAgentSessionState,
+): Pick<
+  CodingAgentSessionRow,
+  | "failedTools"
+  | "errorTypes"
+  | "apiErrors"
+  | "rateLimited"
+  | "retriesExhausted"
+  | "retryMs"
+  | "attempts"
+  | "refusals"
+  | "refusalCategories"
+  | "internalErrors"
+> {
+  return {
+    failedTools: state.failedTools,
+    errorTypes: state.errorTypes,
+    apiErrors: state.apiErrors,
+    rateLimited: state.rateLimited,
+    retriesExhausted: state.retriesExhausted,
+    retryMs: state.retryMs,
+    attempts: state.attempts,
+    refusals: state.refusals,
+    refusalCategories: state.refusalCategories,
+    internalErrors: state.internalErrors,
+  };
+}
+
+function rowPermissionFields(
+  state: CodingAgentSessionState,
+): Pick<
+  CodingAgentSessionRow,
+  | "toolsDenied"
+  | "toolsAborted"
+  | "permissionMode"
+  | "permissionChanges"
+  | "hooksBlocked"
+  | "hooksCancelled"
+  | "hookMs"
+> {
+  return {
+    toolsDenied: state.toolsDenied,
+    toolsAborted: state.toolsAborted,
+    permissionMode: state.permissionMode ?? "",
+    permissionChanges: state.permissionChanges,
+    hooksBlocked: state.hooksBlocked,
+    hooksCancelled: state.hooksCancelled,
+    hookMs: state.hookMs,
+  };
+}
+
+function rowCodeEditingFields(
+  state: CodingAgentSessionState,
+): Pick<
+  CodingAgentSessionRow,
+  | "linesAdded"
+  | "linesRemoved"
+  | "commits"
+  | "pullRequests"
+  | "editsAccepted"
+  | "editsRejected"
+  | "languagesEdited"
+  | "atMentions"
+> {
+  return {
+    linesAdded: state.linesAdded,
+    linesRemoved: state.linesRemoved,
+    commits: state.commits,
+    pullRequests: state.pullRequests,
+    editsAccepted: state.editsAccepted,
+    editsRejected: state.editsRejected,
+    languagesEdited: state.languagesEdited,
+    atMentions: state.atMentions,
+  };
+}
+
+function rowOutcomeFields(
+  state: CodingAgentSessionState,
+): Pick<CodingAgentSessionRow, "stopReason" | "truncated"> {
+  return {
+    stopReason: state.stopReason ?? "",
+    truncated: state.truncated,
+  };
+}
+
+function rowReadBackStateFields(
+  state: CodingAgentSessionState,
+): Pick<
+  CodingAgentSessionRow,
+  | "subAgentIds"
+  | "stepStartedAt"
+  | "previousCallContextTokens"
+  | "metricSeries"
+  | "createdAt"
+  | "updatedAt"
+  | "lastEventOccurredAt"
+> {
+  return {
+    subAgentIds: state.subAgentIds,
+    stepStartedAt: state.steps.map((s) => s.startedAtMs),
+    previousCallContextTokens: state.previousCallContextTokens,
+    metricSeries: Object.entries(state.metricSeries).map(
+      ([seriesId, fact]) => ({
+        seriesId,
+        metricName: fact.metricName,
+        type: fact.type ?? "",
+        decision: fact.decision ?? "",
+        language: fact.language ?? "",
+        value: fact.value,
+      }),
+    ),
+    createdAt: state.createdAt,
+    updatedAt: state.updatedAt,
+    lastEventOccurredAt: state.LastEventOccurredAt,
+  };
+}
+
 /**
  * Project the fold state into the row. Every heavy thing stays out: the row
  * carries counters, bounded sets, and the IDS that reach the spans, the logs and
@@ -480,108 +749,16 @@ export function projectCodingAgentSessionToRow({
   version: string;
 }): CodingAgentSessionRow {
   return {
-    tenantId,
-    sessionId,
-    sessionKeySource: state.sessionKeySource,
-    version,
-    startedAtMs: state.startedAtMs,
-
-    agent: state.agent ?? "",
-    agentVersion: state.agentVersion ?? "",
-    traceIds: state.traceIds,
-    finalRequestId: state.finalRequestId ?? "",
-    userId: state.userId ?? "",
-    terminalType: state.terminalType ?? "",
-    entrypoint: state.entrypoint ?? "",
-
-    modelCalls: state.modelCalls,
-    toolCalls: state.toolCalls,
-    subAgents: state.subAgents,
-    prompts: state.prompts,
-    promptChars: state.promptChars,
-    responseChars: state.responseChars,
-    steps: state.steps.map((s) => [s.name, s.count, s.failed]),
-
-    toolCounts: state.toolCounts,
-    toolDurationMs: state.toolDurationMs,
-    filesTouched: state.filesTouched,
-    skills: state.skills,
-    subAgentTypes: state.subAgentTypes,
-    slashCommands: state.slashCommands,
-    models: state.models,
-    mcpServers: state.mcpServers,
-    mcpTools: state.mcpTools,
-
-    inputTokens: state.inputTokens,
-    outputTokens: state.outputTokens,
-    cacheReadTokens: state.cacheReadTokens,
-    cacheCreationTokens: state.cacheCreationTokens,
-    costUsd: state.costUsd,
-
-    modelCallMs: state.modelCallMs,
-    toolMs: state.toolMs,
-    ttftMsTotal: state.ttftMsTotal,
-    ttftSamples: state.ttftSamples,
-    blockedOnUserMs: state.blockedOnUserMs,
-    activeTimeUserSec: state.activeTimeUserSec,
-    activeTimeCliSec: state.activeTimeCliSec,
-
-    toolResultBytes: state.toolResultBytes,
-    toolInputBytes: state.toolInputBytes,
-    compactions: state.compactions,
-    compactionTokensBefore: state.compactionTokensBefore,
-    compactionTokensAfter: state.compactionTokensAfter,
-    peakContextTokens: state.peakContextTokens,
-    cacheRebuildCount: state.cacheRebuildCount,
-    largestCacheRebuildTokens: state.largestCacheRebuildTokens,
-
-    failedTools: state.failedTools,
-    errorTypes: state.errorTypes,
-    apiErrors: state.apiErrors,
-    rateLimited: state.rateLimited,
-    retriesExhausted: state.retriesExhausted,
-    retryMs: state.retryMs,
-    attempts: state.attempts,
-    refusals: state.refusals,
-    refusalCategories: state.refusalCategories,
-    internalErrors: state.internalErrors,
-
-    toolsDenied: state.toolsDenied,
-    toolsAborted: state.toolsAborted,
-    permissionMode: state.permissionMode ?? "",
-    permissionChanges: state.permissionChanges,
-    hooksBlocked: state.hooksBlocked,
-    hooksCancelled: state.hooksCancelled,
-    hookMs: state.hookMs,
-
-    linesAdded: state.linesAdded,
-    linesRemoved: state.linesRemoved,
-    commits: state.commits,
-    pullRequests: state.pullRequests,
-    editsAccepted: state.editsAccepted,
-    editsRejected: state.editsRejected,
-    languagesEdited: state.languagesEdited,
-    atMentions: state.atMentions,
-
-    stopReason: state.stopReason ?? "",
-    truncated: state.truncated,
-
-    subAgentIds: state.subAgentIds,
-    stepStartedAt: state.steps.map((s) => s.startedAtMs),
-    previousCallContextTokens: state.previousCallContextTokens,
-    metricSeries: Object.entries(state.metricSeries).map(
-      ([seriesId, fact]) => ({
-        seriesId,
-        metricName: fact.metricName,
-        type: fact.type ?? "",
-        decision: fact.decision ?? "",
-        language: fact.language ?? "",
-        value: fact.value,
-      }),
-    ),
-    createdAt: state.createdAt,
-    updatedAt: state.updatedAt,
-    lastEventOccurredAt: state.LastEventOccurredAt,
+    ...rowIdentityFields({ state, tenantId, sessionId, version }),
+    ...rowActivityFields(state),
+    ...rowTokenFields(state),
+    ...rowTimingFields(state),
+    ...rowContextStatsFields(state),
+    ...rowErrorFields(state),
+    ...rowPermissionFields(state),
+    ...rowCodeEditingFields(state),
+    ...rowOutcomeFields(state),
+    ...rowReadBackStateFields(state),
   };
 }
 
@@ -613,9 +790,221 @@ const nullIfEmpty = (value: string): string | null =>
  * from `event_log` once. A caller that bypasses the version gate gets the
  * defaults above.
  */
-export function codingAgentSessionStateFromRow(
+function stateIdentityFields(
   row: CodingAgentSessionRow,
-): CodingAgentSessionState {
+): Pick<
+  CodingAgentSessionState,
+  | "agent"
+  | "sessionId"
+  | "agentVersion"
+  | "terminalType"
+  | "entrypoint"
+  | "finalRequestId"
+  | "userId"
+> {
+  return {
+    agent: nullIfEmpty(row.agent),
+    sessionId: nullIfEmpty(row.sessionId),
+    agentVersion: nullIfEmpty(row.agentVersion),
+    terminalType: nullIfEmpty(row.terminalType),
+    entrypoint: nullIfEmpty(row.entrypoint),
+    finalRequestId: nullIfEmpty(row.finalRequestId),
+    userId: nullIfEmpty(row.userId),
+  };
+}
+
+function stateActivityFields(
+  row: CodingAgentSessionRow,
+): Pick<
+  CodingAgentSessionState,
+  | "modelCalls"
+  | "toolCalls"
+  | "subAgents"
+  | "subAgentIds"
+  | "steps"
+  | "prompts"
+  | "promptChars"
+  | "responseChars"
+> {
+  return {
+    modelCalls: row.modelCalls,
+    toolCalls: row.toolCalls,
+    subAgents: row.subAgents,
+    subAgentIds: row.subAgentIds,
+    steps: row.steps.map((step, index) => ({
+      name: step[0],
+      count: step[1],
+      failed: step[2],
+      startedAtMs: row.stepStartedAt[index] ?? 0,
+    })),
+    prompts: row.prompts,
+    promptChars: row.promptChars,
+    responseChars: row.responseChars,
+  };
+}
+
+function stateToolDetailFields(
+  row: CodingAgentSessionRow,
+): Pick<
+  CodingAgentSessionState,
+  | "toolCounts"
+  | "toolDurationMs"
+  | "filesTouched"
+  | "skills"
+  | "subAgentTypes"
+  | "slashCommands"
+  | "models"
+  | "mcpServers"
+  | "mcpTools"
+> {
+  return {
+    toolCounts: row.toolCounts,
+    toolDurationMs: row.toolDurationMs,
+    filesTouched: row.filesTouched,
+    skills: row.skills,
+    subAgentTypes: row.subAgentTypes,
+    slashCommands: row.slashCommands,
+    models: row.models,
+    mcpServers: row.mcpServers,
+    mcpTools: row.mcpTools,
+  };
+}
+
+function stateTokenFields(
+  row: CodingAgentSessionRow,
+): Pick<
+  CodingAgentSessionState,
+  | "inputTokens"
+  | "outputTokens"
+  | "cacheReadTokens"
+  | "cacheCreationTokens"
+  | "costUsd"
+> {
+  return {
+    inputTokens: row.inputTokens,
+    outputTokens: row.outputTokens,
+    cacheReadTokens: row.cacheReadTokens,
+    cacheCreationTokens: row.cacheCreationTokens,
+    costUsd: row.costUsd,
+  };
+}
+
+function stateTimingFields(
+  row: CodingAgentSessionRow,
+): Pick<
+  CodingAgentSessionState,
+  | "modelCallMs"
+  | "toolMs"
+  | "ttftMsTotal"
+  | "ttftSamples"
+  | "blockedOnUserMs"
+  | "activeTimeUserSec"
+  | "activeTimeCliSec"
+> {
+  return {
+    modelCallMs: row.modelCallMs,
+    toolMs: row.toolMs,
+    ttftMsTotal: row.ttftMsTotal,
+    ttftSamples: row.ttftSamples,
+    blockedOnUserMs: row.blockedOnUserMs,
+    activeTimeUserSec: row.activeTimeUserSec,
+    activeTimeCliSec: row.activeTimeCliSec,
+  };
+}
+
+function stateContextStatsFields(
+  row: CodingAgentSessionRow,
+): Pick<
+  CodingAgentSessionState,
+  | "toolResultBytes"
+  | "toolInputBytes"
+  | "compactions"
+  | "compactionTokensBefore"
+  | "compactionTokensAfter"
+  | "peakContextTokens"
+  | "cacheRebuildCount"
+  | "largestCacheRebuildTokens"
+  | "previousCallContextTokens"
+> {
+  return {
+    toolResultBytes: row.toolResultBytes,
+    toolInputBytes: row.toolInputBytes,
+    compactions: row.compactions,
+    compactionTokensBefore: row.compactionTokensBefore,
+    compactionTokensAfter: row.compactionTokensAfter,
+    peakContextTokens: row.peakContextTokens,
+    cacheRebuildCount: row.cacheRebuildCount,
+    largestCacheRebuildTokens: row.largestCacheRebuildTokens,
+    previousCallContextTokens: row.previousCallContextTokens,
+  };
+}
+
+function stateErrorFields(
+  row: CodingAgentSessionRow,
+): Pick<
+  CodingAgentSessionState,
+  | "failedTools"
+  | "errorTypes"
+  | "apiErrors"
+  | "rateLimited"
+  | "retriesExhausted"
+  | "retryMs"
+  | "attempts"
+  | "refusals"
+  | "refusalCategories"
+  | "internalErrors"
+> {
+  return {
+    failedTools: row.failedTools,
+    errorTypes: row.errorTypes,
+    apiErrors: row.apiErrors,
+    rateLimited: row.rateLimited,
+    retriesExhausted: row.retriesExhausted,
+    retryMs: row.retryMs,
+    attempts: row.attempts,
+    refusals: row.refusals,
+    refusalCategories: row.refusalCategories,
+    internalErrors: row.internalErrors,
+  };
+}
+
+function statePermissionFields(
+  row: CodingAgentSessionRow,
+): Pick<
+  CodingAgentSessionState,
+  | "toolsDenied"
+  | "toolsAborted"
+  | "permissionMode"
+  | "permissionChanges"
+  | "hooksBlocked"
+  | "hooksCancelled"
+  | "hookMs"
+> {
+  return {
+    toolsDenied: row.toolsDenied,
+    toolsAborted: row.toolsAborted,
+    permissionMode: nullIfEmpty(row.permissionMode),
+    permissionChanges: row.permissionChanges,
+    hooksBlocked: row.hooksBlocked,
+    hooksCancelled: row.hooksCancelled,
+    hookMs: row.hookMs,
+  };
+}
+
+function stateCodeEditingFields(
+  row: CodingAgentSessionRow,
+): Pick<
+  CodingAgentSessionState,
+  | "metricSeries"
+  | "linesAdded"
+  | "linesRemoved"
+  | "commits"
+  | "pullRequests"
+  | "editsAccepted"
+  | "editsRejected"
+  | "languagesEdited"
+  | "atMentions"
+> {
   const metricSeries: Record<string, MetricSeriesFact> = Object.fromEntries(
     row.metricSeries.map((unit) => [
       unit.seriesId,
@@ -630,81 +1019,6 @@ export function codingAgentSessionStateFromRow(
   );
 
   return {
-    agent: nullIfEmpty(row.agent),
-    sessionId: nullIfEmpty(row.sessionId),
-    agentVersion: nullIfEmpty(row.agentVersion),
-    terminalType: nullIfEmpty(row.terminalType),
-    entrypoint: nullIfEmpty(row.entrypoint),
-    finalRequestId: nullIfEmpty(row.finalRequestId),
-    userId: nullIfEmpty(row.userId),
-
-    modelCalls: row.modelCalls,
-    toolCalls: row.toolCalls,
-    subAgents: row.subAgents,
-    subAgentIds: row.subAgentIds,
-    steps: row.steps.map((step, index) => ({
-      name: step[0],
-      count: step[1],
-      failed: step[2],
-      startedAtMs: row.stepStartedAt[index] ?? 0,
-    })),
-    prompts: row.prompts,
-    promptChars: row.promptChars,
-    responseChars: row.responseChars,
-
-    toolCounts: row.toolCounts,
-    toolDurationMs: row.toolDurationMs,
-    filesTouched: row.filesTouched,
-    skills: row.skills,
-    subAgentTypes: row.subAgentTypes,
-    slashCommands: row.slashCommands,
-    models: row.models,
-    mcpServers: row.mcpServers,
-    mcpTools: row.mcpTools,
-
-    inputTokens: row.inputTokens,
-    outputTokens: row.outputTokens,
-    cacheReadTokens: row.cacheReadTokens,
-    cacheCreationTokens: row.cacheCreationTokens,
-    costUsd: row.costUsd,
-
-    modelCallMs: row.modelCallMs,
-    toolMs: row.toolMs,
-    ttftMsTotal: row.ttftMsTotal,
-    ttftSamples: row.ttftSamples,
-    blockedOnUserMs: row.blockedOnUserMs,
-    activeTimeUserSec: row.activeTimeUserSec,
-    activeTimeCliSec: row.activeTimeCliSec,
-
-    toolResultBytes: row.toolResultBytes,
-    toolInputBytes: row.toolInputBytes,
-    compactions: row.compactions,
-    compactionTokensBefore: row.compactionTokensBefore,
-    compactionTokensAfter: row.compactionTokensAfter,
-    peakContextTokens: row.peakContextTokens,
-    cacheRebuildCount: row.cacheRebuildCount,
-    largestCacheRebuildTokens: row.largestCacheRebuildTokens,
-    previousCallContextTokens: row.previousCallContextTokens,
-
-    failedTools: row.failedTools,
-    errorTypes: row.errorTypes,
-    apiErrors: row.apiErrors,
-    rateLimited: row.rateLimited,
-    retriesExhausted: row.retriesExhausted,
-    retryMs: row.retryMs,
-    attempts: row.attempts,
-    refusals: row.refusals,
-    refusalCategories: row.refusalCategories,
-    internalErrors: row.internalErrors,
-
-    toolsDenied: row.toolsDenied,
-    toolsAborted: row.toolsAborted,
-    permissionMode: nullIfEmpty(row.permissionMode),
-    permissionChanges: row.permissionChanges,
-    hooksBlocked: row.hooksBlocked,
-    hooksCancelled: row.hooksCancelled,
-    hookMs: row.hookMs,
-
     metricSeries,
     linesAdded: row.linesAdded,
     linesRemoved: row.linesRemoved,
@@ -714,15 +1028,53 @@ export function codingAgentSessionStateFromRow(
     editsRejected: row.editsRejected,
     languagesEdited: row.languagesEdited,
     atMentions: row.atMentions,
+  };
+}
 
+function stateOutcomeFields(
+  row: CodingAgentSessionRow,
+): Pick<CodingAgentSessionState, "stopReason" | "truncated"> {
+  return {
     stopReason: nullIfEmpty(row.stopReason),
     truncated: row.truncated,
+  };
+}
 
+function stateBookkeepingFields(
+  row: CodingAgentSessionRow,
+): Pick<
+  CodingAgentSessionState,
+  | "sessionKeySource"
+  | "traceIds"
+  | "startedAtMs"
+  | "createdAt"
+  | "updatedAt"
+  | "LastEventOccurredAt"
+> {
+  return {
     sessionKeySource: row.sessionKeySource,
     traceIds: row.traceIds,
     startedAtMs: row.startedAtMs,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
     LastEventOccurredAt: row.lastEventOccurredAt,
+  };
+}
+
+export function codingAgentSessionStateFromRow(
+  row: CodingAgentSessionRow,
+): CodingAgentSessionState {
+  return {
+    ...stateIdentityFields(row),
+    ...stateActivityFields(row),
+    ...stateToolDetailFields(row),
+    ...stateTokenFields(row),
+    ...stateTimingFields(row),
+    ...stateContextStatsFields(row),
+    ...stateErrorFields(row),
+    ...statePermissionFields(row),
+    ...stateCodeEditingFields(row),
+    ...stateOutcomeFields(row),
+    ...stateBookkeepingFields(row),
   };
 }

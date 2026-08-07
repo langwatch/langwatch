@@ -195,26 +195,33 @@ const configuredDisplayName = (entry: CustomModelEntry): string | null => {
  * it answers "what can this model do", this answers "what do we call
  * it".
  */
+const recordRowDisplayNames = (
+  row: MaybeStoredModelProvider,
+  displayNames: Record<string, string>,
+): void => {
+  const entries = [
+    ...customEntriesOf(row.customModels),
+    ...customEntriesOf(row.customEmbeddingsModels),
+  ];
+
+  for (const entry of entries) {
+    const displayName = configuredDisplayName(entry);
+    if (!displayName) continue;
+
+    const keys = [`${row.provider}/${entry.modelId}`];
+    if (row.id) keys.push(`${row.id}/${entry.modelId}`);
+
+    for (const key of keys) displayNames[key] ??= displayName;
+  }
+};
+
 export const buildCustomModelDisplayNames = (
   modelProviders: readonly MaybeStoredModelProvider[],
 ): Record<string, string> => {
   const displayNames: Record<string, string> = {};
 
   for (const row of [...modelProviders].sort(byPrecedence)) {
-    const entries = [
-      ...customEntriesOf(row.customModels),
-      ...customEntriesOf(row.customEmbeddingsModels),
-    ];
-
-    for (const entry of entries) {
-      const displayName = configuredDisplayName(entry);
-      if (!displayName) continue;
-
-      const keys = [`${row.provider}/${entry.modelId}`];
-      if (row.id) keys.push(`${row.id}/${entry.modelId}`);
-
-      for (const key of keys) displayNames[key] ??= displayName;
-    }
+    recordRowDisplayNames(row, displayNames);
   }
 
   return displayNames;

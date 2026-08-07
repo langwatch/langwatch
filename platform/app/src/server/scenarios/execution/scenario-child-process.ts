@@ -90,6 +90,99 @@ async function readJobDataFromStdin(): Promise<ChildProcessJobData> {
   });
 }
 
+type ScenarioRunResult = Awaited<ReturnType<typeof ScenarioRunner.run>>;
+
+// For HTTP targets, use a remote span judge that queries spans from
+// the platform API before evaluation. The trace ID will be captured
+// from the adapter after the conversation completes.
+function resolveJudgeAgent({
+  target,
+  scenario,
+  judgeModel,
+  context,
+  langwatchEndpoint,
+  langwatchApiKey,
+}: {
+  target: ChildProcessJobData["target"];
+  scenario: ChildProcessJobData["scenario"];
+  judgeModel: ReturnType<typeof createJudgeModelFromParams>;
+  context: ChildProcessJobData["context"];
+  langwatchEndpoint: string;
+  langwatchApiKey: string;
+}): {
+  judgeAgent:
+    | ReturnType<typeof ScenarioRunner.judgeAgent>
+    | RemoteSpanJudgeAgent;
+  remoteSpanJudge: RemoteSpanJudgeAgent | undefined;
+} {
+  if (target.type !== "http") {
+    return {
+      judgeAgent: ScenarioRunner.judgeAgent({
+        criteria: scenario.criteria,
+        model: judgeModel,
+      }),
+      remoteSpanJudge: undefined,
+    };
+  }
+
+  const remoteSpanJudge = new RemoteSpanJudgeAgent({
+    criteria: scenario.criteria,
+    model: judgeModel,
+    projectId: context.projectId,
+    querySpans: createTraceApiSpanQuery({
+      endpoint: langwatchEndpoint,
+      apiKey: langwatchApiKey,
+    }),
+  });
+  return { judgeAgent: remoteSpanJudge, remoteSpanJudge };
+}
+
+// Output JSON result to stdout for parent process to parse
+// Only stdout contains the JSON result; all other output goes to stderr
+function writeChildProcessOutput(result: ScenarioRunResult): void {
+  const outputResult: { success: boolean; reasoning?: string; error?: string } =
+    {
+      success: result.success,
+    };
+  if (result.reasoning) {
+    outputResult.reasoning = result.reasoning;
+  }
+  process.stdout.write(JSON.stringify(outputResult) + "\n");
+}
+
+function createExecutionModels({
+  adapterData,
+  modelParams,
+  simulatorModelParams,
+  judgeModelParams,
+  nlpServiceUrl,
+}: {
+  adapterData: ChildProcessJobData["adapterData"];
+  modelParams: ChildProcessJobData["modelParams"];
+  simulatorModelParams: ChildProcessJobData["simulatorModelParams"];
+  judgeModelParams: ChildProcessJobData["judgeModelParams"];
+  nlpServiceUrl: ChildProcessJobData["nlpServiceUrl"];
+}): {
+  adapter: ReturnType<typeof createAdapter>;
+  simulatorModel: ReturnType<typeof createModelFromParams>;
+  judgeModel: ReturnType<typeof createJudgeModelFromParams>;
+} {
+  const adapter = createAdapter({ adapterData, modelParams, nlpServiceUrl });
+  // The user-simulator and judge resolve their own models (run-plan /
+  // scenario override or the DEFAULT-role scenarios.* defaults). Older jobs
+  // only carried modelParams, so fall back to it when the split params are
+  // absent — preserves the previous single-model behavior during rollout.
+  const simulatorModel = createModelFromParams({
+    litellmParams: simulatorModelParams ?? modelParams,
+    nlpServiceUrl,
+  });
+  const judgeModel = createJudgeModelFromParams({
+    litellmParams: judgeModelParams ?? modelParams,
+    nlpServiceUrl,
+  });
+  return { adapter, simulatorModel, judgeModel };
+}
+
 async function executeScenario(jobData: ChildProcessJobData): Promise<void> {
   const {
     context,
@@ -112,46 +205,22 @@ async function executeScenario(jobData: ChildProcessJobData): Promise<void> {
     );
   }
 
-  const adapter = createAdapter({
+  const { adapter, simulatorModel, judgeModel } = createExecutionModels({
     adapterData,
     modelParams,
-    nlpServiceUrl,
-  });
-  // The user-simulator and judge resolve their own models (run-plan /
-  // scenario override or the DEFAULT-role scenarios.* defaults). Older jobs
-  // only carried modelParams, so fall back to it when the split params are
-  // absent — preserves the previous single-model behavior during rollout.
-  const simulatorModel = createModelFromParams({
-    litellmParams: simulatorModelParams ?? modelParams,
-    nlpServiceUrl,
-  });
-  const judgeModel = createJudgeModelFromParams({
-    litellmParams: judgeModelParams ?? modelParams,
+    simulatorModelParams,
+    judgeModelParams,
     nlpServiceUrl,
   });
 
-  // For HTTP targets, use a remote span judge that queries spans from
-  // the platform API before evaluation. The trace ID will be captured
-  // from the adapter after the conversation completes.
-  let remoteSpanJudge: RemoteSpanJudgeAgent | undefined;
-  const judgeAgent =
-    target.type === "http"
-      ? (() => {
-          remoteSpanJudge = new RemoteSpanJudgeAgent({
-            criteria: scenario.criteria,
-            model: judgeModel,
-            projectId: context.projectId,
-            querySpans: createTraceApiSpanQuery({
-              endpoint: langwatchEndpoint,
-              apiKey: langwatchApiKey,
-            }),
-          });
-          return remoteSpanJudge;
-        })()
-      : ScenarioRunner.judgeAgent({
-          criteria: scenario.criteria,
-          model: judgeModel,
-        });
+  const { judgeAgent, remoteSpanJudge } = resolveJudgeAgent({
+    target,
+    scenario,
+    judgeModel,
+    context,
+    langwatchEndpoint,
+    langwatchApiKey,
+  });
 
   // Results are reported via LangWatch SDK automatically
   const verbose = process.env.SCENARIO_VERBOSE === "true";
@@ -203,16 +272,7 @@ async function executeScenario(jobData: ChildProcessJobData): Promise<void> {
   // the global TracerProvider directly and call forceFlush/shutdown
   await flushOtelTraces();
 
-  // Output JSON result to stdout for parent process to parse
-  // Only stdout contains the JSON result; all other output goes to stderr
-  const outputResult: { success: boolean; reasoning?: string; error?: string } =
-    {
-      success: result.success,
-    };
-  if (result.reasoning) {
-    outputResult.reasoning = result.reasoning;
-  }
-  process.stdout.write(JSON.stringify(outputResult) + "\n");
+  writeChildProcessOutput(result);
 }
 
 /**

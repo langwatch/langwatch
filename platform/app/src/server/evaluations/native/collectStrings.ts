@@ -8,24 +8,31 @@
 const MAX_STRINGS = 5_000;
 const MAX_DEPTH = 8;
 
+function walkStringArray(items: unknown[], depth: number, out: string[]): void {
+  for (const item of items) walkStringNode(item, depth + 1, out);
+}
+
+function walkStringObject(node: object, depth: number, out: string[]): void {
+  for (const item of Object.values(node)) walkStringNode(item, depth + 1, out);
+}
+
+function walkStringNode(node: unknown, depth: number, out: string[]): void {
+  if (out.length >= MAX_STRINGS || depth > MAX_DEPTH) return;
+  if (typeof node === "string") {
+    out.push(node);
+    return;
+  }
+  if (Array.isArray(node)) {
+    walkStringArray(node, depth, out);
+    return;
+  }
+  if (node && typeof node === "object") {
+    walkStringObject(node, depth, out);
+  }
+}
+
 export function collectStrings(value: unknown): string[] {
   const out: string[] = [];
-
-  const walk = (node: unknown, depth: number): void => {
-    if (out.length >= MAX_STRINGS || depth > MAX_DEPTH) return;
-    if (typeof node === "string") {
-      out.push(node);
-      return;
-    }
-    if (Array.isArray(node)) {
-      for (const item of node) walk(item, depth + 1);
-      return;
-    }
-    if (node && typeof node === "object") {
-      for (const item of Object.values(node)) walk(item, depth + 1);
-    }
-  };
-
-  walk(value, 0);
+  walkStringNode(value, 0, out);
   return out;
 }

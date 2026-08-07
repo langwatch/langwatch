@@ -60,6 +60,188 @@ type LambdaFetchResponse<T> = {
   text: () => Promise<string>;
 };
 
+const buildInvokePayload = (path: string, init?: LambdaFetchInit) => ({
+  rawPath: path,
+  requestContext: {
+    http: {
+      method: init?.method ?? "GET",
+    },
+  },
+  headers: init?.headers ?? {},
+  body: init?.body,
+});
+
+type InvokePayload = ReturnType<typeof buildInvokePayload>;
+
+/**
+ * Hard cap, checked before staging or invoking. Even with S3 staging a body
+ * this large would be re-fetched whole into the engine's memory, so reject
+ * it with an actionable error instead of OOMing the Lambda or hitting the
+ * opaque AWS "Request must be smaller than 6291456 bytes" message. Mirrors
+ * the langevals HTTP path's PayloadTooLargeError fail-fast.
+ */
+const assertBodyWithinPayloadCap = ({
+  body,
+  path,
+}: {
+  body: string | undefined;
+  path: string;
+}): void => {
+  if (body === undefined) return;
+
+  const bodyBytes = Buffer.byteLength(body, "utf-8");
+  if (bodyBytes > env.EVAL_MAX_PAYLOAD_BYTES) {
+    throw new InvokePayloadTooLargeError({
+      bytes: bodyBytes,
+      limit: env.EVAL_MAX_PAYLOAD_BYTES,
+      path,
+    });
+  }
+};
+
+/**
+ * Offload an oversized invoke envelope to S3. The decision is made against
+ * the ACTUAL serialized envelope (post JSON-escaping of the body), not the
+ * raw body, because re-stringifying the body into the Payload inflates it —
+ * a body can cross the 6 MiB cap only after escaping. The receiver
+ * (services/nlpgo/adapters/httpapi/staged_payload.go readStudioRequestBody)
+ * fetches the real body from the presigned URL when the header is present.
+ *
+ * Null when the serialized envelope is still under the staging threshold.
+ */
+const stageOversizedInvokeBody = async ({
+  payload,
+  invokeBody,
+  projectId,
+  body,
+  path,
+}: {
+  payload: InvokePayload;
+  invokeBody: string;
+  projectId: string;
+  body: string;
+  path: string;
+}): Promise<{ invokeBody: string; staged: StagedObject } | null> => {
+  const threshold =
+    env.LANGEVALS_STAGING_THRESHOLD_BYTES ??
+    INVOKE_STAGING_THRESHOLD_BYTES_DEFAULT;
+  if (Buffer.byteLength(invokeBody, "utf-8") <= threshold) return null;
+
+  const staged = await stagePayloadToS3({
+    projectId,
+    keyPrefix: `${INVOKE_STAGING_PREFIX}/${projectId}`,
+    serialized: Buffer.from(body, "utf-8"),
+    ttlSeconds: env.LANGEVALS_STAGING_TTL_SECONDS,
+  });
+  const stagedInvokeBody = JSON.stringify({
+    ...payload,
+    body: "",
+    headers: {
+      ...payload.headers,
+      [STAGED_PAYLOAD_HEADER]: staged.stagedUrl,
+    },
+  });
+  logger.info(
+    { projectId, path, thresholdBytes: threshold },
+    "staged oversized nlpgo invoke payload via presigned S3 URL",
+  );
+
+  return { invokeBody: stagedInvokeBody, staged };
+};
+
+const sendInvokeCommand = async ({
+  lambda,
+  functionName,
+  invokeBody,
+  staged,
+  projectId,
+}: {
+  lambda: ReturnType<typeof createLambdaClient>;
+  functionName: string;
+  invokeBody: string;
+  staged: StagedObject | null;
+  projectId: string | undefined;
+}) => {
+  const command = new InvokeCommand({
+    FunctionName: functionName,
+    InvocationType: "RequestResponse",
+    Payload: invokeBody,
+  });
+
+  try {
+    return await lambda.send(command);
+  } finally {
+    // Best-effort delete: by the time lambda.send resolves the receiver has
+    // already fetched the presigned URL, so the staged object is no longer
+    // needed. Runs in finally so a failed invoke still reaps it; a bucket
+    // lifecycle rule on the staging prefix is the orphan/crash fallback.
+    if (staged) {
+      await deleteStagedObject({
+        s3Client: staged.s3Client,
+        s3Bucket: staged.s3Bucket,
+        key: staged.key,
+        projectId: projectId!,
+      });
+    }
+  }
+};
+
+const invokeLambdaArn = async <T>(
+  functionArn: string,
+  path: string,
+  init?: LambdaFetchInit,
+): Promise<LambdaFetchResponse<T>> => {
+  const lambda = createLambdaClient();
+
+  const payload = buildInvokePayload(path, init);
+  const projectId = init?.projectId;
+
+  assertBodyWithinPayloadCap({ body: init?.body, path });
+
+  let invokeBody = JSON.stringify(payload);
+  let staged: StagedObject | null = null;
+  if (projectId !== undefined && init?.body !== undefined) {
+    const stagedInvoke = await stageOversizedInvokeBody({
+      payload,
+      invokeBody,
+      projectId,
+      body: init.body,
+      path,
+    });
+    if (stagedInvoke) {
+      invokeBody = stagedInvoke.invokeBody;
+      staged = stagedInvoke.staged;
+    }
+  }
+
+  const response = await sendInvokeCommand({
+    lambda,
+    functionName: functionArn,
+    invokeBody,
+    staged,
+    projectId,
+  });
+
+  const responsePayload = response.Payload
+    ? Buffer.from(response.Payload).toString("utf-8")
+    : "";
+
+  const actualBody =
+    responsePayload.split("\u0000").filter(Boolean).pop() ?? "";
+
+  const statusCode = response.StatusCode ?? 200;
+
+  return {
+    ok: statusCode >= 200 && statusCode < 300,
+    status: statusCode,
+    statusText: response.FunctionError ?? "OK",
+    json: async () => {
+      return JSON.parse(actualBody);
+    },
+    text: async () => actualBody,
+  };
+};
+
 export const lambdaFetch = async <T>(
   urlOrArn: string,
   path: string,
@@ -67,113 +249,7 @@ export const lambdaFetch = async <T>(
 ): Promise<LambdaFetchResponse<T>> => {
   // If it's a Lambda ARN
   if (urlOrArn.startsWith("arn:aws:lambda")) {
-    const lambda = createLambdaClient();
-
-    const payload = {
-      rawPath: path,
-      requestContext: {
-        http: {
-          method: init?.method ?? "GET",
-        },
-      },
-      headers: init?.headers ?? {},
-      body: init?.body,
-    };
-
-    // Offload an oversized invoke envelope to S3. The decision is made against
-    // the ACTUAL serialized envelope (post JSON-escaping of the body), not the
-    // raw body, because re-stringifying the body into the Payload inflates it —
-    // a body can cross the 6 MiB cap only after escaping. The receiver
-    // (services/nlpgo/adapters/httpapi/staged_payload.go readStudioRequestBody)
-    // fetches the real body from the presigned URL when the header is present.
-    const projectId = init?.projectId;
-
-    // Hard cap, checked before staging or invoking. Even with S3 staging a body
-    // this large would be re-fetched whole into the engine's memory, so reject
-    // it with an actionable error instead of OOMing the Lambda or hitting the
-    // opaque AWS "Request must be smaller than 6291456 bytes" message. Mirrors
-    // the langevals HTTP path's PayloadTooLargeError fail-fast.
-    if (init?.body !== undefined) {
-      const bodyBytes = Buffer.byteLength(init.body, "utf-8");
-      if (bodyBytes > env.EVAL_MAX_PAYLOAD_BYTES) {
-        throw new InvokePayloadTooLargeError({
-          bytes: bodyBytes,
-          limit: env.EVAL_MAX_PAYLOAD_BYTES,
-          path,
-        });
-      }
-    }
-
-    let invokeBody = JSON.stringify(payload);
-    let staged: StagedObject | null = null;
-    if (projectId !== undefined && init?.body !== undefined) {
-      const threshold =
-        env.LANGEVALS_STAGING_THRESHOLD_BYTES ??
-        INVOKE_STAGING_THRESHOLD_BYTES_DEFAULT;
-      if (Buffer.byteLength(invokeBody, "utf-8") > threshold) {
-        staged = await stagePayloadToS3({
-          projectId,
-          keyPrefix: `${INVOKE_STAGING_PREFIX}/${projectId}`,
-          serialized: Buffer.from(init.body, "utf-8"),
-          ttlSeconds: env.LANGEVALS_STAGING_TTL_SECONDS,
-        });
-        invokeBody = JSON.stringify({
-          ...payload,
-          body: "",
-          headers: {
-            ...payload.headers,
-            [STAGED_PAYLOAD_HEADER]: staged.stagedUrl,
-          },
-        });
-        logger.info(
-          { projectId, path, thresholdBytes: threshold },
-          "staged oversized nlpgo invoke payload via presigned S3 URL",
-        );
-      }
-    }
-
-    const command = new InvokeCommand({
-      FunctionName: urlOrArn,
-      InvocationType: "RequestResponse",
-      Payload: invokeBody,
-    });
-
-    let response;
-    try {
-      response = await lambda.send(command);
-    } finally {
-      // Best-effort delete: by the time lambda.send resolves the receiver has
-      // already fetched the presigned URL, so the staged object is no longer
-      // needed. Runs in finally so a failed invoke still reaps it; a bucket
-      // lifecycle rule on the staging prefix is the orphan/crash fallback.
-      if (staged) {
-        await deleteStagedObject({
-          s3Client: staged.s3Client,
-          s3Bucket: staged.s3Bucket,
-          key: staged.key,
-          projectId: projectId!,
-        });
-      }
-    }
-
-    const responsePayload = response.Payload
-      ? Buffer.from(response.Payload).toString("utf-8")
-      : "";
-
-    const actualBody =
-      responsePayload.split("\u0000").filter(Boolean).pop() ?? "";
-
-    const statusCode = response.StatusCode ?? 200;
-
-    return {
-      ok: statusCode >= 200 && statusCode < 300,
-      status: statusCode,
-      statusText: response.FunctionError ?? "OK",
-      json: async () => {
-        return JSON.parse(actualBody);
-      },
-      text: async () => actualBody,
-    };
+    return invokeLambdaArn<T>(urlOrArn, path, init);
   }
 
   // If it's a regular URL

@@ -253,6 +253,845 @@ function validateEmailRecipientFormats(recipients: string[]): void {
   }
 }
 
+type LegacyCreateActionParams = {
+  createdByUserId?: string;
+  members?: string[];
+  slackWebhook?: string;
+  datasetId?: string;
+  datasetMapping?: { mapping: unknown; expansions?: string[] };
+  annotators?: { id: string; name: string }[];
+};
+
+// This legacy mutation cannot carry the validated/encrypted webhook
+// destination shape. Never let a direct caller create a malformed or
+// feature-flag-bypassing SEND_WEBHOOK row; the provider-aware upsert is
+// the sole webhook writer.
+function assertLegacyCreateActionAllowed(action: TriggerAction): void {
+  if (action === TriggerAction.SEND_WEBHOOK) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message:
+        "Webhook automations must be created through the provider-aware upsert API.",
+    });
+  }
+}
+
+// Server-stamp the creator — the schema does not expose this field to the
+// wire (builder5015-002), so callers widen locally to mutate.
+function applyLegacyCreateAnnotationQueueValidation({
+  actionParams,
+  userId,
+}: {
+  actionParams: LegacyCreateActionParams;
+  userId: string | undefined;
+}): void {
+  actionParams.createdByUserId = userId;
+
+  if (!actionParams.annotators) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "Annotators are required",
+    });
+  }
+}
+
+function applyLegacyCreateSlackValidation(
+  actionParams: LegacyCreateActionParams,
+): void {
+  if (!actionParams.slackWebhook) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "Slack webhook is required",
+    });
+  }
+}
+
+// Align with `upsert` (and `validateEmailRecipientFormats`): RFC shape
+// only. External recipients are intentionally allowed; the UI surfaces an
+// "External" warning badge for any non-team address so operators know what
+// they're shipping. Two server contracts for the same action would force
+// the drawer to branch on create-vs-edit, which is a footgun.
+function applyLegacyCreateEmailValidation(
+  actionParams: LegacyCreateActionParams,
+): void {
+  if (!actionParams.members || actionParams.members.length === 0) return;
+  try {
+    validateEmailRecipientFormats(actionParams.members);
+  } catch (err) {
+    throw toTemplateTRPCError(err);
+  }
+}
+
+// Per-action validation (and, for annotation queues, server-stamping) for
+// the legacy create mutation.
+function applyLegacyCreateActionValidation({
+  action,
+  actionParams,
+  userId,
+}: {
+  action: TriggerAction;
+  actionParams: LegacyCreateActionParams;
+  userId: string | undefined;
+}): void {
+  if (action === TriggerAction.ADD_TO_ANNOTATION_QUEUE) {
+    applyLegacyCreateAnnotationQueueValidation({ actionParams, userId });
+  } else if (action === TriggerAction.SEND_SLACK_MESSAGE) {
+    applyLegacyCreateSlackValidation(actionParams);
+  } else if (action === TriggerAction.SEND_EMAIL) {
+    applyLegacyCreateEmailValidation(actionParams);
+  }
+}
+
+type TestFireChannel = "email" | "slack" | "webhook";
+type TestFireCtx = { session: { user: { id: string; email?: string | null } } };
+
+// The webhook channel ships dark (ADR-040 §7): the type picker is
+// flag-gated client-side, and the server refuses the channel too so the
+// flag can't be bypassed by calling the API directly.
+async function assertTestFireChannelAllowed({
+  channel,
+  ctx,
+  projectId,
+}: {
+  channel: TestFireChannel;
+  ctx: TestFireCtx;
+  projectId: string;
+}): Promise<void> {
+  if (channel !== "webhook") return;
+
+  const allowed = await featureFlagService.isEnabled(
+    "release_webhook_automations",
+    { distinctId: ctx.session.user.id, projectId },
+  );
+  if (!allowed) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "Webhook automations are not enabled for this project.",
+    });
+  }
+}
+
+// Email shares the mail provider; webhook fires at an ARBITRARY customer URL
+// from our worker IPs, so an uncapped test button would be an outbound
+// request-flood primitive (ADR-040 §4). Slack stays exempt: its destination
+// is host-pinned to hooks.slack.com.
+async function enforceTestFireRateLimit({
+  channel,
+  userId,
+}: {
+  channel: TestFireChannel;
+  userId: string;
+}): Promise<void> {
+  if (channel !== "email" && channel !== "webhook") return;
+
+  const limit = await rateLimit({
+    key: `testfire:${userId}`,
+    windowSeconds: 60,
+    max: 10,
+  });
+  if (!limit.allowed) {
+    throw new TRPCError({
+      code: "TOO_MANY_REQUESTS",
+      message: buildRetryAfterMessage({
+        prefix: "Too many test fires.",
+        resetAt: limit.resetAt,
+      }),
+    });
+  }
+}
+
+// ADR-031: test fire is no longer an open relay. The client-supplied
+// recipient list is gone from the input entirely — the email recipient is
+// always the authenticated session user.
+function resolveTestFireEmailRecipients({
+  channel,
+  ctx,
+}: {
+  channel: TestFireChannel;
+  ctx: TestFireCtx;
+}): string[] {
+  if (channel !== "email") return [];
+
+  const email = ctx.session.user.email;
+  if (!email) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "Your account has no email address to send a test fire to.",
+    });
+  }
+  return [email];
+}
+
+// Resolve the Slack bot destination: the freshly-typed token, or the saved
+// automation's stored (encrypted) token when it was kept on edit.
+async function resolveTestFireSlackBotDestination({
+  channel,
+  botDestination,
+  automationId,
+  projectId,
+}: {
+  channel: TestFireChannel;
+  botDestination: { channelId: string; botToken: string | null } | null;
+  automationId: string | undefined;
+  projectId: string;
+}): Promise<{ token: string; channel: string } | null> {
+  if (channel !== "slack" || !botDestination) return null;
+
+  const channelId = botDestination.channelId.trim();
+  let token = botDestination.botToken?.trim() || null;
+  if (!token && automationId) {
+    const saved = await getApp().triggers.getById({
+      triggerId: automationId,
+      projectId,
+    });
+    token = decryptSlackBotToken(
+      (saved?.actionParams ?? {}) as SlackActionParams,
+    );
+  }
+  if (!token || !channelId) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "Add a Slack bot token and channel before sending a test fire.",
+    });
+  }
+  return { token, channel: channelId };
+}
+
+// The saved header values behind any kept sentinels in `headers`, decrypted
+// from the stored trigger row. Errors if the destination URL changed since
+// the values were saved — the receiver's expected headers may no longer
+// apply.
+async function resolveSavedWebhookHeaders({
+  webhookDestination,
+  automationId,
+  projectId,
+}: {
+  webhookDestination: TestFireWebhookDestination;
+  automationId: string | undefined;
+  projectId: string;
+}): Promise<Record<string, string>> {
+  if (!automationId) return {};
+
+  const row = await getApp().triggers.getById({
+    triggerId: automationId,
+    projectId,
+  });
+  const stored = (row?.actionParams ?? {}) as WebhookStoredActionParams;
+  if (stored.url !== webhookDestination.url) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message:
+        "Re-enter webhook header values after changing the destination URL.",
+    });
+  }
+  return decryptWebhookHeaders(stored);
+}
+
+// ADR-040 §3: header secrets never reach the client, so a saved automation's
+// test fire carries the kept sentinel — resolve it against the stored
+// ciphertext, exactly like the Slack bot token above. Unresolvable kept
+// values (fresh draft, renamed header) are dropped rather than sent as the
+// literal sentinel.
+async function resolveTestFireWebhookHeaders({
+  webhookDestination,
+  automationId,
+  projectId,
+}: {
+  webhookDestination: TestFireWebhookDestination;
+  automationId: string | undefined;
+  projectId: string;
+}): Promise<TestFireWebhookDestination> {
+  if (
+    !Object.values(webhookDestination.headers).includes(
+      WEBHOOK_HEADER_VALUE_KEPT,
+    )
+  ) {
+    return webhookDestination;
+  }
+
+  const saved = await resolveSavedWebhookHeaders({
+    webhookDestination,
+    automationId,
+    projectId,
+  });
+  const headers: Record<string, string> = {};
+  for (const [name, value] of Object.entries(webhookDestination.headers)) {
+    if (value === WEBHOOK_HEADER_VALUE_KEPT) {
+      if (saved[name] !== undefined) headers[name] = saved[name];
+      continue;
+    }
+    headers[name] = value;
+  }
+  return { ...webhookDestination, headers };
+}
+
+// The signing secret is a stored secret too, so the browser never has it
+// and cannot send it. Resolve it from the saved trigger so a test fire
+// signs exactly as a real one does, which is the only way an author can
+// point the button at their receiver's verification.
+async function resolveTestFireWebhookSigningSecrets({
+  webhookDestination,
+  automationId,
+  projectId,
+}: {
+  webhookDestination: TestFireWebhookDestination;
+  automationId: string | undefined;
+  projectId: string;
+}): Promise<TestFireWebhookDestination> {
+  if (!automationId) return webhookDestination;
+
+  const row = await getApp().triggers.getById({
+    triggerId: automationId,
+    projectId,
+  });
+  const signingSecrets = decryptWebhookSigningSecrets(
+    (row?.actionParams ?? {}) as WebhookStoredActionParams,
+  );
+  if (signingSecrets.length === 0) return webhookDestination;
+
+  return { ...webhookDestination, signingSecrets };
+}
+
+// Widened past the input schema on purpose: signingSecrets is resolved
+// server-side from the saved trigger and is deliberately not accepted from
+// the browser.
+async function resolveTestFireWebhookDestination({
+  webhookDestination,
+  automationId,
+  projectId,
+}: {
+  webhookDestination: TestFireWebhookDestination | null;
+  automationId: string | undefined;
+  projectId: string;
+}): Promise<TestFireWebhookDestination | null> {
+  if (!webhookDestination) return null;
+
+  const withHeaders = await resolveTestFireWebhookHeaders({
+    webhookDestination,
+    automationId,
+    projectId,
+  });
+  return resolveTestFireWebhookSigningSecrets({
+    webhookDestination: withHeaders,
+    automationId,
+    projectId,
+  });
+}
+
+const upsertAutomationInputSchema = z.object({
+  projectId: z.string(),
+  triggerId: z.string().optional(),
+  name: z.string().min(1),
+  action: z.nativeEnum(TriggerAction),
+  alertType: z.nativeEnum(AlertType).nullable().optional(),
+  filters: triggerFiltersSchema,
+  /** ADR-043 Subject facet: the Traces-V2 liqe query the automation is
+   *  about. When set, it supersedes `filters` (persisted as `{}`) and the
+   *  dispatcher evaluates it in-memory. Trace-subject automations, plus
+   *  trace-query REPORTS — where it scopes the traces the report sends. */
+  filterQuery: z.string().nullable().optional(),
+  customGraphId: z.string().nullable().optional(),
+  /** Graph-threshold-alert rule. Present iff this is a graph alert
+   *  (`customGraphId` set); merged into `actionParams` before persist
+   *  so the dispatcher (cron + event-sourced) reads one shape. */
+  graphAlert: graphAlertActionParamsSchema.optional(),
+  /** Scheduled-report shape (source + schedule). Present iff this is a
+   *  REPORT; mutually exclusive with graphAlert. */
+  report: reportActionParamsSchema.optional(),
+  actionParams: actionParamsSchema,
+  templates: templateDraftSchema,
+  notificationCadence: notificationCadenceSchema.optional(),
+  traceDebounceMs: traceDebounceMsSchema.optional(),
+});
+type UpsertAutomationInput = z.infer<typeof upsertAutomationInputSchema>;
+type UpsertAutomationCtx = TestFireCtx & {
+  prisma: Parameters<typeof AutomationCustomGraphService.create>[0];
+};
+
+// The webhook channel ships dark (ADR-040 §7): gate the save route as well
+// as the picker, so the flag can't be bypassed via the API.
+async function assertUpsertWebhookChannelAllowed({
+  action,
+  ctx,
+  projectId,
+}: {
+  action: TriggerAction;
+  ctx: TestFireCtx;
+  projectId: string;
+}): Promise<void> {
+  if (action !== TriggerAction.SEND_WEBHOOK) return;
+
+  const allowed = await featureFlagService.isEnabled(
+    "release_webhook_automations",
+    { distinctId: ctx.session.user.id, projectId },
+  );
+  if (!allowed) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "Webhook automations are not enabled for this project.",
+    });
+  }
+}
+
+// Graph alerts only support notify channels — there is no "ADD_TO_DATASET
+// on a metric crossing a threshold" UX. The graph must belong to the
+// calling project — multitenancy gate; without this a hostile client could
+// attach a trigger to a graph from another tenant.
+async function assertUpsertGraphAlertRequirements({
+  input,
+  ctx,
+}: {
+  input: UpsertAutomationInput;
+  ctx: UpsertAutomationCtx;
+}): Promise<void> {
+  if (!NOTIFY_TRIGGER_ACTIONS.has(input.action)) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message:
+        "Graph alerts only support notify channels (Email, Slack, or a webhook).",
+    });
+  }
+  if (!input.graphAlert) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message:
+        "Graph alerts require a threshold rule (operator, threshold, time period, series).",
+    });
+  }
+  if (!input.alertType) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "Graph alerts require an alert severity.",
+    });
+  }
+
+  const graphExists = await AutomationCustomGraphService.create(
+    ctx.prisma,
+  ).existsInProject({
+    customGraphId: input.customGraphId ?? "",
+    projectId: input.projectId,
+  });
+  if (!graphExists) {
+    throw new TRPCError({
+      code: "NOT_FOUND",
+      message: "Graph not found in this project.",
+    });
+  }
+}
+
+// A report sends a rendered notification on a schedule — notify channels
+// only, like alerts.
+function assertUpsertReportRequirements(action: TriggerAction): void {
+  if (
+    action !== TriggerAction.SEND_EMAIL &&
+    action !== TriggerAction.SEND_SLACK_MESSAGE
+  ) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "Reports can only send Email or Slack notifications.",
+    });
+  }
+}
+
+// Per-action shape validation: the provider registry's per-action Zod
+// schema is the authoritative shape for actionParams. The router's
+// top-level `actionParamsSchema` accepts the union for the wire format;
+// this pass narrows by action, so a SEND_EMAIL upsert can't accidentally
+// save a dataset config (and ADD_TO_DATASET can't persist an empty
+// datasetId, etc.). Persists the PARSED params, not the wire object: Zod
+// strips keys the action doesn't declare, so a Slack secret typed before
+// switching the channel to Email can't ride along and land in the row in
+// plaintext (where the Slack-only encrypt/redact passes would never touch
+// it).
+function parseUpsertActionParams(
+  input: UpsertAutomationInput,
+): Record<string, unknown> {
+  const perAction = actionParamsSchemaFor(input.action);
+  const perActionParsed = perAction.safeParse(input.actionParams);
+  if (!perActionParsed.success) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: `Invalid actionParams for ${input.action}: ${perActionParsed.error.errors[0]?.message ?? "validation failed"}`,
+    });
+  }
+  return perActionParsed.data as Record<string, unknown>;
+}
+
+// Slack webhook / bot-channel presence is enforced by the per-action
+// schema's superRefine above (in `parseUpsertActionParams`). The bot-token
+// presence check (which must allow "kept" on edit) runs after this block —
+// it needs the saved row.
+function assertUpsertActionParamsSemantics(input: UpsertAutomationInput): void {
+  if (
+    input.action === TriggerAction.SEND_EMAIL &&
+    input.actionParams.members &&
+    input.actionParams.members.length > 0
+  ) {
+    validateEmailRecipientFormats(input.actionParams.members);
+  }
+  if (
+    input.action === TriggerAction.ADD_TO_ANNOTATION_QUEUE &&
+    (!input.actionParams.annotators ||
+      input.actionParams.annotators.length === 0)
+  ) {
+    throw new MissingAnnotatorError();
+  }
+}
+
+// Runs every upsert-time validation in the original order, all funnelled
+// through `toTemplateTRPCError` so a provider rejection or domain error
+// reaches the client as a clean typed error.
+async function validateAndParseUpsertInput({
+  input,
+  ctx,
+  isGraphAlert,
+  isReport,
+}: {
+  input: UpsertAutomationInput;
+  ctx: UpsertAutomationCtx;
+  isGraphAlert: boolean;
+  isReport: boolean;
+}): Promise<Record<string, unknown>> {
+  try {
+    validateTemplateDraft(input.templates);
+    await assertUpsertWebhookChannelAllowed({
+      action: input.action,
+      ctx,
+      projectId: input.projectId,
+    });
+    if (isGraphAlert) {
+      await assertUpsertGraphAlertRequirements({ input, ctx });
+    }
+    if (isReport) {
+      assertUpsertReportRequirements(input.action);
+    }
+    const parsedActionParams = parseUpsertActionParams(input);
+    assertUpsertActionParamsSemantics(input);
+    return parsedActionParams;
+  } catch (err) {
+    throw toTemplateTRPCError(err);
+  }
+}
+
+function resolveUpsertFilterQuery({
+  filterQuery,
+  projectId,
+}: {
+  filterQuery: string | null | undefined;
+  projectId: string;
+}): string | null {
+  const normalized =
+    filterQuery && filterQuery.trim() !== "" ? filterQuery.trim() : null;
+  if (normalized === null) return null;
+
+  try {
+    translateFilterToClickHouse(normalized, projectId, { from: 0, to: 0 });
+  } catch (err) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: `Invalid trace filter: ${
+        err instanceof Error ? err.message : "could not parse the query"
+      }`,
+    });
+  }
+  return normalized;
+}
+
+// Provider persist hooks (ADR-041 / ADR-040 §3): encrypt secrets, resolve
+// kept sentinels against the saved row (loaded lazily only when a provider
+// needs it), and reject invalid payloads (missing bot token, kept headers
+// after a URL change) as typed HandledErrors.
+async function resolveUpsertStoredActionParams({
+  action,
+  parsedActionParams,
+  triggerId,
+  projectId,
+}: {
+  action: TriggerAction;
+  parsedActionParams: Record<string, unknown>;
+  triggerId: string | undefined;
+  projectId: string;
+}) {
+  return persistActionParamsFor(action, {
+    incoming: parsedActionParams,
+    loadExisting: async () =>
+      triggerId
+        ? (await getApp().triggers.getById({ triggerId, projectId }))
+            ?.actionParams
+        : undefined,
+  });
+}
+
+// Annotation-queue dispatch attributes created queue items to a user and
+// skips the action when `createdByUserId` is absent. The drawer's provider
+// slice doesn't carry it, so stamp the caller here — same as the legacy
+// create mutation — or an edit would silently strip it and disable
+// dispatch for the trigger. Force createdByUserId to the session user —
+// never trust the client (builder5015-002). The schema strips it from the
+// wire; we stamp unconditionally on the annotation-queue branch below.
+function stampUpsertActionParams({
+  action,
+  storedActionParams,
+  userId,
+}: {
+  action: TriggerAction;
+  storedActionParams: unknown;
+  userId: string | undefined;
+}): Record<string, unknown> {
+  return action === TriggerAction.ADD_TO_ANNOTATION_QUEUE
+    ? {
+        ...(storedActionParams as Record<string, unknown>),
+        createdByUserId: userId,
+      }
+    : { ...(storedActionParams as Record<string, unknown>) };
+}
+
+type UpsertTriggerData = Omit<Prisma.TriggerUncheckedCreateInput, "projectId">;
+
+function buildGraphAlertUpsertData({
+  input,
+  actionParams,
+}: {
+  input: UpsertAutomationInput;
+  actionParams: Record<string, unknown>;
+}): UpsertTriggerData {
+  const graphAlert: GraphAlertActionParams = input.graphAlert!;
+  const builderInput = {
+    id: input.triggerId ?? ksuid(KSUID_RESOURCES.TRIGGER).toString(),
+    name: input.name,
+    projectId: input.projectId,
+    action: input.action,
+    alertType: input.alertType ?? AlertType.INFO,
+    customGraphId: input.customGraphId!,
+    actionParams: {
+      ...actionParams,
+      ...graphAlert,
+    },
+  };
+  const built = buildGraphAlertTriggerData(builderInput);
+  return {
+    name: built.name,
+    action: built.action,
+    triggerKind: TriggerKind.ALERT,
+    alertType: built.alertType,
+    filters: built.filters,
+    // Graph alerts never carry a trace-filter query; clear it so a kind
+    // conversion can't leave a stale one behind.
+    filterQuery: null,
+    customGraphId: built.customGraphId,
+    actionParams: built.actionParams,
+    slackTemplateType: input.templates.slackTemplateType ?? null,
+    slackTemplate: input.templates.slackTemplate ?? null,
+    emailSubjectTemplate: input.templates.emailSubjectTemplate ?? null,
+    emailBodyTemplate: input.templates.emailBodyTemplate ?? null,
+  };
+}
+
+function buildReportUpsertData({
+  input,
+  actionParams,
+  filterQuery,
+}: {
+  input: UpsertAutomationInput;
+  actionParams: Record<string, unknown>;
+  filterQuery: string | null;
+}): UpsertTriggerData {
+  const built = buildReportTriggerData({
+    id: input.triggerId ?? ksuid(KSUID_RESOURCES.TRIGGER).toString(),
+    name: input.name,
+    projectId: input.projectId,
+    action: input.action,
+    actionParams: { ...actionParams, ...input.report! },
+  });
+  return {
+    name: built.name,
+    action: built.action,
+    triggerKind: TriggerKind.REPORT,
+    filters: built.filters,
+    // Converting an existing graph alert into a report must release the
+    // graph: a left-behind `customGraphId` re-arms the row as a threshold
+    // alert on the heartbeat path, so the report fires as an alert too.
+    customGraphId: null,
+    // A trace-query report sends the traces matching the author's Subject
+    // query — without this the report would only ever send the newest
+    // traces in the window. A graph/dashboard report has no trace query,
+    // so the column is cleared (a source change can't strand a stale one).
+    filterQuery:
+      input.report!.source.kind === "traceQuery" ? filterQuery : null,
+    actionParams: built.actionParams,
+    slackTemplateType: input.templates.slackTemplateType ?? null,
+    slackTemplate: input.templates.slackTemplate ?? null,
+    emailSubjectTemplate: input.templates.emailSubjectTemplate ?? null,
+    emailBodyTemplate: input.templates.emailBodyTemplate ?? null,
+  };
+}
+
+function buildPlainAutomationUpsertData({
+  input,
+  actionParams,
+  filterQuery,
+}: {
+  input: UpsertAutomationInput;
+  actionParams: Record<string, unknown>;
+  filterQuery: string | null;
+}): UpsertTriggerData {
+  return {
+    name: input.name,
+    action: input.action,
+    triggerKind: TriggerKind.AUTOMATION,
+    alertType: input.alertType ?? null,
+    // A trace-subject automation supersedes the structured `filters` with
+    // its liqe query; persist an empty `{}` so the legacy matcher is a
+    // no-op and the dispatcher reads `filterQuery` instead.
+    filters: filterQuery !== null ? "{}" : JSON.stringify(input.filters),
+    filterQuery,
+    customGraphId: input.customGraphId ?? null,
+    actionParams: actionParams as Prisma.InputJsonValue,
+    slackTemplateType: input.templates.slackTemplateType ?? null,
+    slackTemplate: input.templates.slackTemplate ?? null,
+    emailSubjectTemplate: input.templates.emailSubjectTemplate ?? null,
+    emailBodyTemplate: input.templates.emailBodyTemplate ?? null,
+  };
+}
+
+// Graph alerts: route the row shape through the SSOT builder so it's
+// byte-identical to what `graphs.updateById` writes on the dashboard path
+// (N1 — the sweep fixed graphs.ts but automations.ts was still hand-rolling
+// the row). The dispatcher only knows one shape; drift between the two
+// writers silently breaks dispatch for whichever format loses.
+function buildUpsertTriggerData({
+  input,
+  actionParams,
+  filterQuery,
+  isGraphAlert,
+  isReport,
+}: {
+  input: UpsertAutomationInput;
+  actionParams: Record<string, unknown>;
+  filterQuery: string | null;
+  isGraphAlert: boolean;
+  isReport: boolean;
+}): UpsertTriggerData {
+  if (isGraphAlert && input.graphAlert && input.customGraphId) {
+    return buildGraphAlertUpsertData({ input, actionParams });
+  }
+  if (isReport && input.report) {
+    return buildReportUpsertData({ input, actionParams, filterQuery });
+  }
+  return buildPlainAutomationUpsertData({ input, actionParams, filterQuery });
+}
+
+async function persistUpsertTrigger({
+  input,
+  data,
+  isGraphAlert,
+}: {
+  input: UpsertAutomationInput;
+  data: UpsertTriggerData;
+  isGraphAlert: boolean;
+}) {
+  if (input.triggerId) {
+    const cadenceUpdate = resolveCadenceForUpdate(
+      input.action,
+      input.notificationCadence,
+      isGraphAlert,
+    );
+    return getApp().triggers.update({
+      triggerId: input.triggerId,
+      projectId: input.projectId,
+      data: {
+        ...data,
+        ...(cadenceUpdate !== undefined
+          ? { notificationCadence: cadenceUpdate }
+          : {}),
+        ...(input.traceDebounceMs !== undefined
+          ? { traceDebounceMs: input.traceDebounceMs }
+          : {}),
+      },
+    });
+  }
+
+  // A graph alert owns its custom-graph's unique `customGraphId` slot.
+  // `deleteById` soft-deletes (keeps the row and its @unique customGraphId
+  // occupied), so a fresh `create` for a graph that ever had an alert would
+  // violate the unique index — an unhandled P2002 → 500, with no UI path to
+  // recover since the soft-deleted row is hidden. Reactivate the existing
+  // row instead, matching the legacy graphs.updateById upsert-by-
+  // customGraphId behaviour.
+  const existingForGraph =
+    isGraphAlert && input.customGraphId
+      ? await getApp().triggers.getByCustomGraphId({
+          projectId: input.projectId,
+          customGraphId: input.customGraphId,
+        })
+      : null;
+
+  if (existingForGraph) {
+    return getApp().triggers.update({
+      triggerId: existingForGraph.id,
+      projectId: input.projectId,
+      data: {
+        ...data,
+        deleted: false,
+        active: true,
+        lastRunAt: new Date().getTime(),
+        notificationCadence: resolveCadenceForCreate(
+          input.action,
+          input.notificationCadence,
+          isGraphAlert,
+        ),
+        traceDebounceMs: input.traceDebounceMs ?? DEFAULT_TRACE_DEBOUNCE_MS,
+      },
+    });
+  }
+
+  return getApp().triggers.create({
+    data: {
+      id: ksuid(KSUID_RESOURCES.TRIGGER).toString(),
+      projectId: input.projectId,
+      lastRunAt: new Date().getTime(),
+      notificationCadence: resolveCadenceForCreate(
+        input.action,
+        input.notificationCadence,
+        isGraphAlert,
+      ),
+      traceDebounceMs: input.traceDebounceMs ?? DEFAULT_TRACE_DEBOUNCE_MS,
+      ...data,
+    },
+  });
+}
+
+async function syncUpsertReportSchedule({
+  input,
+  trigger,
+  isReport,
+}: {
+  input: UpsertAutomationInput;
+  trigger: { id: string };
+  isReport: boolean;
+}): Promise<void> {
+  if (isReport && input.report) {
+    // Wire the report onto the calendar scheduler (ADR-044): its trigger
+    // id is the scheduler targetId; publishWake nudges every pod's loop.
+    await getApp().triggers.syncReportSchedule({
+      projectId: input.projectId,
+      triggerId: trigger.id,
+      cron: input.report.schedule.cron,
+      timezone: input.report.schedule.timezone,
+    });
+  } else {
+    // Editing a report into a trace automation or graph alert must retire
+    // its calendar entry — otherwise the ScheduledJob keeps waking forever
+    // and the report handler repeatedly loads a now-non-report trigger,
+    // fails to parse its actionParams, and skips every cadence. Idempotent,
+    // so a trigger that was never a report costs one no-op deactivate.
+    await getApp().triggers.removeReportSchedule({
+      projectId: input.projectId,
+      triggerId: trigger.id,
+    });
+  }
+}
+
 export const automationRouter = createTRPCRouter({
   create: protectedProcedure
     .input(
@@ -287,17 +1126,7 @@ export const automationRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("triggers:create"))
     .mutation(async ({ ctx, input }) => {
-      // This legacy mutation cannot carry the validated/encrypted webhook
-      // destination shape. Never let a direct caller create a malformed or
-      // feature-flag-bypassing SEND_WEBHOOK row; the provider-aware upsert is
-      // the sole webhook writer.
-      if (input.action === TriggerAction.SEND_WEBHOOK) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message:
-            "Webhook automations must be created through the provider-aware upsert API.",
-        });
-      }
+      assertLegacyCreateActionAllowed(input.action);
 
       const project = await getApp().projects.getById(input.projectId);
 
@@ -305,45 +1134,11 @@ export const automationRouter = createTRPCRouter({
         throw new Error(`Project with id ${input.projectId} not found`);
       }
 
-      if (input.action === TriggerAction.ADD_TO_ANNOTATION_QUEUE) {
-        // Server-stamp the creator — the schema does not expose this to the
-        // wire (builder5015-002), so we widen locally to mutate.
-        (input.actionParams as Record<string, unknown>).createdByUserId =
-          ctx.session?.user.id;
-
-        if (!input.actionParams.annotators) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: "Annotators are required",
-          });
-        }
-      }
-
-      if (input.action === TriggerAction.SEND_SLACK_MESSAGE) {
-        if (!input.actionParams.slackWebhook) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: "Slack webhook is required",
-          });
-        }
-      } else if (input.action === TriggerAction.SEND_EMAIL) {
-        // Align with `upsert` (and `validateEmailRecipientFormats`): RFC
-        // shape only. External recipients are intentionally allowed; the
-        // UI surfaces an "External" warning badge for any non-team
-        // address so operators know what they're shipping. Two server
-        // contracts for the same action would force the drawer to
-        // branch on create-vs-edit, which is a footgun.
-        if (
-          input.actionParams.members &&
-          input.actionParams.members.length > 0
-        ) {
-          try {
-            validateEmailRecipientFormats(input.actionParams.members);
-          } catch (err) {
-            throw toTemplateTRPCError(err);
-          }
-        }
-      }
+      applyLegacyCreateActionValidation({
+        action: input.action,
+        actionParams: input.actionParams,
+        userId: ctx.session?.user.id,
+      });
 
       const trigger = await getApp().triggers.create({
         data: {
@@ -752,140 +1547,31 @@ export const automationRouter = createTRPCRouter({
       // and intentionally exempt from the rate limit — it fires to the
       // customer's own webhook, not our mail provider.
       try {
-        // The webhook channel ships dark (ADR-040 §7): the type picker is
-        // flag-gated client-side, and the server refuses the channel too so
-        // the flag can't be bypassed by calling the API directly.
-        if (input.channel === "webhook") {
-          const allowed = await featureFlagService.isEnabled(
-            "release_webhook_automations",
-            { distinctId: ctx.session.user.id, projectId: input.projectId },
-          );
-          if (!allowed) {
-            throw new TRPCError({
-              code: "FORBIDDEN",
-              message: "Webhook automations are not enabled for this project.",
-            });
-          }
-        }
-        // Email shares the mail provider; webhook fires at an ARBITRARY
-        // customer URL from our worker IPs, so an uncapped test button would
-        // be an outbound request-flood primitive (ADR-040 §4). Slack stays
-        // exempt: its destination is host-pinned to hooks.slack.com.
-        if (input.channel === "email" || input.channel === "webhook") {
-          const limit = await rateLimit({
-            key: `testfire:${ctx.session.user.id}`,
-            windowSeconds: 60,
-            max: 10,
-          });
-          if (!limit.allowed) {
-            throw new TRPCError({
-              code: "TOO_MANY_REQUESTS",
-              message: buildRetryAfterMessage({
-                prefix: "Too many test fires.",
-                resetAt: limit.resetAt,
-              }),
-            });
-          }
-        }
-        let recipients: string[] = [];
-        if (input.channel === "email") {
-          const email = ctx.session.user.email;
-          if (!email) {
-            throw new TRPCError({
-              code: "BAD_REQUEST",
-              message:
-                "Your account has no email address to send a test fire to.",
-            });
-          }
-          recipients = [email];
-        }
-        // Resolve the Slack bot destination: the freshly-typed token, or the
-        // saved automation's stored (encrypted) token when it was kept on edit.
-        let botDestination: { token: string; channel: string } | null = null;
-        if (input.channel === "slack" && input.botDestination) {
-          const channel = input.botDestination.channelId.trim();
-          let token = input.botDestination.botToken?.trim() || null;
-          if (!token && input.automationId) {
-            const saved = await getApp().triggers.getById({
-              triggerId: input.automationId,
-              projectId: input.projectId,
-            });
-            token = decryptSlackBotToken(
-              (saved?.actionParams ?? {}) as SlackActionParams,
-            );
-          }
-          if (!token || !channel) {
-            throw new TRPCError({
-              code: "BAD_REQUEST",
-              message:
-                "Add a Slack bot token and channel before sending a test fire.",
-            });
-          }
-          botDestination = { token, channel };
-        }
+        await assertTestFireChannelAllowed({
+          channel: input.channel,
+          ctx,
+          projectId: input.projectId,
+        });
+        await enforceTestFireRateLimit({
+          channel: input.channel,
+          userId: ctx.session.user.id,
+        });
 
-        // ADR-040 §3: header secrets never reach the client, so a saved
-        // automation's test fire carries the kept sentinel — resolve it
-        // against the stored ciphertext, exactly like the Slack bot token
-        // above. Unresolvable kept values (fresh draft, renamed header) are
-        // dropped rather than sent as the literal sentinel.
-        // Widened past the input schema on purpose: signingSecrets is
-        // resolved server-side from the saved trigger and is deliberately not
-        // accepted from the browser.
-        let webhookDestination: TestFireWebhookDestination | null | undefined =
-          input.webhookDestination;
-        if (
-          webhookDestination &&
-          Object.values(webhookDestination.headers).includes(
-            WEBHOOK_HEADER_VALUE_KEPT,
-          )
-        ) {
-          let saved: Record<string, string> = {};
-          if (input.automationId) {
-            const row = await getApp().triggers.getById({
-              triggerId: input.automationId,
-              projectId: input.projectId,
-            });
-            const stored = (row?.actionParams ??
-              {}) as WebhookStoredActionParams;
-            if (stored.url !== webhookDestination.url) {
-              throw new TRPCError({
-                code: "BAD_REQUEST",
-                message:
-                  "Re-enter webhook header values after changing the destination URL.",
-              });
-            }
-            saved = decryptWebhookHeaders(stored);
-          }
-          const headers: Record<string, string> = {};
-          for (const [name, value] of Object.entries(
-            webhookDestination.headers,
-          )) {
-            if (value === WEBHOOK_HEADER_VALUE_KEPT) {
-              if (saved[name] !== undefined) headers[name] = saved[name];
-              continue;
-            }
-            headers[name] = value;
-          }
-          webhookDestination = { ...webhookDestination, headers };
-        }
-
-        // The signing secret is a stored secret too, so the browser never has
-        // it and cannot send it. Resolve it from the saved trigger so a test
-        // fire signs exactly as a real one does, which is the only way an
-        // author can point the button at their receiver's verification.
-        if (webhookDestination && input.automationId) {
-          const row = await getApp().triggers.getById({
-            triggerId: input.automationId,
-            projectId: input.projectId,
-          });
-          const signingSecrets = decryptWebhookSigningSecrets(
-            (row?.actionParams ?? {}) as WebhookStoredActionParams,
-          );
-          if (signingSecrets.length > 0) {
-            webhookDestination = { ...webhookDestination, signingSecrets };
-          }
-        }
+        const recipients = resolveTestFireEmailRecipients({
+          channel: input.channel,
+          ctx,
+        });
+        const botDestination = await resolveTestFireSlackBotDestination({
+          channel: input.channel,
+          botDestination: input.botDestination,
+          automationId: input.automationId,
+          projectId: input.projectId,
+        });
+        const webhookDestination = await resolveTestFireWebhookDestination({
+          webhookDestination: input.webhookDestination,
+          automationId: input.automationId,
+          projectId: input.projectId,
+        });
 
         const project = await resolveProjectIdentity(input.projectId);
         return await getApp().triggerTemplates.testFire({
@@ -905,387 +1591,56 @@ export const automationRouter = createTRPCRouter({
       }
     }),
   upsert: protectedProcedure
-    .input(
-      z.object({
-        projectId: z.string(),
-        triggerId: z.string().optional(),
-        name: z.string().min(1),
-        action: z.nativeEnum(TriggerAction),
-        alertType: z.nativeEnum(AlertType).nullable().optional(),
-        filters: triggerFiltersSchema,
-        /** ADR-043 Subject facet: the Traces-V2 liqe query the automation is
-         *  about. When set, it supersedes `filters` (persisted as `{}`) and the
-         *  dispatcher evaluates it in-memory. Trace-subject automations, plus
-         *  trace-query REPORTS — where it scopes the traces the report sends. */
-        filterQuery: z.string().nullable().optional(),
-        customGraphId: z.string().nullable().optional(),
-        /** Graph-threshold-alert rule. Present iff this is a graph alert
-         *  (`customGraphId` set); merged into `actionParams` before persist
-         *  so the dispatcher (cron + event-sourced) reads one shape. */
-        graphAlert: graphAlertActionParamsSchema.optional(),
-        /** Scheduled-report shape (source + schedule). Present iff this is a
-         *  REPORT; mutually exclusive with graphAlert. */
-        report: reportActionParamsSchema.optional(),
-        actionParams: actionParamsSchema,
-        templates: templateDraftSchema,
-        notificationCadence: notificationCadenceSchema.optional(),
-        traceDebounceMs: traceDebounceMsSchema.optional(),
-      }),
-    )
+    .input(upsertAutomationInputSchema)
     .use(checkProjectPermission("triggers:update"))
     .mutation(async ({ ctx, input }) => {
       const isGraphAlert = !!input.customGraphId;
       const isReport = !isGraphAlert && !!input.report;
-      let parsedActionParams: Record<string, unknown> = {};
-      try {
-        validateTemplateDraft(input.templates);
-        // The webhook channel ships dark (ADR-040 §7): gate the save route as
-        // well as the picker, so the flag can't be bypassed via the API.
-        if (input.action === TriggerAction.SEND_WEBHOOK) {
-          const allowed = await featureFlagService.isEnabled(
-            "release_webhook_automations",
-            { distinctId: ctx.session.user.id, projectId: input.projectId },
-          );
-          if (!allowed) {
-            throw new TRPCError({
-              code: "FORBIDDEN",
-              message: "Webhook automations are not enabled for this project.",
-            });
-          }
-        }
-        if (isGraphAlert) {
-          // Graph alerts only support notify channels — there is no
-          // "ADD_TO_DATASET on a metric crossing a threshold" UX.
-          if (!NOTIFY_TRIGGER_ACTIONS.has(input.action)) {
-            throw new TRPCError({
-              code: "BAD_REQUEST",
-              message:
-                "Graph alerts only support notify channels (Email, Slack, or a webhook).",
-            });
-          }
-          if (!input.graphAlert) {
-            throw new TRPCError({
-              code: "BAD_REQUEST",
-              message:
-                "Graph alerts require a threshold rule (operator, threshold, time period, series).",
-            });
-          }
-          if (!input.alertType) {
-            throw new TRPCError({
-              code: "BAD_REQUEST",
-              message: "Graph alerts require an alert severity.",
-            });
-          }
-          // The graph must belong to the calling project — multitenancy
-          // gate. Without this a hostile client could attach a trigger to
-          // a graph from another tenant.
-          const graphExists = await AutomationCustomGraphService.create(
-            ctx.prisma,
-          ).existsInProject({
-            customGraphId: input.customGraphId ?? "",
-            projectId: input.projectId,
-          });
-          if (!graphExists) {
-            throw new TRPCError({
-              code: "NOT_FOUND",
-              message: "Graph not found in this project.",
-            });
-          }
-        }
-        if (isReport) {
-          // A report sends a rendered notification on a schedule — notify
-          // channels only, like alerts.
-          if (
-            input.action !== TriggerAction.SEND_EMAIL &&
-            input.action !== TriggerAction.SEND_SLACK_MESSAGE
-          ) {
-            throw new TRPCError({
-              code: "BAD_REQUEST",
-              message: "Reports can only send Email or Slack notifications.",
-            });
-          }
-        }
-        // Per-action shape validation: the provider registry's per-action
-        // Zod schema is the authoritative shape for actionParams. The router's
-        // top-level `actionParamsSchema` accepts the union for the wire
-        // format; this pass narrows by action, so a SEND_EMAIL upsert can't
-        // accidentally save a dataset config (and ADD_TO_DATASET can't
-        // persist an empty datasetId, etc.).
-        const perAction = actionParamsSchemaFor(input.action);
-        const perActionParsed = perAction.safeParse(input.actionParams);
-        if (!perActionParsed.success) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: `Invalid actionParams for ${input.action}: ${perActionParsed.error.errors[0]?.message ?? "validation failed"}`,
-          });
-        }
-        // Persist the PARSED params, not the wire object: Zod strips keys the
-        // action doesn't declare, so a Slack secret typed before switching the
-        // channel to Email can't ride along and land in the row in plaintext
-        // (where the Slack-only encrypt/redact passes would never touch it).
-        parsedActionParams = perActionParsed.data as Record<string, unknown>;
-        if (
-          input.action === TriggerAction.SEND_EMAIL &&
-          input.actionParams.members &&
-          input.actionParams.members.length > 0
-        ) {
-          validateEmailRecipientFormats(input.actionParams.members);
-        }
-        // Slack webhook / bot-channel presence is enforced by the per-action
-        // schema's superRefine above. The bot-token presence check (which must
-        // allow "kept" on edit) runs after this block — it needs the saved row.
-        if (
-          input.action === TriggerAction.ADD_TO_ANNOTATION_QUEUE &&
-          (!input.actionParams.annotators ||
-            input.actionParams.annotators.length === 0)
-        ) {
-          throw new MissingAnnotatorError();
-        }
-      } catch (err) {
-        throw toTemplateTRPCError(err);
-      }
+
+      const parsedActionParams = await validateAndParseUpsertInput({
+        input,
+        ctx,
+        isGraphAlert,
+        isReport,
+      });
 
       // ADR-043 Subject facet: normalise + validate the trace-filter query
       // before persisting. Empty/whitespace collapses to null (the legacy
       // `filters` path). A non-empty query is dry-run through the compiler so a
       // malformed query is rejected here with author feedback rather than
       // silently failing closed (matching nothing) at dispatch time.
-      const filterQuery =
-        input.filterQuery && input.filterQuery.trim() !== ""
-          ? input.filterQuery.trim()
-          : null;
-      if (filterQuery !== null) {
-        try {
-          translateFilterToClickHouse(filterQuery, input.projectId, {
-            from: 0,
-            to: 0,
-          });
-        } catch (err) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: `Invalid trace filter: ${
-              err instanceof Error ? err.message : "could not parse the query"
-            }`,
-          });
-        }
-      }
+      const filterQuery = resolveUpsertFilterQuery({
+        filterQuery: input.filterQuery,
+        projectId: input.projectId,
+      });
 
       // ADR-041 Slack bot delivery: encrypt a freshly-entered bot token (or
       // keep the stored ciphertext when the field was left blank on edit), and
       // reject a bot connection saved with no token at all. The token is never
       // returned to the client, so honouring "kept" means reading the saved row.
-      // Provider persist hooks (ADR-041 / ADR-040 §3): encrypt secrets,
-      // resolve kept sentinels against the saved row (loaded lazily only
-      // when a provider needs it), and reject invalid payloads (missing bot
-      // token, kept headers after a URL change) as typed HandledErrors.
-      const storedActionParams = await persistActionParamsFor(input.action, {
-        incoming: parsedActionParams,
-        loadExisting: async () =>
-          input.triggerId
-            ? (
-                await getApp().triggers.getById({
-                  triggerId: input.triggerId,
-                  projectId: input.projectId,
-                })
-              )?.actionParams
-            : undefined,
+      const storedActionParams = await resolveUpsertStoredActionParams({
+        action: input.action,
+        parsedActionParams,
+        triggerId: input.triggerId,
+        projectId: input.projectId,
+      });
+      const actionParams = stampUpsertActionParams({
+        action: input.action,
+        storedActionParams,
+        userId: ctx.session?.user.id,
       });
 
-      // Annotation-queue dispatch attributes created queue items to a user
-      // and skips the action when `createdByUserId` is absent. The drawer's
-      // provider slice doesn't carry it, so stamp the caller here — same as
-      // the legacy create mutation — or an edit would silently strip it and
-      // disable dispatch for the trigger.
-      // Force createdByUserId to the session user — never trust the client
-      // (builder5015-002). The schema strips it from the wire; we stamp
-      // unconditionally on the annotation-queue branch below.
-      const actionParams: Record<string, unknown> =
-        input.action === TriggerAction.ADD_TO_ANNOTATION_QUEUE
-          ? {
-              ...(storedActionParams as Record<string, unknown>),
-              createdByUserId: ctx.session?.user.id,
-            }
-          : { ...(storedActionParams as Record<string, unknown>) };
+      const data = buildUpsertTriggerData({
+        input,
+        actionParams,
+        filterQuery,
+        isGraphAlert,
+        isReport,
+      });
 
-      // Graph alerts: route the row shape through the SSOT builder so it's
-      // byte-identical to what `graphs.updateById` writes on the dashboard
-      // path (N1 — the sweep fixed graphs.ts but automations.ts was still
-      // hand-rolling the row). The dispatcher only knows one shape; drift
-      // between the two writers silently breaks dispatch for whichever
-      // format loses.
-      let data: Omit<Prisma.TriggerUncheckedCreateInput, "projectId">;
-      if (isGraphAlert && input.graphAlert && input.customGraphId) {
-        const graphAlert: GraphAlertActionParams = input.graphAlert;
-        const builderInput = {
-          id: input.triggerId ?? ksuid(KSUID_RESOURCES.TRIGGER).toString(),
-          name: input.name,
-          projectId: input.projectId,
-          action: input.action,
-          alertType: input.alertType ?? AlertType.INFO,
-          customGraphId: input.customGraphId,
-          actionParams: {
-            ...actionParams,
-            ...graphAlert,
-          },
-        };
-        const built = buildGraphAlertTriggerData(builderInput);
-        data = {
-          name: built.name,
-          action: built.action,
-          triggerKind: TriggerKind.ALERT,
-          alertType: built.alertType,
-          filters: built.filters,
-          // Graph alerts never carry a trace-filter query; clear it so a kind
-          // conversion can't leave a stale one behind.
-          filterQuery: null,
-          customGraphId: built.customGraphId,
-          actionParams: built.actionParams,
-          slackTemplateType: input.templates.slackTemplateType ?? null,
-          slackTemplate: input.templates.slackTemplate ?? null,
-          emailSubjectTemplate: input.templates.emailSubjectTemplate ?? null,
-          emailBodyTemplate: input.templates.emailBodyTemplate ?? null,
-        };
-      } else if (isReport && input.report) {
-        const built = buildReportTriggerData({
-          id: input.triggerId ?? ksuid(KSUID_RESOURCES.TRIGGER).toString(),
-          name: input.name,
-          projectId: input.projectId,
-          action: input.action,
-          actionParams: { ...actionParams, ...input.report },
-        });
-        data = {
-          name: built.name,
-          action: built.action,
-          triggerKind: TriggerKind.REPORT,
-          filters: built.filters,
-          // Converting an existing graph alert into a report must release the
-          // graph: a left-behind `customGraphId` re-arms the row as a threshold
-          // alert on the heartbeat path, so the report fires as an alert too.
-          customGraphId: null,
-          // A trace-query report sends the traces matching the author's Subject
-          // query — without this the report would only ever send the newest
-          // traces in the window. A graph/dashboard report has no trace query,
-          // so the column is cleared (a source change can't strand a stale one).
-          filterQuery:
-            input.report.source.kind === "traceQuery" ? filterQuery : null,
-          actionParams: built.actionParams,
-          slackTemplateType: input.templates.slackTemplateType ?? null,
-          slackTemplate: input.templates.slackTemplate ?? null,
-          emailSubjectTemplate: input.templates.emailSubjectTemplate ?? null,
-          emailBodyTemplate: input.templates.emailBodyTemplate ?? null,
-        };
-      } else {
-        data = {
-          name: input.name,
-          action: input.action,
-          triggerKind: TriggerKind.AUTOMATION,
-          alertType: input.alertType ?? null,
-          // A trace-subject automation supersedes the structured `filters` with
-          // its liqe query; persist an empty `{}` so the legacy matcher is a
-          // no-op and the dispatcher reads `filterQuery` instead.
-          filters: filterQuery !== null ? "{}" : JSON.stringify(input.filters),
-          filterQuery,
-          customGraphId: input.customGraphId ?? null,
-          actionParams: actionParams as Prisma.InputJsonValue,
-          slackTemplateType: input.templates.slackTemplateType ?? null,
-          slackTemplate: input.templates.slackTemplate ?? null,
-          emailSubjectTemplate: input.templates.emailSubjectTemplate ?? null,
-          emailBodyTemplate: input.templates.emailBodyTemplate ?? null,
-        };
-      }
+      const trigger = await persistUpsertTrigger({ input, data, isGraphAlert });
 
-      let trigger;
-      if (input.triggerId) {
-        const cadenceUpdate = resolveCadenceForUpdate(
-          input.action,
-          input.notificationCadence,
-          isGraphAlert,
-        );
-        trigger = await getApp().triggers.update({
-          triggerId: input.triggerId,
-          projectId: input.projectId,
-          data: {
-            ...data,
-            ...(cadenceUpdate !== undefined
-              ? { notificationCadence: cadenceUpdate }
-              : {}),
-            ...(input.traceDebounceMs !== undefined
-              ? { traceDebounceMs: input.traceDebounceMs }
-              : {}),
-          },
-        });
-      } else {
-        // A graph alert owns its custom-graph's unique `customGraphId` slot.
-        // `deleteById` soft-deletes (keeps the row and its @unique
-        // customGraphId occupied), so a fresh `create` for a graph that ever
-        // had an alert would violate the unique index — an unhandled P2002 →
-        // 500, with no UI path to recover since the soft-deleted row is hidden.
-        // Reactivate the existing row instead, matching the legacy
-        // graphs.updateById upsert-by-customGraphId behaviour.
-        const existingForGraph =
-          isGraphAlert && input.customGraphId
-            ? await getApp().triggers.getByCustomGraphId({
-                projectId: input.projectId,
-                customGraphId: input.customGraphId,
-              })
-            : null;
-        if (existingForGraph) {
-          trigger = await getApp().triggers.update({
-            triggerId: existingForGraph.id,
-            projectId: input.projectId,
-            data: {
-              ...data,
-              deleted: false,
-              active: true,
-              lastRunAt: new Date().getTime(),
-              notificationCadence: resolveCadenceForCreate(
-                input.action,
-                input.notificationCadence,
-                isGraphAlert,
-              ),
-              traceDebounceMs:
-                input.traceDebounceMs ?? DEFAULT_TRACE_DEBOUNCE_MS,
-            },
-          });
-        } else {
-          trigger = await getApp().triggers.create({
-            data: {
-              id: ksuid(KSUID_RESOURCES.TRIGGER).toString(),
-              projectId: input.projectId,
-              lastRunAt: new Date().getTime(),
-              notificationCadence: resolveCadenceForCreate(
-                input.action,
-                input.notificationCadence,
-                isGraphAlert,
-              ),
-              traceDebounceMs:
-                input.traceDebounceMs ?? DEFAULT_TRACE_DEBOUNCE_MS,
-              ...data,
-            },
-          });
-        }
-      }
-
-      if (isReport && input.report) {
-        // Wire the report onto the calendar scheduler (ADR-044): its trigger
-        // id is the scheduler targetId; publishWake nudges every pod's loop.
-        await getApp().triggers.syncReportSchedule({
-          projectId: input.projectId,
-          triggerId: trigger.id,
-          cron: input.report.schedule.cron,
-          timezone: input.report.schedule.timezone,
-        });
-      } else {
-        // Editing a report into a trace automation or graph alert must retire
-        // its calendar entry — otherwise the ScheduledJob keeps waking forever
-        // and the report handler repeatedly loads a now-non-report trigger,
-        // fails to parse its actionParams, and skips every cadence. Idempotent,
-        // so a trigger that was never a report costs one no-op deactivate.
-        await getApp().triggers.removeReportSchedule({
-          projectId: input.projectId,
-          triggerId: trigger.id,
-        });
-      }
+      await syncUpsertReportSchedule({ input, trigger, isReport });
 
       await getApp().triggers.invalidate(input.projectId);
       return redactTriggerForRead(trigger);

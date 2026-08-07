@@ -4,6 +4,62 @@ import { connection as redisConnection } from "~/server/redis";
 
 const logger = createLogger("langwatch:better-auth:revoke");
 
+type RedisConnection = NonNullable<typeof redisConnection>;
+
+/**
+ * Delete every cached session listed in the `active-sessions-` index and then
+ * the index itself, appending each token it cleared to `cleared`.
+ */
+const clearCachedSessionsFromIndex = async ({
+  redis,
+  userId,
+  cleared,
+}: {
+  redis: RedisConnection;
+  userId: string;
+  cleared: string[];
+}): Promise<void> => {
+  const indexKey = `better-auth:active-sessions-${userId}`;
+  const indexJson = await redis.get(indexKey);
+  if (!indexJson) return;
+
+  try {
+    const sessions = JSON.parse(indexJson) as Array<{ token: string }>;
+    for (const s of sessions) {
+      await redis.del(`better-auth:${s.token}`);
+      cleared.push(s.token);
+    }
+  } catch (parseErr) {
+    logger.warn(
+      { err: parseErr, userId },
+      "Failed to parse active-sessions index from Redis, falling back to DB scan",
+    );
+  }
+  await redis.del(indexKey);
+};
+
+const clearCachedSessionsFromDb = async ({
+  redis,
+  prisma,
+  userId,
+  cleared,
+}: {
+  redis: RedisConnection;
+  prisma: PrismaClient;
+  userId: string;
+  cleared: string[];
+}): Promise<void> => {
+  const dbSessions = await prisma.session.findMany({
+    where: { userId },
+    select: { sessionToken: true },
+  });
+  for (const s of dbSessions) {
+    if (!cleared.includes(s.sessionToken)) {
+      await redis.del(`better-auth:${s.sessionToken}`);
+    }
+  }
+};
+
 /**
  * Force-revoke ALL sessions for a user, clearing both the Postgres
  * `Session` table AND the BetterAuth Redis session cache.
@@ -52,36 +108,21 @@ export const revokeAllSessionsForUser = async ({
   const cleared: string[] = [];
   if (redisConnection) {
     try {
-      const indexKey = `better-auth:active-sessions-${userId}`;
-      const indexJson = await redisConnection.get(indexKey);
-      if (indexJson) {
-        try {
-          const sessions = JSON.parse(indexJson) as Array<{ token: string }>;
-          for (const s of sessions) {
-            await redisConnection.del(`better-auth:${s.token}`);
-            cleared.push(s.token);
-          }
-        } catch (parseErr) {
-          logger.warn(
-            { err: parseErr, userId },
-            "Failed to parse active-sessions index from Redis, falling back to DB scan",
-          );
-        }
-        await redisConnection.del(indexKey);
-      }
+      await clearCachedSessionsFromIndex({
+        redis: redisConnection,
+        userId,
+        cleared,
+      });
 
       // Always also scan Postgres for any session tokens that weren't in
       // the Redis index (the index is a write-time best-effort cache,
       // not a source of truth). This is the safety net.
-      const dbSessions = await prisma.session.findMany({
-        where: { userId },
-        select: { sessionToken: true },
+      await clearCachedSessionsFromDb({
+        redis: redisConnection,
+        prisma,
+        userId,
+        cleared,
       });
-      for (const s of dbSessions) {
-        if (!cleared.includes(s.sessionToken)) {
-          await redisConnection.del(`better-auth:${s.sessionToken}`);
-        }
-      }
     } catch (err) {
       logger.error(
         { err, userId },
@@ -97,6 +138,66 @@ export const revokeAllSessionsForUser = async ({
     { userId, deleted: result.count, redisCleared: cleared.length },
     "Revoked all sessions for user",
   );
+};
+
+/**
+ * Delete every cached session in the `active-sessions-` index except the kept
+ * one, and return the entries that survive so the caller can rewrite the index.
+ */
+const clearOtherCachedSessionsFromIndex = async ({
+  redis,
+  indexKey,
+  userId,
+  keepToken,
+}: {
+  redis: RedisConnection;
+  indexKey: string;
+  userId: string;
+  keepToken: string | undefined;
+}): Promise<Array<{ token: string; expiresAt: number }>> => {
+  const indexJson = await redis.get(indexKey);
+  const remainingTokens: Array<{ token: string; expiresAt: number }> = [];
+  if (indexJson) {
+    try {
+      const sessions = JSON.parse(indexJson) as Array<{
+        token: string;
+        expiresAt: number;
+      }>;
+      for (const s of sessions) {
+        if (s.token === keepToken) {
+          remainingTokens.push(s);
+        } else {
+          await redis.del(`better-auth:${s.token}`);
+        }
+      }
+    } catch (parseErr) {
+      logger.warn(
+        { err: parseErr, userId },
+        "Failed to parse active-sessions index from Redis during partial revoke",
+      );
+    }
+  }
+  return remainingTokens;
+};
+
+const clearOtherCachedSessionsFromDb = async ({
+  redis,
+  prisma,
+  userId,
+  keepSessionId,
+}: {
+  redis: RedisConnection;
+  prisma: PrismaClient;
+  userId: string;
+  keepSessionId: string;
+}): Promise<void> => {
+  const dbSessions = await prisma.session.findMany({
+    where: { userId, NOT: { id: keepSessionId } },
+    select: { sessionToken: true },
+  });
+  for (const s of dbSessions) {
+    await redis.del(`better-auth:${s.sessionToken}`);
+  }
 };
 
 /**
@@ -131,28 +232,12 @@ export const revokeOtherSessionsForUser = async ({
   if (redisConnection) {
     try {
       const indexKey = `better-auth:active-sessions-${userId}`;
-      const indexJson = await redisConnection.get(indexKey);
-      const remainingTokens: Array<{ token: string; expiresAt: number }> = [];
-      if (indexJson) {
-        try {
-          const sessions = JSON.parse(indexJson) as Array<{
-            token: string;
-            expiresAt: number;
-          }>;
-          for (const s of sessions) {
-            if (s.token === keepToken) {
-              remainingTokens.push(s);
-            } else {
-              await redisConnection.del(`better-auth:${s.token}`);
-            }
-          }
-        } catch (parseErr) {
-          logger.warn(
-            { err: parseErr, userId },
-            "Failed to parse active-sessions index from Redis during partial revoke",
-          );
-        }
-      }
+      const remainingTokens = await clearOtherCachedSessionsFromIndex({
+        redis: redisConnection,
+        indexKey,
+        userId,
+        keepToken,
+      });
       // Rewrite the index with only the kept session, or delete if empty.
       if (remainingTokens.length > 0) {
         await redisConnection.set(indexKey, JSON.stringify(remainingTokens));
@@ -161,13 +246,12 @@ export const revokeOtherSessionsForUser = async ({
       }
 
       // Safety net: scan Postgres for any session tokens not yet cleared.
-      const dbSessions = await prisma.session.findMany({
-        where: { userId, NOT: { id: keepSessionId } },
-        select: { sessionToken: true },
+      await clearOtherCachedSessionsFromDb({
+        redis: redisConnection,
+        prisma,
+        userId,
+        keepSessionId,
       });
-      for (const s of dbSessions) {
-        await redisConnection.del(`better-auth:${s.sessionToken}`);
-      }
     } catch (err) {
       logger.error(
         { err, userId, keepSessionId },

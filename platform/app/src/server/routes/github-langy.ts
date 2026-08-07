@@ -261,153 +261,252 @@ secured
     return c.redirect(url.toString(), 302);
   });
 
-secured
-  .access(publicEndpoint(SETUP_PUBLIC_REASON))
-  .get("/github-langy/setup", async (c) => {
-    const state = verifyState(c.req.query("state") ?? null);
-    const installationId = c.req.query("installation_id");
-    if (!state || !installationId) {
-      return setupError({
+type SetupSession = NonNullable<
+  Awaited<ReturnType<typeof getServerAuthSession>>
+>;
+
+/** Parses + verifies the signed `state` and `installation_id` query params. */
+function verifySetupRequest(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  c: any,
+):
+  | { ok: true; state: GithubOauthStatePayload; installationId: string }
+  | { ok: false; response: Response } {
+  const state = verifyState(c.req.query("state") ?? null);
+  const installationId = c.req.query("installation_id");
+  if (!state || !installationId) {
+    return {
+      ok: false,
+      response: setupError({
         c,
         state,
         errorMessage: "Invalid state or missing installation",
         status: 400,
-      });
-    }
+      }),
+    };
+  }
+  return { ok: true, state, installationId };
+}
 
-    // Re-bind the session to the state's user.
-    const session = await getServerAuthSession({
-      req: c.req.raw as NextRequestShim,
-    });
-    if (!session?.user || session.user.id !== state.userId) {
-      return setupError({
+/** Re-binds the session to the state's user. */
+async function requireSetupSession(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  c: any,
+  state: GithubOauthStatePayload,
+): Promise<
+  { ok: true; session: SetupSession } | { ok: false; response: Response }
+> {
+  const session = await getServerAuthSession({
+    req: c.req.raw as NextRequestShim,
+  });
+  if (!session?.user || session.user.id !== state.userId) {
+    return {
+      ok: false,
+      response: setupError({
         c,
         state,
         errorMessage: "Session changed mid-flow",
         status: 401,
-      });
-    }
+      }),
+    };
+  }
+  return { ok: true, session: session as SetupSession };
+}
 
-    // Burn the single-use nonce (skips when Redis was down at /install).
-    if (state.nonceRegistered) {
-      const consumed = await consumeGithubInstallNonce(state.nonce);
-      if (consumed === false) {
-        return setupError({
-          c,
-          state,
-          errorMessage: "Installation link already used",
-          status: 401,
+/** Burns the single-use nonce (skips when Redis was down at /install). */
+async function consumeSetupNonce(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  c: any,
+  state: GithubOauthStatePayload,
+): Promise<Response | null> {
+  if (!state.nonceRegistered) return null;
+  const consumed = await consumeGithubInstallNonce(state.nonce);
+  if (consumed === false) {
+    return setupError({
+      c,
+      state,
+      errorMessage: "Installation link already used",
+      status: 401,
+    });
+  }
+  return null;
+}
+
+/** Re-checks tenant membership, the connect permission, and the Langy
+ *  rollout gate — all defense-in-depth against a stale signed state, in the
+ *  same order as the tRPC surface. */
+async function authorizeSetupInstall(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  c: any,
+  state: GithubOauthStatePayload,
+  session: SetupSession,
+): Promise<Response | null> {
+  // Re-check tenant membership (defense in depth against a stale state).
+  if (
+    !(await getApp().langy.githubInstallations.isOrganizationMember({
+      userId: state.userId,
+      organizationId: state.organizationId,
+    }))
+  ) {
+    return setupError({
+      c,
+      state,
+      errorMessage: "Not a member of this organization",
+      status: 403,
+    });
+  }
+
+  // Re-check the connect permission too: the caller's role may have been
+  // lowered between /install and GitHub's redirect back here, and recording
+  // the installation is the write the permission exists to gate.
+  if (
+    !(await hasOrganizationPermission(
+      { prisma, session },
+      state.organizationId,
+      "langy:manage",
+    ))
+  ) {
+    return setupError({ c, state, errorMessage: "Forbidden", status: 403 });
+  }
+
+  // Re-check the Langy gate before persisting anything. The install may have
+  // begun while the flag was on; if the rollout was disabled (or the caller's
+  // access revoked) in between, the internal-only boundary must still hold, so
+  // the kill switch is immediate for this customer-facing path. The nonce was
+  // already burned above, so a denied caller can't retry the signed state.
+  if (
+    !(await hasLangyAccess({
+      user: session.user,
+      organizationId: state.organizationId,
+    }))
+  ) {
+    return setupError({
+      c,
+      state,
+      errorMessage: "The GitHub integration is not enabled for this account.",
+      status: 404,
+    });
+  }
+
+  return null;
+}
+
+/** Records the installation against the org, or reports the failure —
+ *  auditing a cross-tenant takeover attempt as a security event before
+ *  falling back to the generic public error. */
+async function recordSetupInstallation({
+  c,
+  state,
+  installationId,
+  returnTo,
+}: {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  c: any;
+  state: GithubOauthStatePayload;
+  installationId: string;
+  returnTo: string;
+}): Promise<
+  { ok: true; accountLogin: string } | { ok: false; response: Response }
+> {
+  try {
+    const { accountLogin } =
+      await getApp().langy.githubInstallations.recordInstallation({
+        installationId,
+        organizationId: state.organizationId,
+      });
+    return { ok: true, accountLogin };
+  } catch (err) {
+    // A cross-tenant takeover attempt (installation already owned by another
+    // org) is a security event, not an ordinary failure: audit it against the
+    // acting user/org so it is visible, but still return the generic message
+    // so the caller learns nothing about whether the installation id exists.
+    if (err instanceof LangyGithubInstallationConflictError) {
+      logger.warn(
+        {
+          installationId: err.installationId,
+          attemptedOrganizationId: err.attemptedOrganizationId,
+          userId: state.userId,
+        },
+        "blocked cross-tenant github installation rebind attempt",
+      );
+      try {
+        await auditLog({
+          userId: state.userId,
+          organizationId: state.organizationId,
+          action: "langy.github.install.rejected_cross_tenant",
+          args: { installationId: err.installationId },
         });
+      } catch (auditErr) {
+        logger.warn(
+          { err: auditErr },
+          "audit log write failed after blocked rebind",
+        );
       }
+    } else {
+      logger.warn({ err }, "github installation record failed");
     }
+    const publicMsg = publicGithubErrorMessage();
+    const response =
+      state.mode === "popup"
+        ? popupHtml(c, popupErrorHtml(publicMsg), 502)
+        : c.redirect(withGithubError(returnTo, publicMsg), 302);
+    return { ok: false, response };
+  }
+}
 
-    // Re-check tenant membership (defense in depth against a stale state).
-    if (
-      !(await getApp().langy.githubInstallations.isOrganizationMember({
-        userId: state.userId,
-        organizationId: state.organizationId,
-      }))
-    ) {
-      return setupError({
-        c,
-        state,
-        errorMessage: "Not a member of this organization",
-        status: 403,
-      });
-    }
+/** Best-effort audit of a successful install; the installation is already
+ *  recorded, so a failure here is logged rather than surfaced. */
+async function auditSetupInstallSuccess(
+  state: GithubOauthStatePayload,
+  installationId: string,
+  accountLogin: string,
+): Promise<void> {
+  try {
+    await auditLog({
+      userId: state.userId,
+      organizationId: state.organizationId,
+      action: "langy.github.install",
+      args: { installationId, accountLogin },
+    });
+  } catch (err) {
+    // The installation is already recorded — honour the success over audit
+    // completeness (operator-visible via this logger).
+    logger.warn(
+      { err, organizationId: state.organizationId },
+      "audit log write failed after github install — installation persisted",
+    );
+  }
+}
 
-    // Re-check the connect permission too: the caller's role may have been
-    // lowered between /install and GitHub's redirect back here, and recording
-    // the installation is the write the permission exists to gate.
-    if (
-      !(await hasOrganizationPermission(
-        { prisma, session },
-        state.organizationId,
-        "langy:manage",
-      ))
-    ) {
-      return setupError({ c, state, errorMessage: "Forbidden", status: 403 });
-    }
+secured
+  .access(publicEndpoint(SETUP_PUBLIC_REASON))
+  .get("/github-langy/setup", async (c) => {
+    const request = verifySetupRequest(c);
+    if (!request.ok) return request.response;
+    const { state, installationId } = request;
 
-    // Re-check the Langy gate before persisting anything. The install may have
-    // begun while the flag was on; if the rollout was disabled (or the caller's
-    // access revoked) in between, the internal-only boundary must still hold, so
-    // the kill switch is immediate for this customer-facing path. The nonce was
-    // already burned above, so a denied caller can't retry the signed state.
-    if (
-      !(await hasLangyAccess({
-        user: session.user,
-        organizationId: state.organizationId,
-      }))
-    ) {
-      return setupError({
-        c,
-        state,
-        errorMessage: "The GitHub integration is not enabled for this account.",
-        status: 404,
-      });
-    }
+    const sessionResult = await requireSetupSession(c, state);
+    if (!sessionResult.ok) return sessionResult.response;
+    const { session } = sessionResult;
+
+    const nonceRejection = await consumeSetupNonce(c, state);
+    if (nonceRejection) return nonceRejection;
+
+    const authRejection = await authorizeSetupInstall(c, state, session);
+    if (authRejection) return authRejection;
 
     const returnTo = safeReturnTo(state.returnTo);
 
-    let accountLogin: string;
-    try {
-      ({ accountLogin } =
-        await getApp().langy.githubInstallations.recordInstallation({
-          installationId,
-          organizationId: state.organizationId,
-        }));
-    } catch (err) {
-      // A cross-tenant takeover attempt (installation already owned by another
-      // org) is a security event, not an ordinary failure: audit it against the
-      // acting user/org so it is visible, but still return the generic message
-      // so the caller learns nothing about whether the installation id exists.
-      if (err instanceof LangyGithubInstallationConflictError) {
-        logger.warn(
-          {
-            installationId: err.installationId,
-            attemptedOrganizationId: err.attemptedOrganizationId,
-            userId: state.userId,
-          },
-          "blocked cross-tenant github installation rebind attempt",
-        );
-        try {
-          await auditLog({
-            userId: state.userId,
-            organizationId: state.organizationId,
-            action: "langy.github.install.rejected_cross_tenant",
-            args: { installationId: err.installationId },
-          });
-        } catch (auditErr) {
-          logger.warn(
-            { err: auditErr },
-            "audit log write failed after blocked rebind",
-          );
-        }
-      } else {
-        logger.warn({ err }, "github installation record failed");
-      }
-      const publicMsg = publicGithubErrorMessage();
-      return state.mode === "popup"
-        ? popupHtml(c, popupErrorHtml(publicMsg), 502)
-        : c.redirect(withGithubError(returnTo, publicMsg), 302);
-    }
+    const recorded = await recordSetupInstallation({
+      c,
+      state,
+      installationId,
+      returnTo,
+    });
+    if (!recorded.ok) return recorded.response;
+    const { accountLogin } = recorded;
 
-    try {
-      await auditLog({
-        userId: state.userId,
-        organizationId: state.organizationId,
-        action: "langy.github.install",
-        args: { installationId, accountLogin },
-      });
-    } catch (err) {
-      // The installation is already recorded — honour the success over audit
-      // completeness (operator-visible via this logger).
-      logger.warn(
-        { err, organizationId: state.organizationId },
-        "audit log write failed after github install — installation persisted",
-      );
-    }
+    await auditSetupInstallSuccess(state, installationId, accountLogin);
 
     if (state.mode === "popup") {
       return popupHtml(c, popupResponseHtml(accountLogin), 200);

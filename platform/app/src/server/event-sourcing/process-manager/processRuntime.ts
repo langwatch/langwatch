@@ -61,6 +61,77 @@ export function buildIntentHandlers(
   return handlers;
 }
 
+type EvolveParams = Parameters<ProcessDefinition<unknown>["evolve"]>[0];
+type EvolveReturn = ReturnType<ProcessDefinition<unknown>["evolve"]>;
+
+function evolveWakeInput(params: {
+  config: ProcessManagerDefinition["config"];
+  previousState: EvolveParams["previousState"];
+  ref: EvolveParams["ref"];
+  input: Extract<EvolveParams["input"], { kind: "wake" }>;
+  factories: ReturnType<typeof buildIntentFactories>;
+}): EvolveReturn {
+  const { config, previousState, ref, input, factories } = params;
+  if (!config.onWake) {
+    return { state: previousState, nextWakeAt: null, intents: [] };
+  }
+  const evolution = config.onWake(previousState, {
+    at: input.scheduledFor,
+    now: input.now,
+    key: ref.processKey,
+    projectId: ref.projectId,
+    intents: factories,
+  });
+  return {
+    state: evolution.state,
+    // Rearm from the present, not from the slot we missed. A wake
+    // that fires days late must schedule the NEXT slot from now, or
+    // every skipped interval is replayed back-to-back on recovery.
+    nextWakeAt: config.schedule
+      ? Math.max(input.scheduledFor, input.now) + config.schedule.everyMs
+      : (evolution.nextWakeAt ?? null),
+    intents: evolution.intents ?? [],
+  };
+}
+
+function evolveEventInput(params: {
+  config: ProcessManagerDefinition["config"];
+  previousState: EvolveParams["previousState"];
+  ref: EvolveParams["ref"];
+  envelope: ProcessEventEnvelope;
+  now: number;
+  factories: ReturnType<typeof buildIntentFactories>;
+}): EvolveReturn {
+  const { config, previousState, ref, envelope, now, factories } = params;
+  if (envelope.eventType === SCHEDULE_ARM_EVENT_TYPE) {
+    return {
+      state: previousState,
+      nextWakeAt:
+        Math.max(envelope.occurredAt, now) + (config.schedule?.everyMs ?? 0),
+      intents: [],
+    };
+  }
+
+  const handler = config.handlers[envelope.eventType];
+  if (!handler) {
+    throw new Error(
+      `Process manager "${config.name}" received undeclared event "${envelope.eventType}"`,
+    );
+  }
+  const evolution = handler(previousState, envelope.payload, {
+    at: envelope.occurredAt,
+    now,
+    key: envelope.processKey,
+    projectId: envelope.projectId,
+    intents: factories,
+  });
+  return {
+    state: evolution.state,
+    nextWakeAt: evolution.nextWakeAt ?? null,
+    intents: evolution.intents ?? [],
+  };
+}
+
 /**
  * The runtime-facing ProcessDefinition a builder config generates. Exported
  * so tests (and future domains' harnesses) can drive the EXACT evolve the
@@ -77,58 +148,16 @@ export function buildProcessDefinition(
       const factories = buildIntentFactories(config.intents, {
         processKey: ref.processKey,
       });
-      if (input.kind === "wake") {
-        if (!config.onWake) {
-          return { state: previousState, nextWakeAt: null, intents: [] };
-        }
-        const evolution = config.onWake(previousState, {
-          at: input.scheduledFor,
-          now: input.now,
-          key: ref.processKey,
-          projectId: ref.projectId,
-          intents: factories,
-        });
-        return {
-          state: evolution.state,
-          // Rearm from the present, not from the slot we missed. A wake
-          // that fires days late must schedule the NEXT slot from now, or
-          // every skipped interval is replayed back-to-back on recovery.
-          nextWakeAt: config.schedule
-            ? Math.max(input.scheduledFor, input.now) + config.schedule.everyMs
-            : (evolution.nextWakeAt ?? null),
-          intents: evolution.intents ?? [],
-        };
-      }
-
-      const envelope = input.event;
-      if (envelope.eventType === SCHEDULE_ARM_EVENT_TYPE) {
-        return {
-          state: previousState,
-          nextWakeAt:
-            Math.max(envelope.occurredAt, input.now) +
-            (config.schedule?.everyMs ?? 0),
-          intents: [],
-        };
-      }
-
-      const handler = config.handlers[envelope.eventType];
-      if (!handler) {
-        throw new Error(
-          `Process manager "${config.name}" received undeclared event "${envelope.eventType}"`,
-        );
-      }
-      const evolution = handler(previousState, envelope.payload, {
-        at: envelope.occurredAt,
-        now: input.now,
-        key: envelope.processKey,
-        projectId: envelope.projectId,
-        intents: factories,
-      });
-      return {
-        state: evolution.state,
-        nextWakeAt: evolution.nextWakeAt ?? null,
-        intents: evolution.intents ?? [],
-      };
+      return input.kind === "wake"
+        ? evolveWakeInput({ config, previousState, ref, input, factories })
+        : evolveEventInput({
+            config,
+            previousState,
+            ref,
+            envelope: input.event,
+            now: input.now,
+            factories,
+          });
     },
   };
 }

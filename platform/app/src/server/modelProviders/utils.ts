@@ -14,6 +14,8 @@ import { ModelProviderDisabledError } from "./modelProviderDisabledError";
 import type { MaybeStoredModelProvider } from "./registry";
 import {
   findAlternateBelowScope,
+  type Resolution,
+  type ResolutionScope,
   resolveModelForFeature,
 } from "./resolveModelForFeature";
 
@@ -106,6 +108,132 @@ export const getVercelAIModel = async ({
   return vercelProvider(model_);
 };
 
+/**
+ * The `alternate` descriptor the disabled-provider error carries: the
+ * cascade-next candidate, but only when it sits above the project scope —
+ * a project-scoped alternate is the very row the user already has open.
+ */
+function alternateSwapCandidate({
+  alternate,
+  modelProviders,
+}: {
+  alternate: Resolution | null;
+  modelProviders: Record<string, MaybeStoredModelProvider>;
+}) {
+  if (!alternate || alternate.scope === null || alternate.scope === "project") {
+    return null;
+  }
+  const alternateProviderKey = alternate.model.split("/")[0] ?? null;
+  return {
+    scope: alternate.scope,
+    model: alternate.model,
+    providerKey: alternateProviderKey ?? "",
+    providerEnabled: Boolean(
+      alternateProviderKey && modelProviders[alternateProviderKey]?.enabled,
+    ),
+  };
+}
+
+/**
+ * Cascade picked a model but the backing provider is disabled.
+ * Silently swapping to a random enabled provider is dangerous (the
+ * user thinks they're calling the one they configured); throw a
+ * typed error so the frontend can offer a one-click swap to the
+ * cascade-next candidate (if any) or a deep-link to settings.
+ */
+async function disabledProviderError({
+  resolved,
+  resolvedScope,
+  providerKey,
+  featureKey,
+  projectId,
+  modelProviders,
+}: {
+  resolved: Resolution;
+  resolvedScope: Exclude<ResolutionScope, null>;
+  providerKey: string;
+  featureKey: string;
+  projectId: string;
+  modelProviders: Record<string, MaybeStoredModelProvider>;
+}): Promise<ModelProviderDisabledError> {
+  const alternate = await findAlternateBelowScope(
+    featureKey,
+    { prisma, projectId },
+    resolvedScope,
+  );
+  const feature = featureByKey(featureKey);
+  return new ModelProviderDisabledError({
+    featureKey,
+    featureDisplayName: feature?.displayName ?? featureKey,
+    role: resolved.feature.role,
+    projectId,
+    resolvedScope,
+    resolvedModel: resolved.model,
+    providerKey,
+    alternate: alternateSwapCandidate({ alternate, modelProviders }),
+  });
+}
+
+async function cascadeResolvedModel({
+  projectId,
+  featureKey,
+  modelProviders,
+}: {
+  projectId: string;
+  featureKey: string;
+  modelProviders: Record<string, MaybeStoredModelProvider>;
+}): Promise<string> {
+  const resolved = await resolveModelForFeature(featureKey, {
+    prisma,
+    projectId,
+  });
+  const providerKey = resolved.model.split("/")[0] ?? "";
+  if (modelProviders[providerKey]?.enabled) return resolved.model;
+
+  // `resolved.scope` is always non-null on the success path (the
+  // resolver returns ModelNotConfiguredError when nothing resolves,
+  // not a null-scope Resolution), but the type is loose — narrow
+  // here so the typed error stays correct.
+  if (resolved.scope === null) {
+    throw new Error("resolveModelForFeature returned a null scope");
+  }
+  throw await disabledProviderError({
+    resolved,
+    resolvedScope: resolved.scope,
+    providerKey,
+    featureKey,
+    projectId,
+    modelProviders,
+  });
+}
+
+/** First enabled provider carrying a usable custom model. */
+function firstEnabledCustomModel(
+  modelProviders: Record<string, MaybeStoredModelProvider>,
+): string | null {
+  for (const [key, provider] of Object.entries(modelProviders)) {
+    if (provider.enabled && provider.customModels?.length) {
+      return `${key}/${provider.customModels[0]?.modelId ?? ""}`;
+    }
+  }
+  return null;
+}
+
+/** Nothing available, distinguish "none configured" from "all disabled". */
+function noUsableProviderError(
+  modelProviders: Record<string, MaybeStoredModelProvider>,
+): Error {
+  if (Object.keys(modelProviders).length > 0) {
+    return new Error(
+      "All configured model providers are disabled or have no usable models. Go to Settings → Model Providers to enable one or add a model.",
+    );
+  }
+
+  return new Error(
+    "No model providers configured for this project. Go to Settings → Model Providers to add one.",
+  );
+}
+
 async function resolveModel({
   explicit,
   projectId,
@@ -127,52 +255,10 @@ async function resolveModel({
   //    popup with the feature+role in context. Swallowing it here
   //    would silently substitute an unrelated model.
   try {
-    const resolved = await resolveModelForFeature(featureKey, {
-      prisma,
+    return await cascadeResolvedModel({
       projectId,
-    });
-    const providerKey = resolved.model.split("/")[0] ?? "";
-    if (modelProviders[providerKey]?.enabled) return resolved.model;
-    // Cascade picked a model but the backing provider is disabled.
-    // Silently swapping to a random enabled provider is dangerous (the
-    // user thinks they're calling the one they configured); throw a
-    // typed error so the frontend can offer a one-click swap to the
-    // cascade-next candidate (if any) or a deep-link to settings.
-    //
-    // `resolved.scope` is always non-null on the success path (the
-    // resolver returns ModelNotConfiguredError when nothing resolves,
-    // not a null-scope Resolution), but the type is loose — narrow
-    // here so the typed error stays correct.
-    if (resolved.scope === null) {
-      throw new Error("resolveModelForFeature returned a null scope");
-    }
-    const alternate = await findAlternateBelowScope(
       featureKey,
-      { prisma, projectId },
-      resolved.scope,
-    );
-    const feature = featureByKey(featureKey);
-    const alternateProviderKey = alternate?.model.split("/")[0] ?? null;
-    throw new ModelProviderDisabledError({
-      featureKey,
-      featureDisplayName: feature?.displayName ?? featureKey,
-      role: resolved.feature.role,
-      projectId,
-      resolvedScope: resolved.scope,
-      resolvedModel: resolved.model,
-      providerKey,
-      alternate:
-        alternate && alternate.scope !== null && alternate.scope !== "project"
-          ? {
-              scope: alternate.scope,
-              model: alternate.model,
-              providerKey: alternateProviderKey ?? "",
-              providerEnabled: Boolean(
-                alternateProviderKey &&
-                  modelProviders[alternateProviderKey]?.enabled,
-              ),
-            }
-          : null,
+      modelProviders,
     });
   } catch (err) {
     if (err instanceof ModelNotConfiguredError) throw err;
@@ -183,20 +269,9 @@ async function resolveModel({
   }
 
   // 3. Find any enabled provider with a usable custom model.
-  for (const [key, provider] of Object.entries(modelProviders)) {
-    if (provider.enabled && provider.customModels?.length) {
-      return `${key}/${provider.customModels[0]?.modelId ?? ""}`;
-    }
-  }
+  const fromEnabledProvider = firstEnabledCustomModel(modelProviders);
+  if (fromEnabledProvider) return fromEnabledProvider;
 
-  // 4. Nothing available, distinguish "none configured" from "all disabled".
-  if (Object.keys(modelProviders).length > 0) {
-    throw new Error(
-      "All configured model providers are disabled or have no usable models. Go to Settings → Model Providers to enable one or add a model.",
-    );
-  }
-
-  throw new Error(
-    "No model providers configured for this project. Go to Settings → Model Providers to add one.",
-  );
+  // 4. Nothing available.
+  throw noUsableProviderError(modelProviders);
 }

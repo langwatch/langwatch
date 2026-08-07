@@ -336,6 +336,112 @@ const getDatasetHead = async ({
   }
 };
 
+const deleteS3JsonlDatasetRecords = async ({
+  recordIds,
+  projectId,
+  dataset,
+  prisma,
+}: {
+  recordIds: string[];
+  projectId: string;
+  dataset: Dataset;
+  prisma: PrismaClient;
+}) => {
+  const { deleted } = await deleteS3JsonlRecords({
+    prisma,
+    dataset,
+    projectId,
+    recordIds,
+  });
+  if (deleted === 0) {
+    throw new TRPCError({
+      code: "NOT_FOUND",
+      message: "No matching records found to delete",
+    });
+  }
+  return { deletedCount: deleted };
+};
+
+const deleteS3BlobDatasetRecords = async ({
+  recordIds,
+  datasetId,
+  projectId,
+  prisma,
+}: {
+  recordIds: string[];
+  datasetId: string;
+  projectId: string;
+  prisma: PrismaClient;
+}) => {
+  // Get existing records
+  let records: any[] = [];
+  try {
+    const { records: fetchedRecords } = await storageService.getObject(
+      projectId,
+      datasetId,
+    );
+    records = fetchedRecords;
+  } catch (error) {
+    if ((error as any).name === "NoSuchKey") {
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: "No records found to delete",
+      });
+    }
+    captureException(toError(error));
+    throw error;
+  }
+
+  const initialLength = records.length;
+  records = records.filter((record) => !recordIds.includes(record.id));
+
+  if (records.length === initialLength) {
+    throw new TRPCError({
+      code: "NOT_FOUND",
+      message: "No matching records found to delete",
+    });
+  }
+
+  // Save back to S3
+  await storageService.putObject(projectId, datasetId, JSON.stringify(records));
+
+  await prisma.dataset.update({
+    where: { id: datasetId, projectId },
+    data: { s3RecordCount: records.length },
+  });
+
+  return { deletedCount: initialLength - records.length };
+};
+
+const deletePrismaDatasetRecords = async ({
+  recordIds,
+  datasetId,
+  projectId,
+  prisma,
+}: {
+  recordIds: string[];
+  datasetId: string;
+  projectId: string;
+  prisma: PrismaClient;
+}) => {
+  const { count } = await prisma.datasetRecord.deleteMany({
+    where: {
+      id: { in: recordIds },
+      datasetId,
+      projectId,
+    },
+  });
+
+  if (count === 0) {
+    throw new TRPCError({
+      code: "NOT_FOUND",
+      message: "No matching records found to delete",
+    });
+  }
+
+  return { deletedCount: count };
+};
+
 const deleteManyDatasetRecords = async ({
   recordIds,
   datasetId,
@@ -354,82 +460,29 @@ const deleteManyDatasetRecords = async ({
   // offset index, under the per-dataset advisory lock (Decision 9). Replaces the
   // dead single-blob `useS3` path below for the new layout.
   if (dataset.contentLayout === "s3_jsonl") {
-    const { deleted } = await deleteS3JsonlRecords({
-      prisma,
-      dataset,
-      projectId,
+    return deleteS3JsonlDatasetRecords({
       recordIds,
+      projectId,
+      dataset,
+      prisma,
     });
-    if (deleted === 0) {
-      throw new TRPCError({
-        code: "NOT_FOUND",
-        message: "No matching records found to delete",
-      });
-    }
-    return { deletedCount: deleted };
   }
 
   if (dataset.useS3) {
-    // Get existing records
-    let records: any[] = [];
-    try {
-      const { records: fetchedRecords } = await storageService.getObject(
-        projectId,
-        datasetId,
-      );
-      records = fetchedRecords;
-    } catch (error) {
-      if ((error as any).name === "NoSuchKey") {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "No records found to delete",
-        });
-      }
-      captureException(toError(error));
-      throw error;
-    }
-
-    const initialLength = records.length;
-    records = records.filter((record) => !recordIds.includes(record.id));
-
-    if (records.length === initialLength) {
-      throw new TRPCError({
-        code: "NOT_FOUND",
-        message: "No matching records found to delete",
-      });
-    }
-
-    // Save back to S3
-    await storageService.putObject(
-      projectId,
+    return deleteS3BlobDatasetRecords({
+      recordIds,
       datasetId,
-      JSON.stringify(records),
-    );
-
-    await prisma.dataset.update({
-      where: { id: datasetId, projectId },
-      data: { s3RecordCount: records.length },
+      projectId,
+      prisma,
     });
-
-    return { deletedCount: initialLength - records.length };
-  } else {
-    const { count } = await prisma.datasetRecord.deleteMany({
-      where: {
-        id: { in: recordIds },
-        datasetId,
-        projectId,
-      },
-    });
-
-    if (count === 0) {
-      throw new TRPCError({
-        code: "NOT_FOUND",
-        message: "No matching records found to delete",
-      });
-    }
-
-    return { deletedCount: count };
   }
+
+  return deletePrismaDatasetRecords({
+    recordIds,
+    datasetId,
+    projectId,
+    prisma,
+  });
 };
 
 const updateDatasetRecord = async ({

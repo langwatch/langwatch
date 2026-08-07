@@ -20,6 +20,41 @@ export function validateTimeZone(tz: string): string {
   }
 }
 
+type FilterValue =
+  | string[]
+  | Record<string, string[]>
+  | Record<string, Record<string, string[]>>;
+
+type FilterValueEntry = string[] | Record<string, string[]>;
+
+function dateTruncSubDay(
+  column: string,
+  timeScaleMinutes: number,
+  tz: string,
+): string {
+  if (timeScaleMinutes <= 1) {
+    return `toStartOfMinute(${column}, '${tz}')`;
+  }
+  if (timeScaleMinutes % MINUTES_PER_HOUR === 0) {
+    const hours = timeScaleMinutes / MINUTES_PER_HOUR;
+    return `toStartOfInterval(${column}, INTERVAL ${hours} HOUR, '${tz}')`;
+  }
+  return `toStartOfInterval(${column}, INTERVAL ${timeScaleMinutes} MINUTE, '${tz}')`;
+}
+
+function dateTruncByDay(
+  column: string,
+  timeScaleMinutes: number,
+  tz: string,
+): string {
+  const days = Math.floor(timeScaleMinutes / MINUTES_PER_DAY);
+  if (days === 1) return `toStartOfDay(${column}, '${tz}')`;
+  if (days <= DAYS_PER_WEEK)
+    return `toStartOfInterval(${column}, INTERVAL ${days} DAY, '${tz}')`;
+  if (days <= DAYS_PER_MONTH) return `toStartOfWeek(${column}, 1, '${tz}')`;
+  return `toStartOfMonth(${column}, '${tz}')`;
+}
+
 /**
  * Build a ClickHouse date-bucket function over a given column for a given
  * timeScale (in minutes) and timezone. Mirrors the legacy builder's logic
@@ -31,63 +66,51 @@ export function dateTrunc(
   timeZone: string,
 ): string {
   const tz = validateTimeZone(timeZone);
-  if (timeScaleMinutes <= 1) {
-    return `toStartOfMinute(${column}, '${tz}')`;
-  } else if (timeScaleMinutes < MINUTES_PER_DAY) {
-    if (timeScaleMinutes % MINUTES_PER_HOUR === 0) {
-      const hours = timeScaleMinutes / MINUTES_PER_HOUR;
-      return `toStartOfInterval(${column}, INTERVAL ${hours} HOUR, '${tz}')`;
-    }
-    return `toStartOfInterval(${column}, INTERVAL ${timeScaleMinutes} MINUTE, '${tz}')`;
-  } else {
-    const days = Math.floor(timeScaleMinutes / MINUTES_PER_DAY);
-    if (days === 1) return `toStartOfDay(${column}, '${tz}')`;
-    if (days <= DAYS_PER_WEEK)
-      return `toStartOfInterval(${column}, INTERVAL ${days} DAY, '${tz}')`;
-    if (days <= DAYS_PER_MONTH) return `toStartOfWeek(${column}, 1, '${tz}')`;
-    return `toStartOfMonth(${column}, '${tz}')`;
+  if (timeScaleMinutes < MINUTES_PER_DAY) {
+    return dateTruncSubDay(column, timeScaleMinutes, tz);
   }
+  return dateTruncByDay(column, timeScaleMinutes, tz);
 }
 
-export function hasFilterValues(
-  v:
-    | string[]
-    | Record<string, string[]>
-    | Record<string, Record<string, string[]>>
-    | undefined,
-): boolean {
-  if (v === undefined) return false;
-  if (Array.isArray(v)) return v.length > 0;
-  if (typeof v !== "object") return false;
-  for (const inner of Object.values(v)) {
-    if (Array.isArray(inner) && inner.length > 0) return true;
-    if (typeof inner === "object" && inner !== null) {
-      for (const vv of Object.values(inner)) {
-        if (Array.isArray(vv) && vv.length > 0) return true;
-      }
-    }
+function innerHasValues(inner: FilterValueEntry): boolean {
+  if (Array.isArray(inner)) return inner.length > 0;
+  if (typeof inner !== "object" || inner === null) return false;
+  for (const vv of Object.values(inner)) {
+    if (Array.isArray(vv) && vv.length > 0) return true;
   }
   return false;
 }
 
-export function collectStringValues(
-  value:
-    | string[]
-    | Record<string, string[]>
-    | Record<string, Record<string, string[]>>,
-): string[] {
+export function hasFilterValues(v: FilterValue | undefined): boolean {
+  if (v === undefined) return false;
+  if (Array.isArray(v)) return v.length > 0;
+  if (typeof v !== "object") return false;
+  for (const inner of Object.values(v)) {
+    if (innerHasValues(inner)) return true;
+  }
+  return false;
+}
+
+function collectInnerStringValues(
+  inner: FilterValueEntry,
+  out: string[],
+): void {
+  if (Array.isArray(inner)) {
+    out.push(...inner);
+    return;
+  }
+  if (typeof inner === "object" && inner !== null) {
+    for (const v of Object.values(inner)) {
+      if (Array.isArray(v)) out.push(...v);
+    }
+  }
+}
+
+export function collectStringValues(value: FilterValue): string[] {
   if (Array.isArray(value)) return value;
   const out: string[] = [];
   for (const inner of Object.values(value)) {
-    if (Array.isArray(inner)) {
-      out.push(...inner);
-      continue;
-    }
-    if (typeof inner === "object" && inner !== null) {
-      for (const v of Object.values(inner)) {
-        if (Array.isArray(v)) out.push(...v);
-      }
-    }
+    collectInnerStringValues(inner, out);
   }
   return out;
 }

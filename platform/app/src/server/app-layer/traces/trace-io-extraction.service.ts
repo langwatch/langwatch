@@ -1,5 +1,5 @@
 import { SpanKind } from "@opentelemetry/api";
-import { getLangWatchTracer } from "langwatch";
+import { getLangWatchTracer, type LangWatchSpan } from "langwatch";
 import type { NormalizedSpan } from "../../event-sourcing/pipelines/trace-processing/schemas/spans";
 import { ATTR_KEYS } from "./canonicalisation/extractors/_constants";
 import {
@@ -34,6 +34,69 @@ export class TraceIOExtractionService {
    *
    * @returns ExtractedIO with both raw JSON and text representation, or null if not found
    */
+  private computeFirstInput(
+    spans: NormalizedSpan[],
+    otelSpan: LangWatchSpan,
+  ): ExtractedIO | null {
+    if (spans.length === 0) {
+      otelSpan.setAttributes({ "input.found": false });
+      return null;
+    }
+
+    const tree = this.organizeSpansIntoTree(spans);
+    const orderedSpans = this.flattenSpanTree(tree, "outside-in");
+
+    // Filter to spans with valid inputs
+    const spansWithInput = orderedSpans.filter((span) => {
+      if (shouldExcludeSpan(span)) return false;
+      const input = this.extractRichIOFromSpan(span, "input");
+      return input !== null;
+    });
+
+    const firstSpan = spansWithInput[0];
+
+    if (firstSpan) {
+      const input = this.extractRichIOFromSpan(firstSpan, "input");
+      otelSpan.setAttributes({
+        "input.found": true,
+        "span.type": getSpanType(firstSpan),
+        "input.length": input?.text.length ?? 0,
+      });
+      return input;
+    }
+
+    // No semantic match — try stringified-payload fallback against the
+    // topmost span that HAS an input attribute, so `ComputedInput` is
+    // non-null when the trace genuinely carries data. Fallback is
+    // applied only after every semantic candidate has been exhausted,
+    // so it can never shadow a real match.
+    for (const span of orderedSpans) {
+      if (shouldExcludeSpan(span)) continue;
+      const fb = this.extractFallbackIOFromSpan(span, "input");
+      if (fb) {
+        otelSpan.setAttributes({
+          "input.found": true,
+          "input.source": "stringified_fallback",
+          "input.length": fb.text.length,
+        });
+        return fb;
+      }
+    }
+
+    otelSpan.setAttributes({
+      "input.found": false,
+      "fallback.used": true,
+    });
+    const httpFallback = this.getHttpFallback(orderedSpans);
+    return httpFallback
+      ? {
+          raw: httpFallback,
+          text: httpFallback,
+          source: "langwatch" as const,
+        }
+      : null;
+  }
+
   extractFirstInput(spans: NormalizedSpan[]): ExtractedIO | null {
     return this.tracer.withActiveSpan(
       "TraceIOExtractionService.extractFirstInput",
@@ -41,65 +104,7 @@ export class TraceIOExtractionService {
         kind: SpanKind.INTERNAL,
         attributes: { "span.count": spans.length },
       },
-      (otelSpan) => {
-        if (spans.length === 0) {
-          otelSpan.setAttributes({ "input.found": false });
-          return null;
-        }
-
-        const tree = this.organizeSpansIntoTree(spans);
-        const orderedSpans = this.flattenSpanTree(tree, "outside-in");
-
-        // Filter to spans with valid inputs
-        const spansWithInput = orderedSpans.filter((span) => {
-          if (shouldExcludeSpan(span)) return false;
-          const input = this.extractRichIOFromSpan(span, "input");
-          return input !== null;
-        });
-
-        const firstSpan = spansWithInput[0];
-
-        if (firstSpan) {
-          const input = this.extractRichIOFromSpan(firstSpan, "input");
-          otelSpan.setAttributes({
-            "input.found": true,
-            "span.type": getSpanType(firstSpan),
-            "input.length": input?.text.length ?? 0,
-          });
-          return input;
-        }
-
-        // No semantic match — try stringified-payload fallback against the
-        // topmost span that HAS an input attribute, so `ComputedInput` is
-        // non-null when the trace genuinely carries data. Fallback is
-        // applied only after every semantic candidate has been exhausted,
-        // so it can never shadow a real match.
-        for (const span of orderedSpans) {
-          if (shouldExcludeSpan(span)) continue;
-          const fb = this.extractFallbackIOFromSpan(span, "input");
-          if (fb) {
-            otelSpan.setAttributes({
-              "input.found": true,
-              "input.source": "stringified_fallback",
-              "input.length": fb.text.length,
-            });
-            return fb;
-          }
-        }
-
-        otelSpan.setAttributes({
-          "input.found": false,
-          "fallback.used": true,
-        });
-        const httpFallback = this.getHttpFallback(orderedSpans);
-        return httpFallback
-          ? {
-              raw: httpFallback,
-              text: httpFallback,
-              source: "langwatch" as const,
-            }
-          : null;
-      },
+      (otelSpan) => this.computeFirstInput(spans, otelSpan),
     );
   }
 
@@ -109,6 +114,119 @@ export class TraceIOExtractionService {
    *
    * @returns ExtractedIO with both raw JSON and text representation, or null if not found
    */
+  private hasValidOutput(span: NormalizedSpan): boolean {
+    if (shouldExcludeSpan(span)) return false;
+    const output = this.extractRichIOFromSpan(span, "output");
+    return output !== null;
+  }
+
+  // Try single top-level node first.
+  private singleTopLevelOutput(
+    tree: SpanTreeNode[],
+    otelSpan: LangWatchSpan,
+  ): ExtractedIO | null | undefined {
+    const topLevelWithOutput = this.flattenSpanTree(tree, "inside-out")
+      .filter((span) => this.hasValidOutput(span))
+      .reverse();
+
+    if (topLevelWithOutput.length !== 1 || !topLevelWithOutput[0]) {
+      return undefined;
+    }
+
+    const span = topLevelWithOutput[0];
+    const output = this.extractRichIOFromSpan(span, "output");
+
+    otelSpan.setAttributes({
+      "output.found": true,
+      "span.type": getSpanType(span),
+      "output.source": "single_top_level",
+      "output.length": output?.text.length ?? 0,
+    });
+
+    return output;
+  }
+
+  // Fall back to last-finishing span.
+  private lastFinishingOutput(
+    spans: NormalizedSpan[],
+    otelSpan: LangWatchSpan,
+  ): ExtractedIO | null | undefined {
+    const sortedByEndTime = spans
+      .filter((span) => this.hasValidOutput(span))
+      .sort((a, b) => b.endTimeUnixMs - a.endTimeUnixMs);
+
+    const lastSpan = sortedByEndTime[0];
+    if (!lastSpan) return undefined;
+
+    const output = this.extractRichIOFromSpan(lastSpan, "output");
+    otelSpan.setAttributes({
+      "output.found": true,
+      "span.type": getSpanType(lastSpan),
+      "output.source": "last_finishing",
+      "output.length": output?.text.length ?? 0,
+    });
+    return output;
+  }
+
+  // No semantic match on any span — try stringified-payload fallback
+  // against the span that finished last. See `extractFirstInput` for
+  // rationale: fallback is never allowed to shadow a semantic match.
+  private stringifiedOutputFallback(
+    spans: NormalizedSpan[],
+    otelSpan: LangWatchSpan,
+  ): ExtractedIO | null | undefined {
+    const allByEndTime = [...spans].sort(
+      (a, b) => b.endTimeUnixMs - a.endTimeUnixMs,
+    );
+    for (const span of allByEndTime) {
+      if (shouldExcludeSpan(span)) continue;
+      const fb = this.extractFallbackIOFromSpan(span, "output");
+      if (fb) {
+        otelSpan.setAttributes({
+          "output.found": true,
+          "output.source": "stringified_fallback",
+          "output.length": fb.text.length,
+        });
+        return fb;
+      }
+    }
+    return undefined;
+  }
+
+  private computeLastOutput(
+    spans: NormalizedSpan[],
+    otelSpan: LangWatchSpan,
+  ): ExtractedIO | null {
+    if (spans.length === 0) {
+      otelSpan.setAttributes({ "output.found": false });
+      return null;
+    }
+
+    const tree = this.organizeSpansIntoTree(spans);
+
+    const topLevel = this.singleTopLevelOutput(tree, otelSpan);
+    if (topLevel !== undefined) return topLevel;
+
+    const lastFinishing = this.lastFinishingOutput(spans, otelSpan);
+    if (lastFinishing !== undefined) return lastFinishing;
+
+    const fallback = this.stringifiedOutputFallback(spans, otelSpan);
+    if (fallback !== undefined) return fallback;
+
+    otelSpan.setAttributes({
+      "output.found": false,
+      "fallback.used": true,
+    });
+    const httpFallback = this.getHttpStatusFallback(tree);
+    return httpFallback
+      ? {
+          raw: httpFallback,
+          text: httpFallback,
+          source: "langwatch" as const,
+        }
+      : null;
+  }
+
   extractLastOutput(spans: NormalizedSpan[]): ExtractedIO | null {
     return this.tracer.withActiveSpan(
       "TraceIOExtractionService.extractLastOutput",
@@ -116,89 +234,7 @@ export class TraceIOExtractionService {
         kind: SpanKind.INTERNAL,
         attributes: { "span.count": spans.length },
       },
-      (otelSpan) => {
-        if (spans.length === 0) {
-          otelSpan.setAttributes({ "output.found": false });
-          return null;
-        }
-
-        const tree = this.organizeSpansIntoTree(spans);
-
-        const hasValidOutput = (span: NormalizedSpan): boolean => {
-          if (shouldExcludeSpan(span)) return false;
-          const output = this.extractRichIOFromSpan(span, "output");
-          return output !== null;
-        };
-
-        // Try single top-level node first
-        const topLevelWithOutput = this.flattenSpanTree(tree, "inside-out")
-          .filter(hasValidOutput)
-          .reverse();
-
-        if (topLevelWithOutput.length === 1 && topLevelWithOutput[0]) {
-          const span = topLevelWithOutput[0];
-          const output = this.extractRichIOFromSpan(span, "output");
-
-          otelSpan.setAttributes({
-            "output.found": true,
-            "span.type": getSpanType(span),
-            "output.source": "single_top_level",
-            "output.length": output?.text.length ?? 0,
-          });
-
-          return output;
-        }
-
-        // Fall back to last-finishing span
-        const sortedByEndTime = spans
-          .filter(hasValidOutput)
-          .sort((a, b) => b.endTimeUnixMs - a.endTimeUnixMs);
-
-        const lastSpan = sortedByEndTime[0];
-
-        if (lastSpan) {
-          const output = this.extractRichIOFromSpan(lastSpan, "output");
-          otelSpan.setAttributes({
-            "output.found": true,
-            "span.type": getSpanType(lastSpan),
-            "output.source": "last_finishing",
-            "output.length": output?.text.length ?? 0,
-          });
-          return output;
-        }
-
-        // No semantic match on any span — try stringified-payload fallback
-        // against the span that finished last. See `extractFirstInput` for
-        // rationale: fallback is never allowed to shadow a semantic match.
-        const allByEndTime = [...spans].sort(
-          (a, b) => b.endTimeUnixMs - a.endTimeUnixMs,
-        );
-        for (const span of allByEndTime) {
-          if (shouldExcludeSpan(span)) continue;
-          const fb = this.extractFallbackIOFromSpan(span, "output");
-          if (fb) {
-            otelSpan.setAttributes({
-              "output.found": true,
-              "output.source": "stringified_fallback",
-              "output.length": fb.text.length,
-            });
-            return fb;
-          }
-        }
-
-        otelSpan.setAttributes({
-          "output.found": false,
-          "fallback.used": true,
-        });
-        const httpFallback = this.getHttpStatusFallback(tree);
-        return httpFallback
-          ? {
-              raw: httpFallback,
-              text: httpFallback,
-              source: "langwatch" as const,
-            }
-          : null;
-      },
+      (otelSpan) => this.computeLastOutput(spans, otelSpan),
     );
   }
 
@@ -322,16 +358,7 @@ export class TraceIOExtractionService {
    */
   flattenSpanTree(tree: SpanTreeNode[], mode: FlattenMode): NormalizedSpan[] {
     const result: NormalizedSpan[] = [];
-
-    const traverse = (nodes: SpanTreeNode[]) => {
-      for (const node of nodes) {
-        if (mode === "outside-in") result.push(node.span);
-        if (node.children.length > 0) traverse(node.children);
-        if (mode === "inside-out") result.push(node.span);
-      }
-    };
-
-    traverse(tree);
+    collectSpansInTraversalOrder(tree, mode, result);
     return result;
   }
 
@@ -377,6 +404,21 @@ export interface SpanTreeNode {
  * Options for flattening a span tree.
  */
 export type FlattenMode = "outside-in" | "inside-out";
+
+/** Depth-first traversal backing `flattenSpanTree`; pushes into `result` in place. */
+function collectSpansInTraversalOrder(
+  nodes: SpanTreeNode[],
+  mode: FlattenMode,
+  result: NormalizedSpan[],
+): void {
+  for (const node of nodes) {
+    if (mode === "outside-in") result.push(node.span);
+    if (node.children.length > 0) {
+      collectSpansInTraversalOrder(node.children, mode, result);
+    }
+    if (mode === "inside-out") result.push(node.span);
+  }
+}
 
 /**
  * Extracted I/O result - can be either raw JSON or a text representation.
@@ -426,6 +468,57 @@ const COMMON_TEXT_KEYS = [
  */
 const MAX_PLAIN_JSON_RECURSION_DEPTH = 32;
 
+/** Recurses into a nested plain-object value, or returns null when it isn't one. */
+function recurseIntoPlainJsonValue(val: unknown, depth: number): string | null {
+  if (val && typeof val === "object" && !Array.isArray(val)) {
+    return extractTextFromPlainJson(val as Record<string, unknown>, depth + 1);
+  }
+  return null;
+}
+
+/** Text for a single COMMON_TEXT_KEYS candidate, or null when `val` yields none. */
+function textFromCommonKeyValue(val: unknown, depth: number): string | null {
+  if (typeof val === "string" && val.length > 0) return val;
+  if (typeof val === "number" || typeof val === "boolean") return String(val);
+  // Nested object with a known key (e.g. { inputs: { input: "hello" } })
+  return recurseIntoPlainJsonValue(val, depth);
+}
+
+function textFromCommonKeys(
+  obj: Record<string, unknown>,
+  depth: number,
+): string | null {
+  for (const key of COMMON_TEXT_KEYS) {
+    const val = obj[key];
+    if (val === undefined) continue;
+    const text = textFromCommonKeyValue(val, depth);
+    if (text) return text;
+  }
+  return null;
+}
+
+// LangChain: { inputs: { input: ... } } / { outputs: { output: ... } }
+function textFromInputsOutputsWrapper(
+  obj: Record<string, unknown>,
+  depth: number,
+): string | null {
+  return recurseIntoPlainJsonValue(obj.inputs ?? obj.outputs, depth);
+}
+
+// Single-key wrapper fallback: many frameworks emit the real payload under an
+// arbitrary wrapper key like `{ data: {...} }`, `{ result: {...} }`,
+// `{ response: {...} }`. Recurse into the inner object so the COMMON_TEXT_KEYS
+// loop above gets a chance to find `content`/`answer`/`text`/... inside.
+function textFromSingleKeyWrapper(
+  obj: Record<string, unknown>,
+  depth: number,
+): string | null {
+  const entries = Object.entries(obj);
+  if (entries.length !== 1) return null;
+  const [, only] = entries[0]!;
+  return recurseIntoPlainJsonValue(only, depth);
+}
+
 /**
  * Extracts a human-readable text representation from a plain JSON object
  * that is NOT message-shaped (no role/content structure).
@@ -439,48 +532,11 @@ function extractTextFromPlainJson(
 ): string | null {
   if (depth >= MAX_PLAIN_JSON_RECURSION_DEPTH) return null;
 
-  for (const key of COMMON_TEXT_KEYS) {
-    const val = obj[key];
-    if (val === undefined) continue;
-    if (typeof val === "string" && val.length > 0) return val;
-    if (typeof val === "number" || typeof val === "boolean") return String(val);
-    // Nested object with a known key (e.g. { inputs: { input: "hello" } })
-    if (val && typeof val === "object" && !Array.isArray(val)) {
-      const nested = extractTextFromPlainJson(
-        val as Record<string, unknown>,
-        depth + 1,
-      );
-      if (nested) return nested;
-    }
-  }
-
-  // LangChain: { inputs: { input: ... } } / { outputs: { output: ... } }
-  const wrapper = obj.inputs ?? obj.outputs;
-  if (wrapper && typeof wrapper === "object" && !Array.isArray(wrapper)) {
-    const nested = extractTextFromPlainJson(
-      wrapper as Record<string, unknown>,
-      depth + 1,
-    );
-    if (nested) return nested;
-  }
-
-  // Single-key wrapper fallback: many frameworks emit the real payload under an
-  // arbitrary wrapper key like `{ data: {...} }`, `{ result: {...} }`,
-  // `{ response: {...} }`. Recurse into the inner object so the COMMON_TEXT_KEYS
-  // loop above gets a chance to find `content`/`answer`/`text`/... inside.
-  const entries = Object.entries(obj);
-  if (entries.length === 1) {
-    const [, only] = entries[0]!;
-    if (only && typeof only === "object" && !Array.isArray(only)) {
-      const nested = extractTextFromPlainJson(
-        only as Record<string, unknown>,
-        depth + 1,
-      );
-      if (nested) return nested;
-    }
-  }
-
-  return null;
+  return (
+    textFromCommonKeys(obj, depth) ??
+    textFromInputsOutputsWrapper(obj, depth) ??
+    textFromSingleKeyWrapper(obj, depth)
+  );
 }
 
 /**
@@ -530,6 +586,92 @@ function stringifyForText(value: unknown): string | null {
   }
 }
 
+function normalizeChatPayloadStringValue(
+  value: string,
+  seen: WeakSet<object>,
+): unknown {
+  const trimmed = value.trim();
+  if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      return normalizeChatPayload(parsed, seen);
+    } catch {
+      // not parseable JSON — leave the raw string alone
+    }
+  }
+  return value;
+}
+
+function normalizeChatPayloadArray(
+  value: unknown[],
+  seen: WeakSet<object>,
+): unknown {
+  if (seen.has(value)) return null;
+  seen.add(value);
+  return value.map((item) => normalizeChatPayload(item, seen));
+}
+
+// If `obj` IS a content block whose `text` is a JSON-encoded typed block
+// (with a non-text inner `type`), replace it with the unwrapped block.
+// Text block that wasn't unwrapped: preserve `text` verbatim so
+// user-pasted JSON-looking content stays as the original string.
+function unwrapChatPayloadTextEnvelope(
+  obj: Record<string, unknown>,
+  text: string,
+  seen: WeakSet<object>,
+): unknown {
+  const t = text.trim();
+  if (t.startsWith("{") && t.endsWith("}") && t.includes('"type":"')) {
+    try {
+      const inner = JSON.parse(t) as Record<string, unknown>;
+      if (
+        inner &&
+        typeof inner === "object" &&
+        typeof inner.type === "string" &&
+        inner.type !== "text"
+      ) {
+        // Recurse into the unwrapped block in case the inner shape
+        // also has nested wrappers (e.g. tool_result.content).
+        return normalizeChatPayload(inner, seen);
+      }
+    } catch {
+      // not clean JSON — fall through and keep the text wrapper
+    }
+  }
+  return obj;
+}
+
+// Walk every property, normalizing in place.
+function normalizeChatPayloadObjectProperties(
+  obj: Record<string, unknown>,
+  seen: WeakSet<object>,
+): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  const isChatMessage = typeof obj.role === "string";
+  for (const [k, v] of Object.entries(obj)) {
+    // A chat message's content is user/model text, so a JSON-looking string
+    // must stay text. Structured AI responses commonly use this shape and
+    // are intentionally displayed as JSON in the trace output.
+    out[k] =
+      isChatMessage && k === "content" && typeof v === "string"
+        ? v
+        : normalizeChatPayload(v, seen);
+  }
+  return out;
+}
+
+function normalizeChatPayloadObject(
+  value: Record<string, unknown>,
+  seen: WeakSet<object>,
+): unknown {
+  if (seen.has(value)) return null;
+  seen.add(value);
+  if (value.type === "text" && typeof value.text === "string") {
+    return unwrapChatPayloadTextEnvelope(value, value.text, seen);
+  }
+  return normalizeChatPayloadObjectProperties(value, seen);
+}
+
 /**
  * Some agent runtimes (Claude Code, certain Anthropic instrumentations)
  * emit chat content with each typed block (`thinking` / `tool_use` /
@@ -551,67 +693,48 @@ function normalizeChatPayload(
   seen: WeakSet<object> = new WeakSet(),
 ): unknown {
   if (typeof value === "string") {
-    const trimmed = value.trim();
-    if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
-      try {
-        const parsed = JSON.parse(trimmed);
-        return normalizeChatPayload(parsed, seen);
-      } catch {
-        // not parseable JSON — leave the raw string alone
-      }
-    }
-    return value;
+    return normalizeChatPayloadStringValue(value, seen);
   }
   if (Array.isArray(value)) {
-    if (seen.has(value)) return null;
-    seen.add(value);
-    return value.map((item) => normalizeChatPayload(item, seen));
+    return normalizeChatPayloadArray(value, seen);
   }
   if (value && typeof value === "object") {
-    if (seen.has(value as object)) return null;
-    seen.add(value as object);
-    const obj = value as Record<string, unknown>;
-    // If this object IS a content block whose `text` is a JSON-encoded
-    // typed block (with a non-text inner `type`), replace it with the
-    // unwrapped block.
-    if (obj.type === "text" && typeof obj.text === "string") {
-      const t = obj.text.trim();
-      if (t.startsWith("{") && t.endsWith("}") && t.includes('"type":"')) {
-        try {
-          const inner = JSON.parse(t) as Record<string, unknown>;
-          if (
-            inner &&
-            typeof inner === "object" &&
-            typeof inner.type === "string" &&
-            inner.type !== "text"
-          ) {
-            // Recurse into the unwrapped block in case the inner shape
-            // also has nested wrappers (e.g. tool_result.content).
-            return normalizeChatPayload(inner, seen);
-          }
-        } catch {
-          // not clean JSON — fall through and keep the text wrapper
-        }
-      }
-      // Text block that wasn't unwrapped: preserve `text` verbatim so
-      // user-pasted JSON-looking content stays as the original string.
-      return obj;
-    }
-    // Otherwise: walk every property, normalizing in place.
-    const out: Record<string, unknown> = {};
-    const isChatMessage = typeof obj.role === "string";
-    for (const [k, v] of Object.entries(obj)) {
-      // A chat message's content is user/model text, so a JSON-looking string
-      // must stay text. Structured AI responses commonly use this shape and
-      // are intentionally displayed as JSON in the trace output.
-      out[k] =
-        isChatMessage && k === "content" && typeof v === "string"
-          ? v
-          : normalizeChatPayload(v, seen);
-    }
-    return out;
+    return normalizeChatPayloadObject(value as Record<string, unknown>, seen);
   }
   return value;
+}
+
+function messagesToTextFromString(
+  messages: string,
+  mode: "input" | "output",
+): string | null {
+  // Try to parse JSON-encoded message payloads and extract text semantically
+  try {
+    const parsed: unknown = JSON.parse(messages);
+    if (typeof parsed === "object" && parsed !== null) {
+      return messagesToText(parsed, mode);
+    }
+  } catch {
+    // Not JSON — return the string as-is
+  }
+  return messages;
+}
+
+function messagesToTextFromArray(
+  messages: unknown[],
+  mode: "input" | "output",
+): string | null {
+  if (mode === "input") {
+    const lastUserText = extractLastUserMessageText(messages);
+    if (lastUserText) return lastUserText;
+  }
+
+  const texts: string[] = [];
+  for (const msg of messages) {
+    const text = extractMessageContentText(msg);
+    if (text) texts.push(text);
+  }
+  return texts.length > 0 ? texts.join("\n") : null;
 }
 
 function messagesToText(
@@ -621,30 +744,11 @@ function messagesToText(
   if (!messages) return null;
 
   if (typeof messages === "string") {
-    // Try to parse JSON-encoded message payloads and extract text semantically
-    try {
-      const parsed: unknown = JSON.parse(messages);
-      if (typeof parsed === "object" && parsed !== null) {
-        return messagesToText(parsed, mode);
-      }
-    } catch {
-      // Not JSON — return the string as-is
-    }
-    return messages;
+    return messagesToTextFromString(messages, mode);
   }
 
   if (Array.isArray(messages)) {
-    if (mode === "input") {
-      const lastUserText = extractLastUserMessageText(messages);
-      if (lastUserText) return lastUserText;
-    }
-
-    const texts: string[] = [];
-    for (const msg of messages) {
-      const text = extractMessageContentText(msg);
-      if (text) texts.push(text);
-    }
-    return texts.length > 0 ? texts.join("\n") : null;
+    return messagesToTextFromArray(messages, mode);
   }
 
   // Try message-shaped extraction first (content, parts, text, value)

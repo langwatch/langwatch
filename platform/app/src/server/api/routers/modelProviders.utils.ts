@@ -308,58 +308,31 @@ async function resolveServingRow({
   return servingRow ?? modelProvider;
 }
 
-export const prepareLitellmParams = async ({
-  model,
-  modelProvider: givenModelProvider,
-  projectId,
-}: {
-  model: string;
-  modelProvider: MaybeStoredModelProvider;
-  projectId: string;
-}) => {
-  // Execution backstop for the terms-restricted provider: every general
-  // inference path (workflows, evaluations, playground, optimization
-  // studio) funnels through here on its way to litellm/nlpgo, and codex
-  // must never ride it — its only road is the AI gateway's Responses
-  // endpoint (see codexGatewayModel.ts), reserved for the coding-assistant
-  // surfaces. Pickers already hide codex models on these surfaces; this
-  // guard is what makes the restriction hold against a handcrafted request.
-  if (isCodexModel(model) || givenModelProvider.provider === "openai_codex") {
+// Guard against the terms-restricted provider: every general inference path
+// (workflows, evaluations, playground, optimization studio) funnels through
+// `prepareLitellmParams` on its way to litellm/nlpgo, and codex must never
+// ride it — its only road is the AI gateway's Responses endpoint (see
+// codexGatewayModel.ts), reserved for the coding-assistant surfaces. Pickers
+// already hide codex models on these surfaces; this is what makes the
+// restriction hold against a handcrafted request. Checked both against the
+// raw wire value (legacy `openai_codex/...` prefix) and, after row
+// resolution, against the resolved row's provider (the canonical
+// `mp_<row-id>/<model>` format names the row, so a handcrafted canonical
+// value would otherwise sail past the wire check and build litellm params
+// around the stored OAuth token).
+function assertNotCodexModel(model: string, provider: string) {
+  if (isCodexModel(model) || provider === "openai_codex") {
     throw new Error(
       `"${model}" serves the coding-assistant surfaces only and cannot run workflows, evaluations or the playground.`,
     );
   }
+}
 
-  const params: Record<string, string> = {};
-
-  // Multi-instance correction: the caller hands us the scope-collapse
-  // winner for the provider key, but with several rows per provider that
-  // row may not serve this model at all (its catalog doesn't list it) —
-  // the model was picked from a wider-scope row's catalog. Executing it
-  // against the wrong row's credentials targets a deployment that doesn't
-  // exist there (Azure answers 404 "Resource not found"). Re-select the
-  // narrowest ENABLED row that lists the model. Only for legacy
-  // `{provider}/{model}` wire values — an `{mpId}/{model}` value is an
-  // explicit row pick — and only for stored rows (env-fed pseudo-rows
-  // have no id and no custom catalog).
-  const modelProvider = await resolveServingRow({
-    model,
-    modelProvider: givenModelProvider,
-    projectId,
-  });
-
-  // Second half of the codex backstop. The wire check above only sees the
-  // legacy `openai_codex/...` prefix; the canonical `mp_<row-id>/<model>`
-  // format names the ROW, so a handcrafted request carrying a codex row's
-  // canonical value sails past it and would build litellm params around the
-  // stored OAuth token. The resolved row knows its provider — fail closed on
-  // it too.
-  if (modelProvider.provider === "openai_codex") {
-    throw new Error(
-      `"${model}" serves the coding-assistant surfaces only and cannot run workflows, evaluations or the playground.`,
-    );
-  }
-
+function applyModelAndAuthParams(
+  params: Record<string, string>,
+  model: string,
+  modelProvider: MaybeStoredModelProvider,
+) {
   // Normalise the incoming wire value for LiteLLM. After iter 109 two
   // formats coexist: the canonical `{mpId}/{model}` and the legacy
   // `{provider}/{model}`. LiteLLM only understands the latter; translate
@@ -381,87 +354,166 @@ export const prepareLitellmParams = async ({
   const endpoint = getModelOrDefaultEndpointKey(modelProvider);
   if (endpoint) {
     // Strip trailing /v1 for Anthropic - LiteLLM adds it internally
-    if (modelProvider.provider === "anthropic") {
-      params.api_base = endpoint.replace(/\/v1\/?$/, "");
-    } else {
-      params.api_base = endpoint;
-    }
+    params.api_base =
+      modelProvider.provider === "anthropic"
+        ? endpoint.replace(/\/v1\/?$/, "")
+        : endpoint;
   }
 
+  return apiKey;
+}
+
+function applyVertexAiParams(
+  params: Record<string, string>,
+  modelProvider: MaybeStoredModelProvider,
+  apiKey: string | undefined,
+) {
+  params.vertex_credentials = apiKey ?? "invalid";
+  params.vertex_project =
+    getModelOrDefaultEnvKey(modelProvider, "VERTEXAI_PROJECT") ?? "invalid";
+  params.vertex_location =
+    getModelOrDefaultEnvKey(modelProvider, "VERTEXAI_LOCATION") ?? "invalid";
+}
+
+function applyBedrockParams(
+  params: Record<string, string>,
+  modelProvider: MaybeStoredModelProvider,
+) {
+  delete params.api_key;
+  params.aws_access_key_id =
+    getModelOrDefaultEnvKey(modelProvider, "AWS_ACCESS_KEY_ID") ?? "invalid";
+  params.aws_secret_access_key =
+    getModelOrDefaultEnvKey(modelProvider, "AWS_SECRET_ACCESS_KEY") ??
+    "invalid";
+  params.aws_region_name =
+    getModelOrDefaultEnvKey(modelProvider, "AWS_REGION_NAME") ?? "invalid";
+}
+
+function applyAzureApiVersion(
+  params: Record<string, string>,
+  modelProvider: MaybeStoredModelProvider,
+) {
+  const gatewayBaseUrl = getModelOrDefaultEnvKey(
+    modelProvider,
+    "AZURE_API_GATEWAY_BASE_URL",
+  );
+
+  if (gatewayBaseUrl) {
+    // API Gateway mode: route through the customer's gateway endpoint with
+    // its own pinned api-version (the gateway/APIM owns version policy).
+    params.api_base = gatewayBaseUrl;
+    params.use_azure_gateway = "true";
+    params.api_version =
+      getModelOrDefaultEnvKey(modelProvider, "AZURE_API_GATEWAY_VERSION") ??
+      "2024-05-01-preview";
+  } else {
+    // Direct mode: pin a modern api-version (see DEFAULT_AZURE_API_VERSION).
+    params.api_version =
+      getModelOrDefaultEnvKey(modelProvider, "AZURE_OPENAI_API_VERSION") ??
+      DEFAULT_AZURE_API_VERSION;
+  }
+}
+
+// Map the model id to its Azure deployment name when the provider defines an
+// explicit deploymentMapping (the deployment name need not equal the model
+// id). The gateway/control-plane path already honors this field
+// (config.materialiser); mirror it here so the in-process Studio / playground
+// path agrees instead of assuming model id == deployment name.
+function applyAzureDeploymentMapping(
+  params: Record<string, string>,
+  modelProvider: MaybeStoredModelProvider,
+) {
+  const deploymentMap = modelProvider.deploymentMapping as Record<
+    string,
+    string
+  > | null;
+  if (!deploymentMap) return;
+
+  // params.model is already normalized to `provider/model` (the incoming
+  // `model` may still be the canonical `mp_.../...` wire format), so key the
+  // lookups off it for both the bare and full-key forms.
+  const bareModel = params.model.split("/").slice(1).join("/");
+  const deployment = deploymentMap[bareModel] ?? deploymentMap[params.model];
+  if (deployment) {
+    params.deployment = deployment;
+  }
+}
+
+function applyAzureExtraHeaders(
+  params: Record<string, string>,
+  modelProvider: MaybeStoredModelProvider,
+) {
+  if (!modelProvider.extraHeaders) return;
+
+  const extraHeaders = modelProvider.extraHeaders as {
+    key: string;
+    value: string;
+  }[];
+  params.extra_headers = JSON.stringify(
+    Object.fromEntries(extraHeaders.map(({ key, value }) => [key, value])),
+  );
+}
+
+// Azure: resolve api-version and deployment so the downstream gateway
+// (Bifrost) targets the right Azure surface.
+function applyAzureParams(
+  params: Record<string, string>,
+  modelProvider: MaybeStoredModelProvider,
+) {
+  applyAzureApiVersion(params, modelProvider);
+  applyAzureDeploymentMapping(params, modelProvider);
+  applyAzureExtraHeaders(params, modelProvider);
+}
+
+// Provider-specific params beyond the common model/auth ones, dispatched by
+// provider so `prepareLitellmParams` stays a straight-line pipeline.
+function applyProviderSpecificParams(
+  params: Record<string, string>,
+  modelProvider: MaybeStoredModelProvider,
+  apiKey: string | undefined,
+) {
   if (modelProvider.provider === "vertex_ai") {
-    params.vertex_credentials = apiKey ?? "invalid";
-    params.vertex_project =
-      getModelOrDefaultEnvKey(modelProvider, "VERTEXAI_PROJECT") ?? "invalid";
-    params.vertex_location =
-      getModelOrDefaultEnvKey(modelProvider, "VERTEXAI_LOCATION") ?? "invalid";
+    applyVertexAiParams(params, modelProvider, apiKey);
+  } else if (modelProvider.provider === "bedrock") {
+    applyBedrockParams(params, modelProvider);
+  } else if (modelProvider.provider === "azure") {
+    applyAzureParams(params, modelProvider);
   }
+}
 
-  if (modelProvider.provider === "bedrock") {
-    delete params.api_key;
-    params.aws_access_key_id =
-      getModelOrDefaultEnvKey(modelProvider, "AWS_ACCESS_KEY_ID") ?? "invalid";
-    params.aws_secret_access_key =
-      getModelOrDefaultEnvKey(modelProvider, "AWS_SECRET_ACCESS_KEY") ??
-      "invalid";
-    params.aws_region_name =
-      getModelOrDefaultEnvKey(modelProvider, "AWS_REGION_NAME") ?? "invalid";
-  }
+export const prepareLitellmParams = async ({
+  model,
+  modelProvider: givenModelProvider,
+  projectId,
+}: {
+  model: string;
+  modelProvider: MaybeStoredModelProvider;
+  projectId: string;
+}) => {
+  assertNotCodexModel(model, givenModelProvider.provider);
 
-  // Azure: resolve api-version and deployment so the downstream gateway
-  // (Bifrost) targets the right Azure surface.
-  if (modelProvider.provider === "azure") {
-    const gatewayBaseUrl = getModelOrDefaultEnvKey(
-      modelProvider,
-      "AZURE_API_GATEWAY_BASE_URL",
-    );
+  const params: Record<string, string> = {};
 
-    if (gatewayBaseUrl) {
-      // API Gateway mode: route through the customer's gateway endpoint with
-      // its own pinned api-version (the gateway/APIM owns version policy).
-      params.api_base = gatewayBaseUrl;
-      params.use_azure_gateway = "true";
-      params.api_version =
-        getModelOrDefaultEnvKey(modelProvider, "AZURE_API_GATEWAY_VERSION") ??
-        "2024-05-01-preview";
-    } else {
-      // Direct mode: pin a modern api-version (see DEFAULT_AZURE_API_VERSION).
-      params.api_version =
-        getModelOrDefaultEnvKey(modelProvider, "AZURE_OPENAI_API_VERSION") ??
-        DEFAULT_AZURE_API_VERSION;
-    }
+  // Multi-instance correction: the caller hands us the scope-collapse
+  // winner for the provider key, but with several rows per provider that
+  // row may not serve this model at all (its catalog doesn't list it) —
+  // the model was picked from a wider-scope row's catalog. Executing it
+  // against the wrong row's credentials targets a deployment that doesn't
+  // exist there (Azure answers 404 "Resource not found"). Re-select the
+  // narrowest ENABLED row that lists the model. Only for legacy
+  // `{provider}/{model}` wire values — an `{mpId}/{model}` value is an
+  // explicit row pick — and only for stored rows (env-fed pseudo-rows
+  // have no id and no custom catalog).
+  const modelProvider = await resolveServingRow({
+    model,
+    modelProvider: givenModelProvider,
+    projectId,
+  });
 
-    // Map the model id to its Azure deployment name when the provider defines
-    // an explicit deploymentMapping (the deployment name need not equal the
-    // model id). The gateway/control-plane path already honors this field
-    // (config.materialiser); mirror it here so the in-process Studio /
-    // playground path agrees instead of assuming model id == deployment name.
-    const deploymentMap = modelProvider.deploymentMapping as Record<
-      string,
-      string
-    > | null;
-    if (deploymentMap) {
-      // params.model is already normalized to `provider/model` (the incoming
-      // `model` may still be the canonical `mp_.../...` wire format), so key
-      // the lookups off it for both the bare and full-key forms.
-      const bareModel = params.model.split("/").slice(1).join("/");
-      const deployment =
-        deploymentMap[bareModel] ?? deploymentMap[params.model];
-      if (deployment) {
-        params.deployment = deployment;
-      }
-    }
+  assertNotCodexModel(model, modelProvider.provider);
 
-    // Pass through all extra headers
-    if (modelProvider.extraHeaders) {
-      const extraHeaders = modelProvider.extraHeaders as {
-        key: string;
-        value: string;
-      }[];
-      params.extra_headers = JSON.stringify(
-        Object.fromEntries(extraHeaders.map(({ key, value }) => [key, value])),
-      );
-    }
-  }
+  const apiKey = applyModelAndAuthParams(params, model, modelProvider);
+  applyProviderSpecificParams(params, modelProvider, apiKey);
 
   return await buildManagedBedrockLitellmParams({
     params,

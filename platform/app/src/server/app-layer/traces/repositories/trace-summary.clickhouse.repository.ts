@@ -62,6 +62,14 @@ function storageAnchorForWrite(data: TraceSummaryData): number {
   });
 }
 
+const toBit = (value: boolean): 0 | 1 => (value ? 1 : 0);
+
+const roundOrNull = (value: number | null | undefined): number | null =>
+  value != null ? Math.round(value) : null;
+
+const dateOrEpoch = (value: number | null | undefined): Date =>
+  value ? new Date(value) : new Date(0);
+
 interface ClickHouseSummaryRecord extends TraceSummaryFieldsBase {
   ProjectionId: string;
   Version: string;
@@ -553,26 +561,17 @@ export class TraceSummaryClickHouseRepository
       EarliestSpanStartMs: data.occurredAt,
       CreatedAt: new Date(data.createdAt),
       UpdatedAt: new Date(data.updatedAt),
-      LastEventOccurredAt: data.LastEventOccurredAt
-        ? new Date(data.LastEventOccurredAt)
-        : new Date(0),
+      LastEventOccurredAt: dateOrEpoch(data.LastEventOccurredAt),
       ComputedIOSchemaVersion: data.computedIOSchemaVersion,
       ComputedInput: data.computedInput,
       ComputedOutput: data.computedOutput,
-      TimeToFirstTokenMs:
-        data.timeToFirstTokenMs != null
-          ? Math.round(data.timeToFirstTokenMs)
-          : null,
-      TimeToLastTokenMs:
-        data.timeToLastTokenMs != null
-          ? Math.round(data.timeToLastTokenMs)
-          : null,
+      TimeToFirstTokenMs: roundOrNull(data.timeToFirstTokenMs),
+      TimeToLastTokenMs: roundOrNull(data.timeToLastTokenMs),
       TotalDurationMs: Math.round(data.totalDurationMs),
-      TokensPerSecond:
-        data.tokensPerSecond != null ? Math.round(data.tokensPerSecond) : null,
+      TokensPerSecond: roundOrNull(data.tokensPerSecond),
       SpanCount: data.spanCount,
-      ContainsErrorStatus: data.containsErrorStatus ? 1 : 0,
-      ContainsOKStatus: data.containsOKStatus ? 1 : 0,
+      ContainsErrorStatus: toBit(data.containsErrorStatus),
+      ContainsOKStatus: toBit(data.containsOKStatus),
       ErrorMessage: data.errorMessage,
       Models: data.models,
       TotalCost: data.totalCost,
@@ -580,12 +579,12 @@ export class TraceSummaryClickHouseRepository
       TokensEstimated: data.tokensEstimated,
       TotalPromptTokenCount: data.totalPromptTokenCount,
       TotalCompletionTokenCount: data.totalCompletionTokenCount,
-      OutputFromRootSpan: data.outputFromRootSpan ? 1 : 0,
+      OutputFromRootSpan: toBit(data.outputFromRootSpan),
       OutputSpanEndTimeMs: data.outputSpanEndTimeMs,
-      BlockedByGuardrail: data.blockedByGuardrail ? 1 : 0,
+      BlockedByGuardrail: toBit(data.blockedByGuardrail),
       RootSpanType: data.rootSpanType,
-      ContainsAi: data.containsAi ? 1 : 0,
-      ContainsPrompt: data.containsPrompt ? 1 : 0,
+      ContainsAi: toBit(data.containsAi),
+      ContainsPrompt: toBit(data.containsPrompt),
       SelectedPromptId: data.selectedPromptId,
       SelectedPromptSpanId: data.selectedPromptSpanId,
       LastUsedPromptId: data.lastUsedPromptId,
@@ -595,7 +594,7 @@ export class TraceSummaryClickHouseRepository
       TopicId: data.topicId,
       SubTopicId: data.subTopicId,
       AnnotationIds: data.annotationIds,
-      HasAnnotation: data.annotationIds.length > 0 ? 1 : 0,
+      HasAnnotation: toBit(data.annotationIds.length > 0),
       TraceName: data.traceName,
       _retention_days: retentionDays,
     };

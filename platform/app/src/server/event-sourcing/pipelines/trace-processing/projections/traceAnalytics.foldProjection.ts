@@ -531,6 +531,56 @@ export const TRACE_ANALYTICS_HAS_SIGNAL_SQL =
   ` OR Attributes['langwatch.reserved.log_record_count'] NOT IN ('', '0')` +
   ` OR Version < '${TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT}')`;
 
+/**
+ * The hoisted dimension columns (UserId / ConversationId / CustomerId /
+ * Origin / Labels) derived from the accumulated attribute map — the same
+ * reserved keys {@link TRACE_ANALYTICS_ATTR_KEYS} names.
+ */
+function deriveHoistedDimensions(attrs: Record<string, string>): {
+  userId: string | null;
+  conversationId: string | null;
+  customerId: string | null;
+  origin: string;
+  labels: string[];
+} {
+  return {
+    userId: readNullableString(attrs[TRACE_ANALYTICS_ATTR_KEYS.USER_ID]),
+    conversationId: readNullableString(
+      attrs[TRACE_ANALYTICS_ATTR_KEYS.CONVERSATION_ID],
+    ),
+    customerId: readNullableString(
+      attrs[TRACE_ANALYTICS_ATTR_KEYS.CUSTOMER_ID],
+    ),
+    origin: attrs[TRACE_ANALYTICS_ATTR_KEYS.ORIGIN] ?? "",
+    labels: parseLabels(attrs[TRACE_ANALYTICS_ATTR_KEYS.LABELS]),
+  };
+}
+
+/**
+ * The read-back columns (ADR-066, migration 00056) that round-trip the
+ * fold's working bookkeeping, defaulted the same way the fold's own state
+ * defaults them.
+ */
+function projectReadBackFields(state: TraceAnalyticsData): {
+  spanCount: number;
+  annotationIds: string[];
+  rootSpanStartTimeMs: number;
+  traceNameFromFallback: boolean;
+  rootMetadataFromFallback: boolean;
+  traceNameUserOverridden: boolean;
+  lastEventOccurredAt: number;
+} {
+  return {
+    spanCount: state.spanCount,
+    annotationIds: state.annotationIds ?? [],
+    rootSpanStartTimeMs: state.rootSpanStartTimeMs ?? 0,
+    traceNameFromFallback: state.traceNameFromFallback ?? false,
+    rootMetadataFromFallback: state.rootMetadataFromFallback ?? false,
+    traceNameUserOverridden: state.traceNameUserOverridden ?? false,
+    lastEventOccurredAt: state.LastEventOccurredAt,
+  };
+}
+
 export function projectAnalyticsStateToRow({
   state,
   tenantId,
@@ -553,15 +603,9 @@ export function projectAnalyticsStateToRow({
   now?: number;
 }): TraceAnalyticsRow {
   const attrs = state.attributes ?? {};
-  const userId = readNullableString(attrs[TRACE_ANALYTICS_ATTR_KEYS.USER_ID]);
-  const conversationId = readNullableString(
-    attrs[TRACE_ANALYTICS_ATTR_KEYS.CONVERSATION_ID],
-  );
-  const customerId = readNullableString(
-    attrs[TRACE_ANALYTICS_ATTR_KEYS.CUSTOMER_ID],
-  );
-  const origin = attrs[TRACE_ANALYTICS_ATTR_KEYS.ORIGIN] ?? "";
-  const labels = parseLabels(attrs[TRACE_ANALYTICS_ATTR_KEYS.LABELS]);
+  const { userId, conversationId, customerId, origin, labels } =
+    deriveHoistedDimensions(attrs);
+  const readBack = projectReadBackFields(state);
 
   return {
     tenantId,
@@ -626,13 +670,13 @@ export function projectAnalyticsStateToRow({
     hasSignal: hasPersistableSignal(state),
 
     // Read-back state (ADR-066) — round-trips the fold's working bookkeeping.
-    spanCount: state.spanCount,
-    annotationIds: state.annotationIds ?? [],
-    rootSpanStartTimeMs: state.rootSpanStartTimeMs ?? 0,
-    traceNameFromFallback: state.traceNameFromFallback ?? false,
-    rootMetadataFromFallback: state.rootMetadataFromFallback ?? false,
-    traceNameUserOverridden: state.traceNameUserOverridden ?? false,
-    lastEventOccurredAt: state.LastEventOccurredAt,
+    spanCount: readBack.spanCount,
+    annotationIds: readBack.annotationIds,
+    rootSpanStartTimeMs: readBack.rootSpanStartTimeMs,
+    traceNameFromFallback: readBack.traceNameFromFallback,
+    rootMetadataFromFallback: readBack.rootMetadataFromFallback,
+    traceNameUserOverridden: readBack.traceNameUserOverridden,
+    lastEventOccurredAt: readBack.lastEventOccurredAt,
   };
 }
 
@@ -1019,14 +1063,15 @@ interface LogContribution {
  * Read from contribution.liftedAttributes (this event's contribution)
  * NOT mergedAttributes, so cost doesn't double-count across replays.
  */
-function applyLogContribution({
-  state,
-  contribution,
-}: {
-  state: TraceAnalyticsData;
-  contribution: LogContribution;
-}): TraceAnalyticsData {
-  const mergedAttributes = { ...state.attributes };
+/**
+ * Bump the reserved log count and merge this contribution's lifted
+ * canonical `langwatch.*` attributes onto the trace's accumulated map.
+ */
+function mergeLogContributionAttributes(
+  attributes: Record<string, string>,
+  contribution: LogContribution,
+): Record<string, string> {
+  const mergedAttributes = { ...attributes };
   const logCount = parseInt(
     mergedAttributes["langwatch.reserved.log_record_count"] ?? "0",
     10,
@@ -1037,16 +1082,27 @@ function applyLogContribution({
   for (const [key, value] of Object.entries(contribution.liftedAttributes)) {
     mergedAttributes[key] = String(value);
   }
+  return mergedAttributes;
+}
 
-  let models = state.models;
-  let totalCost = state.totalCost;
-  let nonBilledCost = state.nonBilledCost;
-  let totalPromptTokenCount = state.totalPromptTokenCount;
-  let totalCompletionTokenCount = state.totalCompletionTokenCount;
+/** Merge this contribution's lifted model, if any, onto the trace's models. */
+function accumulateLogContributionModel(
+  models: string[],
+  contribution: LogContribution,
+): string[] {
   const model = contribution.liftedAttributes["langwatch.model"];
   if (typeof model === "string" && model.length > 0) {
-    models = mergeModelsMostRecentFirst(models, [model]);
+    return mergeModelsMostRecentFirst(models, [model]);
   }
+  return models;
+}
+
+/** Roll this contribution's lifted cost onto the trace-level cost sums. */
+function accumulateLogContributionCost(
+  current: { totalCost: number | null; nonBilledCost: number | null },
+  contribution: LogContribution,
+): { totalCost: number | null; nonBilledCost: number | null } {
+  let { totalCost, nonBilledCost } = current;
   const cost = Number(contribution.liftedAttributes["langwatch.cost.usd"]);
   if (Number.isFinite(cost) && cost > 0) {
     totalCost = (totalCost ?? 0) + cost;
@@ -1054,18 +1110,62 @@ function applyLogContribution({
       nonBilledCost = (nonBilledCost ?? 0) + cost;
     }
   }
+  return { totalCost, nonBilledCost };
+}
+
+/** Roll this contribution's lifted input tokens onto the trace-level sum. */
+function accumulateLogContributionInputTokens(
+  totalPromptTokenCount: number | null,
+  contribution: LogContribution,
+): number | null {
   const inputTokens = Number(
     contribution.liftedAttributes["langwatch.input_tokens"],
   );
   if (Number.isFinite(inputTokens) && inputTokens > 0) {
-    totalPromptTokenCount = (totalPromptTokenCount ?? 0) + inputTokens;
+    return (totalPromptTokenCount ?? 0) + inputTokens;
   }
+  return totalPromptTokenCount;
+}
+
+/** Roll this contribution's lifted output tokens onto the trace-level sum. */
+function accumulateLogContributionOutputTokens(
+  totalCompletionTokenCount: number | null,
+  contribution: LogContribution,
+): number | null {
   const outputTokens = Number(
     contribution.liftedAttributes["langwatch.output_tokens"],
   );
   if (Number.isFinite(outputTokens) && outputTokens > 0) {
-    totalCompletionTokenCount = (totalCompletionTokenCount ?? 0) + outputTokens;
+    return (totalCompletionTokenCount ?? 0) + outputTokens;
   }
+  return totalCompletionTokenCount;
+}
+
+function applyLogContribution({
+  state,
+  contribution,
+}: {
+  state: TraceAnalyticsData;
+  contribution: LogContribution;
+}): TraceAnalyticsData {
+  const mergedAttributes = mergeLogContributionAttributes(
+    state.attributes,
+    contribution,
+  );
+
+  const models = accumulateLogContributionModel(state.models, contribution);
+  const { totalCost, nonBilledCost } = accumulateLogContributionCost(
+    { totalCost: state.totalCost, nonBilledCost: state.nonBilledCost },
+    contribution,
+  );
+  const totalPromptTokenCount = accumulateLogContributionInputTokens(
+    state.totalPromptTokenCount,
+    contribution,
+  );
+  const totalCompletionTokenCount = accumulateLogContributionOutputTokens(
+    state.totalCompletionTokenCount,
+    contribution,
+  );
 
   // Same trace-level model metadata stamp the span path applies, so
   // log-only (Path B) traces also surface `metadata.model`.

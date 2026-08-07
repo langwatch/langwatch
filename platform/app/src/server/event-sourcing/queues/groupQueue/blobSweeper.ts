@@ -261,6 +261,60 @@ export class BlobSweeper {
     return { keys: Array.from(seen), truncated, resumeFrom };
   }
 
+  private async sweepOneKey(params: {
+    queueName: string;
+    key: string;
+    dryRun: boolean;
+    tally: BlobSweepTally;
+  }): Promise<void> {
+    const { queueName, key, dryRun, tally } = params;
+    const parsed = this.parseBlobKey(queueName, key);
+    // A key that does not split into exactly one projectId/hash pair is not a
+    // GQ2 blob whatever the glob matched. Skip rather than guess at its shape.
+    if (!parsed) return;
+    const { projectId, hash } = parsed;
+    // The brand exists so a caller cannot namespace a blob with an arbitrary
+    // user-controlled string. Minting here is legitimate: this value was read
+    // back out of a key the queue itself wrote, not off a request.
+    const keyArgs = {
+      queueName,
+      projectId: createTenantId(projectId),
+      hash,
+    };
+    try {
+      const outcome = String(
+        await sweepScript.run(
+          this.redis,
+          3,
+          blobLeaseSetKey(keyArgs),
+          blobHolderSetKey(keyArgs),
+          key,
+          dryRun ? "1" : "0",
+        ),
+      ) as BlobSweepOutcome;
+      if (!BLOB_SWEEP_OUTCOMES.includes(outcome)) return;
+      tally[outcome] += 1;
+      tally.scanned += 1;
+      if (!dryRun) {
+        gqBlobSweepTotal.inc({ queue_name: queueName, outcome });
+      }
+    } catch (err) {
+      // One unreadable blob must not abort the sweep. The cursor still moves
+      // past it, so it is retried when the cursor next comes around rather
+      // than on the next tick — deliberately, because holding the cursor for a
+      // blob that fails every time would stall the whole walk behind it. Its
+      // bytes stay bounded by the backstop TTL in the meantime.
+      logger.warn(
+        {
+          queueName,
+          blobHash: hash,
+          err: err instanceof Error ? err.message : String(err),
+        },
+        "Blob sweep failed for one blob; continuing",
+      );
+    }
+  }
+
   async sweepQueue({
     queueName,
     dryRun = false,
@@ -273,51 +327,7 @@ export class BlobSweeper {
     tally.truncated = truncated;
 
     for (const key of keys) {
-      const parsed = this.parseBlobKey(queueName, key);
-      // A key that does not split into exactly one projectId/hash pair is not a
-      // GQ2 blob whatever the glob matched. Skip rather than guess at its shape.
-      if (!parsed) continue;
-      const { projectId, hash } = parsed;
-      // The brand exists so a caller cannot namespace a blob with an arbitrary
-      // user-controlled string. Minting here is legitimate: this value was read
-      // back out of a key the queue itself wrote, not off a request.
-      const keyArgs = {
-        queueName,
-        projectId: createTenantId(projectId),
-        hash,
-      };
-      try {
-        const outcome = String(
-          await sweepScript.run(
-            this.redis,
-            3,
-            blobLeaseSetKey(keyArgs),
-            blobHolderSetKey(keyArgs),
-            key,
-            dryRun ? "1" : "0",
-          ),
-        ) as BlobSweepOutcome;
-        if (!BLOB_SWEEP_OUTCOMES.includes(outcome)) continue;
-        tally[outcome] += 1;
-        tally.scanned += 1;
-        if (!dryRun) {
-          gqBlobSweepTotal.inc({ queue_name: queueName, outcome });
-        }
-      } catch (err) {
-        // One unreadable blob must not abort the sweep. The cursor still moves
-        // past it, so it is retried when the cursor next comes around rather
-        // than on the next tick — deliberately, because holding the cursor for a
-        // blob that fails every time would stall the whole walk behind it. Its
-        // bytes stay bounded by the backstop TTL in the meantime.
-        logger.warn(
-          {
-            queueName,
-            blobHash: hash,
-            err: err instanceof Error ? err.message : String(err),
-          },
-          "Blob sweep failed for one blob; continuing",
-        );
-      }
+      await this.sweepOneKey({ queueName, key, dryRun, tally });
     }
 
     // Commit the cursor only now, and never for a dry run: until the blobs this

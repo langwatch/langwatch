@@ -170,6 +170,88 @@ const TIER_ORDER: Array<"project" | "team" | "organization"> = [
   "organization",
 ];
 
+/** Configs attached at this tier, sorted by createdAt DESC. */
+function configsForTier({
+  configs,
+  chain,
+  tier,
+}: {
+  configs: ConfigForChain[];
+  chain: ScopeChain;
+  tier: "project" | "team" | "organization";
+}): ConfigForChain[] {
+  const tierConfigs = configs.filter((c) => tierForConfig(c, chain) === tier);
+  tierConfigs.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  return tierConfigs;
+}
+
+/**
+ * Aliases like `openai/latest` resolve to the registry flagship
+ * here so downstream consumers (litellm, aigateway, nlp) only
+ * ever see concrete model ids. Non-alias values pass through.
+ * If an alias has no concrete resolution in the current catalog
+ * (e.g. a provider added later but the flagship hasn't shipped
+ * yet), skip this entry and let the cascade continue rather
+ * than leak a virtual id downstream.
+ */
+function concreteModelValue(value: string): string | null {
+  const expanded = expandLatestAlias(value);
+  if (isLatestAlias(value) && expanded === value) return null;
+  return expanded;
+}
+
+/**
+ * First config at this tier carrying a concrete, feature-allowed value for
+ * `key`, in the order the configs were handed over.
+ *
+ * A restricted model (codex) resolving for a feature outside its
+ * allowed set is treated as not-set so the cascade keeps walking —
+ * the write paths reject saving these, but an older config or a
+ * wider-scope value must not leak a terms-restricted model into
+ * an ordinary feature.
+ */
+function pickAllowedModel({
+  configs,
+  key,
+  featureKey,
+}: {
+  configs: ConfigForChain[];
+  key: string;
+  featureKey: string;
+}): string | null {
+  for (const c of configs) {
+    const value = readKey(c.config, key);
+    if (!value) continue;
+    const expanded = concreteModelValue(value);
+    if (!expanded) continue;
+    if (!isModelAllowedForFeature({ modelId: expanded, featureKey })) continue;
+    return expanded;
+  }
+  return null;
+}
+
+/**
+ * First config at this tier carrying a concrete value for `key`. Unlike
+ * `pickAllowedModel` this does not apply the per-feature restriction
+ * check — the alternate walk only suggests a swap candidate.
+ */
+function pickConcreteModel({
+  configs,
+  key,
+}: {
+  configs: ConfigForChain[];
+  key: string;
+}): string | null {
+  for (const c of configs) {
+    const value = readKey(c.config, key);
+    if (!value) continue;
+    const expanded = concreteModelValue(value);
+    if (!expanded) continue;
+    return expanded;
+  }
+  return null;
+}
+
 /**
  * Walk the scope chain + config attachments to return the model a
  * feature should use. See
@@ -208,63 +290,37 @@ export async function resolveModelForFeature(
   // or the role key (role default). Feature-key match beats role-key
   // match at the same tier.
   for (const tier of TIER_ORDER) {
-    const tierConfigs = configs.filter((c) => tierForConfig(c, chain) === tier);
+    const tierConfigs = configsForTier({ configs, chain, tier });
     if (tierConfigs.length === 0) continue;
-    tierConfigs.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 
     // 1a. Per-feature override at this tier.
-    for (const c of tierConfigs) {
-      const value = readKey(c.config, feature.key);
-      if (value) {
-        // Aliases like `openai/latest` resolve to the registry flagship
-        // here so downstream consumers (litellm, aigateway, nlp) only
-        // ever see concrete model ids. Non-alias values pass through.
-        // If an alias has no concrete resolution in the current catalog
-        // (e.g. a provider added later but the flagship hasn't shipped
-        // yet), skip this entry and let the cascade continue rather
-        // than leak a virtual id downstream.
-        const expanded = expandLatestAlias(value);
-        if (isLatestAlias(value) && expanded === value) continue;
-        // A restricted model (codex) resolving for a feature outside its
-        // allowed set is treated as not-set so the cascade keeps walking —
-        // the write paths reject saving these, but an older config or a
-        // wider-scope value must not leak a terms-restricted model into
-        // an ordinary feature.
-        if (
-          !isModelAllowedForFeature({
-            modelId: expanded,
-            featureKey: feature.key,
-          })
-        )
-          continue;
-        return {
-          model: expanded,
-          source: "feature_override",
-          scope: tier,
-          feature,
-        };
-      }
+    const override = pickAllowedModel({
+      configs: tierConfigs,
+      key: feature.key,
+      featureKey: feature.key,
+    });
+    if (override) {
+      return {
+        model: override,
+        source: "feature_override",
+        scope: tier,
+        feature,
+      };
     }
+
     // 1b. Role-level value at this tier.
-    for (const c of tierConfigs) {
-      const value = readKey(c.config, feature.role);
-      if (value) {
-        const expanded = expandLatestAlias(value);
-        if (isLatestAlias(value) && expanded === value) continue;
-        if (
-          !isModelAllowedForFeature({
-            modelId: expanded,
-            featureKey: feature.key,
-          })
-        )
-          continue;
-        return {
-          model: expanded,
-          source: "role_default",
-          scope: tier,
-          feature,
-        };
-      }
+    const roleDefault = pickAllowedModel({
+      configs: tierConfigs,
+      key: feature.role,
+      featureKey: feature.key,
+    });
+    if (roleDefault) {
+      return {
+        model: roleDefault,
+        source: "role_default",
+        scope: tier,
+        feature,
+      };
     }
   }
 
@@ -315,35 +371,33 @@ export async function findAlternateBelowScope(
   const tiersBelow = TIER_ORDER.slice(skipIndex + 1);
 
   for (const tier of tiersBelow) {
-    const tierConfigs = configs.filter((c) => tierForConfig(c, chain) === tier);
+    const tierConfigs = configsForTier({ configs, chain, tier });
     if (tierConfigs.length === 0) continue;
-    tierConfigs.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 
-    for (const c of tierConfigs) {
-      const value = readKey(c.config, feature.key);
-      if (value) {
-        const expanded = expandLatestAlias(value);
-        if (isLatestAlias(value) && expanded === value) continue;
-        return {
-          model: expanded,
-          source: "feature_override",
-          scope: tier,
-          feature,
-        };
-      }
+    const override = pickConcreteModel({
+      configs: tierConfigs,
+      key: feature.key,
+    });
+    if (override) {
+      return {
+        model: override,
+        source: "feature_override",
+        scope: tier,
+        feature,
+      };
     }
-    for (const c of tierConfigs) {
-      const value = readKey(c.config, feature.role);
-      if (value) {
-        const expanded = expandLatestAlias(value);
-        if (isLatestAlias(value) && expanded === value) continue;
-        return {
-          model: expanded,
-          source: "role_default",
-          scope: tier,
-          feature,
-        };
-      }
+
+    const roleDefault = pickConcreteModel({
+      configs: tierConfigs,
+      key: feature.role,
+    });
+    if (roleDefault) {
+      return {
+        model: roleDefault,
+        source: "role_default",
+        scope: tier,
+        feature,
+      };
     }
   }
 

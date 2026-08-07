@@ -23,32 +23,27 @@ const logger = createLogger("langwatch:tracer:collector:piiCheck");
 // null = not yet initialized, undefined = initialized but no credentials
 let cachedCredentials: { project_id: string } | undefined | null = null;
 
+function resolveCredentials(): { project_id: string } | undefined {
+  if (!env.GOOGLE_APPLICATION_CREDENTIALS) return undefined;
+  try {
+    const parsed = JSON.parse(env.GOOGLE_APPLICATION_CREDENTIALS);
+    if (typeof parsed?.project_id !== "string" || !parsed.project_id.trim()) {
+      logger.error("GOOGLE_APPLICATION_CREDENTIALS missing valid project_id");
+      return undefined;
+    }
+    return parsed;
+  } catch (e) {
+    logger.error(
+      { error: e },
+      "Failed to parse GOOGLE_APPLICATION_CREDENTIALS JSON",
+    );
+    return undefined;
+  }
+}
+
 function getCredentials(): { project_id: string } | undefined {
   if (cachedCredentials === null) {
-    if (!env.GOOGLE_APPLICATION_CREDENTIALS) {
-      cachedCredentials = undefined;
-    } else {
-      try {
-        const parsed = JSON.parse(env.GOOGLE_APPLICATION_CREDENTIALS);
-        if (
-          typeof parsed?.project_id !== "string" ||
-          !parsed.project_id.trim()
-        ) {
-          logger.error(
-            "GOOGLE_APPLICATION_CREDENTIALS missing valid project_id",
-          );
-          cachedCredentials = undefined;
-        } else {
-          cachedCredentials = parsed;
-        }
-      } catch (e) {
-        logger.error(
-          { error: e },
-          "Failed to parse GOOGLE_APPLICATION_CREDENTIALS JSON",
-        );
-        cachedCredentials = undefined;
-      }
-    }
+    cachedCredentials = resolveCredentials();
   }
   return cachedCredentials ?? undefined;
 }

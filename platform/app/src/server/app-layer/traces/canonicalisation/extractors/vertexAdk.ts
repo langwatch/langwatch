@@ -58,6 +58,36 @@ const OPERATION_NAME_SPAN_TYPE_MAP: Record<string, string> = {
   invoke_agent: "agent",
 };
 
+/**
+ * Chat messages out of an ADK llm_response: a single content object, or
+ * (raw Gemini responses) candidates[].content.
+ */
+const geminiResponseMessages = (
+  response: Record<string, unknown>,
+): unknown[] => {
+  const messages: unknown[] = [];
+  if (isRecord(response.content)) {
+    messages.push(
+      ...convertGeminiContent({
+        content: response.content,
+        defaultRole: "assistant",
+      }),
+    );
+  } else if (Array.isArray(response.candidates)) {
+    for (const candidate of response.candidates) {
+      if (isRecord(candidate) && isRecord(candidate.content)) {
+        messages.push(
+          ...convertGeminiContent({
+            content: candidate.content,
+            defaultRole: "assistant",
+          }),
+        );
+      }
+    }
+  }
+  return messages;
+};
+
 export class VertexAdkExtractor implements CanonicalAttributesExtractor {
   readonly id = "vertex-adk";
 
@@ -136,7 +166,22 @@ export class VertexAdkExtractor implements CanonicalAttributesExtractor {
     if (!isRecord(request)) return;
     attrs.take(VERTEX_ADK_KEYS.LLM_REQUEST);
 
-    // Model (standard gen_ai.request.model usually present; fallback only)
+    this.liftLlmRequestModel(ctx, request);
+    this.liftLlmRequestInputMessages(ctx, request);
+
+    const config = isRecord(request.config) ? request.config : undefined;
+    if (config === undefined) return;
+
+    this.liftSystemInstruction(ctx, config);
+    this.liftToolDefinitions(ctx, config);
+    this.liftRequestParams(ctx, config);
+  }
+
+  // Model (standard gen_ai.request.model usually present; fallback only)
+  private liftLlmRequestModel(
+    ctx: ExtractorContext,
+    request: Record<string, unknown>,
+  ): void {
     if (
       isNonEmptyString(request.model) &&
       this.setIfMissing({
@@ -147,27 +192,37 @@ export class VertexAdkExtractor implements CanonicalAttributesExtractor {
     ) {
       ctx.recordRule(`${this.id}:llm_request.model->gen_ai.request.model`);
     }
+  }
 
-    // Input messages (Gemini contents → chat messages)
+  // Input messages (Gemini contents → chat messages)
+  private liftLlmRequestInputMessages(
+    ctx: ExtractorContext,
+    request: Record<string, unknown>,
+  ): void {
+    const { attrs } = ctx.bag;
     if (
-      !attrs.has(ATTR_KEYS.GEN_AI_INPUT_MESSAGES) &&
-      ctx.out[ATTR_KEYS.GEN_AI_INPUT_MESSAGES] === undefined &&
-      Array.isArray(request.contents)
+      attrs.has(ATTR_KEYS.GEN_AI_INPUT_MESSAGES) ||
+      ctx.out[ATTR_KEYS.GEN_AI_INPUT_MESSAGES] !== undefined ||
+      !Array.isArray(request.contents)
     ) {
-      const messages = request.contents.flatMap((content) =>
-        convertGeminiContent({ content, defaultRole: "user" }),
-      );
-      if (messages.length > 0) {
-        ctx.setAttr(ATTR_KEYS.GEN_AI_INPUT_MESSAGES, messages);
-        ctx.recordRule(`${this.id}:llm_request->gen_ai.input.messages`);
-        recordValueType(ctx, ATTR_KEYS.GEN_AI_INPUT_MESSAGES, "chat_messages");
-      }
+      return;
     }
 
-    const config = isRecord(request.config) ? request.config : undefined;
-    if (config === undefined) return;
+    const messages = request.contents.flatMap((content) =>
+      convertGeminiContent({ content, defaultRole: "user" }),
+    );
+    if (messages.length > 0) {
+      ctx.setAttr(ATTR_KEYS.GEN_AI_INPUT_MESSAGES, messages);
+      ctx.recordRule(`${this.id}:llm_request->gen_ai.input.messages`);
+      recordValueType(ctx, ATTR_KEYS.GEN_AI_INPUT_MESSAGES, "chat_messages");
+    }
+  }
 
-    // System instructions
+  // System instructions
+  private liftSystemInstruction(
+    ctx: ExtractorContext,
+    config: Record<string, unknown>,
+  ): void {
     const sysInstruction = systemInstructionText(config.system_instruction);
     if (
       sysInstruction !== null &&
@@ -179,21 +234,30 @@ export class VertexAdkExtractor implements CanonicalAttributesExtractor {
     ) {
       ctx.recordRule(`${this.id}:system_instruction`);
     }
+  }
 
-    // Tool definitions
-    if (Array.isArray(config.tools) && config.tools.length > 0) {
-      if (
-        this.setIfMissing({
-          ctx,
-          key: ATTR_KEYS.GEN_AI_TOOL_DEFINITIONS,
-          value: config.tools,
-        })
-      ) {
-        ctx.recordRule(`${this.id}:tools->gen_ai.tool.definitions`);
-      }
+  // Tool definitions
+  private liftToolDefinitions(
+    ctx: ExtractorContext,
+    config: Record<string, unknown>,
+  ): void {
+    if (!Array.isArray(config.tools) || config.tools.length === 0) return;
+    if (
+      this.setIfMissing({
+        ctx,
+        key: ATTR_KEYS.GEN_AI_TOOL_DEFINITIONS,
+        value: config.tools,
+      })
+    ) {
+      ctx.recordRule(`${this.id}:tools->gen_ai.tool.definitions`);
     }
+  }
 
-    // Request parameters
+  // Request parameters
+  private liftRequestParams(
+    ctx: ExtractorContext,
+    config: Record<string, unknown>,
+  ): void {
     const paramMap: [string, unknown][] = [
       [ATTR_KEYS.GEN_AI_REQUEST_TEMPERATURE, config.temperature],
       [ATTR_KEYS.GEN_AI_REQUEST_TOP_P, config.top_p],
@@ -222,79 +286,81 @@ export class VertexAdkExtractor implements CanonicalAttributesExtractor {
     if (!isRecord(response)) return;
     attrs.take(VERTEX_ADK_KEYS.LLM_RESPONSE);
 
-    // Output messages: ADK LlmResponse carries a single content object;
-    // raw Gemini responses carry candidates[].content
+    this.liftLlmResponseOutputMessages(ctx, response);
+    this.liftLlmResponseUsage(ctx, response);
+    this.liftLlmResponseFinishReason(ctx, response);
+  }
+
+  // Output messages: ADK LlmResponse carries a single content object;
+  // raw Gemini responses carry candidates[].content
+  private liftLlmResponseOutputMessages(
+    ctx: ExtractorContext,
+    response: Record<string, unknown>,
+  ): void {
+    const { attrs } = ctx.bag;
     if (
-      !attrs.has(ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES) &&
-      ctx.out[ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES] === undefined
+      attrs.has(ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES) ||
+      ctx.out[ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES] !== undefined
     ) {
-      const messages: unknown[] = [];
-      if (isRecord(response.content)) {
-        messages.push(
-          ...convertGeminiContent({
-            content: response.content,
-            defaultRole: "assistant",
-          }),
-        );
-      } else if (Array.isArray(response.candidates)) {
-        for (const candidate of response.candidates) {
-          if (isRecord(candidate) && isRecord(candidate.content)) {
-            messages.push(
-              ...convertGeminiContent({
-                content: candidate.content,
-                defaultRole: "assistant",
-              }),
-            );
-          }
-        }
-      }
-      if (messages.length > 0) {
-        ctx.setAttr(ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES, messages);
-        ctx.recordRule(`${this.id}:llm_response->gen_ai.output.messages`);
-        recordValueType(ctx, ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES, "chat_messages");
-      }
+      return;
     }
 
-    // Usage tokens (fallback when the standard gen_ai.usage.* are absent)
+    const messages = geminiResponseMessages(response);
+    if (messages.length > 0) {
+      ctx.setAttr(ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES, messages);
+      ctx.recordRule(`${this.id}:llm_response->gen_ai.output.messages`);
+      recordValueType(ctx, ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES, "chat_messages");
+    }
+  }
+
+  // Usage tokens (fallback when the standard gen_ai.usage.* are absent)
+  private liftLlmResponseUsage(
+    ctx: ExtractorContext,
+    response: Record<string, unknown>,
+  ): void {
     const usage = isRecord(response.usage_metadata)
       ? response.usage_metadata
       : undefined;
-    if (usage !== undefined) {
-      const usageMap: [string, unknown][] = [
-        [ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS, usage.prompt_token_count],
-        [ATTR_KEYS.GEN_AI_USAGE_OUTPUT_TOKENS, usage.candidates_token_count],
-        [
-          ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS,
-          usage.cached_content_token_count,
-        ],
-        [ATTR_KEYS.GEN_AI_USAGE_REASONING_TOKENS, usage.thoughts_token_count],
-      ];
-      let hasExtractedUsage = false;
-      for (const [key, raw] of usageMap) {
-        const value = asNumber(raw);
-        if (
-          value !== null &&
-          this.setIfMissing({ ctx, key: key, value: value })
-        ) {
-          hasExtractedUsage = true;
-        }
-      }
-      if (hasExtractedUsage) {
-        ctx.recordRule(`${this.id}:usage_metadata->gen_ai.usage`);
+    if (usage === undefined) return;
+
+    const usageMap: [string, unknown][] = [
+      [ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS, usage.prompt_token_count],
+      [ATTR_KEYS.GEN_AI_USAGE_OUTPUT_TOKENS, usage.candidates_token_count],
+      [
+        ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS,
+        usage.cached_content_token_count,
+      ],
+      [ATTR_KEYS.GEN_AI_USAGE_REASONING_TOKENS, usage.thoughts_token_count],
+    ];
+    let hasExtractedUsage = false;
+    for (const [key, raw] of usageMap) {
+      const value = asNumber(raw);
+      if (
+        value !== null &&
+        this.setIfMissing({ ctx, key: key, value: value })
+      ) {
+        hasExtractedUsage = true;
       }
     }
+    if (hasExtractedUsage) {
+      ctx.recordRule(`${this.id}:usage_metadata->gen_ai.usage`);
+    }
+  }
 
-    // Finish reason
-    if (isNonEmptyString(response.finish_reason)) {
-      if (
-        this.setIfMissing({
-          ctx,
-          key: ATTR_KEYS.GEN_AI_RESPONSE_FINISH_REASONS,
-          value: [response.finish_reason],
-        })
-      ) {
-        ctx.recordRule(`${this.id}:finish_reason`);
-      }
+  // Finish reason
+  private liftLlmResponseFinishReason(
+    ctx: ExtractorContext,
+    response: Record<string, unknown>,
+  ): void {
+    if (!isNonEmptyString(response.finish_reason)) return;
+    if (
+      this.setIfMissing({
+        ctx,
+        key: ATTR_KEYS.GEN_AI_RESPONSE_FINISH_REASONS,
+        value: [response.finish_reason],
+      })
+    ) {
+      ctx.recordRule(`${this.id}:finish_reason`);
     }
   }
 

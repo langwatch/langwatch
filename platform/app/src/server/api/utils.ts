@@ -21,6 +21,7 @@ import {
   PLATFORM_DEFAULT_DATA_PRIVACY,
   type ResolvedAudience,
   type ResolvedCategory,
+  type ResolvedCustomAttributeRule,
   type ResolvedDataPrivacy,
 } from "~/server/data-privacy/dataPrivacy.types";
 import { getDataPrivacyPolicyService } from "~/server/data-privacy/dataPrivacyPolicy.service";
@@ -211,136 +212,102 @@ function restrictLabelFor(
     : null;
 }
 
-export async function getUserProtectionsForProject(
-  ctx: {
-    prisma: PrismaClient;
-    session: Session | null;
-    publiclyShared?: boolean;
-  },
-  { projectId }: { projectId: string } & Record<string, unknown>,
-): Promise<Protections> {
-  // Cost visibility follows the caller's own permission, never the fact that a
-  // share link was presented. An anonymous viewer of a public link sees no
-  // costs; a member resolving an org/project-scoped link sees them only if they
-  // hold `cost:view` in-app. Sharing a trace must not disclose spend. See
-  // ADR-057.
-  const canSeeCosts = await hasProjectPermission(ctx, projectId, "cost:view");
+/**
+ * The Protections returned when data-privacy policy resolution fails: deny
+ * captured input/output (the viewer sees the redacted placeholder) until
+ * resolution recovers; cost visibility keeps its own permission check.
+ *
+ * Fail closed for attributes too: with the policy unresolved we cannot know
+ * WHICH custom attributes are restricted, so hide ALL of them. An empty
+ * `hiddenAttributes` would redact NOTHING (the redact helpers no-op on an
+ * empty list), leaking resource/span attributes an outage must never
+ * expose — so use a catch-all `*` pattern, the most restrictive value,
+ * which matches every attribute key.
+ */
+function buildFailClosedProtections({
+  canSeeCosts,
+  visibilityCutoffMs,
+}: {
+  canSeeCosts: boolean;
+  visibilityCutoffMs: number | null;
+}): Protections {
+  return {
+    canSeeCosts,
+    canSeeCapturedInput: false,
+    canSeeCapturedOutput: false,
+    capturedInputVisibleTo: null,
+    capturedOutputVisibleTo: null,
+    contentCategories: uniformContentCategories(false),
+    hiddenAttributes: [{ pattern: "*", visibleTo: "members of this project" }],
+    visibilityCutoffMs,
+  };
+}
 
-  // The plan-based visibility window applies to every user-facing read,
-  // including public shares — sharing must not be the bypass.
-  const visibilityCutoffMs = await getVisibilityCutoffMsForProject(projectId);
+/**
+ * Protections for a public share, a non-signed-in viewer, or a demo
+ * project: only captured content is visible, and every restricted custom
+ * attribute is hidden.
+ */
+function buildPublicProtections({
+  policy,
+  canSeeCosts,
+  restrictedAttributeRules,
+  visibilityCutoffMs,
+}: {
+  policy: ResolvedDataPrivacy;
+  canSeeCosts: boolean;
+  restrictedAttributeRules: ResolvedCustomAttributeRule[];
+  visibilityCutoffMs: number | null;
+}): Protections {
+  // A public viewer has no group facts, so restrict labels resolve any group
+  // ids to a generic word; that only affects the placeholder copy, not the
+  // visibility decision (public sees captured content only).
+  const publicContentCategories = Object.fromEntries(
+    CONTENT_CATEGORIES.map((category) => [
+      category,
+      {
+        canSee: isContentVisibleToPublic(policy.categories[category]),
+        restrictVisibleTo: restrictLabelFor(policy.categories[category], {
+          groups: {},
+        }),
+      } satisfies CategoryVisibility,
+    ]),
+  ) as Record<ContentCategory, CategoryVisibility>;
+  return {
+    canSeeCosts,
+    canSeeCapturedInput: publicContentCategories.input.canSee,
+    canSeeCapturedOutput: publicContentCategories.output.canSee,
+    contentCategories: publicContentCategories,
+    hiddenAttributes: restrictedAttributeRules.map((rule) => ({
+      pattern: rule.pattern,
+      visibleTo: "members of this project",
+    })),
+    restrictedAttributes: restrictedAttributeRules.map((rule) => ({
+      pattern: rule.pattern,
+      visibleTo: "members of this project",
+      canSee: false,
+    })),
+    visibilityCutoffMs,
+  };
+}
 
-  const project = await ctx.prisma.project.findUniqueOrThrow({
-    where: { id: projectId, archivedAt: null },
-    select: {
-      teamId: true,
-      ownerUserId: true,
-    },
-  });
-
-  // The scoped data-privacy policy is the single source of truth for content
-  // visibility. The kill switch falls back to the platform default (every
-  // category captured and visible to the team).
-  let policy: ResolvedDataPrivacy = PLATFORM_DEFAULT_DATA_PRIVACY;
-  if (process.env.LANGWATCH_DATA_PRIVACY_ENFORCEMENT !== "off") {
-    try {
-      policy = await getDataPrivacyPolicyService().getResolvedForProject({
-        projectId,
-      });
-    } catch (error) {
-      // Fail closed: a resolver/cache/db failure must not expose content that a
-      // restrict rule would otherwise hide. Deny captured input/output (the
-      // viewer sees the redacted placeholder) until resolution recovers; cost
-      // visibility keeps its own permission check. The kill switch path above
-      // skips this and keeps the legacy-enum behavior.
-      logger.error(
-        { error, projectId },
-        "data-privacy policy resolution failed; hiding captured content (fail-closed)",
-      );
-      return {
-        canSeeCosts,
-        canSeeCapturedInput: false,
-        canSeeCapturedOutput: false,
-        capturedInputVisibleTo: null,
-        capturedOutputVisibleTo: null,
-        contentCategories: uniformContentCategories(false),
-        // Fail closed for attributes too: with the policy unresolved we cannot
-        // know WHICH custom attributes are restricted, so hide ALL of them. An
-        // empty `hiddenAttributes` would redact NOTHING (the redact helpers
-        // no-op on an empty list), leaking resource/span attributes an outage
-        // must never expose — so use a catch-all `*` pattern, the most
-        // restrictive value, which matches every attribute key.
-        hiddenAttributes: [
-          { pattern: "*", visibleTo: "members of this project" },
-        ],
-        visibilityCutoffMs,
-      };
-    }
-  }
-  const restrictedAttributeRules = policy.customAttributes.filter(
-    (rule) => rule.disposition === "restrict",
-  );
-
-  // For public shares or non-signed in users, only captured content is visible,
-  // and every restricted custom attribute is hidden.
-  if (
-    // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
-    ctx.publiclyShared ||
-    !ctx.session?.user?.id ||
-    isDemoProject(projectId, "traces:view")
-  ) {
-    // A public viewer has no group facts, so restrict labels resolve any group
-    // ids to a generic word; that only affects the placeholder copy, not the
-    // visibility decision (public sees captured content only).
-    const publicContentCategories = Object.fromEntries(
-      CONTENT_CATEGORIES.map((category) => [
-        category,
-        {
-          canSee: isContentVisibleToPublic(policy.categories[category]),
-          restrictVisibleTo: restrictLabelFor(policy.categories[category], {
-            groups: {},
-          }),
-        } satisfies CategoryVisibility,
-      ]),
-    ) as Record<ContentCategory, CategoryVisibility>;
-    return {
-      canSeeCosts,
-      canSeeCapturedInput: publicContentCategories.input.canSee,
-      canSeeCapturedOutput: publicContentCategories.output.canSee,
-      contentCategories: publicContentCategories,
-      hiddenAttributes: restrictedAttributeRules.map((rule) => ({
-        pattern: rule.pattern,
-        visibleTo: "members of this project",
-      })),
-      restrictedAttributes: restrictedAttributeRules.map((rule) => ({
-        pattern: rule.pattern,
-        visibleTo: "members of this project",
-        canSee: false,
-      })),
-      visibilityCutoffMs,
-    };
-  }
-
-  const userId = ctx.session.user.id;
-  const teamBindings = await ctx.prisma.roleBinding.findMany({
-    where: {
-      userId,
-      scopeType: RoleBindingScopeType.TEAM,
-      scopeId: project.teamId,
-    },
-    select: { role: true },
-  });
-
+/** Team-role facts, falling back to the org role when the team gave no binding at all. */
+async function resolveMembershipFacts({
+  userId,
+  teamId,
+  teamBindings,
+}: {
+  userId: string;
+  teamId: string;
+  teamBindings: Array<{ role: TeamUserRole }>;
+}): Promise<{ isAdmin: boolean; isMember: boolean; isMemberRole: boolean }> {
   let isAdmin = teamBindings.some((b) => b.role === TeamUserRole.ADMIN);
   let isMember = teamBindings.length > 0;
   let isMemberRole = teamBindings.some((b) => b.role === TeamUserRole.MEMBER);
-  const isViewer = teamBindings.some((b) => b.role === TeamUserRole.VIEWER);
-  const isProjectOwner =
-    project.ownerUserId != null && project.ownerUserId === userId;
   if (!isMember) {
     const orgRole = await getApp().organizations.getUserOrgRoleByTeamId({
       userId,
-      teamId: project.teamId,
+      teamId,
     });
     if (orgRole === OrganizationUserRole.ADMIN) {
       isMember = true;
@@ -350,12 +317,85 @@ export async function getUserProtectionsForProject(
       isMemberRole = true;
     }
   }
+  return { isAdmin, isMember, isMemberRole };
+}
 
-  // Group membership is only needed when a restrict audience names groups; the
-  // role-group and owner audiences decide from facts already in hand, keeping
-  // the common read path free of the extra queries.
-  let organizationId: string | null = null;
-  let groupIds: string[] = [];
+/**
+ * Group membership is only needed when a restrict audience names groups; the
+ * role-group and owner audiences decide from facts already in hand, keeping
+ * the common read path free of the extra queries.
+ */
+async function resolveGroupFactsIfNeeded({
+  ctx,
+  userId,
+  teamId,
+  isMember,
+  needsFacts,
+}: {
+  ctx: { prisma: PrismaClient };
+  userId: string;
+  teamId: string;
+  isMember: boolean;
+  needsFacts: boolean;
+}): Promise<{ organizationId: string | null; groupIds: string[] }> {
+  if (!isMember || !needsFacts) {
+    return { organizationId: null, groupIds: [] };
+  }
+  const team = await ctx.prisma.team.findUnique({
+    where: { id: teamId },
+    select: { organizationId: true },
+  });
+  const organizationId = team?.organizationId ?? null;
+  if (!organizationId) {
+    return { organizationId: null, groupIds: [] };
+  }
+  const memberships = await ctx.prisma.groupMembership.findMany({
+    where: { userId, group: { organizationId } },
+    select: { groupId: true },
+  });
+  return { organizationId, groupIds: memberships.map((m) => m.groupId) };
+}
+
+/**
+ * Resolves the signed-in viewer's role/ownership facts for the project's
+ * team, falling back to the org role when the team gave no binding, then —
+ * only when a restrict audience actually names groups — the org-scoped
+ * group memberships needed to evaluate it. Also returns the resolved
+ * organizationId, since the caller needs it again for the batched audience
+ * name lookup.
+ */
+async function resolveViewerFacts({
+  ctx,
+  userId,
+  project,
+  policy,
+  restrictedAttributeRules,
+}: {
+  ctx: { prisma: PrismaClient };
+  userId: string;
+  project: { teamId: string; ownerUserId: string | null };
+  policy: ResolvedDataPrivacy;
+  restrictedAttributeRules: ResolvedCustomAttributeRule[];
+}): Promise<{ viewer: ViewerFacts; organizationId: string | null }> {
+  const teamBindings = await ctx.prisma.roleBinding.findMany({
+    where: {
+      userId,
+      scopeType: RoleBindingScopeType.TEAM,
+      scopeId: project.teamId,
+    },
+    select: { role: true },
+  });
+
+  const isViewer = teamBindings.some((b) => b.role === TeamUserRole.VIEWER);
+  const isProjectOwner =
+    project.ownerUserId != null && project.ownerUserId === userId;
+
+  const { isAdmin, isMember, isMemberRole } = await resolveMembershipFacts({
+    userId,
+    teamId: project.teamId,
+    teamBindings,
+  });
+
   const needsFacts =
     CONTENT_CATEGORIES.some((category) =>
       needsAudienceFacts(policy.categories[category]),
@@ -363,29 +403,45 @@ export async function getUserProtectionsForProject(
     restrictedAttributeRules.some((rule) =>
       needsAudienceFacts({ disposition: "restrict", audience: rule.audience }),
     );
-  if (isMember && needsFacts) {
-    const team = await ctx.prisma.team.findUnique({
-      where: { id: project.teamId },
-      select: { organizationId: true },
-    });
-    organizationId = team?.organizationId ?? null;
-    if (organizationId) {
-      const memberships = await ctx.prisma.groupMembership.findMany({
-        where: { userId, group: { organizationId } },
-        select: { groupId: true },
-      });
-      groupIds = memberships.map((m) => m.groupId);
-    }
-  }
-
-  const viewer: ViewerFacts = {
-    isAdmin,
+  const { organizationId, groupIds } = await resolveGroupFactsIfNeeded({
+    ctx,
+    userId,
+    teamId: project.teamId,
     isMember,
-    isMemberRole,
-    isViewer,
-    isProjectOwner,
-    groupIds,
+    needsFacts,
+  });
+
+  return {
+    viewer: {
+      isAdmin,
+      isMember,
+      isMemberRole,
+      isViewer,
+      isProjectOwner,
+      groupIds,
+    },
+    organizationId,
   };
+}
+
+/** Protections for a signed-in team/org member: per-category and per-attribute visibility from their viewer facts. */
+async function buildMemberProtections({
+  ctx,
+  viewer,
+  organizationId,
+  policy,
+  canSeeCosts,
+  restrictedAttributeRules,
+  visibilityCutoffMs,
+}: {
+  ctx: { prisma: PrismaClient };
+  viewer: ViewerFacts;
+  organizationId: string | null;
+  policy: ResolvedDataPrivacy;
+  canSeeCosts: boolean;
+  restrictedAttributeRules: ResolvedCustomAttributeRule[];
+  visibilityCutoffMs: number | null;
+}): Promise<Protections> {
   const hiddenAttributeRules = restrictedAttributeRules.filter(
     (rule) =>
       !isContentVisible(
@@ -449,4 +505,91 @@ export async function getUserProtectionsForProject(
     restrictedAttributes,
     visibilityCutoffMs,
   };
+}
+
+export async function getUserProtectionsForProject(
+  ctx: {
+    prisma: PrismaClient;
+    session: Session | null;
+    publiclyShared?: boolean;
+  },
+  { projectId }: { projectId: string } & Record<string, unknown>,
+): Promise<Protections> {
+  // Cost visibility follows the caller's own permission, never the fact that a
+  // share link was presented. An anonymous viewer of a public link sees no
+  // costs; a member resolving an org/project-scoped link sees them only if they
+  // hold `cost:view` in-app. Sharing a trace must not disclose spend. See
+  // ADR-057.
+  const canSeeCosts = await hasProjectPermission(ctx, projectId, "cost:view");
+
+  // The plan-based visibility window applies to every user-facing read,
+  // including public shares — sharing must not be the bypass.
+  const visibilityCutoffMs = await getVisibilityCutoffMsForProject(projectId);
+
+  const project = await ctx.prisma.project.findUniqueOrThrow({
+    where: { id: projectId, archivedAt: null },
+    select: {
+      teamId: true,
+      ownerUserId: true,
+    },
+  });
+
+  // The scoped data-privacy policy is the single source of truth for content
+  // visibility. The kill switch falls back to the platform default (every
+  // category captured and visible to the team).
+  let policy: ResolvedDataPrivacy = PLATFORM_DEFAULT_DATA_PRIVACY;
+  if (process.env.LANGWATCH_DATA_PRIVACY_ENFORCEMENT !== "off") {
+    try {
+      policy = await getDataPrivacyPolicyService().getResolvedForProject({
+        projectId,
+      });
+    } catch (error) {
+      // Fail closed: a resolver/cache/db failure must not expose content that a
+      // restrict rule would otherwise hide. The kill switch path above skips
+      // this and keeps the legacy-enum behavior.
+      logger.error(
+        { error, projectId },
+        "data-privacy policy resolution failed; hiding captured content (fail-closed)",
+      );
+      return buildFailClosedProtections({ canSeeCosts, visibilityCutoffMs });
+    }
+  }
+  const restrictedAttributeRules = policy.customAttributes.filter(
+    (rule) => rule.disposition === "restrict",
+  );
+
+  // For public shares or non-signed in users, only captured content is visible,
+  // and every restricted custom attribute is hidden.
+  if (
+    // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
+    ctx.publiclyShared ||
+    !ctx.session?.user?.id ||
+    isDemoProject(projectId, "traces:view")
+  ) {
+    return buildPublicProtections({
+      policy,
+      canSeeCosts,
+      restrictedAttributeRules,
+      visibilityCutoffMs,
+    });
+  }
+
+  const userId = ctx.session.user.id;
+  const { viewer, organizationId } = await resolveViewerFacts({
+    ctx,
+    userId,
+    project,
+    policy,
+    restrictedAttributeRules,
+  });
+
+  return buildMemberProtections({
+    ctx,
+    viewer,
+    organizationId,
+    policy,
+    canSeeCosts,
+    restrictedAttributeRules,
+    visibilityCutoffMs,
+  });
 }

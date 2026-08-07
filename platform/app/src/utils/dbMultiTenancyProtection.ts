@@ -136,36 +136,39 @@ const isScopeIdValue = (value: any): boolean => {
   return false;
 };
 
+// Nested through a `scopes` relation (`{ scopes: { some: ... } }`),
+// either a single predicate or an OR-list. Every OR-branch must be
+// a valid scope predicate so a query can't sneak in `{ OR: [{}] }`
+// and walk every row. scopeId accepts both `string` and `{ in: [...] }`
+// shapes - the cascade walker passes lists for TEAM / PROJECT tiers
+// (every team in the org / every project in the org the caller can
+// see), and that list IS the tenancy constraint.
+const hasNestedScopePredicate = (where: any): boolean => {
+  const some = where.scopes?.some;
+  if (!some || typeof some !== "object") return false;
+  if (typeof some.scopeType === "string" && isScopeIdValue(some.scopeId)) {
+    return true;
+  }
+  if (
+    Array.isArray(some.OR) &&
+    some.OR.length > 0 &&
+    some.OR.every(
+      (o: any) =>
+        o && typeof o.scopeType === "string" && isScopeIdValue(o.scopeId),
+    )
+  ) {
+    return true;
+  }
+  return false;
+};
+
 const hasScopePredicate = (where: any): boolean => {
   if (!where || typeof where !== "object") return false;
   // Top-level (scopeType, scopeId) - typical for join tables filtering by one scope.
   if (typeof where.scopeType === "string" && isScopeIdValue(where.scopeId)) {
     return true;
   }
-  // Nested through a `scopes` relation (`{ scopes: { some: ... } }`),
-  // either a single predicate or an OR-list. Every OR-branch must be
-  // a valid scope predicate so a query can't sneak in `{ OR: [{}] }`
-  // and walk every row. scopeId accepts both `string` and `{ in: [...] }`
-  // shapes - the cascade walker passes lists for TEAM / PROJECT tiers
-  // (every team in the org / every project in the org the caller can
-  // see), and that list IS the tenancy constraint.
-  const some = where.scopes?.some;
-  if (some && typeof some === "object") {
-    if (typeof some.scopeType === "string" && isScopeIdValue(some.scopeId)) {
-      return true;
-    }
-    if (
-      Array.isArray(some.OR) &&
-      some.OR.length > 0 &&
-      some.OR.every(
-        (o: any) =>
-          o && typeof o.scopeType === "string" && isScopeIdValue(o.scopeId),
-      )
-    ) {
-      return true;
-    }
-  }
-  return false;
+  return hasNestedScopePredicate(where);
 };
 
 const hasIdOrInPredicate = (where: any): boolean => {
@@ -177,29 +180,40 @@ const hasIdOrInPredicate = (where: any): boolean => {
   return false;
 };
 
+const hasBoundedAndBranch = ({
+  where,
+  passes,
+}: {
+  where: any;
+  passes: (clause: any) => boolean;
+}): boolean =>
+  Array.isArray(where.AND) &&
+  where.AND.some((clause: any) => validateRecursive(clause, passes));
+
+// OR semantics: every alternative branch must independently carry a
+// tenancy predicate, otherwise the unbounded branch leaks rows. The
+// canonical case is `findByHashedSecret`, which ORs together a current
+// hashedSecret + an in-grace previousHashedSecret; both branches name
+// a uniquely-keyed secret, so the guard recognises the query as bounded.
+const hasBoundedOrBranches = ({
+  where,
+  passes,
+}: {
+  where: any;
+  passes: (clause: any) => boolean;
+}): boolean =>
+  Array.isArray(where.OR) &&
+  where.OR.length > 0 &&
+  where.OR.every((clause: any) => validateRecursive(clause, passes));
+
 const validateRecursive = (
   where: any,
   passes: (clause: any) => boolean,
 ): boolean => {
   if (!where || typeof where !== "object") return false;
   if (passes(where)) return true;
-  if (Array.isArray(where.AND)) {
-    for (const clause of where.AND) {
-      if (validateRecursive(clause, passes)) return true;
-    }
-  }
-  // OR semantics: every alternative branch must independently carry a
-  // tenancy predicate, otherwise the unbounded branch leaks rows. The
-  // canonical case is `findByHashedSecret`, which ORs together a current
-  // hashedSecret + an in-grace previousHashedSecret; both branches name
-  // a uniquely-keyed secret, so the guard recognises the query as bounded.
-  if (Array.isArray(where.OR) && where.OR.length > 0) {
-    const allBranchesBounded = where.OR.every((clause: any) =>
-      validateRecursive(clause, passes),
-    );
-    if (allBranchesBounded) return true;
-  }
-  return false;
+  if (hasBoundedAndBranch({ where, passes })) return true;
+  return hasBoundedOrBranches({ where, passes });
 };
 
 // Join tables scoped by their parent AiToolEntry: every query names the parent
@@ -681,28 +695,179 @@ const EXEMPT_MODELS = new Set<string>([
   ...ORG_DERIVED_EXEMPT,
 ]);
 
+// Raw queries (`$queryRaw`, `$executeRaw`) carry their tenancy scope
+// inside the SQL string itself, where the structural guard cannot see
+// it. Two cheap structural defences still apply: require the SQL text
+// to mention a tenancy column, or accept an explicit grep-able
+// `-- @tenancy: <reason>` opt-out for genuinely cross-tenant queries.
+const assertRawQueryTenancy = (args: Prisma.MiddlewareParams["args"]) => {
+  const sql = extractRawSql(args);
+  if (!sql) return;
+  if (RAW_TENANCY_OPTOUT_RE.test(sql)) return;
+  if (!RAW_TENANCY_PREDICATE_RE.test(sql)) {
+    throw new Error(
+      "The raw query is missing a tenancy predicate. Include `projectId`, " +
+        "`organizationId`, or `tenantId` in the SQL — or opt out with a " +
+        "`-- @tenancy: <reason>` comment if the query intentionally scans " +
+        "across tenants.",
+    );
+  }
+};
+
+const assertScopedModelTenancy = ({
+  config,
+  model,
+  action,
+  args,
+}: {
+  config: ScopedModelConfig;
+  model: string;
+  action: Prisma.MiddlewareParams["action"];
+  args: Prisma.MiddlewareParams["args"];
+}) => {
+  if (action === "create" || action === "createMany") {
+    const data = action === "create" ? args?.data : args?.data;
+    const err = config.validateCreateData(data);
+    if (err) {
+      throw new Error(`The ${action} action on the ${model} model ${err}.`);
+    }
+    return;
+  }
+  const err = config.validateWhere(args?.where);
+  if (err) {
+    throw new Error(`The ${action} action on the ${model} model ${err}.`);
+  }
+};
+
+// ShareLink resolution: an anonymous viewer presents only a share token (or
+// internal id) — the projectId is what the row teaches them, so it cannot be
+// required in the where. The `token` lookup is the capability path; `id`
+// covers the pre-revocation ownership check. Deliberately NO other lookup
+// shape is exempt: everything else on ShareLink must carry projectId.
+// See ADR-057.
+const isShareLinkTokenLookup = ({
+  action,
+  model,
+  args,
+}: {
+  action: Prisma.MiddlewareParams["action"];
+  model: string;
+  args: Prisma.MiddlewareParams["args"];
+}): boolean =>
+  (action === "findFirst" || action === "findUnique") &&
+  model === "ShareLink" &&
+  (args?.where?.token || args?.where?.id);
+
+// Gateway auth resolver: findByHashedSecret is the hot-path lookup
+// that converts an opaque `vk-lw-*` bearer token into a
+// VirtualKey row. The hashedSecret itself is a cryptographic
+// identifier unique across the platform (HMAC-SHA256 with a
+// per-deployment pepper), so projectId/organizationId cannot be
+// known to the caller - the VK row IS what teaches them. The OR
+// clause here is always shape
+//   { OR: [{ hashedSecret }, { previousHashedSecret, previousSecretValidUntil }] }
+// matching virtualKey.repository.ts:findByHashedSecret. Narrow
+// exemption matches the ShareLink pattern above.
+const isVirtualKeyHashedSecretLookup = ({
+  action,
+  model,
+  args,
+}: {
+  action: Prisma.MiddlewareParams["action"];
+  model: string;
+  args: Prisma.MiddlewareParams["args"];
+}): boolean =>
+  action === "findFirst" &&
+  model === "VirtualKey" &&
+  Array.isArray(args?.where?.OR) &&
+  args.where.OR.every((o: any) => o?.hashedSecret || o?.previousHashedSecret);
+
+// Gateway warm-cache resolver: /api/internal/gateway/config/:vk_id
+// hits findUnique({ where: { id: vkId }}) because the gateway
+// already authenticated the VK via resolve-key and now needs the
+// full config payload (keyed by id it learned from the JWT). The
+// HMAC-signed transport + JWT validation upstream is the tenancy
+// check; adding projectId here would require a redundant JWT
+// lookup. Narrow: only findUnique on VirtualKey with a bare id in
+// the where clause - everything else still under the normal guard.
+const isVirtualKeyWarmCacheLookup = ({
+  action,
+  model,
+  args,
+}: {
+  action: Prisma.MiddlewareParams["action"];
+  model: string;
+  args: Prisma.MiddlewareParams["args"];
+}): boolean =>
+  action === "findUnique" &&
+  model === "VirtualKey" &&
+  typeof args?.where?.id === "string" &&
+  Object.keys(args.where).length === 1;
+
+const isNarrowlyExemptLookup = (input: {
+  action: Prisma.MiddlewareParams["action"];
+  model: string;
+  args: Prisma.MiddlewareParams["args"];
+}): boolean =>
+  isShareLinkTokenLookup(input) ||
+  isVirtualKeyHashedSecretLookup(input) ||
+  isVirtualKeyWarmCacheLookup(input);
+
+const assertProjectIdInCreateData = ({
+  action,
+  model,
+  args,
+}: {
+  action: Prisma.MiddlewareParams["action"];
+  model: string;
+  args: Prisma.MiddlewareParams["args"];
+}) => {
+  const data =
+    action === "create" ? args?.data : args?.data?.map((d: any) => d);
+  const hasProjectId = Array.isArray(data)
+    ? data.every((d) => d.projectId)
+    : data?.projectId;
+
+  if (!hasProjectId) {
+    throw new Error(
+      `The ${action} action on the ${model} model requires a 'projectId' in the data field`,
+    );
+  }
+};
+
+const assertProjectIdInWhere = ({
+  action,
+  model,
+  args,
+}: {
+  action: Prisma.MiddlewareParams["action"];
+  model: string;
+  args: Prisma.MiddlewareParams["args"];
+}) => {
+  if (
+    !args?.where?.projectId &&
+    !args?.where?.projectId_slug &&
+    !args?.where?.projectId_date &&
+    !args?.where?.projectId_modelProviderId_slot &&
+    !args?.where?.projectId_traceId &&
+    !args?.where?.projectId?.in &&
+    !args?.where?.OR?.every((o: any) => o.projectId || o.organizationId)
+  ) {
+    throw new Error(
+      args?.where?.OR
+        ? `The ${action} action on the ${model} model requires that all the OR clauses check for either the projectId or organizationId`
+        : `The ${action} action on the ${model} model requires a 'projectId' or 'projectId.in' in the where clause`,
+    );
+  }
+};
+
 const _guardProjectId = ({ params }: { params: Prisma.MiddlewareParams }) => {
   const action = params.action;
 
-  // Raw queries (`$queryRaw`, `$executeRaw`) carry their tenancy scope
-  // inside the SQL string itself, where the structural guard cannot see
-  // it. Two cheap structural defences still apply: require the SQL text
-  // to mention a tenancy column, or accept an explicit grep-able
-  // `-- @tenancy: <reason>` opt-out for genuinely cross-tenant queries.
-  // This must run BEFORE the no-model exemption below: raw ops have no
-  // `params.model`, so an earlier `!params.model` return would skip it.
+  // The raw-query check must run BEFORE the no-model exemption below: raw ops
+  // have no `params.model`, so an earlier `!params.model` return would skip it.
   if (action === "queryRaw" || action === "executeRaw") {
-    const sql = extractRawSql(params.args);
-    if (!sql) return;
-    if (RAW_TENANCY_OPTOUT_RE.test(sql)) return;
-    if (!RAW_TENANCY_PREDICATE_RE.test(sql)) {
-      throw new Error(
-        "The raw query is missing a tenancy predicate. Include `projectId`, " +
-          "`organizationId`, or `tenantId` in the SQL — or opt out with a " +
-          "`-- @tenancy: <reason>` comment if the query intentionally scans " +
-          "across tenants.",
-      );
-    }
+    assertRawQueryTenancy(params.args);
     return;
   }
 
@@ -722,102 +887,20 @@ const _guardProjectId = ({ params }: { params: Prisma.MiddlewareParams }) => {
   // comment for the rationale.
   if (model && SCOPED_MODELS[model]) {
     const config = SCOPED_MODELS[model];
-    if (action === "create" || action === "createMany") {
-      const data = action === "create" ? params.args?.data : params.args?.data;
-      const err = config.validateCreateData(data);
-      if (err) {
-        throw new Error(`The ${action} action on the ${model} model ${err}.`);
-      }
-    } else {
-      const err = config.validateWhere(params.args?.where);
-      if (err) {
-        throw new Error(`The ${action} action on the ${model} model ${err}.`);
-      }
-    }
+    assertScopedModelTenancy({ config, model, action, args: params.args });
     return;
   }
 
-  // ShareLink resolution: an anonymous viewer presents only a share token (or
-  // internal id) — the projectId is what the row teaches them, so it cannot be
-  // required in the where. The `token` lookup is the capability path; `id`
-  // covers the pre-revocation ownership check. Deliberately NO other lookup
-  // shape is exempt: everything else on ShareLink must carry projectId.
-  // See ADR-057.
-  if (
-    (action === "findFirst" || action === "findUnique") &&
-    model === "ShareLink" &&
-    (params.args?.where?.token || params.args?.where?.id)
-  ) {
-    return;
-  }
-
-  // Gateway auth resolver: findByHashedSecret is the hot-path lookup
-  // that converts an opaque `vk-lw-*` bearer token into a
-  // VirtualKey row. The hashedSecret itself is a cryptographic
-  // identifier unique across the platform (HMAC-SHA256 with a
-  // per-deployment pepper), so projectId/organizationId cannot be
-  // known to the caller - the VK row IS what teaches them. The OR
-  // clause here is always shape
-  //   { OR: [{ hashedSecret }, { previousHashedSecret, previousSecretValidUntil }] }
-  // matching virtualKey.repository.ts:findByHashedSecret. Narrow
-  // exemption matches the ShareLink pattern above.
-  if (
-    action === "findFirst" &&
-    model === "VirtualKey" &&
-    Array.isArray(params.args?.where?.OR) &&
-    params.args.where.OR.every(
-      (o: any) => o?.hashedSecret || o?.previousHashedSecret,
-    )
-  ) {
-    return;
-  }
-
-  // Gateway warm-cache resolver: /api/internal/gateway/config/:vk_id
-  // hits findUnique({ where: { id: vkId }}) because the gateway
-  // already authenticated the VK via resolve-key and now needs the
-  // full config payload (keyed by id it learned from the JWT). The
-  // HMAC-signed transport + JWT validation upstream is the tenancy
-  // check; adding projectId here would require a redundant JWT
-  // lookup. Narrow: only findUnique on VirtualKey with a bare id in
-  // the where clause - everything else still under the normal guard.
-  if (
-    action === "findUnique" &&
-    model === "VirtualKey" &&
-    typeof params.args?.where?.id === "string" &&
-    Object.keys(params.args.where).length === 1
-  ) {
+  if (isNarrowlyExemptLookup({ action, model, args: params.args })) {
     return;
   }
 
   if (action === "create" || action === "createMany") {
-    const data =
-      action === "create"
-        ? params.args?.data
-        : params.args?.data?.map((d: any) => d);
-    const hasProjectId = Array.isArray(data)
-      ? data.every((d) => d.projectId)
-      : data?.projectId;
-
-    if (!hasProjectId) {
-      throw new Error(
-        `The ${action} action on the ${model} model requires a 'projectId' in the data field`,
-      );
-    }
-  } else if (
-    !params.args?.where?.projectId &&
-    !params.args?.where?.projectId_slug &&
-    !params.args?.where?.projectId_date &&
-    !params.args?.where?.projectId_modelProviderId_slot &&
-    !params.args?.where?.projectId_traceId &&
-    !params.args?.where?.projectId?.in &&
-    !params.args?.where?.OR?.every((o: any) => o.projectId || o.organizationId)
-  ) {
-    throw new Error(
-      params.args?.where?.OR
-        ? `The ${action} action on the ${model} model requires that all the OR clauses check for either the projectId or organizationId`
-        : `The ${action} action on the ${model} model requires a 'projectId' or 'projectId.in' in the where clause`,
-    );
+    assertProjectIdInCreateData({ action, model, args: params.args });
+    return;
   }
+
+  assertProjectIdInWhere({ action, model, args: params.args });
 };
 
 export const guardProjectId: Prisma.Middleware = async (params, next) => {

@@ -49,8 +49,8 @@ async function readAfterUniqueViolation<T>(
   }
 }
 
-export async function getTestUser() {
-  const user = await readAfterUniqueViolation<User>(
+function upsertSharedTestUser(): Promise<User> {
+  return readAfterUniqueViolation<User>(
     prisma.user.upsert({
       where: { email: "test-user@example.com" },
       update: {},
@@ -61,8 +61,10 @@ export async function getTestUser() {
     }),
     () => prisma.user.findUnique({ where: { email: "test-user@example.com" } }),
   );
+}
 
-  const organization = await readAfterUniqueViolation<Organization>(
+function upsertSharedTestOrganization(): Promise<Organization> {
+  return readAfterUniqueViolation<Organization>(
     prisma.organization.upsert({
       where: { slug: "test-organization" },
       update: { license: ENTERPRISE_LICENSE_KEY },
@@ -75,24 +77,36 @@ export async function getTestUser() {
     () =>
       prisma.organization.findUnique({ where: { slug: "test-organization" } }),
   );
+}
 
-  const team = await readAfterUniqueViolation<Team>(
+function upsertSharedTestTeam({
+  organizationId,
+}: {
+  organizationId: string;
+}): Promise<Team> {
+  return readAfterUniqueViolation<Team>(
     prisma.team.upsert({
-      where: { slug: "test-team", organizationId: organization.id },
+      where: { slug: "test-team", organizationId },
       update: {},
       create: {
         name: "Test Team",
         slug: "test-team",
-        organizationId: organization.id,
+        organizationId,
       },
     }),
     () =>
       prisma.team.findUnique({
-        where: { slug: "test-team", organizationId: organization.id },
+        where: { slug: "test-team", organizationId },
       }),
   );
+}
 
-  await readAfterUniqueViolation<Project>(
+function upsertSharedTestProject({
+  teamId,
+}: {
+  teamId: string;
+}): Promise<Project> {
+  return readAfterUniqueViolation<Project>(
     prisma.project.upsert({
       where: { id: "test-project-id" },
       update: {},
@@ -101,33 +115,58 @@ export async function getTestUser() {
         name: "Test Project",
         slug: "test-project",
         apiKey: "test-api-key",
-        teamId: team.id,
+        teamId,
         language: "en",
         framework: "test-framework",
       },
     }),
     () => prisma.project.findUnique({ where: { id: "test-project-id" } }),
   );
+}
 
-  await ignoreUniqueViolation(
+function joinTestTeam({ userId, teamId }: { userId: string; teamId: string }) {
+  return ignoreUniqueViolation(
     prisma.teamUser.create({
       data: {
-        userId: user.id,
-        teamId: team.id,
+        userId,
+        teamId,
         role: TeamUserRole.MEMBER,
       },
     }),
   );
+}
 
-  await ignoreUniqueViolation(
+function joinTestOrganization({
+  userId,
+  organizationId,
+}: {
+  userId: string;
+  organizationId: string;
+}) {
+  return ignoreUniqueViolation(
     prisma.organizationUser.create({
       data: {
-        userId: user.id,
-        organizationId: organization.id,
+        userId,
+        organizationId,
         role: OrganizationUserRole.MEMBER,
       },
     }),
   );
+}
+
+export async function getTestUser() {
+  const user = await upsertSharedTestUser();
+  const organization = await upsertSharedTestOrganization();
+  const team = await upsertSharedTestTeam({
+    organizationId: organization.id,
+  });
+
+  await upsertSharedTestProject({ teamId: team.id });
+  await joinTestTeam({ userId: user.id, teamId: team.id });
+  await joinTestOrganization({
+    userId: user.id,
+    organizationId: organization.id,
+  });
 
   return user;
 }

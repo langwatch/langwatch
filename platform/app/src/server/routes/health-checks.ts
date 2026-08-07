@@ -62,6 +62,156 @@ async function authenticateProject(c: {
   return { project, authToken };
 }
 
+// ── shared canary-trace helpers (collector + processor) ────────────────
+
+/** Builds the REST + OTLP canary trace payloads sent to the collector
+ *  endpoints. `includeModelAttribute` matches the processor check's extra
+ *  `gen_ai.request.model` attribute (the collector check omits it). */
+function buildCanaryTracePayloads({
+  emoji,
+  includeModelAttribute,
+}: {
+  emoji: string;
+  includeModelAttribute: boolean;
+}): {
+  restTraceId: string;
+  otelTraceIdBase64: string;
+  restParams: CollectorRESTParams;
+  otelParams: DeepPartial<IExportTraceServiceRequest>;
+} {
+  const restTraceId = `trace_${nanoid()}`;
+  const otelTraceIdBase64 = crypto.randomBytes(16).toString("base64");
+
+  const restParams: CollectorRESTParams = {
+    spans: [
+      {
+        trace_id: restTraceId,
+        span_id: `span_${nanoid()}`,
+        type: "span",
+        input: { type: "text", value: emoji },
+        output: { type: "text", value: "\u{1F4AF}" },
+        timestamps: { started_at: Date.now(), finished_at: Date.now() },
+      },
+    ],
+    metadata: { canary: true } as any,
+  };
+
+  const modelAttribute = includeModelAttribute
+    ? [
+        {
+          key: "gen_ai.request.model",
+          value: { stringValue: "openai/gpt-4.1-nano" },
+        },
+      ]
+    : [];
+
+  const otelParams: DeepPartial<IExportTraceServiceRequest> = {
+    resourceSpans: [
+      {
+        resource: {
+          attributes: [
+            {
+              key: "metadata.canary",
+              value: { stringValue: "true" },
+            },
+          ],
+        },
+        scopeSpans: [
+          {
+            scope: { name: "opentelemetry.langwatch.health_check" },
+            spans: [
+              {
+                traceId: otelTraceIdBase64,
+                spanId: Buffer.from(
+                  crypto.randomBytes(8).toString("hex"),
+                  "hex",
+                ).toString("base64"),
+                name: "Health check",
+                kind: "SPAN_KIND_INTERNAL" as unknown as ESpanKind,
+                startTimeUnixNano: (Date.now() * 1000 * 1000).toString(),
+                endTimeUnixNano: (Date.now() * 1000 * 1000).toString(),
+                attributes: [
+                  ...modelAttribute,
+                  {
+                    key: "gen_ai.prompt.0.role",
+                    value: { stringValue: "user" },
+                  },
+                  {
+                    key: "gen_ai.prompt.0.content.0.text",
+                    value: { stringValue: emoji },
+                  },
+                  {
+                    key: "gen_ai.completion.0.text",
+                    value: { stringValue: "\u{1F4AF}" },
+                  },
+                ],
+                status: {},
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  };
+
+  return { restTraceId, otelTraceIdBase64, restParams, otelParams };
+}
+
+/** Sends the REST + OTLP canary traces in parallel, returning both raw
+ *  responses for the caller to validate. */
+async function sendCanaryTraces({
+  authToken,
+  restParams,
+  otelParams,
+}: {
+  authToken: string;
+  restParams: CollectorRESTParams;
+  otelParams: DeepPartial<IExportTraceServiceRequest>;
+}): Promise<{ restResponse: Response; otelResponse: Response }> {
+  const [restResponse, otelResponse] = await Promise.all([
+    fetch(`${env.BASE_HOST}/api/collector`, {
+      method: "POST",
+      headers: {
+        "X-Auth-Token": authToken,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(restParams),
+    }),
+    fetch(`${env.BASE_HOST}/api/otel/v1/traces`, {
+      method: "POST",
+      headers: {
+        "X-Auth-Token": authToken,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(otelParams),
+    }),
+  ]);
+  return { restResponse, otelResponse };
+}
+
+/** The wire failure response for a canary send, or null when both succeeded. */
+function canarySendFailureResponse(
+  c: any,
+  {
+    restResponse,
+    otelResponse,
+  }: { restResponse: Response; otelResponse: Response },
+): Response | null {
+  if (!restResponse.ok) {
+    return c.json(
+      { message: "Failed to send trace to LangWatch using REST" },
+      { status: 500 },
+    );
+  }
+  if (!otelResponse.ok) {
+    return c.json(
+      { message: "Failed to send trace to LangWatch using OTLP" },
+      { status: 500 },
+    );
+  }
+  return null;
+}
+
 // ── GET /collector ───────────────────────────────────────────────────
 
 secured
@@ -73,103 +223,21 @@ secured
     }
     const { authToken } = auth;
 
-    const restParams: CollectorRESTParams = {
-      spans: [
-        {
-          trace_id: `trace_${nanoid()}`,
-          span_id: `span_${nanoid()}`,
-          type: "span",
-          input: { type: "text", value: "\u{1F423}" },
-          output: { type: "text", value: "\u{1F4AF}" },
-          timestamps: { started_at: Date.now(), finished_at: Date.now() },
-        },
-      ],
-      metadata: { canary: true } as any,
-    };
+    const { restParams, otelParams } = buildCanaryTracePayloads({
+      emoji: "\u{1F423}",
+      includeModelAttribute: false,
+    });
 
-    const otelParams: DeepPartial<IExportTraceServiceRequest> = {
-      resourceSpans: [
-        {
-          resource: {
-            attributes: [
-              {
-                key: "metadata.canary",
-                value: { stringValue: "true" },
-              },
-            ],
-          },
-          scopeSpans: [
-            {
-              scope: { name: "opentelemetry.langwatch.health_check" },
-              spans: [
-                {
-                  traceId: Buffer.from(
-                    crypto.randomBytes(16).toString("hex"),
-                    "hex",
-                  ).toString("base64"),
-                  spanId: Buffer.from(
-                    crypto.randomBytes(8).toString("hex"),
-                    "hex",
-                  ).toString("base64"),
-                  name: "Health check",
-                  kind: "SPAN_KIND_INTERNAL" as unknown as ESpanKind,
-                  startTimeUnixNano: (Date.now() * 1000 * 1000).toString(),
-                  endTimeUnixNano: (Date.now() * 1000 * 1000).toString(),
-                  attributes: [
-                    {
-                      key: "gen_ai.prompt.0.role",
-                      value: { stringValue: "user" },
-                    },
-                    {
-                      key: "gen_ai.prompt.0.content.0.text",
-                      value: { stringValue: "\u{1F423}" },
-                    },
-                    {
-                      key: "gen_ai.completion.0.text",
-                      value: { stringValue: "\u{1F4AF}" },
-                    },
-                  ],
-                  status: {},
-                },
-              ],
-            },
-          ],
-        },
-      ],
-    };
+    const {
+      restResponse: restCollectorResponse,
+      otelResponse: otelCollectorResponse,
+    } = await sendCanaryTraces({ authToken, restParams, otelParams });
 
-    const [restCollectorResponse, otelCollectorResponse] = await Promise.all([
-      fetch(`${env.BASE_HOST}/api/collector`, {
-        method: "POST",
-        headers: {
-          "X-Auth-Token": authToken,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(restParams),
-      }),
-      fetch(`${env.BASE_HOST}/api/otel/v1/traces`, {
-        method: "POST",
-        headers: {
-          "X-Auth-Token": authToken,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(otelParams),
-      }),
-    ]);
-
-    if (!restCollectorResponse.ok) {
-      return c.json(
-        { message: "Failed to send trace to LangWatch using REST" },
-        { status: 500 },
-      );
-    }
-
-    if (!otelCollectorResponse.ok) {
-      return c.json(
-        { message: "Failed to send trace to LangWatch using OTLP" },
-        { status: 500 },
-      );
-    }
+    const failure = canarySendFailureResponse(c, {
+      restResponse: restCollectorResponse,
+      otelResponse: otelCollectorResponse,
+    });
+    if (failure) return failure;
 
     const otelBody = await otelCollectorResponse.json();
     return c.json({
@@ -236,6 +304,98 @@ secured
     });
   });
 
+// ── /processor retry-poll helpers ───────────────────────────────────────
+
+/** Polls `/api/traces/:id` until it 200s or the 60s timeout elapses,
+ *  logging slow responses and fetch errors along the way. Throws once
+ *  exhausted. */
+async function pollForCanaryTrace({
+  authToken,
+  traceId,
+}: {
+  authToken: string;
+  traceId: string;
+}): Promise<Response> {
+  const startTime = Date.now();
+  const timeoutMs = 60 * 1000;
+  const retryIntervalMs = 2000;
+  let attempt = 0;
+
+  while (Date.now() - startTime < timeoutMs) {
+    await sleep(retryIntervalMs);
+    attempt++;
+
+    try {
+      const fetchStart = Date.now();
+      const traceResponse = await fetch(
+        `${env.BASE_HOST}/api/traces/${encodeURIComponent(traceId)}`,
+        {
+          headers: { "X-Auth-Token": authToken },
+        },
+      );
+      const fetchMs = Date.now() - fetchStart;
+
+      if (traceResponse.ok) {
+        logger.info(
+          { traceId, attempt, fetchMs, elapsedMs: Date.now() - startTime },
+          "Trace found",
+        );
+        return traceResponse;
+      }
+
+      if (fetchMs > 3000) {
+        logger.warn(
+          {
+            traceId,
+            attempt,
+            fetchMs,
+            status: traceResponse.status,
+            elapsedMs: Date.now() - startTime,
+          },
+          "Trace poll slow response",
+        );
+      }
+    } catch (error) {
+      logger.warn(
+        {
+          traceId,
+          attempt,
+          elapsedMs: Date.now() - startTime,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        "Trace poll fetch error",
+      );
+    }
+  }
+
+  logger.warn(
+    { traceId, attempts: attempt, elapsedMs: Date.now() - startTime },
+    "Trace poll exhausted all attempts",
+  );
+  throw new Error("Timeout waiting for trace to be available");
+}
+
+/** Waits for both canary traces to become queryable, naming which side
+ *  (REST/OTLP) failed if either polling exhausts its retries. */
+async function awaitCanaryTraces({
+  authToken,
+  restTraceId,
+  otelTraceIdBase64,
+}: {
+  authToken: string;
+  restTraceId: string;
+  otelTraceIdBase64: string;
+}): Promise<void> {
+  await Promise.all([
+    pollForCanaryTrace({ authToken, traceId: restTraceId }).catch(() => {
+      throw new Error("Failed to get REST trace after multiple retries");
+    }),
+    pollForCanaryTrace({ authToken, traceId: otelTraceIdBase64 }).catch(() => {
+      throw new Error("Failed to get OTLP trace after multiple retries");
+    }),
+  ]);
+}
+
 // ── GET /processor ───────────────────────────────────────────────────
 
 secured
@@ -247,73 +407,11 @@ secured
     }
     const { authToken } = auth;
 
-    const restTraceId = `trace_${nanoid()}`;
-    const restParams: CollectorRESTParams = {
-      spans: [
-        {
-          trace_id: restTraceId,
-          span_id: `span_${nanoid()}`,
-          type: "span",
-          input: { type: "text", value: "\u{1F424}" },
-          output: { type: "text", value: "\u{1F4AF}" },
-          timestamps: { started_at: Date.now(), finished_at: Date.now() },
-        },
-      ],
-      metadata: { canary: true } as any,
-    };
-
-    const otelTraceIdBase64 = crypto.randomBytes(16).toString("base64");
-    const otelParams: DeepPartial<IExportTraceServiceRequest> = {
-      resourceSpans: [
-        {
-          resource: {
-            attributes: [
-              {
-                key: "metadata.canary",
-                value: { stringValue: "true" },
-              },
-            ],
-          },
-          scopeSpans: [
-            {
-              scope: { name: "opentelemetry.langwatch.health_check" },
-              spans: [
-                {
-                  traceId: otelTraceIdBase64,
-                  spanId: Buffer.from(
-                    crypto.randomBytes(8).toString("hex"),
-                    "hex",
-                  ).toString("base64"),
-                  name: "Health check",
-                  kind: "SPAN_KIND_INTERNAL" as unknown as ESpanKind,
-                  startTimeUnixNano: (Date.now() * 1000 * 1000).toString(),
-                  endTimeUnixNano: (Date.now() * 1000 * 1000).toString(),
-                  attributes: [
-                    {
-                      key: "gen_ai.request.model",
-                      value: { stringValue: "openai/gpt-4.1-nano" },
-                    },
-                    {
-                      key: "gen_ai.prompt.0.role",
-                      value: { stringValue: "user" },
-                    },
-                    {
-                      key: "gen_ai.prompt.0.content.0.text",
-                      value: { stringValue: "\u{1F424}" },
-                    },
-                    {
-                      key: "gen_ai.completion.0.text",
-                      value: { stringValue: "\u{1F4AF}" },
-                    },
-                  ],
-                  status: {},
-                },
-              ],
-            },
-          ],
-        },
-      ],
-    };
+    const { restTraceId, otelTraceIdBase64, restParams, otelParams } =
+      buildCanaryTracePayloads({
+        emoji: "\u{1F424}",
+        includeModelAttribute: true,
+      });
 
     const t0 = Date.now();
     logger.info(
@@ -321,24 +419,8 @@ secured
       "Healthcheck started, sending canary traces",
     );
 
-    const [restCollectorResponse, otelResponse] = await Promise.all([
-      fetch(`${env.BASE_HOST}/api/collector`, {
-        method: "POST",
-        headers: {
-          "X-Auth-Token": authToken,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(restParams),
-      }),
-      fetch(`${env.BASE_HOST}/api/otel/v1/traces`, {
-        method: "POST",
-        headers: {
-          "X-Auth-Token": authToken,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(otelParams),
-      }),
-    ]);
+    const { restResponse: restCollectorResponse, otelResponse } =
+      await sendCanaryTraces({ authToken, restParams, otelParams });
 
     const sendDurationMs = Date.now() - t0;
     logger.info(
@@ -352,92 +434,16 @@ secured
       "Canary traces sent",
     );
 
-    if (!restCollectorResponse.ok) {
-      return c.json(
-        { message: "Failed to send trace to LangWatch using REST" },
-        { status: 500 },
-      );
-    }
-
-    if (!otelResponse.ok) {
-      return c.json(
-        { message: "Failed to send trace to LangWatch using OTLP" },
-        { status: 500 },
-      );
-    }
+    const failure = canarySendFailureResponse(c, {
+      restResponse: restCollectorResponse,
+      otelResponse,
+    });
+    if (failure) return failure;
 
     const otelBody = await otelResponse.json();
 
-    // Check traces with retry mechanism
-    const checkTraceWithRetry = async (traceId: string): Promise<Response> => {
-      const startTime = Date.now();
-      const timeoutMs = 60 * 1000;
-      const retryIntervalMs = 2000;
-      let attempt = 0;
-
-      while (Date.now() - startTime < timeoutMs) {
-        await sleep(retryIntervalMs);
-        attempt++;
-
-        try {
-          const fetchStart = Date.now();
-          const traceResponse = await fetch(
-            `${env.BASE_HOST}/api/traces/${encodeURIComponent(traceId)}`,
-            {
-              headers: { "X-Auth-Token": authToken },
-            },
-          );
-          const fetchMs = Date.now() - fetchStart;
-
-          if (traceResponse.ok) {
-            logger.info(
-              { traceId, attempt, fetchMs, elapsedMs: Date.now() - startTime },
-              "Trace found",
-            );
-            return traceResponse;
-          }
-
-          if (fetchMs > 3000) {
-            logger.warn(
-              {
-                traceId,
-                attempt,
-                fetchMs,
-                status: traceResponse.status,
-                elapsedMs: Date.now() - startTime,
-              },
-              "Trace poll slow response",
-            );
-          }
-        } catch (error) {
-          logger.warn(
-            {
-              traceId,
-              attempt,
-              elapsedMs: Date.now() - startTime,
-              error: error instanceof Error ? error.message : String(error),
-            },
-            "Trace poll fetch error",
-          );
-        }
-      }
-
-      logger.warn(
-        { traceId, attempts: attempt, elapsedMs: Date.now() - startTime },
-        "Trace poll exhausted all attempts",
-      );
-      throw new Error("Timeout waiting for trace to be available");
-    };
-
     try {
-      await Promise.all([
-        checkTraceWithRetry(restTraceId).catch(() => {
-          throw new Error("Failed to get REST trace after multiple retries");
-        }),
-        checkTraceWithRetry(otelTraceIdBase64).catch(() => {
-          throw new Error("Failed to get OTLP trace after multiple retries");
-        }),
-      ]);
+      await awaitCanaryTraces({ authToken, restTraceId, otelTraceIdBase64 });
     } catch (error) {
       const totalMs = Date.now() - t0;
       logger.warn(

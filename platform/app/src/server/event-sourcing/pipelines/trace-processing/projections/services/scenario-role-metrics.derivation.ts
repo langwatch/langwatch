@@ -23,6 +23,77 @@ export interface ScenarioRoleMetrics {
 }
 
 /**
+ * Nearest-ancestor role resolution for one span, memoized in `cache` across
+ * the whole aggregation. Seeds the cache for the current chain to a sentinel
+ * so a parent cycle (customer-emitted bad parent links) terminates instead
+ * of recursing forever; resolved once the walk bottoms out.
+ */
+function resolveEffectiveRole({
+  spanId,
+  bySpanId,
+  cache,
+}: {
+  spanId: string;
+  bySpanId: Map<string, ScenarioRoleSpanInput>;
+  cache: Map<string, string | null>;
+}): string | null {
+  const cached = cache.get(spanId);
+  if (cached !== undefined) return cached;
+
+  cache.set(spanId, null);
+
+  const span = bySpanId.get(spanId);
+  if (!span) return null;
+
+  let resolved: string | null;
+  if (span.role !== undefined && span.role !== "") {
+    resolved = span.role;
+  } else if (span.parentSpanId && bySpanId.has(span.parentSpanId)) {
+    resolved = resolveEffectiveRole({
+      spanId: span.parentSpanId,
+      bySpanId,
+      cache,
+    });
+  } else {
+    resolved = null;
+  }
+
+  cache.set(spanId, resolved);
+  return resolved;
+}
+
+function accumulateRoleCosts({
+  spans,
+  bySpanId,
+  cache,
+}: {
+  spans: ScenarioRoleSpanInput[];
+  bySpanId: Map<string, ScenarioRoleSpanInput>;
+  cache: Map<string, string | null>;
+}): Record<string, number> {
+  const scenarioRoleCosts: Record<string, number> = {};
+  for (const span of spans) {
+    if (span.cost <= 0) continue;
+    const role = resolveEffectiveRole({ spanId: span.spanId, bySpanId, cache });
+    if (!role) continue;
+    scenarioRoleCosts[role] = (scenarioRoleCosts[role] ?? 0) + span.cost;
+  }
+  return scenarioRoleCosts;
+}
+
+function accumulateRoleLatencies(
+  spans: ScenarioRoleSpanInput[],
+): Record<string, number> {
+  const scenarioRoleLatencies: Record<string, number> = {};
+  for (const span of spans) {
+    if (span.role === undefined || span.role === "") continue;
+    scenarioRoleLatencies[span.role] =
+      (scenarioRoleLatencies[span.role] ?? 0) + span.durationMs;
+  }
+  return scenarioRoleLatencies;
+}
+
+/**
  * Aggregates per-role cost and latency for scenario traces from the COMPLETE
  * set of spans.
  *
@@ -48,48 +119,14 @@ export function aggregateScenarioRoleMetrics(
 
   const effectiveRoleCache = new Map<string, string | null>();
 
-  function effectiveRole(spanId: string): string | null {
-    const cached = effectiveRoleCache.get(spanId);
-    if (cached !== undefined) return cached;
-
-    // Seed the cache for the current chain to a sentinel so a parent cycle
-    // (customer-emitted bad parent links) terminates instead of recursing
-    // forever; resolved below.
-    effectiveRoleCache.set(spanId, null);
-
-    const span = bySpanId.get(spanId);
-    if (!span) return null;
-
-    let resolved: string | null;
-    if (span.role !== undefined && span.role !== "") {
-      resolved = span.role;
-    } else if (span.parentSpanId && bySpanId.has(span.parentSpanId)) {
-      resolved = effectiveRole(span.parentSpanId);
-    } else {
-      resolved = null;
-    }
-
-    effectiveRoleCache.set(spanId, resolved);
-    return resolved;
-  }
-
-  const scenarioRoleCosts: Record<string, number> = {};
-  const scenarioRoleLatencies: Record<string, number> = {};
-
-  for (const span of spans) {
-    if (span.cost > 0) {
-      const role = effectiveRole(span.spanId);
-      if (role) {
-        scenarioRoleCosts[role] = (scenarioRoleCosts[role] ?? 0) + span.cost;
-      }
-    }
-    if (span.role !== undefined && span.role !== "") {
-      scenarioRoleLatencies[span.role] =
-        (scenarioRoleLatencies[span.role] ?? 0) + span.durationMs;
-    }
-  }
-
-  return { scenarioRoleCosts, scenarioRoleLatencies };
+  return {
+    scenarioRoleCosts: accumulateRoleCosts({
+      spans,
+      bySpanId,
+      cache: effectiveRoleCache,
+    }),
+    scenarioRoleLatencies: accumulateRoleLatencies(spans),
+  };
 }
 
 /**

@@ -59,6 +59,44 @@ function filterLLMNode(
   return filterUnsupportedSamplingParams(llm, allowed);
 }
 
+type WorkflowNodeLike = {
+  data?: {
+    llm?: LLMLike;
+    parameters?: Array<{
+      identifier?: string;
+      value?: unknown;
+    }>;
+  };
+};
+
+/**
+ * Strip unsupported sampling params on every place an LLMConfig lives on a
+ * single node: `data.llm` and every `data.parameters[]` entry whose
+ * identifier is "llm". Mutates the node's config objects in place.
+ */
+function filterNodeLLMConfigs(
+  node: WorkflowNodeLike,
+  customModelsByProvider: CustomModelsByProvider,
+): void {
+  const data = node.data;
+  if (!data) return;
+  if (data.llm && typeof data.llm === "object") {
+    const filtered = filterLLMNode(data.llm, customModelsByProvider);
+    replaceObjectContents(data.llm, filtered);
+  }
+  for (const param of data.parameters ?? []) {
+    if (
+      param.identifier === "llm" &&
+      param.value &&
+      typeof param.value === "object"
+    ) {
+      const value = param.value as LLMLike;
+      const filtered = filterLLMNode(value, customModelsByProvider);
+      replaceObjectContents(value, filtered);
+    }
+  }
+}
+
 /**
  * Walk a workflow DSL payload and strip unsupported sampling params on
  * every place an LLMConfig lives:
@@ -74,15 +112,7 @@ export async function stripUnsupportedLLMParamsFromWorkflow(opts: {
   prisma: PrismaClient;
   projectId: string;
   workflow: {
-    nodes?: Array<{
-      data?: {
-        llm?: LLMLike;
-        parameters?: Array<{
-          identifier?: string;
-          value?: unknown;
-        }>;
-      };
-    }>;
+    nodes?: WorkflowNodeLike[];
   };
 }): Promise<void> {
   const customModelsByProvider = await loadProjectCustomModels(
@@ -91,23 +121,7 @@ export async function stripUnsupportedLLMParamsFromWorkflow(opts: {
   );
   const { workflow } = opts;
   for (const node of workflow.nodes ?? []) {
-    const data = node.data;
-    if (!data) continue;
-    if (data.llm && typeof data.llm === "object") {
-      const filtered = filterLLMNode(data.llm, customModelsByProvider);
-      replaceObjectContents(data.llm, filtered);
-    }
-    for (const param of data.parameters ?? []) {
-      if (
-        param.identifier === "llm" &&
-        param.value &&
-        typeof param.value === "object"
-      ) {
-        const value = param.value as LLMLike;
-        const filtered = filterLLMNode(value, customModelsByProvider);
-        replaceObjectContents(value, filtered);
-      }
-    }
+    filterNodeLLMConfigs(node, customModelsByProvider);
   }
 }
 

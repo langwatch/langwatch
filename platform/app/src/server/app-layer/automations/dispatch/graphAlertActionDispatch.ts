@@ -222,6 +222,520 @@ export interface GraphAlertDispatchResult {
   renderErrors: string[];
 }
 
+/** The two callbacks every notify channel uses to gate + record a
+ *  per-recipient at-most-once send for one fire — see {@link makeRecipientLedger}. */
+interface RecipientLedger {
+  isRecipientSent: (recipientHash: string) => Promise<boolean>;
+  recordRecipientSent: (recipientHash: string) => Promise<void>;
+}
+
+/**
+ * Per-recipient at-most-once gate for THIS fire. Same key shape the trace
+ * cadence dispatcher uses (`rcpt:{fireDigest}:{recipientHash}`), so both
+ * paths read and write one ledger.
+ */
+function makeRecipientLedger({
+  deps,
+  trigger,
+  project,
+  fireDigest,
+}: {
+  deps: GraphAlertDispatchDeps;
+  trigger: Trigger;
+  project: Project;
+  fireDigest: string;
+}): RecipientLedger {
+  const claimKey = (recipientHash: string) =>
+    `rcpt:${fireDigest}:${recipientHash}`;
+  return {
+    isRecipientSent: (recipientHash: string) =>
+      deps.isRecipientSent({
+        triggerId: trigger.id,
+        traceId: claimKey(recipientHash),
+        projectId: project.id,
+      }),
+    recordRecipientSent: async (recipientHash: string) => {
+      await deps.recordRecipientSent({
+        triggerId: trigger.id,
+        traceId: claimKey(recipientHash),
+        projectId: project.id,
+      });
+    },
+  };
+}
+
+/**
+ * ADR-031: the two hard email caps, consumed HERE — inside the shared
+ * dispatcher — so the real-time reactor and heartbeat callers cannot
+ * drift. Both claims are keyed on the fire digest, so an outbox retry of
+ * THIS fire re-reads the count instead of burning a second slot, and the
+ * next incident (new digest) gets a fresh slot.
+ *
+ * Over either cap the dispatch is a terminal drop: no send, no throw —
+ * throwing would let the outbox retry the spam. `didSend` stays true so
+ * the caller opens the incident, exactly as the cron does
+ * (`addTriggersSent` runs even after a cap-suppressed send). Rolling the
+ * evaluator's claim back instead would re-arm the alert on every fold
+ * update for as long as the cap is exhausted. `capExhausted` carries what
+ * actually happened for logs / telemetry.
+ *
+ * Returns the drop result when a cap dropped the dispatch, or `null` when
+ * both caps have room and the caller should proceed to render + send.
+ */
+async function consumeGraphAlertEmailCapsOrDrop({
+  deps,
+  trigger,
+  project,
+  allowedRecipientCount,
+  fireDigest,
+}: {
+  deps: GraphAlertDispatchDeps;
+  trigger: Trigger;
+  project: Project;
+  allowedRecipientCount: number;
+  fireDigest: string;
+}): Promise<GraphAlertDispatchResult | null> {
+  const capSlot = await deps.consumeEmailCapSlot({
+    projectId: project.id,
+    triggerId: trigger.id,
+    now: new Date(),
+    dedupKey: `${project.id}/${trigger.id}:digest:${fireDigest}`,
+  });
+  if (!capSlot.allowed) {
+    logger.error(
+      {
+        triggerId: trigger.id,
+        projectId: project.id,
+        count: capSlot.count,
+        cap: deps.emailHourlyCap,
+      },
+      "Custom-graph trigger exceeded its hourly email cap — dropping this dispatch",
+    );
+    return {
+      channel: "email",
+      didSend: true,
+      capExhausted: "trigger-hourly",
+      missingVariables: [],
+      renderErrors: [],
+    };
+  }
+  // ADR-031: per-PROJECT daily cap — the backstop ABOVE the per-trigger
+  // hourly cap, run only once the hourly cap has passed and the surviving
+  // recipient set is known. Counts RECIPIENTS (`allowedRecipientCount`),
+  // the actual outbound email volume, not dispatches.
+  const tenantSlot = await deps.consumeTenantEmailCapSlot({
+    projectId: project.id,
+    now: new Date(),
+    cap: deps.tenantDailyCap,
+    recipientCount: allowedRecipientCount,
+    dedupKey: `${project.id}:tenant:${fireDigest}`,
+  });
+  if (!tenantSlot.allowed) {
+    logger.warn(
+      {
+        triggerId: trigger.id,
+        projectId: project.id,
+        count: tenantSlot.count,
+        cap: deps.tenantDailyCap,
+      },
+      "Project exceeded its daily trigger-email cap — dropping this " +
+        "custom-graph dispatch. Backstop above the per-trigger hourly cap.",
+    );
+    return {
+      channel: "email",
+      didSend: true,
+      capExhausted: "project-daily",
+      missingVariables: [],
+      renderErrors: [],
+    };
+  }
+  return null;
+}
+
+async function dispatchGraphAlertEmail({
+  deps,
+  trigger,
+  project,
+  context,
+  recipients,
+  defaults,
+  fireDigest,
+  ledger,
+}: {
+  deps: GraphAlertDispatchDeps;
+  trigger: Trigger;
+  project: Project;
+  context: GraphAlertTemplateContext;
+  recipients: string[];
+  defaults: typeof ALERT_TRIGGER_DEFAULTS;
+  fireDigest: string;
+  ledger: RecipientLedger;
+}): Promise<GraphAlertDispatchResult> {
+  if (recipients.length === 0) {
+    logger.info(
+      { triggerId: trigger.id, projectId: project.id },
+      "Graph alert has no email recipients — skipping send",
+    );
+    return {
+      channel: "email",
+      didSend: false,
+      missingVariables: [],
+      renderErrors: [],
+    };
+  }
+  // ADR-031: drop suppressed (unsubscribed) recipients BEFORE rendering /
+  // sending, exactly as the cron's handleSendEmail does. Without this the
+  // event-sourced path silently ignores one-click unsubscribes.
+  const allowedRecipients = await deps.filterSuppressedRecipients({
+    projectId: project.id,
+    triggerId: trigger.id,
+    emails: recipients,
+  });
+  if (allowedRecipients.length === 0) {
+    logger.info(
+      { triggerId: trigger.id, projectId: project.id },
+      "All graph-alert email recipients are suppressed — skipping send",
+    );
+    return {
+      channel: "email",
+      didSend: false,
+      missingVariables: [],
+      renderErrors: [],
+    };
+  }
+  const capDrop = await consumeGraphAlertEmailCapsOrDrop({
+    deps,
+    trigger,
+    project,
+    allowedRecipientCount: allowedRecipients.length,
+    fireDigest,
+  });
+  if (capDrop) return capDrop;
+
+  const rendered = await renderTriggerEmail({
+    subjectTemplate: trigger.emailSubjectTemplate,
+    bodyTemplate: trigger.emailBodyTemplate,
+    context,
+    defaults,
+  });
+  if (rendered.errors.length > 0) {
+    logger.warn(
+      {
+        triggerId: trigger.id,
+        projectId: project.id,
+        errors: rendered.errors,
+      },
+      "Graph-alert email render errors — fell back to default for affected parts",
+    );
+  }
+  // The mailer sends one envelope per recipient and consults the gate for
+  // each, so a retry after a partial failure resumes at the first recipient
+  // the previous attempt never reached.
+  await deps.sendEmail({
+    triggerEmails: allowedRecipients,
+    triggerId: trigger.id,
+    projectId: project.id,
+    subject: rendered.subject,
+    html: rendered.html,
+    isRecipientSent: ledger.isRecipientSent,
+    recordRecipientSent: ledger.recordRecipientSent,
+  });
+  // `didSend` stays true when the gate skipped everyone: the alert DID reach
+  // its recipients — on the attempt that crashed before recording the
+  // incident. The caller must open the incident on this retry, not treat the
+  // fire as undelivered.
+  return {
+    channel: "email",
+    didSend: true,
+    missingVariables: rendered.missingVariables,
+    renderErrors: rendered.errors,
+  };
+}
+
+async function dispatchGraphAlertSlackBot({
+  deps,
+  trigger,
+  project,
+  context,
+  botDestination,
+  templateType,
+  defaults,
+  ledger,
+}: {
+  deps: GraphAlertDispatchDeps;
+  trigger: Trigger;
+  project: Project;
+  context: GraphAlertTemplateContext;
+  botDestination: { token: string; channel: string };
+  templateType: SlackTemplateType | null;
+  defaults: typeof ALERT_TRIGGER_DEFAULTS;
+  ledger: RecipientLedger;
+}): Promise<GraphAlertDispatchResult> {
+  // A Slack channel is this fire's only "recipient" — gate it the same way
+  // an email address is gated, or an outbox retry re-posts the alert.
+  const botHash = destinationHash(`bot:${botDestination.channel}`);
+  if (await ledger.isRecipientSent(botHash)) {
+    logger.info(
+      { triggerId: trigger.id, projectId: project.id },
+      "Graph-alert Slack post already delivered for this fire — skipping re-post on retry",
+    );
+    return {
+      channel: "slack",
+      didSend: true,
+      missingVariables: [],
+      renderErrors: [],
+    };
+  }
+  const rendered = await renderTriggerSlack({
+    templateType,
+    template: trigger.slackTemplate,
+    context,
+    defaults,
+    allowGatedBlocks: true,
+  });
+  if (rendered.errors.length > 0) {
+    logger.warn(
+      {
+        triggerId: trigger.id,
+        projectId: project.id,
+        errors: rendered.errors,
+      },
+      "Graph-alert Slack render errors — fell back to default",
+    );
+  }
+  await deps.sendSlackBot({
+    token: botDestination.token,
+    channel: botDestination.channel,
+    payload: rendered.payload,
+    triggerName: trigger.name,
+  });
+  await ledger.recordRecipientSent(botHash);
+  return {
+    channel: "slack",
+    didSend: true,
+    missingVariables: rendered.missingVariables,
+    renderErrors: rendered.errors,
+  };
+}
+
+async function dispatchGraphAlertSlackWebhook({
+  deps,
+  trigger,
+  project,
+  context,
+  slackWebhook,
+  templateType,
+  defaults,
+  ledger,
+}: {
+  deps: GraphAlertDispatchDeps;
+  trigger: Trigger;
+  project: Project;
+  context: GraphAlertTemplateContext;
+  slackWebhook: string;
+  templateType: SlackTemplateType | null;
+  defaults: typeof ALERT_TRIGGER_DEFAULTS;
+  ledger: RecipientLedger;
+}): Promise<GraphAlertDispatchResult> {
+  // Same at-most-once gate as the bot branch — the webhook URL is the
+  // destination identity here.
+  const webhookHash = destinationHash(slackWebhook);
+  if (await ledger.isRecipientSent(webhookHash)) {
+    logger.info(
+      { triggerId: trigger.id, projectId: project.id },
+      "Graph-alert Slack post already delivered for this fire — skipping re-post on retry",
+    );
+    return {
+      channel: "slack",
+      didSend: true,
+      missingVariables: [],
+      renderErrors: [],
+    };
+  }
+  const rendered = await renderTriggerSlack({
+    templateType,
+    template: trigger.slackTemplate,
+    context,
+    defaults,
+  });
+  if (rendered.errors.length > 0) {
+    logger.warn(
+      {
+        triggerId: trigger.id,
+        projectId: project.id,
+        errors: rendered.errors,
+      },
+      "Graph-alert Slack render errors — fell back to default",
+    );
+  }
+  await deps.sendSlack({
+    triggerWebhook: slackWebhook,
+    triggerName: trigger.name,
+    payload: rendered.payload,
+  });
+  await ledger.recordRecipientSent(webhookHash);
+  return {
+    channel: "slack",
+    didSend: true,
+    missingVariables: rendered.missingVariables,
+    renderErrors: rendered.errors,
+  };
+}
+
+async function dispatchGraphAlertSlack({
+  deps,
+  trigger,
+  project,
+  context,
+  slackWebhook,
+  botDestination,
+  defaults,
+  ledger,
+}: {
+  deps: GraphAlertDispatchDeps;
+  trigger: Trigger;
+  project: Project;
+  context: GraphAlertTemplateContext;
+  slackWebhook: string | null;
+  botDestination: { token: string; channel: string } | null;
+  defaults: typeof ALERT_TRIGGER_DEFAULTS;
+  ledger: RecipientLedger;
+}): Promise<GraphAlertDispatchResult> {
+  const templateType: SlackTemplateType | null =
+    trigger.slackTemplateType === "block_kit" ? "block_kit" : "string";
+
+  // Bot connection (ADR-041): post via the Web API with the gate open so the
+  // alert's chart/table/alert blocks render.
+  if (botDestination) {
+    return dispatchGraphAlertSlackBot({
+      deps,
+      trigger,
+      project,
+      context,
+      botDestination,
+      templateType,
+      defaults,
+      ledger,
+    });
+  }
+
+  if (!slackWebhook) {
+    logger.info(
+      { triggerId: trigger.id, projectId: project.id },
+      "Graph alert has no Slack webhook configured — skipping send",
+    );
+    return {
+      channel: "slack",
+      didSend: false,
+      missingVariables: [],
+      renderErrors: [],
+    };
+  }
+  return dispatchGraphAlertSlackWebhook({
+    deps,
+    trigger,
+    project,
+    context,
+    slackWebhook,
+    templateType,
+    defaults,
+    ledger,
+  });
+}
+
+async function dispatchGraphAlertWebhook({
+  deps,
+  trigger,
+  project,
+  context,
+  defaults,
+  fireDigest,
+  ledger,
+}: {
+  deps: GraphAlertDispatchDeps;
+  trigger: Trigger;
+  project: Project;
+  context: GraphAlertTemplateContext;
+  defaults: typeof ALERT_TRIGGER_DEFAULTS;
+  fireDigest: string;
+  ledger: RecipientLedger;
+}): Promise<GraphAlertDispatchResult> {
+  // The whole webhook config, body template included, lives in
+  // `actionParams` (ADR-040 §1) — no evaluator pre-extraction to thread.
+  // Header values are stored as one ciphertext blob (ADR-040 §3),
+  // decrypted just before the send below.
+  const params = (trigger.actionParams ??
+    {}) as Partial<WebhookStoredActionParams>;
+  if (!params.url) {
+    logger.info(
+      { triggerId: trigger.id, projectId: project.id },
+      "Graph alert has no webhook URL configured — skipping send",
+    );
+    return {
+      channel: "webhook",
+      didSend: false,
+      missingVariables: [],
+      renderErrors: [],
+    };
+  }
+  // The endpoint URL is this fire's destination identity — gate it the same
+  // way an email address or Slack channel is, or an outbox retry re-posts.
+  const urlHash = destinationHash(`webhook:${params.url}`);
+  if (await ledger.isRecipientSent(urlHash)) {
+    logger.info(
+      { triggerId: trigger.id, projectId: project.id },
+      "Graph-alert webhook already delivered for this fire — skipping re-post on retry",
+    );
+    return {
+      channel: "webhook",
+      didSend: true,
+      missingVariables: [],
+      renderErrors: [],
+    };
+  }
+  const rendered = await renderWebhookBody({
+    template: params.bodyTemplate ?? null,
+    context,
+    defaultBody: defaults.webhookBody,
+  });
+  if (rendered.errors.length > 0) {
+    logger.warn(
+      {
+        triggerId: trigger.id,
+        projectId: project.id,
+        errors: rendered.errors,
+      },
+      "Graph-alert webhook body render errors — fell back to default body",
+    );
+  }
+  // Send + classify + log one attempt as a unit (ADR-040 §5/§6). A
+  // non-2xx throws BEFORE the claim below, so a retryable failure is
+  // actually retried; the delivery-log row is written either way.
+  await deliverWebhook({
+    send: deps.sendWebhook,
+    recorder: deps.recordWebhookDelivery,
+    projectId: project.id,
+    triggerId: trigger.id,
+    // The fire digest is this dispatch's stable identity — every outbox
+    // retry of the same fire reuses it as the X-LangWatch-Event-Id so the
+    // receiver dedupes (ADR-040 §5).
+    eventId: `evt_${destinationHash(`event:${fireDigest}`)}`,
+    url: params.url,
+    method: params.method,
+    headers: decryptWebhookHeaders(params),
+    signingSecrets: decryptWebhookSigningSecrets(params),
+    body: rendered.body,
+    triggerName: trigger.name,
+  });
+  await ledger.recordRecipientSent(urlHash);
+  return {
+    channel: "webhook",
+    didSend: true,
+    missingVariables: rendered.missingVariables,
+    renderErrors: rendered.errors,
+  };
+}
+
 /**
  * ADR-034 Phase 8.1 dispatch helper for custom-graph threshold alerts.
  *
@@ -267,352 +781,49 @@ export async function dispatchGraphAlertAction({
 }): Promise<GraphAlertDispatchResult> {
   const { trigger, project, context, recipients, slackWebhook } = input;
   const defaults = ALERT_TRIGGER_DEFAULTS;
-
-  // Per-recipient at-most-once gate for THIS fire. Same key shape the trace
-  // cadence dispatcher uses (`rcpt:{fireDigest}:{recipientHash}`), so both
-  // paths read and write one ledger.
-  const claimKey = (recipientHash: string) =>
-    `rcpt:${input.fireDigest}:${recipientHash}`;
-  const isRecipientSent = (recipientHash: string) =>
-    deps.isRecipientSent({
-      triggerId: trigger.id,
-      traceId: claimKey(recipientHash),
-      projectId: project.id,
-    });
-  const recordRecipientSent = async (recipientHash: string) => {
-    await deps.recordRecipientSent({
-      triggerId: trigger.id,
-      traceId: claimKey(recipientHash),
-      projectId: project.id,
-    });
-  };
+  const ledger = makeRecipientLedger({
+    deps,
+    trigger,
+    project,
+    fireDigest: input.fireDigest,
+  });
 
   if (trigger.action === "SEND_EMAIL") {
-    if (recipients.length === 0) {
-      logger.info(
-        { triggerId: trigger.id, projectId: project.id },
-        "Graph alert has no email recipients — skipping send",
-      );
-      return {
-        channel: "email",
-        didSend: false,
-        missingVariables: [],
-        renderErrors: [],
-      };
-    }
-    // ADR-031: drop suppressed (unsubscribed) recipients BEFORE rendering /
-    // sending, exactly as the cron's handleSendEmail does. Without this the
-    // event-sourced path silently ignores one-click unsubscribes.
-    const allowedRecipients = await deps.filterSuppressedRecipients({
-      projectId: project.id,
-      triggerId: trigger.id,
-      emails: recipients,
-    });
-    if (allowedRecipients.length === 0) {
-      logger.info(
-        { triggerId: trigger.id, projectId: project.id },
-        "All graph-alert email recipients are suppressed — skipping send",
-      );
-      return {
-        channel: "email",
-        didSend: false,
-        missingVariables: [],
-        renderErrors: [],
-      };
-    }
-    // ADR-031: the two hard email caps, consumed HERE — inside the shared
-    // dispatcher — so the real-time reactor and heartbeat callers cannot
-    // drift. Both claims are keyed on the fire digest, so an outbox retry of
-    // THIS fire re-reads the count instead of burning a second slot, and the
-    // next incident (new digest) gets a fresh slot.
-    //
-    // Over either cap the dispatch is a terminal drop: no send, no throw —
-    // throwing would let the outbox retry the spam. `didSend` stays true so
-    // the caller opens the incident, exactly as the cron does
-    // (`addTriggersSent` runs even after a cap-suppressed send). Rolling the
-    // evaluator's claim back instead would re-arm the alert on every fold
-    // update for as long as the cap is exhausted. `capExhausted` carries what
-    // actually happened for logs / telemetry.
-    const capSlot = await deps.consumeEmailCapSlot({
-      projectId: project.id,
-      triggerId: trigger.id,
-      now: new Date(),
-      dedupKey: `${project.id}/${trigger.id}:digest:${input.fireDigest}`,
-    });
-    if (!capSlot.allowed) {
-      logger.error(
-        {
-          triggerId: trigger.id,
-          projectId: project.id,
-          count: capSlot.count,
-          cap: deps.emailHourlyCap,
-        },
-        "Custom-graph trigger exceeded its hourly email cap — dropping this dispatch",
-      );
-      return {
-        channel: "email",
-        didSend: true,
-        capExhausted: "trigger-hourly",
-        missingVariables: [],
-        renderErrors: [],
-      };
-    }
-    // ADR-031: per-PROJECT daily cap — the backstop ABOVE the per-trigger
-    // hourly cap, run only once the hourly cap has passed and the surviving
-    // recipient set is known. Counts RECIPIENTS (`allowedRecipients.length`),
-    // the actual outbound email volume, not dispatches.
-    const tenantSlot = await deps.consumeTenantEmailCapSlot({
-      projectId: project.id,
-      now: new Date(),
-      cap: deps.tenantDailyCap,
-      recipientCount: allowedRecipients.length,
-      dedupKey: `${project.id}:tenant:${input.fireDigest}`,
-    });
-    if (!tenantSlot.allowed) {
-      logger.warn(
-        {
-          triggerId: trigger.id,
-          projectId: project.id,
-          count: tenantSlot.count,
-          cap: deps.tenantDailyCap,
-        },
-        "Project exceeded its daily trigger-email cap — dropping this " +
-          "custom-graph dispatch. Backstop above the per-trigger hourly cap.",
-      );
-      return {
-        channel: "email",
-        didSend: true,
-        capExhausted: "project-daily",
-        missingVariables: [],
-        renderErrors: [],
-      };
-    }
-    const rendered = await renderTriggerEmail({
-      subjectTemplate: trigger.emailSubjectTemplate,
-      bodyTemplate: trigger.emailBodyTemplate,
+    return dispatchGraphAlertEmail({
+      deps,
+      trigger,
+      project,
       context,
+      recipients,
       defaults,
+      fireDigest: input.fireDigest,
+      ledger,
     });
-    if (rendered.errors.length > 0) {
-      logger.warn(
-        {
-          triggerId: trigger.id,
-          projectId: project.id,
-          errors: rendered.errors,
-        },
-        "Graph-alert email render errors — fell back to default for affected parts",
-      );
-    }
-    // The mailer sends one envelope per recipient and consults the gate for
-    // each, so a retry after a partial failure resumes at the first recipient
-    // the previous attempt never reached.
-    await deps.sendEmail({
-      triggerEmails: allowedRecipients,
-      triggerId: trigger.id,
-      projectId: project.id,
-      subject: rendered.subject,
-      html: rendered.html,
-      isRecipientSent,
-      recordRecipientSent,
-    });
-    // `didSend` stays true when the gate skipped everyone: the alert DID reach
-    // its recipients — on the attempt that crashed before recording the
-    // incident. The caller must open the incident on this retry, not treat the
-    // fire as undelivered.
-    return {
-      channel: "email",
-      didSend: true,
-      missingVariables: rendered.missingVariables,
-      renderErrors: rendered.errors,
-    };
   }
 
   if (trigger.action === "SEND_SLACK_MESSAGE") {
-    const templateType: SlackTemplateType | null =
-      trigger.slackTemplateType === "block_kit" ? "block_kit" : "string";
-
-    // Bot connection (ADR-041): post via the Web API with the gate open so the
-    // alert's chart/table/alert blocks render.
-    if (input.botDestination) {
-      // A Slack channel is this fire's only "recipient" — gate it the same way
-      // an email address is gated, or an outbox retry re-posts the alert.
-      const botHash = destinationHash(`bot:${input.botDestination.channel}`);
-      if (await isRecipientSent(botHash)) {
-        logger.info(
-          { triggerId: trigger.id, projectId: project.id },
-          "Graph-alert Slack post already delivered for this fire — skipping re-post on retry",
-        );
-        return {
-          channel: "slack",
-          didSend: true,
-          missingVariables: [],
-          renderErrors: [],
-        };
-      }
-      const rendered = await renderTriggerSlack({
-        templateType,
-        template: trigger.slackTemplate,
-        context,
-        defaults,
-        allowGatedBlocks: true,
-      });
-      if (rendered.errors.length > 0) {
-        logger.warn(
-          {
-            triggerId: trigger.id,
-            projectId: project.id,
-            errors: rendered.errors,
-          },
-          "Graph-alert Slack render errors — fell back to default",
-        );
-      }
-      await deps.sendSlackBot({
-        token: input.botDestination.token,
-        channel: input.botDestination.channel,
-        payload: rendered.payload,
-        triggerName: trigger.name,
-      });
-      await recordRecipientSent(botHash);
-      return {
-        channel: "slack",
-        didSend: true,
-        missingVariables: rendered.missingVariables,
-        renderErrors: rendered.errors,
-      };
-    }
-
-    if (!slackWebhook) {
-      logger.info(
-        { triggerId: trigger.id, projectId: project.id },
-        "Graph alert has no Slack webhook configured — skipping send",
-      );
-      return {
-        channel: "slack",
-        didSend: false,
-        missingVariables: [],
-        renderErrors: [],
-      };
-    }
-    // Same at-most-once gate as the bot branch — the webhook URL is the
-    // destination identity here.
-    const webhookHash = destinationHash(slackWebhook);
-    if (await isRecipientSent(webhookHash)) {
-      logger.info(
-        { triggerId: trigger.id, projectId: project.id },
-        "Graph-alert Slack post already delivered for this fire — skipping re-post on retry",
-      );
-      return {
-        channel: "slack",
-        didSend: true,
-        missingVariables: [],
-        renderErrors: [],
-      };
-    }
-    const rendered = await renderTriggerSlack({
-      templateType,
-      template: trigger.slackTemplate,
+    return dispatchGraphAlertSlack({
+      deps,
+      trigger,
+      project,
       context,
+      slackWebhook,
+      botDestination: input.botDestination ?? null,
       defaults,
+      ledger,
     });
-    if (rendered.errors.length > 0) {
-      logger.warn(
-        {
-          triggerId: trigger.id,
-          projectId: project.id,
-          errors: rendered.errors,
-        },
-        "Graph-alert Slack render errors — fell back to default",
-      );
-    }
-    await deps.sendSlack({
-      triggerWebhook: slackWebhook,
-      triggerName: trigger.name,
-      payload: rendered.payload,
-    });
-    await recordRecipientSent(webhookHash);
-    return {
-      channel: "slack",
-      didSend: true,
-      missingVariables: rendered.missingVariables,
-      renderErrors: rendered.errors,
-    };
   }
 
   if (trigger.action === "SEND_WEBHOOK") {
-    // The whole webhook config, body template included, lives in
-    // `actionParams` (ADR-040 §1) — no evaluator pre-extraction to thread.
-    // Header values are stored as one ciphertext blob (ADR-040 §3),
-    // decrypted just before the send below.
-    const params = (trigger.actionParams ??
-      {}) as Partial<WebhookStoredActionParams>;
-    if (!params.url) {
-      logger.info(
-        { triggerId: trigger.id, projectId: project.id },
-        "Graph alert has no webhook URL configured — skipping send",
-      );
-      return {
-        channel: "webhook",
-        didSend: false,
-        missingVariables: [],
-        renderErrors: [],
-      };
-    }
-    // The endpoint URL is this fire's destination identity — gate it the same
-    // way an email address or Slack channel is, or an outbox retry re-posts.
-    const urlHash = destinationHash(`webhook:${params.url}`);
-    if (await isRecipientSent(urlHash)) {
-      logger.info(
-        { triggerId: trigger.id, projectId: project.id },
-        "Graph-alert webhook already delivered for this fire — skipping re-post on retry",
-      );
-      return {
-        channel: "webhook",
-        didSend: true,
-        missingVariables: [],
-        renderErrors: [],
-      };
-    }
-    const rendered = await renderWebhookBody({
-      template: params.bodyTemplate ?? null,
+    return dispatchGraphAlertWebhook({
+      deps,
+      trigger,
+      project,
       context,
-      defaultBody: defaults.webhookBody,
+      defaults,
+      fireDigest: input.fireDigest,
+      ledger,
     });
-    if (rendered.errors.length > 0) {
-      logger.warn(
-        {
-          triggerId: trigger.id,
-          projectId: project.id,
-          errors: rendered.errors,
-        },
-        "Graph-alert webhook body render errors — fell back to default body",
-      );
-    }
-    // Send + classify + log one attempt as a unit (ADR-040 §5/§6). A
-    // non-2xx throws BEFORE the claim below, so a retryable failure is
-    // actually retried; the delivery-log row is written either way.
-    await deliverWebhook({
-      send: deps.sendWebhook,
-      recorder: deps.recordWebhookDelivery,
-      projectId: project.id,
-      triggerId: trigger.id,
-      // The fire digest is this dispatch's stable identity — every outbox
-      // retry of the same fire reuses it as the X-LangWatch-Event-Id so the
-      // receiver dedupes (ADR-040 §5).
-      eventId: `evt_${destinationHash(`event:${input.fireDigest}`)}`,
-      url: params.url,
-      method: params.method,
-      headers: decryptWebhookHeaders(params),
-      signingSecrets: decryptWebhookSigningSecrets(params),
-      body: rendered.body,
-      triggerName: trigger.name,
-    });
-    await recordRecipientSent(urlHash);
-    return {
-      channel: "webhook",
-      didSend: true,
-      missingVariables: rendered.missingVariables,
-      renderErrors: rendered.errors,
-    };
   }
 
   // Persist actions (ADD_TO_DATASET / ADD_TO_ANNOTATION_QUEUE) and any

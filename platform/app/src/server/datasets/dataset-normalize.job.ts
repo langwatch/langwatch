@@ -28,6 +28,7 @@
 
 import readline from "node:readline";
 import type { Readable } from "node:stream";
+import type { Dataset } from "@prisma/client";
 import Papa from "papaparse";
 import type { DatasetRepository } from "./dataset.repository";
 import { StreamingChunkWriter } from "./dataset-chunk-writer";
@@ -186,237 +187,325 @@ const applyRename = (
 };
 
 /**
- * Stream-parse a staged source into the chunk writer and capture the (already
- * reserved-renamed) column headers from the first record / CSV fields. Each
- * record's keys are rewritten through the rename map as it streams through so
- * stored rows match `columnTypes` (m4). Memory stays bounded for CSV/JSONL.
+ * User-confirmed columns from the upload step (ADR-032 v19). When the confirm
+ * UI sent the richer shape, each column carries an immutable `sourceHeader` —
+ * the canonical header it was parsed from — and is bound to its file header BY
+ * HEADER, so the user can drag-reorder and rename in the confirm step without
+ * scrambling the data. A legacy bare name+type list (no `sourceHeader`) binds
+ * positionally (`targetColumns[i]` ↔ canonical header `i`), the pre-reorder
+ * behaviour.
  */
-const parseInto = async (params: {
-  stream: Readable;
-  format: FileFormat;
-  writer: StreamingChunkWriter;
-  sizeBytes: number;
-  /**
-   * User-confirmed columns from the upload step (ADR-032 v19). When the confirm
-   * UI sent the richer shape, each column carries an immutable `sourceHeader` —
-   * the canonical header it was parsed from — and is bound to its file header BY
-   * HEADER, so the user can drag-reorder and rename in the confirm step without
-   * scrambling the data. A legacy bare name+type list (no `sourceHeader`) binds
-   * positionally (`targetColumns[i]` ↔ canonical header `i`), the pre-reorder
-   * behaviour. Each record's keys are renamed to the confirmed `name` and each
-   * value converted to the confirmed `type` as it streams; the final
-   * `appliedColumnTypes` is the confirmed list in the user's chosen order, with
-   * `sourceHeader` stripped. The confirmed list may cover a SUBSET of the file
-   * headers — omitted headers are columns the user excluded, and their values
-   * are dropped per record (stray keys not present as file headers are still
-   * preserved). A duplicate/phantom `sourceHeader`, an empty list, or a legacy
-   * count mismatch honours nothing and derives all-`string` from the headers.
-   */
-  targetColumns?: DatasetConfirmColumns | DatasetColumns | null;
-}): Promise<{
+type TargetColumns = DatasetConfirmColumns | DatasetColumns | null | undefined;
+
+/**
+ * How confirmed target columns bind to the file's headers:
+ * `targetByCanonical` maps canonicalHeader → confirmed `{ name, type }`, built
+ * once headers are known and only when the confirmed columns bind cleanly
+ * (else stays null → derive-all-string). With the confirm shape this may
+ * cover a SUBSET of the file headers — the omitted ones are columns the user
+ * excluded. `canonicalSet` is the full set of file headers, set alongside a
+ * sourceHeader-bound map — it lets `applyTargetBinding` tell an EXCLUDED
+ * header (in the file, not confirmed → drop) apart from a STRAY key (not a
+ * file header at all, e.g. a JSONL record with extra keys → keep). Null on
+ * the legacy positional path (no exclusion).
+ */
+interface TargetBinding {
+  targetByCanonical: Map<string, DatasetColumns[number]>;
+  canonicalSet: Set<string> | null;
+}
+
+// Confirmed names become the stored record keys (`out[target.name]` below),
+// so a blank or duplicated name would collapse two columns onto one key
+// (silent per-record data loss) or write an `""`-keyed column. The upload
+// route's schema already rejects this, so reaching here means a malformed
+// stored row — degrade to a derived all-`string` schema rather than emit the
+// corruption.
+function hasValidTargetNames(
+  targetColumns: DatasetConfirmColumns | DatasetColumns,
+): boolean {
+  const names = targetColumns.map((c) => c.name);
+  return (
+    !names.some((name) => name.trim() === "") &&
+    new Set(names).size === names.length
+  );
+}
+
+const hasSourceHeader = (
+  c: DatasetColumns[number] | DatasetConfirmColumns[number],
+): boolean =>
+  typeof (c as DatasetConfirmColumns[number]).sourceHeader === "string";
+
+// Duplicate `sourceHeader`s collapse in the Map (last wins), which would bind
+// fewer columns than `targetColumns` claims while `appliedColumnTypes` still
+// persists the phantom duplicate — degrade rather than emit that. Every
+// confirmed column must reference a real file header (no phantom); a SUBSET
+// is allowed — headers absent from the confirmed list are the columns the
+// user excluded, and are dropped per-record below.
+function bindBySourceHeader(
+  canonical: string[],
+  targetColumns: DatasetConfirmColumns,
+): TargetBinding | null {
+  const byHeader = new Map(targetColumns.map((c) => [c.sourceHeader, c]));
+  if (byHeader.size !== targetColumns.length) return null;
+  const canonicalHeaders = new Set(canonical);
+  if (![...byHeader.keys()].every((h) => canonicalHeaders.has(h))) {
+    return null;
+  }
+  return { targetByCanonical: byHeader, canonicalSet: canonicalHeaders };
+}
+
+// Legacy bare name+type list: binds positionally against the file's headers,
+// requiring an exact 1:1 count (no exclusion support).
+function bindPositionally(
+  canonical: string[],
+  targetColumns: DatasetConfirmColumns | DatasetColumns,
+): TargetBinding | null {
+  if (targetColumns.length !== canonical.length) return null;
+  return {
+    targetByCanonical: new Map(canonical.map((h, i) => [h, targetColumns[i]!])),
+    canonicalSet: null,
+  };
+}
+
+/**
+ * Determines how `targetColumns` binds to `canonical` (the file's
+ * reserved-renamed headers). Returns null on any degrade condition — an empty
+ * confirmed list can't produce a 0-column dataset, so the caller derives an
+ * all-`string` schema instead.
+ */
+function buildTargetBinding(
+  canonical: string[],
+  targetColumns: TargetColumns,
+): TargetBinding | null {
+  if (!targetColumns || targetColumns.length === 0) return null;
+  if (!hasValidTargetNames(targetColumns)) return null;
+
+  // Prefer binding by the immutable `sourceHeader` (survives drag-reorder +
+  // rename + exclusion); fall back to positional binding for legacy bare
+  // name+type lists (which require an exact 1:1 count — no exclusion).
+  const hasSourceHeaders = targetColumns.every(hasSourceHeader);
+  // A PARTIAL confirm payload (some items carry `sourceHeader`, some don't) is
+  // a client bug, not a legacy list — positional-binding it could silently map
+  // values to the wrong column. Mirror the upload route (which rejects any
+  // "looks like confirm" payload) and degrade rather than fall through to the
+  // positional branch below.
+  const hasAnySourceHeaders = targetColumns.some(hasSourceHeader);
+  if (hasAnySourceHeaders && !hasSourceHeaders) return null;
+
+  return hasSourceHeaders
+    ? bindBySourceHeader(canonical, targetColumns as DatasetConfirmColumns)
+    : bindPositionally(canonical, targetColumns);
+}
+
+/**
+ * Rename confirmed keys to their new names and convert their values to the
+ * confirmed types; drop excluded file headers; keep stray keys untouched.
+ * Identity when nothing was confirmed (or on a mismatch) — preserving the
+ * pre-v19 all-`string` pass-through. Streaming: one record at a time.
+ */
+function applyTargetBinding({
+  record,
+  targetByCanonical,
+  canonicalSet,
+}: {
+  record: Record<string, unknown>;
+  targetByCanonical: Map<string, DatasetColumns[number]> | null;
+  canonicalSet: Set<string> | null;
+}): Record<string, unknown> {
+  if (!targetByCanonical) return record;
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(record)) {
+    const target = targetByCanonical.get(key);
+    if (target) {
+      // Kept column: rename + type-convert.
+      out[target.name] = convertValueToColumnType(value, target.type);
+    } else if (canonicalSet?.has(key)) {
+      // Excluded file header: the user dropped this column — omit its value.
+      continue;
+    } else {
+      // Stray key (not a confirmed file header): preserve as-is.
+      out[key] = value;
+    }
+  }
+  return out;
+}
+
+/** Mutable per-parse state threaded through the format-specific parsers so
+ * headers/rename/target binding are captured exactly once. */
+interface ParseState {
   headers: string[];
-  appliedColumnTypes: DatasetColumns | null;
-}> => {
-  const { stream, format, writer, sizeBytes, targetColumns } = params;
-  let headers: string[] = [];
-  let renameMap = new Map<string, string>();
-  // canonicalHeader → confirmed { name, type }; built once headers are known and
-  // only when the confirmed columns bind cleanly (else stays null →
-  // derive-all-string). With the confirm shape this may cover a SUBSET of the
-  // file headers — the omitted ones are columns the user excluded.
-  let targetByCanonical: Map<string, DatasetColumns[number]> | null = null;
-  // The full set of file headers, set alongside a sourceHeader-bound map. Lets
-  // `applyTarget` tell an EXCLUDED header (in the file, not confirmed → drop)
-  // apart from a STRAY key (not a file header at all, e.g. a JSONL record with
-  // extra keys → keep). Null on the legacy positional path (no exclusion).
-  let canonicalSet: Set<string> | null = null;
-  const buildTargetMap = (canonical: string[]): void => {
-    // An empty confirmed list can't produce a 0-column dataset; degrade instead.
-    if (!targetColumns || targetColumns.length === 0) return;
-    // Confirmed names become the stored record keys (`out[target.name]` below),
-    // so a blank or duplicated name would collapse two columns onto one key
-    // (silent per-record data loss) or write an `""`-keyed column. The upload
-    // route's schema already rejects this, so reaching here means a malformed
-    // stored row — degrade to a derived all-`string` schema rather than emit the
-    // corruption.
-    const names = targetColumns.map((c) => c.name);
-    if (
-      names.some((name) => name.trim() === "") ||
-      new Set(names).size !== names.length
-    ) {
-      return;
-    }
-    // Prefer binding by the immutable `sourceHeader` (survives drag-reorder +
-    // rename + exclusion); fall back to positional binding for legacy bare
-    // name+type lists (which require an exact 1:1 count — no exclusion).
-    const hasSourceHeaders = targetColumns.every(
-      (c) =>
-        typeof (c as DatasetConfirmColumns[number]).sourceHeader === "string",
-    );
-    // A PARTIAL confirm payload (some items carry `sourceHeader`, some don't) is
-    // a client bug, not a legacy list — positional-binding it could silently map
-    // values to the wrong column. Mirror the upload route (which rejects any
-    // "looks like confirm" payload) and degrade rather than fall through to the
-    // positional branch below.
-    const hasAnySourceHeaders = targetColumns.some(
-      (c) =>
-        typeof (c as DatasetConfirmColumns[number]).sourceHeader === "string",
-    );
-    if (hasAnySourceHeaders && !hasSourceHeaders) return;
-    if (hasSourceHeaders) {
-      const byHeader = new Map(
-        (targetColumns as DatasetConfirmColumns).map((c) => [
-          c.sourceHeader,
-          c,
-        ]),
-      );
-      // Duplicate `sourceHeader`s collapse in the Map (last wins), which would
-      // bind fewer columns than `targetColumns` claims while `appliedColumnTypes`
-      // still persists the phantom duplicate. Degrade rather than emit that.
-      if (byHeader.size !== targetColumns.length) return;
-      // Every confirmed column must reference a real file header (no phantom).
-      // A SUBSET is allowed — headers absent from the confirmed list are the
-      // columns the user excluded, and are dropped per-record below.
-      const canonicalHeaders = new Set(canonical);
-      if (![...byHeader.keys()].every((h) => canonicalHeaders.has(h))) return;
-      targetByCanonical = byHeader;
-      canonicalSet = canonicalHeaders;
-      return;
-    }
-    if (targetColumns.length !== canonical.length) return;
-    targetByCanonical = new Map(
-      canonical.map((h, i) => [h, targetColumns[i]!]),
-    );
-  };
-  // Rename confirmed keys to their new names and convert their values to the
-  // confirmed types; drop excluded file headers; keep stray keys untouched.
-  // Identity when nothing was confirmed (or on a mismatch) — preserving the
-  // pre-v19 all-`string` pass-through. Streaming: one record at a time.
-  const applyTarget = (
-    record: Record<string, unknown>,
-  ): Record<string, unknown> => {
-    if (!targetByCanonical) return record;
-    const out: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(record)) {
-      const target = targetByCanonical.get(key);
-      if (target) {
-        // Kept column: rename + type-convert.
-        out[target.name] = convertValueToColumnType(value, target.type);
-      } else if (canonicalSet?.has(key)) {
-        // Excluded file header: the user dropped this column — omit its value.
-        continue;
-      } else {
-        // Stray key (not a confirmed file header): preserve as-is.
-        out[key] = value;
-      }
-    }
-    return out;
-  };
-  // The persisted columnTypes are the confirmed columns in the user's chosen
-  // (drag) order, with the transient `sourceHeader` stripped — null when nothing
-  // bound (the handler then derives all-`string`).
-  const appliedColumnTypes = (): DatasetColumns | null =>
-    targetByCanonical
-      ? targetColumns!.map(({ name, type }) => ({ name, type }))
-      : null;
-  // Capture headers the first time we see them, derive the rename map, and
-  // expose headers in their safe (renamed) form so columnTypes matches the
-  // rewritten row keys.
-  const captureHeaders = (rawKeys: string[]): void => {
-    if (headers.length > 0) return;
-    renameMap = buildRenameMap(rawKeys);
-    headers = renameReservedColumns(rawKeys);
-    buildTargetMap(headers);
-  };
+  renameMap: Map<string, string>;
+  targetByCanonical: Map<string, DatasetColumns[number]> | null;
+  canonicalSet: Set<string> | null;
+  targetColumns: TargetColumns;
+}
 
-  if (format === "jsonl") {
-    const rl = readline.createInterface({ input: stream, crlfDelay: Infinity });
-    for await (const rawLine of rl) {
-      // I-MEM: bound a pathological no-newline / giant-line file. `readline`
-      // already buffers a line at a time; this caps that buffer's size.
-      if (Buffer.byteLength(rawLine, "utf8") > MAX_JSONL_LINE_BYTES) {
-        throw new Error("JSONL line exceeds max size — malformed file");
-      }
-      const line = scrubNullBytes(rawLine).trim();
-      if (line.length === 0) continue;
-      const record = JSON.parse(line) as Record<string, unknown>;
-      captureHeaders(Object.keys(record));
-      await writer.push(applyTarget(applyRename(record, renameMap)));
-    }
-    return {
-      headers,
-      appliedColumnTypes: appliedColumnTypes(),
-    };
+const createParseState = (targetColumns: TargetColumns): ParseState => ({
+  headers: [],
+  renameMap: new Map(),
+  targetByCanonical: null,
+  canonicalSet: null,
+  targetColumns,
+});
+
+/** Binds `headers` onto `state` (already reserved-renamed / deduped by the
+ * caller) and derives the target binding from them. */
+function bindHeaders(state: ParseState, headers: string[]): void {
+  state.headers = headers;
+  const binding = buildTargetBinding(headers, state.targetColumns);
+  if (binding) {
+    state.targetByCanonical = binding.targetByCanonical;
+    state.canonicalSet = binding.canonicalSet;
   }
+}
 
-  if (format === "csv") {
-    // CSV is parsed with `header:false` (rows as arrays) and mapped to objects
-    // by index here — NOT papaparse's `header:true`. Under our pause/resume
-    // backpressure, papaparse re-runs its duplicate-header dedup against the
-    // current data row on every resume, suffixing the second of any two equal
-    // cells with `_1` (corrupting e.g. input==expected rows, or two blank cells)
-    // and warning once per row. We dedup the real header row ONCE instead.
-    let csvHeaders: string[] | null = null;
-    await new Promise<void>((resolve, reject) => {
-      // papaparse accepts a Node Readable and emits rows via `step`, so the
-      // whole CSV is never materialized in memory. Serialize the backpressured
-      // chunk writes by pausing the parser while a flush is in flight.
-      let chain: Promise<void> = Promise.resolve();
-      // papaparse's Node build accepts a Readable as a streaming source, but
-      // its types only model browser File/string inputs — cast at this one seam.
-      Papa.parse<string[]>(stream as unknown as Papa.LocalFile, {
-        header: false,
-        skipEmptyLines: true,
-        // Bound papaparse's read buffer so it pulls the stream in fixed-size
-        // chunks rather than draining it as fast as the chunk writer allows.
-        chunkSize: CSV_IO_CHUNK_BYTES,
-        step: (row, parser) => {
-          const values = row.data;
-          // The first row is the header: dedupe repeats + reserved-rename once.
-          if (csvHeaders === null) {
-            const raw = values.map((value) =>
-              value == null ? "" : String(value),
-            );
-            csvHeaders = renameReservedColumns(dedupeHeaders(raw));
-            headers = csvHeaders;
-            buildTargetMap(headers);
-            return;
-          }
-          const record: Record<string, unknown> = {};
-          csvHeaders.forEach((header, i) => {
-            record[header] = values[i];
-          });
-          // I-MEM: reject a single row whose serialized fields cross
-          // MAX_CSV_ROW_BYTES (a malformed CSV with no row delimiter or one
-          // giant field), the CSV counterpart to the JSONL line cap — fail the
-          // dataset rather than risk an OOM accumulating an unbounded row.
-          if (csvRowBytes(record) > MAX_CSV_ROW_BYTES) {
+/**
+ * Capture headers the first time we see them, derive the rename map, and
+ * expose headers in their safe (renamed) form so columnTypes matches the
+ * rewritten row keys.
+ */
+function captureHeaders(state: ParseState, rawKeys: string[]): void {
+  if (state.headers.length > 0) return;
+  state.renameMap = buildRenameMap(rawKeys);
+  bindHeaders(state, renameReservedColumns(rawKeys));
+}
+
+/**
+ * The persisted columnTypes are the confirmed columns in the user's chosen
+ * (drag) order, with the transient `sourceHeader` stripped — null when nothing
+ * bound (the handler then derives all-`string`).
+ */
+const appliedColumnTypesFrom = (state: ParseState): DatasetColumns | null =>
+  state.targetByCanonical
+    ? state.targetColumns!.map(({ name, type }) => ({ name, type }))
+    : null;
+
+/** JSONL: `readline` emits one line at a time, so memory stays bounded; each
+ * record's keys are captured on the first line and every record streams
+ * straight through to the chunk writer. */
+async function parseJsonlInto({
+  stream,
+  writer,
+  state,
+}: {
+  stream: Readable;
+  writer: StreamingChunkWriter;
+  state: ParseState;
+}): Promise<void> {
+  const rl = readline.createInterface({ input: stream, crlfDelay: Infinity });
+  for await (const rawLine of rl) {
+    // I-MEM: bound a pathological no-newline / giant-line file. `readline`
+    // already buffers a line at a time; this caps that buffer's size.
+    if (Buffer.byteLength(rawLine, "utf8") > MAX_JSONL_LINE_BYTES) {
+      throw new Error("JSONL line exceeds max size — malformed file");
+    }
+    const line = scrubNullBytes(rawLine).trim();
+    if (line.length === 0) continue;
+    const record = JSON.parse(line) as Record<string, unknown>;
+    captureHeaders(state, Object.keys(record));
+    await writer.push(
+      applyTargetBinding({
+        record: applyRename(record, state.renameMap),
+        targetByCanonical: state.targetByCanonical,
+        canonicalSet: state.canonicalSet,
+      }),
+    );
+  }
+}
+
+/**
+ * CSV is parsed with `header:false` (rows as arrays) and mapped to objects by
+ * index here — NOT papaparse's `header:true`. Under our pause/resume
+ * backpressure, papaparse re-runs its duplicate-header dedup against the
+ * current data row on every resume, suffixing the second of any two equal
+ * cells with `_1` (corrupting e.g. input==expected rows, or two blank cells)
+ * and warning once per row. We dedup the real header row ONCE instead.
+ */
+async function parseCsvInto({
+  stream,
+  writer,
+  state,
+}: {
+  stream: Readable;
+  writer: StreamingChunkWriter;
+  state: ParseState;
+}): Promise<void> {
+  let csvHeaders: string[] | null = null;
+  await new Promise<void>((resolve, reject) => {
+    // papaparse accepts a Node Readable and emits rows via `step`, so the
+    // whole CSV is never materialized in memory. Serialize the backpressured
+    // chunk writes by pausing the parser while a flush is in flight.
+    let chain: Promise<void> = Promise.resolve();
+    // papaparse's Node build accepts a Readable as a streaming source, but
+    // its types only model browser File/string inputs — cast at this one seam.
+    Papa.parse<string[]>(stream as unknown as Papa.LocalFile, {
+      header: false,
+      skipEmptyLines: true,
+      // Bound papaparse's read buffer so it pulls the stream in fixed-size
+      // chunks rather than draining it as fast as the chunk writer allows.
+      chunkSize: CSV_IO_CHUNK_BYTES,
+      step: (row, parser) => {
+        const values = row.data;
+        // The first row is the header: dedupe repeats + reserved-rename once.
+        if (csvHeaders === null) {
+          const raw = values.map((value) =>
+            value == null ? "" : String(value),
+          );
+          csvHeaders = renameReservedColumns(dedupeHeaders(raw));
+          bindHeaders(state, csvHeaders);
+          return;
+        }
+        const record: Record<string, unknown> = {};
+        csvHeaders.forEach((header, i) => {
+          record[header] = values[i];
+        });
+        // I-MEM: reject a single row whose serialized fields cross
+        // MAX_CSV_ROW_BYTES (a malformed CSV with no row delimiter or one
+        // giant field), the CSV counterpart to the JSONL line cap — fail the
+        // dataset rather than risk an OOM accumulating an unbounded row.
+        if (csvRowBytes(record) > MAX_CSV_ROW_BYTES) {
+          parser.abort();
+          reject(new Error("CSV row exceeds max size — malformed file"));
+          return;
+        }
+        parser.pause();
+        chain = chain
+          .then(() =>
+            writer.push(
+              applyTargetBinding({
+                record,
+                targetByCanonical: state.targetByCanonical,
+                canonicalSet: state.canonicalSet,
+              }),
+            ),
+          )
+          .then(() => parser.resume())
+          .catch((error: unknown) => {
             parser.abort();
-            reject(new Error("CSV row exceeds max size — malformed file"));
-            return;
-          }
-          parser.pause();
-          chain = chain
-            .then(() => writer.push(applyTarget(record)))
-            .then(() => parser.resume())
-            .catch((error: unknown) => {
-              parser.abort();
-              reject(error);
-            });
-        },
-        complete: () => {
-          chain.then(() => resolve()).catch(reject);
-        },
-        error: (error: unknown) => reject(error),
-      });
+            reject(error);
+          });
+      },
+      complete: () => {
+        chain.then(() => resolve()).catch(reject);
+      },
+      error: (error: unknown) => reject(error),
     });
-    return {
-      headers,
-      appliedColumnTypes: appliedColumnTypes(),
-    };
-  }
+  });
+}
 
-  // format === "json": a single array — guard the size, then buffer + parse.
+/** A single staged `.json` array — guard the size, then buffer + parse (no
+ * streaming JSON-array parser is wired in v1). */
+async function parseJsonArrayInto({
+  stream,
+  writer,
+  state,
+  sizeBytes,
+}: {
+  stream: Readable;
+  writer: StreamingChunkWriter;
+  state: ParseState;
+  sizeBytes: number;
+}): Promise<void> {
   if (sizeBytes > LARGE_JSON_MAX_BYTES) {
     throw new LargeJsonUnsupportedError();
   }
@@ -426,12 +515,53 @@ const parseInto = async (params: {
     throw new Error("JSON content must be an array of objects");
   }
   for (const record of parsed as Record<string, unknown>[]) {
-    captureHeaders(Object.keys(record));
-    await writer.push(applyTarget(applyRename(record, renameMap)));
+    captureHeaders(state, Object.keys(record));
+    await writer.push(
+      applyTargetBinding({
+        record: applyRename(record, state.renameMap),
+        targetByCanonical: state.targetByCanonical,
+        canonicalSet: state.canonicalSet,
+      }),
+    );
   }
+}
+
+/**
+ * Stream-parse a staged source into the chunk writer and capture the (already
+ * reserved-renamed) column headers from the first record / CSV fields. Each
+ * record's keys are rewritten through the rename map as it streams through so
+ * stored rows match `columnTypes` (m4). Memory stays bounded for CSV/JSONL.
+ *
+ * The confirmed list may cover a SUBSET of the file headers — omitted headers
+ * are columns the user excluded, and their values are dropped per record
+ * (stray keys not present as file headers are still preserved). A
+ * duplicate/phantom `sourceHeader`, an empty list, or a legacy count mismatch
+ * honours nothing and derives all-`string` from the headers.
+ */
+const parseInto = async (params: {
+  stream: Readable;
+  format: FileFormat;
+  writer: StreamingChunkWriter;
+  sizeBytes: number;
+  targetColumns?: TargetColumns;
+}): Promise<{
+  headers: string[];
+  appliedColumnTypes: DatasetColumns | null;
+}> => {
+  const { stream, format, writer, sizeBytes, targetColumns } = params;
+  const state = createParseState(targetColumns);
+
+  if (format === "jsonl") {
+    await parseJsonlInto({ stream, writer, state });
+  } else if (format === "csv") {
+    await parseCsvInto({ stream, writer, state });
+  } else {
+    await parseJsonArrayInto({ stream, writer, state, sizeBytes });
+  }
+
   return {
-    headers,
-    appliedColumnTypes: appliedColumnTypes(),
+    headers: state.headers,
+    appliedColumnTypes: appliedColumnTypesFrom(state),
   };
 };
 
@@ -446,6 +576,131 @@ const deriveColumnTypes = (headers: string[]): DatasetColumns =>
   }));
 
 /**
+ * Happy path: stream-parse the staged upload into chunk objects, finalize
+ * counters, and flip the dataset to `ready`. Throws on any failure — the
+ * caller's catch block reaps orphaned chunks and marks the dataset `failed`.
+ */
+async function runNormalize({
+  deps,
+  payload,
+  dataset,
+  storage,
+}: {
+  deps: DatasetNormalizeDeps;
+  payload: DatasetNormalizePayload;
+  dataset: Dataset;
+  storage: DatasetStorage;
+}): Promise<void> {
+  const { projectId, datasetId, stagingKey, filename } = payload;
+
+  // Defense-in-depth fast reject (I-MEM): finalize already capped this, but
+  // never start streaming an over-cap object.
+  const sizeBytes = await storage.headStagedObjectSize({
+    projectId,
+    key: stagingKey,
+  });
+  if (sizeBytes > UPLOAD_MAX_BYTES) {
+    throw new Error("Uploaded file is too large");
+  }
+
+  const format = detectFileFormat(filename);
+  const stream = await storage.streamStaged({ projectId, key: stagingKey });
+  const writer = new StreamingChunkWriter({ storage, projectId, datasetId });
+
+  // ADR-032 v19: the upload's confirm step persists the user-chosen columns
+  // on the row (names + types). Honour them — rename + type-convert per
+  // record as it streams. Absent (SDK / REST / API-key callers that don't
+  // pass a schema) → null, so parseInto leaves rows as-is and we derive
+  // all-`string` below, exactly as before.
+  const confirmedColumns = (dataset.columnTypes as DatasetColumns) ?? [];
+  const { headers, appliedColumnTypes } = await parseInto({
+    stream,
+    format,
+    writer,
+    sizeBytes,
+    targetColumns: confirmedColumns.length > 0 ? confirmedColumns : null,
+  });
+  // I-MEM: finalize returns the aggregated meta built from per-chunk
+  // metadata only — the chunk `jsonl` payloads were released at each flush,
+  // so the whole normalized file is never accumulated in heap.
+  const meta = await writer.finalize();
+  const columnTypes = appliedColumnTypes ?? deriveColumnTypes(headers);
+
+  // m5: an empty upload is a failure, not a 0-chunk `ready` dataset — this
+  // matches the legacy upload contract (which rejects an empty file).
+  if (meta.rowCount === 0) {
+    throw new Error("Uploaded file is empty");
+  }
+
+  // I-IDEM: a re-drive that wrote fewer chunks than a crashed prior run
+  // leaves orphan `chunk-NNNNN` objects past this run's last index. Delete
+  // them before flipping to `ready` so the chunk set matches `chunkCount`.
+  await storage.deleteChunksFrom({
+    projectId,
+    datasetId,
+    fromIndex: meta.chunkCount,
+  });
+
+  await deps.repository.update({
+    id: datasetId,
+    projectId,
+    data: {
+      status: "ready",
+      statusError: null,
+      rowCount: meta.rowCount,
+      sizeBytes: BigInt(meta.sizeBytes),
+      chunkCount: meta.chunkCount,
+      chunkOffsets: meta.chunkOffsets,
+      columnTypes,
+    },
+  });
+
+  // Best-effort staging cleanup — non-fatal (the lifecycle rule reaps it
+  // otherwise; a failed delete must not fail a successful normalize).
+  try {
+    await storage.deleteStaged({ projectId, key: stagingKey });
+  } catch {
+    // ignore
+  }
+}
+
+/**
+ * A failed dataset owns no valid chunks. `parseInto` flushes chunk objects to
+ * S3 as it streams, so a mid-stream failure (e.g. a JSONL parse error at row N
+ * of M) leaves chunk-0..k orphaned — and chunk keys, unlike staging keys,
+ * carry no lifecycle TTL to reap them, so a permanently-failed dataset would
+ * leak them forever. Best-effort delete every flushed chunk, then mark the
+ * dataset `failed`. The staging object is intentionally NOT deleted so a
+ * manual retry can re-run (re-writing chunks from index 0).
+ */
+async function handleNormalizeFailure({
+  deps,
+  projectId,
+  datasetId,
+  storage,
+  error,
+}: {
+  deps: DatasetNormalizeDeps;
+  projectId: string;
+  datasetId: string;
+  storage: DatasetStorage;
+  error: unknown;
+}): Promise<void> {
+  try {
+    await storage.deleteChunksFrom({ projectId, datasetId, fromIndex: 0 });
+  } catch {
+    // non-fatal: a failed reap is preferable to masking the real error.
+  }
+  const statusError =
+    error instanceof Error ? error.message : "Normalize failed";
+  await deps.repository.update({
+    id: datasetId,
+    projectId,
+    data: { status: "failed", statusError },
+  });
+}
+
+/**
  * Build the `datasetNormalize` handler over its injected boundaries.
  *
  * Returns the GroupQueue process function. On success the dataset flips to
@@ -455,7 +710,7 @@ const deriveColumnTypes = (headers: string[]): DatasetColumns =>
  */
 export const createDatasetNormalizeHandler = (deps: DatasetNormalizeDeps) => {
   return async (payload: DatasetNormalizePayload): Promise<void> => {
-    const { projectId, datasetId, stagingKey, filename } = payload;
+    const { projectId, datasetId } = payload;
 
     const dataset = await deps.repository.findOne({ id: datasetId, projectId });
     // Idempotent re-drive guard (I-IDEM): only a `processing` dataset is
@@ -466,101 +721,15 @@ export const createDatasetNormalizeHandler = (deps: DatasetNormalizeDeps) => {
     const storage = await deps.getStorage(projectId);
 
     try {
-      // Defense-in-depth fast reject (I-MEM): finalize already capped this, but
-      // never start streaming an over-cap object.
-      const sizeBytes = await storage.headStagedObjectSize({
-        projectId,
-        key: stagingKey,
-      });
-      if (sizeBytes > UPLOAD_MAX_BYTES) {
-        throw new Error("Uploaded file is too large");
-      }
-
-      const format = detectFileFormat(filename);
-      const stream = await storage.streamStaged({ projectId, key: stagingKey });
-      const writer = new StreamingChunkWriter({
-        storage,
-        projectId,
-        datasetId,
-      });
-
-      // ADR-032 v19: the upload's confirm step persists the user-chosen columns
-      // on the row (names + types). Honour them — rename + type-convert per
-      // record as it streams. Absent (SDK / REST / API-key callers that don't
-      // pass a schema) → null, so parseInto leaves rows as-is and we derive
-      // all-`string` below, exactly as before.
-      const confirmedColumns = (dataset.columnTypes as DatasetColumns) ?? [];
-      const { headers, appliedColumnTypes } = await parseInto({
-        stream,
-        format,
-        writer,
-        sizeBytes,
-        targetColumns: confirmedColumns.length > 0 ? confirmedColumns : null,
-      });
-      // I-MEM: finalize returns the aggregated meta built from per-chunk
-      // metadata only — the chunk `jsonl` payloads were released at each flush,
-      // so the whole normalized file is never accumulated in heap.
-      const meta = await writer.finalize();
-      const columnTypes = appliedColumnTypes ?? deriveColumnTypes(headers);
-
-      // m5: an empty upload is a failure, not a 0-chunk `ready` dataset — this
-      // matches the legacy upload contract (which rejects an empty file).
-      if (meta.rowCount === 0) {
-        throw new Error("Uploaded file is empty");
-      }
-
-      // I-IDEM: a re-drive that wrote fewer chunks than a crashed prior run
-      // leaves orphan `chunk-NNNNN` objects past this run's last index. Delete
-      // them before flipping to `ready` so the chunk set matches `chunkCount`.
-      await storage.deleteChunksFrom({
-        projectId,
-        datasetId,
-        fromIndex: meta.chunkCount,
-      });
-
-      await deps.repository.update({
-        id: datasetId,
-        projectId,
-        data: {
-          status: "ready",
-          statusError: null,
-          rowCount: meta.rowCount,
-          sizeBytes: BigInt(meta.sizeBytes),
-          chunkCount: meta.chunkCount,
-          chunkOffsets: meta.chunkOffsets,
-          columnTypes,
-        },
-      });
-
-      // Best-effort staging cleanup — non-fatal (the lifecycle rule reaps it
-      // otherwise; a failed delete must not fail a successful normalize).
-      try {
-        await storage.deleteStaged({ projectId, key: stagingKey });
-      } catch {
-        // ignore
-      }
+      await runNormalize({ deps, payload, dataset, storage });
     } catch (error: unknown) {
-      // A failed dataset owns no valid chunks. parseInto flushes chunk objects
-      // to S3 as it streams, so a mid-stream failure (e.g. a JSONL parse error
-      // at row N of M) leaves chunk-0..k orphaned — and chunk keys, unlike
-      // staging keys, carry no lifecycle TTL to reap them, so a
-      // permanently-failed dataset would leak them forever. Best-effort delete
-      // every flushed chunk. Swallow any secondary error so it never masks the
-      // original failure cause (the staging object is preserved below for a
-      // manual retry, which re-writes chunks from index 0).
-      try {
-        await storage.deleteChunksFrom({ projectId, datasetId, fromIndex: 0 });
-      } catch {
-        // non-fatal: a failed reap is preferable to masking the real error.
-      }
-      // Mark failed and rethrow so the queue records the failure; the staging
-      // object is intentionally NOT deleted so a manual retry can re-run.
-      const statusError =
-        error instanceof Error ? error.message : "Normalize failed";
-      await deps.repository.update({
-        id: datasetId,
+      // Mark failed and rethrow so the queue records the failure.
+      await handleNormalizeFailure({
+        deps,
         projectId,
-        data: { status: "failed", statusError },
+        datasetId,
+        storage,
+        error,
       });
       throw error;
     }

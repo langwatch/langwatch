@@ -38,6 +38,12 @@ interface CompatSession {
   expires: string;
 }
 
+const adaptExpiry = (expiresAt: string | Date | undefined): string => {
+  if (expiresAt instanceof Date) return expiresAt.toISOString();
+  if (typeof expiresAt === "string") return expiresAt;
+  return new Date().toISOString();
+};
+
 const adaptSession = (data: unknown): CompatSession | null => {
   if (!data || typeof data !== "object") return null;
   const raw = data as {
@@ -58,12 +64,7 @@ const adaptSession = (data: unknown): CompatSession | null => {
       pendingSsoSetup: (user.pendingSsoSetup as boolean | undefined) ?? false,
       impersonator: user.impersonator as CompatSession["user"]["impersonator"],
     },
-    expires:
-      expiresAt instanceof Date
-        ? expiresAt.toISOString()
-        : typeof expiresAt === "string"
-          ? expiresAt
-          : new Date().toISOString(),
+    expires: adaptExpiry(expiresAt),
   };
 };
 
@@ -180,59 +181,65 @@ export const useSession = (
   };
 };
 
-export const signIn = async (
-  provider: string,
-  options?: {
-    email?: string;
-    password?: string;
-    callbackUrl?: string;
-    redirect?: boolean;
-  },
-): Promise<
-  { error?: string; code?: string; status?: number; ok?: boolean } | undefined
-> => {
-  // Same-origin guard on the post-login redirect target.
-  const callbackURL = options?.callbackUrl
-    ? safeRedirectTarget(options.callbackUrl)
-    : undefined;
-  const shouldRedirect = options?.redirect !== false;
+type SignInResult =
+  | { error?: string; code?: string; status?: number; ok?: boolean }
+  | undefined;
 
-  if (provider === "credentials" || provider === "email") {
-    const result = await client.signIn.email({
-      email: options?.email ?? "",
-      password: options?.password ?? "",
-      callbackURL,
-    });
-    if (result.error) {
-      // `code` is what the screens map to wording; `error` stays the message
-      // for callers that only ever read it.
-      return {
-        error: result.error.message ?? "CredentialsSignin",
-        code: result.error.code,
-        status: result.error.status,
-        ok: false,
-      };
-    }
-    // NextAuth compat: the caller expects signIn to navigate on success.
-    // BetterAuth's signIn.email returns a JSON result and does NOT auto-
-    // redirect the browser — the caller has to do it.
-    if (shouldRedirect) {
-      navigate(callbackURL ?? "/");
-    }
-    return { ok: true };
+const signInWithEmail = async ({
+  email,
+  password,
+  callbackURL,
+  shouldRedirect,
+}: {
+  email: string;
+  password: string;
+  callbackURL: string | undefined;
+  shouldRedirect: boolean;
+}): Promise<SignInResult> => {
+  const result = await client.signIn.email({
+    email,
+    password,
+    callbackURL,
+  });
+  if (result.error) {
+    // `code` is what the screens map to wording; `error` stays the message
+    // for callers that only ever read it.
+    return {
+      error: result.error.message ?? "CredentialsSignin",
+      code: result.error.code,
+      status: result.error.status,
+      ok: false,
+    };
   }
+  // NextAuth compat: the caller expects signIn to navigate on success.
+  // BetterAuth's signIn.email returns a JSON result and does NOT auto-
+  // redirect the browser — the caller has to do it.
+  if (shouldRedirect) {
+    navigate(callbackURL ?? "/");
+  }
+  return { ok: true };
+};
 
-  // Every provider goes through signIn.social, social (google, github,
-  // gitlab, microsoft) and generic-OAuth (see `PLAIN_OIDC_PROVIDERS` and the
-  // named entries beside it in `ee/sso/providers.ts`) alike: the social plugin
-  // and the generic-oauth plugin both honor the same providerId. BetterAuth
-  // handles the redirect to the provider URL itself when `disableRedirect`
-  // is unset.
-  //
-  // Normalize `azure-ad` to `microsoft` (BetterAuth's internal provider id)
-  // to match `linkAccount()` which does the same mapping. Also honor
-  // `redirect: false` by passing `disableRedirect: true` so the caller can
-  // handle navigation itself.
+// Every provider goes through signIn.social, social (google, github,
+// gitlab, microsoft) and generic-OAuth (see `PLAIN_OIDC_PROVIDERS` and the
+// named entries beside it in `ee/sso/providers.ts`) alike: the social plugin
+// and the generic-oauth plugin both honor the same providerId. BetterAuth
+// handles the redirect to the provider URL itself when `disableRedirect`
+// is unset.
+//
+// Normalize `azure-ad` to `microsoft` (BetterAuth's internal provider id)
+// to match `linkAccount()` which does the same mapping. Also honor
+// `redirect: false` by passing `disableRedirect: true` so the caller can
+// handle navigation itself.
+const signInWithSocial = async ({
+  provider,
+  callbackURL,
+  shouldRedirect,
+}: {
+  provider: string;
+  callbackURL: string | undefined;
+  shouldRedirect: boolean;
+}): Promise<SignInResult> => {
   const mappedProvider = provider === "azure-ad" ? "microsoft" : provider;
   const result = await client.signIn.social({
     provider: mappedProvider as "google",
@@ -261,6 +268,33 @@ export const signIn = async (
     }
   }
   return { ok: true };
+};
+
+export const signIn = async (
+  provider: string,
+  options?: {
+    email?: string;
+    password?: string;
+    callbackUrl?: string;
+    redirect?: boolean;
+  },
+): Promise<SignInResult> => {
+  // Same-origin guard on the post-login redirect target.
+  const callbackURL = options?.callbackUrl
+    ? safeRedirectTarget(options.callbackUrl)
+    : undefined;
+  const shouldRedirect = options?.redirect !== false;
+
+  if (provider === "credentials" || provider === "email") {
+    return signInWithEmail({
+      email: options?.email ?? "",
+      password: options?.password ?? "",
+      callbackURL,
+      shouldRedirect,
+    });
+  }
+
+  return signInWithSocial({ provider, callbackURL, shouldRedirect });
 };
 
 /**
@@ -365,38 +399,15 @@ const SOCIAL_PROVIDERS = new Set([
  * map `azure-ad` → `microsoft` internally so the UI doesn't need to know the
  * BetterAuth internal naming.
  */
-export const linkAccount = async (
-  provider: string,
-  options?: { callbackUrl?: string },
+const postAccountLink = async (
+  endpoint: string,
+  body: Record<string, unknown>,
 ): Promise<{ error?: string; ok?: boolean }> => {
-  const callbackURL = safeRedirectTarget(options?.callbackUrl) || "/";
-
-  if (SOCIAL_PROVIDERS.has(provider)) {
-    const mapped = provider === "azure-ad" ? "microsoft" : provider;
-    const res = await fetch("/api/auth/link-social", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify({ provider: mapped, callbackURL }),
-    });
-    if (!res.ok) {
-      return { error: await res.text(), ok: false };
-    }
-    const data = (await res.json()) as { url?: string; redirect?: boolean };
-    if (data.url && data.redirect !== false) {
-      navigate(data.url);
-    }
-    return { ok: true };
-  }
-
-  // Generic-oauth providers: the plugin's own endpoint. This is the
-  // fall-through on purpose, so a newly supported OIDC provider links
-  // correctly without being listed anywhere here.
-  const res = await fetch("/api/auth/oauth2/link", {
+  const res = await fetch(endpoint, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     credentials: "include",
-    body: JSON.stringify({ providerId: provider, callbackURL }),
+    body: JSON.stringify(body),
   });
   if (!res.ok) {
     return { error: await res.text(), ok: false };
@@ -406,6 +417,29 @@ export const linkAccount = async (
     navigate(data.url);
   }
   return { ok: true };
+};
+
+export const linkAccount = async (
+  provider: string,
+  options?: { callbackUrl?: string },
+): Promise<{ error?: string; ok?: boolean }> => {
+  const callbackURL = safeRedirectTarget(options?.callbackUrl) || "/";
+
+  if (SOCIAL_PROVIDERS.has(provider)) {
+    const mapped = provider === "azure-ad" ? "microsoft" : provider;
+    return postAccountLink("/api/auth/link-social", {
+      provider: mapped,
+      callbackURL,
+    });
+  }
+
+  // Generic-oauth providers: the plugin's own endpoint. This is the
+  // fall-through on purpose, so a newly supported OIDC provider links
+  // correctly without being listed anywhere here.
+  return postAccountLink("/api/auth/oauth2/link", {
+    providerId: provider,
+    callbackURL,
+  });
 };
 
 /**

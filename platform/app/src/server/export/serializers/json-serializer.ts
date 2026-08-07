@@ -27,21 +27,7 @@ export function serializeTraceToSummaryJson({
   trace: Trace;
 }): string {
   const obj = {
-    trace_id: trace.trace_id,
-    project_id: trace.project_id,
-    timestamp: trace.timestamps.started_at,
-    input: trace.input?.value ?? null,
-    output: trace.output?.value ?? null,
-    labels: trace.metadata.labels ?? [],
-    first_token_ms: trace.metrics?.first_token_ms ?? null,
-    total_time_ms: trace.metrics?.total_time_ms ?? null,
-    prompt_tokens: trace.metrics?.prompt_tokens ?? null,
-    completion_tokens: trace.metrics?.completion_tokens ?? null,
-    total_cost: trace.metrics?.total_cost ?? null,
-    metadata: extractMetadataForJson(trace),
-    topic: trace.metadata.topic_id ?? null,
-    subtopic: trace.metadata.subtopic_id ?? null,
-    error: trace.error ? trace.error.message : null,
+    ...serializeTraceFieldsForJson(trace),
     evaluations: (trace.evaluations ?? []).map(serializeEvaluation),
   };
 
@@ -62,21 +48,7 @@ export function serializeTraceToSummaryJson({
  */
 export function serializeTraceToFullJson({ trace }: { trace: Trace }): string {
   const obj = {
-    trace_id: trace.trace_id,
-    project_id: trace.project_id,
-    timestamp: trace.timestamps.started_at,
-    input: trace.input?.value ?? null,
-    output: trace.output?.value ?? null,
-    labels: trace.metadata.labels ?? [],
-    first_token_ms: trace.metrics?.first_token_ms ?? null,
-    total_time_ms: trace.metrics?.total_time_ms ?? null,
-    prompt_tokens: trace.metrics?.prompt_tokens ?? null,
-    completion_tokens: trace.metrics?.completion_tokens ?? null,
-    total_cost: trace.metrics?.total_cost ?? null,
-    metadata: extractMetadataForJson(trace),
-    topic: trace.metadata.topic_id ?? null,
-    subtopic: trace.metadata.subtopic_id ?? null,
-    error: trace.error ? trace.error.message : null,
+    ...serializeTraceFieldsForJson(trace),
     spans: (trace.spans ?? []).map(serializeSpanForJson),
     evaluations: (trace.evaluations ?? []).map(serializeEvaluation),
   };
@@ -89,13 +61,40 @@ export function serializeTraceToFullJson({ trace }: { trace: Trace }): string {
 // ---------------------------------------------------------------------------
 
 /**
+ * The trace-level fields shared by both modes, in the order both modes emit
+ * them. Summary appends `evaluations`; Full appends `spans` then `evaluations`.
+ */
+function serializeTraceFieldsForJson(trace: Trace): Record<string, unknown> {
+  return {
+    trace_id: trace.trace_id,
+    project_id: trace.project_id,
+    timestamp: trace.timestamps.started_at,
+    input: trace.input?.value ?? null,
+    output: trace.output?.value ?? null,
+    labels: trace.metadata.labels ?? [],
+    ...serializeTraceMetricsForJson(trace),
+    metadata: extractMetadataForJson(trace),
+    topic: trace.metadata.topic_id ?? null,
+    subtopic: trace.metadata.subtopic_id ?? null,
+    error: trace.error ? trace.error.message : null,
+  };
+}
+
+function serializeTraceMetricsForJson(trace: Trace): Record<string, unknown> {
+  return {
+    first_token_ms: trace.metrics?.first_token_ms ?? null,
+    total_time_ms: trace.metrics?.total_time_ms ?? null,
+    prompt_tokens: trace.metrics?.prompt_tokens ?? null,
+    completion_tokens: trace.metrics?.completion_tokens ?? null,
+    total_cost: trace.metrics?.total_cost ?? null,
+  };
+}
+
+/**
  * Pick only the intended public fields from a span for JSON export.
  * Prevents internal/unexpected fields from leaking into exported data.
  */
 function serializeSpanForJson(span: Span): Record<string, unknown> {
-  const llmSpan = span.type === "llm" ? (span as LLMSpan) : null;
-  const ragSpan = span.type === "rag" ? (span as RAGSpan) : null;
-
   return {
     span_id: span.span_id,
     parent_id: span.parent_id ?? null,
@@ -106,12 +105,22 @@ function serializeSpanForJson(span: Span): Record<string, unknown> {
     timestamps: span.timestamps,
     metrics: span.metrics ?? null,
     params: span.params ?? null,
-    ...(llmSpan
-      ? { model: llmSpan.model ?? null, vendor: llmSpan.vendor ?? null }
-      : {}),
-    ...(ragSpan ? { contexts: ragSpan.contexts } : {}),
+    ...llmSpanFieldsForJson(span),
+    ...ragSpanFieldsForJson(span),
     error: span.error ?? null,
   };
+}
+
+function llmSpanFieldsForJson(span: Span): Record<string, unknown> {
+  const llmSpan = span.type === "llm" ? (span as LLMSpan) : null;
+  return llmSpan
+    ? { model: llmSpan.model ?? null, vendor: llmSpan.vendor ?? null }
+    : {};
+}
+
+function ragSpanFieldsForJson(span: Span): Record<string, unknown> {
+  const ragSpan = span.type === "rag" ? (span as RAGSpan) : null;
+  return ragSpan ? { contexts: ragSpan.contexts } : {};
 }
 
 function serializeEvaluation(evaluation: {

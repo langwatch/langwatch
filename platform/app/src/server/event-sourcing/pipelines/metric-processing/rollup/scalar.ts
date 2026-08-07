@@ -20,6 +20,34 @@ export function buildGaugeRow({
   }
 }
 
+function applyCumulativeSumPoint({
+  row,
+  point,
+  index,
+  all,
+  current,
+}: {
+  row: MetricRollupRow;
+  point: CanonicalMetricDataPoint;
+  index: number;
+  all: CanonicalMetricDataPoint[];
+  current: number;
+}): void {
+  const previous = previousPoint(all, index);
+  const starts = startsNewSequence(previous, point);
+  const previousValue = previous ? numberValue(previous) : null;
+  const decreased =
+    point.isMonotonic === true &&
+    previousValue !== null &&
+    current < previousValue;
+  if (starts || decreased || previousValue === null) {
+    resetOrGap({ row, previous, current: point });
+    addStats(row, current);
+  } else {
+    addStats(row, current - previousValue);
+  }
+}
+
 export function buildSumRow({
   row,
   entries,
@@ -36,18 +64,6 @@ export function buildSumRow({
       addStats(row, current);
       continue;
     }
-    const previous = previousPoint(all, index);
-    const starts = startsNewSequence(previous, point);
-    const previousValue = previous ? numberValue(previous) : null;
-    const decreased =
-      point.isMonotonic === true &&
-      previousValue !== null &&
-      current < previousValue;
-    if (starts || decreased || previousValue === null) {
-      resetOrGap({ row, previous, current: point });
-      addStats(row, current);
-    } else {
-      addStats(row, current - previousValue);
-    }
+    applyCumulativeSumPoint({ row, point, index, all, current });
   }
 }

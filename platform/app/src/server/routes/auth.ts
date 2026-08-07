@@ -72,6 +72,80 @@ secured.access(authPolicy()).get("/auth/session", async (c) => {
   });
 });
 
+const LOGOUT_COOKIE_NAMES = [
+  "better-auth.session_token",
+  "better-auth.session_data",
+  "better-auth.dont_remember",
+];
+
+const buildLogoutClearCookies = (): string[] => {
+  const clearCookies: string[] = [];
+  for (const name of LOGOUT_COOKIE_NAMES) {
+    clearCookies.push(`${name}=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax`);
+    clearCookies.push(
+      `__Secure-${name}=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax; Secure`,
+    );
+  }
+  return clearCookies;
+};
+
+const deleteServerSession = async (token: string, userId: string) => {
+  try {
+    await prisma.session.delete({
+      where: { sessionToken: token },
+    });
+  } catch {
+    // Session may already be deleted
+  }
+
+  if (redisConnection) {
+    try {
+      await redisConnection.del(`better-auth:${token}`);
+      const listKey = `better-auth:active-sessions-${userId}`;
+      await redisConnection.del(listKey);
+    } catch {
+      // Redis cleanup is best-effort
+    }
+  }
+};
+
+const clearSessionForCookies = async (cookies: string) => {
+  const sessionToken =
+    extractCookie(cookies, "__Secure-better-auth.session_token") ??
+    extractCookie(cookies, "better-auth.session_token");
+
+  if (!sessionToken) {
+    return;
+  }
+
+  try {
+    const headers = new Headers();
+    headers.set("cookie", cookies);
+    const session = await auth.api.getSession({ headers });
+
+    if (session) {
+      await deleteServerSession(session.session.token, session.user.id);
+    }
+  } catch {
+    // Session lookup failed — still clear cookies below
+  }
+};
+
+// Resolved provider, not raw env: on a denied (unlicensed) deployment the
+// platform gate coerces the deployment to email mode (ADR-027), so logout
+// must not bounce the user through the IdP.
+const resolveGetLogoutRedirect = async (): Promise<string> => {
+  if (
+    (await resolveAuthProvider()) === "auth0" &&
+    env.AUTH0_ISSUER &&
+    env.AUTH0_CLIENT_ID
+  ) {
+    const returnTo = encodeURIComponent(`${env.NEXTAUTH_URL}/auth/signin`);
+    return `${env.AUTH0_ISSUER}/v2/logout?client_id=${env.AUTH0_CLIENT_ID}&returnTo=${returnTo}`;
+  }
+  return "/auth/signin";
+};
+
 // ---------- GET|POST /api/auth/logout ----------
 const logoutHandler = async (c: Context) => {
   const method = c.req.method;
@@ -81,79 +155,17 @@ const logoutHandler = async (c: Context) => {
   }
 
   const cookies = c.req.header("cookie") ?? "";
-  const sessionToken =
-    extractCookie(cookies, "__Secure-better-auth.session_token") ??
-    extractCookie(cookies, "better-auth.session_token");
-
-  if (sessionToken) {
-    try {
-      const headers = new Headers();
-      headers.set("cookie", cookies);
-      const session = await auth.api.getSession({ headers });
-
-      if (session) {
-        const token = session.session.token;
-
-        try {
-          await prisma.session.delete({
-            where: { sessionToken: token },
-          });
-        } catch {
-          // Session may already be deleted
-        }
-
-        if (redisConnection) {
-          try {
-            await redisConnection.del(`better-auth:${token}`);
-            const listKey = `better-auth:active-sessions-${session.user.id}`;
-            await redisConnection.del(listKey);
-          } catch {
-            // Redis cleanup is best-effort
-          }
-        }
-      }
-    } catch {
-      // Session lookup failed — still clear cookies below
-    }
-  }
-
-  const cookieNames = [
-    "better-auth.session_token",
-    "better-auth.session_data",
-    "better-auth.dont_remember",
-  ];
-
-  const clearCookies: string[] = [];
-  for (const name of cookieNames) {
-    clearCookies.push(`${name}=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax`);
-    clearCookies.push(
-      `__Secure-${name}=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax; Secure`,
-    );
-  }
+  await clearSessionForCookies(cookies);
 
   // Hono supports multiple Set-Cookie headers via append
-  for (const cookie of clearCookies) {
+  for (const cookie of buildLogoutClearCookies()) {
     c.header("Set-Cookie", cookie, { append: true });
   }
 
   if (method === "GET") {
-    // Resolved provider, not raw env: on a denied (unlicensed) deployment
-    // the platform gate coerces the deployment to email mode (ADR-027), so
-    // logout must not bounce the user through the IdP.
-    if (
-      (await resolveAuthProvider()) === "auth0" &&
-      env.AUTH0_ISSUER &&
-      env.AUTH0_CLIENT_ID
-    ) {
-      const returnTo = encodeURIComponent(`${env.NEXTAUTH_URL}/auth/signin`);
-      const federatedLogoutUrl = `${env.AUTH0_ISSUER}/v2/logout?client_id=${env.AUTH0_CLIENT_ID}&returnTo=${returnTo}`;
-      return c.redirect(federatedLogoutUrl, 302);
-    } else {
-      return c.redirect("/auth/signin", 302);
-    }
-  } else {
-    return c.json({ success: true });
+    return c.redirect(await resolveGetLogoutRedirect(), 302);
   }
+  return c.json({ success: true });
 };
 
 secured.access(authPolicy()).get("/auth/logout", logoutHandler);

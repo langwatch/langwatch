@@ -39,6 +39,43 @@ export type UnifiedAuthVariables = {
 };
 
 /**
+ * Decodes `base64(projectId:token)` out of a Basic Authorization header.
+ *
+ * Returns null on anything malformed — no colon, an empty half, or undecodable
+ * base64 — so the caller can fall through to X-Auth-Token: a malformed Basic
+ * header (e.g. injected by a corporate proxy for upstream auth) must not poison
+ * the customer's legitimate X-Auth-Token credential.
+ */
+function credentialsFromBasicAuth(
+  authHeader: string,
+): { token: string; projectId: string } | null {
+  const encoded = authHeader.slice(6);
+  try {
+    const decoded = Buffer.from(encoded, "base64").toString("utf-8");
+    const colonIndex = decoded.indexOf(":");
+    if (colonIndex === -1) return null;
+    const projectId = decoded.slice(0, colonIndex);
+    const token = decoded.slice(colonIndex + 1);
+    if (projectId && token) {
+      return { token, projectId };
+    }
+  } catch {
+    // Same fallthrough on undecodable base64.
+  }
+  return null;
+}
+
+/**
+ * The token carried by a Bearer Authorization header, or null when it is empty
+ * — an empty Bearer falls through to X-Auth-Token, the same proxy-injection
+ * hardening {@link credentialsFromBasicAuth} applies.
+ */
+function bearerToken(authHeader: string): string | null {
+  const token = authHeader.slice(7).trim();
+  return token ? token : null;
+}
+
+/**
  * Parses the Authorization header to extract credentials for all supported
  * auth methods:
  *   1. Basic Auth: base64(projectId:token) — for SDKs
@@ -54,33 +91,16 @@ function extractCredentials(
 
   // Priority 1: Basic Auth — carries both projectId and token
   if (authHeader?.toLowerCase().startsWith("basic ")) {
-    const encoded = authHeader.slice(6);
-    try {
-      const decoded = Buffer.from(encoded, "base64").toString("utf-8");
-      const colonIndex = decoded.indexOf(":");
-      if (colonIndex !== -1) {
-        const projectId = decoded.slice(0, colonIndex);
-        const token = decoded.slice(colonIndex + 1);
-        if (projectId && token) {
-          return { token, projectId };
-        }
-      }
-      // Fall through to X-Auth-Token below: a malformed Basic header (e.g.
-      // injected by a corporate proxy for upstream auth) must not poison
-      // the customer's legitimate X-Auth-Token credential.
-    } catch {
-      // Same fallthrough on undecodable base64.
-    }
+    const basic = credentialsFromBasicAuth(authHeader);
+    if (basic) return basic;
   }
 
   // Priority 2: Bearer token
   if (authHeader?.toLowerCase().startsWith("bearer ")) {
-    const token = authHeader.slice(7).trim();
+    const token = bearerToken(authHeader);
     if (token) {
       return { token, projectId: xProjectId ?? null };
     }
-    // Empty Bearer also falls through to X-Auth-Token — same proxy-injection
-    // hardening as Basic above.
   }
 
   // Priority 3: X-Auth-Token header (legacy)

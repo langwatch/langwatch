@@ -216,38 +216,41 @@ export class EventRepositoryMemory implements EventRepository {
     }
 
     for (const record of records) {
-      const key = `${record.TenantId}:${record.AggregateType}:${String(record.AggregateId)}`;
-      const aggregateEvents = this.eventsByKey.get(key) ?? [];
-
-      // Prevent duplicates by checking if event with same ID already exists
-      const alreadyExists = aggregateEvents.some(
-        (e) => e.EventId === record.EventId,
-      );
-      if (alreadyExists) {
-        // Log duplicate attempt for observability
-        if (process.env.NODE_ENV !== "test") {
-          logger.warn(
-            {
-              eventId: record.EventId,
-              aggregateId: record.AggregateId,
-              tenantId: record.TenantId,
-            },
-            "Duplicate event detected and skipped",
-          );
-        }
-        continue;
-      }
-
-      // Deep clone to prevent mutation
-      aggregateEvents.push({
-        ...record,
-        EventPayload:
-          typeof record.EventPayload === "object" &&
-          record.EventPayload !== null
-            ? JSON.parse(JSON.stringify(record.EventPayload))
-            : record.EventPayload,
-      });
-      this.eventsByKey.set(key, aggregateEvents);
+      this.insertEventRecord(record);
     }
+  }
+
+  private insertEventRecord(record: EventRecord): void {
+    const key = `${record.TenantId}:${record.AggregateType}:${String(record.AggregateId)}`;
+    const aggregateEvents = this.eventsByKey.get(key) ?? [];
+
+    // Prevent duplicates by checking if event with same ID already exists
+    const alreadyExists = aggregateEvents.some(
+      (e) => e.EventId === record.EventId,
+    );
+    if (alreadyExists) {
+      // Log duplicate attempt for observability
+      if (process.env.NODE_ENV !== "test") {
+        logger.warn(
+          {
+            eventId: record.EventId,
+            aggregateId: record.AggregateId,
+            tenantId: record.TenantId,
+          },
+          "Duplicate event detected and skipped",
+        );
+      }
+      return;
+    }
+
+    // Deep clone to prevent mutation
+    aggregateEvents.push({
+      ...record,
+      EventPayload:
+        typeof record.EventPayload === "object" && record.EventPayload !== null
+          ? JSON.parse(JSON.stringify(record.EventPayload))
+          : record.EventPayload,
+    });
+    this.eventsByKey.set(key, aggregateEvents);
   }
 }

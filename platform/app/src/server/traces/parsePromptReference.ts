@@ -41,15 +41,106 @@ const ATTR_PROMPT_VARIABLES_PREFIX = "langwatch.prompt.variables.";
  * handles may contain `/` but never `:`. Disambiguation: positive integer
  * suffix → version; otherwise → tag. `"latest"` suffix is treated as a no-op.
  */
+/** Extracts `langwatch.prompt.version.id`, or null when absent/empty. */
+function extractVersionId(attrs: Record<string, unknown>): string | null {
+  const raw = attrs[ATTR_PROMPT_VERSION_ID];
+  return typeof raw === "string" && raw.length > 0 ? raw : null;
+}
+
+/**
+ * Combined format: `handle:<version_or_tag>`. Returns null on invalid
+ * shorthand (e.g. empty slug) so the caller falls back to nullResult.
+ */
+function parseCombinedPromptId({
+  promptId,
+  versionId,
+  variables,
+}: {
+  promptId: string;
+  versionId: string | null;
+  variables: Record<string, string> | null;
+}): PromptReference | null {
+  try {
+    const shorthand = parsePromptShorthand(promptId);
+    return {
+      promptHandle: shorthand.slug,
+      promptVersionNumber: shorthand.version ?? null,
+      promptVersionId: versionId,
+      promptTag: shorthand.tag ?? null,
+      promptVariables: variables,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Flat format: bare-slug `prompt.id` with version carried in its own
+ * attribute. Pair with `version.number` if present so the rollup gets a
+ * human-readable version too.
+ *
+ * Prefer the explicit `langwatch.prompt.handle` attribute when present:
+ * the python-sdk + nlpgo emit BOTH on Prompt.compile (id=raw configId,
+ * handle=canonical slug). Falling back to the raw configId-as-handle
+ * here meant downstream surfaces (toast on lookup failure, "Open in
+ * Prompts" label fallback) showed the unreadable configId instead of
+ * the canonical handle. When there's no handle attribute (older SDK
+ * shape that only emitted prompt.id), fall back to prompt.id itself.
+ */
+function parseFlatPromptId({
+  attrs,
+  promptId,
+  versionId,
+  variables,
+}: {
+  attrs: Record<string, unknown>;
+  promptId: string;
+  versionId: string | null;
+  variables: Record<string, string> | null;
+}): PromptReference {
+  const versionNumber = parseVersionNumber(attrs[ATTR_PROMPT_VERSION_NUMBER]);
+  const handleAttr = attrs[ATTR_PROMPT_HANDLE];
+  const promptHandle =
+    typeof handleAttr === "string" && handleAttr.length > 0
+      ? handleAttr
+      : promptId;
+  return {
+    promptHandle,
+    promptVersionNumber: versionNumber,
+    promptVersionId: versionId,
+    promptTag: null,
+    promptVariables: variables,
+  };
+}
+
+/** Legacy separated format: `langwatch.prompt.handle` + `.version.number`. */
+function parseLegacyPromptHandle({
+  attrs,
+  versionId,
+  variables,
+}: {
+  attrs: Record<string, unknown>;
+  versionId: string | null;
+  variables: Record<string, string> | null;
+}): PromptReference | null {
+  const handle = attrs[ATTR_PROMPT_HANDLE];
+  if (typeof handle !== "string" || handle.length === 0) return null;
+  const versionNumber = parseVersionNumber(attrs[ATTR_PROMPT_VERSION_NUMBER]);
+  if (versionNumber === null) return null;
+  return {
+    promptHandle: handle,
+    promptVersionNumber: versionNumber,
+    promptVersionId: versionId,
+    promptTag: null,
+    promptVariables: variables,
+  };
+}
+
 export function parsePromptReference(
   attrs: Record<string, unknown>,
 ): PromptReference {
   const variables = parsePromptVariables(attrs);
-  const versionIdRaw = attrs[ATTR_PROMPT_VERSION_ID];
-  const versionId =
-    typeof versionIdRaw === "string" && versionIdRaw.length > 0
-      ? versionIdRaw
-      : null;
+  const versionId = extractVersionId(attrs);
 
   const nullResult: PromptReference = {
     promptHandle: null,
@@ -61,66 +152,17 @@ export function parsePromptReference(
 
   const promptId = attrs[ATTR_PROMPT_ID];
 
-  // Combined format: `handle:<version_or_tag>`.
   if (typeof promptId === "string" && promptId.includes(":")) {
-    try {
-      const shorthand = parsePromptShorthand(promptId);
-      return {
-        promptHandle: shorthand.slug,
-        promptVersionNumber: shorthand.version ?? null,
-        promptVersionId: versionId,
-        promptTag: shorthand.tag ?? null,
-        promptVariables: variables,
-      };
-    } catch {
-      // Invalid shorthand (e.g., empty slug) — bail to nullResult.
-      return nullResult;
-    }
+    return (
+      parseCombinedPromptId({ promptId, versionId, variables }) ?? nullResult
+    );
   }
 
-  // Flat format: bare-slug `prompt.id` with version carried in its own
-  // attribute. Pair with `version.number` if present so the rollup gets a
-  // human-readable version too.
-  //
-  // Prefer the explicit `langwatch.prompt.handle` attribute when present:
-  // the python-sdk + nlpgo emit BOTH on Prompt.compile (id=raw configId,
-  // handle=canonical slug). Falling back to the raw configId-as-handle
-  // here meant downstream surfaces (toast on lookup failure, "Open in
-  // Prompts" label fallback) showed the unreadable configId instead of
-  // the canonical handle. When there's no handle attribute (older SDK
-  // shape that only emitted prompt.id), fall back to prompt.id itself.
   if (typeof promptId === "string" && promptId.length > 0) {
-    const versionNumber = parseVersionNumber(attrs[ATTR_PROMPT_VERSION_NUMBER]);
-    const handleAttr = attrs[ATTR_PROMPT_HANDLE];
-    const promptHandle =
-      typeof handleAttr === "string" && handleAttr.length > 0
-        ? handleAttr
-        : promptId;
-    return {
-      promptHandle,
-      promptVersionNumber: versionNumber,
-      promptVersionId: versionId,
-      promptTag: null,
-      promptVariables: variables,
-    };
+    return parseFlatPromptId({ attrs, promptId, versionId, variables });
   }
 
-  // Legacy separated format.
-  const handle = attrs[ATTR_PROMPT_HANDLE];
-  if (typeof handle === "string" && handle.length > 0) {
-    const versionNumber = parseVersionNumber(attrs[ATTR_PROMPT_VERSION_NUMBER]);
-    if (versionNumber !== null) {
-      return {
-        promptHandle: handle,
-        promptVersionNumber: versionNumber,
-        promptVersionId: versionId,
-        promptTag: null,
-        promptVariables: variables,
-      };
-    }
-  }
-
-  return nullResult;
+  return parseLegacyPromptHandle({ attrs, versionId, variables }) ?? nullResult;
 }
 
 function parseVersionNumber(raw: unknown): number | null {

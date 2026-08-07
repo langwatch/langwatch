@@ -1,4 +1,5 @@
 import { LOGS_ONLY_AGENT_IDS } from "../agents";
+import type { CodingAgentMetric } from "../agents/_types";
 import {
   normalizeEventName,
   normalizeMetricName,
@@ -127,7 +128,16 @@ const CACHE_REBUILD_MIN_TOKENS = 1_000;
  */
 const ABORTED_SOURCES = new Set(["user_abort"]);
 
-export function createInitCodingAgentSession(): CodingAgentSessionData {
+function initIdentityFields(): Pick<
+  CodingAgentSessionData,
+  | "agent"
+  | "sessionId"
+  | "agentVersion"
+  | "terminalType"
+  | "entrypoint"
+  | "finalRequestId"
+  | "userId"
+> {
   return {
     agent: null,
     sessionId: null,
@@ -136,7 +146,21 @@ export function createInitCodingAgentSession(): CodingAgentSessionData {
     entrypoint: null,
     finalRequestId: null,
     userId: null,
+  };
+}
 
+function initActivityFields(): Pick<
+  CodingAgentSessionData,
+  | "modelCalls"
+  | "toolCalls"
+  | "subAgents"
+  | "subAgentIds"
+  | "steps"
+  | "prompts"
+  | "promptChars"
+  | "responseChars"
+> {
+  return {
     modelCalls: 0,
     toolCalls: 0,
     subAgents: 0,
@@ -145,7 +169,22 @@ export function createInitCodingAgentSession(): CodingAgentSessionData {
     prompts: 0,
     promptChars: 0,
     responseChars: 0,
+  };
+}
 
+function initToolDetailFields(): Pick<
+  CodingAgentSessionData,
+  | "toolCounts"
+  | "toolDurationMs"
+  | "filesTouched"
+  | "skills"
+  | "subAgentTypes"
+  | "slashCommands"
+  | "models"
+  | "mcpServers"
+  | "mcpTools"
+> {
+  return {
     toolCounts: {},
     toolDurationMs: {},
     filesTouched: [],
@@ -155,13 +194,37 @@ export function createInitCodingAgentSession(): CodingAgentSessionData {
     models: [],
     mcpServers: [],
     mcpTools: [],
+  };
+}
 
+function initTokenFields(): Pick<
+  CodingAgentSessionData,
+  | "inputTokens"
+  | "outputTokens"
+  | "cacheReadTokens"
+  | "cacheCreationTokens"
+  | "costUsd"
+> {
+  return {
     inputTokens: 0,
     outputTokens: 0,
     cacheReadTokens: 0,
     cacheCreationTokens: 0,
     costUsd: 0,
+  };
+}
 
+function initTimingFields(): Pick<
+  CodingAgentSessionData,
+  | "modelCallMs"
+  | "toolMs"
+  | "ttftMsTotal"
+  | "ttftSamples"
+  | "blockedOnUserMs"
+  | "activeTimeUserSec"
+  | "activeTimeCliSec"
+> {
+  return {
     modelCallMs: 0,
     toolMs: 0,
     ttftMsTotal: 0,
@@ -169,7 +232,22 @@ export function createInitCodingAgentSession(): CodingAgentSessionData {
     blockedOnUserMs: 0,
     activeTimeUserSec: 0,
     activeTimeCliSec: 0,
+  };
+}
 
+function initContextStatsFields(): Pick<
+  CodingAgentSessionData,
+  | "toolResultBytes"
+  | "toolInputBytes"
+  | "compactions"
+  | "compactionTokensBefore"
+  | "compactionTokensAfter"
+  | "peakContextTokens"
+  | "cacheRebuildCount"
+  | "largestCacheRebuildTokens"
+  | "previousCallContextTokens"
+> {
+  return {
     toolResultBytes: 0,
     toolInputBytes: 0,
     compactions: 0,
@@ -179,7 +257,23 @@ export function createInitCodingAgentSession(): CodingAgentSessionData {
     cacheRebuildCount: 0,
     largestCacheRebuildTokens: 0,
     previousCallContextTokens: 0,
+  };
+}
 
+function initErrorFields(): Pick<
+  CodingAgentSessionData,
+  | "failedTools"
+  | "errorTypes"
+  | "apiErrors"
+  | "rateLimited"
+  | "retriesExhausted"
+  | "retryMs"
+  | "attempts"
+  | "refusals"
+  | "refusalCategories"
+  | "internalErrors"
+> {
+  return {
     failedTools: 0,
     errorTypes: {},
     apiErrors: 0,
@@ -190,7 +284,20 @@ export function createInitCodingAgentSession(): CodingAgentSessionData {
     refusals: 0,
     refusalCategories: [],
     internalErrors: 0,
+  };
+}
 
+function initPermissionFields(): Pick<
+  CodingAgentSessionData,
+  | "toolsDenied"
+  | "toolsAborted"
+  | "permissionMode"
+  | "permissionChanges"
+  | "hooksBlocked"
+  | "hooksCancelled"
+  | "hookMs"
+> {
+  return {
     toolsDenied: 0,
     toolsAborted: 0,
     permissionMode: null,
@@ -198,7 +305,22 @@ export function createInitCodingAgentSession(): CodingAgentSessionData {
     hooksBlocked: 0,
     hooksCancelled: 0,
     hookMs: 0,
+  };
+}
 
+function initCodeEditingFields(): Pick<
+  CodingAgentSessionData,
+  | "metricSeries"
+  | "linesAdded"
+  | "linesRemoved"
+  | "commits"
+  | "pullRequests"
+  | "editsAccepted"
+  | "editsRejected"
+  | "languagesEdited"
+  | "atMentions"
+> {
+  return {
     metricSeries: {},
     linesAdded: 0,
     linesRemoved: 0,
@@ -208,9 +330,31 @@ export function createInitCodingAgentSession(): CodingAgentSessionData {
     editsRejected: 0,
     languagesEdited: [],
     atMentions: 0,
+  };
+}
 
+function initOutcomeFields(): Pick<
+  CodingAgentSessionData,
+  "stopReason" | "truncated"
+> {
+  return {
     stopReason: null,
     truncated: false,
+  };
+}
+
+export function createInitCodingAgentSession(): CodingAgentSessionData {
+  return {
+    ...initIdentityFields(),
+    ...initActivityFields(),
+    ...initToolDetailFields(),
+    ...initTokenFields(),
+    ...initTimingFields(),
+    ...initContextStatsFields(),
+    ...initErrorFields(),
+    ...initPermissionFields(),
+    ...initCodeEditingFields(),
+    ...initOutcomeFields(),
   };
 }
 
@@ -461,6 +605,81 @@ export interface SpanFactsView {
   attrs: Record<string, unknown>;
 }
 
+function applyLlmRequestSpan({
+  state,
+  attrs,
+  durationMs,
+  isLogsOnly,
+}: {
+  state: CodingAgentSessionData;
+  attrs: Record<string, unknown>;
+  durationMs: number;
+  isLogsOnly: boolean;
+}): CodingAgentSessionData {
+  // Identity still rides the span; only the counted facts are the log's.
+  return isLogsOnly
+    ? withIdentity(state, attrs)
+    : foldModelCall(withIdentity(state, attrs), attrs, durationMs);
+}
+
+function applySubagentSpawnSpan(
+  state: CodingAgentSessionData,
+  attrs: Record<string, unknown>,
+): CodingAgentSessionData {
+  const next = withIdentity(state, attrs);
+  const agentType = str(attrs.agent_type) ?? str(attrs.subagent_type);
+  const agentId = str(attrs.agent_id);
+  return {
+    ...next,
+    ...(agentId !== null ? seenSubAgent(next, agentId) : {}),
+    subAgentTypes:
+      agentType !== null
+        ? addToBoundedSet(next.subAgentTypes, agentType)
+        : next.subAgentTypes,
+  };
+}
+
+// The time a HUMAN sat waiting to approve a tool. Pure friction: the agent was
+// idle and so was the person. Nothing else in the telemetry surfaces it.
+function applyBlockedOnUserSpan(
+  state: CodingAgentSessionData,
+  attrs: Record<string, unknown>,
+  durationMs: number,
+): CodingAgentSessionData {
+  return {
+    ...state,
+    blockedOnUserMs:
+      state.blockedOnUserMs + (num(attrs.duration_ms) || durationMs),
+  };
+}
+
+function applyToolSpan({
+  state,
+  attrs,
+  durationMs,
+  isLogsOnly,
+  statusCode,
+  startedAtMs,
+}: {
+  state: CodingAgentSessionData;
+  attrs: Record<string, unknown>;
+  durationMs: number;
+  isLogsOnly: boolean;
+  statusCode: number;
+  startedAtMs: number;
+}): CodingAgentSessionData {
+  // Same gate as the model call above: a logs-only agent folds its tool runs
+  // from `tool_result`, so the tool span would be the second count.
+  if (isLogsOnly) return withIdentity(state, attrs);
+
+  return foldToolInvocation(withIdentity(state, attrs), {
+    attrs,
+    failed: statusCode === SPAN_STATUS_ERROR,
+    toolMs: num(attrs.duration_ms) || durationMs,
+    startedAtMs,
+  });
+}
+
 /** Fold one SPAN's facts into the session. */
 export function applySpanToCodingAgentSession({
   state,
@@ -485,49 +704,25 @@ export function applySpanToCodingAgentSession({
   const durationMs = Math.max(0, span.endTimeUnixMs - span.startTimeUnixMs);
   const isLogsOnly = agent !== undefined && LOGS_ONLY_AGENT_IDS.has(agent);
 
-  if (span.name === CLAUDE.SPAN.LLM_REQUEST) {
-    // Identity still rides the span; only the counted facts are the log's.
-    return isLogsOnly
-      ? withIdentity(state, attrs)
-      : foldModelCall(withIdentity(state, attrs), attrs, durationMs);
+  switch (span.name) {
+    case CLAUDE.SPAN.LLM_REQUEST:
+      return applyLlmRequestSpan({ state, attrs, durationMs, isLogsOnly });
+    case CLAUDE.SPAN.SUBAGENT_SPAWN:
+      return applySubagentSpawnSpan(state, attrs);
+    case CLAUDE.SPAN.BLOCKED_ON_USER:
+      return applyBlockedOnUserSpan(state, attrs, durationMs);
+    case CLAUDE.SPAN.TOOL:
+      return applyToolSpan({
+        state,
+        attrs,
+        durationMs,
+        isLogsOnly,
+        statusCode: span.statusCode,
+        startedAtMs: span.startTimeUnixMs,
+      });
+    default:
+      return state;
   }
-
-  if (span.name === CLAUDE.SPAN.SUBAGENT_SPAWN) {
-    const next = withIdentity(state, attrs);
-    const agentType = str(attrs.agent_type) ?? str(attrs.subagent_type);
-    const agentId = str(attrs.agent_id);
-    return {
-      ...next,
-      ...(agentId !== null ? seenSubAgent(next, agentId) : {}),
-      subAgentTypes:
-        agentType !== null
-          ? addToBoundedSet(next.subAgentTypes, agentType)
-          : next.subAgentTypes,
-    };
-  }
-
-  // The time a HUMAN sat waiting to approve a tool. Pure friction: the agent was
-  // idle and so was the person. Nothing else in the telemetry surfaces it.
-  if (span.name === CLAUDE.SPAN.BLOCKED_ON_USER) {
-    return {
-      ...state,
-      blockedOnUserMs:
-        state.blockedOnUserMs + (num(attrs.duration_ms) || durationMs),
-    };
-  }
-
-  if (span.name !== CLAUDE.SPAN.TOOL) return state;
-
-  // Same gate as the model call above: a logs-only agent folds its tool runs
-  // from `tool_result`, so the tool span would be the second count.
-  if (isLogsOnly) return withIdentity(state, attrs);
-
-  return foldToolInvocation(withIdentity(state, attrs), {
-    attrs,
-    failed: span.statusCode === SPAN_STATUS_ERROR,
-    toolMs: num(attrs.duration_ms) || durationMs,
-    startedAtMs: span.startTimeUnixMs,
-  });
 }
 
 /**
@@ -537,6 +732,72 @@ export function applySpanToCodingAgentSession({
  * duration, sizes — on its `tool_result` EVENT. The caller gates which
  * carrier counts for its agent, so an agent with both never double-counts.
  */
+// A sub-agent runs its OWN conversation and can do twenty reads of its own.
+// Splicing those into the session's steps would read as though the main thread
+// did them, flattening away the hierarchy. The sub-agent is already
+// represented by the step that SPAWNED it. `agent_id` is absent on the main
+// thread and present on every sub-agent span, so it is exactly the
+// discriminator. The work still counts toward the totals — it happened.
+function toolStepPatch(
+  withTool: CodingAgentSessionData,
+  next: CodingAgentSessionData,
+  {
+    toolAgentId,
+    toolName,
+    startedAtMs,
+    failed,
+  }: {
+    toolAgentId: string | null;
+    toolName: string;
+    startedAtMs: number;
+    failed: boolean;
+  },
+): Partial<CodingAgentSessionData> {
+  if (toolAgentId !== null) return seenSubAgent(withTool, toolAgentId);
+  return {
+    steps: appendStep(next.steps, { name: toolName, startedAtMs, failed }),
+  };
+}
+
+function toolCrossReferencePatch(
+  next: CodingAgentSessionData,
+  attrs: Record<string, unknown>,
+  toolName: string,
+): Partial<CodingAgentSessionData> {
+  const patch: Partial<CodingAgentSessionData> = {};
+
+  const filePath = str(attrs.file_path);
+  if (filePath !== null) {
+    patch.filesTouched = addToBoundedSet(next.filesTouched, filePath);
+  }
+
+  // A skill reaches the session two ways: the `skill_activated` event and the
+  // Skill TOOL span. A skill the agent invoked proactively arrives on one path,
+  // a `/slash` skill on the other — reading only one loses half of them.
+  const skillName = str(attrs.skill_name);
+  if (skillName !== null) {
+    patch.skills = addToBoundedSet(next.skills, skillName);
+  }
+
+  // An MCP call announces itself in its NAME — `mcp__<server>__<tool>` — and that
+  // is the signal that actually arrives. Reading only the `mcp_server.name` /
+  // `mcp_tool.name` attributes found nothing on real sessions: a session that had
+  // plainly called an MCP server reported using none, because the agent doesn't
+  // emit those attributes on the tool span. So parse the name first and treat the
+  // attributes as a bonus for agents that DO send them.
+  const fromName = parseMcpToolName(toolName);
+  const mcpServer = str(attrs["mcp_server.name"]) ?? fromName?.server ?? null;
+  if (mcpServer !== null) {
+    patch.mcpServers = addToBoundedSet(next.mcpServers, mcpServer);
+  }
+  const mcpTool = str(attrs["mcp_tool.name"]) ?? fromName?.tool ?? null;
+  if (mcpTool !== null) {
+    patch.mcpTools = addToBoundedSet(next.mcpTools, mcpTool);
+  }
+
+  return patch;
+}
+
 function foldToolInvocation(
   next: CodingAgentSessionData,
   {
@@ -567,52 +828,17 @@ function foldToolInvocation(
     withTool.toolDurationMs = bump(next.toolDurationMs, toolName, toolMs);
   }
 
-  // A sub-agent runs its OWN conversation and can do twenty reads of its own.
-  // Splicing those into the session's steps would read as though the main thread
-  // did them, flattening away the hierarchy. The sub-agent is already
-  // represented by the step that SPAWNED it. `agent_id` is absent on the main
-  // thread and present on every sub-agent span, so it is exactly the
-  // discriminator. The work still counts toward the totals — it happened.
   const toolAgentId = str(attrs.agent_id);
-  if (toolAgentId !== null) {
-    Object.assign(withTool, seenSubAgent(withTool, toolAgentId));
-  }
-  if (toolAgentId === null) {
-    withTool.steps = appendStep(next.steps, {
-      name: toolName,
+  Object.assign(
+    withTool,
+    toolStepPatch(withTool, next, {
+      toolAgentId,
+      toolName,
       startedAtMs,
       failed,
-    });
-  }
-
-  const filePath = str(attrs.file_path);
-  if (filePath !== null) {
-    withTool.filesTouched = addToBoundedSet(next.filesTouched, filePath);
-  }
-
-  // A skill reaches the session two ways: the `skill_activated` event and the
-  // Skill TOOL span. A skill the agent invoked proactively arrives on one path,
-  // a `/slash` skill on the other — reading only one loses half of them.
-  const skillName = str(attrs.skill_name);
-  if (skillName !== null) {
-    withTool.skills = addToBoundedSet(next.skills, skillName);
-  }
-
-  // An MCP call announces itself in its NAME — `mcp__<server>__<tool>` — and that
-  // is the signal that actually arrives. Reading only the `mcp_server.name` /
-  // `mcp_tool.name` attributes found nothing on real sessions: a session that had
-  // plainly called an MCP server reported using none, because the agent doesn't
-  // emit those attributes on the tool span. So parse the name first and treat the
-  // attributes as a bonus for agents that DO send them.
-  const fromName = parseMcpToolName(toolName);
-  const mcpServer = str(attrs["mcp_server.name"]) ?? fromName?.server ?? null;
-  if (mcpServer !== null) {
-    withTool.mcpServers = addToBoundedSet(next.mcpServers, mcpServer);
-  }
-  const mcpTool = str(attrs["mcp_tool.name"]) ?? fromName?.tool ?? null;
-  if (mcpTool !== null) {
-    withTool.mcpTools = addToBoundedSet(next.mcpTools, mcpTool);
-  }
+    }),
+  );
+  Object.assign(withTool, toolCrossReferencePatch(next, attrs, toolName));
 
   return withTool;
 }
@@ -627,6 +853,192 @@ function foldToolInvocation(
  * everything spans normally carry, so its `api_request` folds the model call
  * and its `tool_result` folds the tool invocation.
  */
+function onUserPrompt(
+  base: CodingAgentSessionData,
+  attrs: Record<string, unknown>,
+): CodingAgentSessionData {
+  const command = str(attrs.command_name);
+  return {
+    ...base,
+    prompts: base.prompts + 1,
+    // The length, never the text.
+    promptChars: base.promptChars + num(attrs.prompt_length),
+    slashCommands:
+      command !== null
+        ? addToBoundedSet(base.slashCommands, command)
+        : base.slashCommands,
+  };
+}
+
+function onAssistantResponse(
+  base: CodingAgentSessionData,
+  attrs: Record<string, unknown>,
+): CodingAgentSessionData {
+  return {
+    ...base,
+    responseChars: base.responseChars + num(attrs.response_length),
+  };
+}
+
+function onApiRequest(
+  base: CodingAgentSessionData,
+  attrs: Record<string, unknown>,
+  isLogsOnly: boolean,
+): CodingAgentSessionData {
+  // The authoritative cost: the agent reports what it was actually billed,
+  // which no span carries.
+  const withCost = { ...base, costUsd: base.costUsd + num(attrs.cost_usd) };
+  // For a logs-only agent this event IS the model call — the same facts
+  // the llm_request span carries for Claude Code fold from here instead.
+  return isLogsOnly ? foldModelCall(withCost, attrs, 0) : withCost;
+}
+
+function onToolResult(
+  base: CodingAgentSessionData,
+  attrs: Record<string, unknown>,
+  { isLogsOnly, occurredAtMs }: { isLogsOnly: boolean; occurredAtMs?: number },
+): CodingAgentSessionData {
+  const errorType = str(attrs.error_type);
+  const withBytes = {
+    ...base,
+    // Bytes of tool OUTPUT fed back into the context — the usual cause of a
+    // session bloating its way into a compaction.
+    toolResultBytes: base.toolResultBytes + num(attrs.tool_result_size_bytes),
+    toolInputBytes: base.toolInputBytes + num(attrs.tool_input_size_bytes),
+    errorTypes:
+      errorType !== null && scalarStr(attrs.success) === "false"
+        ? bump(base.errorTypes, errorType)
+        : base.errorTypes,
+  };
+  // For a logs-only agent this event IS the tool run — name, duration,
+  // outcome — which span-bearing agents fold from the tool span.
+  return isLogsOnly
+    ? foldToolInvocation(withBytes, {
+        attrs,
+        failed: scalarStr(attrs.success) === "false",
+        toolMs: num(attrs.duration_ms),
+        startedAtMs: occurredAtMs ?? 0,
+      })
+    : withBytes;
+}
+
+// An ABORT (the human walked away from the prompt) is a different act from
+// a refusal, and NEITHER is a tool that broke. Counting them as failures
+// would report the human's judgement as the agent's fault.
+function onToolDecision(
+  base: CodingAgentSessionData,
+  attrs: Record<string, unknown>,
+): CodingAgentSessionData {
+  if (str(attrs.decision) !== "reject") return base;
+  const source = str(attrs.source) ?? "";
+  return ABORTED_SOURCES.has(source)
+    ? { ...base, toolsAborted: base.toolsAborted + 1 }
+    : { ...base, toolsDenied: base.toolsDenied + 1 };
+}
+
+function onApiError(
+  base: CodingAgentSessionData,
+  attrs: Record<string, unknown>,
+): CodingAgentSessionData {
+  return {
+    ...base,
+    apiErrors: base.apiErrors + 1,
+    rateLimited:
+      base.rateLimited +
+      (scalarStr(attrs.status_code) === RATE_LIMIT_STATUS ? 1 : 0),
+  };
+}
+
+function onRetriesExhausted(
+  base: CodingAgentSessionData,
+  attrs: Record<string, unknown>,
+): CodingAgentSessionData {
+  return {
+    ...base,
+    retriesExhausted: base.retriesExhausted + 1,
+    // Wall-clock burned on attempts that produced nothing.
+    retryMs: base.retryMs + num(attrs.total_retry_duration_ms),
+  };
+}
+
+// A server-side fallback hop already retried on another model, so the user
+// never saw that refusal. Counting it would overstate how often the agent
+// actually refused the human.
+function onRefusal(
+  base: CodingAgentSessionData,
+  attrs: Record<string, unknown>,
+): CodingAgentSessionData {
+  if (scalarStr(attrs.server_fallback_hop) === "true") return base;
+  const category = str(attrs.category);
+  return {
+    ...base,
+    refusals: base.refusals + 1,
+    refusalCategories:
+      category !== null
+        ? addToBoundedSet(base.refusalCategories, category)
+        : base.refusalCategories,
+  };
+}
+
+function onCompaction(
+  base: CodingAgentSessionData,
+  attrs: Record<string, unknown>,
+): CodingAgentSessionData {
+  return {
+    ...base,
+    compactions: base.compactions + 1,
+    compactionTokensBefore: base.compactionTokensBefore + num(attrs.pre_tokens),
+    compactionTokensAfter: base.compactionTokensAfter + num(attrs.post_tokens),
+  };
+}
+
+function onPermissionMode(
+  base: CodingAgentSessionData,
+  attrs: Record<string, unknown>,
+): CodingAgentSessionData {
+  const mode = str(attrs.to_mode);
+  return {
+    ...base,
+    permissionMode: mode ?? base.permissionMode,
+    // Every widening of what the agent is allowed to do is worth auditing.
+    permissionChanges: base.permissionChanges + 1,
+  };
+}
+
+function onSkillActivated(
+  base: CodingAgentSessionData,
+  attrs: Record<string, unknown>,
+): CodingAgentSessionData {
+  const skill = str(attrs["skill.name"]);
+  return skill !== null
+    ? { ...base, skills: addToBoundedSet(base.skills, skill) }
+    : base;
+}
+
+function onMcpConnection(
+  base: CodingAgentSessionData,
+  attrs: Record<string, unknown>,
+): CodingAgentSessionData {
+  const server = str(attrs.server_name) ?? str(attrs["plugin.name"]);
+  return server !== null
+    ? { ...base, mcpServers: addToBoundedSet(base.mcpServers, server) }
+    : base;
+}
+
+// The safeguards that actually FIRED: a hook that returned a blocking
+// decision stopped the agent doing something.
+function onHookComplete(
+  base: CodingAgentSessionData,
+  attrs: Record<string, unknown>,
+): CodingAgentSessionData {
+  return {
+    ...base,
+    hooksBlocked: base.hooksBlocked + num(attrs.num_blocking),
+    hooksCancelled: base.hooksCancelled + num(attrs.num_cancelled),
+    hookMs: base.hookMs + num(attrs.total_duration_ms),
+  };
+}
+
 export function applyLogToCodingAgentSession({
   state,
   attributes,
@@ -661,155 +1073,36 @@ export function applyLogToCodingAgentSession({
   const base = withIdentity(state, attrs);
 
   switch (event) {
-    case CLAUDE.EVENT.USER_PROMPT: {
-      const command = str(attrs.command_name);
-      return {
-        ...base,
-        prompts: base.prompts + 1,
-        // The length, never the text.
-        promptChars: base.promptChars + num(attrs.prompt_length),
-        slashCommands:
-          command !== null
-            ? addToBoundedSet(base.slashCommands, command)
-            : base.slashCommands,
-      };
-    }
-
+    case CLAUDE.EVENT.USER_PROMPT:
+      return onUserPrompt(base, attrs);
     case CLAUDE.EVENT.ASSISTANT_RESPONSE:
-      return {
-        ...base,
-        responseChars: base.responseChars + num(attrs.response_length),
-      };
-
-    case CLAUDE.EVENT.API_REQUEST: {
-      // The authoritative cost: the agent reports what it was actually billed,
-      // which no span carries.
-      const withCost = { ...base, costUsd: base.costUsd + num(attrs.cost_usd) };
-      // For a logs-only agent this event IS the model call — the same facts
-      // the llm_request span carries for Claude Code fold from here instead.
-      return isLogsOnly ? foldModelCall(withCost, attrs, 0) : withCost;
-    }
-
-    case CLAUDE.EVENT.TOOL_RESULT: {
-      const errorType = str(attrs.error_type);
-      const withBytes = {
-        ...base,
-        // Bytes of tool OUTPUT fed back into the context — the usual cause of a
-        // session bloating its way into a compaction.
-        toolResultBytes:
-          base.toolResultBytes + num(attrs.tool_result_size_bytes),
-        toolInputBytes: base.toolInputBytes + num(attrs.tool_input_size_bytes),
-        errorTypes:
-          errorType !== null && scalarStr(attrs.success) === "false"
-            ? bump(base.errorTypes, errorType)
-            : base.errorTypes,
-      };
-      // For a logs-only agent this event IS the tool run — name, duration,
-      // outcome — which span-bearing agents fold from the tool span.
-      return isLogsOnly
-        ? foldToolInvocation(withBytes, {
-            attrs,
-            failed: scalarStr(attrs.success) === "false",
-            toolMs: num(attrs.duration_ms),
-            startedAtMs: occurredAtMs ?? 0,
-          })
-        : withBytes;
-    }
-
-    case CLAUDE.EVENT.TOOL_DECISION: {
-      if (str(attrs.decision) !== "reject") return base;
-      const source = str(attrs.source) ?? "";
-      // An ABORT (the human walked away from the prompt) is a different act from
-      // a refusal, and NEITHER is a tool that broke. Counting them as failures
-      // would report the human's judgement as the agent's fault.
-      return ABORTED_SOURCES.has(source)
-        ? { ...base, toolsAborted: base.toolsAborted + 1 }
-        : { ...base, toolsDenied: base.toolsDenied + 1 };
-    }
-
+      return onAssistantResponse(base, attrs);
+    case CLAUDE.EVENT.API_REQUEST:
+      return onApiRequest(base, attrs, isLogsOnly);
+    case CLAUDE.EVENT.TOOL_RESULT:
+      return onToolResult(base, attrs, { isLogsOnly, occurredAtMs });
+    case CLAUDE.EVENT.TOOL_DECISION:
+      return onToolDecision(base, attrs);
     case CLAUDE.EVENT.API_ERROR:
-      return {
-        ...base,
-        apiErrors: base.apiErrors + 1,
-        rateLimited:
-          base.rateLimited +
-          (scalarStr(attrs.status_code) === RATE_LIMIT_STATUS ? 1 : 0),
-      };
-
+      return onApiError(base, attrs);
     case CLAUDE.EVENT.RETRIES_EXHAUSTED:
-      return {
-        ...base,
-        retriesExhausted: base.retriesExhausted + 1,
-        // Wall-clock burned on attempts that produced nothing.
-        retryMs: base.retryMs + num(attrs.total_retry_duration_ms),
-      };
-
-    case CLAUDE.EVENT.REFUSAL: {
-      // A server-side fallback hop already retried on another model, so the user
-      // never saw that refusal. Counting it would overstate how often the agent
-      // actually refused the human.
-      if (scalarStr(attrs.server_fallback_hop) === "true") return base;
-      const category = str(attrs.category);
-      return {
-        ...base,
-        refusals: base.refusals + 1,
-        refusalCategories:
-          category !== null
-            ? addToBoundedSet(base.refusalCategories, category)
-            : base.refusalCategories,
-      };
-    }
-
+      return onRetriesExhausted(base, attrs);
+    case CLAUDE.EVENT.REFUSAL:
+      return onRefusal(base, attrs);
     case CLAUDE.EVENT.COMPACTION:
-      return {
-        ...base,
-        compactions: base.compactions + 1,
-        compactionTokensBefore:
-          base.compactionTokensBefore + num(attrs.pre_tokens),
-        compactionTokensAfter:
-          base.compactionTokensAfter + num(attrs.post_tokens),
-      };
-
-    case CLAUDE.EVENT.PERMISSION_MODE: {
-      const mode = str(attrs.to_mode);
-      return {
-        ...base,
-        permissionMode: mode ?? base.permissionMode,
-        // Every widening of what the agent is allowed to do is worth auditing.
-        permissionChanges: base.permissionChanges + 1,
-      };
-    }
-
-    case CLAUDE.EVENT.SKILL_ACTIVATED: {
-      const skill = str(attrs["skill.name"]);
-      return skill !== null
-        ? { ...base, skills: addToBoundedSet(base.skills, skill) }
-        : base;
-    }
-
-    case CLAUDE.EVENT.MCP_CONNECTION: {
-      const server = str(attrs.server_name) ?? str(attrs["plugin.name"]);
-      return server !== null
-        ? { ...base, mcpServers: addToBoundedSet(base.mcpServers, server) }
-        : base;
-    }
-
+      return onCompaction(base, attrs);
+    case CLAUDE.EVENT.PERMISSION_MODE:
+      return onPermissionMode(base, attrs);
+    case CLAUDE.EVENT.SKILL_ACTIVATED:
+      return onSkillActivated(base, attrs);
+    case CLAUDE.EVENT.MCP_CONNECTION:
+      return onMcpConnection(base, attrs);
     case CLAUDE.EVENT.HOOK_COMPLETE:
-      // The safeguards that actually FIRED: a hook that returned a blocking
-      // decision stopped the agent doing something.
-      return {
-        ...base,
-        hooksBlocked: base.hooksBlocked + num(attrs.num_blocking),
-        hooksCancelled: base.hooksCancelled + num(attrs.num_cancelled),
-        hookMs: base.hookMs + num(attrs.total_duration_ms),
-      };
-
+      return onHookComplete(base, attrs);
     case CLAUDE.EVENT.AT_MENTION:
       return { ...base, atMentions: base.atMentions + 1 };
-
     case CLAUDE.EVENT.INTERNAL_ERROR:
       return { ...base, internalErrors: base.internalErrors + 1 };
-
     default:
       return base;
   }
@@ -901,6 +1194,80 @@ export function applyMetricToCodingAgentSession({
   });
 }
 
+/** The metric-fed fields' running totals, folded whole from the converged units. */
+interface MetricOverlayTotals {
+  linesAdded: number;
+  linesRemoved: number;
+  commits: number;
+  pullRequests: number;
+  editsAccepted: number;
+  editsRejected: number;
+  activeTimeUserSec: number;
+  activeTimeCliSec: number;
+  languagesEdited: string[];
+}
+
+function foldLinesOfCode(
+  totals: MetricOverlayTotals,
+  fact: MetricSeriesFact,
+): MetricOverlayTotals {
+  return {
+    ...totals,
+    linesAdded: totals.linesAdded + (fact.type === "added" ? fact.value : 0),
+    linesRemoved:
+      totals.linesRemoved + (fact.type === "removed" ? fact.value : 0),
+  };
+}
+
+function foldEditDecision(
+  totals: MetricOverlayTotals,
+  fact: MetricSeriesFact,
+): MetricOverlayTotals {
+  return {
+    ...totals,
+    editsAccepted:
+      totals.editsAccepted + (fact.decision === "accept" ? fact.value : 0),
+    editsRejected:
+      totals.editsRejected + (fact.decision === "accept" ? 0 : fact.value),
+    languagesEdited:
+      fact.language !== null && fact.language !== "unknown"
+        ? addToBoundedSet(totals.languagesEdited, fact.language)
+        : totals.languagesEdited,
+  };
+}
+
+function foldActiveTime(
+  totals: MetricOverlayTotals,
+  fact: MetricSeriesFact,
+): MetricOverlayTotals {
+  return {
+    ...totals,
+    activeTimeUserSec:
+      totals.activeTimeUserSec + (fact.type === "user" ? fact.value : 0),
+    activeTimeCliSec:
+      totals.activeTimeCliSec + (fact.type === "cli" ? fact.value : 0),
+  };
+}
+
+const METRIC_OVERLAY_FOLDERS: Partial<
+  Record<
+    CodingAgentMetric,
+    (totals: MetricOverlayTotals, fact: MetricSeriesFact) => MetricOverlayTotals
+  >
+> = {
+  lines_of_code: foldLinesOfCode,
+  commit: (totals, fact) => ({
+    ...totals,
+    commits: totals.commits + fact.value,
+  }),
+  pull_request: (totals, fact) => ({
+    ...totals,
+    pullRequests: totals.pullRequests + fact.value,
+  }),
+  edit_decision: foldEditDecision,
+  active_time: foldActiveTime,
+};
+
 /**
  * The metric-fed fields, recomputed whole from the converged units. These
  * fields are EXCLUSIVELY metric-fed (no span or log path writes them), so a
@@ -909,55 +1276,35 @@ export function applyMetricToCodingAgentSession({
 function recomputeMetricOverlay(
   state: CodingAgentSessionData,
 ): CodingAgentSessionData {
-  let linesAdded = 0;
-  let linesRemoved = 0;
-  let commits = 0;
-  let pullRequests = 0;
-  let editsAccepted = 0;
-  let editsRejected = 0;
-  let activeTimeUserSec = 0;
-  let activeTimeCliSec = 0;
-  let languagesEdited: string[] = [];
+  const initialTotals: MetricOverlayTotals = {
+    linesAdded: 0,
+    linesRemoved: 0,
+    commits: 0,
+    pullRequests: 0,
+    editsAccepted: 0,
+    editsRejected: 0,
+    activeTimeUserSec: 0,
+    activeTimeCliSec: 0,
+    languagesEdited: [],
+  };
 
-  for (const fact of Object.values(state.metricSeries)) {
-    switch (normalizeMetricName(fact.metricName)) {
-      case "lines_of_code":
-        if (fact.type === "added") linesAdded += fact.value;
-        if (fact.type === "removed") linesRemoved += fact.value;
-        break;
-      case "commit":
-        commits += fact.value;
-        break;
-      case "pull_request":
-        pullRequests += fact.value;
-        break;
-      case "edit_decision":
-        if (fact.decision === "accept") editsAccepted += fact.value;
-        else editsRejected += fact.value;
-        if (fact.language !== null && fact.language !== "unknown") {
-          languagesEdited = addToBoundedSet(languagesEdited, fact.language);
-        }
-        break;
-      case "active_time":
-        if (fact.type === "user") activeTimeUserSec += fact.value;
-        if (fact.type === "cli") activeTimeCliSec += fact.value;
-        break;
-      default:
-        break;
-    }
-  }
+  const totals = Object.values(state.metricSeries).reduce((acc, fact) => {
+    const normalized = normalizeMetricName(fact.metricName);
+    const folder = normalized ? METRIC_OVERLAY_FOLDERS[normalized] : undefined;
+    return folder ? folder(acc, fact) : acc;
+  }, initialTotals);
 
   return {
     ...state,
-    linesAdded,
-    linesRemoved,
-    commits: Math.round(commits),
-    pullRequests: Math.round(pullRequests),
-    editsAccepted: Math.round(editsAccepted),
-    editsRejected: Math.round(editsRejected),
-    activeTimeUserSec,
-    activeTimeCliSec,
-    languagesEdited,
+    linesAdded: totals.linesAdded,
+    linesRemoved: totals.linesRemoved,
+    commits: Math.round(totals.commits),
+    pullRequests: Math.round(totals.pullRequests),
+    editsAccepted: Math.round(totals.editsAccepted),
+    editsRejected: Math.round(totals.editsRejected),
+    activeTimeUserSec: totals.activeTimeUserSec,
+    activeTimeCliSec: totals.activeTimeCliSec,
+    languagesEdited: totals.languagesEdited,
   };
 }
 

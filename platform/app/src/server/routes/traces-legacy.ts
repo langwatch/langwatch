@@ -100,6 +100,78 @@ async function authenticateRequest(c: Context, permission: Permission) {
   return { project: resolved.project, markUsed };
 }
 
+/** The trace id + response format (`digest`/`json`) named by the request. */
+function resolveTraceIdFormat(c: Context): { traceId: string; format: string } {
+  const traceId = c.req.param("id");
+  const formatParam = c.req.query("format");
+  const llmMode =
+    c.req.query("llmMode") === "true" || c.req.query("llmMode") === "1";
+  const format = formatParam ?? (llmMode ? "digest" : "json");
+  return { traceId, format };
+}
+
+/** Loads the trace + its evaluations, or null when the trace does not exist. */
+async function loadTraceById({
+  project,
+  traceId,
+}: {
+  project: { id: string };
+  traceId: string;
+}): Promise<{ trace: Trace; evaluations: unknown[] } | null> {
+  const protections = await getProtectionsForProject(prisma, {
+    projectId: project.id,
+  });
+  const traceService = TraceService.create(
+    prisma,
+    buildTraceBlobResolutionDeps(),
+  );
+  const trace = await traceService.getById({
+    projectId: project.id,
+    traceId,
+    protections,
+    opts: { full: true },
+  });
+  if (!trace) return null;
+
+  const evaluationsMap = await traceService.getEvaluationsMultiple(
+    project.id,
+    [traceId],
+    protections,
+  );
+  const evaluations = evaluationsMap[traceId] ?? [];
+  return { trace, evaluations };
+}
+
+/** Shapes the loaded trace into the digest or full wire response. */
+function formatTraceByIdResponse({
+  traceId,
+  format,
+  trace,
+  evaluations,
+}: {
+  traceId: string;
+  format: string;
+  trace: Trace;
+  evaluations: unknown[];
+}) {
+  if (format === "digest") {
+    return {
+      trace_id: traceId,
+      formatted_trace: formatSpansDigest(trace.spans ?? []),
+      timestamps: trace.timestamps,
+      metadata: trace.metadata,
+      evaluations,
+    };
+  }
+
+  const asciiTree = generateAsciiTree(trace.spans);
+  return {
+    ...trace,
+    evaluations,
+    ascii_tree: asciiTree,
+  };
+}
+
 // ---------- GET /api/trace/:id ----------
 secured.access(tracesViewAuth).get("/trace/:id", async (c) => {
   const auth = await authenticateRequest(c, "traces:view");
@@ -109,11 +181,7 @@ secured.access(tracesViewAuth).get("/trace/:id", async (c) => {
   const { project, markUsed } = auth;
 
   try {
-    const traceId = c.req.param("id");
-    const formatParam = c.req.query("format");
-    const llmMode =
-      c.req.query("llmMode") === "true" || c.req.query("llmMode") === "1";
-    const format = formatParam ?? (llmMode ? "digest" : "json");
+    const { traceId, format } = resolveTraceIdFormat(c);
 
     c.header("Deprecation", "true");
     c.header(
@@ -121,49 +189,21 @@ secured.access(tracesViewAuth).get("/trace/:id", async (c) => {
       `</api/traces/${traceId}?format=${format}>; rel="successor-version"`,
     );
 
-    const protections = await getProtectionsForProject(prisma, {
-      projectId: project.id,
-    });
-    const traceService = TraceService.create(
-      prisma,
-      buildTraceBlobResolutionDeps(),
-    );
-    const trace = await traceService.getById({
-      projectId: project.id,
-      traceId,
-      protections,
-      opts: { full: true },
-    });
-    if (!trace) {
+    const loaded = await loadTraceById({ project, traceId });
+    if (!loaded) {
       return c.json({ message: "Trace not found." }, 404);
     }
 
-    const evaluationsMap = await traceService.getEvaluationsMultiple(
-      project.id,
-      [traceId],
-      protections,
-    );
-    const evaluations = evaluationsMap[traceId] ?? [];
-
     markUsed();
 
-    if (format === "digest") {
-      return c.json({
-        trace_id: traceId,
-        formatted_trace: formatSpansDigest(trace.spans ?? []),
-        timestamps: trace.timestamps,
-        metadata: trace.metadata,
-        evaluations,
-      });
-    }
-
-    const asciiTree = generateAsciiTree(trace.spans);
-
-    return c.json({
-      ...trace,
-      evaluations,
-      ascii_tree: asciiTree,
-    });
+    return c.json(
+      formatTraceByIdResponse({
+        traceId,
+        format,
+        trace: loaded.trace,
+        evaluations: loaded.evaluations,
+      }),
+    );
   } catch (error) {
     console.error("[API /api/trace/:id] Error:", error);
     return c.json(
@@ -242,39 +282,48 @@ const paramsSchema = getAllForProjectInput
     llmMode: z.boolean().optional().default(false),
   });
 
-secured.access(tracesViewAuth).post("/trace/search", async (c) => {
-  const auth = await authenticateRequest(c, "traces:view");
-  if ("error" in auth) {
-    return c.json(auth.body, auth.status);
-  }
-  const { project, markUsed } = auth;
-
+/** Parses + validates the search request body, or the 400 response to
+ *  return when it fails either step. */
+async function parseTraceSearchRequest(
+  c: Context,
+): Promise<
+  | { ok: true; params: z.infer<typeof paramsSchema> }
+  | { ok: false; response: Response }
+> {
   let body: Record<string, any>;
   try {
     body = await c.req.json();
   } catch {
-    return c.json({ error: "Invalid body" }, 400);
+    return { ok: false, response: c.json({ error: "Invalid body" }, 400) };
   }
 
-  let params: z.infer<typeof paramsSchema>;
   try {
-    params = paramsSchema.strict().parse(body);
+    const params = paramsSchema.strict().parse(body);
+    return { ok: true, params };
   } catch (error) {
     const validationError = fromZodError(error as ZodError);
-    return c.json({ error: validationError.message }, 400);
+    return {
+      ok: false,
+      response: c.json({ error: validationError.message }, 400),
+    };
   }
+}
 
-  const format = params.format ?? (params.llmMode ? "digest" : "json");
-
-  c.header("Deprecation", "true");
-  c.header("Link", `</api/traces/search>; rel="successor-version"`);
-
-  const pageSize = Math.min(params.pageSize ?? 1000, 1000);
+/** Fetches the raw project trace search results for the validated params. */
+async function fetchTraceSearchResults({
+  project,
+  params,
+  pageSize,
+}: {
+  project: { id: string };
+  params: z.infer<typeof paramsSchema>;
+  pageSize: number;
+}) {
   const protections = await getProtectionsForProject(prisma, {
     projectId: project.id,
   });
   const traceService = TraceService.create(prisma);
-  const results = await traceService.getAllTracesForProject(
+  return traceService.getAllTracesForProject(
     {
       ...params,
       projectId: project.id,
@@ -294,16 +343,21 @@ secured.access(tracesViewAuth).post("/trace/search", async (c) => {
       scrollId: params.scrollId ?? undefined,
     },
   );
+}
 
-  const rawTraces = results.groups.flat() as Trace[];
-  const enrichedTraces = enrichTracesWithEvaluations({
-    traces: rawTraces,
-    traceChecks: results.traceChecks,
-  });
-
-  let traces: unknown[];
+/** Shapes the enriched traces per the requested format: digest summaries,
+ *  LLM-mode traces (spans stripped), or the raw enriched traces. */
+function shapeSearchTraces({
+  format,
+  llmMode,
+  enrichedTraces,
+}: {
+  format: string;
+  llmMode: boolean;
+  enrichedTraces: ReturnType<typeof enrichTracesWithEvaluations>;
+}): unknown[] {
   if (format === "digest") {
-    traces = enrichedTraces.map((trace) => ({
+    return enrichedTraces.map((trace) => ({
       trace_id: trace.trace_id,
       formatted_trace: formatTraceSummaryDigest(trace),
       input: trace.input,
@@ -313,15 +367,47 @@ secured.access(tracesViewAuth).post("/trace/search", async (c) => {
       error: trace.error,
       evaluations: trace.evaluations,
     }));
-  } else if (params.llmMode) {
-    traces = enrichedTraces.map((trace) => ({
+  }
+  if (llmMode) {
+    return enrichedTraces.map((trace) => ({
       ...toLLMModeTrace(trace as Trace & { spans: Span[] }),
       spans: [],
       evaluations: trace.evaluations,
     }));
-  } else {
-    traces = enrichedTraces;
   }
+  return enrichedTraces;
+}
+
+secured.access(tracesViewAuth).post("/trace/search", async (c) => {
+  const auth = await authenticateRequest(c, "traces:view");
+  if ("error" in auth) {
+    return c.json(auth.body, auth.status);
+  }
+  const { project, markUsed } = auth;
+
+  const parsed = await parseTraceSearchRequest(c);
+  if (!parsed.ok) return parsed.response;
+  const { params } = parsed;
+
+  const format = params.format ?? (params.llmMode ? "digest" : "json");
+
+  c.header("Deprecation", "true");
+  c.header("Link", `</api/traces/search>; rel="successor-version"`);
+
+  const pageSize = Math.min(params.pageSize ?? 1000, 1000);
+  const results = await fetchTraceSearchResults({ project, params, pageSize });
+
+  const rawTraces = results.groups.flat() as Trace[];
+  const enrichedTraces = enrichTracesWithEvaluations({
+    traces: rawTraces,
+    traceChecks: results.traceChecks,
+  });
+
+  const traces = shapeSearchTraces({
+    format,
+    llmMode: params.llmMode,
+    enrichedTraces,
+  });
 
   markUsed();
   return c.json({

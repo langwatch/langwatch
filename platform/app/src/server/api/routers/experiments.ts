@@ -61,22 +61,316 @@ const mapExperimentError = (error: unknown): never => {
 /** Experiment service from app dependency container. */
 const experimentService = () => getApp().experiments;
 
+const saveExperimentInputSchema = z.object({
+  projectId: z.string(),
+  experimentId: z.string().optional(),
+  workbenchState: workbenchStateSchema,
+  dsl: workflowJsonSchema,
+  commitMessage: z.string().optional(),
+});
+type SaveExperimentInput = z.infer<typeof saveExperimentInputSchema>;
+
+// Update dataset names as well if experiment name changes
+async function renameSaveExperimentDatasetsIfChanged({
+  projectId,
+  currentExperimentName,
+  nodes,
+  newName,
+}: {
+  projectId: string;
+  currentExperimentName: string | null;
+  nodes: Node<Entry>[];
+  newName: string;
+}): Promise<void> {
+  if (!currentExperimentName || currentExperimentName === newName) return;
+
+  const datasetIds = nodes
+    .filter((node) => node.type === "dataset")
+    .map((node) => node.data.dataset?.id)
+    .filter(Boolean) as string[];
+
+  const datasets = await prisma.dataset.findMany({
+    where: { id: { in: datasetIds }, projectId },
+  });
+
+  for (const dataset of datasets) {
+    if (dataset.name.startsWith(currentExperimentName)) {
+      await prisma.dataset.update({
+        where: { id: dataset.id, projectId },
+        data: { name: dataset.name.replace(currentExperimentName, newName) },
+      });
+    }
+  }
+}
+
+// Resolves the workflow id backing an existing experiment being saved over,
+// and renames its saved datasets to follow an experiment rename. Returns
+// undefined for a brand-new experiment (no `experimentId` yet).
+async function resolveExistingSaveExperimentWorkflowId({
+  input,
+  name,
+}: {
+  input: SaveExperimentInput;
+  name: string;
+}): Promise<string | undefined> {
+  if (!input.experimentId) return undefined;
+
+  const currentExperiment = await experimentService().findById({
+    projectId: input.projectId,
+    id: input.experimentId,
+  });
+
+  if (!currentExperiment) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Experiment not found" });
+  }
+
+  let workflowId: string | undefined;
+  if (currentExperiment.workflowId) {
+    const workflow = await prisma.workflow.findUnique({
+      where: { id: currentExperiment.workflowId, projectId: input.projectId },
+    });
+    if (!workflow) {
+      throw new TRPCError({ code: "NOT_FOUND", message: "Workflow not found" });
+    }
+    workflowId = workflow.id;
+  }
+
+  await renameSaveExperimentDatasetsIfChanged({
+    projectId: input.projectId,
+    currentExperimentName: currentExperiment.name,
+    nodes: input.dsl.nodes,
+    newName: name,
+  });
+
+  return workflowId;
+}
+
+async function resolveOrCreateSaveExperimentWorkflow({
+  ctx,
+  input,
+  workflowId,
+  workflowName,
+}: {
+  ctx: TRPCContext;
+  input: SaveExperimentInput;
+  workflowId: string | undefined;
+  workflowName: string;
+}): Promise<string> {
+  if (workflowId) return workflowId;
+
+  const workflow = await ctx.prisma.workflow.create({
+    data: {
+      id: `workflow_${nanoid()}`,
+      projectId: input.projectId,
+      name: workflowName,
+      icon: input.dsl.icon,
+      description: input.dsl.description,
+    },
+  });
+  return workflow.id;
+}
+
+async function persistSavedExperiment({
+  experiments,
+  input,
+  name,
+  slug,
+  workflowId,
+  experimentId,
+}: {
+  experiments: ReturnType<typeof experimentService>;
+  input: SaveExperimentInput;
+  name: string;
+  slug: string;
+  workflowId: string;
+  experimentId: string;
+}): Promise<void> {
+  await experiments.saveWithSlugRetry({
+    initialSlug: slug,
+    execute: (s) => {
+      const data = {
+        name,
+        slug: s,
+        projectId: input.projectId,
+        type: ExperimentType.BATCH_EVALUATION_V2,
+        workflowId,
+        workbenchState: input.workbenchState,
+      };
+      return prisma.experiment.upsert({
+        where: { id: experimentId, projectId: input.projectId },
+        update: data,
+        create: { ...data, id: experimentId },
+      });
+    },
+    regenerateSlug: () =>
+      experiments.generateUniqueSlug({
+        baseSlug: slugify(name),
+        projectId: input.projectId,
+        excludeExperimentId: input.experimentId,
+      }),
+  });
+}
+
+const getWorkflowEntryDatasetId = (dsl: JsonValue | undefined) => {
+  return (
+    (dsl as Workflow | undefined)?.nodes.find(
+      (node) => node.type === "entry",
+    ) as Node<Entry>
+  )?.data.dataset?.id;
+};
+
+type EvaluationListExperiment = Awaited<
+  ReturnType<ReturnType<typeof experimentService>["listForEvaluationsBoard"]>
+>[number];
+type EvaluationListRunsByExperimentId = Awaited<
+  ReturnType<ExperimentRunService["listRuns"]>
+>;
+
+function buildExperimentEvaluationListItem({
+  experiment,
+  runsByExperimentId,
+  datasetsById,
+}: {
+  experiment: EvaluationListExperiment;
+  runsByExperimentId: EvaluationListRunsByExperimentId;
+  datasetsById: Record<string, { id: string; name: string }>;
+}) {
+  const runs = runsByExperimentId[experiment.id] ?? [];
+  const latestRun = runs.sort(
+    (a, b) => b.timestamps.createdAt - a.timestamps.createdAt,
+  )[0];
+  const primaryMetric = latestRun
+    ? Object.values(latestRun?.summary.evaluations)[0]
+    : undefined;
+
+  return {
+    ...experiment,
+    workbenchState: experiment.workbenchState as WizardState | undefined,
+    runsSummary: {
+      count: runs.length,
+      primaryMetric,
+      latestRun: {
+        timestamps: latestRun?.timestamps,
+      },
+    },
+    dataset:
+      datasetsById[
+        getWorkflowEntryDatasetId(experiment.workflow?.currentVersion?.dsl) ??
+          ""
+      ],
+    updatedAt:
+      latestRun?.timestamps.createdAt ?? experiment.updatedAt.getTime(),
+  };
+}
+
+type ExperimentWithWorkflowLatestVersion = NonNullable<
+  Awaited<ReturnType<ExperimentService["findByIdWithWorkflowLatestVersion"]>>
+>;
+
+// V2 (workflow-backed) experiment copy: copies the workflow (+ optionally
+// its datasets), commits a version of the copied DSL, then creates the new
+// experiment row pointing at it with a unique slug.
+async function copyV2ExperimentWithWorkflow({
+  ctx,
+  experiment,
+  input,
+}: {
+  ctx: TRPCContext;
+  experiment: ExperimentWithWorkflowLatestVersion;
+  input: { projectId: string; sourceProjectId: string; copyDatasets?: boolean };
+}) {
+  // V2 experiments require a workflow
+  if (!experiment.workflowId || !experiment.workflow?.latestVersion?.dsl) {
+    throw new TRPCError({
+      code: "NOT_FOUND",
+      message: "Experiment workflow not found",
+    });
+  }
+
+  const { workflowId, dsl } = await copyWorkflowWithDatasets({
+    ctx,
+    workflow: {
+      id: experiment.workflow.id,
+      name: experiment.workflow.name,
+      icon: experiment.workflow.icon,
+      description: experiment.workflow.description,
+      isEvaluator: experiment.workflow.isEvaluator,
+      isComponent: experiment.workflow.isComponent,
+      latestVersion: experiment.workflow.latestVersion,
+    },
+    targetProjectId: input.projectId,
+    sourceProjectId: input.sourceProjectId,
+    copyDatasets: input.copyDatasets,
+    copiedFromWorkflowId: experiment.workflowId,
+  });
+
+  const newWorkflow = await ctx.prisma.workflow.findFirst({
+    where: {
+      id: workflowId,
+      projectId: input.projectId,
+    },
+  });
+
+  if (!newWorkflow) {
+    throw new TRPCError({
+      code: "INTERNAL_SERVER_ERROR",
+      message: "Failed to create workflow",
+    });
+  }
+
+  // Save workflow version
+  await saveOrCommitWorkflowVersion({
+    ctx,
+    input: {
+      projectId: input.projectId,
+      workflowId,
+      dsl,
+    },
+    autoSaved: false,
+    commitMessage: `Copied from ${experiment.workflow.name}`,
+  });
+
+  // Create new experiment with unique slug
+  const experimentName = experiment.name ?? experiment.slug;
+  const experiments = experimentService();
+  const initialSlug = await experiments.generateUniqueSlug({
+    baseSlug: slugify(experimentName),
+    projectId: input.projectId,
+  });
+
+  const { result: newExperiment } = await experiments.saveWithSlugRetry({
+    initialSlug,
+    execute: (s) =>
+      ctx.prisma.experiment.create({
+        data: {
+          id: `experiment_${nanoid()}`,
+          name: experimentName,
+          slug: s,
+          projectId: input.projectId,
+          type: experiment.type,
+          workflowId,
+          ...(experiment.workbenchState && {
+            workbenchState: experiment.workbenchState as Prisma.InputJsonValue,
+          }),
+        },
+      }),
+    regenerateSlug: () =>
+      experiments.generateUniqueSlug({
+        baseSlug: slugify(experimentName),
+        projectId: input.projectId,
+      }),
+  });
+
+  return { experiment: newExperiment, workflow: newWorkflow };
+}
+
 export const experimentsRouter = createTRPCRouter({
   saveExperiment: protectedProcedure
-    .input(
-      z.object({
-        projectId: z.string(),
-        experimentId: z.string().optional(),
-        workbenchState: workbenchStateSchema,
-        dsl: workflowJsonSchema,
-        commitMessage: z.string().optional(),
-      }),
-    )
+    .input(saveExperimentInputSchema)
     .use(checkProjectPermission("workflows:create"))
     .mutation(async ({ ctx, input }) => {
       const experiments = experimentService();
 
-      let workflowId = input.dsl.workflow_id;
       const name =
         input.workbenchState.name ??
         (await experiments.findNextDraftName({
@@ -88,75 +382,18 @@ export const experimentsRouter = createTRPCRouter({
         excludeExperimentId: input.experimentId,
       });
 
-      if (input.experimentId) {
-        const currentExperiment = await experimentService().findById({
-          projectId: input.projectId,
-          id: input.experimentId,
-        });
-
-        if (!currentExperiment) {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "Experiment not found",
-          });
-        }
-
-        if (currentExperiment.workflowId) {
-          const workflow = await prisma.workflow.findUnique({
-            where: {
-              id: currentExperiment.workflowId,
-              projectId: input.projectId,
-            },
-          });
-
-          if (!workflow) {
-            throw new TRPCError({
-              code: "NOT_FOUND",
-              message: "Workflow not found",
-            });
-          }
-
-          workflowId = workflow.id;
-        }
-
-        // Update dataset names as well if experiment name changes
-        if (currentExperiment.name && currentExperiment.name !== name) {
-          const datasetIds = input.dsl.nodes
-            .filter((node: Node<Entry>) => node.type === "dataset")
-            .map((node: Node<Entry>) => node.data.dataset?.id)
-            .filter(Boolean) as string[];
-
-          const datasets = await prisma.dataset.findMany({
-            where: { id: { in: datasetIds }, projectId: input.projectId },
-          });
-
-          for (const dataset of datasets) {
-            if (dataset.name.startsWith(currentExperiment.name)) {
-              await prisma.dataset.update({
-                where: { id: dataset.id, projectId: input.projectId },
-                data: {
-                  name: dataset.name.replace(currentExperiment.name, name),
-                },
-              });
-            }
-          }
-        }
-      }
+      const existingWorkflowId = await resolveExistingSaveExperimentWorkflowId({
+        input,
+        name,
+      });
 
       const workflowName = `${name} - Workflow`;
-      if (!workflowId) {
-        const workflow = await ctx.prisma.workflow.create({
-          data: {
-            id: `workflow_${nanoid()}`,
-            projectId: input.projectId,
-            name: workflowName,
-            icon: input.dsl.icon,
-            description: input.dsl.description,
-          },
-        });
-
-        workflowId = workflow.id;
-      }
+      const workflowId = await resolveOrCreateSaveExperimentWorkflow({
+        ctx,
+        input,
+        workflowId: existingWorkflowId ?? input.dsl.workflow_id,
+        workflowName,
+      });
 
       await saveOrCommitWorkflowVersion({
         ctx,
@@ -176,29 +413,13 @@ export const experimentsRouter = createTRPCRouter({
 
       const experimentId = input.experimentId ?? `experiment_${nanoid()}`;
 
-      await experiments.saveWithSlugRetry({
-        initialSlug: slug,
-        execute: (s) => {
-          const data = {
-            name,
-            slug: s,
-            projectId: input.projectId,
-            type: ExperimentType.BATCH_EVALUATION_V2,
-            workflowId,
-            workbenchState: input.workbenchState,
-          };
-          return prisma.experiment.upsert({
-            where: { id: experimentId, projectId: input.projectId },
-            update: data,
-            create: { ...data, id: experimentId },
-          });
-        },
-        regenerateSlug: () =>
-          experiments.generateUniqueSlug({
-            baseSlug: slugify(name),
-            projectId: input.projectId,
-            excludeExperimentId: input.experimentId,
-          }),
+      await persistSavedExperiment({
+        experiments,
+        input,
+        name,
+        slug,
+        workflowId,
+        experimentId,
       });
 
       // For some reason, prisma upsert sometimes return not an experiment but {count: 0}, so we need to refetch it
@@ -515,18 +736,10 @@ export const experimentsRouter = createTRPCRouter({
         pageOffset + pageSize,
       );
 
-      const getDatasetId = (dsl: JsonValue | undefined) => {
-        return (
-          (dsl as Workflow | undefined)?.nodes.find(
-            (node) => node.type === "entry",
-          ) as Node<Entry>
-        )?.data.dataset?.id;
-      };
-
       const datasetIds = experiments
-        .map((experiment) => {
-          return getDatasetId(experiment.workflow?.currentVersion?.dsl);
-        })
+        .map((experiment) =>
+          getWorkflowEntryDatasetId(experiment.workflow?.currentVersion?.dsl),
+        )
         .filter(Boolean) as string[];
 
       const datasetsById = Object.fromEntries(
@@ -548,35 +761,13 @@ export const experimentsRouter = createTRPCRouter({
       });
 
       const experimentsWithDatasetsAndRuns = experiments
-        .map((experiment) => {
-          const runs = runsByExperimentId[experiment.id] ?? [];
-          const latestRun = runs.sort(
-            (a, b) => b.timestamps.createdAt - a.timestamps.createdAt,
-          )[0];
-          const primaryMetric = latestRun
-            ? Object.values(latestRun?.summary.evaluations)[0]
-            : undefined;
-
-          return {
-            ...experiment,
-            workbenchState: experiment.workbenchState as
-              | WizardState
-              | undefined,
-            runsSummary: {
-              count: runs.length,
-              primaryMetric,
-              latestRun: {
-                timestamps: latestRun?.timestamps,
-              },
-            },
-            dataset:
-              datasetsById[
-                getDatasetId(experiment.workflow?.currentVersion?.dsl) ?? ""
-              ],
-            updatedAt:
-              latestRun?.timestamps.createdAt ?? experiment.updatedAt.getTime(),
-          };
-        })
+        .map((experiment) =>
+          buildExperimentEvaluationListItem({
+            experiment,
+            runsByExperimentId,
+            datasetsById,
+          }),
+        )
         .sort((a, b) => b.updatedAt - a.updatedAt);
 
       return {
@@ -854,90 +1045,7 @@ export const experimentsRouter = createTRPCRouter({
         });
       }
 
-      // V2 experiments require a workflow
-      if (!experiment.workflowId || !experiment.workflow?.latestVersion?.dsl) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Experiment workflow not found",
-        });
-      }
-
-      const { workflowId, dsl } = await copyWorkflowWithDatasets({
-        ctx,
-        workflow: {
-          id: experiment.workflow.id,
-          name: experiment.workflow.name,
-          icon: experiment.workflow.icon,
-          description: experiment.workflow.description,
-          isEvaluator: experiment.workflow.isEvaluator,
-          isComponent: experiment.workflow.isComponent,
-          latestVersion: experiment.workflow.latestVersion,
-        },
-        targetProjectId: input.projectId,
-        sourceProjectId: input.sourceProjectId,
-        copyDatasets: input.copyDatasets,
-        copiedFromWorkflowId: experiment.workflowId,
-      });
-
-      const newWorkflow = await ctx.prisma.workflow.findFirst({
-        where: {
-          id: workflowId,
-          projectId: input.projectId,
-        },
-      });
-
-      if (!newWorkflow) {
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: "Failed to create workflow",
-        });
-      }
-
-      // Save workflow version
-      await saveOrCommitWorkflowVersion({
-        ctx,
-        input: {
-          projectId: input.projectId,
-          workflowId,
-          dsl,
-        },
-        autoSaved: false,
-        commitMessage: `Copied from ${experiment.workflow.name}`,
-      });
-
-      // Create new experiment with unique slug
-      const experimentName = experiment.name ?? experiment.slug;
-      const experiments = experimentService();
-      const initialSlug = await experiments.generateUniqueSlug({
-        baseSlug: slugify(experimentName),
-        projectId: input.projectId,
-      });
-
-      const { result: newExperiment } = await experiments.saveWithSlugRetry({
-        initialSlug,
-        execute: (s) =>
-          ctx.prisma.experiment.create({
-            data: {
-              id: `experiment_${nanoid()}`,
-              name: experimentName,
-              slug: s,
-              projectId: input.projectId,
-              type: experiment.type,
-              workflowId,
-              ...(experiment.workbenchState && {
-                workbenchState:
-                  experiment.workbenchState as Prisma.InputJsonValue,
-              }),
-            },
-          }),
-        regenerateSlug: () =>
-          experiments.generateUniqueSlug({
-            baseSlug: slugify(experimentName),
-            projectId: input.projectId,
-          }),
-      });
-
-      return { experiment: newExperiment, workflow: newWorkflow };
+      return copyV2ExperimentWithWorkflow({ ctx, experiment, input });
     }),
 
   /**
@@ -952,6 +1060,64 @@ export const experimentsRouter = createTRPCRouter({
       });
     }),
 });
+
+type EvaluationsV3WorkbenchDataset = {
+  id: string;
+  type: string;
+  datasetId?: string;
+};
+
+// Copies each "saved" dataset referenced by the workbench state and returns
+// the old-id → new-id mapping. A dataset that fails to copy (e.g. deleted
+// upstream) keeps its original reference rather than failing the whole
+// experiment copy.
+async function copyEvaluationsV3Datasets({
+  ctx,
+  datasets,
+  sourceProjectId,
+  targetProjectId,
+}: {
+  ctx: TRPCContext;
+  datasets: EvaluationsV3WorkbenchDataset[];
+  sourceProjectId: string;
+  targetProjectId: string;
+}): Promise<Record<string, string>> {
+  const datasetService = DatasetService.create(ctx.prisma);
+  const datasetIdMap: Record<string, string> = {};
+
+  for (const dataset of datasets) {
+    if (dataset.type !== "saved" || !dataset.datasetId) continue;
+    try {
+      const newDataset = await datasetService.copyDataset({
+        sourceDatasetId: dataset.datasetId,
+        sourceProjectId,
+        targetProjectId,
+      });
+      datasetIdMap[dataset.datasetId] = newDataset.id;
+    } catch {
+      // If dataset copy fails (e.g., not found), keep original reference
+      continue;
+    }
+  }
+
+  return datasetIdMap;
+}
+
+// Points each copied "saved" dataset reference at its new project-local id.
+function remapEvaluationsV3DatasetReferences(
+  datasets: EvaluationsV3WorkbenchDataset[],
+  datasetIdMap: Record<string, string>,
+): void {
+  for (const dataset of datasets) {
+    if (
+      dataset.type === "saved" &&
+      dataset.datasetId &&
+      datasetIdMap[dataset.datasetId]
+    ) {
+      dataset.datasetId = datasetIdMap[dataset.datasetId];
+    }
+  }
+}
 
 /**
  * Copies an EVALUATIONS_V3 experiment to another project.
@@ -987,44 +1153,14 @@ const copyEvaluationsV3Experiment = async ({
 
   // Process datasets if copyDatasets is enabled
   if (copyDatasets && Array.isArray(workbenchState.datasets)) {
-    const datasetService = DatasetService.create(ctx.prisma);
-    const datasetIdMap: Record<string, string> = {};
-
-    // Copy saved datasets and build ID mapping
-    for (const dataset of workbenchState.datasets as Array<{
-      id: string;
-      type: string;
-      datasetId?: string;
-    }>) {
-      if (dataset.type === "saved" && dataset.datasetId) {
-        try {
-          const newDataset = await datasetService.copyDataset({
-            sourceDatasetId: dataset.datasetId,
-            sourceProjectId,
-            targetProjectId,
-          });
-          datasetIdMap[dataset.datasetId] = newDataset.id;
-        } catch {
-          // If dataset copy fails (e.g., not found), keep original reference
-          continue;
-        }
-      }
-    }
-
-    // Update dataset references in workbenchState
-    for (const dataset of workbenchState.datasets as Array<{
-      id: string;
-      type: string;
-      datasetId?: string;
-    }>) {
-      if (
-        dataset.type === "saved" &&
-        dataset.datasetId &&
-        datasetIdMap[dataset.datasetId]
-      ) {
-        dataset.datasetId = datasetIdMap[dataset.datasetId];
-      }
-    }
+    const datasets = workbenchState.datasets as EvaluationsV3WorkbenchDataset[];
+    const datasetIdMap = await copyEvaluationsV3Datasets({
+      ctx,
+      datasets,
+      sourceProjectId,
+      targetProjectId,
+    });
+    remapEvaluationsV3DatasetReferences(datasets, datasetIdMap);
   }
 
   // Generate unique slug for the new experiment

@@ -26,6 +26,33 @@ const PROMPT_ATTRIBUTE_KEYS = [
 ] as const;
 
 /**
+ * Resolves one prompt-relevant key off `params`, preferring the flat-keyed
+ * shape (`params["langwatch.prompt.id"]`) — that's how OTel attributes land
+ * before ingestion un-flattens them, and some SDK paths leave them as-is —
+ * and falling back to a nested dot-path walk.
+ */
+function resolvePromptAttributeValue({
+  params,
+  key,
+}: {
+  params: Record<string, unknown>;
+  key: string;
+}): unknown {
+  if (params[key] !== undefined) {
+    return params[key];
+  }
+  const segments = key.split(".");
+  let current: unknown = params;
+  for (const segment of segments) {
+    if (typeof current !== "object" || current === null) {
+      return undefined;
+    }
+    current = (current as Record<string, unknown>)[segment];
+  }
+  return current;
+}
+
+/**
  * Converts nested span params (e.g. `{ langwatch: { prompt: { id: "..." } } }`)
  * to the flat dot-notation attributes expected by parsePromptReference
  * (e.g. `{ "langwatch.prompt.id": "..." }`).
@@ -43,24 +70,9 @@ export function flattenParamsToPromptAttributes(
   const attrs: Record<string, unknown> = {};
 
   for (const key of PROMPT_ATTRIBUTE_KEYS) {
-    // Flat-keyed shape first (`params["langwatch.prompt.id"]`) — that's
-    // how OTel attributes land before ingestion un-flattens them, and
-    // some SDK paths leave them as-is. Fall back to nested walk after.
-    if (params[key] !== undefined) {
-      attrs[key] = params[key];
-      continue;
-    }
-    const segments = key.split(".");
-    let current: unknown = params;
-    for (const segment of segments) {
-      if (typeof current !== "object" || current === null) {
-        current = undefined;
-        break;
-      }
-      current = (current as Record<string, unknown>)[segment];
-    }
-    if (current !== undefined) {
-      attrs[key] = current;
+    const value = resolvePromptAttributeValue({ params, key });
+    if (value !== undefined) {
+      attrs[key] = value;
     }
   }
 
@@ -86,6 +98,55 @@ export function flattenParamsToPromptAttributes(
  * @param params.spans - All spans in the trace
  * @returns The closest preceding PromptReference, or null if none found
  */
+/** Builds a parent-spanId → children index for efficient sibling lookup. */
+function buildChildrenByParentIndex(
+  spans: PromptLookupSpan[],
+): Map<string, PromptLookupSpan[]> {
+  const childrenByParent = new Map<string, PromptLookupSpan[]>();
+  for (const span of spans) {
+    if (!span.parentSpanId) continue;
+    const siblings = childrenByParent.get(span.parentSpanId);
+    if (siblings) {
+      siblings.push(span);
+    } else {
+      childrenByParent.set(span.parentSpanId, [span]);
+    }
+  }
+  return childrenByParent;
+}
+
+/**
+ * One step of the ancestor walk: checks children of `ancestor` (siblings of
+ * the current path) for the closest preceding prompt reference, falling back
+ * to checking the ancestor itself (old behavior).
+ */
+function resolveAncestorStep({
+  ancestorId,
+  ancestor,
+  childrenByParent,
+  targetStartTime,
+  excludeSpanIds,
+}: {
+  ancestorId: string;
+  ancestor: PromptLookupSpan;
+  childrenByParent: Map<string, PromptLookupSpan[]>;
+  targetStartTime: number;
+  excludeSpanIds: Set<string>;
+}): PromptReference | null {
+  const siblingRef = findClosestPrecedingSibling({
+    parentId: ancestorId,
+    childrenByParent,
+    targetStartTime,
+    excludeSpanIds,
+  });
+  if (siblingRef) {
+    return siblingRef;
+  }
+
+  const ancestorRef = parsePromptReference(ancestor.attributes);
+  return ancestorRef.promptHandle ? ancestorRef : null;
+}
+
 export function findPromptReferenceInAncestors({
   targetSpanId,
   spans,
@@ -101,19 +162,7 @@ export function findPromptReferenceInAncestors({
   }
 
   const targetStartTime = targetSpan.startTime;
-
-  // Build a parent-to-children index for efficient sibling lookup.
-  const childrenByParent = new Map<string, PromptLookupSpan[]>();
-  for (const span of spans) {
-    if (span.parentSpanId) {
-      const siblings = childrenByParent.get(span.parentSpanId);
-      if (siblings) {
-        siblings.push(span);
-      } else {
-        childrenByParent.set(span.parentSpanId, [span]);
-      }
-    }
-  }
+  const childrenByParent = buildChildrenByParentIndex(spans);
 
   // Walk up the parent chain from the target span.
   // Track visited IDs to guard against malformed cyclic parent chains.
@@ -127,22 +176,15 @@ export function findPromptReferenceInAncestors({
     const ancestor = spanMap.get(currentId);
     if (!ancestor) break;
 
-    // Check children of this ancestor (siblings of the current path)
-    // that have a prompt ref and started before the target span.
-    const siblingRef = findClosestPrecedingSibling({
-      parentId: currentId,
+    const ref = resolveAncestorStep({
+      ancestorId: currentId,
+      ancestor,
       childrenByParent,
       targetStartTime,
       excludeSpanIds: visited,
     });
-    if (siblingRef) {
-      return siblingRef;
-    }
-
-    // Fall back to checking the ancestor itself (old behavior).
-    const ancestorRef = parsePromptReference(ancestor.attributes);
-    if (ancestorRef.promptHandle) {
-      return ancestorRef;
+    if (ref) {
+      return ref;
     }
 
     currentId = ancestor.parentSpanId;

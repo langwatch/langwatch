@@ -87,6 +87,54 @@ function schemaDemandsKey({
 }
 
 /**
+ * Whether the caller's own declaration marks this key required — either the
+ * explicit `optionalKeys` list, or the field schema's own optionality.
+ */
+function isDeclaredRequiredKey({
+  key,
+  fieldSchemas,
+  declaredOptional,
+}: {
+  key: string;
+  fieldSchemas: Record<string, unknown>;
+  declaredOptional: Set<string> | undefined;
+}): boolean {
+  if (declaredOptional) return !declaredOptional.has(key);
+  return !(
+    (
+      fieldSchemas[key] as { isOptional?: () => boolean } | undefined
+    )?.isOptional?.() ?? false
+  );
+}
+
+/**
+ * Only a schema that demands this key on an empty form has an opinion
+ * worth following. Otherwise the field is `.nullable().optional()` for
+ * storage reasons alone and the declared answer stands.
+ */
+function schemaRelaxesKey({
+  keysSchema,
+  blankValues,
+  trimmedValues,
+  key,
+}: {
+  keysSchema: unknown;
+  blankValues: Record<string, string>;
+  trimmedValues: Record<string, string>;
+  key: string;
+}): boolean {
+  const alwaysDemanded = schemaDemandsKey({
+    keysSchema,
+    values: blankValues,
+    key,
+  });
+  return (
+    alwaysDemanded &&
+    !schemaDemandsKey({ keysSchema, values: trimmedValues, key })
+  );
+}
+
+/**
  * Which credential fields the drawer marks required, right now.
  *
  * Requiredness is not a property of a field on its own: a provider that
@@ -131,27 +179,10 @@ export function getRequiredCredentialKeys({
 
   const required = new Set<string>();
   for (const key of keys) {
-    const isDeclaredRequired = declaredOptional
-      ? !declaredOptional.has(key)
-      : !(
-          (
-            fieldSchemas[key] as { isOptional?: () => boolean } | undefined
-          )?.isOptional?.() ?? false
-        );
-    if (!isDeclaredRequired) continue;
-
-    // Only a schema that demands this key on an empty form has an opinion
-    // worth following. Otherwise the field is `.nullable().optional()` for
-    // storage reasons alone and the declared answer stands.
-    const alwaysDemanded = schemaDemandsKey({
-      keysSchema,
-      values: blankValues,
-      key,
-    });
-    if (
-      alwaysDemanded &&
-      !schemaDemandsKey({ keysSchema, values: trimmedValues, key })
-    ) {
+    if (!isDeclaredRequiredKey({ key, fieldSchemas, declaredOptional })) {
+      continue;
+    }
+    if (schemaRelaxesKey({ keysSchema, blankValues, trimmedValues, key })) {
       continue;
     }
     required.add(key);
@@ -197,6 +228,40 @@ export function getDisplayKeysForProvider(
   return schemaShape;
 }
 
+/**
+ * The value one credential field is seeded with: what the customer already
+ * typed wins, then what is stored, then the masked stand-in for a provider
+ * running off environment variables.
+ */
+function resolveCredentialFieldValue({
+  key,
+  storedKeys,
+  previousKeys,
+  isUsingEnvVars,
+}: {
+  key: string;
+  storedKeys: Record<string, unknown>;
+  previousKeys: Record<string, string> | undefined;
+  isUsingEnvVars: boolean | undefined;
+}): string {
+  if (previousKeys && Object.prototype.hasOwnProperty.call(previousKeys, key)) {
+    const previousValue = previousKeys[key];
+    if (typeof previousValue === "string") {
+      return previousValue;
+    }
+  }
+
+  const storedValue = storedKeys[key];
+  if (typeof storedValue === "string") {
+    return storedValue;
+  }
+  if (isUsingEnvVars && isApiKeyField(key)) {
+    // Provider is enabled via env vars - show MASKED for API key fields
+    return MASKED_KEY_PLACEHOLDER;
+  }
+  return "";
+}
+
 /** Builds credential form state, preserving prior user input.
  * When provider is enabled but has no stored keys (using env vars),
  * API key fields will show MASKED_KEY_PLACEHOLDER.
@@ -220,26 +285,12 @@ export function buildCustomKeyState({
   const isUsingEnvVars = options?.providerEnabledWithEnvVars && !hasStoredKeys;
 
   Object.keys(displayKeyMap ?? {}).forEach((key) => {
-    if (
-      previousKeys &&
-      Object.prototype.hasOwnProperty.call(previousKeys, key)
-    ) {
-      const previousValue = previousKeys[key];
-      if (typeof previousValue === "string") {
-        result[key] = previousValue;
-        return;
-      }
-    }
-
-    const storedValue = storedKeys[key];
-    if (typeof storedValue === "string") {
-      result[key] = storedValue;
-    } else if (isUsingEnvVars && isApiKeyField(key)) {
-      // Provider is enabled via env vars - show MASKED for API key fields
-      result[key] = MASKED_KEY_PLACEHOLDER;
-    } else {
-      result[key] = "";
-    }
+    result[key] = resolveCredentialFieldValue({
+      key,
+      storedKeys,
+      previousKeys,
+      isUsingEnvVars,
+    });
   });
 
   return result;

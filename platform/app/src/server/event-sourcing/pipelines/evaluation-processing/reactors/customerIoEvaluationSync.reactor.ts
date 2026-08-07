@@ -28,6 +28,147 @@ export interface CustomerIoEvaluationSyncReactorDeps {
   evaluationCountFn: (organizationId: string) => Promise<number | null>;
 }
 
+/** Fire-and-forget nurturing call: log + capture on failure, never throw. */
+function fireAndForgetNurturing(args: {
+  projectId: string;
+  failureMessage: string;
+  call: Promise<unknown>;
+}): void {
+  void args.call.catch((error) => {
+    logger.error({ projectId: args.projectId, error }, args.failureMessage);
+    captureException(toError(error));
+  });
+}
+
+function trackFirstEvaluation(args: {
+  deps: CustomerIoEvaluationSyncReactorDeps;
+  projectId: string;
+  userId: string;
+  now: string;
+  evaluatorType: string;
+}): void {
+  fireAndForgetNurturing({
+    projectId: args.projectId,
+    failureMessage: "Failed to identify user for first evaluation",
+    call: args.deps.nurturing.identifyUser({
+      userId: args.userId,
+      traits: {
+        has_evaluations: true,
+        evaluation_count: 1,
+        first_evaluation_at: args.now,
+      },
+    }),
+  });
+  fireAndForgetNurturing({
+    projectId: args.projectId,
+    failureMessage: "Failed to track first_evaluation_created event",
+    call: args.deps.nurturing.trackEvent({
+      userId: args.userId,
+      event: "first_evaluation_created",
+      properties: {
+        evaluation_type: args.evaluatorType,
+        project_id: args.projectId,
+      },
+    }),
+  });
+}
+
+function trackSubsequentEvaluation(args: {
+  deps: CustomerIoEvaluationSyncReactorDeps;
+  projectId: string;
+  userId: string;
+  now: string;
+  newCount: number;
+}): void {
+  fireAndForgetNurturing({
+    projectId: args.projectId,
+    failureMessage: "Failed to identify user for evaluation update",
+    call: args.deps.nurturing.identifyUser({
+      userId: args.userId,
+      traits: {
+        evaluation_count: args.newCount,
+        last_evaluation_at: args.now,
+      },
+    }),
+  });
+}
+
+function trackEvaluationRan(args: {
+  deps: CustomerIoEvaluationSyncReactorDeps;
+  projectId: string;
+  userId: string;
+  foldState: EvaluationRunData;
+}): void {
+  fireAndForgetNurturing({
+    projectId: args.projectId,
+    failureMessage: "Failed to track evaluation_ran event",
+    call: args.deps.nurturing.trackEvent({
+      userId: args.userId,
+      event: "evaluation_ran",
+      properties: {
+        evaluation_id: args.foldState.evaluationId,
+        score: args.foldState.score,
+        passed: args.foldState.passed,
+      },
+    }),
+  });
+}
+
+async function syncEvaluationMilestones(args: {
+  deps: CustomerIoEvaluationSyncReactorDeps;
+  projectId: string;
+  foldState: EvaluationRunData;
+  occurredAt: number;
+}): Promise<void> {
+  const { deps, projectId, foldState, occurredAt } = args;
+  const { userId, organizationId } =
+    await deps.projects.resolveOrgAdmin(projectId);
+
+  if (!userId || !organizationId) {
+    logger.warn(
+      { projectId },
+      "No admin user found for project — skipping CIO evaluation sync",
+    );
+    return;
+  }
+
+  const now = new Date(occurredAt).toISOString();
+
+  const rawCount = await deps.evaluationCountFn(organizationId);
+  if (rawCount === null) {
+    logger.warn(
+      { projectId },
+      "Could not determine evaluation count — skipping CIO evaluation sync",
+    );
+    return;
+  }
+  // The fold projection persists before reactors fire, so the current
+  // evaluation is already counted — subtract 1 to get prior count.
+  const existingCount = Math.max(0, rawCount - 1);
+  const isFirstEvaluation = existingCount === 0;
+
+  if (isFirstEvaluation) {
+    trackFirstEvaluation({
+      deps,
+      projectId,
+      userId,
+      now,
+      evaluatorType: foldState.evaluatorType,
+    });
+  } else {
+    trackSubsequentEvaluation({
+      deps,
+      projectId,
+      userId,
+      now,
+      newCount: existingCount + 1,
+    });
+  }
+
+  // Track evaluation_ran for every evaluation (first and subsequent)
+  trackEvaluationRan({ deps, projectId, userId, foldState });
+}
+
 /**
  * Reactor that syncs evaluation milestones and metrics to Customer.io.
  *
@@ -74,104 +215,12 @@ export function createCustomerIoEvaluationSyncReactor(
       const { tenantId: projectId, foldState } = context;
 
       try {
-        const { userId, organizationId } =
-          await deps.projects.resolveOrgAdmin(projectId);
-
-        if (!userId || !organizationId) {
-          logger.warn(
-            { projectId },
-            "No admin user found for project — skipping CIO evaluation sync",
-          );
-          return;
-        }
-
-        const now = new Date(event.occurredAt).toISOString();
-
-        const rawCount = await deps.evaluationCountFn(organizationId);
-        if (rawCount === null) {
-          logger.warn(
-            { projectId },
-            "Could not determine evaluation count — skipping CIO evaluation sync",
-          );
-          return;
-        }
-        // The fold projection persists before reactors fire, so the current
-        // evaluation is already counted — subtract 1 to get prior count.
-        const existingCount = Math.max(0, rawCount - 1);
-        const isFirstEvaluation = existingCount === 0;
-
-        if (isFirstEvaluation) {
-          // Fire-and-forget: do not block reactor processing
-          void deps.nurturing
-            .identifyUser({
-              userId,
-              traits: {
-                has_evaluations: true,
-                evaluation_count: 1,
-                first_evaluation_at: now,
-              },
-            })
-            .catch((error) => {
-              logger.error(
-                { projectId, error },
-                "Failed to identify user for first evaluation",
-              );
-              captureException(toError(error));
-            });
-          void deps.nurturing
-            .trackEvent({
-              userId,
-              event: "first_evaluation_created",
-              properties: {
-                evaluation_type: foldState.evaluatorType,
-                project_id: projectId,
-              },
-            })
-            .catch((error) => {
-              logger.error(
-                { projectId, error },
-                "Failed to track first_evaluation_created event",
-              );
-              captureException(toError(error));
-            });
-        } else {
-          const newCount = existingCount + 1;
-          // Fire-and-forget: do not block reactor processing
-          void deps.nurturing
-            .identifyUser({
-              userId,
-              traits: {
-                evaluation_count: newCount,
-                last_evaluation_at: now,
-              },
-            })
-            .catch((error) => {
-              logger.error(
-                { projectId, error },
-                "Failed to identify user for evaluation update",
-              );
-              captureException(toError(error));
-            });
-        }
-
-        // Track evaluation_ran for every evaluation (first and subsequent)
-        void deps.nurturing
-          .trackEvent({
-            userId,
-            event: "evaluation_ran",
-            properties: {
-              evaluation_id: foldState.evaluationId,
-              score: foldState.score,
-              passed: foldState.passed,
-            },
-          })
-          .catch((error) => {
-            logger.error(
-              { projectId, error },
-              "Failed to track evaluation_ran event",
-            );
-            captureException(toError(error));
-          });
+        await syncEvaluationMilestones({
+          deps,
+          projectId,
+          foldState,
+          occurredAt: event.occurredAt,
+        });
       } catch (error) {
         logger.error(
           { projectId, error },

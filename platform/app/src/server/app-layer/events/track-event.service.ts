@@ -45,6 +45,46 @@ export const predefinedEventTypes = predefinedEventsSchemas.options.map(
   (schema) => schema.shape.event_type.value,
 );
 
+type TrackedEventSpanAttribute = {
+  key: string;
+  value: { stringValue?: string; doubleValue?: number };
+};
+
+function buildMetricAttributes(
+  metrics: Record<string, number>,
+): TrackedEventSpanAttribute[] {
+  return Object.entries(metrics).map(([key, value]) => ({
+    key: `event.metrics.${key}`,
+    value: { doubleValue: value },
+  }));
+}
+
+function buildEventDetailAttributes(
+  eventDetails: Record<string, string | null> | undefined,
+): TrackedEventSpanAttribute[] {
+  if (!eventDetails) return [];
+  const attributes: TrackedEventSpanAttribute[] = [];
+  for (const [key, value] of Object.entries(eventDetails)) {
+    if (typeof value === "string") {
+      attributes.push({
+        key: `event.details.${key}`,
+        value: { stringValue: value },
+      });
+    } else if (typeof value === "number") {
+      attributes.push({
+        key: `event.details.${key}`,
+        value: { doubleValue: value },
+      });
+    } else if (value != null) {
+      attributes.push({
+        key: `event.details.${key}`,
+        value: { stringValue: String(value) },
+      });
+    }
+  }
+  return attributes;
+}
+
 /**
  * Build the OTEL span for a tracked event and dispatch it through the
  * trace-processing event-sourcing pipeline.
@@ -67,41 +107,12 @@ export async function recordTrackedEventSpan(params: {
     .digest("hex")
     .slice(0, 16);
 
-  const attributes: {
-    key: string;
-    value: { stringValue?: string; doubleValue?: number };
-  }[] = [
+  const attributes: TrackedEventSpanAttribute[] = [
     { key: "event.type", value: { stringValue: body.event_type } },
     { key: "event.id", value: { stringValue: eventId } },
+    ...buildMetricAttributes(body.metrics),
+    ...buildEventDetailAttributes(body.event_details),
   ];
-
-  for (const [key, value] of Object.entries(body.metrics)) {
-    attributes.push({
-      key: `event.metrics.${key}`,
-      value: { doubleValue: value },
-    });
-  }
-
-  if (body.event_details) {
-    for (const [key, value] of Object.entries(body.event_details)) {
-      if (typeof value === "string") {
-        attributes.push({
-          key: `event.details.${key}`,
-          value: { stringValue: value },
-        });
-      } else if (typeof value === "number") {
-        attributes.push({
-          key: `event.details.${key}`,
-          value: { doubleValue: value },
-        });
-      } else if (value != null) {
-        attributes.push({
-          key: `event.details.${key}`,
-          value: { stringValue: String(value) },
-        });
-      }
-    }
-  }
 
   await getApp().traces.collection.ingestNormalizedSpan({
     tenantId: project.id,

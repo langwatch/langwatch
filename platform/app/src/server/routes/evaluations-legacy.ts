@@ -13,7 +13,7 @@
 import { HandledError } from "@langwatch/handled-error";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
-import type { Project } from "@prisma/client";
+import type { Evaluator, Monitor, Project } from "@prisma/client";
 import { CostReferenceType, CostType, ExperimentType } from "@prisma/client";
 import type { JsonArray } from "@prisma/client/runtime/library";
 import { TRPCError } from "@trpc/server";
@@ -191,6 +191,55 @@ async function authenticateRequest(
   return { project: resolved.project, markUsed };
 }
 
+/**
+ * A JSON request body, or the 400 response for a body that isn't valid JSON —
+ * every legacy evaluate/guardrail/dataset-evaluate route reads its body the
+ * same way and answers the same "Bad request" message on failure.
+ */
+async function parseJsonRequestBody(
+  c: Context,
+): Promise<{ body: Record<string, any> } | { errorResponse: Response }> {
+  try {
+    return { body: await c.req.json() };
+  } catch {
+    return { errorResponse: c.json({ message: "Bad request" }, 400) };
+  }
+}
+
+/**
+ * The message shown to the caller and logged for a validation failure: the
+ * zod-validation-error message for a ZodError, an Error's own message
+ * otherwise, or the stringified value as a last resort.
+ */
+const errorMessageFor = (error: unknown): string =>
+  error instanceof ZodErrorClass
+    ? fromZodError(error).message
+    : error instanceof Error
+      ? error.message
+      : String(error);
+
+/** The log line every legacy evaluate-route validation catch block writes. */
+const logValidationError = ({
+  error,
+  projectId,
+  message,
+}: {
+  error: unknown;
+  projectId: string;
+  message: string;
+}) => {
+  logger.error(
+    {
+      err: error,
+      ...(error instanceof ZodErrorClass
+        ? { zodIssues: mapZodIssuesToLogContext(error.issues) }
+        : {}),
+      projectId,
+    },
+    message,
+  );
+};
+
 const secured = createServiceApp({ basePath: "/api" });
 
 // ---------- GET /api/evaluations/list ----------
@@ -310,112 +359,162 @@ secured.access(legacyEvaluationAuth).post(
     }
     const { project, markUsed } = auth;
 
-    const contentType = c.req.header("content-type");
-    if (!contentType?.includes("application/json")) {
-      logger.warn(
-        {
-          contentType,
-        },
-        "log_results request body is not json",
-      );
-      return c.json({ message: "Invalid body, expecting json" }, 400);
+    const parsedBody = await readLogResultsRequestBody(c);
+    if ("errorResponse" in parsedBody) {
+      return parsedBody.errorResponse;
     }
-
-    let body: Record<string, any>;
-    let payloadSize: number;
-    try {
-      // Size comes from the wire bytes, not a re-serialisation of the parsed
-      // body — these payloads carry full dataset entries and LLM outputs.
-      const raw = await c.req.text();
-      payloadSize = Buffer.byteLength(raw, "utf8");
-      body = JSON.parse(raw);
-    } catch {
-      return c.json({ message: "Invalid body, expecting json" }, 400);
-    }
+    const { body, payloadSize } = parsedBody;
 
     getPayloadSizeHistogram("log_results").observe(payloadSize);
 
-    let params: ESBatchEvaluationRESTParams;
-    try {
-      params = eSBatchEvaluationRESTParamsSchema.parse(body);
-    } catch (error) {
-      logger.error(
-        { error, body, projectId: project.id },
-        "invalid log_results data received",
-      );
-      captureException(toError(error), { extra: { projectId: project.id } });
-      const validationError = fromZodError(error as ZodError);
-      return c.json({ error: validationError.message }, 400);
+    const parsedParams = parseLogResultsParams({ c, body, project });
+    if ("errorResponse" in parsedParams) {
+      return parsedParams.errorResponse;
     }
-
-    if (!params.experiment_id && !params.experiment_slug) {
-      logger.warn(
-        { runId: params.run_id },
-        "log_results missing experiment_id and experiment_slug",
-      );
-      return c.json(
-        { error: "Either experiment_id or experiment_slug is required" },
-        400,
-      );
-    }
-
-    if (
-      params.timestamps?.created_at &&
-      params.timestamps.created_at.toString().length === 10
-    ) {
-      return c.json(
-        {
-          error:
-            "Timestamps should be in milliseconds not in seconds, please multiply it by 1000",
-        },
-        400,
-      );
-    }
+    const { params } = parsedParams;
 
     try {
       await processBatchEvaluation(project, params);
     } catch (error) {
-      if (error instanceof z.ZodError) {
-        logger.error(
-          { error, body: params, projectId: project.id },
-          "failed to validate data for batch evaluation",
-        );
-        captureException(toError(error), {
-          extra: { projectId: project.id, param: params },
-        });
-        const validationError = fromZodError(error);
-        return c.json({ error: validationError.message }, 400);
-      } else if (HandledError.isHandled(error)) {
-        logger.warn(
-          { code: error.code, meta: error.meta, projectId: project.id },
-          "handled error processing batch evaluation",
-        );
-        return c.json(
-          { error: error.code, message: error.message },
-          error.httpStatus as 400,
-        );
-      } else {
-        logger.error(
-          { error, body: params, projectId: project.id },
-          "internal server error processing batch evaluation",
-        );
-        captureException(toError(error), {
-          extra: { projectId: project.id, param: params },
-        });
-        return c.json(
-          {
-            error:
-              error instanceof Error ? error.message : "Internal server error",
-          },
-          500,
-        );
-      }
+      return batchEvaluationErrorResponse({ c, error, project, params });
     }
 
     markUsed();
     return c.json({ message: "ok" });
   },
 );
+
+/**
+ * Reads the log_results body off the wire: rejects a non-JSON content type,
+ * then parses the raw bytes. `payloadSize` comes from the wire bytes, not a
+ * re-serialisation of the parsed body — these payloads carry full dataset
+ * entries and LLM outputs.
+ */
+async function readLogResultsRequestBody(
+  c: Context,
+): Promise<
+  | { body: Record<string, any>; payloadSize: number }
+  | { errorResponse: Response }
+> {
+  const contentType = c.req.header("content-type");
+  if (!contentType?.includes("application/json")) {
+    logger.warn({ contentType }, "log_results request body is not json");
+    return {
+      errorResponse: c.json({ message: "Invalid body, expecting json" }, 400),
+    };
+  }
+
+  try {
+    const raw = await c.req.text();
+    const payloadSize = Buffer.byteLength(raw, "utf8");
+    const body = JSON.parse(raw);
+    return { body, payloadSize };
+  } catch {
+    return {
+      errorResponse: c.json({ message: "Invalid body, expecting json" }, 400),
+    };
+  }
+}
+
+function parseLogResultsParams({
+  c,
+  body,
+  project,
+}: {
+  c: Context;
+  body: Record<string, any>;
+  project: Project;
+}): { params: ESBatchEvaluationRESTParams } | { errorResponse: Response } {
+  let params: ESBatchEvaluationRESTParams;
+  try {
+    params = eSBatchEvaluationRESTParamsSchema.parse(body);
+  } catch (error) {
+    logger.error(
+      { error, body, projectId: project.id },
+      "invalid log_results data received",
+    );
+    captureException(toError(error), { extra: { projectId: project.id } });
+    const validationError = fromZodError(error as ZodError);
+    return { errorResponse: c.json({ error: validationError.message }, 400) };
+  }
+
+  if (!params.experiment_id && !params.experiment_slug) {
+    logger.warn(
+      { runId: params.run_id },
+      "log_results missing experiment_id and experiment_slug",
+    );
+    return {
+      errorResponse: c.json(
+        { error: "Either experiment_id or experiment_slug is required" },
+        400,
+      ),
+    };
+  }
+
+  if (
+    params.timestamps?.created_at &&
+    params.timestamps.created_at.toString().length === 10
+  ) {
+    return {
+      errorResponse: c.json(
+        {
+          error:
+            "Timestamps should be in milliseconds not in seconds, please multiply it by 1000",
+        },
+        400,
+      ),
+    };
+  }
+
+  return { params };
+}
+
+function batchEvaluationErrorResponse({
+  c,
+  error,
+  project,
+  params,
+}: {
+  c: Context;
+  error: unknown;
+  project: Project;
+  params: ESBatchEvaluationRESTParams;
+}) {
+  if (error instanceof z.ZodError) {
+    logger.error(
+      { error, body: params, projectId: project.id },
+      "failed to validate data for batch evaluation",
+    );
+    captureException(toError(error), {
+      extra: { projectId: project.id, param: params },
+    });
+    const validationError = fromZodError(error);
+    return c.json({ error: validationError.message }, 400);
+  } else if (HandledError.isHandled(error)) {
+    logger.warn(
+      { code: error.code, meta: error.meta, projectId: project.id },
+      "handled error processing batch evaluation",
+    );
+    return c.json(
+      { error: error.code, message: error.message },
+      error.httpStatus as 400,
+    );
+  } else {
+    logger.error(
+      { error, body: params, projectId: project.id },
+      "internal server error processing batch evaluation",
+    );
+    captureException(toError(error), {
+      extra: { projectId: project.id, param: params },
+    });
+    return c.json(
+      {
+        error: error instanceof Error ? error.message : "Internal server error",
+      },
+      500,
+    );
+  }
+}
 
 /**
  * What every evaluate route documents.
@@ -617,86 +716,43 @@ secured.access(legacyEvaluationAuth).post(
       return c.json(auth.body, auth.status);
     }
     const { markUsed } = auth;
-    // dataset/evaluate needs the full team relation for downstream queries.
-    const project = await prisma.project.findUnique({
-      where: { id: auth.project.id },
-      include: { team: true },
-    });
+    const project = await resolveDatasetEvaluateProject(auth.project.id);
     if (!project) {
       return c.json({ message: "Invalid auth token." }, 401);
     }
 
-    let body: Record<string, any>;
-    try {
-      body = await c.req.json();
-    } catch {
-      return c.json({ message: "Bad request" }, 400);
+    const parsedBody = await parseJsonRequestBody(c);
+    if ("errorResponse" in parsedBody) {
+      return parsedBody.errorResponse;
     }
+    const { body } = parsedBody;
 
-    let params: BatchEvaluationRESTParams;
-    try {
-      params = batchEvaluationInputSchema.parse(body);
-    } catch (error) {
-      logger.error(
-        { error, body, projectId: project.id },
-        "invalid evaluation params received",
-      );
-      captureException(toError(error), { extra: { projectId: project.id } });
-      const validationError = fromZodError(error as ZodError);
-      return c.json({ error: validationError.message }, 400);
+    const parsedParams = parseDatasetEvaluateParams({ c, body, project });
+    if ("errorResponse" in parsedParams) {
+      return parsedParams.errorResponse;
     }
+    const { params } = parsedParams;
 
     const { datasetSlug } = params;
     const experimentSlug = params.experimentSlug ?? params.batchId ?? nanoid();
     const evaluation = params.evaluation;
-    let settings = null;
-    let checkType;
 
-    const check = await prisma.monitor.findFirst({
-      where: { projectId: project.id, slug: evaluation },
+    const { checkType, settings } = await resolveDatasetEvaluateCheckType({
+      projectId: project.id,
+      evaluation,
     });
 
-    if (check != null) {
-      checkType = check.checkType;
-      settings = check.parameters;
-    } else {
-      checkType = evaluation;
+    const resolvedData = await resolveDatasetEvaluateData({
+      c,
+      project,
+      checkType,
+      body,
+      rawData: params.data,
+    });
+    if ("errorResponse" in resolvedData) {
+      return resolvedData.errorResponse;
     }
-
-    const evaluator = await getEvaluatorIncludingCustom(
-      project.id,
-      checkType as EvaluatorTypes,
-    );
-    if (!evaluator) {
-      return c.json({ error: `Evaluator not found: ${checkType}` }, 400);
-    }
-
-    let data: DataForEvaluation;
-    try {
-      data = getEvaluatorDataForParams(
-        checkType,
-        params.data as Record<string, any>,
-      );
-      if (
-        !evaluator.requiredFields.every((field: string) => field in data.data)
-      ) {
-        return c.json(
-          {
-            error: `Missing required field for ${checkType}`,
-            requiredFields: evaluator.requiredFields,
-          },
-          400,
-        );
-      }
-    } catch (error) {
-      logger.error(
-        { error, body, projectId: project.id },
-        "invalid evaluation data received",
-      );
-      captureException(toError(error), { extra: { projectId: project.id } });
-      const validationError = fromZodError(error as ZodError);
-      return c.json({ error: validationError.message }, 400);
-    }
+    const { data } = resolvedData;
 
     const dataset = await prisma.dataset.findFirst({
       where: { slug: datasetSlug, projectId: project.id },
@@ -705,74 +761,256 @@ secured.access(legacyEvaluationAuth).post(
       return c.json({ error: "Dataset not found" }, 404);
     }
 
-    let result: SingleEvaluationResult;
-    try {
-      result = await runEvaluation({
-        projectId: project.id,
-        data,
-        evaluatorType: checkType as EvaluatorTypes,
-        settings: (settings as Record<string, unknown>) ?? {},
-      });
-    } catch (error) {
-      result = {
-        status: "error",
-        error_type: "INTERNAL_ERROR",
-        details: error instanceof Error ? error.message : "Internal error",
-        traceback: [],
-      };
-    }
+    const result = await runDatasetEvaluation({
+      projectId: project.id,
+      data,
+      checkType,
+      settings,
+    });
 
-    const experiment = await ExperimentService.create(prisma).findBySlug({
+    const experiment = await findExperimentOrThrow({
       projectId: project.id,
       slug: experimentSlug,
     });
-    if (!experiment) {
-      throw new TRPCError({
-        code: "NOT_FOUND",
-        message: "Experiment not found",
-      });
-    }
 
-    if ("cost" in result && result.cost) {
-      await prisma.cost.create({
-        data: {
-          id: `cost_${nanoid()}`,
-          projectId: project.id,
-          costType: CostType.BATCH_EVALUATION,
-          costName: evaluation,
-          referenceType: CostReferenceType.BATCH,
-          referenceId: experiment.id,
-          amount: result.cost.amount,
-          currency: result.cost.currency,
-        },
-      });
-    }
+    await recordDatasetEvaluationCost({
+      result,
+      project,
+      evaluation,
+      experimentId: experiment.id,
+    });
 
-    const { score, passed, details, cost, status, label } =
-      result as EvaluationResult;
-
-    await prisma.batchEvaluation.create({
-      data: {
-        id: nanoid(),
-        experimentId: experiment.id,
-        projectId: project.id,
-        data: data.data,
-        status,
-        score: score ?? 0,
-        passed: passed ?? false,
-        label,
-        details: details ?? "",
-        cost: cost?.amount ?? 0,
-        evaluation,
-        datasetSlug,
-        datasetId: dataset.id,
-      },
+    await saveDatasetBatchEvaluationRow({
+      project,
+      experiment,
+      data,
+      result,
+      evaluation,
+      datasetSlug,
+      dataset,
     });
 
     markUsed();
     return c.json(result);
   },
 );
+
+// dataset/evaluate needs the full team relation for downstream queries.
+async function resolveDatasetEvaluateProject(projectId: string) {
+  return prisma.project.findUnique({
+    where: { id: projectId },
+    include: { team: true },
+  });
+}
+
+function parseDatasetEvaluateParams({
+  c,
+  body,
+  project,
+}: {
+  c: Context;
+  body: Record<string, any>;
+  project: Project;
+}): { params: BatchEvaluationRESTParams } | { errorResponse: Response } {
+  try {
+    return { params: batchEvaluationInputSchema.parse(body) };
+  } catch (error) {
+    logger.error(
+      { error, body, projectId: project.id },
+      "invalid evaluation params received",
+    );
+    captureException(toError(error), { extra: { projectId: project.id } });
+    const validationError = fromZodError(error as ZodError);
+    return { errorResponse: c.json({ error: validationError.message }, 400) };
+  }
+}
+
+async function resolveDatasetEvaluateCheckType({
+  projectId,
+  evaluation,
+}: {
+  projectId: string;
+  evaluation: string;
+}): Promise<{ checkType: string; settings: unknown }> {
+  const check = await prisma.monitor.findFirst({
+    where: { projectId, slug: evaluation },
+  });
+
+  if (check != null) {
+    return { checkType: check.checkType, settings: check.parameters };
+  }
+  return { checkType: evaluation, settings: null };
+}
+
+async function resolveDatasetEvaluateData({
+  c,
+  project,
+  checkType,
+  body,
+  rawData,
+}: {
+  c: Context;
+  project: Project;
+  checkType: string;
+  body: Record<string, any>;
+  rawData: unknown;
+}): Promise<{ data: DataForEvaluation } | { errorResponse: Response }> {
+  const evaluator = await getEvaluatorIncludingCustom(
+    project.id,
+    checkType as EvaluatorTypes,
+  );
+  if (!evaluator) {
+    return {
+      errorResponse: c.json(
+        { error: `Evaluator not found: ${checkType}` },
+        400,
+      ),
+    };
+  }
+
+  try {
+    const data = getEvaluatorDataForParams(
+      checkType,
+      rawData as Record<string, any>,
+    );
+    if (
+      !evaluator.requiredFields.every((field: string) => field in data.data)
+    ) {
+      return {
+        errorResponse: c.json(
+          {
+            error: `Missing required field for ${checkType}`,
+            requiredFields: evaluator.requiredFields,
+          },
+          400,
+        ),
+      };
+    }
+    return { data };
+  } catch (error) {
+    logger.error(
+      { error, body, projectId: project.id },
+      "invalid evaluation data received",
+    );
+    captureException(toError(error), { extra: { projectId: project.id } });
+    const validationError = fromZodError(error as ZodError);
+    return { errorResponse: c.json({ error: validationError.message }, 400) };
+  }
+}
+
+async function runDatasetEvaluation({
+  projectId,
+  data,
+  checkType,
+  settings,
+}: {
+  projectId: string;
+  data: DataForEvaluation;
+  checkType: string;
+  settings: unknown;
+}): Promise<SingleEvaluationResult> {
+  try {
+    return await runEvaluation({
+      projectId,
+      data,
+      evaluatorType: checkType as EvaluatorTypes,
+      settings: (settings as Record<string, unknown>) ?? {},
+    });
+  } catch (error) {
+    return {
+      status: "error",
+      error_type: "INTERNAL_ERROR",
+      details: error instanceof Error ? error.message : "Internal error",
+      traceback: [],
+    };
+  }
+}
+
+async function recordDatasetEvaluationCost({
+  result,
+  project,
+  evaluation,
+  experimentId,
+}: {
+  result: SingleEvaluationResult;
+  project: Project;
+  evaluation: string;
+  experimentId: string;
+}) {
+  if ("cost" in result && result.cost) {
+    await prisma.cost.create({
+      data: {
+        id: `cost_${nanoid()}`,
+        projectId: project.id,
+        costType: CostType.BATCH_EVALUATION,
+        costName: evaluation,
+        referenceType: CostReferenceType.BATCH,
+        referenceId: experimentId,
+        amount: result.cost.amount,
+        currency: result.cost.currency,
+      },
+    });
+  }
+}
+
+async function findExperimentOrThrow({
+  projectId,
+  slug,
+}: {
+  projectId: string;
+  slug: string;
+}) {
+  const experiment = await ExperimentService.create(prisma).findBySlug({
+    projectId,
+    slug,
+  });
+  if (!experiment) {
+    throw new TRPCError({
+      code: "NOT_FOUND",
+      message: "Experiment not found",
+    });
+  }
+  return experiment;
+}
+
+async function saveDatasetBatchEvaluationRow({
+  project,
+  experiment,
+  data,
+  result,
+  evaluation,
+  datasetSlug,
+  dataset,
+}: {
+  project: Project;
+  experiment: { id: string };
+  data: DataForEvaluation;
+  result: SingleEvaluationResult;
+  evaluation: string;
+  datasetSlug: string;
+  dataset: { id: string };
+}) {
+  const { score, passed, details, cost, status, label } =
+    result as EvaluationResult;
+
+  await prisma.batchEvaluation.create({
+    data: {
+      id: nanoid(),
+      experimentId: experiment.id,
+      projectId: project.id,
+      data: data.data,
+      status,
+      score: score ?? 0,
+      passed: passed ?? false,
+      label,
+      details: details ?? "",
+      cost: cost?.amount ?? 0,
+      evaluation,
+      datasetSlug,
+      datasetId: dataset.id,
+    },
+  });
+}
 
 export const app = secured.hono;
 
@@ -830,6 +1068,44 @@ const autoparseContexts = (
   });
 };
 
+const CANONICAL_EVALUATOR_KEYS = new Set([
+  "input",
+  "output",
+  "contexts",
+  "expected_output",
+  "expected_contexts",
+  "conversation",
+]);
+
+// Preserve evaluator-specific fields (e.g. pairwise's candidate_a_id /
+// candidate_a_output) that the legacy default schema strips. Bounded
+// to the evaluator's declared required + optional fields so a stray
+// mapping output on a non-pairwise evaluator can't ride through and
+// trip a strict pydantic model on the langevals side — the spread is
+// opt-in per evaluator, not a catch-all. The canonical 6 fields are
+// normalized below; everything else listed in the evaluator's
+// contract passes through as-is.
+const collectEvaluatorExtras = ({
+  params,
+  checkType,
+}: {
+  params: Record<string, any>;
+  checkType: string;
+}): Record<string, unknown> => {
+  const evaluatorContract = AVAILABLE_EVALUATORS[checkType as EvaluatorTypes];
+  const allowedExtras = new Set([
+    ...(evaluatorContract?.requiredFields ?? []),
+    ...(evaluatorContract?.optionalFields ?? []),
+  ]);
+  const extras: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(params)) {
+    if (CANONICAL_EVALUATOR_KEYS.has(key)) continue;
+    if (!allowedExtras.has(key)) continue;
+    extras[key] = value;
+  }
+  return extras;
+};
+
 export const getEvaluatorDataForParams = (
   checkType: string,
   params: Record<string, any>,
@@ -847,33 +1123,7 @@ export const getEvaluatorDataForParams = (
     expected_contexts: autoparseContexts(params.expected_contexts),
   });
 
-  // Preserve evaluator-specific fields (e.g. pairwise's candidate_a_id /
-  // candidate_a_output) that the legacy default schema strips. Bounded
-  // to the evaluator's declared required + optional fields so a stray
-  // mapping output on a non-pairwise evaluator can't ride through and
-  // trip a strict pydantic model on the langevals side — the spread is
-  // opt-in per evaluator, not a catch-all. The canonical 6 fields are
-  // normalized below; everything else listed in the evaluator's
-  // contract passes through as-is.
-  const canonicalKeys = new Set([
-    "input",
-    "output",
-    "contexts",
-    "expected_output",
-    "expected_contexts",
-    "conversation",
-  ]);
-  const evaluatorContract = AVAILABLE_EVALUATORS[checkType as EvaluatorTypes];
-  const allowedExtras = new Set([
-    ...(evaluatorContract?.requiredFields ?? []),
-    ...(evaluatorContract?.optionalFields ?? []),
-  ]);
-  const extras: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(params)) {
-    if (canonicalKeys.has(key)) continue;
-    if (!allowedExtras.has(key)) continue;
-    extras[key] = value;
-  }
+  const extras = collectEvaluatorExtras({ params, checkType });
 
   return {
     type: "default",
@@ -1054,119 +1304,267 @@ export const resolveEvaluatorSettingsDefaults = async (
 
 // --- Evaluator call handler (used by evaluations + guardrails routes) ---
 
-async function handleEvaluatorCall(
-  c: Context,
-  evaluatorSlug: string,
-  as_guardrail: boolean,
-) {
-  const auth = await authenticateRequest(c, "evaluations:manage");
-  if ("error" in auth) {
-    return c.json(auth.body, auth.status);
+type WorkflowEvaluatorDef = { name: string; requiredFields: string[] };
+
+type ResolvedEvaluatorDefinition =
+  | EvaluatorDefinition<keyof typeof AVAILABLE_EVALUATORS>
+  | WorkflowEvaluatorDef;
+
+type EvaluatorSourceResolution = {
+  checkType: string;
+  evaluatorSettings: Record<string, unknown> | undefined;
+  evaluatorName: string | undefined;
+  savedEvaluatorId: string | undefined;
+  workflowEvaluatorDef: WorkflowEvaluatorDef | undefined;
+};
+
+async function resolveWorkflowEvaluatorCheckType({
+  c,
+  savedEvaluator,
+  slugOrId,
+}: {
+  c: Context;
+  savedEvaluator: Evaluator;
+  slugOrId: string;
+}): Promise<
+  | { response: Response }
+  | { checkType: string; workflowEvaluatorDef: WorkflowEvaluatorDef }
+> {
+  const checkType = `custom/${savedEvaluator.workflowId}`;
+  // Non-null: the caller only takes this branch when
+  // savedEvaluator.workflowId is truthy.
+  const workflow = await prisma.workflow.findUnique({
+    where: { id: savedEvaluator.workflowId! },
+    include: { currentVersion: true },
+  });
+  if (!workflow) {
+    return {
+      response: c.json(
+        { error: `Workflow not found for evaluator: ${slugOrId}` },
+        404,
+      ),
+    };
   }
-  const { project, markUsed } = auth;
+  const dsl = workflow.currentVersion?.dsl as unknown as Workflow | undefined;
+  const entryOutputs = dsl ? getWorkflowEntryOutputs(dsl) : [];
+  return {
+    checkType,
+    workflowEvaluatorDef: {
+      name: savedEvaluator.name,
+      requiredFields: entryOutputs.map((o) => o.identifier),
+    },
+  };
+}
 
-  let body: Record<string, any>;
-  try {
-    body = await c.req.json();
-  } catch {
-    return c.json({ message: "Bad request" }, 400);
+function resolveCodeEvaluatorCheckType({
+  c,
+  savedEvaluator,
+  slugOrId,
+}: {
+  c: Context;
+  savedEvaluator: Evaluator;
+  slugOrId: string;
+}):
+  | { response: Response }
+  | { checkType: string; workflowEvaluatorDef: WorkflowEvaluatorDef } {
+  const checkType = `${CODE_EVALUATOR_CHECK_PREFIX}${savedEvaluator.id}`;
+  const parsedConfig = codeEvaluatorConfigSchema.safeParse(
+    savedEvaluator.config,
+  );
+  if (!parsedConfig.success) {
+    return {
+      response: c.json(
+        { error: `Code evaluator has an invalid config: ${slugOrId}` },
+        400,
+      ),
+    };
   }
+  return {
+    checkType,
+    workflowEvaluatorDef: {
+      name: savedEvaluator.name,
+      requiredFields: parsedConfig.data.inputs.map((i) => i.identifier),
+    },
+  };
+}
 
-  let checkType: string;
-  let evaluatorSettings: Record<string, unknown> | undefined;
-  let evaluatorName: string | undefined;
-  let savedEvaluatorId: string | undefined;
-  let workflowEvaluatorDef:
-    | { name: string; requiredFields: string[] }
-    | undefined;
+async function resolveSavedEvaluatorCheckType({
+  c,
+  savedEvaluator,
+  slugOrId,
+  evaluatorSlug,
+  config,
+}: {
+  c: Context;
+  savedEvaluator: Evaluator;
+  slugOrId: string;
+  evaluatorSlug: string;
+  config: { evaluatorType?: string; settings?: Record<string, unknown> } | null;
+}): Promise<
+  | { response: Response }
+  | {
+      checkType: string;
+      workflowEvaluatorDef: WorkflowEvaluatorDef | undefined;
+    }
+> {
+  if (savedEvaluator.type === "workflow" && savedEvaluator.workflowId) {
+    return resolveWorkflowEvaluatorCheckType({ c, savedEvaluator, slugOrId });
+  }
+  if (savedEvaluator.type === "code") {
+    return resolveCodeEvaluatorCheckType({ c, savedEvaluator, slugOrId });
+  }
+  return {
+    checkType: config?.evaluatorType ?? evaluatorSlug,
+    workflowEvaluatorDef: undefined,
+  };
+}
 
-  if (evaluatorSlug.startsWith("evaluators/")) {
-    const slugOrId = evaluatorSlug.replace("evaluators/", "");
-    const savedEvaluator = await prisma.evaluator.findFirst({
-      where: {
-        projectId: project.id,
-        OR: [{ slug: slugOrId }, { id: slugOrId }],
-        archivedAt: null,
-      },
-    });
-
-    if (savedEvaluator) {
-      const config = savedEvaluator.config as {
-        evaluatorType?: string;
-        settings?: Record<string, unknown>;
-      } | null;
-
-      if (savedEvaluator.type === "workflow" && savedEvaluator.workflowId) {
-        checkType = `custom/${savedEvaluator.workflowId}`;
-        const workflow = await prisma.workflow.findUnique({
-          where: { id: savedEvaluator.workflowId },
-          include: { currentVersion: true },
-        });
-        if (!workflow) {
-          return c.json(
-            { error: `Workflow not found for evaluator: ${slugOrId}` },
-            404,
-          );
-        }
-        const dsl = workflow.currentVersion?.dsl as unknown as
-          | Workflow
-          | undefined;
-        const entryOutputs = dsl ? getWorkflowEntryOutputs(dsl) : [];
-        workflowEvaluatorDef = {
-          name: savedEvaluator.name,
-          requiredFields: entryOutputs.map((o) => o.identifier),
-        };
-      } else if (savedEvaluator.type === "code") {
-        checkType = `${CODE_EVALUATOR_CHECK_PREFIX}${savedEvaluator.id}`;
-        const parsedConfig = codeEvaluatorConfigSchema.safeParse(
-          savedEvaluator.config,
-        );
-        if (!parsedConfig.success) {
-          return c.json(
-            { error: `Code evaluator has an invalid config: ${slugOrId}` },
-            400,
-          );
-        }
-        workflowEvaluatorDef = {
-          name: savedEvaluator.name,
-          requiredFields: parsedConfig.data.inputs.map((i) => i.identifier),
-        };
-      } else {
-        checkType = config?.evaluatorType ?? evaluatorSlug;
-      }
-      evaluatorSettings = config?.settings;
-      evaluatorName = savedEvaluator.name;
-      savedEvaluatorId = savedEvaluator.id;
-    } else {
-      return c.json(
+async function resolveSavedEvaluatorSource({
+  c,
+  project,
+  slugOrId,
+  evaluatorSlug,
+}: {
+  c: Context;
+  project: Project;
+  slugOrId: string;
+  evaluatorSlug: string;
+}): Promise<{ response: Response } | EvaluatorSourceResolution> {
+  const savedEvaluator = await prisma.evaluator.findFirst({
+    where: {
+      projectId: project.id,
+      OR: [{ slug: slugOrId }, { id: slugOrId }],
+      archivedAt: null,
+    },
+  });
+  if (!savedEvaluator) {
+    return {
+      response: c.json(
         { error: `Evaluator not found with slug or id: ${slugOrId}` },
         404,
-      );
-    }
-  } else {
-    const monitor = await prisma.monitor.findUnique({
-      where: {
-        projectId_slug: { projectId: project.id, slug: evaluatorSlug },
-      },
-    });
-    if (monitor != null) {
-      checkType = monitor.checkType;
-      evaluatorSettings = monitor.parameters as
-        | Record<string, unknown>
-        | undefined;
-      evaluatorName = monitor.name;
-    } else {
-      checkType = evaluatorSlug;
-    }
+      ),
+    };
   }
 
-  const monitor = !evaluatorSlug.startsWith("evaluators/")
+  const config = savedEvaluator.config as {
+    evaluatorType?: string;
+    settings?: Record<string, unknown>;
+  } | null;
+
+  const checkTypeResult = await resolveSavedEvaluatorCheckType({
+    c,
+    savedEvaluator,
+    slugOrId,
+    evaluatorSlug,
+    config,
+  });
+  if ("response" in checkTypeResult) {
+    return checkTypeResult;
+  }
+
+  return {
+    checkType: checkTypeResult.checkType,
+    evaluatorSettings: config?.settings,
+    evaluatorName: savedEvaluator.name,
+    savedEvaluatorId: savedEvaluator.id,
+    workflowEvaluatorDef: checkTypeResult.workflowEvaluatorDef,
+  };
+}
+
+async function resolveMonitorEvaluatorSource({
+  project,
+  evaluatorSlug,
+}: {
+  project: Project;
+  evaluatorSlug: string;
+}): Promise<EvaluatorSourceResolution> {
+  const monitor = await prisma.monitor.findUnique({
+    where: {
+      projectId_slug: { projectId: project.id, slug: evaluatorSlug },
+    },
+  });
+  if (monitor != null) {
+    return {
+      checkType: monitor.checkType,
+      evaluatorSettings: monitor.parameters as
+        | Record<string, unknown>
+        | undefined,
+      evaluatorName: monitor.name,
+      savedEvaluatorId: undefined,
+      workflowEvaluatorDef: undefined,
+    };
+  }
+  return {
+    checkType: evaluatorSlug,
+    evaluatorSettings: undefined,
+    evaluatorName: undefined,
+    savedEvaluatorId: undefined,
+    workflowEvaluatorDef: undefined,
+  };
+}
+
+async function resolveEvaluatorSource({
+  c,
+  project,
+  evaluatorSlug,
+}: {
+  c: Context;
+  project: Project;
+  evaluatorSlug: string;
+}): Promise<{ response: Response } | EvaluatorSourceResolution> {
+  if (evaluatorSlug.startsWith("evaluators/")) {
+    const slugOrId = evaluatorSlug.replace("evaluators/", "");
+    return resolveSavedEvaluatorSource({
+      c,
+      project,
+      slugOrId,
+      evaluatorSlug,
+    });
+  }
+  return resolveMonitorEvaluatorSource({ project, evaluatorSlug });
+}
+
+async function findMonitorForNonSavedEvaluatorSlug({
+  project,
+  evaluatorSlug,
+}: {
+  project: Project;
+  evaluatorSlug: string;
+}): Promise<Monitor | null> {
+  return !evaluatorSlug.startsWith("evaluators/")
     ? await prisma.monitor.findUnique({
         where: {
           projectId_slug: { projectId: project.id, slug: evaluatorSlug },
         },
       })
     : null;
+}
+
+async function resolveEvaluatorForCall({
+  c,
+  project,
+  evaluatorSlug,
+}: {
+  c: Context;
+  project: Project;
+  evaluatorSlug: string;
+}): Promise<
+  | { response: Response }
+  | (EvaluatorSourceResolution & {
+      monitor: Monitor | null;
+      isLegacyPairwiseDispatch: boolean;
+      evaluatorDefinition: ResolvedEvaluatorDefinition;
+    })
+> {
+  const source = await resolveEvaluatorSource({ c, project, evaluatorSlug });
+  if ("response" in source) {
+    return source;
+  }
+
+  const monitor = await findMonitorForNonSavedEvaluatorSlug({
+    project,
+    evaluatorSlug,
+  });
 
   // Every legacy `langevals/pairwise_compare` dispatch — from a saved
   // evaluator, a monitor, or a bare slug — is transparently rerouted to
@@ -1176,47 +1574,66 @@ async function handleEvaluatorCall(
   // needs to know the redirect happened; it keeps sending the 2-slot wire
   // shape it always has, and isLegacyPairwiseDispatch below decides whether
   // that shape needs translating before it reaches the new judge.
-  const isLegacyPairwiseDispatch = checkType === LEGACY_PAIRWISE_EVALUATOR_TYPE;
-  checkType = resolveDispatchEvaluatorType(checkType) ?? checkType;
+  const isLegacyPairwiseDispatch =
+    source.checkType === LEGACY_PAIRWISE_EVALUATOR_TYPE;
+  const checkType =
+    resolveDispatchEvaluatorType(source.checkType) ?? source.checkType;
 
   const evaluatorDefinition =
-    workflowEvaluatorDef ??
+    source.workflowEvaluatorDef ??
     (await getEvaluatorIncludingCustom(
       project.id,
       checkType as EvaluatorTypes,
     ));
   if (!evaluatorDefinition) {
-    return c.json({ error: `Evaluator not found: ${checkType}` }, 404);
+    return {
+      response: c.json({ error: `Evaluator not found: ${checkType}` }, 404),
+    };
   }
 
-  let params: EvaluationRESTParams;
+  return {
+    ...source,
+    checkType,
+    monitor,
+    isLegacyPairwiseDispatch,
+    evaluatorDefinition,
+  };
+}
+
+function parseEvaluationParams({
+  c,
+  body,
+  project,
+}: {
+  c: Context;
+  body: Record<string, any>;
+  project: Project;
+}): { response: Response } | { params: EvaluationRESTParams } {
   try {
-    params = evaluationInputSchema.parse(body);
+    return { params: evaluationInputSchema.parse(body) };
   } catch (error) {
-    const message =
-      error instanceof ZodErrorClass
-        ? fromZodError(error).message
-        : error instanceof Error
-          ? error.message
-          : String(error);
-    logger.error(
-      {
-        err: error,
-        ...(error instanceof ZodErrorClass
-          ? { zodIssues: mapZodIssuesToLogContext(error.issues) }
-          : {}),
-        projectId: project.id,
-      },
-      "invalid evaluation params received",
-    );
+    const message = errorMessageFor(error);
+    logValidationError({
+      error,
+      projectId: project.id,
+      message: "invalid evaluation params received",
+    });
     captureException(toError(error), {
       extra: { projectId: project.id, validationError: message },
     });
-    return c.json({ error: message }, 400);
+    return { response: c.json({ error: message }, 400) };
   }
+}
 
-  const isGuardrail = as_guardrail || params.as_guardrail;
-
+function guardrailSkipIfMonitorDisabled({
+  c,
+  monitor,
+  isGuardrail,
+}: {
+  c: Context;
+  monitor: Monitor | null;
+  isGuardrail: boolean | undefined;
+}): Response | null {
   if (monitor && !monitor.enabled && !!isGuardrail) {
     return c.json({
       status: "skipped",
@@ -1224,16 +1641,36 @@ async function handleEvaluatorCall(
       ...(isGuardrail ? { passed: true } : {}),
     });
   }
+  return null;
+}
 
-  if (body.settings?.trace_id) {
-    params.trace_id = body.settings.trace_id;
-  }
-
+async function resolveEvaluatorSettings({
+  c,
+  project,
+  checkType,
+  evaluatorDefinition,
+  workflowEvaluatorDef,
+  evaluatorSettings,
+  monitor,
+  params,
+  isLegacyPairwiseDispatch,
+}: {
+  c: Context;
+  project: Project;
+  checkType: string;
+  evaluatorDefinition: ResolvedEvaluatorDefinition;
+  workflowEvaluatorDef: WorkflowEvaluatorDef | undefined;
+  evaluatorSettings: Record<string, unknown> | undefined;
+  monitor: Monitor | null;
+  params: EvaluationRESTParams;
+  isLegacyPairwiseDispatch: boolean;
+}): Promise<{ response: Response } | { settings: any }> {
   const evaluatorSettingSchema = checkType.startsWith("custom/")
     ? undefined
     : evaluatorsSchema.shape[checkType as EvaluatorTypes]?.shape.settings;
 
-  let settings: any = ((evaluatorSettings ?? monitor?.parameters) as any) ?? {};
+  const baseSettings: any =
+    ((evaluatorSettings ?? monitor?.parameters) as any) ?? {};
 
   try {
     // NB: `select_best_compare`'s settings schema is non-strict, so a legacy
@@ -1251,7 +1688,7 @@ async function handleEvaluatorCall(
             await resolveEvaluatorSettingsDefaults(project.id),
           )
         : {}),
-      ...(settings as Record<string, unknown>),
+      ...(baseSettings as Record<string, unknown>),
       ...(params.settings ? params.settings : {}),
     };
 
@@ -1271,66 +1708,72 @@ async function handleEvaluatorCall(
       );
     }
 
-    settings = evaluatorSettingSchema?.parse(finalSettings);
+    return { settings: evaluatorSettingSchema?.parse(finalSettings) };
   } catch (error) {
-    const message =
-      error instanceof ZodErrorClass
-        ? fromZodError(error).message
-        : error instanceof Error
-          ? error.message
-          : String(error);
-    logger.error(
-      {
-        err: error,
-        ...(error instanceof ZodErrorClass
-          ? { zodIssues: mapZodIssuesToLogContext(error.issues) }
-          : {}),
-        projectId: project.id,
-      },
-      "invalid settings received for the evaluator",
-    );
+    const message = errorMessageFor(error);
+    logValidationError({
+      error,
+      projectId: project.id,
+      message: "invalid settings received for the evaluator",
+    });
     captureException(toError(error), {
       extra: { projectId: project.id, validationError: message },
     });
-    return c.json(
-      {
-        error: `Invalid settings for ${checkType} evaluator: ${message}`,
-      },
-      400,
-    );
+    return {
+      response: c.json(
+        { error: `Invalid settings for ${checkType} evaluator: ${message}` },
+        400,
+      ),
+    };
   }
+}
 
-  let data: DataForEvaluation;
+function buildEvaluationData({
+  c,
+  project,
+  checkType,
+  params,
+  isLegacyPairwiseDispatch,
+}: {
+  c: Context;
+  project: Project;
+  checkType: string;
+  params: EvaluationRESTParams;
+  isLegacyPairwiseDispatch: boolean;
+}): { response: Response } | { data: DataForEvaluation } {
   try {
-    data = getEvaluatorDataForParams(
+    const data = getEvaluatorDataForParams(
       checkType,
       (isLegacyPairwiseDispatch
         ? translateLegacyPairwisePayload(params.data as Record<string, any>)
         : params.data) as Record<string, any>,
     );
+    return { data };
   } catch (error) {
-    const message =
-      error instanceof ZodErrorClass
-        ? fromZodError(error).message
-        : error instanceof Error
-          ? error.message
-          : String(error);
-    logger.error(
-      {
-        err: error,
-        ...(error instanceof ZodErrorClass
-          ? { zodIssues: mapZodIssuesToLogContext(error.issues) }
-          : {}),
-        projectId: project.id,
-      },
-      "invalid evaluation data received",
-    );
+    const message = errorMessageFor(error);
+    logValidationError({
+      error,
+      projectId: project.id,
+      message: "invalid evaluation data received",
+    });
     captureException(toError(error), {
       extra: { projectId: project.id, validationError: message },
     });
-    return c.json({ error: message }, 400);
+    return { response: c.json({ error: message }, 400) };
   }
+}
 
+function validateRequiredFields({
+  c,
+  project,
+  evaluatorDefinition,
+  data,
+}: {
+  c: Context;
+  project: Project;
+  evaluatorDefinition: ResolvedEvaluatorDefinition;
+  data: DataForEvaluation;
+}): Response | null {
   for (const requiredField of evaluatorDefinition.requiredFields) {
     if (
       data.data[requiredField] === undefined ||
@@ -1365,10 +1808,113 @@ async function handleEvaluatorCall(
       );
     }
   }
+  return null;
+}
 
-  let result: SingleEvaluationResult;
-  let costId: string | undefined;
+async function prepareEvaluationRequest({
+  c,
+  project,
+  body,
+  checkType,
+  evaluatorDefinition,
+  workflowEvaluatorDef,
+  evaluatorSettings,
+  monitor,
+  isLegacyPairwiseDispatch,
+  asGuardrailFlag,
+}: {
+  c: Context;
+  project: Project;
+  body: Record<string, any>;
+  checkType: string;
+  evaluatorDefinition: ResolvedEvaluatorDefinition;
+  workflowEvaluatorDef: WorkflowEvaluatorDef | undefined;
+  evaluatorSettings: Record<string, unknown> | undefined;
+  monitor: Monitor | null;
+  isLegacyPairwiseDispatch: boolean;
+  asGuardrailFlag: boolean;
+}): Promise<
+  | { response: Response }
+  | {
+      params: EvaluationRESTParams;
+      isGuardrail: boolean | undefined;
+      settings: any;
+      data: DataForEvaluation;
+    }
+> {
+  const parsedParams = parseEvaluationParams({ c, body, project });
+  if ("response" in parsedParams) {
+    return parsedParams;
+  }
+  const { params } = parsedParams;
 
+  const isGuardrail = asGuardrailFlag || params.as_guardrail;
+
+  const skipResponse = guardrailSkipIfMonitorDisabled({
+    c,
+    monitor,
+    isGuardrail,
+  });
+  if (skipResponse) {
+    return { response: skipResponse };
+  }
+
+  if (body.settings?.trace_id) {
+    params.trace_id = body.settings.trace_id;
+  }
+
+  const settingsResult = await resolveEvaluatorSettings({
+    c,
+    project,
+    checkType,
+    evaluatorDefinition,
+    workflowEvaluatorDef,
+    evaluatorSettings,
+    monitor,
+    params,
+    isLegacyPairwiseDispatch,
+  });
+  if ("response" in settingsResult) {
+    return settingsResult;
+  }
+  const { settings } = settingsResult;
+
+  const dataResult = buildEvaluationData({
+    c,
+    project,
+    checkType,
+    params,
+    isLegacyPairwiseDispatch,
+  });
+  if ("response" in dataResult) {
+    return dataResult;
+  }
+  const { data } = dataResult;
+
+  const fieldErrorResponse = validateRequiredFields({
+    c,
+    project,
+    evaluatorDefinition,
+    data,
+  });
+  if (fieldErrorResponse) {
+    return { response: fieldErrorResponse };
+  }
+
+  return { params, isGuardrail, settings, data };
+}
+
+function resolveEvaluationIdentity({
+  params,
+  checkType,
+  savedEvaluatorId,
+  monitor,
+}: {
+  params: EvaluationRESTParams;
+  checkType: string;
+  savedEvaluatorId: string | undefined;
+  monitor: Monitor | null;
+}): { evaluationId: string; evaluatorId: string } {
   const evaluationId =
     params.evaluation_id ?? generate(KSUID_RESOURCES.EVALUATION).toString();
   const evaluatorId =
@@ -1376,10 +1922,34 @@ async function handleEvaluatorCall(
     monitor?.id ??
     params.evaluator_id ??
     evaluationNameAutoslug(params.name ?? checkType);
+  return { evaluationId, evaluatorId };
+}
+
+async function runEvaluationAndRecordCost({
+  projectId,
+  checkType,
+  data,
+  settings,
+  isGuardrail,
+  evaluatorName,
+  monitor,
+  traceId,
+}: {
+  projectId: string;
+  checkType: string;
+  data: DataForEvaluation;
+  settings: any;
+  isGuardrail: boolean | undefined;
+  evaluatorName: string | undefined;
+  monitor: Monitor | null;
+  traceId: string | undefined;
+}): Promise<{ result: SingleEvaluationResult; costId: string | undefined }> {
+  let result: SingleEvaluationResult;
+  let costId: string | undefined;
 
   const runEval = () =>
     runEvaluation({
-      projectId: project.id,
+      projectId,
       evaluatorType: checkType as EvaluatorTypes,
       data,
       settings,
@@ -1395,28 +1965,18 @@ async function handleEvaluatorCall(
       result = await runEval();
     }
 
-    if ("cost" in result && result.cost) {
-      const cost = await prisma.cost.create({
-        data: {
-          id: generate(KSUID_RESOURCES.COST).toString(),
-          projectId: project.id,
-          costType: isGuardrail ? CostType.GUARDRAIL : CostType.TRACE_CHECK,
-          costName: evaluatorName ?? monitor?.name ?? checkType,
-          referenceType: CostReferenceType.CHECK,
-          referenceId: evaluatorName ?? monitor?.id ?? checkType,
-          amount: result.cost.amount,
-          currency: result.cost.currency,
-          extraInfo: { trace_id: params.trace_id },
-        },
-      });
-      costId = cost.id;
-    }
+    costId = await createEvaluationCostRecord({
+      projectId,
+      checkType,
+      isGuardrail,
+      evaluatorName,
+      monitor,
+      traceId,
+      result,
+    });
   } catch (error) {
-    captureException(toError(error), { extra: { projectId: project.id } });
-    logger.error(
-      { err: error, projectId: project.id },
-      "error running evaluation",
-    );
+    captureException(toError(error), { extra: { projectId } });
+    logger.error({ err: error, projectId }, "error running evaluation");
     result = {
       status: "error",
       error_type: "INTERNAL_ERROR",
@@ -1428,67 +1988,306 @@ async function handleEvaluatorCall(
             : "Internal error",
       traceback: [],
     };
-  } finally {
-    await getApp()
-      .evaluations.reportEvaluation({
-        tenantId: project.id,
-        evaluationId,
-        evaluatorId,
-        evaluatorType: checkType!,
-        evaluatorName:
-          evaluatorName ?? monitor?.name ?? params.name ?? undefined,
-        traceId: params.trace_id ?? undefined,
-        isGuardrail: isGuardrail ?? undefined,
-        status: result!.status,
-        score: "score" in result! ? result!.score : undefined,
-        passed: "passed" in result! ? result!.passed : undefined,
-        label: "label" in result! ? result!.label : undefined,
-        details: "details" in result! ? result!.details : undefined,
-        costId: costId ?? null,
-        occurredAt: Date.now(),
-        error:
-          result!.status === "error"
-            ? "details" in result!
-              ? result!.details
-              : undefined
-            : undefined,
-      })
-      .catch((eventError: unknown) => {
-        captureException(toError(eventError), {
-          extra: {
-            projectId: project.id,
-            evaluationId,
-            event: "reported",
-          },
-        });
-        logger.error(
-          { err: eventError, projectId: project.id, evaluationId },
-          "Failed to emit evaluation reported event",
-        );
-      });
   }
 
-  const resultWithoutTraceback: EvaluationRESTResult =
-    result!.status === "error"
-      ? {
-          status: "error",
-          error_type: "EVALUATOR_ERROR",
-          details: result!.details,
-          ...(isGuardrail ? { passed: true } : {}),
-        }
-      : result!.status === "skipped"
-        ? {
-            status: "skipped",
-            details: result!.details,
-            ...(isGuardrail ? { passed: true } : {}),
-          }
-        : {
-            ...result!,
-            ...(isGuardrail ? { passed: result!.passed ?? true } : {}),
-          };
+  return { result, costId };
+}
+
+async function createEvaluationCostRecord({
+  projectId,
+  checkType,
+  isGuardrail,
+  evaluatorName,
+  monitor,
+  traceId,
+  result,
+}: {
+  projectId: string;
+  checkType: string;
+  isGuardrail: boolean | undefined;
+  evaluatorName: string | undefined;
+  monitor: Monitor | null;
+  traceId: string | undefined;
+  result: SingleEvaluationResult;
+}): Promise<string | undefined> {
+  if (!("cost" in result) || !result.cost) {
+    return undefined;
+  }
+  const cost = await prisma.cost.create({
+    data: {
+      id: generate(KSUID_RESOURCES.COST).toString(),
+      projectId,
+      costType: isGuardrail ? CostType.GUARDRAIL : CostType.TRACE_CHECK,
+      costName: evaluatorName ?? monitor?.name ?? checkType,
+      referenceType: CostReferenceType.CHECK,
+      referenceId: evaluatorName ?? monitor?.id ?? checkType,
+      amount: result.cost.amount,
+      currency: result.cost.currency,
+      extraInfo: { trace_id: traceId },
+    },
+  });
+  return cost.id;
+}
+
+async function reportEvaluationResult({
+  project,
+  evaluationId,
+  evaluatorId,
+  checkType,
+  evaluatorName,
+  monitor,
+  params,
+  isGuardrail,
+  result,
+  costId,
+}: {
+  project: Project;
+  evaluationId: string;
+  evaluatorId: string;
+  checkType: string;
+  evaluatorName: string | undefined;
+  monitor: Monitor | null;
+  params: EvaluationRESTParams;
+  isGuardrail: boolean | undefined;
+  result: SingleEvaluationResult;
+  costId: string | undefined;
+}): Promise<void> {
+  const payload = buildReportEvaluationPayload({
+    project,
+    evaluationId,
+    evaluatorId,
+    checkType,
+    evaluatorName,
+    monitor,
+    params,
+    isGuardrail,
+    result,
+    costId,
+  });
+  await getApp()
+    .evaluations.reportEvaluation(payload)
+    .catch((eventError: unknown) => {
+      captureException(toError(eventError), {
+        extra: {
+          projectId: project.id,
+          evaluationId,
+          event: "reported",
+        },
+      });
+      logger.error(
+        { err: eventError, projectId: project.id, evaluationId },
+        "Failed to emit evaluation reported event",
+      );
+    });
+}
+
+function buildReportEvaluationPayload({
+  project,
+  evaluationId,
+  evaluatorId,
+  checkType,
+  evaluatorName,
+  monitor,
+  params,
+  isGuardrail,
+  result,
+  costId,
+}: {
+  project: Project;
+  evaluationId: string;
+  evaluatorId: string;
+  checkType: string;
+  evaluatorName: string | undefined;
+  monitor: Monitor | null;
+  params: EvaluationRESTParams;
+  isGuardrail: boolean | undefined;
+  result: SingleEvaluationResult;
+  costId: string | undefined;
+}) {
+  return {
+    tenantId: project.id,
+    evaluationId,
+    evaluatorId,
+    evaluatorType: checkType,
+    evaluatorName: evaluatorName ?? monitor?.name ?? params.name ?? undefined,
+    traceId: params.trace_id ?? undefined,
+    isGuardrail: isGuardrail ?? undefined,
+    status: result.status,
+    score: "score" in result ? result.score : undefined,
+    passed: "passed" in result ? result.passed : undefined,
+    label: "label" in result ? result.label : undefined,
+    details: "details" in result ? result.details : undefined,
+    costId: costId ?? null,
+    occurredAt: Date.now(),
+    error: errorDetailsFromResult(result),
+  };
+}
+
+// Equivalent to `result.status === "error" ? ("details" in result ? result.details : undefined) : undefined`
+// — flattened to a single condition since both false branches agree.
+const errorDetailsFromResult = (
+  result: SingleEvaluationResult,
+): string | undefined =>
+  result.status === "error" && "details" in result ? result.details : undefined;
+
+function shapeEvaluationResponse({
+  result,
+  isGuardrail,
+}: {
+  result: SingleEvaluationResult;
+  isGuardrail: boolean | undefined;
+}): EvaluationRESTResult {
+  if (result.status === "error") {
+    return {
+      status: "error",
+      error_type: "EVALUATOR_ERROR",
+      details: result.details,
+      ...(isGuardrail ? { passed: true } : {}),
+    };
+  }
+  if (result.status === "skipped") {
+    return {
+      status: "skipped",
+      details: result.details,
+      ...(isGuardrail ? { passed: true } : {}),
+    };
+  }
+  return {
+    ...result,
+    ...(isGuardrail ? { passed: result.passed ?? true } : {}),
+  };
+}
+
+async function handleEvaluatorCall(
+  c: Context,
+  evaluatorSlug: string,
+  as_guardrail: boolean,
+) {
+  const auth = await authenticateRequest(c, "evaluations:manage");
+  if ("error" in auth) {
+    return c.json(auth.body, auth.status);
+  }
+  const { project, markUsed } = auth;
+
+  const parsedBody = await parseJsonRequestBody(c);
+  if ("errorResponse" in parsedBody) {
+    return parsedBody.errorResponse;
+  }
+  const { body } = parsedBody;
+
+  const resolvedEvaluator = await resolveEvaluatorForCall({
+    c,
+    project,
+    evaluatorSlug,
+  });
+  if ("response" in resolvedEvaluator) {
+    return resolvedEvaluator.response;
+  }
+  const {
+    checkType,
+    evaluatorSettings,
+    evaluatorName,
+    savedEvaluatorId,
+    workflowEvaluatorDef,
+    monitor,
+    isLegacyPairwiseDispatch,
+    evaluatorDefinition,
+  } = resolvedEvaluator;
+
+  const prepared = await prepareEvaluationRequest({
+    c,
+    project,
+    body,
+    checkType,
+    evaluatorDefinition,
+    workflowEvaluatorDef,
+    evaluatorSettings,
+    monitor,
+    isLegacyPairwiseDispatch,
+    asGuardrailFlag: as_guardrail,
+  });
+  if ("response" in prepared) {
+    return prepared.response;
+  }
+  const { params, isGuardrail, settings, data } = prepared;
+
+  const { evaluationId, evaluatorId } = resolveEvaluationIdentity({
+    params,
+    checkType,
+    savedEvaluatorId,
+    monitor,
+  });
+
+  const result = await runEvaluateAndReport({
+    project,
+    checkType,
+    data,
+    settings,
+    isGuardrail,
+    evaluatorName,
+    monitor,
+    params,
+    evaluationId,
+    evaluatorId,
+  });
+
+  const resultWithoutTraceback = shapeEvaluationResponse({
+    result,
+    isGuardrail,
+  });
 
   markUsed();
   return c.json(resultWithoutTraceback);
+}
+
+async function runEvaluateAndReport({
+  project,
+  checkType,
+  data,
+  settings,
+  isGuardrail,
+  evaluatorName,
+  monitor,
+  params,
+  evaluationId,
+  evaluatorId,
+}: {
+  project: Project;
+  checkType: string;
+  data: DataForEvaluation;
+  settings: any;
+  isGuardrail: boolean | undefined;
+  evaluatorName: string | undefined;
+  monitor: Monitor | null;
+  params: EvaluationRESTParams;
+  evaluationId: string;
+  evaluatorId: string;
+}): Promise<SingleEvaluationResult> {
+  const { result, costId } = await runEvaluationAndRecordCost({
+    projectId: project.id,
+    checkType,
+    data,
+    settings,
+    isGuardrail,
+    evaluatorName,
+    monitor,
+    traceId: params.trace_id,
+  });
+
+  await reportEvaluationResult({
+    project,
+    evaluationId,
+    evaluatorId,
+    checkType,
+    evaluatorName,
+    monitor,
+    params,
+    isGuardrail,
+    result,
+    costId,
+  });
+
+  return result;
 }
 
 // --- Batch evaluation processing ---
@@ -1499,31 +2298,60 @@ const VALID_TARGET_TYPES: ESBatchEvaluationTargetType[] = [
   "custom",
 ];
 
+type ESBatchEvaluationRESTTarget = NonNullable<
+  ESBatchEvaluationRESTParams["targets"]
+>[number];
+
+type ResolvedTarget = {
+  targetType: ESBatchEvaluationTargetType;
+  metadata: ESBatchEvaluationRESTTarget["metadata"];
+};
+
+// Reads an explicit target type off `metadata.type`, stripping it out of the
+// metadata that's kept. Returns null when metadata carries no (string) type
+// override, so the caller falls back to the target's own declared type.
+const parseTargetTypeFromMetadata = (
+  metadata: NonNullable<ESBatchEvaluationRESTTarget["metadata"]>,
+): ResolvedTarget | null => {
+  if (!("type" in metadata)) return null;
+  const typeFromMetadata = metadata.type;
+  if (typeof typeFromMetadata !== "string") return null;
+
+  const parseResult =
+    eSBatchEvaluationTargetTypeSchema.safeParse(typeFromMetadata);
+  if (!parseResult.success) {
+    throw new Error(
+      `Invalid target type '${typeFromMetadata}'. Must be one of: ${VALID_TARGET_TYPES.join(", ")}`,
+    );
+  }
+
+  const { type: _, ...restMetadata } = metadata;
+  return {
+    targetType: parseResult.data,
+    metadata: Object.keys(restMetadata).length > 0 ? restMetadata : null,
+  };
+};
+
+const resolveTargetTypeAndMetadata = (
+  target: ESBatchEvaluationRESTTarget,
+): ResolvedTarget => {
+  const defaultResolution: ResolvedTarget = {
+    targetType: target.type ?? "custom",
+    metadata: target.metadata,
+  };
+  if (!target.metadata) {
+    return defaultResolution;
+  }
+  return parseTargetTypeFromMetadata(target.metadata) ?? defaultResolution;
+};
+
 const processTargets = (
   targets: ESBatchEvaluationRESTParams["targets"],
 ): ESBatchEvaluationTarget[] | null => {
   if (!targets || targets.length === 0) return null;
 
   return targets.map((target) => {
-    let targetType: ESBatchEvaluationTargetType = target.type ?? "custom";
-    let metadata = target.metadata;
-
-    if (metadata && "type" in metadata) {
-      const typeFromMetadata = metadata.type;
-      if (typeof typeFromMetadata === "string") {
-        const parseResult =
-          eSBatchEvaluationTargetTypeSchema.safeParse(typeFromMetadata);
-        if (parseResult.success) {
-          targetType = parseResult.data;
-          const { type: _, ...restMetadata } = metadata;
-          metadata = Object.keys(restMetadata).length > 0 ? restMetadata : null;
-        } else {
-          throw new Error(
-            `Invalid target type '${typeFromMetadata}'. Must be one of: ${VALID_TARGET_TYPES.join(", ")}`,
-          );
-        }
-      }
-    }
+    const { targetType, metadata } = resolveTargetTypeAndMetadata(target);
 
     return {
       id: target.id,
@@ -1575,14 +2403,24 @@ const processBatchEvaluation = async (
   await dispatchToClickHouse(project, experiment.id, batchEvaluation);
 };
 
-const dispatchToClickHouse = async (
-  project: Project,
-  experimentId: string,
-  batchEvaluation: ESBatchEvaluation,
-) => {
-  const { run_id: runId } = batchEvaluation;
-  const targets = mapEsTargetsToTargets(batchEvaluation.targets ?? []);
+type ESBatchEvaluationDatasetEntry = ESBatchEvaluation["dataset"][number];
+type ESBatchEvaluationEvaluationEntry =
+  ESBatchEvaluation["evaluations"][number];
+type MappedTargets = ReturnType<typeof mapEsTargetsToTargets>;
 
+async function startClickHouseExperimentRun({
+  project,
+  runId,
+  experimentId,
+  batchEvaluation,
+  targets,
+}: {
+  project: Project;
+  runId: string | undefined;
+  experimentId: string;
+  batchEvaluation: ESBatchEvaluation;
+  targets: MappedTargets;
+}) {
   try {
     await getApp().experimentRuns.startExperimentRun({
       tenantId: project.id,
@@ -1599,124 +2437,250 @@ const dispatchToClickHouse = async (
     );
     throw error;
   }
+}
+
+const dispatchTargetResult = ({
+  project,
+  runId,
+  experimentId,
+  entry,
+  targets,
+}: {
+  project: Project;
+  runId: string | undefined;
+  experimentId: string;
+  entry: ESBatchEvaluationDatasetEntry;
+  targets: MappedTargets;
+}) =>
+  getApp()
+    .experimentRuns.recordTargetResult({
+      tenantId: project.id,
+      runId,
+      experimentId,
+      index: entry.index,
+      targetId: entry.target_id ?? "",
+      entry: entry.entry,
+      predicted: entry.predicted ?? undefined,
+      cost: entry.cost ?? undefined,
+      duration: entry.duration ?? undefined,
+      error: entry.error ?? undefined,
+      traceId: entry.trace_id ?? undefined,
+      targets,
+      occurredAt: Date.now(),
+    })
+    .catch((err) => {
+      logger.warn(
+        {
+          err,
+          runId,
+          index: entry.index,
+          targetId: entry.target_id,
+        },
+        "Failed to dispatch recordTargetResult to CH",
+      );
+    });
+
+const recordTargetResults = ({
+  project,
+  runId,
+  experimentId,
+  dataset,
+  targets,
+}: {
+  project: Project;
+  runId: string | undefined;
+  experimentId: string;
+  dataset: ESBatchEvaluation["dataset"];
+  targets: MappedTargets;
+}) =>
+  dataset.map((entry) =>
+    dispatchTargetResult({ project, runId, experimentId, entry, targets }),
+  );
+
+const dispatchEvaluatorResult = ({
+  project,
+  runId,
+  experimentId,
+  evaluation,
+}: {
+  project: Project;
+  runId: string | undefined;
+  experimentId: string;
+  evaluation: ESBatchEvaluationEvaluationEntry;
+}) =>
+  getApp()
+    .experimentRuns.recordEvaluatorResult({
+      tenantId: project.id,
+      runId,
+      experimentId,
+      index: evaluation.index,
+      targetId: evaluation.target_id ?? "",
+      evaluatorId: evaluation.evaluator,
+      evaluatorName: evaluation.name ?? undefined,
+      status: evaluation.status,
+      score:
+        typeof evaluation.score === "number" ? evaluation.score : undefined,
+      label: evaluation.label ?? undefined,
+      passed: evaluation.passed ?? undefined,
+      details: evaluation.details ?? undefined,
+      cost: evaluation.cost ?? undefined,
+      inputs: evaluation.inputs ?? undefined,
+      duration:
+        typeof evaluation.duration === "number"
+          ? evaluation.duration
+          : undefined,
+      occurredAt: Date.now(),
+    })
+    .catch((err) => {
+      logger.warn(
+        {
+          err,
+          runId,
+          index: evaluation.index,
+          evaluator: evaluation.evaluator,
+        },
+        "Failed to dispatch recordEvaluatorResult to CH",
+      );
+    });
+
+const recordEvaluatorResults = ({
+  project,
+  runId,
+  experimentId,
+  evaluations,
+}: {
+  project: Project;
+  runId: string | undefined;
+  experimentId: string;
+  evaluations: ESBatchEvaluation["evaluations"];
+}) =>
+  evaluations.map((evaluation) =>
+    dispatchEvaluatorResult({ project, runId, experimentId, evaluation }),
+  );
+
+async function completeClickHouseExperimentRunIfFinished({
+  project,
+  runId,
+  experimentId,
+  timestamps,
+}: {
+  project: Project;
+  runId: string | undefined;
+  experimentId: string;
+  timestamps: ESBatchEvaluation["timestamps"];
+}) {
+  if (!timestamps.finished_at && !timestamps.stopped_at) {
+    return;
+  }
+  try {
+    await getApp().experimentRuns.completeExperimentRun({
+      tenantId: project.id,
+      runId,
+      experimentId,
+      finishedAt: timestamps.finished_at ?? undefined,
+      stoppedAt: timestamps.stopped_at ?? undefined,
+      occurredAt: Date.now(),
+    });
+  } catch (error) {
+    logger.warn(
+      { error, runId, projectId: project.id },
+      "Failed to dispatch completeExperimentRun to CH",
+    );
+  }
+}
+
+const dispatchLocalEvaluation = ({
+  project,
+  runId,
+  evaluation,
+}: {
+  project: Project;
+  runId: string | undefined;
+  evaluation: ESBatchEvaluationEvaluationEntry;
+}) => {
+  const targetId = evaluation.target_id ?? "";
+  const evaluationId = `local_eval_${runId}_${evaluation.evaluator}_${evaluation.index}_${targetId}`;
+  return getApp()
+    .evaluations.reportEvaluation({
+      tenantId: project.id,
+      evaluationId,
+      evaluatorId: evaluation.evaluator,
+      evaluatorType: evaluation.evaluator,
+      evaluatorName: evaluation.name ?? undefined,
+      status: evaluation.status,
+      score:
+        typeof evaluation.score === "number" ? evaluation.score : undefined,
+      passed: evaluation.passed ?? undefined,
+      label: evaluation.label ?? undefined,
+      details: evaluation.details ?? undefined,
+      occurredAt: Date.now(),
+    })
+    .catch((err) => {
+      logger.warn(
+        { err, evaluationId, evaluator: evaluation.evaluator },
+        "Failed to dispatch evaluation to evaluation processing pipeline",
+      );
+    });
+};
+
+async function reportLocalEvaluations({
+  project,
+  runId,
+  evaluations,
+}: {
+  project: Project;
+  runId: string | undefined;
+  evaluations: ESBatchEvaluation["evaluations"];
+}) {
+  const evalPromises = evaluations.map((evaluation) =>
+    dispatchLocalEvaluation({ project, runId, evaluation }),
+  );
+  await Promise.all(evalPromises);
+}
+
+const dispatchToClickHouse = async (
+  project: Project,
+  experimentId: string,
+  batchEvaluation: ESBatchEvaluation,
+) => {
+  const { run_id: runId } = batchEvaluation;
+  const targets = mapEsTargetsToTargets(batchEvaluation.targets ?? []);
+
+  await startClickHouseExperimentRun({
+    project,
+    runId,
+    experimentId,
+    batchEvaluation,
+    targets,
+  });
 
   const resultPromises = [
-    ...batchEvaluation.dataset.map((entry) =>
-      getApp()
-        .experimentRuns.recordTargetResult({
-          tenantId: project.id,
-          runId,
-          experimentId,
-          index: entry.index,
-          targetId: entry.target_id ?? "",
-          entry: entry.entry,
-          predicted: entry.predicted ?? undefined,
-          cost: entry.cost ?? undefined,
-          duration: entry.duration ?? undefined,
-          error: entry.error ?? undefined,
-          traceId: entry.trace_id ?? undefined,
-          targets,
-          occurredAt: Date.now(),
-        })
-        .catch((err) => {
-          logger.warn(
-            {
-              err,
-              runId,
-              index: entry.index,
-              targetId: entry.target_id,
-            },
-            "Failed to dispatch recordTargetResult to CH",
-          );
-        }),
-    ),
-    ...batchEvaluation.evaluations.map((evaluation) =>
-      getApp()
-        .experimentRuns.recordEvaluatorResult({
-          tenantId: project.id,
-          runId,
-          experimentId,
-          index: evaluation.index,
-          targetId: evaluation.target_id ?? "",
-          evaluatorId: evaluation.evaluator,
-          evaluatorName: evaluation.name ?? undefined,
-          status: evaluation.status,
-          score:
-            typeof evaluation.score === "number" ? evaluation.score : undefined,
-          label: evaluation.label ?? undefined,
-          passed: evaluation.passed ?? undefined,
-          details: evaluation.details ?? undefined,
-          cost: evaluation.cost ?? undefined,
-          inputs: evaluation.inputs ?? undefined,
-          duration:
-            typeof evaluation.duration === "number"
-              ? evaluation.duration
-              : undefined,
-          occurredAt: Date.now(),
-        })
-        .catch((err) => {
-          logger.warn(
-            {
-              err,
-              runId,
-              index: evaluation.index,
-              evaluator: evaluation.evaluator,
-            },
-            "Failed to dispatch recordEvaluatorResult to CH",
-          );
-        }),
-    ),
+    ...recordTargetResults({
+      project,
+      runId,
+      experimentId,
+      dataset: batchEvaluation.dataset,
+      targets,
+    }),
+    ...recordEvaluatorResults({
+      project,
+      runId,
+      experimentId,
+      evaluations: batchEvaluation.evaluations,
+    }),
   ];
   await Promise.all(resultPromises);
 
-  if (
-    batchEvaluation.timestamps.finished_at ||
-    batchEvaluation.timestamps.stopped_at
-  ) {
-    try {
-      await getApp().experimentRuns.completeExperimentRun({
-        tenantId: project.id,
-        runId,
-        experimentId,
-        finishedAt: batchEvaluation.timestamps.finished_at ?? undefined,
-        stoppedAt: batchEvaluation.timestamps.stopped_at ?? undefined,
-        occurredAt: Date.now(),
-      });
-    } catch (error) {
-      logger.warn(
-        { error, runId, projectId: project.id },
-        "Failed to dispatch completeExperimentRun to CH",
-      );
-    }
-  }
+  await completeClickHouseExperimentRunIfFinished({
+    project,
+    runId,
+    experimentId,
+    timestamps: batchEvaluation.timestamps,
+  });
 
-  {
-    const appInstance = getApp();
-    const evalPromises = batchEvaluation.evaluations.map((evaluation) => {
-      const targetId = evaluation.target_id ?? "";
-      const evaluationId = `local_eval_${runId}_${evaluation.evaluator}_${evaluation.index}_${targetId}`;
-      return appInstance.evaluations
-        .reportEvaluation({
-          tenantId: project.id,
-          evaluationId,
-          evaluatorId: evaluation.evaluator,
-          evaluatorType: evaluation.evaluator,
-          evaluatorName: evaluation.name ?? undefined,
-          status: evaluation.status,
-          score:
-            typeof evaluation.score === "number" ? evaluation.score : undefined,
-          passed: evaluation.passed ?? undefined,
-          label: evaluation.label ?? undefined,
-          details: evaluation.details ?? undefined,
-          occurredAt: Date.now(),
-        })
-        .catch((err) => {
-          logger.warn(
-            { err, evaluationId, evaluator: evaluation.evaluator },
-            "Failed to dispatch evaluation to evaluation processing pipeline",
-          );
-        });
-    });
-    await Promise.all(evalPromises);
-  }
+  await reportLocalEvaluations({
+    project,
+    runId,
+    evaluations: batchEvaluation.evaluations,
+  });
 };

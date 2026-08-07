@@ -140,31 +140,12 @@ export class ExportService {
 
     // Fetch batches until no more data
     while (true) {
-      const result = await this.traceService.getAllTracesForProject(
-        {
-          projectId: request.projectId,
-          startDate: request.startDate,
-          endDate: request.endDate,
-          filters: request.filters,
-          query: request.query,
-          traceIds: request.traceIds,
-          pageSize: BATCH_SIZE,
-          scrollId,
-        },
+      const result = await this.fetchTraceBatch({
+        request,
         protections,
-        {
-          downloadMode: true,
-          includeSpans,
-          // DATA LOSS (#4991): summary mode reads no span content, but it still
-          // emits trace-level `trace.input`/`trace.output` (see the csv/json
-          // summary serializers) — so it is content-consuming too. Gating on
-          // `includeSpans` therefore shipped the truncated 64 KB preview for any
-          // offloaded trace, silently. Resolve for every export mode; the batch
-          // resolver keeps the extra event_log reads bounded.
-          resolveBlobs: true,
-          scrollId: scrollId ?? null,
-        },
-      );
+        includeSpans,
+        scrollId,
+      });
 
       // Flatten groups into traces
       const traces: Trace[] = result.groups.flat();
@@ -173,18 +154,17 @@ export class ExportService {
       if (isFirstBatch) {
         total = result.totalHits;
 
-        if (total === 0 || traces.length === 0) {
+        if (hasNothingToExport({ total, traces })) {
           logger.info({ projectId: request.projectId }, "No traces to export");
           return;
         }
       }
 
-      // Merge evaluator names from every batch
-      const batchNames = collectEvaluatorNames({
+      mergeEvaluatorNames({
+        into: evaluatorNameSet,
         traces,
         traceChecks: result.traceChecks,
       });
-      for (const name of batchNames) evaluatorNameSet.add(name);
 
       // Merge evaluations from traceChecks into trace objects
       const enrichedTraces = enrichTracesWithEvaluations({
@@ -214,7 +194,7 @@ export class ExportService {
       scrollId = result.scrollId;
 
       // Stop if no more data (no scrollId or empty batch)
-      if (!scrollId || traces.length === 0) {
+      if (isLastBatch({ scrollId, traces })) {
         break;
       }
     }
@@ -223,6 +203,81 @@ export class ExportService {
       { projectId: request.projectId, exported, total },
       "Trace export completed",
     );
+  }
+
+  private async fetchTraceBatch({
+    request,
+    protections,
+    includeSpans,
+    scrollId,
+  }: {
+    request: ExportRequest;
+    protections: Protections;
+    includeSpans: boolean;
+    scrollId: string | undefined;
+  }) {
+    return await this.traceService.getAllTracesForProject(
+      {
+        projectId: request.projectId,
+        startDate: request.startDate,
+        endDate: request.endDate,
+        filters: request.filters,
+        query: request.query,
+        traceIds: request.traceIds,
+        pageSize: BATCH_SIZE,
+        scrollId,
+      },
+      protections,
+      {
+        downloadMode: true,
+        includeSpans,
+        // DATA LOSS (#4991): summary mode reads no span content, but it still
+        // emits trace-level `trace.input`/`trace.output` (see the csv/json
+        // summary serializers) — so it is content-consuming too. Gating on
+        // `includeSpans` therefore shipped the truncated 64 KB preview for any
+        // offloaded trace, silently. Resolve for every export mode; the batch
+        // resolver keeps the extra event_log reads bounded.
+        resolveBlobs: true,
+        scrollId: scrollId ?? null,
+      },
+    );
+  }
+}
+
+function hasNothingToExport({
+  total,
+  traces,
+}: {
+  total: number;
+  traces: Trace[];
+}): boolean {
+  return total === 0 || traces.length === 0;
+}
+
+function isLastBatch({
+  scrollId,
+  traces,
+}: {
+  scrollId: string | undefined;
+  traces: Trace[];
+}): boolean {
+  return !scrollId || traces.length === 0;
+}
+
+/**
+ * Merge evaluator names from every batch into the accumulator.
+ */
+function mergeEvaluatorNames({
+  into,
+  traces,
+  traceChecks,
+}: {
+  into: Set<string>;
+  traces: Trace[];
+  traceChecks: Record<string, Evaluation[]>;
+}): void {
+  for (const name of collectEvaluatorNames({ traces, traceChecks })) {
+    into.add(name);
   }
 }
 

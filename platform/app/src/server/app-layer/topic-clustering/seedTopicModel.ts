@@ -30,6 +30,8 @@ export interface SeedTopicModelDeps {
   recordTopics: RecordTopicsSeedCommand;
 }
 
+type SeedProjectOutcome = "seeded" | "failed" | "skipped";
+
 /**
  * Seeds one project's pre-ownership Topic rows onto its clustering stream,
  * unless the projection already owns the model. Awaited by the clustering
@@ -104,6 +106,120 @@ export async function seedTopicModelHistory(
   }
 }
 
+/**
+ * Fleet-wide walk over the projects that still hold pre-ownership Topic
+ * rows. A distinct-projectId scan straight off `Topic` trips the tenancy
+ * guard: `Topic` is project-scoped and the first page carries no projectId
+ * predicate. Instead we page the GLOBAL `Project` model — which the guard
+ * exempts (it IS the tenant, addressed by its own id), exactly as the
+ * sibling schedule seed's `findEligibleProjectsPage` does — and keep only
+ * the projects that own Topic rows via a `topics: { some }` EXISTS filter.
+ * Topic.projectId is a FK, so that is the same set as a distinct-projectId
+ * scan of `Topic`. Each project's rows are still READ back through the
+ * guarded model API in seedProjectTopicModel, which carries its projectId —
+ * only this fleet-wide enumeration is cross-tenant.
+ */
+async function fetchProjectSeedPage({
+  prisma,
+  cursor,
+}: {
+  prisma: PrismaClient;
+  cursor: string | null;
+}): Promise<Array<{ projectId: string }>> {
+  return (
+    await prisma.project.findMany({
+      where: {
+        topics: { some: {} },
+        ...(cursor ? { id: { gt: cursor } } : {}),
+      },
+      select: { id: true },
+      orderBy: { id: "asc" },
+      take: PAGE_SIZE,
+    })
+  ).map((project) => ({ projectId: project.id }));
+}
+
+/**
+ * One ownership query per page instead of one per project: projects that
+ * signed up after the cutover always carry a cursor row (the projection
+ * writes it with their first topics), so they cost nothing here.
+ */
+async function fetchOwnedProjectIds({
+  prisma,
+  projectIds,
+}: {
+  prisma: PrismaClient;
+  projectIds: string[];
+}): Promise<Set<string>> {
+  return new Set(
+    (
+      await prisma.topicModelProjection.findMany({
+        where: { projectId: { in: projectIds } },
+        select: { projectId: true },
+      })
+    ).map((row) => row.projectId),
+  );
+}
+
+async function seedProjectIfUnowned({
+  deps,
+  projectId,
+  owned,
+}: {
+  deps: SeedTopicModelDeps;
+  projectId: string;
+  owned: Set<string>;
+}): Promise<SeedProjectOutcome> {
+  if (owned.has(projectId)) {
+    return "skipped";
+  }
+  try {
+    const result = await seedProjectTopicModel({
+      prisma: deps.prisma,
+      recordTopics: deps.recordTopics,
+      projectId,
+    });
+    return result === "seeded" ? "seeded" : "skipped";
+  } catch (error) {
+    // Per-project isolation: one bad project must not truncate the
+    // fleet. The next boot retries it (its cursor row never appeared).
+    logger.error(
+      {
+        projectId,
+        error: error instanceof Error ? error.message : String(error),
+      },
+      "Seeding this project's topics failed; the next boot retries it",
+    );
+    return "failed";
+  }
+}
+
+async function processSeedPage({
+  deps,
+  page,
+}: {
+  deps: SeedTopicModelDeps;
+  page: Array<{ projectId: string }>;
+}): Promise<{ seeded: number; skipped: number; failed: number }> {
+  const owned = await fetchOwnedProjectIds({
+    prisma: deps.prisma,
+    projectIds: page.map((p) => p.projectId),
+  });
+
+  let seeded = 0;
+  let skipped = 0;
+  let failed = 0;
+
+  for (const { projectId } of page) {
+    const outcome = await seedProjectIfUnowned({ deps, projectId, owned });
+    if (outcome === "seeded") seeded++;
+    else if (outcome === "skipped") skipped++;
+    else failed++;
+  }
+
+  return { seeded, skipped, failed };
+}
+
 async function runSeedPass(
   deps: SeedTopicModelDeps,
 ): Promise<{ seeded: number; skipped: number }> {
@@ -113,69 +229,14 @@ async function runSeedPass(
   let cursor: string | null = null;
 
   for (;;) {
-    // Fleet-wide walk over the projects that still hold pre-ownership Topic
-    // rows. A distinct-projectId scan straight off `Topic` trips the tenancy
-    // guard: `Topic` is project-scoped and the first page carries no projectId
-    // predicate. Instead we page the GLOBAL `Project` model — which the guard
-    // exempts (it IS the tenant, addressed by its own id), exactly as the
-    // sibling schedule seed's `findEligibleProjectsPage` does — and keep only
-    // the projects that own Topic rows via a `topics: { some }` EXISTS filter.
-    // Topic.projectId is a FK, so that is the same set as a distinct-projectId
-    // scan of `Topic`. Each project's rows are still READ back through the
-    // guarded model API in seedProjectTopicModel, which carries its projectId —
-    // only this fleet-wide enumeration is cross-tenant.
-    const page: Array<{ projectId: string }> = (
-      await deps.prisma.project.findMany({
-        where: {
-          topics: { some: {} },
-          ...(cursor ? { id: { gt: cursor } } : {}),
-        },
-        select: { id: true },
-        orderBy: { id: "asc" },
-        take: PAGE_SIZE,
-      })
-    ).map((project) => ({ projectId: project.id }));
+    const page = await fetchProjectSeedPage({ prisma: deps.prisma, cursor });
     if (page.length === 0) break;
     cursor = page[page.length - 1]!.projectId;
 
-    // One ownership query per page instead of one per project: projects that
-    // signed up after the cutover always carry a cursor row (the projection
-    // writes it with their first topics), so they cost nothing here.
-    const owned = new Set(
-      (
-        await deps.prisma.topicModelProjection.findMany({
-          where: { projectId: { in: page.map((p) => p.projectId) } },
-          select: { projectId: true },
-        })
-      ).map((row) => row.projectId),
-    );
-
-    for (const { projectId } of page) {
-      if (owned.has(projectId)) {
-        skipped++;
-        continue;
-      }
-      try {
-        const result = await seedProjectTopicModel({
-          prisma: deps.prisma,
-          recordTopics: deps.recordTopics,
-          projectId,
-        });
-        if (result === "seeded") seeded++;
-        else skipped++;
-      } catch (error) {
-        failed++;
-        // Per-project isolation: one bad project must not truncate the
-        // fleet. The next boot retries it (its cursor row never appeared).
-        logger.error(
-          {
-            projectId,
-            error: error instanceof Error ? error.message : String(error),
-          },
-          "Seeding this project's topics failed; the next boot retries it",
-        );
-      }
-    }
+    const pageResult = await processSeedPage({ deps, page });
+    seeded += pageResult.seeded;
+    skipped += pageResult.skipped;
+    failed += pageResult.failed;
   }
 
   // Nothing seeded and nothing failed means every legacy project is owned

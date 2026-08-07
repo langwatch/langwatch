@@ -62,6 +62,146 @@ interface ResolvedTraceName {
  *      block the metadata upgrade on later real roots that started
  *      after the fallback span.
  */
+function unchangedTraceName({
+  state,
+  nameFromFallback,
+  metadataFromFallback,
+}: {
+  state: TraceSummaryData;
+  nameFromFallback: boolean;
+  metadataFromFallback: boolean;
+}): ResolvedTraceName {
+  return {
+    traceName: state.traceName,
+    rootSpanType: state.rootSpanType,
+    rootSpanStartTimeMs: state.rootSpanStartTimeMs,
+    traceNameFromFallback: nameFromFallback,
+    rootMetadataFromFallback: metadataFromFallback,
+  };
+}
+
+// A real root always wins over fallback metadata. The metadata
+// takeover is gated on `metadataFromFallback`, NOT
+// `nameFromFallback` — a user rename clears the name flag but
+// leaves the metadata still fallback-sourced, and we still want
+// a real root's metadata to land in that case.
+function canRootSpanClaimMetadata({
+  metadataFromFallback,
+  haveCanonicalRoot,
+  isEarlierNamedRoot,
+  upgradesEmptyNamedRoot,
+}: {
+  metadataFromFallback: boolean;
+  haveCanonicalRoot: boolean;
+  isEarlierNamedRoot: boolean;
+  upgradesEmptyNamedRoot: boolean;
+}): boolean {
+  return (
+    metadataFromFallback ||
+    !haveCanonicalRoot ||
+    isEarlierNamedRoot ||
+    upgradesEmptyNamedRoot
+  );
+}
+
+function resolveRootSpanName({
+  state,
+  span,
+  nameFromFallback,
+  metadataFromFallback,
+  unchanged,
+}: {
+  state: TraceSummaryData;
+  span: NormalizedSpan;
+  nameFromFallback: boolean;
+  metadataFromFallback: boolean;
+  unchanged: ResolvedTraceName;
+}): ResolvedTraceName {
+  const spanStartMs = span.startTimeUnixMs;
+  const spanType = String(span.spanAttributes[ATTR_KEYS.SPAN_TYPE] ?? "");
+
+  const currentRootStartMs = state.rootSpanStartTimeMs;
+  const haveCanonicalRoot = currentRootStartMs !== undefined;
+  const isEarlierNamedRoot =
+    span.name !== "" && haveCanonicalRoot && spanStartMs < currentRootStartMs;
+  const upgradesEmptyNamedRoot =
+    haveCanonicalRoot && state.traceName === "" && span.name !== "";
+
+  if (
+    !canRootSpanClaimMetadata({
+      metadataFromFallback,
+      haveCanonicalRoot,
+      isEarlierNamedRoot,
+      upgradesEmptyNamedRoot,
+    })
+  ) {
+    return unchanged;
+  }
+
+  // The name only takes over when the *name* itself was still
+  // fallback-sourced (or empty). A user-supplied name survives a
+  // metadata upgrade — the user's intent overrides the discovery.
+  const nameTakesOver = nameFromFallback || state.traceName === "";
+  return {
+    traceName: nameTakesOver ? span.name : state.traceName,
+    rootSpanType: spanType || null,
+    rootSpanStartTimeMs: spanStartMs,
+    traceNameFromFallback: false,
+    rootMetadataFromFallback: false,
+  };
+}
+
+// Same span re-arriving (or a different span at the same start) shouldn't
+// ping-pong the name once we've claimed one — only a strictly-earlier
+// start (or no fallback claimed yet) dethrones the current fallback.
+function isEarlierOrFirstFallback(
+  state: TraceSummaryData,
+  spanStartMs: number,
+): boolean {
+  const currentStartMs = state.rootSpanStartTimeMs;
+  return currentStartMs === undefined || spanStartMs < currentStartMs;
+}
+
+// Non-root span. Only the fallback path can update from here, and
+// only if (a) we've never had a real root, and (b) this is now the
+// earliest-starting span we've seen.
+function resolveNonRootSpanName({
+  state,
+  span,
+  metadataFromFallback,
+  unchanged,
+}: {
+  state: TraceSummaryData;
+  span: NormalizedSpan;
+  metadataFromFallback: boolean;
+  unchanged: ResolvedTraceName;
+}): ResolvedTraceName {
+  const haveRealRoot =
+    !metadataFromFallback && state.rootSpanStartTimeMs !== undefined;
+  if (haveRealRoot) return unchanged;
+  // A user-overridden name is final; don't let the fallback path
+  // overwrite it even when no real root exists. The user explicitly
+  // told us what to call this trace.
+  if (state.traceNameUserOverridden) return unchanged;
+
+  const spanStartMs = span.startTimeUnixMs;
+  if (!isEarlierOrFirstFallback(state, spanStartMs)) return unchanged;
+  // The fallback is supposed to be the *trace's* working name, not
+  // a placeholder of nothing. If the candidate span itself has no
+  // name (empty string) and we already have a name, keep the name.
+  const candidateNameIsBetter = state.traceName === "" || span.name !== "";
+  if (!candidateNameIsBetter) return unchanged;
+
+  const spanType = String(span.spanAttributes[ATTR_KEYS.SPAN_TYPE] ?? "");
+  return {
+    traceName: span.name || state.traceName,
+    rootSpanType: spanType || null,
+    rootSpanStartTimeMs: spanStartMs,
+    traceNameFromFallback: true,
+    rootMetadataFromFallback: true,
+  };
+}
+
 export class TraceNameResolutionService {
   resolveFromSpan({
     state,
@@ -73,86 +213,26 @@ export class TraceNameResolutionService {
     const nameFromFallback = state.traceNameFromFallback ?? false;
     const metadataFromFallback =
       state.rootMetadataFromFallback ?? nameFromFallback;
-    const unchanged: ResolvedTraceName = {
-      traceName: state.traceName,
-      rootSpanType: state.rootSpanType,
-      rootSpanStartTimeMs: state.rootSpanStartTimeMs,
-      traceNameFromFallback: nameFromFallback,
-      rootMetadataFromFallback: metadataFromFallback,
-    };
+    const unchanged = unchangedTraceName({
+      state,
+      nameFromFallback,
+      metadataFromFallback,
+    });
 
     const isRootSpan = span.parentSpanId === null;
-    const spanStartMs = span.startTimeUnixMs;
-    const spanType = String(span.spanAttributes[ATTR_KEYS.SPAN_TYPE] ?? "");
-
-    if (isRootSpan) {
-      const currentRootStartMs = state.rootSpanStartTimeMs;
-      const haveCanonicalRoot = currentRootStartMs !== undefined;
-      const isEarlierNamedRoot =
-        span.name !== "" &&
-        haveCanonicalRoot &&
-        spanStartMs < currentRootStartMs;
-      const upgradesEmptyNamedRoot =
-        haveCanonicalRoot && state.traceName === "" && span.name !== "";
-
-      // A real root always wins over fallback metadata. The metadata
-      // takeover is gated on `metadataFromFallback`, NOT
-      // `nameFromFallback` — a user rename clears the name flag but
-      // leaves the metadata still fallback-sourced, and we still want
-      // a real root's metadata to land in that case.
-      if (
-        metadataFromFallback ||
-        !haveCanonicalRoot ||
-        isEarlierNamedRoot ||
-        upgradesEmptyNamedRoot
-      ) {
-        // The name only takes over when the *name* itself was still
-        // fallback-sourced (or empty). A user-supplied name survives a
-        // metadata upgrade — the user's intent overrides the discovery.
-        const nameTakesOver = nameFromFallback || state.traceName === "";
-        return {
-          traceName: nameTakesOver ? span.name : state.traceName,
-          rootSpanType: spanType || null,
-          rootSpanStartTimeMs: spanStartMs,
-          traceNameFromFallback: false,
-          rootMetadataFromFallback: false,
-        };
-      }
-
-      return unchanged;
-    }
-
-    // Non-root span. Only the fallback path can update from here, and
-    // only if (a) we've never had a real root, and (b) this is now the
-    // earliest-starting span we've seen.
-    const haveRealRoot =
-      !metadataFromFallback && state.rootSpanStartTimeMs !== undefined;
-    if (haveRealRoot) return unchanged;
-    // A user-overridden name is final; don't let the fallback path
-    // overwrite it even when no real root exists. The user explicitly
-    // told us what to call this trace.
-    if (state.traceNameUserOverridden) return unchanged;
-
-    const currentStartMs = state.rootSpanStartTimeMs;
-    const isFirstFallback = currentStartMs === undefined;
-    const isEarlierThanCurrentFallback =
-      currentStartMs !== undefined && spanStartMs < currentStartMs;
-    // Same span re-arriving (or a different span at the same start)
-    // shouldn't ping-pong the name once we've claimed one — only a
-    // strictly-earlier start dethrones the current fallback.
-    if (!isFirstFallback && !isEarlierThanCurrentFallback) return unchanged;
-    // The fallback is supposed to be the *trace's* working name, not
-    // a placeholder of nothing. If the candidate span itself has no
-    // name (empty string) and we already have a name, keep the name.
-    const candidateNameIsBetter = state.traceName === "" || span.name !== "";
-    if (!candidateNameIsBetter) return unchanged;
-
-    return {
-      traceName: span.name || state.traceName,
-      rootSpanType: spanType || null,
-      rootSpanStartTimeMs: spanStartMs,
-      traceNameFromFallback: true,
-      rootMetadataFromFallback: true,
-    };
+    return isRootSpan
+      ? resolveRootSpanName({
+          state,
+          span,
+          nameFromFallback,
+          metadataFromFallback,
+          unchanged,
+        })
+      : resolveNonRootSpanName({
+          state,
+          span,
+          metadataFromFallback,
+          unchanged,
+        });
   }
 }

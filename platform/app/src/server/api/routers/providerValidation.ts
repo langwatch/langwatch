@@ -921,6 +921,49 @@ export async function validateKeyWithCustomUrl({
  * });
  * ```
  */
+/** API key and base URL pulled out of `customKeys` using the registry's field names. */
+function resolveCredentialFields({
+  providerDef,
+  customKeys,
+}: {
+  providerDef: (typeof modelProviders)[keyof typeof modelProviders];
+  customKeys: Record<string, string>;
+}): {
+  apiKeyField: string;
+  endpointField: string | undefined;
+  apiKey: string;
+  baseUrl: string;
+} {
+  const apiKeyField = providerDef.apiKey;
+  const endpointField = providerDef.endpointKey;
+  const apiKey = customKeys[apiKeyField]?.trim() ?? "";
+  const baseUrl = endpointField
+    ? (customKeys[endpointField]?.trim() ?? "")
+    : "";
+  return { apiKeyField, endpointField, apiKey, baseUrl };
+}
+
+/**
+ * True when there is no credential worth probing: the key is still the
+ * masked placeholder (user didn't change it), or it's empty and the
+ * provider isn't the "custom" provider configured purely by base URL.
+ */
+function isCredentialSkippable({
+  provider,
+  apiKey,
+  baseUrl,
+}: {
+  provider: string;
+  apiKey: string;
+  baseUrl: string;
+}): boolean {
+  if (apiKey === MASKED_KEY_PLACEHOLDER) return true;
+  if (!apiKey) {
+    return provider !== "custom" || !baseUrl;
+  }
+  return false;
+}
+
 export async function validateProviderApiKey(
   provider: string,
   customKeys: Record<string, string>,
@@ -937,25 +980,17 @@ export async function validateProviderApiKey(
   }
 
   // Extract API key and base URL using registry field names
-  const apiKeyField = providerDef.apiKey;
-  const endpointField = providerDef.endpointKey;
+  const { endpointField, apiKey, baseUrl } = resolveCredentialFields({
+    providerDef,
+    customKeys,
+  });
 
-  const apiKey = customKeys[apiKeyField]?.trim() ?? "";
-  const baseUrl = endpointField
-    ? (customKeys[endpointField]?.trim() ?? "")
-    : "";
-
-  // Skip validation if API key is masked (user editing existing provider without changing key)
-  if (apiKey === MASKED_KEY_PLACEHOLDER) {
+  // Skip validation if API key is masked (user editing existing provider
+  // without changing key), or if no API key was provided (schema validation
+  // handles required fields; for the custom provider, only skip if there's
+  // no base URL either).
+  if (isCredentialSkippable({ provider, apiKey, baseUrl })) {
     return { valid: true };
-  }
-
-  // Skip validation if no API key provided (schema validation handles required fields)
-  // For custom provider, only skip if no base URL either
-  if (!apiKey) {
-    if (provider !== "custom" || !baseUrl) {
-      return { valid: true };
-    }
   }
 
   // Get auth strategy (default to bearer) and base URL

@@ -41,6 +41,41 @@ function messageKeyOf(identity: OutboxMessageIdentity): string {
  * message-key prefix. An absent prefix matches every dead message of the
  * instance.
  */
+function isMessageDueForLease(
+  message: StoredMessage,
+  params: { now: number; processNames?: readonly string[] },
+): boolean {
+  if (message.status !== "pending") return false;
+  if (
+    params.processNames &&
+    !params.processNames.includes(message.processName)
+  ) {
+    return false;
+  }
+  if (message.nextAttemptAt > params.now) return false;
+  if (message.leasedUntil > params.now) return false;
+  return true;
+}
+
+function isWakeAllowed(processName: string, allowed?: Set<string>): boolean {
+  return !allowed || allowed.has(processName);
+}
+
+function toDueWakeIfDue(params: {
+  instance: PersistedProcessInstance;
+  now: number;
+  allowed?: Set<string>;
+}): DueWake | null {
+  const { instance, now, allowed } = params;
+  if (!isWakeAllowed(instance.ref.processName, allowed)) return null;
+  if (instance.nextWakeAt === null || instance.nextWakeAt > now) return null;
+  return {
+    ref: instance.ref,
+    revision: instance.revision,
+    wakeAt: instance.nextWakeAt,
+  };
+}
+
 function isRequeueTarget(
   message: StoredMessage,
   target: {
@@ -169,14 +204,7 @@ export class InMemoryProcessStore implements ProcessStore {
     const leased: LeasedOutboxMessageRecord[] = [];
     for (const message of this.messages.values()) {
       if (leased.length >= params.limit) break;
-      if (message.status !== "pending") continue;
-      if (
-        params.processNames &&
-        !params.processNames.includes(message.processName)
-      )
-        continue;
-      if (message.nextAttemptAt > params.now) continue;
-      if (message.leasedUntil > params.now) continue;
+      if (!isMessageDueForLease(message, params)) continue;
       message.leasedUntil = params.now + params.leaseDurationMs;
       message.leaseToken = nanoid();
       leased.push({ ...message, leaseToken: message.leaseToken });
@@ -226,15 +254,8 @@ export class InMemoryProcessStore implements ProcessStore {
     const due: DueWake[] = [];
     for (const instance of this.instances.values()) {
       if (due.length >= params.limit) break;
-      if (allowed && !allowed.has(instance.ref.processName)) continue;
-      if (instance.nextWakeAt === null || instance.nextWakeAt > params.now) {
-        continue;
-      }
-      due.push({
-        ref: instance.ref,
-        revision: instance.revision,
-        wakeAt: instance.nextWakeAt,
-      });
+      const wake = toDueWakeIfDue({ instance, now: params.now, allowed });
+      if (wake) due.push(wake);
     }
     return due;
   }

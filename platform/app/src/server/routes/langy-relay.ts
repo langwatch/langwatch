@@ -53,6 +53,96 @@ interface RelayTally {
   terminal: boolean;
 }
 
+/** Builds the relay that authenticates and applies frames for one stream,
+ *  wired to the given Redis connection. */
+function buildLangyTurnRelay(redis: NonNullable<typeof connection>) {
+  const handoffStore = createLangyTurnHandoffStore({ redis });
+  return new LangyTurnRelay({
+    conversations: getApp().langy.conversations,
+    buffer: createLangyTokenBuffer({ redis }),
+    reserveFrameNonce: createLangyFrameDedup({ redis }).reserveFrameNonce,
+    // Authenticate frames against the synchronous per-turn handoff token first
+    // (the exact one the worker signs with), so a first turn whose RunToken
+    // projection is still landing isn't dropped as no-run-token. Empty token
+    // (legacy conversation) falls through to the projection.
+    readHandoffRunToken: async ({ projectId, conversationId, turnId }) => {
+      const handoff = await handoffStore.read({ conversationId, turnId });
+      // The handoff key is conversation+turn scoped, but conversation identity
+      // is project-scoped (`@@unique([projectId, ConversationId])`). Refuse a
+      // handoff stashed under a different project so a colliding conversation
+      // id can never hand this stream another tenant's runToken.
+      if (!handoff || handoff.projectId !== projectId) return null;
+      return handoff.runToken || null;
+    },
+    resourceLinks: createLangyResourceLinkStore({ redis }),
+    resolveResourceUrl: resolveNavigateFallbackUrl,
+    logger,
+  });
+}
+
+/** Applies every complete (newline-terminated) line in `pending` to the
+ *  relay, returning what's left over (a partial line, or ""). */
+async function drainCompleteLines(
+  pending: string,
+  relay: LangyTurnRelay,
+  tally: RelayTally,
+): Promise<string> {
+  let rest = pending;
+  let nl: number;
+  while ((nl = rest.indexOf("\n")) >= 0) {
+    const line = rest.slice(0, nl).trim();
+    rest = rest.slice(nl + 1);
+    if (line) await applyLine(relay, line, tally);
+  }
+  return rest;
+}
+
+/** Reads the ndjson body line by line, applying each complete line to the
+ *  relay. A trailing partial line (no newline yet) is flushed once the
+ *  stream ends. */
+async function consumeRelayStream(
+  body: ReadableStream<Uint8Array>,
+  relay: LangyTurnRelay,
+  tally: RelayTally,
+): Promise<void> {
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  let pending = "";
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      pending += decoder.decode(value, { stream: true });
+      pending = await drainCompleteLines(pending, relay, tally);
+    }
+    // A final line without a trailing newline.
+    const tail = pending.trim();
+    if (tail) await applyLine(relay, tail, tally);
+  } catch (error) {
+    logger.warn(
+      {
+        error: error instanceof Error ? error.message : String(error),
+        ...(relay.pinnedTurn ?? {}),
+      },
+      "relay stream read error — connection closed mid-turn",
+    );
+  }
+}
+
+// One summary per stream, not one log per frame: the tally is the useful
+// shape (throughput + duplicate/rejection rates) and the pinned ids make it
+// attributable. The counters make the same rates graphable fleet-wide.
+function recordRelayTally(tally: RelayTally, relay: LangyTurnRelay): void {
+  getLangyRelayFramesCounter("applied").inc(tally.applied);
+  getLangyRelayFramesCounter("duplicate").inc(tally.duplicate);
+  getLangyRelayFramesCounter("rejected").inc(tally.rejected);
+  if (tally.terminal) getLangyRelayFramesCounter("terminal").inc();
+  logger.info(
+    { ...tally, ...(relay.pinnedTurn ?? {}) },
+    "langy relay stream closed",
+  );
+}
+
 /**
  * POST /relay/frames — a long-lived ndjson stream of authenticated worker
  * frames. Responds once the stream ends (fire-and-forget frames need no
@@ -68,30 +158,7 @@ secured.access(relayPolicy()).post("/relay/frames", async (c) => {
   const body = c.req.raw.body;
   if (!body) return c.json({ error: "missing body" }, 400);
 
-  const handoffStore = createLangyTurnHandoffStore({ redis: connection });
-  const relay = new LangyTurnRelay({
-    conversations: getApp().langy.conversations,
-    buffer: createLangyTokenBuffer({ redis: connection }),
-    reserveFrameNonce: createLangyFrameDedup({ redis: connection })
-      .reserveFrameNonce,
-    // Authenticate frames against the synchronous per-turn handoff token first
-    // (the exact one the worker signs with), so a first turn whose RunToken
-    // projection is still landing isn't dropped as no-run-token. Empty token
-    // (legacy conversation) falls through to the projection.
-    readHandoffRunToken: async ({ projectId, conversationId, turnId }) => {
-      const handoff = await handoffStore.read({ conversationId, turnId });
-      // The handoff key is conversation+turn scoped, but conversation identity
-      // is project-scoped (`@@unique([projectId, ConversationId])`). Refuse a
-      // handoff stashed under a different project so a colliding conversation
-      // id can never hand this stream another tenant's runToken.
-      if (!handoff || handoff.projectId !== projectId) return null;
-      return handoff.runToken || null;
-    },
-    resourceLinks: createLangyResourceLinkStore({ redis: connection }),
-    resolveResourceUrl: resolveNavigateFallbackUrl,
-    logger,
-  });
-
+  const relay = buildLangyTurnRelay(connection);
   const tally: RelayTally = {
     applied: 0,
     duplicate: 0,
@@ -99,45 +166,8 @@ secured.access(relayPolicy()).post("/relay/frames", async (c) => {
     terminal: false,
   };
 
-  const reader = body.getReader();
-  const decoder = new TextDecoder();
-  let pending = "";
-  try {
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      pending += decoder.decode(value, { stream: true });
-      let nl: number;
-      while ((nl = pending.indexOf("\n")) >= 0) {
-        const line = pending.slice(0, nl).trim();
-        pending = pending.slice(nl + 1);
-        if (line) await applyLine(relay, line, tally);
-      }
-    }
-    // A final line without a trailing newline.
-    const tail = pending.trim();
-    if (tail) await applyLine(relay, tail, tally);
-  } catch (error) {
-    logger.warn(
-      {
-        error: error instanceof Error ? error.message : String(error),
-        ...(relay.pinnedTurn ?? {}),
-      },
-      "relay stream read error — connection closed mid-turn",
-    );
-  }
-
-  // One summary per stream, not one log per frame: the tally is the useful
-  // shape (throughput + duplicate/rejection rates) and the pinned ids make it
-  // attributable. The counters make the same rates graphable fleet-wide.
-  getLangyRelayFramesCounter("applied").inc(tally.applied);
-  getLangyRelayFramesCounter("duplicate").inc(tally.duplicate);
-  getLangyRelayFramesCounter("rejected").inc(tally.rejected);
-  if (tally.terminal) getLangyRelayFramesCounter("terminal").inc();
-  logger.info(
-    { ...tally, ...(relay.pinnedTurn ?? {}) },
-    "langy relay stream closed",
-  );
+  await consumeRelayStream(body, relay, tally);
+  recordRelayTally(tally, relay);
 
   return c.json(tally, 200);
 });

@@ -113,28 +113,45 @@ const ITEM_ID_KEYS = ["id", "scenarioRunId", "batchRunId", "runId"] as const;
  * the navigate silently dropped. Depth-capped defensive walk; only precise
  * per-resource links qualify, and only allowlisted id fields key them.
  */
+/** Record `href` under every id key it answers to on `obj`. Split out of `walkForPlatformLinks`. */
+function recordPlatformLinkKeys(
+  obj: Record<string, unknown>,
+  href: string,
+  links: Map<string, string>,
+): void {
+  for (const id of nestedResourceIds(href)) links.set(id, href);
+  for (const key of ITEM_ID_KEYS) {
+    const value = obj[key];
+    if (typeof value === "string" && value) links.set(value, href);
+  }
+}
+
+/** Depth-capped recursive walk. Split out of `collectItemPlatformLinks` (hoisted to
+ * module scope — takes `links` as a parameter instead of closing over it). */
+function walkForPlatformLinks(
+  node: unknown,
+  depth: number,
+  links: Map<string, string>,
+): void {
+  if (!node || typeof node !== "object" || depth > 4) return;
+  if (Array.isArray(node)) {
+    for (const item of node) walkForPlatformLinks(item, depth + 1, links);
+    return;
+  }
+  const obj = node as Record<string, unknown>;
+  const href = typeof obj.platformUrl === "string" ? obj.platformUrl : null;
+  if (href && isPreciseResourceHref(href)) {
+    recordPlatformLinkKeys(obj, href, links);
+  }
+  for (const value of Object.values(obj))
+    walkForPlatformLinks(value, depth + 1, links);
+}
+
 function collectItemPlatformLinks(
   payload: unknown,
 ): Array<{ id: string; href: string }> {
   const links = new Map<string, string>();
-  const walk = (node: unknown, depth: number): void => {
-    if (!node || typeof node !== "object" || depth > 4) return;
-    if (Array.isArray(node)) {
-      for (const item of node) walk(item, depth + 1);
-      return;
-    }
-    const obj = node as Record<string, unknown>;
-    const href = typeof obj.platformUrl === "string" ? obj.platformUrl : null;
-    if (href && isPreciseResourceHref(href)) {
-      for (const id of nestedResourceIds(href)) links.set(id, href);
-      for (const key of ITEM_ID_KEYS) {
-        const value = obj[key];
-        if (typeof value === "string" && value) links.set(value, href);
-      }
-    }
-    for (const value of Object.values(obj)) walk(value, depth + 1);
-  };
-  walk(payload, 0);
+  walkForPlatformLinks(payload, 0, links);
   return Array.from(links, ([id, href]) => ({ id, href }));
 }
 
@@ -325,6 +342,14 @@ export type LangyRelayOutcome =
   | { status: "duplicate" }
   | { status: "rejected"; reason: LangyRelayRejection };
 
+/** Fields `recordToolCallEvent` and its two phase-specific helpers share. */
+interface ToolCallEventArgs {
+  projectId: string;
+  at: { conversationId: string; turnId: string };
+  frame: Extract<LangyRelayFrame, { type: "tool" }>;
+  call: LangyToolFrame;
+}
+
 /**
  * One relay per pushed connection (one turn). `handle` is called once per ndjson
  * line; it is safe to call after a terminal (further frames are dropped as
@@ -492,6 +517,199 @@ export class LangyTurnRelay {
     );
   }
 
+  private async applyDeltaFrame(
+    at: { conversationId: string; turnId: string },
+    frame: Extract<LangyRelayFrame, { type: "delta" }>,
+  ): Promise<LangyRelayOutcome> {
+    await this.deps.buffer.appendChunk({ ...at, text: frame.text });
+    return { status: "applied" };
+  }
+
+  private async applyReasoningFrame(
+    at: { conversationId: string; turnId: string },
+    frame: Extract<LangyRelayFrame, { type: "reasoning" }>,
+  ): Promise<LangyRelayOutcome> {
+    // Ephemeral thinking tokens — live edge only, never durable. Same live
+    // channel as status/progress; the browser shows them while they stream
+    // and drops them on settle (no fold ingest, no message part).
+    await this.deps.buffer.appendReasoning({ ...at, text: frame.text });
+    return { status: "applied" };
+  }
+
+  private async applyStatusFrame(
+    at: { conversationId: string; turnId: string },
+    frame: Extract<LangyRelayFrame, { type: "status" }>,
+  ): Promise<LangyRelayOutcome> {
+    await this.deps.buffer.appendStatus({ ...at, status: frame.status });
+    return { status: "applied" };
+  }
+
+  private async applyProgressFrame(
+    at: { conversationId: string; turnId: string },
+    frame: Extract<LangyRelayFrame, { type: "progress" }>,
+  ): Promise<LangyRelayOutcome> {
+    await this.deps.buffer.appendProgress({
+      ...at,
+      ...(frame.message !== undefined ? { message: frame.message } : {}),
+      ...(frame.progress !== undefined ? { progress: frame.progress } : {}),
+      ...(frame.current !== undefined ? { current: frame.current } : {}),
+      ...(frame.total !== undefined ? { total: frame.total } : {}),
+      ...(frame.batchItems !== undefined
+        ? { batchItems: frame.batchItems }
+        : {}),
+      ...(frame.batchDurationMs !== undefined
+        ? { batchDurationMs: frame.batchDurationMs }
+        : {}),
+    });
+    return { status: "applied" };
+  }
+
+  private async applyHeartbeatFrame(at: {
+    conversationId: string;
+    turnId: string;
+  }): Promise<LangyRelayOutcome> {
+    // Liveness only — refresh the turn's freshness, write no content.
+    await this.deps.buffer.heartbeat(at);
+    return { status: "applied" };
+  }
+
+  private async applyPlanFrame(
+    projectId: string,
+    at: { conversationId: string; turnId: string },
+    frame: Extract<LangyRelayFrame, { type: "plan" }>,
+  ): Promise<LangyRelayOutcome> {
+    // A full plan snapshot. Both a LIVE checklist (buffer) and a DURABLE
+    // record (plan_updated, last-write-wins on the turn fold). The live card
+    // lands first so the checklist reconciles as promptly as the tokens; the
+    // durable event survives reload. Redelivery already died at the frameNonce
+    // gate above, so this dispatches at-most-once per distinct snapshot.
+    await this.deps.buffer.appendPlan({ ...at, items: frame.items });
+    await this.deps.conversations.recordPlanUpdated({
+      projectId,
+      ...at,
+      items: frame.items,
+    });
+    return { status: "applied" };
+  }
+
+  private async applyCardFrame(
+    at: { conversationId: string; turnId: string },
+    frame: Extract<LangyRelayFrame, { type: "card" }>,
+  ): Promise<LangyRelayOutcome> {
+    // A live UI card in the ordered stream. Rendered via the milestone slot
+    // (kind + detail); card `data` is carried on the stream for the renderer.
+    await this.deps.buffer.appendMilestone({
+      ...at,
+      kind: frame.kind,
+      ...(frame.detail !== undefined ? { detail: frame.detail } : {}),
+    });
+    return { status: "applied" };
+  }
+
+  private async applyToolTypeFrame(
+    projectId: string,
+    at: { conversationId: string; turnId: string },
+    frame: Extract<LangyRelayFrame, { type: "tool" }>,
+  ): Promise<LangyRelayOutcome> {
+    // A SOLE `langwatch navigate open <resourceId>` call is not a lookup —
+    // it is the agent naming WHICH already-surfaced resource to open. It
+    // never becomes a visible tool card or a durable event (live-only,
+    // see `resourceLinks`); everything else goes through the normal path.
+    const invocation = this.soleNavigateInvocationOf(frame);
+    if (invocation) {
+      return this.applyNavigateTool({ projectId, at, frame, invocation });
+    }
+
+    // The model sometimes CHAINS the navigate onto its lookup
+    // (`…get X --format json && langwatch navigate open X`). The chained
+    // call keeps its normal life — card, durable record; the other
+    // segments are real work — but each navigate segment still fires:
+    // the id comes from the command string and the address only ever
+    // from the link store, so compound stdout changes nothing here.
+    // (Remembering stays sole-invocation-gated — stdout provenance.)
+    if (frame.phase === "end" && !frame.isError) {
+      for (const chained of this.chainedNavigateInvocationsOf(frame)) {
+        await this.applyNavigateTool({
+          projectId,
+          at,
+          frame,
+          invocation: chained,
+        });
+      }
+    }
+    return this.applyTool(projectId, at, frame);
+  }
+
+  private async applyFinalFrame(
+    projectId: string,
+    at: { conversationId: string; turnId: string },
+    frame: Extract<LangyRelayFrame, { type: "final" }>,
+  ): Promise<LangyRelayOutcome> {
+    await this.deps.buffer.markEnd(at);
+    await this.deps.conversations.ingestAgentTurnResult({
+      projectId,
+      conversationId: at.conversationId,
+      turnId: at.turnId,
+      status: "completed",
+      ...(frame.text !== undefined ? { text: frame.text } : {}),
+      ...(frame.toolCalls !== undefined ? { toolCalls: frame.toolCalls } : {}),
+    });
+    return { status: "terminal" };
+  }
+
+  private async applyErrorFrame(
+    projectId: string,
+    at: { conversationId: string; turnId: string },
+    frame: Extract<LangyRelayFrame, { type: "error" }>,
+  ): Promise<LangyRelayOutcome> {
+    // The LIVE edge must carry the SAME classified, serialized domain error
+    // the durable path records — not the raw frame message. The browser reads
+    // the error off the stream as a JSON domain error (readLangyStreamError);
+    // a raw string parses as null and collapses every named failure into the
+    // generic "Something went wrong". Classify by the typed herr envelope
+    // when the frame carries one (the full cause chain — e.g. the gateway's
+    // no_provider_configured riding as a reason — persists into LastError),
+    // falling back to the vetted `code` (never the prose), the same mapping
+    // ingestAgentTurnResult applies to the fold.
+    const classified = langyAgentErrorFromErrorFrame({
+      code: frame.code ?? frame.error,
+      ...(frame.herr !== undefined ? { cause: frame.herr } : {}),
+    });
+    await this.deps.buffer.markError({
+      ...at,
+      error: serializeLangyTurnError(classified),
+    });
+    await this.deps.conversations.ingestAgentTurnResult({
+      projectId,
+      conversationId: at.conversationId,
+      turnId: at.turnId,
+      status: "failed",
+      ...(frame.code !== undefined ? { errorCode: frame.code } : {}),
+      ...(frame.herr !== undefined ? { errorCause: frame.herr } : {}),
+    });
+    return { status: "terminal" };
+  }
+
+  private async applyHandoffFrame(
+    projectId: string,
+    at: { conversationId: string; turnId: string },
+    frame: Extract<LangyRelayFrame, { type: "handoff" }>,
+  ): Promise<LangyRelayOutcome> {
+    // ADR-048: the worker checkpointed on shutdown. End the live stream and
+    // persist the opaque resume token so the next turn resumes from it. The
+    // turn is NOT failed — it will be re-driven on a fresh worker.
+    await this.deps.buffer.markEnd(at);
+    if (frame.resumeToken !== undefined && frame.resumeToken !== "") {
+      await this.deps.conversations.recordTurnHandoff({
+        projectId,
+        conversationId: at.conversationId,
+        turnId: at.turnId,
+        token: frame.resumeToken,
+      });
+    }
+    return { status: "terminal" };
+  }
+
   private async apply(
     envelope: LangyFrameEnvelope,
     frame: LangyRelayFrame,
@@ -501,164 +719,40 @@ export class LangyTurnRelay {
 
     switch (frame.type) {
       case "delta":
-        await this.deps.buffer.appendChunk({ ...at, text: frame.text });
-        return { status: "applied" };
-
+        return this.applyDeltaFrame(at, frame);
       case "reasoning":
-        // Ephemeral thinking tokens — live edge only, never durable. Same live
-        // channel as status/progress; the browser shows them while they stream
-        // and drops them on settle (no fold ingest, no message part).
-        await this.deps.buffer.appendReasoning({ ...at, text: frame.text });
-        return { status: "applied" };
-
+        return this.applyReasoningFrame(at, frame);
       case "status":
-        await this.deps.buffer.appendStatus({ ...at, status: frame.status });
-        return { status: "applied" };
-
+        return this.applyStatusFrame(at, frame);
       case "progress":
-        await this.deps.buffer.appendProgress({
-          ...at,
-          ...(frame.message !== undefined ? { message: frame.message } : {}),
-          ...(frame.progress !== undefined ? { progress: frame.progress } : {}),
-          ...(frame.current !== undefined ? { current: frame.current } : {}),
-          ...(frame.total !== undefined ? { total: frame.total } : {}),
-          ...(frame.batchItems !== undefined
-            ? { batchItems: frame.batchItems }
-            : {}),
-          ...(frame.batchDurationMs !== undefined
-            ? { batchDurationMs: frame.batchDurationMs }
-            : {}),
-        });
-        return { status: "applied" };
-
+        return this.applyProgressFrame(at, frame);
       case "heartbeat":
-        // Liveness only — refresh the turn's freshness, write no content.
-        await this.deps.buffer.heartbeat(at);
-        return { status: "applied" };
-
+        return this.applyHeartbeatFrame(at);
       case "plan":
-        // A full plan snapshot. Both a LIVE checklist (buffer) and a DURABLE
-        // record (plan_updated, last-write-wins on the turn fold). The live card
-        // lands first so the checklist reconciles as promptly as the tokens; the
-        // durable event survives reload. Redelivery already died at the frameNonce
-        // gate above, so this dispatches at-most-once per distinct snapshot.
-        await this.deps.buffer.appendPlan({ ...at, items: frame.items });
-        await this.deps.conversations.recordPlanUpdated({
-          projectId,
-          ...at,
-          items: frame.items,
-        });
-        return { status: "applied" };
-
+        return this.applyPlanFrame(projectId, at, frame);
       case "card":
-        // A live UI card in the ordered stream. Rendered via the milestone slot
-        // (kind + detail); card `data` is carried on the stream for the renderer.
-        await this.deps.buffer.appendMilestone({
-          ...at,
-          kind: frame.kind,
-          ...(frame.detail !== undefined ? { detail: frame.detail } : {}),
-        });
-        return { status: "applied" };
-
-      case "tool": {
-        // A SOLE `langwatch navigate open <resourceId>` call is not a lookup —
-        // it is the agent naming WHICH already-surfaced resource to open. It
-        // never becomes a visible tool card or a durable event (live-only,
-        // see `resourceLinks`); everything else goes through the normal path.
-        const invocation = this.soleNavigateInvocationOf(frame);
-        if (invocation) {
-          return this.applyNavigateTool({ projectId, at, frame, invocation });
-        }
-
-        // The model sometimes CHAINS the navigate onto its lookup
-        // (`…get X --format json && langwatch navigate open X`). The chained
-        // call keeps its normal life — card, durable record; the other
-        // segments are real work — but each navigate segment still fires:
-        // the id comes from the command string and the address only ever
-        // from the link store, so compound stdout changes nothing here.
-        // (Remembering stays sole-invocation-gated — stdout provenance.)
-        if (frame.phase === "end" && !frame.isError) {
-          for (const chained of this.chainedNavigateInvocationsOf(frame)) {
-            await this.applyNavigateTool({
-              projectId,
-              at,
-              frame,
-              invocation: chained,
-            });
-          }
-        }
-        return this.applyTool(projectId, at, frame);
-      }
-
+        return this.applyCardFrame(at, frame);
+      case "tool":
+        return this.applyToolTypeFrame(projectId, at, frame);
       case "final":
-        await this.deps.buffer.markEnd(at);
-        await this.deps.conversations.ingestAgentTurnResult({
-          projectId,
-          conversationId,
-          turnId,
-          status: "completed",
-          ...(frame.text !== undefined ? { text: frame.text } : {}),
-          ...(frame.toolCalls !== undefined
-            ? { toolCalls: frame.toolCalls }
-            : {}),
-        });
-        return { status: "terminal" };
-
-      case "error": {
-        // The LIVE edge must carry the SAME classified, serialized domain error
-        // the durable path records — not the raw frame message. The browser reads
-        // the error off the stream as a JSON domain error (readLangyStreamError);
-        // a raw string parses as null and collapses every named failure into the
-        // generic "Something went wrong". Classify by the typed herr envelope
-        // when the frame carries one (the full cause chain — e.g. the gateway's
-        // no_provider_configured riding as a reason — persists into LastError),
-        // falling back to the vetted `code` (never the prose), the same mapping
-        // ingestAgentTurnResult applies to the fold.
-        const classified = langyAgentErrorFromErrorFrame({
-          code: frame.code ?? frame.error,
-          ...(frame.herr !== undefined ? { cause: frame.herr } : {}),
-        });
-        await this.deps.buffer.markError({
-          ...at,
-          error: serializeLangyTurnError(classified),
-        });
-        await this.deps.conversations.ingestAgentTurnResult({
-          projectId,
-          conversationId,
-          turnId,
-          status: "failed",
-          ...(frame.code !== undefined ? { errorCode: frame.code } : {}),
-          ...(frame.herr !== undefined ? { errorCause: frame.herr } : {}),
-        });
-        return { status: "terminal" };
-      }
-
+        return this.applyFinalFrame(projectId, at, frame);
+      case "error":
+        return this.applyErrorFrame(projectId, at, frame);
       case "handoff":
-        // ADR-048: the worker checkpointed on shutdown. End the live stream and
-        // persist the opaque resume token so the next turn resumes from it. The
-        // turn is NOT failed — it will be re-driven on a fresh worker.
-        await this.deps.buffer.markEnd(at);
-        if (frame.resumeToken !== undefined && frame.resumeToken !== "") {
-          await this.deps.conversations.recordTurnHandoff({
-            projectId,
-            conversationId,
-            turnId,
-            token: frame.resumeToken,
-          });
-        }
-        return { status: "terminal" };
+        return this.applyHandoffFrame(projectId, at, frame);
     }
   }
 
-  private async applyTool(
-    projectId: string,
-    at: { conversationId: string; turnId: string },
+  /**
+   * Re-type a shell call that was really the LangWatch CLI: typed name,
+   * stdout reduced to its JSON document, and the result digest computed.
+   * Anything else passes through untouched (identity, not a copy). Split out
+   * of `applyTool`.
+   */
+  private buildNormalizedToolCall(
     frame: Extract<LangyRelayFrame, { type: "tool" }>,
-  ): Promise<LangyRelayOutcome> {
-    // Re-type a shell call that was really the LangWatch CLI: typed name,
-    // stdout reduced to its JSON document, and the result digest computed.
-    // Anything else passes through untouched (identity, not a copy).
-    const call = this.cliEnvelope.normalizeToolFrame({
+  ): LangyToolFrame {
+    return this.cliEnvelope.normalizeToolFrame({
       frame: {
         id: frame.id,
         name: frame.name,
@@ -670,30 +764,47 @@ export class LangyTurnRelay {
         ...(frame.result !== undefined ? { result: frame.result } : {}),
       },
     });
+  }
 
-    // Remember this resource's platform link — the ONLY thing a later
-    // `navigate` instruction may resolve an address from. Only from a
-    // settled, successful call (so a resource the viewer's own access could
-    // not reach never lands here); only when the call was a SOLE plain
-    // `langwatch` invocation, so its stdout is provably the CLI's own output
-    // and not something the agent chained in (`langwatch trace get x; echo
-    // '{…forged…}'` must never seed a navigation target); and only when the
-    // link addresses this ONE resource rather than degrading to a surface's
-    // bare index (a scenario run whose set could not be resolved, say) — an
-    // index must never be cached as if it were the resource's own address.
-    if (frame.phase === "end" && !call.isError) {
-      const command = this.cliEnvelope.shellCommandOf({
-        id: frame.id,
-        name: frame.name,
-        phase: frame.phase,
-        ...(frame.input !== undefined ? { input: frame.input } : {}),
-      });
-      if (command && isSoleLangwatchInvocation(command)) {
-        await this.rememberResourceLink(at, call);
-      }
+  /**
+   * Remember this resource's platform link — the ONLY thing a later
+   * `navigate` instruction may resolve an address from. Only from a
+   * settled, successful call (so a resource the viewer's own access could
+   * not reach never lands here); only when the call was a SOLE plain
+   * `langwatch` invocation, so its stdout is provably the CLI's own output
+   * and not something the agent chained in (`langwatch trace get x; echo
+   * '{…forged…}'` must never seed a navigation target); and only when the
+   * link addresses this ONE resource rather than degrading to a surface's
+   * bare index (a scenario run whose set could not be resolved, say) — an
+   * index must never be cached as if it were the resource's own address.
+   * Split out of `applyTool`.
+   */
+  private async maybeRememberToolResourceLink({
+    at,
+    frame,
+    call,
+  }: {
+    at: { conversationId: string; turnId: string };
+    frame: Extract<LangyRelayFrame, { type: "tool" }>;
+    call: LangyToolFrame;
+  }): Promise<void> {
+    if (frame.phase !== "end" || call.isError) return;
+    const command = this.cliEnvelope.shellCommandOf({
+      id: frame.id,
+      name: frame.name,
+      phase: frame.phase,
+      ...(frame.input !== undefined ? { input: frame.input } : {}),
+    });
+    if (command && isSoleLangwatchInvocation(command)) {
+      await this.rememberResourceLink(at, call);
     }
+  }
 
-    // Live card first so it opens as promptly as the tokens flow…
+  private async appendToolCard(
+    at: { conversationId: string; turnId: string },
+    frame: Extract<LangyRelayFrame, { type: "tool" }>,
+    call: LangyToolFrame,
+  ): Promise<void> {
     await this.deps.buffer.appendTool({
       ...at,
       id: call.id,
@@ -706,46 +817,92 @@ export class LangyTurnRelay {
       ...(call.digest !== undefined ? { digest: call.digest } : {}),
       ...(call.result !== undefined ? { result: call.result } : {}),
     });
-    // A capability's present-continuous sub-status ("Searching traces…") for the
-    // live status line — emitted AFTER the tool frame so the cold-start clear (it
-    // fires on the tool entry, once per turn) cannot wipe it, and cleared with an
-    // empty status when the call settles, so it shows only between the step's
-    // start and its output. Non-capability calls (a raw bash) carry no label.
-    const progress = resolveCapabilityProgress(call.name);
-    if (progress) {
-      await this.deps.buffer.appendStatus({
-        ...at,
-        status: frame.phase === "start" ? `${progress.headline}…` : "",
-      });
-    }
+  }
 
-    // …then the durable milestone (a tool call is a meaningful audit event).
-    if (frame.phase === "start") {
-      await this.deps.conversations.recordToolCallStarted({
-        projectId,
-        ...at,
-        toolCallId: call.id,
-        toolName: call.name,
-        ...(frame.command !== undefined ? { command: frame.command } : {}),
-        ...(call.input !== undefined ? { input: call.input } : {}),
-      });
-    } else {
-      await this.deps.conversations.recordToolCallCompleted({
-        projectId,
-        ...at,
-        toolCallId: call.id,
-        toolName: call.name,
-        ...(call.isError !== undefined ? { isError: call.isError } : {}),
-        ...(frame.command !== undefined ? { command: frame.command } : {}),
-        ...(call.input !== undefined ? { input: call.input } : {}),
-        ...(frame.durationMs !== undefined
-          ? { durationMs: frame.durationMs }
-          : {}),
-        ...(call.isError && call.output !== undefined
-          ? { errorText: call.output }
-          : {}),
-      });
+  /**
+   * A capability's present-continuous sub-status ("Searching traces…") for the
+   * live status line — emitted AFTER the tool frame so the cold-start clear (it
+   * fires on the tool entry, once per turn) cannot wipe it, and cleared with an
+   * empty status when the call settles, so it shows only between the step's
+   * start and its output. Non-capability calls (a raw bash) carry no label.
+   * Split out of `applyTool`.
+   */
+  private async appendToolCapabilityStatus(
+    at: { conversationId: string; turnId: string },
+    frame: Extract<LangyRelayFrame, { type: "tool" }>,
+    call: LangyToolFrame,
+  ): Promise<void> {
+    const progress = resolveCapabilityProgress(call.name);
+    if (!progress) return;
+    await this.deps.buffer.appendStatus({
+      ...at,
+      status: frame.phase === "start" ? `${progress.headline}…` : "",
+    });
+  }
+
+  private async recordToolCallStartedEvent({
+    projectId,
+    at,
+    frame,
+    call,
+  }: ToolCallEventArgs): Promise<void> {
+    await this.deps.conversations.recordToolCallStarted({
+      projectId,
+      ...at,
+      toolCallId: call.id,
+      toolName: call.name,
+      ...(frame.command !== undefined ? { command: frame.command } : {}),
+      ...(call.input !== undefined ? { input: call.input } : {}),
+    });
+  }
+
+  private async recordToolCallCompletedEvent({
+    projectId,
+    at,
+    frame,
+    call,
+  }: ToolCallEventArgs): Promise<void> {
+    await this.deps.conversations.recordToolCallCompleted({
+      projectId,
+      ...at,
+      toolCallId: call.id,
+      toolName: call.name,
+      ...(call.isError !== undefined ? { isError: call.isError } : {}),
+      ...(frame.command !== undefined ? { command: frame.command } : {}),
+      ...(call.input !== undefined ? { input: call.input } : {}),
+      ...(frame.durationMs !== undefined
+        ? { durationMs: frame.durationMs }
+        : {}),
+      ...(call.isError && call.output !== undefined
+        ? { errorText: call.output }
+        : {}),
+    });
+  }
+
+  /** The durable milestone (a tool call is a meaningful audit event). Split out of `applyTool`. */
+  private async recordToolCallEvent(args: ToolCallEventArgs): Promise<void> {
+    if (args.frame.phase === "start") {
+      await this.recordToolCallStartedEvent(args);
+      return;
     }
+    await this.recordToolCallCompletedEvent(args);
+  }
+
+  private async applyTool(
+    projectId: string,
+    at: { conversationId: string; turnId: string },
+    frame: Extract<LangyRelayFrame, { type: "tool" }>,
+  ): Promise<LangyRelayOutcome> {
+    const call = this.buildNormalizedToolCall(frame);
+
+    await this.maybeRememberToolResourceLink({ at, frame, call });
+
+    // Live card first so it opens as promptly as the tokens flow…
+    await this.appendToolCard(at, frame, call);
+    await this.appendToolCapabilityStatus(at, frame, call);
+
+    // …then the durable milestone.
+    await this.recordToolCallEvent({ projectId, at, frame, call });
     return { status: "applied" };
   }
 

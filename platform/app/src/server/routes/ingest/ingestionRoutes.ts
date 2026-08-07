@@ -56,6 +56,7 @@ import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
 import { DEFAULT_PII_REDACTION_LEVEL } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
+import type { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
 import { GatewayBudgetRepository } from "~/server/gateway/budget.repository";
 import { ChangeEventRepository } from "~/server/gateway/changeEvent.repository";
 import { usdToNanoUsd } from "~/server/gateway/wireMoney";
@@ -373,6 +374,49 @@ async function rateLimitGuard(c: Context): Promise<Response | null> {
   );
 }
 
+/**
+ * Shared prologue for every ingest receiver: rate-limit guard, bearer-secret
+ * auth, and the path sourceId / authenticated-source id match check.
+ */
+async function authorizeIngestRequest(
+  c: Context,
+): Promise<
+  { ok: true; source: IngestionSource } | { ok: false; response: Response }
+> {
+  const limited = await rateLimitGuard(c);
+  if (limited) return { ok: false, response: limited };
+
+  const source = await authIngestionSource(c);
+  if (!source) {
+    return { ok: false, response: c.json({ error: "unauthorized" }, 401) };
+  }
+  const sourceId = c.req.param("sourceId");
+  if (sourceId !== source.id) {
+    return { ok: false, response: c.json({ error: "unauthorized" }, 401) };
+  }
+  return { ok: true, source };
+}
+
+/** The 400 wrong_endpoint response when a source's type isn't among those
+ *  the calling receiver accepts, or null when it is. */
+function rejectWrongIngestEndpoint(
+  c: Context,
+  source: IngestionSource,
+  {
+    allowedSourceTypes,
+    message,
+  }: { allowedSourceTypes: readonly string[]; message: string },
+): Response | null {
+  if (allowedSourceTypes.includes(source.sourceType)) return null;
+  return c.json({ error: "wrong_endpoint", error_description: message }, 400);
+}
+
+/** Marks the source as having just received an event (lastEventAt bump). */
+async function recordIngestSourceEvent(sourceId: string): Promise<void> {
+  const service = IngestionSourceService.create(prisma);
+  await service.recordEventReceived(sourceId);
+}
+
 // ---------------------------------------------------------------------------
 // POST /api/ingest/otel/:sourceId
 // ---------------------------------------------------------------------------
@@ -395,33 +439,26 @@ async function rateLimitGuard(c: Context): Promise<Response | null> {
 //   - receiver-shapes.feature (Lane-S)
 //   - architecture-invariants.feature (Lane-B)
 // ---------------------------------------------------------------------------
-secured.access(ingestAuth).post("/otel/:sourceId", async (c: Context) => {
-  const limited = await rateLimitGuard(c);
-  if (limited) return limited;
+const OTEL_TRACE_SOURCE_TYPES = [
+  "otel_generic",
+  "claude_cowork",
+  "claude_code",
+] as const;
 
-  const source = await authIngestionSource(c);
-  if (!source) {
-    return c.json({ error: "unauthorized" }, 401);
-  }
-  const sourceId = c.req.param("sourceId");
-  if (sourceId !== source.id) {
-    return c.json({ error: "unauthorized" }, 401);
-  }
-  if (
-    source.sourceType !== "otel_generic" &&
-    source.sourceType !== "claude_cowork" &&
-    source.sourceType !== "claude_code"
-  ) {
-    return c.json(
-      {
-        error: "wrong_endpoint",
-        error_description:
-          "OTLP path is only valid for otel_generic, claude_cowork, and claude_code sources",
-      },
-      400,
-    );
-  }
+interface OtelTraceIngestResult {
+  bodyBytes: number;
+  eventCount: number;
+  rejectedSpans: number;
+  parseHint: string | undefined;
+}
 
+/** Parses the OTLP traces body, stamps origin metadata, and hands off to
+ *  the unified trace pipeline. Any failure degrades to a `parseHint` on the
+ *  eventual 202 rather than propagating — the receiver still acks. */
+async function ingestOtelTraces(
+  c: Context,
+  source: IngestionSource,
+): Promise<OtelTraceIngestResult> {
   let bodyBytes = 0;
   let eventCount = 0;
   let rejectedSpans = 0;
@@ -475,20 +512,13 @@ secured.access(ingestAuth).post("/otel/:sourceId", async (c: Context) => {
       "otel ingest receive failed (still ack'ing)",
     );
   }
+  return { bodyBytes, eventCount, rejectedSpans, parseHint };
+}
 
-  const service = IngestionSourceService.create(prisma);
-  await service.recordEventReceived(source.id);
-  logger.info(
-    {
-      sourceId: source.id,
-      sourceType: source.sourceType,
-      bytes: bodyBytes,
-      events: eventCount,
-      rejectedSpans,
-    },
-    "otel ingest landed in unified trace pipeline",
-  );
-
+function buildOtelTraceIngestResponse(
+  result: OtelTraceIngestResult,
+): Record<string, unknown> {
+  const { bodyBytes, eventCount, rejectedSpans, parseHint } = result;
   const responseBody: Record<string, unknown> = {
     accepted: true,
     bytes: bodyBytes,
@@ -503,7 +533,35 @@ secured.access(ingestAuth).post("/otel/:sourceId", async (c: Context) => {
         "arrays. See https://docs.langwatch.ai/ai-gateway/governance/" +
         "ingestion-sources/otel-generic for a copy-paste curl.";
   }
-  return c.json(responseBody, 202);
+  return responseBody;
+}
+
+secured.access(ingestAuth).post("/otel/:sourceId", async (c: Context) => {
+  const auth = await authorizeIngestRequest(c);
+  if (!auth.ok) return auth.response;
+  const { source } = auth;
+
+  const typeError = rejectWrongIngestEndpoint(c, source, {
+    allowedSourceTypes: OTEL_TRACE_SOURCE_TYPES,
+    message:
+      "OTLP path is only valid for otel_generic, claude_cowork, and claude_code sources",
+  });
+  if (typeError) return typeError;
+
+  const result = await ingestOtelTraces(c, source);
+  await recordIngestSourceEvent(source.id);
+  logger.info(
+    {
+      sourceId: source.id,
+      sourceType: source.sourceType,
+      bytes: result.bodyBytes,
+      events: result.eventCount,
+      rejectedSpans: result.rejectedSpans,
+    },
+    "otel ingest landed in unified trace pipeline",
+  );
+
+  return c.json(buildOtelTraceIngestResponse(result), 202);
 });
 
 // ---------------------------------------------------------------------------
@@ -620,395 +678,608 @@ secured.access(ingestAuth).post("/webhook/:sourceId", async (c: Context) => {
 //
 // Spec: docs/ai-governance/ingestion-sources/claude-code-otlp.feature
 // ---------------------------------------------------------------------------
+function countOtlpLogRecords(request: IExportLogsServiceRequest): number {
+  return (request.resourceLogs ?? []).reduce(
+    (acc, rl) =>
+      acc +
+      (rl.scopeLogs ?? []).reduce(
+        (a, sl) => a + (sl.logRecords?.length ?? 0),
+        0,
+      ),
+    0,
+  );
+}
+
+// Audit / forensics: hand the LogRecords to the existing log pipeline so
+// they show up alongside spans in the trace viewer + /me Recent Activity.
+// Best-effort: a failure here must not stop cost extraction below.
+async function handOffOtelLogsToPipeline({
+  source,
+  govProjectId,
+  logRequest,
+}: {
+  source: IngestionSource;
+  govProjectId: string;
+  logRequest: IExportLogsServiceRequest;
+}): Promise<void> {
+  try {
+    await getApp().traces.logCollection.handleOtlpLogRequest({
+      tenantId: govProjectId,
+      organizationId: source.organizationId,
+      logRequest,
+      piiRedactionLevel: DEFAULT_PII_REDACTION_LEVEL,
+    });
+  } catch (handoffErr) {
+    logger.warn(
+      { sourceId: source.id, err: String(handoffErr) },
+      "log pipeline handoff failed (cost extraction continues)",
+    );
+  }
+}
+
+/** Resolves a cost event's reporting user to an org member's User.id,
+ *  falling back to null (and an audit log line) when the emitting email
+ *  is not a member. */
+async function resolveCostEventPrincipal({
+  event,
+  source,
+}: {
+  event: CanonicalCostEvent;
+  source: IngestionSource;
+}): Promise<string | null> {
+  if (!event.userEmail) return null;
+
+  // Prisma relation name on User is `orgMemberships` (not
+  // `organizations`) — Ariana caught this on the first real Claude Code
+  // call. The auto-detected user.email matched the captured OAuth
+  // account; the relation filter was the only blocker between extracted
+  // event and ledger row.
+  const user = await prisma.user.findFirst({
+    where: {
+      email: event.userEmail,
+      orgMemberships: { some: { organizationId: source.organizationId } },
+    },
+    select: { id: true },
+  });
+  if (user?.id) return user.id;
+
+  // Audit hint: Anthropic OAuth user is emitting cost but isn't a member
+  // of the source's org. Roll-up still happens at org/team/project scope;
+  // admins can grep this log to see who's leaking cost they can't yet
+  // attribute per-user.
+  logger.info(
+    {
+      sourceId: source.id,
+      userEmail: event.userEmail,
+      anthropicAccountId: event.raw["user.account_id"],
+      requestId: event.requestId,
+    },
+    "ingestion-source event from non-member email — falling back to org/team/project scope only",
+  );
+  return null;
+}
+
+// BUDGET_UPDATED so the gateway's /changes subscriber evicts L1 and the
+// next request re-resolves with the fresh spend. Ariana's anomaly + budget
+// pipelines fire identically to the gateway VK path. Best-effort: the
+// ledger row already landed by the time this runs.
+async function emitCostEventBudgetUpdated({
+  changeEvents,
+  source,
+  govProjectId,
+  event,
+  budgetIds,
+}: {
+  changeEvents: ChangeEventRepository;
+  source: IngestionSource;
+  govProjectId: string;
+  event: CanonicalCostEvent;
+  budgetIds: string[];
+}): Promise<void> {
+  try {
+    await changeEvents.append({
+      organizationId: source.organizationId,
+      projectId: govProjectId,
+      kind: "BUDGET_UPDATED",
+      payload: {
+        source: "ingestion_source",
+        sourceId: source.id,
+        requestId: event.requestId,
+        userEmail: event.userEmail,
+        budgetIds,
+        amountUsd: event.costUsd,
+      },
+    });
+  } catch (changeErr) {
+    logger.warn(
+      {
+        sourceId: source.id,
+        requestId: event.requestId,
+        err: String(changeErr),
+      },
+      "BUDGET_UPDATED emit failed (ledger row already landed)",
+    );
+  }
+}
+
+/** Writes one cost event's ledger rows (one per applicable budget) and
+ *  emits the BUDGET_UPDATED change event. Returns the row count written. */
+async function writeCostEventLedgerRows({
+  event,
+  source,
+  govProjectId,
+  budgetRepo,
+  budgetCHRepo,
+  changeEvents,
+}: {
+  event: CanonicalCostEvent;
+  source: IngestionSource;
+  govProjectId: string;
+  budgetRepo: GatewayBudgetRepository;
+  budgetCHRepo: GatewayBudgetClickHouseRepository;
+  changeEvents: ChangeEventRepository;
+}): Promise<number> {
+  // Resolve principal: user.email → User.id (org member only). Fallback to
+  // null on unknown users — the budget still rolls up at org/team/project
+  // scope, just no per-user attribution.
+  const principalUserId = await resolveCostEventPrincipal({ event, source });
+
+  // Sentinel teamId/virtualKeyId for ingestion-source rows. ApplicableScopes
+  // typed signature requires non-null strings; the budget query filters
+  // TEAM-scoped budgets by `scope=TEAM AND scopeId=teamId` so a sentinel
+  // that can't be a real team id naturally excludes those narrow budgets
+  // while still letting ORG / PROJECT / PRINCIPAL budgets match. Same shape
+  // for VIRTUAL_KEY: ingestion sources have no VK, the sentinel ensures
+  // VK-scoped budgets correctly skip.
+  const sentinelVK = `_ingestion_:${source.id}`;
+  const scopes = {
+    organizationId: source.organizationId,
+    teamId: source.teamId ?? `_ingestion_:${source.id}`,
+    projectId: govProjectId,
+    virtualKeyId: sentinelVK,
+    principalUserId,
+  };
+  // ATTRIBUTED_USER templates bucket spend per end user, and an ingestion
+  // source carries none, so a row here could only name the bare anchor: a
+  // bucket no enforcement reads, filed under the same (budget, request)
+  // identity the per-user row needs. Templates accrue on the gateway spend
+  // pipeline alone.
+  const budgets = (await budgetRepo.applicableForRequest(scopes)).filter(
+    (b) => b.scopeType !== "ATTRIBUTED_USER",
+  );
+  if (budgets.length === 0) return 0;
+
+  // The reported cost is a float the caller sent, so it is pinned to an
+  // integer once, here, and every total downstream adds those integers
+  // rather than re-deriving from decimals.
+  const nano = usdToNanoUsd(event.costUsd.toFixed(10));
+  const rows = budgets.map((b) => ({
+    tenantId: govProjectId,
+    budgetId: b.id,
+    scope: b.scopeType,
+    scopeId: b.scopeId,
+    window: b.window,
+    virtualKeyId: sentinelVK,
+    gatewayRequestId: event.requestId,
+    amountNanoUsd: Number(nano),
+    tokensInput: event.inputTokens,
+    tokensOutput: event.outputTokens,
+    tokensCacheRead: event.cacheReadTokens,
+    tokensCacheWrite: event.cacheCreationTokens,
+    model: event.model,
+    durationMs: 0,
+    status: "SUCCESS" as const,
+    occurredAt: event.occurredAt,
+  }));
+  await budgetCHRepo.insertDebit(rows);
+
+  await emitCostEventBudgetUpdated({
+    changeEvents,
+    source,
+    govProjectId,
+    event,
+    budgetIds: budgets.map((b) => b.id),
+  });
+
+  return rows.length;
+}
+
+/** Dispatches every extracted cost event to the ledger, one at a time so a
+ *  single event's failure doesn't drop the rest of the batch. */
+async function dispatchIngestCostEvents({
+  events,
+  source,
+  govProjectId,
+  budgetCHRepo,
+}: {
+  events: CanonicalCostEvent[];
+  source: IngestionSource;
+  govProjectId: string;
+  budgetCHRepo: GatewayBudgetClickHouseRepository;
+}): Promise<number> {
+  const budgetRepo = new GatewayBudgetRepository(prisma);
+  const changeEvents = new ChangeEventRepository(prisma);
+
+  let ledgerRowsWritten = 0;
+  for (const event of events) {
+    try {
+      ledgerRowsWritten += await writeCostEventLedgerRows({
+        event,
+        source,
+        govProjectId,
+        budgetRepo,
+        budgetCHRepo,
+        changeEvents,
+      });
+    } catch (eventErr) {
+      logger.warn(
+        {
+          sourceId: source.id,
+          requestId: event.requestId,
+          err: String(eventErr),
+        },
+        "ingestion-source event ledger-write failed (continuing batch)",
+      );
+    }
+  }
+  return ledgerRowsWritten;
+}
+
+interface OtelLogsIngestResult {
+  bodyBytes: number;
+  logRecordCount: number;
+  costEventCount: number;
+  ledgerRowsWritten: number;
+  parseHint: string | undefined;
+}
+
+/** Parses the OTLP logs body, hands off to the log pipeline for forensics,
+ *  and dispatches any extracted cost events to the budget ledger. Any
+ *  failure degrades to a `parseHint` on the eventual 202 — the receiver
+ *  still acks. */
+/** Resolves the Governance Project, stamps origin attrs, hands the parsed
+ *  request off to the log pipeline for forensics, and dispatches any
+ *  extracted cost events to the budget ledger. Only called when the parsed
+ *  request carries at least one log record. */
+async function processOtelLogRecords({
+  source,
+  parsed,
+  body,
+  contentType,
+}: {
+  source: IngestionSource;
+  parsed: IExportLogsServiceRequest;
+  body: ArrayBuffer;
+  contentType: string | undefined;
+}): Promise<{ costEventCount: number; ledgerRowsWritten: number }> {
+  const govProject = await ensureHiddenGovernanceProject(
+    prisma,
+    source.organizationId,
+  );
+  // Stamp origin attrs on every record first — governance origin filtering
+  // reads them off the log attributes, mirroring the trace path and the
+  // webhook receiver.
+  stampLogOriginAttrs(parsed, source);
+  enforceApiKeyIdOnLogRequest(
+    parsed as unknown as Parameters<typeof enforceApiKeyIdOnLogRequest>[0],
+    null,
+  );
+  await handOffOtelLogsToPipeline({
+    source,
+    govProjectId: govProject.id,
+    logRequest: parsed,
+  });
+
+  // Cost extraction: when the source carries OTTL statements in
+  // parserConfig, round-trip the payload through the gateway's
+  // /internal/transform (which embeds pkg/ottl) and read the canonical
+  // `langwatch.*` namespace from the mutated payload. Otherwise fall back
+  // to the legacy hardcoded claude_code extractor for sources created
+  // before OTTL config existed. Ledger-write one row per event per
+  // applicable budget.
+  const events = await extractCostEventsForSource({
+    source,
+    parsed,
+    rawBody: body,
+    contentType,
+  });
+
+  const budgetCHRepo = events.length > 0 ? getApp().gateway.budgets : undefined;
+  const ledgerRowsWritten =
+    events.length > 0 && budgetCHRepo
+      ? await dispatchIngestCostEvents({
+          events,
+          source,
+          govProjectId: govProject.id,
+          budgetCHRepo,
+        })
+      : 0;
+
+  return { costEventCount: events.length, ledgerRowsWritten };
+}
+
+async function ingestOtelLogsAndCost(
+  c: Context,
+  source: IngestionSource,
+): Promise<OtelLogsIngestResult> {
+  let bodyBytes = 0;
+  let logRecordCount = 0;
+  let costEventCount = 0;
+  let ledgerRowsWritten = 0;
+  let parseHint: string | undefined;
+
+  try {
+    const body = await readOtlpBody(c.req.raw);
+    bodyBytes = body.byteLength;
+    const contentType = c.req.header("content-type");
+    const parsed = parseOtlpLogs(body, contentType);
+    if (!parsed.ok) {
+      parseHint = parsed.error;
+    } else {
+      logRecordCount = countOtlpLogRecords(parsed.request);
+
+      if (logRecordCount > 0) {
+        const processed = await processOtelLogRecords({
+          source,
+          parsed: parsed.request,
+          body,
+          contentType,
+        });
+        costEventCount = processed.costEventCount;
+        ledgerRowsWritten = processed.ledgerRowsWritten;
+      }
+    }
+  } catch (err) {
+    parseHint = String(err);
+    logger.warn(
+      { sourceId: source.id, err: String(err) },
+      "otel logs ingest receive failed (still ack'ing)",
+    );
+  }
+
+  return {
+    bodyBytes,
+    logRecordCount,
+    costEventCount,
+    ledgerRowsWritten,
+    parseHint,
+  };
+}
+
+function buildOtelLogsIngestResponse(
+  result: OtelLogsIngestResult,
+): Record<string, unknown> {
+  const responseBody: Record<string, unknown> = {
+    accepted: true,
+    bytes: result.bodyBytes,
+    logRecords: result.logRecordCount,
+    costEvents: result.costEventCount,
+    ledgerRows: result.ledgerRowsWritten,
+  };
+  if (result.parseHint) responseBody.hint = result.parseHint;
+  return responseBody;
+}
+
 secured
   .access(ingestAuth)
   .post("/otel/:sourceId/v1/logs", async (c: Context) => {
-    const limited = await rateLimitGuard(c);
-    if (limited) return limited;
+    const auth = await authorizeIngestRequest(c);
+    if (!auth.ok) return auth.response;
+    const { source } = auth;
 
-    const source = await authIngestionSource(c);
-    if (!source) {
-      return c.json({ error: "unauthorized" }, 401);
-    }
-    const sourceId = c.req.param("sourceId");
-    if (sourceId !== source.id) {
-      return c.json({ error: "unauthorized" }, 401);
-    }
-
-    let bodyBytes = 0;
-    let logRecordCount = 0;
-    let costEventCount = 0;
-    let ledgerRowsWritten = 0;
-    let parseHint: string | undefined;
-
-    try {
-      const body = await readOtlpBody(c.req.raw);
-      bodyBytes = body.byteLength;
-      const contentType = c.req.header("content-type");
-      const parsed = parseOtlpLogs(body, contentType);
-      if (!parsed.ok) {
-        parseHint = parsed.error;
-      } else {
-        logRecordCount = (parsed.request.resourceLogs ?? []).reduce(
-          (acc, rl) =>
-            acc +
-            (rl.scopeLogs ?? []).reduce(
-              (a, sl) => a + (sl.logRecords?.length ?? 0),
-              0,
-            ),
-          0,
-        );
-
-        // Audit / forensics: hand the LogRecords to the existing log
-        // pipeline so they show up alongside spans in the trace viewer
-        // + /me Recent Activity. Stamp origin attrs on every
-        // record first — governance origin filtering reads them
-        // off the log attributes, mirroring the trace path and the
-        // webhook receiver.
-        if (logRecordCount > 0) {
-          const govProject = await ensureHiddenGovernanceProject(
-            prisma,
-            source.organizationId,
-          );
-          stampLogOriginAttrs(parsed.request, source);
-          enforceApiKeyIdOnLogRequest(
-            parsed.request as unknown as Parameters<
-              typeof enforceApiKeyIdOnLogRequest
-            >[0],
-            null,
-          );
-          try {
-            await getApp().traces.logCollection.handleOtlpLogRequest({
-              tenantId: govProject.id,
-              organizationId: source.organizationId,
-              logRequest: parsed.request,
-              piiRedactionLevel: DEFAULT_PII_REDACTION_LEVEL,
-            });
-          } catch (handoffErr) {
-            logger.warn(
-              { sourceId: source.id, err: String(handoffErr) },
-              "log pipeline handoff failed (cost extraction continues)",
-            );
-          }
-
-          // Cost extraction: when the source carries OTTL statements in
-          // parserConfig, round-trip the payload through the gateway's
-          // /internal/transform (which embeds pkg/ottl) and read the
-          // canonical `langwatch.*` namespace from the mutated payload.
-          // Otherwise fall back to the legacy hardcoded claude_code
-          // extractor for sources created before OTTL config existed.
-          // Ledger-write one row per event per applicable budget.
-          const events = await extractCostEventsForSource({
-            source,
-            parsed: parsed.request,
-            rawBody: body,
-            contentType,
-          });
-          costEventCount = events.length;
-
-          const budgetCHRepo =
-            events.length > 0 ? getApp().gateway.budgets : undefined;
-          if (events.length > 0 && budgetCHRepo) {
-            const budgetRepo = new GatewayBudgetRepository(prisma);
-            const changeEvents = new ChangeEventRepository(prisma);
-
-            for (const event of events) {
-              try {
-                // Resolve principal: user.email → User.id (org member only).
-                // Fallback to null on unknown users — the budget still rolls
-                // up at org/team/project scope, just no per-user attribution.
-                let principalUserId: string | null = null;
-                if (event.userEmail) {
-                  // Prisma relation name on User is `orgMemberships` (not
-                  // `organizations`) — Ariana caught this on the first
-                  // real Claude Code call. The auto-detected user.email
-                  // matched the captured OAuth account; the relation
-                  // filter was the only blocker between extracted event
-                  // and ledger row.
-                  const user = await prisma.user.findFirst({
-                    where: {
-                      email: event.userEmail,
-                      orgMemberships: {
-                        some: { organizationId: source.organizationId },
-                      },
-                    },
-                    select: { id: true },
-                  });
-                  principalUserId = user?.id ?? null;
-                  if (!principalUserId) {
-                    // Audit hint: Anthropic OAuth user is emitting cost
-                    // but isn't a member of the source's org. Roll-up
-                    // still happens at org/team/project scope; admins
-                    // can grep this log to see who's leaking cost they
-                    // can't yet attribute per-user.
-                    logger.info(
-                      {
-                        sourceId: source.id,
-                        userEmail: event.userEmail,
-                        anthropicAccountId: event.raw["user.account_id"],
-                        requestId: event.requestId,
-                      },
-                      "ingestion-source event from non-member email — falling back to org/team/project scope only",
-                    );
-                  }
-                }
-
-                // Sentinel teamId/virtualKeyId for ingestion-source rows.
-                // ApplicableScopes typed signature requires non-null
-                // strings; the budget query filters TEAM-scoped budgets
-                // by `scope=TEAM AND scopeId=teamId` so a sentinel that
-                // can't be a real team id naturally excludes those
-                // narrow budgets while still letting ORG / PROJECT /
-                // PRINCIPAL budgets match. Same shape for VIRTUAL_KEY:
-                // ingestion sources have no VK, the sentinel ensures
-                // VK-scoped budgets correctly skip.
-                const sentinelVK = `_ingestion_:${source.id}`;
-                const scopes = {
-                  organizationId: source.organizationId,
-                  teamId: source.teamId ?? `_ingestion_:${source.id}`,
-                  projectId: govProject.id,
-                  virtualKeyId: sentinelVK,
-                  principalUserId,
-                };
-                // ATTRIBUTED_USER templates bucket spend per end user, and
-                // an ingestion source carries none, so a row here could
-                // only name the bare anchor: a bucket no enforcement reads,
-                // filed under the same (budget, request) identity the
-                // per-user row needs. Templates accrue on the gateway
-                // spend pipeline alone.
-                const budgets = (
-                  await budgetRepo.applicableForRequest(scopes)
-                ).filter((b) => b.scopeType !== "ATTRIBUTED_USER");
-                if (budgets.length === 0) continue;
-
-                // The reported cost is a float the caller sent, so it is
-                // pinned to an integer once, here, and every total downstream
-                // adds those integers rather than re-deriving from decimals.
-                const nano = usdToNanoUsd(event.costUsd.toFixed(10));
-                const rows = budgets.map((b) => ({
-                  tenantId: govProject.id,
-                  budgetId: b.id,
-                  scope: b.scopeType,
-                  scopeId: b.scopeId,
-                  window: b.window,
-                  virtualKeyId: sentinelVK,
-                  gatewayRequestId: event.requestId,
-                  amountNanoUsd: Number(nano),
-                  tokensInput: event.inputTokens,
-                  tokensOutput: event.outputTokens,
-                  tokensCacheRead: event.cacheReadTokens,
-                  tokensCacheWrite: event.cacheCreationTokens,
-                  model: event.model,
-                  durationMs: 0,
-                  status: "SUCCESS" as const,
-                  occurredAt: event.occurredAt,
-                }));
-                await budgetCHRepo.insertDebit(rows);
-                ledgerRowsWritten += rows.length;
-
-                // BUDGET_UPDATED so the gateway's /changes subscriber
-                // evicts L1 and the next request re-resolves with the
-                // fresh spend. Ariana's anomaly + budget pipelines fire
-                // identically to the gateway VK path.
-                try {
-                  await changeEvents.append({
-                    organizationId: source.organizationId,
-                    projectId: govProject.id,
-                    kind: "BUDGET_UPDATED",
-                    payload: {
-                      source: "ingestion_source",
-                      sourceId: source.id,
-                      requestId: event.requestId,
-                      userEmail: event.userEmail,
-                      budgetIds: budgets.map((b) => b.id),
-                      amountUsd: event.costUsd,
-                    },
-                  });
-                } catch (changeErr) {
-                  logger.warn(
-                    {
-                      sourceId: source.id,
-                      requestId: event.requestId,
-                      err: String(changeErr),
-                    },
-                    "BUDGET_UPDATED emit failed (ledger row already landed)",
-                  );
-                }
-              } catch (eventErr) {
-                logger.warn(
-                  {
-                    sourceId: source.id,
-                    requestId: event.requestId,
-                    err: String(eventErr),
-                  },
-                  "ingestion-source event ledger-write failed (continuing batch)",
-                );
-              }
-            }
-          }
-        }
-      }
-    } catch (err) {
-      parseHint = String(err);
-      logger.warn(
-        { sourceId: source.id, err: String(err) },
-        "otel logs ingest receive failed (still ack'ing)",
-      );
-    }
-
-    const service = IngestionSourceService.create(prisma);
-    await service.recordEventReceived(source.id);
+    const result = await ingestOtelLogsAndCost(c, source);
+    await recordIngestSourceEvent(source.id);
     logger.info(
       {
         sourceId: source.id,
         sourceType: source.sourceType,
-        bytes: bodyBytes,
-        logRecords: logRecordCount,
-        costEvents: costEventCount,
-        ledgerRows: ledgerRowsWritten,
+        bytes: result.bodyBytes,
+        logRecords: result.logRecordCount,
+        costEvents: result.costEventCount,
+        ledgerRows: result.ledgerRowsWritten,
       },
       "otel logs ingest landed",
     );
 
-    const responseBody: Record<string, unknown> = {
-      accepted: true,
-      bytes: bodyBytes,
-      logRecords: logRecordCount,
-      costEvents: costEventCount,
-      ledgerRows: ledgerRowsWritten,
-    };
-    if (parseHint) responseBody.hint = parseHint;
-    return c.json(responseBody, 202);
+    return c.json(buildOtelLogsIngestResponse(result), 202);
   });
+
+function countOtlpMetricDataPoints(
+  request: IExportMetricsServiceRequest,
+): number {
+  return (request.resourceMetrics ?? []).reduce(
+    (acc, rm) =>
+      acc +
+      (rm.scopeMetrics ?? []).reduce(
+        (scopeAcc, sm) =>
+          scopeAcc +
+          (sm.metrics ?? []).reduce(
+            (metricAcc, metric) =>
+              metricAcc +
+              (metric?.gauge?.dataPoints?.length ?? 0) +
+              (metric?.sum?.dataPoints?.length ?? 0) +
+              (metric?.histogram?.dataPoints?.length ?? 0) +
+              (metric?.exponentialHistogram?.dataPoints?.length ?? 0) +
+              (metric?.summary?.dataPoints?.length ?? 0),
+            0,
+          ),
+        0,
+      ),
+    0,
+  );
+}
+
+// Gate on the payload carrying metrics at all, not on its datapoint arrays
+// being well-formed: a request whose metrics all have malformed dataPoints
+// has a zero pre-count, and skipping validation would ack it as fully
+// accepted with nothing rejected.
+function hasOtlpMetricPayload(request: IExportMetricsServiceRequest): boolean {
+  const resourceMetrics = request.resourceMetrics;
+  return Array.isArray(resourceMetrics)
+    ? resourceMetrics.length > 0
+    : resourceMetrics != null;
+}
+
+type MetricDispatchOutcome =
+  | { kind: "short_circuit"; response: Response }
+  | {
+      kind: "dispatched";
+      rejectedDataPoints: number;
+      acceptedDataPoints: number;
+      errorMessage: string | undefined;
+    };
+
+/** Hands the parsed metrics off to the metric pipeline. Scoped away from the
+ *  outer catch, which turns anything it sees into a `parseHint` on a 202
+ *  `accepted: true`. Past parsing, a throw is no longer the sender's bad
+ *  payload — it is ours, and acking it drops the batch for good. On both
+ *  short-circuit exits the source event is deliberately not recorded: the
+ *  collector re-sends this same request, so counting it now double-counts
+ *  it. */
+async function dispatchOtelMetrics({
+  c,
+  source,
+  request,
+}: {
+  c: Context;
+  source: IngestionSource;
+  request: IExportMetricsServiceRequest;
+}): Promise<MetricDispatchOutcome> {
+  try {
+    const govProject = await ensureHiddenGovernanceProject(
+      prisma,
+      source.organizationId,
+    );
+    stampMetricOriginAttrs({ request, source });
+    enforceApiKeyIdOnMetricRequest(
+      request as unknown as Parameters<
+        typeof enforceApiKeyIdOnMetricRequest
+      >[0],
+      null,
+    );
+    const result =
+      await getApp().traces.metricCollection.handleOtlpMetricRequest({
+        tenantId: govProject.id,
+        organizationId: source.organizationId,
+        metricRequest: request,
+        piiRedactionLevel: DEFAULT_PII_REDACTION_LEVEL,
+      });
+    if (result.outcome === "unavailable") {
+      return {
+        kind: "short_circuit",
+        response: c.json({ accepted: false, error: result.errorMessage }, 503),
+      };
+    }
+    return {
+      kind: "dispatched",
+      rejectedDataPoints: result.rejectedDataPoints,
+      acceptedDataPoints: result.acceptedDataPoints,
+      errorMessage: result.errorMessage,
+    };
+  } catch (error) {
+    logger.error(
+      { error, sourceId: source.id },
+      "otel metrics ingest failed after parsing; answering retryably",
+    );
+    return {
+      kind: "short_circuit",
+      response: c.json(
+        { accepted: false, error: "failed to record data point" },
+        503,
+      ),
+    };
+  }
+}
+
+type OtelMetricsIngestOutcome =
+  | { kind: "short_circuit"; response: Response }
+  | {
+      kind: "completed";
+      bodyBytes: number;
+      metricCount: number;
+      rejectedDataPoints: number;
+      acceptedDataPoints: number;
+      parseHint: string | undefined;
+    };
+
+/** Parses the OTLP metrics body and dispatches any datapoints to the metric
+ *  pipeline. Any parse failure degrades to a `parseHint` on the eventual
+ *  202 — the receiver still acks; a post-parse dispatch failure short-
+ *  circuits with a retryable 503 instead (see `dispatchOtelMetrics`). */
+async function ingestOtelMetrics(
+  c: Context,
+  source: IngestionSource,
+): Promise<OtelMetricsIngestOutcome> {
+  let bodyBytes = 0;
+  let metricCount = 0;
+  let rejectedDataPoints = 0;
+  let acceptedDataPoints = 0;
+  let parseHint: string | undefined;
+  try {
+    const body = await readOtlpBody(c.req.raw);
+    bodyBytes = body.byteLength;
+    const parsed = parseOtlpMetrics(body, c.req.header("content-type"));
+    if (!parsed.ok) {
+      parseHint = parsed.error;
+    } else {
+      metricCount = countOtlpMetricDataPoints(parsed.request);
+      if (hasOtlpMetricPayload(parsed.request)) {
+        const dispatch = await dispatchOtelMetrics({
+          c,
+          source,
+          request: parsed.request,
+        });
+        if (dispatch.kind === "short_circuit") return dispatch;
+        rejectedDataPoints = dispatch.rejectedDataPoints;
+        acceptedDataPoints = dispatch.acceptedDataPoints;
+        parseHint = dispatch.errorMessage;
+      }
+    }
+  } catch (err) {
+    parseHint = String(err);
+  }
+
+  return {
+    kind: "completed",
+    bodyBytes,
+    metricCount,
+    rejectedDataPoints,
+    acceptedDataPoints,
+    parseHint,
+  };
+}
 
 secured
   .access(ingestAuth)
   .post("/otel/:sourceId/v1/metrics", async (c: Context) => {
-    const limited = await rateLimitGuard(c);
-    if (limited) return limited;
+    const auth = await authorizeIngestRequest(c);
+    if (!auth.ok) return auth.response;
+    const { source } = auth;
 
-    const source = await authIngestionSource(c);
-    if (!source) {
-      return c.json({ error: "unauthorized" }, 401);
-    }
-    const sourceId = c.req.param("sourceId");
-    if (sourceId !== source.id) {
-      return c.json({ error: "unauthorized" }, 401);
-    }
+    const outcome = await ingestOtelMetrics(c, source);
+    if (outcome.kind === "short_circuit") return outcome.response;
 
-    let bodyBytes = 0;
-    let metricCount = 0;
-    let rejectedDataPoints = 0;
-    let acceptedDataPoints = 0;
-    let parseHint: string | undefined;
-    try {
-      const body = await readOtlpBody(c.req.raw);
-      bodyBytes = body.byteLength;
-      const parsed = parseOtlpMetrics(body, c.req.header("content-type"));
-      if (!parsed.ok) {
-        parseHint = parsed.error;
-      } else {
-        metricCount = (parsed.request.resourceMetrics ?? []).reduce(
-          (acc, rm) =>
-            acc +
-            (rm.scopeMetrics ?? []).reduce(
-              (scopeAcc, sm) =>
-                scopeAcc +
-                (sm.metrics ?? []).reduce(
-                  (metricAcc, metric) =>
-                    metricAcc +
-                    (metric?.gauge?.dataPoints?.length ?? 0) +
-                    (metric?.sum?.dataPoints?.length ?? 0) +
-                    (metric?.histogram?.dataPoints?.length ?? 0) +
-                    (metric?.exponentialHistogram?.dataPoints?.length ?? 0) +
-                    (metric?.summary?.dataPoints?.length ?? 0),
-                  0,
-                ),
-              0,
-            ),
-          0,
-        );
-        // Gate on the payload carrying metrics at all, not on its datapoint
-        // arrays being well-formed: a request whose metrics all have malformed
-        // dataPoints has a zero pre-count, and skipping validation would ack it
-        // as fully accepted with nothing rejected.
-        const resourceMetrics = parsed.request.resourceMetrics;
-        const hasMetricPayload = Array.isArray(resourceMetrics)
-          ? resourceMetrics.length > 0
-          : resourceMetrics != null;
-        if (hasMetricPayload) {
-          // Scoped away from the outer catch, which turns anything it sees into
-          // a `parseHint` on a 202 `accepted: true`. Past parsing, a throw is no
-          // longer the sender's bad payload — it is ours, and acking it drops
-          // the batch for good. In both exits below the source event is
-          // deliberately not recorded: the collector re-sends this same
-          // request, so counting it now double-counts it.
-          try {
-            const govProject = await ensureHiddenGovernanceProject(
-              prisma,
-              source.organizationId,
-            );
-            stampMetricOriginAttrs({ request: parsed.request, source });
-            enforceApiKeyIdOnMetricRequest(
-              parsed.request as unknown as Parameters<
-                typeof enforceApiKeyIdOnMetricRequest
-              >[0],
-              null,
-            );
-            const result =
-              await getApp().traces.metricCollection.handleOtlpMetricRequest({
-                tenantId: govProject.id,
-                organizationId: source.organizationId,
-                metricRequest: parsed.request,
-                piiRedactionLevel: DEFAULT_PII_REDACTION_LEVEL,
-              });
-            if (result.outcome === "unavailable") {
-              return c.json(
-                { accepted: false, error: result.errorMessage },
-                503,
-              );
-            }
-            rejectedDataPoints = result.rejectedDataPoints;
-            acceptedDataPoints = result.acceptedDataPoints;
-            parseHint = result.errorMessage;
-          } catch (error) {
-            logger.error(
-              { error, sourceId: source.id },
-              "otel metrics ingest failed after parsing; answering retryably",
-            );
-            return c.json(
-              { accepted: false, error: "failed to record data point" },
-              503,
-            );
-          }
-        }
-      }
-    } catch (err) {
-      parseHint = String(err);
-    }
-
-    const service = IngestionSourceService.create(prisma);
-    await service.recordEventReceived(source.id);
+    await recordIngestSourceEvent(source.id);
     logger.info(
       {
         sourceId: source.id,
-        bytes: bodyBytes,
-        metrics: metricCount,
+        bytes: outcome.bodyBytes,
+        metrics: outcome.metricCount,
       },
       "otel metrics ingest landed",
     );
 
     const responseBody: Record<string, unknown> = {
       accepted: true,
-      bytes: bodyBytes,
-      metrics: metricCount,
-      acceptedDataPoints,
+      bytes: outcome.bodyBytes,
+      metrics: outcome.metricCount,
+      acceptedDataPoints: outcome.acceptedDataPoints,
       partialSuccess: {
-        rejectedDataPoints,
-        ...(parseHint ? { errorMessage: parseHint } : {}),
+        rejectedDataPoints: outcome.rejectedDataPoints,
+        ...(outcome.parseHint ? { errorMessage: outcome.parseHint } : {}),
       },
     };
-    if (parseHint) responseBody.hint = parseHint;
+    if (outcome.parseHint) responseBody.hint = outcome.parseHint;
     return c.json(responseBody, 202);
   });
 

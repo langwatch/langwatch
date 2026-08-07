@@ -35,42 +35,78 @@ const PRIVATE_S3_ENV_PREFIX = "DATAPLANE_S3__";
  */
 const privateS3Configs = parsePrivateS3EnvVars();
 
+// Format: DATAPLANE_S3__<label>__<orgId>
+// Strip prefix, then take the last segment after "__" as orgId
+function parseOrgIdFromEnvKey(key: string): string | undefined {
+  const suffix = key.slice(PRIVATE_S3_ENV_PREFIX.length);
+  const lastSep = suffix.lastIndexOf("__");
+  const orgId = lastSep >= 0 ? suffix.slice(lastSep + 2) : suffix;
+  return orgId || undefined;
+}
+
+function parsePrivateS3ConfigValue(
+  key: string,
+  orgId: string,
+  value: string,
+): DataplaneS3Config | undefined {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(value);
+  } catch {
+    logger.warn(
+      { orgId, envVar: key },
+      "Skipping private S3 config: invalid JSON in env var",
+    );
+    return undefined;
+  }
+
+  const result = dataplaneS3ConfigSchema.safeParse(parsed);
+  if (!result.success) {
+    logger.warn(
+      { orgId, envVar: key, errors: result.error.flatten().fieldErrors },
+      "Skipping private S3 config: validation failed",
+    );
+    return undefined;
+  }
+
+  return result.data;
+}
+
+interface ParsedPrivateS3Entry {
+  orgId: string;
+  config: DataplaneS3Config;
+}
+
+function parsePrivateS3EnvEntry(
+  key: string,
+  value: string | undefined,
+): ParsedPrivateS3Entry | undefined {
+  if (!key.startsWith(PRIVATE_S3_ENV_PREFIX) || !value) {
+    return undefined;
+  }
+
+  const orgId = parseOrgIdFromEnvKey(key);
+  if (!orgId) {
+    return undefined;
+  }
+
+  const config = parsePrivateS3ConfigValue(key, orgId, value);
+  if (!config) {
+    return undefined;
+  }
+
+  return { orgId, config };
+}
+
 function parsePrivateS3EnvVars(): Map<string, DataplaneS3Config> {
   const map = new Map<string, DataplaneS3Config>();
 
   for (const [key, value] of Object.entries(process.env)) {
-    if (!key.startsWith(PRIVATE_S3_ENV_PREFIX) || !value) {
+    const entry = parsePrivateS3EnvEntry(key, value);
+    if (!entry) {
       continue;
     }
-
-    // Format: DATAPLANE_S3__<label>__<orgId>
-    // Strip prefix, then take the last segment after "__" as orgId
-    const suffix = key.slice(PRIVATE_S3_ENV_PREFIX.length);
-    const lastSep = suffix.lastIndexOf("__");
-    const orgId = lastSep >= 0 ? suffix.slice(lastSep + 2) : suffix;
-    if (!orgId) {
-      continue;
-    }
-
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(value);
-    } catch {
-      logger.warn(
-        { orgId, envVar: key },
-        "Skipping private S3 config: invalid JSON in env var",
-      );
-      continue;
-    }
-
-    const result = dataplaneS3ConfigSchema.safeParse(parsed);
-    if (!result.success) {
-      logger.warn(
-        { orgId, envVar: key, errors: result.error.flatten().fieldErrors },
-        "Skipping private S3 config: validation failed",
-      );
-      continue;
-    }
+    const { orgId, config } = entry;
 
     if (map.has(orgId)) {
       throw new Error(
@@ -78,7 +114,7 @@ function parsePrivateS3EnvVars(): Map<string, DataplaneS3Config> {
       );
     }
 
-    map.set(orgId, result.data);
+    map.set(orgId, config);
     logger.info(
       { orgId, envVar: key },
       "Loaded private S3 config from env var",

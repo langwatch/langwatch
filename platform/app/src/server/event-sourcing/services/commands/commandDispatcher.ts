@@ -53,16 +53,14 @@ export interface ProcessCommandParams<EventType extends Event> {
 }
 
 /**
- * Validates that a command handler returned a defined array of well-formed
- * events, throwing a {@link ValidationError} otherwise.
- *
- * Extracted so {@link processCommand} and {@link processCommandBatch} reject
- * identical malformed handler output rather than each carrying its own copy.
+ * Asserts a command handler's return value is a defined array, throwing the
+ * same {@link ValidationError} shape {@link validateHandlerEvents} has always
+ * raised on malformed input.
  */
-function validateHandlerEvents(
+function assertHandlerEventsIsArray(
   events: unknown,
   commandType: CommandType,
-): void {
+): asserts events is unknown[] {
   if (!events) {
     throw new ValidationError({
       reason: `Command handler for "${commandType}" returned undefined. Handler must return an array of events.`,
@@ -80,41 +78,70 @@ function validateHandlerEvents(
       context: { commandType },
     });
   }
+}
+
+/**
+ * Validates a single event from a command handler's returned array, throwing
+ * a {@link ValidationError} if it is undefined or malformed.
+ */
+function validateSingleHandlerEvent({
+  event,
+  index,
+  commandType,
+}: {
+  event: unknown;
+  index: number;
+  commandType: CommandType;
+}): void {
+  if (!event) {
+    throw new ValidationError({
+      reason: `Command handler for "${commandType}" returned an array with undefined at index ${index}. All events must be defined.`,
+      field: "events",
+      value: undefined,
+      context: { commandType, index },
+    });
+  }
+
+  if (!EventUtils.isValidEvent(event)) {
+    const parseResult = EventSchema.safeParse(event);
+    const validationError =
+      parseResult.success === false
+        ? `Validation errors: ${parseResult.error.issues
+            .map((issue) => `${issue.path.join(".")}: ${issue.message}`)
+            .join(", ")}`
+        : "Unknown validation error";
+
+    throw new ValidationError({
+      reason: `Command handler for "${commandType}" returned an invalid event at index ${index}. Event must have id, aggregateId, timestamp, type, and data. ${validationError}.`,
+      field: "events",
+      value: undefined,
+      context: {
+        commandType,
+        index,
+        zodIssues:
+          parseResult.success === false
+            ? mapZodIssuesToLogContext(parseResult.error.issues)
+            : void 0,
+      },
+    });
+  }
+}
+
+/**
+ * Validates that a command handler returned a defined array of well-formed
+ * events, throwing a {@link ValidationError} otherwise.
+ *
+ * Extracted so {@link processCommand} and {@link processCommandBatch} reject
+ * identical malformed handler output rather than each carrying its own copy.
+ */
+function validateHandlerEvents(
+  events: unknown,
+  commandType: CommandType,
+): void {
+  assertHandlerEventsIsArray(events, commandType);
 
   for (let i = 0; i < events.length; i++) {
-    const event = events[i];
-    if (!event) {
-      throw new ValidationError({
-        reason: `Command handler for "${commandType}" returned an array with undefined at index ${i}. All events must be defined.`,
-        field: "events",
-        value: undefined,
-        context: { commandType, index: i },
-      });
-    }
-
-    if (!EventUtils.isValidEvent(event)) {
-      const parseResult = EventSchema.safeParse(event);
-      const validationError =
-        parseResult.success === false
-          ? `Validation errors: ${parseResult.error.issues
-              .map((issue) => `${issue.path.join(".")}: ${issue.message}`)
-              .join(", ")}`
-          : "Unknown validation error";
-
-      throw new ValidationError({
-        reason: `Command handler for "${commandType}" returned an invalid event at index ${i}. Event must have id, aggregateId, timestamp, type, and data. ${validationError}.`,
-        field: "events",
-        value: undefined,
-        context: {
-          commandType,
-          index: i,
-          zodIssues:
-            parseResult.success === false
-              ? mapZodIssuesToLogContext(parseResult.error.issues)
-              : void 0,
-        },
-      });
-    }
+    validateSingleHandlerEvent({ event: events[i], index: i, commandType });
   }
 }
 
@@ -143,6 +170,54 @@ function validateCommandPayload<EventType extends Event>({
     });
   }
   return validation.data;
+}
+
+/**
+ * Stores a processed command's events (if any) and runs the handler's
+ * best-effort post-store cleanup.
+ *
+ * ADR-022: Post-store cleanup is invoked AFTER the event_log INSERT is
+ * durable. Best-effort: errors are caught and logged, never rethrown —
+ * cleanup failure must not roll back a successfully stored event. The
+ * canonical use case is deleting the transient S3 spool that the edge
+ * created to carry an over-threshold command payload.
+ */
+async function persistCommandEvents<EventType extends Event>(args: {
+  events: EventType[];
+  tenantId: TenantId;
+  storeEventsFn: ProcessCommandParams<EventType>["storeEventsFn"];
+  handler: CommandHandler<Command<any>, EventType>;
+  command: Command<any>;
+  commandType: CommandType;
+  logger?: ReturnType<typeof createLogger>;
+}): Promise<void> {
+  const {
+    events,
+    tenantId,
+    storeEventsFn,
+    handler,
+    command,
+    commandType,
+    logger: log,
+  } = args;
+  if (events.length === 0) {
+    return;
+  }
+
+  await storeEventsFn(events, { tenantId });
+  if (handler.cleanupAfterStore) {
+    try {
+      await handler.cleanupAfterStore(command);
+    } catch (err) {
+      log?.warn(
+        {
+          error: err instanceof Error ? err.message : String(err),
+          commandType,
+        },
+        "Post-store cleanup failed (best-effort) — event is durable, cleanup skipped",
+      );
+    }
+  }
 }
 
 /**
@@ -203,27 +278,15 @@ export async function processCommand<EventType extends Event>(
 
     validateHandlerEvents(events, commandType);
 
-    if (events.length > 0) {
-      await storeEventsFn(events, { tenantId });
-      // ADR-022: Post-store cleanup. Invoked AFTER the event_log INSERT is durable.
-      // Best-effort: errors are caught and logged, never rethrown — cleanup failure
-      // must not roll back a successfully stored event. The canonical use case is
-      // deleting the transient S3 spool that the edge created to carry an
-      // over-threshold command payload.
-      if (handler.cleanupAfterStore) {
-        try {
-          await handler.cleanupAfterStore(command);
-        } catch (err) {
-          log?.warn(
-            {
-              error: err instanceof Error ? err.message : String(err),
-              commandType,
-            },
-            "Post-store cleanup failed (best-effort) — event is durable, cleanup skipped",
-          );
-        }
-      }
-    }
+    await persistCommandEvents({
+      events,
+      tenantId,
+      storeEventsFn,
+      handler,
+      command,
+      commandType,
+      logger: log,
+    });
 
     const durationMs = performance.now() - commandStartTime;
     incrementEsCommandTotal(pipelineName, commandType, "completed");
@@ -369,6 +432,37 @@ async function handleBatchCommands<EventType extends Event>(args: {
 }
 
 /**
+ * Runs each handled command's best-effort post-store cleanup (ADR-022) in
+ * order. A cleanup failure is logged and swallowed — it must never roll back
+ * durable events.
+ */
+async function cleanupHandledCommands<EventType extends Event>(args: {
+  handler: CommandHandler<Command<any>, EventType>;
+  handledCommands: Command<any>[];
+  commandType: CommandType;
+  logger?: ReturnType<typeof createLogger>;
+}): Promise<void> {
+  const { handler, handledCommands, commandType, logger: log } = args;
+  if (!handler.cleanupAfterStore) {
+    return;
+  }
+
+  for (const command of handledCommands) {
+    try {
+      await handler.cleanupAfterStore(command);
+    } catch (err) {
+      log?.warn(
+        {
+          error: err instanceof Error ? err.message : String(err),
+          commandType,
+        },
+        "Post-store cleanup failed (best-effort) — event is durable, cleanup skipped",
+      );
+    }
+  }
+}
+
+/**
  * Persist the batch in ONE multi-row append, then run each handled command's
  * best-effort post-store cleanup (ADR-022). An empty event set skips the store.
  * A cleanup failure is logged and swallowed — it must never roll back durable
@@ -388,21 +482,12 @@ async function persistBatch<EventType extends Event>(args: {
   }
 
   await storeEventsFn(allEvents, { tenantId });
-  if (handler.cleanupAfterStore) {
-    for (const command of handledCommands) {
-      try {
-        await handler.cleanupAfterStore(command);
-      } catch (err) {
-        log?.warn(
-          {
-            error: err instanceof Error ? err.message : String(err),
-            commandType,
-          },
-          "Post-store cleanup failed (best-effort) — event is durable, cleanup skipped",
-        );
-      }
-    }
-  }
+  await cleanupHandledCommands({
+    handler,
+    handledCommands,
+    commandType,
+    logger: log,
+  });
 }
 
 /**

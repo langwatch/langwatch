@@ -393,6 +393,33 @@ export async function getBoundedCutoffs({
   return { cutoffs, occurredAtBounds };
 }
 
+/** True when the row's event falls after the aggregate's replay cutoff. */
+function isBeyondCutoff(
+  row: ClickHouseEventRow,
+  cutoff: CutoffInfo | undefined,
+): boolean {
+  if (!cutoff) return false;
+  const eventTimestamp =
+    typeof row.EventTimestamp === "string"
+      ? parseInt(row.EventTimestamp, 10)
+      : row.EventTimestamp;
+  if (eventTimestamp > cutoff.timestamp) return true;
+  return eventTimestamp === cutoff.timestamp && row.EventId > cutoff.eventId;
+}
+
+function pushGrouped(
+  grouped: Map<string, ReplayEvent[]>,
+  key: string,
+  event: ReplayEvent,
+): void {
+  const list = grouped.get(key);
+  if (list) {
+    list.push(event);
+  } else {
+    grouped.set(key, [event]);
+  }
+}
+
 /**
  * Load ALL events for a set of aggregates in a single ClickHouse query.
  * No eventTypes filter — different projections may need different event types,
@@ -436,25 +463,9 @@ export async function loadEventsForAggregatesBulk({
 
   for (const row of rows) {
     const key = `${tenantId}:${row.AggregateType}:${row.AggregateId}`;
-    const cutoff = cutoffs.get(key);
-
     // Skip events beyond the cutoff for this aggregate
-    if (cutoff) {
-      const eventTimestamp =
-        typeof row.EventTimestamp === "string"
-          ? parseInt(row.EventTimestamp, 10)
-          : row.EventTimestamp;
-      if (eventTimestamp > cutoff.timestamp) continue;
-      if (eventTimestamp === cutoff.timestamp && row.EventId > cutoff.eventId)
-        continue;
-    }
-
-    let list = grouped.get(key);
-    if (!list) {
-      list = [];
-      grouped.set(key, list);
-    }
-    list.push(rowToEvent(row));
+    if (isBeyondCutoff(row, cutoffs.get(key))) continue;
+    pushGrouped(grouped, key, rowToEvent(row));
   }
 
   return grouped;

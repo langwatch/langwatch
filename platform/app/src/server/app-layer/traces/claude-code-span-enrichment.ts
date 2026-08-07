@@ -129,6 +129,30 @@ const CHAT_ROLES = [
 type ChatRole = (typeof CHAT_ROLES)[number];
 const CHAT_ROLE_SET: ReadonlySet<string> = new Set(CHAT_ROLES);
 
+function enrichmentForClaimedSpan({
+  span,
+  outputByRequestId,
+  costByRequestId,
+  inputBySpanId,
+}: {
+  span: ClaudeSpanRef;
+  outputByRequestId: Map<string, SpanInputOutput>;
+  costByRequestId: Map<string, number>;
+  inputBySpanId: Map<string, SpanInputOutput>;
+}): ClaudeSpanEnrichment | null {
+  const output =
+    span.requestId !== null
+      ? (outputByRequestId.get(span.requestId) ?? null)
+      : null;
+  const cost =
+    span.requestId !== null
+      ? (costByRequestId.get(span.requestId) ?? null)
+      : null;
+  const input = inputBySpanId.get(span.spanId) ?? null;
+  if (input === null && output === null && cost === null) return null;
+  return { input, output, cost };
+}
+
 /**
  * Compute the input/output content + authoritative cost to attach to each
  * `llm_request`-style span from the trace's claude_code content logs. Returns a
@@ -150,18 +174,13 @@ export function computeClaudeSpanEnrichment({
   const inputBySpanId = buildInputIndex({ spans, logs });
 
   for (const span of spans) {
-    const output =
-      span.requestId !== null
-        ? (outputByRequestId.get(span.requestId) ?? null)
-        : null;
-    const cost =
-      span.requestId !== null
-        ? (costByRequestId.get(span.requestId) ?? null)
-        : null;
-    const input = inputBySpanId.get(span.spanId) ?? null;
-    if (input !== null || output !== null || cost !== null) {
-      result.set(span.spanId, { input, output, cost });
-    }
+    const enrichment = enrichmentForClaimedSpan({
+      span,
+      outputByRequestId,
+      costByRequestId,
+      inputBySpanId,
+    });
+    if (enrichment !== null) result.set(span.spanId, enrichment);
   }
   return result;
 }
@@ -187,6 +206,59 @@ function buildCostIndex(logs: ClaudeContentLog[]): Map<string, number> {
 }
 
 /**
+ * Ingest parsed the raw body once and stamped the reply text on the record,
+ * so prefer that over re-parsing a 60 KB blob on every read. The parse stays
+ * as the fallback for records ingested before the derivation existed — and
+ * it keeps the `tool_use` markers, which the derived text does not, so we
+ * only take the shortcut when the call asked for no tools.
+ */
+function responseBodyOutputText(log: ClaudeContentLog): string | null {
+  const derived =
+    log.derivedOutputText !== null &&
+    log.derivedOutputText !== undefined &&
+    (log.derivedToolCallCount ?? 0) === 0
+      ? log.derivedOutputText
+      : null;
+  return derived ?? extractAssistantOutputFromResponseBody(log.body);
+}
+
+function assistantResponseOutputText(log: ClaudeContentLog): string | null {
+  return log.body !== null && log.body.length > 0
+    ? capPayloadString(log.body, undefined, "assistant_output")
+    : null;
+}
+
+function applyResponseBodyOutputs(
+  logs: ClaudeContentLog[],
+  byRequestId: Map<string, SpanInputOutput>,
+): void {
+  for (const log of logs) {
+    if (log.eventName !== OUTPUT_BODY_EVENT || log.requestId === null) continue;
+    if (byRequestId.has(log.requestId)) continue;
+    const text = responseBodyOutputText(log);
+    if (text !== null) {
+      byRequestId.set(log.requestId, { type: "text", value: text });
+    }
+  }
+}
+
+function applyAssistantResponseOutputs(
+  logs: ClaudeContentLog[],
+  byRequestId: Map<string, SpanInputOutput>,
+): void {
+  for (const log of logs) {
+    if (log.eventName !== ASSISTANT_RESPONSE_EVENT || log.requestId === null) {
+      continue;
+    }
+    if (byRequestId.has(log.requestId)) continue;
+    const text = assistantResponseOutputText(log);
+    if (text !== null) {
+      byRequestId.set(log.requestId, { type: "text", value: text });
+    }
+  }
+}
+
+/**
  * Index output content by `request_id`. `api_response_body` (parsed) takes
  * precedence over `assistant_response` (raw text) for the same request id, and
  * the first log of each kind wins. Bodies are bounded by `capPayloadString`
@@ -196,41 +268,63 @@ function buildOutputIndex(
   logs: ClaudeContentLog[],
 ): Map<string, SpanInputOutput> {
   const byRequestId = new Map<string, SpanInputOutput>();
-
-  for (const log of logs) {
-    if (log.eventName !== OUTPUT_BODY_EVENT || log.requestId === null) continue;
-    if (byRequestId.has(log.requestId)) continue;
-    // Ingest parsed the raw body once and stamped the reply text on the record,
-    // so prefer that over re-parsing a 60 KB blob on every read. The parse stays
-    // as the fallback for records ingested before the derivation existed — and
-    // it keeps the `tool_use` markers, which the derived text does not, so we
-    // only take the shortcut when the call asked for no tools.
-    const derived =
-      log.derivedOutputText !== null &&
-      log.derivedOutputText !== undefined &&
-      (log.derivedToolCallCount ?? 0) === 0
-        ? log.derivedOutputText
-        : null;
-    const text = derived ?? extractAssistantOutputFromResponseBody(log.body);
-    if (text !== null) {
-      byRequestId.set(log.requestId, { type: "text", value: text });
-    }
-  }
-
-  for (const log of logs) {
-    if (log.eventName !== ASSISTANT_RESPONSE_EVENT || log.requestId === null) {
-      continue;
-    }
-    if (byRequestId.has(log.requestId)) continue;
-    if (log.body !== null && log.body.length > 0) {
-      byRequestId.set(log.requestId, {
-        type: "text",
-        value: capPayloadString(log.body, undefined, "assistant_output"),
-      });
-    }
-  }
-
+  applyResponseBodyOutputs(logs, byRequestId);
+  applyAssistantResponseOutputs(logs, byRequestId);
   return byRequestId;
+}
+
+interface GroupedContentLogs {
+  requestBodiesByQuerySource: Map<string, ClaudeContentLog[]>;
+  promptsByQuerySource: Map<string, ClaudeContentLog[]>;
+}
+
+function groupContentLogsByQuerySource({
+  logs,
+  spansDeclareQuerySource,
+}: {
+  logs: ClaudeContentLog[];
+  spansDeclareQuerySource: boolean;
+}): GroupedContentLogs {
+  const requestBodiesByQuerySource = new Map<string, ClaudeContentLog[]>();
+  const promptsByQuerySource = new Map<string, ClaudeContentLog[]>();
+  for (const log of logs) {
+    const key = spansDeclareQuerySource
+      ? querySourceKey(log.querySource)
+      : NULL_QUERY_SOURCE_KEY;
+    if (log.eventName === INPUT_BODY_EVENT) {
+      pushInto(requestBodiesByQuerySource, key, log);
+    } else if (log.eventName === USER_PROMPT_EVENT) {
+      pushInto(promptsByQuerySource, key, log);
+    }
+  }
+  for (const bodies of requestBodiesByQuerySource.values()) {
+    bodies.sort(byTimeAsc);
+  }
+  for (const prompts of promptsByQuerySource.values()) {
+    prompts.sort(byTimeAsc);
+  }
+  return { requestBodiesByQuerySource, promptsByQuerySource };
+}
+
+function pairSpansWithInputs({
+  spansByQuerySource,
+  requestBodiesByQuerySource,
+  promptsByQuerySource,
+  bySpanId,
+}: {
+  spansByQuerySource: Map<string, ClaudeSpanRef[]>;
+  requestBodiesByQuerySource: Map<string, ClaudeContentLog[]>;
+  promptsByQuerySource: Map<string, ClaudeContentLog[]>;
+  bySpanId: Map<string, SpanInputOutput>;
+}): void {
+  for (const [key, spansInGroup] of spansByQuerySource) {
+    const requestBodies = requestBodiesByQuerySource.get(key) ?? [];
+    const prompts = promptsByQuerySource.get(key) ?? [];
+    for (let i = 0; i < spansInGroup.length; i++) {
+      const input = buildSpanInput({ requestBody: requestBodies[i], prompts });
+      if (input !== null) bySpanId.set(spansInGroup[i]!.spanId, input);
+    }
+  }
 }
 
 /**
@@ -272,33 +366,15 @@ function buildInputIndex({
   // no system prompt, no tool definitions. When no span declares a source
   // there is nothing to keep apart, so the whole trace pairs as one group.
   const spansDeclareQuerySource = spans.some((s) => s.querySource !== null);
-  const requestBodiesByQuerySource = new Map<string, ClaudeContentLog[]>();
-  const promptsByQuerySource = new Map<string, ClaudeContentLog[]>();
-  for (const log of logs) {
-    const key = spansDeclareQuerySource
-      ? querySourceKey(log.querySource)
-      : NULL_QUERY_SOURCE_KEY;
-    if (log.eventName === INPUT_BODY_EVENT) {
-      pushInto(requestBodiesByQuerySource, key, log);
-    } else if (log.eventName === USER_PROMPT_EVENT) {
-      pushInto(promptsByQuerySource, key, log);
-    }
-  }
-  for (const bodies of requestBodiesByQuerySource.values()) {
-    bodies.sort(byTimeAsc);
-  }
-  for (const prompts of promptsByQuerySource.values()) {
-    prompts.sort(byTimeAsc);
-  }
+  const { requestBodiesByQuerySource, promptsByQuerySource } =
+    groupContentLogsByQuerySource({ logs, spansDeclareQuerySource });
 
-  for (const [key, spansInGroup] of spansByQuerySource) {
-    const requestBodies = requestBodiesByQuerySource.get(key) ?? [];
-    const prompts = promptsByQuerySource.get(key) ?? [];
-    for (let i = 0; i < spansInGroup.length; i++) {
-      const input = buildSpanInput({ requestBody: requestBodies[i], prompts });
-      if (input !== null) bySpanId.set(spansInGroup[i]!.spanId, input);
-    }
-  }
+  pairSpansWithInputs({
+    spansByQuerySource,
+    requestBodiesByQuerySource,
+    promptsByQuerySource,
+    bySpanId,
+  });
 
   dedupeRepeatedSystemMessages({ spans, bySpanId });
 
@@ -504,6 +580,57 @@ export interface ClaudeToolSpanEnrichment {
 const TOOL_DECISION_EVENT = "tool_decision";
 const TOOL_RESULT_EVENT = "tool_result";
 
+interface ToolLogIndexes {
+  resultByUseId: Map<string, ClaudeToolLog>;
+  decisionByUseId: Map<string, ClaudeToolLog>;
+}
+
+/** First log per (event, tool_use_id) wins, mirroring buildOutputIndex. */
+function indexToolLogsByUseId(toolLogs: ClaudeToolLog[]): ToolLogIndexes {
+  const resultByUseId = new Map<string, ClaudeToolLog>();
+  const decisionByUseId = new Map<string, ClaudeToolLog>();
+  for (const log of toolLogs) {
+    if (log.toolUseId === null) continue;
+    if (
+      log.eventName === TOOL_RESULT_EVENT &&
+      !resultByUseId.has(log.toolUseId)
+    ) {
+      resultByUseId.set(log.toolUseId, log);
+    } else if (
+      log.eventName === TOOL_DECISION_EVENT &&
+      !decisionByUseId.has(log.toolUseId)
+    ) {
+      decisionByUseId.set(log.toolUseId, log);
+    }
+  }
+  return { resultByUseId, decisionByUseId };
+}
+
+function enrichmentForToolSpan({
+  span,
+  resultByUseId,
+  decisionByUseId,
+  resultContentByUseId,
+}: {
+  span: ClaudeToolSpanRef;
+  resultByUseId: Map<string, ClaudeToolLog>;
+  decisionByUseId: Map<string, ClaudeToolLog>;
+  resultContentByUseId: Map<string, string>;
+}): ClaudeToolSpanEnrichment | null {
+  const toolResult = resultByUseId.get(span.toolUseId) ?? null;
+  const decision = decisionByUseId.get(span.toolUseId) ?? null;
+  if (toolResult === null && decision === null) return null;
+
+  const input = buildToolInput({ toolResult, decision });
+  const output = buildToolOutput({
+    toolResult,
+    decision,
+    resultContent: resultContentByUseId.get(span.toolUseId) ?? null,
+  });
+  if (input === null && output === null) return null;
+  return { input, output };
+}
+
 /**
  * Compute input/output for the trace's tool spans from its tool event logs —
  * an EXACT join by `tool_use_id` (both sides carry it), no positional risk.
@@ -531,41 +658,19 @@ export function computeClaudeToolSpanEnrichment({
   const result = new Map<string, ClaudeToolSpanEnrichment>();
   if (spans.length === 0 || toolLogs.length === 0) return result;
 
-  // First log per (event, tool_use_id) wins, mirroring buildOutputIndex.
-  const resultByUseId = new Map<string, ClaudeToolLog>();
-  const decisionByUseId = new Map<string, ClaudeToolLog>();
-  for (const log of toolLogs) {
-    if (log.toolUseId === null) continue;
-    if (
-      log.eventName === TOOL_RESULT_EVENT &&
-      !resultByUseId.has(log.toolUseId)
-    ) {
-      resultByUseId.set(log.toolUseId, log);
-    } else if (
-      log.eventName === TOOL_DECISION_EVENT &&
-      !decisionByUseId.has(log.toolUseId)
-    ) {
-      decisionByUseId.set(log.toolUseId, log);
-    }
-  }
+  const { resultByUseId, decisionByUseId } = indexToolLogsByUseId(toolLogs);
   if (resultByUseId.size === 0 && decisionByUseId.size === 0) return result;
 
   const resultContentByUseId = buildToolResultContentIndex(contentLogs);
 
   for (const span of spans) {
-    const toolResult = resultByUseId.get(span.toolUseId) ?? null;
-    const decision = decisionByUseId.get(span.toolUseId) ?? null;
-    if (toolResult === null && decision === null) continue;
-
-    const input = buildToolInput({ toolResult, decision });
-    const output = buildToolOutput({
-      toolResult,
-      decision,
-      resultContent: resultContentByUseId.get(span.toolUseId) ?? null,
+    const enrichment = enrichmentForToolSpan({
+      span,
+      resultByUseId,
+      decisionByUseId,
+      resultContentByUseId,
     });
-    if (input !== null || output !== null) {
-      result.set(span.spanId, { input, output });
-    }
+    if (enrichment !== null) result.set(span.spanId, enrichment);
   }
   return result;
 }
@@ -604,6 +709,48 @@ function buildToolInput({
   return toJsonOrText(capPayloadString(raw, undefined, "tool_input"));
 }
 
+function toolResultStatus(
+  success: boolean | null,
+): "failed" | "completed" | "unknown" {
+  if (success === false) return "failed";
+  if (success === true) return "completed";
+  return "unknown";
+}
+
+function toolResultOutput({
+  toolResult,
+  decision,
+}: {
+  toolResult: ClaudeToolLog;
+  decision: ClaudeToolLog | null;
+}): SpanInputOutput {
+  return {
+    type: "json",
+    value: prune({
+      // The telemetry states sizes and outcome, not content — this summary
+      // IS the output on the light path, not a fallback for a parse miss.
+      status: toolResultStatus(toolResult.success),
+      success: toolResult.success,
+      durationMs: toolResult.durationMs,
+      resultSizeBytes: toolResult.resultSizeBytes,
+      decision: decision?.decision ?? null,
+      decisionSource: decision?.decisionSource ?? toolResult.decisionSource,
+    }),
+  };
+}
+
+/** Denied tools never run: no result log ever comes. */
+function rejectedToolOutput(decision: ClaudeToolLog): SpanInputOutput {
+  return {
+    type: "json",
+    value: prune({
+      status: "rejected",
+      decision: decision.decision,
+      decisionSource: decision.decisionSource,
+    }),
+  };
+}
+
 function buildToolOutput({
   toolResult,
   decision,
@@ -613,40 +760,10 @@ function buildToolOutput({
   decision: ClaudeToolLog | null;
   resultContent: string | null;
 }): SpanInputOutput | null {
-  if (resultContent !== null) {
-    return { type: "text", value: resultContent };
-  }
-  if (toolResult !== null) {
-    const status =
-      toolResult.success === false
-        ? "failed"
-        : toolResult.success === true
-          ? "completed"
-          : "unknown";
-    return {
-      type: "json",
-      value: prune({
-        // The telemetry states sizes and outcome, not content — this summary
-        // IS the output on the light path, not a fallback for a parse miss.
-        status,
-        success: toolResult.success,
-        durationMs: toolResult.durationMs,
-        resultSizeBytes: toolResult.resultSizeBytes,
-        decision: decision?.decision ?? null,
-        decisionSource: decision?.decisionSource ?? toolResult.decisionSource,
-      }),
-    };
-  }
+  if (resultContent !== null) return { type: "text", value: resultContent };
+  if (toolResult !== null) return toolResultOutput({ toolResult, decision });
   if (decision !== null && decision.decision === "reject") {
-    // Denied tools never run: no result log ever comes.
-    return {
-      type: "json",
-      value: prune({
-        status: "rejected",
-        decision: decision.decision,
-        decisionSource: decision.decisionSource,
-      }),
-    };
+    return rejectedToolOutput(decision);
   }
   return null;
 }
@@ -668,6 +785,59 @@ function prune<T extends Record<string, unknown>>(obj: T): T {
   return out;
 }
 
+interface InteractionCandidate {
+  timeUnixMs: number;
+  rank: number;
+  text: string;
+}
+
+function isWithinInteractionWindow({
+  log,
+  windowStartMs,
+  windowEndMs,
+  slackMs,
+}: {
+  log: ClaudeContentLog;
+  windowStartMs: number;
+  windowEndMs: number;
+  slackMs: number;
+}): boolean {
+  return (
+    isConversationalQuerySource(log.querySource) &&
+    log.timeUnixMs >= windowStartMs &&
+    log.timeUnixMs <= windowEndMs + slackMs
+  );
+}
+
+/**
+ * `api_response_body` beats `assistant_response` at the same timestamp
+ * (parsed body keeps `tool_use` markers) — encoded as rank 1 vs rank 0.
+ */
+function interactionCandidateText(
+  log: ClaudeContentLog,
+): { rank: number; text: string } | null {
+  if (log.eventName === OUTPUT_BODY_EVENT) {
+    const text = responseBodyOutputText(log);
+    return text !== null ? { rank: 1, text } : null;
+  }
+  if (log.eventName === ASSISTANT_RESPONSE_EVENT) {
+    const text = assistantResponseOutputText(log);
+    return text !== null ? { rank: 0, text } : null;
+  }
+  return null;
+}
+
+function isBetterInteractionCandidate(
+  candidate: InteractionCandidate,
+  best: InteractionCandidate | null,
+): boolean {
+  return (
+    best === null ||
+    candidate.timeUnixMs > best.timeUnixMs ||
+    (candidate.timeUnixMs === best.timeUnixMs && candidate.rank > best.rank)
+  );
+}
+
 /**
  * The interaction (turn) span's OUTPUT: the last conversational assistant
  * reply that falls inside the turn's window (+`slackMs` for the exporter
@@ -687,38 +857,20 @@ export function computeClaudeInteractionOutput({
   windowEndMs: number;
   slackMs?: number;
 }): SpanInputOutput | null {
-  let best: { timeUnixMs: number; rank: number; text: string } | null = null;
+  let best: InteractionCandidate | null = null;
   for (const log of logs) {
-    if (!isConversationalQuerySource(log.querySource)) continue;
-    if (log.timeUnixMs < windowStartMs) continue;
-    if (log.timeUnixMs > windowEndMs + slackMs) continue;
-
-    let text: string | null = null;
-    let rank = 0;
-    if (log.eventName === OUTPUT_BODY_EVENT) {
-      const derived =
-        log.derivedOutputText != null && (log.derivedToolCallCount ?? 0) === 0
-          ? log.derivedOutputText
-          : null;
-      text = derived ?? extractAssistantOutputFromResponseBody(log.body);
-      rank = 1;
-    } else if (log.eventName === ASSISTANT_RESPONSE_EVENT) {
-      text =
-        log.body !== null && log.body.length > 0
-          ? capPayloadString(log.body, undefined, "assistant_output")
-          : null;
-      rank = 0;
-    } else {
+    if (
+      !isWithinInteractionWindow({ log, windowStartMs, windowEndMs, slackMs })
+    ) {
       continue;
     }
-    if (text === null) continue;
-    if (
-      best === null ||
-      log.timeUnixMs > best.timeUnixMs ||
-      (log.timeUnixMs === best.timeUnixMs && rank > best.rank)
-    ) {
-      best = { timeUnixMs: log.timeUnixMs, rank, text };
-    }
+    const candidateText = interactionCandidateText(log);
+    if (candidateText === null) continue;
+    const candidate: InteractionCandidate = {
+      timeUnixMs: log.timeUnixMs,
+      ...candidateText,
+    };
+    if (isBetterInteractionCandidate(candidate, best)) best = candidate;
   }
   return best !== null ? { type: "text", value: best.text } : null;
 }

@@ -1,5 +1,10 @@
 import { createLogger } from "@langwatch/observability";
 
+import type {
+  EventHandler,
+  IntentSpec,
+  WakeHandler,
+} from "../../pipeline/processManagerDefinition";
 import { definePipeline } from "../../pipeline/staticBuilder";
 import { toSafeFailureDiagnostic } from "../../process-manager/failureDiagnostic";
 import { RecordTriggerMatchCommand } from "./commands/recordTriggerMatch.command";
@@ -44,7 +49,10 @@ import {
   TRIGGER_MATCH_COALESCE_MAX_BATCH,
   TRIGGER_MATCH_RECORDED_EVENT_TYPE,
 } from "./schemas/constants";
-import type { AutomationEvent } from "./schemas/events";
+import type {
+  AutomationEvent,
+  TriggerMatchRecordedEventData,
+} from "./schemas/events";
 
 const logger = createLogger("langwatch:triggers:automations-pipeline");
 
@@ -79,6 +87,83 @@ function runWebhookDeliveryPruneWithTriggerSettlementRetention(
     }
   };
 }
+
+type TriggerSettlementIntents = {
+  notifyDigest: IntentSpec<typeof notifyDigestIntentSchema>;
+  persistMatch: IntentSpec<typeof persistMatchIntentSchema>;
+  logOverflow: IntentSpec<typeof logOverflowIntentSchema>;
+};
+
+const onTriggerMatchRecorded: EventHandler<
+  SettlementState,
+  TriggerMatchRecordedEventData,
+  TriggerSettlementIntents
+> = (state, data, ctx) => {
+  const { state: nextState, flushed } = addPending(state, data, ctx.at);
+  return {
+    state: nextState,
+    // Cap hit: the oldest matches dispatch NOW instead of being discarded —
+    // degraded batching under extreme load, never loss.
+    intents:
+      flushed.length > 0
+        ? [
+            ...flushed.map(({ traceId, match }) =>
+              match.actionClass === "persist"
+                ? ctx.intents.persistMatch(
+                    `persist:${traceId}:${match.settleWindowBucket}`,
+                    { triggerId: ctx.key, traceId },
+                  )
+                : ctx.intents.notifyDigest(
+                    `digest:${match.dispatchDueAt}:${digestBatchKey([traceId])}`,
+                    {
+                      triggerId: ctx.key,
+                      traceIds: [traceId],
+                      boundary: match.dispatchDueAt,
+                    },
+                  ),
+            ),
+            ctx.intents.logOverflow(`overflow:${nextState.overflowFlushed}`, {
+              triggerId: ctx.key,
+              flushed: flushed.length,
+              totalFlushed: nextState.overflowFlushed,
+            }),
+          ]
+        : undefined,
+    nextWakeAt: settleBoundary(nextState),
+  };
+};
+
+const onTriggerSettlementWake: WakeHandler<
+  SettlementState,
+  TriggerSettlementIntents
+> = (state, ctx) => {
+  const due = drainDue(state, ctx.at);
+  return {
+    state: due.state,
+    intents: [
+      ...due.boundaries.map((boundary) =>
+        ctx.intents.notifyDigest(
+          `digest:${boundary.key}:${digestBatchKey(boundary.traceIds)}`,
+          {
+            triggerId: ctx.key,
+            traceIds: boundary.traceIds,
+            boundary: boundary.key,
+          },
+        ),
+      ),
+      ...due.settledMatches.map((match) =>
+        ctx.intents.persistMatch(
+          `persist:${match.traceId}:${match.settleWindowBucket}`,
+          {
+            triggerId: ctx.key,
+            traceId: match.traceId,
+          },
+        ),
+      ),
+    ],
+    nextWakeAt: due.nextBoundary,
+  };
+};
 
 /** Only the executor dependencies are injected — the process-manager
  *  topology itself (states, intents, evolve/wake handlers, outbox tuning)
@@ -118,71 +203,8 @@ export function createAutomationsPipeline(deps: AutomationsPipelineDeps) {
           logOverflowIntentSchema,
           createLogOverflowHandler(),
         )
-        .on(TRIGGER_MATCH_RECORDED_EVENT_TYPE, (state, data, ctx) => {
-          const { state: nextState, flushed } = addPending(state, data, ctx.at);
-          return {
-            state: nextState,
-            // Cap hit: the oldest matches dispatch NOW instead of being
-            // discarded — degraded batching under extreme load, never loss.
-            intents:
-              flushed.length > 0
-                ? [
-                    ...flushed.map(({ traceId, match }) =>
-                      match.actionClass === "persist"
-                        ? ctx.intents.persistMatch(
-                            `persist:${traceId}:${match.settleWindowBucket}`,
-                            { triggerId: ctx.key, traceId },
-                          )
-                        : ctx.intents.notifyDigest(
-                            `digest:${match.dispatchDueAt}:${digestBatchKey([traceId])}`,
-                            {
-                              triggerId: ctx.key,
-                              traceIds: [traceId],
-                              boundary: match.dispatchDueAt,
-                            },
-                          ),
-                    ),
-                    ctx.intents.logOverflow(
-                      `overflow:${nextState.overflowFlushed}`,
-                      {
-                        triggerId: ctx.key,
-                        flushed: flushed.length,
-                        totalFlushed: nextState.overflowFlushed,
-                      },
-                    ),
-                  ]
-                : undefined,
-            nextWakeAt: settleBoundary(nextState),
-          };
-        })
-        .onWake((state, ctx) => {
-          const due = drainDue(state, ctx.at);
-          return {
-            state: due.state,
-            intents: [
-              ...due.boundaries.map((boundary) =>
-                ctx.intents.notifyDigest(
-                  `digest:${boundary.key}:${digestBatchKey(boundary.traceIds)}`,
-                  {
-                    triggerId: ctx.key,
-                    traceIds: boundary.traceIds,
-                    boundary: boundary.key,
-                  },
-                ),
-              ),
-              ...due.settledMatches.map((match) =>
-                ctx.intents.persistMatch(
-                  `persist:${match.traceId}:${match.settleWindowBucket}`,
-                  {
-                    triggerId: ctx.key,
-                    traceId: match.traceId,
-                  },
-                ),
-              ),
-            ],
-            nextWakeAt: due.nextBoundary,
-          };
-        })
+        .on(TRIGGER_MATCH_RECORDED_EVENT_TYPE, onTriggerMatchRecorded)
+        .onWake(onTriggerSettlementWake)
         .outbox({ maxAttempts: 8, leaseDurationMs: 120_000 }),
     )
     .withProcessManager("graphAlertSweep", (pm) =>

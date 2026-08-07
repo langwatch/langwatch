@@ -38,6 +38,87 @@ interface ClickHouseCountRow {
   totalHits: number | string;
 }
 
+const groupRunsByExperimentId = (
+  runs: ExperimentRun[],
+): Record<string, ExperimentRun[]> => {
+  const result: Record<string, ExperimentRun[]> = {};
+  for (const run of runs) {
+    if (!(run.experimentId in result)) {
+      result[run.experimentId] = [];
+    }
+    result[run.experimentId]!.push(run);
+  }
+  return result;
+};
+
+const computeCostByTraceId = (
+  traceCostRows: Array<{ TraceId: string; TotalCost: number | null }>,
+): Map<string, number> => {
+  const costByTraceId = new Map<string, number>();
+  for (const row of traceCostRows) {
+    if (row.TotalCost !== null && row.TotalCost > 0) {
+      costByTraceId.set(row.TraceId, row.TotalCost);
+    }
+  }
+  return costByTraceId;
+};
+
+/** Counts how many target items share each traceId (for cost splitting). */
+const computeTargetCountByTraceId = ({
+  items,
+  costByTraceId,
+}: {
+  items: ClickHouseExperimentRunItemRow[];
+  costByTraceId: Map<string, number>;
+}): Map<string, number> => {
+  const targetCountByTraceId = new Map<string, number>();
+  for (const item of items) {
+    if (
+      item.ResultType === "target" &&
+      item.TraceId &&
+      costByTraceId.has(item.TraceId)
+    ) {
+      targetCountByTraceId.set(
+        item.TraceId,
+        (targetCountByTraceId.get(item.TraceId) ?? 0) + 1,
+      );
+    }
+  }
+  return targetCountByTraceId;
+};
+
+/**
+ * For multi-target experiments where multiple items share the same traceId,
+ * the trace cost is split evenly across items (each target execution is a
+ * child span of the same iteration trace).
+ */
+const applyTraceCostsToItems = ({
+  items,
+  costByTraceId,
+  targetCountByTraceId,
+}: {
+  items: ClickHouseExperimentRunItemRow[];
+  costByTraceId: Map<string, number>;
+  targetCountByTraceId: Map<string, number>;
+}): ClickHouseExperimentRunItemRow[] =>
+  items.map((item) => {
+    if (
+      item.ResultType !== "target" ||
+      !item.TraceId ||
+      item.TargetCost !== null
+    ) {
+      return item;
+    }
+
+    const traceCost = costByTraceId.get(item.TraceId);
+    if (traceCost === undefined) return item;
+
+    const targetCount = targetCountByTraceId.get(item.TraceId) ?? 1;
+    const perItemCost = Number((traceCost / targetCount).toFixed(6));
+
+    return { ...item, TargetCost: perItemCost };
+  });
+
 type ProjectClickHouseClient = NonNullable<
   Awaited<ReturnType<typeof getClickHouseClientForProject>>
 >;
@@ -100,6 +181,42 @@ export class ExperimentRunService {
     }
   }
 
+  /** Fetches the latest-version run summary rows for a set of experiments. */
+  private async fetchRunRows({
+    clickHouseClient,
+    projectId,
+    experimentIds,
+  }: {
+    clickHouseClient: ProjectClickHouseClient;
+    projectId: string;
+    experimentIds: string[];
+  }): Promise<ClickHouseExperimentRunRow[]> {
+    const runsResult = await clickHouseClient.query({
+      query: `
+        SELECT *
+        FROM experiment_runs AS t
+        WHERE t.TenantId = {tenantId:String}
+          AND t.ExperimentId IN ({experimentIds:Array(String)})
+          AND (t.TenantId, t.RunId, t.ExperimentId, t.UpdatedAt) IN (
+            SELECT TenantId, RunId, ExperimentId, max(UpdatedAt)
+            FROM experiment_runs
+            WHERE TenantId = {tenantId:String}
+              AND ExperimentId IN ({experimentIds:Array(String)})
+            GROUP BY TenantId, RunId, ExperimentId
+          )
+        ORDER BY t.CreatedAt DESC
+        LIMIT 10000
+      `,
+      query_params: {
+        tenantId: projectId,
+        experimentIds,
+      },
+      format: "JSONEachRow",
+    });
+
+    return (await runsResult.json()) as ClickHouseExperimentRunRow[];
+  }
+
   /**
    * List experiment runs for one or more experiments.
    *
@@ -138,75 +255,64 @@ export class ExperimentRunService {
           "Listing experiment runs from ClickHouse",
         );
 
-        try {
-          // Fetch run summaries
-          const runsResult = await clickHouseClient.query({
-            query: `
-              SELECT *
-              FROM experiment_runs AS t
-              WHERE t.TenantId = {tenantId:String}
-                AND t.ExperimentId IN ({experimentIds:Array(String)})
-                AND (t.TenantId, t.RunId, t.ExperimentId, t.UpdatedAt) IN (
-                  SELECT TenantId, RunId, ExperimentId, max(UpdatedAt)
-                  FROM experiment_runs
-                  WHERE TenantId = {tenantId:String}
-                    AND ExperimentId IN ({experimentIds:Array(String)})
-                  GROUP BY TenantId, RunId, ExperimentId
-                )
-              ORDER BY t.CreatedAt DESC
-              LIMIT 10000
-            `,
-            query_params: {
-              tenantId: projectId,
-              experimentIds,
-            },
-            format: "JSONEachRow",
-          });
-
-          const runRows =
-            (await runsResult.json()) as ClickHouseExperimentRunRow[];
-
-          if (runRows.length === 0) {
-            return {};
-          }
-
-          const runs = await this.enrichRunsWithBreakdownAndCosts({
-            clickHouseClient,
-            projectId,
-            runRows,
-          });
-
-          // Group by experiment ID
-          const result: Record<string, ExperimentRun[]> = {};
-          for (const run of runs) {
-            if (!(run.experimentId in result)) {
-              result[run.experimentId] = [];
-            }
-            result[run.experimentId]!.push(run);
-          }
-
-          this.logger.debug(
-            {
-              projectId,
-              runCount: runRows.length,
-              experimentCount: Object.keys(result).length,
-            },
-            "Successfully listed experiment runs from ClickHouse",
-          );
-
-          return result;
-        } catch (error) {
-          this.logger.error(
-            {
-              projectId,
-              error: error instanceof Error ? error.message : error,
-            },
-            "Failed to list experiment runs from ClickHouse",
-          );
-          throw new Error("Failed to list experiment runs from ClickHouse");
-        }
+        return this.listRunsFromClickHouse({
+          clickHouseClient,
+          projectId,
+          experimentIds,
+        });
       },
     );
+  }
+
+  /** The body of {@link listRuns}: fetch, enrich, and group into the response shape. */
+  private async listRunsFromClickHouse({
+    clickHouseClient,
+    projectId,
+    experimentIds,
+  }: {
+    clickHouseClient: ProjectClickHouseClient;
+    projectId: string;
+    experimentIds: string[];
+  }): Promise<Record<string, ExperimentRun[]>> {
+    try {
+      const runRows = await this.fetchRunRows({
+        clickHouseClient,
+        projectId,
+        experimentIds,
+      });
+
+      if (runRows.length === 0) {
+        return {};
+      }
+
+      const runs = await this.enrichRunsWithBreakdownAndCosts({
+        clickHouseClient,
+        projectId,
+        runRows,
+      });
+
+      const result = groupRunsByExperimentId(runs);
+
+      this.logger.debug(
+        {
+          projectId,
+          runCount: runRows.length,
+          experimentCount: Object.keys(result).length,
+        },
+        "Successfully listed experiment runs from ClickHouse",
+      );
+
+      return result;
+    } catch (error) {
+      this.logger.error(
+        {
+          projectId,
+          error: error instanceof Error ? error.message : error,
+        },
+        "Failed to list experiment runs from ClickHouse",
+      );
+      throw new Error("Failed to list experiment runs from ClickHouse");
+    }
   }
 
   async getRunAggregatesForExperimentIds({
@@ -415,6 +521,125 @@ export class ExperimentRunService {
    * @returns `null` if ClickHouse is unavailable OR if the run row has
    *   not been folded yet — see method-level docstring for the rationale.
    */
+  /**
+   * Single-run read: resolve the latest version with a scalar
+   * `UpdatedAt = (SELECT max(UpdatedAt) ...)` subquery. The scalar
+   * equality is PREWHERE-able, so the heavy columns are materialized for
+   * only the surviving version instead of across every version of the
+   * run. The IN-tuple form stays the right choice for the multi-run list
+   * reads (listRuns) and for experiment_run_items below.
+   */
+  private async fetchRunRecord({
+    clickHouseClient,
+    projectId,
+    experimentId,
+    runId,
+  }: {
+    clickHouseClient: ProjectClickHouseClient;
+    projectId: string;
+    experimentId: string;
+    runId: string;
+  }): Promise<ClickHouseExperimentRunRow | undefined> {
+    const runResult = await clickHouseClient.query({
+      query: `
+        SELECT *
+        FROM experiment_runs
+        WHERE TenantId = {tenantId:String}
+          AND ExperimentId = {experimentId:String}
+          AND RunId = {runId:String}
+          AND UpdatedAt = (
+            SELECT max(UpdatedAt)
+            FROM experiment_runs
+            WHERE TenantId = {tenantId:String}
+              AND ExperimentId = {experimentId:String}
+              AND RunId = {runId:String}
+          )
+        LIMIT 1
+      `,
+      query_params: {
+        tenantId: projectId,
+        experimentId,
+        runId,
+      },
+      format: "JSONEachRow",
+    });
+
+    const runRows = (await runResult.json()) as ClickHouseExperimentRunRow[];
+    return runRows[0];
+  }
+
+  /**
+   * Fetch all items for this run.
+   *
+   * ExperimentId is part of the WHERE filter and the dedup key tuple
+   * because runId is not unique across experiments — without it, rows
+   * from one experiment leak into another's view whenever they share
+   * the same runId (e.g. when SDK callers reuse a stable run_id across
+   * BatchEvaluation invocations).
+   *
+   * Dedup uses an IN-tuple subquery on (key columns, OccurredAt) rather
+   * than the per-row dedup anti-pattern. That pattern reads every selected column
+   * (including heavy payloads like DatasetEntry / EvaluationDetails)
+   * before deduplicating, which can OOM on large parts. The IN-tuple
+   * pattern resolves dedup using only lightweight key columns and the
+   * ReplacingMergeTree version column (OccurredAt). See
+   * trace-dedup-oom-safety.unit.test.ts for the rationale.
+   */
+  private async fetchRunItemRows({
+    clickHouseClient,
+    projectId,
+    experimentId,
+    runId,
+    occurredAtRange,
+  }: {
+    clickHouseClient: ProjectClickHouseClient;
+    projectId: string;
+    experimentId: string;
+    runId: string;
+    occurredAtRange: ReturnType<typeof computeOccurredAtRangeForRuns>;
+  }): Promise<ClickHouseExperimentRunItemRow[]> {
+    const itemsResult = await clickHouseClient.query({
+      query: `
+        SELECT *
+        FROM experiment_run_items
+        WHERE TenantId = {tenantId:String}
+          AND ExperimentId = {experimentId:String}
+          AND RunId = {runId:String}
+          AND OccurredAt >= {minOccurredAt:DateTime64(3)}
+          AND OccurredAt <= {maxOccurredAt:DateTime64(3)}
+          AND (TenantId, ExperimentId, RunId, RowIndex, TargetId, ResultType, coalesce(EvaluatorId, ''), OccurredAt) IN (
+            SELECT
+              TenantId,
+              ExperimentId,
+              RunId,
+              RowIndex,
+              TargetId,
+              ResultType,
+              coalesce(EvaluatorId, ''),
+              max(OccurredAt)
+            FROM experiment_run_items
+            WHERE TenantId = {tenantId:String}
+              AND ExperimentId = {experimentId:String}
+              AND RunId = {runId:String}
+              AND OccurredAt >= {minOccurredAt:DateTime64(3)}
+              AND OccurredAt <= {maxOccurredAt:DateTime64(3)}
+            GROUP BY TenantId, ExperimentId, RunId, RowIndex, TargetId, ResultType, coalesce(EvaluatorId, '')
+          )
+        ORDER BY RowIndex ASC, ResultType ASC
+      `,
+      query_params: {
+        tenantId: projectId,
+        experimentId,
+        runId,
+        minOccurredAt: occurredAtRange.minOccurredAt,
+        maxOccurredAt: occurredAtRange.maxOccurredAt,
+      },
+      format: "JSONEachRow",
+    });
+
+    return (await itemsResult.json()) as ClickHouseExperimentRunItemRow[];
+  }
+
   async getRun({
     projectId,
     experimentId,
@@ -443,39 +668,12 @@ export class ExperimentRunService {
         );
 
         try {
-          // Single-run read: resolve the latest version with a scalar
-          // `UpdatedAt = (SELECT max(UpdatedAt) ...)` subquery. The scalar
-          // equality is PREWHERE-able, so the heavy columns are materialized for
-          // only the surviving version instead of across every version of the
-          // run. The IN-tuple form stays the right choice for the multi-run list
-          // reads (listRuns) and for experiment_run_items below.
-          const runResult = await clickHouseClient.query({
-            query: `
-              SELECT *
-              FROM experiment_runs
-              WHERE TenantId = {tenantId:String}
-                AND ExperimentId = {experimentId:String}
-                AND RunId = {runId:String}
-                AND UpdatedAt = (
-                  SELECT max(UpdatedAt)
-                  FROM experiment_runs
-                  WHERE TenantId = {tenantId:String}
-                    AND ExperimentId = {experimentId:String}
-                    AND RunId = {runId:String}
-                )
-              LIMIT 1
-            `,
-            query_params: {
-              tenantId: projectId,
-              experimentId,
-              runId,
-            },
-            format: "JSONEachRow",
+          const runRecord = await this.fetchRunRecord({
+            clickHouseClient,
+            projectId,
+            experimentId,
+            runId,
           });
-
-          const runRows =
-            (await runResult.json()) as ClickHouseExperimentRunRow[];
-          const runRecord = runRows[0];
 
           if (!runRecord) {
             return null;
@@ -492,62 +690,13 @@ export class ExperimentRunService {
             runCount: 1,
           });
 
-          // Fetch all items for this run.
-          //
-          // ExperimentId is part of the WHERE filter and the dedup key tuple
-          // because runId is not unique across experiments — without it, rows
-          // from one experiment leak into another's view whenever they share
-          // the same runId (e.g. when SDK callers reuse a stable run_id across
-          // BatchEvaluation invocations).
-          //
-          // Dedup uses an IN-tuple subquery on (key columns, OccurredAt) rather
-          // than the per-row dedup anti-pattern. That pattern reads every selected column
-          // (including heavy payloads like DatasetEntry / EvaluationDetails)
-          // before deduplicating, which can OOM on large parts. The IN-tuple
-          // pattern resolves dedup using only lightweight key columns and the
-          // ReplacingMergeTree version column (OccurredAt). See
-          // trace-dedup-oom-safety.unit.test.ts for the rationale.
-          const itemsResult = await clickHouseClient.query({
-            query: `
-              SELECT *
-              FROM experiment_run_items
-              WHERE TenantId = {tenantId:String}
-                AND ExperimentId = {experimentId:String}
-                AND RunId = {runId:String}
-                AND OccurredAt >= {minOccurredAt:DateTime64(3)}
-                AND OccurredAt <= {maxOccurredAt:DateTime64(3)}
-                AND (TenantId, ExperimentId, RunId, RowIndex, TargetId, ResultType, coalesce(EvaluatorId, ''), OccurredAt) IN (
-                  SELECT
-                    TenantId,
-                    ExperimentId,
-                    RunId,
-                    RowIndex,
-                    TargetId,
-                    ResultType,
-                    coalesce(EvaluatorId, ''),
-                    max(OccurredAt)
-                  FROM experiment_run_items
-                  WHERE TenantId = {tenantId:String}
-                    AND ExperimentId = {experimentId:String}
-                    AND RunId = {runId:String}
-                    AND OccurredAt >= {minOccurredAt:DateTime64(3)}
-                    AND OccurredAt <= {maxOccurredAt:DateTime64(3)}
-                  GROUP BY TenantId, ExperimentId, RunId, RowIndex, TargetId, ResultType, coalesce(EvaluatorId, '')
-                )
-              ORDER BY RowIndex ASC, ResultType ASC
-            `,
-            query_params: {
-              tenantId: projectId,
-              experimentId,
-              runId,
-              minOccurredAt: occurredAtRange.minOccurredAt,
-              maxOccurredAt: occurredAtRange.maxOccurredAt,
-            },
-            format: "JSONEachRow",
+          const itemRows = await this.fetchRunItemRows({
+            clickHouseClient,
+            projectId,
+            experimentId,
+            runId,
+            occurredAtRange,
           });
-
-          const itemRows =
-            (await itemsResult.json()) as ClickHouseExperimentRunItemRow[];
 
           // Enrich target items with costs from trace_summaries.
           // The SDK doesn't send costs in recordTargetResult, but the
@@ -740,6 +889,63 @@ export class ExperimentRunService {
   }
 
   /**
+   * Bound OccurredAt to the run's lifecycle window. trace_summaries is
+   * partitioned by toYearWeek(OccurredAt); a TraceId-only filter can't
+   * prune, so it opens every weekly partition (including cold storage)
+   * to read two light columns. A target's trace runs during its run, so
+   * its OccurredAt falls inside the buffered run window the caller
+   * already computed. The bound is applied on the outer read only, not
+   * inside the max(UpdatedAt) dedup subquery: OccurredAt can shift across
+   * ReplacingMergeTree versions (a late-arriving span can move a trace's
+   * min start time), so filtering versions by OccurredAt before resolving
+   * the latest could pick the wrong version. Filtering the already-deduped
+   * outer rows is always correct.
+   */
+  private async fetchTraceCostRows({
+    clickHouseClient,
+    projectId,
+    traceIds,
+    occurredAtRange,
+  }: {
+    clickHouseClient: ProjectClickHouseClient;
+    projectId: string;
+    traceIds: string[];
+    occurredAtRange: { minOccurredAt: string; maxOccurredAt: string };
+  }): Promise<Array<{ TraceId: string; TotalCost: number | null }>> {
+    const traceCostResult = await clickHouseClient.query({
+      query: `
+        SELECT
+          TraceId,
+          TotalCost
+        FROM trace_summaries
+        WHERE TenantId = {tenantId:String}
+          AND TraceId IN ({traceIds:Array(String)})
+          AND OccurredAt >= {minOccurredAt:DateTime64(3)}
+          AND OccurredAt <= {maxOccurredAt:DateTime64(3)}
+          AND (TenantId, TraceId, UpdatedAt) IN (
+            SELECT TenantId, TraceId, max(UpdatedAt)
+            FROM trace_summaries
+            WHERE TenantId = {tenantId:String}
+              AND TraceId IN ({traceIds:Array(String)})
+            GROUP BY TenantId, TraceId
+          )
+      `,
+      query_params: {
+        tenantId: projectId,
+        traceIds,
+        minOccurredAt: occurredAtRange.minOccurredAt,
+        maxOccurredAt: occurredAtRange.maxOccurredAt,
+      },
+      format: "JSONEachRow",
+    });
+
+    return traceCostResult.json<{
+      TraceId: string;
+      TotalCost: number | null;
+    }>();
+  }
+
+  /**
    * Enriches experiment run items with cost data from trace_summaries.
    *
    * SDK experiments don't send costs inline — costs are computed by the
@@ -776,90 +982,25 @@ export class ExperimentRunService {
     if (traceIds.length === 0) return items;
 
     try {
-      const traceCostResult = await clickHouseClient.query({
-        // Bound OccurredAt to the run's lifecycle window. trace_summaries is
-        // partitioned by toYearWeek(OccurredAt); a TraceId-only filter can't
-        // prune, so it opens every weekly partition (including cold storage)
-        // to read two light columns. A target's trace runs during its run, so
-        // its OccurredAt falls inside the buffered run window the caller
-        // already computed. The bound is applied on the outer read only, not
-        // inside the max(UpdatedAt) dedup subquery: OccurredAt can shift across
-        // ReplacingMergeTree versions (a late-arriving span can move a trace's
-        // min start time), so filtering versions by OccurredAt before resolving
-        // the latest could pick the wrong version. Filtering the already-deduped
-        // outer rows is always correct.
-        query: `
-          SELECT
-            TraceId,
-            TotalCost
-          FROM trace_summaries
-          WHERE TenantId = {tenantId:String}
-            AND TraceId IN ({traceIds:Array(String)})
-            AND OccurredAt >= {minOccurredAt:DateTime64(3)}
-            AND OccurredAt <= {maxOccurredAt:DateTime64(3)}
-            AND (TenantId, TraceId, UpdatedAt) IN (
-              SELECT TenantId, TraceId, max(UpdatedAt)
-              FROM trace_summaries
-              WHERE TenantId = {tenantId:String}
-                AND TraceId IN ({traceIds:Array(String)})
-              GROUP BY TenantId, TraceId
-            )
-        `,
-        query_params: {
-          tenantId: projectId,
-          traceIds,
-          minOccurredAt: occurredAtRange.minOccurredAt,
-          maxOccurredAt: occurredAtRange.maxOccurredAt,
-        },
-        format: "JSONEachRow",
+      const traceCostRows = await this.fetchTraceCostRows({
+        clickHouseClient,
+        projectId,
+        traceIds,
+        occurredAtRange,
       });
-
-      const traceCostRows = await traceCostResult.json<{
-        TraceId: string;
-        TotalCost: number | null;
-      }>();
 
       if (traceCostRows.length === 0) return items;
 
-      const costByTraceId = new Map<string, number>();
-      for (const row of traceCostRows) {
-        if (row.TotalCost !== null && row.TotalCost > 0) {
-          costByTraceId.set(row.TraceId, row.TotalCost);
-        }
-      }
+      const costByTraceId = computeCostByTraceId(traceCostRows);
+      const targetCountByTraceId = computeTargetCountByTraceId({
+        items,
+        costByTraceId,
+      });
 
-      // Count how many target items share each traceId (for cost splitting)
-      const targetCountByTraceId = new Map<string, number>();
-      for (const item of items) {
-        if (
-          item.ResultType === "target" &&
-          item.TraceId &&
-          costByTraceId.has(item.TraceId)
-        ) {
-          targetCountByTraceId.set(
-            item.TraceId,
-            (targetCountByTraceId.get(item.TraceId) ?? 0) + 1,
-          );
-        }
-      }
-
-      // Enrich items with costs
-      return items.map((item) => {
-        if (
-          item.ResultType !== "target" ||
-          !item.TraceId ||
-          item.TargetCost !== null
-        ) {
-          return item;
-        }
-
-        const traceCost = costByTraceId.get(item.TraceId);
-        if (traceCost === undefined) return item;
-
-        const targetCount = targetCountByTraceId.get(item.TraceId) ?? 1;
-        const perItemCost = Number((traceCost / targetCount).toFixed(6));
-
-        return { ...item, TargetCost: perItemCost };
+      return applyTraceCostsToItems({
+        items,
+        costByTraceId,
+        targetCountByTraceId,
       });
     } catch (error) {
       this.logger.warn(

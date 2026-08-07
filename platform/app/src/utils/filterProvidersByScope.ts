@@ -84,6 +84,60 @@ export function resolveScopeFilter(
   };
 }
 
+const teamOfProject = (
+  projectId: string,
+  hierarchy: ScopeHierarchy,
+): string | null => {
+  const p = hierarchy.projects?.find((x) => x.id === projectId);
+  return p?.teamId ?? null;
+};
+
+function isScopeInOrganizationFilter(scope: Scope, filterScopeId: string) {
+  if (scope.scopeType === "ORGANIZATION") {
+    return scope.scopeId === filterScopeId;
+  }
+  // TEAM and PROJECT scopes inside a single-org context are always in
+  // the org's tree; the page only loads one org at a time.
+  return true;
+}
+
+function isScopeInTeamFilter({
+  scope,
+  filterScopeId,
+  hierarchy,
+}: {
+  scope: Scope;
+  filterScopeId: string;
+  hierarchy: ScopeHierarchy;
+}) {
+  if (scope.scopeType === "ORGANIZATION") return true;
+  if (scope.scopeType === "TEAM") return scope.scopeId === filterScopeId;
+  if (scope.scopeType === "PROJECT") {
+    return teamOfProject(scope.scopeId, hierarchy) === filterScopeId;
+  }
+  return false;
+}
+
+function isScopeInProjectFilter({
+  scope,
+  filterScopeId,
+  hierarchy,
+}: {
+  scope: Scope;
+  filterScopeId: string;
+  hierarchy: ScopeHierarchy;
+}) {
+  if (scope.scopeType === "ORGANIZATION") return true;
+  if (scope.scopeType === "TEAM") {
+    const parentTeam = teamOfProject(filterScopeId, hierarchy);
+    return parentTeam !== null && scope.scopeId === parentTeam;
+  }
+  if (scope.scopeType === "PROJECT") {
+    return scope.scopeId === filterScopeId;
+  }
+  return false;
+}
+
 /**
  * Predicate for "does this scope sit on the same branch of the org tree
  * as the active filter?". Used by both the providers table and the
@@ -96,39 +150,24 @@ export function isScopeInFilter(
 ): boolean {
   if (filter.kind === "all") return true;
 
-  const teamOfProject = (projectId: string): string | null => {
-    const p = hierarchy.projects?.find((x) => x.id === projectId);
-    return p?.teamId ?? null;
-  };
-
   if (filter.scopeType === "ORGANIZATION") {
-    if (scope.scopeType === "ORGANIZATION") {
-      return scope.scopeId === filter.scopeId;
-    }
-    // TEAM and PROJECT scopes inside a single-org context are always in
-    // the org's tree; the page only loads one org at a time.
-    return true;
+    return isScopeInOrganizationFilter(scope, filter.scopeId);
   }
 
   if (filter.scopeType === "TEAM") {
-    if (scope.scopeType === "ORGANIZATION") return true;
-    if (scope.scopeType === "TEAM") return scope.scopeId === filter.scopeId;
-    if (scope.scopeType === "PROJECT") {
-      return teamOfProject(scope.scopeId) === filter.scopeId;
-    }
-    return false;
+    return isScopeInTeamFilter({
+      scope,
+      filterScopeId: filter.scopeId,
+      hierarchy,
+    });
   }
 
   if (filter.scopeType === "PROJECT") {
-    if (scope.scopeType === "ORGANIZATION") return true;
-    if (scope.scopeType === "TEAM") {
-      const parentTeam = teamOfProject(filter.scopeId);
-      return parentTeam !== null && scope.scopeId === parentTeam;
-    }
-    if (scope.scopeType === "PROJECT") {
-      return scope.scopeId === filter.scopeId;
-    }
-    return false;
+    return isScopeInProjectFilter({
+      scope,
+      filterScopeId: filter.scopeId,
+      hierarchy,
+    });
   }
 
   return false;

@@ -33,7 +33,7 @@ import {
 } from "./dataset-mutations";
 import { enqueueDatasetNormalize } from "./dataset-normalize.queue";
 import { DatasetRecordRepository } from "./dataset-record.repository";
-import { getDatasetStorage } from "./dataset-storage";
+import { type DatasetStorage, getDatasetStorage } from "./dataset-storage";
 import {
   ColumnTypeChangeNotSupportedError,
   DatasetChunkCountMissingError,
@@ -208,6 +208,137 @@ export class DatasetService {
     });
   }
 
+  // s3_jsonl column changes (rename / retype / add / remove) are a chunk
+  // rewrite under the per-dataset advisory lock (ADR-032 v19) — which owns its
+  // own transaction and so can't run inside the `$transaction` in
+  // `updateExistingDataset`. The lock re-reads + re-validates the row under
+  // it, so the caller's pre-check is a fast short-circuit, not the
+  // authoritative gate.
+  private async migrateS3JsonlDatasetColumns({
+    preexisting,
+    projectId,
+    datasetId,
+    name,
+    columnTypes,
+  }: {
+    preexisting: Dataset;
+    projectId: string;
+    datasetId: string;
+    name: string;
+    columnTypes: DatasetColumns;
+  }): Promise<Dataset> {
+    const slug = this.generateSlug(name);
+    const conflictingDataset = await this.repository.findBySlug({
+      slug,
+      projectId,
+      excludeId: datasetId,
+    });
+    if (conflictingDataset) {
+      throw new DatasetConflictError();
+    }
+    return await migrateS3JsonlColumns({
+      prisma: this.prisma,
+      dataset: preexisting,
+      projectId,
+      oldColumnTypes: preexisting.columnTypes as DatasetColumns,
+      newColumnTypes: columnTypes,
+      name,
+      slug,
+      repository: this.repository,
+    });
+  }
+
+  private async applyDatasetUpdateInTx(
+    params: {
+      datasetId: string;
+      projectId: string;
+      name: string;
+      columnTypes: DatasetColumns;
+    },
+    { tx }: { tx: Prisma.TransactionClient },
+  ): Promise<Dataset> {
+    const { datasetId, projectId, name, columnTypes } = params;
+
+    // Get existing dataset for column comparison
+    const existingDataset = await this.repository.findOne(
+      { id: datasetId, projectId },
+      { tx },
+    );
+
+    if (!existingDataset) {
+      throw new DatasetNotFoundError();
+    }
+
+    // Defense in depth for the UI's ready-gate: editing a dataset that is still
+    // `uploading`/`processing` (or `failed`) races the normalize job and edits
+    // content that isn't settled. Refuse unless ready (a null status = legacy =
+    // ready). The datasets-page menu hides Edit for non-ready rows; this stops a
+    // direct/stale call too.
+    if (existingDataset.status != null && existingDataset.status !== "ready") {
+      throw new DatasetNotReadyError({
+        status: existingDataset.status,
+        statusError: existingDataset.statusError,
+      });
+    }
+
+    const slug = this.generateSlug(name);
+
+    // Check for slug collision with other datasets (excluding current one)
+    const conflictingDataset = await this.repository.findBySlug(
+      { slug, projectId, excludeId: datasetId },
+      { tx },
+    );
+
+    if (conflictingDataset) {
+      throw new DatasetConflictError();
+    }
+
+    const existingColumns = existingDataset.columnTypes as DatasetColumns;
+    const columnsChanged =
+      JSON.stringify(existingColumns) !== JSON.stringify(columnTypes);
+
+    // Defensive: s3_jsonl column changes are handled up front via
+    // `migrateS3JsonlColumns` (the advisory-lock chunk rewrite) and return
+    // before this transaction (ADR-032 v19). Reaching here with s3_jsonl and a
+    // changed schema would mean that early branch regressed — refuse rather
+    // than run the PG record migrator, which would read zero rows (I-PG) and
+    // silently corrupt nothing into the chunk store.
+    if (existingDataset.contentLayout === "s3_jsonl" && columnsChanged) {
+      throw new ColumnTypeChangeNotSupportedError();
+    }
+
+    // Only rewrite row data when the column KEY structure changes
+    // (rename / add / remove / reorder). In the legacy postgres layout the
+    // stored `entry` JSON is untyped — column types are metadata — and the
+    // record migrator (`tryToMapPreviousColumnsToNewColumns`) only remaps
+    // keys, never values. So a type-only change (e.g. string→image) would
+    // rewrite every row with byte-identical JSON: O(rowCount) UPDATEs of pure
+    // no-ops, which is exactly what blew the transaction budget. Skip it and
+    // let the `dataset.update` below persist the new types alone. The
+    // `columnsChanged` short-circuit means a name-only edit never reaches
+    // `columnKeysChanged` (and so never reads/maps the stored column array).
+    if (
+      columnsChanged &&
+      this.columnKeysChanged(existingColumns, columnTypes)
+    ) {
+      await this.migrateDatasetRecordColumns(
+        {
+          datasetId,
+          projectId,
+          oldColumnTypes: existingColumns,
+          newColumnTypes: columnTypes,
+        },
+        { tx },
+      );
+    }
+
+    // Update the dataset (repository validates ownership - will throw if datasetId doesn't belong to projectId)
+    return await this.repository.update(
+      { id: datasetId, projectId, data: { name, slug, columnTypes } },
+      { tx },
+    );
+  }
+
   /**
    * Updates an existing dataset with new name, slug, and column types.
    * Handles column type migrations by remapping existing records.
@@ -223,11 +354,10 @@ export class DatasetService {
   }) {
     const { datasetId, projectId, name, columnTypes } = params;
 
-    // s3_jsonl column changes (rename / retype / add / remove) are a chunk
-    // rewrite under the per-dataset advisory lock (ADR-032 v19) — which owns its
-    // own transaction and so can't run inside the `$transaction` below. Handle it
-    // up front; the lock re-reads + re-validates the row under it. (Reads here are
-    // outside the lock, so this is a fast pre-check, not the authoritative gate.)
+    // s3_jsonl column changes are handled up front (see
+    // `migrateS3JsonlDatasetColumns`); everything else runs inside the
+    // `$transaction` below. (Reads here are outside the lock, so this is a
+    // fast pre-check, not the authoritative gate.)
     const preexisting = await this.repository.findOne({
       id: datasetId,
       projectId,
@@ -244,126 +374,21 @@ export class DatasetService {
     const columnsChanged =
       JSON.stringify(preexisting.columnTypes) !== JSON.stringify(columnTypes);
     if (columnsChanged && preexisting.contentLayout === "s3_jsonl") {
-      const slug = this.generateSlug(name);
-      const conflictingDataset = await this.repository.findBySlug({
-        slug,
+      return await this.migrateS3JsonlDatasetColumns({
+        preexisting,
         projectId,
-        excludeId: datasetId,
-      });
-      if (conflictingDataset) {
-        throw new DatasetConflictError();
-      }
-      return await migrateS3JsonlColumns({
-        prisma: this.prisma,
-        dataset: preexisting,
-        projectId,
-        oldColumnTypes: preexisting.columnTypes as DatasetColumns,
-        newColumnTypes: columnTypes,
+        datasetId,
         name,
-        slug,
-        repository: this.repository,
+        columnTypes,
       });
     }
 
     return await this.prisma.$transaction(
-      async (tx) => {
-        // Get existing dataset for column comparison
-        const existingDataset = await this.repository.findOne(
-          {
-            id: datasetId,
-            projectId,
-          },
+      (tx) =>
+        this.applyDatasetUpdateInTx(
+          { datasetId, projectId, name, columnTypes },
           { tx },
-        );
-
-        if (!existingDataset) {
-          throw new DatasetNotFoundError();
-        }
-
-        // Defense in depth for the UI's ready-gate: editing a dataset that is still
-        // `uploading`/`processing` (or `failed`) races the normalize job and edits
-        // content that isn't settled. Refuse unless ready (a null status = legacy =
-        // ready). The datasets-page menu hides Edit for non-ready rows; this stops a
-        // direct/stale call too.
-        if (
-          existingDataset.status != null &&
-          existingDataset.status !== "ready"
-        ) {
-          throw new DatasetNotReadyError({
-            status: existingDataset.status,
-            statusError: existingDataset.statusError,
-          });
-        }
-
-        const slug = this.generateSlug(name);
-
-        // Check for slug collision with other datasets (excluding current one)
-        const conflictingDataset = await this.repository.findBySlug(
-          {
-            slug,
-            projectId,
-            excludeId: datasetId,
-          },
-          { tx },
-        );
-
-        if (conflictingDataset) {
-          throw new DatasetConflictError();
-        }
-
-        const existingColumns = existingDataset.columnTypes as DatasetColumns;
-        const columnsChanged =
-          JSON.stringify(existingColumns) !== JSON.stringify(columnTypes);
-
-        // Defensive: s3_jsonl column changes are handled up front via
-        // `migrateS3JsonlColumns` (the advisory-lock chunk rewrite) and return
-        // before this transaction (ADR-032 v19). Reaching here with s3_jsonl and a
-        // changed schema would mean that early branch regressed — refuse rather
-        // than run the PG record migrator, which would read zero rows (I-PG) and
-        // silently corrupt nothing into the chunk store.
-        if (existingDataset.contentLayout === "s3_jsonl" && columnsChanged) {
-          throw new ColumnTypeChangeNotSupportedError();
-        }
-
-        // Only rewrite row data when the column KEY structure changes
-        // (rename / add / remove / reorder). In the legacy postgres layout the
-        // stored `entry` JSON is untyped — column types are metadata — and the
-        // record migrator (`tryToMapPreviousColumnsToNewColumns`) only remaps
-        // keys, never values. So a type-only change (e.g. string→image) would
-        // rewrite every row with byte-identical JSON: O(rowCount) UPDATEs of pure
-        // no-ops, which is exactly what blew the transaction budget. Skip it and
-        // let the `dataset.update` below persist the new types alone. The
-        // `columnsChanged` short-circuit means a name-only edit never reaches
-        // `columnKeysChanged` (and so never reads/maps the stored column array).
-        if (
-          columnsChanged &&
-          this.columnKeysChanged(existingColumns, columnTypes)
-        ) {
-          await this.migrateDatasetRecordColumns(
-            {
-              datasetId,
-              projectId,
-              oldColumnTypes: existingColumns,
-              newColumnTypes: columnTypes,
-            },
-            { tx },
-          );
-        }
-
-        // Update the dataset (repository validates ownership - will throw if datasetId doesn't belong to projectId)
-        return await this.repository.update(
-          {
-            id: datasetId,
-            projectId,
-            data: {
-              name,
-              slug,
-              columnTypes,
-            },
-          },
-          { tx },
-        );
-      },
+        ),
       {
         // Safety net for the remaining heavy case: a column rename / add / remove
         // still runs `migrateDatasetRecordColumns` here — one `datasetRecord.update`
@@ -747,6 +772,180 @@ export class DatasetService {
     });
   }
 
+  // Validate the offsets index before trusting it to drive page selection. A
+  // malformed/partial JSON (e.g. an interrupted migration that somehow
+  // committed a half-written array) would otherwise produce NaN comparisons
+  // → an empty page against a positive rowCount (silent data loss) or an
+  // `index: undefined` passed to readChunk. On bad data, the caller falls
+  // THROUGH to the offsets-absent repair branch (read every chunk + slice)
+  // rather than serve a wrong page.
+  private validChunkOffsets(dataset: Dataset): ChunkOffset[] {
+    const rawOffsets = Array.isArray(dataset.chunkOffsets)
+      ? (dataset.chunkOffsets as unknown as ChunkOffset[])
+      : [];
+    const offsetsValid =
+      rawOffsets.length > 0 &&
+      rawOffsets.every(
+        (o) =>
+          o != null &&
+          Number.isInteger(o.index) &&
+          Number.isFinite(o.startRow) &&
+          Number.isFinite(o.endRow) &&
+          o.endRow >= o.startRow,
+      );
+    return offsetsValid ? rawOffsets : [];
+  }
+
+  // Read only the chunks overlapping [windowStart, windowEnd). With offsets
+  // present this touches at most ⌈limit / rows-per-chunk⌉ + 1 chunks.
+  private async readS3JsonlWindowFromOffsets({
+    dataset,
+    projectId,
+    storage,
+    offsets,
+    windowStart,
+    windowEnd,
+  }: {
+    dataset: Dataset;
+    projectId: string;
+    storage: DatasetStorage;
+    offsets: ChunkOffset[];
+    windowStart: number;
+    windowEnd: number;
+  }): Promise<DatasetRecord[]> {
+    const pageRecords: DatasetRecord[] = [];
+    const overlapping = offsets.filter(
+      (o) => o.startRow < windowEnd && o.endRow > windowStart,
+    );
+    for (const offset of overlapping) {
+      const rows = await storage.readChunk({
+        projectId,
+        datasetId: dataset.id,
+        index: offset.index,
+      });
+      rows.forEach((line, within) => {
+        const globalRow = offset.startRow + within;
+        if (globalRow >= windowStart && globalRow < windowEnd) {
+          pageRecords.push(adaptS3JsonlRecord(line, dataset));
+        }
+      });
+    }
+    return pageRecords;
+  }
+
+  // No chunkOffsets (legacy/partial migration): the only way to honour the
+  // page window is to read every chunk, then slice — an UNBOUNDED read per
+  // page. Guard on sizeBytes so a large offset-less dataset can't OOM the
+  // pod on a normal list call (offsets-present datasets take the bounded
+  // branch above).
+  private async readS3JsonlWindowFullScan({
+    dataset,
+    projectId,
+    storage,
+    windowStart,
+    windowEnd,
+  }: {
+    dataset: Dataset;
+    projectId: string;
+    storage: DatasetStorage;
+    windowStart: number;
+    windowEnd: number;
+  }): Promise<DatasetRecord[]> {
+    assertDatasetReadableInHeap(dataset);
+    // I-COUNT: same guard as getFullDataset — a `ready` s3_jsonl dataset MUST
+    // have a non-null chunkCount. `chunkCount ?? 0` would loop zero times and
+    // serve an EMPTY page against a positive rowCount (silent data loss); the
+    // offsets branch above never reaches here, so this only fires on genuine
+    // drift. Throw loudly so it surfaces (and recomputeDatasetCounts repairs).
+    if (dataset.chunkCount == null) {
+      throw new DatasetChunkCountMissingError(dataset.id);
+    }
+    const rows = await storage.readChunks({
+      projectId,
+      datasetId: dataset.id,
+      chunkCount: dataset.chunkCount,
+    });
+    const records = rows.map((line) => adaptS3JsonlRecord(line, dataset));
+    return records.slice(windowStart, windowEnd);
+  }
+
+  private async paginateS3JsonlDataset({
+    dataset,
+    projectId,
+    page,
+    limit,
+    skip,
+  }: {
+    dataset: Dataset;
+    projectId: string;
+    page: number;
+    limit: number;
+    skip: number;
+  }) {
+    if (dataset.status !== "ready") {
+      throw new DatasetNotReadyError({
+        status: dataset.status,
+        statusError: dataset.statusError,
+      });
+    }
+
+    const storage = await getDatasetStorage(projectId);
+    // PG-authoritative count (Decision 1/2); fall back to chunkCount-driven read.
+    const total = dataset.rowCount ?? 0;
+    const windowStart = skip;
+    const windowEnd = skip + limit; // exclusive
+    const offsets = this.validChunkOffsets(dataset);
+
+    const pageRecords =
+      offsets.length > 0
+        ? await this.readS3JsonlWindowFromOffsets({
+            dataset,
+            projectId,
+            storage,
+            offsets,
+            windowStart,
+            windowEnd,
+          })
+        : await this.readS3JsonlWindowFullScan({
+            dataset,
+            projectId,
+            storage,
+            windowStart,
+            windowEnd,
+          });
+
+    return {
+      data: pageRecords,
+      pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+    };
+  }
+
+  private async paginatePostgresRecords({
+    dataset,
+    projectId,
+    page,
+    limit,
+    skip,
+  }: {
+    dataset: Dataset;
+    projectId: string;
+    page: number;
+    limit: number;
+    skip: number;
+  }) {
+    const { records, total } = await this.recordRepository.listPaginated({
+      datasetId: dataset.id,
+      projectId,
+      skip,
+      take: limit,
+    });
+
+    return {
+      data: records,
+      pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+    };
+  }
+
   /**
    * Reads one page of records from an already-resolved dataset — the shared
    * windowed read behind both `listRecords` (slug/id lookup first) and
@@ -760,8 +959,8 @@ export class DatasetService {
     page: number;
     limit: number;
   }) {
-    const { dataset } = params;
-    const skip = (params.page - 1) * params.limit;
+    const { dataset, projectId, page, limit } = params;
+    const skip = (page - 1) * limit;
 
     // ADR-032: s3_jsonl content lives in chunk objects, not the PG
     // DatasetRecord table (I-PG → zero PG rows), so the PG-only paginator would
@@ -770,116 +969,22 @@ export class DatasetService {
     // page×limit window (via the PG-authoritative `chunkOffsets`) — I-MEM, so a
     // page request never reads non-overlapping chunks of a multi-GB dataset.
     if (dataset.contentLayout === "s3_jsonl") {
-      if (dataset.status !== "ready") {
-        throw new DatasetNotReadyError({
-          status: dataset.status,
-          statusError: dataset.statusError,
-        });
-      }
-
-      const storage = await getDatasetStorage(params.projectId);
-      // PG-authoritative count (Decision 1/2); fall back to chunkCount-driven read.
-      const total = dataset.rowCount ?? 0;
-      const windowStart = skip;
-      const windowEnd = skip + params.limit; // exclusive
-
-      // Validate the offsets index before trusting it to drive page selection.
-      // A malformed/partial JSON (e.g. an interrupted migration that somehow
-      // committed a half-written array) would otherwise produce NaN comparisons
-      // → an empty page against a positive rowCount (silent data loss) or an
-      // `index: undefined` passed to readChunk. On bad data, fall THROUGH to the
-      // offsets-absent repair branch (read every chunk + slice) rather than
-      // serve a wrong page. The offsets-absent branch already throws loudly on a
-      // null chunkCount, so a genuinely-broken dataset surfaces, not silences.
-      const rawOffsets = Array.isArray(dataset.chunkOffsets)
-        ? (dataset.chunkOffsets as unknown as ChunkOffset[])
-        : [];
-      const offsetsValid =
-        rawOffsets.length > 0 &&
-        rawOffsets.every(
-          (o) =>
-            o != null &&
-            Number.isInteger(o.index) &&
-            Number.isFinite(o.startRow) &&
-            Number.isFinite(o.endRow) &&
-            o.endRow >= o.startRow,
-        );
-      const offsets: ChunkOffset[] = offsetsValid ? rawOffsets : [];
-
-      // Read only the chunks overlapping [windowStart, windowEnd). With offsets
-      // present this touches at most ⌈limit / rows-per-chunk⌉ + 1 chunks.
-      // Defensive fallback (legacy rows with no offsets): read every chunk in
-      // order, but still slice the page — no offsets means we can't locate the
-      // window cheaply, the same bound legacy data already lived under.
-      const pageRecords: DatasetRecord[] = [];
-      if (offsets.length > 0) {
-        const overlapping = offsets.filter(
-          (o) => o.startRow < windowEnd && o.endRow > windowStart,
-        );
-        for (const offset of overlapping) {
-          const rows = await storage.readChunk({
-            projectId: params.projectId,
-            datasetId: dataset.id,
-            index: offset.index,
-          });
-          rows.forEach((line, within) => {
-            const globalRow = offset.startRow + within;
-            if (globalRow >= windowStart && globalRow < windowEnd) {
-              pageRecords.push(adaptS3JsonlRecord(line, dataset));
-            }
-          });
-        }
-      } else {
-        // No chunkOffsets (legacy/partial migration): the only way to honour the
-        // page window is to read every chunk, then slice — an UNBOUNDED read per
-        // page. Guard on sizeBytes so a large offset-less dataset can't OOM the
-        // pod on a normal list call (offsets-present datasets take the bounded
-        // branch above).
-        assertDatasetReadableInHeap(dataset);
-        // I-COUNT: same guard as getFullDataset — a `ready` s3_jsonl dataset MUST
-        // have a non-null chunkCount. `chunkCount ?? 0` would loop zero times and
-        // serve an EMPTY page against a positive rowCount (silent data loss); the
-        // offsets branch above never reaches here, so this only fires on genuine
-        // drift. Throw loudly so it surfaces (and recomputeDatasetCounts repairs).
-        if (dataset.chunkCount == null) {
-          throw new DatasetChunkCountMissingError(dataset.id);
-        }
-        const rows = await storage.readChunks({
-          projectId: params.projectId,
-          datasetId: dataset.id,
-          chunkCount: dataset.chunkCount,
-        });
-        const records = rows.map((line) => adaptS3JsonlRecord(line, dataset));
-        pageRecords.push(...records.slice(windowStart, windowEnd));
-      }
-
-      return {
-        data: pageRecords,
-        pagination: {
-          page: params.page,
-          limit: params.limit,
-          total,
-          totalPages: Math.ceil(total / params.limit),
-        },
-      };
+      return this.paginateS3JsonlDataset({
+        dataset,
+        projectId,
+        page,
+        limit,
+        skip,
+      });
     }
 
-    const { records, total } = await this.recordRepository.listPaginated({
-      datasetId: dataset.id,
-      projectId: params.projectId,
+    return this.paginatePostgresRecords({
+      dataset,
+      projectId,
+      page,
+      limit,
       skip,
-      take: params.limit,
     });
-
-    return {
-      data: records,
-      pagination: {
-        page: params.page,
-        limit: params.limit,
-        total,
-        totalPages: Math.ceil(total / params.limit),
-      },
-    };
   }
 
   /**
@@ -1666,24 +1771,16 @@ export class DatasetService {
     }
   }
 
-  /**
-   * R3: finalize a direct upload. The staging key is read from the dataset row
-   * (C1 — never trust a client-supplied key); finalize is gated to datasets in
-   * `uploading` (C1 — blocks finalize replay), enforces the size cap (HEAD;
-   * deletes the staged object when over-cap, ADR D4/M6), and flips the dataset
-   * to `processing`. The normalize job is enqueued from here in rung 4.
-   *
-   * @throws {DatasetNotFoundError} if the dataset is missing or archived
-   * @throws {UploadNotPendingError} if the dataset is not in `uploading`
-   * @throws {StagedUploadNotFoundError} if the staged object is missing/incomplete
-   * @throws {UploadTooLargeError} if the staged object exceeds the size cap
-   */
-  async finalizeUpload(params: {
+  // C1: gathers what finalize needs from the dataset row while enforcing its
+  // precondition gates — not found/archived, status, staging key, filename —
+  // each throwing its own domain error so the caller doesn't re-derive them.
+  private async resolveFinalizableUpload({
+    projectId,
+    datasetId,
+  }: {
     projectId: string;
     datasetId: string;
-  }): Promise<{ datasetId: string; status: "processing" }> {
-    const { projectId, datasetId } = params;
-
+  }): Promise<{ stagingKey: string; filename: string }> {
     const dataset = await this.repository.findOne({ id: datasetId, projectId });
     // C1: not found OR archived is not finalizable.
     if (!dataset || dataset.archivedAt) {
@@ -1711,12 +1808,22 @@ export class DatasetService {
         "Dataset upload is missing its filename — cannot detect file format",
       );
     }
+    return { stagingKey, filename };
+  }
 
-    const storage = await getDatasetStorage(projectId);
-
-    let sizeBytes: number;
+  private async headStagedSizeOrFail({
+    storage,
+    projectId,
+    datasetId,
+    stagingKey,
+  }: {
+    storage: DatasetStorage;
+    projectId: string;
+    datasetId: string;
+    stagingKey: string;
+  }): Promise<number> {
     try {
-      sizeBytes = await storage.headStagedObjectSize({
+      return await storage.headStagedObjectSize({
         projectId,
         key: stagingKey,
       });
@@ -1742,31 +1849,83 @@ export class DatasetService {
       }
       throw error;
     }
+  }
+
+  // M6 / ADR D4: reject AND delete an over-cap staged object (best-effort
+  // delete; a failed delete must not mask the size rejection), marking the
+  // dataset `failed` — not retryable, the user must upload a smaller file.
+  private async rejectOverCapUpload({
+    storage,
+    projectId,
+    datasetId,
+    stagingKey,
+  }: {
+    storage: DatasetStorage;
+    projectId: string;
+    datasetId: string;
+    stagingKey: string;
+  }): Promise<never> {
+    try {
+      await storage.deleteStaged({ projectId, key: stagingKey });
+    } catch {
+      // non-fatal: the staging lifecycle rule reaps it eventually.
+    }
+    // Null the stagingKey in the same update: the staged object was just
+    // deleted, so the row no longer has a source to re-read. Leaving the key
+    // set would make retryNormalize accept this `failed` dataset and re-drive
+    // a deleted object, failing with the misleading "Uploaded object not
+    // found" instead of the real over-cap cause.
+    await this.repository.update({
+      id: datasetId,
+      projectId,
+      data: {
+        status: "failed",
+        statusError: "Uploaded file is too large",
+        stagingKey: null,
+      },
+    });
+    throw new UploadTooLargeError();
+  }
+
+  /**
+   * R3: finalize a direct upload. The staging key is read from the dataset row
+   * (C1 — never trust a client-supplied key); finalize is gated to datasets in
+   * `uploading` (C1 — blocks finalize replay), enforces the size cap (HEAD;
+   * deletes the staged object when over-cap, ADR D4/M6), and flips the dataset
+   * to `processing`. The normalize job is enqueued from here in rung 4.
+   *
+   * @throws {DatasetNotFoundError} if the dataset is missing or archived
+   * @throws {UploadNotPendingError} if the dataset is not in `uploading`
+   * @throws {StagedUploadNotFoundError} if the staged object is missing/incomplete
+   * @throws {UploadTooLargeError} if the staged object exceeds the size cap
+   */
+  async finalizeUpload(params: {
+    projectId: string;
+    datasetId: string;
+  }): Promise<{ datasetId: string; status: "processing" }> {
+    const { projectId, datasetId } = params;
+
+    const { stagingKey, filename } = await this.resolveFinalizableUpload({
+      projectId,
+      datasetId,
+    });
+
+    const storage = await getDatasetStorage(projectId);
+
+    const sizeBytes = await this.headStagedSizeOrFail({
+      storage,
+      projectId,
+      datasetId,
+      stagingKey,
+    });
 
     if (exceedsUploadCap(sizeBytes)) {
-      // M6 / ADR D4: reject AND delete the over-cap staged object (best-effort;
-      // a failed delete must not mask the size rejection).
-      try {
-        await storage.deleteStaged({ projectId, key: stagingKey });
-      } catch {
-        // non-fatal: the staging lifecycle rule reaps it eventually.
-      }
-      // Null the stagingKey in the same update: the staged object was just
-      // deleted, so the row no longer has a source to re-read. Leaving the key
-      // set would make retryNormalize accept this `failed` dataset and re-drive
-      // a deleted object, failing with the misleading "Uploaded object not
-      // found" instead of the real over-cap cause. An over-cap upload is not
-      // retryable — the user must upload a smaller file.
-      await this.repository.update({
-        id: datasetId,
+      await this.rejectOverCapUpload({
+        storage,
         projectId,
-        data: {
-          status: "failed",
-          statusError: "Uploaded file is too large",
-          stagingKey: null,
-        },
+        datasetId,
+        stagingKey,
       });
-      throw new UploadTooLargeError();
     }
 
     // Atomic uploading→processing transition: the WHERE-guarded `updateMany` is

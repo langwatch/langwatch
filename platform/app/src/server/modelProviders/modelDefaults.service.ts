@@ -106,24 +106,37 @@ function validKeySet(): Set<string> {
   return keys;
 }
 
+function isStorableConfigValue(value: unknown): value is string {
+  return typeof value === "string" && value.length > 0;
+}
+
+/**
+ * Restricted models (codex) are rejected loudly, not dropped: a save
+ * that silently loses a key would read as "worked" in the drawer.
+ */
+function assertModelAllowedForKey(
+  key: string,
+  value: string,
+  roleKeys: Set<string>,
+): void {
+  const allowed = roleKeys.has(key)
+    ? isModelAllowedAsRoleDefault(value, key as ModelRole)
+    : isModelAllowedForFeature({ modelId: value, featureKey: key });
+  if (!allowed) {
+    throw new Error(
+      `"${value}" serves the coding-assistant surfaces only and cannot be set for "${key}".`,
+    );
+  }
+}
+
 function sanitizeConfig(raw: Record<string, unknown>): Record<string, string> {
   const valid = validKeySet();
   const roleKeys = new Set<string>(MODEL_ROLES);
   const clean: Record<string, string> = {};
   for (const [key, value] of Object.entries(raw)) {
     if (!valid.has(key)) continue;
-    if (typeof value !== "string") continue;
-    if (value.length === 0) continue;
-    // Restricted models (codex) are rejected loudly, not dropped: a save
-    // that silently loses a key would read as "worked" in the drawer.
-    const allowed = roleKeys.has(key)
-      ? isModelAllowedAsRoleDefault(value, key as ModelRole)
-      : isModelAllowedForFeature({ modelId: value, featureKey: key });
-    if (!allowed) {
-      throw new Error(
-        `"${value}" serves the coding-assistant surfaces only and cannot be set for "${key}".`,
-      );
-    }
+    if (!isStorableConfigValue(value)) continue;
+    assertModelAllowedForKey(key, value, roleKeys);
     clean[key] = value;
   }
   return clean;

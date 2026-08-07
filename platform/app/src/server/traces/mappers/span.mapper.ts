@@ -136,6 +136,55 @@ function getAnnotatedType(
 }
 
 /**
+ * ClickHouse Map(String, String) stores objects as JSON strings; parse a
+ * string value back to an object when it decodes to one, otherwise return
+ * the value unchanged (including non-JSON strings, kept as-is).
+ */
+function parseJsonObjectIfString(value: unknown): unknown {
+  if (typeof value !== "string") return value;
+  try {
+    const parsed = JSON.parse(value);
+    if (typeof parsed === "object" && parsed !== null) {
+      return parsed;
+    }
+  } catch {
+    // Not JSON — keep as string
+  }
+  return value;
+}
+
+/** Priority-2 resolution for {@link extractInput}: `langwatch.input`, annotated-type-aware. */
+function extractLangwatchInputValue(
+  spanAttributes: NormalizedAttributes,
+): SpanInputOutput {
+  const lwInput = parseJsonObjectIfString(spanAttributes["langwatch.input"]);
+
+  // Unwrap {type, value} wrapper preserved by canonicalization (e.g. chat_messages)
+  if (isLegacyWrapper(lwInput)) {
+    return unwrapLegacyWrapper(lwInput, spanAttributes, "langwatch.input");
+  }
+  const annotatedType = getAnnotatedType(spanAttributes, "langwatch.input");
+  if (annotatedType === "chat_messages" && Array.isArray(lwInput)) {
+    return {
+      type: "chat_messages",
+      value: toJsonSerializable(lwInput) as ChatMessage[],
+    };
+  }
+  if (annotatedType === "text" || typeof lwInput === "string") {
+    // ClickHouse deserializeAttributes() may parse JSON-like strings back to
+    // objects/arrays (e.g. "[{\"role\":...}]" → Array). Re-stringify to avoid
+    // String([object Object]).
+    const textValue =
+      typeof lwInput === "string" ? lwInput : JSON.stringify(lwInput);
+    return { type: "text", value: textValue };
+  }
+  return {
+    type: "json",
+    value: toJsonSerializable(lwInput),
+  };
+}
+
+/**
  * Extracts input from canonical span attributes only.
  * After canonicalization, input is at:
  * 1. gen_ai.input.messages (chat messages)
@@ -157,42 +206,8 @@ function extractInput(
   }
 
   // Priority 2: langwatch.input → use annotated type or infer
-  let lwInput = spanAttributes["langwatch.input"];
-  if (lwInput !== undefined) {
-    // ClickHouse Map(String, String) stores objects as JSON strings
-    if (typeof lwInput === "string") {
-      try {
-        const parsed = JSON.parse(lwInput);
-        if (typeof parsed === "object" && parsed !== null) {
-          lwInput = parsed;
-        }
-      } catch {
-        // Not JSON — keep as string
-      }
-    }
-    // Unwrap {type, value} wrapper preserved by canonicalization (e.g. chat_messages)
-    if (isLegacyWrapper(lwInput)) {
-      return unwrapLegacyWrapper(lwInput, spanAttributes, "langwatch.input");
-    }
-    const annotatedType = getAnnotatedType(spanAttributes, "langwatch.input");
-    if (annotatedType === "chat_messages" && Array.isArray(lwInput)) {
-      return {
-        type: "chat_messages",
-        value: toJsonSerializable(lwInput) as ChatMessage[],
-      };
-    }
-    if (annotatedType === "text" || typeof lwInput === "string") {
-      // ClickHouse deserializeAttributes() may parse JSON-like strings back to
-      // objects/arrays (e.g. "[{\"role\":...}]" → Array). Re-stringify to avoid
-      // String([object Object]).
-      const textValue =
-        typeof lwInput === "string" ? lwInput : JSON.stringify(lwInput);
-      return { type: "text", value: textValue };
-    }
-    return {
-      type: "json",
-      value: toJsonSerializable(lwInput),
-    };
+  if (spanAttributes["langwatch.input"] !== undefined) {
+    return extractLangwatchInputValue(spanAttributes);
   }
 
   // Priority 3: gen_ai.tool.call.arguments — the tool-call semconv twin of
@@ -224,6 +239,43 @@ function parseJsonOrText(value: unknown): SpanInputOutput {
   return { type: "json", value: toJsonSerializable(value) };
 }
 
+/** Priority-2 resolution for {@link extractOutput}: `langwatch.output`, annotated-type-aware. */
+function extractLangwatchOutputValue(
+  spanAttributes: NormalizedAttributes,
+): SpanInputOutput {
+  const lwOutput = parseJsonObjectIfString(spanAttributes["langwatch.output"]);
+
+  // Unwrap {type, value} wrapper preserved by canonicalization (e.g. chat_messages)
+  if (isLegacyWrapper(lwOutput)) {
+    return unwrapLegacyWrapper(lwOutput, spanAttributes, "langwatch.output");
+  }
+  const annotatedType = getAnnotatedType(spanAttributes, "langwatch.output");
+  if (annotatedType === "chat_messages" && Array.isArray(lwOutput)) {
+    return {
+      type: "chat_messages",
+      value: toJsonSerializable(lwOutput) as ChatMessage[],
+    };
+  }
+  if (
+    annotatedType === "evaluation_result" ||
+    annotatedType === "guardrail_result"
+  ) {
+    return {
+      type: annotatedType,
+      value: toJsonSerializable(lwOutput),
+    } as unknown as SpanInputOutput;
+  }
+  if (annotatedType === "text" || typeof lwOutput === "string") {
+    const textValue =
+      typeof lwOutput === "string" ? lwOutput : JSON.stringify(lwOutput);
+    return { type: "text", value: textValue };
+  }
+  return {
+    type: "json",
+    value: toJsonSerializable(lwOutput),
+  };
+}
+
 /**
  * Extracts output from canonical span attributes only.
  * After canonicalization, output is at:
@@ -244,48 +296,8 @@ function extractOutput(
   }
 
   // Priority 2: langwatch.output → use annotated type or infer
-  let lwOutput = spanAttributes["langwatch.output"];
-  if (lwOutput !== undefined) {
-    // ClickHouse Map(String, String) stores objects as JSON strings
-    if (typeof lwOutput === "string") {
-      try {
-        const parsed = JSON.parse(lwOutput);
-        if (typeof parsed === "object" && parsed !== null) {
-          lwOutput = parsed;
-        }
-      } catch {
-        // Not JSON — keep as string
-      }
-    }
-    // Unwrap {type, value} wrapper preserved by canonicalization (e.g. chat_messages)
-    if (isLegacyWrapper(lwOutput)) {
-      return unwrapLegacyWrapper(lwOutput, spanAttributes, "langwatch.output");
-    }
-    const annotatedType = getAnnotatedType(spanAttributes, "langwatch.output");
-    if (annotatedType === "chat_messages" && Array.isArray(lwOutput)) {
-      return {
-        type: "chat_messages",
-        value: toJsonSerializable(lwOutput) as ChatMessage[],
-      };
-    }
-    if (
-      annotatedType === "evaluation_result" ||
-      annotatedType === "guardrail_result"
-    ) {
-      return {
-        type: annotatedType,
-        value: toJsonSerializable(lwOutput),
-      } as unknown as SpanInputOutput;
-    }
-    if (annotatedType === "text" || typeof lwOutput === "string") {
-      const textValue =
-        typeof lwOutput === "string" ? lwOutput : JSON.stringify(lwOutput);
-      return { type: "text", value: textValue };
-    }
-    return {
-      type: "json",
-      value: toJsonSerializable(lwOutput),
-    };
+  if (spanAttributes["langwatch.output"] !== undefined) {
+    return extractLangwatchOutputValue(spanAttributes);
   }
 
   // Priority 3: gen_ai.tool.call.result — see extractInput's tool-call twin.
@@ -383,6 +395,22 @@ function extractVendor(spanAttributes: NormalizedAttributes): string | null {
   return typeof vendor === "string" ? vendor : null;
 }
 
+/** Maps one raw RAG context entry (string, structured object, or other) to a {@link RAGChunk}. */
+function mapContextEntry(ctx: unknown): RAGChunk {
+  if (typeof ctx === "string") {
+    return { content: ctx };
+  }
+  if (typeof ctx === "object" && ctx !== null) {
+    const obj = ctx as Record<string, unknown>;
+    return {
+      document_id: typeof obj.document_id === "string" ? obj.document_id : null,
+      chunk_id: typeof obj.chunk_id === "string" ? obj.chunk_id : null,
+      content: obj.content ?? obj,
+    };
+  }
+  return { content: String(ctx) };
+}
+
 /**
  * Extracts RAG contexts from canonical span attributes only.
  * After canonicalization, RAG contexts are at langwatch.rag.contexts.
@@ -405,21 +433,7 @@ function extractContexts(
     return undefined;
   }
 
-  return contexts.map((ctx: unknown) => {
-    if (typeof ctx === "string") {
-      return { content: ctx };
-    }
-    if (typeof ctx === "object" && ctx !== null) {
-      const obj = ctx as Record<string, unknown>;
-      return {
-        document_id:
-          typeof obj.document_id === "string" ? obj.document_id : null,
-        chunk_id: typeof obj.chunk_id === "string" ? obj.chunk_id : null,
-        content: obj.content ?? obj,
-      };
-    }
-    return { content: String(ctx) };
-  });
+  return contexts.map(mapContextEntry);
 }
 
 /**
@@ -437,6 +451,57 @@ function extractContexts(
  * statusMessage is often a short HTTP-status summary ("Bad Request") that
  * loses the actionable detail.
  */
+type ExceptionEvent = { name: string; attributes: NormalizedAttributes };
+
+/**
+ * Resolves the error message: newest exception event's
+ * `exception.message` → span-level `exception.message` → statusMessage →
+ * "Unknown error".
+ */
+function resolveErrorMessage({
+  latestExceptionEvent,
+  spanAttributes,
+  statusMessage,
+}: {
+  latestExceptionEvent: ExceptionEvent | undefined;
+  spanAttributes: NormalizedAttributes;
+  statusMessage: string | null;
+}): string {
+  const eventMessage = latestExceptionEvent?.attributes["exception.message"];
+  const attrMessage = spanAttributes["exception.message"];
+
+  return (
+    (typeof eventMessage === "string" && eventMessage.length > 0
+      ? eventMessage
+      : undefined) ??
+    (typeof attrMessage === "string" && attrMessage.length > 0
+      ? attrMessage
+      : undefined) ??
+    statusMessage ??
+    "Unknown error"
+  );
+}
+
+/**
+ * Resolves the error stacktrace: newest exception event's
+ * `exception.stacktrace` → span-level `exception.stacktrace`, split into lines.
+ */
+function resolveErrorStacktrace({
+  latestExceptionEvent,
+  spanAttributes,
+}: {
+  latestExceptionEvent: ExceptionEvent | undefined;
+  spanAttributes: NormalizedAttributes;
+}): string[] {
+  const eventStacktrace =
+    latestExceptionEvent?.attributes["exception.stacktrace"];
+  const attrStacktrace = spanAttributes["exception.stacktrace"];
+  const stacktrace =
+    (typeof eventStacktrace === "string" ? eventStacktrace : undefined) ??
+    (typeof attrStacktrace === "string" ? attrStacktrace : undefined);
+  return typeof stacktrace === "string" ? stacktrace.split("\n") : [];
+}
+
 function extractError({
   statusCode,
   statusMessage,
@@ -446,7 +511,7 @@ function extractError({
   statusCode: NormalizedStatusCode | null;
   statusMessage: string | null;
   spanAttributes: NormalizedAttributes;
-  events: readonly { name: string; attributes: NormalizedAttributes }[];
+  events: readonly ExceptionEvent[];
 }): ErrorCapture | null {
   if (statusCode !== NormalizedStatusCode.ERROR) {
     return null;
@@ -458,32 +523,17 @@ function extractError({
       ? exceptionEvents[exceptionEvents.length - 1]
       : undefined;
 
-  const eventMessage = latestExceptionEvent?.attributes["exception.message"];
-  const attrMessage = spanAttributes["exception.message"];
-
-  const errorMessage =
-    (typeof eventMessage === "string" && eventMessage.length > 0
-      ? eventMessage
-      : undefined) ??
-    (typeof attrMessage === "string" && attrMessage.length > 0
-      ? attrMessage
-      : undefined) ??
-    statusMessage ??
-    "Unknown error";
-
-  const eventStacktrace =
-    latestExceptionEvent?.attributes["exception.stacktrace"];
-  const attrStacktrace = spanAttributes["exception.stacktrace"];
-  const stacktrace =
-    (typeof eventStacktrace === "string" ? eventStacktrace : undefined) ??
-    (typeof attrStacktrace === "string" ? attrStacktrace : undefined);
-  const stacktraceArray =
-    typeof stacktrace === "string" ? stacktrace.split("\n") : [];
-
   return {
     has_error: true,
-    message: errorMessage,
-    stacktrace: stacktraceArray,
+    message: resolveErrorMessage({
+      latestExceptionEvent,
+      spanAttributes,
+      statusMessage,
+    }),
+    stacktrace: resolveErrorStacktrace({
+      latestExceptionEvent,
+      spanAttributes,
+    }),
   };
 }
 

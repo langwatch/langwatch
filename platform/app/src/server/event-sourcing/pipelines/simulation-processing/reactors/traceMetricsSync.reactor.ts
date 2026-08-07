@@ -16,6 +16,42 @@ export interface TraceMetricsSyncReactorDeps {
   computeRunMetrics: (data: ComputeRunMetricsCommandData) => Promise<void>;
 }
 
+async function dispatchComputeRunMetricsForTrace({
+  deps,
+  tenantId,
+  scenarioRunId,
+  traceId,
+}: {
+  deps: TraceMetricsSyncReactorDeps;
+  tenantId: string;
+  scenarioRunId: string;
+  traceId: string;
+}): Promise<void> {
+  try {
+    logger.debug(
+      { traceId, tenantId, scenarioRunId },
+      "Dispatching computeRunMetrics (pull mode) for missing trace metrics",
+    );
+
+    await deps.computeRunMetrics({
+      tenantId,
+      scenarioRunId,
+      traceId,
+      retryCount: 0,
+      occurredAt: Date.now(),
+    });
+  } catch (error) {
+    // Rethrow so the GroupQueue retries the reactor job.
+    // This is the last chance (RunFinished pull path) — swallowing
+    // the error would permanently lose metrics for this trace.
+    logger.error(
+      { traceId, tenantId, scenarioRunId, error },
+      "Failed to dispatch computeRunMetrics for trace, will retry",
+    );
+    throw error;
+  }
+}
+
 /**
  * Simulation-side reactor: on RunFinished, dispatches computeRunMetrics
  * (pull mode) for any traces that don't have metrics yet.
@@ -49,29 +85,12 @@ export function createTraceMetricsSyncReactor(
         // Skip traces we already have metrics for
         if (foldState.TraceMetrics[traceId]) continue;
 
-        try {
-          logger.debug(
-            { traceId, tenantId, scenarioRunId },
-            "Dispatching computeRunMetrics (pull mode) for missing trace metrics",
-          );
-
-          await deps.computeRunMetrics({
-            tenantId,
-            scenarioRunId,
-            traceId,
-            retryCount: 0,
-            occurredAt: Date.now(),
-          });
-        } catch (error) {
-          // Rethrow so the GroupQueue retries the reactor job.
-          // This is the last chance (RunFinished pull path) — swallowing
-          // the error would permanently lose metrics for this trace.
-          logger.error(
-            { traceId, tenantId, scenarioRunId, error },
-            "Failed to dispatch computeRunMetrics for trace, will retry",
-          );
-          throw error;
-        }
+        await dispatchComputeRunMetricsForTrace({
+          deps,
+          tenantId,
+          scenarioRunId,
+          traceId,
+        });
       }
     },
   };

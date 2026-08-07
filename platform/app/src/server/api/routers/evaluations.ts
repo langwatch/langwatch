@@ -25,6 +25,62 @@ import { getUserProtectionsForProject } from "../utils";
 
 const logger = createLogger("langwatch:evaluations");
 
+type EvaluationResult = NonNullable<
+  Awaited<ReturnType<typeof runEvaluationForTrace>>
+>;
+
+const reportEvaluationDetails = (result: EvaluationResult) => {
+  if (result.status === "error") return result.details;
+  if (result.status === "processed") return result.details ?? undefined;
+  return undefined;
+};
+
+const buildReportEvaluationFields = (result: EvaluationResult) => ({
+  status: result.status,
+  score:
+    result.status === "processed" && typeof result.score === "number"
+      ? result.score
+      : undefined,
+  passed:
+    result.status === "processed" ? (result.passed ?? undefined) : undefined,
+  label:
+    result.status === "processed" ? (result.label ?? undefined) : undefined,
+  details: reportEvaluationDetails(result),
+  error: result.status === "error" ? result.details : undefined,
+});
+
+// Dispatch to evaluation processing pipeline
+const reportEvaluationResultToPipeline = async ({
+  result,
+  projectId,
+  evaluatorType,
+  traceId,
+}: {
+  result: EvaluationResult;
+  projectId: string;
+  evaluatorType: string;
+  traceId: string;
+}) => {
+  const evaluationId = generate(KSUID_RESOURCES.EVALUATION).toString();
+  try {
+    const app = getApp();
+    await app.evaluations.reportEvaluation({
+      tenantId: projectId,
+      evaluationId,
+      evaluatorId: evaluatorType,
+      evaluatorType,
+      traceId,
+      ...buildReportEvaluationFields(result),
+      occurredAt: Date.now(),
+    });
+  } catch (error) {
+    logger.warn(
+      { error, evaluationId, evaluatorType },
+      "Failed to dispatch single re-eval to evaluation processing pipeline",
+    );
+  }
+};
+
 export const evaluationsRouter = createTRPCRouter({
   availableEvaluators: protectedProcedure
     .input(z.object({ projectId: z.string() }))
@@ -111,45 +167,13 @@ export const evaluationsRouter = createTRPCRouter({
         });
       }
 
-      // Dispatch to evaluation processing pipeline
       if (result) {
-        const evaluationId = generate(KSUID_RESOURCES.EVALUATION).toString();
-        try {
-          const app = getApp();
-          await app.evaluations.reportEvaluation({
-            tenantId: input.projectId,
-            evaluationId,
-            evaluatorId: input.evaluatorType,
-            evaluatorType: input.evaluatorType,
-            traceId: input.traceId,
-            status: result.status,
-            score:
-              result.status === "processed" && typeof result.score === "number"
-                ? result.score
-                : undefined,
-            passed:
-              result.status === "processed"
-                ? (result.passed ?? undefined)
-                : undefined,
-            label:
-              result.status === "processed"
-                ? (result.label ?? undefined)
-                : undefined,
-            details:
-              result.status === "error"
-                ? result.details
-                : result.status === "processed"
-                  ? (result.details ?? undefined)
-                  : undefined,
-            error: result.status === "error" ? result.details : undefined,
-            occurredAt: Date.now(),
-          });
-        } catch (error) {
-          logger.warn(
-            { error, evaluationId, evaluatorType: input.evaluatorType },
-            "Failed to dispatch single re-eval to evaluation processing pipeline",
-          );
-        }
+        await reportEvaluationResultToPipeline({
+          result,
+          projectId: input.projectId,
+          evaluatorType: input.evaluatorType,
+          traceId: input.traceId,
+        });
       }
 
       return result;

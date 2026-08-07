@@ -9,9 +9,13 @@
  * appropriate SSE event format for the frontend.
  */
 
-import { HandledError } from "@langwatch/handled-error";
+import {
+  HandledError,
+  type SerializedHandledError,
+} from "@langwatch/handled-error";
 import { trace as otelTrace } from "@opentelemetry/api";
 
+import type { ExecutionState } from "~/optimization_studio/types/dsl";
 import type { StudioServerEvent } from "~/optimization_studio/types/events";
 import { nodeErrorToDomainError } from "~/optimization_studio/utils/nodeErrorDomain";
 import { EvaluatorExecutionError } from "~/server/app-layer/evaluations/errors";
@@ -127,23 +131,32 @@ const classifyEvaluatorExecutionError = (
  * The client-side formatTargetOutput utility handles display formatting.
  * This ensures structured outputs like {pizza: false} are preserved for display.
  */
+/**
+ * Evaluator-as-target: returns all non-null/undefined output fields
+ * dynamically. This avoids hardcoding specific field names (like `details`)
+ * which can cause "sticky" fields that persist even after removal from the
+ * End node.
+ */
+const extractEvaluatorAsTargetOutput = (
+  outputs: Record<string, unknown>,
+): unknown => {
+  const result: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(outputs)) {
+    if (value !== undefined && value !== null) {
+      result[key] = value;
+    }
+  }
+  return Object.keys(result).length > 0 ? result : undefined;
+};
+
 export const extractTargetOutput = (
   outputs: Record<string, unknown> | undefined,
   options?: { isEvaluatorAsTarget?: boolean },
 ): unknown => {
   if (!outputs) return undefined;
 
-  // Evaluator-as-target: return all non-null/undefined output fields dynamically.
-  // This avoids hardcoding specific field names (like `details`) which can cause
-  // "sticky" fields that persist even after removal from the End node.
   if (options?.isEvaluatorAsTarget) {
-    const result: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(outputs)) {
-      if (value !== undefined && value !== null) {
-        result[key] = value;
-      }
-    }
-    return Object.keys(result).length > 0 ? result : undefined;
+    return extractEvaluatorAsTargetOutput(outputs);
   }
 
   // Empty outputs
@@ -265,6 +278,53 @@ const persistableInputs = (
   };
 };
 
+const buildErrorEvaluationResult = ({
+  rawErrorDetails,
+  classifiedDomainError,
+}: {
+  rawErrorDetails: string;
+  classifiedDomainError: EvaluatorExecutionError | undefined;
+}): SingleEvaluationResult & {
+  domainError?: ReturnType<EvaluatorExecutionError["serialize"]>;
+} => ({
+  status: "error",
+  error_type: "EvaluatorError",
+  details: rawErrorDetails,
+  traceback: [],
+  ...(classifiedDomainError
+    ? { domainError: classifiedDomainError.serialize() }
+    : {}),
+});
+
+const buildProcessedEvaluationResult = ({
+  executionState,
+  stripScore,
+}: {
+  executionState: { outputs?: Record<string, unknown>; cost?: number };
+  stripScore?: boolean;
+}): SingleEvaluationResult => ({
+  status: "processed",
+  // Strip score for guardrail-type evaluators where score is just 0 or 1
+  score: stripScore ? undefined : coerceScore(executionState.outputs?.score),
+  passed: coercePassed(executionState.outputs?.passed),
+  label:
+    typeof executionState.outputs?.label === "string"
+      ? executionState.outputs.label
+      : undefined,
+  // Only include details when it's a non-empty string.
+  // Python's EvaluationResultWithMetadata always serializes details
+  // (default None -> null), so we filter out null/undefined to prevent
+  // the "sticky details" bug where details appears even after removal.
+  details:
+    typeof executionState.outputs?.details === "string" &&
+    executionState.outputs.details
+      ? executionState.outputs.details
+      : undefined,
+  cost: executionState.cost
+    ? { currency: "USD", amount: executionState.cost }
+    : undefined,
+});
+
 /**
  * Maps an evaluator completion event to an evaluator_result SSE event.
  *
@@ -309,7 +369,6 @@ export const mapEvaluatorResult = ({
 
   const duration = durationOf(executionState.timestamps);
 
-  // Build SingleEvaluationResult
   // Check for errors: either execution-level error OR evaluator returned error status in outputs
   const hasExecutionError = !!executionState.error;
   const hasEvaluatorError = executionState.outputs?.status === "error";
@@ -321,43 +380,13 @@ export const mapEvaluatorResult = ({
   const classifiedDomainError =
     classifyEvaluatorExecutionError(rawErrorDetails);
 
-  const result: SingleEvaluationResult & {
-    domainError?: ReturnType<EvaluatorExecutionError["serialize"]>;
-  } =
+  const result =
     hasExecutionError || hasEvaluatorError
-      ? {
-          status: "error",
-          error_type: "EvaluatorError",
-          details: rawErrorDetails,
-          traceback: [],
-          ...(classifiedDomainError
-            ? { domainError: classifiedDomainError.serialize() }
-            : {}),
-        }
-      : {
-          status: "processed",
-          // Strip score for guardrail-type evaluators where score is just 0 or 1
-          score: options?.stripScore
-            ? undefined
-            : coerceScore(executionState.outputs?.score),
-          passed: coercePassed(executionState.outputs?.passed),
-          label:
-            typeof executionState.outputs?.label === "string"
-              ? executionState.outputs.label
-              : undefined,
-          // Only include details when it's a non-empty string.
-          // Python's EvaluationResultWithMetadata always serializes details
-          // (default None -> null), so we filter out null/undefined to prevent
-          // the "sticky details" bug where details appears even after removal.
-          details:
-            typeof executionState.outputs?.details === "string" &&
-            executionState.outputs.details
-              ? executionState.outputs.details
-              : undefined,
-          cost: executionState.cost
-            ? { currency: "USD", amount: executionState.cost }
-            : undefined,
-        };
+      ? buildErrorEvaluationResult({ rawErrorDetails, classifiedDomainError })
+      : buildProcessedEvaluationResult({
+          executionState,
+          stripScore: options?.stripScore,
+        });
 
   return {
     type: "evaluator_result",
@@ -368,6 +397,71 @@ export const mapEvaluatorResult = ({
     duration,
     inputs: persistableInputs(options?.inputs),
   };
+};
+
+const mapTargetNodeEvent = ({
+  componentId,
+  rowIndex,
+  executionState,
+  isError,
+  config,
+}: {
+  componentId: string;
+  rowIndex: number;
+  executionState: ExecutionState;
+  isError: boolean;
+  config?: ResultMapperConfig;
+}): EvaluationV3Event => {
+  const isEvaluatorAsTarget =
+    config?.evaluatorTargetNodeIds?.has(componentId) ?? false;
+  return mapTargetResult({
+    nodeId: componentId,
+    rowIndex,
+    executionState: {
+      outputs: executionState.outputs,
+      cost: executionState.cost,
+      timestamps: executionState.timestamps,
+      trace_id: executionState.trace_id,
+      error: isError ? executionState.error : undefined,
+      error_type: isError ? executionState.error_type : undefined,
+      upstream_status: isError ? executionState.upstream_status : undefined,
+    },
+    options: { isEvaluatorAsTarget },
+  });
+};
+
+const mapEvaluatorNodeEvent = ({
+  componentId,
+  rowIndex,
+  executionState,
+  isError,
+  config,
+  evaluatorInputs,
+}: {
+  componentId: string;
+  rowIndex: number;
+  executionState: ExecutionState;
+  isError: boolean;
+  config?: ResultMapperConfig;
+  evaluatorInputs?: Record<string, unknown>;
+}): EvaluationV3Event => {
+  const { evaluatorId } = parseNodeId(componentId);
+  const stripScore = evaluatorId
+    ? config?.stripScoreEvaluatorIds?.has(evaluatorId)
+    : false;
+
+  return mapEvaluatorResult({
+    nodeId: componentId,
+    rowIndex,
+    executionState: {
+      status: executionState.status,
+      outputs: executionState.outputs,
+      cost: executionState.cost,
+      timestamps: executionState.timestamps,
+      error: isError ? executionState.error : undefined,
+    },
+    options: { stripScore, inputs: evaluatorInputs },
+  });
 };
 
 /**
@@ -419,41 +513,21 @@ export const mapNlpEvent = ({
 
   // Determine if this is a target or evaluator node
   if (targetNodes.has(component_id)) {
-    // Target node
-    const isEvaluatorAsTarget =
-      config?.evaluatorTargetNodeIds?.has(component_id) ?? false;
-    return mapTargetResult({
-      nodeId: component_id,
+    return mapTargetNodeEvent({
+      componentId: component_id,
       rowIndex,
-      executionState: {
-        outputs: execution_state.outputs,
-        cost: execution_state.cost,
-        timestamps: execution_state.timestamps,
-        trace_id: execution_state.trace_id,
-        error: isError ? execution_state.error : undefined,
-        error_type: isError ? execution_state.error_type : undefined,
-        upstream_status: isError ? execution_state.upstream_status : undefined,
-      },
-      options: { isEvaluatorAsTarget },
+      executionState: execution_state,
+      isError,
+      config,
     });
   } else if (isEvaluatorNode(component_id)) {
-    // Evaluator node - check if score should be stripped
-    const { evaluatorId } = parseNodeId(component_id);
-    const stripScore = evaluatorId
-      ? config?.stripScoreEvaluatorIds?.has(evaluatorId)
-      : false;
-
-    return mapEvaluatorResult({
-      nodeId: component_id,
+    return mapEvaluatorNodeEvent({
+      componentId: component_id,
       rowIndex,
-      executionState: {
-        status: execution_state.status,
-        outputs: execution_state.outputs,
-        cost: execution_state.cost,
-        timestamps: execution_state.timestamps,
-        error: isError ? execution_state.error : undefined,
-      },
-      options: { stripScore, inputs: evaluatorInputs },
+      executionState: execution_state,
+      isError,
+      config,
+      evaluatorInputs,
     });
   }
 
@@ -522,6 +596,56 @@ export const mapThrownErrorEvent = ({
  * Workflow evaluators can return stringy score/passed values, so they go
  * through coerceScore/coercePassed like the legacy workflow-evaluation path.
  */
+
+type WorkflowEvaluatorExecutionState = {
+  status: string;
+  outputs?: Record<string, unknown>;
+  cost?: number;
+  error?: string;
+  nodeErrorCode?: string;
+  upstream_status?: number;
+  trace_id?: string;
+};
+
+const buildWorkflowErrorEvaluatorResult = ({
+  executionState,
+  domainError,
+}: {
+  executionState: WorkflowEvaluatorExecutionState;
+  domainError: SerializedHandledError | undefined;
+}): EvaluationV3EvaluatorResult => ({
+  status: "error",
+  error_type: "EvaluatorError",
+  details:
+    executionState.error ??
+    (typeof executionState.outputs?.details === "string"
+      ? executionState.outputs.details
+      : undefined) ??
+    "Unknown evaluator error",
+  traceback: [],
+  ...(domainError ? { domainError } : {}),
+});
+
+const buildWorkflowProcessedEvaluatorResult = (
+  executionState: WorkflowEvaluatorExecutionState,
+): EvaluationV3EvaluatorResult => ({
+  status: "processed",
+  score: coerceScore(executionState.outputs?.score),
+  passed: coercePassed(executionState.outputs?.passed),
+  label:
+    typeof executionState.outputs?.label === "string"
+      ? executionState.outputs.label
+      : undefined,
+  details:
+    typeof executionState.outputs?.details === "string" &&
+    executionState.outputs.details
+      ? executionState.outputs.details
+      : undefined,
+  cost: executionState.cost
+    ? { currency: "USD", amount: executionState.cost }
+    : undefined,
+});
+
 export const mapWorkflowEvaluatorResult = ({
   rowIndex,
   targetId,
@@ -533,23 +657,16 @@ export const mapWorkflowEvaluatorResult = ({
   targetId: string;
   evaluatorId: string;
   evaluatorName: string | undefined;
-  executionState: {
-    status: string;
-    outputs?: Record<string, unknown>;
-    cost?: number;
-    error?: string;
-    /**
-     * The engine's stable code for the failure (`NodeError.Type`).
-     *
-     * Named apart from the result's own `error_type` below, which is a
-     * free-text display label ("EvaluatorError") on `SingleEvaluationResult`.
-     * One identifier meaning both a stable code and a display string, twelve
-     * lines apart, is how a code ends up rendered as a label.
-     */
-    nodeErrorCode?: string;
-    upstream_status?: number;
-    trace_id?: string;
-  };
+  /**
+   * `nodeErrorCode` is the engine's stable code for the failure
+   * (`NodeError.Type`).
+   *
+   * Named apart from the result's own `error_type` below, which is a
+   * free-text display label ("EvaluatorError") on `SingleEvaluationResult`.
+   * One identifier meaning both a stable code and a display string, twelve
+   * lines apart, is how a code ends up rendered as a label.
+   */
+  executionState: WorkflowEvaluatorExecutionState;
 }): EvaluationV3Event => {
   const hasExecutionError = !!executionState.error;
   const hasEvaluatorError =
@@ -571,35 +688,8 @@ export const mapWorkflowEvaluatorResult = ({
 
   const result: EvaluationV3EvaluatorResult =
     hasExecutionError || hasEvaluatorError
-      ? {
-          status: "error",
-          error_type: "EvaluatorError",
-          details:
-            executionState.error ??
-            (typeof executionState.outputs?.details === "string"
-              ? executionState.outputs.details
-              : undefined) ??
-            "Unknown evaluator error",
-          traceback: [],
-          ...(domainError ? { domainError } : {}),
-        }
-      : {
-          status: "processed",
-          score: coerceScore(executionState.outputs?.score),
-          passed: coercePassed(executionState.outputs?.passed),
-          label:
-            typeof executionState.outputs?.label === "string"
-              ? executionState.outputs.label
-              : undefined,
-          details:
-            typeof executionState.outputs?.details === "string" &&
-            executionState.outputs.details
-              ? executionState.outputs.details
-              : undefined,
-          cost: executionState.cost
-            ? { currency: "USD", amount: executionState.cost }
-            : undefined,
-        };
+      ? buildWorkflowErrorEvaluatorResult({ executionState, domainError })
+      : buildWorkflowProcessedEvaluatorResult(executionState);
 
   return {
     type: "evaluator_result",

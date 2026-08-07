@@ -16,37 +16,50 @@ const NUMERIC_STRING_REGEX = /^-?\d+(\.\d+)?$/;
  * OTLP data contains stringValue fields that hold JSON-encoded content (e.g., message arrays).
  * These must remain as strings to preserve the OTLP schema semantics.
  */
+function normalizeNumericString(value: string): unknown {
+  // Only convert numeric strings to numbers
+  // Do NOT parse JSON strings - they should remain as strings
+  // Simple length check to skip long strings early
+  if (
+    value.length > 0 &&
+    value.length < 32 &&
+    NUMERIC_STRING_REGEX.test(value)
+  ) {
+    const numberValue = Number(value);
+    if (Number.isFinite(numberValue)) {
+      return numberValue;
+    }
+  }
+  return value;
+}
+
+function normalizePayloadArray(value: unknown[]): unknown[] {
+  for (let i = 0; i < value.length; i++) {
+    value[i] = normalizePayloadValue(value[i]);
+  }
+  return value;
+}
+
+function normalizePayloadObject(
+  value: Record<string, unknown>,
+): Record<string, unknown> {
+  for (const key of Object.keys(value)) {
+    value[key] = normalizePayloadValue(value[key]);
+  }
+  return value;
+}
+
 function normalizePayloadValue(value: unknown): unknown {
   if (typeof value === "string") {
-    // Only convert numeric strings to numbers
-    // Do NOT parse JSON strings - they should remain as strings
-    // Simple length check to skip long strings early
-    if (
-      value.length > 0 &&
-      value.length < 32 &&
-      NUMERIC_STRING_REGEX.test(value)
-    ) {
-      const numberValue = Number(value);
-      if (Number.isFinite(numberValue)) {
-        return numberValue;
-      }
-    }
-    return value;
+    return normalizeNumericString(value);
   }
 
   if (Array.isArray(value)) {
-    for (let i = 0; i < value.length; i++) {
-      value[i] = normalizePayloadValue(value[i]);
-    }
-    return value;
+    return normalizePayloadArray(value);
   }
 
   if (value && typeof value === "object") {
-    const obj = value as Record<string, unknown>;
-    for (const key of Object.keys(obj)) {
-      obj[key] = normalizePayloadValue(obj[key]);
-    }
-    return obj;
+    return normalizePayloadObject(value as Record<string, unknown>);
   }
 
   return value;

@@ -49,64 +49,61 @@ function uniqueKeys(attributes: Array<{ key: string }>): string[] {
   return [...new Set(attributes.map((attribute) => attribute.key))];
 }
 
-/**
- * Turns one validated OTLP data point into its canonical, lossless form:
- * a stable SeriesId over the identity fields, a PointId over the full
- * canonical payload, and the queryable columns rendered from that same payload.
- */
-export function buildPoint(args: {
-  tenantId: string;
-  organizationId: string;
-  resourceMetric: UnknownRecord;
-  scopeMetric: UnknownRecord;
-  metric: UnknownRecord;
-  metricData: UnknownRecord;
-  point: UnknownRecord;
-  kind: MetricKind;
-  acceptedAt: number;
-}): PreparedMetricPoint {
-  const { point, metric, metricData, kind } = args;
-  validatePointShape({ point, kind });
+function stringField(value: unknown): string {
+  return typeof value === "string" ? value : "";
+}
 
+function requireTimeUnixNano(point: UnknownRecord): string {
   const timeUnixNano = timestampDecimal(point.timeUnixNano);
   if (!timeUnixNano) throw new Error("data point is missing timeUnixNano");
-  const startTimeUnixNano = timestampDecimal(point.startTimeUnixNano) ?? "0";
-  const occurredAt = timestampMs(timeUnixNano);
+  return timeUnixNano;
+}
 
-  const name = typeof metric.name === "string" ? metric.name : "";
+function requireMetricName(metric: UnknownRecord): string {
+  const name = stringField(metric.name);
   if (!name) throw new Error("metric is missing name");
-  const unit = typeof metric.unit === "string" ? metric.unit : "";
-  const description =
-    typeof metric.description === "string" ? metric.description : "";
+  return name;
+}
 
-  const resource = isRecord(args.resourceMetric.resource)
-    ? args.resourceMetric.resource
-    : {};
-  const scope = isRecord(args.scopeMetric.scope) ? args.scopeMetric.scope : {};
-  const resourceAttributes = canonicalAttributes(resource.attributes);
-  const scopeAttributes = canonicalAttributes(scope.attributes);
-  const pointAttributes = canonicalAttributes(point.attributes);
-  const temporality = aggregation({ metricData, kind });
-  const monotonic = kind === "sum" ? Boolean(metricData.isMonotonic) : null;
-  const values = canonicalPointValues({ point, kind });
-  const flags = Number(point.flags ?? 0);
-
-  const seriesIdentity = {
-    tenantId: args.tenantId,
+function buildSeriesIdentity({
+  tenantId,
+  resourceSchemaUrl,
+  resourceAttributes,
+  scopeSchemaUrl,
+  scopeName,
+  scopeVersion,
+  scopeAttributes,
+  name,
+  unit,
+  kind,
+  temporality,
+  monotonic,
+  pointAttributes,
+}: {
+  tenantId: string;
+  resourceSchemaUrl: string;
+  resourceAttributes: ReturnType<typeof canonicalAttributes>;
+  scopeSchemaUrl: string;
+  scopeName: string;
+  scopeVersion: string;
+  scopeAttributes: ReturnType<typeof canonicalAttributes>;
+  name: string;
+  unit: string;
+  kind: MetricKind;
+  temporality: ReturnType<typeof aggregation>;
+  monotonic: boolean | null;
+  pointAttributes: ReturnType<typeof canonicalAttributes>;
+}) {
+  return {
+    tenantId,
     resource: {
-      schemaUrl:
-        typeof args.resourceMetric.schemaUrl === "string"
-          ? args.resourceMetric.schemaUrl
-          : "",
+      schemaUrl: resourceSchemaUrl,
       attributes: resourceAttributes,
     },
     scope: {
-      schemaUrl:
-        typeof args.scopeMetric.schemaUrl === "string"
-          ? args.scopeMetric.schemaUrl
-          : "",
-      name: typeof scope.name === "string" ? scope.name : "",
-      version: typeof scope.version === "string" ? scope.version : "",
+      schemaUrl: scopeSchemaUrl,
+      name: scopeName,
+      version: scopeVersion,
       attributes: scopeAttributes,
     },
     metric: {
@@ -118,20 +115,53 @@ export function buildPoint(args: {
     },
     pointAttributes,
   };
-  const seriesId = sha256(stableStringify(seriesIdentity));
+}
 
-  const canonicalPoint = {
+function buildCanonicalPoint({
+  seriesIdentity,
+  resource,
+  scope,
+  name,
+  description,
+  unit,
+  kind,
+  temporality,
+  monotonic,
+  pointAttributes,
+  startTimeUnixNano,
+  timeUnixNano,
+  flags,
+  values,
+  exemplars,
+}: {
+  seriesIdentity: ReturnType<typeof buildSeriesIdentity>;
+  resource: UnknownRecord;
+  scope: UnknownRecord;
+  name: string;
+  description: string;
+  unit: string;
+  kind: MetricKind;
+  temporality: ReturnType<typeof aggregation>;
+  monotonic: boolean | null;
+  pointAttributes: ReturnType<typeof canonicalAttributes>;
+  startTimeUnixNano: string;
+  timeUnixNano: string;
+  flags: number;
+  values: ReturnType<typeof canonicalPointValues>;
+  exemplars: unknown;
+}) {
+  return {
     resource: {
       schemaUrl: seriesIdentity.resource.schemaUrl,
       droppedAttributesCount: integerDecimal(resource.droppedAttributesCount),
-      attributes: resourceAttributes,
+      attributes: seriesIdentity.resource.attributes,
     },
     scope: {
       schemaUrl: seriesIdentity.scope.schemaUrl,
       name: seriesIdentity.scope.name,
       version: seriesIdentity.scope.version,
       droppedAttributesCount: integerDecimal(scope.droppedAttributesCount),
-      attributes: scopeAttributes,
+      attributes: seriesIdentity.scope.attributes,
     },
     metric: {
       name,
@@ -147,21 +177,69 @@ export function buildPoint(args: {
       timeUnixNano,
       flags,
       ...canonicalValueSection({ values, kind }),
-      exemplars: canonicalExemplars(point.exemplars),
+      exemplars: canonicalExemplars(exemplars),
     },
   };
-  const canonicalPayload = stableStringify(canonicalPoint);
-  const canonicalSizeBytes = Buffer.byteLength(canonicalPayload, "utf8");
+}
+
+function assertCanonicalPayloadSize(canonicalSizeBytes: number): void {
   if (canonicalSizeBytes > MAX_CANONICAL_METRIC_PAYLOAD_BYTES) {
     throw new RangeError(
       `canonical metric payload is ${canonicalSizeBytes} bytes (maximum ${MAX_CANONICAL_METRIC_PAYLOAD_BYTES})`,
     );
   }
-  const pointId = sha256(`${seriesId}\0${canonicalPayload}`);
+}
 
-  const dataPoint: CanonicalMetricDataPoint = {
-    tenantId: args.tenantId,
-    organizationId: args.organizationId,
+function assembleDataPoint({
+  tenantId,
+  organizationId,
+  acceptedAt,
+  pointId,
+  seriesId,
+  seriesIdentity,
+  resourceAttributes,
+  scopeAttributes,
+  pointAttributes,
+  name,
+  description,
+  unit,
+  kind,
+  temporality,
+  monotonic,
+  startTimeUnixNano,
+  timeUnixNano,
+  occurredAt,
+  flags,
+  values,
+  canonicalPayload,
+  canonicalSizeBytes,
+}: {
+  tenantId: string;
+  organizationId: string;
+  acceptedAt: number;
+  pointId: string;
+  seriesId: string;
+  seriesIdentity: ReturnType<typeof buildSeriesIdentity>;
+  resourceAttributes: ReturnType<typeof canonicalAttributes>;
+  scopeAttributes: ReturnType<typeof canonicalAttributes>;
+  pointAttributes: ReturnType<typeof canonicalAttributes>;
+  name: string;
+  description: string;
+  unit: string;
+  kind: MetricKind;
+  temporality: ReturnType<typeof aggregation>;
+  monotonic: boolean | null;
+  startTimeUnixNano: string;
+  timeUnixNano: string;
+  occurredAt: number;
+  flags: number;
+  values: ReturnType<typeof canonicalPointValues>;
+  canonicalPayload: string;
+  canonicalSizeBytes: number;
+}): CanonicalMetricDataPoint {
+  return {
+    tenantId,
+    organizationId,
     pointId,
     seriesId,
     resourceSchemaUrl: seriesIdentity.resource.schemaUrl,
@@ -204,20 +282,123 @@ export function buildPoint(args: {
     canonicalPayload,
     canonicalSizeBytes,
     occurredAt,
-    acceptedAt: args.acceptedAt,
+    acceptedAt,
   };
+}
+
+interface BuildPointArgs {
+  tenantId: string;
+  organizationId: string;
+  resourceMetric: UnknownRecord;
+  scopeMetric: UnknownRecord;
+  metric: UnknownRecord;
+  metricData: UnknownRecord;
+  point: UnknownRecord;
+  kind: MetricKind;
+  acceptedAt: number;
+}
+
+function derivePointFields(args: BuildPointArgs) {
+  const { point, metric, metricData, kind } = args;
+
+  const timeUnixNano = requireTimeUnixNano(point);
+  const startTimeUnixNano = timestampDecimal(point.startTimeUnixNano) ?? "0";
+  const occurredAt = timestampMs(timeUnixNano);
+
+  const name = requireMetricName(metric);
+  const unit = stringField(metric.unit);
+  const description = stringField(metric.description);
+
+  const resource = isRecord(args.resourceMetric.resource)
+    ? args.resourceMetric.resource
+    : {};
+  const scope = isRecord(args.scopeMetric.scope) ? args.scopeMetric.scope : {};
+  const resourceAttributes = canonicalAttributes(resource.attributes);
+  const scopeAttributes = canonicalAttributes(scope.attributes);
+  const pointAttributes = canonicalAttributes(point.attributes);
+  const temporality = aggregation({ metricData, kind });
+  const monotonic = kind === "sum" ? Boolean(metricData.isMonotonic) : null;
+  const values = canonicalPointValues({ point, kind });
+  const flags = Number(point.flags ?? 0);
+
+  const seriesIdentity = buildSeriesIdentity({
+    tenantId: args.tenantId,
+    resourceSchemaUrl: stringField(args.resourceMetric.schemaUrl),
+    resourceAttributes,
+    scopeSchemaUrl: stringField(args.scopeMetric.schemaUrl),
+    scopeName: stringField(scope.name),
+    scopeVersion: stringField(scope.version),
+    scopeAttributes,
+    name,
+    unit,
+    kind,
+    temporality,
+    monotonic,
+    pointAttributes,
+  });
+
+  return {
+    resource,
+    scope,
+    name,
+    unit,
+    description,
+    resourceAttributes,
+    scopeAttributes,
+    pointAttributes,
+    kind,
+    temporality,
+    monotonic,
+    values,
+    flags,
+    startTimeUnixNano,
+    timeUnixNano,
+    occurredAt,
+    seriesIdentity,
+  };
+}
+
+/**
+ * Turns one validated OTLP data point into its canonical, lossless form:
+ * a stable SeriesId over the identity fields, a PointId over the full
+ * canonical payload, and the queryable columns rendered from that same payload.
+ */
+export function buildPoint(args: BuildPointArgs): PreparedMetricPoint {
+  validatePointShape({ point: args.point, kind: args.kind });
+  const fields = derivePointFields(args);
+  const seriesId = sha256(stableStringify(fields.seriesIdentity));
+
+  const canonicalPoint = buildCanonicalPoint({
+    ...fields,
+    exemplars: args.point.exemplars,
+  });
+  const canonicalPayload = stableStringify(canonicalPoint);
+  const canonicalSizeBytes = Buffer.byteLength(canonicalPayload, "utf8");
+  assertCanonicalPayloadSize(canonicalSizeBytes);
+  const pointId = sha256(`${seriesId}\0${canonicalPayload}`);
+
+  const dataPoint = assembleDataPoint({
+    ...fields,
+    tenantId: args.tenantId,
+    organizationId: args.organizationId,
+    acceptedAt: args.acceptedAt,
+    pointId,
+    seriesId,
+    canonicalPayload,
+    canonicalSizeBytes,
+  });
 
   return {
     dataPoint,
     correlations: correlations({
-      exemplars: point.exemplars,
+      exemplars: args.point.exemplars,
       tenantId: args.tenantId,
       pointId,
       seriesId,
-      metricName: name,
-      metricUnit: unit,
-      metricKind: kind,
-      occurredAt,
+      metricName: fields.name,
+      metricUnit: fields.unit,
+      metricKind: fields.kind,
+      occurredAt: fields.occurredAt,
     }),
   };
 }

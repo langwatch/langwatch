@@ -377,6 +377,23 @@ export function evaluationAnalyticsStateFromRow(
 const EVALUATION_STATUS_VALUES: ReadonlySet<EvaluationAnalyticsData["status"]> =
   new Set(["scheduled", "in_progress", "processed", "error", "skipped"]);
 
+/** The stringifiable (scalar) entries of a metadata bag, coerced to string
+ *  for the CH `Map(String, String)` shape. Non-scalar values are dropped —
+ *  the trim service rejects them too. */
+function stringifiableMetadataEntries(
+  metadata: Record<string, unknown>,
+): Array<[string, string]> {
+  const entries: Array<[string, string]> = [];
+  for (const [key, value] of Object.entries(metadata)) {
+    if (typeof value === "string") {
+      entries.push([key, value]);
+    } else if (typeof value === "number" || typeof value === "boolean") {
+      entries.push([key, String(value)]);
+    }
+  }
+  return entries;
+}
+
 /**
  * Merge a passthrough event metadata bag into the slim attributes map.
  * Keys arrive as `Record<string, unknown>` so we coerce to string for the
@@ -387,27 +404,9 @@ function mergeEventMetadata(
   metadata: Record<string, unknown> | undefined,
 ): Record<string, string> {
   if (!metadata) return attributes;
-  let merged = attributes;
-  let copied = false;
-  for (const [key, value] of Object.entries(metadata)) {
-    if (typeof value === "string") {
-      if (!copied) {
-        merged = { ...merged };
-        copied = true;
-      }
-      merged[key] = value;
-      continue;
-    }
-    if (typeof value === "number" || typeof value === "boolean") {
-      if (!copied) {
-        merged = { ...merged };
-        copied = true;
-      }
-      merged[key] = String(value);
-    }
-    // Drop non-scalar values — the trim service rejects them too.
-  }
-  return merged;
+  const entries = stringifiableMetadataEntries(metadata);
+  if (entries.length === 0) return attributes;
+  return { ...attributes, ...Object.fromEntries(entries) };
 }
 
 /**

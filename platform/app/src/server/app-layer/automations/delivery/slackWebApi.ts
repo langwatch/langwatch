@@ -216,6 +216,74 @@ const MAX_CHANNEL_PAGES = 10;
  */
 const CHANNEL_LIST_MAX_RESPONSE_BYTES = 1024 * 1024;
 
+/** One page of a `conversations.list` walk: either a terminal error, or the
+ *  channels found plus the cursor for the next page (absent when done). */
+type ChannelsPageResult =
+  | { kind: "error"; error: string }
+  | { kind: "page"; channels: SlackChannel[]; nextCursor?: string };
+
+/**
+ * Fetch and parse a single `conversations.list` page. Split out of
+ * {@link listChannelsForTypes} so the paging loop stays a plain loop over
+ * this result instead of interleaving the HTTP call, its two failure modes,
+ * and the pagination cursor logic.
+ */
+async function fetchChannelsPage({
+  token,
+  types,
+  cursor,
+}: {
+  token: string;
+  types: string;
+  cursor?: string;
+}): Promise<ChannelsPageResult> {
+  const params = new URLSearchParams({
+    types,
+    exclude_archived: "true",
+    limit: String(CHANNEL_PAGE_SIZE),
+  });
+  if (cursor) params.set("cursor", cursor);
+
+  let response: { status: number; body: string };
+  try {
+    response = await sendHttpDestination({
+      url: CONVERSATIONS_LIST_URL,
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: params.toString(),
+      maxResponseBytes: CHANNEL_LIST_MAX_RESPONSE_BYTES,
+      contextLabel: "Slack conversations.list",
+      validateUrl: validateSlackApiUrl,
+    });
+  } catch {
+    return { kind: "error", error: "request_failed" };
+  }
+
+  let body: SlackConversationsResponse;
+  try {
+    body = JSON.parse(response.body) as SlackConversationsResponse;
+  } catch {
+    return { kind: "error", error: "bad_response" };
+  }
+  if (!body.ok) return { kind: "error", error: body.error ?? "unknown_error" };
+
+  const channels = (body.channels ?? []).map((channel) => ({
+    id: channel.id,
+    name: channel.name,
+    isPrivate: !!channel.is_private,
+  }));
+
+  return {
+    kind: "page",
+    channels,
+    // Slack signals "no more pages" with an absent or empty next_cursor.
+    nextCursor: body.response_metadata?.next_cursor || undefined,
+  };
+}
+
 /**
  * One cursor-paged `conversations.list` walk for a specific `types` set. Slack
  * pages by cursor, so a real workspace needs the full walk — one page is only
@@ -243,49 +311,11 @@ async function listChannelsForTypes(
   let cursor: string | undefined;
 
   for (let page = 0; page < MAX_CHANNEL_PAGES; page++) {
-    const params = new URLSearchParams({
-      types,
-      exclude_archived: "true",
-      limit: String(CHANNEL_PAGE_SIZE),
-    });
-    if (cursor) params.set("cursor", cursor);
+    const result = await fetchChannelsPage({ token, types, cursor });
+    if (result.kind === "error") return done(result.error);
 
-    let response: { status: number; body: string };
-    try {
-      response = await sendHttpDestination({
-        url: CONVERSATIONS_LIST_URL,
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-        body: params.toString(),
-        maxResponseBytes: CHANNEL_LIST_MAX_RESPONSE_BYTES,
-        contextLabel: "Slack conversations.list",
-        validateUrl: validateSlackApiUrl,
-      });
-    } catch {
-      return done("request_failed");
-    }
-
-    let body: SlackConversationsResponse;
-    try {
-      body = JSON.parse(response.body) as SlackConversationsResponse;
-    } catch {
-      return done("bad_response");
-    }
-    if (!body.ok) return done(body.error ?? "unknown_error");
-
-    for (const channel of body.channels ?? []) {
-      collected.push({
-        id: channel.id,
-        name: channel.name,
-        isPrivate: !!channel.is_private,
-      });
-    }
-
-    // Slack signals "no more pages" with an absent or empty next_cursor.
-    cursor = body.response_metadata?.next_cursor || undefined;
+    collected.push(...result.channels);
+    cursor = result.nextCursor;
     if (!cursor) return done(null);
   }
 

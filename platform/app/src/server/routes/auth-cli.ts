@@ -607,8 +607,9 @@ const exchangeRequestSchema = z.object({
   client_info: clientInfoSchema,
 });
 
-secured.access(CLI_POLICY).post("/exchange", async (c: Context) => {
-  const redis = getRedis();
+async function parseExchangeBody(
+  c: Context,
+): Promise<Response | { device_code: string; client_info?: ClientInfo }> {
   const body = await c.req.json().catch(() => ({}));
   const parsed = exchangeRequestSchema.safeParse(body);
   if (!parsed.success) {
@@ -620,15 +621,20 @@ secured.access(CLI_POLICY).post("/exchange", async (c: Context) => {
       400,
     );
   }
+  return parsed.data;
+}
 
-  const { device_code } = parsed.data;
-
+async function checkExchangePollRate(
+  c: Context,
+  deviceCode: string,
+): Promise<Response | null> {
+  const redis = getRedis();
   // Per-device polling rate-limit. RFC 8628 says clients respect the
   // server-issued interval but defensive servers must enforce it too.
   // We use SET NX EX — first call writes the key with TTL, subsequent
   // calls within window see existing key and get rejected.
   const setResult = await redis.set(
-    pollRateKey(device_code),
+    pollRateKey(deviceCode),
     "1",
     "EX",
     POLL_RATE_LIMIT_SECONDS,
@@ -644,8 +650,15 @@ secured.access(CLI_POLICY).post("/exchange", async (c: Context) => {
       429,
     );
   }
+  return null;
+}
 
-  const raw = await redis.get(deviceCodeKey(device_code));
+async function loadDeviceCodeRecordForExchange(
+  c: Context,
+  deviceCode: string,
+): Promise<Response | DeviceCodeRecord> {
+  const redis = getRedis();
+  const raw = await redis.get(deviceCodeKey(deviceCode));
   if (!raw) {
     // Either the device_code never existed or it expired and Redis evicted it.
     // RFC 8628 recommends `expired_token` here.
@@ -664,7 +677,7 @@ secured.access(CLI_POLICY).post("/exchange", async (c: Context) => {
   if (Date.now() > record.expires_at) {
     // Per-key dels — Redis cluster CROSSSLOT-rejects multi-key ops
     // when keys differ in hash slot.
-    await redis.del(deviceCodeKey(device_code));
+    await redis.del(deviceCodeKey(deviceCode));
     await redis.del(userCodeKey(record.user_code));
     return c.json(
       { error: "expired_token", error_description: "Device code expired" },
@@ -672,242 +685,369 @@ secured.access(CLI_POLICY).post("/exchange", async (c: Context) => {
     );
   }
 
-  if (record.status === "denied") {
-    // Per-key dels — Redis cluster CROSSSLOT-rejects multi-key ops
-    // when keys differ in hash slot.
-    await redis.del(deviceCodeKey(device_code));
-    await redis.del(userCodeKey(record.user_code));
+  return record;
+}
+
+async function respondDeviceCodeDenied(
+  c: Context,
+  record: DeviceCodeRecord,
+  deviceCode: string,
+): Promise<Response> {
+  const redis = getRedis();
+  // Per-key dels — Redis cluster CROSSSLOT-rejects multi-key ops
+  // when keys differ in hash slot.
+  await redis.del(deviceCodeKey(deviceCode));
+  await redis.del(userCodeKey(record.user_code));
+  return c.json(
+    {
+      error: "access_denied",
+      error_description: "Authorization request was denied by the user",
+    },
+    410,
+  );
+}
+
+function respondAuthorizationPending(c: Context): Response {
+  return c.json(
+    {
+      error: "authorization_pending",
+      error_description: "User has not yet completed authorization",
+    },
+    428,
+  );
+}
+
+function respondApprovedMissingPayload(
+  c: Context,
+  deviceCode: string,
+): Response {
+  // Should not happen — approval handler always populates these. Treat
+  // as a transient pending state so the CLI keeps polling rather than
+  // crashing. Worst case the user re-runs `langwatch login`.
+  logger.warn(
+    `[auth-cli] approved device_code ${deviceCode} missing user/org payload — returning pending`,
+  );
+  return c.json(
+    {
+      error: "authorization_pending",
+      error_description: "Approval received but session not ready yet",
+    },
+    428,
+  );
+}
+
+// Look up user + org details for the response payload. We only fetch
+// the fields the CLI actually needs to print on success.
+async function loadApprovedUserAndOrg(c: Context, record: DeviceCodeRecord) {
+  const user = await prisma.user.findUnique({
+    where: { id: record.user_id },
+    select: { id: true, email: true, name: true },
+  });
+  const organization = await prisma.organization.findUnique({
+    where: { id: record.organization_id },
+    select: { id: true, name: true, slug: true },
+  });
+  if (!user || !organization) {
+    logger.error(
+      `[auth-cli] approved device_code refers to missing user (${record.user_id}) or org (${record.organization_id})`,
+    );
     return c.json(
       {
-        error: "access_denied",
-        error_description: "Authorization request was denied by the user",
+        error: "server_error",
+        error_description: "User or organization no longer exists",
       },
-      410,
+      500,
     );
   }
+  return { user, organization };
+}
 
-  if (record.status === "pending") {
+// No-paste API-key flow: the user picked a project on /cli/auth and the
+// approve handler stamped the project's existing apiKey onto the record.
+// Return the verbatim apiKey + project identity; CLI writes it to .env.
+// No access/refresh tokens needed — the apiKey IS the credential the
+// SDK uses, and it's already revocable from /settings/projects.
+async function respondProjectApiKeyExchange(
+  c: Context,
+  params: {
+    record: DeviceCodeRecord;
+    deviceCode: string;
+    user: { id: string; email: string; name: string | null };
+    organization: { id: string; name: string; slug: string };
+  },
+): Promise<Response> {
+  const { record, deviceCode, user, organization } = params;
+  if (!record.project_api_key) {
+    logger.warn(
+      `[auth-cli] approved project_api_key device_code ${deviceCode} missing project payload — returning pending`,
+    );
     return c.json(
       {
         error: "authorization_pending",
-        error_description: "User has not yet completed authorization",
+        error_description: "Approval received but project key not ready yet",
       },
       428,
     );
   }
+  const redis = getRedis();
+  // Single-use device_code: delete after successful exchange. Per-key
+  // dels — Redis cluster CROSSSLOT-rejects multi-key ops on differing
+  // hash slots.
+  await redis.del(deviceCodeKey(deviceCode));
+  await redis.del(userCodeKey(record.user_code));
+  return c.json(
+    {
+      kind: "api_key" as const,
+      api_key: record.project_api_key.api_key,
+      project: {
+        id: record.project_api_key.project_id,
+        slug: record.project_api_key.project_slug,
+        name: record.project_api_key.project_name,
+      },
+      user: { id: user.id, email: user.email, name: user.name },
+      organization: {
+        id: organization.id,
+        name: organization.name,
+        slug: organization.slug,
+      },
+      endpoint: controlPlaneBaseUrl(),
+    },
+    200,
+  );
+}
+
+async function ensurePersonalProjectForExchange(
+  user: { id: string; email: string; name: string | null },
+  organization: { id: string; name: string; slug: string },
+): Promise<
+  { id: string; slug: string; name: string; api_key: string } | undefined
+> {
+  // Personal VK is optional on the device session: orgs that haven't
+  // published a default RoutingPolicy yet (fresh signup, solo dev,
+  // dogfood account) can still sign the user in for governance / portal
+  // navigation. The CLI wrapper mints a VK lazily on first gateway call
+  // once a provider chain becomes available.
+
+  // Personal project delivery: the personal project is a normal project
+  // with a normal apiKey, and it is what data commands (`langwatch trace
+  // search`, `/api/me/usage`, ...) authenticate with after a device
+  // login. Ensure the workspace here (idempotent; approve may have
+  // skipped VK minting for provider-less orgs) and ship its key so the
+  // CLI never has to ask the user for one. Best-effort: a workspace
+  // failure must not fail the login itself, and older CLIs ignore the
+  // extra field.
+  try {
+    const workspace = await new PersonalWorkspaceService(prisma).ensure({
+      userId: user.id,
+      organizationId: organization.id,
+      displayName: user.name,
+      displayEmail: user.email,
+    });
+    return {
+      id: workspace.project.id,
+      slug: workspace.project.slug,
+      name: workspace.project.name,
+      api_key: workspace.project.apiKey,
+    };
+  } catch (err) {
+    logger.error(
+      { err, userId: user.id, organizationId: organization.id },
+      "[auth-cli] could not ensure personal workspace on exchange; device session ships without personal_project",
+    );
+    return undefined;
+  }
+}
+
+async function mintDeviceSessionTokens({
+  user,
+  organization,
+  clientInfo,
+}: {
+  user: { id: string };
+  organization: { id: string };
+  clientInfo: ClientInfo | undefined;
+}): Promise<{ accessToken: string; refreshToken: string }> {
+  // Mint access + refresh tokens, persist both in Redis with TTL so
+  // protected CLI endpoints (/budget/status etc.) can validate Bearer
+  // tokens against an authoritative store.
+  const accessToken = generateAccessToken();
+  const refreshToken = generateRefreshToken();
+  const now = Date.now();
+  // Phase 8 — stamp client device info so /me/devices can show
+  // "Bob's MacBook Pro" entries. session_started_at is preserved
+  // through future /refresh rotations so the dashboard can show
+  // "logged in 5 days ago" rather than the rotation timestamp.
+  const clientInfoStamped: ClientInfo | undefined = clientInfo
+    ? { ...clientInfo, session_started_at: now }
+    : undefined;
+  const accessRecord: AccessTokenRecord = {
+    user_id: user.id,
+    organization_id: organization.id,
+    issued_at: now,
+    expires_at: now + ACCESS_TOKEN_TTL_SECONDS * 1000,
+    client_info: clientInfoStamped,
+  };
+  const refreshRecord: RefreshTokenRecord = {
+    user_id: user.id,
+    organization_id: organization.id,
+    issued_at: now,
+    expires_at: now + REFRESH_TOKEN_TTL_SECONDS * 1000,
+    client_info: clientInfoStamped,
+  };
+  const redis = getRedis();
+  // Per-key sets — Redis cluster CROSSSLOT-rejects multi-key ops
+  // when keys differ in hash slot. The two records can briefly diverge
+  // (e.g. access set but refresh not yet) — that's acceptable: the
+  // browser path only reads access; refresh exchange goes back through
+  // this same handler if access expires.
+  await redis.set(
+    accessTokenKey(accessToken),
+    JSON.stringify(accessRecord),
+    "EX",
+    ACCESS_TOKEN_TTL_SECONDS,
+  );
+  await redis.set(
+    refreshTokenKey(refreshToken),
+    JSON.stringify(refreshRecord),
+    "EX",
+    REFRESH_TOKEN_TTL_SECONDS,
+  );
+
+  // Per-user token index — single-key ops, cluster-safe. Used by
+  // CliTokenRevocationService.revokeForUser on deactivation.
+  const indexKey = userTokensIndexKey(user.id);
+  await redis
+    .pipeline()
+    .sadd(indexKey, accessTokenKey(accessToken), refreshTokenKey(refreshToken))
+    .pexpire(indexKey, REFRESH_TOKEN_TTL_SECONDS * 1000)
+    .exec();
+
+  return { accessToken, refreshToken };
+}
+
+async function respondDeviceSessionExchange(
+  c: Context,
+  params: {
+    record: DeviceCodeRecord;
+    deviceCode: string;
+    user: { id: string; email: string; name: string | null };
+    organization: { id: string; name: string; slug: string };
+    clientInfo: ClientInfo | undefined;
+  },
+): Promise<Response> {
+  const { record, deviceCode, user, organization, clientInfo } = params;
+
+  const personalProject = await ensurePersonalProjectForExchange(
+    user,
+    organization,
+  );
+
+  const { accessToken, refreshToken } = await mintDeviceSessionTokens({
+    user,
+    organization,
+    clientInfo,
+  });
+
+  const redis = getRedis();
+  // Single-use device_code: delete after successful exchange.
+  // Per-key dels — Redis cluster CROSSSLOT-rejects multi-key ops
+  // when keys differ in hash slot.
+  await redis.del(deviceCodeKey(deviceCode));
+  await redis.del(userCodeKey(record.user_code));
+
+  return c.json(
+    {
+      kind: "device_session" as const,
+      access_token: accessToken,
+      token_type: "Bearer" as const,
+      expires_in: ACCESS_TOKEN_TTL_SECONDS,
+      refresh_token: refreshToken,
+      refresh_expires_in: REFRESH_TOKEN_TTL_SECONDS,
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+      },
+      organization: {
+        id: organization.id,
+        name: organization.name,
+        slug: organization.slug,
+      },
+      default_personal_vk: record.personal_vk,
+      personal_project: personalProject,
+      endpoint: controlPlaneBaseUrl(),
+    },
+    200,
+  );
+}
+
+async function respondApprovedExchange(
+  c: Context,
+  params: {
+    record: DeviceCodeRecord;
+    deviceCode: string;
+    clientInfo: ClientInfo | undefined;
+  },
+): Promise<Response> {
+  const { record, deviceCode, clientInfo } = params;
+
+  if (!record.user_id || !record.organization_id) {
+    return respondApprovedMissingPayload(c, deviceCode);
+  }
+
+  const loaded = await loadApprovedUserAndOrg(c, record);
+  if (loaded instanceof Response) return loaded;
+  const { user, organization } = loaded;
+
+  // No-paste API-key flow: the user picked a project on /cli/auth and the
+  // approve handler stamped the project's existing apiKey onto the record.
+  // Return the verbatim apiKey + project identity; CLI writes it to .env.
+  // No access/refresh tokens needed — the apiKey IS the credential the
+  // SDK uses, and it's already revocable from /settings/projects.
+  if ((record.credential_type ?? "device_session") === "project_api_key") {
+    return respondProjectApiKeyExchange(c, {
+      record,
+      deviceCode,
+      user,
+      organization,
+    });
+  }
+
+  return respondDeviceSessionExchange(c, {
+    record,
+    deviceCode,
+    user,
+    organization,
+    clientInfo,
+  });
+}
+
+secured.access(CLI_POLICY).post("/exchange", async (c: Context) => {
+  const parsedBody = await parseExchangeBody(c);
+  if (parsedBody instanceof Response) return parsedBody;
+  const { device_code, client_info } = parsedBody;
+
+  const rateLimited = await checkExchangePollRate(c, device_code);
+  if (rateLimited) return rateLimited;
+
+  const loadedRecord = await loadDeviceCodeRecordForExchange(c, device_code);
+  if (loadedRecord instanceof Response) return loadedRecord;
+  const record = loadedRecord;
+
+  if (record.status === "denied") {
+    return respondDeviceCodeDenied(c, record, device_code);
+  }
+
+  if (record.status === "pending") {
+    return respondAuthorizationPending(c);
+  }
 
   if (record.status === "approved") {
-    if (!record.user_id || !record.organization_id) {
-      // Should not happen — approval handler always populates these. Treat
-      // as a transient pending state so the CLI keeps polling rather than
-      // crashing. Worst case the user re-runs `langwatch login`.
-      logger.warn(
-        `[auth-cli] approved device_code ${device_code} missing user/org payload — returning pending`,
-      );
-      return c.json(
-        {
-          error: "authorization_pending",
-          error_description: "Approval received but session not ready yet",
-        },
-        428,
-      );
-    }
-
-    // Look up user + org details for the response payload. We only fetch
-    // the fields the CLI actually needs to print on success.
-    const user = await prisma.user.findUnique({
-      where: { id: record.user_id },
-      select: { id: true, email: true, name: true },
+    return respondApprovedExchange(c, {
+      record,
+      deviceCode: device_code,
+      clientInfo: client_info,
     });
-    const organization = await prisma.organization.findUnique({
-      where: { id: record.organization_id },
-      select: { id: true, name: true, slug: true },
-    });
-    if (!user || !organization) {
-      logger.error(
-        `[auth-cli] approved device_code refers to missing user (${record.user_id}) or org (${record.organization_id})`,
-      );
-      return c.json(
-        {
-          error: "server_error",
-          error_description: "User or organization no longer exists",
-        },
-        500,
-      );
-    }
-
-    const responseEndpoint = controlPlaneBaseUrl();
-
-    // No-paste API-key flow: the user picked a project on /cli/auth and the
-    // approve handler stamped the project's existing apiKey onto the record.
-    // Return the verbatim apiKey + project identity; CLI writes it to .env.
-    // No access/refresh tokens needed — the apiKey IS the credential the
-    // SDK uses, and it's already revocable from /settings/projects.
-    if ((record.credential_type ?? "device_session") === "project_api_key") {
-      if (!record.project_api_key) {
-        logger.warn(
-          `[auth-cli] approved project_api_key device_code ${device_code} missing project payload — returning pending`,
-        );
-        return c.json(
-          {
-            error: "authorization_pending",
-            error_description:
-              "Approval received but project key not ready yet",
-          },
-          428,
-        );
-      }
-      // Single-use device_code: delete after successful exchange. Per-key
-      // dels — Redis cluster CROSSSLOT-rejects multi-key ops on differing
-      // hash slots.
-      await redis.del(deviceCodeKey(device_code));
-      await redis.del(userCodeKey(record.user_code));
-      return c.json(
-        {
-          kind: "api_key" as const,
-          api_key: record.project_api_key.api_key,
-          project: {
-            id: record.project_api_key.project_id,
-            slug: record.project_api_key.project_slug,
-            name: record.project_api_key.project_name,
-          },
-          user: { id: user.id, email: user.email, name: user.name },
-          organization: {
-            id: organization.id,
-            name: organization.name,
-            slug: organization.slug,
-          },
-          endpoint: responseEndpoint,
-        },
-        200,
-      );
-    }
-
-    // Personal VK is optional on the device session: orgs that haven't
-    // published a default RoutingPolicy yet (fresh signup, solo dev,
-    // dogfood account) can still sign the user in for governance / portal
-    // navigation. The CLI wrapper mints a VK lazily on first gateway call
-    // once a provider chain becomes available.
-
-    // Personal project delivery: the personal project is a normal project
-    // with a normal apiKey, and it is what data commands (`langwatch trace
-    // search`, `/api/me/usage`, ...) authenticate with after a device
-    // login. Ensure the workspace here (idempotent; approve may have
-    // skipped VK minting for provider-less orgs) and ship its key so the
-    // CLI never has to ask the user for one. Best-effort: a workspace
-    // failure must not fail the login itself, and older CLIs ignore the
-    // extra field.
-    let personalProject:
-      | { id: string; slug: string; name: string; api_key: string }
-      | undefined;
-    try {
-      const workspace = await new PersonalWorkspaceService(prisma).ensure({
-        userId: user.id,
-        organizationId: organization.id,
-        displayName: user.name,
-        displayEmail: user.email,
-      });
-      personalProject = {
-        id: workspace.project.id,
-        slug: workspace.project.slug,
-        name: workspace.project.name,
-        api_key: workspace.project.apiKey,
-      };
-    } catch (err) {
-      logger.error(
-        { err, userId: user.id, organizationId: organization.id },
-        "[auth-cli] could not ensure personal workspace on exchange; device session ships without personal_project",
-      );
-    }
-
-    // Mint access + refresh tokens, persist both in Redis with TTL so
-    // protected CLI endpoints (/budget/status etc.) can validate Bearer
-    // tokens against an authoritative store.
-    const accessToken = generateAccessToken();
-    const refreshToken = generateRefreshToken();
-    const now = Date.now();
-    // Phase 8 — stamp client device info so /me/devices can show
-    // "Bob's MacBook Pro" entries. session_started_at is preserved
-    // through future /refresh rotations so the dashboard can show
-    // "logged in 5 days ago" rather than the rotation timestamp.
-    const clientInfoStamped: ClientInfo | undefined = parsed.data.client_info
-      ? { ...parsed.data.client_info, session_started_at: now }
-      : undefined;
-    const accessRecord: AccessTokenRecord = {
-      user_id: user.id,
-      organization_id: organization.id,
-      issued_at: now,
-      expires_at: now + ACCESS_TOKEN_TTL_SECONDS * 1000,
-      client_info: clientInfoStamped,
-    };
-    const refreshRecord: RefreshTokenRecord = {
-      user_id: user.id,
-      organization_id: organization.id,
-      issued_at: now,
-      expires_at: now + REFRESH_TOKEN_TTL_SECONDS * 1000,
-      client_info: clientInfoStamped,
-    };
-    // Per-key sets — Redis cluster CROSSSLOT-rejects multi-key ops
-    // when keys differ in hash slot. The two records can briefly diverge
-    // (e.g. access set but refresh not yet) — that's acceptable: the
-    // browser path only reads access; refresh exchange goes back through
-    // this same handler if access expires.
-    await redis.set(
-      accessTokenKey(accessToken),
-      JSON.stringify(accessRecord),
-      "EX",
-      ACCESS_TOKEN_TTL_SECONDS,
-    );
-    await redis.set(
-      refreshTokenKey(refreshToken),
-      JSON.stringify(refreshRecord),
-      "EX",
-      REFRESH_TOKEN_TTL_SECONDS,
-    );
-
-    // Per-user token index — single-key ops, cluster-safe. Used by
-    // CliTokenRevocationService.revokeForUser on deactivation.
-    const indexKey = userTokensIndexKey(user.id);
-    await redis
-      .pipeline()
-      .sadd(
-        indexKey,
-        accessTokenKey(accessToken),
-        refreshTokenKey(refreshToken),
-      )
-      .pexpire(indexKey, REFRESH_TOKEN_TTL_SECONDS * 1000)
-      .exec();
-
-    // Single-use device_code: delete after successful exchange.
-    // Per-key dels — Redis cluster CROSSSLOT-rejects multi-key ops
-    // when keys differ in hash slot.
-    await redis.del(deviceCodeKey(device_code));
-    await redis.del(userCodeKey(record.user_code));
-
-    return c.json(
-      {
-        kind: "device_session" as const,
-        access_token: accessToken,
-        token_type: "Bearer" as const,
-        expires_in: ACCESS_TOKEN_TTL_SECONDS,
-        refresh_token: refreshToken,
-        refresh_expires_in: REFRESH_TOKEN_TTL_SECONDS,
-        user: {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-        },
-        organization: {
-          id: organization.id,
-          name: organization.name,
-          slug: organization.slug,
-        },
-        default_personal_vk: record.personal_vk,
-        personal_project: personalProject,
-        endpoint: responseEndpoint,
-      },
-      200,
-    );
   }
 
   if (record.status === "expired") {
@@ -931,8 +1071,9 @@ const refreshRequestSchema = z.object({
   refresh_token: z.string().min(1),
 });
 
-secured.access(CLI_POLICY).post("/refresh", async (c: Context) => {
-  const redis = getRedis();
+async function parseRefreshBody(
+  c: Context,
+): Promise<Response | { refresh_token: string }> {
   const body = await c.req.json().catch(() => ({}));
   const parsed = refreshRequestSchema.safeParse(body);
   if (!parsed.success) {
@@ -944,9 +1085,15 @@ secured.access(CLI_POLICY).post("/refresh", async (c: Context) => {
       400,
     );
   }
+  return parsed.data;
+}
 
-  const { refresh_token } = parsed.data;
-  const raw = await redis.get(refreshTokenKey(refresh_token));
+async function loadRefreshTokenRecord(
+  c: Context,
+  refreshToken: string,
+): Promise<Response | RefreshTokenRecord> {
+  const redis = getRedis();
+  const raw = await redis.get(refreshTokenKey(refreshToken));
   if (!raw) {
     // Unknown / revoked. CLI wipes local state on 401.
     return c.json(
@@ -960,7 +1107,7 @@ secured.access(CLI_POLICY).post("/refresh", async (c: Context) => {
 
   const record = JSON.parse(raw) as RefreshTokenRecord;
   if (Date.now() > record.expires_at) {
-    await redis.del(refreshTokenKey(refresh_token));
+    await redis.del(refreshTokenKey(refreshToken));
     return c.json(
       {
         error: "invalid_grant",
@@ -969,13 +1116,20 @@ secured.access(CLI_POLICY).post("/refresh", async (c: Context) => {
       401,
     );
   }
+  return record;
+}
 
-  // Phase 8 — enforce admin-configured max session duration. The
-  // session-start anchor is `client_info.session_started_at` (set at
-  // /exchange and preserved across rotations); fall back to
-  // record.issued_at for sessions started before client_info was
-  // captured. When maxSessionDurationDays > 0 and the session is
-  // older, reject the refresh — the user must re-run `langwatch login`.
+// Phase 8 — enforce admin-configured max session duration. The
+// session-start anchor is `client_info.session_started_at` (set at
+// /exchange and preserved across rotations); fall back to
+// record.issued_at for sessions started before client_info was
+// captured. When maxSessionDurationDays > 0 and the session is
+// older, reject the refresh — the user must re-run `langwatch login`.
+async function enforceMaxSessionDuration(
+  c: Context,
+  record: RefreshTokenRecord,
+  refreshToken: string,
+): Promise<Response | null> {
   const sessionAnchorMs =
     record.client_info?.session_started_at ?? record.issued_at;
   const org = await prisma.organization.findUnique({
@@ -983,34 +1137,43 @@ secured.access(CLI_POLICY).post("/refresh", async (c: Context) => {
     select: { maxSessionDurationDays: true },
   });
   const maxDurationDays = org?.maxSessionDurationDays ?? 0;
-  if (maxDurationDays > 0) {
-    const sessionAgeMs = Date.now() - sessionAnchorMs;
-    const maxDurationMs = maxDurationDays * 24 * 60 * 60 * 1000;
-    if (sessionAgeMs > maxDurationMs) {
-      // Reject + invalidate the old refresh token to prevent further
-      // rotation attempts. The CLI gets 401 → wipes local state.
-      await redis.del(refreshTokenKey(refresh_token));
-      logger.info(
-        {
-          userId: record.user_id,
-          organizationId: record.organization_id,
-          sessionAgeDays: Math.round(sessionAgeMs / 86_400_000),
-          maxDurationDays,
-        },
-        "rejecting refresh: session exceeded org max-duration policy",
-      );
-      return c.json(
-        {
-          error: "invalid_grant",
-          error_description: `Session exceeded organization max-duration policy of ${maxDurationDays} days. Please run \`langwatch login\` to start a new session.`,
-        },
-        401,
-      );
-    }
-  }
+  if (maxDurationDays <= 0) return null;
 
-  // Rotate: mint new pair, invalidate old. (Sliding-window rotation —
-  // standard OAuth pattern, helps detect stolen tokens.)
+  const sessionAgeMs = Date.now() - sessionAnchorMs;
+  const maxDurationMs = maxDurationDays * 24 * 60 * 60 * 1000;
+  if (sessionAgeMs <= maxDurationMs) return null;
+
+  // Reject + invalidate the old refresh token to prevent further
+  // rotation attempts. The CLI gets 401 → wipes local state.
+  const redis = getRedis();
+  await redis.del(refreshTokenKey(refreshToken));
+  logger.info(
+    {
+      userId: record.user_id,
+      organizationId: record.organization_id,
+      sessionAgeDays: Math.round(sessionAgeMs / 86_400_000),
+      maxDurationDays,
+    },
+    "rejecting refresh: session exceeded org max-duration policy",
+  );
+  return c.json(
+    {
+      error: "invalid_grant",
+      error_description: `Session exceeded organization max-duration policy of ${maxDurationDays} days. Please run \`langwatch login\` to start a new session.`,
+    },
+    401,
+  );
+}
+
+// Rotate: mint new pair, invalidate old. (Sliding-window rotation —
+// standard OAuth pattern, helps detect stolen tokens.)
+async function rotateRefreshToken({
+  record,
+  oldRefreshToken,
+}: {
+  record: RefreshTokenRecord;
+  oldRefreshToken: string;
+}): Promise<{ accessToken: string; refreshToken: string }> {
   const newAccessToken = generateAccessToken();
   const newRefreshToken = generateRefreshToken();
   const now = Date.now();
@@ -1032,6 +1195,7 @@ secured.access(CLI_POLICY).post("/refresh", async (c: Context) => {
     client_info: carriedClientInfo,
   };
 
+  const redis = getRedis();
   await redis
     .multi()
     .set(
@@ -1046,7 +1210,7 @@ secured.access(CLI_POLICY).post("/refresh", async (c: Context) => {
       "EX",
       REFRESH_TOKEN_TTL_SECONDS,
     )
-    .del(refreshTokenKey(refresh_token))
+    .del(refreshTokenKey(oldRefreshToken))
     .exec();
 
   // Refresh the per-user index so revokeForUser sees the rotated pair.
@@ -1065,12 +1229,36 @@ secured.access(CLI_POLICY).post("/refresh", async (c: Context) => {
     .pexpire(indexKey, REFRESH_TOKEN_TTL_SECONDS * 1000)
     .exec();
 
+  return { accessToken: newAccessToken, refreshToken: newRefreshToken };
+}
+
+secured.access(CLI_POLICY).post("/refresh", async (c: Context) => {
+  const parsedBody = await parseRefreshBody(c);
+  if (parsedBody instanceof Response) return parsedBody;
+  const { refresh_token } = parsedBody;
+
+  const loadedRecord = await loadRefreshTokenRecord(c, refresh_token);
+  if (loadedRecord instanceof Response) return loadedRecord;
+  const record = loadedRecord;
+
+  const durationRefusal = await enforceMaxSessionDuration(
+    c,
+    record,
+    refresh_token,
+  );
+  if (durationRefusal) return durationRefusal;
+
+  const { accessToken, refreshToken } = await rotateRefreshToken({
+    record,
+    oldRefreshToken: refresh_token,
+  });
+
   return c.json(
     {
-      access_token: newAccessToken,
+      access_token: accessToken,
       token_type: "Bearer",
       expires_in: ACCESS_TOKEN_TTL_SECONDS,
-      refresh_token: newRefreshToken,
+      refresh_token: refreshToken,
       refresh_expires_in: REFRESH_TOKEN_TTL_SECONDS,
     },
     200,
@@ -1899,7 +2087,7 @@ const approveRequestSchema = z.object({
   project_id: z.string().optional(),
 });
 
-secured.access(cliApproveAuth).post("/approve", async (c: Context) => {
+async function authenticateApproveCaller(c: Context) {
   const session = await getServerAuthSession({ req: c.req.raw as any });
   if (!session?.user) {
     return c.json(
@@ -1907,7 +2095,10 @@ secured.access(cliApproveAuth).post("/approve", async (c: Context) => {
       401,
     );
   }
+  return session.user;
+}
 
+async function parseApproveBody(c: Context) {
   const body = await c.req.json().catch(() => ({}));
   const parsed = approveRequestSchema.safeParse(body);
   if (!parsed.success) {
@@ -1919,14 +2110,20 @@ secured.access(cliApproveAuth).post("/approve", async (c: Context) => {
       400,
     );
   }
-  const { user_code, organization_id, project_id } = parsed.data;
+  return parsed.data;
+}
 
-  // Verify caller is a member of the org they're issuing a key for.
+// Verify caller is a member of the org they're issuing a key for.
+async function verifyApproveOrgMembership(
+  c: Context,
+  userId: string,
+  organizationId: string,
+): Promise<Response | null> {
   const membership = await prisma.organizationUser.findUnique({
     where: {
       userId_organizationId: {
-        userId: session.user.id,
-        organizationId: organization_id,
+        userId,
+        organizationId,
       },
     },
   });
@@ -1934,13 +2131,19 @@ secured.access(cliApproveAuth).post("/approve", async (c: Context) => {
     return c.json(
       {
         error: "forbidden",
-        error_description: `Not a member of organization ${organization_id}`,
+        error_description: `Not a member of organization ${organizationId}`,
       },
       403,
     );
   }
+  return null;
+}
 
-  const record = await findDeviceCodeByUserCode(user_code);
+async function loadPendingDeviceCodeForApprove(
+  c: Context,
+  userCode: string,
+): Promise<Response | DeviceCodeRecord> {
+  const record = await findDeviceCodeByUserCode(userCode);
   if (!record) {
     return c.json(
       { error: "not_found", error_description: "Code not recognised" },
@@ -1962,89 +2165,254 @@ secured.access(cliApproveAuth).post("/approve", async (c: Context) => {
       409,
     );
   }
+  return record;
+}
 
-  // Branch on the credential type the CLI requested at /device-code time.
-  // `project_api_key` returns the user-picked project's existing apiKey; no
-  // new key is minted, so existing consumers (other team members, CI, etc.)
-  // keep working unchanged. The CLI writes the key into `$CWD/.env`.
-  if ((record.credential_type ?? "device_session") === "project_api_key") {
-    if (!project_id) {
-      return c.json(
-        {
-          error: "invalid_request",
-          error_description:
-            "project_id is required when credential_type is project_api_key",
-        },
-        400,
-      );
-    }
-    // Resolve the picked project: it must live in the chosen org and not be
-    // archived. Authorization is NOT decided by this lookup. The
-    // `hasProjectPermission(..., "project:update")` check below is the source
-    // of truth, and it re-derives the org from the project id and inspects
-    // project-, team- and org-scoped role bindings plus the org role. So an
-    // org-level admin (or an org/team-scoped role-binding admin) who sees the
-    // project in the picker via `organization.getAll`, but is not a direct
-    // TeamUser member, is authorized by their real permission instead of
-    // being pre-filtered out. The org-scoping predicate here plus that RBAC
-    // check together stop a spoofed `project_id` from leaking another org's
-    // key.
-    const project = await prisma.project.findFirst({
-      where: {
-        id: project_id,
-        archivedAt: null,
-        team: {
-          organizationId: organization_id,
-        },
-      },
-      select: {
-        id: true,
-        slug: true,
-        name: true,
-        apiKey: true,
-        isPersonal: true,
-        ownerUserId: true,
-      },
-    });
-    if (!project) {
-      return c.json(
-        {
-          error: "forbidden",
-          error_description:
-            "Project not found or unavailable in this organization",
-        },
-        403,
-      );
-    }
-
-    // The browser picker lists personal as a clearly-labelled entry the user
-    // must deliberately choose, so an explicit self-pick is honoured here;
-    // everything else the shared handout rule refuses.
-    const refusal = await refuseProjectKeyHandout(c, project, session.user.id);
-    if (refusal) return refusal;
-
-    await approveDeviceCode({
-      deviceCode: record.device_code,
-      userId: session.user.id,
-      organizationId: organization_id,
-      projectApiKey: {
-        project_id: project.id,
-        project_slug: project.slug,
-        project_name: project.name,
-        api_key: project.apiKey,
-      },
-    });
-
+async function approveProjectApiKeyFlow(
+  c: Context,
+  params: {
+    record: DeviceCodeRecord;
+    organizationId: string;
+    projectId: string | undefined;
+    callerId: string;
+  },
+): Promise<Response> {
+  const { record, organizationId, projectId, callerId } = params;
+  if (!projectId) {
     return c.json(
       {
-        ok: true,
-        kind: "api_key" as const,
-        project: { id: project.id, slug: project.slug, name: project.name },
-        organization_id,
+        error: "invalid_request",
+        error_description:
+          "project_id is required when credential_type is project_api_key",
       },
-      200,
+      400,
     );
   }
+  // Resolve the picked project: it must live in the chosen org and not be
+  // archived. Authorization is NOT decided by this lookup. The
+  // `hasProjectPermission(..., "project:update")` check below is the source
+  // of truth, and it re-derives the org from the project id and inspects
+  // project-, team- and org-scoped role bindings plus the org role. So an
+  // org-level admin (or an org/team-scoped role-binding admin) who sees the
+  // project in the picker via `organization.getAll`, but is not a direct
+  // TeamUser member, is authorized by their real permission instead of
+  // being pre-filtered out. The org-scoping predicate here plus that RBAC
+  // check together stop a spoofed `project_id` from leaking another org's
+  // key.
+  const project = await prisma.project.findFirst({
+    where: {
+      id: projectId,
+      archivedAt: null,
+      team: {
+        organizationId,
+      },
+    },
+    select: {
+      id: true,
+      slug: true,
+      name: true,
+      apiKey: true,
+      isPersonal: true,
+      ownerUserId: true,
+    },
+  });
+  if (!project) {
+    return c.json(
+      {
+        error: "forbidden",
+        error_description:
+          "Project not found or unavailable in this organization",
+      },
+      403,
+    );
+  }
+
+  // The browser picker lists personal as a clearly-labelled entry the user
+  // must deliberately choose, so an explicit self-pick is honoured here;
+  // everything else the shared handout rule refuses.
+  const refusal = await refuseProjectKeyHandout(c, project, callerId);
+  if (refusal) return refusal;
+
+  await approveDeviceCode({
+    deviceCode: record.device_code,
+    userId: callerId,
+    organizationId,
+    projectApiKey: {
+      project_id: project.id,
+      project_slug: project.slug,
+      project_name: project.name,
+      api_key: project.apiKey,
+    },
+  });
+
+  return c.json(
+    {
+      ok: true,
+      kind: "api_key" as const,
+      project: { id: project.id, slug: project.slug, name: project.name },
+      organization_id: organizationId,
+    },
+    200,
+  );
+}
+
+// Mint (or return) the user's default personal VK for this org.
+type MintPersonalVkApproveParams = {
+  record: DeviceCodeRecord;
+  userCode: string;
+  organizationId: string;
+  caller: {
+    id: string;
+    name: string | null | undefined;
+    email: string | null | undefined;
+  };
+};
+
+// Fresh signup / dogfood account / org with no accessible providers (or
+// with an explicitly-pinned empty policy): log the user in with a device
+// session anyway. The /me Model Providers tile surfaces the actionable
+// "add a provider" CTA; failing the entire approve flow here blocked solo
+// devs from ever reaching the setup screens. Post-fix to the
+// no-default-policy graceful fallback, this branch fires only when there
+// are truly zero eligible providers via scope cascade.
+async function approveWithoutPersonalVk(
+  c: Context,
+  params: MintPersonalVkApproveParams,
+  err: NoEligibleProvidersError | RoutingPolicyHasNoProvidersError,
+): Promise<Response> {
+  const { record, userCode, organizationId, caller } = params;
+  logger.info(
+    {
+      user_code: userCode,
+      organization_id: organizationId,
+      reason:
+        err instanceof NoEligibleProvidersError
+          ? "no_eligible_providers"
+          : "routing_policy_has_no_providers",
+    },
+    "[auth-cli] approving device session without personal VK; admin/user must configure provider before gateway use",
+  );
+  await approveDeviceCode({
+    deviceCode: record.device_code,
+    userId: caller.id,
+    organizationId,
+  });
+  return c.json({ ok: true, organization_id: organizationId }, 200);
+}
+
+// Issue an additional device-specific key instead so multiple devices
+// don't have to share the "default" key. Label includes a short suffix
+// from the user_code for human discoverability.
+async function issueAdditionalDeviceVk(
+  c: Context,
+  params: MintPersonalVkApproveParams,
+  service: PersonalVirtualKeyService,
+): Promise<
+  Response | { issued: Awaited<ReturnType<PersonalVirtualKeyService["issue"]>> }
+> {
+  const { userCode, organizationId, caller } = params;
+  const labelSuffix = userCode.replace("-", "").toLowerCase().slice(0, 6);
+  const workspace = await prisma.team.findFirst({
+    where: {
+      organizationId,
+      ownerUserId: caller.id,
+      isPersonal: true,
+    },
+    select: {
+      id: true,
+      projects: {
+        where: { isPersonal: true, archivedAt: null },
+        select: { id: true },
+        take: 1,
+      },
+    },
+  });
+  if (!workspace?.projects[0]) {
+    return c.json(
+      {
+        error: "server_error",
+        error_description: "Personal workspace missing",
+      },
+      500,
+    );
+  }
+  const issued = await service.issue({
+    userId: caller.id,
+    organizationId,
+    personalProjectId: workspace.projects[0].id,
+    personalTeamId: workspace.id,
+    label: `device-${labelSuffix}`,
+  });
+  return { issued };
+}
+
+function respondApproveMintFailure(
+  c: Context,
+  userCode: string,
+  err: unknown,
+): Response {
+  logger.error(
+    { err, user_code: userCode },
+    `[auth-cli] approve failed for ${userCode}`,
+  );
+  // Surface the actionable case where the org has no provider
+  // credentials configured yet — admin needs to set one up before
+  // users can issue personal VKs (storyboard Screen 4 prerequisite).
+  // Other errors stay generic to avoid leaking internals.
+  const message =
+    err instanceof Error && /provider credential is required/i.test(err.message)
+      ? "Your admin needs to configure a model provider first. Ask them to add one at Settings → Model Providers."
+      : "Failed to issue key";
+  return c.json({ error: "server_error", error_description: message }, 500);
+}
+
+// Mint (or return) the user's default personal VK for this org.
+// Idempotent — if already present, the service throws
+// PersonalVirtualKeyAlreadyExistsError; we map that to 409 so the
+// user knows they already have a default and should run a fresh
+// login on the new device only after revoking the old one.
+async function mintPersonalVkForApprove(
+  c: Context,
+  params: MintPersonalVkApproveParams,
+) {
+  const { userCode, organizationId, caller } = params;
+  const service = PersonalVirtualKeyService.create(prisma);
+  try {
+    const issued = await service.ensureDefault({
+      userId: caller.id,
+      organizationId,
+      displayName: caller.name,
+      displayEmail: caller.email,
+    });
+    return { issued };
+  } catch (err) {
+    if (
+      err instanceof NoEligibleProvidersError ||
+      err instanceof RoutingPolicyHasNoProvidersError
+    ) {
+      return approveWithoutPersonalVk(c, params, err);
+    }
+    if (err instanceof PersonalVirtualKeyAlreadyExistsError) {
+      return issueAdditionalDeviceVk(c, params, service);
+    }
+    return respondApproveMintFailure(c, userCode, err);
+  }
+}
+
+async function approveDeviceSessionFlow(
+  c: Context,
+  params: {
+    record: DeviceCodeRecord;
+    userCode: string;
+    organizationId: string;
+    caller: {
+      id: string;
+      name: string | null | undefined;
+      email: string | null | undefined;
+    };
+  },
+): Promise<Response> {
+  const { record, userCode, organizationId, caller } = params;
 
   // Governance gate: the device-session flow provisions a personal
   // workspace (Team + Project) and a personal virtual key for the user.
@@ -2059,8 +2427,8 @@ secured.access(cliApproveAuth).post("/approve", async (c: Context) => {
   // project (customer report) stays impossible for gated orgs.
   const governanceEnabled = await featureFlagService
     .isEnabled("release_ui_ai_governance_enabled", {
-      distinctId: session.user.id,
-      organizationId: organization_id,
+      distinctId: caller.id,
+      organizationId,
       defaultValue: true,
     })
     .catch(() => true);
@@ -2075,109 +2443,19 @@ secured.access(cliApproveAuth).post("/approve", async (c: Context) => {
     );
   }
 
-  // Mint (or return) the user's default personal VK for this org.
-  // Idempotent — if already present, the service throws
-  // PersonalVirtualKeyAlreadyExistsError; we map that to 409 so the
-  // user knows they already have a default and should run a fresh
-  // login on the new device only after revoking the old one.
-  const service = PersonalVirtualKeyService.create(prisma);
-  let issued;
-  try {
-    issued = await service.ensureDefault({
-      userId: session.user.id,
-      organizationId: organization_id,
-      displayName: session.user.name,
-      displayEmail: session.user.email,
-    });
-  } catch (err) {
-    if (
-      err instanceof NoEligibleProvidersError ||
-      err instanceof RoutingPolicyHasNoProvidersError
-    ) {
-      // Fresh signup / dogfood account / org with no accessible
-      // providers (or with an explicitly-pinned empty policy): log the
-      // user in with a device session anyway. The /me Model Providers
-      // tile surfaces the actionable "add a provider" CTA; failing the
-      // entire approve flow here blocked solo devs from ever reaching
-      // the setup screens. Post-fix to the no-default-policy graceful
-      // fallback, this branch fires only when there are truly zero
-      // eligible providers via scope cascade.
-      logger.info(
-        {
-          user_code,
-          organization_id,
-          reason:
-            err instanceof NoEligibleProvidersError
-              ? "no_eligible_providers"
-              : "routing_policy_has_no_providers",
-        },
-        "[auth-cli] approving device session without personal VK; admin/user must configure provider before gateway use",
-      );
-      await approveDeviceCode({
-        deviceCode: record.device_code,
-        userId: session.user.id,
-        organizationId: organization_id,
-      });
-      return c.json({ ok: true, organization_id }, 200);
-    }
-    if (err instanceof PersonalVirtualKeyAlreadyExistsError) {
-      // Issue an additional device-specific key instead so multiple
-      // devices don't have to share the "default" key. Label includes
-      // a short suffix from the user_code for human discoverability.
-      const labelSuffix = user_code.replace("-", "").toLowerCase().slice(0, 6);
-      const workspace = await prisma.team.findFirst({
-        where: {
-          organizationId: organization_id,
-          ownerUserId: session.user.id,
-          isPersonal: true,
-        },
-        select: {
-          id: true,
-          projects: {
-            where: { isPersonal: true, archivedAt: null },
-            select: { id: true },
-            take: 1,
-          },
-        },
-      });
-      if (!workspace?.projects[0]) {
-        return c.json(
-          {
-            error: "server_error",
-            error_description: "Personal workspace missing",
-          },
-          500,
-        );
-      }
-      issued = await service.issue({
-        userId: session.user.id,
-        organizationId: organization_id,
-        personalProjectId: workspace.projects[0].id,
-        personalTeamId: workspace.id,
-        label: `device-${labelSuffix}`,
-      });
-    } else {
-      logger.error(
-        { err, user_code },
-        `[auth-cli] approve failed for ${user_code}`,
-      );
-      // Surface the actionable case where the org has no provider
-      // credentials configured yet — admin needs to set one up before
-      // users can issue personal VKs (storyboard Screen 4 prerequisite).
-      // Other errors stay generic to avoid leaking internals.
-      const message =
-        err instanceof Error &&
-        /provider credential is required/i.test(err.message)
-          ? "Your admin needs to configure a model provider first. Ask them to add one at Settings → Model Providers."
-          : "Failed to issue key";
-      return c.json({ error: "server_error", error_description: message }, 500);
-    }
-  }
+  const minted = await mintPersonalVkForApprove(c, {
+    record,
+    userCode,
+    organizationId,
+    caller,
+  });
+  if (minted instanceof Response) return minted;
+  const { issued } = minted;
 
   await approveDeviceCode({
     deviceCode: record.device_code,
-    userId: session.user.id,
-    organizationId: organization_id,
+    userId: caller.id,
+    organizationId,
     personalVk: {
       id: issued.virtualKey.id,
       label: issued.virtualKey.name,
@@ -2190,10 +2468,50 @@ secured.access(cliApproveAuth).post("/approve", async (c: Context) => {
     {
       ok: true,
       personal_vk_label: issued.virtualKey.name,
-      organization_id,
+      organization_id: organizationId,
     },
     200,
   );
+}
+
+secured.access(cliApproveAuth).post("/approve", async (c: Context) => {
+  const caller = await authenticateApproveCaller(c);
+  if (caller instanceof Response) return caller;
+
+  const parsedBody = await parseApproveBody(c);
+  if (parsedBody instanceof Response) return parsedBody;
+  const { user_code, organization_id, project_id } = parsedBody;
+
+  const membershipRefusal = await verifyApproveOrgMembership(
+    c,
+    caller.id,
+    organization_id,
+  );
+  if (membershipRefusal) return membershipRefusal;
+
+  const loadedRecord = await loadPendingDeviceCodeForApprove(c, user_code);
+  if (loadedRecord instanceof Response) return loadedRecord;
+  const record = loadedRecord;
+
+  // Branch on the credential type the CLI requested at /device-code time.
+  // `project_api_key` returns the user-picked project's existing apiKey; no
+  // new key is minted, so existing consumers (other team members, CI, etc.)
+  // keep working unchanged. The CLI writes the key into `$CWD/.env`.
+  if ((record.credential_type ?? "device_session") === "project_api_key") {
+    return approveProjectApiKeyFlow(c, {
+      record,
+      organizationId: organization_id,
+      projectId: project_id,
+      callerId: caller.id,
+    });
+  }
+
+  return approveDeviceSessionFlow(c, {
+    record,
+    userCode: user_code,
+    organizationId: organization_id,
+    caller: { id: caller.id, name: caller.name, email: caller.email },
+  });
 });
 
 // ---------------------------------------------------------------------------

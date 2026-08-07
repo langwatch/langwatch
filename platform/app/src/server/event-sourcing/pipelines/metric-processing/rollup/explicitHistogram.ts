@@ -115,6 +115,40 @@ function differenceHistogramPoint({
   };
 }
 
+/** A point's merged contribution: its coarsened counts, count, sum, and whether it was counted whole (vs. differenced). */
+function resolveHistogramPointContribution({
+  row,
+  point,
+  index,
+  all,
+  bounds,
+}: {
+  row: MetricRollupRow;
+  point: CanonicalMetricDataPoint;
+  index: number;
+  all: CanonicalMetricDataPoint[];
+  bounds: number[];
+}): {
+  counts: bigint[];
+  count: bigint;
+  sum: number | null;
+  usesWholePoint: boolean;
+} {
+  if (point.aggregationTemporality === "cumulative") {
+    const delta = differenceHistogramPoint({ point, index, all, bounds });
+    if (delta) {
+      return { ...delta, usesWholePoint: false };
+    }
+    resetOrGap({ row, previous: previousPoint(all, index), current: point });
+  }
+  return {
+    counts: coarsenExplicit({ point, targetBounds: bounds }),
+    count: bigint(point.count),
+    sum: point.sum,
+    usesWholePoint: true,
+  };
+}
+
 export function buildHistogramRow({
   row,
   entries,
@@ -137,36 +171,20 @@ export function buildHistogramRow({
   let hasSum = false;
 
   for (const { point, index } of entries) {
-    let coarsenedCounts: bigint[] | null = null;
-    let usesWholePoint = point.aggregationTemporality !== "cumulative";
-    let count = bigint(point.count);
-    let sum = point.sum;
-
-    if (point.aggregationTemporality === "cumulative") {
-      const delta = differenceHistogramPoint({ point, index, all, bounds });
-      if (!delta) {
-        resetOrGap({
-          row,
-          previous: previousPoint(all, index),
-          current: point,
-        });
-        usesWholePoint = true;
-      } else {
-        coarsenedCounts = delta.counts;
-        count = delta.count;
-        sum = delta.sum;
-      }
-    }
-
-    const coarsened =
-      coarsenedCounts ?? coarsenExplicit({ point, targetBounds: bounds });
-    coarsened.forEach((value, i) => (merged[i]! += value));
-    totalCount += count;
-    if (sum !== null) {
-      totalSum += sum;
+    const contribution = resolveHistogramPointContribution({
+      row,
+      point,
+      index,
+      all,
+      bounds,
+    });
+    contribution.counts.forEach((value, i) => (merged[i]! += value));
+    totalCount += contribution.count;
+    if (contribution.sum !== null) {
+      totalSum += contribution.sum;
       hasSum = true;
     }
-    if (usesWholePoint) extendExtrema({ row, point });
+    if (contribution.usesWholePoint) extendExtrema({ row, point });
   }
 
   row.explicitBounds = bounds;

@@ -106,88 +106,129 @@ export function resolveDataPrivacy({
   facts: DataPrivacyScopeFacts;
 }): ResolvedDataPrivacy {
   const chain = buildDataPrivacyChain(facts);
-
-  const resolved: ResolvedDataPrivacy = {
-    categories: {
-      input: { ...PLATFORM_DEFAULT_DATA_PRIVACY.categories.input },
-      output: { ...PLATFORM_DEFAULT_DATA_PRIVACY.categories.output },
-      system: { ...PLATFORM_DEFAULT_DATA_PRIVACY.categories.system },
-      tools: { ...PLATFORM_DEFAULT_DATA_PRIVACY.categories.tools },
-    },
-    pii: { ...PLATFORM_DEFAULT_DATA_PRIVACY.pii },
-    secrets: {
-      enabled: PLATFORM_DEFAULT_DATA_PRIVACY.secrets.enabled,
-      customPatterns: [],
-    },
-    customAttributes: [],
-  };
-
-  const setCategory: Record<string, boolean> = {};
-  let setPii = false;
-  let setSecretsEnabled = false;
-  const piiExceptPatterns = new Set<string>();
-  // Per attribute pattern, the first (most-specific) entry in the chain wins.
-  const attributeRules = new Map<
-    string,
-    ResolvedDataPrivacy["customAttributes"][number]
-  >();
-  const customPatterns = new Set<string>();
+  const acc = createAccumulator();
 
   for (const candidate of chain) {
-    const row = rows.find(
-      (r) =>
-        r.scopeType === candidate.scopeType &&
-        r.scopeId === candidate.scopeId &&
-        r.personalOnly === candidate.personalOnly,
-    );
+    const row = findCandidateRow({ rows, candidate });
     if (!row) continue;
     const config = row.config;
 
-    for (const category of CONTENT_CATEGORIES) {
-      const setting = config.categories?.[category];
-      if (setting && !setCategory[category]) {
-        resolved.categories[category] = {
-          disposition: setting.disposition,
-          audience: resolveAudience(setting.audience),
-        };
-        setCategory[category] = true;
-      }
-    }
-
-    if (config.pii && !setPii) {
-      resolved.pii = {
-        level: config.pii.level,
-        entities: config.pii.entities ?? [],
-        exceptPatterns: [],
-      };
-      setPii = true;
-    }
-    // Like secret customPatterns, exceptions accumulate across the whole chain
-    // even though the level itself is first-set-wins: an org-wide exception for
-    // a company id format applies no matter which scope pinned the level.
-    for (const pattern of config.pii?.exceptPatterns ?? [])
-      piiExceptPatterns.add(pattern);
-
-    if (config.secrets && !setSecretsEnabled) {
-      resolved.secrets.enabled = config.secrets.enabled;
-      setSecretsEnabled = true;
-    }
-
-    for (const rule of config.customAttributes ?? []) {
-      if (!attributeRules.has(rule.pattern)) {
-        attributeRules.set(rule.pattern, {
-          pattern: rule.pattern,
-          disposition: rule.disposition,
-          audience: resolveAudience(rule.audience),
-        });
-      }
-    }
-    for (const pattern of config.secrets?.customPatterns ?? [])
-      customPatterns.add(pattern);
+    applyCategories({ config, acc });
+    applyPii({ config, acc });
+    applySecretsEnabled({ config, acc });
+    applyCustomAttributes({ config, acc });
+    applySecretPatterns({ config, acc });
   }
 
-  resolved.customAttributes = [...attributeRules.values()];
-  resolved.secrets.customPatterns = [...customPatterns];
-  resolved.pii.exceptPatterns = [...piiExceptPatterns];
+  const { resolved } = acc;
+  resolved.customAttributes = [...acc.attributeRules.values()];
+  resolved.secrets.customPatterns = [...acc.customPatterns];
+  resolved.pii.exceptPatterns = [...acc.piiExceptPatterns];
   return resolved;
+}
+
+interface Accumulator {
+  resolved: ResolvedDataPrivacy;
+  setCategory: Record<string, boolean>;
+  setPii: boolean;
+  setSecretsEnabled: boolean;
+  piiExceptPatterns: Set<string>;
+  /** Per attribute pattern, the first (most-specific) entry in the chain wins. */
+  attributeRules: Map<string, ResolvedDataPrivacy["customAttributes"][number]>;
+  customPatterns: Set<string>;
+}
+
+function createAccumulator(): Accumulator {
+  return {
+    resolved: {
+      categories: {
+        input: { ...PLATFORM_DEFAULT_DATA_PRIVACY.categories.input },
+        output: { ...PLATFORM_DEFAULT_DATA_PRIVACY.categories.output },
+        system: { ...PLATFORM_DEFAULT_DATA_PRIVACY.categories.system },
+        tools: { ...PLATFORM_DEFAULT_DATA_PRIVACY.categories.tools },
+      },
+      pii: { ...PLATFORM_DEFAULT_DATA_PRIVACY.pii },
+      secrets: {
+        enabled: PLATFORM_DEFAULT_DATA_PRIVACY.secrets.enabled,
+        customPatterns: [],
+      },
+      customAttributes: [],
+    },
+    setCategory: {},
+    setPii: false,
+    setSecretsEnabled: false,
+    piiExceptPatterns: new Set<string>(),
+    attributeRules: new Map(),
+    customPatterns: new Set<string>(),
+  };
+}
+
+function findCandidateRow({
+  rows,
+  candidate,
+}: {
+  rows: DataPrivacyRow[];
+  candidate: Candidate;
+}): DataPrivacyRow | undefined {
+  return rows.find(
+    (r) =>
+      r.scopeType === candidate.scopeType &&
+      r.scopeId === candidate.scopeId &&
+      r.personalOnly === candidate.personalOnly,
+  );
+}
+
+type Applied = { config: DataPrivacyConfig; acc: Accumulator };
+
+function applyCategories({ config, acc }: Applied): void {
+  for (const category of CONTENT_CATEGORIES) {
+    const setting = config.categories?.[category];
+    if (setting && !acc.setCategory[category]) {
+      acc.resolved.categories[category] = {
+        disposition: setting.disposition,
+        audience: resolveAudience(setting.audience),
+      };
+      acc.setCategory[category] = true;
+    }
+  }
+}
+
+function applyPii({ config, acc }: Applied): void {
+  if (config.pii && !acc.setPii) {
+    acc.resolved.pii = {
+      level: config.pii.level,
+      entities: config.pii.entities ?? [],
+      exceptPatterns: [],
+    };
+    acc.setPii = true;
+  }
+  // Like secret customPatterns, exceptions accumulate across the whole chain
+  // even though the level itself is first-set-wins: an org-wide exception for
+  // a company id format applies no matter which scope pinned the level.
+  for (const pattern of config.pii?.exceptPatterns ?? [])
+    acc.piiExceptPatterns.add(pattern);
+}
+
+function applySecretsEnabled({ config, acc }: Applied): void {
+  if (config.secrets && !acc.setSecretsEnabled) {
+    acc.resolved.secrets.enabled = config.secrets.enabled;
+    acc.setSecretsEnabled = true;
+  }
+}
+
+function applyCustomAttributes({ config, acc }: Applied): void {
+  for (const rule of config.customAttributes ?? []) {
+    if (!acc.attributeRules.has(rule.pattern)) {
+      acc.attributeRules.set(rule.pattern, {
+        pattern: rule.pattern,
+        disposition: rule.disposition,
+        audience: resolveAudience(rule.audience),
+      });
+    }
+  }
+}
+
+function applySecretPatterns({ config, acc }: Applied): void {
+  for (const pattern of config.secrets?.customPatterns ?? [])
+    acc.customPatterns.add(pattern);
 }

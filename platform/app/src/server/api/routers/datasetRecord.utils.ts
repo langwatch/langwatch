@@ -90,6 +90,87 @@ const createDatasetRecords = ({
   });
 };
 
+type DatasetRecordWriteDb = typeof prisma | Prisma.TransactionClient;
+
+async function resolveDatasetForRecordWrite({
+  db,
+  providedDataset,
+  datasetId,
+  projectId,
+}: {
+  db: DatasetRecordWriteDb;
+  providedDataset: Dataset | null | undefined;
+  datasetId: string;
+  projectId: string;
+}): Promise<Dataset> {
+  const dataset =
+    providedDataset ??
+    (await db.dataset.findFirst({
+      where: { id: datasetId, projectId },
+    }));
+
+  if (!dataset) {
+    throw new TRPCError({
+      code: "NOT_FOUND",
+      message: "Dataset not found",
+    });
+  }
+
+  return dataset;
+}
+
+// Legacy single-blob `useS3` layout: read the whole existing blob, append the
+// new records, and write it back — superseded by the s3_jsonl chunked layout
+// above for new datasets, but still served for datasets created before it.
+async function appendToS3BlobDataset({
+  db,
+  projectId,
+  datasetId,
+  datasetRecords,
+}: {
+  db: DatasetRecordWriteDb;
+  projectId: string;
+  datasetId: string;
+  datasetRecords: DatasetRecordInput[];
+}) {
+  const recordData = createDatasetRecords({
+    entries: datasetRecords,
+    datasetId,
+    projectId,
+    useS3: true,
+  });
+
+  let existingRecords: any[] = [];
+  try {
+    const { records: fetchedRecords } = await storageService.getObject(
+      projectId,
+      datasetId,
+    );
+    existingRecords = fetchedRecords;
+  } catch (error) {
+    if ((error as any).name !== "NoSuchKey") {
+      captureException(toError(error));
+      throw error;
+    }
+  }
+
+  // Combine existing and new records
+  const allRecords = [...existingRecords, ...recordData];
+
+  await storageService.putObject(
+    projectId,
+    datasetId,
+    JSON.stringify(allRecords),
+  );
+
+  await db.dataset.update({
+    where: { id: datasetId, projectId },
+    data: { s3RecordCount: allRecords.length },
+  });
+
+  return { success: true };
+}
+
 export const createManyDatasetRecords = async ({
   datasetId,
   projectId,
@@ -112,18 +193,12 @@ export const createManyDatasetRecords = async ({
   dataset?: Dataset | null;
 }) => {
   const db = tx ?? prisma;
-  const dataset =
-    providedDataset ??
-    (await db.dataset.findFirst({
-      where: { id: datasetId, projectId },
-    }));
-
-  if (!dataset) {
-    throw new TRPCError({
-      code: "NOT_FOUND",
-      message: "Dataset not found",
-    });
-  }
+  const dataset = await resolveDatasetForRecordWrite({
+    db,
+    providedDataset,
+    datasetId,
+    projectId,
+  });
 
   // ADR-032 rung 6b: an s3_jsonl dataset appends to chunk objects (new chunks
   // from `chunkCount`) under the per-dataset advisory lock (Decision 9), not the
@@ -150,53 +225,18 @@ export const createManyDatasetRecords = async ({
   }
 
   if (dataset.useS3) {
-    const recordData = createDatasetRecords({
-      entries: datasetRecords,
-      datasetId,
-      projectId,
-      useS3: true,
-    });
-
-    let existingRecords: any[] = [];
-    try {
-      const { records: fetchedRecords } = await storageService.getObject(
-        projectId,
-        datasetId,
-      );
-      existingRecords = fetchedRecords;
-    } catch (error) {
-      if ((error as any).name !== "NoSuchKey") {
-        captureException(toError(error));
-        throw error;
-      }
-    }
-
-    // Combine existing and new records
-    const allRecords = [...existingRecords, ...recordData];
-
-    await storageService.putObject(
-      projectId,
-      datasetId,
-      JSON.stringify(allRecords),
-    );
-
-    await db.dataset.update({
-      where: { id: datasetId, projectId },
-      data: { s3RecordCount: allRecords.length },
-    });
-
-    return { success: true };
-  } else {
-    const recordData = createDatasetRecords({
-      entries: datasetRecords,
-      datasetId,
-      projectId,
-    });
-
-    return db.datasetRecord.createMany({
-      data: recordData as (DatasetRecord & { entry: any })[],
-    });
+    return appendToS3BlobDataset({ db, projectId, datasetId, datasetRecords });
   }
+
+  const recordData = createDatasetRecords({
+    entries: datasetRecords,
+    datasetId,
+    projectId,
+  });
+
+  return db.datasetRecord.createMany({
+    data: recordData as (DatasetRecord & { entry: any })[],
+  });
 };
 
 const processBatchedRecords = ({
@@ -358,6 +398,128 @@ const selectS3JsonlRecordViaOffsets = async ({
   return adaptS3JsonlRecord(line, dataset);
 };
 
+// Appends adapted rows to `records` up to `headLimit`, mutating in place —
+// shared by both head-collection strategies below.
+function pushHeadRows({
+  rows,
+  records,
+  dataset,
+  headLimit,
+}: {
+  rows: unknown[];
+  records: DatasetRecord[];
+  dataset: Dataset;
+  headLimit: number;
+}): void {
+  for (const line of rows) {
+    if (records.length >= headLimit) return;
+    records.push(adaptS3JsonlRecord(line, dataset));
+  }
+}
+
+// Offset index present: read only the chunks it marks non-empty, in order,
+// until the preview is full — empty leading/middle chunks are skipped
+// without a read.
+async function collectS3JsonlHeadFromOffsets({
+  storage,
+  projectId,
+  dataset,
+  offsets,
+  headLimit,
+}: {
+  storage: DatasetStorage;
+  projectId: string;
+  dataset: Dataset;
+  offsets: ChunkOffset[];
+  headLimit: number;
+}): Promise<DatasetRecord[]> {
+  const records: DatasetRecord[] = [];
+  for (const offset of offsets) {
+    if (records.length >= headLimit) break;
+    if (offset.endRow <= offset.startRow) continue;
+    const rows = await storage.readChunk({
+      projectId,
+      datasetId: dataset.id,
+      index: offset.index,
+    });
+    pushHeadRows({ rows, records, dataset, headLimit });
+  }
+  return records;
+}
+
+// Legacy/never-written offsets: scan chunks in order, skipping empties,
+// until the preview is full. Still bounded — stops at the first chunk(s)
+// that fill it, never reads the whole dataset.
+async function collectS3JsonlHeadByScanning({
+  storage,
+  projectId,
+  dataset,
+  chunkCount,
+  headLimit,
+}: {
+  storage: DatasetStorage;
+  projectId: string;
+  dataset: Dataset;
+  chunkCount: number;
+  headLimit: number;
+}): Promise<DatasetRecord[]> {
+  const records: DatasetRecord[] = [];
+  for (
+    let index = 0;
+    index < chunkCount && records.length < headLimit;
+    index++
+  ) {
+    const rows = await storage.readChunk({
+      projectId,
+      datasetId: dataset.id,
+      index,
+    });
+    pushHeadRows({ rows, records, dataset, headLimit });
+  }
+  return records;
+}
+
+async function resolveS3JsonlHeadRecords({
+  storage,
+  projectId,
+  dataset,
+  offsets,
+  headLimit,
+}: {
+  storage: DatasetStorage;
+  projectId: string;
+  dataset: Dataset;
+  offsets: ChunkOffset[];
+  headLimit: number;
+}): Promise<DatasetRecord[]> {
+  if (offsets.length > 0) {
+    return collectS3JsonlHeadFromOffsets({
+      storage,
+      projectId,
+      dataset,
+      offsets,
+      headLimit,
+    });
+  }
+
+  // I-COUNT: with no offsets the scan is driven by chunkCount; a null
+  // chunkCount would otherwise scan zero chunks and return an EMPTY preview
+  // against a positive total — masking the very drift this guards elsewhere
+  // (getFullDataset/listRecords). Throw rather than render an empty head. The
+  // offsets branch above never reaches here, so this only fires on real drift.
+  if (dataset.chunkCount == null) {
+    throw new DatasetChunkCountMissingError(dataset.id);
+  }
+
+  return collectS3JsonlHeadByScanning({
+    storage,
+    projectId,
+    dataset,
+    chunkCount: dataset.chunkCount,
+    headLimit,
+  });
+}
+
 /**
  * Read the head (first up-to-5 rows) of an s3_jsonl dataset for the preview,
  * gated on `status='ready'` (ADR-032 Decision 6 / I-READY). Reads the first
@@ -390,54 +552,15 @@ export const readDatasetHeadS3Jsonl = async ({
 
   const storage = await getDatasetStorage(projectId);
   const HEAD_LIMIT = 5;
-  const chunkCount = dataset.chunkCount ?? 0;
   const offsets = readOffsets(dataset);
 
-  const records: DatasetRecord[] = [];
-  const pushRows = (rows: unknown[]): void => {
-    for (const line of rows) {
-      if (records.length >= HEAD_LIMIT) return;
-      records.push(adaptS3JsonlRecord(line, dataset));
-    }
-  };
-
-  if (offsets.length > 0) {
-    // Offset index present: read only the chunks it marks non-empty, in order,
-    // until the preview is full — empty leading/middle chunks are skipped
-    // without a read.
-    for (const offset of offsets) {
-      if (records.length >= HEAD_LIMIT) break;
-      if (offset.endRow <= offset.startRow) continue;
-      pushRows(
-        await storage.readChunk({
-          projectId,
-          datasetId: dataset.id,
-          index: offset.index,
-        }),
-      );
-    }
-  } else {
-    // I-COUNT: with no offsets the scan is driven by chunkCount; a null
-    // chunkCount (`?? 0`) would scan zero chunks and return an EMPTY preview
-    // against a positive total — masking the very drift this guards elsewhere
-    // (getFullDataset/listRecords). Throw rather than render an empty head. The
-    // offsets branch above never reaches here, so this only fires on real drift.
-    if (dataset.chunkCount == null) {
-      throw new DatasetChunkCountMissingError(dataset.id);
-    }
-    // Legacy/never-written offsets: scan chunks in order, skipping empties,
-    // until the preview is full. Still bounded — stops at the first chunk(s)
-    // that fill it, never reads the whole dataset.
-    for (
-      let index = 0;
-      index < chunkCount && records.length < HEAD_LIMIT;
-      index++
-    ) {
-      pushRows(
-        await storage.readChunk({ projectId, datasetId: dataset.id, index }),
-      );
-    }
-  }
+  const records = await resolveS3JsonlHeadRecords({
+    storage,
+    projectId,
+    dataset,
+    offsets,
+    headLimit: HEAD_LIMIT,
+  });
 
   return {
     records,
@@ -457,6 +580,373 @@ export const readDatasetHeadS3Jsonl = async ({
  */
 export const DATASET_EDITOR_READ_LIMIT_MB = 13;
 
+type FullDatasetResult = Dataset & {
+  datasetRecords: DatasetRecord[];
+  truncated?: boolean;
+  count: number;
+};
+
+// A `ready` s3_jsonl dataset with its chunkCount narrowed non-null, i.e. one
+// that has already passed the I-COUNT guard below.
+type ReadyS3JsonlDataset = Dataset & { chunkCount: number };
+
+// M2: a single-row `entrySelection` reads ONLY the chunk that holds the row
+// (via `chunkOffsets`) — the same short-circuit the PG path gets from
+// skip/take — so it's O(1 chunk), not O(dataset). Falls back to an unbounded
+// full read (guarded on `sizeBytes`) only when no short-circuit is possible
+// (missing/legacy offsets).
+async function selectSingleS3JsonlDatasetRecord({
+  dataset,
+  projectId,
+  datasetId,
+  storage,
+  entrySelection,
+  limitMb,
+  count,
+}: {
+  dataset: ReadyS3JsonlDataset;
+  projectId: string;
+  datasetId: string;
+  storage: DatasetStorage;
+  entrySelection: Exclude<EntrySelection, "all">;
+  limitMb: number | null;
+  count: number;
+}): Promise<FullDatasetResult> {
+  const record = await selectS3JsonlRecordViaOffsets({
+    dataset,
+    projectId,
+    storage,
+    entrySelection,
+  });
+  if (record !== null) {
+    return { ...dataset, count, datasetRecords: [record], truncated: false };
+  }
+
+  // `record === null`: no short-circuit possible (missing/legacy offsets).
+  // This rare defensive path reads the whole dataset to honour
+  // last/random/N correctly, then selects the single row — an UNBOUNDED read
+  // even for a single-row selection, so guard it on `sizeBytes` (the export
+  // path below guards the same way) rather than OOM on a large legacy dataset.
+  assertDatasetReadableInHeap(dataset);
+  const rows = await storage.readChunks({
+    projectId,
+    datasetId,
+    chunkCount: dataset.chunkCount,
+  });
+  const allRecords = rows.map((line) => adaptS3JsonlRecord(line, dataset));
+  const selected = selectRecords(allRecords, entrySelection);
+  const { truncatedRecords, truncated } = processBatchedRecords({
+    records: selected,
+    limitMb,
+  });
+  return {
+    ...dataset,
+    count: dataset.rowCount ?? allRecords.length,
+    datasetRecords: truncatedRecords,
+    truncated,
+  };
+}
+
+// "all": read chunks ONE AT A TIME (I-MEM), accumulating rows until the
+// `limitMb` byte budget is reached, then STOP — never reading the remaining
+// chunks. `count` stays PG-authoritative (it is NOT the number of rows
+// actually read).
+async function readAllS3JsonlDatasetRecordsBounded({
+  dataset,
+  projectId,
+  datasetId,
+  storage,
+  limitMb,
+  count,
+}: {
+  dataset: ReadyS3JsonlDataset;
+  projectId: string;
+  datasetId: string;
+  storage: DatasetStorage;
+  limitMb: number | null;
+  count: number;
+}): Promise<FullDatasetResult> {
+  const accumulated: DatasetRecord[] = [];
+  let totalSize = 0;
+  let truncated = false;
+  for (let index = 0; index < dataset.chunkCount; index++) {
+    const rows = await storage.readChunk({ projectId, datasetId, index });
+    const records = rows.map((line) => adaptS3JsonlRecord(line, dataset));
+    const result = processBatchedRecords({ records, limitMb, totalSize });
+    accumulated.push(...result.truncatedRecords);
+    totalSize = result.totalSize;
+    if (result.truncated) {
+      truncated = true;
+      break;
+    }
+  }
+
+  return { ...dataset, count, datasetRecords: accumulated, truncated };
+}
+
+// ADR-032 Decision 6 / I-READY: the s3_jsonl content layout reads from chunk
+// objects, gated on `status='ready'`. Routed independently of the dead
+// single-blob `useS3` path.
+async function getFullDatasetFromS3Jsonl({
+  dataset,
+  projectId,
+  datasetId,
+  entrySelection,
+  limitMb,
+}: {
+  dataset: Dataset;
+  projectId: string;
+  datasetId: string;
+  entrySelection: EntrySelection;
+  limitMb: number | null;
+}): Promise<FullDatasetResult> {
+  if (dataset.status !== "ready") {
+    throw new DatasetNotReadyError({
+      status: dataset.status,
+      statusError: dataset.statusError,
+    });
+  }
+
+  // I-COUNT: a `ready` s3_jsonl dataset MUST have a non-null chunkCount.
+  // `chunkCount ?? 0` would otherwise loop zero times and serve an EMPTY
+  // dataset against a positive rowCount — silent, undiagnosable data loss.
+  // Throw loudly so the drift surfaces (and `recomputeDatasetCounts` repairs).
+  if (dataset.chunkCount == null) {
+    throw new DatasetChunkCountMissingError(datasetId);
+  }
+  const readyDataset: ReadyS3JsonlDataset = {
+    ...dataset,
+    chunkCount: dataset.chunkCount,
+  };
+
+  const storage = await getDatasetStorage(projectId);
+  const count = readyDataset.rowCount ?? 0;
+
+  if (entrySelection !== "all") {
+    return selectSingleS3JsonlDatasetRecord({
+      dataset: readyDataset,
+      projectId,
+      datasetId,
+      storage,
+      entrySelection,
+      limitMb,
+      count,
+    });
+  }
+
+  // I-MEM: a full export (`limitMb: null`) would materialize the whole dataset
+  // in heap. The bounded reads below cap at the byte budget; an unbounded
+  // export can't, so guard it on the PG-authoritative size and reject a
+  // multi-GB download with a clear, typed error instead of OOMing the pod.
+  // (True streaming export is the reads-at-scale fast-follow epic.)
+  if (limitMb === null) {
+    assertDatasetReadableInHeap(readyDataset);
+  }
+
+  return readAllS3JsonlDatasetRecordsBounded({
+    dataset: readyDataset,
+    projectId,
+    datasetId,
+    storage,
+    limitMb,
+    count,
+  });
+}
+
+// Legacy single-blob `useS3` layout: read the whole existing blob, batching
+// the in-memory records against the byte budget the same way the s3_jsonl
+// and postgres paths do.
+async function getFullDatasetFromS3Blob({
+  dataset,
+  projectId,
+  datasetId,
+  limitMb,
+}: {
+  dataset: Dataset;
+  projectId: string;
+  datasetId: string;
+  limitMb: number | null;
+}): Promise<FullDatasetResult> {
+  const BATCH_SIZE = 500;
+  const truncatedDatasetRecords: DatasetRecord[] = [];
+  let truncated = false;
+  let totalSize = 0;
+  let currentPage = 0;
+
+  try {
+    const { records: recordsFromStorage } = await storageService.getObject(
+      projectId,
+      datasetId,
+    );
+    const records: any[] = recordsFromStorage;
+
+    do {
+      const batch = records.slice(
+        currentPage * BATCH_SIZE,
+        (currentPage + 1) * BATCH_SIZE,
+      );
+
+      if (batch.length === 0) break;
+
+      const {
+        truncatedRecords: processedRecords,
+        truncated: batchTruncated,
+        totalSize: newTotalSize,
+      } = processBatchedRecords({ records: batch, limitMb, totalSize });
+
+      truncatedDatasetRecords.push(...processedRecords);
+      truncated = batchTruncated;
+      totalSize = newTotalSize;
+
+      if (batch.length < BATCH_SIZE) break;
+      currentPage++;
+    } while (!truncated);
+
+    return {
+      ...dataset,
+      count: records.length,
+      datasetRecords: truncatedDatasetRecords,
+      truncated,
+    };
+  } catch (error) {
+    captureException(toError(error));
+    throw error;
+  }
+}
+
+function resolvePostgresRecordSkip(
+  entrySelection: "first" | "last" | "random" | number,
+  count: number,
+): number {
+  if (entrySelection === "first") return 0;
+  if (entrySelection === "last") return Math.max(count - 1, 0);
+  if (entrySelection === "random") return Math.floor(Math.random() * count);
+  return Math.max(0, Math.min(entrySelection, count - 1));
+}
+
+async function getSinglePostgresDatasetRecord({
+  dataset,
+  datasetId,
+  projectId,
+  entrySelection,
+  count,
+}: {
+  dataset: Dataset;
+  datasetId: string;
+  projectId: string;
+  entrySelection: "first" | "last" | "random" | number;
+  count: number;
+}): Promise<FullDatasetResult> {
+  const skip = resolvePostgresRecordSkip(entrySelection, count);
+
+  return {
+    ...dataset,
+    count,
+    datasetRecords: await prisma.datasetRecord.findMany({
+      where: { datasetId, projectId },
+      orderBy: { createdAt: "asc" },
+      take: 1,
+      skip,
+    }),
+  };
+}
+
+async function getBatchedPostgresDatasetRecords({
+  dataset,
+  datasetId,
+  projectId,
+  limitMb,
+  count,
+}: {
+  dataset: Dataset;
+  datasetId: string;
+  projectId: string;
+  limitMb: number | null;
+  count: number;
+}): Promise<FullDatasetResult> {
+  const truncatedDatasetRecords: DatasetRecord[] = [];
+  let truncated = false;
+  let totalSize = 0;
+  let currentPage = 0;
+  const BATCH_SIZE = 500;
+
+  // Fetch records in batches
+  do {
+    const records = await prisma.datasetRecord.findMany({
+      where: { datasetId, projectId },
+      orderBy: { createdAt: "asc" },
+      take: BATCH_SIZE,
+      skip: currentPage * BATCH_SIZE,
+    });
+
+    if (records.length === 0) break;
+
+    const {
+      truncatedRecords: processedRecords,
+      truncated: batchTruncated,
+      totalSize: newTotalSize,
+    } = processBatchedRecords({ records, limitMb, totalSize });
+
+    truncatedDatasetRecords.push(...processedRecords);
+    truncated = batchTruncated;
+    totalSize = newTotalSize;
+
+    if (records.length < BATCH_SIZE) break;
+    currentPage++;
+  } while (!truncated);
+
+  return {
+    ...dataset,
+    datasetRecords: truncatedDatasetRecords,
+    truncated,
+    count,
+  };
+}
+
+const isSingleRecordSelection = (
+  entrySelection: EntrySelection,
+): entrySelection is "first" | "last" | "random" | number =>
+  entrySelection === "first" ||
+  entrySelection === "random" ||
+  entrySelection === "last" ||
+  typeof entrySelection === "number";
+
+async function getFullDatasetFromPostgres({
+  dataset,
+  datasetId,
+  projectId,
+  entrySelection,
+  limitMb,
+}: {
+  dataset: Dataset;
+  datasetId: string;
+  projectId: string;
+  entrySelection: EntrySelection;
+  limitMb: number | null;
+}): Promise<FullDatasetResult> {
+  const count = await prisma.datasetRecord.count({
+    where: { datasetId, projectId },
+  });
+
+  if (isSingleRecordSelection(entrySelection)) {
+    return getSinglePostgresDatasetRecord({
+      dataset,
+      datasetId,
+      projectId,
+      entrySelection,
+      count,
+    });
+  }
+
+  return getBatchedPostgresDatasetRecords({
+    dataset,
+    datasetId,
+    projectId,
+    limitMb,
+    count,
+  });
+}
+
 export const getFullDataset = async ({
   datasetId,
   projectId,
@@ -467,14 +957,7 @@ export const getFullDataset = async ({
   projectId: string;
   entrySelection?: EntrySelection;
   limitMb?: number | null;
-}): Promise<
-  | (Dataset & {
-      datasetRecords: DatasetRecord[];
-      truncated?: boolean;
-      count: number;
-    })
-  | null
-> => {
+}): Promise<FullDatasetResult | null> => {
   const dataset = await prisma.dataset.findFirst({
     where: { id: datasetId, projectId },
   });
@@ -483,235 +966,25 @@ export const getFullDataset = async ({
     return null;
   }
 
-  const truncatedDatasetRecords: DatasetRecord[] = [];
-
-  const BATCH_SIZE = 500;
-
-  // ADR-032 Decision 6 / I-READY: the s3_jsonl content layout reads from chunk
-  // objects, gated on `status='ready'`. Routed independently of the dead
-  // single-blob `useS3` path. Postgres datasets default `status:"ready"`, so the
-  // gate never fires for legacy data.
   if (dataset.contentLayout === "s3_jsonl") {
-    if (dataset.status !== "ready") {
-      throw new DatasetNotReadyError({
-        status: dataset.status,
-        statusError: dataset.statusError,
-      });
-    }
-
-    // I-COUNT: a `ready` s3_jsonl dataset MUST have a non-null chunkCount.
-    // `chunkCount ?? 0` below would otherwise loop zero times and serve an EMPTY
-    // dataset against a positive rowCount — silent, undiagnosable data loss.
-    // Throw loudly so the drift surfaces (and `recomputeDatasetCounts` repairs).
-    if (dataset.chunkCount == null) {
-      throw new DatasetChunkCountMissingError(datasetId);
-    }
-
-    const storage = await getDatasetStorage(projectId);
-
-    const count = dataset.rowCount ?? 0;
-
-    // M2: a single-row `entrySelection` reads ONLY the chunk that holds the row
-    // (via `chunkOffsets`) — the same short-circuit the PG path gets from
-    // skip/take — so it's O(1 chunk), not O(dataset).
-    if (entrySelection !== "all") {
-      const record = await selectS3JsonlRecordViaOffsets({
-        dataset,
-        projectId,
-        storage,
-        entrySelection,
-      });
-      if (record !== null) {
-        return {
-          ...dataset,
-          count,
-          datasetRecords: [record],
-          truncated: false,
-        };
-      }
-      // `record === null`: no short-circuit possible (missing/legacy offsets).
-      // This rare defensive path reads the whole dataset to honour
-      // last/random/N correctly, then selects the single row — an UNBOUNDED read
-      // even for a single-row selection, so guard it on `sizeBytes` (the export
-      // path below guards the same way) rather than OOM on a large legacy dataset.
-      assertDatasetReadableInHeap(dataset);
-      const rows = await storage.readChunks({
-        projectId,
-        datasetId,
-        chunkCount: dataset.chunkCount,
-      });
-      const allRecords = rows.map((line) => adaptS3JsonlRecord(line, dataset));
-      const selected = selectRecords(allRecords, entrySelection);
-      const { truncatedRecords, truncated } = processBatchedRecords({
-        records: selected,
-        limitMb,
-      });
-      return {
-        ...dataset,
-        count: dataset.rowCount ?? allRecords.length,
-        datasetRecords: truncatedRecords,
-        truncated,
-      };
-    }
-
-    // I-MEM: a full export (`limitMb: null`) would materialize the whole dataset
-    // in heap. The bounded reads below cap at the byte budget; an unbounded
-    // export can't, so guard it on the PG-authoritative size and reject a
-    // multi-GB download with a clear, typed error instead of OOMing the pod.
-    // (True streaming export is the reads-at-scale fast-follow epic.)
-    if (limitMb === null) {
-      assertDatasetReadableInHeap(dataset);
-    }
-
-    // "all": read chunks ONE AT A TIME (I-MEM), accumulating rows until the
-    // `limitMb` byte budget is reached, then STOP — never reading the remaining
-    // chunks. `count` stays PG-authoritative (it is NOT the number of rows
-    // actually read). Equivalent to the prior read-all-then-truncate, minus the
-    // unbounded read.
-    const chunkCount = dataset.chunkCount ?? 0;
-    const accumulated: DatasetRecord[] = [];
-    let totalSize = 0;
-    let truncated = false;
-    for (let index = 0; index < chunkCount; index++) {
-      const rows = await storage.readChunk({ projectId, datasetId, index });
-      const records = rows.map((line) => adaptS3JsonlRecord(line, dataset));
-      const result = processBatchedRecords({
-        records,
-        limitMb,
-        totalSize,
-      });
-      accumulated.push(...result.truncatedRecords);
-      totalSize = result.totalSize;
-      if (result.truncated) {
-        truncated = true;
-        break;
-      }
-    }
-
-    return {
-      ...dataset,
-      count,
-      datasetRecords: accumulated,
-      truncated,
-    };
+    return getFullDatasetFromS3Jsonl({
+      dataset,
+      projectId,
+      datasetId,
+      entrySelection,
+      limitMb,
+    });
   }
 
   if (dataset.useS3) {
-    let records: any[] = [];
-    let truncated = false;
-    let totalSize = 0;
-    let currentPage = 0;
-
-    try {
-      const { records: recordsFromStorage } = await storageService.getObject(
-        projectId,
-        datasetId,
-      );
-      records = recordsFromStorage;
-
-      do {
-        const batch = records.slice(
-          currentPage * BATCH_SIZE,
-          (currentPage + 1) * BATCH_SIZE,
-        );
-
-        if (batch.length === 0) break;
-
-        const {
-          truncatedRecords: processedRecords,
-          truncated: batchTruncated,
-          totalSize: newTotalSize,
-        } = processBatchedRecords({ records: batch, limitMb, totalSize });
-
-        truncatedDatasetRecords.push(...processedRecords);
-        truncated = batchTruncated;
-        totalSize = newTotalSize;
-
-        if (batch.length < BATCH_SIZE) break;
-        currentPage++;
-      } while (!truncated);
-
-      return {
-        ...dataset,
-        count: records.length,
-        datasetRecords: truncatedDatasetRecords,
-        truncated,
-      };
-    } catch (error) {
-      captureException(toError(error));
-      throw error;
-    }
-  } else {
-    const count = await prisma.datasetRecord.count({
-      where: { datasetId, projectId },
-    });
-
-    if (
-      entrySelection === "first" ||
-      entrySelection === "random" ||
-      entrySelection === "last" ||
-      typeof entrySelection === "number"
-    ) {
-      let skip = 0;
-
-      if (entrySelection === "first") {
-        skip = 0;
-      } else if (entrySelection === "last") {
-        skip = Math.max(count - 1, 0);
-      } else if (entrySelection === "random") {
-        skip = Math.floor(Math.random() * count);
-      } else if (typeof entrySelection === "number") {
-        skip = Math.max(0, Math.min(entrySelection, count - 1));
-      }
-
-      return {
-        ...dataset,
-        count,
-        datasetRecords: await prisma.datasetRecord.findMany({
-          where: { datasetId, projectId },
-          orderBy: { createdAt: "asc" },
-          take: 1,
-          skip,
-        }),
-      };
-    }
-
-    const truncatedDatasetRecords: DatasetRecord[] = [];
-    let truncated = false;
-    let totalSize = 0;
-    let currentPage = 0;
-    const BATCH_SIZE = 500;
-
-    // Fetch records in batches
-    do {
-      const records = await prisma.datasetRecord.findMany({
-        where: { datasetId, projectId },
-        orderBy: { createdAt: "asc" },
-        take: BATCH_SIZE,
-        skip: currentPage * BATCH_SIZE,
-      });
-
-      if (records.length === 0) break;
-
-      const {
-        truncatedRecords: processedRecords,
-        truncated: batchTruncated,
-        totalSize: newTotalSize,
-      } = processBatchedRecords({ records, limitMb, totalSize });
-
-      truncatedDatasetRecords.push(...processedRecords);
-      truncated = batchTruncated;
-      totalSize = newTotalSize;
-
-      if (records.length < BATCH_SIZE) break;
-      currentPage++;
-    } while (!truncated);
-
-    return {
-      ...dataset,
-      datasetRecords: truncatedDatasetRecords,
-      truncated,
-      count,
-    };
+    return getFullDatasetFromS3Blob({ dataset, projectId, datasetId, limitMb });
   }
+
+  return getFullDatasetFromPostgres({
+    dataset,
+    datasetId,
+    projectId,
+    entrySelection,
+    limitMb,
+  });
 };

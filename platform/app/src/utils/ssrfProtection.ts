@@ -360,6 +360,152 @@ function buildUnresolvedResult(
 // Main Validation Logic
 // ============================================================================
 
+function parseHttpUrl(url: string): URL {
+  let parsedUrl: URL;
+  try {
+    parsedUrl = new URL(url);
+  } catch {
+    throw new Error("Invalid URL format");
+  }
+
+  if (parsedUrl.protocol !== "http:" && parsedUrl.protocol !== "https:") {
+    throw new Error(
+      `Unsupported protocol: ${parsedUrl.protocol} — only http and https are allowed`,
+    );
+  }
+
+  return parsedUrl;
+}
+
+function buildValidationContext({
+  url,
+  parsedUrl,
+  config,
+}: {
+  url: string;
+  parsedUrl: URL;
+  config: SSRFConfig;
+}): ValidationContext {
+  const hostname = parsedUrl.hostname.toLowerCase();
+  const port = parsedUrl.port
+    ? parseInt(parsedUrl.port, 10)
+    : parsedUrl.protocol === "https:"
+      ? 443
+      : 80;
+  const path = parsedUrl.pathname + parsedUrl.search;
+
+  return {
+    url,
+    parsedUrl,
+    hostname,
+    port,
+    path,
+    config,
+  };
+}
+
+/**
+ * Allowlist (literal hostname match, case-insensitive) — bypasses
+ * private-IP / localhost blocking. Cloud metadata is rejected before this
+ * runs, so it can never be allowlisted. Null when the host is not listed.
+ */
+function matchAllowlistedHost(
+  ctx: ValidationContext,
+): SSRFAllowlistedResult | null {
+  const { url, hostname, config } = ctx;
+  if (config.allowedHosts.length === 0) return null;
+
+  const normalizedAllowed = config.allowedHosts.map((h) =>
+    h.trim().toLowerCase(),
+  );
+  if (!normalizedAllowed.includes(hostname)) return null;
+
+  logger.info(
+    { url, hostname, allowedHosts: normalizedAllowed },
+    "Allowing request to allowlisted host",
+  );
+  const ipVersion = isIP(hostname);
+  return buildAllowlistedResult(ctx, ipVersion !== 0 ? hostname : undefined);
+}
+
+/**
+ * Blocks a DNS failure when BLOCK_LOCAL_HTTP_CALLS is on; otherwise reports the
+ * URL as unresolved.
+ */
+function unresolvedOnDnsFailure(
+  ctx: ValidationContext,
+  dnsError: unknown,
+): SSRFUnresolvedResult {
+  const { url, hostname, config } = ctx;
+
+  if (!config.blockLocal) {
+    logger.debug(
+      {
+        url,
+        hostname,
+        error: dnsError instanceof Error ? dnsError.message : String(dnsError),
+      },
+      "DNS resolution failed; not blocking because BLOCK_LOCAL_HTTP_CALLS is off",
+    );
+    return buildUnresolvedResult(ctx, "dns-failed");
+  }
+  logger.error(
+    {
+      url,
+      hostname,
+      error: dnsError instanceof Error ? dnsError.message : String(dnsError),
+    },
+    "DNS resolution failed during SSRF check - blocking request",
+  );
+  throw new Error(
+    `Unable to resolve hostname "${hostname}". Please verify the URL is correct and the server is reachable.`,
+  );
+}
+
+/**
+ * Blocks an empty DNS answer when BLOCK_LOCAL_HTTP_CALLS is on; otherwise
+ * reports the URL as unresolved.
+ */
+function unresolvedOnMissingRecords(
+  ctx: ValidationContext,
+): SSRFUnresolvedResult {
+  const { url, hostname, config } = ctx;
+
+  if (!config.blockLocal) {
+    logger.debug(
+      { url, hostname },
+      "No DNS records found; not blocking because BLOCK_LOCAL_HTTP_CALLS is off",
+    );
+    return buildUnresolvedResult(ctx, "no-records");
+  }
+  logger.error({ url, hostname }, "No DNS records found - blocking request");
+  throw new Error(
+    `Unable to resolve hostname "${hostname}". Please verify the URL is correct.`,
+  );
+}
+
+/**
+ * Resolves the hostname, or yields the unresolved result that a non-blocking
+ * config tolerates. Throws when BLOCK_LOCAL_HTTP_CALLS is on and the name
+ * cannot be resolved to any address.
+ */
+async function resolveAddressesOrUnresolved(
+  ctx: ValidationContext,
+): Promise<{ addresses: string[] } | { unresolved: SSRFUnresolvedResult }> {
+  let allAddresses: string[];
+  try {
+    allAddresses = await resolveHostname(ctx.hostname);
+  } catch (dnsError) {
+    return { unresolved: unresolvedOnDnsFailure(ctx, dnsError) };
+  }
+
+  if (allAddresses.length === 0) {
+    return { unresolved: unresolvedOnMissingRecords(ctx) };
+  }
+
+  return { addresses: allAddresses };
+}
+
 /**
  * Creates an SSRF validator with injected configuration.
  * Use this for testability or custom configurations.
@@ -368,59 +514,16 @@ export function createSSRFValidator(config: SSRFConfig) {
   return async function validateUrlForSSRF(
     url: string,
   ): Promise<SSRFValidationResult> {
-    let parsedUrl: URL;
-    try {
-      parsedUrl = new URL(url);
-    } catch {
-      throw new Error("Invalid URL format");
-    }
-
-    if (parsedUrl.protocol !== "http:" && parsedUrl.protocol !== "https:") {
-      throw new Error(
-        `Unsupported protocol: ${parsedUrl.protocol} — only http and https are allowed`,
-      );
-    }
-
-    const hostname = parsedUrl.hostname.toLowerCase();
-    const port = parsedUrl.port
-      ? parseInt(parsedUrl.port, 10)
-      : parsedUrl.protocol === "https:"
-        ? 443
-        : 80;
-    const path = parsedUrl.pathname + parsedUrl.search;
-
-    const ctx: ValidationContext = {
-      url,
-      parsedUrl,
-      hostname,
-      port,
-      path,
-      config,
-    };
+    const parsedUrl = parseHttpUrl(url);
+    const ctx = buildValidationContext({ url, parsedUrl, config });
+    const { hostname } = ctx;
 
     // Always validate metadata and cloud domains (critical security)
     validateNotMetadataEndpoint(ctx);
     validateNotBlockedCloudDomain(ctx);
 
-    // Allowlist (literal hostname match, case-insensitive) — bypasses
-    // private-IP / localhost blocking. Cloud metadata was already rejected
-    // above, so it can never be allowlisted.
-    if (config.allowedHosts.length > 0) {
-      const normalizedAllowed = config.allowedHosts.map((h) =>
-        h.trim().toLowerCase(),
-      );
-      if (normalizedAllowed.includes(hostname)) {
-        logger.info(
-          { url, hostname, allowedHosts: normalizedAllowed },
-          "Allowing request to allowlisted host",
-        );
-        const ipVersion = isIP(hostname);
-        return buildAllowlistedResult(
-          ctx,
-          ipVersion !== 0 ? hostname : undefined,
-        );
-      }
-    }
+    const allowlisted = matchAllowlistedHost(ctx);
+    if (allowlisted) return allowlisted;
 
     // Handle IP literals
     const ipVersion = isIP(hostname);
@@ -430,56 +533,12 @@ export function createSSRFValidator(config: SSRFConfig) {
     }
 
     // Resolve hostname to IP addresses
-    let allAddresses: string[];
-    try {
-      allAddresses = await resolveHostname(hostname);
-    } catch (dnsError) {
-      if (!config.blockLocal) {
-        logger.debug(
-          {
-            url,
-            hostname,
-            error:
-              dnsError instanceof Error ? dnsError.message : String(dnsError),
-          },
-          "DNS resolution failed; not blocking because BLOCK_LOCAL_HTTP_CALLS is off",
-        );
-        return buildUnresolvedResult(ctx, "dns-failed");
-      }
-      logger.error(
-        {
-          url,
-          hostname,
-          error:
-            dnsError instanceof Error ? dnsError.message : String(dnsError),
-        },
-        "DNS resolution failed during SSRF check - blocking request",
-      );
-      throw new Error(
-        `Unable to resolve hostname "${hostname}". Please verify the URL is correct and the server is reachable.`,
-      );
-    }
+    const resolution = await resolveAddressesOrUnresolved(ctx);
+    if ("unresolved" in resolution) return resolution.unresolved;
 
-    if (allAddresses.length === 0) {
-      if (!config.blockLocal) {
-        logger.debug(
-          { url, hostname },
-          "No DNS records found; not blocking because BLOCK_LOCAL_HTTP_CALLS is off",
-        );
-        return buildUnresolvedResult(ctx, "no-records");
-      }
-      logger.error(
-        { url, hostname },
-        "No DNS records found - blocking request",
-      );
-      throw new Error(
-        `Unable to resolve hostname "${hostname}". Please verify the URL is correct.`,
-      );
-    }
+    validateResolvedAddresses(ctx, resolution.addresses, config.blockLocal);
 
-    validateResolvedAddresses(ctx, allAddresses, config.blockLocal);
-
-    const resolvedIp = allAddresses[0]!;
+    const resolvedIp = resolution.addresses[0]!;
     logger.debug(
       { url, hostname, resolvedIp },
       "URL validated and resolved for SSRF-safe fetch",
@@ -592,6 +651,127 @@ function getResolvedIpForPinning(result: SSRFValidationResult): string | null {
 }
 
 /**
+ * Use IP pinning dispatcher when we have a resolved IP.
+ * Always apply TLS config (e.g. rejectUnauthorized) via a custom Agent.
+ * The caller's socket-level bounds (if any) ride on the Agent so they hold
+ * even when `signal` is absent.
+ */
+function createSSRFDispatcher({
+  resolvedIp,
+  tlsConfig,
+  timeouts,
+}: {
+  resolvedIp: string | null;
+  tlsConfig: { rejectUnauthorized: boolean };
+  timeouts: AgentTimeoutOptions;
+}): Agent {
+  return resolvedIp && isIP(resolvedIp) !== 0
+    ? createIpPinningAgent(resolvedIp, tlsConfig, timeouts)
+    : new Agent({
+        ...timeouts,
+        connect: { rejectUnauthorized: tlsConfig.rejectUnauthorized },
+      });
+}
+
+function buildRedirectInit({
+  init,
+  redirectCount,
+  status,
+}: {
+  init: SSRFSafeFetchOptions | undefined;
+  redirectCount: number;
+  status: number;
+}): SSRFSafeFetchOptions {
+  // `signal` and the socket-level bounds are carried into every hop, so
+  // one caller deadline bounds the WHOLE chain (up to MAX_REDIRECTS),
+  // not each hop independently.
+  const redirectInit: SSRFSafeFetchOptions = {
+    ...init,
+    signal: init?.signal,
+    headersTimeoutMs: init?.headersTimeoutMs,
+    bodyTimeoutMs: init?.bodyTimeoutMs,
+    _redirectCount: redirectCount + 1,
+  };
+
+  if (
+    status === 303 ||
+    (status !== 307 && status !== 308 && init?.method === "POST")
+  ) {
+    redirectInit.method = "GET";
+    redirectInit.body = undefined;
+  }
+
+  return redirectInit;
+}
+
+interface PreparedRedirect {
+  validated: SSRFValidationResult;
+  init: SSRFSafeFetchOptions;
+}
+
+/**
+ * Validates a 3xx Location through the SSRF checks and builds the next hop's
+ * options. Null when the response is not a redirect this call should follow.
+ */
+async function prepareRedirect({
+  response,
+  validated,
+  init,
+}: {
+  response: FetchResponse;
+  validated: SSRFValidationResult;
+  init: SSRFSafeFetchOptions | undefined;
+}): Promise<PreparedRedirect | null> {
+  if (response.status < 300 || response.status >= 400) return null;
+
+  const location = response.headers.get("location");
+  if (!location) return null;
+
+  if (init?.followRedirects === false) {
+    throw new Error(
+      "Redirects are not followed for this destination — the endpoint must answer directly.",
+    );
+  }
+
+  const redirectCount = init?._redirectCount ?? 0;
+  if (redirectCount >= MAX_REDIRECTS) {
+    throw new Error(`Too many redirects (max ${MAX_REDIRECTS})`);
+  }
+
+  const redirectUrl = new URL(location, validated.originalUrl).toString();
+
+  logger.debug(
+    {
+      originalUrl: validated.originalUrl,
+      redirectUrl,
+      redirectCount: redirectCount + 1,
+    },
+    "Following redirect with SSRF validation",
+  );
+
+  const redirectValidated = await validateUrlForSSRF(redirectUrl);
+
+  return {
+    validated: redirectValidated,
+    init: buildRedirectInit({ init, redirectCount, status: response.status }),
+  };
+}
+
+function toConnectionFailure(
+  err: unknown,
+  validated: SSRFValidationResult,
+): unknown {
+  if (err instanceof Error) {
+    const cause = (err as Error & { cause?: Error }).cause;
+    if (cause) {
+      return formatConnectionError(cause, validated.hostname, validated.port);
+    }
+    return formatConnectionError(err, validated.hostname, validated.port);
+  }
+  return err;
+}
+
+/**
  * Performs SSRF-validated fetch using the pre-resolved IP address.
  * Eliminates TOCTOU by using undici's dispatcher to pin to the resolved IP.
  * Uses redirect: 'manual' to validate redirect URLs before following.
@@ -606,28 +786,20 @@ export async function fetchWithResolvedIp(
   tlsConfig: { rejectUnauthorized: boolean } = defaultFetchConfig,
 ): Promise<FetchResponse> {
   const headers = new Headers(init?.headers);
-  const redirectCount = init?._redirectCount ?? 0;
 
   if (!headers.has("Host")) {
     headers.set("Host", validated.hostname);
   }
 
   const requestUrl = `${validated.protocol}//${validated.hostname}:${validated.port}${validated.path}`;
-  const resolvedIp = getResolvedIpForPinning(validated);
-  const agentTimeouts = resolveAgentTimeouts(init);
 
-  // Use IP pinning dispatcher when we have a resolved IP.
-  // Always apply TLS config (e.g. rejectUnauthorized) via a custom Agent.
-  // The caller's socket-level bounds (if any) ride on the Agent so they hold
-  // even when `signal` is absent.
-  const dispatcher =
-    resolvedIp && isIP(resolvedIp) !== 0
-      ? createIpPinningAgent(resolvedIp, tlsConfig, agentTimeouts)
-      : new Agent({
-          ...agentTimeouts,
-          connect: { rejectUnauthorized: tlsConfig.rejectUnauthorized },
-        });
+  const dispatcher = createSSRFDispatcher({
+    resolvedIp: getResolvedIpForPinning(validated),
+    tlsConfig,
+    timeouts: resolveAgentTimeouts(init),
+  });
 
+  let redirect: PreparedRedirect;
   try {
     const response = await undiciFetch(requestUrl, {
       method: init?.method,
@@ -640,67 +812,16 @@ export async function fetchWithResolvedIp(
       dispatcher,
     });
 
-    if (response.status >= 300 && response.status < 400) {
-      const location = response.headers.get("location");
-      if (location) {
-        if (init?.followRedirects === false) {
-          throw new Error(
-            "Redirects are not followed for this destination — the endpoint must answer directly.",
-          );
-        }
-        if (redirectCount >= MAX_REDIRECTS) {
-          throw new Error(`Too many redirects (max ${MAX_REDIRECTS})`);
-        }
-
-        const redirectUrl = new URL(location, validated.originalUrl).toString();
-
-        logger.debug(
-          {
-            originalUrl: validated.originalUrl,
-            redirectUrl,
-            redirectCount: redirectCount + 1,
-          },
-          "Following redirect with SSRF validation",
-        );
-
-        const redirectValidated = await validateUrlForSSRF(redirectUrl);
-
-        // `signal` and the socket-level bounds are carried into every hop, so
-        // one caller deadline bounds the WHOLE chain (up to MAX_REDIRECTS),
-        // not each hop independently.
-        const redirectInit: SSRFSafeFetchOptions = {
-          ...init,
-          signal: init?.signal,
-          headersTimeoutMs: init?.headersTimeoutMs,
-          bodyTimeoutMs: init?.bodyTimeoutMs,
-          _redirectCount: redirectCount + 1,
-        };
-
-        if (
-          response.status === 303 ||
-          (response.status !== 307 &&
-            response.status !== 308 &&
-            init?.method === "POST")
-        ) {
-          redirectInit.method = "GET";
-          redirectInit.body = undefined;
-        }
-
-        return fetchWithResolvedIp(redirectValidated, redirectInit, tlsConfig);
-      }
-    }
-
-    return response;
+    const prepared = await prepareRedirect({ response, validated, init });
+    if (!prepared) return response;
+    redirect = prepared;
   } catch (err) {
-    if (err instanceof Error) {
-      const cause = (err as Error & { cause?: Error }).cause;
-      if (cause) {
-        throw formatConnectionError(cause, validated.hostname, validated.port);
-      }
-      throw formatConnectionError(err, validated.hostname, validated.port);
-    }
-    throw err;
+    throw toConnectionFailure(err, validated);
   }
+
+  // Deliberately outside the try: the hop reports its own connection failures,
+  // and re-wrapping them here would name this hop's host for the next hop's error.
+  return fetchWithResolvedIp(redirect.validated, redirect.init, tlsConfig);
 }
 
 /**

@@ -74,21 +74,23 @@ import { app as trpcApp } from "./routes/trpc";
 import { app as unsubscribeApp } from "./routes/unsubscribe";
 import { app as workflowsApp } from "./routes/workflows";
 
-export function createApiRouter() {
-  const api = new Hono();
-
-  // Legacy OAuth callback rewrites — customer IdPs registered with old URLs.
-  // These only rewrite the path and re-dispatch to /api/auth/oauth2/callback/*
-  // (handled by authApp), so they carry a public policy and are registered
-  // through the builder rather than raw Hono.
-  const legacyOAuthCallbacks = createServiceApp({
-    basePath: "/api/auth/callback",
-  });
-  const rewriteCallback = (provider: string) => (c: Context) => {
+const rewriteLegacyOAuthCallback =
+  (api: Hono, provider: string) => (c: Context) => {
     const url = new URL(c.req.url);
     url.pathname = `/api/auth/oauth2/callback/${provider}`;
     return api.fetch(new Request(url.toString(), c.req.raw));
   };
+
+/**
+ * Legacy OAuth callback rewrites — customer IdPs registered with old URLs.
+ * These only rewrite the path and re-dispatch to /api/auth/oauth2/callback/*
+ * (handled by authApp), so they carry a public policy and are registered
+ * through the builder rather than raw Hono.
+ */
+function registerLegacyOAuthCallbacks(api: Hono): void {
+  const legacyOAuthCallbacks = createServiceApp({
+    basePath: "/api/auth/callback",
+  });
   // Driven off the same list the providers pin their `redirectURI` to, so a
   // provider cannot be added on one side and forgotten on the other. Without a
   // rewrite the round-trip still lands on the `/api/auth/*` catch-all, but it
@@ -101,22 +103,29 @@ export function createApiRouter() {
           "legacy IdP callback URL; rewrites to /api/auth/oauth2/callback/* and re-dispatches",
         ),
       )
-      .all(`/${provider}`, rewriteCallback(provider));
+      .all(`/${provider}`, rewriteLegacyOAuthCallback(api, provider));
   }
   api.route("/", legacyOAuthCallbacks.hono);
+}
 
+/**
+ * Every sub-app mounted at "/", in registration order. Order encodes routing
+ * precedence (Hono matches the first registration that fits), so the
+ * comments below are load-bearing — see each one before reordering.
+ */
+const apiApps: Hono[] = [
   // ORDERING: specific paths before catch-all siblings with same basePath
-  api.route("/", datasetGenerateApp); // /api/dataset/generate (before datasetApp's /:slugOrId)
-  api.route("/", workflowsApp); // /api/workflows/code-completion, /post_event
-  api.route("/", healthChecksApp); // /api/health/collector, /evaluations, etc.
+  datasetGenerateApp, // /api/dataset/generate (before datasetApp's /:slugOrId)
+  workflowsApp, // /api/workflows/code-completion, /post_event
+  healthChecksApp, // /api/health/collector, /evaluations, etc.
 
-  api.route("/", agentsApp);
-  api.route("/", analyticsApp);
-  api.route("/", copilotKitApp);
-  api.route("/", dashboardsApp);
-  api.route("/", datasetApp);
-  api.route("/", evaluatorsApp);
-  api.route("/", eventsApp);
+  agentsApp,
+  analyticsApp,
+  copilotKitApp,
+  dashboardsApp,
+  datasetApp,
+  evaluatorsApp,
+  eventsApp,
   // experimentsV3App owns the session-authenticated execute/abort endpoints and
   // the API-key-authenticated run/runs endpoints; experimentsApp owns the
   // project-API-key list endpoint (GET /api/experiments). Both live under
@@ -125,71 +134,81 @@ export function createApiRouter() {
   // sibling route resolution. experimentsApp authenticates per-route via the
   // SecuredApp builder (no namespace-wide guard), so this ordering is
   // belt-and-suspenders; the experiments-route-auth regression test pins it.
-  api.route("/", experimentsV3App);
-  api.route("/", experimentsV3LegacyAliasApp); // /api/evaluations/v3/... → /api/experiments/...
-  api.route("/", experimentsApp);
-  api.route("/", filesApp);
-  api.route("/", exportTracesApp);
-  api.route("/", exportScenarioRunsApp);
+  experimentsV3App,
+  experimentsV3LegacyAliasApp, // /api/evaluations/v3/... → /api/experiments/...
+  experimentsApp,
+  filesApp,
+  exportTracesApp,
+  exportScenarioRunsApp,
   // ORDERING: the unauthenticated spec document shares the /api/gateway/v1
   // namespace with the credentialed resource routes, so it is mounted first
   // and cannot be shadowed by a sibling that later grows a parameterised
   // segment at the root of that namespace.
-  api.route("/", gatewayOpenApiApp); // /api/gateway/v1/openapi.json
-  api.route("/", gatewayPlatformApp);
-  api.route("/", governanceApp);
-  api.route("/", graphsApp);
-  api.route("/", meApp); // /api/me/usage — personal spend/usage
-  api.route("/", modelDefaultsApp);
-  api.route("/", modelProvidersApp);
-  api.route("/", monitorsApp);
-  api.route("/", apiKeysApp);
-  api.route("/", projectsApp);
-  api.route("/", promptsApp);
-  api.route("/", scenarioEventsApp);
-  api.route("/", scenariosApp);
-  api.route("/", secretsApp);
-  api.route("/", simulationRunsApp);
-  api.route("/", suitesApp);
-  api.route("/", teamsApp);
-  api.route("/", webhookPlatformApp);
-  api.route("/", gatewaySpendApp);
-  api.route("/", tracesApp);
-  api.route("/", triggersApp);
-  api.route("/", userAvatarApp); // /api/user-avatar/:projectId/:id — user avatars
-  api.route("/", workflowsCrudApp); // CRUD — complements workflowsApp (code-completion, post_event)
+  gatewayOpenApiApp, // /api/gateway/v1/openapi.json
+  gatewayPlatformApp,
+  governanceApp,
+  graphsApp,
+  meApp, // /api/me/usage — personal spend/usage
+  modelDefaultsApp,
+  modelProvidersApp,
+  monitorsApp,
+  apiKeysApp,
+  projectsApp,
+  promptsApp,
+  scenarioEventsApp,
+  scenariosApp,
+  secretsApp,
+  simulationRunsApp,
+  suitesApp,
+  teamsApp,
+  webhookPlatformApp,
+  gatewaySpendApp,
+  tracesApp,
+  triggersApp,
+  userAvatarApp, // /api/user-avatar/:projectId/:id — user avatars
+  workflowsCrudApp, // CRUD — complements workflowsApp (code-completion, post_event)
 
-  api.route("/", gatewayInternalApp);
-  api.route("/", otelApp);
-  api.route("/", rumApp); // /api/rum/v1/traces — browser telemetry proxy
-  api.route("/", playgroundApp);
-  api.route("/", langyInternalApp);
-  api.route("/", langyRelayApp);
-  api.route("/", githubLangyApp);
-  api.route("/", scenarioGenerateApp);
-  api.route("/", scimApp);
-  api.route("/", webhooksApp);
+  gatewayInternalApp,
+  otelApp,
+  rumApp, // /api/rum/v1/traces — browser telemetry proxy
+  playgroundApp,
+  langyInternalApp,
+  langyRelayApp,
+  githubLangyApp,
+  scenarioGenerateApp,
+  scimApp,
+  webhooksApp,
 
-  api.route("/", adminApp);
-  api.route("/", bugReportsApp); // /api/bug-reports — public issue-report intake
-  api.route("/", annotationsApp);
+  adminApp,
+  bugReportsApp, // /api/bug-reports — public issue-report intake
+  annotationsApp,
   // ORDERING: authCliApp MUST be registered BEFORE authApp.
   // authApp owns the BetterAuth catch-all (`/auth/*`), which would
   // otherwise swallow `/auth/cli/*` and return 404 from BetterAuth.
   // Register the more-specific basePath first so Hono routes match it.
-  api.route("/", authCliApp); // /api/auth/cli/* — RFC 8628 device-flow for CLI
-  api.route("/", authApp);
-  api.route("/", collectorApp);
-  api.route("/", ingestionRoutesApp); // /api/ingest/* — Activity Monitor receivers
-  api.route("/", cronApp);
-  api.route("/", evaluationsLegacyApp);
-  api.route("/", healthApp);
-  api.route("/", miscApp);
-  api.route("/", opsApp);
-  api.route("/", sseApp);
-  api.route("/", tracesLegacyApp);
-  api.route("/", trpcApp);
-  api.route("/", unsubscribeApp); // /api/unsubscribe — RFC 8058 one-click POST
+  authCliApp, // /api/auth/cli/* — RFC 8628 device-flow for CLI
+  authApp,
+  collectorApp,
+  ingestionRoutesApp, // /api/ingest/* — Activity Monitor receivers
+  cronApp,
+  evaluationsLegacyApp,
+  healthApp,
+  miscApp,
+  opsApp,
+  sseApp,
+  tracesLegacyApp,
+  trpcApp,
+  unsubscribeApp, // /api/unsubscribe — RFC 8058 one-click POST
+];
+
+export function createApiRouter() {
+  const api = new Hono();
+
+  registerLegacyOAuthCallbacks(api);
+
+  for (const app of apiApps) {
+    api.route("/", app);
+  }
 
   return api;
 }

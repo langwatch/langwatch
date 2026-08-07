@@ -6,6 +6,47 @@ interface PromptInput {
   type: LlmConfigInputType;
 }
 
+const addLiquidVariables = (target: Set<string>, text: string): void => {
+  const { inputVariables } = extractLiquidVariables(text);
+  for (const name of inputVariables) {
+    target.add(name);
+  }
+};
+
+const detectTemplateVariables = ({
+  prompt,
+  messages,
+}: {
+  prompt: string;
+  messages: Array<{ role: string; content: string }>;
+}): Set<string> => {
+  const detectedNames = new Set<string>();
+
+  // Extract from prompt text
+  if (prompt) {
+    addLiquidVariables(detectedNames, prompt);
+  }
+
+  // Extract from all message contents
+  for (const message of messages) {
+    if (message.content) {
+      addLiquidVariables(detectedNames, message.content);
+    }
+  }
+
+  return detectedNames;
+};
+
+// "input" first (locked variable), then alphabetically
+const byLockedInputThenAlphabetical = (
+  a: PromptInput,
+  b: PromptInput,
+): number => {
+  if (a.identifier === "input") return -1;
+  if (b.identifier === "input") return 1;
+  return a.identifier.localeCompare(b.identifier);
+};
+
 /**
  * Auto-detects template variables from prompt text and messages,
  * then merges them with explicitly provided inputs.
@@ -25,25 +66,7 @@ export function mergeAutoDetectedInputs({
   messages: Array<{ role: string; content: string }>;
   inputs: PromptInput[];
 }): PromptInput[] {
-  const detectedNames = new Set<string>();
-
-  // Extract from prompt text
-  if (prompt) {
-    const { inputVariables } = extractLiquidVariables(prompt);
-    for (const name of inputVariables) {
-      detectedNames.add(name);
-    }
-  }
-
-  // Extract from all message contents
-  for (const message of messages) {
-    if (message.content) {
-      const { inputVariables } = extractLiquidVariables(message.content);
-      for (const name of inputVariables) {
-        detectedNames.add(name);
-      }
-    }
-  }
+  const detectedNames = detectTemplateVariables({ prompt, messages });
 
   // Merge: explicit inputs keep their type, auto-detected get "str"
   const mergedMap = new Map<string, LlmConfigInputType>();
@@ -60,12 +83,8 @@ export function mergeAutoDetectedInputs({
     }
   }
 
-  // Convert to array and sort: "input" first (locked variable), then alphabetically
+  // Convert to array and sort
   return Array.from(mergedMap.entries())
     .map(([identifier, type]) => ({ identifier, type }))
-    .sort((a, b) => {
-      if (a.identifier === "input") return -1;
-      if (b.identifier === "input") return 1;
-      return a.identifier.localeCompare(b.identifier);
-    });
+    .sort(byLockedInputThenAlphabetical);
 }

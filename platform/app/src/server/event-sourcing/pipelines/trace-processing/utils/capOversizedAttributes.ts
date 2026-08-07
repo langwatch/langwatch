@@ -75,6 +75,60 @@ function truncationPlaceholder(
     : `[truncated: ${byteSize} bytes]`;
 }
 
+/** Caps `value.stringValue` in place when it exceeds `maxBytes`. */
+function capStringValue(value: OtlpAnyValue, maxBytes: number): boolean {
+  if (typeof value.stringValue !== "string") return false;
+  const byteSize = utf8ByteLength(value.stringValue);
+  if (byteSize <= maxBytes) return false;
+  value.stringValue = truncationPlaceholder(
+    byteSize,
+    dataUrlMimeType(value.stringValue),
+  );
+  return true;
+}
+
+/**
+ * Caps `value.bytesValue` in place when it exceeds `maxBytes`. Replaces the
+ * binary payload with a `stringValue` placeholder — downstream consumers
+ * read this attribute as a value type, so a string is the safe substitute.
+ */
+function capBytesValue(value: OtlpAnyValue, maxBytes: number): boolean {
+  if (value.bytesValue == null) return false;
+  const byteSize =
+    value.bytesValue instanceof Uint8Array
+      ? value.bytesValue.byteLength
+      : // JSON-serialized bytes ({"0":1,...}) or unexpected shape: best-effort size.
+        utf8ByteLength(String(value.bytesValue));
+  if (byteSize <= maxBytes) return false;
+  value.bytesValue = null;
+  value.stringValue = truncationPlaceholder(byteSize, null);
+  return true;
+}
+
+/** Recurses into `value.arrayValue.values`, capping each item in place. */
+function capArrayValue(value: OtlpAnyValue, maxBytes: number): boolean {
+  if (!value.arrayValue || !Array.isArray(value.arrayValue.values)) {
+    return false;
+  }
+  let capped = false;
+  for (const item of value.arrayValue.values) {
+    if (capAnyValue(item, maxBytes)) capped = true;
+  }
+  return capped;
+}
+
+/** Recurses into `value.kvlistValue.values`, capping each entry in place. */
+function capKvlistValue(value: OtlpAnyValue, maxBytes: number): boolean {
+  if (!value.kvlistValue || !Array.isArray(value.kvlistValue.values)) {
+    return false;
+  }
+  let capped = false;
+  for (const entry of value.kvlistValue.values) {
+    if (entry?.value && capAnyValue(entry.value, maxBytes)) capped = true;
+  }
+  return capped;
+}
+
 /**
  * Caps a single OTLP AnyValue in place. Returns true when something was
  * replaced (used only for bookkeeping / tests). Recurses into arrays and
@@ -83,48 +137,12 @@ function truncationPlaceholder(
 function capAnyValue(value: OtlpAnyValue, maxBytes: number): boolean {
   if (value == null || typeof value !== "object") return false;
 
-  let capped = false;
+  const cappedString = capStringValue(value, maxBytes);
+  const cappedBytes = capBytesValue(value, maxBytes);
+  const cappedArray = capArrayValue(value, maxBytes);
+  const cappedKvlist = capKvlistValue(value, maxBytes);
 
-  if (typeof value.stringValue === "string") {
-    const byteSize = utf8ByteLength(value.stringValue);
-    if (byteSize > maxBytes) {
-      value.stringValue = truncationPlaceholder(
-        byteSize,
-        dataUrlMimeType(value.stringValue),
-      );
-      capped = true;
-    }
-  }
-
-  if (value.bytesValue != null) {
-    const byteSize =
-      value.bytesValue instanceof Uint8Array
-        ? value.bytesValue.byteLength
-        : // JSON-serialized bytes ({"0":1,...}) or unexpected shape: best-effort size.
-          utf8ByteLength(String(value.bytesValue));
-    if (byteSize > maxBytes) {
-      // Replace the binary payload with a text placeholder. Downstream
-      // consumers read this attribute as a value type, so a stringValue
-      // placeholder is the safe, readable substitute.
-      value.bytesValue = null;
-      value.stringValue = truncationPlaceholder(byteSize, null);
-      capped = true;
-    }
-  }
-
-  if (value.arrayValue && Array.isArray(value.arrayValue.values)) {
-    for (const item of value.arrayValue.values) {
-      if (capAnyValue(item, maxBytes)) capped = true;
-    }
-  }
-
-  if (value.kvlistValue && Array.isArray(value.kvlistValue.values)) {
-    for (const entry of value.kvlistValue.values) {
-      if (entry?.value && capAnyValue(entry.value, maxBytes)) capped = true;
-    }
-  }
-
-  return capped;
+  return cappedString || cappedBytes || cappedArray || cappedKvlist;
 }
 
 type AttributeList = OtlpSpan["attributes"];
@@ -148,6 +166,38 @@ function capAttributeList(attributes: AttributeList, maxBytes: number): number {
 // enforceable — any change to the mutating pair should be mirrored in the
 // probe pair, and vice versa.
 
+function stringValueExceeds(value: OtlpAnyValue, maxBytes: number): boolean {
+  return (
+    typeof value.stringValue === "string" &&
+    utf8ByteLength(value.stringValue) > maxBytes
+  );
+}
+
+function bytesValueExceeds(value: OtlpAnyValue, maxBytes: number): boolean {
+  if (value.bytesValue == null) return false;
+  const byteSize =
+    value.bytesValue instanceof Uint8Array
+      ? value.bytesValue.byteLength
+      : Buffer.byteLength(String(value.bytesValue), "utf8");
+  return byteSize > maxBytes;
+}
+
+function arrayValueExceeds(value: OtlpAnyValue, maxBytes: number): boolean {
+  if (!value.arrayValue || !Array.isArray(value.arrayValue.values)) {
+    return false;
+  }
+  return value.arrayValue.values.some((item) => valueExceeds(item, maxBytes));
+}
+
+function kvlistValueExceeds(value: OtlpAnyValue, maxBytes: number): boolean {
+  if (!value.kvlistValue || !Array.isArray(value.kvlistValue.values)) {
+    return false;
+  }
+  return value.kvlistValue.values.some(
+    (entry) => entry?.value && valueExceeds(entry.value, maxBytes),
+  );
+}
+
 /**
  * Read-only recursive size probe. Returns true iff any `stringValue` or
  * `bytesValue` in `value` (or nested inside `arrayValue`/`kvlistValue`)
@@ -162,30 +212,36 @@ export function valueExceeds(
 ): boolean {
   if (value == null || typeof value !== "object") return false;
 
-  if (typeof value.stringValue === "string") {
-    if (utf8ByteLength(value.stringValue) > maxBytes) return true;
-  }
+  return (
+    stringValueExceeds(value, maxBytes) ||
+    bytesValueExceeds(value, maxBytes) ||
+    arrayValueExceeds(value, maxBytes) ||
+    kvlistValueExceeds(value, maxBytes)
+  );
+}
 
-  if (value.bytesValue != null) {
-    const byteSize =
-      value.bytesValue instanceof Uint8Array
-        ? value.bytesValue.byteLength
-        : Buffer.byteLength(String(value.bytesValue), "utf8");
-    if (byteSize > maxBytes) return true;
-  }
+/** Read-only mirror of `capAttributeList` — probes instead of mutating. */
+function attributeListExceeds(
+  attributes: AttributeList,
+  maxBytes: number,
+): boolean {
+  if (!Array.isArray(attributes)) return false;
+  return attributes.some(
+    (attr) => attr?.value && valueExceeds(attr.value, maxBytes),
+  );
+}
 
-  if (value.arrayValue && Array.isArray(value.arrayValue.values)) {
-    for (const item of value.arrayValue.values) {
-      if (valueExceeds(item, maxBytes)) return true;
-    }
+function spanEventsExceed(span: OtlpSpan, maxBytes: number): boolean {
+  for (const event of span.events ?? []) {
+    if (attributeListExceeds(event.attributes, maxBytes)) return true;
   }
+  return false;
+}
 
-  if (value.kvlistValue && Array.isArray(value.kvlistValue.values)) {
-    for (const entry of value.kvlistValue.values) {
-      if (entry?.value && valueExceeds(entry.value, maxBytes)) return true;
-    }
+function spanLinksExceed(span: OtlpSpan, maxBytes: number): boolean {
+  for (const link of span.links ?? []) {
+    if (attributeListExceeds(link.attributes, maxBytes)) return true;
   }
-
   return false;
 }
 
@@ -205,34 +261,15 @@ export function hasOversizedAttribute(
   maxBytes: number = DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES,
 ): boolean {
   try {
-    if (Array.isArray(span.attributes)) {
-      for (const attr of span.attributes) {
-        if (attr?.value && valueExceeds(attr.value, maxBytes)) return true;
-      }
-    }
-    for (const event of span.events ?? []) {
-      if (Array.isArray(event.attributes)) {
-        for (const attr of event.attributes) {
-          if (attr?.value && valueExceeds(attr.value, maxBytes)) return true;
-        }
-      }
-    }
-    for (const link of span.links ?? []) {
-      if (Array.isArray(link.attributes)) {
-        for (const attr of link.attributes) {
-          if (attr?.value && valueExceeds(attr.value, maxBytes)) return true;
-        }
-      }
-    }
-    if (resource && Array.isArray(resource.attributes)) {
-      for (const attr of resource.attributes) {
-        if (attr?.value && valueExceeds(attr.value, maxBytes)) return true;
-      }
-    }
+    return (
+      attributeListExceeds(span.attributes, maxBytes) ||
+      spanEventsExceed(span, maxBytes) ||
+      spanLinksExceed(span, maxBytes) ||
+      (resource != null && attributeListExceeds(resource.attributes, maxBytes))
+    );
   } catch {
     return false;
   }
-  return false;
 }
 
 /**

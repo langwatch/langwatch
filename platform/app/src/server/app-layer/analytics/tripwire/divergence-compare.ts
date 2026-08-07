@@ -88,13 +88,167 @@ function flattenBucketMetrics(bucket: TimeseriesBucket): Map<string, number> {
   return flat;
 }
 
+type RecordDivergence = (d: Divergence) => void;
+
+/**
+ * Compare the flattened metric maps for one matched (routed, legacy) bucket
+ * pair. Split out of `compareForTripwire`.
+ */
+function compareMetricsForDate({
+  period,
+  date,
+  routedBucket,
+  legacyBucket,
+  record,
+}: {
+  period: "current" | "previous";
+  date: string;
+  routedBucket: TimeseriesBucket;
+  legacyBucket: TimeseriesBucket;
+  record: RecordDivergence;
+}): void {
+  const routedFlat = flattenBucketMetrics(routedBucket);
+  const legacyFlat = flattenBucketMetrics(legacyBucket);
+  const allMetrics = new Set([...routedFlat.keys(), ...legacyFlat.keys()]);
+
+  for (const metric of allMetrics) {
+    const rv = routedFlat.get(metric);
+    const lv = legacyFlat.get(metric);
+
+    // A group key that exists on one side only (e.g. a model bucket the
+    // routed table attributes differently) shows up here as a metric
+    // path missing from the other map.
+    if (rv === undefined || lv === undefined) {
+      record({
+        kind: "missing-metric",
+        period,
+        date,
+        metric,
+        routed: rv ?? null,
+        legacy: lv ?? null,
+        relativeDelta: null,
+      });
+      continue;
+    }
+
+    const denom = Math.max(Math.abs(rv), Math.abs(lv));
+    if (denom === 0) continue;
+    const delta = Math.abs(rv - lv) / denom;
+    if (delta > TRIPWIRE_NUMERIC_TOLERANCE) {
+      record({
+        kind: "value",
+        period,
+        date,
+        metric,
+        routed: rv,
+        legacy: lv,
+        relativeDelta: delta,
+      });
+    }
+  }
+}
+
+/**
+ * Compare one period's routed vs. legacy buckets, date by date. Split out of
+ * `compareForTripwire`.
+ */
+function comparePeriodBuckets({
+  period,
+  routedBuckets,
+  legacyBuckets,
+  record,
+}: {
+  period: "current" | "previous";
+  routedBuckets: TimeseriesBucket[];
+  legacyBuckets: TimeseriesBucket[];
+  record: RecordDivergence;
+}): void {
+  const routedByDate = new Map(routedBuckets.map((b) => [b.date, b]));
+  const legacyByDate = new Map(legacyBuckets.map((b) => [b.date, b]));
+
+  // A bucket present on one side and absent on the other is a divergence in
+  // its own right — a routed query that drops a whole date (or invents one)
+  // is exactly the failure the tripwire exists to catch, and the old
+  // `if (!l) continue` silently tolerated it.
+  const allDates = new Set([...routedByDate.keys(), ...legacyByDate.keys()]);
+
+  for (const date of allDates) {
+    const r = routedByDate.get(date);
+    const l = legacyByDate.get(date);
+    if (!r || !l) {
+      record({
+        kind: "missing-bucket",
+        period,
+        date,
+        metric: "*",
+        routed: r ? 1 : null,
+        legacy: l ? 1 : null,
+        relativeDelta: null,
+      });
+      continue;
+    }
+    compareMetricsForDate({
+      period,
+      date,
+      routedBucket: r,
+      legacyBucket: l,
+      record,
+    });
+  }
+}
+
+function logDivergences({
+  projectId,
+  table,
+  divergenceCount,
+  divergences,
+}: {
+  projectId: string;
+  table: AnalyticsTable;
+  divergenceCount: number;
+  divergences: Divergence[];
+}): void {
+  if (divergenceCount === 0) return;
+  tripwireLogger.warn(
+    {
+      projectId,
+      table,
+      divergenceCount,
+      // Cap the structured payload so a fully-divergent grouped query
+      // doesn't dump megabytes of log lines.
+      divergences: divergences.slice(0, 10),
+    },
+    "ADR-034 tripwire: routed analytics result diverged from legacy trace_summaries result",
+  );
+}
+
+function logComparisonFailure({
+  projectId,
+  table,
+  error,
+}: {
+  projectId: string;
+  table: AnalyticsTable;
+  error: unknown;
+}): void {
+  // Tripwire must never break the read.
+  tripwireLogger.warn(
+    {
+      projectId,
+      table,
+      error: error instanceof Error ? error.message : String(error),
+    },
+    "ADR-034 tripwire: failed to compare routed and legacy results",
+  );
+}
+
 export function compareForTripwire(input: CompareForTripwireInput): void {
   const { projectId, table, routed, legacy } = input;
   try {
     const divergences: Divergence[] = [];
     let divergenceCount = 0;
 
-    const record = (d: Divergence): void => {
+    const record: RecordDivergence = (d) => {
       divergenceCount++;
       if (divergences.length < MAX_COLLECTED_DIVERGENCES) divergences.push(d);
     };
@@ -104,102 +258,11 @@ export function compareForTripwire(input: CompareForTripwireInput): void {
         period === "current" ? routed.currentPeriod : routed.previousPeriod;
       const legacyBuckets =
         period === "current" ? legacy.currentPeriod : legacy.previousPeriod;
-
-      const routedByDate = new Map(routedBuckets.map((b) => [b.date, b]));
-      const legacyByDate = new Map(legacyBuckets.map((b) => [b.date, b]));
-
-      // A bucket present on one side and absent on the other is a divergence in
-      // its own right — a routed query that drops a whole date (or invents one)
-      // is exactly the failure the tripwire exists to catch, and the old
-      // `if (!l) continue` silently tolerated it.
-      const allDates = new Set([
-        ...routedByDate.keys(),
-        ...legacyByDate.keys(),
-      ]);
-
-      for (const date of allDates) {
-        const r = routedByDate.get(date);
-        const l = legacyByDate.get(date);
-        if (!r || !l) {
-          record({
-            kind: "missing-bucket",
-            period,
-            date,
-            metric: "*",
-            routed: r ? 1 : null,
-            legacy: l ? 1 : null,
-            relativeDelta: null,
-          });
-          continue;
-        }
-
-        const routedFlat = flattenBucketMetrics(r);
-        const legacyFlat = flattenBucketMetrics(l);
-        const allMetrics = new Set([
-          ...routedFlat.keys(),
-          ...legacyFlat.keys(),
-        ]);
-
-        for (const metric of allMetrics) {
-          const rv = routedFlat.get(metric);
-          const lv = legacyFlat.get(metric);
-
-          // A group key that exists on one side only (e.g. a model bucket the
-          // routed table attributes differently) shows up here as a metric
-          // path missing from the other map.
-          if (rv === undefined || lv === undefined) {
-            record({
-              kind: "missing-metric",
-              period,
-              date,
-              metric,
-              routed: rv ?? null,
-              legacy: lv ?? null,
-              relativeDelta: null,
-            });
-            continue;
-          }
-
-          const denom = Math.max(Math.abs(rv), Math.abs(lv));
-          if (denom === 0) continue;
-          const delta = Math.abs(rv - lv) / denom;
-          if (delta > TRIPWIRE_NUMERIC_TOLERANCE) {
-            record({
-              kind: "value",
-              period,
-              date,
-              metric,
-              routed: rv,
-              legacy: lv,
-              relativeDelta: delta,
-            });
-          }
-        }
-      }
+      comparePeriodBuckets({ period, routedBuckets, legacyBuckets, record });
     }
 
-    if (divergenceCount > 0) {
-      tripwireLogger.warn(
-        {
-          projectId,
-          table,
-          divergenceCount,
-          // Cap the structured payload so a fully-divergent grouped query
-          // doesn't dump megabytes of log lines.
-          divergences: divergences.slice(0, 10),
-        },
-        "ADR-034 tripwire: routed analytics result diverged from legacy trace_summaries result",
-      );
-    }
+    logDivergences({ projectId, table, divergenceCount, divergences });
   } catch (error) {
-    // Tripwire must never break the read.
-    tripwireLogger.warn(
-      {
-        projectId,
-        table,
-        error: error instanceof Error ? error.message : String(error),
-      },
-      "ADR-034 tripwire: failed to compare routed and legacy results",
-    );
+    logComparisonFailure({ projectId, table, error });
   }
 }

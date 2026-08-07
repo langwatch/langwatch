@@ -25,13 +25,52 @@ export interface ConfirmSettledMatchDeps {
 }
 
 /**
- * The dispatch-time filter re-check (ADR-026 settle semantics): a match
- * detected at event time is only dispatched if the trigger's filters still
- * pass against the SETTLED fold state. ADR-043 trace-subject automations
- * carry a liqe `filterQuery` matched in-memory; legacy triggers keep the
- * structured `filters` path. Anything unevaluable at dispatch fails closed.
+ * ADR-043 trace-subject automations carry a liqe `filterQuery` matched
+ * in-memory against the settled fold state. Split out of
+ * {@link confirmSettledMatch} so the two filter dialects (query vs. legacy
+ * structured filters) each get their own guard-clause-free read.
  */
-export async function confirmSettledMatch({
+async function confirmSettledMatchByQuery({
+  deps,
+  projectId,
+  traceId,
+  foldState,
+  filterQuery,
+}: {
+  deps: ConfirmSettledMatchDeps;
+  projectId: string;
+  traceId: string;
+  foldState: TraceSummaryData;
+  filterQuery: string;
+}): Promise<boolean> {
+  const needs = queryNeeds(filterQuery);
+  const evaluations = needs.has("evaluations")
+    ? await deps.evaluationRuns.findByTraceId(projectId, traceId)
+    : null;
+  const events = needs.has("events")
+    ? await deps.deriveEvents({
+        tenantId: projectId,
+        traceId,
+        occurredAtMs: foldState.occurredAt,
+        foldVersion: foldState.spanCount,
+      })
+    : null;
+  // Spans aren't derived at dispatch time; the evaluator fails span-scoped
+  // fields closed on its own, so `spans` stays null.
+  return evaluateQueryInMemory(filterQuery, {
+    summary: foldState,
+    evaluations,
+    events,
+    spans: null,
+  });
+}
+
+/**
+ * Legacy structured `filters` path — kept alongside the liqe query path
+ * for triggers that predate ADR-043. Split out of {@link confirmSettledMatch}
+ * for the same reason as {@link confirmSettledMatchByQuery}.
+ */
+async function confirmSettledMatchByLegacyFilters({
   deps,
   trigger,
   projectId,
@@ -44,29 +83,6 @@ export async function confirmSettledMatch({
   traceId: string;
   foldState: TraceSummaryData;
 }): Promise<boolean> {
-  if (trigger.filterQuery != null) {
-    const needs = queryNeeds(trigger.filterQuery);
-    const evaluations = needs.has("evaluations")
-      ? await deps.evaluationRuns.findByTraceId(projectId, traceId)
-      : null;
-    const events = needs.has("events")
-      ? await deps.deriveEvents({
-          tenantId: projectId,
-          traceId,
-          occurredAtMs: foldState.occurredAt,
-          foldVersion: foldState.spanCount,
-        })
-      : null;
-    // Spans aren't derived at dispatch time; the evaluator fails span-scoped
-    // fields closed on its own, so `spans` stays null.
-    return evaluateQueryInMemory(trigger.filterQuery, {
-      summary: foldState,
-      evaluations,
-      events,
-      spans: null,
-    });
-  }
-
   const { traceFilters, evaluationFilters, hasEvaluationFilters } =
     classifyTriggerFilters(trigger.filters);
 
@@ -98,4 +114,43 @@ export async function confirmSettledMatch({
   }
 
   return true;
+}
+
+/**
+ * The dispatch-time filter re-check (ADR-026 settle semantics): a match
+ * detected at event time is only dispatched if the trigger's filters still
+ * pass against the SETTLED fold state. ADR-043 trace-subject automations
+ * carry a liqe `filterQuery` matched in-memory; legacy triggers keep the
+ * structured `filters` path. Anything unevaluable at dispatch fails closed.
+ */
+export async function confirmSettledMatch({
+  deps,
+  trigger,
+  projectId,
+  traceId,
+  foldState,
+}: {
+  deps: ConfirmSettledMatchDeps;
+  trigger: TriggerSummary;
+  projectId: string;
+  traceId: string;
+  foldState: TraceSummaryData;
+}): Promise<boolean> {
+  if (trigger.filterQuery != null) {
+    return confirmSettledMatchByQuery({
+      deps,
+      projectId,
+      traceId,
+      foldState,
+      filterQuery: trigger.filterQuery,
+    });
+  }
+
+  return confirmSettledMatchByLegacyFilters({
+    deps,
+    trigger,
+    projectId,
+    traceId,
+    foldState,
+  });
 }

@@ -120,34 +120,68 @@ export function stripRolesFromChatArrayJson(
     return null;
   }
 
-  let messages: unknown[];
-  let rewrap: (next: unknown[]) => unknown;
+  const conversation = unwrapConversation(parsed);
+  if (!conversation) return null;
+
+  const { next, removed } = stripMessages({
+    messages: conversation.messages,
+    roles,
+    stripToolCalls,
+  });
+
+  if (removed === 0) return null;
+  return { json: JSON.stringify(conversation.rewrap(next)), removed };
+}
+
+/** The LangWatch `{ type: "chat_messages", value: [...] }` wrapper and a bare
+ *  messages array, reduced to the message list plus how to put it back. */
+function unwrapConversation(
+  parsed: unknown,
+): { messages: unknown[]; rewrap: (next: unknown[]) => unknown } | null {
   if (Array.isArray(parsed)) {
-    messages = parsed;
-    rewrap = (next) => next;
-  } else if (
+    return { messages: parsed, rewrap: (next) => next };
+  }
+  if (
     isChatMessage(parsed) &&
     Array.isArray((parsed as { value?: unknown }).value)
   ) {
-    messages = (parsed as { value: unknown[] }).value;
-    rewrap = (next) => ({ ...parsed, value: next });
-  } else {
-    return null;
+    return {
+      messages: (parsed as { value: unknown[] }).value,
+      rewrap: (next) => ({ ...parsed, value: next }),
+    };
   }
+  return null;
+}
 
+function hasDroppedRole(message: unknown, roles: ReadonlySet<string>): boolean {
+  const role = isChatMessage(message) ? message.role : undefined;
+  return typeof role === "string" && roles.has(role);
+}
+
+function carriesStrippableToolCalls(
+  message: unknown,
+  stripToolCalls: boolean,
+): message is Record<string, unknown> {
+  return stripToolCalls && isChatMessage(message) && message.tool_calls != null;
+}
+
+function stripMessages({
+  messages,
+  roles,
+  stripToolCalls,
+}: {
+  messages: unknown[];
+  roles: ReadonlySet<string>;
+  stripToolCalls: boolean;
+}): { next: unknown[]; removed: number } {
   let removed = 0;
   const next: unknown[] = [];
   for (const message of messages) {
-    const role = isChatMessage(message) ? message.role : undefined;
-    if (typeof role === "string" && roles.has(role)) {
+    if (hasDroppedRole(message, roles)) {
       removed++;
       continue;
     }
-    if (
-      stripToolCalls &&
-      isChatMessage(message) &&
-      message.tool_calls != null
-    ) {
+    if (carriesStrippableToolCalls(message, stripToolCalls)) {
       const { tool_calls: _dropped, ...rest } = message;
       removed++;
       next.push(rest);
@@ -155,9 +189,7 @@ export function stripRolesFromChatArrayJson(
     }
     next.push(message);
   }
-
-  if (removed === 0) return null;
-  return { json: JSON.stringify(rewrap(next)), removed };
+  return { next, removed };
 }
 
 /** Marker stamped on a span whose content was dropped, so the UI can explain it. */

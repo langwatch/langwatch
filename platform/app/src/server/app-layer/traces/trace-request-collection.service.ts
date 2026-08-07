@@ -73,6 +73,58 @@ export interface TraceRequestCollectionResult {
   errorMessage: string;
 }
 
+type OtlpResourceSpanEntry = NonNullable<
+  IExportTraceServiceRequest["resourceSpans"]
+>[number];
+type OtlpScopeSpanEntry = OtlpResourceSpanEntry["scopeSpans"][number];
+
+/** Running counts of how a trace request's spans were disposed of, tallied across the whole request. */
+interface SpanIngestionTally {
+  collectedSpanCount: number;
+  droppedSpanCount: number;
+  dedupedSpanCount: number;
+  ingestionFailureCount: number;
+  filteredSpanCount: number;
+  errors: string[];
+}
+
+function createSpanIngestionTally(): SpanIngestionTally {
+  return {
+    collectedSpanCount: 0,
+    droppedSpanCount: 0,
+    dedupedSpanCount: 0,
+    ingestionFailureCount: 0,
+    filteredSpanCount: 0,
+    errors: [],
+  };
+}
+
+function recordIngestionResult(
+  tally: SpanIngestionTally,
+  result: SpanIngestionResult,
+): void {
+  switch (result.status) {
+    case "collected":
+      tally.collectedSpanCount++;
+      break;
+    case "dropped":
+      tally.droppedSpanCount++;
+      break;
+    case "deduped":
+      tally.dedupedSpanCount++;
+      break;
+    case "filtered":
+      tally.filteredSpanCount++;
+      break;
+    case "failed":
+      tally.ingestionFailureCount++;
+      break;
+  }
+  if (result.error) {
+    tally.errors.push(result.error);
+  }
+}
+
 export interface TraceRequestCollectionDeps {
   dedup: SpanDedupService;
   recordSpan: (data: RecordSpanCommandData) => Promise<void>;
@@ -126,84 +178,132 @@ export class TraceRequestCollectionService {
           trace_request_count: traceRequest.resourceSpans?.length ?? 0,
         },
       },
-      async (span) => {
-        let collectedSpanCount = 0;
-        let droppedSpanCount = 0;
-        let dedupedSpanCount = 0;
-        let ingestionFailureCount = 0;
-        let filteredSpanCount = 0;
-        const errors: string[] = [];
-
-        for (const resourceSpan of traceRequest.resourceSpans ?? []) {
-          const resource = resourceSpan?.resource;
-          const resourceParseResult = resourceSchema.safeParse(resource);
-          if (!resourceParseResult.success) {
-            this.logger.error(
-              { result: resourceParseResult, tenantId },
-              "Error parsing OTLP resource",
-            );
-          }
-
-          for (const scopeSpan of resourceSpan?.scopeSpans ?? []) {
-            const scope = scopeSpan?.scope;
-            const scopeParseResult =
-              instrumentationScopeSchema.safeParse(scope);
-            if (!scopeParseResult.success) {
-              this.logger.error(
-                { result: scopeParseResult, tenantId },
-                "Error parsing OTLP scope",
-              );
-            }
-
-            for (const otelSpan of scopeSpan?.spans ?? []) {
-              const result = await this.processSpan({
-                tenantId,
-                otelSpan,
-                resource: resourceParseResult.data ?? null,
-                scope: scopeParseResult.data ?? null,
-                piiRedactionLevel,
-                otelSpanRef: span,
-              });
-
-              switch (result.status) {
-                case "collected":
-                  collectedSpanCount++;
-                  break;
-                case "dropped":
-                  droppedSpanCount++;
-                  break;
-                case "deduped":
-                  dedupedSpanCount++;
-                  break;
-                case "filtered":
-                  filteredSpanCount++;
-                  break;
-                case "failed":
-                  ingestionFailureCount++;
-                  break;
-              }
-              if (result.error) {
-                errors.push(result.error);
-              }
-            }
-          }
-        }
-
-        span.setAttribute("spans.ingestion.successes", collectedSpanCount);
-        span.setAttribute("spans.ingestion.failures", ingestionFailureCount);
-        span.setAttribute("spans.ingestion.drops", droppedSpanCount);
-        span.setAttribute("spans.ingestion.deduped", dedupedSpanCount);
-        span.setAttribute("spans.ingestion.filtered", filteredSpanCount);
-
-        // Filtered spans are intentionally not stored (coding-agent infra
-        // noise), so they are NOT rejections.
-        const rejectedSpans = droppedSpanCount + ingestionFailureCount;
-        return {
-          rejectedSpans,
-          errorMessage: errors.join("; "),
-        };
-      },
+      (span) =>
+        this.collectTraceRequestSpans({
+          tenantId,
+          traceRequest,
+          piiRedactionLevel,
+          otelSpanRef: span,
+        }),
     );
+  }
+
+  private async collectTraceRequestSpans({
+    tenantId,
+    traceRequest,
+    piiRedactionLevel,
+    otelSpanRef,
+  }: {
+    tenantId: string;
+    traceRequest: IExportTraceServiceRequest;
+    piiRedactionLevel: PIIRedactionLevel;
+    otelSpanRef: OtelSpan;
+  }): Promise<TraceRequestCollectionResult> {
+    const tally = createSpanIngestionTally();
+
+    for (const resourceSpan of traceRequest.resourceSpans ?? []) {
+      await this.processResourceSpan({
+        tenantId,
+        resourceSpan,
+        piiRedactionLevel,
+        otelSpanRef,
+        tally,
+      });
+    }
+
+    otelSpanRef.setAttribute(
+      "spans.ingestion.successes",
+      tally.collectedSpanCount,
+    );
+    otelSpanRef.setAttribute(
+      "spans.ingestion.failures",
+      tally.ingestionFailureCount,
+    );
+    otelSpanRef.setAttribute("spans.ingestion.drops", tally.droppedSpanCount);
+    otelSpanRef.setAttribute("spans.ingestion.deduped", tally.dedupedSpanCount);
+    otelSpanRef.setAttribute(
+      "spans.ingestion.filtered",
+      tally.filteredSpanCount,
+    );
+
+    // Filtered spans are intentionally not stored (coding-agent infra
+    // noise), so they are NOT rejections.
+    const rejectedSpans = tally.droppedSpanCount + tally.ingestionFailureCount;
+    return {
+      rejectedSpans,
+      errorMessage: tally.errors.join("; "),
+    };
+  }
+
+  private async processResourceSpan({
+    tenantId,
+    resourceSpan,
+    piiRedactionLevel,
+    otelSpanRef,
+    tally,
+  }: {
+    tenantId: string;
+    resourceSpan: OtlpResourceSpanEntry;
+    piiRedactionLevel: PIIRedactionLevel;
+    otelSpanRef: OtelSpan;
+    tally: SpanIngestionTally;
+  }): Promise<void> {
+    const resource = resourceSpan?.resource;
+    const resourceParseResult = resourceSchema.safeParse(resource);
+    if (!resourceParseResult.success) {
+      this.logger.error(
+        { result: resourceParseResult, tenantId },
+        "Error parsing OTLP resource",
+      );
+    }
+
+    for (const scopeSpan of resourceSpan?.scopeSpans ?? []) {
+      await this.processScopeSpan({
+        tenantId,
+        scopeSpan,
+        resource: resourceParseResult.data ?? null,
+        piiRedactionLevel,
+        otelSpanRef,
+        tally,
+      });
+    }
+  }
+
+  private async processScopeSpan({
+    tenantId,
+    scopeSpan,
+    resource,
+    piiRedactionLevel,
+    otelSpanRef,
+    tally,
+  }: {
+    tenantId: string;
+    scopeSpan: OtlpScopeSpanEntry;
+    resource: OtlpResource | null;
+    piiRedactionLevel: PIIRedactionLevel;
+    otelSpanRef: OtelSpan;
+    tally: SpanIngestionTally;
+  }): Promise<void> {
+    const scope = scopeSpan?.scope;
+    const scopeParseResult = instrumentationScopeSchema.safeParse(scope);
+    if (!scopeParseResult.success) {
+      this.logger.error(
+        { result: scopeParseResult, tenantId },
+        "Error parsing OTLP scope",
+      );
+    }
+
+    for (const otelSpan of scopeSpan?.spans ?? []) {
+      const result = await this.processSpan({
+        tenantId,
+        otelSpan,
+        resource,
+        scope: scopeParseResult.data ?? null,
+        piiRedactionLevel,
+        otelSpanRef,
+      });
+      recordIngestionResult(tally, result);
+    }
   }
 
   /**

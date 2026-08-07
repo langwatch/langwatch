@@ -4,6 +4,7 @@ import {
   type Attributes,
   context,
   propagation,
+  type Span,
   SpanKind,
   SpanStatusCode,
   type Tracer,
@@ -39,6 +40,16 @@ export type HandleResult =
   | { outcome: "revisionConflict"; actualRevision: number };
 
 const SLOW_PROCESS_MANAGER_OPERATION_MS = 1_000;
+
+const OUTCOME_METRIC_LABELS: Record<
+  HandleResult["outcome"],
+  "duplicate_event" | "stale_wake" | "revision_conflict" | "committed"
+> = {
+  duplicateEvent: "duplicate_event",
+  staleWake: "stale_wake",
+  revisionConflict: "revision_conflict",
+  committed: "committed",
+};
 
 export interface ProcessManagerServiceOptions<State> {
   definition: ProcessDefinition<State>;
@@ -253,6 +264,83 @@ export class ProcessManagerService<State> {
     return carrier;
   }
 
+  private recordEvolveOutcome(params: {
+    result: HandleResult;
+    inputKind: "event" | "wake";
+    logContext: Record<string, string | number | undefined>;
+  }): void {
+    const outcome = OUTCOME_METRIC_LABELS[params.result.outcome];
+    incrementEsProcessManagerTotal({
+      processName: this.definition.name,
+      inputKind: params.inputKind,
+      outcome,
+    });
+    if (outcome === "revision_conflict") {
+      this.logger.warn(
+        {
+          processName: this.definition.name,
+          inputKind: params.inputKind,
+          outcome,
+          ...params.logContext,
+        },
+        "Process-manager evolution hit a revision conflict",
+      );
+    }
+  }
+
+  private recordEvolveFailure(params: {
+    error: unknown;
+    span: Span;
+    inputKind: "event" | "wake";
+    logContext: Record<string, string | number | undefined>;
+  }): void {
+    incrementEsProcessManagerTotal({
+      processName: this.definition.name,
+      inputKind: params.inputKind,
+      outcome: "failed",
+    });
+    const { errorType, errorMessage } = toSafeFailureDiagnostic(params.error);
+    params.span.recordException({
+      name: errorType,
+      message: errorMessage,
+    });
+    params.span.setStatus({ code: SpanStatusCode.ERROR });
+    this.logger.error(
+      {
+        processName: this.definition.name,
+        inputKind: params.inputKind,
+        errorType,
+        errorMessage,
+        ...params.logContext,
+      },
+      "Process-manager evolution failed",
+    );
+  }
+
+  private recordEvolveDuration(params: {
+    startedAt: number;
+    inputKind: "event" | "wake";
+    logContext: Record<string, string | number | undefined>;
+  }): void {
+    const durationMs = performance.now() - params.startedAt;
+    observeEsProcessManagerDuration({
+      processName: this.definition.name,
+      inputKind: params.inputKind,
+      durationMs,
+    });
+    if (durationMs >= SLOW_PROCESS_MANAGER_OPERATION_MS) {
+      this.logger.warn(
+        {
+          processName: this.definition.name,
+          inputKind: params.inputKind,
+          durationMs: Math.round(durationMs),
+          ...params.logContext,
+        },
+        "Process-manager evolution is slow",
+      );
+    }
+  }
+
   private async inEvolveSpan<T extends HandleResult>(params: {
     inputKind: "event" | "wake";
     logContext: Record<string, string | number | undefined>;
@@ -266,72 +354,26 @@ export class ProcessManagerService<State> {
         const startedAt = performance.now();
         try {
           const result = await params.run();
-          const outcome =
-            (result as HandleResult).outcome === "duplicateEvent"
-              ? "duplicate_event"
-              : (result as HandleResult).outcome === "staleWake"
-                ? "stale_wake"
-                : (result as HandleResult).outcome === "revisionConflict"
-                  ? "revision_conflict"
-                  : "committed";
-          incrementEsProcessManagerTotal({
-            processName: this.definition.name,
+          this.recordEvolveOutcome({
+            result,
             inputKind: params.inputKind,
-            outcome,
+            logContext: params.logContext,
           });
-          if (outcome === "revision_conflict") {
-            this.logger.warn(
-              {
-                processName: this.definition.name,
-                inputKind: params.inputKind,
-                outcome,
-                ...params.logContext,
-              },
-              "Process-manager evolution hit a revision conflict",
-            );
-          }
           return result;
         } catch (error) {
-          incrementEsProcessManagerTotal({
-            processName: this.definition.name,
+          this.recordEvolveFailure({
+            error,
+            span,
             inputKind: params.inputKind,
-            outcome: "failed",
+            logContext: params.logContext,
           });
-          const { errorType, errorMessage } = toSafeFailureDiagnostic(error);
-          span.recordException({
-            name: errorType,
-            message: errorMessage,
-          });
-          span.setStatus({ code: SpanStatusCode.ERROR });
-          this.logger.error(
-            {
-              processName: this.definition.name,
-              inputKind: params.inputKind,
-              errorType,
-              errorMessage,
-              ...params.logContext,
-            },
-            "Process-manager evolution failed",
-          );
           throw error;
         } finally {
-          const durationMs = performance.now() - startedAt;
-          observeEsProcessManagerDuration({
-            processName: this.definition.name,
+          this.recordEvolveDuration({
+            startedAt,
             inputKind: params.inputKind,
-            durationMs,
+            logContext: params.logContext,
           });
-          if (durationMs >= SLOW_PROCESS_MANAGER_OPERATION_MS) {
-            this.logger.warn(
-              {
-                processName: this.definition.name,
-                inputKind: params.inputKind,
-                durationMs: Math.round(durationMs),
-                ...params.logContext,
-              },
-              "Process-manager evolution is slow",
-            );
-          }
           span.end();
         }
       },

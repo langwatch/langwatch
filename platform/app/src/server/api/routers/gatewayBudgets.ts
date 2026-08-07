@@ -6,6 +6,7 @@
  * flows pass a scope kind + target id; the server normalises onto
  * `scopeType` and the matching typed FK column.
  */
+import type { PrismaClient } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { getApp } from "~/server/app-layer/app";
@@ -325,15 +326,10 @@ export type BudgetListScopeTarget = {
   memberCount?: number;
 };
 
-// Batch-resolves scope target (name + secondary) for a list of budgets,
-// grouping by scopeType so each scope gets at most one findMany. Detail
-// view uses the equivalent per-budget path in GatewayBudgetService; list
-// needed its own implementation to avoid N queries per page.
-async function resolveScopeTargetsBatch(
-  prisma: import("@prisma/client").PrismaClient,
+/** Groups budget scopeIds by scopeType, one Set per kind, so each kind gets at most one findMany. */
+function groupScopeIdsByType(
   budgets: Array<{ scopeType: string; scopeId: string }>,
-  organizationId: string | null,
-): Promise<Map<string, BudgetListScopeTarget>> {
+): Record<string, Set<string>> {
   const ids: Record<string, Set<string>> = {
     ORGANIZATION: new Set(),
     TEAM: new Set(),
@@ -346,6 +342,19 @@ async function resolveScopeTargetsBatch(
   for (const b of budgets) {
     ids[b.scopeType]?.add(b.scopeId);
   }
+  return ids;
+}
+
+/** The one findMany per scope kind, skipped (resolving to `[]`) when that kind has no ids in this batch. */
+async function fetchScopeRows({
+  prisma,
+  ids,
+  organizationId,
+}: {
+  prisma: PrismaClient;
+  ids: Record<string, Set<string>>;
+  organizationId: string | null;
+}) {
   const [orgs, teams, projects, vks, users, groups] = await Promise.all([
     ids.ORGANIZATION?.size
       ? prisma.organization.findMany({
@@ -403,7 +412,13 @@ async function resolveScopeTargetsBatch(
         })
       : Promise.resolve([]),
   ]);
-  const out = new Map<string, BudgetListScopeTarget>();
+  return { orgs, teams, projects, vks, users, groups };
+}
+
+function populateOrganizationTargets(
+  out: Map<string, BudgetListScopeTarget>,
+  orgs: Array<{ id: string; name: string; slug: string }>,
+): void {
   for (const o of orgs) {
     out.set(`ORGANIZATION:${o.id}`, {
       kind: "ORGANIZATION",
@@ -412,6 +427,12 @@ async function resolveScopeTargetsBatch(
       secondary: o.slug,
     });
   }
+}
+
+function populateTeamTargets(
+  out: Map<string, BudgetListScopeTarget>,
+  teams: Array<{ id: string; name: string; slug: string }>,
+): void {
   for (const t of teams) {
     out.set(`TEAM:${t.id}`, {
       kind: "TEAM",
@@ -420,6 +441,12 @@ async function resolveScopeTargetsBatch(
       secondary: t.slug,
     });
   }
+}
+
+function populateProjectTargets(
+  out: Map<string, BudgetListScopeTarget>,
+  projects: Array<{ id: string; name: string; slug: string }>,
+): void {
   for (const p of projects) {
     out.set(`PROJECT:${p.id}`, {
       kind: "PROJECT",
@@ -428,9 +455,27 @@ async function resolveScopeTargetsBatch(
       secondary: p.slug,
     });
   }
-  // Derive the project slug (if any) from the first PROJECT-scope row
-  // on the VK — used only as a UI breadcrumb. Cheap inline lookup; the
-  // batch is bounded by `ids.VIRTUAL_KEY.size`.
+}
+
+/**
+ * Derives each VK's project slug (if any) from the first PROJECT-scope row
+ * on it — used only as a UI breadcrumb. Cheap inline lookup; the batch is
+ * bounded by the VIRTUAL_KEY id count.
+ */
+async function populateVirtualKeyTargets({
+  prisma,
+  out,
+  vks,
+}: {
+  prisma: PrismaClient;
+  out: Map<string, BudgetListScopeTarget>;
+  vks: Array<{
+    id: string;
+    name: string;
+    displayPrefix: string | null;
+    scopes: Array<{ scopeId: string }>;
+  }>;
+}): Promise<void> {
   const projectIdsForSlugs = vks
     .map((vk) => vk.scopes[0]?.scopeId)
     .filter((id): id is string => typeof id === "string");
@@ -453,6 +498,12 @@ async function resolveScopeTargetsBatch(
       projectSlug: projectSlugById.get(vk.scopes[0]?.scopeId ?? "") ?? null,
     });
   }
+}
+
+function populatePrincipalTargets(
+  out: Map<string, BudgetListScopeTarget>,
+  users: Array<{ id: string; name: string | null; email: string | null }>,
+): void {
   for (const u of users) {
     out.set(`PRINCIPAL:${u.id}`, {
       kind: "PRINCIPAL",
@@ -461,6 +512,17 @@ async function resolveScopeTargetsBatch(
       secondary: u.email ?? null,
     });
   }
+}
+
+function populateGroupTargets(
+  out: Map<string, BudgetListScopeTarget>,
+  groups: Array<{
+    id: string;
+    name: string;
+    slug: string;
+    _count: { members: number };
+  }>,
+): void {
   for (const g of groups) {
     out.set(`GROUP:${g.id}`, {
       kind: "GROUP",
@@ -470,38 +532,79 @@ async function resolveScopeTargetsBatch(
       memberCount: g._count.members,
     });
   }
-  // A per-person template anchors on a virtual key or a project, and the
-  // scopeId alone does not say which, so both are asked for and the key
-  // wins where an id somehow matches both.
+}
+
+/**
+ * A per-person template anchors on a virtual key or a project, and the
+ * scopeId alone does not say which, so both are asked for and the key
+ * wins where an id somehow matches both.
+ */
+async function populateAttributedUserTargets({
+  prisma,
+  out,
+  ids,
+  organizationId,
+}: {
+  prisma: PrismaClient;
+  out: Map<string, BudgetListScopeTarget>;
+  ids: Record<string, Set<string>>;
+  organizationId: string | null;
+}): Promise<void> {
   const anchorIds = [...(ids.ATTRIBUTED_USER ?? [])];
-  if (anchorIds.length > 0 && organizationId) {
-    const [anchorKeys, anchorProjects] = await Promise.all([
-      prisma.virtualKey.findMany({
-        where: { id: { in: anchorIds }, organizationId },
-        select: { id: true, name: true, displayPrefix: true },
-      }),
-      prisma.project.findMany({
-        where: { id: { in: anchorIds }, team: { organizationId } },
-        select: { id: true, name: true, slug: true },
-      }),
-    ]);
-    for (const p of anchorProjects) {
-      out.set(`ATTRIBUTED_USER:${p.id}`, {
-        kind: "ATTRIBUTED_USER",
-        id: p.id,
-        name: p.name,
-        secondary: p.slug,
-      });
-    }
-    for (const vk of anchorKeys) {
-      out.set(`ATTRIBUTED_USER:${vk.id}`, {
-        kind: "ATTRIBUTED_USER",
-        id: vk.id,
-        name: vk.name,
-        secondary: vk.displayPrefix ? `${vk.displayPrefix}…` : null,
-      });
-    }
+  if (anchorIds.length === 0 || !organizationId) return;
+
+  const [anchorKeys, anchorProjects] = await Promise.all([
+    prisma.virtualKey.findMany({
+      where: { id: { in: anchorIds }, organizationId },
+      select: { id: true, name: true, displayPrefix: true },
+    }),
+    prisma.project.findMany({
+      where: { id: { in: anchorIds }, team: { organizationId } },
+      select: { id: true, name: true, slug: true },
+    }),
+  ]);
+  for (const p of anchorProjects) {
+    out.set(`ATTRIBUTED_USER:${p.id}`, {
+      kind: "ATTRIBUTED_USER",
+      id: p.id,
+      name: p.name,
+      secondary: p.slug,
+    });
   }
+  for (const vk of anchorKeys) {
+    out.set(`ATTRIBUTED_USER:${vk.id}`, {
+      kind: "ATTRIBUTED_USER",
+      id: vk.id,
+      name: vk.name,
+      secondary: vk.displayPrefix ? `${vk.displayPrefix}…` : null,
+    });
+  }
+}
+
+// Batch-resolves scope target (name + secondary) for a list of budgets,
+// grouping by scopeType so each scope gets at most one findMany. Detail
+// view uses the equivalent per-budget path in GatewayBudgetService; list
+// needed its own implementation to avoid N queries per page.
+async function resolveScopeTargetsBatch(
+  prisma: PrismaClient,
+  budgets: Array<{ scopeType: string; scopeId: string }>,
+  organizationId: string | null,
+): Promise<Map<string, BudgetListScopeTarget>> {
+  const ids = groupScopeIdsByType(budgets);
+  const { orgs, teams, projects, vks, users, groups } = await fetchScopeRows({
+    prisma,
+    ids,
+    organizationId,
+  });
+
+  const out = new Map<string, BudgetListScopeTarget>();
+  populateOrganizationTargets(out, orgs);
+  populateTeamTargets(out, teams);
+  populateProjectTargets(out, projects);
+  await populateVirtualKeyTargets({ prisma, out, vks });
+  populatePrincipalTargets(out, users);
+  populateGroupTargets(out, groups);
+  await populateAttributedUserTargets({ prisma, out, ids, organizationId });
   return out;
 }
 

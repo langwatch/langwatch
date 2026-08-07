@@ -162,6 +162,42 @@ export function sanitizeLangyPromptValue(value: string, max: number): string {
   );
 }
 
+/** A resource kind's sanitised (label, ref) pair, as handed to its describer. */
+interface DescribedResourceFields {
+  label: string;
+  ref: string;
+}
+
+type ResourceDescriber = (fields: DescribedResourceFields) => string | null;
+
+/**
+ * Per-kind describers for the resource kinds with bespoke wording. Kinds not
+ * listed here (experiment / prompt / dataset / dashboard / scenario /
+ * evaluation — all resource refs the agent resolves through its own scoped
+ * tools) fall through to `describeResource`'s generic wording. Data-driven
+ * replacement for what was a `switch` over `chip.kind`.
+ */
+const RESOURCE_DESCRIBERS: Partial<
+  Record<LangyResourceContext["kind"], ResourceDescriber>
+> = {
+  // The project is already implicit in the session key's scope.
+  project: ({ label }) => `- the project "${label}"`,
+  // `ref` is the SELECTED TRACE IDS. Work from exactly these rows — do not go
+  // and re-search for them.
+  selection: ({ label, ref }) =>
+    ref
+      ? `- ${label} — the user has these traces selected; work from exactly these ids: ${ref}`
+      : null,
+  // `ref` is the SEARCH QUERY ITSELF, not an id. The agent can run it, narrow
+  // it, or count what it matches.
+  filter: ({ ref }) =>
+    ref
+      ? `- the user's current Trace Explorer search is: ${ref} (run, narrow or count against this query when they say "these traces")`
+      : null,
+  trace: ({ label, ref }) =>
+    ref ? `- the trace they have open, id: ${ref}` : `- ${label}`,
+};
+
 /** How each resource kind is described to the model, in words it can act on. */
 function describeResource(chip: LangyResourceContext): string | null {
   const label = sanitizeLangyPromptValue(chip.label, MAX_LABEL_LENGTH);
@@ -170,35 +206,10 @@ function describeResource(chip: LangyResourceContext): string | null {
     : "";
   if (!label && !ref) return null;
 
-  switch (chip.kind) {
-    case "project":
-      // The project is already implicit in the session key's scope.
-      return `- the project "${label}"`;
+  const describer = RESOURCE_DESCRIBERS[chip.kind];
+  if (describer) return describer({ label, ref });
 
-    case "selection":
-      // `ref` is the SELECTED TRACE IDS. Work from exactly these rows — do not
-      // go and re-search for them.
-      return ref
-        ? `- ${label} — the user has these traces selected; work from exactly these ids: ${ref}`
-        : null;
-
-    case "filter":
-      // `ref` is the SEARCH QUERY ITSELF, not an id. The agent can run it, narrow
-      // it, or count what it matches.
-      return ref
-        ? `- the user's current Trace Explorer search is: ${ref} (run, narrow or count against this query when they say "these traces")`
-        : null;
-
-    case "trace":
-      return ref ? `- the trace they have open, id: ${ref}` : `- ${label}`;
-
-    default:
-      // experiment / prompt / dataset / dashboard / scenario / evaluation — all
-      // resource refs the agent resolves through its own scoped tools.
-      return ref
-        ? `- the ${chip.kind} they have open, ref: ${ref}`
-        : `- ${label}`;
-  }
+  return ref ? `- the ${chip.kind} they have open, ref: ${ref}` : `- ${label}`;
 }
 
 /** A skill the user asked for, and what they aimed it at. */

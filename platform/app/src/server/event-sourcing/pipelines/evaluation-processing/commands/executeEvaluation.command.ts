@@ -8,7 +8,9 @@ import {
 import { getAzureSafetyEnvFromProject } from "../../../../app-layer/evaluations/azure-safety-env.server";
 import type { EvaluationCostRecorder } from "../../../../app-layer/evaluations/evaluation-cost.recorder";
 import type { EvaluationExecutionService } from "../../../../app-layer/evaluations/evaluation-execution.service";
+import type { EvaluationExecutionResult } from "../../../../app-layer/evaluations/evaluation-execution.types";
 import type { MonitorService } from "../../../../app-layer/monitors/monitor.service";
+import type { MonitorWithEvaluator } from "../../../../app-layer/monitors/repositories/monitor.repository";
 import {
   buildPreconditionTraceDataFromCommand,
   checkEvaluatorRequiredFields,
@@ -117,6 +119,313 @@ const SCHEMA = defineCommandSchema(
 );
 
 /**
+ * 1a. Azure Safety BYOK gate — hard cutover to per-project credentials. If
+ * the monitor uses an Azure evaluator and the project has no azure_safety
+ * provider configured, returns the skip message so the caller can emit a
+ * clear configure message the customer can self-serve from the UI. Returns
+ * null when the gate does not apply or the project is configured.
+ */
+async function resolveAzureSafetyGateSkip(args: {
+  deps: ExecuteEvaluationCommandDeps;
+  monitor: MonitorWithEvaluator;
+  tenantId: ReturnType<typeof createTenantId>;
+  evaluatorId: string;
+}): Promise<string | null> {
+  if (!isAzureEvaluatorType(args.monitor.checkType)) return null;
+  const azureEnvResolver =
+    args.deps.azureSafetyEnvResolver ?? getAzureSafetyEnvFromProject;
+  const azureEnv = await azureEnvResolver(args.tenantId);
+  if (azureEnv) return null;
+  logger.warn(
+    {
+      tenantId: args.tenantId,
+      evaluatorId: args.evaluatorId,
+      evaluatorType: args.monitor.checkType,
+    },
+    "Azure Safety provider not configured — skipping evaluation",
+  );
+  return AZURE_SAFETY_NOT_CONFIGURED_MESSAGE;
+}
+
+/**
+ * 3. Read spans from CH, check evaluator required fields, then user-configured
+ * preconditions. Fetches events on demand only if a precondition references
+ * event fields.
+ */
+async function checkEvaluationPreconditions(args: {
+  deps: ExecuteEvaluationCommandDeps;
+  tenantId: ReturnType<typeof createTenantId>;
+  data: ExecuteEvaluationCommandData;
+  monitor: MonitorWithEvaluator;
+}): Promise<boolean> {
+  // Pass the event's occurredAt so the span read can prune stored_spans to the
+  // trace's weekly partition instead of cold-scanning every partition on S3
+  // (the read falls back to an unconstrained scan if the window misses).
+  const spans = await args.deps.spanStorage.getSpansByTraceId({
+    tenantId: args.tenantId,
+    traceId: args.data.traceId,
+    occurredAtMs: args.data.occurredAt,
+  });
+
+  const requiredFieldsMet = checkEvaluatorRequiredFields({
+    evaluatorType: args.monitor.checkType,
+    spans,
+  });
+  if (!requiredFieldsMet) {
+    logger.debug(
+      {
+        tenantId: args.tenantId,
+        evaluatorId: args.data.evaluatorId,
+        traceId: args.data.traceId,
+      },
+      "Evaluator required fields not met — skipping evaluation",
+    );
+    return false;
+  }
+
+  const preconditions = (args.monitor.preconditions ??
+    []) as CheckPreconditions;
+
+  let events: PreconditionTraceData["events"] = null;
+  if (preconditionsNeedEvents(preconditions)) {
+    const traceEvents = await args.deps.traceEvents.getEventsByTraceId({
+      tenantId: args.tenantId,
+      traceId: args.data.traceId,
+    });
+    events = traceEvents.map((e) => ({
+      event_type: e.event_type,
+      metrics: e.metrics ?? [],
+      event_details: e.event_details ?? [],
+    }));
+  }
+
+  const traceData = buildPreconditionTraceDataFromCommand({
+    data: args.data,
+    spans,
+    events,
+  });
+  const preconditionsMet = evaluatePreconditions({ traceData, preconditions });
+
+  if (!preconditionsMet) {
+    logger.debug(
+      {
+        tenantId: args.tenantId,
+        evaluatorId: args.data.evaluatorId,
+        traceId: args.data.traceId,
+      },
+      "Preconditions not met — skipping evaluation",
+    );
+    return false;
+  }
+
+  return true;
+}
+
+/** 1. Fetch monitor via service. Reports a "skipped" event itself when the
+ *  monitor is missing, so the caller only needs to check which case it got. */
+async function resolveMonitorOrReportMissing(args: {
+  deps: ExecuteEvaluationCommandDeps;
+  tenantId: ReturnType<typeof createTenantId>;
+  data: ExecuteEvaluationCommandData;
+}): Promise<
+  { monitor: MonitorWithEvaluator } | { events: EvaluationProcessingEvent[] }
+> {
+  const monitor = await args.deps.monitors.getMonitorById({
+    projectId: args.tenantId,
+    monitorId: args.data.evaluatorId,
+  });
+  if (monitor) return { monitor };
+  logger.warn(
+    { tenantId: args.tenantId, evaluatorId: args.data.evaluatorId },
+    "Monitor not found — skipping evaluation",
+  );
+  const events = await emitReported({
+    data: args.data,
+    tenantId: args.tenantId,
+    result: { status: "skipped", details: "Monitor not found" },
+  });
+  return { events };
+}
+
+/**
+ * 4. Run evaluation via app-layer service, then either drop a non-evaluatable
+ * trace with no event, or record cost and emit the single reported event.
+ */
+async function runEvaluationAndEmit(args: {
+  deps: ExecuteEvaluationCommandDeps;
+  tenantId: ReturnType<typeof createTenantId>;
+  data: ExecuteEvaluationCommandData;
+  monitor: MonitorWithEvaluator;
+  settings: unknown;
+  workflowId: string | null | undefined;
+}): Promise<EvaluationProcessingEvent[]> {
+  const { deps, tenantId, data, monitor, settings, workflowId } = args;
+  const result = await deps.evaluationExecution.executeForTrace({
+    projectId: tenantId,
+    traceId: data.traceId,
+    evaluatorType: data.evaluatorType,
+    settings: settings as Record<string, any>,
+    mappings: monitor.mappings as MappingState | null,
+    level: monitor.level as "trace" | "thread",
+    workflowId,
+  });
+
+  // A trace the service could not evaluate (no thread_id for a thread-based
+  // monitor, errored trace with no I/O, etc.) comes back as "skipped". Drop
+  // it with no event, like an unmet precondition: a skipped run has no
+  // score to fold, and a bulk re-evaluation over non-evaluatable traces
+  // would otherwise emit thousands of results, each paying the heavy
+  // evaluation-projection read. Config skips (monitor not found, provider
+  // not configured) are emitted earlier via their own path — or, when the
+  // failure is thrown from inside execution, by the customer-fault branch
+  // in the catch below — and still surface in the UI.
+  if (result.status === "skipped") {
+    logger.debug(
+      {
+        tenantId,
+        evaluatorId: data.evaluatorId,
+        traceId: data.traceId,
+        details: result.details,
+      },
+      "Trace not evaluatable — skipping with no result event",
+    );
+    return [];
+  }
+
+  const costId = await recordEvaluationCostIfProcessed({
+    deps,
+    tenantId,
+    data,
+    result,
+  });
+
+  // 6. Emit single reported event — fold projection persists to CH.
+  return await emitReported({
+    data,
+    tenantId,
+    result: buildProcessedEvaluationResult({ result, costId }),
+    offloadInputs: deps.offloadInputs,
+  });
+}
+
+function resolveEvaluatorSettings(monitor: MonitorWithEvaluator) {
+  return monitor.evaluator?.config
+    ? ((monitor.evaluator.config as Record<string, any>).settings ??
+        monitor.parameters)
+    : monitor.parameters;
+}
+
+/** 5. Record cost via service — only for a processed result that carries one. */
+async function recordEvaluationCostIfProcessed(args: {
+  deps: ExecuteEvaluationCommandDeps;
+  tenantId: ReturnType<typeof createTenantId>;
+  data: ExecuteEvaluationCommandData;
+  result: EvaluationExecutionResult;
+}): Promise<string | null> {
+  if (args.result.status !== "processed" || !args.result.cost) return null;
+  return args.deps.costRecorder.recordCost({
+    projectId: args.tenantId,
+    isGuardrail: !!args.data.isGuardrail,
+    evaluatorName: args.data.evaluatorName ?? args.data.evaluatorType,
+    evaluatorId: args.data.evaluatorId,
+    traceId: args.data.traceId,
+    amount: args.result.cost.amount,
+    currency: args.result.cost.currency,
+  });
+}
+
+/**
+ * 6. Shape the emitted result. For error results, lift `details` into `error`
+ * if the service didn't already set it, so the real failure message always
+ * lands in the event's error field where the UI reads from.
+ */
+function buildProcessedEvaluationResult(args: {
+  result: EvaluationExecutionResult;
+  costId: string | null;
+}) {
+  const isError = args.result.status === "error";
+  const errorField = isError
+    ? (args.result.error ?? args.result.details ?? "Evaluator failed")
+    : args.result.error;
+
+  return {
+    status: args.result.status,
+    score: args.result.score,
+    passed: args.result.passed,
+    label: args.result.label,
+    details: isError ? undefined : args.result.details,
+    error: errorField,
+    errorDetails: args.result.errorDetails ?? null,
+    inputs: args.result.inputs ?? null,
+    costId: args.costId,
+  };
+}
+
+/**
+ * Customer-fixable errors (see {@link isCustomerFixable}) are skipped, not
+ * errored — mirrors the pre-execution config gates. Everything else is an
+ * unanticipated failure and is reported as an error event.
+ */
+async function handleExecutionError(args: {
+  deps: ExecuteEvaluationCommandDeps;
+  tenantId: ReturnType<typeof createTenantId>;
+  data: ExecuteEvaluationCommandData;
+  error: unknown;
+}): Promise<EvaluationProcessingEvent[]> {
+  const { tenantId, data, error } = args;
+
+  if (isCustomerFixable(error)) {
+    logger.info(
+      {
+        // `meta` first so the fixed identifiers below always win: `meta`
+        // is free-form per subclass and can itself carry a `traceId`.
+        ...error.meta,
+        code: error.code,
+        tenantId,
+        evaluationId: data.evaluationId,
+        evaluatorId: data.evaluatorId,
+        traceId: data.traceId,
+        error: error.message,
+      },
+      // Neutral wording on purpose: this branch also catches oversized
+      // payloads and non-evaluatable traces, neither of which is a
+      // misconfiguration. `code` in the payload says which it was.
+      "Customer-fixable evaluator failure — skipping evaluation",
+    );
+
+    return emitReported({
+      data,
+      tenantId,
+      result: {
+        status: "skipped",
+        details: error.message,
+      },
+    });
+  }
+
+  logger.error(
+    {
+      tenantId: tenantId,
+      evaluationId: data.evaluationId,
+      evaluatorId: data.evaluatorId,
+      traceId: data.traceId,
+      error: error instanceof Error ? error.message : String(error),
+    },
+    "Evaluation execution failed",
+  );
+
+  return emitReported({
+    data,
+    tenantId,
+    result: {
+      status: "error",
+      error: extractErrorMessage(error),
+      errorDetails: error instanceof Error ? (error.stack ?? null) : null,
+    },
+  });
+}
+
+/**
  * Command handler for executing evaluations.
  *
  * Sampling + preconditions + execution -> emits a single EvaluationReportedEvent.
@@ -177,52 +486,29 @@ export class ExecuteEvaluationCommand
       "Handling execute evaluation command",
     );
 
-    // 1. Fetch monitor via service
-    const monitor = await this.deps.monitors.getMonitorById({
-      projectId: tenantId,
-      monitorId: data.evaluatorId,
+    const monitorResolution = await resolveMonitorOrReportMissing({
+      deps: this.deps,
+      tenantId,
+      data,
     });
-    if (!monitor) {
-      logger.warn(
-        { tenantId: tenantId, evaluatorId: data.evaluatorId },
-        "Monitor not found — skipping evaluation",
-      );
+    if ("events" in monitorResolution) return monitorResolution.events;
+    const { monitor } = monitorResolution;
+
+    const azureSkipDetails = await resolveAzureSafetyGateSkip({
+      deps: this.deps,
+      monitor,
+      tenantId,
+      evaluatorId: data.evaluatorId,
+    });
+    if (azureSkipDetails) {
       return emitReported({
         data,
         tenantId,
         result: {
           status: "skipped",
-          details: "Monitor not found",
+          details: azureSkipDetails,
         },
       });
-    }
-
-    // 1a. Azure Safety BYOK gate — hard cutover to per-project credentials.
-    // If the monitor uses an Azure evaluator and the project has no
-    // azure_safety provider configured, skip with a clear configure message
-    // so the customer can self-serve the fix from the UI.
-    if (isAzureEvaluatorType(monitor.checkType)) {
-      const azureEnvResolver =
-        this.deps.azureSafetyEnvResolver ?? getAzureSafetyEnvFromProject;
-      const azureEnv = await azureEnvResolver(tenantId);
-      if (!azureEnv) {
-        logger.warn(
-          {
-            tenantId,
-            evaluatorId: data.evaluatorId,
-            evaluatorType: monitor.checkType,
-          },
-          "Azure Safety provider not configured — skipping evaluation",
-        );
-        return emitReported({
-          data,
-          tenantId,
-          result: {
-            status: "skipped",
-            details: AZURE_SAFETY_NOT_CONFIGURED_MESSAGE,
-          },
-        });
-      }
     }
 
     // 2. Sampling
@@ -238,207 +524,34 @@ export class ExecuteEvaluationCommand
       return [];
     }
 
-    // 3. Read spans from CH, check evaluator required fields + preconditions.
-    // Pass the event's occurredAt so the span read can prune stored_spans to the
-    // trace's weekly partition instead of cold-scanning every partition on S3
-    // (the read falls back to an unconstrained scan if the window misses).
-    const spans = await this.deps.spanStorage.getSpansByTraceId({
+    const preconditionsMet = await checkEvaluationPreconditions({
+      deps: this.deps,
       tenantId,
-      traceId: data.traceId,
-      occurredAtMs: data.occurredAt,
-    });
-
-    // Check evaluator required fields first
-    const requiredFieldsMet = checkEvaluatorRequiredFields({
-      evaluatorType: monitor.checkType,
-      spans,
-    });
-    if (!requiredFieldsMet) {
-      logger.debug(
-        {
-          tenantId: tenantId,
-          evaluatorId: data.evaluatorId,
-          traceId: data.traceId,
-        },
-        "Evaluator required fields not met — skipping evaluation",
-      );
-      return [];
-    }
-
-    // Then check user-configured preconditions
-    const preconditions = (monitor.preconditions ?? []) as CheckPreconditions;
-
-    // Fetch events on demand if any preconditions reference event fields
-    let events: PreconditionTraceData["events"] = null;
-    if (preconditionsNeedEvents(preconditions)) {
-      const traceEvents = await this.deps.traceEvents.getEventsByTraceId({
-        tenantId,
-        traceId: data.traceId,
-      });
-      events = traceEvents.map((e) => ({
-        event_type: e.event_type,
-        metrics: e.metrics ?? [],
-        event_details: e.event_details ?? [],
-      }));
-    }
-
-    const traceData = buildPreconditionTraceDataFromCommand({
       data,
-      spans,
-      events,
+      monitor,
     });
-    const preconditionsMet = evaluatePreconditions({
-      traceData,
-      preconditions,
-    });
-
     if (!preconditionsMet) {
-      logger.debug(
-        {
-          tenantId: tenantId,
-          evaluatorId: data.evaluatorId,
-          traceId: data.traceId,
-        },
-        "Preconditions not met — skipping evaluation",
-      );
       return []; // No events — preconditions didn't match
     }
 
     // 4. Run evaluation via app-layer service
-    const settings = monitor.evaluator?.config
-      ? ((monitor.evaluator.config as Record<string, any>).settings ??
-        monitor.parameters)
-      : monitor.parameters;
-
+    const settings = resolveEvaluatorSettings(monitor);
     const workflowId =
       monitor.evaluator?.type === "workflow"
         ? monitor.evaluator.workflowId
         : undefined;
 
     try {
-      const result = await this.deps.evaluationExecution.executeForTrace({
-        projectId: tenantId,
-        traceId: data.traceId,
-        evaluatorType: data.evaluatorType,
-        settings: settings as Record<string, any>,
-        mappings: monitor.mappings as MappingState | null,
-        level: monitor.level as "trace" | "thread",
+      return await runEvaluationAndEmit({
+        deps: this.deps,
+        tenantId,
+        data,
+        monitor,
+        settings,
         workflowId,
       });
-
-      // A trace the service could not evaluate (no thread_id for a thread-based
-      // monitor, errored trace with no I/O, etc.) comes back as "skipped". Drop
-      // it with no event, like an unmet precondition: a skipped run has no
-      // score to fold, and a bulk re-evaluation over non-evaluatable traces
-      // would otherwise emit thousands of results, each paying the heavy
-      // evaluation-projection read. Config skips (monitor not found, provider
-      // not configured) are emitted earlier via their own path — or, when the
-      // failure is thrown from inside execution, by the customer-fault branch
-      // in the catch below — and still surface in the UI.
-      if (result.status === "skipped") {
-        logger.debug(
-          {
-            tenantId,
-            evaluatorId: data.evaluatorId,
-            traceId: data.traceId,
-            details: result.details,
-          },
-          "Trace not evaluatable — skipping with no result event",
-        );
-        return [];
-      }
-
-      // 5. Record cost via service
-      let costId: string | null = null;
-      if (result.status === "processed" && result.cost) {
-        costId = await this.deps.costRecorder.recordCost({
-          projectId: tenantId,
-          isGuardrail: !!data.isGuardrail,
-          evaluatorName: data.evaluatorName ?? data.evaluatorType,
-          evaluatorId: data.evaluatorId,
-          traceId: data.traceId,
-          amount: result.cost.amount,
-          currency: result.cost.currency,
-        });
-      }
-
-      // 6. Emit single reported event — fold projection persists to CH.
-      // For error results, lift `details` into `error` if the service didn't
-      // already set it, so the real failure message always lands in the
-      // event's error field where the UI reads from.
-      const isError = result.status === "error";
-      const errorField = isError
-        ? (result.error ?? result.details ?? "Evaluator failed")
-        : result.error;
-
-      return await emitReported({
-        data,
-        tenantId,
-        result: {
-          status: result.status,
-          score: result.score,
-          passed: result.passed,
-          label: result.label,
-          details: isError ? undefined : result.details,
-          error: errorField,
-          errorDetails: result.errorDetails ?? null,
-          inputs: result.inputs ?? null,
-          costId,
-        },
-        offloadInputs: this.deps.offloadInputs,
-      });
     } catch (error) {
-      // Customer-fixable errors (see isCustomerFixable above) are skipped,
-      // not errored — mirrors the pre-execution config gates above.
-      if (isCustomerFixable(error)) {
-        logger.info(
-          {
-            // `meta` first so the fixed identifiers below always win: `meta`
-            // is free-form per subclass and can itself carry a `traceId`.
-            ...error.meta,
-            code: error.code,
-            tenantId,
-            evaluationId: data.evaluationId,
-            evaluatorId: data.evaluatorId,
-            traceId: data.traceId,
-            error: error.message,
-          },
-          // Neutral wording on purpose: this branch also catches oversized
-          // payloads and non-evaluatable traces, neither of which is a
-          // misconfiguration. `code` in the payload says which it was.
-          "Customer-fixable evaluator failure — skipping evaluation",
-        );
-
-        return emitReported({
-          data,
-          tenantId,
-          result: {
-            status: "skipped",
-            details: error.message,
-          },
-        });
-      }
-
-      logger.error(
-        {
-          tenantId: tenantId,
-          evaluationId: data.evaluationId,
-          evaluatorId: data.evaluatorId,
-          traceId: data.traceId,
-          error: error instanceof Error ? error.message : String(error),
-        },
-        "Evaluation execution failed",
-      );
-
-      return emitReported({
-        data,
-        tenantId,
-        result: {
-          status: "error",
-          error: extractErrorMessage(error),
-          errorDetails: error instanceof Error ? (error.stack ?? null) : null,
-        },
-      });
+      return handleExecutionError({ deps: this.deps, tenantId, data, error });
     }
   }
 }

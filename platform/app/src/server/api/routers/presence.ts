@@ -19,6 +19,38 @@ const logger = createLogger("langwatch:api:presence");
 const projectInput = z.object({ projectId: z.string() });
 const sessionInput = projectInput.extend({ sessionId: z.string().min(1) });
 
+/**
+ * Parses a raw cursor broadcast payload and applies the same defense-in-depth
+ * filters as onPresenceCursor: malformed JSON, cross-project leakage,
+ * anchor mismatch, and self-echo are all dropped by returning undefined.
+ */
+const parseCursorEvent = ({
+  payload,
+  projectId,
+  anchor,
+  sessionId,
+}: {
+  payload: { event: string; timestamp: number };
+  projectId: string;
+  anchor: PresenceCursorEvent["anchor"];
+  sessionId: string;
+}): PresenceCursorEvent | undefined => {
+  let parsed: PresenceCursorEvent;
+  try {
+    parsed = JSON.parse(payload.event) as PresenceCursorEvent;
+  } catch {
+    return undefined;
+  }
+  // Defense-in-depth: per-tenant emitter already isolates this, but
+  // a malformed payload or future shared-emitter regression must not
+  // leak cursors across projects.
+  if (parsed.projectId !== projectId) return undefined;
+  if (parsed.anchor !== anchor) return undefined;
+  // Don't echo a client's own cursor back to it.
+  if (parsed.sessionId === sessionId) return undefined;
+  return parsed;
+};
+
 export const presenceRouter = createTRPCRouter({
   /**
    * Heartbeat + location update for a single browser session.
@@ -191,19 +223,13 @@ export const presenceRouter = createTRPCRouter({
           signal: opts.signal,
         })) {
           const payload = eventArgs[0] as { event: string; timestamp: number };
-          let parsed: PresenceCursorEvent;
-          try {
-            parsed = JSON.parse(payload.event) as PresenceCursorEvent;
-          } catch {
-            continue;
-          }
-          // Defense-in-depth: per-tenant emitter already isolates this, but
-          // a malformed payload or future shared-emitter regression must not
-          // leak cursors across projects.
-          if (parsed.projectId !== projectId) continue;
-          if (parsed.anchor !== anchor) continue;
-          // Don't echo a client's own cursor back to it.
-          if (parsed.sessionId === sessionId) continue;
+          const parsed = parseCursorEvent({
+            payload,
+            projectId,
+            anchor,
+            sessionId,
+          });
+          if (!parsed) continue;
           yield parsed;
         }
       } finally {

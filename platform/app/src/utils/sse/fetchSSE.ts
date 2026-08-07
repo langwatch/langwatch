@@ -32,6 +32,77 @@ export interface FetchSSEOptions<T> {
   onError?: (error: Error) => void;
 }
 
+interface SSESettlement {
+  /** Abort signal for the underlying request; aborted by every settle path. */
+  signal: AbortSignal;
+  /** Settles the stream successfully, once. */
+  settle: () => void;
+  /** Settles the stream as a failure, once, honouring the caller's onError. */
+  handleError: (error: Error) => void;
+  /** (Re)arms the inactivity timer that fails the stream when it lapses. */
+  setResetableTimeout: (timeoutMs: number) => void;
+}
+
+/**
+ * Owns the one-shot settlement of the wrapping Promise: the abort controller,
+ * the inactivity timer, and the guard that keeps the first outcome the only one.
+ */
+function createSSESettlement({
+  resolve,
+  reject,
+  onError,
+}: {
+  resolve: (value: void | PromiseLike<void>) => void;
+  reject: (reason?: unknown) => void;
+  onError?: (error: Error) => void;
+}): SSESettlement {
+  const controller = new AbortController();
+  let timeoutId: NodeJS.Timeout | undefined;
+  let isSettled = false;
+
+  const cleanup = () => {
+    controller.abort();
+    if (timeoutId) clearTimeout(timeoutId);
+  };
+
+  const handleError = (error: Error) => {
+    if (isSettled) return;
+    isSettled = true;
+    cleanup();
+    if (onError) {
+      onError(error);
+      resolve();
+    } else {
+      reject(error);
+    }
+  };
+
+  const settle = () => {
+    if (isSettled) return;
+    isSettled = true;
+    cleanup();
+    resolve();
+  };
+
+  const setResetableTimeout = (timeoutMs: number) => {
+    if (timeoutId) clearTimeout(timeoutId);
+    timeoutId = setTimeout(() => {
+      const error = new FetchSSETimeoutError(
+        `Connection timed out with timeout ${timeoutMs}ms waiting for the next event`,
+      );
+      logger.error(error);
+      handleError(error);
+    }, timeoutMs);
+  };
+
+  return {
+    signal: controller.signal,
+    settle,
+    handleError,
+    setResetableTimeout,
+  };
+}
+
 /**
  * Fetches data from an endpoint using SSE (Server-Sent Events)
  * and processes events through callbacks
@@ -49,37 +120,8 @@ export async function fetchSSE<T>({
   // Wrap in a Promise so timeout errors can properly reject
   // instead of becoming unhandled exceptions
   return new Promise((resolve, reject) => {
-    const controller = new AbortController();
-    let timeoutId: NodeJS.Timeout | undefined;
-    let isSettled = false;
-
-    const cleanup = () => {
-      controller.abort();
-      if (timeoutId) clearTimeout(timeoutId);
-    };
-
-    const handleError = (error: Error) => {
-      if (isSettled) return;
-      isSettled = true;
-      cleanup();
-      if (onError) {
-        onError(error);
-        resolve();
-      } else {
-        reject(error);
-      }
-    };
-
-    const setResetableTimeout = (timeoutMs: number) => {
-      if (timeoutId) clearTimeout(timeoutId);
-      timeoutId = setTimeout(() => {
-        const error = new FetchSSETimeoutError(
-          `Connection timed out with timeout ${timeoutMs}ms waiting for the next event`,
-        );
-        logger.error(error);
-        handleError(error);
-      }, timeoutMs);
-    };
+    const { signal, settle, handleError, setResetableTimeout } =
+      createSSESettlement({ resolve, reject, onError });
 
     fetchEventSource(endpoint, {
       openWhenHidden: true,
@@ -90,7 +132,7 @@ export async function fetchSSE<T>({
         ...headers,
       },
       body: JSON.stringify(payload),
-      signal: controller.signal,
+      signal,
 
       async onopen(response) {
         setResetableTimeout(timeout);
@@ -118,20 +160,12 @@ export async function fetchSSE<T>({
         onEvent(event);
 
         if (shouldStopProcessing?.(event)) {
-          if (!isSettled) {
-            isSettled = true;
-            cleanup();
-            resolve();
-          }
+          settle();
         }
       },
 
       onclose() {
-        if (!isSettled) {
-          isSettled = true;
-          cleanup();
-          resolve();
-        }
+        settle();
       },
 
       onerror(error) {
@@ -139,11 +173,7 @@ export async function fetchSSE<T>({
       },
     })
       .then(() => {
-        if (!isSettled) {
-          isSettled = true;
-          cleanup();
-          resolve();
-        }
+        settle();
       })
       .catch((error) => {
         handleError(toError(error));

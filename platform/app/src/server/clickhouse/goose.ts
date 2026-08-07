@@ -236,6 +236,83 @@ async function executeBootstrapSQL(
   await client.command({ query: sql });
 }
 
+// Create database with appropriate engine
+// For replicated setup, use ON CLUSTER to ensure all nodes register the database
+async function createDatabaseIfMissing(
+  client: ClickHouseClient,
+  config: ClickHouseConfig,
+  verbose?: boolean,
+): Promise<void> {
+  const databaseEngine = config.clusterName
+    ? `ENGINE = Replicated('/clickhouse/databases/${config.database}', '{shard}', '{replica}')`
+    : "";
+  const onCluster = config.clusterName
+    ? `ON CLUSTER ${config.clusterName}`
+    : "";
+
+  await executeBootstrapSQL(
+    client,
+    `CREATE DATABASE IF NOT EXISTS ${config.database} ${onCluster} ${databaseEngine}`,
+    verbose,
+  );
+
+  // Verify database was created (Replicated databases require Keeper)
+  const dbResult = await client.query({
+    query: `SELECT 1 FROM system.databases WHERE name = {database:String}`,
+    query_params: { database: config.database },
+    format: "JSONEachRow",
+  });
+  const dbRows = await dbResult.json();
+
+  if (dbRows.length === 0) {
+    throw new MigrationError(
+      config.clusterName
+        ? `Failed to create Replicated database "${config.database}". ClickHouse Keeper may not be configured. Either configure Keeper or unset CLICKHOUSE_CLUSTER for local development.`
+        : `Failed to create database "${config.database}".`,
+      "bootstrap",
+    );
+  }
+}
+
+// Create goose_db_version table in the target database
+// Goose creates this table in the database specified in the connection string.
+// We pre-create it to avoid race conditions when multiple workers start simultaneously.
+// Schema must match goose's ClickHouse table: https://github.com/pressly/goose
+//
+// For Replicated databases (when clusterName is set):
+// - DDL is automatically replicated to all nodes by the database engine
+// - Data replication requires ReplicatedMergeTree (the database provides Keeper paths)
+async function createGooseVersionTable(
+  client: ClickHouseClient,
+  config: ClickHouseConfig,
+  verbose?: boolean,
+): Promise<void> {
+  const engine = config.clusterName ? "ReplicatedMergeTree()" : "MergeTree()";
+  await executeBootstrapSQL(
+    client,
+    `CREATE TABLE IF NOT EXISTS ${config.database}.goose_db_version (
+      version_id Int64,
+      is_applied UInt8,
+      date Date DEFAULT now(),
+      tstamp DateTime DEFAULT now()
+    ) ENGINE = ${engine}
+    ORDER BY date
+    SETTINGS index_granularity = 8192`,
+    verbose,
+  );
+
+  // Insert initial version 0 row if table is empty (atomic to avoid TOCTOU race)
+  // Goose requires at least one row to determine the starting version.
+  // Without this, goose reports "no next version found" on an empty table.
+  await executeBootstrapSQL(
+    client,
+    `INSERT INTO ${config.database}.goose_db_version (version_id, is_applied)
+     SELECT 0, 1
+     WHERE NOT EXISTS (SELECT 1 FROM ${config.database}.goose_db_version LIMIT 1)`,
+    verbose,
+  );
+}
+
 // Must run BEFORE goose so goose_db_version is created with correct engine for replication
 async function bootstrapDatabase(
   config: ClickHouseConfig,
@@ -250,71 +327,8 @@ async function bootstrapDatabase(
   // (NLB can route each connection to a different node, causing issues with Replicated DBs)
   await withClient(config.serverUrl, async (client) => {
     await verifyDatabaseEngine(client, config.database, config.clusterName);
-
-    // Create database with appropriate engine
-    // For replicated setup, use ON CLUSTER to ensure all nodes register the database
-    const databaseEngine = config.clusterName
-      ? `ENGINE = Replicated('/clickhouse/databases/${config.database}', '{shard}', '{replica}')`
-      : "";
-    const onCluster = config.clusterName
-      ? `ON CLUSTER ${config.clusterName}`
-      : "";
-
-    await executeBootstrapSQL(
-      client,
-      `CREATE DATABASE IF NOT EXISTS ${config.database} ${onCluster} ${databaseEngine}`,
-      verbose,
-    );
-
-    // Verify database was created (Replicated databases require Keeper)
-    const dbResult = await client.query({
-      query: `SELECT 1 FROM system.databases WHERE name = {database:String}`,
-      query_params: { database: config.database },
-      format: "JSONEachRow",
-    });
-    const dbRows = await dbResult.json();
-
-    if (dbRows.length === 0) {
-      throw new MigrationError(
-        config.clusterName
-          ? `Failed to create Replicated database "${config.database}". ClickHouse Keeper may not be configured. Either configure Keeper or unset CLICKHOUSE_CLUSTER for local development.`
-          : `Failed to create database "${config.database}".`,
-        "bootstrap",
-      );
-    }
-
-    // Create goose_db_version table in the target database
-    // Goose creates this table in the database specified in the connection string.
-    // We pre-create it to avoid race conditions when multiple workers start simultaneously.
-    // Schema must match goose's ClickHouse table: https://github.com/pressly/goose
-    //
-    // For Replicated databases (when clusterName is set):
-    // - DDL is automatically replicated to all nodes by the database engine
-    // - Data replication requires ReplicatedMergeTree (the database provides Keeper paths)
-    const engine = config.clusterName ? "ReplicatedMergeTree()" : "MergeTree()";
-    await executeBootstrapSQL(
-      client,
-      `CREATE TABLE IF NOT EXISTS ${config.database}.goose_db_version (
-        version_id Int64,
-        is_applied UInt8,
-        date Date DEFAULT now(),
-        tstamp DateTime DEFAULT now()
-      ) ENGINE = ${engine}
-      ORDER BY date
-      SETTINGS index_granularity = 8192`,
-      verbose,
-    );
-
-    // Insert initial version 0 row if table is empty (atomic to avoid TOCTOU race)
-    // Goose requires at least one row to determine the starting version.
-    // Without this, goose reports "no next version found" on an empty table.
-    await executeBootstrapSQL(
-      client,
-      `INSERT INTO ${config.database}.goose_db_version (version_id, is_applied)
-       SELECT 0, 1
-       WHERE NOT EXISTS (SELECT 1 FROM ${config.database}.goose_db_version LIMIT 1)`,
-      verbose,
-    );
+    await createDatabaseIfMissing(client, config, verbose);
+    await createGooseVersionTable(client, config, verbose);
   });
 
   // Check if 'local_primary' storage policy exists on this CH instance.
@@ -392,25 +406,31 @@ function logConfig(config: ClickHouseConfig): void {
   );
 }
 
-function executeGoose(
-  command: string,
+function logGooseInvocation(
   config: ClickHouseConfig,
-  options: GooseOptions = {},
-): string {
-  const migrationsDir = options.migrationsDir ?? MIGRATIONS_DIR;
-  const envVars = buildMigrationEnvVars(config);
+  migrationsDir: string,
+): void {
+  logConfig(config);
+  logger.info({ migrationsDir, __dirname }, "Goose migrations directory");
+  // Log connection string with password masked
+  const maskedConnStr = config.gooseConnectionString.replace(
+    /:([^:@]+)@/,
+    ":***@",
+  );
+  logger.info({ connectionString: maskedConnStr }, "Goose connection string");
+}
 
-  if (options.verbose) {
-    logConfig(config);
-    logger.info({ migrationsDir, __dirname }, "Goose migrations directory");
-    // Log connection string with password masked
-    const maskedConnStr = config.gooseConnectionString.replace(
-      /:([^:@]+)@/,
-      ":***@",
-    );
-    logger.info({ connectionString: maskedConnStr }, "Goose connection string");
-  }
-
+function buildGooseArgs({
+  command,
+  config,
+  migrationsDir,
+  verbose,
+}: {
+  command: string;
+  config: ClickHouseConfig;
+  migrationsDir: string;
+  verbose?: boolean;
+}): string[] {
   const args = [
     "-dir",
     migrationsDir,
@@ -421,10 +441,17 @@ function executeGoose(
     command,
   ];
 
-  if (options.verbose) {
+  if (verbose) {
     args.unshift("-v");
   }
 
+  return args;
+}
+
+function runGooseProcess(
+  args: string[],
+  envVars: NodeJS.ProcessEnv,
+): { output: string; status: number | null; stdout: string } {
   // Always pipe output so we can check for specific messages
   const result = spawnSync("goose", args, {
     encoding: "utf-8",
@@ -440,16 +467,19 @@ function executeGoose(
   }
 
   const output = [result.stderr, result.stdout].filter(Boolean).join("\n");
+  return { output, status: result.status, stdout: result.stdout ?? "" };
+}
 
-  // In verbose mode, print the output
-  if (options.verbose) {
-    logger.info(
-      { gooseOutput: output, exitCode: result.status },
-      "Goose output",
-    );
-  }
-
-  if (result.status !== 0) {
+function interpretGooseOutcome({
+  output,
+  status,
+  stdout,
+}: {
+  output: string;
+  status: number | null;
+  stdout: string;
+}): string {
+  if (status !== 0) {
     // "no next version found" means all migrations are already applied - not an error
     if (
       output.includes("no next version found") ||
@@ -465,7 +495,39 @@ function executeGoose(
     );
   }
 
-  return result.stdout ?? "";
+  return stdout;
+}
+
+function executeGoose(
+  command: string,
+  config: ClickHouseConfig,
+  options: GooseOptions = {},
+): string {
+  const migrationsDir = options.migrationsDir ?? MIGRATIONS_DIR;
+  const envVars = buildMigrationEnvVars(config);
+
+  if (options.verbose) {
+    logGooseInvocation(config, migrationsDir);
+  }
+
+  const args = buildGooseArgs({
+    command,
+    config,
+    migrationsDir,
+    verbose: options.verbose,
+  });
+
+  const result = runGooseProcess(args, envVars);
+
+  // In verbose mode, print the output
+  if (options.verbose) {
+    logger.info(
+      { gooseOutput: result.output, exitCode: result.status },
+      "Goose output",
+    );
+  }
+
+  return interpretGooseOutcome(result);
 }
 
 export async function migrateUp(options: GooseOptions = {}): Promise<string> {

@@ -136,47 +136,79 @@ export async function queryWindowed<T>(
       return result;
     }
 
-    const hinted = await run(
-      windowFragment(hintMs - windowMs, hintMs + windowMs),
-    );
-
-    // `none` treats the hinted window as authoritative (empty means genuinely
-    // absent within the window), so it never widens — which also means an empty
-    // result has no widen outcome to be recorded as. Give it its own: callers
-    // that resolve queued work through a `none` read retry on empty, so folding
-    // it into `hit` reports a permanently-failing lookup as a healthy one.
-    if (fallback === "none") {
-      incrementWindowedReadCount(
-        table,
-        isEmpty(hinted) ? "windowed_empty" : "hit",
-      );
-      return hinted;
-    }
-
-    // A non-empty hinted read needs no widening: it stayed cheap. Count as `hit`.
-    if (!isEmpty(hinted)) {
-      incrementWindowedReadCount(table, "hit");
-      return hinted;
-    }
-
-    const widened = await run(fallbackFragment(fallback, windowMs));
-    const isWidenedEmpty = isEmpty(widened);
-    if (fallback === "unbounded") {
-      incrementWindowedReadCount(
-        table,
-        isWidenedEmpty ? "unbounded_empty" : "unbounded_hit",
-      );
-    } else {
-      incrementWindowedReadCount(
-        table,
-        isWidenedEmpty ? "widened_empty" : "widened_hit",
-      );
-    }
-    return widened;
+    return await runHintedRead({
+      table,
+      hintMs,
+      windowMs,
+      fallback,
+      isEmpty,
+      run,
+    });
   } catch (error) {
     // A failed attempt still emits exactly one outcome — the future limiter's
     // baseline must see failures, not undercount them as absent reads.
     incrementWindowedReadCount(table, "error");
     throw error;
   }
+}
+
+/**
+ * The hint-present path: prune to `±windowMs` around the hint, then apply the
+ * fallback's widen policy. Split out of `queryWindowed` purely to keep the
+ * outer function's outcome-recording try/catch simple; the orchestration —
+ * attempt order, widen conditions, and which outcome each branch records —
+ * is unchanged.
+ */
+async function runHintedRead<T>({
+  table,
+  hintMs,
+  windowMs,
+  fallback,
+  isEmpty,
+  run,
+}: {
+  table: string;
+  hintMs: number;
+  windowMs: number;
+  fallback: WindowFallback;
+  isEmpty: (result: T) => boolean;
+  run: (window: WindowFragment | null) => Promise<T>;
+}): Promise<T> {
+  const hinted = await run(
+    windowFragment(hintMs - windowMs, hintMs + windowMs),
+  );
+
+  // `none` treats the hinted window as authoritative (empty means genuinely
+  // absent within the window), so it never widens — which also means an empty
+  // result has no widen outcome to be recorded as. Give it its own: callers
+  // that resolve queued work through a `none` read retry on empty, so folding
+  // it into `hit` reports a permanently-failing lookup as a healthy one.
+  if (fallback === "none") {
+    incrementWindowedReadCount(
+      table,
+      isEmpty(hinted) ? "windowed_empty" : "hit",
+    );
+    return hinted;
+  }
+
+  // A non-empty hinted read needs no widening: it stayed cheap. Count as `hit`.
+  if (!isEmpty(hinted)) {
+    incrementWindowedReadCount(table, "hit");
+    return hinted;
+  }
+
+  const widened = await run(fallbackFragment(fallback, windowMs));
+  const isWidenedEmpty = isEmpty(widened);
+  if (fallback === "unbounded") {
+    incrementWindowedReadCount(
+      table,
+      isWidenedEmpty ? "unbounded_empty" : "unbounded_hit",
+    );
+  } else {
+    incrementWindowedReadCount(
+      table,
+      isWidenedEmpty ? "widened_empty" : "widened_hit",
+    );
+  }
+  return widened;
 }

@@ -111,13 +111,12 @@ bodyLiquid.registerFilter("raw", { handler: identity, raw: true });
  * interpolation. `scenarioMappings` output is merged last and overrides base
  * keys, preserving each mapping's raw-vs-scalar treatment.
  */
-export function buildTemplateContext({
-  input,
-  scenarioMappings,
-}: {
-  input: AgentInput;
-  scenarioMappings?: Record<string, FieldMapping>;
-}): Record<string, unknown> {
+interface BaseTemplateContext {
+  base: Record<string, unknown>;
+  inputIsStructured: boolean;
+}
+
+function buildBaseTemplateContext(input: AgentInput): BaseTemplateContext {
   const lastUserMessage = input.messages.findLast((m) => m.role === "user");
   const inputIsStructured =
     lastUserMessage !== undefined &&
@@ -132,22 +131,49 @@ export function buildTemplateContext({
           ? new RawJson(JSON.stringify(lastUserMessage.content))
           : (lastUserMessage.content as string),
   };
+  return { base, inputIsStructured };
+}
 
+function buildMappedTemplateContext({
+  scenarioMappings,
+  input,
+  inputIsStructured,
+}: {
+  scenarioMappings: Record<string, FieldMapping> | undefined;
+  input: AgentInput;
+  inputIsStructured: boolean;
+}): Record<string, unknown> {
   const mapped: Record<string, unknown> = {};
-  if (scenarioMappings) {
-    const resolved = resolveFieldMappings({
-      fieldMappings: scenarioMappings,
-      agentInput: input,
-    });
-    for (const [identifier, mapping] of Object.entries(scenarioMappings)) {
-      const value = resolved[identifier];
-      if (value === undefined) continue;
-      const field = sourceFieldOf(mapping);
-      const isRawJson =
-        field === "messages" || (field === "input" && inputIsStructured);
-      mapped[identifier] = isRawJson ? new RawJson(value) : value;
-    }
+  if (!scenarioMappings) return mapped;
+
+  const resolved = resolveFieldMappings({
+    fieldMappings: scenarioMappings,
+    agentInput: input,
+  });
+  for (const [identifier, mapping] of Object.entries(scenarioMappings)) {
+    const value = resolved[identifier];
+    if (value === undefined) continue;
+    const field = sourceFieldOf(mapping);
+    const isRawJson =
+      field === "messages" || (field === "input" && inputIsStructured);
+    mapped[identifier] = isRawJson ? new RawJson(value) : value;
   }
+  return mapped;
+}
+
+export function buildTemplateContext({
+  input,
+  scenarioMappings,
+}: {
+  input: AgentInput;
+  scenarioMappings?: Record<string, FieldMapping>;
+}): Record<string, unknown> {
+  const { base, inputIsStructured } = buildBaseTemplateContext(input);
+  const mapped = buildMappedTemplateContext({
+    scenarioMappings,
+    input,
+    inputIsStructured,
+  });
 
   return { ...base, ...mapped };
 }

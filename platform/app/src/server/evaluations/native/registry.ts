@@ -92,6 +92,111 @@ function enabledPiiEntities(
  * Errors are never touched (an operational failure must stay visible). Applies
  * to both the remote Presidio detector and the native secrets detector.
  */
+function markerHitCount({
+  entity,
+  count,
+  kind,
+  enabled,
+}: {
+  entity: string;
+  count: number;
+  kind: AugmentKind;
+  enabled: Set<string> | null;
+}): number {
+  if (kind === "secret") {
+    return entity === SECRET_MARKER_ENTITY ? count : 0;
+  }
+  if (entity === SECRET_MARKER_ENTITY) return 0;
+  return enabled === null || enabled.has(entity) ? count : 0;
+}
+
+function countMarkerHits({
+  texts,
+  kind,
+  enabled,
+}: {
+  texts: string[];
+  kind: AugmentKind;
+  enabled: Set<string> | null;
+}): number {
+  let markerHits = 0;
+  for (const text of texts) {
+    for (const [entity, count] of findRedactionMarkers(text)) {
+      markerHits += markerHitCount({ entity, count, kind, enabled });
+    }
+  }
+  return markerHits;
+}
+
+// Dropped: nothing the mapping fed the evaluator has content, yet the trace
+// dropped a content category. (A mapped non-empty attribute makes this false,
+// which is the "evaluate the other field" case.)
+function isContentDropped({
+  texts,
+  droppedCategories,
+}: {
+  texts: string[];
+  droppedCategories: string[];
+}): boolean {
+  const hasContent = texts.some((text) => text.trim().length > 0);
+  return !hasContent && droppedCategories.length > 0;
+}
+
+function buildAugmentNotes({
+  markerHits,
+  droppedFail,
+  noun,
+}: {
+  markerHits: number;
+  droppedFail: boolean;
+  noun: string;
+}): string[] {
+  const notes: string[] = [];
+  if (markerHits > 0) {
+    notes.push(
+      markerHits === 1
+        ? `1 ${noun} value was already redacted at ingestion`
+        : `${markerHits} ${noun} values were already redacted at ingestion`,
+    );
+  }
+  if (droppedFail) {
+    notes.push("content was dropped at ingestion and could not be checked");
+  }
+  return notes;
+}
+
+function buildAugmentedResult({
+  result,
+  markerHits,
+  droppedFail,
+  notes,
+}: {
+  result: SingleEvaluationResult;
+  markerHits: number;
+  droppedFail: boolean;
+  notes: string[];
+}): SingleEvaluationResult {
+  const baseScore =
+    result.status === "processed" && typeof result.score === "number"
+      ? result.score
+      : 0;
+  const prior =
+    result.status === "processed" && result.details ? `${result.details} ` : "";
+
+  return {
+    status: "processed",
+    score: baseScore + markerHits + (droppedFail && markerHits === 0 ? 1 : 0),
+    passed: false,
+    details: `${prior}(${notes.join("; ")})`,
+    ...(result.status === "processed" && result.label
+      ? { label: result.label }
+      : {}),
+    ...(result.status === "processed" && result.cost
+      ? { cost: result.cost }
+      : {}),
+  };
+}
+
 export function augmentEvaluationResult({
   evaluatorType,
   mappedData,
@@ -110,56 +215,13 @@ export function augmentEvaluationResult({
 
   const texts = collectStrings(mappedData);
   const enabled = kind === "pii" ? enabledPiiEntities(settings) : null;
-
-  let markerHits = 0;
-  for (const text of texts) {
-    for (const [entity, count] of findRedactionMarkers(text)) {
-      if (kind === "secret") {
-        if (entity === SECRET_MARKER_ENTITY) markerHits += count;
-      } else if (entity !== SECRET_MARKER_ENTITY) {
-        if (enabled === null || enabled.has(entity)) markerHits += count;
-      }
-    }
-  }
-
-  // Dropped: nothing the mapping fed the evaluator has content, yet the trace
-  // dropped a content category. (A mapped non-empty attribute makes this false,
-  // which is the "evaluate the other field" case.)
-  const hasContent = texts.some((text) => text.trim().length > 0);
-  const droppedFail = !hasContent && droppedCategories.length > 0;
+  const markerHits = countMarkerHits({ texts, kind, enabled });
+  const droppedFail = isContentDropped({ texts, droppedCategories });
 
   if (markerHits === 0 && !droppedFail) return result;
 
-  const baseScore =
-    result.status === "processed" && typeof result.score === "number"
-      ? result.score
-      : 0;
   const noun = kind === "secret" ? "secret" : "PII";
+  const notes = buildAugmentNotes({ markerHits, droppedFail, noun });
 
-  const notes: string[] = [];
-  if (markerHits > 0) {
-    notes.push(
-      markerHits === 1
-        ? `1 ${noun} value was already redacted at ingestion`
-        : `${markerHits} ${noun} values were already redacted at ingestion`,
-    );
-  }
-  if (droppedFail) {
-    notes.push("content was dropped at ingestion and could not be checked");
-  }
-  const prior =
-    result.status === "processed" && result.details ? `${result.details} ` : "";
-
-  return {
-    status: "processed",
-    score: baseScore + markerHits + (droppedFail && markerHits === 0 ? 1 : 0),
-    passed: false,
-    details: `${prior}(${notes.join("; ")})`,
-    ...(result.status === "processed" && result.label
-      ? { label: result.label }
-      : {}),
-    ...(result.status === "processed" && result.cost
-      ? { cost: result.cost }
-      : {}),
-  };
+  return buildAugmentedResult({ result, markerHits, droppedFail, notes });
 }

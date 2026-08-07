@@ -79,9 +79,217 @@ function toLeasedMessage(row: ProcessManagerOutbox): LeasedOutboxMessageRecord {
   return { ...message, leaseToken: message.leaseToken };
 }
 
+type InstanceUpsertData = {
+  tenantId: string;
+  userId: string | null;
+  state: ReturnType<typeof toJsonInput>;
+  revision: number;
+  nextWakeAt: Date | null;
+  updatedAt: Date;
+};
+
 /** Durable Postgres implementation of the process state/inbox/outbox port. */
 export class PrismaProcessStore implements ProcessStore {
   constructor(private readonly prisma: PrismaClient) {}
+
+  private async acquireProcessLock(
+    tx: Prisma.TransactionClient,
+    ref: ProcessRef,
+  ): Promise<void> {
+    // This lock only serializes commits for the same process reference.
+    // Revision remains an explicit compare-and-swap below; the lock also
+    // closes the absent-row race for the first commit.
+    await tx.$queryRaw`
+      WITH process_lock AS MATERIALIZED (
+        SELECT pg_advisory_xact_lock(
+          hashtextextended(${refLockKey(ref)}, 0)
+        )
+      )
+      SELECT 1 AS "acquired" FROM process_lock
+    `;
+  }
+
+  private async isDuplicateInboxEvent(
+    tx: Prisma.TransactionClient,
+    params: { ref: ProcessRef; sourceEventId: string },
+  ): Promise<boolean> {
+    const duplicate = await tx.processManagerInbox.findUnique({
+      where: {
+        projectId: params.ref.projectId,
+        processName_projectId_sourceEventKey: {
+          processName: params.ref.processName,
+          projectId: params.ref.projectId,
+          sourceEventKey: deriveInboxKey(params.sourceEventId),
+        },
+      },
+      select: { id: true },
+    });
+    return duplicate !== null;
+  }
+
+  private async readActualRevision(
+    tx: Prisma.TransactionClient,
+    ref: ProcessRef,
+  ): Promise<number> {
+    const existing = await tx.processManagerInstance.findUnique({
+      where: {
+        projectId: ref.projectId,
+        processName_projectId_processKey: refWhere(ref),
+      },
+      select: { revision: true },
+    });
+    return existing?.revision ?? 0;
+  }
+
+  /**
+   * Inserts the instance row on its first commit, or updates it under the
+   * expected-revision compare-and-swap otherwise. Either path re-reads the
+   * current revision when the write lands on zero rows and reports the
+   * conflict — the same fallback the caller previously inlined twice.
+   */
+  private async upsertInstance(
+    tx: Prisma.TransactionClient,
+    params: {
+      ref: ProcessRef;
+      actualRevision: number;
+      expectedRevision: number;
+      instanceData: InstanceUpsertData;
+    },
+  ): Promise<{ outcome: "revisionConflict"; actualRevision: number } | null> {
+    if (params.actualRevision === 0) {
+      const inserted = await tx.processManagerInstance.createMany({
+        data: [
+          {
+            id: generate(KSUID_RESOURCES.PROCESS_MANAGER_INSTANCE).toString(),
+            ...refWhere(params.ref),
+            ...params.instanceData,
+          },
+        ],
+        skipDuplicates: true,
+      });
+      if (inserted.count === 1) return null;
+    } else {
+      const updated = await tx.processManagerInstance.updateMany({
+        where: {
+          ...refWhere(params.ref),
+          revision: params.expectedRevision,
+        },
+        data: params.instanceData,
+      });
+      if (updated.count === 1) return null;
+    }
+
+    const current = await tx.processManagerInstance.findUnique({
+      where: {
+        projectId: params.ref.projectId,
+        processName_projectId_processKey: refWhere(params.ref),
+      },
+      select: { revision: true },
+    });
+    return {
+      outcome: "revisionConflict" as const,
+      actualRevision: current?.revision ?? 0,
+    };
+  }
+
+  private async checkDuplicateEvent(
+    tx: Prisma.TransactionClient,
+    commit: Pick<ProcessCommit, "ref" | "sourceEventId">,
+  ): Promise<{ outcome: "duplicateEvent" } | null> {
+    if (commit.sourceEventId === null) return null;
+    const isDuplicate = await this.isDuplicateInboxEvent(tx, {
+      ref: commit.ref,
+      sourceEventId: commit.sourceEventId,
+    });
+    return isDuplicate ? { outcome: "duplicateEvent" as const } : null;
+  }
+
+  private async insertInboxRow(
+    tx: Prisma.TransactionClient,
+    params: {
+      ref: ProcessRef;
+      tenantId: string;
+      sourceEventId: string;
+      now: number;
+    },
+  ): Promise<void> {
+    // The source-event uniqueness spans process keys. If another ref
+    // won that race, roll back the state CAS before reporting duplicate.
+    const inbox = await tx.processManagerInbox.createMany({
+      data: [
+        {
+          id: generate(KSUID_RESOURCES.PROCESS_MANAGER_INBOX).toString(),
+          ...refWhere(params.ref),
+          tenantId: params.tenantId,
+          sourceEventId: params.sourceEventId,
+          sourceEventKey: deriveInboxKey(params.sourceEventId),
+          consumedAt: asDate(params.now),
+        },
+      ],
+      skipDuplicates: true,
+    });
+    if (inbox.count !== 1) throw new DuplicateInboxRollback();
+  }
+
+  private async maybeInsertInboxRow(
+    tx: Prisma.TransactionClient,
+    commit: Pick<ProcessCommit, "ref" | "tenantId" | "sourceEventId" | "now">,
+  ): Promise<void> {
+    if (commit.sourceEventId === null) return;
+    await this.insertInboxRow(tx, {
+      ref: commit.ref,
+      tenantId: commit.tenantId,
+      sourceEventId: commit.sourceEventId,
+      now: commit.now,
+    });
+  }
+
+  private async insertOutboxMessages(
+    tx: Prisma.TransactionClient,
+    params: {
+      ref: ProcessRef;
+      tenantId: string;
+      sourceEventId: string | null;
+      now: number;
+      messages: ProcessCommit["messages"];
+    },
+  ): Promise<{
+    insertedMessageKeys: string[];
+    duplicateMessageKeys: string[];
+  }> {
+    const insertedMessageKeys: string[] = [];
+    const duplicateMessageKeys: string[] = [];
+    for (const message of params.messages) {
+      const inserted = await tx.processManagerOutbox.createMany({
+        data: [
+          {
+            id: generate(KSUID_RESOURCES.PROCESS_MANAGER_OUTBOX).toString(),
+            ...refWhere(params.ref),
+            tenantId: params.tenantId,
+            userId: message.userId ?? null,
+            messageKey: message.messageKey,
+            intentType: message.intentType,
+            payload: toJsonInput(message.payload),
+            traceCarrier: message.traceCarrier,
+            sourceEventId: params.sourceEventId,
+            status: "pending",
+            attempts: 0,
+            nextAttemptAt: asDate(params.now),
+            leasedUntil: null,
+            leaseToken: null,
+            dispatchedAt: null,
+            createdAt: asDate(params.now),
+            updatedAt: asDate(params.now),
+          },
+        ],
+        skipDuplicates: true,
+      });
+      (inserted.count === 1 ? insertedMessageKeys : duplicateMessageKeys).push(
+        message.messageKey,
+      );
+    }
+    return { insertedMessageKeys, duplicateMessageKeys };
+  }
 
   async findByRef<State = unknown>(params: {
     ref: ProcessRef;
@@ -109,41 +317,12 @@ export class PrismaProcessStore implements ProcessStore {
   ): Promise<CommitResult> {
     try {
       return await this.prisma.$transaction(async (tx) => {
-        // This lock only serializes commits for the same process reference.
-        // Revision remains an explicit compare-and-swap below; the lock also
-        // closes the absent-row race for the first commit.
-        await tx.$queryRaw`
-          WITH process_lock AS MATERIALIZED (
-            SELECT pg_advisory_xact_lock(
-              hashtextextended(${refLockKey(commit.ref)}, 0)
-            )
-          )
-          SELECT 1 AS "acquired" FROM process_lock
-        `;
+        await this.acquireProcessLock(tx, commit.ref);
 
-        if (commit.sourceEventId !== null) {
-          const duplicate = await tx.processManagerInbox.findUnique({
-            where: {
-              projectId: commit.ref.projectId,
-              processName_projectId_sourceEventKey: {
-                processName: commit.ref.processName,
-                projectId: commit.ref.projectId,
-                sourceEventKey: deriveInboxKey(commit.sourceEventId),
-              },
-            },
-            select: { id: true },
-          });
-          if (duplicate) return { outcome: "duplicateEvent" as const };
-        }
+        const duplicate = await this.checkDuplicateEvent(tx, commit);
+        if (duplicate) return duplicate;
 
-        const existing = await tx.processManagerInstance.findUnique({
-          where: {
-            projectId: commit.ref.projectId,
-            processName_projectId_processKey: refWhere(commit.ref),
-          },
-          select: { revision: true },
-        });
-        const actualRevision = existing?.revision ?? 0;
+        const actualRevision = await this.readActualRevision(tx, commit.ref);
         if (actualRevision !== commit.expectedRevision) {
           return {
             outcome: "revisionConflict" as const,
@@ -152,7 +331,7 @@ export class PrismaProcessStore implements ProcessStore {
         }
 
         const revision = actualRevision + 1;
-        const instanceData = {
+        const instanceData: InstanceUpsertData = {
           tenantId: commit.tenantId,
           userId: commit.userId ?? null,
           state: toJsonInput(commit.state as JsonValue),
@@ -162,106 +341,24 @@ export class PrismaProcessStore implements ProcessStore {
           updatedAt: asDate(commit.now),
         };
 
-        if (actualRevision === 0) {
-          const inserted = await tx.processManagerInstance.createMany({
-            data: [
-              {
-                id: generate(
-                  KSUID_RESOURCES.PROCESS_MANAGER_INSTANCE,
-                ).toString(),
-                ...refWhere(commit.ref),
-                ...instanceData,
-              },
-            ],
-            skipDuplicates: true,
-          });
-          if (inserted.count !== 1) {
-            const current = await tx.processManagerInstance.findUnique({
-              where: {
-                projectId: commit.ref.projectId,
-                processName_projectId_processKey: refWhere(commit.ref),
-              },
-              select: { revision: true },
-            });
-            return {
-              outcome: "revisionConflict" as const,
-              actualRevision: current?.revision ?? 0,
-            };
-          }
-        } else {
-          const updated = await tx.processManagerInstance.updateMany({
-            where: {
-              ...refWhere(commit.ref),
-              revision: commit.expectedRevision,
-            },
-            data: instanceData,
-          });
-          if (updated.count !== 1) {
-            const current = await tx.processManagerInstance.findUnique({
-              where: {
-                projectId: commit.ref.projectId,
-                processName_projectId_processKey: refWhere(commit.ref),
-              },
-              select: { revision: true },
-            });
-            return {
-              outcome: "revisionConflict" as const,
-              actualRevision: current?.revision ?? 0,
-            };
-          }
-        }
+        const conflict = await this.upsertInstance(tx, {
+          ref: commit.ref,
+          actualRevision,
+          expectedRevision: commit.expectedRevision,
+          instanceData,
+        });
+        if (conflict) return conflict;
 
-        if (commit.sourceEventId !== null) {
-          const inbox = await tx.processManagerInbox.createMany({
-            data: [
-              {
-                id: generate(KSUID_RESOURCES.PROCESS_MANAGER_INBOX).toString(),
-                ...refWhere(commit.ref),
-                tenantId: commit.tenantId,
-                sourceEventId: commit.sourceEventId,
-                sourceEventKey: deriveInboxKey(commit.sourceEventId),
-                consumedAt: asDate(commit.now),
-              },
-            ],
-            skipDuplicates: true,
-          });
-          // The source-event uniqueness spans process keys. If another ref
-          // won that race, roll back the state CAS before reporting duplicate.
-          if (inbox.count !== 1) throw new DuplicateInboxRollback();
-        }
+        await this.maybeInsertInboxRow(tx, commit);
 
-        const insertedMessageKeys: string[] = [];
-        const duplicateMessageKeys: string[] = [];
-        for (const message of commit.messages) {
-          const inserted = await tx.processManagerOutbox.createMany({
-            data: [
-              {
-                id: generate(KSUID_RESOURCES.PROCESS_MANAGER_OUTBOX).toString(),
-                ...refWhere(commit.ref),
-                tenantId: commit.tenantId,
-                userId: message.userId ?? null,
-                messageKey: message.messageKey,
-                intentType: message.intentType,
-                payload: toJsonInput(message.payload),
-                traceCarrier: message.traceCarrier,
-                sourceEventId: commit.sourceEventId,
-                status: "pending",
-                attempts: 0,
-                nextAttemptAt: asDate(commit.now),
-                leasedUntil: null,
-                leaseToken: null,
-                dispatchedAt: null,
-                createdAt: asDate(commit.now),
-                updatedAt: asDate(commit.now),
-              },
-            ],
-            skipDuplicates: true,
+        const { insertedMessageKeys, duplicateMessageKeys } =
+          await this.insertOutboxMessages(tx, {
+            ref: commit.ref,
+            tenantId: commit.tenantId,
+            sourceEventId: commit.sourceEventId,
+            now: commit.now,
+            messages: commit.messages,
           });
-          (inserted.count === 1
-            ? insertedMessageKeys
-            : duplicateMessageKeys
-          ).push(message.messageKey);
-        }
 
         return {
           outcome: "committed" as const,

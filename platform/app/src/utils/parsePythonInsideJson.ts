@@ -86,6 +86,31 @@ const semantics = grammar.createSemantics().addOperation("toJSON", {
 export const isPythonRepr = (input: string) =>
   /^[A-Z][A-Za-z0-9_]*\(/.test(input);
 
+const unwrapSingleUnnamedArg = (value: unknown): unknown =>
+  typeof value === "object" &&
+  "arg0" in (value as any) &&
+  Object.keys(value as any).length === 1
+    ? (value as any).arg0
+    : value;
+
+const parsePythonRepr = (item: string): { parsed: unknown } | null => {
+  const match = grammar.match(item);
+  if (!match.succeeded()) return null;
+
+  const result = semantics(match).toJSON();
+  if (typeof result === "object" && !Array.isArray(result)) {
+    return {
+      parsed: Object.fromEntries(
+        Object.entries(result).map(([key, value]) => [
+          key,
+          unwrapSingleUnnamedArg(value),
+        ]),
+      ),
+    };
+  }
+  return { parsed: result };
+};
+
 export const parsePythonInsideJson = <T extends object>(item: T): T => {
   if (typeof item === "object" && Array.isArray(item)) {
     return item.map((item) => parsePythonInsideJson(item)) as T;
@@ -97,22 +122,9 @@ export const parsePythonInsideJson = <T extends object>(item: T): T => {
       ]),
     ) as T;
   } else if (typeof item === "string" && isPythonRepr(item)) {
-    const match = grammar.match(item);
-    if (match.succeeded()) {
-      let result = semantics(match).toJSON();
-      if (typeof result === "object" && !Array.isArray(result)) {
-        result = Object.fromEntries(
-          Object.entries(result).map(([key, value]) => [
-            key,
-            typeof value === "object" &&
-            "arg0" in (value as any) &&
-            Object.keys(value as any).length === 1
-              ? (value as any).arg0
-              : value,
-          ]),
-        );
-      }
-      return result;
+    const parsed = parsePythonRepr(item);
+    if (parsed) {
+      return parsed.parsed as T;
     }
   }
   return item;

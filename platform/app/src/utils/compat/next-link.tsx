@@ -19,22 +19,34 @@ interface NextLinkProps
   children?: ReactNode;
 }
 
+function appendQueryValue(
+  params: URLSearchParams,
+  key: string,
+  value: unknown,
+): void {
+  if (Array.isArray(value)) {
+    for (const v of value) params.append(key, String(v));
+  } else {
+    params.set(key, String(value));
+  }
+}
+
+function buildQueryString(query: Record<string, any>): string {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(query)) {
+    if (value === undefined || value === null) continue;
+    appendQueryValue(params, key, value);
+  }
+  return params.toString();
+}
+
 function buildHref(
   href: string | { pathname: string; query?: Record<string, any> },
 ): string {
   if (typeof href === "string") return href;
   const { pathname, query } = href;
   if (!query || Object.keys(query).length === 0) return pathname;
-  const params = new URLSearchParams();
-  for (const [key, value] of Object.entries(query)) {
-    if (value === undefined || value === null) continue;
-    if (Array.isArray(value)) {
-      for (const v of value) params.append(key, String(v));
-    } else {
-      params.set(key, String(value));
-    }
-  }
-  const qs = params.toString();
+  const qs = buildQueryString(query);
   return qs ? `${pathname}?${qs}` : pathname;
 }
 

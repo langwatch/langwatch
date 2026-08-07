@@ -153,6 +153,316 @@ interface ClickHouseWriteRecord {
 /** UInt64 columns ride as strings — see the interface docblock. */
 const big = (n: number): string => String(Math.max(0, Math.round(n)));
 
+/** `TenantId`..`Entrypoint`: session identity plus the reporting agent. */
+function buildIdentityAndAgentFields(
+  row: CodingAgentSessionRow,
+): Pick<
+  ClickHouseWriteRecord,
+  | "TenantId"
+  | "SessionId"
+  | "SessionKeySource"
+  | "Version"
+  | "Agent"
+  | "AgentVersion"
+  | "TraceIds"
+  | "FinalRequestId"
+  | "UserId"
+  | "TerminalType"
+  | "Entrypoint"
+> {
+  return {
+    TenantId: row.tenantId,
+    SessionId: row.sessionId,
+    SessionKeySource: row.sessionKeySource,
+    Version: row.version,
+
+    Agent: row.agent,
+    AgentVersion: row.agentVersion,
+    TraceIds: row.traceIds,
+    FinalRequestId: row.finalRequestId,
+    UserId: row.userId,
+    TerminalType: row.terminalType,
+    Entrypoint: row.entrypoint,
+  };
+}
+
+/**
+ * `StartedAt`/`CreatedAt`/`UpdatedAt`. `CreatedAt` preserves first-seen
+ * creation across re-folds; `UpdatedAt` is the RMT version and must be
+ * strictly greater than the version it supersedes — see `nextVersionStamp`
+ * for why write time alone is not enough.
+ */
+function buildTimestampFields({
+  row,
+  versionStampMs,
+  now,
+}: {
+  row: CodingAgentSessionRow;
+  versionStampMs: number;
+  now: Date;
+}): Pick<ClickHouseWriteRecord, "StartedAt" | "CreatedAt" | "UpdatedAt"> {
+  return {
+    StartedAt: new Date(row.startedAtMs),
+    CreatedAt: row.createdAt > 0 ? new Date(row.createdAt) : now,
+    UpdatedAt: new Date(versionStampMs),
+  };
+}
+
+/** `ModelCalls`..`Steps`: per-session activity counters. */
+function buildActivityCountFields(
+  row: CodingAgentSessionRow,
+): Pick<
+  ClickHouseWriteRecord,
+  | "ModelCalls"
+  | "ToolCalls"
+  | "SubAgents"
+  | "Prompts"
+  | "PromptChars"
+  | "ResponseChars"
+  | "Steps"
+> {
+  return {
+    ModelCalls: row.modelCalls,
+    ToolCalls: row.toolCalls,
+    SubAgents: row.subAgents,
+    Prompts: row.prompts,
+    PromptChars: big(row.promptChars),
+    ResponseChars: big(row.responseChars),
+    Steps: row.steps,
+  };
+}
+
+/** `ToolCounts`..`McpTools`: tool, skill and MCP usage sets. */
+function buildToolUsageFields(
+  row: CodingAgentSessionRow,
+): Pick<
+  ClickHouseWriteRecord,
+  | "ToolCounts"
+  | "ToolDurationMs"
+  | "FilesTouched"
+  | "Skills"
+  | "SubAgentTypes"
+  | "SlashCommands"
+  | "Models"
+  | "McpServers"
+  | "McpTools"
+> {
+  return {
+    ToolCounts: row.toolCounts,
+    ToolDurationMs: Object.fromEntries(
+      Object.entries(row.toolDurationMs).map(([k, v]) => [k, big(v)]),
+    ),
+    FilesTouched: row.filesTouched,
+    Skills: row.skills,
+    SubAgentTypes: row.subAgentTypes,
+    SlashCommands: row.slashCommands,
+    Models: row.models,
+    McpServers: row.mcpServers,
+    McpTools: row.mcpTools,
+  };
+}
+
+/** `InputTokens`..`CostUsd`: token and cost totals. */
+function buildTokenAndCostFields(
+  row: CodingAgentSessionRow,
+): Pick<
+  ClickHouseWriteRecord,
+  | "InputTokens"
+  | "OutputTokens"
+  | "CacheReadTokens"
+  | "CacheCreationTokens"
+  | "CostUsd"
+> {
+  return {
+    InputTokens: big(row.inputTokens),
+    OutputTokens: big(row.outputTokens),
+    CacheReadTokens: big(row.cacheReadTokens),
+    CacheCreationTokens: big(row.cacheCreationTokens),
+    CostUsd: row.costUsd,
+  };
+}
+
+/** `ModelCallMs`..`ActiveTimeCliSec`: timing totals. */
+function buildTimingFields(
+  row: CodingAgentSessionRow,
+): Pick<
+  ClickHouseWriteRecord,
+  | "ModelCallMs"
+  | "ToolMs"
+  | "TtftMsTotal"
+  | "TtftSamples"
+  | "BlockedOnUserMs"
+  | "ActiveTimeUserSec"
+  | "ActiveTimeCliSec"
+> {
+  return {
+    ModelCallMs: big(row.modelCallMs),
+    ToolMs: big(row.toolMs),
+    TtftMsTotal: big(row.ttftMsTotal),
+    TtftSamples: row.ttftSamples,
+    BlockedOnUserMs: big(row.blockedOnUserMs),
+    ActiveTimeUserSec: big(row.activeTimeUserSec),
+    ActiveTimeCliSec: big(row.activeTimeCliSec),
+  };
+}
+
+/** `ToolResultBytes`..`LargestCacheRebuildTokens`: payload size and context-cache stats. */
+function buildByteAndCompactionFields(
+  row: CodingAgentSessionRow,
+): Pick<
+  ClickHouseWriteRecord,
+  | "ToolResultBytes"
+  | "ToolInputBytes"
+  | "Compactions"
+  | "CompactionTokensBefore"
+  | "CompactionTokensAfter"
+  | "PeakContextTokens"
+  | "CacheRebuildCount"
+  | "LargestCacheRebuildTokens"
+> {
+  return {
+    ToolResultBytes: big(row.toolResultBytes),
+    ToolInputBytes: big(row.toolInputBytes),
+    Compactions: row.compactions,
+    CompactionTokensBefore: big(row.compactionTokensBefore),
+    CompactionTokensAfter: big(row.compactionTokensAfter),
+    PeakContextTokens: big(row.peakContextTokens),
+    CacheRebuildCount: row.cacheRebuildCount,
+    LargestCacheRebuildTokens: big(row.largestCacheRebuildTokens),
+  };
+}
+
+/** `FailedTools`..`InternalErrors`: failure and retry counters. */
+function buildErrorFields(
+  row: CodingAgentSessionRow,
+): Pick<
+  ClickHouseWriteRecord,
+  | "FailedTools"
+  | "ErrorTypes"
+  | "ApiErrors"
+  | "RateLimited"
+  | "RetriesExhausted"
+  | "RetryMs"
+  | "Attempts"
+  | "Refusals"
+  | "RefusalCategories"
+  | "InternalErrors"
+> {
+  return {
+    FailedTools: row.failedTools,
+    ErrorTypes: row.errorTypes,
+    ApiErrors: row.apiErrors,
+    RateLimited: row.rateLimited,
+    RetriesExhausted: row.retriesExhausted,
+    RetryMs: big(row.retryMs),
+    Attempts: row.attempts,
+    Refusals: row.refusals,
+    RefusalCategories: row.refusalCategories,
+    InternalErrors: row.internalErrors,
+  };
+}
+
+/** `ToolsDenied`..`HookMs`: permission-gate counters. */
+function buildPermissionFields(
+  row: CodingAgentSessionRow,
+): Pick<
+  ClickHouseWriteRecord,
+  | "ToolsDenied"
+  | "ToolsAborted"
+  | "PermissionMode"
+  | "PermissionChanges"
+  | "HooksBlocked"
+  | "HooksCancelled"
+  | "HookMs"
+> {
+  return {
+    ToolsDenied: row.toolsDenied,
+    ToolsAborted: row.toolsAborted,
+    PermissionMode: row.permissionMode,
+    PermissionChanges: row.permissionChanges,
+    HooksBlocked: row.hooksBlocked,
+    HooksCancelled: row.hooksCancelled,
+    HookMs: big(row.hookMs),
+  };
+}
+
+/** `LinesAdded`..`AtMentions`: code-change counters. */
+function buildCodeStatsFields(
+  row: CodingAgentSessionRow,
+): Pick<
+  ClickHouseWriteRecord,
+  | "LinesAdded"
+  | "LinesRemoved"
+  | "Commits"
+  | "PullRequests"
+  | "EditsAccepted"
+  | "EditsRejected"
+  | "LanguagesEdited"
+  | "AtMentions"
+> {
+  return {
+    LinesAdded: big(row.linesAdded),
+    LinesRemoved: big(row.linesRemoved),
+    Commits: row.commits,
+    PullRequests: row.pullRequests,
+    EditsAccepted: row.editsAccepted,
+    EditsRejected: row.editsRejected,
+    LanguagesEdited: row.languagesEdited,
+    AtMentions: row.atMentions,
+  };
+}
+
+/** `StopReason`, `Truncated`: how the session ended. */
+function buildOutcomeFields(
+  row: CodingAgentSessionRow,
+): Pick<ClickHouseWriteRecord, "StopReason" | "Truncated"> {
+  return {
+    StopReason: row.stopReason,
+    Truncated: row.truncated,
+  };
+}
+
+/** `SubAgentIds`..`LastEventOccurredAt`: read-back state (ADR-066, migration 00053). */
+function buildReadBackFields(
+  row: CodingAgentSessionRow,
+): Pick<
+  ClickHouseWriteRecord,
+  | "SubAgentIds"
+  | "StepStartedAt"
+  | "PreviousCallContextTokens"
+  | "MetricSeries"
+  | "LastEventOccurredAt"
+> {
+  return {
+    SubAgentIds: row.subAgentIds,
+    StepStartedAt: row.stepStartedAt.map(big),
+    PreviousCallContextTokens: big(row.previousCallContextTokens),
+    MetricSeries: row.metricSeries.map((unit) => [
+      unit.seriesId,
+      unit.metricName,
+      unit.type,
+      unit.decision,
+      unit.language,
+      unit.value,
+    ]),
+    LastEventOccurredAt: new Date(row.lastEventOccurredAt),
+  };
+}
+
+/** `AppliedEventIds`, `_retention_days`: dedup watermark plus TTL. */
+function buildDedupAndRetentionFields({
+  appliedEventIds,
+  retentionDays,
+}: {
+  appliedEventIds: readonly string[];
+  retentionDays?: number;
+}): Pick<ClickHouseWriteRecord, "AppliedEventIds" | "_retention_days"> {
+  return {
+    AppliedEventIds: [...appliedEventIds],
+    _retention_days: retentionDays ?? PLATFORM_DEFAULT_RETENTION_DAYS,
+  };
+}
+
 function toRecord({
   row,
   retentionDays,
@@ -166,115 +476,19 @@ function toRecord({
 }): ClickHouseWriteRecord {
   const now = new Date();
   return {
-    TenantId: row.tenantId,
-    SessionId: row.sessionId,
-    SessionKeySource: row.sessionKeySource,
-    Version: row.version,
-    StartedAt: new Date(row.startedAtMs),
-    // Preserve first-seen creation across re-folds; UpdatedAt is the RMT
-    // version and must be strictly greater than the version it supersedes —
-    // see nextVersionStamp for why write time alone is not enough.
-    CreatedAt: row.createdAt > 0 ? new Date(row.createdAt) : now,
-    UpdatedAt: new Date(versionStampMs),
-
-    Agent: row.agent,
-    AgentVersion: row.agentVersion,
-    TraceIds: row.traceIds,
-    FinalRequestId: row.finalRequestId,
-    UserId: row.userId,
-    TerminalType: row.terminalType,
-    Entrypoint: row.entrypoint,
-
-    ModelCalls: row.modelCalls,
-    ToolCalls: row.toolCalls,
-    SubAgents: row.subAgents,
-    Prompts: row.prompts,
-    PromptChars: big(row.promptChars),
-    ResponseChars: big(row.responseChars),
-    Steps: row.steps,
-
-    ToolCounts: row.toolCounts,
-    ToolDurationMs: Object.fromEntries(
-      Object.entries(row.toolDurationMs).map(([k, v]) => [k, big(v)]),
-    ),
-    FilesTouched: row.filesTouched,
-    Skills: row.skills,
-    SubAgentTypes: row.subAgentTypes,
-    SlashCommands: row.slashCommands,
-    Models: row.models,
-    McpServers: row.mcpServers,
-    McpTools: row.mcpTools,
-
-    InputTokens: big(row.inputTokens),
-    OutputTokens: big(row.outputTokens),
-    CacheReadTokens: big(row.cacheReadTokens),
-    CacheCreationTokens: big(row.cacheCreationTokens),
-    CostUsd: row.costUsd,
-
-    ModelCallMs: big(row.modelCallMs),
-    ToolMs: big(row.toolMs),
-    TtftMsTotal: big(row.ttftMsTotal),
-    TtftSamples: row.ttftSamples,
-    BlockedOnUserMs: big(row.blockedOnUserMs),
-    ActiveTimeUserSec: big(row.activeTimeUserSec),
-    ActiveTimeCliSec: big(row.activeTimeCliSec),
-
-    ToolResultBytes: big(row.toolResultBytes),
-    ToolInputBytes: big(row.toolInputBytes),
-    Compactions: row.compactions,
-    CompactionTokensBefore: big(row.compactionTokensBefore),
-    CompactionTokensAfter: big(row.compactionTokensAfter),
-    PeakContextTokens: big(row.peakContextTokens),
-    CacheRebuildCount: row.cacheRebuildCount,
-    LargestCacheRebuildTokens: big(row.largestCacheRebuildTokens),
-
-    FailedTools: row.failedTools,
-    ErrorTypes: row.errorTypes,
-    ApiErrors: row.apiErrors,
-    RateLimited: row.rateLimited,
-    RetriesExhausted: row.retriesExhausted,
-    RetryMs: big(row.retryMs),
-    Attempts: row.attempts,
-    Refusals: row.refusals,
-    RefusalCategories: row.refusalCategories,
-    InternalErrors: row.internalErrors,
-
-    ToolsDenied: row.toolsDenied,
-    ToolsAborted: row.toolsAborted,
-    PermissionMode: row.permissionMode,
-    PermissionChanges: row.permissionChanges,
-    HooksBlocked: row.hooksBlocked,
-    HooksCancelled: row.hooksCancelled,
-    HookMs: big(row.hookMs),
-
-    LinesAdded: big(row.linesAdded),
-    LinesRemoved: big(row.linesRemoved),
-    Commits: row.commits,
-    PullRequests: row.pullRequests,
-    EditsAccepted: row.editsAccepted,
-    EditsRejected: row.editsRejected,
-    LanguagesEdited: row.languagesEdited,
-    AtMentions: row.atMentions,
-
-    StopReason: row.stopReason,
-    Truncated: row.truncated,
-
-    SubAgentIds: row.subAgentIds,
-    StepStartedAt: row.stepStartedAt.map(big),
-    PreviousCallContextTokens: big(row.previousCallContextTokens),
-    MetricSeries: row.metricSeries.map((unit) => [
-      unit.seriesId,
-      unit.metricName,
-      unit.type,
-      unit.decision,
-      unit.language,
-      unit.value,
-    ]),
-    LastEventOccurredAt: new Date(row.lastEventOccurredAt),
-
-    AppliedEventIds: [...appliedEventIds],
-
-    _retention_days: retentionDays ?? PLATFORM_DEFAULT_RETENTION_DAYS,
+    ...buildIdentityAndAgentFields(row),
+    ...buildTimestampFields({ row, versionStampMs, now }),
+    ...buildActivityCountFields(row),
+    ...buildToolUsageFields(row),
+    ...buildTokenAndCostFields(row),
+    ...buildTimingFields(row),
+    ...buildByteAndCompactionFields(row),
+    ...buildErrorFields(row),
+    ...buildPermissionFields(row),
+    ...buildCodeStatsFields(row),
+    ...buildOutcomeFields(row),
+    ...buildReadBackFields(row),
+    ...buildDedupAndRetentionFields({ appliedEventIds, retentionDays }),
   };
 }
 
@@ -763,6 +977,40 @@ function dedupToLatestPerSession(
   return [...bySession.values()];
 }
 
+// A column absent from the record ranks as "no progress" rather than NaN,
+// which would make every comparison against it false and the winner depend on
+// argument order.
+const msOf = (value: unknown): number => {
+  const ms = parseClickHouseDateTimeMs(String(value ?? ""));
+  return Number.isFinite(ms) ? ms : 0;
+};
+
+/** The progress signals `preferredOf` ranks a record's version by. */
+const progressOf = (record: Record<string, unknown>) => ({
+  watermark: msOf(record.LastEventOccurredAt),
+  signals:
+    asNumber(record.ModelCalls) +
+    asNumber(record.ToolCalls) +
+    asNumber(record.Prompts),
+  units: Array.isArray(record.MetricSeries) ? record.MetricSeries.length : 0,
+  applied: Array.isArray(record.AppliedEventIds)
+    ? record.AppliedEventIds.length
+    : 0,
+  startedAt: msOf(record.StartedAt),
+});
+
+/**
+ * The first four progress keys, in priority order: whichever discriminates
+ * first wins, higher is better. `startedAt` is not in this list — it is the
+ * final tiebreak, and it prefers LOWER (see `preferredOf`), not higher.
+ */
+const HIGHER_WINS_PROGRESS_KEYS = [
+  "watermark",
+  "signals",
+  "units",
+  "applied",
+] as const;
+
 /**
  * `findLatestRecord`'s ranking, key for key, applied in TypeScript.
  *
@@ -774,39 +1022,13 @@ function preferredOf(
   incumbent: Record<string, unknown>,
   challenger: Record<string, unknown>,
 ): Record<string, unknown> {
-  // A column absent from the record ranks as "no progress" rather than NaN,
-  // which would make every comparison against it false and the winner depend on
-  // argument order.
-  const msOf = (value: unknown) => {
-    const ms = parseClickHouseDateTimeMs(String(value ?? ""));
-    return Number.isFinite(ms) ? ms : 0;
-  };
-  const progressOf = (record: Record<string, unknown>) => ({
-    watermark: msOf(record.LastEventOccurredAt),
-    signals:
-      asNumber(record.ModelCalls) +
-      asNumber(record.ToolCalls) +
-      asNumber(record.Prompts),
-    units: Array.isArray(record.MetricSeries) ? record.MetricSeries.length : 0,
-    applied: Array.isArray(record.AppliedEventIds)
-      ? record.AppliedEventIds.length
-      : 0,
-    startedAt: msOf(record.StartedAt),
-  });
   const held = progressOf(incumbent);
   const next = progressOf(challenger);
 
-  if (held.watermark !== next.watermark) {
-    return next.watermark > held.watermark ? challenger : incumbent;
-  }
-  if (held.signals !== next.signals) {
-    return next.signals > held.signals ? challenger : incumbent;
-  }
-  if (held.units !== next.units) {
-    return next.units > held.units ? challenger : incumbent;
-  }
-  if (held.applied !== next.applied) {
-    return next.applied > held.applied ? challenger : incumbent;
+  for (const key of HIGHER_WINS_PROGRESS_KEYS) {
+    if (held[key] !== next[key]) {
+      return next[key] > held[key] ? challenger : incumbent;
+    }
   }
   return next.startedAt < held.startedAt ? challenger : incumbent;
 }
@@ -823,15 +1045,36 @@ function preferredOf(
  * 00:00:00.000` decodes POSITIVE anywhere west of UTC, which would let the
  * store decode exactly the rows its gate exists to reject.
  */
-function fromRecord(record: Record<string, unknown>): CodingAgentSessionRow {
-  const steps = Array.isArray(record.Steps) ? record.Steps : [];
+/** `tenantId`..`startedAtMs`: the session's own identity. */
+function decodeIdentity(
+  record: Record<string, unknown>,
+): Pick<
+  CodingAgentSessionRow,
+  "tenantId" | "sessionId" | "sessionKeySource" | "version" | "startedAtMs"
+> {
   return {
     tenantId: String(record.TenantId ?? ""),
     sessionId: String(record.SessionId ?? ""),
     sessionKeySource: String(record.SessionKeySource ?? ""),
     version: String(record.Version ?? ""),
     startedAtMs: parseClickHouseDateTimeMs(String(record.StartedAt ?? "")),
+  };
+}
 
+/** `agent`..`entrypoint`: the reporting agent. */
+function decodeAgentInfo(
+  record: Record<string, unknown>,
+): Pick<
+  CodingAgentSessionRow,
+  | "agent"
+  | "agentVersion"
+  | "traceIds"
+  | "finalRequestId"
+  | "userId"
+  | "terminalType"
+  | "entrypoint"
+> {
+  return {
     agent: String(record.Agent ?? ""),
     agentVersion: String(record.AgentVersion ?? ""),
     traceIds: asStringArray(record.TraceIds),
@@ -839,7 +1082,24 @@ function fromRecord(record: Record<string, unknown>): CodingAgentSessionRow {
     userId: String(record.UserId ?? ""),
     terminalType: String(record.TerminalType ?? ""),
     entrypoint: String(record.Entrypoint ?? ""),
+  };
+}
 
+/** `modelCalls`..`steps`: per-session activity counters. */
+function decodeActivityCounts(
+  record: Record<string, unknown>,
+): Pick<
+  CodingAgentSessionRow,
+  | "modelCalls"
+  | "toolCalls"
+  | "subAgents"
+  | "prompts"
+  | "promptChars"
+  | "responseChars"
+  | "steps"
+> {
+  const steps = Array.isArray(record.Steps) ? record.Steps : [];
+  return {
     modelCalls: asNumber(record.ModelCalls),
     toolCalls: asNumber(record.ToolCalls),
     subAgents: asNumber(record.SubAgents),
@@ -854,7 +1114,25 @@ function fromRecord(record: Record<string, unknown>): CodingAgentSessionRow {
         boolean,
       ];
     }),
+  };
+}
 
+/** `toolCounts`..`mcpTools`: tool, skill and MCP usage sets. */
+function decodeToolUsage(
+  record: Record<string, unknown>,
+): Pick<
+  CodingAgentSessionRow,
+  | "toolCounts"
+  | "toolDurationMs"
+  | "filesTouched"
+  | "skills"
+  | "subAgentTypes"
+  | "slashCommands"
+  | "models"
+  | "mcpServers"
+  | "mcpTools"
+> {
+  return {
     toolCounts: asNumberMap(record.ToolCounts),
     toolDurationMs: asNumberMap(record.ToolDurationMs),
     filesTouched: asStringArray(record.FilesTouched),
@@ -864,13 +1142,43 @@ function fromRecord(record: Record<string, unknown>): CodingAgentSessionRow {
     models: asStringArray(record.Models),
     mcpServers: asStringArray(record.McpServers),
     mcpTools: asStringArray(record.McpTools),
+  };
+}
 
+/** `inputTokens`..`costUsd`: token and cost totals. */
+function decodeTokensAndCost(
+  record: Record<string, unknown>,
+): Pick<
+  CodingAgentSessionRow,
+  | "inputTokens"
+  | "outputTokens"
+  | "cacheReadTokens"
+  | "cacheCreationTokens"
+  | "costUsd"
+> {
+  return {
     inputTokens: asNumber(record.InputTokens),
     outputTokens: asNumber(record.OutputTokens),
     cacheReadTokens: asNumber(record.CacheReadTokens),
     cacheCreationTokens: asNumber(record.CacheCreationTokens),
     costUsd: asNumber(record.CostUsd),
+  };
+}
 
+/** `modelCallMs`..`activeTimeCliSec`: timing totals. */
+function decodeTiming(
+  record: Record<string, unknown>,
+): Pick<
+  CodingAgentSessionRow,
+  | "modelCallMs"
+  | "toolMs"
+  | "ttftMsTotal"
+  | "ttftSamples"
+  | "blockedOnUserMs"
+  | "activeTimeUserSec"
+  | "activeTimeCliSec"
+> {
+  return {
     modelCallMs: asNumber(record.ModelCallMs),
     toolMs: asNumber(record.ToolMs),
     ttftMsTotal: asNumber(record.TtftMsTotal),
@@ -878,7 +1186,24 @@ function fromRecord(record: Record<string, unknown>): CodingAgentSessionRow {
     blockedOnUserMs: asNumber(record.BlockedOnUserMs),
     activeTimeUserSec: asNumber(record.ActiveTimeUserSec),
     activeTimeCliSec: asNumber(record.ActiveTimeCliSec),
+  };
+}
 
+/** `toolResultBytes`..`largestCacheRebuildTokens`: payload size and context-cache stats. */
+function decodeByteAndCompaction(
+  record: Record<string, unknown>,
+): Pick<
+  CodingAgentSessionRow,
+  | "toolResultBytes"
+  | "toolInputBytes"
+  | "compactions"
+  | "compactionTokensBefore"
+  | "compactionTokensAfter"
+  | "peakContextTokens"
+  | "cacheRebuildCount"
+  | "largestCacheRebuildTokens"
+> {
+  return {
     toolResultBytes: asNumber(record.ToolResultBytes),
     toolInputBytes: asNumber(record.ToolInputBytes),
     compactions: asNumber(record.Compactions),
@@ -887,7 +1212,26 @@ function fromRecord(record: Record<string, unknown>): CodingAgentSessionRow {
     peakContextTokens: asNumber(record.PeakContextTokens),
     cacheRebuildCount: asNumber(record.CacheRebuildCount),
     largestCacheRebuildTokens: asNumber(record.LargestCacheRebuildTokens),
+  };
+}
 
+/** `failedTools`..`internalErrors`: failure and retry counters. */
+function decodeErrors(
+  record: Record<string, unknown>,
+): Pick<
+  CodingAgentSessionRow,
+  | "failedTools"
+  | "errorTypes"
+  | "apiErrors"
+  | "rateLimited"
+  | "retriesExhausted"
+  | "retryMs"
+  | "attempts"
+  | "refusals"
+  | "refusalCategories"
+  | "internalErrors"
+> {
+  return {
     failedTools: asNumber(record.FailedTools),
     errorTypes: asNumberMap(record.ErrorTypes),
     apiErrors: asNumber(record.ApiErrors),
@@ -898,7 +1242,23 @@ function fromRecord(record: Record<string, unknown>): CodingAgentSessionRow {
     refusals: asNumber(record.Refusals),
     refusalCategories: asStringArray(record.RefusalCategories),
     internalErrors: asNumber(record.InternalErrors),
+  };
+}
 
+/** `toolsDenied`..`hookMs`: permission-gate counters. */
+function decodePermissions(
+  record: Record<string, unknown>,
+): Pick<
+  CodingAgentSessionRow,
+  | "toolsDenied"
+  | "toolsAborted"
+  | "permissionMode"
+  | "permissionChanges"
+  | "hooksBlocked"
+  | "hooksCancelled"
+  | "hookMs"
+> {
+  return {
     toolsDenied: asNumber(record.ToolsDenied),
     toolsAborted: asNumber(record.ToolsAborted),
     permissionMode: String(record.PermissionMode ?? ""),
@@ -906,7 +1266,24 @@ function fromRecord(record: Record<string, unknown>): CodingAgentSessionRow {
     hooksBlocked: asNumber(record.HooksBlocked),
     hooksCancelled: asNumber(record.HooksCancelled),
     hookMs: asNumber(record.HookMs),
+  };
+}
 
+/** `linesAdded`..`atMentions`: code-change counters. */
+function decodeCodeStats(
+  record: Record<string, unknown>,
+): Pick<
+  CodingAgentSessionRow,
+  | "linesAdded"
+  | "linesRemoved"
+  | "commits"
+  | "pullRequests"
+  | "editsAccepted"
+  | "editsRejected"
+  | "languagesEdited"
+  | "atMentions"
+> {
+  return {
     linesAdded: asNumber(record.LinesAdded),
     linesRemoved: asNumber(record.LinesRemoved),
     commits: asNumber(record.Commits),
@@ -915,10 +1292,36 @@ function fromRecord(record: Record<string, unknown>): CodingAgentSessionRow {
     editsRejected: asNumber(record.EditsRejected),
     languagesEdited: asStringArray(record.LanguagesEdited),
     atMentions: asNumber(record.AtMentions),
+  };
+}
 
+/** `stopReason`, `truncated`: how the session ended. */
+function decodeOutcome(
+  record: Record<string, unknown>,
+): Pick<CodingAgentSessionRow, "stopReason" | "truncated"> {
+  return {
     stopReason: String(record.StopReason ?? ""),
     truncated: Boolean(record.Truncated),
+  };
+}
 
+/**
+ * `subAgentIds`..`lastEventOccurredAt`: read-back state (ADR-066, migration
+ * 00053) plus fold bookkeeping timestamps.
+ */
+function decodeReadBack(
+  record: Record<string, unknown>,
+): Pick<
+  CodingAgentSessionRow,
+  | "subAgentIds"
+  | "stepStartedAt"
+  | "previousCallContextTokens"
+  | "metricSeries"
+  | "createdAt"
+  | "updatedAt"
+  | "lastEventOccurredAt"
+> {
+  return {
     subAgentIds: asStringArray(record.SubAgentIds),
     stepStartedAt: asNumberArray(record.StepStartedAt),
     previousCallContextTokens: asNumber(record.PreviousCallContextTokens),
@@ -928,5 +1331,22 @@ function fromRecord(record: Record<string, unknown>): CodingAgentSessionRow {
     lastEventOccurredAt: parseClickHouseDateTimeMs(
       String(record.LastEventOccurredAt ?? ""),
     ),
+  };
+}
+
+function fromRecord(record: Record<string, unknown>): CodingAgentSessionRow {
+  return {
+    ...decodeIdentity(record),
+    ...decodeAgentInfo(record),
+    ...decodeActivityCounts(record),
+    ...decodeToolUsage(record),
+    ...decodeTokensAndCost(record),
+    ...decodeTiming(record),
+    ...decodeByteAndCompaction(record),
+    ...decodeErrors(record),
+    ...decodePermissions(record),
+    ...decodeCodeStats(record),
+    ...decodeOutcome(record),
+    ...decodeReadBack(record),
   };
 }

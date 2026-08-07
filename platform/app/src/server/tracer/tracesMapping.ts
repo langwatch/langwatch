@@ -24,6 +24,10 @@ type TraceWithAnnotations = BaseTrace & {
   })[];
 };
 
+type AnnotationWithUser = NonNullable<
+  TraceWithAnnotations["annotations"]
+>[number];
+
 /**
  * Span subfield type for UI components
  */
@@ -153,6 +157,51 @@ function filterThreadTraces(
   }
 
   return threadTraces;
+}
+
+function resolveAnnotationValue({
+  annotation,
+  key,
+  subkey,
+  data,
+}: {
+  annotation: AnnotationWithUser;
+  key: string;
+  subkey?: string;
+  data: { annotationScoreOptions?: AnnotationScore[] };
+}): any {
+  if (
+    subkey &&
+    typeof annotation.scoreOptions === "object" &&
+    annotation.scoreOptions !== null
+  ) {
+    if (key === "score") {
+      return (annotation.scoreOptions as any)[subkey]?.value;
+    }
+    if (key === "score.reason") {
+      return (annotation.scoreOptions as any)[subkey]?.reason;
+    }
+  }
+  const scoreOptions = () =>
+    Object.fromEntries(
+      Object.entries(annotation.scoreOptions ?? {})
+        .map(([key, score]) => [
+          data.annotationScoreOptions?.find((scoreOpt) => scoreOpt.id === key)
+            ?.name ?? key,
+          score,
+        ])
+        .filter(([_, scoreValue]) => scoreValue?.value !== null),
+    );
+  const keyMap = {
+    comment: () => annotation.comment,
+    is_thumbs_up: () => annotation.isThumbsUp,
+    author: () => annotation.user?.name ?? annotation.email ?? "",
+    score: scoreOptions,
+    "score.reason": scoreOptions,
+    expected_output: () => annotation.expectedOutput,
+  };
+  const func = keyMap[key as keyof typeof keyMap];
+  return func ? func() : undefined;
 }
 
 export const TRACE_MAPPINGS = {
@@ -415,41 +464,9 @@ export const TRACE_MAPPINGS = {
       if (!key) {
         return trace.annotations ?? [];
       }
-      return (trace.annotations ?? []).map((annotation) => {
-        if (
-          subkey &&
-          typeof annotation.scoreOptions === "object" &&
-          annotation.scoreOptions !== null
-        ) {
-          if (key === "score") {
-            return (annotation.scoreOptions as any)[subkey]?.value;
-          }
-          if (key === "score.reason") {
-            return (annotation.scoreOptions as any)[subkey]?.reason;
-          }
-        }
-        const scoreOptions = () =>
-          Object.fromEntries(
-            Object.entries(annotation.scoreOptions ?? {})
-              .map(([key, score]) => [
-                data.annotationScoreOptions?.find(
-                  (scoreOpt) => scoreOpt.id === key,
-                )?.name ?? key,
-                score,
-              ])
-              .filter(([_, scoreValue]) => scoreValue?.value !== null),
-          );
-        const keyMap = {
-          comment: () => annotation.comment,
-          is_thumbs_up: () => annotation.isThumbsUp,
-          author: () => annotation.user?.name ?? annotation.email ?? "",
-          score: scoreOptions,
-          "score.reason": scoreOptions,
-          expected_output: () => annotation.expectedOutput,
-        };
-        const func = keyMap[key as keyof typeof keyMap];
-        return func ? func() : undefined;
-      });
+      return (trace.annotations ?? []).map((annotation) =>
+        resolveAnnotationValue({ annotation, key, subkey, data }),
+      );
     },
     expandable_by: "annotations.id",
   },
@@ -891,43 +908,76 @@ export const mapTraceToDatasetEntry = ({
   return expandedTraces.map((trace) =>
     Object.fromEntries(
       Object.entries(mapping).map(
-        ([column, { source, key, subkey, selectedFields }]) => {
-          const source_ =
-            source && source in TRACE_MAPPINGS
-              ? TRACE_MAPPINGS[source as keyof typeof TRACE_MAPPINGS]
-              : undefined;
-
-          let value = source_?.mapping({
-            trace,
+        ([column, { source, key, subkey, selectedFields }]) =>
+          mapDatasetEntryColumn({
+            column,
+            source,
             key,
             subkey,
-            data: {
-              annotationScoreOptions,
-              allTraces,
-              selectedFields,
-            },
-          });
-
-          if (
-            source_ &&
-            "expandable_by" in source_ &&
-            source_?.expandable_by &&
-            expansions.has(source_?.expandable_by)
-          ) {
-            value = value?.[0];
-          }
-
-          return [
-            column,
-            typeof value !== "string" && typeof value !== "number"
-              ? JSON.stringify(value)
-              : value,
-          ];
-        },
+            selectedFields,
+            trace,
+            expansions,
+            annotationScoreOptions,
+            allTraces,
+          }),
       ),
     ),
   );
 };
+
+function mapDatasetEntryColumn({
+  column,
+  source,
+  key,
+  subkey,
+  selectedFields,
+  trace,
+  expansions,
+  annotationScoreOptions,
+  allTraces,
+}: {
+  column: string;
+  source: string;
+  key?: string;
+  subkey?: string;
+  selectedFields?: string[];
+  trace: TraceWithAnnotations;
+  expansions: Set<keyof typeof TRACE_EXPANSIONS>;
+  annotationScoreOptions?: AnnotationScore[];
+  allTraces?: TraceWithAnnotations[];
+}): [string, string | number] {
+  const source_ =
+    source && source in TRACE_MAPPINGS
+      ? TRACE_MAPPINGS[source as keyof typeof TRACE_MAPPINGS]
+      : undefined;
+
+  let value = source_?.mapping({
+    trace,
+    key,
+    subkey,
+    data: {
+      annotationScoreOptions,
+      allTraces,
+      selectedFields,
+    },
+  });
+
+  if (
+    source_ &&
+    "expandable_by" in source_ &&
+    source_?.expandable_by &&
+    expansions.has(source_?.expandable_by)
+  ) {
+    value = value?.[0];
+  }
+
+  return [
+    column,
+    typeof value !== "string" && typeof value !== "number"
+      ? JSON.stringify(value)
+      : value,
+  ];
+}
 
 type StringTypeToType = {
   string: string;
@@ -949,6 +999,73 @@ const unwrapTypedObject = (v: unknown): unknown => {
   return obj.value;
 };
 
+// Fallback shapes for a string value that failed to JSON.parse into `type`
+// (or parsed into a shape that doesn't match it) — used only from the catch
+// branch of convertStringValueToComplexType below.
+function fallbackStringConversion<T extends keyof StringTypeToType>(
+  value: string,
+  type: T,
+): StringTypeToType[T] | undefined {
+  if (type === "string[]") {
+    return [tryAndConvertTo(value, "string")] as unknown as StringTypeToType[T];
+  }
+  if (type === "array") {
+    return [value] as unknown as StringTypeToType[T];
+  }
+  if (type === "object") {
+    return { _json: value } as unknown as StringTypeToType[T];
+  }
+  return undefined;
+}
+
+function convertStringValueToComplexType<T extends keyof StringTypeToType>(
+  value: string,
+  type: T,
+): StringTypeToType[T] | undefined {
+  try {
+    const parsed = JSON.parse(value);
+    if (!Array.isArray(parsed) && typeof parsed === "object") {
+      return parsed as unknown as StringTypeToType[T];
+    }
+    if (Array.isArray(parsed)) {
+      if (type === "string[]") {
+        return parsed.map((v) =>
+          tryAndConvertTo(v, "string"),
+        ) as unknown as StringTypeToType[T];
+      }
+      return parsed as unknown as StringTypeToType[T];
+    }
+    throw new Error("Failed to parse to a valid type, falling back");
+  } catch {
+    return fallbackStringConversion(value, type);
+  }
+}
+
+const PRIMITIVE_TYPE_CONVERTERS: {
+  [K in "string" | "number"]: (value: any) => StringTypeToType[K];
+} = {
+  string: (value) =>
+    typeof value === "string" ? value : JSON.stringify(value),
+  number: (value) => Number(value),
+};
+
+function isStringArrayConversion<T extends keyof StringTypeToType>(
+  value: unknown,
+  type: T,
+): value is any[] {
+  return Array.isArray(value) && type === "string[]";
+}
+
+function isComplexStringConversion<T extends keyof StringTypeToType>(
+  value: unknown,
+  type: T,
+): value is string {
+  return (
+    typeof value === "string" &&
+    (type === "object" || type === "string[]" || type === "array")
+  );
+}
+
 export const tryAndConvertTo = <T extends keyof StringTypeToType>(
   value: any,
   type: T,
@@ -957,53 +1074,21 @@ export const tryAndConvertTo = <T extends keyof StringTypeToType>(
   // OTel SDK auto-wraps span IO as { type: <string>, value: <any> }; evaluators need bare values. (#3875)
   const unwrapped = unwrapTypedObject(value);
   if (unwrapped !== undefined) value = unwrapped;
-  if (value === null || value === undefined) {
+  if (value == null) {
     return undefined;
   }
-  if (type === "string") {
-    return (
-      typeof value === "string" ? value : JSON.stringify(value)
+  if (type in PRIMITIVE_TYPE_CONVERTERS) {
+    return PRIMITIVE_TYPE_CONVERTERS[type as "string" | "number"](
+      value,
     ) as StringTypeToType[T];
   }
-  if (type === "number") {
-    return Number(value) as StringTypeToType[T];
-  }
-  if (Array.isArray(value) && type === "string[]") {
+  if (isStringArrayConversion(value, type)) {
     return value.map((v) =>
       tryAndConvertTo(v, "string"),
     ) as unknown as StringTypeToType[T];
   }
-  if (
-    typeof value === "string" &&
-    (type === "object" || type === "string[]" || type === "array")
-  ) {
-    try {
-      const parsed = JSON.parse(value);
-      if (!Array.isArray(parsed) && typeof parsed === "object") {
-        return parsed as unknown as StringTypeToType[T];
-      }
-      if (Array.isArray(parsed)) {
-        if (type === "string[]") {
-          return parsed.map((v) =>
-            tryAndConvertTo(v, "string"),
-          ) as unknown as StringTypeToType[T];
-        }
-        return parsed as unknown as StringTypeToType[T];
-      }
-      throw new Error("Failed to parse to a valid type, falling back");
-    } catch {
-      if (type === "string[]") {
-        return [
-          tryAndConvertTo(value, "string"),
-        ] as unknown as StringTypeToType[T];
-      }
-      if (type === "array") {
-        return [value] as unknown as StringTypeToType[T];
-      }
-      if (type === "object") {
-        return { _json: value } as unknown as StringTypeToType[T];
-      }
-    }
+  if (isComplexStringConversion(value, type)) {
+    return convertStringValueToComplexType(value, type);
   }
   return value as unknown as StringTypeToType[T];
 };

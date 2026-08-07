@@ -72,28 +72,20 @@ function tagFieldName(node: TagToken): string | null {
  * node so callers can read its sub-conditions and strip it by location.
  */
 function findGroupNode(ast: LiqeQuery, evaluatorId: string): LiqeQuery | null {
-  let found: LiqeQuery | null = null;
-  const visit = (node: LiqeQuery): void => {
-    if (found) return;
-    if (node.type === "ParenthesizedExpression") {
-      if (groupContainsEvaluator(node.expression, evaluatorId)) {
-        found = node;
-        return;
-      }
-      visit(node.expression);
-      return;
-    }
-    if (node.type === "LogicalExpression") {
-      visit(node.left);
-      visit(node.right);
-      return;
-    }
-    if (node.type === "UnaryOperator") {
-      visit(node.operand);
-    }
-  };
-  visit(ast);
-  return found;
+  if (ast.type === "ParenthesizedExpression") {
+    if (groupContainsEvaluator(ast.expression, evaluatorId)) return ast;
+    return findGroupNode(ast.expression, evaluatorId);
+  }
+  if (ast.type === "LogicalExpression") {
+    return (
+      findGroupNode(ast.left, evaluatorId) ??
+      findGroupNode(ast.right, evaluatorId)
+    );
+  }
+  if (ast.type === "UnaryOperator") {
+    return findGroupNode(ast.operand, evaluatorId);
+  }
+  return null;
 }
 
 /**
@@ -119,6 +111,49 @@ function groupContainsEvaluator(node: LiqeQuery, evaluatorId: string): boolean {
   return false;
 }
 
+function applyCategoricalSub({
+  tag,
+  field,
+  negated,
+  group,
+}: {
+  tag: TagToken;
+  field: string;
+  negated: boolean;
+  group: EvaluatorGroup;
+}): void {
+  if (tag.expression.type !== "LiteralExpression") return;
+  group.categorical.push({
+    field,
+    value: String(tag.expression.value),
+    negated,
+  });
+}
+
+function applyScoreComparisonSub(
+  op: string,
+  raw: unknown,
+  group: EvaluatorGroup,
+): void {
+  const num = typeof raw === "number" ? raw : parseFloat(String(raw));
+  if (!Number.isFinite(num)) return;
+  if (op === ":>" || op === ":>=") group.score = { from: num };
+  else if (op === ":<" || op === ":<=") group.score = { to: num };
+}
+
+function applyScoreSub(tag: TagToken, group: EvaluatorGroup): void {
+  if (tag.expression.type === "RangeExpression") {
+    group.score = {
+      from: tag.expression.range.min,
+      to: tag.expression.range.max,
+    };
+    return;
+  }
+  if (tag.expression.type === "LiteralExpression") {
+    applyScoreComparisonSub(tag.operator.operator, tag.expression.value, group);
+  }
+}
+
 /** Collect verdict/label/score sub-conditions out of a located group's AND-chain. */
 function readSubConditions(node: LiqeQuery, group: EvaluatorGroup): void {
   walkAST(node, (tag, negated) => {
@@ -126,30 +161,11 @@ function readSubConditions(node: LiqeQuery, group: EvaluatorGroup): void {
     const field = tagFieldName(tag);
     if (!field) return;
     if (CATEGORICAL_SUB_FIELDS.has(field)) {
-      if (tag.expression.type !== "LiteralExpression") return;
-      group.categorical.push({
-        field,
-        value: String(tag.expression.value),
-        negated,
-      });
+      applyCategoricalSub({ tag, field, negated, group });
       return;
     }
     if (field === EVALUATOR_SCORE_FIELD && !negated) {
-      if (tag.expression.type === "RangeExpression") {
-        group.score = {
-          from: tag.expression.range.min,
-          to: tag.expression.range.max,
-        };
-        return;
-      }
-      if (tag.expression.type === "LiteralExpression") {
-        const op = tag.operator.operator;
-        const raw = tag.expression.value;
-        const num = typeof raw === "number" ? raw : parseFloat(String(raw));
-        if (!Number.isFinite(num)) return;
-        if (op === ":>" || op === ":>=") group.score = { from: num };
-        else if (op === ":<" || op === ":<=") group.score = { to: num };
-      }
+      applyScoreSub(tag, group);
     }
   });
 }

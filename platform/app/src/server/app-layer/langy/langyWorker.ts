@@ -142,250 +142,279 @@ export interface LangyWorkerPort {
 }
 
 /**
- * HTTP implementation over the manager's internal-secret-authenticated endpoints.
+ * Headers common to every manager call: internal-secret auth plus the active
+ * trace context, so the manager's own spans attach to the SAME trace as the
+ * call that triggered them.
  */
-export function createLangyWorkerPort(config: {
-  agentUrl: string;
-  internalSecret: string;
-}): LangyWorkerPort {
-  const { agentUrl, internalSecret } = config;
+function buildInternalHeaders(internalSecret: string): Record<string, string> {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${internalSecret}`,
+  };
+  propagation.inject(context.active(), headers);
+  return headers;
+}
 
+type ProbeArgs = Parameters<LangyWorkerPort["probe"]>[0];
+
+/**
+ * Capability fields, not a pre-computed signature: the manager owns the
+ * canonicalisation, and computing it here too would be a second copy of the
+ * rule, free to drift until every probe silently missed. Split out of
+ * `probeLangyWorker`.
+ */
+function buildProbeRequestBody(args: ProbeArgs): Record<string, unknown> {
+  const {
+    projectId,
+    actorUserId,
+    conversationId,
+    model,
+    hasGithubAuth,
+    githubRepoScopeKey,
+    egressAllowlist,
+    mirrorTier,
+  } = args;
   return {
-    async probe({
-      projectId,
-      actorUserId,
-      conversationId,
-      model,
-      hasGithubAuth,
-      githubRepoScopeKey,
-      egressAllowlist,
-      mirrorTier,
-    }) {
+    projectId,
+    actorUserId,
+    conversationId,
+    ...(model ? { model } : {}),
+    hasGithubAuth,
+    ...(githubRepoScopeKey ? { githubRepoScopeKey } : {}),
+    ...(egressAllowlist?.length ? { egressAllowlist } : {}),
+    ...(mirrorTier ? { mirrorTier } : {}),
+  };
+}
+
+async function probeLangyWorker(
+  config: { agentUrl: string; internalSecret: string },
+  args: ProbeArgs,
+): Promise<boolean> {
+  const { conversationId } = args;
+  try {
+    // traceparent rides along (no span of its own — the probe is a single
+    // cheap read on the turn's critical path) so the manager's probe
+    // handling lands in the same trace as the dispatch that follows.
+    const headers = buildInternalHeaders(config.internalSecret);
+    const response = await fetch(`${config.agentUrl}/worker/probe`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(buildProbeRequestBody(args)),
+      signal: AbortSignal.timeout(AGENT_PROBE_TIMEOUT_MS),
+    });
+    if (!response.ok) return false;
+    const body = (await response.json()) as { alive?: unknown };
+    const alive = body.alive === true;
+    trace.getActiveSpan()?.setAttribute("langy.probe.hit", alive);
+    return alive;
+  } catch (error) {
+    logger.debug(
+      { error, conversationId },
+      "langy worker probe failed — minting a session key as if cold",
+    );
+    return false;
+  }
+}
+
+type WarmArgs = Parameters<LangyWorkerPort["warm"]>[0];
+
+async function warmLangyWorker(
+  config: { agentUrl: string; internalSecret: string },
+  {
+    projectId,
+    actorUserId,
+    conversationId,
+    credentials,
+    modelOverride,
+  }: WarmArgs,
+): Promise<void> {
+  // Its own span, the one worth staring at: the warm is fire-and-forget, so
+  // the only way to know whether the boot actually hides behind the rest of
+  // the turn is to see this span overlap the ones that follow it. traceparent
+  // is injected so the manager's spawn/boot spans attach to THIS trace.
+  await tracer.withActiveSpan(
+    "langy.chat.warm_worker",
+    {
+      attributes: {
+        "tenant.id": projectId,
+        "user.id": actorUserId,
+        "langy.conversation.id": conversationId,
+      },
+    },
+    async () => {
       try {
-        // traceparent rides along (no span of its own — the probe is a single
-        // cheap read on the turn's critical path) so the manager's probe
-        // handling lands in the same trace as the dispatch that follows.
-        const headers: Record<string, string> = {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${internalSecret}`,
-        };
-        propagation.inject(context.active(), headers);
-        const response = await fetch(`${agentUrl}/worker/probe`, {
+        const headers = buildInternalHeaders(config.internalSecret);
+        const response = await fetch(`${config.agentUrl}/warm`, {
           method: "POST",
           headers,
           body: JSON.stringify({
             projectId,
             actorUserId,
             conversationId,
-            // Capability fields, not a pre-computed signature: the manager owns
-            // the canonicalisation, and computing it here too would be a second
-            // copy of the rule, free to drift until every probe silently missed.
-            ...(model ? { model } : {}),
-            hasGithubAuth,
-            ...(githubRepoScopeKey ? { githubRepoScopeKey } : {}),
-            ...(egressAllowlist?.length ? { egressAllowlist } : {}),
-            ...(mirrorTier ? { mirrorTier } : {}),
+            credentials,
+            ...(modelOverride ? { modelOverride } : {}),
           }),
-          signal: AbortSignal.timeout(AGENT_PROBE_TIMEOUT_MS),
+          signal: AbortSignal.timeout(AGENT_WARM_TIMEOUT_MS),
         });
-        if (!response.ok) return false;
-        const body = (await response.json()) as { alive?: unknown };
-        const alive = body.alive === true;
-        trace.getActiveSpan()?.setAttribute("langy.probe.hit", alive);
-        return alive;
+        void response.body?.cancel();
       } catch (error) {
+        // A cold start is the status quo, not a failure. Debug on purpose.
         logger.debug(
           { error, conversationId },
-          "langy worker probe failed — minting a session key as if cold",
+          "langy worker warm failed — cold-starting",
         );
-        return false;
       }
     },
+  );
+}
 
-    async warm({
-      projectId,
-      actorUserId,
-      conversationId,
-      credentials,
-      modelOverride,
-    }) {
-      // Its own span, the one worth staring at: the warm is fire-and-forget, so
-      // the only way to know whether the boot actually hides behind the rest of
-      // the turn is to see this span overlap the ones that follow it. traceparent
-      // is injected so the manager's spawn/boot spans attach to THIS trace.
-      await tracer.withActiveSpan(
-        "langy.chat.warm_worker",
-        {
-          attributes: {
-            "tenant.id": projectId,
-            "user.id": actorUserId,
-            "langy.conversation.id": conversationId,
-          },
-        },
-        async () => {
-          try {
-            const headers: Record<string, string> = {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${internalSecret}`,
-            };
-            propagation.inject(context.active(), headers);
+/**
+ * The pre-stream outcome implied by the manager's dispatch response. Split
+ * out of `dispatchLangyTurn` — flattens what was a 4-way nested ternary into
+ * guard clauses over the same status codes, in the same order.
+ */
+function dispatchOutcomeFromResponse(response: Response): LangyDispatchOutcome {
+  if (response.status === 202 || response.ok) return "accepted";
+  if (response.status === 409) return "busy";
+  if (response.status === 428) return "credentialsRequired";
+  // Only the statuses that mean "the agent understood this request and
+  // refused it as invalid" are permanent. A 401 mid secret-rotation, a
+  // proxy 404, a 408 — all transient, all must stay retryable, or a rolling
+  // deploy terminalizes healthy turns.
+  if (response.status === 400 || response.status === 422) return "rejected";
+  return "unavailable";
+}
 
-            const response = await fetch(`${agentUrl}/warm`, {
-              method: "POST",
-              headers,
-              body: JSON.stringify({
-                projectId,
-                actorUserId,
-                conversationId,
-                credentials,
-                ...(modelOverride ? { modelOverride } : {}),
-              }),
-              signal: AbortSignal.timeout(AGENT_WARM_TIMEOUT_MS),
-            });
-            void response.body?.cancel();
-          } catch (error) {
-            // A cold start is the status quo, not a failure. Debug on purpose.
-            logger.debug(
-              { error, conversationId },
-              "langy worker warm failed — cold-starting",
-            );
-          }
-        },
-      );
+type DispatchArgs = Parameters<LangyWorkerPort["dispatch"]>[0];
+
+async function dispatchLangyTurn(
+  config: { agentUrl: string; internalSecret: string },
+  args: DispatchArgs,
+): Promise<LangyDispatchOutcome> {
+  const {
+    intent,
+    conversationId,
+    turnId,
+    projectId,
+    userId,
+    runToken,
+    prompt,
+    system,
+    historySeed,
+    credentials,
+    modelOverride,
+    resumeToken,
+  } = args;
+  return tracer.withActiveSpan(
+    "langy.chat.dispatch_turn",
+    {
+      attributes: {
+        "tenant.id": projectId,
+        "user.id": userId,
+        "langy.conversation.id": conversationId,
+        "langy.turn.id": turnId,
+        "langy.worker.intent": intent,
+      },
     },
-
-    async dispatch({
-      intent,
-      conversationId,
-      turnId,
-      projectId,
-      userId,
-      runToken,
-      prompt,
-      system,
-      historySeed,
-      credentials,
-      modelOverride,
-      resumeToken,
-    }) {
-      return tracer.withActiveSpan(
-        "langy.chat.dispatch_turn",
-        {
-          attributes: {
-            "tenant.id": projectId,
-            "user.id": userId,
-            "langy.conversation.id": conversationId,
-            "langy.turn.id": turnId,
-            "langy.worker.intent": intent,
-          },
-        },
-        async (span): Promise<LangyDispatchOutcome> => {
-          try {
-            const headers: Record<string, string> = {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${internalSecret}`,
-            };
-            propagation.inject(context.active(), headers);
-
-            const response = await fetch(`${agentUrl}/worker/${intent}`, {
-              method: "POST",
-              headers,
-              body: JSON.stringify({
-                conversationId,
-                // turnId + projectId ride the payload so the manager can echo them
-                // on its durable final; runToken + userId let it sign the frames it
-                // pushes to the relay.
-                turnId,
-                projectId,
-                userId,
-                runToken,
-                prompt,
-                system,
-                // The seed a fresh session's first message is folded from; a
-                // warm session ignores it (the manager decides, it owns the
-                // session-freshness ground truth).
-                ...(historySeed ? { historySeed } : {}),
-                credentials,
-                ...(modelOverride ? { modelOverride } : {}),
-                // ADR-048: resume from a prior turn's checkpoint if one is pending.
-                ...(resumeToken ? { resumeToken } : {}),
-              }),
-              signal: AbortSignal.timeout(AGENT_DISPATCH_TIMEOUT_MS),
-            });
-            // Fire-and-forget output: the worker streams the turn to the relay, not
-            // on this response — read the status, drop the body.
-            void response.body?.cancel();
-            const outcome: LangyDispatchOutcome =
-              response.status === 202 || response.ok
-                ? "accepted"
-                : response.status === 409
-                  ? "busy"
-                  : response.status === 428
-                    ? "credentialsRequired"
-                    : // Only the statuses that mean "the agent understood this
-                      // request and refused it as invalid" are permanent. A
-                      // 401 mid secret-rotation, a proxy 404, a 408 — all
-                      // transient, all must stay retryable, or a rolling
-                      // deploy terminalizes healthy turns.
-                      response.status === 400 || response.status === 422
-                      ? "rejected"
-                      : "unavailable";
-            span.setAttribute("langy.dispatch.outcome", outcome);
-            getLangyDispatchCounter(
-              outcome === "credentialsRequired"
-                ? "credentials_required"
-                : outcome,
-            ).inc();
-            return outcome;
-          } catch (error) {
-            logger.warn(
-              { error, conversationId, turnId },
-              "langy worker dispatch failed — leaving the turn to the liveness subscriber",
-            );
-            span.setAttribute("langy.dispatch.outcome", "error");
-            getLangyDispatchCounter("error").inc();
-            return "unavailable";
-          }
-        },
-      );
+    async (span): Promise<LangyDispatchOutcome> => {
+      try {
+        const headers = buildInternalHeaders(config.internalSecret);
+        const response = await fetch(`${config.agentUrl}/worker/${intent}`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            conversationId,
+            // turnId + projectId ride the payload so the manager can echo them
+            // on its durable final; runToken + userId let it sign the frames it
+            // pushes to the relay.
+            turnId,
+            projectId,
+            userId,
+            runToken,
+            prompt,
+            system,
+            // The seed a fresh session's first message is folded from; a
+            // warm session ignores it (the manager decides, it owns the
+            // session-freshness ground truth).
+            ...(historySeed ? { historySeed } : {}),
+            credentials,
+            ...(modelOverride ? { modelOverride } : {}),
+            // ADR-048: resume from a prior turn's checkpoint if one is pending.
+            ...(resumeToken ? { resumeToken } : {}),
+          }),
+          signal: AbortSignal.timeout(AGENT_DISPATCH_TIMEOUT_MS),
+        });
+        // Fire-and-forget output: the worker streams the turn to the relay, not
+        // on this response — read the status, drop the body.
+        void response.body?.cancel();
+        const outcome = dispatchOutcomeFromResponse(response);
+        span.setAttribute("langy.dispatch.outcome", outcome);
+        getLangyDispatchCounter(
+          outcome === "credentialsRequired" ? "credentials_required" : outcome,
+        ).inc();
+        return outcome;
+      } catch (error) {
+        logger.warn(
+          { error, conversationId, turnId },
+          "langy worker dispatch failed — leaving the turn to the liveness subscriber",
+        );
+        span.setAttribute("langy.dispatch.outcome", "error");
+        getLangyDispatchCounter("error").inc();
+        return "unavailable";
+      }
     },
+  );
+}
 
-    async cancel({ conversationId, turnId, projectId }) {
-      await tracer.withActiveSpan(
-        "langy.chat.cancel_turn",
-        {
-          attributes: {
-            "tenant.id": projectId,
-            "langy.conversation.id": conversationId,
-            "langy.turn.id": turnId,
-          },
-        },
-        async () => {
-          try {
-            const headers: Record<string, string> = {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${internalSecret}`,
-            };
-            propagation.inject(context.active(), headers);
+type CancelArgs = Parameters<LangyWorkerPort["cancel"]>[0];
 
-            const response = await fetch(`${agentUrl}/worker/cancel`, {
-              method: "POST",
-              headers,
-              body: JSON.stringify({ conversationId, turnId, projectId }),
-              signal: AbortSignal.timeout(AGENT_CANCEL_TIMEOUT_MS),
-            });
-            void response.body?.cancel();
-          } catch (error) {
-            // The stop is already truthful (durable stopped terminal + stream
-            // end); a cancel that cannot reach the worker only leaves it burning
-            // tokens until it finishes on its own. Debug, never surface.
-            logger.debug(
-              { error, conversationId, turnId },
-              "langy worker cancel failed — the turn is already stopped on record",
-            );
-          }
-        },
-      );
+async function cancelLangyTurn(
+  config: { agentUrl: string; internalSecret: string },
+  { conversationId, turnId, projectId }: CancelArgs,
+): Promise<void> {
+  await tracer.withActiveSpan(
+    "langy.chat.cancel_turn",
+    {
+      attributes: {
+        "tenant.id": projectId,
+        "langy.conversation.id": conversationId,
+        "langy.turn.id": turnId,
+      },
     },
+    async () => {
+      try {
+        const headers = buildInternalHeaders(config.internalSecret);
+        const response = await fetch(`${config.agentUrl}/worker/cancel`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({ conversationId, turnId, projectId }),
+          signal: AbortSignal.timeout(AGENT_CANCEL_TIMEOUT_MS),
+        });
+        void response.body?.cancel();
+      } catch (error) {
+        // The stop is already truthful (durable stopped terminal + stream
+        // end); a cancel that cannot reach the worker only leaves it burning
+        // tokens until it finishes on its own. Debug, never surface.
+        logger.debug(
+          { error, conversationId, turnId },
+          "langy worker cancel failed — the turn is already stopped on record",
+        );
+      }
+    },
+  );
+}
+
+/**
+ * HTTP implementation over the manager's internal-secret-authenticated endpoints.
+ */
+export function createLangyWorkerPort(config: {
+  agentUrl: string;
+  internalSecret: string;
+}): LangyWorkerPort {
+  return {
+    probe: (args) => probeLangyWorker(config, args),
+    warm: (args) => warmLangyWorker(config, args),
+    dispatch: (args) => dispatchLangyTurn(config, args),
+    cancel: (args) => cancelLangyTurn(config, args),
   };
 }

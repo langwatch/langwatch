@@ -192,6 +192,260 @@ export type PrefetchResult =
 // Core Logic (depends on abstractions)
 // ============================================================================
 
+type PrefetchStepResult<T> =
+  | ({ ok: true } & T)
+  | { ok: false; result: PrefetchResult };
+
+async function resolveScenarioOrFail({
+  context,
+  scenarioFetcher,
+}: {
+  context: ExecutionContext;
+  scenarioFetcher: ScenarioFetcher;
+}): Promise<
+  PrefetchStepResult<{
+    scenarioResult: NonNullable<Awaited<ReturnType<typeof fetchScenario>>>;
+  }>
+> {
+  const scenarioResult = await fetchScenario(
+    context.projectId,
+    context.scenarioId,
+    scenarioFetcher,
+  );
+  if (!scenarioResult) {
+    logger.warn(
+      { projectId: context.projectId, scenarioId: context.scenarioId },
+      "Scenario not found",
+    );
+    return {
+      ok: false,
+      result: {
+        success: false,
+        error: `Scenario ${context.scenarioId} not found`,
+      },
+    };
+  }
+  return { ok: true, scenarioResult };
+}
+
+async function resolveProjectOrFail({
+  context,
+  projectFetcher,
+}: {
+  context: ExecutionContext;
+  projectFetcher: ProjectFetcher;
+}): Promise<PrefetchStepResult<{ project: { apiKey: string } }>> {
+  const projectResult = await fetchProject(context.projectId, projectFetcher);
+  if (!projectResult.success) {
+    logger.warn(
+      { projectId: context.projectId, error: projectResult.error },
+      "Project fetch failed",
+    );
+    return {
+      ok: false,
+      result: { success: false, error: projectResult.error },
+    };
+  }
+  return { ok: true, project: projectResult.data };
+}
+
+function targetLabelFor(target: TargetConfig): string {
+  if (target.type === "prompt") return "Prompt";
+  if (target.type === "code") return "Code agent";
+  if (target.type === "workflow") return "Workflow agent";
+  return "HTTP agent";
+}
+
+async function resolveAdapterDataOrFail({
+  context,
+  target,
+  deps,
+}: {
+  context: ExecutionContext;
+  target: TargetConfig;
+  deps: DataPrefetcherDependencies;
+}): Promise<PrefetchStepResult<{ adapterData: TargetAdapterData }>> {
+  const adapterResult = await fetchAgentData(context.projectId, target, deps);
+  if (
+    adapterResult !== null &&
+    "success" in adapterResult &&
+    !adapterResult.success
+  ) {
+    // Hydration failure from workflow DSL — surface structured error
+    logger.warn(
+      {
+        projectId: context.projectId,
+        targetType: target.type,
+        reason: adapterResult.reason,
+      },
+      `Workflow LLM hydration failed: ${adapterResult.message}`,
+    );
+    return {
+      ok: false,
+      result: {
+        success: false,
+        error: adapterResult.message,
+        reason: adapterResult.reason,
+      },
+    };
+  }
+  const adapterData = adapterResult as TargetAdapterData | null;
+  if (!adapterData) {
+    logger.warn(
+      {
+        projectId: context.projectId,
+        targetType: target.type,
+        targetReferenceId: target.referenceId,
+      },
+      "Target adapter not found",
+    );
+    return {
+      ok: false,
+      result: {
+        success: false,
+        error: `${targetLabelFor(target)} ${target.referenceId} not found`,
+      },
+    };
+  }
+  return { ok: true, adapterData };
+}
+
+// Resolve the three model roles a run needs:
+//   - the target adapter (prompt / workflow under test): the prompt's own
+//     model when set, else the project's scenarios.generator default.
+//   - the user-simulator and the judge: a run-plan override, else the
+//     scenario's own override, else the DEFAULT-role scenarios.user_simulator
+//     / scenarios.judge model. The split lets the role-play and evaluation
+//     use a smart model independently of the agent under test.
+// ModelNotConfiguredError bubbles as a structured "model not configured"
+// failure with the resolver's message.
+async function resolveModelRolesOrFail({
+  context,
+  adapterData,
+  scenarioResult,
+  deps,
+}: {
+  context: ExecutionContext;
+  adapterData: TargetAdapterData;
+  scenarioResult: {
+    simulatorModel: string | null;
+    judgeModel: string | null;
+  };
+  deps: DataPrefetcherDependencies;
+}): Promise<
+  PrefetchStepResult<{
+    modelForParams: string;
+    simulatorModel: string;
+    judgeModel: string;
+  }>
+> {
+  const suiteOverrides = await deps.suiteModelFetcher.getBySetId(
+    context.setId,
+    context.projectId,
+  );
+  try {
+    const modelForParams =
+      adapterData.type === "prompt" && adapterData.model
+        ? adapterData.model
+        : await deps.modelResolver.resolve(
+            "scenarios.generator",
+            context.projectId,
+          );
+    const simulatorModel =
+      suiteOverrides?.simulatorModel ??
+      scenarioResult.simulatorModel ??
+      (await deps.modelResolver.resolve(
+        "scenarios.user_simulator",
+        context.projectId,
+      ));
+    const judgeModel =
+      suiteOverrides?.judgeModel ??
+      scenarioResult.judgeModel ??
+      (await deps.modelResolver.resolve("scenarios.judge", context.projectId));
+    return { ok: true, modelForParams, simulatorModel, judgeModel };
+  } catch (err) {
+    const message =
+      err instanceof Error
+        ? err.message
+        : "No default model configured for this project";
+    return { ok: false, result: { success: false, error: message } };
+  }
+}
+
+async function prepareAllModelParamsOrFail({
+  context,
+  modelForParams,
+  simulatorModel,
+  judgeModel,
+  modelParamsProvider,
+}: {
+  context: ExecutionContext;
+  modelForParams: string;
+  simulatorModel: string;
+  judgeModel: string;
+  modelParamsProvider: ModelParamsProvider;
+}): Promise<
+  PrefetchStepResult<{
+    modelParams: LiteLLMParams;
+    simulatorModelParams: LiteLLMParams;
+    judgeModelParams: LiteLLMParams;
+  }>
+> {
+  const [modelParamsResult, simulatorParamsResult, judgeParamsResult] =
+    await Promise.all([
+      modelParamsProvider.prepare(context.projectId, modelForParams),
+      modelParamsProvider.prepare(context.projectId, simulatorModel),
+      modelParamsProvider.prepare(context.projectId, judgeModel),
+    ]);
+  for (const { label, model, result } of [
+    { label: "adapter", model: modelForParams, result: modelParamsResult },
+    {
+      label: "user-simulator",
+      model: simulatorModel,
+      result: simulatorParamsResult,
+    },
+    { label: "judge", model: judgeModel, result: judgeParamsResult },
+  ]) {
+    if (!result.success) {
+      logger.warn(
+        {
+          projectId: context.projectId,
+          role: label,
+          model,
+          reason: result.reason,
+        },
+        `Failed to prepare model params: ${result.message}`,
+      );
+      return {
+        ok: false,
+        result: {
+          success: false,
+          error: result.message,
+          reason: result.reason,
+        },
+      };
+    }
+  }
+  // Narrowing: the loop above returns on any failure, so all three succeeded.
+  if (
+    !modelParamsResult.success ||
+    !simulatorParamsResult.success ||
+    !judgeParamsResult.success
+  ) {
+    return {
+      ok: false,
+      result: { success: false, error: "Failed to prepare model params" },
+    };
+  }
+
+  return {
+    ok: true,
+    modelParams: modelParamsResult.params,
+    simulatorModelParams: simulatorParamsResult.params,
+    judgeModelParams: judgeParamsResult.params,
+  };
+}
+
 /**
  * Pre-fetch all data needed for scenario execution.
  *
@@ -214,160 +468,44 @@ export async function prefetchScenarioData(
     "Prefetching scenario data",
   );
 
-  const scenarioResult = await fetchScenario(
-    context.projectId,
-    context.scenarioId,
-    deps.scenarioFetcher,
-  );
-  if (!scenarioResult) {
-    logger.warn(
-      { projectId: context.projectId, scenarioId: context.scenarioId },
-      "Scenario not found",
-    );
-    return {
-      success: false,
-      error: `Scenario ${context.scenarioId} not found`,
-    };
-  }
+  const scenarioStep = await resolveScenarioOrFail({
+    context,
+    scenarioFetcher: deps.scenarioFetcher,
+  });
+  if (!scenarioStep.ok) return scenarioStep.result;
+  const { scenarioResult } = scenarioStep;
   const scenario = scenarioResult.config;
 
-  const projectResult = await fetchProject(
-    context.projectId,
-    deps.projectFetcher,
-  );
-  if (!projectResult.success) {
-    logger.warn(
-      { projectId: context.projectId, error: projectResult.error },
-      "Project fetch failed",
-    );
-    return { success: false, error: projectResult.error };
-  }
-  const project = projectResult.data;
+  const projectStep = await resolveProjectOrFail({
+    context,
+    projectFetcher: deps.projectFetcher,
+  });
+  if (!projectStep.ok) return projectStep.result;
+  const { project } = projectStep;
 
-  const adapterResult = await fetchAgentData(context.projectId, target, deps);
-  if (
-    adapterResult !== null &&
-    "success" in adapterResult &&
-    !adapterResult.success
-  ) {
-    // Hydration failure from workflow DSL — surface structured error
-    logger.warn(
-      {
-        projectId: context.projectId,
-        targetType: target.type,
-        reason: adapterResult.reason,
-      },
-      `Workflow LLM hydration failed: ${adapterResult.message}`,
-    );
-    return {
-      success: false,
-      error: adapterResult.message,
-      reason: adapterResult.reason,
-    };
-  }
-  const adapterData = adapterResult as TargetAdapterData | null;
-  if (!adapterData) {
-    logger.warn(
-      {
-        projectId: context.projectId,
-        targetType: target.type,
-        targetReferenceId: target.referenceId,
-      },
-      "Target adapter not found",
-    );
-    const targetLabel =
-      target.type === "prompt"
-        ? "Prompt"
-        : target.type === "code"
-          ? "Code agent"
-          : target.type === "workflow"
-            ? "Workflow agent"
-            : "HTTP agent";
-    return {
-      success: false,
-      error: `${targetLabel} ${target.referenceId} not found`,
-    };
-  }
+  const adapterStep = await resolveAdapterDataOrFail({ context, target, deps });
+  if (!adapterStep.ok) return adapterStep.result;
+  const { adapterData } = adapterStep;
 
-  // Resolve the three model roles a run needs:
-  //   - the target adapter (prompt / workflow under test): the prompt's own
-  //     model when set, else the project's scenarios.generator default.
-  //   - the user-simulator and the judge: a run-plan override, else the
-  //     scenario's own override, else the DEFAULT-role scenarios.user_simulator
-  //     / scenarios.judge model. The split lets the role-play and evaluation
-  //     use a smart model independently of the agent under test.
-  // ModelNotConfiguredError bubbles as a structured "model not configured"
-  // failure with the resolver's message.
-  const suiteOverrides = await deps.suiteModelFetcher.getBySetId(
-    context.setId,
-    context.projectId,
-  );
-  let modelForParams: string;
-  let simulatorModel: string;
-  let judgeModel: string;
-  try {
-    modelForParams =
-      adapterData.type === "prompt" && adapterData.model
-        ? adapterData.model
-        : await deps.modelResolver.resolve(
-            "scenarios.generator",
-            context.projectId,
-          );
-    simulatorModel =
-      suiteOverrides?.simulatorModel ??
-      scenarioResult.simulatorModel ??
-      (await deps.modelResolver.resolve(
-        "scenarios.user_simulator",
-        context.projectId,
-      ));
-    judgeModel =
-      suiteOverrides?.judgeModel ??
-      scenarioResult.judgeModel ??
-      (await deps.modelResolver.resolve("scenarios.judge", context.projectId));
-  } catch (err) {
-    const message =
-      err instanceof Error
-        ? err.message
-        : "No default model configured for this project";
-    return { success: false, error: message };
-  }
+  const modelRolesStep = await resolveModelRolesOrFail({
+    context,
+    adapterData,
+    scenarioResult,
+    deps,
+  });
+  if (!modelRolesStep.ok) return modelRolesStep.result;
+  const { modelForParams, simulatorModel, judgeModel } = modelRolesStep;
 
-  const [modelParamsResult, simulatorParamsResult, judgeParamsResult] =
-    await Promise.all([
-      deps.modelParamsProvider.prepare(context.projectId, modelForParams),
-      deps.modelParamsProvider.prepare(context.projectId, simulatorModel),
-      deps.modelParamsProvider.prepare(context.projectId, judgeModel),
-    ]);
-  for (const { label, model, result } of [
-    { label: "adapter", model: modelForParams, result: modelParamsResult },
-    {
-      label: "user-simulator",
-      model: simulatorModel,
-      result: simulatorParamsResult,
-    },
-    { label: "judge", model: judgeModel, result: judgeParamsResult },
-  ]) {
-    if (!result.success) {
-      logger.warn(
-        {
-          projectId: context.projectId,
-          role: label,
-          model,
-          reason: result.reason,
-        },
-        `Failed to prepare model params: ${result.message}`,
-      );
-      return { success: false, error: result.message, reason: result.reason };
-    }
-  }
-  // Narrowing: the loop above returns on any failure, so all three succeeded.
-  if (
-    !modelParamsResult.success ||
-    !simulatorParamsResult.success ||
-    !judgeParamsResult.success
-  ) {
-    return { success: false, error: "Failed to prepare model params" };
-  }
+  const modelParamsStep = await prepareAllModelParamsOrFail({
+    context,
+    modelForParams,
+    simulatorModel,
+    judgeModel,
+    modelParamsProvider: deps.modelParamsProvider,
+  });
+  if (!modelParamsStep.ok) return modelParamsStep.result;
+  const { modelParams, simulatorModelParams, judgeModelParams } =
+    modelParamsStep;
 
   logger.debug(
     {
@@ -384,9 +522,9 @@ export async function prefetchScenarioData(
       context,
       scenario,
       adapterData,
-      modelParams: modelParamsResult.params,
-      simulatorModelParams: simulatorParamsResult.params,
-      judgeModelParams: judgeParamsResult.params,
+      modelParams,
+      simulatorModelParams,
+      judgeModelParams,
       nlpServiceUrl: env.LANGWATCH_NLP_SERVICE,
       target,
     },
@@ -715,6 +853,197 @@ type HydrateLlmResult =
   | { success: true; dsl: Record<string, unknown> }
   | { success: false; reason: ModelParamsFailureReason; message: string };
 
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return typeof value === "object" && value !== null
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function asArray(value: unknown): unknown[] {
+  return Array.isArray(value) ? value : [];
+}
+
+/** Legacy `default_llm` fallback resolved once per DSL hydration pass. */
+interface LlmHydrationDefaults {
+  defaultModel: string | undefined;
+  defaultLlm: Record<string, unknown> | null;
+}
+
+// Legacy fallback. `default_llm` only exists on raw persisted DSLs from
+// spec_version <= 1.4 (nodes own their config since 1.5); this reader
+// keeps tolerating it because scenario agents can reference old workflow
+// versions that were never re-saved. On 1.5+ DSLs a modelless llm
+// parameter is stale state and must NOT be silently substituted — leave
+// it unhydrated so the engine raises its typed llm_model_not_set error.
+function resolveLlmHydrationDefaults(
+  dsl: Record<string, unknown>,
+): LlmHydrationDefaults {
+  const specParts =
+    typeof dsl.spec_version === "string"
+      ? dsl.spec_version.split(".").map(Number)
+      : [];
+  const specMajor = specParts[0] ?? NaN;
+  const specMinor = specParts[1] ?? 0;
+  const legacyDsl =
+    !Number.isFinite(specMajor) ||
+    !Number.isFinite(specMinor) ||
+    specMajor < 1 ||
+    (specMajor === 1 && specMinor < 5);
+  const defaultLlm = legacyDsl ? asRecord(dsl.default_llm) : null;
+  const defaultModel = legacyDsl
+    ? typeof defaultLlm?.model === "string" && defaultLlm.model.length > 0
+      ? defaultLlm.model
+      : DEFAULT_MODEL
+    : undefined;
+  return { defaultModel, defaultLlm };
+}
+
+function extractLlmParamModel({
+  param,
+  defaultModel,
+}: {
+  param: unknown;
+  defaultModel: string | undefined;
+}): string | undefined {
+  const p = asRecord(param);
+  if (p?.type !== "llm") return undefined;
+  const value = asRecord(p.value);
+  return typeof value?.model === "string" && value.model.length > 0
+    ? value.model
+    : defaultModel;
+}
+
+// Collect unique models needed before hitting the provider
+function collectModelsNeeded({
+  nodes,
+  defaultModel,
+}: {
+  nodes: unknown[];
+  defaultModel: string | undefined;
+}): Set<string> {
+  const modelsNeeded = new Set<string>();
+  for (const node of nodes) {
+    const n = asRecord(node);
+    if (!n) continue;
+    const nodeData = asRecord(n.data);
+    const parameters = asArray(nodeData?.parameters);
+    for (const param of parameters) {
+      const model = extractLlmParamModel({ param, defaultModel });
+      if (model) modelsNeeded.add(model);
+    }
+  }
+  return modelsNeeded;
+}
+
+type LitellmParamsLookup = Map<string, Record<string, unknown>>;
+
+type PrepareLitellmParamsResult =
+  | { success: true; litellmParamsByModel: LitellmParamsLookup }
+  | { success: false; reason: ModelParamsFailureReason; message: string };
+
+// Fetch litellm_params for each unique model — fail fast on first failure.
+// Partial hydration is not safe: a partially-hydrated DSL still reaches the
+// NLP service with "dummy" api_key for the un-hydrated nodes.
+async function prepareLitellmParamsByModel({
+  modelsNeeded,
+  projectId,
+  modelParamsProvider,
+}: {
+  modelsNeeded: Set<string>;
+  projectId: string;
+  modelParamsProvider: ModelParamsProvider;
+}): Promise<PrepareLitellmParamsResult> {
+  const litellmParamsByModel: LitellmParamsLookup = new Map();
+  const prepareResults = await Promise.all(
+    Array.from(modelsNeeded).map(async (model) => {
+      const result = await modelParamsProvider.prepare(projectId, model);
+      return { model, result };
+    }),
+  );
+
+  for (const { model, result } of prepareResults) {
+    if (!result.success) {
+      logger.warn(
+        { projectId, model, reason: result.reason },
+        `Failed to hydrate llm parameter: ${result.message}`,
+      );
+      return { success: false, reason: result.reason, message: result.message };
+    }
+    litellmParamsByModel.set(model, result.params as Record<string, unknown>);
+  }
+
+  return { success: true, litellmParamsByModel };
+}
+
+function hydrateLlmParam({
+  param,
+  defaultModel,
+  defaultLlm,
+  litellmParamsByModel,
+}: {
+  param: unknown;
+  defaultModel: string | undefined;
+  defaultLlm: Record<string, unknown> | null;
+  litellmParamsByModel: LitellmParamsLookup;
+}): unknown {
+  const p = asRecord(param);
+  if (p?.type !== "llm") return param;
+
+  const existingValue = asRecord(p.value);
+  const model =
+    typeof existingValue?.model === "string" && existingValue.model.length > 0
+      ? existingValue.model
+      : defaultModel;
+  if (!model) return param;
+
+  const litellmParams = litellmParamsByModel.get(model);
+  if (!litellmParams) return param;
+
+  // Use existing value if present, otherwise fall back to default_llm or { model }.
+  // Normalize to snake_case to match addEnvs.ts behaviour (e.g. maxTokens → max_tokens).
+  const rawBaseValue = existingValue ?? defaultLlm ?? { model };
+  // Cast through unknown then to the expected intersection type — rawBaseValue is opaque
+  // Record<string, unknown> from the DSL and normalizeToSnakeCase is safe on any object.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const normalizedBase = normalizeToSnakeCase(rawBaseValue as any);
+
+  // Guarantee top-level `model` — partial existingValue (e.g. only `temperature`) would
+  // otherwise pass through without one, diverging from addEnvs.ts which derives model via
+  // LLMConfig contract. Downstream NLP reads value.model directly.
+  return {
+    ...p,
+    value: { ...normalizedBase, model, litellm_params: litellmParams },
+  };
+}
+
+function hydrateLlmNode({
+  node,
+  defaultModel,
+  defaultLlm,
+  litellmParamsByModel,
+}: {
+  node: unknown;
+  defaultModel: string | undefined;
+  defaultLlm: Record<string, unknown> | null;
+  litellmParamsByModel: LitellmParamsLookup;
+}): unknown {
+  const n = asRecord(node);
+  if (!n) return node;
+  const data = asRecord(n.data);
+  if (!data) return node;
+
+  const parameters = Array.isArray(data.parameters)
+    ? (data.parameters as unknown[])
+    : null;
+  if (!parameters) return node;
+
+  const hydratedParams = parameters.map((param) =>
+    hydrateLlmParam({ param, defaultModel, defaultLlm, litellmParamsByModel }),
+  );
+
+  return { ...n, data: { ...data, parameters: hydratedParams } };
+}
+
 /**
  * Injects litellm_params into every llm-type parameter across all DSL nodes.
  *
@@ -735,141 +1064,35 @@ async function hydrateLlmParameters({
   projectId: string;
   modelParamsProvider: ModelParamsProvider;
 }): Promise<HydrateLlmResult> {
-  const nodes = Array.isArray(dsl.nodes) ? (dsl.nodes as unknown[]) : [];
+  const nodes = asArray(dsl.nodes);
   if (nodes.length === 0) return { success: true, dsl };
 
-  // Legacy fallback. `default_llm` only exists on raw persisted DSLs from
-  // spec_version <= 1.4 (nodes own their config since 1.5); this reader
-  // keeps tolerating it because scenario agents can reference old workflow
-  // versions that were never re-saved. On 1.5+ DSLs a modelless llm
-  // parameter is stale state and must NOT be silently substituted — leave
-  // it unhydrated so the engine raises its typed llm_model_not_set error.
-  const specParts =
-    typeof dsl.spec_version === "string"
-      ? dsl.spec_version.split(".").map(Number)
-      : [];
-  const specMajor = specParts[0] ?? NaN;
-  const specMinor = specParts[1] ?? 0;
-  const legacyDsl =
-    !Number.isFinite(specMajor) ||
-    !Number.isFinite(specMinor) ||
-    specMajor < 1 ||
-    (specMajor === 1 && specMinor < 5);
-  const defaultLlm =
-    legacyDsl && typeof dsl.default_llm === "object" && dsl.default_llm !== null
-      ? (dsl.default_llm as Record<string, unknown>)
-      : null;
-  const defaultModel = legacyDsl
-    ? typeof defaultLlm?.model === "string" && defaultLlm.model.length > 0
-      ? defaultLlm.model
-      : DEFAULT_MODEL
-    : undefined;
+  const { defaultModel, defaultLlm } = resolveLlmHydrationDefaults(dsl);
 
-  // Collect unique models needed before hitting the provider
-  const modelsNeeded = new Set<string>();
-  for (const node of nodes) {
-    if (typeof node !== "object" || node === null) continue;
-    const n = node as Record<string, unknown>;
-    const nodeData =
-      typeof n.data === "object" && n.data !== null
-        ? (n.data as Record<string, unknown>)
-        : null;
-    const rawParameters = nodeData?.parameters;
-    const parameters = Array.isArray(rawParameters)
-      ? (rawParameters as unknown[])
-      : [];
-    for (const param of parameters) {
-      if (typeof param !== "object" || param === null) continue;
-      const p = param as Record<string, unknown>;
-      if (p.type !== "llm") continue;
-      const value =
-        typeof p.value === "object" && p.value !== null
-          ? (p.value as Record<string, unknown>)
-          : null;
-      const model =
-        typeof value?.model === "string" && value.model.length > 0
-          ? value.model
-          : defaultModel;
-      if (model) modelsNeeded.add(model);
-    }
-  }
-
+  const modelsNeeded = collectModelsNeeded({ nodes, defaultModel });
   if (modelsNeeded.size === 0) return { success: true, dsl };
 
-  // Fetch litellm_params for each unique model — fail fast on first failure.
-  // Partial hydration is not safe: a partially-hydrated DSL still reaches the
-  // NLP service with "dummy" api_key for the un-hydrated nodes.
-  const litellmParamsByModel = new Map<string, Record<string, unknown>>();
-  const prepareResults = await Promise.all(
-    Array.from(modelsNeeded).map(async (model) => {
-      const result = await modelParamsProvider.prepare(projectId, model);
-      return { model, result };
-    }),
-  );
-
-  for (const { model, result } of prepareResults) {
-    if (!result.success) {
-      logger.warn(
-        { projectId, model, reason: result.reason },
-        `Failed to hydrate llm parameter: ${result.message}`,
-      );
-      return { success: false, reason: result.reason, message: result.message };
-    }
-    litellmParamsByModel.set(model, result.params as Record<string, unknown>);
+  const litellmResult = await prepareLitellmParamsByModel({
+    modelsNeeded,
+    projectId,
+    modelParamsProvider,
+  });
+  if (!litellmResult.success) {
+    return {
+      success: false,
+      reason: litellmResult.reason,
+      message: litellmResult.message,
+    };
   }
 
-  const hydratedNodes = nodes.map((node) => {
-    if (typeof node !== "object" || node === null) return node;
-    const n = node as Record<string, unknown>;
-    const data =
-      typeof n.data === "object" && n.data !== null
-        ? (n.data as Record<string, unknown>)
-        : null;
-    if (!data) return node;
-
-    const parameters = Array.isArray(data.parameters)
-      ? (data.parameters as unknown[])
-      : null;
-    if (!parameters) return node;
-
-    const hydratedParams = parameters.map((param) => {
-      if (typeof param !== "object" || param === null) return param;
-      const p = param as Record<string, unknown>;
-      if (p.type !== "llm") return param;
-
-      const existingValue =
-        typeof p.value === "object" && p.value !== null
-          ? (p.value as Record<string, unknown>)
-          : null;
-      const model =
-        typeof existingValue?.model === "string" &&
-        existingValue.model.length > 0
-          ? existingValue.model
-          : defaultModel;
-      if (!model) return param;
-
-      const litellmParams = litellmParamsByModel.get(model);
-      if (!litellmParams) return param;
-
-      // Use existing value if present, otherwise fall back to default_llm or { model }.
-      // Normalize to snake_case to match addEnvs.ts behaviour (e.g. maxTokens → max_tokens).
-      const rawBaseValue = existingValue ?? defaultLlm ?? { model };
-      // Cast through unknown then to the expected intersection type — rawBaseValue is opaque
-      // Record<string, unknown> from the DSL and normalizeToSnakeCase is safe on any object.
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const normalizedBase = normalizeToSnakeCase(rawBaseValue as any);
-
-      // Guarantee top-level `model` — partial existingValue (e.g. only `temperature`) would
-      // otherwise pass through without one, diverging from addEnvs.ts which derives model via
-      // LLMConfig contract. Downstream NLP reads value.model directly.
-      return {
-        ...p,
-        value: { ...normalizedBase, model, litellm_params: litellmParams },
-      };
-    });
-
-    return { ...n, data: { ...data, parameters: hydratedParams } };
-  });
+  const hydratedNodes = nodes.map((node) =>
+    hydrateLlmNode({
+      node,
+      defaultModel,
+      defaultLlm,
+      litellmParamsByModel: litellmResult.litellmParamsByModel,
+    }),
+  );
 
   return { success: true, dsl: { ...dsl, nodes: hydratedNodes } };
 }
@@ -922,6 +1145,199 @@ function extractWorkflowIO(dsl: Record<string, unknown>): {
 // Factory Function (wires up production dependencies)
 // ============================================================================
 
+async function getSuiteModelOverrides(
+  setId: string,
+  projectId: string,
+): Promise<{
+  simulatorModel: string | null;
+  judgeModel: string | null;
+} | null> {
+  const suiteId = extractSuiteId(setId);
+  if (!suiteId) return null;
+  const suite = await prisma.simulationSuite.findFirst({
+    where: { id: suiteId, projectId },
+    select: { simulatorModel: true, judgeModel: true },
+  });
+  if (!suite) return null;
+  return {
+    simulatorModel: suite.simulatorModel,
+    judgeModel: suite.judgeModel,
+  };
+}
+
+async function getLatestWorkflowDsl({
+  projectId,
+  workflowId,
+}: {
+  projectId: string;
+  workflowId: string;
+}): Promise<{ workflowId: string; dsl: Record<string, unknown> } | null> {
+  const workflow = await prisma.workflow.findFirst({
+    where: { id: workflowId, projectId, archivedAt: null },
+    select: { id: true, latestVersionId: true },
+  });
+  if (!workflow?.latestVersionId) return null;
+  const version = await prisma.workflowVersion.findFirst({
+    where: { id: workflow.latestVersionId, projectId },
+    select: { dsl: true },
+  });
+  if (!version) return null;
+  return {
+    workflowId: workflow.id,
+    dsl: version.dsl as unknown as Record<string, unknown>,
+  };
+}
+
+async function findProjectApiKey(
+  projectId: string,
+): Promise<{ apiKey: string | null } | null> {
+  return prisma.project.findUnique({
+    where: { id: projectId },
+    select: { apiKey: true },
+  });
+}
+
+async function resolveModelViaFeature(
+  featureKey: string,
+  projectId: string,
+): Promise<string> {
+  const resolved = await resolveModelForFeature(featureKey, {
+    prisma,
+    projectId,
+  });
+  return resolved.model;
+}
+
+async function getDecryptedProjectSecrets(
+  projectId: string,
+): Promise<Record<string, string>> {
+  const rows = await prisma.projectSecret.findMany({
+    where: { projectId },
+    select: { name: true, encryptedValue: true },
+  });
+  const secrets: Record<string, string> = {};
+  for (const row of rows) {
+    try {
+      secrets[row.name] = decrypt(row.encryptedValue);
+    } catch (err) {
+      // Wrap per-secret so a single corrupt row yields a readable error
+      // instead of a raw crypto stack trace surfacing at the caller.
+      throw new Error(
+        `Failed to decrypt project secret "${row.name}": ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
+    }
+  }
+  return secrets;
+}
+
+function invalidModelFormatResult(model: string): ModelParamsResult {
+  return {
+    success: false,
+    reason: "invalid_model_format",
+    message: `Invalid model format '${model}' - expected 'provider/model' format (e.g., 'openai/gpt-4')`,
+  };
+}
+
+type ProjectModelProviders = Awaited<
+  ReturnType<typeof getProjectModelProviders>
+>;
+
+async function resolveModelProviderOrFail(
+  providerKey: string,
+  projectId: string,
+): Promise<
+  | { ok: true; provider: ProjectModelProviders[string] }
+  | { ok: false; result: ModelParamsResult }
+> {
+  const providers = await getProjectModelProviders(projectId);
+  const provider = providers[providerKey];
+
+  if (!provider) {
+    return {
+      ok: false,
+      result: {
+        success: false,
+        reason: "provider_not_found",
+        message: `Provider '${providerKey}' not found for this project. Available providers: ${Object.keys(providers).join(", ") || "none"}`,
+      },
+    };
+  }
+
+  if (!provider.enabled) {
+    return {
+      ok: false,
+      result: {
+        success: false,
+        reason: "provider_not_enabled",
+        message: `Provider '${providerKey}' is not enabled for this project. Enable it in Settings > Model Providers.`,
+      },
+    };
+  }
+
+  return { ok: true, provider };
+}
+
+function validateLitellmParams(
+  params: Awaited<ReturnType<typeof prepareLitellmParams>>,
+  providerKey: string,
+): ModelParamsResult | null {
+  const hasCredentials = !!(
+    params.api_key ||
+    params.vertex_credentials ||
+    params.aws_access_key_id
+  );
+  if (!hasCredentials || !params.model) {
+    const missing = [];
+    if (!hasCredentials) missing.push("API key");
+    if (!params.model) missing.push("model");
+    return {
+      success: false,
+      reason: "missing_params",
+      message: `Provider '${providerKey}' is missing required configuration: ${missing.join(" and ")}. Check Settings > Model Providers.`,
+    };
+  }
+  return null;
+}
+
+async function prepareModelParams(
+  projectId: string,
+  model: string,
+): Promise<ModelParamsResult> {
+  try {
+    if (!model.includes("/")) return invalidModelFormatResult(model);
+
+    const providerKey = model.split("/")[0];
+    if (!providerKey) return invalidModelFormatResult(model);
+
+    const providerResolution = await resolveModelProviderOrFail(
+      providerKey,
+      projectId,
+    );
+    if (!providerResolution.ok) return providerResolution.result;
+
+    const params = await prepareLitellmParams({
+      model,
+      modelProvider: providerResolution.provider,
+      projectId,
+    });
+
+    const validationError = validateLitellmParams(params, providerKey);
+    if (validationError) return validationError;
+
+    return { success: true, params: params as LiteLLMParams };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logger.error({ error }, "failed to prepare LiteLLM params");
+    return {
+      success: false,
+      reason: "preparation_error",
+      message: `Unexpected error preparing model params: ${errorMessage}`,
+    };
+  }
+}
+
 /**
  * Creates production dependencies for the data prefetcher.
  *
@@ -942,19 +1358,7 @@ export function createDataPrefetcherDependencies(): DataPrefetcherDependencies {
       getById: (params) => scenarioService.getById(params),
     },
     suiteModelFetcher: {
-      getBySetId: async (setId, projectId) => {
-        const suiteId = extractSuiteId(setId);
-        if (!suiteId) return null;
-        const suite = await prisma.simulationSuite.findFirst({
-          where: { id: suiteId, projectId },
-          select: { simulatorModel: true, judgeModel: true },
-        });
-        if (!suite) return null;
-        return {
-          simulatorModel: suite.simulatorModel,
-          judgeModel: suite.judgeModel,
-        };
-      },
+      getBySetId: getSuiteModelOverrides,
     },
     promptFetcher: {
       getPromptByIdOrHandle: (params) =>
@@ -964,135 +1368,19 @@ export function createDataPrefetcherDependencies(): DataPrefetcherDependencies {
       findById: (params) => agentRepository.findById(params),
     },
     workflowVersionFetcher: {
-      getLatestDsl: async ({ projectId, workflowId }) => {
-        const workflow = await prisma.workflow.findFirst({
-          where: { id: workflowId, projectId, archivedAt: null },
-          select: { id: true, latestVersionId: true },
-        });
-        if (!workflow?.latestVersionId) return null;
-        const version = await prisma.workflowVersion.findFirst({
-          where: { id: workflow.latestVersionId, projectId },
-          select: { dsl: true },
-        });
-        if (!version) return null;
-        return {
-          workflowId: workflow.id,
-          dsl: version.dsl as unknown as Record<string, unknown>,
-        };
-      },
+      getLatestDsl: getLatestWorkflowDsl,
     },
     projectFetcher: {
-      findUnique: async (projectId) =>
-        prisma.project.findUnique({
-          where: { id: projectId },
-          select: { apiKey: true },
-        }),
+      findUnique: findProjectApiKey,
     },
     modelResolver: {
-      resolve: async (featureKey, projectId) => {
-        const resolved = await resolveModelForFeature(featureKey, {
-          prisma,
-          projectId,
-        });
-        return resolved.model;
-      },
+      resolve: resolveModelViaFeature,
     },
     projectSecretsFetcher: {
-      getSecrets: async (projectId) => {
-        const rows = await prisma.projectSecret.findMany({
-          where: { projectId },
-          select: { name: true, encryptedValue: true },
-        });
-        const secrets: Record<string, string> = {};
-        for (const row of rows) {
-          try {
-            secrets[row.name] = decrypt(row.encryptedValue);
-          } catch (err) {
-            // Wrap per-secret so a single corrupt row yields a readable error
-            // instead of a raw crypto stack trace surfacing at the caller.
-            throw new Error(
-              `Failed to decrypt project secret "${row.name}": ${
-                err instanceof Error ? err.message : String(err)
-              }`,
-            );
-          }
-        }
-        return secrets;
-      },
+      getSecrets: getDecryptedProjectSecrets,
     },
     modelParamsProvider: {
-      prepare: async (projectId, model): Promise<ModelParamsResult> => {
-        try {
-          if (!model.includes("/")) {
-            return {
-              success: false,
-              reason: "invalid_model_format",
-              message: `Invalid model format '${model}' - expected 'provider/model' format (e.g., 'openai/gpt-4')`,
-            };
-          }
-
-          const providerKey = model.split("/")[0];
-          if (!providerKey) {
-            return {
-              success: false,
-              reason: "invalid_model_format",
-              message: `Invalid model format '${model}' - expected 'provider/model' format (e.g., 'openai/gpt-4')`,
-            };
-          }
-
-          const providers = await getProjectModelProviders(projectId);
-          const provider = providers[providerKey];
-
-          if (!provider) {
-            return {
-              success: false,
-              reason: "provider_not_found",
-              message: `Provider '${providerKey}' not found for this project. Available providers: ${Object.keys(providers).join(", ") || "none"}`,
-            };
-          }
-
-          if (!provider.enabled) {
-            return {
-              success: false,
-              reason: "provider_not_enabled",
-              message: `Provider '${providerKey}' is not enabled for this project. Enable it in Settings > Model Providers.`,
-            };
-          }
-
-          const params = await prepareLitellmParams({
-            model,
-            modelProvider: provider,
-            projectId,
-          });
-
-          const hasCredentials = !!(
-            params.api_key ||
-            params.vertex_credentials ||
-            params.aws_access_key_id
-          );
-          if (!hasCredentials || !params.model) {
-            const missing = [];
-            if (!hasCredentials) missing.push("API key");
-            if (!params.model) missing.push("model");
-            return {
-              success: false,
-              reason: "missing_params",
-              message: `Provider '${providerKey}' is missing required configuration: ${missing.join(" and ")}. Check Settings > Model Providers.`,
-            };
-          }
-
-          return { success: true, params: params as LiteLLMParams };
-        } catch (error) {
-          const errorMessage =
-            error instanceof Error ? error.message : String(error);
-          logger.error({ error }, "failed to prepare LiteLLM params");
-          return {
-            success: false,
-            reason: "preparation_error",
-            message: `Unexpected error preparing model params: ${errorMessage}`,
-          };
-        }
-      },
+      prepare: prepareModelParams,
     },
   };
 }

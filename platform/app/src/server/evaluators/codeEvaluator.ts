@@ -90,6 +90,96 @@ const stripValues = (fields: CodeEvaluatorConfig["inputs"]): Field[] =>
     type: type as Field["type"],
   }));
 
+const buildCodeEvaluatorEntryNode = (
+  config: CodeEvaluatorConfig,
+): {
+  id: string;
+  type: string;
+  position: { x: number; y: number };
+  data: Entry;
+} => ({
+  id: "entry",
+  type: "entry",
+  position: { x: 0, y: 0 },
+  data: {
+    name: "Entry",
+    outputs: stripValues(config.inputs),
+    entry_selection: "first",
+    train_size: 1,
+    test_size: 0,
+    seed: 42,
+  } as Entry,
+});
+
+const buildCodeEvaluatorCodeNode = ({
+  name,
+  config,
+}: {
+  name: string;
+  config: CodeEvaluatorConfig;
+}): {
+  id: string;
+  type: string;
+  position: { x: number; y: number };
+  data: Code;
+} => ({
+  id: "code_evaluator",
+  type: "code",
+  position: { x: 300, y: 0 },
+  data: {
+    name,
+    cls: "Code",
+    inputs: stripValues(config.inputs),
+    // No declared outputs: the engine only enforces that *declared* code
+    // outputs are present in the returned dict (a "missing_output" error).
+    // An evaluator returns any subset of the contract, so declaring them
+    // would break a function that returns only `passed`. The end node below
+    // carries the contract and surfaces whichever keys the code returns.
+    outputs: [],
+    parameters: [{ identifier: "code", type: "code", value: config.code }],
+  } as Code,
+});
+
+const buildCodeEvaluatorEndNode = (): {
+  id: string;
+  type: string;
+  position: { x: number; y: number };
+  data: End;
+} => ({
+  id: "end",
+  type: "end",
+  position: { x: 600, y: 0 },
+  data: {
+    name: "End",
+    behave_as: "evaluator",
+    // Always the fixed evaluator contract, independent of what the code
+    // returns. resolveInputs only binds an input when the upstream key
+    // exists, so a partial return surfaces just the keys it produced.
+    inputs: stripValues(CODE_EVALUATOR_OUTPUT_FIELDS),
+  } as End,
+});
+
+const buildCodeEvaluatorEdges = (
+  config: CodeEvaluatorConfig,
+): Workflow["edges"] => [
+  ...config.inputs.map(({ identifier }) => ({
+    id: `entry_to_code_${identifier}`,
+    source: "entry",
+    sourceHandle: `outputs.${identifier}`,
+    target: "code_evaluator",
+    targetHandle: `inputs.${identifier}`,
+    type: "default",
+  })),
+  ...CODE_EVALUATOR_OUTPUT_FIELDS.map(({ identifier }) => ({
+    id: `code_to_end_${identifier}`,
+    source: "code_evaluator",
+    sourceHandle: `outputs.${identifier}`,
+    target: "end",
+    targetHandle: `inputs.${identifier}`,
+    type: "default",
+  })),
+];
+
 /**
  * Builds the ephemeral entry -> code -> end workflow the engine executes for
  * a code evaluator. The end node carries the evaluator contract fields the
@@ -102,66 +192,9 @@ export const buildCodeEvaluatorDsl = ({
   name: string;
   config: CodeEvaluatorConfig;
 }): Workflow => {
-  const entryNode: {
-    id: string;
-    type: string;
-    position: { x: number; y: number };
-    data: Entry;
-  } = {
-    id: "entry",
-    type: "entry",
-    position: { x: 0, y: 0 },
-    data: {
-      name: "Entry",
-      outputs: stripValues(config.inputs),
-      entry_selection: "first",
-      train_size: 1,
-      test_size: 0,
-      seed: 42,
-    } as Entry,
-  };
-
-  const codeNode: {
-    id: string;
-    type: string;
-    position: { x: number; y: number };
-    data: Code;
-  } = {
-    id: "code_evaluator",
-    type: "code",
-    position: { x: 300, y: 0 },
-    data: {
-      name,
-      cls: "Code",
-      inputs: stripValues(config.inputs),
-      // No declared outputs: the engine only enforces that *declared* code
-      // outputs are present in the returned dict (a "missing_output" error).
-      // An evaluator returns any subset of the contract, so declaring them
-      // would break a function that returns only `passed`. The end node below
-      // carries the contract and surfaces whichever keys the code returns.
-      outputs: [],
-      parameters: [{ identifier: "code", type: "code", value: config.code }],
-    } as Code,
-  };
-
-  const endNode: {
-    id: string;
-    type: string;
-    position: { x: number; y: number };
-    data: End;
-  } = {
-    id: "end",
-    type: "end",
-    position: { x: 600, y: 0 },
-    data: {
-      name: "End",
-      behave_as: "evaluator",
-      // Always the fixed evaluator contract, independent of what the code
-      // returns. resolveInputs only binds an input when the upstream key
-      // exists, so a partial return surfaces just the keys it produced.
-      inputs: stripValues(CODE_EVALUATOR_OUTPUT_FIELDS),
-    } as End,
-  };
+  const entryNode = buildCodeEvaluatorEntryNode(config);
+  const codeNode = buildCodeEvaluatorCodeNode({ name, config });
+  const endNode = buildCodeEvaluatorEndNode();
 
   return {
     spec_version: LATEST_SPEC_VERSION,
@@ -173,24 +206,7 @@ export const buildCodeEvaluatorDsl = ({
     template_adapter: "default",
     enable_tracing: true,
     nodes: [entryNode, codeNode, endNode] as Workflow["nodes"],
-    edges: [
-      ...config.inputs.map(({ identifier }) => ({
-        id: `entry_to_code_${identifier}`,
-        source: "entry",
-        sourceHandle: `outputs.${identifier}`,
-        target: "code_evaluator",
-        targetHandle: `inputs.${identifier}`,
-        type: "default",
-      })),
-      ...CODE_EVALUATOR_OUTPUT_FIELDS.map(({ identifier }) => ({
-        id: `code_to_end_${identifier}`,
-        source: "code_evaluator",
-        sourceHandle: `outputs.${identifier}`,
-        target: "end",
-        targetHandle: `inputs.${identifier}`,
-        type: "default",
-      })),
-    ],
+    edges: buildCodeEvaluatorEdges(config),
     state: {},
   };
 };

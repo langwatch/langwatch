@@ -317,6 +317,61 @@ async function collectCandidatesForProject({
   return surviving;
 }
 
+/**
+ * Builds one sweep candidate from an active graph trigger, or `null` when the
+ * trigger doesn't currently qualify (missing threshold config, neither
+ * no-data-shaped nor firing, or no graph attached). Split out of
+ * {@link loadCandidatesForProject} so the per-trigger guard chain isn't
+ * nested inside the `for` loop.
+ */
+async function buildCandidateForTrigger({
+  deps,
+  projectId,
+  trigger,
+  openIds,
+}: {
+  deps: GraphTriggerHeartbeatDeps;
+  projectId: string;
+  trigger: Awaited<
+    ReturnType<TriggerService["getActiveGraphTriggersForProject"]>
+  >[number];
+  openIds: Set<string>;
+}): Promise<CandidateTrigger | null> {
+  const params = (trigger.actionParams ?? {}) as ActionParams;
+  const { operator, threshold, timePeriod } = params;
+  if (
+    operator === undefined ||
+    threshold === undefined ||
+    timePeriod === undefined
+  ) {
+    return null;
+  }
+  const windowMs = Math.max(MIN_BOUND_WINDOW_MS, timePeriod * 60 * 1000);
+  const isNoData = isNoDataPredicate({ operator, threshold });
+  const isOpen = openIds.has(trigger.id);
+  if (!isNoData && !isOpen) return null;
+  if (!trigger.customGraphId) return null;
+
+  // ADR-034 Phase 6 source classification. Unknown-source defaults to
+  // "trace" so we preserve the pre-Phase-6 behaviour for graphs whose
+  // metrics aren't in `field-availability`.
+  const lookedUp = await deps.lookupTriggerSource({
+    triggerId: trigger.id,
+    customGraphId: trigger.customGraphId,
+    projectId,
+    seriesName: params.seriesName,
+  });
+  const source: AnalyticsMetricSource = lookedUp ?? "trace";
+
+  return {
+    triggerId: trigger.id,
+    projectId,
+    windowMs,
+    reasonKind: isOpen ? "resolve" : "absence",
+    source,
+  };
+}
+
 async function loadCandidatesForProject({
   deps,
   projectId,
@@ -336,41 +391,13 @@ async function loadCandidatesForProject({
 
   const candidates: CandidateTrigger[] = [];
   for (const trigger of triggers) {
-    const params = (trigger.actionParams ?? {}) as ActionParams;
-    const operator = params.operator;
-    const threshold = params.threshold;
-    const timePeriod = params.timePeriod;
-    if (
-      operator === undefined ||
-      threshold === undefined ||
-      timePeriod === undefined
-    ) {
-      continue;
-    }
-    const windowMs = Math.max(MIN_BOUND_WINDOW_MS, timePeriod * 60 * 1000);
-    const isNoData = isNoDataPredicate({ operator, threshold });
-    const isOpen = openIds.has(trigger.id);
-    if (!isNoData && !isOpen) continue;
-    if (!trigger.customGraphId) continue;
-
-    // ADR-034 Phase 6 source classification. Unknown-source defaults to
-    // "trace" so we preserve the pre-Phase-6 behaviour for graphs whose
-    // metrics aren't in `field-availability`.
-    const lookedUp = await deps.lookupTriggerSource({
-      triggerId: trigger.id,
-      customGraphId: trigger.customGraphId,
+    const candidate = await buildCandidateForTrigger({
+      deps,
       projectId,
-      seriesName: params.seriesName,
+      trigger,
+      openIds,
     });
-    const source: AnalyticsMetricSource = lookedUp ?? "trace";
-
-    candidates.push({
-      triggerId: trigger.id,
-      projectId,
-      windowMs,
-      reasonKind: isOpen ? "resolve" : "absence",
-      source,
-    });
+    if (candidate) candidates.push(candidate);
   }
   return candidates;
 }
@@ -404,6 +431,27 @@ async function loadOpenTriggerIds(
     distinct: ["triggerId"],
   });
   return new Set(rows.map((r) => r.triggerId));
+}
+
+/** Extract the last-occurred timestamp from a recency query's result rows,
+ *  or `null` when there's no usable row — split out of
+ *  {@link loadProjectRecency} so its row/type-narrowing guards don't nest
+ *  inside the query's try block. */
+function parseRecencyRow(
+  rows: Array<{ lastMs: string | number | null }>,
+): number | null {
+  const row = rows[0];
+  if (!row || row.lastMs === null || row.lastMs === undefined) {
+    return null;
+  }
+  const ms =
+    typeof row.lastMs === "string"
+      ? Number.parseInt(row.lastMs, 10)
+      : row.lastMs;
+  if (!Number.isFinite(ms) || ms <= 0) {
+    return null;
+  }
+  return ms;
 }
 
 async function loadProjectRecency({
@@ -465,18 +513,7 @@ async function loadProjectRecency({
     const rows = (await result.json()) as Array<{
       lastMs: string | number | null;
     }>;
-    const row = rows[0];
-    if (!row || row.lastMs === null || row.lastMs === undefined) {
-      return { projectId, source, lastOccurredAtMs: null };
-    }
-    const ms =
-      typeof row.lastMs === "string"
-        ? Number.parseInt(row.lastMs, 10)
-        : row.lastMs;
-    if (!Number.isFinite(ms) || ms <= 0) {
-      return { projectId, source, lastOccurredAtMs: null };
-    }
-    return { projectId, source, lastOccurredAtMs: ms };
+    return { projectId, source, lastOccurredAtMs: parseRecencyRow(rows) };
   } catch (error) {
     logger.warn(
       {

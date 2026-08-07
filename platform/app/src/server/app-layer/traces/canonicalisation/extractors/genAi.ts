@@ -33,6 +33,7 @@
  * - gen_ai.usage.completion_tokens → gen_ai.usage.output_tokens
  */
 
+import type { AttributeBag } from "../attributeBag";
 import { ATTR_KEYS } from "./_constants";
 import {
   coerceStringNumberAttrs,
@@ -54,29 +55,78 @@ import type {
   LogExtractorContext,
 } from "./_types";
 
+const asNumberFromAttr = (attrs: AttributeBag, key: string): number | null => {
+  const raw = attrs.get(key);
+  if (raw === undefined || raw === null || raw === "") return null;
+  const n =
+    typeof raw === "number" ? raw : typeof raw === "string" ? Number(raw) : NaN;
+  return Number.isFinite(n) ? n : null;
+};
+
+const asStringFromAttr = (attrs: AttributeBag, key: string): string | null => {
+  const raw = attrs.get(key);
+  return typeof raw === "string" && raw.length > 0 ? raw : null;
+};
+
+const asJsonStringFromAttr = (
+  attrs: AttributeBag,
+  key: string,
+): string | null => {
+  const raw = attrs.get(key);
+  if (raw === undefined || raw === null) return null;
+  if (typeof raw === "string") {
+    return raw.length > 0 ? raw : null;
+  }
+  if (typeof raw === "object") {
+    try {
+      return JSON.stringify(raw);
+    } catch {
+      return null;
+    }
+  }
+  return null;
+};
+
+// Array of content blocks: [{ type: "text", content: "..." }]
+const textPartsFromSystemInstructionBlocks = (blocks: unknown[]): string[] => {
+  const textParts: string[] = [];
+  for (const block of blocks) {
+    if (typeof block === "string") {
+      textParts.push(block);
+    } else if (isRecord(block)) {
+      const obj = block as Record<string, unknown>;
+      const text = obj.content ?? obj.text;
+      if (typeof text === "string") {
+        textParts.push(text);
+      }
+    }
+  }
+  return textParts;
+};
+
 export class GenAIExtractor implements CanonicalAttributesExtractor {
   readonly id = "genai";
 
-  apply(ctx: ExtractorContext): void {
+  // ─────────────────────────────────────────────────────────────────────────
+  // Operation Name (derived from span type)
+  // ─────────────────────────────────────────────────────────────────────────
+  private setOperationName(ctx: ExtractorContext): void {
     const { attrs } = ctx.bag;
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // Operation Name (derived from span type)
-    // ─────────────────────────────────────────────────────────────────────────
-    if (!attrs.has(ATTR_KEYS.GEN_AI_OPERATION_NAME)) {
-      const spanType =
-        attrs.get(ATTR_KEYS.SPAN_TYPE) ?? attrs.get(ATTR_KEYS.TYPE);
-      const operationName = spanTypeToGenAiOperationName(spanType);
-      if (operationName) {
-        ctx.setAttr(ATTR_KEYS.GEN_AI_OPERATION_NAME, operationName);
-        ctx.recordRule(`${this.id}:operation.name`);
-      }
+    if (attrs.has(ATTR_KEYS.GEN_AI_OPERATION_NAME)) return;
+    const spanType =
+      attrs.get(ATTR_KEYS.SPAN_TYPE) ?? attrs.get(ATTR_KEYS.TYPE);
+    const operationName = spanTypeToGenAiOperationName(spanType);
+    if (operationName) {
+      ctx.setAttr(ATTR_KEYS.GEN_AI_OPERATION_NAME, operationName);
+      ctx.recordRule(`${this.id}:operation.name`);
     }
+  }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Provider Name (from legacy gen_ai.system)
-    // ─────────────────────────────────────────────────────────────────────────
-    const system = attrs.take(ATTR_KEYS.GEN_AI_SYSTEM);
+  // ─────────────────────────────────────────────────────────────────────────
+  // Provider Name (from legacy gen_ai.system)
+  // ─────────────────────────────────────────────────────────────────────────
+  private setProviderName(ctx: ExtractorContext): void {
+    const system = ctx.bag.attrs.take(ATTR_KEYS.GEN_AI_SYSTEM);
     if (
       system !== undefined &&
       typeof system === "string" &&
@@ -85,11 +135,14 @@ export class GenAIExtractor implements CanonicalAttributesExtractor {
       ctx.setAttr(ATTR_KEYS.GEN_AI_PROVIDER_NAME, system);
       ctx.recordRule(`${this.id}:provider.name`);
     }
+  }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Agent Name (consolidated from multiple legacy sources)
-    // Priority: gen_ai.agent.name > gen_ai.agent > agent.name
-    // ─────────────────────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────────────────
+  // Agent Name (consolidated from multiple legacy sources)
+  // Priority: gen_ai.agent.name > gen_ai.agent > agent.name
+  // ─────────────────────────────────────────────────────────────────────────
+  private setAgentName(ctx: ExtractorContext): void {
+    const { attrs } = ctx.bag;
     const agentName =
       attrs.take(ATTR_KEYS.GEN_AI_AGENT_NAME) ??
       attrs.take(ATTR_KEYS.GEN_AI_AGENT) ??
@@ -102,25 +155,17 @@ export class GenAIExtractor implements CanonicalAttributesExtractor {
       ctx.setAttr(ATTR_KEYS.GEN_AI_AGENT_NAME, agentName);
       ctx.recordRule(`${this.id}:agent.name`);
     }
+  }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Model (from legacy llm.model_name if gen_ai.*.model not present)
-    // ─────────────────────────────────────────────────────────────────────────
-    extractModelToBoth({
-      ctx,
-      sourceKey: ATTR_KEYS.LLM_MODEL_NAME,
-      transform: (raw) => (typeof raw === "string" ? raw : null),
-      ruleId: `${this.id}:model(llm.model_name)`,
-    });
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // Input Messages
-    // Sources (in priority order):
-    // - gen_ai.prompt (legacy)
-    // - llm.input_messages (legacy OTel)
-    // Note: langwatch.input is handled by the LangWatch extractor which
-    // directly produces gen_ai.input.messages when structured format is detected
-    // ─────────────────────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────────────────
+  // Input Messages
+  // Sources (in priority order):
+  // - gen_ai.prompt (legacy)
+  // - llm.input_messages (legacy OTel)
+  // Note: langwatch.input is handled by the LangWatch extractor which
+  // directly produces gen_ai.input.messages when structured format is detected
+  // ─────────────────────────────────────────────────────────────────────────
+  private extractInputMessagesStep(ctx: ExtractorContext): boolean {
     const inputExtracted = extractInputMessages(
       ctx,
       [
@@ -135,90 +180,85 @@ export class GenAIExtractor implements CanonicalAttributesExtractor {
     if (inputExtracted) {
       recordValueType(ctx, ATTR_KEYS.GEN_AI_INPUT_MESSAGES, "chat_messages");
     }
+    return inputExtracted;
+  }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // System Instructions (from explicit gen_ai.system_instructions attribute)
-    // OTel GenAI semconv v1.38.0: gen_ai.system_instructions
-    // Supports both string and array-of-content-blocks formats:
-    //   string: "You are a helpful assistant."
-    //   array:  [{ type: "text", content: "You are a helpful assistant." }]
-    // ─────────────────────────────────────────────────────────────────────────
-    const rawSystemInstructions = attrs.take(
+  // ─────────────────────────────────────────────────────────────────────────
+  // System Instructions (from explicit gen_ai.system_instructions attribute)
+  // OTel GenAI semconv v1.38.0: gen_ai.system_instructions
+  // Supports both string and array-of-content-blocks formats:
+  //   string: "You are a helpful assistant."
+  //   array:  [{ type: "text", content: "You are a helpful assistant." }]
+  // ─────────────────────────────────────────────────────────────────────────
+  private setSystemInstructions(ctx: ExtractorContext): void {
+    const rawSystemInstructions = ctx.bag.attrs.take(
       ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS,
     );
-    if (rawSystemInstructions !== undefined) {
-      if (typeof rawSystemInstructions === "string") {
-        ctx.setAttr(
-          ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS,
-          rawSystemInstructions,
-        );
-        ctx.recordRule(`${this.id}:system_instructions(string)`);
-      } else if (Array.isArray(rawSystemInstructions)) {
-        // Array of content blocks: [{ type: "text", content: "..." }]
-        const textParts: string[] = [];
-        for (const block of rawSystemInstructions) {
-          if (typeof block === "string") {
-            textParts.push(block);
-          } else if (isRecord(block)) {
-            const obj = block as Record<string, unknown>;
-            const text = obj.content ?? obj.text;
-            if (typeof text === "string") {
-              textParts.push(text);
-            }
-          }
-        }
-        if (textParts.length > 0) {
-          ctx.setAttr(
-            ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS,
-            textParts.join("\n"),
-          );
-          ctx.recordRule(`${this.id}:system_instructions(array)`);
-        }
-      }
+    if (rawSystemInstructions === undefined) return;
+
+    if (typeof rawSystemInstructions === "string") {
+      ctx.setAttr(ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS, rawSystemInstructions);
+      ctx.recordRule(`${this.id}:system_instructions(string)`);
+      return;
     }
 
-    // If gen_ai.input.messages was already present (e.g. from OpenClaw/OTEL
-    // GenAI spec), extractInputMessages skips it. Still extract system
-    // instruction from the existing messages if not already set.
+    if (Array.isArray(rawSystemInstructions)) {
+      const textParts = textPartsFromSystemInstructionBlocks(
+        rawSystemInstructions,
+      );
+      if (textParts.length > 0) {
+        ctx.setAttr(ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS, textParts.join("\n"));
+        ctx.recordRule(`${this.id}:system_instructions(array)`);
+      }
+    }
+  }
+
+  // If gen_ai.input.messages was already present (e.g. from OpenClaw/OTEL
+  // GenAI spec), extractInputMessages skips it. Still extract system
+  // instruction from the existing messages if not already set.
+  private deriveSystemInstructionFromExisting(
+    ctx: ExtractorContext,
+    inputExtracted: boolean,
+  ): void {
     if (
-      !inputExtracted &&
-      ctx.out[ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS] === undefined
+      inputExtracted ||
+      ctx.out[ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS] !== undefined
     ) {
-      const existing = attrs.get(ATTR_KEYS.GEN_AI_INPUT_MESSAGES);
-      if (Array.isArray(existing)) {
-        const sysInstruction = extractSystemInstructionFromMessages(existing);
-        if (sysInstruction !== null) {
-          ctx.setAttr(ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS, sysInstruction);
-          // Strip system messages and re-set
-          const stripped = stripSystemMessages(existing);
-          attrs.take(ATTR_KEYS.GEN_AI_INPUT_MESSAGES);
-          if (stripped.length > 0) {
-            ctx.setAttr(ATTR_KEYS.GEN_AI_INPUT_MESSAGES, stripped);
-          }
-          ctx.recordRule(`${this.id}:system_instruction(existing)`);
-        }
-        // Annotate existing messages as chat_messages type (only if messages remain)
-        if (
-          ctx.out[ATTR_KEYS.GEN_AI_INPUT_MESSAGES] !== undefined ||
-          attrs.has(ATTR_KEYS.GEN_AI_INPUT_MESSAGES)
-        ) {
-          recordValueType(
-            ctx,
-            ATTR_KEYS.GEN_AI_INPUT_MESSAGES,
-            "chat_messages",
-          );
-        }
-      }
+      return;
     }
+    const { attrs } = ctx.bag;
+    const existing = attrs.get(ATTR_KEYS.GEN_AI_INPUT_MESSAGES);
+    if (!Array.isArray(existing)) return;
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Output Messages
-    // Sources (in priority order):
-    // - gen_ai.completion (legacy)
-    // - llm.output_messages (legacy OTel)
-    // Note: langwatch.output is handled by the LangWatch extractor which
-    // directly produces gen_ai.output.messages when structured format is detected
-    // ─────────────────────────────────────────────────────────────────────────
+    const sysInstruction = extractSystemInstructionFromMessages(existing);
+    if (sysInstruction !== null) {
+      ctx.setAttr(ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS, sysInstruction);
+      // Strip system messages and re-set
+      const stripped = stripSystemMessages(existing);
+      attrs.take(ATTR_KEYS.GEN_AI_INPUT_MESSAGES);
+      if (stripped.length > 0) {
+        ctx.setAttr(ATTR_KEYS.GEN_AI_INPUT_MESSAGES, stripped);
+      }
+      ctx.recordRule(`${this.id}:system_instruction(existing)`);
+    }
+    // Annotate existing messages as chat_messages type (only if messages remain)
+    if (
+      ctx.out[ATTR_KEYS.GEN_AI_INPUT_MESSAGES] !== undefined ||
+      attrs.has(ATTR_KEYS.GEN_AI_INPUT_MESSAGES)
+    ) {
+      recordValueType(ctx, ATTR_KEYS.GEN_AI_INPUT_MESSAGES, "chat_messages");
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Output Messages
+  // Sources (in priority order):
+  // - gen_ai.completion (legacy)
+  // - llm.output_messages (legacy OTel)
+  // Note: langwatch.output is handled by the LangWatch extractor which
+  // directly produces gen_ai.output.messages when structured format is detected
+  // ─────────────────────────────────────────────────────────────────────────
+  private extractOutputMessagesStep(ctx: ExtractorContext): void {
     const outputExtracted = extractOutputMessages(
       ctx,
       [
@@ -233,6 +273,76 @@ export class GenAIExtractor implements CanonicalAttributesExtractor {
     if (outputExtracted) {
       recordValueType(ctx, ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES, "chat_messages");
     }
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Request Parameters (from legacy llm.invocation_parameters)
+  // Extracts model parameters like temperature, max_tokens, etc.
+  // ─────────────────────────────────────────────────────────────────────────
+  private applyInvocationParams(ctx: ExtractorContext): void {
+    const invocationParams = ctx.bag.attrs.get(
+      ATTR_KEYS.LLM_INVOCATION_PARAMETERS,
+    );
+    if (!isRecord(invocationParams)) return;
+    const params = invocationParams as Record<string, unknown>;
+
+    const temperature = asNumber(params.temperature);
+    const maxTokens = asNumber(params.max_tokens);
+    const topP = asNumber(params.top_p);
+    const frequencyPenalty = asNumber(params.frequency_penalty);
+    const presencePenalty = asNumber(params.presence_penalty);
+    const seed = asNumber(params.seed);
+    const choiceCount = asNumber(params.n);
+    const errorType = params.error_type;
+
+    const numericParams: Array<[number | null, string]> = [
+      [temperature, ATTR_KEYS.GEN_AI_REQUEST_TEMPERATURE],
+      [maxTokens, ATTR_KEYS.GEN_AI_REQUEST_MAX_TOKENS],
+      [topP, ATTR_KEYS.GEN_AI_REQUEST_TOP_P],
+      [frequencyPenalty, ATTR_KEYS.GEN_AI_REQUEST_FREQUENCY_PENALTY],
+      [presencePenalty, ATTR_KEYS.GEN_AI_REQUEST_PRESENCE_PENALTY],
+      [seed, ATTR_KEYS.GEN_AI_REQUEST_SEED],
+    ];
+    for (const [value, key] of numericParams) {
+      if (value !== null) ctx.setAttr(key, value);
+    }
+    if (typeof errorType === "string") {
+      ctx.setAttr(ATTR_KEYS.ERROR_TYPE, errorType);
+    }
+
+    const stopSequences = coerceToStringArray(params.stop);
+    if (stopSequences) {
+      ctx.setAttr(ATTR_KEYS.GEN_AI_REQUEST_STOP_SEQUENCES, stopSequences);
+    }
+
+    // Only set choice count if explicitly different from default (1)
+    if (choiceCount !== null && choiceCount !== 1) {
+      ctx.setAttr(ATTR_KEYS.GEN_AI_REQUEST_CHOICE_COUNT, choiceCount);
+    }
+
+    ctx.recordRule(`${this.id}:params`);
+    ctx.bag.attrs.delete(ATTR_KEYS.LLM_INVOCATION_PARAMETERS);
+  }
+
+  apply(ctx: ExtractorContext): void {
+    this.setOperationName(ctx);
+    this.setProviderName(ctx);
+    this.setAgentName(ctx);
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Model (from legacy llm.model_name if gen_ai.*.model not present)
+    // ─────────────────────────────────────────────────────────────────────────
+    extractModelToBoth({
+      ctx,
+      sourceKey: ATTR_KEYS.LLM_MODEL_NAME,
+      transform: (raw) => (typeof raw === "string" ? raw : null),
+      ruleId: `${this.id}:model(llm.model_name)`,
+    });
+
+    const inputExtracted = this.extractInputMessagesStep(ctx);
+    this.setSystemInstructions(ctx);
+    this.deriveSystemInstructionFromExisting(ctx, inputExtracted);
+    this.extractOutputMessagesStep(ctx);
 
     // ─────────────────────────────────────────────────────────────────────────
     // Usage Tokens
@@ -279,63 +389,7 @@ export class GenAIExtractor implements CanonicalAttributesExtractor {
       ATTR_KEYS.GEN_AI_REQUEST_SEED,
     ]);
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Request Parameters (from legacy llm.invocation_parameters)
-    // Extracts model parameters like temperature, max_tokens, etc.
-    // ─────────────────────────────────────────────────────────────────────────
-    const invocationParams = ctx.bag.attrs.get(
-      ATTR_KEYS.LLM_INVOCATION_PARAMETERS,
-    );
-    if (isRecord(invocationParams)) {
-      const params = invocationParams as Record<string, unknown>;
-
-      const temperature = asNumber(params.temperature);
-      const maxTokens = asNumber(params.max_tokens);
-      const topP = asNumber(params.top_p);
-      const frequencyPenalty = asNumber(params.frequency_penalty);
-      const presencePenalty = asNumber(params.presence_penalty);
-      const seed = asNumber(params.seed);
-      const choiceCount = asNumber(params.n);
-      const errorType = params.error_type;
-
-      if (temperature !== null) {
-        ctx.setAttr(ATTR_KEYS.GEN_AI_REQUEST_TEMPERATURE, temperature);
-      }
-      if (maxTokens !== null) {
-        ctx.setAttr(ATTR_KEYS.GEN_AI_REQUEST_MAX_TOKENS, maxTokens);
-      }
-      if (topP !== null) {
-        ctx.setAttr(ATTR_KEYS.GEN_AI_REQUEST_TOP_P, topP);
-      }
-      if (frequencyPenalty !== null) {
-        ctx.setAttr(
-          ATTR_KEYS.GEN_AI_REQUEST_FREQUENCY_PENALTY,
-          frequencyPenalty,
-        );
-      }
-      if (presencePenalty !== null) {
-        ctx.setAttr(ATTR_KEYS.GEN_AI_REQUEST_PRESENCE_PENALTY, presencePenalty);
-      }
-      if (seed !== null) {
-        ctx.setAttr(ATTR_KEYS.GEN_AI_REQUEST_SEED, seed);
-      }
-      if (typeof errorType === "string") {
-        ctx.setAttr(ATTR_KEYS.ERROR_TYPE, errorType);
-      }
-
-      const stopSequences = coerceToStringArray(params.stop);
-      if (stopSequences) {
-        ctx.setAttr(ATTR_KEYS.GEN_AI_REQUEST_STOP_SEQUENCES, stopSequences);
-      }
-
-      // Only set choice count if explicitly different from default (1)
-      if (choiceCount !== null && choiceCount !== 1) {
-        ctx.setAttr(ATTR_KEYS.GEN_AI_REQUEST_CHOICE_COUNT, choiceCount);
-      }
-
-      ctx.recordRule(`${this.id}:params`);
-      ctx.bag.attrs.delete(ATTR_KEYS.LLM_INVOCATION_PARAMETERS);
-    }
+    this.applyInvocationParams(ctx);
   }
 
   /**
@@ -358,46 +412,27 @@ export class GenAIExtractor implements CanonicalAttributesExtractor {
   applyLog(ctx: LogExtractorContext): void {
     const { attrs } = ctx.bag;
 
-    const asNumberFrom = (key: string): number | null => {
-      const raw = attrs.get(key);
-      if (raw === undefined || raw === null || raw === "") return null;
-      const n =
-        typeof raw === "number"
-          ? raw
-          : typeof raw === "string"
-            ? Number(raw)
-            : NaN;
-      return Number.isFinite(n) ? n : null;
-    };
-    const asStringFrom = (key: string): string | null => {
-      const raw = attrs.get(key);
-      return typeof raw === "string" && raw.length > 0 ? raw : null;
-    };
-    const asJsonStringFrom = (key: string): string | null => {
-      const raw = attrs.get(key);
-      if (raw === undefined || raw === null) return null;
-      if (typeof raw === "string") {
-        return raw.length > 0 ? raw : null;
-      }
-      if (typeof raw === "object") {
-        try {
-          return JSON.stringify(raw);
-        } catch {
-          return null;
-        }
-      }
-      return null;
-    };
-
-    const model = asStringFrom(ATTR_KEYS.GEN_AI_REQUEST_MODEL);
-    const inputTokens = asNumberFrom(ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS);
-    const outputTokens = asNumberFrom(ATTR_KEYS.GEN_AI_USAGE_OUTPUT_TOKENS);
+    const model = asStringFromAttr(attrs, ATTR_KEYS.GEN_AI_REQUEST_MODEL);
+    const inputTokens = asNumberFromAttr(
+      attrs,
+      ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS,
+    );
+    const outputTokens = asNumberFromAttr(
+      attrs,
+      ATTR_KEYS.GEN_AI_USAGE_OUTPUT_TOKENS,
+    );
     const cacheReadTokens =
-      asNumberFrom("gen_ai.usage.cache_read_tokens") ??
-      asNumberFrom("cached_content_token_count");
-    const threadId = asStringFrom(ATTR_KEYS.GEN_AI_CONVERSATION_ID);
-    const inputMessages = asJsonStringFrom(ATTR_KEYS.GEN_AI_INPUT_MESSAGES);
-    const outputMessages = asJsonStringFrom(ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES);
+      asNumberFromAttr(attrs, "gen_ai.usage.cache_read_tokens") ??
+      asNumberFromAttr(attrs, "cached_content_token_count");
+    const threadId = asStringFromAttr(attrs, ATTR_KEYS.GEN_AI_CONVERSATION_ID);
+    const inputMessages = asJsonStringFromAttr(
+      attrs,
+      ATTR_KEYS.GEN_AI_INPUT_MESSAGES,
+    );
+    const outputMessages = asJsonStringFromAttr(
+      attrs,
+      ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES,
+    );
 
     let fired = false;
     if (model !== null) {

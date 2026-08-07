@@ -184,6 +184,23 @@ function truncateWithEllipsis(value: string, cap: number): string {
 }
 
 /**
+ * Classifies and transforms a single attribute for the slim analytics fold.
+ * Returns undefined when the key/value pair should be dropped.
+ */
+function trimAttributeValue(key: string, value: string): string | undefined {
+  if (isBlocklisted(key)) return undefined;
+
+  if (key.startsWith(METADATA_PREFIX)) {
+    return truncateWithEllipsis(value, ANALYTICS_METADATA_VALUE_CAP);
+  }
+  if (key.startsWith(RESERVED_PREFIX) || FOLD_ACCUMULATOR_KEYS.has(key)) {
+    return truncateWithEllipsis(value, ANALYTICS_METADATA_VALUE_CAP);
+  }
+  // Over-cap arbitrary key: dropped — payload or unbounded blob.
+  return value.length <= ANALYTICS_STANDARD_VALUE_CAP ? value : undefined;
+}
+
+/**
  * Trim a trace-level Attributes map for the slim analytics fold.
  *
  * Pure: returns a new object; never mutates the input.
@@ -194,20 +211,8 @@ export function trimAttributesForAnalytics(
   const out: Record<string, string> = {};
   for (const [key, value] of Object.entries(attrs)) {
     if (typeof value !== "string") continue;
-    if (isBlocklisted(key)) continue;
-
-    if (key.startsWith(METADATA_PREFIX)) {
-      out[key] = truncateWithEllipsis(value, ANALYTICS_METADATA_VALUE_CAP);
-      continue;
-    }
-    if (key.startsWith(RESERVED_PREFIX) || FOLD_ACCUMULATOR_KEYS.has(key)) {
-      out[key] = truncateWithEllipsis(value, ANALYTICS_METADATA_VALUE_CAP);
-      continue;
-    }
-    if (value.length <= ANALYTICS_STANDARD_VALUE_CAP) {
-      out[key] = value;
-    }
-    // else: drop the over-cap arbitrary key — payload or unbounded blob.
+    const trimmed = trimAttributeValue(key, value);
+    if (trimmed !== undefined) out[key] = trimmed;
   }
   return out;
 }

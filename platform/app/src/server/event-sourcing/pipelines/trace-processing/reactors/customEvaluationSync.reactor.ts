@@ -57,6 +57,34 @@ function deterministicEvaluationId({
 
 const EVAL_EVENT_NAME = "langwatch.evaluation.custom";
 
+type OtlpSpanEvent = NonNullable<OtlpSpan["events"]>[number];
+
+function findJsonEncodedEventPayload(event: OtlpSpanEvent): string | undefined {
+  const jsonAttr = event.attributes.find(
+    (attr) => attr.key === "json_encoded_event",
+  );
+  return jsonAttr?.value && "stringValue" in jsonAttr.value
+    ? jsonAttr.value.stringValue
+    : undefined;
+}
+
+function parseSdkEvaluation(jsonPayload: string): SdkEvaluation | undefined {
+  try {
+    const parsed: unknown = JSON.parse(jsonPayload);
+    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed))
+      return undefined;
+    const record = parsed as Record<string, unknown>;
+    if (typeof record.name !== "string") return undefined;
+    return record as unknown as SdkEvaluation;
+  } catch {
+    logger.warn(
+      { payloadLength: jsonPayload.length },
+      "Failed to parse json_encoded_event from evaluation span event",
+    );
+    return undefined;
+  }
+}
+
 /**
  * Extracts SDK evaluations directly from OTLP span events.
  *
@@ -69,32 +97,11 @@ export function extractEvaluationsFromSpan(span: OtlpSpan): SdkEvaluation[] {
   for (const event of span.events ?? []) {
     if (event.name !== EVAL_EVENT_NAME) continue;
 
-    const jsonAttr = event.attributes.find(
-      (attr) => attr.key === "json_encoded_event",
-    );
-    const jsonPayload =
-      jsonAttr?.value && "stringValue" in jsonAttr.value
-        ? jsonAttr.value.stringValue
-        : undefined;
+    const jsonPayload = findJsonEncodedEventPayload(event);
     if (typeof jsonPayload !== "string") continue;
 
-    try {
-      const parsed: unknown = JSON.parse(jsonPayload);
-      if (
-        typeof parsed !== "object" ||
-        parsed === null ||
-        Array.isArray(parsed)
-      )
-        continue;
-      const record = parsed as Record<string, unknown>;
-      if (typeof record.name !== "string") continue;
-      evaluations.push(record as unknown as SdkEvaluation);
-    } catch {
-      logger.warn(
-        { payloadLength: jsonPayload.length },
-        "Failed to parse json_encoded_event from evaluation span event",
-      );
-    }
+    const evaluation = parseSdkEvaluation(jsonPayload);
+    if (evaluation) evaluations.push(evaluation);
   }
 
   return evaluations;
@@ -128,6 +135,106 @@ function hasSyncableEvaluations(event: TraceProcessingEvent): boolean {
   if (!isSpanReceivedEvent(event)) return false;
   if (event.occurredAt < Date.now() - STALE_TRACE_THRESHOLD_MS) return false;
   return spanHasEvaluationEvents(event.data.span);
+}
+
+function resolveEvaluationIdentity({
+  traceId,
+  evaluation,
+}: {
+  traceId: string;
+  evaluation: SdkEvaluation;
+}): {
+  evaluationId: string;
+  evaluatorId: string;
+  status: NonNullable<SdkEvaluation["status"]>;
+} {
+  return {
+    evaluationId:
+      evaluation.evaluation_id ??
+      deterministicEvaluationId({ traceId, evaluation }),
+    evaluatorId:
+      evaluation.evaluator_id ?? evaluationNameAutoslug(evaluation.name),
+    status: evaluation.status ?? (evaluation.error ? "error" : "processed"),
+  };
+}
+
+function buildReportEvaluationCommandData({
+  tenantId,
+  traceId,
+  evaluation,
+  identity,
+  occurredAt,
+}: {
+  tenantId: string;
+  traceId: string;
+  evaluation: SdkEvaluation;
+  identity: ReturnType<typeof resolveEvaluationIdentity>;
+  occurredAt: number;
+}): ReportEvaluationCommandData {
+  return {
+    tenantId,
+    evaluationId: identity.evaluationId,
+    evaluatorId: identity.evaluatorId,
+    evaluatorType: "custom",
+    evaluatorName: evaluation.name,
+    traceId,
+    isGuardrail: evaluation.is_guardrail ?? undefined,
+    status: identity.status,
+    score: evaluation.score ?? null,
+    passed: evaluation.passed ?? null,
+    label: evaluation.label ?? null,
+    details: evaluation.details ?? null,
+    error: evaluation.error?.message ?? null,
+    errorDetails: evaluation.error?.stacktrace?.join("\n") ?? null,
+    costId: evaluation.cost_id ?? null,
+    occurredAt,
+  };
+}
+
+async function syncEvaluations({
+  deps,
+  tenantId,
+  traceId,
+  evaluations,
+  occurredAt,
+}: {
+  deps: CustomEvaluationSyncReactorDeps;
+  tenantId: string;
+  traceId: string;
+  evaluations: SdkEvaluation[];
+  occurredAt: number;
+}): Promise<Error[]> {
+  const errors: Error[] = [];
+
+  for (const evaluation of evaluations) {
+    const identity = resolveEvaluationIdentity({ traceId, evaluation });
+
+    try {
+      await deps.reportEvaluation(
+        buildReportEvaluationCommandData({
+          tenantId,
+          traceId,
+          evaluation,
+          identity,
+          occurredAt,
+        }),
+      );
+    } catch (error) {
+      logger.error(
+        {
+          tenantId,
+          traceId,
+          evaluationId: identity.evaluationId,
+          evaluatorId: identity.evaluatorId,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        "Failed to sync custom evaluation",
+      );
+      errors.push(error instanceof Error ? error : new Error(String(error)));
+    }
+  }
+
+  return errors;
 }
 
 /**
@@ -168,53 +275,13 @@ export function createCustomEvaluationSyncReactor(
         "Syncing custom SDK evaluations",
       );
 
-      const errors: Error[] = [];
-
-      for (const evaluation of evaluations) {
-        const evaluationId =
-          evaluation.evaluation_id ??
-          deterministicEvaluationId({ traceId, evaluation });
-        const evaluatorId =
-          evaluation.evaluator_id ?? evaluationNameAutoslug(evaluation.name);
-        const status =
-          evaluation.status ?? (evaluation.error ? "error" : "processed");
-        const occurredAt = event.occurredAt;
-
-        try {
-          await deps.reportEvaluation({
-            tenantId,
-            evaluationId,
-            evaluatorId,
-            evaluatorType: "custom",
-            evaluatorName: evaluation.name,
-            traceId,
-            isGuardrail: evaluation.is_guardrail ?? undefined,
-            status,
-            score: evaluation.score ?? null,
-            passed: evaluation.passed ?? null,
-            label: evaluation.label ?? null,
-            details: evaluation.details ?? null,
-            error: evaluation.error?.message ?? null,
-            errorDetails: evaluation.error?.stacktrace?.join("\n") ?? null,
-            costId: evaluation.cost_id ?? null,
-            occurredAt,
-          });
-        } catch (error) {
-          logger.error(
-            {
-              tenantId,
-              traceId,
-              evaluationId,
-              evaluatorId,
-              error: error instanceof Error ? error.message : String(error),
-            },
-            "Failed to sync custom evaluation",
-          );
-          errors.push(
-            error instanceof Error ? error : new Error(String(error)),
-          );
-        }
-      }
+      const errors = await syncEvaluations({
+        deps,
+        tenantId,
+        traceId,
+        evaluations,
+        occurredAt: event.occurredAt,
+      });
 
       logger.debug(
         {

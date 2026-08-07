@@ -813,17 +813,111 @@ export function combineFilters(
 }
 
 /**
+ * Value shapes a single filter field can carry in the raw filters object,
+ * from a flat array up to a doubly-nested key/subkey map.
+ */
+type RawFilterValue =
+  | string[]
+  | Record<string, string[]>
+  | Record<string, Record<string, string[]>>;
+
+/**
+ * Double nested with key and subkey
+ */
+function collectDoubleNestedFilterTranslations({
+  field,
+  key,
+  subValue,
+  spanTimePredicate,
+  translations,
+}: {
+  field: FilterField;
+  key: string;
+  subValue: Record<string, string[]>;
+  spanTimePredicate?: string;
+  translations: FilterTranslation[];
+}): void {
+  for (const [subkey, subSubValue] of Object.entries(subValue)) {
+    if (Array.isArray(subSubValue)) {
+      translations.push(
+        translateFilter({
+          field,
+          values: subSubValue,
+          key,
+          subkey,
+          spanTimePredicate,
+        }),
+      );
+    }
+  }
+}
+
+/**
+ * Nested filter with key
+ */
+function collectNestedFilterTranslations({
+  field,
+  value,
+  spanTimePredicate,
+  translations,
+}: {
+  field: FilterField;
+  value: Record<string, string[]> | Record<string, Record<string, string[]>>;
+  spanTimePredicate?: string;
+  translations: FilterTranslation[];
+}): void {
+  for (const [key, subValue] of Object.entries(value)) {
+    if (Array.isArray(subValue)) {
+      translations.push(
+        translateFilter({ field, values: subValue, key, spanTimePredicate }),
+      );
+    } else if (typeof subValue === "object") {
+      collectDoubleNestedFilterTranslations({
+        field,
+        key,
+        subValue,
+        spanTimePredicate,
+        translations,
+      });
+    }
+  }
+}
+
+/**
+ * Translate one field's raw filter value, appending the resulting
+ * translation(s) to `translations` in place.
+ */
+function collectFieldFilterTranslations({
+  field,
+  value,
+  spanTimePredicate,
+  translations,
+}: {
+  field: FilterField;
+  value: RawFilterValue;
+  spanTimePredicate?: string;
+  translations: FilterTranslation[];
+}): void {
+  if (Array.isArray(value)) {
+    // Simple array filter
+    translations.push(
+      translateFilter({ field, values: value, spanTimePredicate }),
+    );
+  } else if (typeof value === "object") {
+    collectNestedFilterTranslations({
+      field,
+      value,
+      spanTimePredicate,
+      translations,
+    });
+  }
+}
+
+/**
  * Translate all filters from a filter object
  */
 export function translateAllFilters(
-  filters: Partial<
-    Record<
-      FilterField,
-      | string[]
-      | Record<string, string[]>
-      | Record<string, Record<string, string[]>>
-    >
-  >,
+  filters: Partial<Record<FilterField, RawFilterValue>>,
   spanTimePredicate?: string,
 ): FilterTranslation {
   const translations: FilterTranslation[] = [];
@@ -833,45 +927,12 @@ export function translateAllFilters(
       continue;
     }
 
-    if (Array.isArray(value)) {
-      // Simple array filter
-      translations.push(
-        translateFilter({
-          field: field as FilterField,
-          values: value,
-          spanTimePredicate,
-        }),
-      );
-    } else if (typeof value === "object") {
-      // Nested filter with key
-      for (const [key, subValue] of Object.entries(value)) {
-        if (Array.isArray(subValue)) {
-          translations.push(
-            translateFilter({
-              field: field as FilterField,
-              values: subValue,
-              key,
-              spanTimePredicate,
-            }),
-          );
-        } else if (typeof subValue === "object") {
-          // Double nested with key and subkey
-          for (const [subkey, subSubValue] of Object.entries(subValue)) {
-            if (Array.isArray(subSubValue)) {
-              translations.push(
-                translateFilter({
-                  field: field as FilterField,
-                  values: subSubValue,
-                  key,
-                  subkey,
-                  spanTimePredicate,
-                }),
-              );
-            }
-          }
-        }
-      }
-    }
+    collectFieldFilterTranslations({
+      field: field as FilterField,
+      value,
+      spanTimePredicate,
+      translations,
+    });
   }
 
   return combineFilters(translations);

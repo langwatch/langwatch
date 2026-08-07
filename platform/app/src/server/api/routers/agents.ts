@@ -1,3 +1,4 @@
+import type { PrismaClient } from "@prisma/client";
 import type { JsonValue } from "@prisma/client/runtime/library";
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
@@ -10,10 +11,12 @@ import {
 } from "~/optimization_studio/types/dsl";
 import {
   type AgentComponentConfig,
+  type AgentCopyRow,
   type AgentType,
   agentTypeSchema,
 } from "../../agents/agent.repository";
 import { AgentService } from "../../agents/agent.service";
+import type { Session } from "../../auth";
 import { checkProjectPermission, hasProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import {
@@ -40,6 +43,79 @@ const getConfigInputSchema = (type: AgentType) => {
     }
   }
 };
+
+/**
+ * Which of a source agent's copies the caller may push to: every copy the
+ * caller holds `evaluations:manage` on in its own project, narrowed to the
+ * requested subset when one was given.
+ */
+async function resolvePermittedCopyIds({
+  ctx,
+  copies,
+  requestedCopyIds,
+}: {
+  ctx: { prisma: PrismaClient; session: Session | null };
+  copies: AgentCopyRow[];
+  requestedCopyIds?: string[];
+}): Promise<string[]> {
+  const permittedCopyIds = (
+    await Promise.all(
+      copies.map(async (c) => ({
+        id: c.id,
+        hasPermission: await hasProjectPermission(
+          ctx,
+          c.projectId,
+          "evaluations:manage",
+        ),
+      })),
+    )
+  )
+    .filter((r) => r.hasPermission)
+    .map((r) => r.id);
+  return requestedCopyIds != null
+    ? requestedCopyIds.filter((id) => permittedCopyIds.includes(id))
+    : permittedCopyIds;
+}
+
+/** Maps agentService.pushToCopies failures to the errors the wire contract expects. */
+function throwMappedPushToCopiesError(error: unknown): never {
+  if (error instanceof Error) {
+    if (error.message === "Agent not found") {
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: "Agent not found",
+      });
+    }
+    if (
+      error.message === "This agent has no copies to push to" ||
+      error.message === "No valid copies selected to push to"
+    ) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: error.message,
+      });
+    }
+  }
+  throw error;
+}
+
+/** Maps agentService.syncFromSource failures to the errors the wire contract expects. */
+function throwMappedSyncFromSourceError(error: unknown): never {
+  const message = error instanceof Error ? error.message : String(error);
+  if (
+    message === "This agent is not a copy and has no source to sync from" ||
+    message === "Source agent has been deleted"
+  ) {
+    throw new TRPCError({
+      code:
+        message === "Source agent has been deleted"
+          ? "NOT_FOUND"
+          : "BAD_REQUEST",
+      message,
+    });
+  }
+  throw error;
+}
 
 /**
  * Agent Router - Manages agent CRUD operations
@@ -394,24 +470,11 @@ export const agentsRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const agentService = AgentService.create(ctx.prisma);
       const copies = await agentService.getCopies(input.agentId);
-      const permittedCopyIds = (
-        await Promise.all(
-          copies.map(async (c) => ({
-            id: c.id,
-            hasPermission: await hasProjectPermission(
-              ctx,
-              c.projectId,
-              "evaluations:manage",
-            ),
-          })),
-        )
-      )
-        .filter((r) => r.hasPermission)
-        .map((r) => r.id);
-      const copyIdsToPush =
-        input.copyIds != null
-          ? input.copyIds.filter((id) => permittedCopyIds.includes(id))
-          : permittedCopyIds;
+      const copyIdsToPush = await resolvePermittedCopyIds({
+        ctx,
+        copies,
+        requestedCopyIds: input.copyIds,
+      });
 
       try {
         return await agentService.pushToCopies(
@@ -420,24 +483,7 @@ export const agentsRouter = createTRPCRouter({
           copyIdsToPush,
         );
       } catch (error) {
-        if (error instanceof Error) {
-          if (error.message === "Agent not found") {
-            throw new TRPCError({
-              code: "NOT_FOUND",
-              message: "Agent not found",
-            });
-          }
-          if (
-            error.message === "This agent has no copies to push to" ||
-            error.message === "No valid copies selected to push to"
-          ) {
-            throw new TRPCError({
-              code: "BAD_REQUEST",
-              message: error.message,
-            });
-          }
-        }
-        throw error;
+        throwMappedPushToCopiesError(error);
       }
     }),
 
@@ -489,21 +535,7 @@ export const agentsRouter = createTRPCRouter({
           input.projectId,
         );
       } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        if (
-          message ===
-            "This agent is not a copy and has no source to sync from" ||
-          message === "Source agent has been deleted"
-        ) {
-          throw new TRPCError({
-            code:
-              message === "Source agent has been deleted"
-                ? "NOT_FOUND"
-                : "BAD_REQUEST",
-            message,
-          });
-        }
-        throw error;
+        throwMappedSyncFromSourceError(error);
       }
     }),
 

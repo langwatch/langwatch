@@ -322,48 +322,163 @@ secured
 
     const randomNumber = Math.floor(Math.random() * 10);
 
-    if (randomNumber % 2 === 0) {
-      try {
-        const ragResponse = await ragMessage(authToken as string);
-        return c.json({ message: "Sent to LangWatch", ragResponse });
-      } catch (error: any) {
-        return c.json({ message: "Error", error }, 500);
-      }
-    } else {
-      try {
-        const threadId = `thread_${nanoid()}`;
-        const userId = `user_${nanoid()}`;
-        const userInput = (await getInitialMessage()) ?? "";
-
-        const assistantResponse = await firstChatMessage({
-          userInput,
-          threadId,
-          userId,
-          authToken: authToken as string,
-        });
-        const expectedUserResponse = await userResponse(
-          userInput,
-          assistantResponse ?? "",
-        );
-        await secondChatMessage({
-          userInput,
-          assistantResponse: assistantResponse ?? "",
-          expectedUserResponse: expectedUserResponse ?? "",
-          threadId,
-          userId,
-          authToken: authToken as string,
-        });
-
-        return c.json({ message: "Sent to LangWatch" });
-      } catch (error: any) {
-        return c.json({ message: "Error", error }, 500);
-      }
-    }
+    return randomNumber % 2 === 0
+      ? runHotelBotRagFlow(c, authToken as string)
+      : runHotelBotChatFlow(c, authToken as string);
   });
 
 // =============================================
 // POST /api/dspy/log_steps
 // =============================================
+
+async function parseLogStepsRequest({
+  c,
+  project,
+}: {
+  c: any;
+  project: Project;
+}): Promise<{ params: DSPyStepRESTParams[] } | Response> {
+  let body: unknown;
+  let payloadSize: number;
+  try {
+    // Take the size from the wire bytes rather than re-serialising the
+    // parsed body: bodies here run to 20MB, and the old
+    // `JSON.stringify(body).length` both cost a full second pass and
+    // reported UTF-16 code units instead of transferred bytes.
+    const raw = await c.req.text();
+    payloadSize = Buffer.byteLength(raw, "utf8");
+    body = JSON.parse(raw);
+  } catch {
+    return c.json({ message: "Bad request" }, 400);
+  }
+
+  const payloadSizeMB = payloadSize / (1024 * 1024);
+  getPayloadSizeHistogram("log_steps").observe(payloadSize);
+
+  logger.info(
+    {
+      payloadSize,
+      payloadSizeMB: payloadSizeMB.toFixed(2),
+      projectId: project.id,
+    },
+    "DSPy log_steps request received",
+  );
+
+  try {
+    const params = z.array(dSPyStepRESTParamsSchema).parse(body);
+    return { params };
+  } catch (error) {
+    logger.error(
+      {
+        error,
+        payloadSize,
+        payloadSizeMB: payloadSizeMB.toFixed(2),
+        projectId: project.id,
+      },
+      "invalid log_steps data received",
+    );
+    captureException(toError(error), { extra: { projectId: project.id } });
+    const validationError = fromZodError(error as ZodError);
+    return c.json({ error: validationError.message }, 400);
+  }
+}
+
+function validateLogStepsTimestamps({
+  c,
+  params,
+  project,
+}: {
+  c: any;
+  params: DSPyStepRESTParams[];
+  project: Project;
+}): Response | null {
+  for (const param of params) {
+    if (
+      param.timestamps.created_at &&
+      param.timestamps.created_at.toString().length === 10
+    ) {
+      logger.error(
+        { param, projectId: project.id },
+        "timestamps not in milliseconds for step",
+      );
+      return c.json(
+        {
+          error:
+            "Timestamps should be in milliseconds not in seconds, please multiply it by 1000",
+        },
+        400,
+      );
+    }
+  }
+  return null;
+}
+
+function handleLogStepError({
+  c,
+  error,
+  param,
+  project,
+}: {
+  c: any;
+  error: unknown;
+  param: DSPyStepRESTParams;
+  project: Project;
+}): Response {
+  if (error instanceof z.ZodError) {
+    logger.error(
+      {
+        error,
+        stepId: param.index,
+        runId: param.run_id,
+        projectId: project.id,
+      },
+      "failed to validate data for DSPy step",
+    );
+    captureException(toError(error), {
+      extra: { projectId: project.id, param },
+    });
+    const validationError = fromZodError(error);
+    return c.json({ error: validationError.message }, 400);
+  }
+  logger.error(
+    {
+      error,
+      stepId: param.index,
+      runId: param.run_id,
+      projectId: project.id,
+    },
+    "internal server error processing DSPy step",
+  );
+  captureException(toError(error), {
+    extra: { projectId: project.id, param },
+  });
+  return c.json(
+    {
+      error: error instanceof Error ? error.message : "Internal server error",
+    },
+    500,
+  );
+}
+
+async function runLogSteps({
+  c,
+  params,
+  project,
+}: {
+  c: any;
+  params: DSPyStepRESTParams[];
+  project: Project;
+}): Promise<Response | null> {
+  for (const param of params) {
+    try {
+      await processDSPyStep(project, param);
+    } catch (error) {
+      return handleLogStepError({ c, error, param, project });
+    }
+  }
+  return null;
+}
+
 secured.access(experimentsManageAuth).post(
   "/dspy/log_steps",
   describeRoute({
@@ -428,118 +543,20 @@ secured.access(experimentsManageAuth).post(
   async (c) => {
     const project = c.get("project");
 
-    let body: unknown;
-    let payloadSize: number;
-    try {
-      // Take the size from the wire bytes rather than re-serialising the
-      // parsed body: bodies here run to 20MB, and the old
-      // `JSON.stringify(body).length` both cost a full second pass and
-      // reported UTF-16 code units instead of transferred bytes.
-      const raw = await c.req.text();
-      payloadSize = Buffer.byteLength(raw, "utf8");
-      body = JSON.parse(raw);
-    } catch {
-      return c.json({ message: "Bad request" }, 400);
-    }
+    const parsed = await parseLogStepsRequest({ c, project });
+    if (parsed instanceof Response) return parsed;
+    const { params } = parsed;
 
-    const payloadSizeMB = payloadSize / (1024 * 1024);
-    getPayloadSizeHistogram("log_steps").observe(payloadSize);
-
-    logger.info(
-      {
-        payloadSize,
-        payloadSizeMB: payloadSizeMB.toFixed(2),
-        projectId: project.id,
-      },
-      "DSPy log_steps request received",
-    );
-
-    let params: DSPyStepRESTParams[];
-    try {
-      params = z.array(dSPyStepRESTParamsSchema).parse(body);
-    } catch (error) {
-      logger.error(
-        {
-          error,
-          payloadSize,
-          payloadSizeMB: payloadSizeMB.toFixed(2),
-          projectId: project.id,
-        },
-        "invalid log_steps data received",
-      );
-      captureException(toError(error), { extra: { projectId: project.id } });
-      const validationError = fromZodError(error as ZodError);
-      return c.json({ error: validationError.message }, 400);
-    }
-
-    for (const param of params) {
-      if (
-        param.timestamps.created_at &&
-        param.timestamps.created_at.toString().length === 10
-      ) {
-        logger.error(
-          { param, projectId: project.id },
-          "timestamps not in milliseconds for step",
-        );
-        return c.json(
-          {
-            error:
-              "Timestamps should be in milliseconds not in seconds, please multiply it by 1000",
-          },
-          400,
-        );
-      }
-    }
+    const timestampError = validateLogStepsTimestamps({ c, params, project });
+    if (timestampError) return timestampError;
 
     logger.info(
       { stepCount: params.length, projectId: project.id },
       "Processing DSPy steps",
     );
 
-    for (const param of params) {
-      try {
-        await processDSPyStep(project, param);
-      } catch (error) {
-        if (error instanceof z.ZodError) {
-          logger.error(
-            {
-              error,
-              stepId: param.index,
-              runId: param.run_id,
-              projectId: project.id,
-            },
-            "failed to validate data for DSPy step",
-          );
-          captureException(toError(error), {
-            extra: { projectId: project.id, param },
-          });
-          const validationError = fromZodError(error);
-          return c.json({ error: validationError.message }, 400);
-        } else {
-          logger.error(
-            {
-              error,
-              stepId: param.index,
-              runId: param.run_id,
-              projectId: project.id,
-            },
-            "internal server error processing DSPy step",
-          );
-          captureException(toError(error), {
-            extra: { projectId: project.id, param },
-          });
-          return c.json(
-            {
-              error:
-                error instanceof Error
-                  ? error.message
-                  : "Internal server error",
-            },
-            500,
-          );
-        }
-      }
-    }
+    const processError = await runLogSteps({ c, params, project });
+    if (processError) return processError;
 
     return c.json({ message: "ok" });
   },
@@ -665,71 +682,17 @@ secured.access(experimentsManageAuth).post(
   async (c) => {
     const project = c.get("project");
 
-    let body: Record<string, any>;
-    try {
-      body = await c.req.json();
-    } catch {
-      return c.json({ message: "Bad request" }, 400);
-    }
+    const parsed = await parseExperimentInitParams({ c, project });
+    if (parsed instanceof Response) return parsed;
+    const { params } = parsed;
 
-    let params: z.infer<typeof dspyInitParamsSchema>;
-    try {
-      params = dspyInitParamsSchema.parse(body);
-    } catch (error) {
-      logger.error(
-        { error, body, projectId: project.id },
-        "invalid init data received",
-      );
-      captureException(toError(error), { extra: { projectId: project.id } });
-      const validationError = fromZodError(error as ZodError);
-      return c.json({ error: validationError.message }, 400);
-    }
-
-    let experiment;
-    try {
-      experiment = await findOrCreateExperiment({
-        project,
-        // The body accepts either identifier and this handler used to forward
-        // only the slug, so an id-only request passed validation and then hit
-        // "Either experiment_id or experiment_slug is required" as a 500.
-        // Every other caller of this function forwards both.
-        experiment_id: params.experiment_id,
-        experiment_slug: params.experiment_slug,
-        experiment_type: params.experiment_type as ExperimentType,
-        experiment_name: params.experiment_name,
-        workflowId: params.workflowId,
-      });
-    } catch (error) {
-      if (error instanceof LimitExceededError) {
-        let message = error.message;
-        try {
-          const organizationId = await resolveOrganizationId(project.teamId);
-          if (organizationId) {
-            message = await buildResourceLimitMessage({
-              organizationId,
-              limitType: error.limitType,
-              max: error.max,
-            });
-          }
-        } catch {
-          logger.warn(
-            { projectId: project.id },
-            "Failed to build resource limit message",
-          );
-        }
-        return c.json(
-          {
-            error: error.code,
-            message,
-            limitType: error.limitType,
-            current: error.current,
-            max: error.max,
-          },
-          403,
-        );
-      }
-      throw error;
-    }
+    const created = await createExperimentOrLimitResponse({
+      c,
+      project,
+      params,
+    });
+    if (created instanceof Response) return created;
+    const { experiment } = created;
 
     return c.json({
       path: `/${project.slug}/experiments/${experiment.slug}`,
@@ -737,6 +700,104 @@ secured.access(experimentsManageAuth).post(
     });
   },
 );
+
+async function parseExperimentInitParams({
+  c,
+  project,
+}: {
+  c: any;
+  project: Project;
+}): Promise<{ params: z.infer<typeof dspyInitParamsSchema> } | Response> {
+  let body: Record<string, any>;
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ message: "Bad request" }, 400);
+  }
+
+  try {
+    const params = dspyInitParamsSchema.parse(body);
+    return { params };
+  } catch (error) {
+    logger.error(
+      { error, body, projectId: project.id },
+      "invalid init data received",
+    );
+    captureException(toError(error), { extra: { projectId: project.id } });
+    const validationError = fromZodError(error as ZodError);
+    return c.json({ error: validationError.message }, 400);
+  }
+}
+
+async function buildLimitExceededResponse({
+  c,
+  project,
+  error,
+}: {
+  c: any;
+  project: Project;
+  error: LimitExceededError;
+}): Promise<Response> {
+  let message = error.message;
+  try {
+    const organizationId = await resolveOrganizationId(project.teamId);
+    if (organizationId) {
+      message = await buildResourceLimitMessage({
+        organizationId,
+        limitType: error.limitType,
+        max: error.max,
+      });
+    }
+  } catch {
+    logger.warn(
+      { projectId: project.id },
+      "Failed to build resource limit message",
+    );
+  }
+  return c.json(
+    {
+      error: error.code,
+      message,
+      limitType: error.limitType,
+      current: error.current,
+      max: error.max,
+    },
+    403,
+  );
+}
+
+async function createExperimentOrLimitResponse({
+  c,
+  project,
+  params,
+}: {
+  c: any;
+  project: Project;
+  params: z.infer<typeof dspyInitParamsSchema>;
+}): Promise<
+  { experiment: Awaited<ReturnType<typeof findOrCreateExperiment>> } | Response
+> {
+  try {
+    const experiment = await findOrCreateExperiment({
+      project,
+      // The body accepts either identifier and this handler used to forward
+      // only the slug, so an id-only request passed validation and then hit
+      // "Either experiment_id or experiment_slug is required" as a 500.
+      // Every other caller of this function forwards both.
+      experiment_id: params.experiment_id,
+      experiment_slug: params.experiment_slug,
+      experiment_type: params.experiment_type as ExperimentType,
+      experiment_name: params.experiment_name,
+      workflowId: params.workflowId,
+    });
+    return { experiment };
+  } catch (error) {
+    if (error instanceof LimitExceededError) {
+      return buildLimitExceededResponse({ c, project, error });
+    }
+    throw error;
+  }
+}
 
 // =============================================
 // POST /api/mcp/authorize
@@ -759,13 +820,8 @@ secured
       return c.json({ error: "Not authenticated" }, 401);
     }
 
-    let body: Record<string, any>;
-    try {
-      body = await c.req.json();
-    } catch {
-      return c.json({ error: "Invalid body" }, 400);
-    }
-
+    const parsedBody = await parseMcpAuthorizeBody(c);
+    if (parsedBody instanceof Response) return parsedBody;
     const {
       projectId,
       redirect_uri,
@@ -773,139 +829,247 @@ secured
       code_challenge,
       code_challenge_method,
       client_id,
-    } = body;
+    } = parsedBody;
 
-    if (!projectId || !redirect_uri || !client_id) {
-      return c.json(
-        { error: "projectId, redirect_uri and client_id are required" },
-        400,
-      );
-    }
+    const redirectUriError = validateMcpRedirectUri({ c, redirect_uri });
+    if (redirectUriError) return redirectUriError;
 
-    try {
-      const redirectUrl = new URL(redirect_uri);
-      if (
-        redirectUrl.protocol === "javascript:" ||
-        redirectUrl.protocol === "data:" ||
-        redirectUrl.protocol === "vbscript:"
-      ) {
-        return c.json({ error: "redirect_uri uses a disallowed scheme" }, 400);
-      }
-    } catch {
-      return c.json({ error: "Invalid redirect_uri" }, 400);
-    }
-
-    // RFC 6749 §10.6: an authorization server must only ever issue a code to
-    // a redirect_uri that was registered for this client_id — otherwise
-    // whoever crafts the authorization request (which can be an attacker,
-    // not the approving user) can point it at a URI they control and the
-    // approved code is exfiltrated there. PKCE does not defend against this:
-    // it proves the token-exchanger holds the verifier for the challenge in
-    // the code, and an attacker who authored the request holds both. Exact
-    // string match against the client's /oauth/register'd redirect_uris —
-    // no scheme/host-only comparison, which a subdomain or path trick could
-    // slip past.
-    const registeredClient = await getOAuthClient(client_id);
-    if (!registeredClient) {
-      return c.json({ error: "Unknown or unregistered client_id" }, 400);
-    }
-    if (!registeredClient.redirectUris.includes(redirect_uri)) {
-      return c.json(
-        {
-          error:
-            "redirect_uri does not match any redirect URI registered for this client_id",
-        },
-        400,
-      );
-    }
+    const clientError = await validateMcpRegisteredClient({
+      c,
+      client_id,
+      redirect_uri,
+    });
+    if (clientError) return clientError;
 
     if (!code_challenge) {
       return c.json({ error: "code_challenge is required (PKCE S256)" }, 400);
     }
 
-    // The demo project is a globally-readable showcase: isDemoProject grants
-    // `project:view` to ANY caller, so it must never reach the RoleBinding check
-    // below — otherwise any authenticated user could mint an MCP auth code
-    // embedding the demo project's API key. (The old `team.members.some` check
-    // happened to block this; the RoleBinding-aware check does not.)
-    if (isDemoProject(projectId, "project:view")) {
-      return c.json(
-        { error: "Project not found or you don't have access" },
-        403,
-      );
-    }
+    const authorized = await authorizeMcpProject({ c, session, projectId });
+    if (authorized instanceof Response) return authorized;
+    const { project } = authorized;
 
-    // Authorize against RoleBindings (the authoritative source since migration
-    // 20260407120000_migrate_team_users_to_role_bindings), not the legacy
-    // TeamUser relation. A user added to the team after that migration has no
-    // TeamUser row, so the old `team.members.some` check rejected them with a
-    // false 403. `project:view` is the baseline grant every team role (incl.
-    // VIEWER) has, and hasProjectPermission also honors org-level access.
-    // ProjectService is constructed directly (not via getApp()) so this handler
-    // stays unit-testable without booting the app container — the same pattern
-    // used in presets.ts and the project-service middleware.
-    const projectService = new ProjectService(
-      new PrismaProjectRepository(prisma),
-    );
-    const project = await projectService.getById(projectId);
-
-    if (
-      !project ||
-      project.archivedAt !== null ||
-      !(await hasProjectPermission(
-        { prisma, session },
-        projectId,
-        "project:view",
-      ))
-    ) {
-      // Single 403 whether the project is missing, archived, or simply
-      // inaccessible — never disclose existence of a project the caller can't reach.
-      return c.json(
-        { error: "Project not found or you don't have access" },
-        403,
-      );
-    }
-
-    const code = randomUUID();
-
-    if (!redis) {
-      return c.json({ error: "Redis is not available" }, 500);
-    }
-
-    const authCodeEntry = JSON.stringify({
-      projectId: project.id,
-      encryptedApiKey: encrypt(project.apiKey),
-      // Captured here so MCP tools that need a caller identity (e.g.,
-      // governance install/uninstall/rotate) can attribute audit rows to
-      // the actual OAuth-flowing user instead of falling back to a project-
-      // wide identity. Read in handler.ts at the token-exchange step.
-      userId: session.user.id,
+    const issued = await issueMcpAuthCode({
+      c,
+      project,
+      session,
       codeChallenge: code_challenge,
-      codeChallengeMethod: code_challenge_method ?? "S256",
-      // Bound here so /oauth/token can require the exchange to present the
-      // exact same client_id + redirect_uri this authorization was validated
-      // and approved against (RFC 6749 §4.1.3 / §3.2.1) — a code minted for
-      // one client's registered URI must never be redeemable against another.
+      codeChallengeMethod: code_challenge_method,
       clientId: client_id,
       redirectUri: redirect_uri,
-      expiresAt: Date.now() + AUTH_CODE_TTL_SECONDS * 1000,
     });
-
-    await redis.set(
-      `${REDIS_AUTH_CODE_PREFIX}${code}`,
-      authCodeEntry,
-      "EX",
-      AUTH_CODE_TTL_SECONDS,
-    );
+    if (issued instanceof Response) return issued;
 
     const redirectUrl = new URL(redirect_uri);
-    redirectUrl.searchParams.set("code", code);
+    redirectUrl.searchParams.set("code", issued.code);
     if (state) {
       redirectUrl.searchParams.set("state", state);
     }
 
     return c.json({ redirect: redirectUrl.toString() });
   });
+
+async function parseMcpAuthorizeBody(c: any): Promise<
+  | {
+      projectId: string;
+      redirect_uri: string;
+      state: string | undefined;
+      code_challenge: string | undefined;
+      code_challenge_method: string | undefined;
+      client_id: string;
+    }
+  | Response
+> {
+  let body: Record<string, any>;
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: "Invalid body" }, 400);
+  }
+
+  const {
+    projectId,
+    redirect_uri,
+    state,
+    code_challenge,
+    code_challenge_method,
+    client_id,
+  } = body;
+
+  if (!projectId || !redirect_uri || !client_id) {
+    return c.json(
+      { error: "projectId, redirect_uri and client_id are required" },
+      400,
+    );
+  }
+
+  return {
+    projectId,
+    redirect_uri,
+    state,
+    code_challenge,
+    code_challenge_method,
+    client_id,
+  };
+}
+
+function validateMcpRedirectUri({
+  c,
+  redirect_uri,
+}: {
+  c: any;
+  redirect_uri: string;
+}): Response | null {
+  try {
+    const redirectUrl = new URL(redirect_uri);
+    if (
+      redirectUrl.protocol === "javascript:" ||
+      redirectUrl.protocol === "data:" ||
+      redirectUrl.protocol === "vbscript:"
+    ) {
+      return c.json({ error: "redirect_uri uses a disallowed scheme" }, 400);
+    }
+  } catch {
+    return c.json({ error: "Invalid redirect_uri" }, 400);
+  }
+  return null;
+}
+
+// RFC 6749 §10.6: an authorization server must only ever issue a code to
+// a redirect_uri that was registered for this client_id — otherwise
+// whoever crafts the authorization request (which can be an attacker,
+// not the approving user) can point it at a URI they control and the
+// approved code is exfiltrated there. PKCE does not defend against this:
+// it proves the token-exchanger holds the verifier for the challenge in
+// the code, and an attacker who authored the request holds both. Exact
+// string match against the client's /oauth/register'd redirect_uris —
+// no scheme/host-only comparison, which a subdomain or path trick could
+// slip past.
+async function validateMcpRegisteredClient({
+  c,
+  client_id,
+  redirect_uri,
+}: {
+  c: any;
+  client_id: string;
+  redirect_uri: string;
+}): Promise<Response | null> {
+  const registeredClient = await getOAuthClient(client_id);
+  if (!registeredClient) {
+    return c.json({ error: "Unknown or unregistered client_id" }, 400);
+  }
+  if (!registeredClient.redirectUris.includes(redirect_uri)) {
+    return c.json(
+      {
+        error:
+          "redirect_uri does not match any redirect URI registered for this client_id",
+      },
+      400,
+    );
+  }
+  return null;
+}
+
+async function authorizeMcpProject({
+  c,
+  session,
+  projectId,
+}: {
+  c: any;
+  session: any;
+  projectId: string;
+}): Promise<{ project: Project } | Response> {
+  // The demo project is a globally-readable showcase: isDemoProject grants
+  // `project:view` to ANY caller, so it must never reach the RoleBinding check
+  // below — otherwise any authenticated user could mint an MCP auth code
+  // embedding the demo project's API key. (The old `team.members.some` check
+  // happened to block this; the RoleBinding-aware check does not.)
+  if (isDemoProject(projectId, "project:view")) {
+    return c.json({ error: "Project not found or you don't have access" }, 403);
+  }
+
+  // Authorize against RoleBindings (the authoritative source since migration
+  // 20260407120000_migrate_team_users_to_role_bindings), not the legacy
+  // TeamUser relation. A user added to the team after that migration has no
+  // TeamUser row, so the old `team.members.some` check rejected them with a
+  // false 403. `project:view` is the baseline grant every team role (incl.
+  // VIEWER) has, and hasProjectPermission also honors org-level access.
+  // ProjectService is constructed directly (not via getApp()) so this handler
+  // stays unit-testable without booting the app container — the same pattern
+  // used in presets.ts and the project-service middleware.
+  const projectService = new ProjectService(
+    new PrismaProjectRepository(prisma),
+  );
+  const project = await projectService.getById(projectId);
+
+  if (
+    !project ||
+    project.archivedAt !== null ||
+    !(await hasProjectPermission(
+      { prisma, session },
+      projectId,
+      "project:view",
+    ))
+  ) {
+    // Single 403 whether the project is missing, archived, or simply
+    // inaccessible — never disclose existence of a project the caller can't reach.
+    return c.json({ error: "Project not found or you don't have access" }, 403);
+  }
+
+  return { project };
+}
+
+async function issueMcpAuthCode({
+  c,
+  project,
+  session,
+  codeChallenge,
+  codeChallengeMethod,
+  clientId,
+  redirectUri,
+}: {
+  c: any;
+  project: Project;
+  session: any;
+  codeChallenge: string;
+  codeChallengeMethod: string | undefined;
+  clientId: string;
+  redirectUri: string;
+}): Promise<{ code: string } | Response> {
+  const code = randomUUID();
+
+  if (!redis) {
+    return c.json({ error: "Redis is not available" }, 500);
+  }
+
+  const authCodeEntry = JSON.stringify({
+    projectId: project.id,
+    encryptedApiKey: encrypt(project.apiKey),
+    // Captured here so MCP tools that need a caller identity (e.g.,
+    // governance install/uninstall/rotate) can attribute audit rows to
+    // the actual OAuth-flowing user instead of falling back to a project-
+    // wide identity. Read in handler.ts at the token-exchange step.
+    userId: session.user.id,
+    codeChallenge,
+    codeChallengeMethod: codeChallengeMethod ?? "S256",
+    // Bound here so /oauth/token can require the exchange to present the
+    // exact same client_id + redirect_uri this authorization was validated
+    // and approved against (RFC 6749 §4.1.3 / §3.2.1) — a code minted for
+    // one client's registered URI must never be redeemable against another.
+    clientId,
+    redirectUri,
+    expiresAt: Date.now() + AUTH_CODE_TTL_SECONDS * 1000,
+  });
+
+  await redis.set(
+    `${REDIS_AUTH_CODE_PREFIX}${code}`,
+    authCodeEntry,
+    "EX",
+    AUTH_CODE_TTL_SECONDS,
+  );
+
+  return { code };
+}
 
 /**
  * What every synchronous workflow-run route documents.
@@ -1844,6 +2008,46 @@ const secondChatMessage = async ({
     userId,
   });
   return completion.choices[0]!.message.content;
+};
+
+const runHotelBotRagFlow = async (c: any, authToken: string) => {
+  try {
+    const ragResponse = await ragMessage(authToken);
+    return c.json({ message: "Sent to LangWatch", ragResponse });
+  } catch (error: any) {
+    return c.json({ message: "Error", error }, 500);
+  }
+};
+
+const runHotelBotChatFlow = async (c: any, authToken: string) => {
+  try {
+    const threadId = `thread_${nanoid()}`;
+    const userId = `user_${nanoid()}`;
+    const userInput = (await getInitialMessage()) ?? "";
+
+    const assistantResponse = await firstChatMessage({
+      userInput,
+      threadId,
+      userId,
+      authToken,
+    });
+    const expectedUserResponse = await userResponse(
+      userInput,
+      assistantResponse ?? "",
+    );
+    await secondChatMessage({
+      userInput,
+      assistantResponse: assistantResponse ?? "",
+      expectedUserResponse: expectedUserResponse ?? "",
+      threadId,
+      userId,
+      authToken,
+    });
+
+    return c.json({ message: "Sent to LangWatch" });
+  } catch (error: any) {
+    return c.json({ message: "Error", error }, 500);
+  }
 };
 
 // =============================================

@@ -130,6 +130,80 @@ export class StoredObjectsService {
    *  - `stored_object_write_failures_total{purpose}` on PUT failure.
    *  - `stored_object_size_bytes{purpose}` histogram on every call.
    */
+  // PUT first: if storage rejects, never write the CH row.
+  private async putBytesForStore({
+    storageUri,
+    bytes,
+    mediaType,
+    projectId,
+    id,
+    sha256,
+    purpose,
+  }: {
+    storageUri: string;
+    bytes: Buffer;
+    mediaType: string;
+    projectId: string;
+    id: string;
+    sha256: string;
+    purpose: string;
+  }): Promise<void> {
+    try {
+      await this.registry.put(storageUri, bytes, mediaType);
+    } catch (error) {
+      getStoredObjectWriteFailureCounter(purpose).inc();
+      logger.error(
+        {
+          projectId,
+          id,
+          sha256,
+          // Redact bucket / account / install-path segments — for
+          // BYOC tenants, the raw URI would carry their private
+          // bucket name into shared log sinks.
+          storageUri: redactStorageUri(storageUri),
+          error,
+        },
+        "Failed to PUT stored object bytes",
+      );
+      throw error;
+    }
+  }
+
+  // Compensating cleanup: if the CH insert fails after a successful
+  // PUT, the bytes would be orphaned in storage (no row points at
+  // them). Best-effort delete the just-written object so we don't
+  // leak storage. The original insert error is what the caller sees.
+  private async insertRowWithCompensation({
+    projectId,
+    row,
+    purpose,
+  }: {
+    projectId: string;
+    row: StoredObject;
+    purpose: string;
+  }): Promise<void> {
+    try {
+      await this.repository.insert({ projectId, row });
+    } catch (insertError) {
+      getStoredObjectWriteFailureCounter(purpose).inc();
+      try {
+        await this.registry.delete(row.storage_uri);
+      } catch (deleteError) {
+        logger.warn(
+          {
+            projectId,
+            id: row.id,
+            storageUri: redactStorageUri(row.storage_uri),
+            deleteError,
+            insertError,
+          },
+          "compensating delete failed; bytes may be orphaned",
+        );
+      }
+      throw insertError;
+    }
+  }
+
   async storeFromBytes({
     projectId,
     purpose,
@@ -184,26 +258,15 @@ export class StoredObjectsService {
 
         const storageUri = await this.mintStorageUri({ projectId, sha256 });
 
-        // PUT first: if storage rejects, never write the CH row
-        try {
-          await this.registry.put(storageUri, bytes, mediaType);
-        } catch (error) {
-          getStoredObjectWriteFailureCounter(purpose).inc();
-          logger.error(
-            {
-              projectId,
-              id,
-              sha256,
-              // Redact bucket / account / install-path segments — for
-              // BYOC tenants, the raw URI would carry their private
-              // bucket name into shared log sinks.
-              storageUri: redactStorageUri(storageUri),
-              error,
-            },
-            "Failed to PUT stored object bytes",
-          );
-          throw error;
-        }
+        await this.putBytesForStore({
+          storageUri,
+          bytes,
+          mediaType,
+          projectId,
+          id,
+          sha256,
+          purpose,
+        });
 
         const now = new Date();
         const row: StoredObject = {
@@ -220,30 +283,7 @@ export class StoredObjectsService {
           inserted_at: now,
         };
 
-        // Compensating cleanup: if the CH insert fails after a successful
-        // PUT, the bytes would be orphaned in storage (no row points at
-        // them). Best-effort delete the just-written object so we don't
-        // leak storage. The original insert error is what the caller sees.
-        try {
-          await this.repository.insert({ projectId, row });
-        } catch (insertError) {
-          getStoredObjectWriteFailureCounter(purpose).inc();
-          try {
-            await this.registry.delete(storageUri);
-          } catch (deleteError) {
-            logger.warn(
-              {
-                projectId,
-                id,
-                storageUri: redactStorageUri(storageUri),
-                deleteError,
-                insertError,
-              },
-              "compensating delete failed; bytes may be orphaned",
-            );
-          }
-          throw insertError;
-        }
+        await this.insertRowWithCompensation({ projectId, row, purpose });
 
         span.setAttribute("stored_object.dedup_hit", false);
         return { id, mediaType, isDuplicate: false };

@@ -58,6 +58,28 @@ export function collectDroppedCategories(spans: Span[] | undefined): string[] {
 }
 
 /**
+ * String-value branch of {@link extractRedactionsForObject}: recurses into
+ * JSON, then Python-repr, and finally falls back to the raw string itself.
+ */
+function extractRedactionsForString(value: string): string[] {
+  try {
+    const json = JSON.parse(value) as unknown;
+    return extractRedactionsForObject(json);
+  } catch {
+    // Try parsing as Python repr - only if it looks like an object
+    try {
+      const json_ = parsePythonInsideJson({ value });
+      if (typeof json_.value === "object" && json_.value !== null) {
+        return extractRedactionsForObject(json_.value);
+      }
+    } catch {
+      // Not valid Python repr either
+    }
+    return [value];
+  }
+}
+
+/**
  * Extracts string values from an object for redaction purposes.
  * When input/output is not visible, we need to collect all string values
  * so they can be redacted from any visible fields.
@@ -67,21 +89,7 @@ export function collectDroppedCategories(spans: Span[] | undefined): string[] {
  */
 export function extractRedactionsForObject(object: unknown): string[] {
   if (typeof object === "string") {
-    try {
-      const json = JSON.parse(object) as unknown;
-      return extractRedactionsForObject(json);
-    } catch {
-      // Try parsing as Python repr - only if it looks like an object
-      try {
-        const json_ = parsePythonInsideJson({ value: object });
-        if (typeof json_.value === "object" && json_.value !== null) {
-          return extractRedactionsForObject(json_.value);
-        }
-      } catch {
-        // Not valid Python repr either
-      }
-      return [object];
-    }
+    return extractRedactionsForString(object);
   }
   if (Array.isArray(object)) {
     return object.flatMap(extractRedactionsForObject);
@@ -91,6 +99,33 @@ export function extractRedactionsForObject(object: unknown): string[] {
   }
 
   return [];
+}
+
+/**
+ * String-value branch of {@link redactObject}: recurses into JSON, then
+ * Python-repr, and finally falls back to blanket-redacting the raw string
+ * when it contains any redaction target.
+ */
+function redactStringValue(value: string, redactions: Set<string>): string {
+  try {
+    const json = JSON.parse(value) as unknown;
+    return JSON.stringify(redactObject(json, redactions));
+  } catch {
+    // Try parsing as Python repr - only if it looks like an object
+    try {
+      const json_ = parsePythonInsideJson({ value });
+      if (typeof json_.value === "object" && json_.value !== null) {
+        return JSON.stringify(redactObject(json_.value, redactions));
+      }
+    } catch {
+      // Not valid Python repr either
+    }
+    return Array.from(redactions).filter((redaction) =>
+      value.includes(redaction),
+    ).length > 0
+      ? "[REDACTED]"
+      : value;
+  }
 }
 
 /**
@@ -105,25 +140,7 @@ export function redactObject<T>(object: T, redactions: Set<string>): T {
     return object;
   }
   if (typeof object === "string") {
-    try {
-      const json = JSON.parse(object) as unknown;
-      return JSON.stringify(redactObject(json, redactions)) as T;
-    } catch {
-      // Try parsing as Python repr - only if it looks like an object
-      try {
-        const json_ = parsePythonInsideJson({ value: object });
-        if (typeof json_.value === "object" && json_.value !== null) {
-          return JSON.stringify(redactObject(json_.value, redactions)) as T;
-        }
-      } catch {
-        // Not valid Python repr either
-      }
-      return Array.from(redactions).filter((redaction) =>
-        object.includes(redaction),
-      ).length > 0
-        ? ("[REDACTED]" as T)
-        : object;
-    }
+    return redactStringValue(object, redactions) as T;
   }
   if (Array.isArray(object)) {
     return object.map((item) => redactObject(item, redactions)) as T;
@@ -161,6 +178,77 @@ export function extractRedactionsFromAllSpanOutputs(spans: Span[]): string[] {
   );
 }
 
+/** True when `startedAtMs` predates the plan's visibility window. */
+function isBeyondVisibilityCutoff({
+  protections,
+  startedAtMs,
+}: {
+  protections: Protections;
+  startedAtMs: number;
+}): boolean {
+  return (
+    protections.visibilityCutoffMs !== null &&
+    protections.visibilityCutoffMs !== undefined &&
+    startedAtMs < protections.visibilityCutoffMs
+  );
+}
+
+/** Redact span input if not allowed to see. */
+function redactSpanInput({
+  input,
+  protections,
+  redactions,
+}: {
+  input: SpanInputOutput | null | undefined;
+  protections: Protections;
+  redactions: Set<string>;
+}): SpanInputOutput | null | undefined {
+  if (!input) return input;
+  if (protections.canSeeCapturedInput !== true) {
+    return { type: "text", value: "[REDACTED]" };
+  }
+  // Create a new object with redacted value
+  const redactedValue = redactObject(input.value, redactions);
+  return { ...input, value: redactedValue } as SpanInputOutput;
+}
+
+/** Redact span output if not allowed to see. */
+function redactSpanOutput({
+  output,
+  protections,
+  redactions,
+}: {
+  output: SpanInputOutput | null | undefined;
+  protections: Protections;
+  redactions: Set<string>;
+}): SpanInputOutput | null | undefined {
+  if (!output) return output;
+  if (protections.canSeeCapturedOutput !== true) {
+    return { type: "text", value: "[REDACTED]" };
+  }
+  // Create a new object with redacted value
+  const redactedValue = redactObject(output.value, redactions);
+  return { ...output, value: redactedValue } as SpanInputOutput;
+}
+
+/** Redact span cost if not allowed to see. */
+function redactSpanMetrics({
+  metrics,
+  protections,
+}: {
+  metrics: SpanMetrics | null | undefined;
+  protections: Protections;
+}): SpanMetrics | null | undefined {
+  if (!metrics) return metrics;
+  const { cost, ...otherMetrics } = metrics;
+  const transformedMetrics: SpanMetrics = otherMetrics;
+
+  if (protections.canSeeCosts === true) {
+    transformedMetrics.cost = cost;
+  }
+  return transformedMetrics;
+}
+
 /**
  * Applies redaction protections to a span.
  *
@@ -174,47 +262,20 @@ export function applySpanProtections(
   protections: Protections,
   redactions: Set<string>,
 ): Span {
-  let transformedInput: SpanInputOutput | null | undefined = span.input;
-  let transformedOutput: SpanInputOutput | null | undefined = span.output;
-  let transformedMetrics: SpanMetrics | null | undefined = span.metrics;
-
-  // Redact input if not allowed to see
-  if (span.input) {
-    if (protections.canSeeCapturedInput !== true) {
-      transformedInput = { type: "text", value: "[REDACTED]" };
-    } else {
-      // Create a new object with redacted value
-      const redactedValue = redactObject(span.input.value, redactions);
-      transformedInput = {
-        ...span.input,
-        value: redactedValue,
-      } as SpanInputOutput;
-    }
-  }
-
-  // Redact output if not allowed to see
-  if (span.output) {
-    if (protections.canSeeCapturedOutput !== true) {
-      transformedOutput = { type: "text", value: "[REDACTED]" };
-    } else {
-      // Create a new object with redacted value
-      const redactedValue = redactObject(span.output.value, redactions);
-      transformedOutput = {
-        ...span.output,
-        value: redactedValue,
-      } as SpanInputOutput;
-    }
-  }
-
-  // Redact cost if not allowed to see
-  if (span.metrics) {
-    const { cost, ...otherMetrics } = span.metrics;
-    transformedMetrics = otherMetrics;
-
-    if (protections.canSeeCosts === true) {
-      transformedMetrics.cost = cost;
-    }
-  }
+  const transformedInput = redactSpanInput({
+    input: span.input,
+    protections,
+    redactions,
+  });
+  const transformedOutput = redactSpanOutput({
+    output: span.output,
+    protections,
+    redactions,
+  });
+  const transformedMetrics = redactSpanMetrics({
+    metrics: span.metrics,
+    protections,
+  });
 
   // Custom attribute rules with a restrict disposition: replace matched span
   // params (the mapper unflattens dotted keys into nested objects, so the
@@ -239,9 +300,10 @@ export function applySpanProtections(
 
   // Teaser-redact content of spans beyond the plan's visibility window
   if (
-    protections.visibilityCutoffMs !== null &&
-    protections.visibilityCutoffMs !== undefined &&
-    span.timestamps.started_at < protections.visibilityCutoffMs
+    isBeyondVisibilityCutoff({
+      protections,
+      startedAtMs: span.timestamps.started_at,
+    })
   ) {
     return redactSpanContent(transformed);
   }
@@ -308,17 +370,14 @@ export function applyDerivedTraceEventProtections(
 }
 
 /**
- * Applies redaction protections to a trace and its spans.
- *
- * @param trace - The trace to apply protections to
- * @param protections - The protection settings
- * @returns The trace with protections applied
+ * Builds the redaction set from trace input/output (and, when not visible,
+ * every span input/output) so hidden content can be scrubbed from any
+ * visible field it also appears in.
  */
-export function applyTraceProtections(
+function buildTraceRedactions(
   trace: Trace,
   protections: Protections,
-): Trace {
-  // Build redaction set from trace input/output if not visible
+): Set<string> {
   let redactions = new Set<string>([
     ...(!protections.canSeeCapturedInput
       ? extractRedactionsForObject(trace.input?.value)
@@ -328,7 +387,6 @@ export function applyTraceProtections(
       : []),
   ]);
 
-  // Add span inputs/outputs to redactions if not visible
   if (!protections.canSeeCapturedInput && trace.spans) {
     redactions = new Set([
       ...redactions,
@@ -342,36 +400,84 @@ export function applyTraceProtections(
     ]);
   }
 
-  // Apply protections to trace input
-  let transformedInput: TraceInput | undefined = trace.input;
-  if (trace.input) {
-    if (protections.canSeeCapturedInput !== true) {
-      transformedInput = void 0;
-    } else {
-      transformedInput = redactObject(trace.input, redactions);
-    }
-  }
+  return redactions;
+}
 
-  // Apply protections to trace output
-  let transformedOutput: TraceOutput | undefined = trace.output;
-  if (trace.output) {
-    if (protections.canSeeCapturedOutput !== true) {
-      transformedOutput = void 0;
-    } else {
-      transformedOutput = redactObject(trace.output, redactions);
-    }
-  }
+/** Apply protections to trace input. */
+function redactTraceInput({
+  input,
+  protections,
+  redactions,
+}: {
+  input: TraceInput | undefined;
+  protections: Protections;
+  redactions: Set<string>;
+}): TraceInput | undefined {
+  if (!input) return input;
+  if (protections.canSeeCapturedInput !== true) return void 0;
+  return redactObject(input, redactions);
+}
 
-  // Apply protections to metrics
-  let transformedMetrics: Trace["metrics"] | undefined = trace.metrics;
-  if (trace.metrics) {
-    const { total_cost, ...otherMetrics } = trace.metrics;
-    transformedMetrics = otherMetrics;
+/** Apply protections to trace output. */
+function redactTraceOutput({
+  output,
+  protections,
+  redactions,
+}: {
+  output: TraceOutput | undefined;
+  protections: Protections;
+  redactions: Set<string>;
+}): TraceOutput | undefined {
+  if (!output) return output;
+  if (protections.canSeeCapturedOutput !== true) return void 0;
+  return redactObject(output, redactions);
+}
 
-    if (protections.canSeeCosts === true) {
-      transformedMetrics.total_cost = total_cost;
-    }
+/** Apply protections to trace-level metrics (cost). */
+function redactTraceMetrics({
+  metrics,
+  protections,
+}: {
+  metrics: Trace["metrics"] | undefined;
+  protections: Protections;
+}): Trace["metrics"] | undefined {
+  if (!metrics) return metrics;
+  const { total_cost, ...otherMetrics } = metrics;
+  const transformedMetrics: Trace["metrics"] = otherMetrics;
+
+  if (protections.canSeeCosts === true) {
+    transformedMetrics.total_cost = total_cost;
   }
+  return transformedMetrics;
+}
+
+/**
+ * Applies redaction protections to a trace and its spans.
+ *
+ * @param trace - The trace to apply protections to
+ * @param protections - The protection settings
+ * @returns The trace with protections applied
+ */
+export function applyTraceProtections(
+  trace: Trace,
+  protections: Protections,
+): Trace {
+  const redactions = buildTraceRedactions(trace, protections);
+
+  const transformedInput = redactTraceInput({
+    input: trace.input,
+    protections,
+    redactions,
+  });
+  const transformedOutput = redactTraceOutput({
+    output: trace.output,
+    protections,
+    redactions,
+  });
+  const transformedMetrics = redactTraceMetrics({
+    metrics: trace.metrics,
+    protections,
+  });
 
   // Apply protections to spans
   const transformedSpans = trace.spans?.map((span) =>
@@ -407,9 +513,10 @@ export function applyTraceProtections(
   // this pass covers the trace-level content fields and stamps the redacted
   // flag for the upgrade CTA.
   if (
-    protections.visibilityCutoffMs !== null &&
-    protections.visibilityCutoffMs !== undefined &&
-    trace.timestamps.started_at < protections.visibilityCutoffMs
+    isBeyondVisibilityCutoff({
+      protections,
+      startedAtMs: trace.timestamps.started_at,
+    })
   ) {
     const { spans, ...traceWithoutSpans } = transformed;
     return {

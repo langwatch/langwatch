@@ -83,6 +83,11 @@ export const MAX_MEMORY_IDS_PER_ENTRY = 5;
 const MAX_MEMORY_ID_LENGTH = 200;
 /** `resource` and `verb` are CLI nouns and verbs, not prose. */
 const MAX_MEMORY_TERM_LENGTH = 64;
+/**
+ * Separator between the resource name and its id list in a memory map key —
+ * a NUL byte so no resource name or id text could ever collide with it.
+ */
+const MEMORY_KEY_SEPARATOR = String.fromCharCode(0);
 
 /**
  * One thing this conversation did — the compact referent a follow-up resolves
@@ -126,6 +131,56 @@ function cleanId(value: string): string | null {
   return id ? id : null;
 }
 
+/** The cleaned, capped id list a digest contributes. Split out of `buildMemoryEntryFromPart`. */
+function extractMemoryIds(
+  digest: NonNullable<ReturnType<typeof digestOf>>,
+): string[] {
+  return (digest.primaryId ? [digest.primaryId] : (digest.ids ?? []))
+    .map(cleanId)
+    .filter((id): id is string => id !== null)
+    .slice(0, MAX_MEMORY_IDS_PER_ENTRY);
+}
+
+/**
+ * Build the memory entry one part contributes, or `null` when it contributes
+ * nothing (errored, no digest, no ids, or an unnamed resource/verb). Split
+ * out of `extractLangyConversationMemory`.
+ */
+function buildMemoryEntryFromPart(
+  part: LangyMessageRow["parts"][number],
+  turn: number,
+): { key: string; entry: LangyConversationMemoryEntry } | null {
+  if (isErrored(part)) return null;
+  const digest = digestOf(part);
+  if (!digest) return null;
+
+  const ids = extractMemoryIds(digest);
+  if (ids.length === 0) return null;
+
+  const resource = sanitizeLangyPromptValue(
+    digest.resource,
+    MAX_MEMORY_TERM_LENGTH,
+  );
+  const verb = sanitizeLangyPromptValue(digest.verb, MAX_MEMORY_TERM_LENGTH);
+  if (!resource || !verb) return null;
+
+  const name = digest.name
+    ? sanitizeLangyPromptValue(digest.name, MAX_LABEL_LENGTH)
+    : "";
+  const total = digest.counts?.total;
+
+  const entry: LangyConversationMemoryEntry = {
+    resource,
+    verb,
+    turn,
+    ids,
+    ...(name ? { name } : {}),
+    ...(typeof total === "number" && total > ids.length ? { total } : {}),
+  };
+  const key = `${resource}${MEMORY_KEY_SEPARATOR}${ids.join(",")}`;
+  return { key, entry };
+}
+
 /**
  * Fold a conversation's durable messages into the resources it touched.
  *
@@ -158,45 +213,13 @@ export function extractLangyConversationMemory({
     if (message.role !== "assistant") continue;
     turn += 1;
     for (const part of message.parts) {
-      if (isErrored(part)) continue;
-      const digest = digestOf(part);
-      if (!digest) continue;
-
-      const ids = (digest.primaryId ? [digest.primaryId] : (digest.ids ?? []))
-        .map(cleanId)
-        .filter((id): id is string => id !== null)
-        .slice(0, MAX_MEMORY_IDS_PER_ENTRY);
-      if (ids.length === 0) continue;
-
-      const resource = sanitizeLangyPromptValue(
-        digest.resource,
-        MAX_MEMORY_TERM_LENGTH,
-      );
-      const verb = sanitizeLangyPromptValue(
-        digest.verb,
-        MAX_MEMORY_TERM_LENGTH,
-      );
-      if (!resource || !verb) continue;
-
-      const name = digest.name
-        ? sanitizeLangyPromptValue(digest.name, MAX_LABEL_LENGTH)
-        : "";
-      const total = digest.counts?.total;
-
-      const entry: LangyConversationMemoryEntry = {
-        resource,
-        verb,
-        turn,
-        ids,
-        ...(name ? { name } : {}),
-        ...(typeof total === "number" && total > ids.length ? { total } : {}),
-      };
-      const key = `${resource}\u0000${ids.join(",")}`;
+      const built = buildMemoryEntryFromPart(part, turn);
+      if (!built) continue;
       // Delete-then-set so the re-inserted entry also moves to the END of the
       // insertion order — "most recent" has to mean the latest TOUCH, not the
       // first sighting.
-      byResource.delete(key);
-      byResource.set(key, entry);
+      byResource.delete(built.key);
+      byResource.set(built.key, built.entry);
     }
   }
 
@@ -315,13 +338,10 @@ function renderTranscriptMessage(role: "user" | "assistant", text: string) {
  * were left out. Sanitised per message (see `sanitizeTranscriptText`), and
  * framed as DATA end-to-end like every other block this module renders.
  */
-export function renderLangyConversationTranscript({
-  messages,
-  currentPrompt,
-}: {
-  messages: LangyMessageRow[];
-  currentPrompt?: string;
-}): string | null {
+/** Split out of `renderLangyConversationTranscript`. */
+function collectSpokenTranscriptMessages(
+  messages: LangyMessageRow[],
+): { role: "user" | "assistant"; text: string }[] {
   const spoken: { role: "user" | "assistant"; text: string }[] = [];
   for (const message of messages) {
     if (message.role !== "user" && message.role !== "assistant") continue;
@@ -329,6 +349,19 @@ export function renderLangyConversationTranscript({
     if (!text) continue;
     spoken.push({ role: message.role, text });
   }
+  return spoken;
+}
+
+/**
+ * On a re-drive the message is already on the durable record, so a trailing
+ * user message with exactly the current prompt's text is dropped: it is the
+ * question, not history. Mutates `spoken` in place. Split out of
+ * `renderLangyConversationTranscript`.
+ */
+function dropTrailingCurrentPrompt(
+  spoken: { role: "user" | "assistant"; text: string }[],
+  currentPrompt: string | undefined,
+): void {
   const last = spoken[spoken.length - 1];
   if (
     last &&
@@ -338,9 +371,15 @@ export function renderLangyConversationTranscript({
   ) {
     spoken.pop();
   }
-  if (spoken.length === 0) return null;
+}
 
-  // Newest messages win the budget; render order stays chronological.
+/**
+ * Newest messages win the budget; render order stays chronological. Split
+ * out of `renderLangyConversationTranscript`.
+ */
+function selectBudgetedTranscript(
+  spoken: { role: "user" | "assistant"; text: string }[],
+): { kept: string[]; elided: number } {
   const kept: string[] = [];
   let budget = MAX_TRANSCRIPT_CHARS;
   for (let i = spoken.length - 1; i >= 0; i--) {
@@ -350,8 +389,22 @@ export function renderLangyConversationTranscript({
     kept.unshift(rendered);
     budget -= rendered.length;
   }
+  return { kept, elided: spoken.length - kept.length };
+}
+
+export function renderLangyConversationTranscript({
+  messages,
+  currentPrompt,
+}: {
+  messages: LangyMessageRow[];
+  currentPrompt?: string;
+}): string | null {
+  const spoken = collectSpokenTranscriptMessages(messages);
+  dropTrailingCurrentPrompt(spoken, currentPrompt);
+  if (spoken.length === 0) return null;
+
+  const { kept, elided } = selectBudgetedTranscript(spoken);
   if (kept.length === 0) return null;
-  const elided = spoken.length - kept.length;
 
   return [
     [

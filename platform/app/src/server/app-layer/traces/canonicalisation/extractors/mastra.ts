@@ -108,75 +108,93 @@ export class MastraExtractor implements CanonicalAttributesExtractor {
     ctx: ExtractorContext,
     modelStepBody: Record<string, unknown> | null,
   ): string | null {
-    const { attrs } = ctx.bag;
-    let modelName: string | null = null;
-
+    const modelNameFromBody = modelStepBody
+      ? this.liftModelNameFromBody(ctx, modelStepBody)
+      : null;
     if (modelStepBody) {
-      // Extract model name from body.model
-      if (
-        typeof modelStepBody.model === "string" &&
-        modelStepBody.model.length > 0
-      ) {
-        modelName = modelStepBody.model;
-        if (
-          !attrs.has(ATTR_KEYS.GEN_AI_REQUEST_MODEL) &&
-          !attrs.has(ATTR_KEYS.GEN_AI_RESPONSE_MODEL)
-        ) {
-          ctx.setAttr(ATTR_KEYS.GEN_AI_REQUEST_MODEL, modelName);
-          ctx.setAttr(ATTR_KEYS.GEN_AI_RESPONSE_MODEL, modelName);
-          ctx.recordRule(
-            `${this.id}:model_step.input.body.model->gen_ai.model`,
-          );
-        }
-      }
-
-      // Extract input messages from body.messages
-      if (
-        Array.isArray(modelStepBody.messages) &&
-        !attrs.has(ATTR_KEYS.GEN_AI_INPUT_MESSAGES) &&
-        ctx.out[ATTR_KEYS.GEN_AI_INPUT_MESSAGES] === undefined
-      ) {
-        const msgs = normalizeToMessages(modelStepBody.messages, "user");
-        if (msgs && msgs.length > 0) {
-          const systemInstruction = extractSystemInstructionFromMessages(msgs);
-          // Strip system messages — they go to gen_ai.system_instructions
-          const chatMsgs = systemInstruction ? stripSystemMessages(msgs) : msgs;
-          if (chatMsgs.length > 0) {
-            ctx.setAttr(ATTR_KEYS.GEN_AI_INPUT_MESSAGES, chatMsgs);
-            recordValueType(
-              ctx,
-              ATTR_KEYS.GEN_AI_INPUT_MESSAGES,
-              "chat_messages",
-            );
-          }
-          if (systemInstruction !== null) {
-            ctx.setAttrIfAbsent(
-              ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS,
-              systemInstruction,
-            );
-          }
-          ctx.recordRule(
-            `${this.id}:model_step.input.body.messages->gen_ai.input.messages`,
-          );
-        }
-      }
+      this.liftInputMessagesFromBody(ctx, modelStepBody);
     }
+
+    if (modelNameFromBody) return modelNameFromBody;
 
     // Fallback: try mastra.metadata.modelMetadata for model name
-    if (!modelName) {
-      modelName = extractModelFromMetadata(attrs);
-      if (
-        modelName &&
-        !attrs.has(ATTR_KEYS.GEN_AI_REQUEST_MODEL) &&
-        !attrs.has(ATTR_KEYS.GEN_AI_RESPONSE_MODEL) &&
-        ctx.out[ATTR_KEYS.GEN_AI_REQUEST_MODEL] === undefined
-      ) {
-        ctx.setAttr(ATTR_KEYS.GEN_AI_REQUEST_MODEL, modelName);
-        ctx.setAttr(ATTR_KEYS.GEN_AI_RESPONSE_MODEL, modelName);
-        ctx.recordRule(`${this.id}:metadata.modelMetadata->gen_ai.model`);
-      }
+    return this.liftModelNameFromMetadataFallback(ctx);
+  }
+
+  // Extract model name from body.model
+  private liftModelNameFromBody(
+    ctx: ExtractorContext,
+    modelStepBody: Record<string, unknown>,
+  ): string | null {
+    if (
+      typeof modelStepBody.model !== "string" ||
+      modelStepBody.model.length === 0
+    ) {
+      return null;
+    }
+    const modelName = modelStepBody.model;
+    const { attrs } = ctx.bag;
+    if (
+      !attrs.has(ATTR_KEYS.GEN_AI_REQUEST_MODEL) &&
+      !attrs.has(ATTR_KEYS.GEN_AI_RESPONSE_MODEL)
+    ) {
+      ctx.setAttr(ATTR_KEYS.GEN_AI_REQUEST_MODEL, modelName);
+      ctx.setAttr(ATTR_KEYS.GEN_AI_RESPONSE_MODEL, modelName);
+      ctx.recordRule(`${this.id}:model_step.input.body.model->gen_ai.model`);
+    }
+    return modelName;
+  }
+
+  // Extract input messages from body.messages
+  private liftInputMessagesFromBody(
+    ctx: ExtractorContext,
+    modelStepBody: Record<string, unknown>,
+  ): void {
+    const { attrs } = ctx.bag;
+    if (
+      !Array.isArray(modelStepBody.messages) ||
+      attrs.has(ATTR_KEYS.GEN_AI_INPUT_MESSAGES) ||
+      ctx.out[ATTR_KEYS.GEN_AI_INPUT_MESSAGES] !== undefined
+    ) {
+      return;
     }
 
+    const msgs = normalizeToMessages(modelStepBody.messages, "user");
+    if (!msgs || msgs.length === 0) return;
+
+    const systemInstruction = extractSystemInstructionFromMessages(msgs);
+    // Strip system messages — they go to gen_ai.system_instructions
+    const chatMsgs = systemInstruction ? stripSystemMessages(msgs) : msgs;
+    if (chatMsgs.length > 0) {
+      ctx.setAttr(ATTR_KEYS.GEN_AI_INPUT_MESSAGES, chatMsgs);
+      recordValueType(ctx, ATTR_KEYS.GEN_AI_INPUT_MESSAGES, "chat_messages");
+    }
+    if (systemInstruction !== null) {
+      ctx.setAttrIfAbsent(
+        ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS,
+        systemInstruction,
+      );
+    }
+    ctx.recordRule(
+      `${this.id}:model_step.input.body.messages->gen_ai.input.messages`,
+    );
+  }
+
+  private liftModelNameFromMetadataFallback(
+    ctx: ExtractorContext,
+  ): string | null {
+    const { attrs } = ctx.bag;
+    const modelName = extractModelFromMetadata(attrs);
+    if (
+      modelName &&
+      !attrs.has(ATTR_KEYS.GEN_AI_REQUEST_MODEL) &&
+      !attrs.has(ATTR_KEYS.GEN_AI_RESPONSE_MODEL) &&
+      ctx.out[ATTR_KEYS.GEN_AI_REQUEST_MODEL] === undefined
+    ) {
+      ctx.setAttr(ATTR_KEYS.GEN_AI_REQUEST_MODEL, modelName);
+      ctx.setAttr(ATTR_KEYS.GEN_AI_RESPONSE_MODEL, modelName);
+      ctx.recordRule(`${this.id}:metadata.modelMetadata->gen_ai.model`);
+    }
     return modelName;
   }
 
@@ -192,83 +210,101 @@ export class MastraExtractor implements CanonicalAttributesExtractor {
     isEvalModelStep: boolean;
     modelStepBody: Record<string, unknown> | null;
   }): void {
-    const { attrs } = ctx.bag;
-
     // For agent_run spans: extract I/O from mastra.agent_run.input/output
     if (mastraType === "agent_run") {
-      if (!attrs.has(ATTR_KEYS.LANGWATCH_INPUT)) {
-        const rawInput = attrs.get(ATTR_KEYS.MASTRA_AGENT_RUN_INPUT);
-        if (rawInput !== undefined) {
-          const lastUserMessage = extractLastUserMessageText(rawInput);
-          if (lastUserMessage) {
-            ctx.setAttr(ATTR_KEYS.LANGWATCH_INPUT, lastUserMessage);
-            ctx.recordRule(
-              `${this.id}:mastra.agent_run.input->langwatch.input`,
-            );
-          }
-        }
-      }
-
-      if (!attrs.has(ATTR_KEYS.LANGWATCH_OUTPUT)) {
-        const rawOutput = attrs.get(ATTR_KEYS.MASTRA_AGENT_RUN_OUTPUT);
-        if (rawOutput !== undefined) {
-          const text = extractTextFromOutput(rawOutput);
-          if (text) {
-            ctx.setAttr(ATTR_KEYS.LANGWATCH_OUTPUT, text);
-            ctx.recordRule(
-              `${this.id}:mastra.agent_run.output->langwatch.output`,
-            );
-          }
-        }
-      }
+      this.extractAgentRunInput(ctx);
+      this.extractAgentRunOutput(ctx);
     }
 
     // For model_step spans: extract text from mastra.model_step.output
-    if (mastraType === "model_step" && !attrs.has(ATTR_KEYS.LANGWATCH_OUTPUT)) {
-      const rawOutput = attrs.get(ATTR_KEYS.MASTRA_MODEL_STEP_OUTPUT);
-      if (rawOutput !== undefined) {
-        if (isEvalModelStep) {
-          // For orphan eval spans: prefer structured object, fall back to text
-          const evalOutput = extractEvalOutput(rawOutput);
-          if (evalOutput != null) {
-            ctx.setAttr(ATTR_KEYS.LANGWATCH_OUTPUT, evalOutput);
-            ctx.recordRule(
-              `${this.id}:orphan.model_step.output->langwatch.output`,
-            );
-          }
-        } else {
-          const text = extractTextFromOutput(rawOutput);
-          if (text) {
-            ctx.setAttr(ATTR_KEYS.LANGWATCH_OUTPUT, text);
-            if (
-              ctx.out[ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES] === undefined &&
-              !ctx.bag.attrs.has(ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES)
-            ) {
-              ctx.setAttr(ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES, [
-                { role: "assistant", content: text },
-              ]);
-              recordValueType(
-                ctx,
-                ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES,
-                "chat_messages",
-              );
-            }
-            ctx.recordRule(
-              `${this.id}:mastra.model_step.output->langwatch.output`,
-            );
-          }
-        }
-      }
+    if (mastraType === "model_step") {
+      this.extractModelStepOutput(ctx, isEvalModelStep);
     }
 
     // For orphan eval spans: extract system prompt as input
-    if (isEvalModelStep && !attrs.has(ATTR_KEYS.LANGWATCH_INPUT)) {
-      const systemPrompt = extractSystemPromptFromBody(modelStepBody);
-      if (systemPrompt) {
-        ctx.setAttr(ATTR_KEYS.LANGWATCH_INPUT, systemPrompt);
-        ctx.recordRule(`${this.id}:orphan.system_prompt->langwatch.input`);
-      }
+    if (isEvalModelStep) {
+      this.extractOrphanEvalInput(ctx, modelStepBody);
     }
+  }
+
+  private extractAgentRunInput(ctx: ExtractorContext): void {
+    const { attrs } = ctx.bag;
+    if (attrs.has(ATTR_KEYS.LANGWATCH_INPUT)) return;
+    const rawInput = attrs.get(ATTR_KEYS.MASTRA_AGENT_RUN_INPUT);
+    if (rawInput === undefined) return;
+    const lastUserMessage = extractLastUserMessageText(rawInput);
+    if (!lastUserMessage) return;
+    ctx.setAttr(ATTR_KEYS.LANGWATCH_INPUT, lastUserMessage);
+    ctx.recordRule(`${this.id}:mastra.agent_run.input->langwatch.input`);
+  }
+
+  private extractAgentRunOutput(ctx: ExtractorContext): void {
+    const { attrs } = ctx.bag;
+    if (attrs.has(ATTR_KEYS.LANGWATCH_OUTPUT)) return;
+    const rawOutput = attrs.get(ATTR_KEYS.MASTRA_AGENT_RUN_OUTPUT);
+    if (rawOutput === undefined) return;
+    const text = extractTextFromOutput(rawOutput);
+    if (!text) return;
+    ctx.setAttr(ATTR_KEYS.LANGWATCH_OUTPUT, text);
+    ctx.recordRule(`${this.id}:mastra.agent_run.output->langwatch.output`);
+  }
+
+  private extractModelStepOutput(
+    ctx: ExtractorContext,
+    isEvalModelStep: boolean,
+  ): void {
+    const { attrs } = ctx.bag;
+    if (attrs.has(ATTR_KEYS.LANGWATCH_OUTPUT)) return;
+    const rawOutput = attrs.get(ATTR_KEYS.MASTRA_MODEL_STEP_OUTPUT);
+    if (rawOutput === undefined) return;
+
+    if (isEvalModelStep) {
+      this.extractOrphanModelStepOutput(ctx, rawOutput);
+      return;
+    }
+    this.extractConversationalModelStepOutput(ctx, rawOutput);
+  }
+
+  // For orphan eval spans: prefer structured object, fall back to text
+  private extractOrphanModelStepOutput(
+    ctx: ExtractorContext,
+    rawOutput: unknown,
+  ): void {
+    const evalOutput = extractEvalOutput(rawOutput);
+    if (evalOutput == null) return;
+    ctx.setAttr(ATTR_KEYS.LANGWATCH_OUTPUT, evalOutput);
+    ctx.recordRule(`${this.id}:orphan.model_step.output->langwatch.output`);
+  }
+
+  private extractConversationalModelStepOutput(
+    ctx: ExtractorContext,
+    rawOutput: unknown,
+  ): void {
+    const text = extractTextFromOutput(rawOutput);
+    if (!text) return;
+    ctx.setAttr(ATTR_KEYS.LANGWATCH_OUTPUT, text);
+    if (
+      ctx.out[ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES] === undefined &&
+      !ctx.bag.attrs.has(ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES)
+    ) {
+      ctx.setAttr(ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES, [
+        { role: "assistant", content: text },
+      ]);
+      recordValueType(ctx, ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES, "chat_messages");
+    }
+    ctx.recordRule(`${this.id}:mastra.model_step.output->langwatch.output`);
+  }
+
+  private extractOrphanEvalInput(
+    ctx: ExtractorContext,
+    modelStepBody: Record<string, unknown> | null,
+  ): void {
+    const { attrs } = ctx.bag;
+    if (attrs.has(ATTR_KEYS.LANGWATCH_INPUT)) return;
+    const systemPrompt = extractSystemPromptFromBody(modelStepBody);
+    if (!systemPrompt) return;
+    ctx.setAttr(ATTR_KEYS.LANGWATCH_INPUT, systemPrompt);
+    ctx.recordRule(`${this.id}:orphan.system_prompt->langwatch.input`);
   }
 
   /** Set contextual display names based on span type and model. */
@@ -452,6 +488,28 @@ function extractEvalOutput(output: unknown): unknown {
   return null;
 }
 
+const textFromContentPart = (part: unknown): string | null => {
+  if (typeof part === "string") return part;
+  if (part && typeof part === "object") {
+    const p = part as Record<string, unknown>;
+    if (typeof p.text === "string") return p.text;
+    if (typeof p.content === "string") return p.content;
+  }
+  return null;
+};
+
+const textFromContentRecord = (
+  content: Record<string, unknown>,
+): string | null => {
+  if (typeof content.text === "string" && content.text.length > 0) {
+    return content.text;
+  }
+  if (typeof content.content === "string" && content.content.length > 0) {
+    return content.content;
+  }
+  return null;
+};
+
 /**
  * Normalizes message content to a string.
  * Handles string, array of content parts, and object with text/content fields.
@@ -460,26 +518,13 @@ function normalizeContentToString(content: unknown): string | null {
   if (typeof content === "string" && content.length > 0) return content;
 
   if (Array.isArray(content)) {
-    const parts = content
-      .map((part) => {
-        if (typeof part === "string") return part;
-        if (part && typeof part === "object") {
-          const p = part as Record<string, unknown>;
-          if (typeof p.text === "string") return p.text;
-          if (typeof p.content === "string") return p.content;
-        }
-        return null;
-      })
-      .filter(Boolean);
+    const parts = content.map(textFromContentPart).filter(Boolean);
     const joined = parts.join("\n");
     return joined.length > 0 ? joined : null;
   }
 
   if (content && typeof content === "object") {
-    const obj = content as Record<string, unknown>;
-    if (typeof obj.text === "string" && obj.text.length > 0) return obj.text;
-    if (typeof obj.content === "string" && obj.content.length > 0)
-      return obj.content;
+    return textFromContentRecord(content as Record<string, unknown>);
   }
 
   return null;
@@ -504,6 +549,26 @@ function extractSystemPromptFromBody(
   return null;
 }
 
+// Try to extract a short description from the system prompt
+const orphanEvalDisplayName = ({
+  modelName,
+  modelStepBody,
+}: {
+  modelName: string | null;
+  modelStepBody: Record<string, unknown> | null;
+}): string => {
+  const systemPrompt = extractSystemPromptFromBody(modelStepBody);
+  if (systemPrompt) {
+    // Take first ~60 chars of the system prompt as description
+    const desc =
+      systemPrompt.length > 60
+        ? systemPrompt.slice(0, 57) + "..."
+        : systemPrompt;
+    return `Eval: ${desc}`;
+  }
+  return modelName ? `Eval: ${modelName}` : "Eval";
+};
+
 /**
  * Derives a contextual display name for a Mastra span.
  */
@@ -519,17 +584,7 @@ function deriveDisplayName({
   modelStepBody: Record<string, unknown> | null;
 }): string | null {
   if (isOrphan) {
-    // Try to extract a short description from the system prompt
-    const systemPrompt = extractSystemPromptFromBody(modelStepBody);
-    if (systemPrompt) {
-      // Take first ~60 chars of the system prompt as description
-      const desc =
-        systemPrompt.length > 60
-          ? systemPrompt.slice(0, 57) + "..."
-          : systemPrompt;
-      return `Eval: ${desc}`;
-    }
-    return modelName ? `Eval: ${modelName}` : "Eval";
+    return orphanEvalDisplayName({ modelName, modelStepBody });
   }
 
   switch (mastraType) {

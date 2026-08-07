@@ -31,6 +31,103 @@ const truncateRecursive = (
   return data;
 };
 
+// Serialize within the real property-key context, not standalone:
+// `JSON.stringify(truncated)` alone always invokes a custom `toJSON()`
+// with key `""`, so a key-sensitive `toJSON()` could measure smaller (or
+// larger) here than it renders inside the final object, letting an
+// oversized entry slip past `maxTotalLength`. Wrapping in `{ [key]: ... }`
+// reproduces the exact key `JSON.stringify` will call `toJSON()` with.
+//
+// `JSON.stringify` drops undefined/function/symbol values from an
+// object entirely, which is indistinguishable from key `""` here, so
+// the wrapped form comes back as the literal string `"{}"` — those keys
+// cost nothing and must not be measured with `.length`.
+const serializedEntryLength = ({
+  key,
+  truncated,
+  kept,
+}: {
+  key: string;
+  truncated: unknown;
+  kept: number;
+}): number => {
+  const quotedKey = JSON.stringify(key);
+  const wrapped = JSON.stringify({ [key]: truncated });
+  const serializedValue =
+    wrapped === "{}" ? undefined : wrapped.slice(quotedKey.length + 2, -1);
+  return serializedValue === undefined
+    ? 0
+    : quotedKey.length +
+        ":".length +
+        serializedValue.length +
+        (kept > 0 ? ",".length : 0);
+};
+
+// The serialised length of an object is the sum of its entries' lengths plus
+// the separators, so we can track the running total by serialising each value
+// exactly once. Re-serialising the whole accumulated object on every key (as
+// this used to) is quadratic, and it runs on precisely the inputs already
+// known to be oversized.
+const truncateObjectToBudget = ({
+  data,
+  maxTotalLength,
+}: {
+  data: object;
+  maxTotalLength: number;
+}): Record<string, unknown> => {
+  const entries = Object.entries(data);
+  const result: Record<string, unknown> = {};
+
+  // Matches what the old whole-object `JSON.stringify(tempResult).length`
+  // measured: the accumulated object *without* the truncation marker, which
+  // is why the budget below keeps the same `- 50` headroom for it.
+  let length = "{}".length;
+  let kept = 0;
+
+  for (const [key, value] of entries) {
+    const truncated = truncateRecursive(value, {
+      maxStringLength: 2 * 1024,
+      maxTotalLength,
+    });
+
+    const entryLength = serializedEntryLength({ key, truncated, kept });
+
+    // Leave room for the truncation marker.
+    if (length + entryLength > maxTotalLength - 50) break;
+
+    result[key] = truncated;
+    length += entryLength;
+    if (entryLength > 0) kept++;
+  }
+
+  return {
+    ...result,
+    "...": "[truncated]",
+  };
+};
+
+const truncateToFirstFittingStringLength = ({
+  data,
+  maxTotalLength,
+  stringLengths,
+}: {
+  data: unknown;
+  maxTotalLength: number;
+  stringLengths: number[];
+}): { fitted: unknown } | null => {
+  for (const stringLength of stringLengths) {
+    const truncated = truncateRecursive(data, {
+      maxStringLength: stringLength,
+      maxTotalLength,
+    });
+
+    if (JSON.stringify(truncated).length <= maxTotalLength) {
+      return { fitted: truncated };
+    }
+  }
+  return null;
+};
+
 const truncateWithSizeLimit = (
   data: unknown,
   maxTotalLength: number,
@@ -40,73 +137,17 @@ const truncateWithSizeLimit = (
     return data;
   }
 
-  for (const stringLength of stringLengths) {
-    const truncated = truncateRecursive(data, {
-      maxStringLength: stringLength,
-      maxTotalLength,
-    });
-
-    if (JSON.stringify(truncated).length <= maxTotalLength) {
-      return truncated;
-    }
+  const fitting = truncateToFirstFittingStringLength({
+    data,
+    maxTotalLength,
+    stringLengths,
+  });
+  if (fitting) {
+    return fitting.fitted;
   }
 
-  // The serialised length of an object is the sum of its entries' lengths plus
-  // the separators, so we can track the running total by serialising each value
-  // exactly once. Re-serialising the whole accumulated object on every key (as
-  // this used to) is quadratic, and it runs on precisely the inputs already
-  // known to be oversized.
   if (typeof data === "object" && data !== null && !Array.isArray(data)) {
-    const entries = Object.entries(data);
-    const result: Record<string, unknown> = {};
-
-    // Matches what the old whole-object `JSON.stringify(tempResult).length`
-    // measured: the accumulated object *without* the truncation marker, which
-    // is why the budget below keeps the same `- 50` headroom for it.
-    let length = "{}".length;
-    let kept = 0;
-
-    for (const [key, value] of entries) {
-      const truncated = truncateRecursive(value, {
-        maxStringLength: 2 * 1024,
-        maxTotalLength,
-      });
-
-      // Serialize within the real property-key context, not standalone:
-      // `JSON.stringify(truncated)` alone always invokes a custom `toJSON()`
-      // with key `""`, so a key-sensitive `toJSON()` could measure smaller (or
-      // larger) here than it renders inside the final object, letting an
-      // oversized entry slip past `maxTotalLength`. Wrapping in `{ [key]: ... }`
-      // reproduces the exact key `JSON.stringify` will call `toJSON()` with.
-      //
-      // `JSON.stringify` drops undefined/function/symbol values from an
-      // object entirely, which is indistinguishable from key `""` here, so
-      // the wrapped form comes back as the literal string `"{}"` — those keys
-      // cost nothing and must not be measured with `.length`.
-      const quotedKey = JSON.stringify(key);
-      const wrapped = JSON.stringify({ [key]: truncated });
-      const serializedValue =
-        wrapped === "{}" ? undefined : wrapped.slice(quotedKey.length + 2, -1);
-      const entryLength =
-        serializedValue === undefined
-          ? 0
-          : quotedKey.length +
-            ":".length +
-            serializedValue.length +
-            (kept > 0 ? ",".length : 0);
-
-      // Leave room for the truncation marker.
-      if (length + entryLength > maxTotalLength - 50) break;
-
-      result[key] = truncated;
-      length += entryLength;
-      if (entryLength > 0) kept++;
-    }
-
-    return {
-      ...result,
-      "...": "[truncated]",
-    };
+    return truncateObjectToBudget({ data, maxTotalLength });
   }
 
   return data;

@@ -1,5 +1,9 @@
 import { createLogger } from "@langwatch/observability";
-import type { TRPCLink } from "@trpc/client";
+import type {
+  Operation,
+  OperationResultObserver,
+  TRPCLink,
+} from "@trpc/client";
 import { TRPCClientError } from "@trpc/client";
 import type { AnyRouter } from "@trpc/server";
 import { observable } from "@trpc/server/observable";
@@ -64,6 +68,254 @@ const toTrpcError = <TRouter extends AnyRouter>(
   return TRPCClientError.from<TRouter>(new Error(`${prefix}: ${msg}`));
 };
 
+/** {@link SSELinkOptions} with every default already applied. */
+interface SSELinkRuntimeOptions {
+  url: string;
+  eventSourceOptions: EventSourceInit;
+  transformPath: (path: string) => string;
+  maxReconnectAttempts: number;
+  reconnectDelay: number;
+}
+
+/**
+ * The one mutable cell per subscription. Every handler reads and writes it
+ * rather than a captured variable, so a handler attached to a superseded
+ * EventSource still sees the connection that is current now — the behaviour
+ * the shared `es` binding used to give.
+ */
+interface SSEConnectionState {
+  es: EventSource | null;
+  reconnectTimer: ReturnType<typeof setTimeout> | null;
+  reconnectAttempts: number;
+  closed: boolean;
+  startedSent: boolean;
+}
+
+const clearReconnectTimer = (state: SSEConnectionState) => {
+  if (!state.reconnectTimer) return;
+  clearTimeout(state.reconnectTimer);
+  state.reconnectTimer = null;
+};
+
+const closeConnection = (state: SSEConnectionState) => {
+  if (state.closed) return;
+  state.closed = true;
+  clearReconnectTimer(state);
+  state.es?.close();
+  state.es = null;
+};
+
+const buildEndpointUrl = ({
+  options,
+  op,
+}: {
+  options: SSELinkRuntimeOptions;
+  op: Operation;
+}): URL => {
+  const base = new URL(options.url);
+  const basePath = base.pathname.endsWith("/")
+    ? base.pathname
+    : `${base.pathname}/`;
+  const opPath = options.transformPath(op.path).replace(/^\//, "");
+  base.pathname = `${basePath}${opPath}`;
+
+  if (op.input !== void 0) {
+    base.searchParams.set("input", superjson.stringify(op.input));
+  }
+  return base;
+};
+
+const handleOpen = <TRouter extends AnyRouter>({
+  state,
+  observer,
+  path,
+}: {
+  state: SSEConnectionState;
+  observer: OperationResultObserver<TRouter, unknown>;
+  path: string;
+}) => {
+  state.reconnectAttempts = 0;
+  logger.info({ path }, "SSE connected");
+
+  if (!state.closed && !state.startedSent) {
+    state.startedSent = true;
+    logger.debug({ path }, "SSE started event sent");
+    observer.next({ result: { type: "started" } });
+  }
+};
+
+const dispatchFrame = <TRouter extends AnyRouter>({
+  parsed,
+  state,
+  observer,
+  path,
+}: {
+  parsed: SSEMessage;
+  state: SSEConnectionState;
+  observer: OperationResultObserver<TRouter, unknown>;
+  path: string;
+}) => {
+  switch (classifySseFrame(parsed)) {
+    case "connected":
+      logger.debug({ path }, "SSE connection acknowledged");
+      return;
+    case "complete":
+      logger.info({ path }, "SSE stream completed");
+      observer.complete();
+      closeConnection(state);
+      return;
+    case "protocol-error": {
+      const msg =
+        isObject(parsed) && typeof parsed.message === "string"
+          ? parsed.message
+          : "SSE Error";
+      logger.error({ path, error: msg }, "SSE error message received");
+      observer.error(TRPCClientError.from<TRouter>(new Error(msg)));
+      closeConnection(state);
+      return;
+    }
+    case "data":
+      break;
+  }
+
+  logger.debug({ path, dataType: typeof parsed }, "SSE data message received");
+  observer.next({
+    result: { type: "data", data: parsed as unknown },
+  });
+};
+
+const handleMessage = <TRouter extends AnyRouter>({
+  event,
+  state,
+  observer,
+  path,
+}: {
+  event: MessageEvent;
+  state: SSEConnectionState;
+  observer: OperationResultObserver<TRouter, unknown>;
+  path: string;
+}) => {
+  if (state.closed) return;
+
+  try {
+    const parsed = superjson.parse(event.data) as SSEMessage;
+    dispatchFrame<TRouter>({ parsed, state, observer, path });
+  } catch (error) {
+    logger.error({ error }, "SSE message parse failed");
+    observer.error(toTrpcError<TRouter>(error, "SSE message parsing failed"));
+    closeConnection(state);
+  }
+};
+
+const scheduleReconnect = ({
+  state,
+  options,
+  path,
+  connect,
+}: {
+  state: SSEConnectionState;
+  options: SSELinkRuntimeOptions;
+  path: string;
+  connect: () => void;
+}) => {
+  state.reconnectAttempts += 1;
+  const delay =
+    options.reconnectDelay * Math.pow(2, state.reconnectAttempts - 1);
+  logger.info(
+    { attempt: state.reconnectAttempts, delay, path },
+    "Scheduling SSE reconnection",
+  );
+  state.reconnectTimer = setTimeout(() => !state.closed && connect(), delay);
+};
+
+const handleConnectionError = <TRouter extends AnyRouter>({
+  state,
+  observer,
+  options,
+  path,
+  connect,
+}: {
+  state: SSEConnectionState;
+  observer: OperationResultObserver<TRouter, unknown>;
+  options: SSELinkRuntimeOptions;
+  path: string;
+  connect: () => void;
+}) => {
+  if (state.closed) return;
+
+  logger.warn(
+    {
+      readyState: state.es?.readyState,
+      attempt: state.reconnectAttempts + 1,
+      maxReconnectAttempts: options.maxReconnectAttempts,
+    },
+    "SSE error",
+  );
+
+  state.es?.close();
+  state.es = null;
+
+  if (state.reconnectAttempts >= options.maxReconnectAttempts) {
+    observer.error(
+      TRPCClientError.from<TRouter>(
+        new Error(
+          `SSE connection failed after ${options.maxReconnectAttempts} attempts`,
+        ),
+      ),
+    );
+    closeConnection(state);
+    return;
+  }
+
+  scheduleReconnect({ state, options, path, connect });
+};
+
+const createConnect = <TRouter extends AnyRouter>({
+  state,
+  observer,
+  options,
+  op,
+}: {
+  state: SSEConnectionState;
+  observer: OperationResultObserver<TRouter, unknown>;
+  options: SSELinkRuntimeOptions;
+  op: Operation;
+}): (() => void) => {
+  const connect = () => {
+    if (state.closed) return;
+    clearReconnectTimer(state);
+
+    state.es?.close();
+    state.es = null;
+
+    const endpointUrl = buildEndpointUrl({ options, op });
+    const path = endpointUrl.pathname;
+    logger.info({ path, input: op.input }, "Initiating SSE connection");
+
+    const es = new EventSource(
+      endpointUrl.toString(),
+      options.eventSourceOptions,
+    );
+    state.es = es;
+
+    es.onopen = () => handleOpen<TRouter>({ state, observer, path });
+
+    es.onmessage = (event) =>
+      handleMessage<TRouter>({ event, state, observer, path });
+
+    es.onerror = () =>
+      handleConnectionError<TRouter>({
+        state,
+        observer,
+        options,
+        path,
+        connect,
+      });
+  };
+
+  return connect;
+};
+
 export function sseLink<TRouter extends AnyRouter = AnyRouter>(
   options: SSELinkOptions,
 ): TRPCLink<TRouter> {
@@ -81,166 +333,36 @@ export function sseLink<TRouter extends AnyRouter = AnyRouter>(
     throw new Error(`Invalid SSE URL: ${url}`);
   }
 
+  const runtimeOptions: SSELinkRuntimeOptions = {
+    url,
+    eventSourceOptions,
+    transformPath,
+    maxReconnectAttempts,
+    reconnectDelay,
+  };
+
   return () =>
     ({ op, next }) => {
       if (op.type !== "subscription") return next(op);
 
       return observable((observer) => {
-        let es: EventSource | null = null;
-        let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
-        let reconnectAttempts = 0;
-        let closed = false;
-        let startedSent = false;
-
-        const clearReconnectTimer = () => {
-          if (!reconnectTimer) return;
-          clearTimeout(reconnectTimer);
-          reconnectTimer = null;
+        const state: SSEConnectionState = {
+          es: null,
+          reconnectTimer: null,
+          reconnectAttempts: 0,
+          closed: false,
+          startedSent: false,
         };
 
-        const close = () => {
-          if (closed) return;
-          closed = true;
-          clearReconnectTimer();
-          es?.close();
-          es = null;
-        };
-
-        const buildUrl = (): URL => {
-          const base = new URL(url);
-          const basePath = base.pathname.endsWith("/")
-            ? base.pathname
-            : `${base.pathname}/`;
-          const opPath = transformPath(op.path).replace(/^\//, "");
-          base.pathname = `${basePath}${opPath}`;
-
-          if (op.input !== void 0) {
-            base.searchParams.set("input", superjson.stringify(op.input));
-          }
-          return base;
-        };
-
-        const connect = () => {
-          if (closed) return;
-          clearReconnectTimer();
-
-          es?.close();
-          es = null;
-
-          const endpointUrl = buildUrl();
-          logger.info(
-            { path: endpointUrl.pathname, input: op.input },
-            "Initiating SSE connection",
-          );
-          es = new EventSource(endpointUrl.toString(), eventSourceOptions);
-
-          es.onopen = () => {
-            reconnectAttempts = 0;
-            logger.info({ path: endpointUrl.pathname }, "SSE connected");
-
-            if (!closed && !startedSent) {
-              startedSent = true;
-              logger.debug(
-                { path: endpointUrl.pathname },
-                "SSE started event sent",
-              );
-              observer.next({ result: { type: "started" } });
-            }
-          };
-
-          es.onmessage = (event) => {
-            if (closed) return;
-
-            try {
-              const parsed = superjson.parse(event.data) as SSEMessage;
-
-              switch (classifySseFrame(parsed)) {
-                case "connected":
-                  logger.debug(
-                    { path: endpointUrl.pathname },
-                    "SSE connection acknowledged",
-                  );
-                  return;
-                case "complete":
-                  logger.info(
-                    { path: endpointUrl.pathname },
-                    "SSE stream completed",
-                  );
-                  observer.complete();
-                  close();
-                  return;
-                case "protocol-error": {
-                  const msg =
-                    isObject(parsed) && typeof parsed.message === "string"
-                      ? parsed.message
-                      : "SSE Error";
-                  logger.error(
-                    { path: endpointUrl.pathname, error: msg },
-                    "SSE error message received",
-                  );
-                  observer.error(TRPCClientError.from<TRouter>(new Error(msg)));
-                  close();
-                  return;
-                }
-                case "data":
-                  break;
-              }
-
-              logger.debug(
-                { path: endpointUrl.pathname, dataType: typeof parsed },
-                "SSE data message received",
-              );
-              observer.next({
-                result: { type: "data", data: parsed as unknown },
-              });
-            } catch (error) {
-              logger.error({ error }, "SSE message parse failed");
-              observer.error(
-                toTrpcError<TRouter>(error, "SSE message parsing failed"),
-              );
-              close();
-            }
-          };
-
-          es.onerror = () => {
-            if (closed) return;
-
-            logger.warn(
-              {
-                readyState: es?.readyState,
-                attempt: reconnectAttempts + 1,
-                maxReconnectAttempts,
-              },
-              "SSE error",
-            );
-
-            es?.close();
-            es = null;
-
-            if (reconnectAttempts >= maxReconnectAttempts) {
-              observer.error(
-                TRPCClientError.from<TRouter>(
-                  new Error(
-                    `SSE connection failed after ${maxReconnectAttempts} attempts`,
-                  ),
-                ),
-              );
-              close();
-              return;
-            }
-
-            reconnectAttempts += 1;
-            const delay = reconnectDelay * Math.pow(2, reconnectAttempts - 1);
-            logger.info(
-              { attempt: reconnectAttempts, delay, path: endpointUrl.pathname },
-              "Scheduling SSE reconnection",
-            );
-            reconnectTimer = setTimeout(() => !closed && connect(), delay);
-          };
-        };
+        const connect = createConnect<TRouter>({
+          state,
+          observer,
+          options: runtimeOptions,
+          op,
+        });
 
         connect();
-        return close;
+        return () => closeConnection(state);
       });
     };
 }

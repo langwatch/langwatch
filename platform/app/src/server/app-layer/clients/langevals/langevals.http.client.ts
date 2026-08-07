@@ -38,17 +38,38 @@ export class LangEvalsHttpClient implements LangEvalsClient {
     params: LangEvalsEvaluateParams,
     retriesLeft: number,
   ): Promise<SingleEvaluationResult> {
-    const { evaluatorType, data, settings, env } = params;
+    const { evaluatorType } = params;
     const url = `${this.endpoint}/${evaluatorType}/evaluate`;
-
     const startTime = performance.now();
-    let response: Response;
 
+    const response = await this.fetchEvaluation({ params, url });
+
+    if (!response.ok) {
+      return this.handleErrorResponse({
+        response,
+        params,
+        retriesLeft,
+        startTime,
+      });
+    }
+
+    return this.parseSuccessResponse({ response, evaluatorType, startTime });
+  }
+
+  /** Issues the evaluator HTTP call, translating a timeout/unreachable host into a typed error. */
+  private async fetchEvaluation({
+    params,
+    url,
+  }: {
+    params: LangEvalsEvaluateParams;
+    url: string;
+  }): Promise<Response> {
+    const { evaluatorType, data, settings, env } = params;
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
 
     try {
-      response = await fetch(url, {
+      return await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         signal: controller.signal,
@@ -91,39 +112,66 @@ export class LangEvalsHttpClient implements LangEvalsClient {
     } finally {
       clearTimeout(timeout);
     }
+  }
 
-    if (!response.ok) {
-      if (response.status >= 500 && retriesLeft > 0) {
-        await new Promise((resolve) => setTimeout(resolve, 100));
-        return this.evaluateWithRetry(params, retriesLeft - 1);
-      }
+  /**
+   * Retries a 5xx once budget allows, otherwise raises the customer-fault
+   * 413 case or the generic execution error.
+   */
+  private async handleErrorResponse({
+    response,
+    params,
+    retriesLeft,
+    startTime,
+  }: {
+    response: Response;
+    params: LangEvalsEvaluateParams;
+    retriesLeft: number;
+    startTime: number;
+  }): Promise<SingleEvaluationResult> {
+    const { evaluatorType } = params;
 
-      const duration = performance.now() - startTime;
-      evaluationDurationHistogram.labels(evaluatorType).observe(duration);
-      let statusText = response.statusText;
-      try {
-        statusText = JSON.stringify(await response.json(), undefined, 2);
-      } catch {
-        /* safe json parse fallback */
-      }
-      // 413 is the customer's payload being too big, not our backend failing.
-      // Raised as its own customer-fault error so it reports as an actionable
-      // skip instead of an opaque `413 {"message":"Request Too Long"}`. The
-      // counter is labelled to match the status the command ultimately emits,
-      // so oversized inputs don't read as platform error-rate on dashboards.
-      if (response.status === 413) {
-        getEvaluationStatusCounter(evaluatorType, "skipped").inc();
-        throw new EvaluatorInputTooLargeError({
-          meta: { evaluatorType, httpStatus: response.status },
-        });
-      }
+    if (response.status >= 500 && retriesLeft > 0) {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      return this.evaluateWithRetry(params, retriesLeft - 1);
+    }
 
-      getEvaluationStatusCounter(evaluatorType, "error").inc();
-      throw new EvaluatorExecutionError(`${response.status} ${statusText}`, {
+    const duration = performance.now() - startTime;
+    evaluationDurationHistogram.labels(evaluatorType).observe(duration);
+    let statusText = response.statusText;
+    try {
+      statusText = JSON.stringify(await response.json(), undefined, 2);
+    } catch {
+      /* safe json parse fallback */
+    }
+    // 413 is the customer's payload being too big, not our backend failing.
+    // Raised as its own customer-fault error so it reports as an actionable
+    // skip instead of an opaque `413 {"message":"Request Too Long"}`. The
+    // counter is labelled to match the status the command ultimately emits,
+    // so oversized inputs don't read as platform error-rate on dashboards.
+    if (response.status === 413) {
+      getEvaluationStatusCounter(evaluatorType, "skipped").inc();
+      throw new EvaluatorInputTooLargeError({
         meta: { evaluatorType, httpStatus: response.status },
       });
     }
 
+    getEvaluationStatusCounter(evaluatorType, "error").inc();
+    throw new EvaluatorExecutionError(`${response.status} ${statusText}`, {
+      meta: { evaluatorType, httpStatus: response.status },
+    });
+  }
+
+  /** Parses a successful evaluator response and records its outcome metric. */
+  private async parseSuccessResponse({
+    response,
+    evaluatorType,
+    startTime,
+  }: {
+    response: Response;
+    evaluatorType: string;
+    startTime: number;
+  }): Promise<SingleEvaluationResult> {
     const duration = performance.now() - startTime;
     evaluationDurationHistogram.labels(evaluatorType).observe(duration);
 

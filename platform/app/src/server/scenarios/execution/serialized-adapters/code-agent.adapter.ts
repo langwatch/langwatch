@@ -49,6 +49,11 @@ export class SerializedCodeAgentAdapterError extends Error {
 
 const tracer = getLangWatchTracer("langwatch.scenarios.code-agent-adapter");
 
+/** Span type accepted by `tracer.withActiveSpan`'s callback. */
+type NlpRequestSpan = Parameters<
+  Parameters<typeof tracer.withActiveSpan>[2]
+>[0];
+
 /**
  * Serialized code agent adapter that uses pre-fetched configuration.
  * Sends code execution requests to the NLP service. No database access required.
@@ -255,77 +260,114 @@ export class SerializedCodeAgentAdapter extends AgentAdapter {
           "nlp.timeout_ms": NLP_FETCH_TIMEOUT_MS,
         },
       },
-      async (span) => {
-        const controller = new AbortController();
-        let timedOut = false;
-        const timeout = setTimeout(() => {
-          timedOut = true;
-          controller.abort();
-        }, NLP_FETCH_TIMEOUT_MS);
-
-        try {
-          let response: Response;
-          try {
-            response = await fetch(url, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(event),
-              signal: controller.signal,
-            });
-          } catch (fetchError) {
-            if (timedOut) {
-              span.setAttribute(
-                "error.kind",
-                "timeout" satisfies AdapterErrorKind,
-              );
-              throw new SerializedCodeAgentAdapterError(
-                `Code execution failed: NLP service ${url} did not respond within ${NLP_FETCH_TIMEOUT_MS}ms (request aborted).`,
-                { kind: "timeout", cause: fetchError },
-              );
-            }
-            span.setAttribute("error.kind", "fetch" satisfies AdapterErrorKind);
-            const cause =
-              fetchError instanceof Error && "cause" in fetchError
-                ? ` (cause: ${String((fetchError as Error & { cause?: unknown }).cause)})`
-                : "";
-            throw new SerializedCodeAgentAdapterError(
-              `Code execution failed: fetch to ${url} failed - ${fetchError instanceof Error ? fetchError.message : String(fetchError)}${cause}`,
-              { kind: "fetch", cause: fetchError },
-            );
-          }
-
-          span.setAttribute("http.status_code", response.status);
-
-          if (!response.ok) {
-            let errorMessage = "";
-            try {
-              const errorBody = (await response.json()) as { detail?: string };
-              errorMessage = errorBody.detail ?? JSON.stringify(errorBody);
-            } catch {
-              errorMessage = await response.text().catch(() => "");
-            }
-            span.setAttribute("error.kind", "http" satisfies AdapterErrorKind);
-            throw new SerializedCodeAgentAdapterError(
-              `Code execution failed: HTTP ${response.status}${errorMessage ? ` - ${errorMessage}` : ""}`,
-              { kind: "http", httpStatus: response.status },
-            );
-          }
-
-          const result = (await response.json()) as {
-            trace_id: string;
-            status: string;
-            result: Record<string, unknown> | null;
-          };
-          span.setAttribute("nlp.status", result.status);
-          if (result.trace_id) {
-            span.setAttribute("nlp.trace_id", result.trace_id);
-          }
-          return this.extractOutput(result.result);
-        } finally {
-          clearTimeout(timeout);
-        }
-      },
+      (span) => this.runNlpRequest({ url, event, span }),
     );
+  }
+
+  private async runNlpRequest({
+    url,
+    event,
+    span,
+  }: {
+    url: string;
+    event: unknown;
+    span: NlpRequestSpan;
+  }): Promise<string> {
+    const controller = new AbortController();
+    let timedOut = false;
+    const timeout = setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, NLP_FETCH_TIMEOUT_MS);
+
+    try {
+      const response = await this.fetchNlpResponse({
+        url,
+        event,
+        controller,
+        span,
+        isTimedOut: () => timedOut,
+      });
+      return await this.handleNlpResponse({ response, span });
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
+  private async fetchNlpResponse({
+    url,
+    event,
+    controller,
+    span,
+    isTimedOut,
+  }: {
+    url: string;
+    event: unknown;
+    controller: AbortController;
+    span: NlpRequestSpan;
+    isTimedOut: () => boolean;
+  }): Promise<Response> {
+    try {
+      return await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(event),
+        signal: controller.signal,
+      });
+    } catch (fetchError) {
+      if (isTimedOut()) {
+        span.setAttribute("error.kind", "timeout" satisfies AdapterErrorKind);
+        throw new SerializedCodeAgentAdapterError(
+          `Code execution failed: NLP service ${url} did not respond within ${NLP_FETCH_TIMEOUT_MS}ms (request aborted).`,
+          { kind: "timeout", cause: fetchError },
+        );
+      }
+      span.setAttribute("error.kind", "fetch" satisfies AdapterErrorKind);
+      const cause =
+        fetchError instanceof Error && "cause" in fetchError
+          ? ` (cause: ${String((fetchError as Error & { cause?: unknown }).cause)})`
+          : "";
+      throw new SerializedCodeAgentAdapterError(
+        `Code execution failed: fetch to ${url} failed - ${fetchError instanceof Error ? fetchError.message : String(fetchError)}${cause}`,
+        { kind: "fetch", cause: fetchError },
+      );
+    }
+  }
+
+  private async handleNlpResponse({
+    response,
+    span,
+  }: {
+    response: Response;
+    span: NlpRequestSpan;
+  }): Promise<string> {
+    span.setAttribute("http.status_code", response.status);
+
+    if (!response.ok) {
+      let errorMessage = "";
+      try {
+        const errorBody = (await response.json()) as { detail?: string };
+        errorMessage = errorBody.detail ?? JSON.stringify(errorBody);
+      } catch {
+        errorMessage = await response.text().catch(() => "");
+      }
+      span.setAttribute("error.kind", "http" satisfies AdapterErrorKind);
+      throw new SerializedCodeAgentAdapterError(
+        `Code execution failed: HTTP ${response.status}${errorMessage ? ` - ${errorMessage}` : ""}`,
+        { kind: "http", httpStatus: response.status },
+      );
+    }
+
+    const result = (await response.json()) as {
+      trace_id: string;
+      status: string;
+      result: Record<string, unknown> | null;
+    };
+    span.setAttribute("nlp.status", result.status);
+    if (result.trace_id) {
+      span.setAttribute("nlp.trace_id", result.trace_id);
+    }
+    return this.extractOutput(result.result);
   }
 
   /**
@@ -342,23 +384,42 @@ export class SerializedCodeAgentAdapter extends AgentAdapter {
         ? this.config.inputs
         : [{ identifier: "input", type: "str" }];
 
-    if (
-      this.config.scenarioMappings &&
-      Object.keys(this.config.scenarioMappings).length > 0
-    ) {
-      const resolved = resolveFieldMappings({
-        fieldMappings: this.config.scenarioMappings,
-        agentInput,
-      });
-      // Only include values for inputs that exist on the agent
-      const record: Record<string, string> = {};
-      for (const inp of declaredInputs) {
-        record[inp.identifier] = resolved[inp.identifier] ?? "";
-      }
-      return record;
+    if (this.hasScenarioMappings()) {
+      return this.resolveInputsFromMappings(agentInput, declaredInputs);
     }
 
-    // Legacy behavior: first input = last user message, rest = ""
+    return this.resolveInputsLegacy(agentInput, declaredInputs);
+  }
+
+  private hasScenarioMappings(): boolean {
+    return !!(
+      this.config.scenarioMappings &&
+      Object.keys(this.config.scenarioMappings).length > 0
+    );
+  }
+
+  /** Resolve each declared agent input from its mapping. Orphan mappings for
+   * inputs that don't exist on the agent are ignored. */
+  private resolveInputsFromMappings(
+    agentInput: AgentInput,
+    declaredInputs: CodeAgentData["inputs"],
+  ): Record<string, string> {
+    const resolved = resolveFieldMappings({
+      fieldMappings: this.config.scenarioMappings!,
+      agentInput,
+    });
+    const record: Record<string, string> = {};
+    for (const inp of declaredInputs) {
+      record[inp.identifier] = resolved[inp.identifier] ?? "";
+    }
+    return record;
+  }
+
+  /** Legacy behavior: first input = last user message, rest = "" */
+  private resolveInputsLegacy(
+    agentInput: AgentInput,
+    declaredInputs: CodeAgentData["inputs"],
+  ): Record<string, string> {
     const lastUserMessage = agentInput.messages.findLast(
       (m) => m.role === "user",
     );

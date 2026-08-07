@@ -174,52 +174,90 @@ function logAuthDecision({
   );
 }
 
-async function verifyGatewaySignature(c: Context, next: Next) {
+function gatewayAuthReject(
+  c: Context,
+  {
+    status,
+    type,
+    code,
+    message,
+    detail,
+  }: {
+    status: 401 | 500;
+    type: string;
+    code: string;
+    message: string;
+    detail?: Record<string, unknown>;
+  },
+) {
+  logAuthDecision({ c, code, status, detail });
+  return c.json({ error: { type, code, message } }, status);
+}
+
+/** The configured HMAC secret, or the rejection to return when it is unset. */
+function requireGatewaySecret(
+  c: Context,
+):
+  | { ok: true; secret: string }
+  | { ok: false; response: ReturnType<typeof gatewayAuthReject> } {
   const secret =
     process.env.LW_GATEWAY_INTERNAL_SECRET ?? env.LW_GATEWAY_INTERNAL_SECRET;
   if (!secret) {
-    logAuthDecision({
-      c,
-      code: "gateway_internal_secret_missing",
-      status: 500,
-    });
-    return c.json(
-      {
-        error: {
-          type: "internal_error",
-          code: "gateway_internal_secret_missing",
-          message: "LW_GATEWAY_INTERNAL_SECRET not configured on control-plane",
-        },
-      },
-      500,
-    );
+    return {
+      ok: false,
+      response: gatewayAuthReject(c, {
+        status: 500,
+        type: "internal_error",
+        code: "gateway_internal_secret_missing",
+        message: "LW_GATEWAY_INTERNAL_SECRET not configured on control-plane",
+      }),
+    };
   }
+  return { ok: true, secret };
+}
 
+/** The presented signature + timestamp headers, or the rejection to return
+ *  when either is missing. */
+function requirePresentedSignature(
+  c: Context,
+):
+  | { ok: true; presentedSig: string; presentedTs: string }
+  | { ok: false; response: ReturnType<typeof gatewayAuthReject> } {
   const presentedSig = c.req.header("X-LangWatch-Gateway-Signature");
   const presentedTs = c.req.header("X-LangWatch-Gateway-Timestamp");
   if (!presentedSig || !presentedTs) {
-    logAuthDecision({
-      c,
-      code: "missing_signature",
-      status: 401,
-      detail: {
-        hasSignature: Boolean(presentedSig),
-        hasTimestamp: Boolean(presentedTs),
-      },
-    });
-    return c.json(
-      {
-        error: {
-          type: "permission_denied",
-          code: "missing_signature",
-          message:
-            "X-LangWatch-Gateway-Signature and X-LangWatch-Gateway-Timestamp are required",
+    return {
+      ok: false,
+      response: gatewayAuthReject(c, {
+        status: 401,
+        type: "permission_denied",
+        code: "missing_signature",
+        message:
+          "X-LangWatch-Gateway-Signature and X-LangWatch-Gateway-Timestamp are required",
+        detail: {
+          hasSignature: Boolean(presentedSig),
+          hasTimestamp: Boolean(presentedTs),
         },
-      },
-      401,
-    );
+      }),
+    };
   }
+  return { ok: true, presentedSig, presentedTs };
+}
 
+/** Verifies the HMAC signature matches the request; the rejection to return
+ *  when it does not. */
+async function requireValidSignature(
+  c: Context,
+  {
+    secret,
+    presentedSig,
+    presentedTs,
+  }: {
+    secret: string;
+    presentedSig: string;
+    presentedTs: string;
+  },
+): Promise<ReturnType<typeof gatewayAuthReject> | null> {
   const body = await c.req.raw.clone().text();
   const url = new URL(c.req.url);
   const canonical = buildGatewayCanonicalString({
@@ -233,57 +271,62 @@ async function verifyGatewaySignature(c: Context, next: Next) {
   const a = Buffer.from(expected);
   const b = Buffer.from(presentedSig);
   if (a.length !== b.length || !timingSafeEqual(a, b)) {
-    logAuthDecision({ c, code: "invalid_signature", status: 401 });
-    return c.json(
-      {
-        error: {
-          type: "permission_denied",
-          code: "invalid_signature",
-          message: "signature mismatch",
-        },
-      },
-      401,
-    );
+    return gatewayAuthReject(c, {
+      status: 401,
+      type: "permission_denied",
+      code: "invalid_signature",
+      message: "signature mismatch",
+    });
   }
+  return null;
+}
 
+/** Verifies the timestamp parses and is within the replay window; the
+ *  rejection to return when it is not. */
+function requireFreshTimestamp(
+  c: Context,
+  presentedTs: string,
+): ReturnType<typeof gatewayAuthReject> | null {
   const ts = Number.parseInt(presentedTs, 10);
   if (!Number.isFinite(ts)) {
-    logAuthDecision({
-      c,
-      code: "invalid_timestamp",
+    return gatewayAuthReject(c, {
       status: 401,
+      type: "permission_denied",
+      code: "invalid_timestamp",
+      message: "X-LangWatch-Gateway-Timestamp must be unix seconds",
       detail: { presentedTs },
     });
-    return c.json(
-      {
-        error: {
-          type: "permission_denied",
-          code: "invalid_timestamp",
-          message: "X-LangWatch-Gateway-Timestamp must be unix seconds",
-        },
-      },
-      401,
-    );
   }
   const now = Math.floor(Date.now() / 1000);
   if (Math.abs(now - ts) > GATEWAY_SIGNATURE_WINDOW_SECONDS) {
-    logAuthDecision({
-      c,
-      code: "timestamp_out_of_window",
+    return gatewayAuthReject(c, {
       status: 401,
+      type: "permission_denied",
+      code: "timestamp_out_of_window",
+      message: `timestamp drift > ${GATEWAY_SIGNATURE_WINDOW_SECONDS}s`,
       detail: { driftSeconds: now - ts },
     });
-    return c.json(
-      {
-        error: {
-          type: "permission_denied",
-          code: "timestamp_out_of_window",
-          message: `timestamp drift > ${GATEWAY_SIGNATURE_WINDOW_SECONDS}s`,
-        },
-      },
-      401,
-    );
   }
+  return null;
+}
+
+async function verifyGatewaySignature(c: Context, next: Next) {
+  const secretResult = requireGatewaySecret(c);
+  if (!secretResult.ok) return secretResult.response;
+
+  const presentedResult = requirePresentedSignature(c);
+  if (!presentedResult.ok) return presentedResult.response;
+  const { presentedSig, presentedTs } = presentedResult;
+
+  const signatureRejection = await requireValidSignature(c, {
+    secret: secretResult.secret,
+    presentedSig,
+    presentedTs,
+  });
+  if (signatureRejection) return signatureRejection;
+
+  const timestampRejection = requireFreshTimestamp(c, presentedTs);
+  if (timestampRejection) return timestampRejection;
 
   await next();
 }

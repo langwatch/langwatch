@@ -1,4 +1,5 @@
 import { PersonalWorkspaceService } from "@ee/governance/services/personalWorkspace.service";
+import type { OrganizationInvite, Prisma, PrismaClient } from "@prisma/client";
 import {
   OrganizationUserRole,
   RoleBindingScopeType,
@@ -15,6 +16,9 @@ import { LITE_MEMBER_VIEWER_ONLY_ERROR } from "~/server/app-layer/organizations/
 import { enrichTeamWithRoleBindings } from "~/server/app-layer/organizations/organization.service";
 import type { FullyLoadedOrganization } from "~/server/app-layer/organizations/repositories/organization.repository";
 import { PrismaRoleBindingRepository } from "~/server/app-layer/role-bindings/repositories/role-binding.prisma.repository";
+import type { RoleBindingForSynthesis } from "~/server/app-layer/role-bindings/repositories/role-binding.repository";
+import type { PlanProviderUser } from "~/server/app-layer/subscription/plan-provider";
+import type { Session } from "~/server/auth";
 import { createLicenseEnforcementService } from "~/server/license-enforcement";
 import { trackServerEvent } from "~/server/posthog";
 import { RoleService } from "~/server/role/role.service";
@@ -29,6 +33,7 @@ import {
   type TeamRoleValue,
 } from "~/utils/memberRoleConstraints";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
+import type { PlanInfo } from "../../../../ee/licensing/planInfo";
 import {
   DuplicateInviteError,
   INVITE_ALREADY_ACCEPTED_MESSAGE,
@@ -76,6 +81,1331 @@ const teamRoleInputSchema = z.union([
   builtInTeamRoleInputSchema,
   customTeamRoleInputSchema,
 ]);
+
+/**
+ * Which orgs the caller can manage, and — for `getAll`'s per-project base-key
+ * redaction — which projects in each org the caller can update. One batched
+ * resolution per org, not one check per project: a scoped check is ~4
+ * queries, so a per-project fan-out would scale with the org's project count.
+ */
+async function resolveOrgAccessMaps({
+  ctx,
+  organizations,
+}: {
+  ctx: { prisma: PrismaClient; session: Session };
+  organizations: FullyLoadedOrganization[];
+}): Promise<{
+  manageableOrgIds: Set<string>;
+  updatableProjectsByOrg: Map<string, Map<string, boolean>>;
+}> {
+  const manageableOrgIds = new Set<string>();
+  const updatableProjectsByOrg = new Map<string, Map<string, boolean>>();
+  for (const organization of organizations) {
+    const canManage = await hasOrganizationPermission(
+      ctx,
+      organization.id,
+      "organization:manage",
+    );
+    if (canManage) manageableOrgIds.add(organization.id);
+
+    const projectTeamId: Record<string, string> = {};
+    for (const team of organization.teams) {
+      for (const project of team.projects) {
+        projectTeamId[project.id] = team.id;
+      }
+    }
+    const projectIds = Object.keys(projectTeamId);
+    if (projectIds.length === 0) continue;
+
+    const { projects: updatableProjects } = await batchScopePermissions(ctx, {
+      organizationId: organization.id,
+      teamIds: [],
+      projectIds,
+      projectTeamId,
+      permission: "project:update",
+    });
+    updatableProjectsByOrg.set(organization.id, updatableProjects);
+  }
+  return { manageableOrgIds, updatableProjectsByOrg };
+}
+
+/**
+ * Decrypts one project's S3 fields (the secret key only when `canManage`)
+ * and blanks the project API key — a project-level write credential — for
+ * a demo request or a project the caller cannot update, so the API never
+ * hands it out relying on the UI not to render it.
+ */
+function redactProjectSecretsForOne({
+  project,
+  canManage,
+  canUpdateProject,
+  isDemo,
+}: {
+  project: FullyLoadedOrganization["teams"][number]["projects"][number];
+  canManage: boolean;
+  canUpdateProject: boolean;
+  isDemo: boolean;
+}): void {
+  if (project.s3AccessKeyId) {
+    project.s3AccessKeyId = decrypt(project.s3AccessKeyId);
+  }
+  project.s3SecretAccessKey =
+    canManage && project.s3SecretAccessKey
+      ? decrypt(project.s3SecretAccessKey)
+      : null;
+  if (project.s3Endpoint) {
+    project.s3Endpoint = decrypt(project.s3Endpoint);
+  }
+  if (isDemo || !canUpdateProject) {
+    project.apiKey = "";
+  }
+}
+
+/** Applies `redactProjectSecretsForOne` to every project across every org. */
+function redactProjectSecrets({
+  organizations,
+  manageableOrgIds,
+  updatableProjectsByOrg,
+  isDemo,
+}: {
+  organizations: FullyLoadedOrganization[];
+  manageableOrgIds: Set<string>;
+  updatableProjectsByOrg: Map<string, Map<string, boolean>>;
+  isDemo: boolean;
+}): void {
+  for (const organization of organizations) {
+    const canManage = manageableOrgIds.has(organization.id);
+    for (const project of organization.teams.flatMap((team) => team.projects)) {
+      const canUpdateProject =
+        updatableProjectsByOrg.get(organization.id)?.get(project.id) ?? false;
+      redactProjectSecretsForOne({
+        project,
+        canManage,
+        canUpdateProject,
+        isDemo,
+      });
+    }
+  }
+}
+
+function filterOrganizationMembersForResponse({
+  organization,
+  userId,
+  demoProjectUserId,
+}: {
+  organization: FullyLoadedOrganization;
+  userId: string;
+  demoProjectUserId: string;
+}): void {
+  organization.members = organization.members.filter(
+    (member) => member.userId === userId || member.userId === demoProjectUserId,
+  );
+}
+
+/** Decrypts org-level S3 fields; the secret key only for callers who can manage the org. */
+function redactOrganizationSecrets({
+  organization,
+  manageableOrgIds,
+}: {
+  organization: FullyLoadedOrganization;
+  manageableOrgIds: Set<string>;
+}): void {
+  if (organization.s3AccessKeyId) {
+    organization.s3AccessKeyId = decrypt(organization.s3AccessKeyId);
+  }
+  organization.s3SecretAccessKey =
+    manageableOrgIds.has(organization.id) && organization.s3SecretAccessKey
+      ? decrypt(organization.s3SecretAccessKey)
+      : null;
+  if (organization.s3Endpoint) {
+    organization.s3Endpoint = decrypt(organization.s3Endpoint);
+  }
+}
+
+/**
+ * The Organization row still carries the dead Elasticsearch columns (kept
+ * for deploy safety until a follow-up migration drops them). Never ship the
+ * stored ciphertext / flag to clients.
+ */
+function clearDeadElasticsearchFields(
+  organization: FullyLoadedOrganization,
+): void {
+  organization.elasticsearchNodeUrl = null;
+  organization.elasticsearchApiKey = null;
+  organization.useCustomElasticsearch = false;
+}
+
+/**
+ * A user can be an org admin via either the legacy OrganizationUser row OR
+ * via an ORGANIZATION-scoped ADMIN RoleBinding (direct or via group).
+ * Without this, users onboarded through the RoleBinding flow with no
+ * OrganizationUser row are treated as external and lose access to every
+ * team that lacks an explicit team/project binding.
+ *
+ * RoleBinding(scope=ORGANIZATION, role=ADMIN) is authoritative when
+ * present: promotes the user's exposed role so the frontend hook
+ * `useOrganizationTeamProject().organizationRole` and downstream guards
+ * (`withPermissionGuard("organization:manage")`) honor it. Without this, a
+ * stale `OrganizationUser.role=MEMBER` row shadows a fresh ADMIN
+ * RoleBinding, gating the admin out of /governance + /settings/governance/*.
+ * Backend RBAC paths already honor RoleBindings
+ * (`resolveOrganizationPermission`, `requireApiKeyPermission`); this closes
+ * the page-guard / SSR-only drift.
+ *
+ * Returns whether the promotion applied — the caller also needs it to
+ * decide `isExternal`.
+ */
+function promoteOrgAdminViaBinding({
+  organization,
+  userId,
+  userRoleBindings,
+}: {
+  organization: FullyLoadedOrganization;
+  userId: string;
+  userRoleBindings: RoleBindingForSynthesis[];
+}): boolean {
+  const isOrgAdminViaBinding = userRoleBindings.some(
+    (b) =>
+      b.organizationId === organization.id &&
+      b.scopeType === RoleBindingScopeType.ORGANIZATION &&
+      b.role === TeamUserRole.ADMIN,
+  );
+  if (isOrgAdminViaBinding) {
+    if (organization.members[0]) {
+      organization.members[0].role = OrganizationUserRole.ADMIN;
+    } else {
+      organization.members = [
+        {
+          userId,
+          organizationId: organization.id,
+          role: OrganizationUserRole.ADMIN,
+        } as (typeof organization.members)[number],
+      ];
+    }
+  }
+  return isOrgAdminViaBinding;
+}
+
+/**
+ * RoleBinding is authoritative for team membership and role. Always prefer
+ * a team-scoped RoleBinding over any stale TeamUser row, since dual-writes
+ * to TeamUser have been removed. Org-scoped bindings are intentionally
+ * excluded: org MEMBER/VIEWER bindings only grant organization:view — they
+ * don't give team-level access. Org admins are handled by the
+ * `organizationRole === ADMIN` shortcut in the frontend hasPermission and
+ * backend resolveTeamPermission.
+ *
+ * NOTE: `enrichTeamWithRoleBindings` is a standalone function (not a
+ * service method) because getApp().organizations is wrapped by traced()
+ * which would turn this sync call into a Promise and silently drop
+ * team.members.
+ */
+function filterOrganizationTeamsForResponse({
+  organization,
+  userId,
+  demoProjectUserId,
+  userRoleBindings,
+  isDemoOrg,
+  isExternal,
+}: {
+  organization: FullyLoadedOrganization;
+  userId: string;
+  demoProjectUserId: string;
+  userRoleBindings: RoleBindingForSynthesis[];
+  isDemoOrg: boolean;
+  isExternal: boolean;
+}): void {
+  organization.teams = organization.teams.filter((team) => {
+    team.members = team.members.filter(
+      (member) =>
+        member.userId === userId || member.userId === demoProjectUserId,
+    );
+
+    const enriched = enrichTeamWithRoleBindings({
+      team,
+      userId,
+      userRoleBindings,
+      organizationId: organization.id,
+    });
+    team.members = enriched.members;
+
+    if (isDemoOrg) return true;
+    return isExternal
+      ? team.members.some((member) => member.userId === userId)
+      : true;
+  });
+}
+
+/** For a demo org, keep only the demo project (and only the demo/actual users) on each of its teams. */
+function restrictOrganizationToDemoProject({
+  organization,
+  demoProjectUserId,
+  demoProjectId,
+  userId,
+}: {
+  organization: FullyLoadedOrganization;
+  demoProjectUserId: string;
+  demoProjectId: string;
+  userId: string;
+}): void {
+  organization.teams = organization.teams.flatMap((team) => {
+    if (team.projects.some((project) => project.id === demoProjectId)) {
+      team.projects = team.projects.filter(
+        (project) => project.id === demoProjectId,
+      );
+      team.members = team.members.filter(
+        (member) =>
+          member.userId === demoProjectUserId || member.userId === userId,
+      );
+      return [team];
+    }
+    return [];
+  });
+}
+
+/** Applies every per-org redaction/filtering step `getAll` needs, in order, mutating `organization` in place. */
+function processOrganizationForResponse({
+  organization,
+  userId,
+  demoProjectUserId,
+  demoProjectId,
+  isDemo,
+  userRoleBindings,
+  manageableOrgIds,
+}: {
+  organization: FullyLoadedOrganization;
+  userId: string;
+  demoProjectUserId: string;
+  demoProjectId: string;
+  isDemo: boolean;
+  userRoleBindings: RoleBindingForSynthesis[];
+  manageableOrgIds: Set<string>;
+}): void {
+  const isDemoOrg =
+    isDemo &&
+    organization.teams.some((team) =>
+      team.projects.some((project) => project.id === demoProjectId),
+    );
+
+  filterOrganizationMembersForResponse({
+    organization,
+    userId,
+    demoProjectUserId,
+  });
+  redactOrganizationSecrets({ organization, manageableOrgIds });
+  clearDeadElasticsearchFields(organization);
+
+  const isOrgAdminViaBinding = promoteOrgAdminViaBinding({
+    organization,
+    userId,
+    userRoleBindings,
+  });
+  const isExternal =
+    !isOrgAdminViaBinding &&
+    organization.members[0]?.role !== "ADMIN" &&
+    organization.members[0]?.role !== "MEMBER";
+
+  filterOrganizationTeamsForResponse({
+    organization,
+    userId,
+    demoProjectUserId,
+    userRoleBindings,
+    isDemoOrg,
+    isExternal,
+  });
+
+  if (isDemoOrg) {
+    restrictOrganizationToDemoProject({
+      organization,
+      demoProjectUserId,
+      demoProjectId,
+      userId,
+    });
+  }
+}
+
+/**
+ * PII guard for picker callers: when the caller doesn't have
+ * organization:manage, null out other members' emails AND strip their
+ * personal-workspace teamMemberships (existence of someone else's personal
+ * workspace is itself private). The caller's own email + own personal
+ * workspace stay visible.
+ */
+function redactOtherMembersPii({
+  organization,
+  callerId,
+}: {
+  organization: {
+    members?: Array<{
+      user: {
+        id: string;
+        email: string | null;
+        teamMemberships?: Array<{
+          team: { isPersonal: boolean; ownerUserId: string | null };
+        }>;
+      };
+    }>;
+  };
+  callerId: string;
+}): void {
+  for (const m of organization.members ?? []) {
+    if (m.user.id !== callerId) {
+      m.user.email = null;
+    }
+    // Drop teamMembership rows that point at someone else's personal
+    // workspace. The caller's own personal workspace stays even when
+    // iterating someone else's memberships (it's their team too — they
+    // belong to it).
+    if (m.user.teamMemberships) {
+      m.user.teamMemberships = m.user.teamMemberships.filter((tm) => {
+        if (!tm.team.isPersonal) return true;
+        return tm.team.ownerUserId === callerId;
+      });
+    }
+  }
+}
+
+type PreparedTeamAssignment = {
+  teamId: string;
+  role: TeamUserRole;
+  customRoleId?: string;
+};
+
+/**
+ * Resolves an admin invite's explicit `teams` (the per-team role assignment
+ * shape) into validated team assignments + the legacy `teamIds` CSV string,
+ * filtering out teams that don't exist in this org and custom-role
+ * assignments that don't validate. Returns null when nothing valid remains
+ * — the caller skips the invite entirely, same as an invalid legacy
+ * `teamIds`.
+ */
+async function resolveAdminInviteTeamsFromExplicitTeams({
+  prisma,
+  organizationId,
+  teams,
+}: {
+  prisma: PrismaClient;
+  organizationId: string;
+  teams: Array<{
+    teamId: string;
+    role: TeamUserRole | string;
+    customRoleId?: string;
+  }>;
+}): Promise<{
+  teamAssignments: PreparedTeamAssignment[];
+  teamIdsString: string;
+} | null> {
+  const teamIds = teams.map((t) => t.teamId);
+
+  const validTeams = await prisma.team.findMany({
+    where: { id: { in: teamIds }, organizationId },
+    select: { id: true },
+  });
+  const validTeamIds = validTeams.map((team) => team.id);
+  if (validTeamIds.length === 0) return null;
+
+  const teamAssignments = teams
+    .filter((t) => validTeamIds.includes(t.teamId))
+    .map((t) => {
+      const hasCustom = typeof t.role === "string" && isCustomRole(t.role);
+      return {
+        teamId: t.teamId,
+        role: hasCustom ? TeamUserRole.CUSTOM : (t.role as TeamUserRole),
+        customRoleId: hasCustom && t.customRoleId ? t.customRoleId : undefined,
+      };
+    })
+    .filter((t) => !(t.role === TeamUserRole.CUSTOM && !t.customRoleId));
+
+  // Validate custom role IDs belong to this organization
+  const customRoleIds = teamAssignments
+    .filter((t) => t.customRoleId)
+    .map((t) => t.customRoleId!);
+  if (customRoleIds.length > 0) {
+    const validCustomRoles = await prisma.customRole.findMany({
+      where: { id: { in: customRoleIds }, organizationId, kind: "custom" },
+      select: { id: true },
+    });
+    const validCustomRoleIds = new Set(validCustomRoles.map((r) => r.id));
+    const invalidRoleIds = customRoleIds.filter(
+      (id) => !validCustomRoleIds.has(id),
+    );
+    if (invalidRoleIds.length > 0) return null; // Skip this invite — invalid custom role
+  }
+
+  return { teamAssignments, teamIdsString: validTeamIds.join(",") };
+}
+
+/** Resolves the legacy `teamIds` CSV field, all under the invite's org-level role mapped down to a team role. */
+async function resolveAdminInviteTeamsFromLegacyTeamIds({
+  prisma,
+  organizationId,
+  teamIdsCsv,
+  role,
+}: {
+  prisma: PrismaClient;
+  organizationId: string;
+  teamIdsCsv: string;
+  role: OrganizationUserRole;
+}): Promise<{
+  teamAssignments: PreparedTeamAssignment[];
+  teamIdsString: string;
+} | null> {
+  const teamIdArray = teamIdsCsv
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  const validTeams = await prisma.team.findMany({
+    where: { id: { in: teamIdArray }, organizationId },
+    select: { id: true },
+  });
+  const validTeamIds = validTeams.map((team) => team.id);
+  if (validTeamIds.length === 0) return null;
+
+  const teamAssignments = validTeamIds.map((teamId) => ({
+    teamId,
+    role: ORGANIZATION_TO_TEAM_ROLE_MAP[role],
+  }));
+
+  return { teamAssignments, teamIdsString: validTeamIds.join(",") };
+}
+
+/**
+ * Prepares one admin-created invite: resolves its team assignments
+ * (explicit `teams`, falling back to the legacy `teamIds` CSV), then shapes
+ * the row `createInvites` writes. Returns null to skip the invite when
+ * validation fails — read-only, so this runs before the write transaction.
+ */
+async function prepareAdminInvite({
+  prisma,
+  organizationId,
+  invite,
+}: {
+  prisma: PrismaClient;
+  organizationId: string;
+  invite: {
+    email: string;
+    role: OrganizationUserRole;
+    teamIds?: string;
+    teams?: Array<{
+      teamId: string;
+      role: TeamUserRole | string;
+      customRoleId?: string;
+    }>;
+  };
+}): Promise<{
+  email: string;
+  role: OrganizationUserRole;
+  organizationId: string;
+  teamIds: string;
+  teamAssignments: PreparedTeamAssignment[] | undefined;
+} | null> {
+  const resolved =
+    invite.teams && invite.teams.length > 0
+      ? await resolveAdminInviteTeamsFromExplicitTeams({
+          prisma,
+          organizationId,
+          teams: invite.teams,
+        })
+      : invite.teamIds?.trim()
+        ? await resolveAdminInviteTeamsFromLegacyTeamIds({
+            prisma,
+            organizationId,
+            teamIdsCsv: invite.teamIds,
+            role: invite.role,
+          })
+        : null;
+
+  if (!resolved) return null;
+  if (!invite.email.trim()) return null;
+
+  return {
+    email: invite.email,
+    role: invite.role,
+    organizationId,
+    teamIds: resolved.teamIdsString,
+    teamAssignments:
+      resolved.teamAssignments.length > 0
+        ? resolved.teamAssignments
+        : undefined,
+  };
+}
+
+/** Custom-role team assignments on an admin-created invite require the enterprise plan. */
+async function assertAdminInvitesAllowCustomRoles({
+  invites,
+  organizationId,
+  actorUser,
+}: {
+  invites: Array<{ teams?: Array<{ role: TeamUserRole | string }> }>;
+  organizationId: string;
+  actorUser: PlanProviderUser;
+}): Promise<void> {
+  const hasCustomRoleInvite = invites.some((invite) =>
+    (invite.teams ?? []).some(
+      (t) => typeof t.role === "string" && isCustomRole(t.role),
+    ),
+  );
+  if (!hasCustomRoleInvite) return;
+  await assertEnterprisePlan({
+    organizationId,
+    user: actorUser,
+    errorMessage: ENTERPRISE_FEATURE_ERRORS.RBAC,
+  });
+}
+
+/**
+ * License-limit check for a batch of admin-created invites. On a limit
+ * breach, fires the resource-limit notification (best-effort) and
+ * re-throws as the FORBIDDEN the client's limit modal expects; any other
+ * error propagates unchanged.
+ */
+async function assertAdminInviteLicenseLimits({
+  inviteService,
+  organizationId,
+  invites,
+  actorUser,
+}: {
+  inviteService: InviteService;
+  organizationId: string;
+  invites: Array<{
+    role: OrganizationUserRole;
+    teams?: Array<{
+      teamId: string;
+      role: TeamUserRole | string;
+      customRoleId?: string;
+    }>;
+  }>;
+  actorUser: PlanProviderUser;
+}): Promise<void> {
+  try {
+    await inviteService.checkLicenseLimits({
+      organizationId,
+      newInvites: invites.map((invite) => ({
+        role: invite.role,
+        teams: invite.teams,
+      })),
+      user: actorUser,
+    });
+  } catch (error) {
+    if (error instanceof LimitExceededError) {
+      void getApp()
+        .usageLimits.notifyResourceLimitReached({
+          organizationId,
+          limitType: error.limitType,
+          current: error.current,
+          max: error.max,
+        })
+        .catch(captureException);
+
+      throw new TRPCError({ code: "FORBIDDEN", message: error.message });
+    }
+    throw error;
+  }
+}
+
+/** Phase 1: creates each valid invite's DB record inside a transaction, skipping one whose email already has a pending invite. */
+async function createAdminInviteRecords({
+  prisma,
+  validInvites,
+}: {
+  prisma: PrismaClient;
+  validInvites: Array<
+    NonNullable<Awaited<ReturnType<typeof prepareAdminInvite>>>
+  >;
+}) {
+  return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+    const txInviteService = InviteService.create(tx);
+    return Promise.all(
+      validInvites.map(async (invite) => {
+        const existingInvite = await txInviteService.checkDuplicateInvite({
+          email: invite.email,
+          organizationId: invite.organizationId,
+        });
+
+        if (existingInvite) {
+          return null;
+        }
+
+        return await txInviteService.createAdminInviteRecord(invite);
+      }),
+    );
+  });
+}
+
+/** Phase 2 side effects: analytics + nurturing calls, fired only when at least one invite record was actually created. */
+function fireAdminInviteCreatedSideEffects({
+  actorUserId,
+  organization,
+  createdRecords,
+}: {
+  actorUserId: string;
+  organization: { members: unknown[] };
+  createdRecords: Array<{ invite: { role: OrganizationUserRole } }>;
+}): void {
+  if (createdRecords.length === 0) return;
+
+  trackServerEvent({
+    userId: actorUserId,
+    event: "team_member_invited",
+    properties: { inviteCount: createdRecords.length },
+  });
+
+  const memberCount = organization.members.length + createdRecords.length;
+  for (const record of createdRecords) {
+    fireTeamMemberInvitedNurturing({
+      userId: actorUserId,
+      teamMemberCount: memberCount,
+      role: record.invite.role,
+    });
+  }
+}
+
+/** Sends each created invite's email (best-effort — failures surface as `emailNotSent`, not a throw). */
+async function sendAdminInviteEmails({
+  inviteService,
+  createdRecords,
+}: {
+  inviteService: InviteService;
+  createdRecords: Array<
+    NonNullable<Awaited<ReturnType<typeof createAdminInviteRecords>>[number]>
+  >;
+}) {
+  return Promise.all(
+    createdRecords.map(async (record) => {
+      const { emailNotSent } = await inviteService.trySendInviteEmail({
+        email: record.invite.email,
+        organization: record.organization,
+        inviteCode: record.invite.inviteCode,
+      });
+      return { invite: record.invite, emailNotSent };
+    }),
+  );
+}
+
+/** No two invites in the SAME request may target the same email — throws BAD_REQUEST naming the offenders. */
+function assertNoDuplicatePayloadEmails(
+  invites: Array<{ email: string }>,
+): void {
+  const normalizedPayloadEmails = invites.map((invite) =>
+    invite.email.trim().toLowerCase(),
+  );
+  const duplicatePayloadEmails = normalizedPayloadEmails.filter(
+    (email, index) => normalizedPayloadEmails.indexOf(email) !== index,
+  );
+
+  if (duplicatePayloadEmails.length > 0) {
+    const uniqueDuplicatePayloadEmails = [...new Set(duplicatePayloadEmails)];
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: `Duplicate emails in request payload: ${uniqueDuplicatePayloadEmails.join(", ")}`,
+    });
+  }
+}
+
+/**
+ * Resolves a self-service invite request's explicit `teams`, throwing
+ * BAD_REQUEST when nothing valid remains or a custom role doesn't check
+ * out — unlike the admin path, an invalid team/role here is a rejected
+ * request, not a silently-skipped invite.
+ */
+async function resolveInviteRequestTeamsFromExplicitTeams({
+  inviteService,
+  prisma,
+  organizationId,
+  teams,
+}: {
+  inviteService: InviteService;
+  prisma: PrismaClient;
+  organizationId: string;
+  teams: Array<{
+    teamId: string;
+    role: TeamUserRole | string;
+    customRoleId?: string;
+  }>;
+}): Promise<{
+  teamAssignments: PreparedTeamAssignment[];
+  teamIdsString: string;
+}> {
+  const teamIds = teams.map((t) => t.teamId);
+  const validTeamIds = await inviteService.validateTeamIds({
+    teamIds,
+    organizationId,
+  });
+
+  if (validTeamIds.length === 0) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "No valid teams provided",
+    });
+  }
+
+  const teamAssignments = teams
+    .filter((t) => validTeamIds.includes(t.teamId))
+    .map((t) => {
+      const hasCustom = typeof t.role === "string" && isCustomRole(t.role);
+      return {
+        teamId: t.teamId,
+        role: hasCustom ? TeamUserRole.CUSTOM : (t.role as TeamUserRole),
+        customRoleId: hasCustom && t.customRoleId ? t.customRoleId : undefined,
+      };
+    });
+
+  // Validate custom role IDs belong to this organization and are user-assignable
+  const customRoleIds = teamAssignments
+    .filter((t) => t.customRoleId)
+    .map((t) => t.customRoleId!);
+  if (customRoleIds.length > 0) {
+    const validCustomRoles = await prisma.customRole.findMany({
+      where: { id: { in: customRoleIds }, organizationId, kind: "custom" },
+      select: { id: true },
+    });
+    const validCustomRoleIds = new Set(validCustomRoles.map((r) => r.id));
+    const invalidRoleIds = customRoleIds.filter(
+      (id) => !validCustomRoleIds.has(id),
+    );
+    if (invalidRoleIds.length > 0) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: `Custom role(s) ${invalidRoleIds.join(", ")} not found in this organization`,
+      });
+    }
+  }
+
+  return { teamAssignments, teamIdsString: validTeamIds.join(",") };
+}
+
+/** Resolves a self-service invite request's legacy `teamIds` CSV field, throwing BAD_REQUEST when nothing valid remains. */
+async function resolveInviteRequestTeamsFromLegacyTeamIds({
+  inviteService,
+  organizationId,
+  teamIdsCsv,
+  role,
+}: {
+  inviteService: InviteService;
+  organizationId: string;
+  teamIdsCsv: string;
+  role: OrganizationUserRole;
+}): Promise<{
+  teamAssignments: PreparedTeamAssignment[];
+  teamIdsString: string;
+}> {
+  const teamIdArray = teamIdsCsv
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  const validTeamIds = await inviteService.validateTeamIds({
+    teamIds: teamIdArray,
+    organizationId,
+  });
+
+  if (validTeamIds.length === 0) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "No valid teams provided",
+    });
+  }
+
+  const teamAssignments = validTeamIds.map((teamId) => ({
+    teamId,
+    role: ORGANIZATION_TO_TEAM_ROLE_MAP[role],
+  }));
+
+  return { teamAssignments, teamIdsString: validTeamIds.join(",") };
+}
+
+/**
+ * Prepares one self-service invite request: resolves its team assignments
+ * (explicit `teams`, falling back to the legacy `teamIds` CSV — at least
+ * one is required), then shapes the row `createInviteRequest` writes.
+ * Throws BAD_REQUEST on any validation failure — unlike the admin path,
+ * there's no "skip this one" here.
+ */
+async function prepareInviteRequest({
+  inviteService,
+  prisma,
+  organizationId,
+  invite,
+  requestedBy,
+}: {
+  inviteService: InviteService;
+  prisma: PrismaClient;
+  organizationId: string;
+  invite: {
+    email: string;
+    role: string;
+    teamIds?: string;
+    teams?: Array<{
+      teamId: string;
+      role: TeamUserRole | string;
+      customRoleId?: string;
+    }>;
+  };
+  requestedBy: string;
+}): Promise<{
+  email: string;
+  role: OrganizationUserRole;
+  organizationId: string;
+  teamIds: string;
+  teamAssignments: PreparedTeamAssignment[] | undefined;
+  requestedBy: string;
+}> {
+  const normalizedEmail = invite.email.trim().toLowerCase();
+
+  const resolved =
+    invite.teams && invite.teams.length > 0
+      ? await resolveInviteRequestTeamsFromExplicitTeams({
+          inviteService,
+          prisma,
+          organizationId,
+          teams: invite.teams,
+        })
+      : invite.teamIds?.trim()
+        ? await resolveInviteRequestTeamsFromLegacyTeamIds({
+            inviteService,
+            organizationId,
+            teamIdsCsv: invite.teamIds,
+            role: invite.role as OrganizationUserRole,
+          })
+        : (() => {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message: "At least one team must be provided",
+            });
+          })();
+
+  return {
+    email: normalizedEmail,
+    role: invite.role as OrganizationUserRole,
+    organizationId,
+    teamIds: resolved.teamIdsString,
+    teamAssignments:
+      resolved.teamAssignments.length > 0
+        ? resolved.teamAssignments
+        : undefined,
+    requestedBy,
+  };
+}
+
+/** Phase: creates each prepared invite request's DB record inside a transaction. */
+async function createInviteRequestRecords({
+  prisma,
+  preparedInvites,
+}: {
+  prisma: PrismaClient;
+  preparedInvites: Array<Awaited<ReturnType<typeof prepareInviteRequest>>>;
+}) {
+  return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+    const transactionalInviteService = InviteService.create(tx);
+    return Promise.all(
+      preparedInvites.map((invite) =>
+        transactionalInviteService.createMemberInviteRequest(invite),
+      ),
+    );
+  });
+}
+
+/** Maps createInviteRequest failures (limit + duplicate) to the TRPCErrors the wire contract expects; anything else rethrows unchanged. */
+function throwMappedInviteRequestError(
+  error: unknown,
+  organizationId: string,
+): never {
+  if (error instanceof LimitExceededError) {
+    void getApp()
+      .usageLimits.notifyResourceLimitReached({
+        organizationId,
+        limitType: error.limitType,
+        current: error.current,
+        max: error.max,
+      })
+      .catch(captureException);
+
+    throw new TRPCError({ code: "FORBIDDEN", message: error.message });
+  }
+  if (error instanceof DuplicateInviteError) {
+    throw new TRPCError({ code: "BAD_REQUEST", message: error.message });
+  }
+  throw error;
+}
+
+/**
+ * Every guard `acceptInvite` needs before touching data, in order. Returns
+ * the invite narrowed non-null plus the caller's verified email — extracted
+ * as its own value (rather than relying on `session.user.email` staying
+ * narrowed at the call site) since that narrowing does not survive a
+ * function boundary.
+ */
+function requireAcceptableInvite<
+  T extends { expiration: Date | null; status: string; email: string },
+>({
+  invite,
+  session,
+}: {
+  invite: T | null;
+  session: Session;
+}): { invite: T; email: string } {
+  if (
+    !invite ||
+    (invite.expiration !== null && invite.expiration < new Date())
+  ) {
+    throw new TRPCError({
+      code: "NOT_FOUND",
+      message: "Invite not found or has expired",
+    });
+  }
+
+  const email = session.user.email;
+  if (!email) {
+    throw new TRPCError({
+      code: "UNAUTHORIZED",
+      message: "You must be signed in to accept the invite",
+    });
+  }
+
+  if (invite.status === "ACCEPTED") {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: INVITE_ALREADY_ACCEPTED_MESSAGE,
+    });
+  }
+
+  if (invite.status !== "PENDING") {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: INVITE_NOT_READY_MESSAGE,
+    });
+  }
+
+  // Case-insensitive email comparison: BetterAuth lowercases emails
+  // during signup/signin (see `findUserByEmail` in
+  // node_modules/better-auth/dist/db/internal-adapter.mjs) so
+  // `session.user.email` is always lowercase, but `invite.email`
+  // preserves the admin's original casing. A strict `!==` would
+  // reject an "Alice@Acme.com" invite for an "alice@acme.com" user.
+  // The old NextAuth flow worked accidentally because it didn't
+  // lowercase emails either — this is now a real mismatch post-migration.
+  if (email.toLowerCase() !== invite.email.trim().toLowerCase()) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: `The invite was sent to ${invite.email}, but you are signed in as ${email}`,
+    });
+  }
+
+  return { invite, email };
+}
+
+/** Applies the invite (membership + role bindings) inside its own transaction. */
+async function applyInviteAcceptance({
+  prisma,
+  userId,
+  invite,
+}: {
+  prisma: PrismaClient;
+  userId: string;
+  invite: OrganizationInvite;
+}): Promise<void> {
+  await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+    const txInviteService = InviteService.create(tx);
+    await txInviteService.applyInvite({ userId, invite });
+  });
+}
+
+/**
+ * Best-effort: provisions the user's Personal Workspace (Team.isPersonal +
+ * Project.isPersonal) for this org. Idempotent — safe if a prior invite
+ * already triggered it. Runs outside the invite tx so an unexpected failure
+ * here doesn't roll the membership back; the next login will retry via the
+ * lazy backfill in `user.personalContext`.
+ */
+async function provisionPersonalWorkspaceBestEffort({
+  prisma,
+  session,
+  email,
+  organizationId,
+}: {
+  prisma: PrismaClient;
+  session: Session;
+  email: string;
+  organizationId: string;
+}): Promise<void> {
+  try {
+    const personalWorkspaceService = new PersonalWorkspaceService(prisma);
+    await personalWorkspaceService.ensure({
+      userId: session.user.id,
+      organizationId,
+      displayName: session.user.name,
+      displayEmail: email,
+    });
+  } catch (err) {
+    // Non-fatal — capture and continue. Lazy backfill will recover
+    // on the user's next session resolution. PostHog signal lets
+    // operators catch systemic provisioning regressions (bad
+    // migration, schema drift, Prisma constraint violation) before
+    // users start complaining about missing personal workspaces.
+    captureException(toError(err), {
+      extra: {
+        origin: "governance.acceptInvite",
+        userId: session.user.id,
+        organizationId,
+      },
+    });
+  }
+}
+
+/** Best-effort Slack + nurturing notifications once an invite has been accepted. */
+function fireAcceptInviteSideEffects({
+  session,
+  email,
+  invite,
+}: {
+  session: Session;
+  email: string;
+  invite: { organization: { id: string; name: string } };
+}): void {
+  void getApp()
+    .notifications.sendSlackSignupEvent({
+      userName: session.user.name,
+      userEmail: email,
+      organizationName: invite.organization.name,
+    })
+    .catch(captureException);
+
+  fireInviteAcceptedNurturingCalls({
+    userId: session.user.id,
+    email,
+    name: session.user.name,
+    organizationId: invite.organization.id,
+    organizationName: invite.organization.name,
+  });
+}
+
+/** Custom-role team assignment requires the enterprise plan. */
+async function assertCustomRoleAssignmentAllowed({
+  prisma,
+  teamId,
+  actorUser,
+}: {
+  prisma: PrismaClient;
+  teamId: string;
+  actorUser: PlanProviderUser;
+}): Promise<void> {
+  const team = await prisma.team.findUnique({
+    where: { id: teamId },
+    select: { organizationId: true },
+  });
+  if (!team) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Team not found" });
+  }
+  await assertEnterprisePlan({
+    organizationId: team.organizationId,
+    user: actorUser,
+    errorMessage: ENTERPRISE_FEATURE_ERRORS.RBAC,
+  });
+}
+
+/**
+ * Built-in role path: an EXTERNAL (Lite Member) user's team role is
+ * restricted to viewer-only, and reassigning one still counts against the
+ * member-type license limit the same way a fresh EXTERNAL grant would. A
+ * no-op for any other org role.
+ */
+async function assertBuiltInRoleAssignmentAllowed({
+  prisma,
+  teamId,
+  userId,
+  role,
+  actorUser,
+}: {
+  prisma: PrismaClient;
+  teamId: string;
+  userId: string;
+  role: TeamRoleValue;
+  actorUser: PlanProviderUser;
+}): Promise<void> {
+  const team = await prisma.team.findUnique({
+    where: { id: teamId },
+    select: { organizationId: true },
+  });
+  if (!team) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Team not found" });
+  }
+
+  const orgMembership = await prisma.organizationUser.findUnique({
+    where: {
+      userId_organizationId: { userId, organizationId: team.organizationId },
+    },
+  });
+
+  if (orgMembership?.role !== OrganizationUserRole.EXTERNAL) return;
+
+  if (
+    !isTeamRoleAllowedForOrganizationRole({
+      organizationRole: OrganizationUserRole.EXTERNAL,
+      teamRole: role,
+    })
+  ) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: LITE_MEMBER_VIEWER_ONLY_ERROR,
+    });
+  }
+
+  const roleService = new RoleService(prisma);
+  const currentBinding = await roleService.getUserCustomRoleBinding({
+    userId,
+    organizationId: team.organizationId,
+    teamId,
+  });
+
+  const oldPermissions = currentBinding?.customRoleId
+    ? await (async () => {
+        const oldRole = await roleService.getRoleByIdOrNull(
+          currentBinding.customRoleId!,
+        );
+        return oldRole?.permissions as string[] | undefined;
+      })()
+    : undefined;
+
+  const changeType = getRoleChangeType({
+    oldRole: OrganizationUserRole.EXTERNAL,
+    oldPermissions,
+    newRole: OrganizationUserRole.EXTERNAL,
+    newPermissions: undefined,
+  });
+
+  const subscriptionLimits = await getApp().planProvider.getActivePlan({
+    organizationId: team.organizationId,
+    user: actorUser,
+  });
+  const licenseRepo = new LicenseEnforcementRepository(prisma);
+  await assertMemberTypeLimitNotExceeded({
+    changeType,
+    organizationId: team.organizationId,
+    licenseRepo,
+    limits: subscriptionLimits,
+  });
+}
+
+/**
+ * Everything about the user's current shared-team membership state that
+ * both the license check and the actual org-role update need.
+ */
+async function resolveCurrentTeamMembershipState({
+  prisma,
+  organizationId,
+  userId,
+}: {
+  prisma: PrismaClient;
+  organizationId: string;
+  userId: string;
+}): Promise<{
+  organizationTeamIds: string[];
+  currentMemberships: Array<{ teamId: string; role: TeamUserRole }>;
+  userPermissions: string[] | undefined;
+}> {
+  // Only the teams the organization shares. A seat decision is about the
+  // person, so it applies to the teams they work in with other people and
+  // leaves the workspace that is only theirs alone. Including it would ask
+  // the organization to demote a team's last admin, which is refused, and
+  // the whole role change would go down with the refusal.
+  const organizationTeamIds = await findSharedTeamIds({
+    client: prisma,
+    organizationId,
+  });
+
+  const currentTeamBindings = await prisma.roleBinding.findMany({
+    where: {
+      organizationId,
+      userId,
+      scopeType: RoleBindingScopeType.TEAM,
+      scopeId: { in: organizationTeamIds },
+    },
+    select: { scopeId: true, role: true, customRoleId: true },
+  });
+
+  const currentMemberships = currentTeamBindings.map((b) => ({
+    teamId: b.scopeId,
+    role: b.role,
+  }));
+
+  const customRoleIds = currentTeamBindings
+    .map((b) => b.customRoleId)
+    .filter((id): id is string => !!id);
+  let userPermissions: string[] | undefined;
+  if (customRoleIds.length > 0) {
+    const customRoles = await prisma.customRole.findMany({
+      where: { id: { in: customRoleIds } },
+      select: { permissions: true },
+    });
+    const allPermissions: string[] = [];
+    for (const cr of customRoles) {
+      if (cr.permissions) {
+        allPermissions.push(...(cr.permissions as string[]));
+      }
+    }
+    userPermissions = allPermissions.length > 0 ? allPermissions : undefined;
+  }
+
+  return { organizationTeamIds, currentMemberships, userPermissions };
+}
+
+/** License-limit check for the org-role change. Returns the resolved plan — the caller also needs it to gate custom-role team updates. */
+async function assertMemberRoleChangeAllowed({
+  prisma,
+  organizationId,
+  currentRole,
+  userPermissions,
+  newRole,
+  actorUser,
+}: {
+  prisma: PrismaClient;
+  organizationId: string;
+  currentRole: OrganizationUserRole;
+  userPermissions: string[] | undefined;
+  newRole: OrganizationUserRole;
+  actorUser: PlanProviderUser;
+}): Promise<PlanInfo> {
+  const changeType = getRoleChangeType({
+    oldRole: currentRole,
+    oldPermissions: userPermissions,
+    newRole,
+    newPermissions: undefined,
+  });
+
+  const subscriptionLimits = await getApp().planProvider.getActivePlan({
+    organizationId,
+    user: actorUser,
+  });
+  const licenseRepo = new LicenseEnforcementRepository(prisma);
+  await assertMemberTypeLimitNotExceeded({
+    changeType,
+    organizationId,
+    licenseRepo,
+    limits: subscriptionLimits,
+  });
+
+  return subscriptionLimits;
+}
+
+/** Any custom-role team assignment in the batch requires the enterprise plan. */
+function assertTeamRoleUpdatesAllowCustomRoles({
+  teamRoleUpdates,
+  planType,
+}: {
+  teamRoleUpdates: Array<{ role: TeamUserRole | string }> | undefined;
+  planType: string;
+}): void {
+  const hasCustomRoleAssignment = (teamRoleUpdates ?? []).some(
+    (update) => typeof update.role === "string" && isCustomRole(update.role),
+  );
+  if (hasCustomRoleAssignment) {
+    assertEnterprisePlanType({
+      planType,
+      errorMessage: ENTERPRISE_FEATURE_ERRORS.RBAC,
+    });
+  }
+}
 
 export const organizationRouter = createTRPCRouter({
   createAndAssign: protectedProcedure
@@ -217,184 +1547,26 @@ export const organizationRouter = createTRPCRouter({
       // the stored value on save. Everyone else gets it redacted — the API
       // must not hand the decrypted secret to lite/viewer members just
       // because the UI happens not to render it.
-      const manageableOrgIds = new Set<string>();
-      // Decides the base-key redaction below. One batched resolution per org,
-      // not one check per project — a scoped check is ~4 queries, so a
-      // per-project fan-out would scale with the org's project count.
-      const updatableProjectsByOrg = new Map<string, Map<string, boolean>>();
-      for (const organization of organizations) {
-        const canManage = await hasOrganizationPermission(
-          ctx,
-          organization.id,
-          "organization:manage",
-        );
-        if (canManage) manageableOrgIds.add(organization.id);
+      const { manageableOrgIds, updatableProjectsByOrg } =
+        await resolveOrgAccessMaps({ ctx, organizations });
 
-        const projectTeamId: Record<string, string> = {};
-        for (const team of organization.teams) {
-          for (const project of team.projects) {
-            projectTeamId[project.id] = team.id;
-          }
-        }
-        const projectIds = Object.keys(projectTeamId);
-        if (projectIds.length === 0) continue;
-
-        const { projects: updatableProjects } = await batchScopePermissions(
-          ctx,
-          {
-            organizationId: organization.id,
-            teamIds: [],
-            projectIds,
-            projectTeamId,
-            permission: "project:update",
-          },
-        );
-        updatableProjectsByOrg.set(organization.id, updatableProjects);
-      }
+      redactProjectSecrets({
+        organizations,
+        manageableOrgIds,
+        updatableProjectsByOrg,
+        isDemo,
+      });
 
       for (const organization of organizations) {
-        const canManage = manageableOrgIds.has(organization.id);
-        for (const project of organization.teams.flatMap(
-          (team) => team.projects,
-        )) {
-          if (project.s3AccessKeyId) {
-            project.s3AccessKeyId = decrypt(project.s3AccessKeyId);
-          }
-          project.s3SecretAccessKey =
-            canManage && project.s3SecretAccessKey
-              ? decrypt(project.s3SecretAccessKey)
-              : null;
-          if (project.s3Endpoint) {
-            project.s3Endpoint = decrypt(project.s3Endpoint);
-          }
-          // The base key is a project-level write credential. Same rule as the
-          // S3 secret above: send it only to those who can change the project,
-          // rather than relying on the UI not to render it. Demo projects
-          // expose it to no one.
-          const canUpdateProject =
-            updatableProjectsByOrg.get(organization.id)?.get(project.id) ??
-            false;
-          if (isDemo || !canUpdateProject) {
-            project.apiKey = "";
-          }
-        }
-      }
-      for (const organization of organizations) {
-        const isDemoOrg =
-          isDemo &&
-          organization.teams.some((team) =>
-            team.projects.some((project) => project.id === demoProjectId),
-          );
-
-        organization.members = organization.members.filter(
-          (member) =>
-            member.userId === userId || member.userId === demoProjectUserId,
-        );
-        if (organization.s3AccessKeyId) {
-          organization.s3AccessKeyId = decrypt(organization.s3AccessKeyId);
-        }
-        organization.s3SecretAccessKey =
-          manageableOrgIds.has(organization.id) &&
-          organization.s3SecretAccessKey
-            ? decrypt(organization.s3SecretAccessKey)
-            : null;
-        if (organization.s3Endpoint) {
-          organization.s3Endpoint = decrypt(organization.s3Endpoint);
-        }
-
-        // The Organization row still carries the dead Elasticsearch columns
-        // (kept for deploy safety until a follow-up migration drops them).
-        // Never ship the stored ciphertext / flag to clients.
-        organization.elasticsearchNodeUrl = null;
-        organization.elasticsearchApiKey = null;
-        organization.useCustomElasticsearch = false;
-
-        // A user can be an org admin via either the legacy OrganizationUser row
-        // OR via an ORGANIZATION-scoped ADMIN RoleBinding (direct or via group).
-        // Without this, users onboarded through the RoleBinding flow with no
-        // OrganizationUser row are treated as external and lose access to every
-        // team that lacks an explicit team/project binding.
-        const isOrgAdminViaBinding = userRoleBindings.some(
-          (b) =>
-            b.organizationId === organization.id &&
-            b.scopeType === RoleBindingScopeType.ORGANIZATION &&
-            b.role === TeamUserRole.ADMIN,
-        );
-        // RoleBinding(scope=ORGANIZATION, role=ADMIN) is authoritative when present:
-        // promote the user's exposed role so the frontend hook
-        // `useOrganizationTeamProject().organizationRole` and downstream guards
-        // (`withPermissionGuard("organization:manage")`) honor it. Without this,
-        // a stale `OrganizationUser.role=MEMBER` row shadows a fresh ADMIN
-        // RoleBinding, gating the admin out of /governance + /settings/governance/*.
-        // Backend RBAC paths already honor RoleBindings (`resolveOrganizationPermission`,
-        // `requireApiKeyPermission`); this closes the page-guard / SSR-only drift.
-        if (isOrgAdminViaBinding) {
-          if (organization.members[0]) {
-            organization.members[0].role = OrganizationUserRole.ADMIN;
-          } else {
-            organization.members = [
-              {
-                userId,
-                organizationId: organization.id,
-                role: OrganizationUserRole.ADMIN,
-              } as (typeof organization.members)[number],
-            ];
-          }
-        }
-        const isExternal =
-          !isOrgAdminViaBinding &&
-          organization.members[0]?.role !== "ADMIN" &&
-          organization.members[0]?.role !== "MEMBER";
-
-        organization.teams = organization.teams.filter((team) => {
-          team.members = team.members.filter(
-            (member) =>
-              member.userId === userId || member.userId === demoProjectUserId,
-          );
-
-          // RoleBinding is authoritative for team membership and role.
-          // Always prefer a team-scoped RoleBinding over any stale TeamUser row,
-          // since dual-writes to TeamUser have been removed.
-          // Org-scoped bindings are intentionally excluded: org MEMBER/VIEWER bindings
-          // only grant organization:view — they don't give team-level access.
-          // Org admins are handled by the organizationRole === ADMIN shortcut in
-          // the frontend hasPermission and backend resolveTeamPermission.
-          //
-          // NOTE: imported as a standalone function (not a service method) because
-          // getApp().organizations is wrapped by traced() which would turn this
-          // sync call into a Promise and silently drop team.members.
-          const enriched = enrichTeamWithRoleBindings({
-            team,
-            userId,
-            userRoleBindings,
-            organizationId: organization.id,
-          });
-          team.members = enriched.members;
-
-          if (isDemoOrg) return true;
-          return isExternal
-            ? team.members.some((member) => member.userId === userId)
-            : true;
+        processOrganizationForResponse({
+          organization,
+          userId,
+          demoProjectUserId,
+          demoProjectId,
+          isDemo,
+          userRoleBindings,
+          manageableOrgIds,
         });
-
-        if (isDemoOrg) {
-          organization.teams = organization.teams.flatMap((team) => {
-            if (team.projects.some((project) => project.id === demoProjectId)) {
-              team.projects = team.projects.filter(
-                (project) => project.id === demoProjectId,
-              );
-
-              team.members = team.members.filter(
-                (member) =>
-                  member.userId === demoProjectUserId ||
-                  member.userId === userId,
-              );
-              return [team];
-            } else {
-              return [];
-            }
-          });
-        }
       }
 
       return organizations;
@@ -507,33 +1679,13 @@ export const organizationRouter = createTRPCRouter({
         });
       }
 
-      // PII guard for picker callers: when the caller doesn't have
-      // organization:manage, null out other members' emails AND
-      // strip their personal-workspace teamMemberships (existence of
-      // someone else's personal workspace is itself private). The
-      // caller's own email + own personal workspace stay visible.
       const callerHasManage = await hasOrganizationPermission(
         ctx,
         input.organizationId,
         "organization:manage",
       );
       if (!callerHasManage) {
-        const callerId = ctx.session.user.id;
-        for (const m of organization.members ?? []) {
-          if (m.user.id !== callerId) {
-            m.user.email = null;
-          }
-          // Drop teamMembership rows that point at someone else's
-          // personal workspace. The caller's own personal workspace
-          // stays even when iterating someone else's memberships
-          // (it's their team too — they belong to it).
-          if (m.user.teamMemberships) {
-            m.user.teamMemberships = m.user.teamMemberships.filter((tm) => {
-              if (!tm.team.isPersonal) return true;
-              return tm.team.ownerUserId === callerId;
-            });
-          }
-        }
+        redactOtherMembersPii({ organization, callerId: ctx.session.user.id });
       }
 
       return organization;
@@ -592,18 +1744,11 @@ export const organizationRouter = createTRPCRouter({
     )
     .use(checkOrganizationPermission("organization:manage"))
     .mutation(async ({ input, ctx }) => {
-      const hasCustomRoleInvite = input.invites.some((invite) =>
-        (invite.teams ?? []).some(
-          (t) => typeof t.role === "string" && isCustomRole(t.role),
-        ),
-      );
-      if (hasCustomRoleInvite) {
-        await assertEnterprisePlan({
-          organizationId: input.organizationId,
-          user: ctx.session.user,
-          errorMessage: ENTERPRISE_FEATURE_ERRORS.RBAC,
-        });
-      }
+      await assertAdminInvitesAllowCustomRoles({
+        invites: input.invites,
+        organizationId: input.organizationId,
+        actorUser: ctx.session.user,
+      });
 
       const prisma = ctx.prisma;
 
@@ -635,150 +1780,22 @@ export const organizationRouter = createTRPCRouter({
         organizationId: input.organizationId,
       });
 
-      // Check license limits using the service
-      try {
-        await inviteService.checkLicenseLimits({
-          organizationId: input.organizationId,
-          newInvites: input.invites.map((invite) => ({
-            role: invite.role,
-            teams: invite.teams,
-          })),
-          user: ctx.session.user,
-        });
-      } catch (error) {
-        if (error instanceof LimitExceededError) {
-          void getApp()
-            .usageLimits.notifyResourceLimitReached({
-              organizationId: input.organizationId,
-              limitType: error.limitType,
-              current: error.current,
-              max: error.max,
-            })
-            .catch(captureException);
+      await assertAdminInviteLicenseLimits({
+        inviteService,
+        organizationId: input.organizationId,
+        invites: input.invites,
+        actorUser: ctx.session.user,
+      });
 
-          throw new TRPCError({
-            code: "FORBIDDEN",
-            message: error.message,
-          });
-        }
-        throw error;
-      }
       // Prepare invite data (read-only validation) outside transaction
       const preparedAdminInvites = await Promise.all(
-        input.invites.map(async (invite) => {
-          let teamAssignments: Array<{
-            teamId: string;
-            role: TeamUserRole;
-            customRoleId?: string;
-          }> = [];
-          let teamIdsString = "";
-
-          if (invite.teams && invite.teams.length > 0) {
-            const teamIds = invite.teams.map((t) => t.teamId);
-
-            const validTeams = await prisma.team.findMany({
-              where: {
-                id: { in: teamIds },
-                organizationId: input.organizationId,
-              },
-              select: { id: true },
-            });
-
-            const validTeamIds = validTeams.map((team) => team.id);
-
-            if (validTeamIds.length === 0) {
-              return null;
-            }
-
-            teamAssignments = invite.teams
-              .filter((t) => validTeamIds.includes(t.teamId))
-              .map((t) => {
-                const hasCustom =
-                  typeof t.role === "string" && isCustomRole(t.role);
-                return {
-                  teamId: t.teamId,
-                  role: hasCustom
-                    ? TeamUserRole.CUSTOM
-                    : (t.role as TeamUserRole),
-                  customRoleId:
-                    hasCustom && t.customRoleId ? t.customRoleId : undefined,
-                };
-              })
-              .filter((t) => {
-                if (t.role === TeamUserRole.CUSTOM && !t.customRoleId) {
-                  return false;
-                }
-                return true;
-              });
-
-            // Validate custom role IDs belong to this organization
-            const customRoleIds = teamAssignments
-              .filter((t) => t.customRoleId)
-              .map((t) => t.customRoleId!);
-            if (customRoleIds.length > 0) {
-              const validCustomRoles = await prisma.customRole.findMany({
-                where: {
-                  id: { in: customRoleIds },
-                  organizationId: input.organizationId,
-                  kind: "custom",
-                },
-                select: { id: true },
-              });
-              const validCustomRoleIds = new Set(
-                validCustomRoles.map((r) => r.id),
-              );
-              const invalidRoleIds = customRoleIds.filter(
-                (id) => !validCustomRoleIds.has(id),
-              );
-              if (invalidRoleIds.length > 0) {
-                return null; // Skip this invite — invalid custom role
-              }
-            }
-
-            teamIdsString = validTeamIds.join(",");
-          } else if (invite.teamIds?.trim()) {
-            const teamIdArray = invite.teamIds
-              .split(",")
-              .map((s) => s.trim())
-              .filter(Boolean);
-
-            const validTeams = await prisma.team.findMany({
-              where: {
-                id: { in: teamIdArray },
-                organizationId: input.organizationId,
-              },
-              select: { id: true },
-            });
-
-            const validTeamIds = validTeams.map((team) => team.id);
-
-            if (validTeamIds.length === 0) {
-              return null;
-            }
-
-            teamAssignments = validTeamIds.map((teamId) => ({
-              teamId,
-              role: ORGANIZATION_TO_TEAM_ROLE_MAP[invite.role],
-            }));
-
-            teamIdsString = validTeamIds.join(",");
-          } else {
-            return null;
-          }
-
-          if (!invite.email.trim()) {
-            return null;
-          }
-
-          return {
-            email: invite.email,
-            role: invite.role,
+        input.invites.map((invite) =>
+          prepareAdminInvite({
+            prisma,
             organizationId: input.organizationId,
-            teamIds: teamIdsString,
-            teamAssignments:
-              teamAssignments.length > 0 ? teamAssignments : undefined,
-          };
-        }),
+            invite,
+          }),
+        ),
       );
 
       const validInvites = preparedAdminInvites.filter(
@@ -786,22 +1803,9 @@ export const organizationRouter = createTRPCRouter({
       );
 
       // Phase 1: DB operations in transaction (no side-effects)
-      const inviteRecords = await prisma.$transaction(async (tx) => {
-        const txInviteService = InviteService.create(tx);
-        return Promise.all(
-          validInvites.map(async (invite) => {
-            const existingInvite = await txInviteService.checkDuplicateInvite({
-              email: invite.email,
-              organizationId: invite.organizationId,
-            });
-
-            if (existingInvite) {
-              return null;
-            }
-
-            return await txInviteService.createAdminInviteRecord(invite);
-          }),
-        );
+      const inviteRecords = await createAdminInviteRecords({
+        prisma,
+        validInvites,
       });
 
       // Phase 2: Send emails outside transaction
@@ -809,35 +1813,13 @@ export const organizationRouter = createTRPCRouter({
         (r): r is NonNullable<typeof r> => r !== null,
       );
 
-      if (createdRecords.length > 0) {
-        trackServerEvent({
-          userId: ctx.session.user.id,
-          event: "team_member_invited",
-          properties: { inviteCount: createdRecords.length },
-        });
+      fireAdminInviteCreatedSideEffects({
+        actorUserId: ctx.session.user.id,
+        organization,
+        createdRecords,
+      });
 
-        const memberCount = organization.members.length + createdRecords.length;
-        for (const record of createdRecords) {
-          fireTeamMemberInvitedNurturing({
-            userId: ctx.session.user.id,
-            teamMemberCount: memberCount,
-            role: record.invite.role,
-          });
-        }
-      }
-
-      const invites = await Promise.all(
-        createdRecords.map(async (record) => {
-          const { emailNotSent } = await inviteService.trySendInviteEmail({
-            email: record.invite.email,
-            organization: record.organization,
-            inviteCode: record.invite.inviteCode,
-          });
-          return { invite: record.invite, emailNotSent };
-        }),
-      );
-
-      return invites;
+      return sendAdminInviteEmails({ inviteService, createdRecords });
     }),
   deleteInvite: protectedProcedure
     .input(z.object({ inviteId: z.string(), organizationId: z.string() }))
@@ -908,18 +1890,11 @@ export const organizationRouter = createTRPCRouter({
     )
     .use(checkOrganizationPermission("organization:view"))
     .mutation(async ({ input, ctx }) => {
-      const hasCustomRoleInvite = input.invites.some((invite) =>
-        (invite.teams ?? []).some(
-          (t) => typeof t.role === "string" && isCustomRole(t.role),
-        ),
-      );
-      if (hasCustomRoleInvite) {
-        await assertEnterprisePlan({
-          organizationId: input.organizationId,
-          user: ctx.session.user,
-          errorMessage: ENTERPRISE_FEATURE_ERRORS.RBAC,
-        });
-      }
+      await assertAdminInvitesAllowCustomRoles({
+        invites: input.invites,
+        organizationId: input.organizationId,
+        actorUser: ctx.session.user,
+      });
 
       const prisma = ctx.prisma;
       const inviteService = InviteService.create(prisma);
@@ -935,170 +1910,23 @@ export const organizationRouter = createTRPCRouter({
           user: ctx.session.user,
         });
 
-        const normalizedPayloadEmails = input.invites.map((invite) =>
-          invite.email.trim().toLowerCase(),
-        );
-        const duplicatePayloadEmails = normalizedPayloadEmails.filter(
-          (email, index) => normalizedPayloadEmails.indexOf(email) !== index,
-        );
-
-        if (duplicatePayloadEmails.length > 0) {
-          const uniqueDuplicatePayloadEmails = [
-            ...new Set(duplicatePayloadEmails),
-          ];
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: `Duplicate emails in request payload: ${uniqueDuplicatePayloadEmails.join(", ")}`,
-          });
-        }
+        assertNoDuplicatePayloadEmails(input.invites);
 
         const preparedInvites = await Promise.all(
-          input.invites.map(async (invite) => {
-            const normalizedEmail = invite.email.trim().toLowerCase();
-
-            // Validate team IDs
-            let teamIdsString = "";
-            let teamAssignments: Array<{
-              teamId: string;
-              role: TeamUserRole;
-              customRoleId?: string;
-            }> = [];
-
-            if (invite.teams && invite.teams.length > 0) {
-              const teamIds = invite.teams.map((t) => t.teamId);
-              const validTeamIds = await inviteService.validateTeamIds({
-                teamIds,
-                organizationId: input.organizationId,
-              });
-
-              if (validTeamIds.length === 0) {
-                throw new TRPCError({
-                  code: "BAD_REQUEST",
-                  message: "No valid teams provided",
-                });
-              }
-
-              teamAssignments = invite.teams
-                .filter((t) => validTeamIds.includes(t.teamId))
-                .map((t) => {
-                  const hasCustom =
-                    typeof t.role === "string" && isCustomRole(t.role);
-                  return {
-                    teamId: t.teamId,
-                    role: hasCustom
-                      ? ("CUSTOM" as TeamUserRole)
-                      : (t.role as TeamUserRole),
-                    customRoleId:
-                      hasCustom && t.customRoleId ? t.customRoleId : undefined,
-                  };
-                });
-
-              // Validate custom role IDs belong to this organization and are user-assignable
-              const customRoleIds = teamAssignments
-                .filter((t) => t.customRoleId)
-                .map((t) => t.customRoleId!);
-              if (customRoleIds.length > 0) {
-                const validCustomRoles = await prisma.customRole.findMany({
-                  where: {
-                    id: { in: customRoleIds },
-                    organizationId: input.organizationId,
-                    kind: "custom",
-                  },
-                  select: { id: true },
-                });
-                const validCustomRoleIds = new Set(
-                  validCustomRoles.map((r) => r.id),
-                );
-                const invalidRoleIds = customRoleIds.filter(
-                  (id) => !validCustomRoleIds.has(id),
-                );
-                if (invalidRoleIds.length > 0) {
-                  throw new TRPCError({
-                    code: "BAD_REQUEST",
-                    message: `Custom role(s) ${invalidRoleIds.join(", ")} not found in this organization`,
-                  });
-                }
-              }
-
-              teamIdsString = validTeamIds.join(",");
-            } else if (invite.teamIds?.trim()) {
-              const teamIdArray = invite.teamIds
-                .split(",")
-                .map((s) => s.trim())
-                .filter(Boolean);
-
-              const validTeamIds = await inviteService.validateTeamIds({
-                teamIds: teamIdArray,
-                organizationId: input.organizationId,
-              });
-
-              if (validTeamIds.length === 0) {
-                throw new TRPCError({
-                  code: "BAD_REQUEST",
-                  message: "No valid teams provided",
-                });
-              }
-
-              teamAssignments = validTeamIds.map((teamId) => ({
-                teamId,
-                role: ORGANIZATION_TO_TEAM_ROLE_MAP[
-                  invite.role as OrganizationUserRole
-                ],
-              }));
-
-              teamIdsString = validTeamIds.join(",");
-            } else {
-              throw new TRPCError({
-                code: "BAD_REQUEST",
-                message: "At least one team must be provided",
-              });
-            }
-
-            return {
-              email: normalizedEmail,
-              role: invite.role as OrganizationUserRole,
+          input.invites.map((invite) =>
+            prepareInviteRequest({
+              inviteService,
+              prisma,
               organizationId: input.organizationId,
-              teamIds: teamIdsString,
-              teamAssignments:
-                teamAssignments.length > 0 ? teamAssignments : undefined,
+              invite,
               requestedBy: ctx.session.user.id,
-            };
-          }),
+            }),
+          ),
         );
 
-        const results = await prisma.$transaction(async (tx) => {
-          const transactionalInviteService = InviteService.create(tx);
-          return Promise.all(
-            preparedInvites.map((invite) =>
-              transactionalInviteService.createMemberInviteRequest(invite),
-            ),
-          );
-        });
-
-        return results;
+        return await createInviteRequestRecords({ prisma, preparedInvites });
       } catch (error) {
-        if (error instanceof LimitExceededError) {
-          void getApp()
-            .usageLimits.notifyResourceLimitReached({
-              organizationId: input.organizationId,
-              limitType: error.limitType,
-              current: error.current,
-              max: error.max,
-            })
-            .catch(captureException);
-
-          throw new TRPCError({
-            code: "FORBIDDEN",
-            message: error.message,
-          });
-        }
-        if (error instanceof DuplicateInviteError) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: error.message,
-          });
-        }
-        throw error;
+        throwMappedInviteRequestError(error, input.organizationId);
       }
     }),
   approveInvite: protectedProcedure
@@ -1177,111 +2005,30 @@ export const organizationRouter = createTRPCRouter({
     .mutation(async ({ input, ctx }) => {
       const prisma = ctx.prisma;
       const session = ctx.session;
-      const invite = await prisma.organizationInvite.findUnique({
+      const rawInvite = await prisma.organizationInvite.findUnique({
         where: { inviteCode: input.inviteCode },
         include: { organization: true },
       });
 
-      if (
-        !invite ||
-        (invite.expiration !== null && invite.expiration < new Date())
-      ) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Invite not found or has expired",
-        });
-      }
-
-      if (!session?.user?.email) {
-        throw new TRPCError({
-          code: "UNAUTHORIZED",
-          message: "You must be signed in to accept the invite",
-        });
-      }
-
-      if (invite.status === "ACCEPTED") {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: INVITE_ALREADY_ACCEPTED_MESSAGE,
-        });
-      }
-
-      if (invite.status !== "PENDING") {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: INVITE_NOT_READY_MESSAGE,
-        });
-      }
-
-      // Case-insensitive email comparison: BetterAuth lowercases emails
-      // during signup/signin (see `findUserByEmail` in
-      // node_modules/better-auth/dist/db/internal-adapter.mjs) so
-      // `session.user.email` is always lowercase, but `invite.email`
-      // preserves the admin's original casing. A strict `!==` would
-      // reject an "Alice@Acme.com" invite for an "alice@acme.com" user.
-      // The old NextAuth flow worked accidentally because it didn't
-      // lowercase emails either — this is now a real mismatch post-migration.
-      if (
-        session.user.email.toLowerCase() !== invite.email.trim().toLowerCase()
-      ) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: `The invite was sent to ${invite.email}, but you are signed in as ${session.user.email}`,
-        });
-      }
-
-      await prisma.$transaction(async (tx) => {
-        const txInviteService = InviteService.create(tx);
-        await txInviteService.applyInvite({
-          userId: session.user.id,
-          invite,
-        });
+      const { invite, email } = requireAcceptableInvite({
+        invite: rawInvite,
+        session,
       });
 
-      // Provision the user's Personal Workspace (Team.isPersonal +
-      // Project.isPersonal) for this org. Idempotent — safe if a prior
-      // invite already triggered it. Runs outside the invite tx so an
-      // unexpected failure here doesn't roll the membership back; the
-      // next login will retry via the lazy backfill in
-      // `user.personalContext`.
-      try {
-        const personalWorkspaceService = new PersonalWorkspaceService(prisma);
-        await personalWorkspaceService.ensure({
-          userId: session.user.id,
-          organizationId: invite.organizationId,
-          displayName: session.user.name,
-          displayEmail: session.user.email,
-        });
-      } catch (err) {
-        // Non-fatal — capture and continue. Lazy backfill will recover
-        // on the user's next session resolution. PostHog signal lets
-        // operators catch systemic provisioning regressions (bad
-        // migration, schema drift, Prisma constraint violation) before
-        // users start complaining about missing personal workspaces.
-        captureException(toError(err), {
-          extra: {
-            origin: "governance.acceptInvite",
-            userId: session.user.id,
-            organizationId: invite.organizationId,
-          },
-        });
-      }
-
-      void getApp()
-        .notifications.sendSlackSignupEvent({
-          userName: session.user.name,
-          userEmail: session.user.email,
-          organizationName: invite.organization.name,
-        })
-        .catch(captureException);
-
-      fireInviteAcceptedNurturingCalls({
+      await applyInviteAcceptance({
+        prisma,
         userId: session.user.id,
-        email: session.user.email,
-        name: session.user.name,
-        organizationId: invite.organization.id,
-        organizationName: invite.organization.name,
+        invite,
       });
+
+      await provisionPersonalWorkspaceBestEffort({
+        prisma,
+        session,
+        email,
+        organizationId: invite.organizationId,
+      });
+
+      fireAcceptInviteSideEffects({ session, email, invite });
 
       const inviteService = InviteService.create(prisma);
       const projectSlug = await inviteService.findLandingProjectSlug(invite);
@@ -1336,92 +2083,19 @@ export const organizationRouter = createTRPCRouter({
       const inputIsCustomRole = isCustomRole(input.role);
 
       if (inputIsCustomRole && input.customRoleId) {
-        // Check enterprise plan before allowing custom role assignment
-        const teamForPlanCheck = await prisma.team.findUnique({
-          where: { id: input.teamId },
-          select: { organizationId: true },
-        });
-        if (!teamForPlanCheck) {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "Team not found",
-          });
-        }
-        await assertEnterprisePlan({
-          organizationId: teamForPlanCheck.organizationId,
-          user: ctx.session.user,
-          errorMessage: ENTERPRISE_FEATURE_ERRORS.RBAC,
+        await assertCustomRoleAssignmentAllowed({
+          prisma,
+          teamId: input.teamId,
+          actorUser: ctx.session.user,
         });
       } else if (!inputIsCustomRole) {
-        // Built-in role path: check license limits for EXTERNAL users
-        const team = await prisma.team.findUnique({
-          where: { id: input.teamId },
-          select: { organizationId: true },
+        await assertBuiltInRoleAssignmentAllowed({
+          prisma,
+          teamId: input.teamId,
+          userId: input.userId,
+          role: input.role as TeamRoleValue,
+          actorUser: ctx.session.user,
         });
-        if (!team) {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "Team not found",
-          });
-        }
-
-        const orgMembership = await prisma.organizationUser.findUnique({
-          where: {
-            userId_organizationId: {
-              userId: input.userId,
-              organizationId: team.organizationId,
-            },
-          },
-        });
-
-        if (orgMembership?.role === OrganizationUserRole.EXTERNAL) {
-          if (
-            !isTeamRoleAllowedForOrganizationRole({
-              organizationRole: OrganizationUserRole.EXTERNAL,
-              teamRole: input.role as TeamRoleValue,
-            })
-          ) {
-            throw new TRPCError({
-              code: "BAD_REQUEST",
-              message: LITE_MEMBER_VIEWER_ONLY_ERROR,
-            });
-          }
-
-          const roleService = new RoleService(prisma);
-          const currentBinding = await roleService.getUserCustomRoleBinding({
-            userId: input.userId,
-            organizationId: team.organizationId,
-            teamId: input.teamId,
-          });
-
-          const oldPermissions = currentBinding?.customRoleId
-            ? await (async () => {
-                const role = await roleService.getRoleByIdOrNull(
-                  currentBinding.customRoleId!,
-                );
-                return role?.permissions as string[] | undefined;
-              })()
-            : undefined;
-
-          const changeType = getRoleChangeType({
-            oldRole: OrganizationUserRole.EXTERNAL,
-            oldPermissions,
-            newRole: OrganizationUserRole.EXTERNAL,
-            newPermissions: undefined,
-          });
-
-          const subscriptionLimits = await getApp().planProvider.getActivePlan({
-            organizationId: team.organizationId,
-            user: ctx.session.user,
-          });
-          const licenseRepo = new LicenseEnforcementRepository(prisma);
-          await assertMemberTypeLimitNotExceeded({
-            changeType,
-            organizationId: team.organizationId,
-            licenseRepo,
-            limits: subscriptionLimits,
-          });
-        }
       }
 
       await getApp().organizations.updateTeamMemberRole({
@@ -1500,78 +2174,26 @@ export const organizationRouter = createTRPCRouter({
         })),
       });
 
-      // Only the teams the organization shares. A seat decision is about the
-      // person, so it applies to the teams they work in with other people and
-      // leaves the workspace that is only theirs alone. Including it would ask
-      // the organization to demote a team's last admin, which is refused, and
-      // the whole role change would go down with the refusal.
-      const organizationTeamIds = await findSharedTeamIds({
-        client: prisma,
-        organizationId: input.organizationId,
-      });
-
-      const currentTeamBindings = await prisma.roleBinding.findMany({
-        where: {
+      const { organizationTeamIds, currentMemberships, userPermissions } =
+        await resolveCurrentTeamMembershipState({
+          prisma,
           organizationId: input.organizationId,
           userId: input.userId,
-          scopeType: RoleBindingScopeType.TEAM,
-          scopeId: { in: organizationTeamIds },
-        },
-        select: { scopeId: true, role: true, customRoleId: true },
-      });
-
-      const currentMemberships = currentTeamBindings.map((b) => ({
-        teamId: b.scopeId,
-        role: b.role,
-      }));
-
-      const userPermissions = await (async () => {
-        const customRoleIds = currentTeamBindings
-          .map((b) => b.customRoleId)
-          .filter((id): id is string => !!id);
-        if (customRoleIds.length === 0) return undefined;
-        const customRoles = await prisma.customRole.findMany({
-          where: { id: { in: customRoleIds } },
-          select: { permissions: true },
         });
-        const allPermissions: string[] = [];
-        for (const cr of customRoles) {
-          if (cr.permissions) {
-            allPermissions.push(...(cr.permissions as string[]));
-          }
-        }
-        return allPermissions.length > 0 ? allPermissions : undefined;
-      })();
 
-      const changeType = getRoleChangeType({
-        oldRole: currentMember.role,
-        oldPermissions: userPermissions,
+      const subscriptionLimits = await assertMemberRoleChangeAllowed({
+        prisma,
+        organizationId: input.organizationId,
+        currentRole: currentMember.role,
+        userPermissions,
         newRole: input.role,
-        newPermissions: undefined,
+        actorUser: ctx.session.user,
       });
 
-      const subscriptionLimits = await getApp().planProvider.getActivePlan({
-        organizationId: input.organizationId,
-        user: ctx.session.user,
+      assertTeamRoleUpdatesAllowCustomRoles({
+        teamRoleUpdates: input.teamRoleUpdates,
+        planType: subscriptionLimits.type,
       });
-      const licenseRepo = new LicenseEnforcementRepository(prisma);
-      await assertMemberTypeLimitNotExceeded({
-        changeType,
-        organizationId: input.organizationId,
-        licenseRepo,
-        limits: subscriptionLimits,
-      });
-
-      const hasCustomRoleAssignment = (input.teamRoleUpdates ?? []).some(
-        (update) =>
-          typeof update.role === "string" && isCustomRole(update.role),
-      );
-      if (hasCustomRoleAssignment) {
-        assertEnterprisePlanType({
-          planType: subscriptionLimits.type,
-          errorMessage: ENTERPRISE_FEATURE_ERRORS.RBAC,
-        });
-      }
 
       const { teamsLeftWithoutAdmin } =
         await getApp().organizations.updateMemberRole({

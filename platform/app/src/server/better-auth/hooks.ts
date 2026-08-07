@@ -56,6 +56,48 @@ const reconcileSsoAccounts = async ({
 };
 
 /**
+ * Records a completed SSO domain auto-join: the audit log line, the Slack
+ * signup event, and the nurturing calls. Runs after the membership
+ * transaction commits.
+ */
+const announceSsoAutoAdd = ({
+  user,
+  org,
+  pendingInvite,
+}: {
+  user: { id: string; email: string; name: string };
+  org: { id: string; name: string };
+  pendingInvite: { id: string } | null | undefined;
+}): void => {
+  logger.info(
+    {
+      userId: user.id,
+      organizationId: org.id,
+      inviteId: pendingInvite?.id ?? null,
+    },
+    pendingInvite
+      ? "Applied pending invite on SSO signup"
+      : "Auto-added new user to SSO organization (default MEMBER)",
+  );
+
+  void getApp()
+    .notifications.sendSlackSignupEvent({
+      userName: user.name,
+      userEmail: user.email,
+      organizationName: org.name,
+    })
+    .catch(captureException);
+
+  fireSsoAutoAddNurturingCalls({
+    userId: user.id,
+    email: user.email,
+    name: user.name,
+    organizationId: org.id,
+    organizationName: org.name,
+  });
+};
+
+/**
  * Called before a new user is created (via OAuth signup or email+password signup).
  *
  * Ports the "new user with matching SSO domain" branch from the old NextAuth
@@ -195,32 +237,7 @@ export const afterUserCreate = async ({
         });
       });
 
-      logger.info(
-        {
-          userId: user.id,
-          organizationId: org.id,
-          inviteId: pendingInvite?.id ?? null,
-        },
-        pendingInvite
-          ? "Applied pending invite on SSO signup"
-          : "Auto-added new user to SSO organization (default MEMBER)",
-      );
-
-      void getApp()
-        .notifications.sendSlackSignupEvent({
-          userName: user.name,
-          userEmail: user.email,
-          organizationName: org.name,
-        })
-        .catch(captureException);
-
-      fireSsoAutoAddNurturingCalls({
-        userId: user.id,
-        email: user.email,
-        name: user.name,
-        organizationId: org.id,
-        organizationName: org.name,
-      });
+      announceSsoAutoAdd({ user, org, pendingInvite });
     } catch (err) {
       // P2002 (unique constraint) means another concurrent OAuth callback
       // or a retry already created this membership. Idempotent success.

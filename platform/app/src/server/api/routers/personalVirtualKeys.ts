@@ -20,6 +20,7 @@ import type { PrismaClient } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { env } from "~/env.mjs";
+import type { Session } from "~/server/auth";
 
 import {
   authorizeInResolver,
@@ -67,6 +68,43 @@ async function assertOrgMembership({
   }
 }
 
+/**
+ * Which principal's keys the caller may see: own keys are always visible;
+ * anything wider needs `virtualKeys:viewOtherPersonal`. Returns `undefined`
+ * to mean "no filter" (an admin sweeping the whole org).
+ */
+async function resolvePersonalVkPrincipal({
+  ctx,
+  organizationId,
+  targetUserId,
+}: {
+  ctx: { prisma: PrismaClient; session: Session };
+  organizationId: string;
+  targetUserId?: string;
+}): Promise<string | undefined> {
+  const callerId = ctx.session.user.id;
+  if (targetUserId === callerId) {
+    return callerId;
+  }
+  const canViewOthers = await hasOrganizationPermission(
+    { prisma: ctx.prisma, session: ctx.session },
+    organizationId,
+    "virtualKeys:viewOtherPersonal",
+  );
+  if (targetUserId !== undefined) {
+    if (!canViewOthers) {
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: "permission_denied: virtualKeys:viewOtherPersonal",
+      });
+    }
+    return targetUserId;
+  }
+  // No target: an admin sweeps the whole org, a plain member sees
+  // only their own keys.
+  return canViewOthers ? undefined : callerId;
+}
+
 export const personalVirtualKeysRouter = createTRPCRouter({
   /**
    * List personal VKs in an organization. Never returns the secret.
@@ -93,32 +131,12 @@ export const personalVirtualKeysRouter = createTRPCRouter({
         organizationId: input.organizationId,
       });
 
-      const callerId = ctx.session.user.id;
-      // Resolve which principal(s) the result is scoped to. Own keys are
-      // always visible; anything wider needs viewOtherPersonal.
-      let principalUserId: string | undefined;
-      if (input.targetUserId === callerId) {
-        principalUserId = callerId;
-      } else {
-        const canViewOthers = await hasOrganizationPermission(
-          { prisma: ctx.prisma, session: ctx.session },
-          input.organizationId,
-          "virtualKeys:viewOtherPersonal",
-        );
-        if (input.targetUserId !== undefined) {
-          if (!canViewOthers) {
-            throw new TRPCError({
-              code: "FORBIDDEN",
-              message: "permission_denied: virtualKeys:viewOtherPersonal",
-            });
-          }
-          principalUserId = input.targetUserId;
-        } else {
-          // No target: an admin sweeps the whole org, a plain member sees
-          // only their own keys.
-          principalUserId = canViewOthers ? undefined : callerId;
-        }
-      }
+      // Resolve which principal(s) the result is scoped to.
+      const principalUserId = await resolvePersonalVkPrincipal({
+        ctx,
+        organizationId: input.organizationId,
+        targetUserId: input.targetUserId,
+      });
 
       const service = PersonalVirtualKeyService.create(ctx.prisma, {
         ...gatewayUrlOptions(),

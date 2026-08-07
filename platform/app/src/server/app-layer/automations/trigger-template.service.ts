@@ -114,6 +114,26 @@ function normalizeSlackType(
 }
 
 /**
+ * Validates one Liquid template column, if it has a non-empty source. Split
+ * out of {@link validateTemplateDraft} so the per-column parse check isn't
+ * nested inside the `for` loop over {@link LIQUID_TEMPLATE_COLUMNS}.
+ */
+function validateLiquidColumn(
+  column: (typeof LIQUID_TEMPLATE_COLUMNS)[number],
+  draft: TemplateDraft,
+): void {
+  const source = draft[column];
+  if (typeof source !== "string" || source.trim() === "") return;
+  const result = validateLiquid(source);
+  if (!result.valid) {
+    throw new TemplateValidationError(
+      column,
+      result.error ?? "Invalid Liquid syntax",
+    );
+  }
+}
+
+/**
  * Validates a template draft before it is persisted: every non-empty Liquid
  * column must parse, and `slackTemplateType` must be a recognised discriminator.
  * Throws `TemplateValidationError` on the first problem. Pure, so the save path
@@ -147,16 +167,7 @@ export function validateTemplateDraft(draft: TemplateDraft): void {
     );
   }
   for (const column of LIQUID_TEMPLATE_COLUMNS) {
-    const source = draft[column];
-    if (typeof source === "string" && source.trim() !== "") {
-      const result = validateLiquid(source);
-      if (!result.valid) {
-        throw new TemplateValidationError(
-          column,
-          result.error ?? "Invalid Liquid syntax",
-        );
-      }
-    }
+    validateLiquidColumn(column, draft);
   }
 }
 
@@ -308,6 +319,169 @@ function buildTestFireContext({
   };
 }
 
+/** Shared render context every test-fire channel renders against. */
+interface TestFireRenderInputs {
+  context: TemplateContext | GraphAlertTemplateContext | ReportTemplateContext;
+  defaults: ReturnType<typeof defaultsForSourceKind>;
+}
+
+async function testFireEmail({
+  deps,
+  draft,
+  recipients,
+  render,
+}: {
+  deps: TestFireTriggerDeps;
+  draft: TemplateDraft;
+  recipients: string[];
+  render: TestFireRenderInputs;
+}): Promise<TestFireResult> {
+  if (recipients.length === 0) {
+    throw new TestFireUnavailableError(
+      "email",
+      "This automation has no email recipients to test-fire to.",
+    );
+  }
+  const rendered = await renderTriggerEmail({
+    subjectTemplate: draft.emailSubjectTemplate ?? null,
+    bodyTemplate: draft.emailBodyTemplate ?? null,
+    context: render.context,
+    defaults: render.defaults,
+    testFire: true,
+  });
+  const noReplyTo = buildTriggerNoReplyAddress({
+    defaultFrom: computeDefaultFrom(),
+    triggerId: TEST_FIRE_TRIGGER_ID_SENTINEL,
+  });
+  await deps.notifier.sendEmail({
+    to: noReplyTo,
+    bcc: recipients,
+    subject: rendered.subject,
+    html: rendered.html,
+  });
+  return {
+    channel: "email",
+    recipientCount: recipients.length,
+    usedDefault: rendered.usedDefault,
+    missingVariables: rendered.missingVariables,
+    errors: rendered.errors,
+  };
+}
+
+async function testFireWebhook({
+  deps,
+  trigger,
+  webhookDestination,
+  render,
+}: {
+  deps: TestFireTriggerDeps;
+  trigger: DraftIdentity;
+  webhookDestination: TestFireWebhookDestination | null | undefined;
+  render: TestFireRenderInputs;
+}): Promise<TestFireResult> {
+  if (!webhookDestination) {
+    throw new TestFireUnavailableError(
+      "webhook",
+      "This automation has no endpoint URL to test-fire to.",
+    );
+  }
+  const { url, method, headers, signingSecrets, bodyTemplate } =
+    webhookDestination;
+  const rendered = await renderWebhookBody({
+    template: bodyTemplate,
+    context: render.context,
+    defaultBody: render.defaults.webhookBody,
+  });
+  // Actually sends through the full SSRF-fenced sender so the author sees a
+  // real status code (ADR-040 §1); a non-2xx throws the classified
+  // DispatchError, which the route lifts into a clean domain error.
+  const { status } = await deps.notifier.sendWebhook({
+    url,
+    method,
+    headers,
+    signingSecrets,
+    body: rendered.body,
+    triggerName: trigger.name,
+  });
+  return {
+    channel: "webhook",
+    recipientCount: 1,
+    usedDefault: rendered.usedDefault,
+    missingVariables: rendered.missingVariables,
+    errors: rendered.errors,
+    httpStatus: status,
+  };
+}
+
+/** Bot connection: post via the Web API with the gate OPEN so the author sees
+ *  the real chart/table/alert blocks render, exactly as a live fire would. */
+async function testFireSlackBot({
+  deps,
+  draft,
+  botDestination,
+  render,
+}: {
+  deps: TestFireTriggerDeps;
+  draft: TemplateDraft;
+  botDestination: { token: string; channel: string };
+  render: TestFireRenderInputs;
+}): Promise<TestFireResult> {
+  const rendered = await renderTriggerSlack({
+    templateType: normalizeSlackType(draft.slackTemplateType),
+    template: draft.slackTemplate ?? null,
+    context: render.context,
+    defaults: render.defaults,
+    testFire: true,
+    allowGatedBlocks: true,
+  });
+  await deps.notifier.sendSlackBot({
+    token: botDestination.token,
+    channel: botDestination.channel,
+    payload: rendered.payload,
+  });
+  return {
+    channel: "slack",
+    recipientCount: 1,
+    usedDefault: rendered.usedDefault,
+    missingVariables: rendered.missingVariables,
+    errors: rendered.errors,
+  };
+}
+
+async function testFireSlackWebhook({
+  deps,
+  draft,
+  webhook,
+  render,
+}: {
+  deps: TestFireTriggerDeps;
+  draft: TemplateDraft;
+  webhook: string | null;
+  render: TestFireRenderInputs;
+}): Promise<TestFireResult> {
+  if (!webhook) {
+    throw new TestFireUnavailableError(
+      "slack",
+      "This automation has no Slack webhook to test-fire to.",
+    );
+  }
+  const rendered = await renderTriggerSlack({
+    templateType: normalizeSlackType(draft.slackTemplateType),
+    template: draft.slackTemplate ?? null,
+    context: render.context,
+    defaults: render.defaults,
+    testFire: true,
+  });
+  await deps.notifier.sendSlack({ webhook, payload: rendered.payload });
+  return {
+    channel: "slack",
+    recipientCount: 1,
+    usedDefault: rendered.usedDefault,
+    missingVariables: rendered.missingVariables,
+    errors: rendered.errors,
+  };
+}
+
 export async function testFireTrigger(
   deps: TestFireTriggerDeps,
   input: TestFireTriggerInput,
@@ -320,7 +494,10 @@ export async function testFireTrigger(
     graphAlert: input.graphAlert,
     report: input.report,
   });
-  const defaults = defaultsForSourceKind(sourceKind);
+  const render: TestFireRenderInputs = {
+    context,
+    defaults: defaultsForSourceKind(sourceKind),
+  };
 
   // Run the same validation save uses so a Test Fire can't bypass the
   // discriminator contract — without this, a draft with `slackTemplate`
@@ -331,117 +508,26 @@ export async function testFireTrigger(
   validateTemplateDraft(draft);
 
   if (channel === "email") {
-    if (recipients.length === 0) {
-      throw new TestFireUnavailableError(
-        "email",
-        "This automation has no email recipients to test-fire to.",
-      );
-    }
-    const rendered = await renderTriggerEmail({
-      subjectTemplate: draft.emailSubjectTemplate ?? null,
-      bodyTemplate: draft.emailBodyTemplate ?? null,
-      context,
-      defaults,
-      testFire: true,
-    });
-    const noReplyTo = buildTriggerNoReplyAddress({
-      defaultFrom: computeDefaultFrom(),
-      triggerId: TEST_FIRE_TRIGGER_ID_SENTINEL,
-    });
-    await deps.notifier.sendEmail({
-      to: noReplyTo,
-      bcc: recipients,
-      subject: rendered.subject,
-      html: rendered.html,
-    });
-    return {
-      channel: "email",
-      recipientCount: recipients.length,
-      usedDefault: rendered.usedDefault,
-      missingVariables: rendered.missingVariables,
-      errors: rendered.errors,
-    };
+    return testFireEmail({ deps, draft, recipients, render });
   }
 
   if (channel === "webhook") {
-    if (!input.webhookDestination) {
-      throw new TestFireUnavailableError(
-        "webhook",
-        "This automation has no endpoint URL to test-fire to.",
-      );
-    }
-    const { url, method, headers, signingSecrets, bodyTemplate } =
-      input.webhookDestination;
-    const rendered = await renderWebhookBody({
-      template: bodyTemplate,
-      context,
-      defaultBody: defaults.webhookBody,
+    return testFireWebhook({
+      deps,
+      trigger,
+      webhookDestination: input.webhookDestination,
+      render,
     });
-    // Actually sends through the full SSRF-fenced sender so the author sees a
-    // real status code (ADR-040 §1); a non-2xx throws the classified
-    // DispatchError, which the route lifts into a clean domain error.
-    const { status } = await deps.notifier.sendWebhook({
-      url,
-      method,
-      headers,
-      signingSecrets,
-      body: rendered.body,
-      triggerName: trigger.name,
-    });
-    return {
-      channel: "webhook",
-      recipientCount: 1,
-      usedDefault: rendered.usedDefault,
-      missingVariables: rendered.missingVariables,
-      errors: rendered.errors,
-      httpStatus: status,
-    };
   }
 
-  // Bot connection: post via the Web API with the gate OPEN so the author sees
-  // the real chart/table/alert blocks render, exactly as a live fire would.
   if (input.botDestination) {
-    const rendered = await renderTriggerSlack({
-      templateType: normalizeSlackType(draft.slackTemplateType),
-      template: draft.slackTemplate ?? null,
-      context,
-      defaults,
-      testFire: true,
-      allowGatedBlocks: true,
+    return testFireSlackBot({
+      deps,
+      draft,
+      botDestination: input.botDestination,
+      render,
     });
-    await deps.notifier.sendSlackBot({
-      token: input.botDestination.token,
-      channel: input.botDestination.channel,
-      payload: rendered.payload,
-    });
-    return {
-      channel: "slack",
-      recipientCount: 1,
-      usedDefault: rendered.usedDefault,
-      missingVariables: rendered.missingVariables,
-      errors: rendered.errors,
-    };
   }
 
-  if (!webhook) {
-    throw new TestFireUnavailableError(
-      "slack",
-      "This automation has no Slack webhook to test-fire to.",
-    );
-  }
-  const rendered = await renderTriggerSlack({
-    templateType: normalizeSlackType(draft.slackTemplateType),
-    template: draft.slackTemplate ?? null,
-    context,
-    defaults,
-    testFire: true,
-  });
-  await deps.notifier.sendSlack({ webhook, payload: rendered.payload });
-  return {
-    channel: "slack",
-    recipientCount: 1,
-    usedDefault: rendered.usedDefault,
-    missingVariables: rendered.missingVariables,
-    errors: rendered.errors,
-  };
+  return testFireSlackWebhook({ deps, draft, webhook, render });
 }

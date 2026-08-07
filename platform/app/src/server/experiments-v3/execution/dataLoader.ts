@@ -325,25 +325,29 @@ export type ExecutionDataInputs = {
   parameters?: Record<string, string | number | boolean>;
 };
 
-export const loadExecutionData = async ({
+type LoadError = { error: string; status: number };
+
+const isLoadError = <T>(result: T | LoadError): result is LoadError =>
+  !!result && typeof result === "object" && "error" in result;
+
+/**
+ * Resolves the base rows + columns: inline data, a saved dataset id, or the
+ * attached dataset reference, in that precedence.
+ */
+const resolveBaseDataset = async ({
   projectId,
   dataset,
-  targets,
-  evaluators,
   inputs,
 }: {
   projectId: string;
   dataset: DatasetInput;
-  targets: TargetForLoading[];
-  evaluators: EvaluatorForLoading[];
   inputs?: ExecutionDataInputs;
-}): Promise<LoadedExecutionData | { error: string; status: number }> => {
-  // Resolve the base rows + columns: inline data, a saved dataset id, or the
-  // attached dataset reference, in that precedence.
-  let baseDataset: LoadedDataset;
+}): Promise<LoadedDataset | LoadError> => {
   if (inputs?.data) {
-    baseDataset = rowsFromInlineData(inputs.data);
-  } else if (inputs?.datasetId) {
+    return rowsFromInlineData(inputs.data);
+  }
+
+  if (inputs?.datasetId) {
     const fullDataset = await getFullDataset({
       datasetId: inputs.datasetId,
       projectId,
@@ -365,7 +369,7 @@ export const loadExecutionData = async ({
         )
         .map((c) => c.name),
     );
-    baseDataset = {
+    return {
       rows: parseJsonColumns(
         fullDataset.datasetRecords.map(
           (r) => r.entry as Record<string, unknown>,
@@ -374,124 +378,155 @@ export const loadExecutionData = async ({
       ),
       columns,
     };
-  } else {
-    const datasetResult = await loadDataset(dataset, projectId);
-    if ("error" in datasetResult) {
-      return datasetResult;
-    }
-    baseDataset = datasetResult;
   }
 
-  // Apply caller parameters as constant columns across every row (and a single
-  // synthetic row when there is no dataset).
-  const { rows: datasetRows, columns: datasetColumns } = applyParametersToRows({
-    rows: baseDataset.rows,
-    columns: baseDataset.columns,
-    parameters: inputs?.parameters,
-  });
+  return loadDataset(dataset, projectId);
+};
 
-  // Load prompts for prompt targets
+const loadPromptForTarget = async ({
+  target,
+  projectId,
+  promptService,
+}: {
+  target: TargetForLoading & { promptId: string };
+  projectId: string;
+  promptService: PromptService;
+}): Promise<VersionedPrompt | LoadError> => {
+  const versionInfo = target.promptVersionNumber
+    ? ` version ${target.promptVersionNumber}`
+    : "";
+  try {
+    const prompt = await promptService.getPromptByIdOrHandle({
+      idOrHandle: target.promptId,
+      projectId,
+      version: target.promptVersionNumber ?? undefined,
+    });
+    if (!prompt) {
+      return {
+        error: `Prompt "${target.promptId}"${versionInfo} not found`,
+        status: 404,
+      };
+    }
+    return prompt;
+  } catch (promptError) {
+    logger.error(
+      {
+        error: promptError,
+        promptId: target.promptId,
+        version: target.promptVersionNumber,
+      },
+      "Failed to load prompt for target",
+    );
+    return {
+      error: `Failed to load prompt "${target.promptId}"${versionInfo}: ${(promptError as Error).message}`,
+      status: 404,
+    };
+  }
+};
+
+/** Loads prompts for prompt targets. */
+const loadPromptsForTargets = async ({
+  targets,
+  projectId,
+}: {
+  targets: TargetForLoading[];
+  projectId: string;
+}): Promise<Map<string, VersionedPrompt> | LoadError> => {
   const loadedPrompts = new Map<string, VersionedPrompt>();
   const promptService = new PromptService(prisma);
 
   for (const target of targets) {
-    if (target.type === "prompt" && target.promptId) {
-      try {
-        const prompt = await promptService.getPromptByIdOrHandle({
-          idOrHandle: target.promptId,
-          projectId,
-          version: target.promptVersionNumber ?? undefined,
-        });
-        if (prompt) {
-          loadedPrompts.set(target.promptId, prompt);
-        } else {
-          const versionInfo = target.promptVersionNumber
-            ? ` version ${target.promptVersionNumber}`
-            : "";
-          return {
-            error: `Prompt "${target.promptId}"${versionInfo} not found`,
-            status: 404,
-          };
-        }
-      } catch (promptError) {
-        const versionInfo = target.promptVersionNumber
-          ? ` version ${target.promptVersionNumber}`
-          : "";
-        logger.error(
-          {
-            error: promptError,
-            promptId: target.promptId,
-            version: target.promptVersionNumber,
-          },
-          "Failed to load prompt for target",
-        );
-        return {
-          error: `Failed to load prompt "${target.promptId}"${versionInfo}: ${(promptError as Error).message}`,
-          status: 404,
-        };
-      }
-    }
+    if (target.type !== "prompt" || !target.promptId) continue;
+
+    const result = await loadPromptForTarget({
+      target: target as TargetForLoading & { promptId: string },
+      projectId,
+      promptService,
+    });
+    if (isLoadError(result)) return result;
+    loadedPrompts.set(target.promptId, result);
   }
 
-  // Load agents for agent targets
+  return loadedPrompts;
+};
+
+/** Loads agents for agent targets. */
+const loadAgentsForTargets = async ({
+  targets,
+  projectId,
+}: {
+  targets: TargetForLoading[];
+  projectId: string;
+}): Promise<Map<string, TypedAgent>> => {
   const loadedAgents = new Map<string, TypedAgent>();
   const agentService = AgentService.create(prisma);
 
   for (const target of targets) {
-    if (target.type === "agent" && target.dbAgentId) {
-      const agent = await agentService.getById({
-        id: target.dbAgentId,
-        projectId,
-      });
-      if (agent) {
-        loadedAgents.set(target.dbAgentId, agent);
-      }
+    if (target.type !== "agent" || !target.dbAgentId) continue;
+    const agent = await agentService.getById({
+      id: target.dbAgentId,
+      projectId,
+    });
+    if (agent) {
+      loadedAgents.set(target.dbAgentId, agent);
     }
   }
 
-  // Load studio workflows for workflow targets (the committed DSL run per row)
-  const loadedWorkflows = new Map<string, LoadedWorkflow>();
+  return loadedAgents;
+};
 
-  const loadPublishedWorkflow = async ({
-    workflowId,
-    workflowVersionId,
-  }: {
-    workflowId: string;
-    workflowVersionId?: string;
-  }): Promise<LoadedWorkflow | { error: string; status: number }> => {
-    const workflow = await prisma.workflow.findUnique({
-      where: { id: workflowId, projectId },
-    });
-    if (!workflow) {
-      return { error: `Workflow "${workflowId}" not found`, status: 404 };
-    }
+const loadPublishedWorkflow = async ({
+  workflowId,
+  workflowVersionId,
+  projectId,
+}: {
+  workflowId: string;
+  workflowVersionId?: string;
+  projectId: string;
+}): Promise<LoadedWorkflow | LoadError> => {
+  const workflow = await prisma.workflow.findUnique({
+    where: { id: workflowId, projectId },
+  });
+  if (!workflow) {
+    return { error: `Workflow "${workflowId}" not found`, status: 404 };
+  }
 
-    const versionId = workflowVersionId ?? workflow.publishedId;
-    if (!versionId) {
-      return {
-        error: `Workflow "${workflowId}" has no committed version to evaluate`,
-        status: 400,
-      };
-    }
-
-    const version = await prisma.workflowVersion.findUnique({
-      where: { id: versionId, projectId, workflowId },
-    });
-    if (!version) {
-      return {
-        error: `Workflow version "${versionId}" not found`,
-        status: 404,
-      };
-    }
-
+  const versionId = workflowVersionId ?? workflow.publishedId;
+  if (!versionId) {
     return {
-      id: workflow.id,
-      name: workflow.name,
-      versionId,
-      dsl: version.dsl as unknown as Workflow,
+      error: `Workflow "${workflowId}" has no committed version to evaluate`,
+      status: 400,
     };
-  };
+  }
 
+  const version = await prisma.workflowVersion.findUnique({
+    where: { id: versionId, projectId, workflowId },
+  });
+  if (!version) {
+    return {
+      error: `Workflow version "${versionId}" not found`,
+      status: 404,
+    };
+  }
+
+  return {
+    id: workflow.id,
+    name: workflow.name,
+    versionId,
+    dsl: version.dsl as unknown as Workflow,
+  };
+};
+
+/** Loads the studio workflow DSL for every direct workflow target. */
+const loadDirectWorkflowTargets = async ({
+  targets,
+  projectId,
+  loadedWorkflows,
+}: {
+  targets: TargetForLoading[];
+  projectId: string;
+  loadedWorkflows: Map<string, LoadedWorkflow>;
+}): Promise<LoadError | undefined> => {
   for (const target of targets) {
     if (target.type !== "workflow" || !target.workflowId) continue;
     if (loadedWorkflows.has(workflowLoadKey(target))) continue;
@@ -499,25 +534,59 @@ export const loadExecutionData = async ({
     const result = await loadPublishedWorkflow({
       workflowId: target.workflowId,
       workflowVersionId: target.workflowVersionId,
+      projectId,
     });
-    if ("error" in result) return result;
+    if (isLoadError(result)) return result;
     loadedWorkflows.set(workflowLoadKey(target), result);
   }
+  return undefined;
+};
 
-  // An agent target can itself wrap a Studio workflow (agent.type ===
-  // "workflow", created via Agent -> New Agent -> Workflow). That agent has no
-  // code of its own — just a pointer to the linked workflow — so it must run
-  // the whole workflow the same way a direct workflow target does, not the
-  // agent's (nonexistent) code. Resolve and cache that linked workflow here so
-  // the orchestrator can dispatch it to executeWorkflowCell.
+/**
+ * An agent target can itself wrap a Studio workflow (agent.type ===
+ * "workflow", created via Agent -> New Agent -> Workflow). That agent has no
+ * code of its own — just a pointer to the linked workflow. Resolves the
+ * workflow id the target's agent links to, or undefined when the target
+ * isn't a workflow-backed agent.
+ */
+const linkedWorkflowIdForTarget = ({
+  target,
+  loadedAgents,
+}: {
+  target: TargetForLoading;
+  loadedAgents: Map<string, TypedAgent>;
+}): string | undefined => {
+  if (target.type !== "agent" || !target.dbAgentId) return undefined;
+  const agent = loadedAgents.get(target.dbAgentId);
+  if (agent?.type !== "workflow") return undefined;
+  return (
+    agent.workflowId ?? (agent.config as { workflow_id?: string }).workflow_id
+  );
+};
+
+/**
+ * That agent has no code of its own — just a pointer to the linked
+ * workflow — so it must run the whole workflow the same way a direct
+ * workflow target does, not the agent's (nonexistent) code. Resolves and
+ * caches that linked workflow so the orchestrator can dispatch it to
+ * executeWorkflowCell.
+ */
+const loadLinkedAgentWorkflowTargets = async ({
+  targets,
+  projectId,
+  loadedAgents,
+  loadedWorkflows,
+}: {
+  targets: TargetForLoading[];
+  projectId: string;
+  loadedAgents: Map<string, TypedAgent>;
+  loadedWorkflows: Map<string, LoadedWorkflow>;
+}): Promise<LoadError | undefined> => {
   for (const target of targets) {
-    if (target.type !== "agent" || !target.dbAgentId) continue;
-    const agent = loadedAgents.get(target.dbAgentId);
-    if (agent?.type !== "workflow") continue;
-
-    const linkedWorkflowId =
-      agent.workflowId ??
-      (agent.config as { workflow_id?: string }).workflow_id;
+    const linkedWorkflowId = linkedWorkflowIdForTarget({
+      target,
+      loadedAgents,
+    });
     if (!linkedWorkflowId) continue;
 
     const key = workflowLoadKey({ workflowId: linkedWorkflowId });
@@ -525,33 +594,69 @@ export const loadExecutionData = async ({
 
     const result = await loadPublishedWorkflow({
       workflowId: linkedWorkflowId,
+      projectId,
     });
-    if ("error" in result) return result;
+    if (isLoadError(result)) return result;
     loadedWorkflows.set(key, result);
   }
+  return undefined;
+};
 
-  // Load evaluators from DB (for both evaluator configs AND evaluator targets)
+/** Loads studio workflows for workflow targets and workflow-backed agent targets. */
+const loadWorkflowsForTargets = async ({
+  targets,
+  projectId,
+  loadedAgents,
+}: {
+  targets: TargetForLoading[];
+  projectId: string;
+  loadedAgents: Map<string, TypedAgent>;
+}): Promise<Map<string, LoadedWorkflow> | LoadError> => {
+  const loadedWorkflows = new Map<string, LoadedWorkflow>();
+
+  const directError = await loadDirectWorkflowTargets({
+    targets,
+    projectId,
+    loadedWorkflows,
+  });
+  if (directError) return directError;
+
+  const linkedError = await loadLinkedAgentWorkflowTargets({
+    targets,
+    projectId,
+    loadedAgents,
+    loadedWorkflows,
+  });
+  if (linkedError) return linkedError;
+
+  return loadedWorkflows;
+};
+
+/** Loads evaluators from DB (for both evaluator configs AND evaluator targets). */
+const loadEvaluatorsForTargets = async ({
+  targets,
+  evaluators,
+  projectId,
+}: {
+  targets: TargetForLoading[];
+  evaluators: EvaluatorForLoading[];
+  projectId: string;
+}): Promise<Map<string, Evaluator>> => {
   const loadedEvaluators = new Map<string, Evaluator>();
   const evaluatorService = EvaluatorService.create(prisma);
 
-  // Collect all evaluator IDs to load
   const evaluatorIdsToLoad = new Set<string>();
-
-  // Add evaluator IDs from evaluator configs
   for (const evaluator of evaluators) {
     if (evaluator.dbEvaluatorId) {
       evaluatorIdsToLoad.add(evaluator.dbEvaluatorId);
     }
   }
-
-  // Add evaluator IDs from evaluator targets
   for (const target of targets) {
     if (target.type === "evaluator" && target.targetEvaluatorId) {
       evaluatorIdsToLoad.add(target.targetEvaluatorId);
     }
   }
 
-  // Load all evaluators
   for (const evaluatorId of evaluatorIdsToLoad) {
     const dbEvaluator = await evaluatorService.getById({
       id: evaluatorId,
@@ -561,6 +666,51 @@ export const loadExecutionData = async ({
       loadedEvaluators.set(evaluatorId, dbEvaluator);
     }
   }
+
+  return loadedEvaluators;
+};
+
+export const loadExecutionData = async ({
+  projectId,
+  dataset,
+  targets,
+  evaluators,
+  inputs,
+}: {
+  projectId: string;
+  dataset: DatasetInput;
+  targets: TargetForLoading[];
+  evaluators: EvaluatorForLoading[];
+  inputs?: ExecutionDataInputs;
+}): Promise<LoadedExecutionData | { error: string; status: number }> => {
+  const baseDataset = await resolveBaseDataset({ projectId, dataset, inputs });
+  if (isLoadError(baseDataset)) return baseDataset;
+
+  // Apply caller parameters as constant columns across every row (and a single
+  // synthetic row when there is no dataset).
+  const { rows: datasetRows, columns: datasetColumns } = applyParametersToRows({
+    rows: baseDataset.rows,
+    columns: baseDataset.columns,
+    parameters: inputs?.parameters,
+  });
+
+  const loadedPrompts = await loadPromptsForTargets({ targets, projectId });
+  if (isLoadError(loadedPrompts)) return loadedPrompts;
+
+  const loadedAgents = await loadAgentsForTargets({ targets, projectId });
+
+  const loadedWorkflows = await loadWorkflowsForTargets({
+    targets,
+    projectId,
+    loadedAgents,
+  });
+  if (isLoadError(loadedWorkflows)) return loadedWorkflows;
+
+  const loadedEvaluators = await loadEvaluatorsForTargets({
+    targets,
+    evaluators,
+    projectId,
+  });
 
   return {
     datasetRows,

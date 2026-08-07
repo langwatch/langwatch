@@ -1,6 +1,6 @@
 import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "@prisma/client";
-import { getLangWatchTracer } from "langwatch";
+import { getLangWatchTracer, type LangWatchSpan } from "langwatch";
 import { getApp } from "~/server/app-layer/app";
 import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
 import {
@@ -79,6 +79,19 @@ export class AmbiguousTraceIdPrefixError extends Error {
  * short-circuit to 404 without scanning.
  */
 const HEX_ONLY = /^[0-9a-f]+$/i;
+
+/**
+ * True when `traceId` looks like a truncated hex prefix (shorter than a full
+ * trace ID, but long enough to meaningfully narrow the scan) — the shape
+ * {@link TraceService.resolveTraceById} attempts git-style prefix resolution for.
+ */
+function isTruncatedTraceIdPrefix(traceId: string): boolean {
+  return (
+    traceId.length < FULL_TRACE_ID_LENGTH &&
+    traceId.length >= MIN_TRACE_ID_PREFIX_LENGTH &&
+    HEX_ONLY.test(traceId)
+  );
+}
 
 import type {
   AggregationFiltersInput,
@@ -267,62 +280,98 @@ export class TraceService {
     return this.tracer.withActiveSpan(
       "TraceService.getById",
       { attributes: { "tenant.id": projectId, "trace.id": traceId } },
-      async (span) => {
-        const traces = await this.clickHouseService.getTracesWithSpans({
-          projectId,
-          traceIds: [traceId],
-          protections,
-          opts: { resolveBlobs: opts?.full },
-        });
-        if (traces[0]) {
-          return this.enrichCodingAgentTrace(projectId, traces[0]);
-        }
-
-        // No exact match. If the input looks like a truncated hex prefix
-        // (shorter than a full trace ID, but long enough to meaningfully
-        // narrow the scan), try git-style prefix resolution scoped to this
-        // project and the last TRACE_ID_PREFIX_LOOKUP_WINDOW_DAYS days.
-        if (
-          traceId.length < FULL_TRACE_ID_LENGTH &&
-          traceId.length >= MIN_TRACE_ID_PREFIX_LENGTH &&
-          HEX_ONLY.test(traceId)
-        ) {
-          const now = Date.now();
-          const candidates =
-            await this.clickHouseService.resolveTraceIdByPrefix({
-              projectId,
-              prefix: traceId,
-              occurredAt: {
-                from:
-                  now -
-                  TRACE_ID_PREFIX_LOOKUP_WINDOW_DAYS * 24 * 60 * 60 * 1000,
-                to: now,
-              },
-              limit: TRACE_ID_PREFIX_CANDIDATE_LIMIT,
-            });
-          if (candidates.length === 0) {
-            return undefined;
-          }
-          if (candidates.length > 1) {
-            span.setAttribute("trace.id.prefix.ambiguous", true);
-            throw new AmbiguousTraceIdPrefixError(traceId, candidates);
-          }
-
-          span.setAttribute("trace.id.prefix.resolved", candidates[0]!);
-          const resolved = await this.clickHouseService.getTracesWithSpans({
-            projectId,
-            traceIds: [candidates[0]!],
-            protections,
-            opts: { resolveBlobs: opts?.full },
-          });
-          return resolved[0]
-            ? this.enrichCodingAgentTrace(projectId, resolved[0])
-            : undefined;
-        }
-
-        return undefined;
-      },
+      async (span) =>
+        this.resolveTraceById({ projectId, traceId, protections, opts, span }),
     );
+  }
+
+  /**
+   * Body of {@link getById}'s active span: exact-match lookup, falling back to
+   * git-style hex-prefix resolution when the input looks like a truncated
+   * trace ID.
+   */
+  private async resolveTraceById({
+    projectId,
+    traceId,
+    protections,
+    opts,
+    span,
+  }: {
+    projectId: string;
+    traceId: string;
+    protections: Protections;
+    opts?: { full?: boolean };
+    span: LangWatchSpan;
+  }): Promise<Trace | undefined> {
+    const traces = await this.clickHouseService.getTracesWithSpans({
+      projectId,
+      traceIds: [traceId],
+      protections,
+      opts: { resolveBlobs: opts?.full },
+    });
+    if (traces[0]) {
+      return this.enrichCodingAgentTrace(projectId, traces[0]);
+    }
+
+    // No exact match. If the input looks like a truncated hex prefix
+    // (shorter than a full trace ID, but long enough to meaningfully
+    // narrow the scan), try git-style prefix resolution scoped to this
+    // project and the last TRACE_ID_PREFIX_LOOKUP_WINDOW_DAYS days.
+    if (!isTruncatedTraceIdPrefix(traceId)) {
+      return undefined;
+    }
+
+    return this.resolveTraceByIdPrefix({
+      projectId,
+      traceId,
+      protections,
+      opts,
+      span,
+    });
+  }
+
+  /** Git-style hex-prefix resolution for a traceId with no exact match. */
+  private async resolveTraceByIdPrefix({
+    projectId,
+    traceId,
+    protections,
+    opts,
+    span,
+  }: {
+    projectId: string;
+    traceId: string;
+    protections: Protections;
+    opts?: { full?: boolean };
+    span: LangWatchSpan;
+  }): Promise<Trace | undefined> {
+    const now = Date.now();
+    const candidates = await this.clickHouseService.resolveTraceIdByPrefix({
+      projectId,
+      prefix: traceId,
+      occurredAt: {
+        from: now - TRACE_ID_PREFIX_LOOKUP_WINDOW_DAYS * 24 * 60 * 60 * 1000,
+        to: now,
+      },
+      limit: TRACE_ID_PREFIX_CANDIDATE_LIMIT,
+    });
+    if (candidates.length === 0) {
+      return undefined;
+    }
+    if (candidates.length > 1) {
+      span.setAttribute("trace.id.prefix.ambiguous", true);
+      throw new AmbiguousTraceIdPrefixError(traceId, candidates);
+    }
+
+    span.setAttribute("trace.id.prefix.resolved", candidates[0]!);
+    const resolved = await this.clickHouseService.getTracesWithSpans({
+      projectId,
+      traceIds: [candidates[0]!],
+      protections,
+      opts: { resolveBlobs: opts?.full },
+    });
+    return resolved[0]
+      ? this.enrichCodingAgentTrace(projectId, resolved[0])
+      : undefined;
   }
 
   /**

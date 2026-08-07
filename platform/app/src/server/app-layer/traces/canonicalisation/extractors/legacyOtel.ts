@@ -35,67 +35,73 @@ import type { CanonicalAttributesExtractor, ExtractorContext } from "./_types";
 export class LegacyOtelTracesExtractor implements CanonicalAttributesExtractor {
   readonly id = "legacy-otel-traces";
 
-  apply(ctx: ExtractorContext): void {
+  // Direct type attribute (legacy)
+  private setDirectType(ctx: ExtractorContext): void {
     const { attrs } = ctx.bag;
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // Span Type Detection
-    // Multiple legacy patterns for determining span type
-    // ─────────────────────────────────────────────────────────────────────────
-    if (!attrs.has(ATTR_KEYS.SPAN_TYPE)) {
-      // Direct type attribute (legacy)
-      const directType =
-        attrs.take(ATTR_KEYS.TYPE) ?? attrs.take(ATTR_KEYS.LANGWATCH_TYPE);
-      if (
-        typeof directType === "string" &&
-        ALLOWED_SPAN_TYPES.has(directType)
-      ) {
-        ctx.setAttr(ATTR_KEYS.SPAN_TYPE, directType);
-        ctx.recordRule(`${this.id}:type(direct)`);
-      }
-
-      // Span kind strings (best-effort mapping)
-      const spanKind =
-        attrs.get(ATTR_KEYS.SPAN_KIND) ??
-        attrs.get(ATTR_KEYS.OTEL_SPAN_KIND) ??
-        attrs.get(ATTR_KEYS.INCOMING_SPAN_KIND);
-      if (typeof spanKind === "string") {
-        if (spanKind.includes("SERVER")) {
-          ctx.setAttrIfAbsent(ATTR_KEYS.SPAN_TYPE, "server");
-        }
-        if (spanKind.includes("CLIENT")) {
-          ctx.setAttrIfAbsent(ATTR_KEYS.SPAN_TYPE, "client");
-        }
-        if (spanKind.includes("PRODUCER")) {
-          ctx.setAttrIfAbsent(ATTR_KEYS.SPAN_TYPE, "producer");
-        }
-        if (spanKind.includes("CONSUMER")) {
-          ctx.setAttrIfAbsent(ATTR_KEYS.SPAN_TYPE, "consumer");
-        }
-      }
-
-      // llm.request.type chat|completion → infer as LLM span
-      const requestType = attrs.take(ATTR_KEYS.LLM_REQUEST_TYPE);
-      if (requestType === "chat" || requestType === "completion") {
-        inferSpanTypeIfAbsent(ctx, "llm", `${this.id}:llm.request.type->llm`);
-      }
-
-      // Tool call detection from operation name or explicit attribute
-      const operationName = attrs.get(ATTR_KEYS.OPERATION_NAME);
-      if (
-        operationName === "ai.toolCall" ||
-        attrs.has(ATTR_KEYS.AI_TOOL_CALL_NAME)
-      ) {
-        ctx.setAttrIfAbsent(ATTR_KEYS.SPAN_TYPE, "tool");
-        ctx.recordRule(`${this.id}:toolcall->tool`);
-      }
+    const directType =
+      attrs.take(ATTR_KEYS.TYPE) ?? attrs.take(ATTR_KEYS.LANGWATCH_TYPE);
+    if (typeof directType === "string" && ALLOWED_SPAN_TYPES.has(directType)) {
+      ctx.setAttr(ATTR_KEYS.SPAN_TYPE, directType);
+      ctx.recordRule(`${this.id}:type(direct)`);
     }
+  }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Legacy Input/Output Extraction
-    // Maps input.value/input → langwatch.input
-    // Maps output.value/output → langwatch.output
-    // ─────────────────────────────────────────────────────────────────────────
+  // Span kind strings (best-effort mapping)
+  private setSpanKindType(ctx: ExtractorContext): void {
+    const { attrs } = ctx.bag;
+    const spanKind =
+      attrs.get(ATTR_KEYS.SPAN_KIND) ??
+      attrs.get(ATTR_KEYS.OTEL_SPAN_KIND) ??
+      attrs.get(ATTR_KEYS.INCOMING_SPAN_KIND);
+    if (typeof spanKind !== "string") return;
+
+    if (spanKind.includes("SERVER")) {
+      ctx.setAttrIfAbsent(ATTR_KEYS.SPAN_TYPE, "server");
+    }
+    if (spanKind.includes("CLIENT")) {
+      ctx.setAttrIfAbsent(ATTR_KEYS.SPAN_TYPE, "client");
+    }
+    if (spanKind.includes("PRODUCER")) {
+      ctx.setAttrIfAbsent(ATTR_KEYS.SPAN_TYPE, "producer");
+    }
+    if (spanKind.includes("CONSUMER")) {
+      ctx.setAttrIfAbsent(ATTR_KEYS.SPAN_TYPE, "consumer");
+    }
+  }
+
+  // llm.request.type chat|completion → infer as LLM span
+  private setLlmRequestTypeSpanType(ctx: ExtractorContext): void {
+    const requestType = ctx.bag.attrs.take(ATTR_KEYS.LLM_REQUEST_TYPE);
+    if (requestType === "chat" || requestType === "completion") {
+      inferSpanTypeIfAbsent(ctx, "llm", `${this.id}:llm.request.type->llm`);
+    }
+  }
+
+  // Tool call detection from operation name or explicit attribute
+  private setToolCallSpanType(ctx: ExtractorContext): void {
+    const { attrs } = ctx.bag;
+    const operationName = attrs.get(ATTR_KEYS.OPERATION_NAME);
+    if (
+      operationName === "ai.toolCall" ||
+      attrs.has(ATTR_KEYS.AI_TOOL_CALL_NAME)
+    ) {
+      ctx.setAttrIfAbsent(ATTR_KEYS.SPAN_TYPE, "tool");
+      ctx.recordRule(`${this.id}:toolcall->tool`);
+    }
+  }
+
+  // Multiple legacy patterns for determining span type
+  private detectSpanType(ctx: ExtractorContext): void {
+    if (ctx.bag.attrs.has(ATTR_KEYS.SPAN_TYPE)) return;
+    this.setDirectType(ctx);
+    this.setSpanKindType(ctx);
+    this.setLlmRequestTypeSpanType(ctx);
+    this.setToolCallSpanType(ctx);
+  }
+
+  // Maps input.value/input → langwatch.input
+  private setLegacyInput(ctx: ExtractorContext): void {
+    const { attrs } = ctx.bag;
     const inputValue =
       attrs.take(ATTR_KEYS.INPUT_VALUE) ?? attrs.take(ATTR_KEYS.INPUT);
     if (
@@ -110,7 +116,11 @@ export class LegacyOtelTracesExtractor implements CanonicalAttributesExtractor {
         typeof inputValue === "string" ? "text" : "json",
       );
     }
+  }
 
+  // Maps output.value/output → langwatch.output
+  private setLegacyOutput(ctx: ExtractorContext): void {
+    const { attrs } = ctx.bag;
     const outputValue =
       attrs.take(ATTR_KEYS.OUTPUT_VALUE) ?? attrs.take(ATTR_KEYS.OUTPUT);
     if (
@@ -125,12 +135,11 @@ export class LegacyOtelTracesExtractor implements CanonicalAttributesExtractor {
         typeof outputValue === "string" ? "text" : "json",
       );
     }
+  }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Tool Call Arguments
-    // Surface ai.toolCall.args as langwatch.input for tool spans
-    // ─────────────────────────────────────────────────────────────────────────
-    const toolArgs = attrs.take(ATTR_KEYS.AI_TOOL_CALL_ARGS);
+  // Surface ai.toolCall.args as langwatch.input for tool spans
+  private setToolCallArgsInput(ctx: ExtractorContext): void {
+    const toolArgs = ctx.bag.attrs.take(ATTR_KEYS.AI_TOOL_CALL_ARGS);
     if (
       toolArgs !== undefined &&
       ctx.out[ATTR_KEYS.LANGWATCH_INPUT] === undefined
@@ -143,14 +152,36 @@ export class LegacyOtelTracesExtractor implements CanonicalAttributesExtractor {
         typeof toolArgs === "string" ? "text" : "json",
       );
     }
+  }
+
+  // Delegates to shared extractErrorInfo for consistent behavior across
+  // all extractors. Priority: span.error > exception > status.message
+  private inferErrorType(ctx: ExtractorContext): void {
+    if (!ctx.bag.attrs.has(ATTR_KEYS.ERROR_TYPE)) {
+      extractErrorInfo(ctx);
+    }
+  }
+
+  apply(ctx: ExtractorContext): void {
+    // ─────────────────────────────────────────────────────────────────────────
+    // Span Type Detection
+    // ─────────────────────────────────────────────────────────────────────────
+    this.detectSpanType(ctx);
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Legacy Input/Output Extraction
+    // ─────────────────────────────────────────────────────────────────────────
+    this.setLegacyInput(ctx);
+    this.setLegacyOutput(ctx);
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Tool Call Arguments
+    // ─────────────────────────────────────────────────────────────────────────
+    this.setToolCallArgsInput(ctx);
 
     // ─────────────────────────────────────────────────────────────────────────
     // Error Type Inference
-    // Delegates to shared extractErrorInfo for consistent behavior across
-    // all extractors. Priority: span.error > exception > status.message
     // ─────────────────────────────────────────────────────────────────────────
-    if (!attrs.has(ATTR_KEYS.ERROR_TYPE)) {
-      extractErrorInfo(ctx);
-    }
+    this.inferErrorType(ctx);
   }
 }

@@ -111,6 +111,50 @@ export interface ClickHouseCostSummaryRow {
  * @param costSummary - Optional per-run cost/duration summary
  * @returns The canonical ExperimentRun
  */
+/** Shared by both run mappers below: every ClickHouse run row carries the same four timestamp columns. */
+const mapRunTimestamps = (row: ClickHouseExperimentRunRow) => ({
+  createdAt: parseClickHouseDateTimeMs(row.CreatedAt),
+  updatedAt: parseClickHouseDateTimeMs(row.UpdatedAt),
+  finishedAt: row.FinishedAt ? parseClickHouseDateTimeMs(row.FinishedAt) : null,
+  stoppedAt: row.StoppedAt ? parseClickHouseDateTimeMs(row.StoppedAt) : null,
+});
+
+const buildEvaluationSummaries = (
+  evaluatorBreakdown?: ClickHouseEvaluatorBreakdownRow[],
+): Record<string, ExperimentRunEvaluationSummary> => {
+  const evaluations: Record<string, ExperimentRunEvaluationSummary> = {};
+  if (!evaluatorBreakdown) return evaluations;
+
+  for (const row of evaluatorBreakdown) {
+    const summary: ExperimentRunEvaluationSummary = {
+      name: row.EvaluatorName ?? row.EvaluatorId,
+      averageScore: row.avgScore,
+    };
+    if (row.hasPassedCount > 0 && row.passRate !== null) {
+      summary.averagePassed = row.passRate;
+    }
+    evaluations[row.EvaluatorId] = summary;
+  }
+  return evaluations;
+};
+
+const buildRunSummary = ({
+  costSummary,
+  evaluations,
+}: {
+  costSummary?: ClickHouseCostSummaryRow;
+  evaluations: Record<string, ExperimentRunEvaluationSummary>;
+}): ExperimentRunSummary => ({
+  datasetCost: costSummary?.datasetCost ?? undefined,
+  evaluationsCost: costSummary?.evaluationsCost ?? undefined,
+  datasetAverageCost: costSummary?.datasetAverageCost ?? undefined,
+  datasetAverageDuration: costSummary?.datasetAverageDuration ?? undefined,
+  evaluationsAverageCost: costSummary?.evaluationsAverageCost ?? undefined,
+  evaluationsAverageDuration:
+    costSummary?.evaluationsAverageDuration ?? undefined,
+  evaluations,
+});
+
 export function mapClickHouseRunToExperimentRun({
   record,
   workflowVersion,
@@ -122,46 +166,14 @@ export function mapClickHouseRunToExperimentRun({
   evaluatorBreakdown?: ClickHouseEvaluatorBreakdownRow[];
   costSummary?: ClickHouseCostSummaryRow;
 }): ExperimentRun {
-  const evaluations: Record<string, ExperimentRunEvaluationSummary> = {};
-
-  if (evaluatorBreakdown) {
-    for (const row of evaluatorBreakdown) {
-      const summary: ExperimentRunEvaluationSummary = {
-        name: row.EvaluatorName ?? row.EvaluatorId,
-        averageScore: row.avgScore,
-      };
-      if (row.hasPassedCount > 0 && row.passRate !== null) {
-        summary.averagePassed = row.passRate;
-      }
-      evaluations[row.EvaluatorId] = summary;
-    }
-  }
-
-  const summary: ExperimentRunSummary = {
-    datasetCost: costSummary?.datasetCost ?? undefined,
-    evaluationsCost: costSummary?.evaluationsCost ?? undefined,
-    datasetAverageCost: costSummary?.datasetAverageCost ?? undefined,
-    datasetAverageDuration: costSummary?.datasetAverageDuration ?? undefined,
-    evaluationsAverageCost: costSummary?.evaluationsAverageCost ?? undefined,
-    evaluationsAverageDuration:
-      costSummary?.evaluationsAverageDuration ?? undefined,
-    evaluations,
-  };
+  const evaluations = buildEvaluationSummaries(evaluatorBreakdown);
+  const summary = buildRunSummary({ costSummary, evaluations });
 
   return {
     experimentId: record.ExperimentId,
     runId: record.RunId,
     workflowVersion: workflowVersion ?? null,
-    timestamps: {
-      createdAt: parseClickHouseDateTimeMs(record.CreatedAt),
-      updatedAt: parseClickHouseDateTimeMs(record.UpdatedAt),
-      finishedAt: record.FinishedAt
-        ? parseClickHouseDateTimeMs(record.FinishedAt)
-        : null,
-      stoppedAt: record.StoppedAt
-        ? parseClickHouseDateTimeMs(record.StoppedAt)
-        : null,
-    },
+    timestamps: mapRunTimestamps(record),
     progress: record.Progress,
     total: record.Total,
     summary,
@@ -197,6 +209,85 @@ function parseDomainError(
  * @param items - All item rows from experiment_run_items for this run
  * @returns The canonical ExperimentRunWithItems
  */
+/** Targets may be empty or invalid JSON. */
+const parseTargetsField = (raw: string) => {
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) && parsed.length > 0 ? parsed : null;
+  } catch {
+    return null;
+  }
+};
+
+const resolveItemTargetId = (
+  item: ClickHouseExperimentRunItemRow,
+): string | null =>
+  item.TargetId && item.TargetId !== "default" ? item.TargetId : null;
+
+const parseDatasetEntry = (raw: string): Record<string, unknown> => {
+  try {
+    return JSON.parse(raw);
+  } catch {
+    // fallback to empty object
+    return {};
+  }
+};
+
+const parsePredicted = (
+  raw: string | null,
+): Record<string, unknown> | undefined => {
+  if (!raw) return undefined;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    // fallback to undefined
+    return undefined;
+  }
+};
+
+const parseEvaluationInputs = (raw: string | null): unknown => {
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+};
+
+const mapTargetResultItem = (
+  item: ClickHouseExperimentRunItemRow,
+): ExperimentRunDatasetEntry => ({
+  index: item.RowIndex,
+  targetId: resolveItemTargetId(item),
+  entry: parseDatasetEntry(item.DatasetEntry),
+  predicted: parsePredicted(item.Predicted),
+  cost: item.TargetCost,
+  duration: item.TargetDurationMs,
+  error: item.TargetError,
+  // The code the customer's copy comes from. Rows written before the
+  // column existed have none, and read back on the raw string as before.
+  domainError: parseDomainError(item.TargetDomainError),
+  traceId: item.TraceId,
+});
+
+const mapEvaluatorResultItem = (
+  item: ClickHouseExperimentRunItemRow,
+): ExperimentRunEvaluation => ({
+  evaluator: item.EvaluatorId ?? "",
+  name: item.EvaluatorName,
+  targetId: resolveItemTargetId(item),
+  status:
+    (item.EvaluationStatus as "processed" | "skipped" | "error") || "error",
+  index: item.RowIndex,
+  score: item.Score,
+  label: item.Label,
+  passed: item.Passed !== null ? item.Passed === 1 : null,
+  details: item.EvaluationDetails,
+  cost: item.EvaluationCost,
+  inputs: parseEvaluationInputs(item.EvaluationInputs),
+  duration: item.EvaluationDurationMs ?? null,
+});
+
 export function mapClickHouseItemsToRunWithItems({
   runRecord,
   items,
@@ -209,75 +300,11 @@ export function mapClickHouseItemsToRunWithItems({
   const dataset: ExperimentRunDatasetEntry[] = [];
   const evaluations: ExperimentRunEvaluation[] = [];
 
-  let targets = null;
-  try {
-    const parsed = JSON.parse(runRecord.Targets);
-    if (Array.isArray(parsed) && parsed.length > 0) {
-      targets = parsed;
-    }
-  } catch {
-    // Targets may be empty or invalid JSON
-  }
-
   for (const item of items) {
     if (item.ResultType === "target") {
-      let entry: Record<string, unknown> = {};
-      try {
-        entry = JSON.parse(item.DatasetEntry);
-      } catch {
-        // fallback to empty object
-      }
-
-      let predicted: Record<string, unknown> | undefined;
-      if (item.Predicted) {
-        try {
-          predicted = JSON.parse(item.Predicted);
-        } catch {
-          // fallback to undefined
-        }
-      }
-
-      const targetId =
-        item.TargetId && item.TargetId !== "default" ? item.TargetId : null;
-      dataset.push({
-        index: item.RowIndex,
-        targetId,
-        entry,
-        predicted,
-        cost: item.TargetCost,
-        duration: item.TargetDurationMs,
-        error: item.TargetError,
-        // The code the customer's copy comes from. Rows written before the
-        // column existed have none, and read back on the raw string as before.
-        domainError: parseDomainError(item.TargetDomainError),
-        traceId: item.TraceId,
-      });
+      dataset.push(mapTargetResultItem(item));
     } else if (item.ResultType === "evaluator") {
-      const targetId =
-        item.TargetId && item.TargetId !== "default" ? item.TargetId : null;
-      evaluations.push({
-        evaluator: item.EvaluatorId ?? "",
-        name: item.EvaluatorName,
-        targetId,
-        status:
-          (item.EvaluationStatus as "processed" | "skipped" | "error") ||
-          "error",
-        index: item.RowIndex,
-        score: item.Score,
-        label: item.Label,
-        passed: item.Passed !== null ? item.Passed === 1 : null,
-        details: item.EvaluationDetails,
-        cost: item.EvaluationCost,
-        inputs: (() => {
-          if (!item.EvaluationInputs) return null;
-          try {
-            return JSON.parse(item.EvaluationInputs);
-          } catch {
-            return null;
-          }
-        })(),
-        duration: item.EvaluationDurationMs ?? null,
-      });
+      evaluations.push(mapEvaluatorResultItem(item));
     }
   }
 
@@ -288,19 +315,10 @@ export function mapClickHouseItemsToRunWithItems({
     workflowVersionId: runRecord.WorkflowVersionId,
     progress: runRecord.Progress,
     total: runRecord.Total,
-    targets,
+    targets: parseTargetsField(runRecord.Targets),
     dataset,
     evaluations,
-    timestamps: {
-      createdAt: parseClickHouseDateTimeMs(runRecord.CreatedAt),
-      updatedAt: parseClickHouseDateTimeMs(runRecord.UpdatedAt),
-      finishedAt: runRecord.FinishedAt
-        ? parseClickHouseDateTimeMs(runRecord.FinishedAt)
-        : null,
-      stoppedAt: runRecord.StoppedAt
-        ? parseClickHouseDateTimeMs(runRecord.StoppedAt)
-        : null,
-    },
+    timestamps: mapRunTimestamps(runRecord),
   };
 }
 

@@ -157,9 +157,63 @@ export class SerializedHttpAgentAdapter extends AgentAdapter {
     const startedAt = Date.now();
     const loggedUrl = redactUrlForLogs(url);
     const redactedHeaders = redactHeaders(headers);
-    let response: Awaited<ReturnType<typeof ssrfSafeFetch>>;
+
+    const response = await this.sendHttpRequest({
+      url,
+      method,
+      headers,
+      body,
+      loggedUrl,
+      redactedHeaders,
+      startedAt,
+    });
+
+    const durationMs = Date.now() - startedAt;
+
+    if (!response.ok) {
+      await this.reportHttpFailure({
+        response,
+        loggedUrl,
+        method,
+        durationMs,
+        redactedHeaders,
+      });
+    }
+
+    this.logger.info(
+      {
+        url: loggedUrl,
+        method,
+        statusCode: response.status,
+        durationMs,
+        requestId: pickUpstreamRequestId(response.headers),
+        headers: redactedHeaders,
+      },
+      "http call ok",
+    );
+
+    return this.parseResponseBody(response);
+  }
+
+  private async sendHttpRequest({
+    url,
+    method,
+    headers,
+    body,
+    loggedUrl,
+    redactedHeaders,
+    startedAt,
+  }: {
+    url: string;
+    method: string;
+    headers: Record<string, string>;
+    body: string;
+    loggedUrl: string;
+    redactedHeaders: Record<string, string>;
+    startedAt: number;
+  }): Promise<Awaited<ReturnType<typeof ssrfSafeFetch>>> {
     try {
-      response = await ssrfSafeFetch(url, {
+      return await ssrfSafeFetch(url, {
         method,
         headers,
         body: method !== "GET" ? body : undefined,
@@ -181,46 +235,48 @@ export class SerializedHttpAgentAdapter extends AgentAdapter {
       );
       throw error;
     }
+  }
 
-    const durationMs = Date.now() - startedAt;
-
-    if (!response.ok) {
-      const responseBody =
-        typeof response.text === "function"
-          ? await response.text().catch(() => "")
-          : "";
-      const upstreamRequestId = pickUpstreamRequestId(response.headers);
-      this.logger.warn(
-        {
-          url: loggedUrl,
-          method,
-          statusCode: response.status,
-          durationMs,
-          responseBodyPreview: previewResponseBody(responseBody),
-          requestId: upstreamRequestId,
-          headers: redactedHeaders,
-        },
-        "http call failed",
-      );
-      throw new Error(
-        `HTTP ${response.status}: ${response.statusText} from ${loggedUrl} (request-id: ${
-          upstreamRequestId ?? "none"
-        }): ${previewErrorBody(responseBody)}`,
-      );
-    }
-
-    this.logger.info(
+  private async reportHttpFailure({
+    response,
+    loggedUrl,
+    method,
+    durationMs,
+    redactedHeaders,
+  }: {
+    response: Awaited<ReturnType<typeof ssrfSafeFetch>>;
+    loggedUrl: string;
+    method: string;
+    durationMs: number;
+    redactedHeaders: Record<string, string>;
+  }): Promise<never> {
+    const responseBody =
+      typeof response.text === "function"
+        ? await response.text().catch(() => "")
+        : "";
+    const upstreamRequestId = pickUpstreamRequestId(response.headers);
+    this.logger.warn(
       {
         url: loggedUrl,
         method,
         statusCode: response.status,
         durationMs,
-        requestId: pickUpstreamRequestId(response.headers),
+        responseBodyPreview: previewResponseBody(responseBody),
+        requestId: upstreamRequestId,
         headers: redactedHeaders,
       },
-      "http call ok",
+      "http call failed",
     );
+    throw new Error(
+      `HTTP ${response.status}: ${response.statusText} from ${loggedUrl} (request-id: ${
+        upstreamRequestId ?? "none"
+      }): ${previewErrorBody(responseBody)}`,
+    );
+  }
 
+  private async parseResponseBody(
+    response: Awaited<ReturnType<typeof ssrfSafeFetch>>,
+  ): Promise<unknown> {
     const contentType = response.headers.get("content-type");
     if (contentType?.includes("application/json")) {
       return await response.json();

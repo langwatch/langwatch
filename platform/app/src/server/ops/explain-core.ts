@@ -71,87 +71,108 @@ export function stripCommentsAndStrings(query: string): string {
   let i = 0;
   const n = query.length;
   while (i < n) {
-    const c = query[i];
-    const next = query[i + 1];
-
-    if (c === "/" && next === "*") {
-      let depth = 1;
-      i += 2;
-      while (i < n && depth > 0) {
-        if (query[i] === "/" && query[i + 1] === "*") {
-          depth++;
-          i += 2;
-        } else if (query[i] === "*" && query[i + 1] === "/") {
-          depth--;
-          i += 2;
-        } else {
-          i++;
-        }
-      }
-      out += " ";
+    const skipped = scanSkippable(query, i);
+    if (skipped) {
+      i = skipped.nextIndex;
+      out += skipped.emit;
       continue;
     }
 
-    if (c === "-" && next === "-") {
-      i += 2;
-      while (i < n && query[i] !== "\n") i++;
-      out += " ";
-      continue;
-    }
-
-    if (c === "#" && (i === 0 || /\s/.test(query[i - 1] ?? ""))) {
-      i++;
-      while (i < n && query[i] !== "\n") i++;
-      out += " ";
-      continue;
-    }
-
-    if (c === "'") {
-      i++;
-      while (i < n) {
-        if (query[i] === "\\" && i + 1 < n) {
-          i += 2;
-          continue;
-        }
-        if (query[i] === "'" && query[i + 1] === "'") {
-          i += 2;
-          continue;
-        }
-        if (query[i] === "'") {
-          i++;
-          break;
-        }
-        i++;
-      }
-      out += "''";
-      continue;
-    }
-
-    if (c === '"') {
-      i++;
-      while (i < n) {
-        if (query[i] === "\\" && i + 1 < n) {
-          i += 2;
-          continue;
-        }
-        if (query[i] === '"' && query[i + 1] === '"') {
-          i += 2;
-          continue;
-        }
-        if (query[i] === '"') {
-          i++;
-          break;
-        }
-        i++;
-      }
-      out += '""';
-      continue;
-    }
-
-    out += c;
+    out += query[i];
     i++;
   }
   return out;
+}
+
+/// The dispatch chain of the lexer, in ClickHouse order: block comment, line
+/// comment, hash comment, single-quoted string, double-quoted string. Returns
+/// where the construct ends and what it collapses to, or `null` when the
+/// character at `i` starts none of them and is copied through verbatim.
+function scanSkippable(
+  query: string,
+  i: number,
+): { nextIndex: number; emit: string } | null {
+  const c = query[i];
+  const next = query[i + 1];
+
+  if (c === "/" && next === "*") {
+    return { nextIndex: skipBlockComment(query, i), emit: " " };
+  }
+
+  if (c === "-" && next === "-") {
+    return { nextIndex: skipToLineEnd(query, i + 2), emit: " " };
+  }
+
+  if (startsHashComment(query, i)) {
+    return { nextIndex: skipToLineEnd(query, i + 1), emit: " " };
+  }
+
+  if (c === "'") {
+    return { nextIndex: skipQuoted(query, i, "'"), emit: "''" };
+  }
+
+  if (c === '"') {
+    return { nextIndex: skipQuoted(query, i, '"'), emit: '""' };
+  }
+
+  return null;
+}
+
+/// A `#` only opens a comment at the start of the query or after whitespace,
+/// so `a#b` (a column named with a hash) is not swallowed.
+function startsHashComment(query: string, i: number): boolean {
+  return query[i] === "#" && (i === 0 || /\s/.test(query[i - 1] ?? ""));
+}
+
+/// `/* ... */`, counting nesting so an inner open does not let the outer
+/// comment terminate early. Runs to the end of the input when unterminated.
+function skipBlockComment(query: string, start: number): number {
+  const n = query.length;
+  let depth = 1;
+  let i = start + 2;
+  while (i < n && depth > 0) {
+    if (query[i] === "/" && query[i + 1] === "*") {
+      depth++;
+      i += 2;
+    } else if (query[i] === "*" && query[i + 1] === "/") {
+      depth--;
+      i += 2;
+    } else {
+      i++;
+    }
+  }
+  return i;
+}
+
+/// Stops ON the newline (it is copied through by the caller) or at the end.
+function skipToLineEnd(query: string, start: number): number {
+  const n = query.length;
+  let i = start;
+  while (i < n && query[i] !== "\n") i++;
+  return i;
+}
+
+/// A string literal opened at `start`, honouring backslash escapes and the
+/// doubled-quote escape. Runs to the end of the input when unterminated.
+function skipQuoted(query: string, start: number, quote: string): number {
+  const n = query.length;
+  let i = start + 1;
+  while (i < n) {
+    if (query[i] === "\\" && i + 1 < n) {
+      i += 2;
+      continue;
+    }
+    if (query[i] === quote && query[i + 1] === quote) {
+      i += 2;
+      continue;
+    }
+    if (query[i] === quote) {
+      i++;
+      break;
+    }
+    i++;
+  }
+  return i;
 }
 
 export function buildExplainQuery(

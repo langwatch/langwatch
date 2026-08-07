@@ -14,6 +14,27 @@ export interface AnomalyWorkerHandle {
 }
 
 /**
+ * Runs a single detector tick, logging the outcome. Failures are caught and
+ * logged rather than propagated — the caller's scheduling loop keeps running
+ * regardless.
+ */
+const runAnomalyDetectorTick = async (
+  detector: AnomalyDetector,
+): Promise<void> => {
+  try {
+    const result = await detector.tick();
+    if (result.surfaced > 0 || result.cleared > 0) {
+      logger.info(result, "anomaly tick");
+    }
+  } catch (err) {
+    logger.error(
+      { err: err instanceof Error ? err.message : String(err) },
+      "anomaly detector tick failed (will retry on next interval)",
+    );
+  }
+};
+
+/**
  * Long-running scheduler that calls AnomalyDetector.tick() every 60s.
  * Stays running as long as the workers process is alive. Failures in
  * an individual tick are logged but do not crash the loop — observability
@@ -57,17 +78,7 @@ export function startAnomalyWorker(): AnomalyWorkerHandle | undefined {
 
   const tick = async () => {
     if (stopped) return;
-    try {
-      const result = await detector.tick();
-      if (result.surfaced > 0 || result.cleared > 0) {
-        logger.info(result, "anomaly tick");
-      }
-    } catch (err) {
-      logger.error(
-        { err: err instanceof Error ? err.message : String(err) },
-        "anomaly detector tick failed (will retry on next interval)",
-      );
-    }
+    await runAnomalyDetectorTick(detector);
     if (!stopped) {
       timer = setTimeout(() => void tick(), TICK_INTERVAL_MS);
     }

@@ -61,6 +61,58 @@ type ClickHouseEvaluationRunWriteRecord = WithDateWrites<
   | "LastEventOccurredAt"
 >;
 
+interface EvaluationSummarySlimRow {
+  EvaluationId: string;
+  EvaluatorId: string;
+  EvaluatorType: string;
+  EvaluatorName: string | null;
+  TraceId: string | null;
+  IsGuardrail: number;
+  Status: string;
+  Score: number | null;
+  Passed: number | null;
+  Label: string | null;
+}
+
+function toEvalSummary(
+  row: EvaluationSummarySlimRow & { TraceId: string },
+): EvalSummary {
+  return {
+    evaluationId: row.EvaluationId,
+    evaluatorId: row.EvaluatorId,
+    evaluatorType: row.EvaluatorType,
+    evaluatorName: row.EvaluatorName,
+    traceId: row.TraceId,
+    isGuardrail: !!row.IsGuardrail,
+    status: row.Status as EvalSummary["status"],
+    score: row.Score,
+    passed: row.Passed === null ? null : !!row.Passed,
+    label: row.Label,
+  };
+}
+
+// Dedup is enforced by the IN-tuple subquery — no JS-side `seen` set.
+function groupEvalSummariesByTrace(
+  rows: EvaluationSummarySlimRow[],
+): Record<string, EvalSummary[]> {
+  const byTrace: Record<string, EvalSummary[]> = {};
+
+  for (const row of rows) {
+    const traceId = row.TraceId;
+    if (!traceId) continue;
+
+    const summary = toEvalSummary({ ...row, TraceId: traceId });
+    const arr = byTrace[traceId];
+    if (arr) {
+      arr.push(summary);
+    } else {
+      byTrace[traceId] = [summary];
+    }
+  }
+
+  return byTrace;
+}
+
 export class EvaluationRunClickHouseRepository
   implements EvaluationRunRepository
 {
@@ -481,50 +533,9 @@ export class EvaluationRunClickHouseRepository
         format: "JSONEachRow",
       });
 
-      interface SlimRow {
-        EvaluationId: string;
-        EvaluatorId: string;
-        EvaluatorType: string;
-        EvaluatorName: string | null;
-        TraceId: string | null;
-        IsGuardrail: number;
-        Status: string;
-        Score: number | null;
-        Passed: number | null;
-        Label: string | null;
-      }
+      const rows = await result.json<EvaluationSummarySlimRow>();
 
-      const rows = await result.json<SlimRow>();
-
-      const byTrace: Record<string, EvalSummary[]> = {};
-
-      // Dedup is now enforced by the IN-tuple subquery — no JS-side `seen` set.
-      for (const row of rows) {
-        const traceId = row.TraceId;
-        if (!traceId) continue;
-
-        const summary: EvalSummary = {
-          evaluationId: row.EvaluationId,
-          evaluatorId: row.EvaluatorId,
-          evaluatorType: row.EvaluatorType,
-          evaluatorName: row.EvaluatorName,
-          traceId,
-          isGuardrail: !!row.IsGuardrail,
-          status: row.Status as EvalSummary["status"],
-          score: row.Score,
-          passed: row.Passed === null ? null : !!row.Passed,
-          label: row.Label,
-        };
-
-        const arr = byTrace[traceId];
-        if (arr) {
-          arr.push(summary);
-        } else {
-          byTrace[traceId] = [summary];
-        }
-      }
-
-      return byTrace;
+      return groupEvalSummariesByTrace(rows);
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
@@ -587,34 +598,8 @@ export class EvaluationRunClickHouseRepository
     // path is off, failed open, or a different writer inserted a fat payload.
     // With offload on, `Inputs` is already a small marker object so these are
     // no-ops.
-    const cappedInputs = capSerializedInputs(
-      data.inputs ? JSON.stringify(data.inputs) : null,
-    );
-    const cappedDetails = capText(data.details);
-    const cappedError = capText(data.error);
-    const cappedErrorDetails = capText(data.errorDetails);
-    if (
-      cappedInputs.truncated ||
-      cappedDetails.truncated ||
-      cappedError.truncated ||
-      cappedErrorDetails.truncated
-    ) {
-      logger.warn(
-        {
-          tenantId,
-          evaluationId: data.evaluationId,
-          inputsOriginalBytes: cappedInputs.originalBytes,
-          detailsOriginalBytes: cappedDetails.originalBytes,
-          errorOriginalBytes: cappedError.originalBytes,
-          errorDetailsOriginalBytes: cappedErrorDetails.originalBytes,
-          inputsTruncated: cappedInputs.truncated,
-          detailsTruncated: cappedDetails.truncated,
-          errorTruncated: cappedError.truncated,
-          errorDetailsTruncated: cappedErrorDetails.truncated,
-        },
-        "evaluation_runs row exceeded a column cap and was truncated at write to stay merge-safe",
-      );
-    }
+    const { cappedInputs, cappedDetails, cappedError, cappedErrorDetails } =
+      capEvaluationRunFields({ data, tenantId });
 
     return {
       ProjectionId: projectionId,
@@ -628,7 +613,7 @@ export class EvaluationRunClickHouseRepository
       IsGuardrail: data.isGuardrail ? 1 : 0,
       Status: data.status,
       Score: data.score,
-      Passed: data.passed === null ? null : data.passed ? 1 : 0,
+      Passed: toTriStateFlag(data.passed),
       Label: data.label,
       Details: cappedDetails.value,
       Inputs: cappedInputs.value,
@@ -639,13 +624,76 @@ export class EvaluationRunClickHouseRepository
       LastEventOccurredAt: data.LastEventOccurredAt
         ? new Date(data.LastEventOccurredAt)
         : new Date(0),
-      ArchivedAt: data.archivedAt != null ? new Date(data.archivedAt) : null,
+      ArchivedAt: toNullableDate(data.archivedAt),
       ScheduledAt: new Date(data.scheduledAt ?? data.createdAt),
-      StartedAt: data.startedAt != null ? new Date(data.startedAt) : null,
-      CompletedAt: data.completedAt != null ? new Date(data.completedAt) : null,
+      StartedAt: toNullableDate(data.startedAt),
+      CompletedAt: toNullableDate(data.completedAt),
       CostId: data.costId ?? null,
       LastProcessedEventId: projectionId,
       _retention_days: retentionDays,
     };
   }
+}
+
+type CapResult = {
+  value: string | null;
+  truncated: boolean;
+  originalBytes: number;
+};
+
+// Belt-and-braces write caps (ADR-040): unconditional, flag-independent,
+// last line of defence that keeps the part merge-safe even if the offload
+// path is off, failed open, or a different writer inserted a fat payload.
+// With offload on, `Inputs` is already a small marker object so these are
+// no-ops.
+function capEvaluationRunFields({
+  data,
+  tenantId,
+}: {
+  data: EvaluationRunData;
+  tenantId: string;
+}): {
+  cappedInputs: CapResult;
+  cappedDetails: CapResult;
+  cappedError: CapResult;
+  cappedErrorDetails: CapResult;
+} {
+  const cappedInputs = capSerializedInputs(
+    data.inputs ? JSON.stringify(data.inputs) : null,
+  );
+  const cappedDetails = capText(data.details);
+  const cappedError = capText(data.error);
+  const cappedErrorDetails = capText(data.errorDetails);
+  if (
+    cappedInputs.truncated ||
+    cappedDetails.truncated ||
+    cappedError.truncated ||
+    cappedErrorDetails.truncated
+  ) {
+    logger.warn(
+      {
+        tenantId,
+        evaluationId: data.evaluationId,
+        inputsOriginalBytes: cappedInputs.originalBytes,
+        detailsOriginalBytes: cappedDetails.originalBytes,
+        errorOriginalBytes: cappedError.originalBytes,
+        errorDetailsOriginalBytes: cappedErrorDetails.originalBytes,
+        inputsTruncated: cappedInputs.truncated,
+        detailsTruncated: cappedDetails.truncated,
+        errorTruncated: cappedError.truncated,
+        errorDetailsTruncated: cappedErrorDetails.truncated,
+      },
+      "evaluation_runs row exceeded a column cap and was truncated at write to stay merge-safe",
+    );
+  }
+
+  return { cappedInputs, cappedDetails, cappedError, cappedErrorDetails };
+}
+
+function toNullableDate(ms: number | null | undefined): Date | null {
+  return ms != null ? new Date(ms) : null;
+}
+
+function toTriStateFlag(value: boolean | null): number | null {
+  return value === null ? null : value ? 1 : 0;
 }

@@ -16,6 +16,79 @@ export type OnboardingCheckStatus = {
   integrated: boolean;
 };
 
+/** Shape selected by OnboardingChecksService.fetchProjectOnboardingData. */
+interface ProjectOnboardingData {
+  teamId: string;
+  firstMessage: boolean;
+  integrated: boolean;
+  workflows: { id: string }[];
+  customGraphs: { id: string }[];
+  datasets: { id: string }[];
+  checks: { id: string }[];
+  triggers: { id: string }[];
+  team: {
+    organizationId: string;
+    members: { userId: string }[];
+  };
+}
+
+// Project-visible MPs: any enabled MP scoped at PROJECT, the project's TEAM,
+// or the project's ORG. This mirrors the PROJECT -> TEAM -> ORGANIZATION
+// cascade that `findAllAccessibleForProject` in ModelProviderRepository uses
+// for real reads, so an org-wide provider counts toward every project under
+// that org. Matching only the PROJECT scope left this step stuck incomplete
+// for org-scoped credentials.
+const hasAccessibleModelProvider = async ({
+  project,
+  projectId,
+}: {
+  project: ProjectOnboardingData | null;
+  projectId: string;
+}): Promise<boolean> => {
+  if (!project) return false;
+
+  const modelProvider = await prisma.modelProvider.findFirst({
+    where: {
+      enabled: true,
+      scopes: {
+        some: {
+          OR: resolveScopeChain({
+            organizationId: project.team.organizationId,
+            teamId: project.teamId,
+            projectId,
+          }),
+        },
+      },
+    },
+    select: { id: true },
+  });
+  return modelProvider !== null;
+};
+
+const buildOnboardingCheckStatus = ({
+  project,
+  hasModelProvider,
+  simulations,
+  prompts,
+}: {
+  project: ProjectOnboardingData | null;
+  hasModelProvider: boolean;
+  simulations: number;
+  prompts: number;
+}): OnboardingCheckStatus => ({
+  workflows: project?.workflows.length ?? 0,
+  customGraphs: project?.customGraphs.length ?? 0,
+  datasets: project?.datasets.length ?? 0,
+  onlineEvaluations: project?.checks.length ?? 0,
+  triggers: project?.triggers.length ?? 0,
+  simulations,
+  modelProviders: hasModelProvider ? 1 : 0,
+  prompts,
+  teamMembers: project?.team.members.length ?? 0,
+  firstMessage: project?.firstMessage ?? false,
+  integrated: project?.integrated ?? false,
+});
+
 /**
  * Service for checking onboarding status of a project
  */
@@ -25,7 +98,31 @@ export class OnboardingChecksService {
    * Returns counts of various entities and integration status
    */
   async getCheckStatus(projectId: string): Promise<OnboardingCheckStatus> {
-    const project = await prisma.project.findUnique({
+    const project = await this.fetchProjectOnboardingData(projectId);
+
+    const hasModelProvider = await hasAccessibleModelProvider({
+      project,
+      projectId,
+    });
+
+    // Check for simulations (scenario sets in ClickHouse)
+    const simulations = await this.getSimulationsCount(projectId);
+
+    // Check for versioned prompts
+    const prompts = await this.getPromptsCount(projectId);
+
+    return buildOnboardingCheckStatus({
+      project,
+      hasModelProvider,
+      simulations,
+      prompts,
+    });
+  }
+
+  private async fetchProjectOnboardingData(
+    projectId: string,
+  ): Promise<ProjectOnboardingData | null> {
+    return prisma.project.findUnique({
       where: { id: projectId },
       include: {
         workflows: {
@@ -65,53 +162,6 @@ export class OnboardingChecksService {
         },
       },
     });
-
-    // Project-visible MPs: any enabled MP scoped at PROJECT, the project's
-    // TEAM, or the project's ORG. This mirrors the PROJECT -> TEAM ->
-    // ORGANIZATION cascade that `findAllAccessibleForProject` in
-    // ModelProviderRepository uses for real reads, so an org-wide provider
-    // counts toward every project under that org. Matching only the PROJECT
-    // scope left this step stuck incomplete for org-scoped credentials.
-    const modelProviders = project
-      ? await prisma.modelProvider.findFirst({
-          where: {
-            enabled: true,
-            scopes: {
-              some: {
-                OR: resolveScopeChain({
-                  organizationId: project.team.organizationId,
-                  teamId: project.teamId,
-                  projectId,
-                }),
-              },
-            },
-          },
-          select: { id: true },
-        })
-      : null;
-
-    const { workflows, customGraphs, datasets, checks, triggers, team } =
-      project ?? {};
-
-    // Check for simulations (scenario sets in ClickHouse)
-    const simulations = await this.getSimulationsCount(projectId);
-
-    // Check for versioned prompts
-    const prompts = await this.getPromptsCount(projectId);
-
-    return {
-      workflows: workflows?.length ?? 0,
-      customGraphs: customGraphs?.length ?? 0,
-      datasets: datasets?.length ?? 0,
-      onlineEvaluations: checks?.length ?? 0,
-      triggers: triggers?.length ?? 0,
-      simulations,
-      modelProviders: modelProviders ? 1 : 0,
-      prompts,
-      teamMembers: team?.members?.length ?? 0,
-      firstMessage: project?.firstMessage ?? false,
-      integrated: project?.integrated ?? false,
-    };
   }
 
   /**

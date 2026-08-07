@@ -174,123 +174,134 @@ function providerDisabledSwapHandler(
   };
 }
 
+/**
+ * Opens the upgrade modal with limit details for a LIMIT_EXCEEDED FORBIDDEN
+ * error, and marks the error via WeakSet so component-level handlers can
+ * skip it.
+ *
+ * @see isHandledByGlobalLicenseHandler in trpcError.ts
+ * @see extractLimitExceededInfo in trpcError.ts
+ */
+function handleLimitExceeded(error: unknown): void {
+  const limitInfo = extractLimitExceededInfo(error);
+  if (!limitInfo) return;
+  // Mark as handled so component-level handlers can skip it
+  if (error instanceof Error) {
+    markAsHandledByLicenseHandler(error);
+  }
+
+  useUpgradeModalStore
+    .getState()
+    .open(limitInfo.limitType, limitInfo.current, limitInfo.max);
+}
+
+/** Check for lite member restriction errors */
+function handleLiteMemberRestriction(error: unknown): void {
+  const restrictionInfo = extractLiteMemberRestrictionInfo(error);
+  if (!restrictionInfo) return;
+  if (error instanceof Error) {
+    markAsHandledByLiteMemberHandler(error);
+  }
+  useUpgradeModalStore.getState().openLiteMemberRestriction({
+    resource: restrictionInfo.resource,
+  });
+}
+
+/**
+ * Silently mark lite member restriction errors on queries.
+ * Queries may fail on allowed pages (e.g., cost:view on analytics)
+ * — the component handles missing data gracefully.
+ * Only mutations and route guards should trigger the modal.
+ */
+function markLiteMemberRestriction(error: unknown): void {
+  const restrictionInfo = extractLiteMemberRestrictionInfo(error);
+  if (restrictionInfo && error instanceof Error) {
+    markAsHandledByLiteMemberHandler(error);
+  }
+}
+
+/**
+ * Check for ModelNotConfiguredError — surfaced when an AI-powered
+ * feature can't resolve a model anywhere in the scope chain.
+ * Emits a sticky orange toast (deduped per (featureKey, role)
+ * toast id) instead of a focus-trapping modal: explicit user
+ * actions still get a clear, actionable nudge but background
+ * flows (auto-save, prefetch) don't get blocked behind a Dialog.
+ */
+function handleMissingModel(error: unknown): void {
+  const missingModelInfo = extractMissingModelInfo(error);
+  if (!missingModelInfo) return;
+  if (error instanceof Error) {
+    markAsHandledByMissingModelHandler(error);
+  }
+  showMissingModelToast(missingModelInfo);
+}
+
+/**
+ * A successful resolve that still produced a provider error
+ * (bad key, 5xx, timed-out) arrives without MODEL_NOT_CONFIGURED
+ * but with an AI_CALL_FAILED discriminator. Surface a softer
+ * toast nudging the user to verify their model configuration —
+ * most provider errors at this layer trace back to a misset key
+ * or a wrong model id.
+ */
+function handleAiCallFailed(error: unknown): void {
+  const aiFailedInfo = extractAiCallFailedInfo(error);
+  if (aiFailedInfo) {
+    showAiCallFailedToast(aiFailedInfo);
+  }
+}
+
+/**
+ * Cascade DID resolve, but the chosen model's provider is
+ * disabled. Open a toast offering a one-click swap to the
+ * parent-scope default (when there is one) — the swap calls
+ * back into modelProviders.setFeatureOverrideForScope to clear
+ * the disabled-scope key so the next resolve falls through.
+ */
+function handleProviderDisabled(error: unknown): void {
+  const providerDisabledInfo = extractProviderDisabledInfo(error);
+  if (!providerDisabledInfo) return;
+  if (error instanceof Error) {
+    markAsHandledByProviderDisabledHandler(error);
+  }
+  showProviderDisabledToast({
+    ...providerDisabledInfo,
+    onSwapToAlternate: providerDisabledSwapHandler(providerDisabledInfo),
+  });
+}
+
 function createQueryClientConfig() {
   return {
     /**
      * Global mutation error handler for license limit enforcement.
      *
-     * This handler intercepts all tRPC mutation errors and:
-     * 1. Checks if the error is a LIMIT_EXCEEDED FORBIDDEN error
-     * 2. If so, opens the upgrade modal with limit details
-     * 3. Marks the error via WeakSet so component-level handlers can skip it
+     * This handler intercepts all tRPC mutation errors and dispatches each
+     * error family to its module-scope handler, in order.
      *
      * Components using `onError` callbacks should check `isHandledByGlobalLicenseHandler(error)`
      * to avoid showing duplicate error UI (toast + modal) for license errors.
-     *
-     * @see isHandledByGlobalLicenseHandler in trpcError.ts
-     * @see extractLimitExceededInfo in trpcError.ts
      */
     mutationCache: new MutationCache({
       // biome-ignore lint/complexity/useMaxParams: TanStack Query's MutationCache onError callback contract is positional
       onError: (error, _variables, _context, _mutation) => {
-        const limitInfo = extractLimitExceededInfo(error);
-        if (limitInfo) {
-          // Mark as handled so component-level handlers can skip it
-          if (error instanceof Error) {
-            markAsHandledByLicenseHandler(error);
-          }
-
-          useUpgradeModalStore
-            .getState()
-            .open(limitInfo.limitType, limitInfo.current, limitInfo.max);
-        }
-        // Check for lite member restriction errors
-        const restrictionInfo = extractLiteMemberRestrictionInfo(error);
-        if (restrictionInfo) {
-          if (error instanceof Error) {
-            markAsHandledByLiteMemberHandler(error);
-          }
-          useUpgradeModalStore.getState().openLiteMemberRestriction({
-            resource: restrictionInfo.resource,
-          });
-        }
-        // Check for ModelNotConfiguredError — surfaced when an AI-powered
-        // feature can't resolve a model anywhere in the scope chain.
-        // Emits a sticky orange toast (deduped per (featureKey, role)
-        // toast id) instead of a focus-trapping modal: explicit user
-        // actions still get a clear, actionable nudge but background
-        // flows (auto-save, prefetch) don't get blocked behind a Dialog.
-        const missingModelInfo = extractMissingModelInfo(error);
-        if (missingModelInfo) {
-          if (error instanceof Error) {
-            markAsHandledByMissingModelHandler(error);
-          }
-          showMissingModelToast(missingModelInfo);
-        }
-        // A successful resolve that still produced a provider error
-        // (bad key, 5xx, timed-out) arrives without MODEL_NOT_CONFIGURED
-        // but with an AI_CALL_FAILED discriminator. Surface a softer
-        // toast nudging the user to verify their model configuration —
-        // most provider errors at this layer trace back to a misset key
-        // or a wrong model id.
-        const aiFailedInfo = extractAiCallFailedInfo(error);
-        if (aiFailedInfo) {
-          showAiCallFailedToast(aiFailedInfo);
-        }
-        // Cascade DID resolve, but the chosen model's provider is
-        // disabled. Open a toast offering a one-click swap to the
-        // parent-scope default (when there is one) — the swap calls
-        // back into modelProviders.setFeatureOverrideForScope to clear
-        // the disabled-scope key so the next resolve falls through.
-        const providerDisabledInfo = extractProviderDisabledInfo(error);
-        if (providerDisabledInfo) {
-          if (error instanceof Error) {
-            markAsHandledByProviderDisabledHandler(error);
-          }
-          showProviderDisabledToast({
-            ...providerDisabledInfo,
-            onSwapToAlternate:
-              providerDisabledSwapHandler(providerDisabledInfo),
-          });
-        }
+        handleLimitExceeded(error);
+        handleLiteMemberRestriction(error);
+        handleMissingModel(error);
+        handleAiCallFailed(error);
+        handleProviderDisabled(error);
         // Non-license/non-restriction errors bubble up to component-level handlers
       },
     }),
     queryCache: new QueryCache({
       onError: (error) => {
-        // Silently mark lite member restriction errors on queries.
-        // Queries may fail on allowed pages (e.g., cost:view on analytics)
-        // — the component handles missing data gracefully.
-        // Only mutations and route guards should trigger the modal.
-        const restrictionInfo = extractLiteMemberRestrictionInfo(error);
-        if (restrictionInfo && error instanceof Error) {
-          markAsHandledByLiteMemberHandler(error);
-        }
+        markLiteMemberRestriction(error);
         // Queries (e.g. fetching a result that requires an LLM call
         // server-side) can also surface a ModelNotConfiguredError. Same
         // toast surface as the mutation path.
-        const missingModelInfo = extractMissingModelInfo(error);
-        if (missingModelInfo) {
-          if (error instanceof Error) {
-            markAsHandledByMissingModelHandler(error);
-          }
-          showMissingModelToast(missingModelInfo);
-        }
-        const aiFailedInfo = extractAiCallFailedInfo(error);
-        if (aiFailedInfo) {
-          showAiCallFailedToast(aiFailedInfo);
-        }
-        const providerDisabledInfo = extractProviderDisabledInfo(error);
-        if (providerDisabledInfo) {
-          if (error instanceof Error) {
-            markAsHandledByProviderDisabledHandler(error);
-          }
-          showProviderDisabledToast({
-            ...providerDisabledInfo,
-            onSwapToAlternate:
-              providerDisabledSwapHandler(providerDisabledInfo),
-          });
-        }
+        handleMissingModel(error);
+        handleAiCallFailed(error);
+        handleProviderDisabled(error);
       },
     }),
     defaultOptions: {

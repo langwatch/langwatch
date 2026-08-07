@@ -302,29 +302,70 @@ export class TieredBlobStore {
     return this.fetch(ref, /* refresh */ false);
   }
 
-  private async fetch(ref: BlobRef, refresh: boolean): Promise<Buffer | null> {
-    if (ref.tier === "redis") {
-      const id = redisBlobId({ projectId: ref.projectId, hash: ref.hash });
-      // A redis-tier miss is represented by a null return (GETEX/GET on an
-      // absent key), never an exception — so any exception here is the
-      // client itself (connection drop, command timeout, OOM-from-noeviction
-      // rejection), not "the blob is gone". Treat it as transient (retry),
-      // mirroring the s3 branch below, instead of letting it fall through to
-      // the decode fail-safe and permanently drop a job over a blip
-      // (2026-07-11 incident: uncaught ioredis errors here were indistinguishable
-      // from a genuinely missing blob).
-      try {
-        return await (refresh
-          ? this.redisBlobs.get({ id, ttlSeconds: BLOB_BACKSTOP_TTL_SECONDS })
-          : this.redisBlobs.peek({ id }));
-      } catch (err) {
-        throw new TransientBlobStoreError({
-          projectId: ref.projectId,
-          hash: ref.hash,
-          cause: err,
-        });
-      }
+  private async fetchRedisTier(
+    ref: BlobRef,
+    refresh: boolean,
+  ): Promise<Buffer | null> {
+    const id = redisBlobId({ projectId: ref.projectId, hash: ref.hash });
+    // A redis-tier miss is represented by a null return (GETEX/GET on an
+    // absent key), never an exception — so any exception here is the
+    // client itself (connection drop, command timeout, OOM-from-noeviction
+    // rejection), not "the blob is gone". Treat it as transient (retry),
+    // mirroring the s3 branch below, instead of letting it fall through to
+    // the decode fail-safe and permanently drop a job over a blip
+    // (2026-07-11 incident: uncaught ioredis errors here were indistinguishable
+    // from a genuinely missing blob).
+    try {
+      return await (refresh
+        ? this.redisBlobs.get({ id, ttlSeconds: BLOB_BACKSTOP_TTL_SECONDS })
+        : this.redisBlobs.peek({ id }));
+    } catch (err) {
+      throw new TransientBlobStoreError({
+        projectId: ref.projectId,
+        hash: ref.hash,
+        cause: err,
+      });
     }
+  }
+
+  /**
+   * A genuinely-absent or oversized/corrupt object is a missing blob → null
+   * → decode fail-safe, which DISCARDS the job (#5538: replay rebuilds fold
+   * projections and never re-invokes reactors, so for a reactor-bearing fold
+   * this is permanent loss, not "recover via replay" as this once claimed —
+   * see `GroupQueue.dropStagedJob`). Anything else (network/5xx) is
+   * transient and must retry, not drop the job (ADR-030 §2). Oversize is
+   * an OBSERVABLE fail-safe — split from "just missing" so oncall can see a
+   * real tamper / zip-bomb event distinct from "TTL reclaimed the blob".
+   */
+  private classifyS3FetchError(ref: BlobRef, err: unknown): null {
+    if (err instanceof BlobTooLargeError) {
+      if (this.queueName) {
+        gqBlobDecodeCapExceededTotal.inc({ queue_name: this.queueName });
+      }
+      if (this.logger) {
+        this.logger.warn(
+          {
+            projectId: ref.projectId,
+            blobHash: ref.hash,
+            cap: MAX_BLOB_BYTES,
+          },
+          "Blob exceeds decode cap — possible tamper / zip-bomb; treating as missing",
+        );
+      }
+      return null;
+    }
+    if (isObjectMissingError(err)) {
+      return null;
+    }
+    throw new TransientBlobStoreError({
+      projectId: ref.projectId,
+      hash: ref.hash,
+      cause: err,
+    });
+  }
+
+  private async fetchS3Tier(ref: BlobRef): Promise<Buffer | null> {
     // Re-mint OUTSIDE the missing-classification: a destination-resolve / mint
     // failure is transient (retry), never "missing" (ADR-030 §2).
     let uri: string;
@@ -343,39 +384,14 @@ export class TieredBlobStore {
         MAX_BLOB_BYTES,
       );
     } catch (err) {
-      // A genuinely-absent or oversized/corrupt object is a missing blob → null
-      // → decode fail-safe, which DISCARDS the job (#5538: replay rebuilds fold
-      // projections and never re-invokes reactors, so for a reactor-bearing fold
-      // this is permanent loss, not "recover via replay" as this once claimed —
-      // see `GroupQueue.dropStagedJob`). Anything else (network/5xx) is
-      // transient and must retry, not drop the job (ADR-030 §2). Oversize is
-      // an OBSERVABLE fail-safe — split from "just missing" so oncall can see a
-      // real tamper / zip-bomb event distinct from "TTL reclaimed the blob".
-      if (err instanceof BlobTooLargeError) {
-        if (this.queueName) {
-          gqBlobDecodeCapExceededTotal.inc({ queue_name: this.queueName });
-        }
-        if (this.logger) {
-          this.logger.warn(
-            {
-              projectId: ref.projectId,
-              blobHash: ref.hash,
-              cap: MAX_BLOB_BYTES,
-            },
-            "Blob exceeds decode cap — possible tamper / zip-bomb; treating as missing",
-          );
-        }
-        return null;
-      }
-      if (isObjectMissingError(err)) {
-        return null;
-      }
-      throw new TransientBlobStoreError({
-        projectId: ref.projectId,
-        hash: ref.hash,
-        cause: err,
-      });
+      return this.classifyS3FetchError(ref, err);
     }
+  }
+
+  private async fetch(ref: BlobRef, refresh: boolean): Promise<Buffer | null> {
+    return ref.tier === "redis"
+      ? this.fetchRedisTier(ref, refresh)
+      : this.fetchS3Tier(ref);
   }
 
   /**

@@ -151,6 +151,68 @@ function buildFilterWhere(input: {
 // Mappers – internal types → scoped output models
 // ---------------------------------------------------------------------------
 
+// Header fields derived from the trace's OTel attributes, each falling back
+// per its own semconv precedence.
+function deriveTraceHeaderAttributeFields(
+  summary: Pick<TraceSummaryData, "attributes" | "traceId">,
+): Pick<
+  TraceHeader,
+  | "name"
+  | "serviceName"
+  | "origin"
+  | "conversationId"
+  | "userId"
+  | "scenarioRunId"
+> {
+  return {
+    name:
+      summary.attributes["langwatch.span.name"] ?? summary.traceId.slice(0, 8),
+    serviceName: summary.attributes["service.name"] ?? "",
+    origin: summary.attributes["langwatch.origin"] ?? "application",
+    conversationId:
+      summary.attributes["gen_ai.conversation.id"] ??
+      summary.attributes["langgraph.thread_id"] ??
+      null,
+    userId: summary.attributes["langwatch.user_id"] ?? null,
+    scenarioRunId: summary.attributes["scenario.run_id"] ?? null,
+  };
+}
+
+// The prompt-linkage fields, each defaulted independently since a trace can
+// carry a "currently selected" prompt, a "last used" prompt, both, or
+// neither.
+function deriveTraceHeaderPromptFields(
+  summary: Pick<
+    TraceSummaryData,
+    | "containsPrompt"
+    | "selectedPromptId"
+    | "selectedPromptSpanId"
+    | "lastUsedPromptId"
+    | "lastUsedPromptVersionNumber"
+    | "lastUsedPromptVersionId"
+    | "lastUsedPromptSpanId"
+  >,
+): Pick<
+  TraceHeader,
+  | "containsPrompt"
+  | "selectedPromptId"
+  | "selectedPromptSpanId"
+  | "lastUsedPromptId"
+  | "lastUsedPromptVersionNumber"
+  | "lastUsedPromptVersionId"
+  | "lastUsedPromptSpanId"
+> {
+  return {
+    containsPrompt: summary.containsPrompt ?? false,
+    selectedPromptId: summary.selectedPromptId ?? null,
+    selectedPromptSpanId: summary.selectedPromptSpanId ?? null,
+    lastUsedPromptId: summary.lastUsedPromptId ?? null,
+    lastUsedPromptVersionNumber: summary.lastUsedPromptVersionNumber ?? null,
+    lastUsedPromptVersionId: summary.lastUsedPromptVersionId ?? null,
+    lastUsedPromptSpanId: summary.lastUsedPromptSpanId ?? null,
+  };
+}
+
 export function mapTraceSummaryToHeader(
   summary: TraceSummaryData,
 ): TraceHeader {
@@ -169,15 +231,7 @@ export function mapTraceSummaryToHeader(
   return {
     traceId: summary.traceId,
     timestamp: summary.occurredAt,
-    name:
-      summary.attributes["langwatch.span.name"] ?? summary.traceId.slice(0, 8),
-    serviceName: summary.attributes["service.name"] ?? "",
-    origin: summary.attributes["langwatch.origin"] ?? "application",
-    conversationId:
-      summary.attributes["gen_ai.conversation.id"] ??
-      summary.attributes["langgraph.thread_id"] ??
-      null,
-    userId: summary.attributes["langwatch.user_id"] ?? null,
+    ...deriveTraceHeaderAttributeFields(summary),
     durationMs: summary.totalDurationMs,
     spanCount: summary.spanCount,
     status,
@@ -195,14 +249,7 @@ export function mapTraceSummaryToHeader(
     ttft: summary.timeToFirstTokenMs,
     traceName: summary.traceName,
     rootSpanType: summary.rootSpanType,
-    scenarioRunId: summary.attributes["scenario.run_id"] ?? null,
-    containsPrompt: summary.containsPrompt ?? false,
-    selectedPromptId: summary.selectedPromptId ?? null,
-    selectedPromptSpanId: summary.selectedPromptSpanId ?? null,
-    lastUsedPromptId: summary.lastUsedPromptId ?? null,
-    lastUsedPromptVersionNumber: summary.lastUsedPromptVersionNumber ?? null,
-    lastUsedPromptVersionId: summary.lastUsedPromptVersionId ?? null,
-    lastUsedPromptSpanId: summary.lastUsedPromptSpanId ?? null,
+    ...deriveTraceHeaderPromptFields(summary),
     attributes: summary.attributes,
   };
 }
@@ -363,6 +410,43 @@ function stringifySpanIO(
   }
 }
 
+function deriveSpanDetailStatus(span: Span): SpanDetail["status"] {
+  if (span.error) return "error";
+  if (span.timestamps.finished_at > 0) return "ok";
+  return "unset";
+}
+
+function mapSpanErrorDetail(span: Span): SpanDetail["error"] {
+  return span.error
+    ? { message: span.error.message, stacktrace: span.error.stacktrace }
+    : null;
+}
+
+function mapSpanMetrics(span: Span): SpanDetail["metrics"] {
+  return span.metrics
+    ? {
+        promptTokens: span.metrics.prompt_tokens,
+        completionTokens: span.metrics.completion_tokens,
+        cost: span.metrics.cost,
+        tokensEstimated: span.metrics.tokens_estimated,
+      }
+    : null;
+}
+
+function mapSpanDetailEvents(
+  rawEvents: Array<{
+    name: string;
+    timeUnixMs: number;
+    attributes: Record<string, unknown>;
+  }>,
+): SpanDetail["events"] {
+  return rawEvents.map((e) => ({
+    name: e.name,
+    timestampMs: e.timeUnixMs,
+    attributes: e.attributes,
+  }));
+}
+
 function mapSpanToDetail(
   span: Span,
   rawEvents: Array<{
@@ -371,10 +455,6 @@ function mapSpanToDetail(
     attributes: Record<string, unknown>;
   }>,
 ): SpanDetail {
-  let status: SpanDetail["status"] = "unset";
-  if (span.error) status = "error";
-  else if (span.timestamps.finished_at > 0) status = "ok";
-
   return {
     spanId: span.span_id,
     parentSpanId: span.parent_id ?? null,
@@ -383,28 +463,15 @@ function mapSpanToDetail(
     startTimeMs: span.timestamps.started_at,
     endTimeMs: span.timestamps.finished_at,
     durationMs: span.timestamps.finished_at - span.timestamps.started_at,
-    status,
+    status: deriveSpanDetailStatus(span),
     model: "model" in span ? (span.model ?? null) : null,
     vendor: "vendor" in span ? (span.vendor ?? null) : null,
     input: buildDisplayInput(span),
     output: stringifySpanIO(span.output),
-    error: span.error
-      ? { message: span.error.message, stacktrace: span.error.stacktrace }
-      : null,
-    metrics: span.metrics
-      ? {
-          promptTokens: span.metrics.prompt_tokens,
-          completionTokens: span.metrics.completion_tokens,
-          cost: span.metrics.cost,
-          tokensEstimated: span.metrics.tokens_estimated,
-        }
-      : null,
+    error: mapSpanErrorDetail(span),
+    metrics: mapSpanMetrics(span),
     params: span.params ?? null,
-    events: rawEvents.map((e) => ({
-      name: e.name,
-      timestampMs: e.timeUnixMs,
-      attributes: e.attributes,
-    })),
+    events: mapSpanDetailEvents(rawEvents),
   };
 }
 
@@ -626,36 +693,214 @@ function hiddenCategoryAttributeRules(
  * placeholder rules above do not touch them, yet they still carry the system and
  * tool turns. Returns a new value; the input is not mutated.
  */
+function stripHiddenChatTurnsFromArray(
+  node: unknown[],
+  roles: ReadonlySet<string>,
+  stripToolCalls: boolean,
+): unknown[] {
+  const out: unknown[] = [];
+  for (const item of node) {
+    const role =
+      item && typeof item === "object"
+        ? (item as { role?: unknown }).role
+        : undefined;
+    if (typeof role === "string" && roles.has(role)) continue;
+    out.push(stripHiddenChatTurnsDeep(item, roles, stripToolCalls));
+  }
+  return out;
+}
+
+function stripHiddenChatTurnsFromObject(
+  node: Record<string, unknown>,
+  roles: ReadonlySet<string>,
+  stripToolCalls: boolean,
+): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(node)) {
+    if (stripToolCalls && key === "tool_calls") continue;
+    out[key] = stripHiddenChatTurnsDeep(value, roles, stripToolCalls);
+  }
+  return out;
+}
+
 function stripHiddenChatTurnsDeep(
   node: unknown,
   roles: ReadonlySet<string>,
   stripToolCalls: boolean,
 ): unknown {
   if (Array.isArray(node)) {
-    const out: unknown[] = [];
-    for (const item of node) {
-      const role =
-        item && typeof item === "object"
-          ? (item as { role?: unknown }).role
-          : undefined;
-      if (typeof role === "string" && roles.has(role)) continue;
-      out.push(stripHiddenChatTurnsDeep(item, roles, stripToolCalls));
-    }
-    return out;
+    return stripHiddenChatTurnsFromArray(node, roles, stripToolCalls);
   }
   if (node && typeof node === "object") {
-    const out: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(node)) {
-      if (stripToolCalls && key === "tool_calls") continue;
-      out[key] = stripHiddenChatTurnsDeep(value, roles, stripToolCalls);
-    }
-    return out;
+    return stripHiddenChatTurnsFromObject(
+      node as Record<string, unknown>,
+      roles,
+      stripToolCalls,
+    );
   }
   if (typeof node === "string") {
     const result = stripRolesFromChatArrayJson(node, roles, stripToolCalls);
     return result ? result.json : node;
   }
   return node;
+}
+
+// A field is redacted only when there WAS content the viewer may not see, so
+// a genuinely empty input never renders the placeholder.
+function computeInputOutputRedactionFlags(
+  dto: { input?: string | null; output?: string | null },
+  protections: V2Protections,
+): { inputRedacted: boolean; outputRedacted: boolean } {
+  return {
+    inputRedacted:
+      protections.canSeeCapturedInput !== true && dto.input != null,
+    outputRedacted:
+      protections.canSeeCapturedOutput !== true && dto.output != null,
+  };
+}
+
+// Strips hidden system/tool turns from any surviving (visible) conversation,
+// and derives the audience label so the drawer can say who redacted content
+// is visible to.
+function buildRedactedInputOutputFields({
+  dto,
+  protections,
+  roles,
+  stripToolCalls,
+  inputRedacted,
+  outputRedacted,
+}: {
+  dto: { input?: string | null; output?: string | null };
+  protections: V2Protections;
+  roles: ReadonlySet<string>;
+  stripToolCalls: boolean;
+  inputRedacted: boolean;
+  outputRedacted: boolean;
+}): {
+  input: string | null;
+  output: string | null;
+  inputVisibleTo: string | null;
+  outputVisibleTo: string | null;
+} {
+  const stripTurns = (json: string | null): string | null => {
+    if (json == null || (roles.size === 0 && !stripToolCalls)) return json;
+    const result = stripRolesFromChatArrayJson(json, roles, stripToolCalls);
+    return result ? result.json : json;
+  };
+  const visibleInput =
+    protections.canSeeCapturedInput === true ? (dto.input ?? null) : null;
+  const visibleOutput =
+    protections.canSeeCapturedOutput === true ? (dto.output ?? null) : null;
+
+  return {
+    input: stripTurns(visibleInput),
+    output: stripTurns(visibleOutput),
+    inputVisibleTo: inputRedacted
+      ? (protections.capturedInputVisibleTo ?? null)
+      : null,
+    outputVisibleTo: outputRedacted
+      ? (protections.capturedOutputVisibleTo ?? null)
+      : null,
+  };
+}
+
+type RedactableContentFields = {
+  inputMediaRefs?: unknown;
+  outputMediaRefs?: unknown;
+  attributes?: Record<string, string>;
+  params?: Record<string, unknown> | null;
+};
+
+// Media refs point at the exact content that was just redacted, and the
+// /api/files URLs they carry are fetchable on their own — so the parsed ref
+// fields AND their reserved-attribute copies must be dropped alongside the
+// text, never just hidden by the UI. Mutates `redacted` in place.
+function stripRedactedMediaRefs(
+  redacted: RedactableContentFields,
+  inputRedacted: boolean,
+  outputRedacted: boolean,
+): void {
+  if (inputRedacted) delete redacted.inputMediaRefs;
+  if (outputRedacted) delete redacted.outputMediaRefs;
+  if ((inputRedacted || outputRedacted) && redacted.attributes) {
+    const attributes = { ...redacted.attributes };
+    if (inputRedacted) delete attributes[RESERVED_INPUT_MEDIA_REFS];
+    if (outputRedacted) delete attributes[RESERVED_OUTPUT_MEDIA_REFS];
+    redacted.attributes = attributes;
+  }
+}
+
+// Custom attribute rules with a restrict disposition, plus the standalone
+// system/tools attribute keys when those categories are hidden: replace the
+// matched attribute values (header attributes, span params, span-event
+// attributes) with the placeholder naming who can see them. Mutates
+// `redacted` in place.
+function redactHiddenAttributeRules(
+  redacted: RedactableContentFields,
+  dto: RedactableContentFields,
+  protections: V2Protections,
+): void {
+  const hidden = [
+    ...(protections.hiddenAttributes ?? []),
+    ...hiddenCategoryAttributeRules(protections),
+  ];
+  if (hidden.length === 0) return;
+
+  const matchers = compileHiddenAttributeMatchers(hidden);
+  if (dto.attributes) {
+    redacted.attributes = redactHiddenAttributesCompiled(
+      dto.attributes,
+      matchers,
+    );
+  }
+  if (dto.params) {
+    redacted.params = redactHiddenAttributesCompiled(dto.params, matchers);
+  }
+  // Span-detail events carry their own attribute records (list-item events
+  // do not, hence the localized cast instead of a constraint field).
+  const events = (
+    dto as { events?: Array<{ attributes?: Record<string, unknown> }> }
+  ).events;
+  if (events?.some((event) => event.attributes)) {
+    (redacted as Record<string, unknown>).events = events.map((event) =>
+      event.attributes
+        ? {
+            ...event,
+            attributes: redactHiddenAttributesCompiled(
+              event.attributes,
+              matchers,
+            ),
+          }
+        : event,
+    );
+  }
+}
+
+// The raw chat-array attributes still carry the hidden system/tool turns
+// (they are input/output-category keys, untouched by the rules above), so an
+// expanded attribute could reveal them. Strips those turns from params and
+// attributes too, when any are hidden. Mutates `redacted` in place.
+function stripHiddenChatTurnsFromRedacted(
+  redacted: RedactableContentFields,
+  roles: ReadonlySet<string>,
+  stripToolCalls: boolean,
+): void {
+  if (roles.size === 0 && !stripToolCalls) return;
+
+  if (redacted.params) {
+    redacted.params = stripHiddenChatTurnsDeep(
+      redacted.params,
+      roles,
+      stripToolCalls,
+    ) as RedactableContentFields["params"];
+  }
+  if (redacted.attributes) {
+    redacted.attributes = stripHiddenChatTurnsDeep(
+      redacted.attributes,
+      roles,
+      stripToolCalls,
+    ) as RedactableContentFields["attributes"];
+  }
 }
 
 export function redactV2Content<
@@ -672,109 +917,37 @@ export function redactV2Content<
     params?: Record<string, unknown> | null;
   },
 >(dto: T, protections: V2Protections): T & V2RedactionFlags {
-  // A field is redacted only when there WAS content the viewer may not see, so a
-  // genuinely empty input never renders the placeholder. The audience label
-  // rides along so the drawer can say who it is visible to.
-  const inputRedacted =
-    protections.canSeeCapturedInput !== true && dto.input != null;
-  const outputRedacted =
-    protections.canSeeCapturedOutput !== true && dto.output != null;
+  const { inputRedacted, outputRedacted } = computeInputOutputRedactionFlags(
+    dto,
+    protections,
+  );
 
   // Strip hidden system/tool turns from any surviving (visible) conversation.
   const { roles, stripToolCalls } = turnsHiddenForViewer(protections);
-  const stripTurns = (json: string | null): string | null => {
-    if (json == null || (roles.size === 0 && !stripToolCalls)) return json;
-    const result = stripRolesFromChatArrayJson(json, roles, stripToolCalls);
-    return result ? result.json : json;
-  };
-  const visibleInput =
-    protections.canSeeCapturedInput === true ? (dto.input ?? null) : null;
-  const visibleOutput =
-    protections.canSeeCapturedOutput === true ? (dto.output ?? null) : null;
+  const { input, output, inputVisibleTo, outputVisibleTo } =
+    buildRedactedInputOutputFields({
+      dto,
+      protections,
+      roles,
+      stripToolCalls,
+      inputRedacted,
+      outputRedacted,
+    });
 
   const redacted: T & V2RedactionFlags = {
     ...dto,
-    input: stripTurns(visibleInput),
-    output: stripTurns(visibleOutput),
+    input,
+    output,
     inputRedacted,
     outputRedacted,
-    inputVisibleTo: inputRedacted
-      ? (protections.capturedInputVisibleTo ?? null)
-      : null,
-    outputVisibleTo: outputRedacted
-      ? (protections.capturedOutputVisibleTo ?? null)
-      : null,
+    inputVisibleTo,
+    outputVisibleTo,
   };
-  // Media refs point at the exact content that was just redacted, and the
-  // /api/files URLs they carry are fetchable on their own — so the parsed ref
-  // fields AND their reserved-attribute copies must be dropped alongside the
-  // text, never just hidden by the UI.
-  if (inputRedacted) delete redacted.inputMediaRefs;
-  if (outputRedacted) delete redacted.outputMediaRefs;
-  if ((inputRedacted || outputRedacted) && redacted.attributes) {
-    const attributes = { ...redacted.attributes };
-    if (inputRedacted) delete attributes[RESERVED_INPUT_MEDIA_REFS];
-    if (outputRedacted) delete attributes[RESERVED_OUTPUT_MEDIA_REFS];
-    redacted.attributes = attributes;
-  }
-  // Custom attribute rules with a restrict disposition, plus the standalone
-  // system/tools attribute keys when those categories are hidden: replace the
-  // matched attribute values (header attributes, span params, span-event
-  // attributes) with the placeholder naming who can see them.
-  const hidden = [
-    ...(protections.hiddenAttributes ?? []),
-    ...hiddenCategoryAttributeRules(protections),
-  ];
-  if (hidden.length > 0) {
-    const matchers = compileHiddenAttributeMatchers(hidden);
-    if (dto.attributes) {
-      redacted.attributes = redactHiddenAttributesCompiled(
-        dto.attributes,
-        matchers,
-      );
-    }
-    if (dto.params) {
-      redacted.params = redactHiddenAttributesCompiled(dto.params, matchers);
-    }
-    // Span-detail events carry their own attribute records (list-item events
-    // do not, hence the localized cast instead of a constraint field).
-    const events = (
-      dto as { events?: Array<{ attributes?: Record<string, unknown> }> }
-    ).events;
-    if (events?.some((event) => event.attributes)) {
-      (redacted as Record<string, unknown>).events = events.map((event) =>
-        event.attributes
-          ? {
-              ...event,
-              attributes: redactHiddenAttributesCompiled(
-                event.attributes,
-                matchers,
-              ),
-            }
-          : event,
-      );
-    }
-  }
-  // The raw chat-array attributes still carry the hidden system/tool turns
-  // (they are input/output-category keys, untouched by the rules above), so an
-  // expanded attribute could reveal them. Strip those turns from params and
-  // attributes too, when any are hidden.
-  if (roles.size > 0 || stripToolCalls) {
-    if (redacted.params) {
-      redacted.params = stripHiddenChatTurnsDeep(
-        redacted.params,
-        roles,
-        stripToolCalls,
-      ) as T["params"];
-    }
-    if (redacted.attributes) {
-      redacted.attributes = stripHiddenChatTurnsDeep(
-        redacted.attributes,
-        roles,
-        stripToolCalls,
-      ) as T["attributes"];
-    }
-  }
+
+  stripRedactedMediaRefs(redacted, inputRedacted, outputRedacted);
+  redactHiddenAttributeRules(redacted, dto, protections);
+  stripHiddenChatTurnsFromRedacted(redacted, roles, stripToolCalls);
+
   return redacted;
 }
 
@@ -1091,6 +1264,117 @@ export async function readCodingAgentTranscriptWithProtections({
       serviceName: row.resourceAttributes?.["service.name"] ?? null,
     })),
   });
+}
+
+// One narrow span fetch + one narrow events fetch in parallel — both keyed
+// by SpanId (and partition-pruned by occurredAtMs when available). Replaces
+// an older path that pulled every span in the trace into Node memory just
+// to .find() one, plus a third query whose result was never read.
+async function fetchSpanAndEventsForDetail({
+  app,
+  input,
+  hint,
+}: {
+  app: ReturnType<typeof getApp>;
+  input: { projectId: string; traceId: string; spanId: string };
+  hint: { occurredAtMs?: number };
+}) {
+  const [span, rawEvents] = await Promise.all([
+    app.traces.spans.getSpanById({
+      tenantId: input.projectId,
+      traceId: input.traceId,
+      spanId: input.spanId,
+      visibilityCutoffMs: await getVisibilityCutoffMsForProject(
+        input.projectId,
+      ),
+      ...hint,
+    }),
+    app.traces.spans.getSpanEvents({
+      tenantId: input.projectId,
+      traceId: input.traceId,
+      spanId: input.spanId,
+      ...hint,
+    }),
+  ]);
+
+  if (!span) {
+    throw new TraceNotFoundError(input.spanId);
+  }
+
+  return { span, rawEvents };
+}
+
+// SDK pattern: `Prompt.compile` / `PromptApiService.get` siblings carry
+// `langwatch.prompt.*` while the actual `llm` span next door does not. Walk
+// ancestors/siblings here so the v2 drawer's prompt accordion lights up on
+// the llm span too (matches legacy SpanDetails). One extra trace-scoped
+// read, only when the llm span has no own prompt attrs. Mutates `detail` in
+// place.
+async function enrichSpanDetailWithAncestorPrompt({
+  detail,
+  span,
+  input,
+  hint,
+}: {
+  detail: SpanDetail;
+  span: Span;
+  input: { projectId: string; traceId: string; spanId: string };
+  hint: { occurredAtMs?: number };
+}): Promise<void> {
+  if (
+    detail.type !== "llm" ||
+    // Coding-agent traces carry no `langwatch.prompt.*` anywhere, so the
+    // full-trace ancestor walk is a guaranteed miss — skipping it makes the
+    // enriched spanDetail read CHEAPER than before for these spans.
+    isCodingAgentShapedSpan(span) ||
+    hasOwnPromptAttrs(detail.params as Record<string, unknown> | null)
+  ) {
+    return;
+  }
+
+  const enriched = await enrichLlmSpanWithAncestorPrompt({
+    tenantId: input.projectId,
+    traceId: input.traceId,
+    targetSpanId: input.spanId,
+    occurredAtMs: hint.occurredAtMs,
+    currentParams: detail.params as Record<string, unknown> | null,
+  });
+  if (enriched) {
+    detail.params = enriched;
+  }
+}
+
+async function finalizeSpanDetail({
+  detail,
+  protections,
+  projectId,
+}: {
+  detail: SpanDetail;
+  protections: V2Protections;
+  projectId: string;
+}): Promise<SpanDetail> {
+  // Token usage with no price on it, offer the user a cost mapping. The
+  // cheap guards run first; the rule lookup only fires for spans that
+  // actually present the unmapped-cost symptom.
+  detail.costSuggestion = await deriveUnmappedCostSuggestion({
+    projectId,
+    model: detail.model ?? null,
+    cost: detail.metrics?.cost,
+    promptTokens: detail.metrics?.promptTokens,
+    completionTokens: detail.metrics?.completionTokens,
+  });
+
+  const redactedDetail = redactV2Content(detail, protections);
+  const detailParams = detail.params as Record<string, unknown> | null;
+  redactedDetail.contentPrivacy = buildContentPrivacy(
+    protections,
+    readDroppedFromParams(detailParams),
+  );
+  redactedDetail.piiAnalysisIncomplete =
+    readPiiIncompleteFromParams(detailParams);
+  redactedDetail.restrictedAttributes =
+    protections.restrictedAttributes ?? null;
+  return redactedDetail;
 }
 
 export const tracesV2Router = createTRPCRouter({
@@ -1809,32 +2093,12 @@ export const tracesV2Router = createTRPCRouter({
         projectId: input.projectId,
       });
       const hint = occurredAtFromInput(input);
-      // One narrow span fetch + one narrow events fetch in parallel —
-      // both keyed by SpanId (and partition-pruned by occurredAtMs when
-      // available). Replaces an older path that pulled every span in the
-      // trace into Node memory just to .find() one, plus a third query
-      // whose result was never read.
-      const [span, rawEvents] = await Promise.all([
-        app.traces.spans.getSpanById({
-          tenantId: input.projectId,
-          traceId: input.traceId,
-          spanId: input.spanId,
-          visibilityCutoffMs: await getVisibilityCutoffMsForProject(
-            input.projectId,
-          ),
-          ...hint,
-        }),
-        app.traces.spans.getSpanEvents({
-          tenantId: input.projectId,
-          traceId: input.traceId,
-          spanId: input.spanId,
-          ...hint,
-        }),
-      ]);
 
-      if (!span) {
-        throw new TraceNotFoundError(input.spanId);
-      }
+      const { span, rawEvents } = await fetchSpanAndEventsForDetail({
+        app,
+        input,
+        hint,
+      });
 
       // Coding-agent spans store their content in the trace's OTLP LOGS, not
       // on the span row — join it on here, BEFORE protections, so the joined
@@ -1879,54 +2143,13 @@ export const tracesV2Router = createTRPCRouter({
         })),
       );
 
-      // SDK pattern: `Prompt.compile` / `PromptApiService.get` siblings
-      // carry `langwatch.prompt.*` while the actual `llm` span next door
-      // does not. Walk ancestors/siblings here so the v2 drawer's prompt
-      // accordion lights up on the llm span too (matches legacy
-      // SpanDetails). One extra trace-scoped read, only when the llm
-      // span has no own prompt attrs.
-      if (
-        detail.type === "llm" &&
-        // Coding-agent traces carry no `langwatch.prompt.*` anywhere, so the
-        // full-trace ancestor walk is a guaranteed miss — skipping it makes
-        // the enriched spanDetail read CHEAPER than before for these spans.
-        !isCodingAgentShapedSpan(span) &&
-        !hasOwnPromptAttrs(detail.params as Record<string, unknown> | null)
-      ) {
-        const enriched = await enrichLlmSpanWithAncestorPrompt({
-          tenantId: input.projectId,
-          traceId: input.traceId,
-          targetSpanId: input.spanId,
-          occurredAtMs: hint.occurredAtMs,
-          currentParams: detail.params as Record<string, unknown> | null,
-        });
-        if (enriched) {
-          detail.params = enriched;
-        }
-      }
+      await enrichSpanDetailWithAncestorPrompt({ detail, span, input, hint });
 
-      // Token usage with no price on it, offer the user a cost mapping.
-      // The cheap guards run first; the rule lookup only fires for spans
-      // that actually present the unmapped-cost symptom.
-      detail.costSuggestion = await deriveUnmappedCostSuggestion({
-        projectId: input.projectId,
-        model: detail.model ?? null,
-        cost: detail.metrics?.cost,
-        promptTokens: detail.metrics?.promptTokens,
-        completionTokens: detail.metrics?.completionTokens,
-      });
-
-      const redactedDetail = redactV2Content(detail, protections);
-      const detailParams = detail.params as Record<string, unknown> | null;
-      redactedDetail.contentPrivacy = buildContentPrivacy(
+      return finalizeSpanDetail({
+        detail,
         protections,
-        readDroppedFromParams(detailParams),
-      );
-      redactedDetail.piiAnalysisIncomplete =
-        readPiiIncompleteFromParams(detailParams);
-      redactedDetail.restrictedAttributes =
-        protections.restrictedAttributes ?? null;
-      return redactedDetail;
+        projectId: input.projectId,
+      });
     }),
 
   /**
@@ -2163,16 +2386,27 @@ const LOG_OUTPUT_CONTENT_EVENTS: ReadonlySet<string> = new Set([
  * untouched, so a structural record like the `api_request` cost anchor is
  * returned intact.
  */
-export function redactTraceLogContent(
+type TraceLogRedactionProtections = {
+  canSeeCapturedInput?: boolean | null;
+  canSeeCapturedOutput?: boolean | null;
+  capturedInputVisibleTo?: string | null;
+  capturedOutputVisibleTo?: string | null;
+};
+
+// Finds every content-carrying key on this log record: the per-event content
+// attributes present with a non-empty value, the derived
+// (langwatch.gen_ai.*) attributes computed from them, and whether the
+// top-level OTLP body itself is content rather than merely echoing the
+// event-name marker (claude_code stamps the marker there; a generic
+// content-of-record emitter puts the record's content there).
+function collectTraceLogContentKeys(
   row: TraceLogRecordDto,
-  protections: {
-    canSeeCapturedInput?: boolean | null;
-    canSeeCapturedOutput?: boolean | null;
-    capturedInputVisibleTo?: string | null;
-    capturedOutputVisibleTo?: string | null;
-  },
-): TraceLogRecordDto {
-  const eventName = row.attributes[LOG_EVENT_NAME_ATTR] ?? "";
+  eventName: string,
+): {
+  presentContentKeys: string[];
+  derivedContentKeys: string[];
+  topBodyIsContent: boolean;
+} {
   const presentContentKeys = contentAttrKeys(eventName).filter((key) => {
     const value = row.attributes[key];
     return typeof value === "string" && value.length > 0;
@@ -2182,18 +2416,21 @@ export function redactTraceLogContent(
       key.startsWith(DERIVED_INPUT_ATTR_PREFIX) ||
       key.startsWith(DERIVED_OUTPUT_ATTR_PREFIX),
   );
-  // The top-level OTLP body is content only when it is NOT merely echoing the
-  // event-name marker (claude_code stamps the marker there; a generic
-  // content-of-record emitter puts the record's content there).
   const topBodyIsContent = row.body.length > 0 && row.body !== eventName;
-  if (
-    presentContentKeys.length === 0 &&
-    derivedContentKeys.length === 0 &&
-    !topBodyIsContent
-  ) {
-    return row;
-  }
 
+  return { presentContentKeys, derivedContentKeys, topBodyIsContent };
+}
+
+// Input-category events gate on input visibility, output-category events on
+// output visibility, and any UNCLASSIFIED record that still carries a
+// content body fails closed (both visibilities required).
+function resolveTraceLogContentVisibility({
+  eventName,
+  protections,
+}: {
+  eventName: string;
+  protections: TraceLogRedactionProtections;
+}): { isInput: boolean; isOutput: boolean; hidden: boolean } {
   const isInput = LOG_INPUT_CONTENT_EVENTS.has(eventName);
   const isOutput = LOG_OUTPUT_CONTENT_EVENTS.has(eventName);
   const canSeeInput = protections.canSeeCapturedInput === true;
@@ -2204,29 +2441,120 @@ export function redactTraceLogContent(
       ? !canSeeOutput
       : // Unclassified content record — reveal only to a viewer allowed BOTH.
         !(canSeeInput && canSeeOutput);
-  if (!hidden) return row;
 
-  const attributes = { ...row.attributes };
+  return { isInput, isOutput, hidden };
+}
+
+// Derived attrs are stripped by the category they were computed from; an
+// unclassified hidden record sheds both, mirroring its fail-closed gate.
+function stripTraceLogAttributes({
+  attributes,
+  presentContentKeys,
+  derivedContentKeys,
+  isInput,
+  isOutput,
+}: {
+  attributes: Record<string, string>;
+  presentContentKeys: string[];
+  derivedContentKeys: string[];
+  isInput: boolean;
+  isOutput: boolean;
+}): void {
   for (const key of presentContentKeys) delete attributes[key];
-  // Derived attrs are stripped by the category they were computed from; an
-  // unclassified hidden record sheds both, mirroring its fail-closed gate.
   for (const key of derivedContentKeys) {
     const isDerivedInput = key.startsWith(DERIVED_INPUT_ATTR_PREFIX);
-    if (isInput ? isDerivedInput : isOutput ? !isDerivedInput : true) {
-      delete attributes[key];
-    }
+    const stripsThisCategory = isInput
+      ? isDerivedInput
+      : isOutput
+        ? !isDerivedInput
+        : true;
+    if (stripsThisCategory) delete attributes[key];
   }
+}
+
+function resolveTraceLogBodyVisibleTo({
+  isInput,
+  isOutput,
+  protections,
+}: {
+  isInput: boolean;
+  isOutput: boolean;
+  protections: TraceLogRedactionProtections;
+}): string | null {
+  if (isInput) return protections.capturedInputVisibleTo ?? null;
+  if (isOutput) return protections.capturedOutputVisibleTo ?? null;
+  return null;
+}
+
+function buildRedactedTraceLogRow({
+  row,
+  presentContentKeys,
+  derivedContentKeys,
+  topBodyIsContent,
+  isInput,
+  isOutput,
+  protections,
+}: {
+  row: TraceLogRecordDto;
+  presentContentKeys: string[];
+  derivedContentKeys: string[];
+  topBodyIsContent: boolean;
+  isInput: boolean;
+  isOutput: boolean;
+  protections: TraceLogRedactionProtections;
+}): TraceLogRecordDto {
+  const attributes = { ...row.attributes };
+  stripTraceLogAttributes({
+    attributes,
+    presentContentKeys,
+    derivedContentKeys,
+    isInput,
+    isOutput,
+  });
+
   return {
     ...row,
     body: topBodyIsContent ? "" : row.body,
     attributes,
     bodyRedacted: true,
-    bodyVisibleTo: isInput
-      ? (protections.capturedInputVisibleTo ?? null)
-      : isOutput
-        ? (protections.capturedOutputVisibleTo ?? null)
-        : null,
+    bodyVisibleTo: resolveTraceLogBodyVisibleTo({
+      isInput,
+      isOutput,
+      protections,
+    }),
   };
+}
+
+export function redactTraceLogContent(
+  row: TraceLogRecordDto,
+  protections: TraceLogRedactionProtections,
+): TraceLogRecordDto {
+  const eventName = row.attributes[LOG_EVENT_NAME_ATTR] ?? "";
+  const { presentContentKeys, derivedContentKeys, topBodyIsContent } =
+    collectTraceLogContentKeys(row, eventName);
+  if (
+    presentContentKeys.length === 0 &&
+    derivedContentKeys.length === 0 &&
+    !topBodyIsContent
+  ) {
+    return row;
+  }
+
+  const { isInput, isOutput, hidden } = resolveTraceLogContentVisibility({
+    eventName,
+    protections,
+  });
+  if (!hidden) return row;
+
+  return buildRedactedTraceLogRow({
+    row,
+    presentContentKeys,
+    derivedContentKeys,
+    topBodyIsContent,
+    isInput,
+    isOutput,
+    protections,
+  });
 }
 
 /**

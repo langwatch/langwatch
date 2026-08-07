@@ -7,7 +7,10 @@ import {
 } from "~/utils/posthogErrorCapture";
 import type { queryBillableEventsTotal as QueryBillableEventsTotalFn } from "../../../../../../ee/billing/services/billableEventsQuery";
 import type { UsageReportingService } from "../../../../../../ee/billing/services/usageReportingService";
-import type { BillingCheckpointService } from "../../../../app-layer/billing/billingCheckpoint.service";
+import type {
+  BillingCheckpoint,
+  BillingCheckpointService,
+} from "../../../../app-layer/billing/billingCheckpoint.service";
 import type { OrganizationService } from "../../../../app-layer/organizations/organization.service";
 import type { Command, CommandHandler } from "../../../";
 import { defineCommandSchema } from "../../../";
@@ -56,6 +59,10 @@ const SCHEMA = defineCommandSchema(
 /**
  * Builds a deterministic idempotency key for Stripe meter events.
  */
+function isCircuitBreakerTripped(consecutiveFailures: number): boolean {
+  return consecutiveFailures >= MAX_CONSECUTIVE_FAILURES;
+}
+
 function buildIdentifier({
   organizationId,
   billingMonth,
@@ -206,7 +213,7 @@ export class ReportUsageForMonthCommand
     const consecutiveFailures = checkpoint?.consecutiveFailures ?? 0;
 
     // Circuit-breaker: stop self-dispatch after too many consecutive failures
-    if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
+    if (isCircuitBreakerTripped(consecutiveFailures)) {
       logger.error(
         {
           organizationId,
@@ -219,50 +226,13 @@ export class ReportUsageForMonthCommand
       return false;
     }
 
-    let targetTotal: number;
-
-    if (checkpoint?.pendingReportedTotal != null) {
-      // Crash recovery: a previous run wrote the intent but never confirmed.
-      targetTotal = checkpoint.pendingReportedTotal;
-      logger.info(
-        { organizationId, billingMonth, targetTotal, lastReportedTotal },
-        "recovering pending checkpoint from previous crash",
-      );
-    } else {
-      // Normal path: query ClickHouse for deduplicated count.
-      const currentTotal = await this.deps.queryBillableEventsTotal({
-        organizationId,
-        billingMonth,
-      });
-
-      if (currentTotal === null) {
-        // ClickHouse not available
-        return false;
-      }
-
-      if (currentTotal <= lastReportedTotal) {
-        logger.debug(
-          {
-            organizationId,
-            billingMonth,
-            currentTotal,
-            lastReportedTotal,
-          },
-          "no new billable events, skipping",
-        );
-        return false;
-      }
-
-      targetTotal = currentTotal;
-
-      // Phase 1: Write intent (pendingReportedTotal) before calling Stripe.
-      await this.deps.billingCheckpoints.writeIntent({
-        organizationId,
-        billingMonth,
-        lastReportedTotal,
-        pendingReportedTotal: targetTotal,
-      });
-    }
+    const targetTotal = await this.resolveTargetTotal({
+      organizationId,
+      billingMonth,
+      checkpoint,
+      lastReportedTotal,
+    });
+    if (targetTotal === null) return false;
 
     // Compute delta and report to Stripe
     const delta = targetTotal - lastReportedTotal;
@@ -290,6 +260,91 @@ export class ReportUsageForMonthCommand
       return false;
     }
 
+    return this.reportDeltaToStripe({
+      usageReportingService,
+      stripeCustomerId,
+      organizationId,
+      billingMonth,
+      identifier,
+      delta,
+      targetTotal,
+      lastReportedTotal,
+      consecutiveFailures,
+    });
+  }
+
+  private async resolveTargetTotal({
+    organizationId,
+    billingMonth,
+    checkpoint,
+    lastReportedTotal,
+  }: {
+    organizationId: string;
+    billingMonth: string;
+    checkpoint: BillingCheckpoint | null;
+    lastReportedTotal: number;
+  }): Promise<number | null> {
+    if (checkpoint?.pendingReportedTotal != null) {
+      // Crash recovery: a previous run wrote the intent but never confirmed.
+      const targetTotal = checkpoint.pendingReportedTotal;
+      logger.info(
+        { organizationId, billingMonth, targetTotal, lastReportedTotal },
+        "recovering pending checkpoint from previous crash",
+      );
+      return targetTotal;
+    }
+
+    // Normal path: query ClickHouse for deduplicated count.
+    const currentTotal = await this.deps.queryBillableEventsTotal({
+      organizationId,
+      billingMonth,
+    });
+
+    if (currentTotal === null) {
+      // ClickHouse not available
+      return null;
+    }
+
+    if (currentTotal <= lastReportedTotal) {
+      logger.debug(
+        { organizationId, billingMonth, currentTotal, lastReportedTotal },
+        "no new billable events, skipping",
+      );
+      return null;
+    }
+
+    // Phase 1: Write intent (pendingReportedTotal) before calling Stripe.
+    await this.deps.billingCheckpoints.writeIntent({
+      organizationId,
+      billingMonth,
+      lastReportedTotal,
+      pendingReportedTotal: currentTotal,
+    });
+
+    return currentTotal;
+  }
+
+  private async reportDeltaToStripe({
+    usageReportingService,
+    stripeCustomerId,
+    organizationId,
+    billingMonth,
+    identifier,
+    delta,
+    targetTotal,
+    lastReportedTotal,
+    consecutiveFailures,
+  }: {
+    usageReportingService: UsageReportingService;
+    stripeCustomerId: string;
+    organizationId: string;
+    billingMonth: string;
+    identifier: string;
+    delta: number;
+    targetTotal: number;
+    lastReportedTotal: number;
+    consecutiveFailures: number;
+  }): Promise<boolean> {
     try {
       const results = await usageReportingService.reportUsageDelta({
         stripeCustomerId,

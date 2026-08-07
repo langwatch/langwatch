@@ -61,6 +61,33 @@ export interface AnomalyDetectorDeps {
   onHardTier?: (anomaly: Anomaly) => Promise<void>;
 }
 
+/** Builds the Anomaly record for a rate-breaker tier crossing. */
+const buildRateAnomaly = ({
+  tenantId,
+  tier,
+  currentRatePerMin,
+  baseline,
+  sustainMinutes,
+  existing,
+}: {
+  tenantId: string;
+  tier: "hard" | "surface";
+  currentRatePerMin: number;
+  baseline: number;
+  sustainMinutes: number;
+  existing: Anomaly | null;
+}): Anomaly => ({
+  tenantId,
+  kind: "rate_breaker",
+  tier,
+  currentRate: Math.round(currentRatePerMin),
+  baseline: Math.round(baseline),
+  triggeredAt: existing?.triggeredAt ?? Date.now(),
+  reason: `rate ${Math.round(currentRatePerMin)}/min is ${Math.round(
+    currentRatePerMin / baseline,
+  )}× baseline ${Math.round(baseline)}/min sustained ${sustainMinutes}min`,
+});
+
 export class AnomalyDetector {
   constructor(private readonly deps: AnomalyDetectorDeps) {}
 
@@ -128,80 +155,141 @@ export class AnomalyDetector {
     const baseline = await this.resolveBaseline(tenantId);
     if (baseline === null) return "noop";
 
-    const recentSurface = await this.deps.rateTracker.currentWindowCount(
-      tenantId,
-      SURFACE_TIER_SUSTAIN_MINUTES * 60,
-    );
-    const surfacePerMin = recentSurface / SURFACE_TIER_SUSTAIN_MINUTES;
-
-    const recentHard = await this.deps.rateTracker.currentWindowCount(
-      tenantId,
-      HARD_TIER_SUSTAIN_MINUTES * 60,
-    );
-    const hardPerMin = recentHard / HARD_TIER_SUSTAIN_MINUTES;
-
+    const { surfacePerMin, hardPerMin } =
+      await this.computeCurrentRates(tenantId);
     const existing = await this.deps.anomalyState.get(tenantId, "rate_breaker");
 
     if (hardPerMin >= baseline * HARD_TIER_MULTIPLIER) {
-      const anomaly: Anomaly = {
+      await this.surfaceRateAnomaly({
         tenantId,
-        kind: "rate_breaker",
         tier: "hard",
-        currentRate: Math.round(hardPerMin),
-        baseline: Math.round(baseline),
-        triggeredAt: existing?.triggeredAt ?? Date.now(),
-        reason: `rate ${Math.round(hardPerMin)}/min is ${Math.round(
-          hardPerMin / baseline,
-        )}× baseline ${Math.round(baseline)}/min sustained ${HARD_TIER_SUSTAIN_MINUTES}min`,
-      };
-      await this.deps.anomalyState.upsert(anomaly);
-      if (this.deps.onHardTier && existing?.tier !== "hard") {
-        try {
-          await this.deps.onHardTier(anomaly);
-        } catch (err) {
-          logger.error(
-            {
-              tenantId,
-              err: err instanceof Error ? err.message : String(err),
-            },
-            "onHardTier callback failed",
-          );
-        }
-      }
-      logger.error(
-        { tenantId, currentRate: hardPerMin, baseline },
-        "HARD-tier rate anomaly",
-      );
+        currentRatePerMin: hardPerMin,
+        baseline,
+        sustainMinutes: HARD_TIER_SUSTAIN_MINUTES,
+        existing,
+      });
       return "surfaced";
     }
 
     if (surfacePerMin >= baseline * SURFACE_TIER_MULTIPLIER) {
-      const anomaly: Anomaly = {
+      await this.surfaceRateAnomaly({
         tenantId,
-        kind: "rate_breaker",
         tier: "surface",
-        currentRate: Math.round(surfacePerMin),
-        baseline: Math.round(baseline),
-        triggeredAt: existing?.triggeredAt ?? Date.now(),
-        reason: `rate ${Math.round(surfacePerMin)}/min is ${Math.round(
-          surfacePerMin / baseline,
-        )}× baseline ${Math.round(baseline)}/min sustained ${SURFACE_TIER_SUSTAIN_MINUTES}min`,
-      };
-      await this.deps.anomalyState.upsert(anomaly);
-      logger.warn(
-        { tenantId, currentRate: surfacePerMin, baseline },
-        "SURFACE-tier rate anomaly",
-      );
+        currentRatePerMin: surfacePerMin,
+        baseline,
+        sustainMinutes: SURFACE_TIER_SUSTAIN_MINUTES,
+        existing,
+      });
       return "surfaced";
     }
 
-    // Below thresholds: clear any active anomaly
-    if (existing) {
-      await this.deps.anomalyState.clear(tenantId, "rate_breaker");
-      logger.info({ tenantId }, "Rate anomaly cleared — back below threshold");
-      return "cleared";
+    return this.clearAnomalyIfExisting({ tenantId, existing });
+  }
+
+  /** Per-minute rates over the surface and hard sustain windows. */
+  private async computeCurrentRates(tenantId: string): Promise<{
+    surfacePerMin: number;
+    hardPerMin: number;
+  }> {
+    const recentSurface = await this.deps.rateTracker.currentWindowCount(
+      tenantId,
+      SURFACE_TIER_SUSTAIN_MINUTES * 60,
+    );
+    const recentHard = await this.deps.rateTracker.currentWindowCount(
+      tenantId,
+      HARD_TIER_SUSTAIN_MINUTES * 60,
+    );
+
+    return {
+      surfacePerMin: recentSurface / SURFACE_TIER_SUSTAIN_MINUTES,
+      hardPerMin: recentHard / HARD_TIER_SUSTAIN_MINUTES,
+    };
+  }
+
+  /**
+   * Persists the anomaly for the crossed tier, notifies onHardTier when
+   * newly entering the hard tier, and logs at the tier's severity.
+   */
+  private async surfaceRateAnomaly({
+    tenantId,
+    tier,
+    currentRatePerMin,
+    baseline,
+    sustainMinutes,
+    existing,
+  }: {
+    tenantId: string;
+    tier: "hard" | "surface";
+    currentRatePerMin: number;
+    baseline: number;
+    sustainMinutes: number;
+    existing: Anomaly | null;
+  }): Promise<void> {
+    const anomaly = buildRateAnomaly({
+      tenantId,
+      tier,
+      currentRatePerMin,
+      baseline,
+      sustainMinutes,
+      existing,
+    });
+    await this.deps.anomalyState.upsert(anomaly);
+
+    if (tier === "hard") {
+      await this.notifyHardTier({ anomaly, existing, tenantId });
+      logger.error(
+        { tenantId, currentRate: currentRatePerMin, baseline },
+        "HARD-tier rate anomaly",
+      );
+      return;
     }
-    return "noop";
+
+    logger.warn(
+      { tenantId, currentRate: currentRatePerMin, baseline },
+      "SURFACE-tier rate anomaly",
+    );
+  }
+
+  /**
+   * The hard-tier auto-pause hook. Currently a no-op (logs only) — pairing
+   * it with the per-tenant pause mechanism is tracked separately. Only
+   * fires the first tick a tenant newly enters the hard tier.
+   */
+  private async notifyHardTier({
+    anomaly,
+    existing,
+    tenantId,
+  }: {
+    anomaly: Anomaly;
+    existing: Anomaly | null;
+    tenantId: string;
+  }): Promise<void> {
+    if (!this.deps.onHardTier || existing?.tier === "hard") return;
+    try {
+      await this.deps.onHardTier(anomaly);
+    } catch (err) {
+      logger.error(
+        {
+          tenantId,
+          err: err instanceof Error ? err.message : String(err),
+        },
+        "onHardTier callback failed",
+      );
+    }
+  }
+
+  // Below thresholds: clear any active anomaly
+  private async clearAnomalyIfExisting({
+    tenantId,
+    existing,
+  }: {
+    tenantId: string;
+    existing: Anomaly | null;
+  }): Promise<"cleared" | "noop"> {
+    if (!existing) return "noop";
+    await this.deps.anomalyState.clear(tenantId, "rate_breaker");
+    logger.info({ tenantId }, "Rate anomaly cleared — back below threshold");
+    return "cleared";
   }
 
   /**

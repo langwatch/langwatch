@@ -67,6 +67,223 @@ type CreatorScope =
   | { type: "team"; id: string }
   | { type: "project"; id: string; teamId: string };
 
+/**
+ * `restricted` mode, CUSTOM bindings and an explicit permission list are one
+ * feature: asking for any of the three requires all three. Create and update
+ * describe the missing-binding case differently because their inputs differ —
+ * create takes the bindings, update takes an optional replacement set.
+ */
+function assertCreateModeConsistency({
+  isRestricted,
+  hasCustomBinding,
+  hasPermissions,
+}: {
+  isRestricted: boolean;
+  hasCustomBinding: boolean;
+  hasPermissions: boolean;
+}): void {
+  if (!isRestricted && !hasCustomBinding && !hasPermissions) return;
+
+  if (!isRestricted) {
+    throw new ApiKeyScopeViolationError(
+      "CUSTOM permissions require permissionMode 'restricted'",
+    );
+  }
+  if (!hasCustomBinding) {
+    throw new ApiKeyScopeViolationError(
+      "restricted mode requires at least one CUSTOM binding",
+    );
+  }
+  if (!hasPermissions) {
+    throw new ApiKeyScopeViolationError(
+      "CUSTOM bindings require at least one permission",
+    );
+  }
+}
+
+function assertUpdateModeConsistency({
+  isRestricted,
+  hasCustomBinding,
+  hasPermissions,
+}: {
+  isRestricted: boolean;
+  hasCustomBinding: boolean;
+  hasPermissions: boolean;
+}): void {
+  if (!isRestricted && !hasCustomBinding && !hasPermissions) return;
+
+  if (!isRestricted) {
+    throw new ApiKeyScopeViolationError(
+      "CUSTOM permissions require permissionMode 'restricted'",
+    );
+  }
+  if (!hasCustomBinding) {
+    throw new ApiKeyScopeViolationError(
+      "restricted mode requires bindings with at least one CUSTOM role",
+    );
+  }
+  if (!hasPermissions) {
+    throw new ApiKeyScopeViolationError(
+      "CUSTOM bindings require at least one permission",
+    );
+  }
+}
+
+/**
+ * Intentional: service keys (userId=null) with no explicit bindings
+ * default to org-wide ADMIN. This is the expected behavior for
+ * headless automation keys that need full org access.
+ */
+function withDefaultServiceKeyBindings({
+  userId,
+  bindings,
+  organizationId,
+}: {
+  userId?: string | null;
+  bindings: RoleBindingInput[];
+  organizationId: string;
+}): RoleBindingInput[] {
+  if (userId || bindings.length > 0) return bindings;
+  return [
+    {
+      role: "ADMIN",
+      scopeType: "ORGANIZATION",
+      scopeId: organizationId,
+    },
+  ];
+}
+
+function distinctCustomRoleIds(
+  roleBindings: { customRoleId: string | null }[],
+): string[] {
+  return [
+    ...new Set(
+      roleBindings
+        .map((rb) => rb.customRoleId)
+        .filter((cid): cid is string => cid !== null),
+    ),
+  ];
+}
+
+function withCustomRoleId({
+  bindings,
+  customRoleId,
+}: {
+  bindings: RoleBindingInput[];
+  customRoleId: string;
+}): RoleBindingInput[] {
+  return bindings.map((b) =>
+    b.role === TeamUserRole.CUSTOM ? { ...b, customRoleId } : b,
+  );
+}
+
+/**
+ * Mints the key's own SYSTEM_API_KEY role and points every CUSTOM binding at it.
+ */
+async function bindNewCustomRole({
+  txRoleRepo,
+  name,
+  organizationId,
+  permissions,
+  bindings,
+}: {
+  txRoleRepo: RoleRepository;
+  name: string;
+  organizationId: string;
+  permissions: string[];
+  bindings: RoleBindingInput[];
+}): Promise<RoleBindingInput[]> {
+  const customRole = await txRoleRepo.create({
+    name,
+    organizationId,
+    permissions,
+    kind: CUSTOM_ROLE_KIND.SYSTEM_API_KEY,
+  });
+  return withCustomRoleId({ bindings, customRoleId: customRole.id });
+}
+
+/**
+ * Points the replacement CUSTOM bindings at the key's role, reusing the role
+ * row already attached when it belongs to this key alone, and minting a fresh
+ * one otherwise.
+ */
+async function rebindCustomRole({
+  txRoleRepo,
+  apiKeyId,
+  organizationId,
+  permissions,
+  existingBindings,
+  bindings,
+}: {
+  txRoleRepo: RoleRepository;
+  apiKeyId: string;
+  organizationId: string;
+  permissions: string[];
+  existingBindings: { customRoleId: string | null }[];
+  bindings: RoleBindingInput[];
+}): Promise<RoleBindingInput[]> {
+  const existingCustomRoleId = existingBindings.find(
+    (rb) => rb.customRoleId !== null,
+  )?.customRoleId;
+
+  const canReuse = existingCustomRoleId
+    ? await txRoleRepo.isExclusiveToApiKey({
+        roleId: existingCustomRoleId,
+        apiKeyId,
+      })
+    : false;
+
+  if (canReuse && existingCustomRoleId) {
+    const customRole = await txRoleRepo.update(existingCustomRoleId, {
+      permissions,
+    });
+    return withCustomRoleId({ bindings, customRoleId: customRole.id });
+  }
+
+  return bindNewCustomRole({
+    txRoleRepo,
+    name: `apikey:${apiKeyId}:${generate(KSUID_RESOURCES.API_KEY_ROLE).toString()}`,
+    organizationId,
+    permissions,
+    bindings,
+  });
+}
+
+/**
+ * Drops the roles the previous bindings owned and the replacement set no
+ * longer points at, so a rewritten key does not leave its old role behind.
+ */
+async function deleteOrphanedCustomRoles({
+  txRoleRepo,
+  apiKeyId,
+  oldCustomRoleIds,
+  bindings,
+}: {
+  txRoleRepo: RoleRepository;
+  apiKeyId: string;
+  oldCustomRoleIds: string[];
+  bindings: RoleBindingInput[];
+}): Promise<void> {
+  const newCustomRoleIds = new Set(
+    bindings
+      .filter(
+        (b): b is Extract<RoleBindingInput, { role: "CUSTOM" }> =>
+          b.role === "CUSTOM",
+      )
+      .map((b) => b.customRoleId)
+      .filter((cid): cid is string => !!cid),
+  );
+  const orphanedRoleIds = oldCustomRoleIds.filter(
+    (roleId) => !newCustomRoleIds.has(roleId),
+  );
+  if (orphanedRoleIds.length > 0) {
+    await txRoleRepo.deleteExclusiveToApiKey({
+      roleIds: orphanedRoleIds,
+      apiKeyId,
+    });
+  }
+}
+
 export class ApiKeyService {
   private readonly repo: ApiKeyRepository;
   private readonly roleRepo: RoleRepository;
@@ -151,25 +368,12 @@ export class ApiKeyService {
       (b) => b.role === TeamUserRole.CUSTOM,
     );
     const hasPermissions = !!permissions && permissions.length > 0;
-    const isRestricted = permissionMode === "restricted";
 
-    if (isRestricted || hasCustomBinding || hasPermissions) {
-      if (!isRestricted) {
-        throw new ApiKeyScopeViolationError(
-          "CUSTOM permissions require permissionMode 'restricted'",
-        );
-      }
-      if (!hasCustomBinding) {
-        throw new ApiKeyScopeViolationError(
-          "restricted mode requires at least one CUSTOM binding",
-        );
-      }
-      if (!hasPermissions) {
-        throw new ApiKeyScopeViolationError(
-          "CUSTOM bindings require at least one permission",
-        );
-      }
-    }
+    assertCreateModeConsistency({
+      isRestricted: permissionMode === "restricted",
+      hasCustomBinding,
+      hasPermissions,
+    });
 
     if (hasPermissions) {
       ApiKeyService.assertPermissionFormat(permissions);
@@ -179,27 +383,13 @@ export class ApiKeyService {
       ? [...permissions].sort()
       : undefined;
 
-    if (userId) {
-      await this.ensureCallerIsOrgMember({ userId, organizationId });
-    } else if (bindings.length > 0) {
-      for (const binding of bindings) {
-        await this.resolveAndValidateScope({ binding, organizationId });
-      }
-    }
+    await this.assertCreatorScopes({ userId, organizationId, bindings });
 
-    // Intentional: service keys (userId=null) with no explicit bindings
-    // default to org-wide ADMIN. This is the expected behavior for
-    // headless automation keys that need full org access.
-    let effectiveBindings = bindings;
-    if (!userId && effectiveBindings.length === 0) {
-      effectiveBindings = [
-        {
-          role: "ADMIN",
-          scopeType: "ORGANIZATION",
-          scopeId: organizationId,
-        },
-      ];
-    }
+    const effectiveBindings = withDefaultServiceKeyBindings({
+      userId,
+      bindings,
+      organizationId,
+    });
 
     // Ingestion-only keys (identified by ingestSourceType) carry the ik-lw-
     // prefix so they're distinguishable from full-access sk-lw- keys; same
@@ -208,7 +398,85 @@ export class ApiKeyService {
       ingestSourceType ? { prefix: INGEST_KEY_PREFIX } : undefined,
     );
 
-    const apiKey = await this.prisma.$transaction(async (tx) => {
+    const apiKey = await this.persistNewApiKey({
+      record: {
+        name,
+        description,
+        lookupId,
+        hashedSecret,
+        permissionMode,
+        userId,
+        createdByUserId,
+        organizationId,
+        expiresAt,
+        ingestSourceType,
+        ingestionTemplateId,
+        createdByDeviceLabel,
+      },
+      organizationId,
+      userId,
+      bindings,
+      effectiveBindings,
+      sortedPermissions,
+    });
+
+    return { token, apiKey };
+  }
+
+  /**
+   * The caller's own standing to mint a key at the requested scopes: an owned
+   * key needs its owner to be an org member, a service key needs every
+   * requested binding to name a scope inside this organization.
+   */
+  private async assertCreatorScopes({
+    userId,
+    organizationId,
+    bindings,
+  }: {
+    userId?: string | null;
+    organizationId: string;
+    bindings: RoleBindingInput[];
+  }): Promise<void> {
+    if (userId) {
+      await this.ensureCallerIsOrgMember({ userId, organizationId });
+      return;
+    }
+    await this.assertBindingScopesInOrg({ bindings, organizationId });
+  }
+
+  private async assertBindingScopesInOrg({
+    bindings,
+    organizationId,
+  }: {
+    bindings: RoleBindingInput[];
+    organizationId: string;
+  }): Promise<void> {
+    for (const binding of bindings) {
+      await this.resolveAndValidateScope({ binding, organizationId });
+    }
+  }
+
+  /**
+   * Writes the key, its custom role and its bindings in one transaction. The
+   * ceiling check runs inside it so the user's own bindings cannot change
+   * between validation and write.
+   */
+  private async persistNewApiKey({
+    record,
+    organizationId,
+    userId,
+    bindings,
+    effectiveBindings,
+    sortedPermissions,
+  }: {
+    record: Parameters<ApiKeyRepository["create"]>[0];
+    organizationId: string;
+    userId?: string | null;
+    bindings: RoleBindingInput[];
+    effectiveBindings: RoleBindingInput[];
+    sortedPermissions?: string[];
+  }): Promise<ApiKey> {
+    return this.prisma.$transaction(async (tx) => {
       const txRepo = ApiKeyRepository.create(tx);
       const txRoleRepo = new RoleRepository(tx);
 
@@ -222,47 +490,28 @@ export class ApiKeyService {
         });
       }
 
-      const created = await txRepo.create({
-        name,
-        description,
-        lookupId,
-        hashedSecret,
-        permissionMode,
-        userId,
-        createdByUserId,
-        organizationId,
-        expiresAt,
-        ingestSourceType,
-        ingestionTemplateId,
-        createdByDeviceLabel,
-      });
+      const created = await txRepo.create(record);
 
-      if (sortedPermissions) {
-        const customRole = await txRoleRepo.create({
-          name: `apikey:${created.id}`,
-          organizationId,
-          permissions: sortedPermissions,
-          kind: CUSTOM_ROLE_KIND.SYSTEM_API_KEY,
-        });
-        effectiveBindings = effectiveBindings.map((b) =>
-          b.role === TeamUserRole.CUSTOM
-            ? { ...b, customRoleId: customRole.id }
-            : b,
-        );
-      }
+      const boundBindings = sortedPermissions
+        ? await bindNewCustomRole({
+            txRoleRepo,
+            name: `apikey:${created.id}`,
+            organizationId,
+            permissions: sortedPermissions,
+            bindings: effectiveBindings,
+          })
+        : effectiveBindings;
 
-      if (effectiveBindings.length > 0) {
+      if (boundBindings.length > 0) {
         await txRepo.createRoleBindings({
           apiKeyId: created.id,
           organizationId,
-          bindings: effectiveBindings,
+          bindings: boundBindings,
         });
       }
 
       return created;
     });
-
-    return { token, apiKey };
   }
 
   /**
@@ -296,6 +545,110 @@ export class ApiKeyService {
     permissions?: string[];
     bindings?: RoleBindingInput[];
   }): Promise<ApiKeyWithBindings> {
+    const existing = await this.loadUpdatableKey({
+      id,
+      callerUserId,
+      callerIsAdmin,
+      organizationId,
+      name,
+    });
+
+    const updateHasCustomBinding =
+      bindings?.some((b) => b.role === TeamUserRole.CUSTOM) ?? false;
+    const updateHasPermissions = !!permissions && permissions.length > 0;
+
+    assertUpdateModeConsistency({
+      isRestricted: permissionMode === "restricted",
+      hasCustomBinding: updateHasCustomBinding,
+      hasPermissions: updateHasPermissions,
+    });
+
+    if (updateHasPermissions) {
+      ApiKeyService.assertPermissionFormat(permissions);
+    }
+
+    const sortedPermissions = updateHasPermissions
+      ? [...permissions].sort()
+      : undefined;
+
+    if (bindings && !existing.userId) {
+      await this.assertBindingScopesInOrg({ bindings, organizationId });
+    }
+
+    const oldCustomRoleIds = distinctCustomRoleIds(existing.roleBindings);
+
+    return this.prisma.$transaction(async (tx) => {
+      const txRepo = ApiKeyRepository.create(tx);
+      const txRoleRepo = new RoleRepository(tx);
+
+      if (bindings && existing.userId) {
+        await this.assertBindingsWithinCeiling({
+          prisma: tx as unknown as PrismaClient,
+          ceilingUserId: existing.userId,
+          organizationId,
+          bindings,
+          rawPermissions: sortedPermissions,
+        });
+      }
+
+      const effectiveBindings =
+        sortedPermissions && bindings
+          ? await rebindCustomRole({
+              txRoleRepo,
+              apiKeyId: id,
+              organizationId,
+              permissions: sortedPermissions,
+              existingBindings: existing.roleBindings,
+              bindings,
+            })
+          : bindings;
+
+      await txRepo.update({
+        id,
+        name,
+        description,
+        permissionMode,
+      });
+
+      if (effectiveBindings) {
+        await txRepo.replaceRoleBindings({
+          apiKeyId: id,
+          organizationId,
+          bindings: effectiveBindings,
+        });
+
+        await deleteOrphanedCustomRoles({
+          txRoleRepo,
+          apiKeyId: id,
+          oldCustomRoleIds,
+          bindings: effectiveBindings,
+        });
+      }
+
+      const updated = await txRepo.findById({ id });
+      if (!updated) throw new ApiKeyNotFoundError(id);
+      return updated;
+    });
+  }
+
+  /**
+   * Loads the key an update is allowed to touch, refusing every reason it is
+   * not: an id outside this organization, a system-managed key, a squat on a
+   * reserved name, a non-owner caller, or an already-revoked key.
+   */
+  private async loadUpdatableKey({
+    id,
+    callerUserId,
+    callerIsAdmin,
+    organizationId,
+    name,
+  }: {
+    id: string;
+    callerUserId: string;
+    callerIsAdmin: boolean;
+    organizationId: string;
+    name?: string;
+  }): Promise<ApiKeyWithBindings> {
     const existing = await this.repo.findById({ id });
     if (!existing) throw new ApiKeyNotFoundError(id);
     if (existing.organizationId !== organizationId) {
@@ -319,137 +672,7 @@ export class ApiKeyService {
 
     if (existing.revokedAt) throw new ApiKeyAlreadyRevokedError(id);
 
-    const updateHasCustomBinding =
-      bindings?.some((b) => b.role === TeamUserRole.CUSTOM) ?? false;
-    const updateHasPermissions = !!permissions && permissions.length > 0;
-    const updateIsRestricted = permissionMode === "restricted";
-
-    if (updateIsRestricted || updateHasCustomBinding || updateHasPermissions) {
-      if (!updateIsRestricted) {
-        throw new ApiKeyScopeViolationError(
-          "CUSTOM permissions require permissionMode 'restricted'",
-        );
-      }
-      if (!updateHasCustomBinding) {
-        throw new ApiKeyScopeViolationError(
-          "restricted mode requires bindings with at least one CUSTOM role",
-        );
-      }
-      if (!updateHasPermissions) {
-        throw new ApiKeyScopeViolationError(
-          "CUSTOM bindings require at least one permission",
-        );
-      }
-    }
-
-    if (updateHasPermissions) {
-      ApiKeyService.assertPermissionFormat(permissions);
-    }
-
-    const sortedPermissions = updateHasPermissions
-      ? [...permissions].sort()
-      : undefined;
-
-    if (bindings && !existing.userId) {
-      for (const binding of bindings) {
-        await this.resolveAndValidateScope({ binding, organizationId });
-      }
-    }
-
-    const oldCustomRoleIds = [
-      ...new Set(
-        existing.roleBindings
-          .map((rb) => rb.customRoleId)
-          .filter((cid): cid is string => cid !== null),
-      ),
-    ];
-
-    return this.prisma.$transaction(async (tx) => {
-      const txRepo = ApiKeyRepository.create(tx);
-      const txRoleRepo = new RoleRepository(tx);
-
-      if (bindings && existing.userId) {
-        await this.assertBindingsWithinCeiling({
-          prisma: tx as unknown as PrismaClient,
-          ceilingUserId: existing.userId,
-          organizationId,
-          bindings,
-          rawPermissions: sortedPermissions,
-        });
-      }
-
-      let effectiveBindings = bindings;
-
-      if (sortedPermissions && effectiveBindings) {
-        const existingCustomRoleId = existing.roleBindings.find(
-          (rb) => rb.customRoleId !== null,
-        )?.customRoleId;
-
-        const canReuse = existingCustomRoleId
-          ? await txRoleRepo.isExclusiveToApiKey({
-              roleId: existingCustomRoleId,
-              apiKeyId: id,
-            })
-          : false;
-
-        let customRole;
-        if (canReuse && existingCustomRoleId) {
-          customRole = await txRoleRepo.update(existingCustomRoleId, {
-            permissions: sortedPermissions,
-          });
-        } else {
-          customRole = await txRoleRepo.create({
-            name: `apikey:${id}:${generate(KSUID_RESOURCES.API_KEY_ROLE).toString()}`,
-            organizationId,
-            permissions: sortedPermissions,
-            kind: CUSTOM_ROLE_KIND.SYSTEM_API_KEY,
-          });
-        }
-        effectiveBindings = effectiveBindings.map((b) =>
-          b.role === TeamUserRole.CUSTOM
-            ? { ...b, customRoleId: customRole.id }
-            : b,
-        );
-      }
-
-      await txRepo.update({
-        id,
-        name,
-        description,
-        permissionMode,
-      });
-
-      if (effectiveBindings) {
-        await txRepo.replaceRoleBindings({
-          apiKeyId: id,
-          organizationId,
-          bindings: effectiveBindings,
-        });
-
-        const newCustomRoleIds = new Set(
-          effectiveBindings
-            .filter(
-              (b): b is Extract<RoleBindingInput, { role: "CUSTOM" }> =>
-                b.role === "CUSTOM",
-            )
-            .map((b) => b.customRoleId)
-            .filter((cid): cid is string => !!cid),
-        );
-        const orphanedRoleIds = oldCustomRoleIds.filter(
-          (roleId) => !newCustomRoleIds.has(roleId),
-        );
-        if (orphanedRoleIds.length > 0) {
-          await txRoleRepo.deleteExclusiveToApiKey({
-            roleIds: orphanedRoleIds,
-            apiKeyId: id,
-          });
-        }
-      }
-
-      const updated = await txRepo.findById({ id });
-      if (!updated) throw new ApiKeyNotFoundError(id);
-      return updated;
-    });
+    return existing;
   }
 
   /**
@@ -492,43 +715,68 @@ export class ApiKeyService {
     rawPermissions?: string[];
   }): Promise<void> {
     for (const binding of bindings) {
-      const scope = await this.resolveAndValidateScope({
-        binding,
+      await this.assertBindingWithinCeiling({
+        prisma,
+        ceilingUserId,
         organizationId,
+        binding,
+        rawPermissions,
       });
-
-      if (binding.role === TeamUserRole.CUSTOM) {
-        if (rawPermissions) {
-          await this.assertRawPermissionsWithinCeiling({
-            prisma,
-            ceilingUserId,
-            organizationId,
-            scope,
-            permissions: rawPermissions,
-          });
-        } else if (binding.customRoleId) {
-          await this.assertCustomRoleWithinCeiling({
-            prisma,
-            ceilingUserId,
-            organizationId,
-            scope,
-            customRoleId: binding.customRoleId,
-          });
-        } else {
-          throw new ApiKeyScopeViolationError(
-            "CUSTOM role requires a customRoleId",
-          );
-        }
-      } else {
-        await this.assertBuiltinRoleWithinCeiling({
-          prisma,
-          ceilingUserId,
-          organizationId,
-          scope,
-          role: binding.role,
-        });
-      }
     }
+  }
+
+  private async assertBindingWithinCeiling({
+    prisma,
+    ceilingUserId,
+    organizationId,
+    binding,
+    rawPermissions,
+  }: {
+    prisma: PrismaClient;
+    ceilingUserId: string;
+    organizationId: string;
+    binding: RoleBindingInput;
+    rawPermissions?: string[];
+  }): Promise<void> {
+    const scope = await this.resolveAndValidateScope({
+      binding,
+      organizationId,
+    });
+
+    if (binding.role !== TeamUserRole.CUSTOM) {
+      await this.assertBuiltinRoleWithinCeiling({
+        prisma,
+        ceilingUserId,
+        organizationId,
+        scope,
+        role: binding.role,
+      });
+      return;
+    }
+
+    if (rawPermissions) {
+      await this.assertRawPermissionsWithinCeiling({
+        prisma,
+        ceilingUserId,
+        organizationId,
+        scope,
+        permissions: rawPermissions,
+      });
+      return;
+    }
+
+    if (binding.customRoleId) {
+      await this.assertCustomRoleWithinCeiling({
+        prisma,
+        ceilingUserId,
+        organizationId,
+        scope,
+        customRoleId: binding.customRoleId,
+      });
+      return;
+    }
+
+    throw new ApiKeyScopeViolationError("CUSTOM role requires a customRoleId");
   }
 
   private async resolveAndValidateScope({
@@ -871,13 +1119,7 @@ export class ApiKeyService {
       const txRoleRepo = new RoleRepository(tx);
 
       const fresh = await txRepo.findById({ id });
-      const customRoleIds = [
-        ...new Set(
-          (fresh?.roleBindings ?? [])
-            .map((rb) => rb.customRoleId)
-            .filter((cid): cid is string => cid !== null),
-        ),
-      ];
+      const customRoleIds = distinctCustomRoleIds(fresh?.roleBindings ?? []);
 
       const result = await txRepo.revoke({ id });
 

@@ -61,6 +61,103 @@ function firstTokenAtFromLangWatchTimestamps(value: unknown): number | null {
   return firstTokenAt !== null && firstTokenAt > 0 ? firstTokenAt : null;
 }
 
+function ttftFromEvents(span: NormalizedSpan): number | null {
+  let timeToFirstToken: number | null = null;
+  for (const event of span.events ?? []) {
+    const delta = event.timeUnixMs - span.startTimeUnixMs;
+    if (delta < 0) continue;
+    if (!FIRST_TOKEN_EVENTS.has(event.name)) continue;
+    if (timeToFirstToken === null || delta < timeToFirstToken) {
+      timeToFirstToken = delta;
+    }
+  }
+  return timeToFirstToken;
+}
+
+function ttltFromEvents(span: NormalizedSpan): number | null {
+  let timeToLastToken: number | null = null;
+  for (const event of span.events ?? []) {
+    const delta = event.timeUnixMs - span.startTimeUnixMs;
+    if (delta < 0) continue;
+    if (!LAST_TOKEN_EVENTS.has(event.name)) continue;
+    if (timeToLastToken === null || delta > timeToLastToken) {
+      timeToLastToken = delta;
+    }
+  }
+  return timeToLastToken;
+}
+
+function tokenTimingFromEvents(span: NormalizedSpan): {
+  timeToFirstToken: number | null;
+  timeToLastToken: number | null;
+} {
+  return {
+    timeToFirstToken: ttftFromEvents(span),
+    timeToLastToken: ttltFromEvents(span),
+  };
+}
+
+function ttftFromServerAttr(span: NormalizedSpan): number | null {
+  const attrTtft = coerceToNumber(
+    span.spanAttributes[ATTR_KEYS.GEN_AI_SERVER_TIME_TO_FIRST_TOKEN],
+  );
+  return attrTtft !== null && attrTtft >= 0 ? attrTtft : null;
+}
+
+// Vercel AI SDK reports TTFT as a duration attribute and emits no stream
+// event, so it needs its own fallback.
+function ttftFromVercelAiSdk(span: NormalizedSpan): number | null {
+  const msToFirstChunk = coerceToNumber(
+    span.spanAttributes[ATTR_KEYS.AI_RESPONSE_MS_TO_FIRST_CHUNK],
+  );
+  return msToFirstChunk !== null && msToFirstChunk >= 0 ? msToFirstChunk : null;
+}
+
+function ttftFromLangWatchTimestamps(span: NormalizedSpan): number | null {
+  const firstTokenAt = firstTokenAtFromLangWatchTimestamps(
+    span.spanAttributes[ATTR_KEYS.LANGWATCH_TIMESTAMPS],
+  );
+  if (firstTokenAt === null) return null;
+  const delta = firstTokenAt - span.startTimeUnixMs;
+  return delta >= 0 ? delta : null;
+}
+
+function earliestNonNull(
+  current: number | null,
+  candidate: number | null,
+): number | null {
+  if (candidate === null) return current;
+  return current === null ? candidate : Math.min(current, candidate);
+}
+
+function latestNonNull(
+  current: number | null,
+  candidate: number | null,
+): number | null {
+  if (candidate === null) return current;
+  return current === null ? candidate : Math.max(current, candidate);
+}
+
+function nonZeroOrNull(value: number): number | null {
+  return value > 0 ? value : null;
+}
+
+function roundedCostOrNull(value: number): number | null {
+  return value > 0 ? Number(value.toFixed(6)) : null;
+}
+
+function tokensPerSecondOf({
+  completionTokens,
+  totalDurationMs,
+}: {
+  completionTokens: number;
+  totalDurationMs: number;
+}): number | null {
+  return completionTokens > 0 && totalDurationMs > 0
+    ? Math.round((completionTokens / totalDurationMs) * 1000)
+    : null;
+}
+
 /**
  * Computes per-span cost, token metrics, and token timing, then
  * accumulates them into trace-level totals.
@@ -171,59 +268,31 @@ export class SpanCostService {
     timeToFirstToken: number | null;
     timeToLastToken: number | null;
   } {
-    let timeToFirstToken: number | null = null;
-    let timeToLastToken: number | null = null;
-
-    for (const event of span.events ?? []) {
-      const delta = event.timeUnixMs - span.startTimeUnixMs;
-      if (delta < 0) continue;
-      if (
-        FIRST_TOKEN_EVENTS.has(event.name) &&
-        (timeToFirstToken === null || delta < timeToFirstToken)
-      ) {
-        timeToFirstToken = delta;
-      }
-      if (
-        LAST_TOKEN_EVENTS.has(event.name) &&
-        (timeToLastToken === null || delta > timeToLastToken)
-      ) {
-        timeToLastToken = delta;
-      }
-    }
-
-    if (timeToFirstToken === null) {
-      const attrTtft = coerceToNumber(
-        span.spanAttributes[ATTR_KEYS.GEN_AI_SERVER_TIME_TO_FIRST_TOKEN],
-      );
-      if (attrTtft !== null && attrTtft >= 0) {
-        timeToFirstToken = attrTtft;
-      }
-    }
-
-    if (timeToFirstToken === null) {
-      // Vercel AI SDK reports TTFT as a duration attribute and emits no
-      // stream event, so it needs its own fallback.
-      const msToFirstChunk = coerceToNumber(
-        span.spanAttributes[ATTR_KEYS.AI_RESPONSE_MS_TO_FIRST_CHUNK],
-      );
-      if (msToFirstChunk !== null && msToFirstChunk >= 0) {
-        timeToFirstToken = msToFirstChunk;
-      }
-    }
-
-    if (timeToFirstToken === null) {
-      const firstTokenAt = firstTokenAtFromLangWatchTimestamps(
-        span.spanAttributes[ATTR_KEYS.LANGWATCH_TIMESTAMPS],
-      );
-      if (firstTokenAt !== null) {
-        const delta = firstTokenAt - span.startTimeUnixMs;
-        if (delta >= 0) {
-          timeToFirstToken = delta;
-        }
-      }
-    }
+    const { timeToFirstToken: fromEvents, timeToLastToken } =
+      tokenTimingFromEvents(span);
+    const timeToFirstToken =
+      fromEvents ??
+      ttftFromServerAttr(span) ??
+      ttftFromVercelAiSdk(span) ??
+      ttftFromLangWatchTimestamps(span);
 
     return { timeToFirstToken, timeToLastToken };
+  }
+
+  /**
+   * A span flagged as a redundant usage copy (e.g. codex's lower-level
+   * response span echoing the turn rollup) contributes nothing to the
+   * trace totals, so its tokens/cost are counted exactly once.
+   */
+  private resolveSpanMetrics(span: NormalizedSpan): {
+    promptTokens: number;
+    completionTokens: number;
+    cost: number;
+    estimated: boolean;
+  } {
+    return this.isTokenAccumulationSkipped(span)
+      ? { promptTokens: 0, completionTokens: 0, cost: 0, estimated: false }
+      : this.extractTokenMetrics(span);
   }
 
   accumulateTokens({
@@ -244,12 +313,7 @@ export class SpanCostService {
     timeToLastTokenMs: number | null;
     tokensPerSecond: number | null;
   } {
-    // A span flagged as a redundant usage copy (e.g. codex's lower-level
-    // response span echoing the turn rollup) contributes nothing to the
-    // trace totals, so its tokens/cost are counted exactly once.
-    const metrics = this.isTokenAccumulationSkipped(span)
-      ? { promptTokens: 0, completionTokens: 0, cost: 0, estimated: false }
-      : this.extractTokenMetrics(span);
+    const metrics = this.resolveSpanMetrics(span);
     const totalPromptTokenCount =
       (state.totalPromptTokenCount ?? 0) + metrics.promptTokens;
     const totalCompletionTokenCount =
@@ -261,38 +325,27 @@ export class SpanCostService {
       (this.isSpanCostNonBillable(span) ? metrics.cost : 0);
 
     const timing = this.extractTokenTiming(span);
-    let timeToFirstTokenMs = state.timeToFirstTokenMs;
-    if (timing.timeToFirstToken !== null) {
-      timeToFirstTokenMs =
-        timeToFirstTokenMs === null
-          ? timing.timeToFirstToken
-          : Math.min(timeToFirstTokenMs, timing.timeToFirstToken);
-    }
-    let timeToLastTokenMs = state.timeToLastTokenMs;
-    if (timing.timeToLastToken !== null) {
-      timeToLastTokenMs =
-        timeToLastTokenMs === null
-          ? timing.timeToLastToken
-          : Math.max(timeToLastTokenMs, timing.timeToLastToken);
-    }
-
-    const tokensPerSecond =
-      totalCompletionTokenCount > 0 && totalDurationMs > 0
-        ? Math.round((totalCompletionTokenCount / totalDurationMs) * 1000)
-        : null;
+    const timeToFirstTokenMs = earliestNonNull(
+      state.timeToFirstTokenMs,
+      timing.timeToFirstToken,
+    );
+    const timeToLastTokenMs = latestNonNull(
+      state.timeToLastTokenMs,
+      timing.timeToLastToken,
+    );
 
     return {
-      totalPromptTokenCount:
-        totalPromptTokenCount > 0 ? totalPromptTokenCount : null,
-      totalCompletionTokenCount:
-        totalCompletionTokenCount > 0 ? totalCompletionTokenCount : null,
-      totalCost: totalCost > 0 ? Number(totalCost.toFixed(6)) : null,
-      nonBilledCost:
-        nonBilledCost > 0 ? Number(nonBilledCost.toFixed(6)) : null,
+      totalPromptTokenCount: nonZeroOrNull(totalPromptTokenCount),
+      totalCompletionTokenCount: nonZeroOrNull(totalCompletionTokenCount),
+      totalCost: roundedCostOrNull(totalCost),
+      nonBilledCost: roundedCostOrNull(nonBilledCost),
       tokensEstimated: state.tokensEstimated || metrics.estimated,
       timeToFirstTokenMs,
       timeToLastTokenMs,
-      tokensPerSecond,
+      tokensPerSecond: tokensPerSecondOf({
+        completionTokens: totalCompletionTokenCount,
+        totalDurationMs,
+      }),
     };
   }
 }

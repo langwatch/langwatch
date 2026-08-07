@@ -76,6 +76,116 @@ secured
   .access(cronPolicy())
   .post("/cron/old_lambdas_cleanup", oldLambdasCleanupHandler);
 
+/** Checks one organization's monthly usage against its plan and sends a
+ *  warning if it's crossed a threshold. Guard clauses skip organizations
+ *  the check does not apply to (no projects, unlimited plan, unknown usage,
+ *  missing plan config), logging why at debug/warn level. */
+async function checkOrganizationUsage(org: { id: string }): Promise<void> {
+  const usageService = getApp().usage;
+
+  const projectIds = await getApp().organizations.getProjectIds(org.id);
+  if (projectIds.length === 0) {
+    logger.debug(
+      { organizationId: org.id },
+      "organization has no projects, skipping",
+    );
+    return;
+  }
+  const currentMonthCount = await usageService.getCurrentMonthCount({
+    organizationId: org.id,
+  });
+
+  if (currentMonthCount === "unlimited") {
+    logger.debug(
+      { organizationId: org.id },
+      "organization has unlimited plan, skipping usage check",
+    );
+    return;
+  }
+
+  if (currentMonthCount === USAGE_UNKNOWN) {
+    // Skipped, not treated as 0. This job decides whether an
+    // organization has crossed a usage threshold; against a fabricated
+    // zero it concludes "comfortably under" for every organization at
+    // once and sends nothing, which is indistinguishable from a quiet
+    // day. Skipping says the same thing honestly and re-checks on the
+    // next tick.
+    logger.warn(
+      { organizationId: org.id },
+      "usage is unknown, skipping usage check for this organization",
+    );
+    return;
+  }
+
+  const activePlan = await getApp().planProvider.getActivePlan({
+    organizationId: org.id,
+  });
+
+  if (
+    !activePlan ||
+    typeof activePlan.maxMessagesPerMonth !== "number" ||
+    activePlan.maxMessagesPerMonth <= 0
+  ) {
+    logger.debug(
+      { organizationId: org.id },
+      "organization has invalid or missing plan configuration, skipping",
+    );
+    return;
+  }
+
+  const maxMessagesPerMonth = activePlan.maxMessagesPerMonth;
+  const usagePercentage =
+    maxMessagesPerMonth > 0
+      ? (currentMonthCount / maxMessagesPerMonth) * 100
+      : 0;
+
+  if (currentMonthCount > 1) {
+    logger.info(
+      {
+        organizationId: org.id,
+        currentMonthMessagesCount: currentMonthCount,
+        maxMessagesPerMonth,
+        usagePercentage: Number(usagePercentage.toFixed(1)),
+        projectCount: projectIds.length,
+      },
+      "organization usage stats",
+    );
+  }
+
+  await getApp().usageLimits.checkAndSendWarning({
+    organizationId: org.id,
+    currentMonthMessagesCount: currentMonthCount,
+    maxMonthlyUsageLimit: maxMessagesPerMonth,
+  });
+}
+
+/** Checks usage limits for every organization (SaaS only), continuing past
+ *  a single organization's failure so one bad org can't starve the rest. */
+async function checkAllOrganizationsUsage(): Promise<void> {
+  try {
+    const organizations = await prisma.organization.findMany({
+      select: { id: true },
+    });
+
+    for (const org of organizations) {
+      try {
+        await checkOrganizationUsage(org);
+      } catch (error) {
+        logger.error(
+          { organizationId: org.id, error },
+          "error checking usage limits for organization",
+        );
+        captureException(toError(error), {
+          extra: { organizationId: org.id },
+        });
+      }
+    }
+  } catch (error) {
+    logger.error({ error }, "error checking usage limits");
+    captureException(toError(error));
+  }
+}
+
 // ---------- GET /api/cron/trace_analytics ----------
 secured.access(cronPolicy()).get("/cron/trace_analytics", async (c) => {
   if (!validateCronKey(c)) {
@@ -84,103 +194,7 @@ secured.access(cronPolicy()).get("/cron/trace_analytics", async (c) => {
 
   // Check usage limits for all organizations (SaaS only)
   if (env.IS_SAAS) {
-    try {
-      const organizations = await prisma.organization.findMany({
-        select: { id: true },
-      });
-
-      const usageService = getApp().usage;
-
-      for (const org of organizations) {
-        try {
-          const projectIds = await getApp().organizations.getProjectIds(org.id);
-          if (projectIds.length === 0) {
-            logger.debug(
-              { organizationId: org.id },
-              "organization has no projects, skipping",
-            );
-            continue;
-          }
-          const currentMonthCount = await usageService.getCurrentMonthCount({
-            organizationId: org.id,
-          });
-
-          if (currentMonthCount === "unlimited") {
-            logger.debug(
-              { organizationId: org.id },
-              "organization has unlimited plan, skipping usage check",
-            );
-            continue;
-          }
-
-          if (currentMonthCount === USAGE_UNKNOWN) {
-            // Skipped, not treated as 0. This job decides whether an
-            // organization has crossed a usage threshold; against a fabricated
-            // zero it concludes "comfortably under" for every organization at
-            // once and sends nothing, which is indistinguishable from a quiet
-            // day. Skipping says the same thing honestly and re-checks on the
-            // next tick.
-            logger.warn(
-              { organizationId: org.id },
-              "usage is unknown, skipping usage check for this organization",
-            );
-            continue;
-          }
-
-          const activePlan = await getApp().planProvider.getActivePlan({
-            organizationId: org.id,
-          });
-
-          if (
-            !activePlan ||
-            typeof activePlan.maxMessagesPerMonth !== "number" ||
-            activePlan.maxMessagesPerMonth <= 0
-          ) {
-            logger.debug(
-              { organizationId: org.id },
-              "organization has invalid or missing plan configuration, skipping",
-            );
-            continue;
-          }
-
-          const maxMessagesPerMonth = activePlan.maxMessagesPerMonth;
-          const usagePercentage =
-            maxMessagesPerMonth > 0
-              ? (currentMonthCount / maxMessagesPerMonth) * 100
-              : 0;
-
-          if (currentMonthCount > 1) {
-            logger.info(
-              {
-                organizationId: org.id,
-                currentMonthMessagesCount: currentMonthCount,
-                maxMessagesPerMonth,
-                usagePercentage: Number(usagePercentage.toFixed(1)),
-                projectCount: projectIds.length,
-              },
-              "organization usage stats",
-            );
-          }
-
-          await getApp().usageLimits.checkAndSendWarning({
-            organizationId: org.id,
-            currentMonthMessagesCount: currentMonthCount,
-            maxMonthlyUsageLimit: maxMessagesPerMonth,
-          });
-        } catch (error) {
-          logger.error(
-            { organizationId: org.id, error },
-            "error checking usage limits for organization",
-          );
-          captureException(toError(error), {
-            extra: { organizationId: org.id },
-          });
-        }
-      }
-    } catch (error) {
-      logger.error({ error }, "error checking usage limits");
-      captureException(toError(error));
-    }
+    await checkAllOrganizationsUsage();
   } else {
     logger.debug("skipping usage limit notifications (not SaaS)");
   }

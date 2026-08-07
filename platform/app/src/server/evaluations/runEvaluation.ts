@@ -68,6 +68,95 @@ export type EvaluationResultWithThreadId = SingleEvaluationResult & {
   inputs?: Record<string, any>;
 };
 
+type MappingConfigEntry = MappingState["mapping"][string];
+
+function isThreadMappingConfig(mappingConfig: MappingConfigEntry): boolean {
+  return (
+    ("type" in mappingConfig && mappingConfig.type === "thread") ||
+    ("source" in mappingConfig &&
+      (mappingConfig.source in THREAD_MAPPINGS ||
+        (SERVER_ONLY_THREAD_SOURCES as readonly string[]).includes(
+          mappingConfig.source,
+        )))
+  );
+}
+
+async function assignThreadField({
+  result,
+  targetField,
+  mappingConfig,
+  threadId,
+  threadTraces,
+}: {
+  result: Record<string, any>;
+  targetField: string;
+  mappingConfig: MappingConfigEntry;
+  threadId: string;
+  threadTraces: Trace[];
+}): Promise<void> {
+  if (!("source" in mappingConfig)) return;
+  const source = mappingConfig.source;
+  if (!source) return;
+
+  if ((SERVER_ONLY_THREAD_SOURCES as readonly string[]).includes(source)) {
+    if (source === "formatted_traces") {
+      result[targetField] = (
+        await Promise.all(
+          threadTraces.map((t) => formatSpansDigest(t.spans ?? [])),
+        )
+      ).join("\n\n---\n\n");
+    }
+    return;
+  }
+
+  const threadSource = source as keyof typeof THREAD_MAPPINGS;
+  const selectedFields =
+    ("selectedFields" in mappingConfig
+      ? mappingConfig.selectedFields
+      : undefined) ?? [];
+  result[targetField] = THREAD_MAPPINGS[threadSource].mapping(
+    { thread_id: threadId, traces: threadTraces },
+    selectedFields as (keyof typeof TRACE_MAPPINGS)[],
+  );
+}
+
+async function assignTraceField({
+  result,
+  targetField,
+  mappingConfig,
+  trace,
+}: {
+  result: Record<string, any>;
+  targetField: string;
+  mappingConfig: MappingConfigEntry;
+  trace: Trace;
+}): Promise<void> {
+  if (!("source" in mappingConfig)) return;
+
+  if (
+    (SERVER_ONLY_TRACE_SOURCES as readonly string[]).includes(
+      mappingConfig.source,
+    )
+  ) {
+    if (mappingConfig.source === "formatted_trace") {
+      result[targetField] = await formatSpansDigest(trace.spans ?? []);
+    }
+    return;
+  }
+
+  const traceMappingConfig = {
+    source: mappingConfig.source,
+    key: mappingConfig.key,
+    subkey: mappingConfig.subkey,
+  };
+  const mapped = mapTraceToDatasetEntry({
+    trace,
+    mapping: { [targetField]: traceMappingConfig as any },
+    expansions: new Set(),
+  })[0];
+  result[targetField] = mapped?.[targetField];
+}
+
 const buildThreadData = async ({
   projectId,
   trace,
@@ -107,59 +196,16 @@ const buildThreadData = async ({
   for (const [targetField, mappingConfig] of Object.entries(
     mappingState.mapping,
   )) {
-    const isThreadMapping =
-      ("type" in mappingConfig && mappingConfig.type === "thread") ||
-      ("source" in mappingConfig &&
-        (mappingConfig.source in THREAD_MAPPINGS ||
-          (SERVER_ONLY_THREAD_SOURCES as readonly string[]).includes(
-            mappingConfig.source,
-          )));
-
-    if (isThreadMapping && "source" in mappingConfig) {
-      const source = mappingConfig.source;
-      if (!source) continue;
-
-      if ((SERVER_ONLY_THREAD_SOURCES as readonly string[]).includes(source)) {
-        if (source === "formatted_traces") {
-          result[targetField] = (
-            await Promise.all(
-              threadTraces.map((t) => formatSpansDigest(t.spans ?? [])),
-            )
-          ).join("\n\n---\n\n");
-        }
-      } else {
-        const threadSource = source as keyof typeof THREAD_MAPPINGS;
-        const selectedFields =
-          ("selectedFields" in mappingConfig
-            ? mappingConfig.selectedFields
-            : undefined) ?? [];
-        result[targetField] = THREAD_MAPPINGS[threadSource].mapping(
-          { thread_id: threadId, traces: threadTraces },
-          selectedFields as (keyof typeof TRACE_MAPPINGS)[],
-        );
-      }
-    } else if ("source" in mappingConfig) {
-      if (
-        (SERVER_ONLY_TRACE_SOURCES as readonly string[]).includes(
-          mappingConfig.source,
-        )
-      ) {
-        if (mappingConfig.source === "formatted_trace") {
-          result[targetField] = await formatSpansDigest(trace.spans ?? []);
-        }
-      } else {
-        const traceMappingConfig = {
-          source: mappingConfig.source,
-          key: mappingConfig.key,
-          subkey: mappingConfig.subkey,
-        };
-        const mapped = mapTraceToDatasetEntry({
-          trace,
-          mapping: { [targetField]: traceMappingConfig as any },
-          expansions: new Set(),
-        })[0];
-        result[targetField] = mapped?.[targetField];
-      }
+    if (isThreadMappingConfig(mappingConfig)) {
+      await assignThreadField({
+        result,
+        targetField,
+        mappingConfig,
+        threadId,
+        threadTraces,
+      });
+    } else {
+      await assignTraceField({ result, targetField, mappingConfig, trace });
     }
   }
 
@@ -190,6 +236,81 @@ const switchMapping = (
   })[0];
 };
 
+async function applyServerOnlyTraceOverrides({
+  mappedData,
+  mappings,
+  trace,
+}: {
+  mappedData: Record<string, any>;
+  mappings: MappingState | null;
+  trace: Trace;
+}): Promise<void> {
+  if (!mappings?.mapping) return;
+
+  for (const [field, config] of Object.entries(mappings.mapping)) {
+    if (
+      "source" in config &&
+      (SERVER_ONLY_TRACE_SOURCES as readonly string[]).includes(config.source)
+    ) {
+      if (config.source === "formatted_trace") {
+        mappedData[field] = await formatSpansDigest(trace.spans ?? []);
+      }
+    }
+  }
+}
+
+async function buildTraceLevelData({
+  trace,
+  mappings,
+  projectId,
+  protections,
+}: {
+  trace: Trace;
+  mappings: MappingState | null;
+  projectId: string;
+  protections: Protections;
+}): Promise<Record<string, any>> {
+  const mappedData = switchMapping(trace, mappings ?? DEFAULT_MAPPINGS);
+  if (!mappedData) {
+    throw new Error("No mapped data found to run evaluator");
+  }
+
+  await applyServerOnlyTraceOverrides({ mappedData, mappings, trace });
+
+  if (mappings && hasThreadMappings(mappings)) {
+    const traceService = TraceService.create(
+      undefined,
+      buildTraceBlobResolutionDeps(),
+    );
+    await resolveThreadMappingsIntoData({
+      data: mappedData as Record<string, unknown>,
+      trace,
+      mappings,
+      getThreadTraces: (threadId) =>
+        traceService.getTracesByThreadId({
+          projectId,
+          threadId,
+          protections,
+          opts: { full: true },
+        }),
+    });
+  }
+
+  return mappedData;
+}
+
+function projectEvaluatorFields({
+  evaluatorType,
+  data,
+}: {
+  evaluatorType: EvaluatorTypes | "workflow";
+  data: Record<string, any>;
+}): Record<string, any> {
+  const evaluator = AVAILABLE_EVALUATORS[evaluatorType];
+  const fields = [...evaluator.requiredFields, ...evaluator.optionalFields];
+  return Object.fromEntries(fields.map((field) => [field, data[field] ?? ""]));
+}
+
 const buildDataForEvaluation = async ({
   evaluatorType,
   trace,
@@ -205,69 +326,23 @@ const buildDataForEvaluation = async ({
   projectId: string;
   protections: Protections;
 }): Promise<DataForEvaluation> => {
-  let data: Record<string, any>;
-
-  if (isThreadLevel) {
-    data = await buildThreadData({
-      projectId,
-      trace,
-      mappingState: mappings,
-      protections,
-    });
-  } else {
-    const mappedData = switchMapping(trace, mappings ?? DEFAULT_MAPPINGS);
-    if (!mappedData) {
-      throw new Error("No mapped data found to run evaluator");
-    }
-
-    if (mappings?.mapping) {
-      for (const [field, config] of Object.entries(mappings.mapping)) {
-        if (
-          "source" in config &&
-          (SERVER_ONLY_TRACE_SOURCES as readonly string[]).includes(
-            config.source,
-          )
-        ) {
-          if (config.source === "formatted_trace") {
-            mappedData[field] = await formatSpansDigest(trace.spans ?? []);
-          }
-        }
-      }
-    }
-
-    data = mappedData;
-
-    if (mappings && hasThreadMappings(mappings)) {
-      const traceService = TraceService.create(
-        undefined,
-        buildTraceBlobResolutionDeps(),
-      );
-      await resolveThreadMappingsIntoData({
-        data: data as Record<string, unknown>,
+  const data = isThreadLevel
+    ? await buildThreadData({
+        projectId,
         trace,
-        mappings,
-        getThreadTraces: (threadId) =>
-          traceService.getTracesByThreadId({
-            projectId,
-            threadId,
-            protections,
-            opts: { full: true },
-          }),
-      });
-    }
-  }
+        mappingState: mappings,
+        protections,
+      })
+    : await buildTraceLevelData({ trace, mappings, projectId, protections });
 
   if (evaluatorType.startsWith("custom/") || evaluatorType === "workflow") {
     return { type: "custom", data };
   }
 
-  const evaluator = AVAILABLE_EVALUATORS[evaluatorType];
-  const fields = [...evaluator.requiredFields, ...evaluator.optionalFields];
-  const data_ = Object.fromEntries(
-    fields.map((field) => [field, data[field] ?? ""]),
-  );
-
-  return { type: "default", data: data_ };
+  return {
+    type: "default",
+    data: projectEvaluatorFields({ evaluatorType, data }),
+  };
 };
 
 export const runEvaluationForTrace = async ({
@@ -366,6 +441,387 @@ export const runEvaluationForTrace = async ({
   };
 };
 
+async function runCustomEvaluationPath({
+  projectId,
+  evaluatorType,
+  data,
+  trace,
+  workflowId,
+  parentCausalityDepth,
+}: {
+  projectId: string;
+  evaluatorType: EvaluatorTypes | "workflow";
+  data: Record<string, any>;
+  trace?: Trace;
+  workflowId?: string | null;
+  parentCausalityDepth?: number;
+}): Promise<SingleEvaluationResult> {
+  // Code evaluators arrive as `{type:"custom"}` with an evaluatorType of
+  // `code/<id>`; route them to the code-evaluator runner instead of letting
+  // `customEvaluation` treat the id as an nlpgo workflow id. Mirrors
+  // EvaluationExecutionService.runEvaluation.
+  const codeEvaluatorId = codeEvaluatorIdFromCheckType(evaluatorType);
+  if (codeEvaluatorId) {
+    return runCodeEvaluator({
+      projectId,
+      evaluatorId: codeEvaluatorId,
+      data,
+      traceId: trace?.trace_id,
+      parentCausalityDepth,
+      parentTrace: extractParentTraceForNlpgo(trace),
+    });
+  }
+  return customEvaluation({
+    projectId,
+    evaluatorType,
+    data,
+    trace,
+    workflowId,
+    parentCausalityDepth,
+  });
+}
+
+// Native (in-process) evaluators short-circuit the langevals HTTP call. They
+// still run through the shared augmenter so a leak that ingestion redaction
+// already scrubbed, or content that was dropped, is reflected in the result.
+async function runNativeEvaluationPath({
+  builtInEvaluatorType,
+  data,
+  settings,
+  droppedCategories,
+}: {
+  builtInEvaluatorType: EvaluatorTypes;
+  data: Record<string, any>;
+  settings?: Record<string, unknown>;
+  droppedCategories: string[];
+}): Promise<SingleEvaluationResult> {
+  const nativeResult = await executeNativeEvaluation({
+    evaluatorType: builtInEvaluatorType,
+    data,
+  });
+  return augmentEvaluationResult({
+    evaluatorType: builtInEvaluatorType,
+    mappedData: data,
+    settings,
+    droppedCategories,
+    result: nativeResult,
+  });
+}
+
+type EvaluatorEnvResolution =
+  | { ok: true; env: Record<string, string> }
+  | { ok: false; result: SingleEvaluationResult };
+
+async function resolveAzureOrDefaultEnv({
+  builtInEvaluatorType,
+  projectId,
+  evaluator,
+}: {
+  builtInEvaluatorType: EvaluatorTypes;
+  projectId: string;
+  evaluator: (typeof AVAILABLE_EVALUATORS)[EvaluatorTypes];
+}): Promise<EvaluatorEnvResolution> {
+  if (isAzureEvaluatorType(builtInEvaluatorType)) {
+    const azureEnv = await getAzureSafetyEnvFromProject(projectId);
+    if (!azureEnv) {
+      return {
+        ok: false,
+        result: {
+          status: "skipped",
+          details: AZURE_SAFETY_NOT_CONFIGURED_MESSAGE,
+        },
+      };
+    }
+    return { ok: true, env: azureEnv };
+  }
+  return {
+    ok: true,
+    env: Object.fromEntries(
+      (evaluator.envVars ?? []).map((envVar) => [envVar, process.env[envVar]!]),
+    ),
+  };
+}
+
+// `openai/moderation` carries a `model` setting ("text-moderation-*") that is
+// not a configured provider model, so it must skip model-env resolution.
+async function applyModelEnvOverride({
+  evaluatorEnv,
+  builtInEvaluatorType,
+  projectId,
+  settings,
+}: {
+  evaluatorEnv: Record<string, string>;
+  builtInEvaluatorType: EvaluatorTypes;
+  projectId: string;
+  settings?: Record<string, unknown>;
+}): Promise<EvaluatorEnvResolution> {
+  if (
+    !(
+      settings &&
+      typeof settings === "object" &&
+      "model" in settings &&
+      typeof settings.model === "string" &&
+      builtInEvaluatorType !== "openai/moderation"
+    )
+  ) {
+    return { ok: true, env: evaluatorEnv };
+  }
+
+  try {
+    const modelEnv = await setupModelEnv({
+      model: settings.model,
+      embeddings: false,
+      projectId,
+      settings,
+    });
+    return { ok: true, env: { ...evaluatorEnv, ...modelEnv } };
+  } catch (error) {
+    if (error instanceof EvaluatorConfigError) {
+      return {
+        ok: false,
+        result: { status: "skipped", details: error.message },
+      };
+    }
+    throw error;
+  }
+}
+
+// Evaluators that embed (ragas faithfulness/context-precision, semantic
+// similarity) need a separate X_LITELLM_EMBEDDINGS_* block for their
+// embeddings provider.
+async function applyEmbeddingsEnvOverride({
+  evaluatorEnv,
+  projectId,
+  settings,
+}: {
+  evaluatorEnv: Record<string, string>;
+  projectId: string;
+  settings?: Record<string, unknown>;
+}): Promise<EvaluatorEnvResolution> {
+  if (
+    !(
+      settings &&
+      typeof settings === "object" &&
+      "embeddings_model" in settings &&
+      typeof settings.embeddings_model === "string"
+    )
+  ) {
+    return { ok: true, env: evaluatorEnv };
+  }
+
+  try {
+    const embeddingsEnv = await setupModelEnv({
+      model: settings.embeddings_model,
+      embeddings: true,
+      projectId,
+      settings,
+    });
+    return { ok: true, env: { ...evaluatorEnv, ...embeddingsEnv } };
+  } catch (error) {
+    if (error instanceof EvaluatorConfigError) {
+      return {
+        ok: false,
+        result: { status: "skipped", details: error.message },
+      };
+    }
+    throw error;
+  }
+}
+
+async function resolveEvaluatorEnv({
+  builtInEvaluatorType,
+  projectId,
+  evaluator,
+  settings,
+}: {
+  builtInEvaluatorType: EvaluatorTypes;
+  projectId: string;
+  evaluator: (typeof AVAILABLE_EVALUATORS)[EvaluatorTypes];
+  settings?: Record<string, unknown>;
+}): Promise<EvaluatorEnvResolution> {
+  const azureOrDefaultEnv = await resolveAzureOrDefaultEnv({
+    builtInEvaluatorType,
+    projectId,
+    evaluator,
+  });
+  if (!azureOrDefaultEnv.ok) return azureOrDefaultEnv;
+
+  const withModelEnv = await applyModelEnvOverride({
+    evaluatorEnv: azureOrDefaultEnv.env,
+    builtInEvaluatorType,
+    projectId,
+    settings,
+  });
+  if (!withModelEnv.ok) return withModelEnv;
+
+  return applyEmbeddingsEnvOverride({
+    evaluatorEnv: withModelEnv.env,
+    projectId,
+    settings,
+  });
+}
+
+// Preserve evaluator-specific fields (e.g. pairwise's candidate_a_id,
+// candidate_a_output) that the legacy canonical-6 forward would otherwise
+// strip. Bounded to the evaluator's declared required + optional fields so a
+// stray mapping output on a non-pairwise evaluator can't ride through and 422
+// a strict pydantic model on the langevals side — the spread is opt-in per
+// evaluator, not a catch-all. The canonical 6 are normalized below; anything
+// else declared in the evaluator's contract passes through as-is. Mirrors the
+// block that lived in the deleted background/workers/evaluationsWorker.ts
+// (added upstream in #5142 for langevals/pairwise_compare).
+const CANONICAL_EVALUATION_KEYS = new Set([
+  "input",
+  "output",
+  "contexts",
+  "expected_contexts",
+  "expected_output",
+  "conversation",
+]);
+
+function selectAllowedExtras({
+  evaluator,
+  data,
+}: {
+  evaluator: (typeof AVAILABLE_EVALUATORS)[EvaluatorTypes];
+  data: Record<string, any>;
+}): Record<string, unknown> {
+  const allowedExtras = new Set([
+    ...(evaluator.requiredFields ?? []),
+    ...(evaluator.optionalFields ?? []),
+  ]);
+  const extras: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(data)) {
+    if (CANONICAL_EVALUATION_KEYS.has(key)) continue;
+    if (!allowedExtras.has(key)) continue;
+    extras[key] = value;
+  }
+  return extras;
+}
+
+async function fetchLangevalsResult({
+  builtInEvaluatorType,
+  projectId,
+  extras,
+  data,
+  settings,
+  evaluatorEnv,
+}: {
+  builtInEvaluatorType: EvaluatorTypes;
+  projectId: string;
+  extras: Record<string, unknown>;
+  data: Record<string, any>;
+  settings?: Record<string, unknown>;
+  evaluatorEnv: Record<string, string>;
+}) {
+  try {
+    return await stagedLangevalsFetch({
+      url: `${env.LANGEVALS_ENDPOINT}/${builtInEvaluatorType}/evaluate`,
+      projectId,
+      kind: "evaluation",
+      body: {
+        data: [
+          {
+            ...extras,
+            input: tryAndConvertTo(data.input, "string"),
+            output: tryAndConvertTo(data.output, "string"),
+            contexts: tryAndConvertTo(data.contexts, "string[]"),
+            expected_contexts: tryAndConvertTo(
+              data.expected_contexts,
+              "string[]",
+            ),
+            expected_output: tryAndConvertTo(data.expected_output, "string"),
+            conversation: tryAndConvertTo(data.conversation, "array"),
+          },
+        ],
+        settings: settings && typeof settings === "object" ? settings : {},
+        env: evaluatorEnv,
+      },
+    });
+  } catch (error) {
+    if (error instanceof Error && error.message.includes("fetch failed")) {
+      throw new Error("Evaluator cannot be reached");
+    }
+    throw error;
+  }
+}
+
+async function readLangevalsErrorDetails(
+  response: Awaited<ReturnType<typeof stagedLangevalsFetch>>,
+): Promise<string> {
+  let statusText = response.statusText;
+  try {
+    statusText = JSON.stringify(await response.json(), undefined, 2);
+  } catch {
+    /* safe json parse fallback */
+  }
+  return statusText;
+}
+
+function normalizeLangevalsRawResult<T extends BatchEvaluationResult[number]>(
+  raw: T,
+): T {
+  return {
+    ...raw,
+    ...("score" in raw && {
+      score: typeof raw.score === "number" ? raw.score : undefined,
+    }),
+    ...("passed" in raw && {
+      passed: typeof raw.passed === "boolean" ? raw.passed : undefined,
+    }),
+  };
+}
+
+async function handleLangevalsFetchResult({
+  response,
+  builtInEvaluatorType,
+  retries,
+  retryEvaluation,
+  data,
+  settings,
+  droppedCategories,
+}: {
+  response: Awaited<ReturnType<typeof fetchLangevalsResult>>;
+  builtInEvaluatorType: EvaluatorTypes;
+  retries: number;
+  retryEvaluation: () => Promise<SingleEvaluationResult>;
+  data: DataForEvaluation;
+  settings?: Record<string, unknown>;
+  droppedCategories: string[];
+}): Promise<SingleEvaluationResult> {
+  if (!response.ok) {
+    if (response.status >= 500 && retries > 0) {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      // Forward trace/workflowId/parentCausalityDepth so the retried attempt
+      // keeps the redaction context (trace.privacy.droppedCategories) and the
+      // causality linkage — omitting them made a guardrail retried after a
+      // transient 5xx report clean instead of flagging dropped content.
+      return retryEvaluation();
+    }
+    getEvaluationStatusCounter(builtInEvaluatorType, "error").inc();
+    const statusText = await readLangevalsErrorDetails(response);
+    throw new Error(`${response.status} ${statusText}`);
+  }
+
+  const raw = ((await response.json()) as BatchEvaluationResult)[0];
+  if (!raw) {
+    getEvaluationStatusCounter(builtInEvaluatorType, "error").inc();
+    throw new Error("Unexpected response: empty results");
+  }
+
+  const result = normalizeLangevalsRawResult(raw);
+
+  getEvaluationStatusCounter(builtInEvaluatorType, result.status).inc();
+
+  return augmentEvaluationResult({
+    evaluatorType: builtInEvaluatorType,
+    mappedData: data.data,
+    settings,
+    droppedCategories,
+    result,
+  });
+}
+
 export const runEvaluation = async ({
   projectId,
   evaluatorType,
@@ -386,22 +842,7 @@ export const runEvaluation = async ({
   parentCausalityDepth?: number;
 }): Promise<SingleEvaluationResult> => {
   if (data.type === "custom") {
-    // Code evaluators arrive as `{type:"custom"}` with an evaluatorType of
-    // `code/<id>`; route them to the code-evaluator runner instead of letting
-    // `customEvaluation` treat the id as an nlpgo workflow id. Mirrors
-    // EvaluationExecutionService.runEvaluation.
-    const codeEvaluatorId = codeEvaluatorIdFromCheckType(evaluatorType);
-    if (codeEvaluatorId) {
-      return runCodeEvaluator({
-        projectId,
-        evaluatorId: codeEvaluatorId,
-        data: data.data,
-        traceId: trace?.trace_id,
-        parentCausalityDepth,
-        parentTrace: extractParentTraceForNlpgo(trace),
-      });
-    }
-    return customEvaluation({
+    return runCustomEvaluationPath({
       projectId,
       evaluatorType,
       data: data.data,
@@ -421,173 +862,48 @@ export const runEvaluation = async ({
 
   const droppedCategories = trace?.privacy?.droppedCategories ?? [];
 
-  // Native (in-process) evaluators short-circuit the langevals HTTP call. They
-  // still run through the shared augmenter so a leak that ingestion redaction
-  // already scrubbed, or content that was dropped, is reflected in the result.
   if (isNativeEvaluatorType(builtInEvaluatorType)) {
-    const nativeResult = await executeNativeEvaluation({
-      evaluatorType: builtInEvaluatorType,
+    return runNativeEvaluationPath({
+      builtInEvaluatorType,
       data: data.data,
-    });
-    return augmentEvaluationResult({
-      evaluatorType: builtInEvaluatorType,
-      mappedData: data.data,
       settings,
       droppedCategories,
-      result: nativeResult,
     });
   }
 
   const evaluator = AVAILABLE_EVALUATORS[builtInEvaluatorType];
 
-  let evaluatorEnv: Record<string, string>;
-  if (isAzureEvaluatorType(builtInEvaluatorType)) {
-    const azureEnv = await getAzureSafetyEnvFromProject(projectId);
-    if (!azureEnv) {
-      return {
-        status: "skipped",
-        details: AZURE_SAFETY_NOT_CONFIGURED_MESSAGE,
-      };
-    }
-    evaluatorEnv = azureEnv;
-  } else {
-    evaluatorEnv = Object.fromEntries(
-      (evaluator.envVars ?? []).map((envVar) => [envVar, process.env[envVar]!]),
-    );
-  }
-
-  // `openai/moderation` carries a `model` setting ("text-moderation-*") that is
-  // not a configured provider model, so it must skip model-env resolution.
-  if (
-    settings &&
-    typeof settings === "object" &&
-    "model" in settings &&
-    typeof settings.model === "string" &&
-    builtInEvaluatorType !== "openai/moderation"
-  ) {
-    try {
-      const modelEnv = await setupModelEnv({
-        model: settings.model,
-        embeddings: false,
-        projectId,
-        settings,
-      });
-      evaluatorEnv = { ...evaluatorEnv, ...modelEnv };
-    } catch (error) {
-      if (error instanceof EvaluatorConfigError) {
-        return {
-          status: "skipped",
-          details: error.message,
-        };
-      }
-      throw error;
-    }
-  }
-
-  // Evaluators that embed (ragas faithfulness/context-precision, semantic
-  // similarity) need a separate X_LITELLM_EMBEDDINGS_* block for their
-  // embeddings provider.
-  if (
-    settings &&
-    typeof settings === "object" &&
-    "embeddings_model" in settings &&
-    typeof settings.embeddings_model === "string"
-  ) {
-    try {
-      const embeddingsEnv = await setupModelEnv({
-        model: settings.embeddings_model,
-        embeddings: true,
-        projectId,
-        settings,
-      });
-      evaluatorEnv = { ...evaluatorEnv, ...embeddingsEnv };
-    } catch (error) {
-      if (error instanceof EvaluatorConfigError) {
-        return {
-          status: "skipped",
-          details: error.message,
-        };
-      }
-      throw error;
-    }
-  }
+  const evaluatorEnvResolution = await resolveEvaluatorEnv({
+    builtInEvaluatorType,
+    projectId,
+    evaluator,
+    settings,
+  });
+  if (!evaluatorEnvResolution.ok) return evaluatorEnvResolution.result;
+  const evaluatorEnv = evaluatorEnvResolution.env;
 
   const startTime = performance.now();
 
-  // Preserve evaluator-specific fields (e.g. pairwise's candidate_a_id,
-  // candidate_a_output) that the legacy canonical-6 forward would otherwise
-  // strip. Bounded to the evaluator's declared required + optional fields so a
-  // stray mapping output on a non-pairwise evaluator can't ride through and 422
-  // a strict pydantic model on the langevals side — the spread is opt-in per
-  // evaluator, not a catch-all. The canonical 6 are normalized below; anything
-  // else declared in the evaluator's contract passes through as-is. Mirrors the
-  // block that lived in the deleted background/workers/evaluationsWorker.ts
-  // (added upstream in #5142 for langevals/pairwise_compare).
-  const canonicalKeys = new Set([
-    "input",
-    "output",
-    "contexts",
-    "expected_contexts",
-    "expected_output",
-    "conversation",
-  ]);
-  const allowedExtras = new Set([
-    ...(evaluator.requiredFields ?? []),
-    ...(evaluator.optionalFields ?? []),
-  ]);
-  const extras: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(data.data)) {
-    if (canonicalKeys.has(key)) continue;
-    if (!allowedExtras.has(key)) continue;
-    extras[key] = value;
-  }
+  const extras = selectAllowedExtras({ evaluator, data: data.data });
 
-  let response;
-  try {
-    response = await stagedLangevalsFetch({
-      url: `${env.LANGEVALS_ENDPOINT}/${builtInEvaluatorType}/evaluate`,
-      projectId,
-      kind: "evaluation",
-      body: {
-        data: [
-          {
-            ...extras,
-            input: tryAndConvertTo(data.data.input, "string"),
-            output: tryAndConvertTo(data.data.output, "string"),
-            contexts: tryAndConvertTo(data.data.contexts, "string[]"),
-            expected_contexts: tryAndConvertTo(
-              data.data.expected_contexts,
-              "string[]",
-            ),
-            expected_output: tryAndConvertTo(
-              data.data.expected_output,
-              "string",
-            ),
-            conversation: tryAndConvertTo(data.data.conversation, "array"),
-          },
-        ],
-        settings: settings && typeof settings === "object" ? settings : {},
-        env: evaluatorEnv,
-      },
-    });
-  } catch (error) {
-    if (error instanceof Error && error.message.includes("fetch failed")) {
-      throw new Error("Evaluator cannot be reached");
-    }
-    throw error;
-  }
+  const response = await fetchLangevalsResult({
+    builtInEvaluatorType,
+    projectId,
+    extras,
+    data: data.data,
+    settings,
+    evaluatorEnv,
+  });
 
   const duration = performance.now() - startTime;
   evaluationDurationHistogram.labels(builtInEvaluatorType).observe(duration);
 
-  if (!response.ok) {
-    if (response.status >= 500 && retries > 0) {
-      await new Promise((resolve) => setTimeout(resolve, 100));
-      // Forward trace/workflowId/parentCausalityDepth so the retried attempt
-      // keeps the redaction context (trace.privacy.droppedCategories) and the
-      // causality linkage — omitting them made a guardrail retried after a
-      // transient 5xx report clean instead of flagging dropped content.
-      return runEvaluation({
+  return handleLangevalsFetchResult({
+    response,
+    builtInEvaluatorType,
+    retries,
+    retryEvaluation: () =>
+      runEvaluation({
         projectId,
         evaluatorType: builtInEvaluatorType,
         data,
@@ -596,42 +912,10 @@ export const runEvaluation = async ({
         workflowId,
         parentCausalityDepth,
         retries: retries - 1,
-      });
-    }
-    getEvaluationStatusCounter(builtInEvaluatorType, "error").inc();
-    let statusText = response.statusText;
-    try {
-      statusText = JSON.stringify(await response.json(), undefined, 2);
-    } catch {
-      /* safe json parse fallback */
-    }
-    throw new Error(`${response.status} ${statusText}`);
-  }
-
-  const raw = ((await response.json()) as BatchEvaluationResult)[0];
-  if (!raw) {
-    getEvaluationStatusCounter(builtInEvaluatorType, "error").inc();
-    throw new Error("Unexpected response: empty results");
-  }
-
-  const result: typeof raw = {
-    ...raw,
-    ...("score" in raw && {
-      score: typeof raw.score === "number" ? raw.score : undefined,
-    }),
-    ...("passed" in raw && {
-      passed: typeof raw.passed === "boolean" ? raw.passed : undefined,
-    }),
-  };
-
-  getEvaluationStatusCounter(builtInEvaluatorType, result.status).inc();
-
-  return augmentEvaluationResult({
-    evaluatorType: builtInEvaluatorType,
-    mappedData: data.data,
+      }),
+    data,
     settings,
     droppedCategories,
-    result,
   });
 };
 

@@ -18,11 +18,13 @@
  */
 import type { Logger } from "pino";
 import { capPayloadString } from "~/server/event-sourcing/pipelines/trace-processing/utils/capOversizedLogRecord";
-import type { Span } from "~/server/tracer/types";
+import type { Span, SpanInputOutput } from "~/server/tracer/types";
 import {
   type ClaudeContentLog,
+  type ClaudeSpanEnrichment,
   type ClaudeSpanRef,
   type ClaudeToolLog,
+  type ClaudeToolSpanEnrichment,
   type ClaudeToolSpanRef,
   computeClaudeInteractionOutput,
   computeClaudeSpanEnrichment,
@@ -276,6 +278,97 @@ export function mapLogRowsToClaudeContentLogs(
   });
 }
 
+function interactionOutputFor({
+  span,
+  logs,
+}: {
+  span: Span;
+  logs: ClaudeContentLog[];
+}): SpanInputOutput | null {
+  if (span.output != null || !isInteractionSpan(span)) return null;
+  return computeClaudeInteractionOutput({
+    logs,
+    windowStartMs: span.timestamps.started_at,
+    windowEndMs: span.timestamps.finished_at,
+  });
+}
+
+function resolvedSpanInput({
+  enrichment,
+  toolEnrichment,
+}: {
+  enrichment: ClaudeSpanEnrichment | undefined;
+  toolEnrichment: ClaudeToolSpanEnrichment | undefined;
+}): SpanInputOutput | null {
+  return enrichment?.input ?? toolEnrichment?.input ?? null;
+}
+
+function resolvedSpanOutput({
+  enrichment,
+  toolEnrichment,
+  interactionOutput,
+}: {
+  enrichment: ClaudeSpanEnrichment | undefined;
+  toolEnrichment: ClaudeToolSpanEnrichment | undefined;
+  interactionOutput: SpanInputOutput | null;
+}): SpanInputOutput | null {
+  return enrichment?.output ?? toolEnrichment?.output ?? interactionOutput;
+}
+
+/** Applies the resolved input/output/cost onto `next`, in place — never overwrites a non-null field. */
+function applyResolvedContent({
+  next,
+  span,
+  input,
+  output,
+  cost,
+}: {
+  next: Span;
+  span: Span;
+  input: SpanInputOutput | null;
+  output: SpanInputOutput | null;
+  cost: number | null | undefined;
+}): void {
+  if (input !== null && next.input == null) next.input = input;
+  if (output !== null && next.output == null) next.output = output;
+  if (cost != null) {
+    next.metrics = { ...(span.metrics ?? {}), cost };
+  }
+}
+
+function enrichOneSpanWithClaudeLogContent({
+  span,
+  logs,
+  enrichmentBySpanId,
+  toolEnrichmentBySpanId,
+}: {
+  span: Span;
+  logs: ClaudeContentLog[];
+  enrichmentBySpanId: Map<string, ClaudeSpanEnrichment>;
+  toolEnrichmentBySpanId: Map<string, ClaudeToolSpanEnrichment>;
+}): Span {
+  const enrichment = enrichmentBySpanId.get(span.span_id);
+  const toolEnrichment = toolEnrichmentBySpanId.get(span.span_id);
+  const interactionOutput = interactionOutputFor({ span, logs });
+  if (!enrichment && !toolEnrichment && interactionOutput === null) {
+    return span;
+  }
+
+  const next: Span = { ...span };
+  applyResolvedContent({
+    next,
+    span,
+    input: resolvedSpanInput({ enrichment, toolEnrichment }),
+    output: resolvedSpanOutput({
+      enrichment,
+      toolEnrichment,
+      interactionOutput,
+    }),
+    cost: enrichment?.cost,
+  });
+  return next;
+}
+
 /**
  * Attach the joined `input` / `output` / `cost` onto the trace's spans —
  * model calls (request_id join), tool calls (tool_use_id join), and the
@@ -305,32 +398,14 @@ export function enrichSpansWithClaudeLogContent({
     contentLogs: logs,
   });
 
-  return withInteractionInputs.map((span) => {
-    const enrichment = enrichmentBySpanId.get(span.span_id);
-    const toolEnrichment = toolEnrichmentBySpanId.get(span.span_id);
-    const interactionOutput =
-      span.output == null && isInteractionSpan(span)
-        ? computeClaudeInteractionOutput({
-            logs,
-            windowStartMs: span.timestamps.started_at,
-            windowEndMs: span.timestamps.finished_at,
-          })
-        : null;
-    if (!enrichment && !toolEnrichment && interactionOutput === null) {
-      return span;
-    }
-
-    const next: Span = { ...span };
-    const input = enrichment?.input ?? toolEnrichment?.input ?? null;
-    const output =
-      enrichment?.output ?? toolEnrichment?.output ?? interactionOutput;
-    if (input !== null && next.input == null) next.input = input;
-    if (output !== null && next.output == null) next.output = output;
-    if (enrichment?.cost != null) {
-      next.metrics = { ...(span.metrics ?? {}), cost: enrichment.cost };
-    }
-    return next;
-  });
+  return withInteractionInputs.map((span) =>
+    enrichOneSpanWithClaudeLogContent({
+      span,
+      logs,
+      enrichmentBySpanId,
+      toolEnrichmentBySpanId,
+    }),
+  );
 }
 
 /**
@@ -449,6 +524,49 @@ export function mapSummaryRowsToClaudeRefs(
 }
 
 /**
+ * The bulk pass's model-call INPUT is not single-span safe: positional
+ * pairing needs the whole trace's call order, and a one-span array
+ * degenerates to "this is the group's first call". Discard it here so the
+ * full-refs join below is the only input source for model calls.
+ */
+function discardSingleSpanModelCallInput(span: Span, next: Span): Span {
+  return next !== span && next.input !== span.input
+    ? { ...next, input: span.input }
+    : next;
+}
+
+function applyPositionalModelCallEnrichment({
+  span,
+  next,
+  modelCallRefs,
+  logRows,
+}: {
+  span: Span;
+  next: Span;
+  modelCallRefs: ClaudeSpanRef[];
+  logRows: StoredLogRecordRow[];
+}): Span {
+  if (modelCallRefs.length === 0 || logRows.length === 0) return next;
+  const enrichment = computeClaudeSpanEnrichment({
+    spans: modelCallRefs,
+    logs: mapLogRowsToClaudeContentLogs(logRows),
+  }).get(span.span_id);
+  if (!enrichment) return next;
+
+  const clone: Span = { ...next };
+  if (enrichment.input !== null && span.input == null) {
+    clone.input = enrichment.input;
+  }
+  if (enrichment.output !== null && clone.output == null) {
+    clone.output = enrichment.output;
+  }
+  if (enrichment.cost !== null) {
+    clone.metrics = { ...(clone.metrics ?? {}), cost: enrichment.cost };
+  }
+  return clone;
+}
+
+/**
  * The single-span (spanDetail) join: enrich ONE fetched span using the
  * trace's logs plus (for model-call spans) the light summary refs that give
  * the positional input pairing its sibling order. PURE — the tracesV2 layer
@@ -471,37 +589,17 @@ export function enrichSingleSpanWithClaudeLogContent({
     spans: [span],
     logRows,
   });
-  let next = enriched!;
+  const next = enriched!;
+  if (!isModelCall) return next;
 
   // The bulk pass's tool join (exact, by tool_use_id) and interaction joins
-  // (own attr + windowed reply) are single-span safe. Its model-call INPUT is
-  // not: positional pairing needs the whole trace's call order, and a
-  // one-span array degenerates to "this is the group's first call" — so for
-  // model calls that input is discarded and the full-refs join below is the
-  // only input source. Output and cost are exact request_id joins either way.
-  if (isModelCall) {
-    if (next !== span && next.input !== span.input) {
-      next = { ...next, input: span.input };
-    }
-    if (modelCallRefs.length > 0 && logRows.length > 0) {
-      const enrichment = computeClaudeSpanEnrichment({
-        spans: modelCallRefs,
-        logs: mapLogRowsToClaudeContentLogs(logRows),
-      }).get(span.span_id);
-      if (enrichment) {
-        const clone: Span = { ...next };
-        if (enrichment.input !== null && span.input == null) {
-          clone.input = enrichment.input;
-        }
-        if (enrichment.output !== null && clone.output == null) {
-          clone.output = enrichment.output;
-        }
-        if (enrichment.cost !== null) {
-          clone.metrics = { ...(clone.metrics ?? {}), cost: enrichment.cost };
-        }
-        next = clone;
-      }
-    }
-  }
-  return next;
+  // (own attr + windowed reply) are single-span safe; only the model-call
+  // INPUT needs discarding and re-deriving below. Output and cost are exact
+  // request_id joins either way.
+  return applyPositionalModelCallEnrichment({
+    span,
+    next: discardSingleSpanModelCallInput(span, next),
+    modelCallRefs,
+    logRows,
+  });
 }

@@ -167,6 +167,55 @@ function dedupedSlim(alias: string, dateClause: string): string {
 
 const SLIM_DATE_FILTER_BOTH_PERIODS = `AND ((OccurredAt >= {currentStart:DateTime64(3)} AND OccurredAt < {currentEnd:DateTime64(3)}) OR (OccurredAt >= {previousStart:DateTime64(3)} AND OccurredAt < {previousEnd:DateTime64(3)}))`;
 
+/** Value shape of a single entry in `AnalyticsTimeseriesBuilderInput["filters"]`. */
+type EvalSlimFilterFieldValue =
+  | string[]
+  | Record<string, string[]>
+  | Record<string, Record<string, string[]>>;
+
+/** Shared shape for the per-filter-case helpers below. */
+interface FilterClauseBuilderArgs {
+  rawValue: EvalSlimFilterFieldValue;
+  clauses: string[];
+  filterParams: Record<string, unknown>;
+  next: (prefix: string) => string;
+}
+
+function addMetadataKeyClause({
+  rawValue,
+  clauses,
+  filterParams,
+  next,
+}: FilterClauseBuilderArgs): void {
+  const keys = collectStringValues(rawValue);
+  if (keys.length === 0) return;
+  const exprs = keys.map((k, i) => {
+    const p = next(`metaKey${i}`);
+    filterParams[p] = k;
+    return `mapContains(${ea}.Attributes, {${p}:String})`;
+  });
+  clauses.push(`(${exprs.join(" OR ")})`);
+}
+
+function addMetadataValueClause({
+  rawValue,
+  clauses,
+  filterParams,
+  next,
+}: FilterClauseBuilderArgs): void {
+  if (typeof rawValue !== "object" || Array.isArray(rawValue)) return;
+  for (const [metaKey, vals] of Object.entries(rawValue)) {
+    if (!Array.isArray(vals) || vals.length === 0) continue;
+    const pKey = next("metaValueKey");
+    filterParams[pKey] = metaKey;
+    const pVals = next("metaValueVals");
+    filterParams[pVals] = vals;
+    clauses.push(
+      `${ea}.Attributes[{${pKey}:String}] IN ({${pVals}:Array(String)})`,
+    );
+  }
+}
+
 /**
  * Translate the small slice of filter fields the eval slim natively
  * serves into a WHERE fragment + params. Anything else MUST have been
@@ -187,31 +236,17 @@ function buildEvalSlimFilterClauses(
     const field = rawField as FilterField;
 
     switch (field) {
-      case "metadata.key": {
-        const keys = collectStringValues(rawValue);
-        if (keys.length === 0) break;
-        const exprs = keys.map((k, i) => {
-          const p = next(`metaKey${i}`);
-          params[p] = k;
-          return `mapContains(${ea}.Attributes, {${p}:String})`;
+      case "metadata.key":
+        addMetadataKeyClause({ rawValue, clauses, filterParams: params, next });
+        break;
+      case "metadata.value":
+        addMetadataValueClause({
+          rawValue,
+          clauses,
+          filterParams: params,
+          next,
         });
-        clauses.push(`(${exprs.join(" OR ")})`);
         break;
-      }
-      case "metadata.value": {
-        if (typeof rawValue !== "object" || Array.isArray(rawValue)) break;
-        for (const [metaKey, vals] of Object.entries(rawValue)) {
-          if (!Array.isArray(vals) || vals.length === 0) continue;
-          const pKey = next("metaValueKey");
-          params[pKey] = metaKey;
-          const pVals = next("metaValueVals");
-          params[pVals] = vals;
-          clauses.push(
-            `${ea}.Attributes[{${pKey}:String}] IN ({${pVals}:Array(String)})`,
-          );
-        }
-        break;
-      }
       default:
         throw new Error(
           `Eval slim builder cannot serve filter "${field}". The router should have routed this to evaluation_runs.`,
@@ -221,6 +256,44 @@ function buildEvalSlimFilterClauses(
 
   const whereClause = clauses.length > 0 ? `AND ${clauses.join(" AND ")}` : "";
   return { whereClause, params };
+}
+
+/**
+ * Build the `<expr> AS <alias>` select fragment for one series. Split out of
+ * `buildEvalSlimTimeseriesQuery` — this is the per-series validation +
+ * aggregation-expression assembly, called once per entry in `input.series`.
+ */
+function buildEvalSlimSeriesSelectExpr(
+  s: AnalyticsTimeseriesBuilderInput["series"][number],
+  index: number,
+): string {
+  if (!isEvalSlimMetricKey(s.metric)) {
+    throw new Error(
+      `Eval slim builder cannot serve metric "${s.metric}". The router should have routed this to evaluation_runs.`,
+    );
+  }
+  // `evaluation_analytics` hoists `EvaluatorType`, not `EvaluatorId`, so a
+  // per-evaluator predicate cannot be expressed against this table. The
+  // router keeps keyed series on `evaluation_runs`; this throw is the
+  // backstop for a routing regression, which would otherwise return numbers
+  // blended across every evaluator in the project.
+  if (s.key !== undefined || s.subkey !== undefined) {
+    throw new Error(
+      `Eval slim builder cannot filter by evaluator key "${String(s.key)}" — evaluation_analytics has no EvaluatorId column. The router should have routed this to evaluation_runs.`,
+    );
+  }
+  const alias = buildMetricAlias({
+    index,
+    metric: s.metric,
+    aggregation: s.aggregation,
+    key: s.key,
+    subkey: s.subkey,
+  });
+  const expr = evalSlimAggExpression(
+    s.aggregation,
+    evalSlimColumnFor(s.metric),
+  );
+  return `${expr} AS ${alias}`;
 }
 
 /**
@@ -257,34 +330,7 @@ export function buildEvalSlimTimeseriesQuery(
   }
 
   for (let i = 0; i < input.series.length; i++) {
-    const s = input.series[i]!;
-    if (!isEvalSlimMetricKey(s.metric)) {
-      throw new Error(
-        `Eval slim builder cannot serve metric "${s.metric}". The router should have routed this to evaluation_runs.`,
-      );
-    }
-    // `evaluation_analytics` hoists `EvaluatorType`, not `EvaluatorId`, so a
-    // per-evaluator predicate cannot be expressed against this table. The
-    // router keeps keyed series on `evaluation_runs`; this throw is the
-    // backstop for a routing regression, which would otherwise return numbers
-    // blended across every evaluator in the project.
-    if (s.key !== undefined || s.subkey !== undefined) {
-      throw new Error(
-        `Eval slim builder cannot filter by evaluator key "${String(s.key)}" — evaluation_analytics has no EvaluatorId column. The router should have routed this to evaluation_runs.`,
-      );
-    }
-    const alias = buildMetricAlias({
-      index: i,
-      metric: s.metric,
-      aggregation: s.aggregation,
-      key: s.key,
-      subkey: s.subkey,
-    });
-    const expr = evalSlimAggExpression(
-      s.aggregation,
-      evalSlimColumnFor(s.metric),
-    );
-    selectExprs.push(`${expr} AS ${alias}`);
+    selectExprs.push(buildEvalSlimSeriesSelectExpr(input.series[i]!, i));
   }
 
   const groupByExprs: string[] = ["period"];

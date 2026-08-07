@@ -82,26 +82,145 @@ const tenantClaimStore = new Map<string, number>();
  * keys doesn't leak unbounded. Production uses Redis and never reaches here.
  */
 const MEMORY_GC_THRESHOLD = 1000;
+
+/** Sweep one map past the GC threshold, deleting entries whose `expiresAt`
+ *  (read via `expiresAtOf`) is at or before `now`. Shared by the four
+ *  near-identical sweeps `sweepExpiredMemoryEntries` runs in sequence. */
+function sweepExpiredEntriesOf<T>({
+  store,
+  now,
+  expiresAtOf,
+}: {
+  store: Map<string, T>;
+  now: number;
+  expiresAtOf: (value: T) => number;
+}): void {
+  if (store.size < MEMORY_GC_THRESHOLD) return;
+  for (const [key, value] of store) {
+    if (expiresAtOf(value) <= now) store.delete(key);
+  }
+}
+
 function sweepExpiredMemoryEntries(now: number): void {
-  if (memoryStore.size >= MEMORY_GC_THRESHOLD) {
-    for (const [k, v] of memoryStore) {
-      if (v.expiresAt <= now) memoryStore.delete(k);
+  sweepExpiredEntriesOf({
+    store: memoryStore,
+    now,
+    expiresAtOf: (entry) => entry.expiresAt,
+  });
+  sweepExpiredEntriesOf({
+    store: claimStore,
+    now,
+    expiresAtOf: (expiresAt) => expiresAt,
+  });
+  sweepExpiredEntriesOf({
+    store: tenantMemoryStore,
+    now,
+    expiresAtOf: (entry) => entry.expiresAt,
+  });
+  sweepExpiredEntriesOf({
+    store: tenantClaimStore,
+    now,
+    expiresAtOf: (expiresAt) => expiresAt,
+  });
+}
+
+/**
+ * Shared in-memory fallback for both the hourly and daily caps: the SET-NX
+ * claim mirror (`claimStore`) gates whether this dispatch has already been
+ * counted, then `memoryStore` holds the running count. `increment` is `1` for
+ * the hourly cap (one INCR per dispatch) and `recipientCount` for the daily
+ * cap (INCRBY per dispatch); `ttlMs` is each cap's own claim/counter TTL.
+ */
+function consumeMemoryCapSlot({
+  claimStore,
+  memoryStore,
+  claimKey,
+  key,
+  nowMs,
+  cap,
+  increment,
+  ttlMs,
+}: {
+  claimStore: Map<string, number>;
+  memoryStore: Map<string, MemoryEntry>;
+  claimKey: string;
+  key: string;
+  nowMs: number;
+  cap: number;
+  increment: number;
+  ttlMs: number;
+}): { allowed: boolean; count: number } {
+  // In-memory claim gate, mirroring the Redis SET-NX: a retry of the same
+  // dispatch that already consumed a slot re-reads the count without incrementing.
+  const existingClaim = claimStore.get(claimKey);
+  if (existingClaim !== undefined && existingClaim > nowMs) {
+    const existing = memoryStore.get(key);
+    if (!existing || existing.expiresAt <= nowMs) {
+      return { allowed: 0 <= cap, count: 0 };
     }
+    return { allowed: existing.count <= cap, count: existing.count };
   }
-  if (claimStore.size >= MEMORY_GC_THRESHOLD) {
-    for (const [k, expiresAt] of claimStore) {
-      if (expiresAt <= now) claimStore.delete(k);
-    }
+  claimStore.set(claimKey, nowMs + ttlMs);
+
+  const existing = memoryStore.get(key);
+  if (!existing || existing.expiresAt <= nowMs) {
+    memoryStore.set(key, { count: increment, expiresAt: nowMs + ttlMs });
+    return { allowed: increment <= cap, count: increment };
   }
-  if (tenantMemoryStore.size >= MEMORY_GC_THRESHOLD) {
-    for (const [k, v] of tenantMemoryStore) {
-      if (v.expiresAt <= now) tenantMemoryStore.delete(k);
+  existing.count += increment;
+  return { allowed: existing.count <= cap, count: existing.count };
+}
+
+/**
+ * Redis path for the hourly cap: claim, then either re-read (claim lost, a
+ * retry) or INCR (claim won). Returns `null` on a Redis error so the caller
+ * falls back to the in-memory counter — logged here since only this layer
+ * knows it was Redis, not the fallback, that failed.
+ */
+async function consumeEmailCapSlotViaRedis({
+  redis,
+  key,
+  claimKey,
+  cap,
+}: {
+  redis: NonNullable<typeof connection>;
+  key: string;
+  claimKey: string;
+  cap: number;
+}): Promise<{ allowed: boolean; count: number } | null> {
+  try {
+    // Claim this dispatch first. SET NX wins only on first sight; a retry of
+    // the same dispatch loses the claim and must NOT consume another slot.
+    const claimed = await redis.set(claimKey, "1", "EX", EXPIRE_SECONDS, "NX");
+    if (!claimed) {
+      // Retry of an already-counted dispatch: read the current count without
+      // incrementing. A missing counter (TTL rolled the hour) reads as 0,
+      // which stays `allowed` — the original consumption already happened.
+      const raw = await redis.get(key);
+      const count = raw ? Number(raw) : 0;
+      return { allowed: count <= cap, count };
     }
-  }
-  if (tenantClaimStore.size >= MEMORY_GC_THRESHOLD) {
-    for (const [k, expiresAt] of tenantClaimStore) {
-      if (expiresAt <= now) tenantClaimStore.delete(k);
-    }
+    const count = await redis.incr(key);
+    // Always set TTL with NX semantics (only when no TTL exists yet) so a
+    // transient first-hit EXPIRE failure can't leave an immortal key — every
+    // subsequent hit re-attempts it without sliding an existing window.
+    await redis.expire(key, EXPIRE_SECONDS, "NX");
+    return { allowed: count <= cap, count };
+  } catch (error) {
+    // A Redis blip must not let the cap silently fail open. The dispatcher
+    // catches throws as retryable and would retry the spam; instead, fall
+    // back to the in-memory counter (same path as connection-undefined) so
+    // the cap keeps working approximately while Redis recovers. Log at ERROR
+    // (not warn): the cap is now degraded to per-worker counters, so the true
+    // cross-worker rate can exceed `cap` until Redis recovers — operators
+    // need to see this, not have it buried as a warning.
+    logger.error(
+      { key, error: error instanceof Error ? error.message : String(error) },
+      "Redis error consuming email cap slot — cap DEGRADED to per-worker " +
+        "in-memory counters until Redis recovers; cross-worker rate may " +
+        "exceed the configured cap",
+    );
+    return null;
   }
 }
 
@@ -129,72 +248,28 @@ export async function consumeEmailCapSlot({
   const claimKey = `cap-claimed:${dedupKey}`;
 
   if (connection) {
-    try {
-      // Claim this dispatch first. SET NX wins only on first sight; a retry of
-      // the same dispatch loses the claim and must NOT consume another slot.
-      const claimed = await connection.set(
-        claimKey,
-        "1",
-        "EX",
-        EXPIRE_SECONDS,
-        "NX",
-      );
-      if (!claimed) {
-        // Retry of an already-counted dispatch: read the current count without
-        // incrementing. A missing counter (TTL rolled the hour) reads as 0,
-        // which stays `allowed` — the original consumption already happened.
-        const raw = await connection.get(key);
-        const count = raw ? Number(raw) : 0;
-        return { allowed: count <= cap, count };
-      }
-      const count = await connection.incr(key);
-      // Always set TTL with NX semantics (only when no TTL exists yet) so a
-      // transient first-hit EXPIRE failure can't leave an immortal key — every
-      // subsequent hit re-attempts it without sliding an existing window.
-      await connection.expire(key, EXPIRE_SECONDS, "NX");
-      return { allowed: count <= cap, count };
-    } catch (error) {
-      // A Redis blip must not let the cap silently fail open. The dispatcher
-      // catches throws as retryable and would retry the spam; instead, fall
-      // back to the in-memory counter (same path as connection-undefined) so
-      // the cap keeps working approximately while Redis recovers. Log at ERROR
-      // (not warn): the cap is now degraded to per-worker counters, so the true
-      // cross-worker rate can exceed `cap` until Redis recovers — operators
-      // need to see this, not have it buried as a warning.
-      logger.error(
-        { key, error: error instanceof Error ? error.message : String(error) },
-        "Redis error consuming email cap slot — cap DEGRADED to per-worker " +
-          "in-memory counters until Redis recovers; cross-worker rate may " +
-          "exceed the configured cap",
-      );
-    }
+    const viaRedis = await consumeEmailCapSlotViaRedis({
+      redis: connection,
+      key,
+      claimKey,
+      cap,
+    });
+    if (viaRedis) return viaRedis;
   }
 
   const nowMs = now.getTime();
   sweepExpiredMemoryEntries(nowMs);
 
-  // In-memory claim gate, mirroring the Redis SET-NX: a retry of the same
-  // dispatch that already consumed a slot re-reads the count without INCR.
-  const existingClaim = claimStore.get(claimKey);
-  if (existingClaim !== undefined && existingClaim > nowMs) {
-    const existing = memoryStore.get(key);
-    if (!existing || existing.expiresAt <= nowMs) {
-      return { allowed: 0 <= cap, count: 0 };
-    }
-    return { allowed: existing.count <= cap, count: existing.count };
-  }
-  claimStore.set(claimKey, nowMs + EXPIRE_SECONDS * 1000);
-
-  const existing = memoryStore.get(key);
-  if (!existing || existing.expiresAt <= nowMs) {
-    memoryStore.set(key, {
-      count: 1,
-      expiresAt: nowMs + EXPIRE_SECONDS * 1000,
-    });
-    return { allowed: 1 <= cap, count: 1 };
-  }
-  existing.count += 1;
-  return { allowed: existing.count <= cap, count: existing.count };
+  return consumeMemoryCapSlot({
+    claimStore,
+    memoryStore,
+    claimKey,
+    key,
+    nowMs,
+    cap,
+    increment: 1,
+    ttlMs: EXPIRE_SECONDS * 1000,
+  });
 }
 
 /**
@@ -225,6 +300,65 @@ export async function consumeEmailCapSlot({
  * (the hourly cap is the primary throttle and logs at ERROR; this backstop's
  * degradation is a warning, not a page).
  */
+/**
+ * Redis path for the daily tenant cap: claim, then either re-read (claim
+ * lost, a retry) or INCRBY recipientCount (claim won). Returns `null` on a
+ * Redis error so the caller falls back to the in-memory counter.
+ */
+async function consumeTenantEmailCapSlotViaRedis({
+  redis,
+  key,
+  claimKey,
+  cap,
+  recipientCount,
+}: {
+  redis: NonNullable<typeof connection>;
+  key: string;
+  claimKey: string;
+  cap: number;
+  recipientCount: number;
+}): Promise<{ allowed: boolean; count: number } | null> {
+  try {
+    // Claim this dispatch first. SET NX wins only on first sight; a retry of
+    // the same dispatch loses the claim and must NOT re-count its recipients.
+    const claimed = await redis.set(
+      claimKey,
+      "1",
+      "EX",
+      TENANT_EXPIRE_SECONDS,
+      "NX",
+    );
+    if (!claimed) {
+      // Retry of an already-counted dispatch: read the running total without
+      // incrementing. A missing counter (TTL rolled the day) reads as 0,
+      // which stays `allowed` — the original consumption already happened.
+      const raw = await redis.get(key);
+      const count = raw ? Number(raw) : 0;
+      return { allowed: count <= cap, count };
+    }
+    const count = await redis.incrby(key, recipientCount);
+    // Always set TTL with NX semantics (only when no TTL exists yet) so a
+    // transient first-hit EXPIRE failure can't leave an immortal key — every
+    // subsequent hit re-attempts it without sliding an existing window.
+    await redis.expire(key, TENANT_EXPIRE_SECONDS, "NX");
+    return { allowed: count <= cap, count };
+  } catch (error) {
+    // A Redis blip must not let the cap fail open (the dispatcher would treat
+    // a throw as retryable and replay the mail). Fall back to the in-memory
+    // counter so the backstop keeps working approximately while Redis
+    // recovers. Logged at WARN: this is the secondary backstop above the
+    // hourly cap (which logs at ERROR), so a degraded daily cap is a warning
+    // worth surfacing, not a page.
+    logger.warn(
+      { key, error: error instanceof Error ? error.message : String(error) },
+      "Redis error consuming tenant email cap slot — daily cap DEGRADED to " +
+        "per-worker in-memory counters until Redis recovers; cross-worker " +
+        "rate may exceed the configured cap",
+    );
+    return null;
+  }
+}
+
 export async function consumeTenantEmailCapSlot({
   projectId,
   now,
@@ -253,72 +387,29 @@ export async function consumeTenantEmailCapSlot({
   const claimKey = `tenant-cap-claimed:${dedupKey}`;
 
   if (connection) {
-    try {
-      // Claim this dispatch first. SET NX wins only on first sight; a retry of
-      // the same dispatch loses the claim and must NOT re-count its recipients.
-      const claimed = await connection.set(
-        claimKey,
-        "1",
-        "EX",
-        TENANT_EXPIRE_SECONDS,
-        "NX",
-      );
-      if (!claimed) {
-        // Retry of an already-counted dispatch: read the running total without
-        // incrementing. A missing counter (TTL rolled the day) reads as 0,
-        // which stays `allowed` — the original consumption already happened.
-        const raw = await connection.get(key);
-        const count = raw ? Number(raw) : 0;
-        return { allowed: count <= cap, count };
-      }
-      const count = await connection.incrby(key, recipientCount);
-      // Always set TTL with NX semantics (only when no TTL exists yet) so a
-      // transient first-hit EXPIRE failure can't leave an immortal key — every
-      // subsequent hit re-attempts it without sliding an existing window.
-      await connection.expire(key, TENANT_EXPIRE_SECONDS, "NX");
-      return { allowed: count <= cap, count };
-    } catch (error) {
-      // A Redis blip must not let the cap fail open (the dispatcher would treat
-      // a throw as retryable and replay the mail). Fall back to the in-memory
-      // counter so the backstop keeps working approximately while Redis
-      // recovers. Logged at WARN: this is the secondary backstop above the
-      // hourly cap (which logs at ERROR), so a degraded daily cap is a warning
-      // worth surfacing, not a page.
-      logger.warn(
-        { key, error: error instanceof Error ? error.message : String(error) },
-        "Redis error consuming tenant email cap slot — daily cap DEGRADED to " +
-          "per-worker in-memory counters until Redis recovers; cross-worker " +
-          "rate may exceed the configured cap",
-      );
-    }
+    const viaRedis = await consumeTenantEmailCapSlotViaRedis({
+      redis: connection,
+      key,
+      claimKey,
+      cap,
+      recipientCount,
+    });
+    if (viaRedis) return viaRedis;
   }
 
   const nowMs = now.getTime();
   sweepExpiredMemoryEntries(nowMs);
 
-  // In-memory claim gate, mirroring the Redis SET-NX: a retry of the same
-  // dispatch that already counted its recipients re-reads the total without
-  // INCRBY.
-  const existingClaim = tenantClaimStore.get(claimKey);
-  if (existingClaim !== undefined && existingClaim > nowMs) {
-    const existing = tenantMemoryStore.get(key);
-    if (!existing || existing.expiresAt <= nowMs) {
-      return { allowed: 0 <= cap, count: 0 };
-    }
-    return { allowed: existing.count <= cap, count: existing.count };
-  }
-  tenantClaimStore.set(claimKey, nowMs + TENANT_EXPIRE_SECONDS * 1000);
-
-  const existing = tenantMemoryStore.get(key);
-  if (!existing || existing.expiresAt <= nowMs) {
-    tenantMemoryStore.set(key, {
-      count: recipientCount,
-      expiresAt: nowMs + TENANT_EXPIRE_SECONDS * 1000,
-    });
-    return { allowed: recipientCount <= cap, count: recipientCount };
-  }
-  existing.count += recipientCount;
-  return { allowed: existing.count <= cap, count: existing.count };
+  return consumeMemoryCapSlot({
+    claimStore: tenantClaimStore,
+    memoryStore: tenantMemoryStore,
+    claimKey,
+    key,
+    nowMs,
+    cap,
+    increment: recipientCount,
+    ttlMs: TENANT_EXPIRE_SECONDS * 1000,
+  });
 }
 
 /** Test-only: clear in-memory state (hourly + tenant). No-op for Redis. */

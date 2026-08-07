@@ -90,23 +90,20 @@ export function githubStepOf(command: string): GithubStep | null {
   return null;
 }
 
-function stepOfSegment(tokens: string[]): GithubStep | null {
-  const [argv0, ...rest] = tokens;
-
-  if (argv0 === "gh") {
-    // `gh repo clone owner/name -- --depth 1`
-    if (rest[0] === "repo" && rest[1] === "clone") {
-      return { begin: "cloning", end: "cloned", detail: repoSlug(rest[2]) };
-    }
-    // `gh pr create --title x --body y`. The detail — the PR's own URL — is NOT
-    // in the command. It is in the command's OUTPUT, which the caller reads.
-    if (rest[0] === "pr" && rest[1] === "create") {
-      return { begin: "opening_pr", end: "opened" };
-    }
-    return null;
+function stepOfGhSegment(rest: string[]): GithubStep | null {
+  // `gh repo clone owner/name -- --depth 1`
+  if (rest[0] === "repo" && rest[1] === "clone") {
+    return { begin: "cloning", end: "cloned", detail: repoSlug(rest[2]) };
   }
+  // `gh pr create --title x --body y`. The detail — the PR's own URL — is NOT
+  // in the command. It is in the command's OUTPUT, which the caller reads.
+  if (rest[0] === "pr" && rest[1] === "create") {
+    return { begin: "opening_pr", end: "opened" };
+  }
+  return null;
+}
 
-  if (argv0 !== "git") return null;
+function stepOfGitSegment(rest: string[]): GithubStep | null {
   const git = gitSubcommand(rest);
   if (!git) return null;
   const [subcommand, ...args] = git;
@@ -132,6 +129,13 @@ function stepOfSegment(tokens: string[]): GithubStep | null {
   }
 }
 
+function stepOfSegment(tokens: string[]): GithubStep | null {
+  const [argv0, ...rest] = tokens;
+  if (argv0 === "gh") return stepOfGhSegment(rest);
+  if (argv0 !== "git") return null;
+  return stepOfGitSegment(rest);
+}
+
 /**
  * The PR-flow progress the browser draws, derived from an assistant message's
  * TOOL PARTS — the same parts the tool cards render from.
@@ -145,6 +149,46 @@ function stepOfSegment(tokens: string[]): GithubStep | null {
  * `output-available` / `output-error` state. An errored command completed no
  * step — a rejected push has not pushed.
  */
+/** The GitHub-flow step a tool part's command performs, if any. */
+function resolveGithubStep(part: {
+  type?: string;
+  input?: unknown;
+}): GithubStep | null {
+  if (typeof part.type !== "string" || !part.type.startsWith("tool-")) {
+    return null;
+  }
+  const command = (part.input as { command?: unknown } | undefined)?.command;
+  if (typeof command !== "string") return null;
+  return githubStepOf(command);
+}
+
+/**
+ * The progress event, if any, one tool part contributes. Split out of
+ * `githubProgressFromToolParts`.
+ */
+function progressEventForPart(part: {
+  type?: string;
+  input?: unknown;
+  state?: string;
+}): GithubProgressEvent | null {
+  const step = resolveGithubStep(part);
+  if (!step) return null;
+
+  if (part.state === "output-error") return null;
+  if (part.state === "output-available") {
+    return step.detail
+      ? { stage: step.end, detail: step.detail }
+      : { stage: step.end };
+  }
+  if (step.begin) {
+    // Still running: the card shows the step as under way.
+    return step.detail
+      ? { stage: step.begin, detail: step.detail }
+      : { stage: step.begin };
+  }
+  return null;
+}
+
 export function githubProgressFromToolParts(
   parts: readonly {
     type?: string;
@@ -154,28 +198,8 @@ export function githubProgressFromToolParts(
 ): GithubProgressEvent[] {
   const events: GithubProgressEvent[] = [];
   for (const part of parts) {
-    if (typeof part.type !== "string" || !part.type.startsWith("tool-"))
-      continue;
-    const command = (part.input as { command?: unknown } | undefined)?.command;
-    if (typeof command !== "string") continue;
-    const step = githubStepOf(command);
-    if (!step) continue;
-
-    if (part.state === "output-error") continue;
-    if (part.state === "output-available") {
-      events.push(
-        step.detail
-          ? { stage: step.end, detail: step.detail }
-          : { stage: step.end },
-      );
-    } else if (step.begin) {
-      // Still running: the card shows the step as under way.
-      events.push(
-        step.detail
-          ? { stage: step.begin, detail: step.detail }
-          : { stage: step.begin },
-      );
-    }
+    const event = progressEventForPart(part);
+    if (event) events.push(event);
   }
   return events;
 }

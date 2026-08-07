@@ -92,54 +92,107 @@ export class LangyCliEnvelopeService {
     const name = this.toolNameOf(invocation);
     if (frame.phase === "start") return { ...frame, name };
 
-    // A FAILED CALL STILL PRINTED ITS FAILURE DOCUMENT.
-    //
-    // Under a machine format the CLI writes `{ok:false, error:{…}}` to stdout
-    // and a one-line human summary to stderr, then exits non-zero. This branch
-    // used to pass the frame straight through, so whichever of the two the
-    // worker happened to put in `output` was what the card got — and when that
-    // was the stderr line, every scrap of structure (the code, the meta, the
-    // tips) was gone before the panel ever saw it. Look for the document in
-    // both, and keep it whole when it is there.
-    if (frame.isError) {
-      const reportedOnFailure = readCliErrorDocument(
-        parseCliJson(frame.output ?? "") ?? frame.output,
-      );
-      return reportedOnFailure
-        ? {
-            ...frame,
-            name,
-            output: JSON.stringify(toCliErrorDocument(reportedOnFailure)),
-          }
-        : { ...frame, name };
-    }
+    if (frame.isError) return this.frameFromErrorEnd({ frame, name });
 
-    // Future workers can emit the canonical value directly. Validate it again
-    // at this trust boundary, then retain exactly that value rather than parsing
-    // a parallel string representation and risking the two drifting apart.
-    const supplied = cliToolResultSchema.safeParse(frame.result);
-    if (supplied.success) {
-      const digest = extractDigest({
-        resource: invocation.resource,
-        verb: invocation.verb,
-        args: invocation.args,
-        output: frame.output ?? "",
-      });
-      return {
-        ...frame,
-        name,
-        output: JSON.stringify(supplied.data),
-        digest,
-        result: supplied.data,
-      };
-    }
+    const suppliedFrame = this.frameFromSuppliedResult({
+      frame,
+      name,
+      invocation,
+    });
+    if (suppliedFrame) return suppliedFrame;
 
     if (frame.output === undefined) return { ...frame, name };
 
-    // The digest is the reference the card hydrates from (ids, the parsed
-    // flags as its query, honest counts); the reduced output stays alongside
-    // as the fallback tier and the agent-history record.
-    const document = parseCliJson(frame.output);
+    return this.frameFromParsedOutput({
+      frame,
+      name,
+      invocation,
+      output: frame.output,
+    });
+  }
+
+  /**
+   * A FAILED CALL STILL PRINTED ITS FAILURE DOCUMENT.
+   *
+   * Under a machine format the CLI writes `{ok:false, error:{…}}` to stdout
+   * and a one-line human summary to stderr, then exits non-zero. This branch
+   * used to pass the frame straight through, so whichever of the two the
+   * worker happened to put in `output` was what the card got — and when that
+   * was the stderr line, every scrap of structure (the code, the meta, the
+   * tips) was gone before the panel ever saw it. Look for the document in
+   * both, and keep it whole when it is there. Split out of `normalizeToolFrame`.
+   */
+  private frameFromErrorEnd({
+    frame,
+    name,
+  }: {
+    frame: LangyToolFrame;
+    name: string;
+  }): LangyToolFrame {
+    const reportedOnFailure = readCliErrorDocument(
+      parseCliJson(frame.output ?? "") ?? frame.output,
+    );
+    return reportedOnFailure
+      ? {
+          ...frame,
+          name,
+          output: JSON.stringify(toCliErrorDocument(reportedOnFailure)),
+        }
+      : { ...frame, name };
+  }
+
+  /**
+   * Future workers can emit the canonical value directly. Validate it again
+   * at this trust boundary, then retain exactly that value rather than
+   * parsing a parallel string representation and risking the two drifting
+   * apart. Returns `null` when the frame carries no such value, so the caller
+   * continues down the string-parsing path. Split out of `normalizeToolFrame`.
+   */
+  private frameFromSuppliedResult({
+    frame,
+    name,
+    invocation,
+  }: {
+    frame: LangyToolFrame;
+    name: string;
+    invocation: LangwatchCommand;
+  }): LangyToolFrame | null {
+    const supplied = cliToolResultSchema.safeParse(frame.result);
+    if (!supplied.success) return null;
+    const digest = extractDigest({
+      resource: invocation.resource,
+      verb: invocation.verb,
+      args: invocation.args,
+      output: frame.output ?? "",
+    });
+    return {
+      ...frame,
+      name,
+      output: JSON.stringify(supplied.data),
+      digest,
+      result: supplied.data,
+    };
+  }
+
+  /**
+   * The digest is the reference the card hydrates from (ids, the parsed
+   * flags as its query, honest counts); the reduced output stays alongside
+   * as the fallback tier and the agent-history record. Split out of
+   * `normalizeToolFrame` — the string-`output` path, once a `result` wasn't
+   * already supplied.
+   */
+  private frameFromParsedOutput({
+    frame,
+    name,
+    invocation,
+    output,
+  }: {
+    frame: LangyToolFrame;
+    name: string;
+    invocation: LangwatchCommand;
+    output: string;
+  }): LangyToolFrame {
+    const document = parseCliJson(output);
 
     // A FAILURE THE CLI REPORTED IN ITS OWN DOCUMENT.
     //
@@ -150,7 +203,7 @@ export class LangyCliEnvelopeService {
     // which is how a validation error ended up rendered to the user as a wall of
     // JSON instead of an error card. The CLI already has a reader for its own
     // failure document; the boundary just never asked.
-    const reported = readCliErrorDocument(document ?? frame.output);
+    const reported = readCliErrorDocument(document ?? output);
     if (reported) {
       return {
         ...frame,
@@ -169,11 +222,11 @@ export class LangyCliEnvelopeService {
       resource: invocation.resource,
       verb: invocation.verb,
       args: invocation.args,
-      output: document ?? frame.output,
+      output: document ?? output,
     });
 
     if (document === null) {
-      const result = toCliTextResult(frame.output);
+      const result = toCliTextResult(output);
       return {
         ...frame,
         name,

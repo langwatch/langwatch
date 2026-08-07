@@ -320,10 +320,60 @@ export class LangyCredentialService {
       );
     }
 
-    // The worker's callback origin + gateway. Both prefer the container-worker
-    // overrides (LANGY_WORKER_CALLBACK_URL / LANGY_WORKER_GATEWAY_URL) that haven
-    // injects when the worker runs inside colima, then fall back to the stable
-    // control-plane origins. See resolveWorkerCallbackUrl / resolveWorkerGatewayBaseUrl.
+    const { langwatchEndpoint, gatewayBaseUrl } =
+      this.resolveWorkerOrigins(projectId);
+
+    const { langwatchApiKey, langwatchApiKeyId } =
+      await this.mintSessionKeyOrThrow({
+        session,
+        projectId,
+        organizationId: project.organizationId,
+        mintSessionKey,
+      });
+
+    const llmVirtualKey = await this.getOrProvisionVirtualKey({
+      projectId,
+      organizationId: project.organizationId,
+      actorUserId,
+    });
+
+    const { githubToken, githubLogin, githubRepoScopeKey } =
+      await this.mintGithubCredentials({
+        session,
+        organizationId: project.organizationId,
+        projectId,
+        actorUserId,
+        repositoryFullName,
+      });
+
+    return {
+      // Absent when the caller asked us not to mint because a live worker already
+      // holds a key. The manager accepts a keyless bundle for a REUSE and refuses
+      // it for a spawn (ErrCredentialsRequired), which is how the die-between-
+      // probe-and-turn race is resolved rather than guessed at.
+      ...(langwatchApiKey ? { langwatchApiKey } : {}),
+      ...(langwatchApiKeyId ? { langwatchApiKeyId } : {}),
+      llmVirtualKey,
+      langwatchEndpoint,
+      gatewayBaseUrl: ensureGatewayV1BaseUrl(gatewayBaseUrl),
+      organizationId: project.organizationId,
+      ...(githubToken ? { githubToken } : {}),
+      ...(githubLogin ? { githubLogin } : {}),
+      ...(githubRepoScopeKey ? { githubRepoScopeKey } : {}),
+    };
+  }
+
+  /**
+   * The worker's callback origin + gateway. Both prefer the container-worker
+   * overrides (LANGY_WORKER_CALLBACK_URL / LANGY_WORKER_GATEWAY_URL) that haven
+   * injects when the worker runs inside colima, then fall back to the stable
+   * control-plane origins. See resolveWorkerCallbackUrl / resolveWorkerGatewayBaseUrl.
+   * Split out of `getOrProvision`.
+   */
+  private resolveWorkerOrigins(projectId: string): {
+    langwatchEndpoint: string;
+    gatewayBaseUrl: string;
+  } {
     const langwatchEndpoint = resolveWorkerCallbackUrl();
     const gatewayBaseUrl = resolveWorkerGatewayBaseUrl();
     // Deliberately PLAIN errors, not handled ones (ADR-045). A control-plane
@@ -347,26 +397,41 @@ export class LangyCredentialService {
       );
       throw new Error("Langy gateway base URL is not configured");
     }
+    return { langwatchEndpoint, gatewayBaseUrl };
+  }
 
-    // Mint a per-session key scoped to THIS user's own permissions (ADR-047).
-    // The key is owned by the user, so ApiKeyService clamps it to what they
-    // actually hold — a Langy tool call can never exceed the human. Fail-closed:
-    // wrap mint failures as LangyCredentialResolutionError so the route returns a
-    // 409 rather than falling back to a broader key. A user who holds none of
-    // Langy's permissions here gets a clean, actionable refusal.
-    let langwatchApiKey: string | undefined;
-    let langwatchApiKeyId: string | undefined;
+  /**
+   * Mint a per-session key scoped to THIS user's own permissions (ADR-047).
+   * The key is owned by the user, so ApiKeyService clamps it to what they
+   * actually hold — a Langy tool call can never exceed the human. Fail-closed:
+   * wrap mint failures as LangyCredentialResolutionError so the route returns a
+   * 409 rather than falling back to a broader key. A user who holds none of
+   * Langy's permissions here gets a clean, actionable refusal. Split out of
+   * `getOrProvision`.
+   */
+  private async mintSessionKeyOrThrow({
+    session,
+    projectId,
+    organizationId,
+    mintSessionKey,
+  }: {
+    session: Session;
+    projectId: string;
+    organizationId: string;
+    mintSessionKey: boolean;
+  }): Promise<{ langwatchApiKey?: string; langwatchApiKeyId?: string }> {
+    if (!mintSessionKey) return {};
     try {
-      if (mintSessionKey) {
-        const minted = await mintLangySessionApiKey({
-          prisma: this.prisma,
-          session,
-          projectId,
-          organizationId: project.organizationId,
-        });
-        langwatchApiKey = minted.token;
-        langwatchApiKeyId = minted.apiKeyId;
-      }
+      const minted = await mintLangySessionApiKey({
+        prisma: this.prisma,
+        session,
+        projectId,
+        organizationId,
+      });
+      return {
+        langwatchApiKey: minted.token,
+        langwatchApiKeyId: minted.apiKeyId,
+      };
     } catch (error) {
       if (error instanceof LangySessionKeyScopeError) {
         // Carries a user-safe message (the caller holds no Langy permissions
@@ -374,7 +439,7 @@ export class LangyCredentialService {
         throw new LangyCredentialResolutionError(error.message);
       }
       logger.error(
-        { error, projectId, userId: actorUserId },
+        { error, projectId, userId: session.user.id },
         "failed to mint Langy session key",
       );
       captureException(toError(error), {
@@ -388,62 +453,59 @@ export class LangyCredentialService {
         `Failed to mint a Langy session key for project ${projectId}.`,
       );
     }
+  }
 
-    const llmVirtualKey = await this.getOrProvisionVirtualKey({
-      projectId,
-      organizationId: project.organizationId,
-      actorUserId,
-    });
-
-    // Best-effort GitHub installation-token mint. Never blocks chat — when
-    // absent the worker's github skill tells the user to install the App,
-    // instead of erroring. The token is a 1h installation token minted from the
-    // App private key (control-plane only); the worker sees only the token.
-    let githubToken: string | undefined;
-    let githubLogin: string | undefined;
-    let githubRepoScopeKey: string | undefined;
-    if (LANGY_GITHUB_ENABLED) {
-      try {
-        const minted = await getApp().langy.githubInstallations.mintTurnToken({
-          organizationId: project.organizationId,
-          ...(repositoryFullName ? { repositoryFullName } : {}),
-        });
-        if (minted) {
-          githubToken = minted.token;
-          githubRepoScopeKey = minted.repoScopeKey;
-          // Attribution identity comes from the LangWatch profile, never from
-          // GitHub — bot-authored PRs need no user OAuth.
-          githubLogin = resolveActingGithubLogin(session);
-        }
-      } catch (error) {
-        githubLogger.warn(
-          { error, projectId, userId: actorUserId },
-          "github installation token mint failed; chat continues without it",
-        );
-        captureException(toError(error), {
-          extra: {
-            projectId,
-            context: "mintTurnToken:LangyCredentialService.getOrProvision",
-          },
-        });
-      }
+  /**
+   * Best-effort GitHub installation-token mint. Never blocks chat — when
+   * absent the worker's github skill tells the user to install the App,
+   * instead of erroring. The token is a 1h installation token minted from the
+   * App private key (control-plane only); the worker sees only the token.
+   * Split out of `getOrProvision`.
+   */
+  private async mintGithubCredentials({
+    session,
+    organizationId,
+    projectId,
+    actorUserId,
+    repositoryFullName,
+  }: {
+    session: Session;
+    organizationId: string;
+    projectId: string;
+    actorUserId: string;
+    repositoryFullName?: string;
+  }): Promise<{
+    githubToken?: string;
+    githubLogin?: string;
+    githubRepoScopeKey?: string;
+  }> {
+    if (!LANGY_GITHUB_ENABLED) return {};
+    try {
+      const minted = await getApp().langy.githubInstallations.mintTurnToken({
+        organizationId,
+        ...(repositoryFullName ? { repositoryFullName } : {}),
+      });
+      if (!minted) return {};
+      return {
+        githubToken: minted.token,
+        githubRepoScopeKey: minted.repoScopeKey,
+        // Attribution identity comes from the LangWatch profile, never from
+        // GitHub — bot-authored PRs need no user OAuth.
+        githubLogin: resolveActingGithubLogin(session),
+      };
+    } catch (error) {
+      githubLogger.warn(
+        { error, projectId, userId: actorUserId },
+        "github installation token mint failed; chat continues without it",
+      );
+      captureException(toError(error), {
+        extra: {
+          projectId,
+          context: "mintTurnToken:LangyCredentialService.getOrProvision",
+        },
+      });
+      return {};
     }
-
-    return {
-      // Absent when the caller asked us not to mint because a live worker already
-      // holds a key. The manager accepts a keyless bundle for a REUSE and refuses
-      // it for a spawn (ErrCredentialsRequired), which is how the die-between-
-      // probe-and-turn race is resolved rather than guessed at.
-      ...(langwatchApiKey ? { langwatchApiKey } : {}),
-      ...(langwatchApiKeyId ? { langwatchApiKeyId } : {}),
-      llmVirtualKey,
-      langwatchEndpoint,
-      gatewayBaseUrl: ensureGatewayV1BaseUrl(gatewayBaseUrl),
-      organizationId: project.organizationId,
-      ...(githubToken ? { githubToken } : {}),
-      ...(githubLogin ? { githubLogin } : {}),
-      ...(githubRepoScopeKey ? { githubRepoScopeKey } : {}),
-    };
   }
 
   private async getOrProvisionVirtualKey(args: {

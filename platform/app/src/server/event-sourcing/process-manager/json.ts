@@ -25,6 +25,56 @@ function isPlainObject(value: object): boolean {
   return proto === null || proto === Object.prototype;
 }
 
+function isPrimitiveJsonSafe(value: unknown, path: string): boolean {
+  switch (typeof value) {
+    case "boolean":
+    case "string":
+      return true;
+    case "number":
+      if (!Number.isFinite(value)) {
+        throw new JsonSafetyError(path, "non-finite number");
+      }
+      return true;
+    case "undefined":
+      throw new JsonSafetyError(path, "undefined");
+    case "function":
+      throw new JsonSafetyError(path, "function");
+    case "bigint":
+      throw new JsonSafetyError(path, "bigint");
+    case "symbol":
+      throw new JsonSafetyError(path, "symbol");
+    case "object":
+      return false;
+    default:
+      throw new JsonSafetyError(path, `unsupported type ${typeof value}`);
+  }
+}
+
+function walkArrayItems(obj: unknown[], path: string, seen: Set<object>): void {
+  obj.forEach((item, index) => {
+    walk({ value: item, path: `${path}[${index}]`, seen });
+  });
+}
+
+function walkPlainObjectEntries(
+  obj: object,
+  path: string,
+  seen: Set<object>,
+): void {
+  if (!isPlainObject(obj)) {
+    throw new JsonSafetyError(
+      path,
+      `non-plain object (${obj.constructor?.name ?? "unknown"})`,
+    );
+  }
+  if (Object.getOwnPropertySymbols(obj).length > 0) {
+    throw new JsonSafetyError(path, "symbol-keyed property");
+  }
+  for (const [key, item] of Object.entries(obj)) {
+    walk({ value: item, path: `${path}.${key}`, seen });
+  }
+}
+
 function walk({
   value,
   path,
@@ -35,29 +85,7 @@ function walk({
   seen: Set<object>;
 }): void {
   if (value === null) return;
-
-  switch (typeof value) {
-    case "boolean":
-    case "string":
-      return;
-    case "number":
-      if (!Number.isFinite(value)) {
-        throw new JsonSafetyError(path, "non-finite number");
-      }
-      return;
-    case "undefined":
-      throw new JsonSafetyError(path, "undefined");
-    case "function":
-      throw new JsonSafetyError(path, "function");
-    case "bigint":
-      throw new JsonSafetyError(path, "bigint");
-    case "symbol":
-      throw new JsonSafetyError(path, "symbol");
-    case "object":
-      break;
-    default:
-      throw new JsonSafetyError(path, `unsupported type ${typeof value}`);
-  }
+  if (isPrimitiveJsonSafe(value, path)) return;
 
   const obj = value as object;
   if (seen.has(obj)) {
@@ -66,22 +94,9 @@ function walk({
   seen.add(obj);
 
   if (Array.isArray(obj)) {
-    obj.forEach((item, index) => {
-      walk({ value: item, path: `${path}[${index}]`, seen });
-    });
+    walkArrayItems(obj, path, seen);
   } else {
-    if (!isPlainObject(obj)) {
-      throw new JsonSafetyError(
-        path,
-        `non-plain object (${obj.constructor?.name ?? "unknown"})`,
-      );
-    }
-    if (Object.getOwnPropertySymbols(obj).length > 0) {
-      throw new JsonSafetyError(path, "symbol-keyed property");
-    }
-    for (const [key, item] of Object.entries(obj)) {
-      walk({ value: item, path: `${path}.${key}`, seen });
-    }
+    walkPlainObjectEntries(obj, path, seen);
   }
 
   seen.delete(obj);

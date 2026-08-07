@@ -46,6 +46,62 @@ function canonicalQuantiles(
   });
 }
 
+/**
+ * Only gauges and sums carry a scalar, and presence matches the validator's:
+ * an explicit null means absent, so a `{ asInt: null, asDouble: 5 }` point
+ * stays a double rather than becoming an int zero.
+ */
+function scalarPointValues({
+  point,
+  kind,
+}: {
+  point: UnknownRecord;
+  kind: MetricKind;
+}): Pick<CanonicalPointValues, "valueType" | "valueInt" | "valueDouble"> {
+  const isScalar = kind === "gauge" || kind === "sum";
+  const hasInt = isScalar && point.asInt !== undefined && point.asInt !== null;
+  const hasDouble =
+    isScalar && point.asDouble !== undefined && point.asDouble !== null;
+  return {
+    valueType: hasInt ? "int" : hasDouble ? "double" : "none",
+    valueInt: hasInt ? integerDecimal(point.asInt, { signed: true }) : null,
+    valueDouble: hasDouble ? finiteNumber(point.asDouble) : null,
+  };
+}
+
+function exponentialPointValues({
+  point,
+  positive,
+  negative,
+  isExponential,
+}: {
+  point: UnknownRecord;
+  positive: UnknownRecord;
+  negative: UnknownRecord;
+  isExponential: boolean;
+}): Pick<
+  CanonicalPointValues,
+  | "exponentialScale"
+  | "exponentialZeroThreshold"
+  | "zeroCount"
+  | "positiveOffset"
+  | "positiveBucketCounts"
+  | "negativeOffset"
+  | "negativeBucketCounts"
+> {
+  return {
+    exponentialScale: isExponential ? Number(point.scale ?? 0) : null,
+    exponentialZeroThreshold: isExponential
+      ? finiteNumber(point.zeroThreshold ?? 0)
+      : null,
+    zeroCount: isExponential ? integerDecimal(point.zeroCount) : null,
+    positiveOffset: isExponential ? Number(positive.offset ?? 0) : null,
+    positiveBucketCounts: integerDecimals(positive.bucketCounts),
+    negativeOffset: isExponential ? Number(negative.offset ?? 0) : null,
+    negativeBucketCounts: integerDecimals(negative.bucketCounts),
+  };
+}
+
 export function canonicalPointValues({
   point,
   kind,
@@ -57,34 +113,16 @@ export function canonicalPointValues({
   const negative = isRecord(point.negative) ? point.negative : {};
   const isExponential = kind === "exponential_histogram";
   const isCounted = kind === "histogram" || isExponential || kind === "summary";
-  // Only gauges and sums carry a scalar, and presence matches the validator's:
-  // an explicit null means absent, so a `{ asInt: null, asDouble: 5 }` point
-  // stays a double rather than becoming an int zero.
-  const isScalar = kind === "gauge" || kind === "sum";
-  const hasInt = isScalar && point.asInt !== undefined && point.asInt !== null;
-  const hasDouble =
-    isScalar && point.asDouble !== undefined && point.asDouble !== null;
-  const valueType = hasInt ? "int" : hasDouble ? "double" : "none";
 
   return {
-    valueType,
-    valueInt: hasInt ? integerDecimal(point.asInt, { signed: true }) : null,
-    valueDouble: hasDouble ? finiteNumber(point.asDouble) : null,
+    ...scalarPointValues({ point, kind }),
     count: isCounted ? integerDecimal(point.count) : null,
     sum: finiteNumber(point.sum),
     min: finiteNumber(point.min),
     max: finiteNumber(point.max),
     explicitBounds: finiteNumbers(point.explicitBounds),
     bucketCounts: integerDecimals(point.bucketCounts),
-    exponentialScale: isExponential ? Number(point.scale ?? 0) : null,
-    exponentialZeroThreshold: isExponential
-      ? finiteNumber(point.zeroThreshold ?? 0)
-      : null,
-    zeroCount: isExponential ? integerDecimal(point.zeroCount) : null,
-    positiveOffset: isExponential ? Number(positive.offset ?? 0) : null,
-    positiveBucketCounts: integerDecimals(positive.bucketCounts),
-    negativeOffset: isExponential ? Number(negative.offset ?? 0) : null,
-    negativeBucketCounts: integerDecimals(negative.bucketCounts),
+    ...exponentialPointValues({ point, positive, negative, isExponential }),
     quantileValues:
       kind === "summary" ? canonicalQuantiles(point.quantileValues) : [],
   };

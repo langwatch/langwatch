@@ -1,5 +1,6 @@
 import { createLogger } from "@langwatch/observability";
 import type { GraphTriggerEvaluationReason } from "~/server/app-layer/automations/graph-trigger-evaluation.service";
+import type { TriggerSummary } from "~/server/app-layer/automations/repositories/trigger.repository";
 import type { TriggerService } from "~/server/app-layer/automations/trigger.service";
 import type { Event } from "~/server/event-sourcing/domain/types";
 
@@ -42,6 +43,38 @@ export interface GraphTriggerActivityDeps {
   }) => Promise<void>;
 }
 
+async function evaluateActiveGraphTriggers({
+  deps,
+  triggers,
+  projectId,
+}: {
+  deps: GraphTriggerActivityDeps;
+  triggers: TriggerSummary[];
+  projectId: string;
+}): Promise<number> {
+  let failures = 0;
+  for (const trigger of triggers) {
+    try {
+      await deps.evaluateGraphTrigger({
+        triggerId: trigger.id,
+        projectId,
+        reason: "real-time",
+      });
+    } catch (error) {
+      failures++;
+      logger.error(
+        {
+          projectId,
+          triggerId: trigger.id,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        "graphTriggerActivity: evaluation failed",
+      );
+    }
+  }
+  return failures;
+}
+
 /**
  * ADR-052: the real-time graph-alert path as a plain subscriber handler —
  * no process state: the shared evaluator owns its `TriggerSent`
@@ -63,26 +96,11 @@ export function createGraphTriggerActivityHandler(
       await deps.triggers.getActiveGraphTriggersForProject(projectId);
     if (triggers.length === 0) return;
 
-    let failures = 0;
-    for (const trigger of triggers) {
-      try {
-        await deps.evaluateGraphTrigger({
-          triggerId: trigger.id,
-          projectId,
-          reason: "real-time",
-        });
-      } catch (error) {
-        failures++;
-        logger.error(
-          {
-            projectId,
-            triggerId: trigger.id,
-            error: error instanceof Error ? error.message : String(error),
-          },
-          "graphTriggerActivity: evaluation failed",
-        );
-      }
-    }
+    const failures = await evaluateActiveGraphTriggers({
+      deps,
+      triggers,
+      projectId,
+    });
     // Throw AFTER the loop so one trigger's failure doesn't starve the
     // others, but the queue still redelivers for the failed ones —
     // TriggerSent idempotency makes the re-evaluations safe.

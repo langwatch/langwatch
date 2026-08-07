@@ -52,29 +52,51 @@ import {
  * rewrite to `user:"name (test)"`). The quote chars stay attached to their
  * quoted segment; a backslash-escaped quote does not close the string.
  */
+interface QuoteSplitState {
+  segments: Array<{ text: string; quoted: boolean }>;
+  buf: string;
+  quoteChar: string;
+}
+
+/** Inside a quoted segment: append the char, closing the quote unless escaped. */
+function appendQuotedChar(
+  state: QuoteSplitState,
+  ch: string,
+  prevChar: string | undefined,
+): void {
+  state.buf += ch;
+  if (ch === state.quoteChar && prevChar !== "\\") {
+    state.segments.push({ text: state.buf, quoted: true });
+    state.buf = "";
+    state.quoteChar = "";
+  }
+}
+
+/** Outside a quoted segment: open a new quote, or accumulate into buf. */
+function appendUnquotedChar(state: QuoteSplitState, ch: string): void {
+  if (ch === '"' || ch === "'") {
+    if (state.buf) state.segments.push({ text: state.buf, quoted: false });
+    state.buf = ch;
+    state.quoteChar = ch;
+  } else {
+    state.buf += ch;
+  }
+}
+
 function splitOnQuotes(s: string): Array<{ text: string; quoted: boolean }> {
-  const segments: Array<{ text: string; quoted: boolean }> = [];
-  let buf = "";
-  let quoteChar = "";
+  const state: QuoteSplitState = { segments: [], buf: "", quoteChar: "" };
   for (let i = 0; i < s.length; i++) {
     const ch = s[i]!;
-    if (quoteChar) {
-      buf += ch;
-      if (ch === quoteChar && s[i - 1] !== "\\") {
-        segments.push({ text: buf, quoted: true });
-        buf = "";
-        quoteChar = "";
-      }
-    } else if (ch === '"' || ch === "'") {
-      if (buf) segments.push({ text: buf, quoted: false });
-      buf = ch;
-      quoteChar = ch;
+    if (state.quoteChar) {
+      appendQuotedChar(state, ch, s[i - 1]);
     } else {
-      buf += ch;
+      appendUnquotedChar(state, ch);
     }
   }
-  if (buf) segments.push({ text: buf, quoted: quoteChar !== "" });
-  return segments;
+  if (state.buf) {
+    state.segments.push({ text: state.buf, quoted: state.quoteChar !== "" });
+  }
+  return state.segments;
 }
 
 function normalizeQueryString(s: string): string {
@@ -130,33 +152,51 @@ const TOKEN_START_PRECEDERS = new Set([" ", "\t", "\n", "("]);
  * Only strip `@` at token-start positions and outside quoted strings, so a
  * literal `@` inside a value like `"user@example.com"` is preserved.
  */
+interface SigilStripState {
+  out: string;
+  inQuotes: boolean;
+  quoteChar: string;
+}
+
+/** Inside a quoted segment: append the char, closing the quote on its match. */
+function appendInsideQuotes(state: SigilStripState, ch: string): void {
+  state.out += ch;
+  if (ch === state.quoteChar) state.inQuotes = false;
+}
+
+function openQuote(state: SigilStripState, ch: string): void {
+  state.out += ch;
+  state.inQuotes = true;
+  state.quoteChar = ch;
+}
+
+/** True when the `@` at index i is a stray autocomplete sigil, not a literal `@`. */
+function isStrippableAtSigil(normalized: string, i: number): boolean {
+  const prev = i === 0 ? undefined : normalized[i - 1];
+  return prev === undefined || TOKEN_START_PRECEDERS.has(prev);
+}
+
 export function stripAtSigils(text: string): string {
   // Replace any NBSP with regular space first — uniform treatment from
   // here on, and the @-strip pass needs to see the post-replacement chars.
   const normalized = text.replace(/\u00A0/g, " ");
-  let out = "";
-  let inQuotes = false;
-  let quoteChar = "";
+  const state: SigilStripState = { out: "", inQuotes: false, quoteChar: "" };
   for (let i = 0; i < normalized.length; i++) {
     const ch = normalized[i] as string;
-    if (inQuotes) {
-      out += ch;
-      if (ch === quoteChar) inQuotes = false;
+    if (state.inQuotes) {
+      appendInsideQuotes(state, ch);
       continue;
     }
     if (ch === '"' || ch === "'") {
-      out += ch;
-      inQuotes = true;
-      quoteChar = ch;
+      openQuote(state, ch);
       continue;
     }
-    if (ch === "@") {
-      const prev = i === 0 ? undefined : normalized[i - 1];
-      if (prev === undefined || TOKEN_START_PRECEDERS.has(prev)) continue;
+    if (ch === "@" && isStrippableAtSigil(normalized, i)) {
+      continue;
     }
-    out += ch;
+    state.out += ch;
   }
-  return out;
+  return state.out;
 }
 
 // Tiny LRU around `parse`. Per keystroke the SearchBar parses twice — once

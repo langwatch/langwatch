@@ -318,18 +318,50 @@ export const ORG_BEARING_MODEL_NAMES: readonly string[] = [
   ...ORG_TENANCY_EXEMPT,
 ];
 
+const collectOrganizationIdsFromBranch = ({
+  branch,
+  acc,
+}: {
+  branch: unknown;
+  acc: Set<string>;
+}): void => {
+  if (Array.isArray(branch)) {
+    for (const clause of branch) collectOrganizationIds(clause, acc);
+  } else if (branch && typeof branch === "object") {
+    collectOrganizationIds(branch, acc);
+  }
+};
+
 const collectOrganizationIds = (where: any, acc: Set<string>): void => {
   if (!where || typeof where !== "object") return;
   if (typeof where.organizationId === "string") acc.add(where.organizationId);
   for (const key of ["AND", "OR", "NOT"] as const) {
-    const branch = (where as any)[key];
-    if (Array.isArray(branch)) {
-      for (const clause of branch) collectOrganizationIds(clause, acc);
-    } else if (branch && typeof branch === "object") {
-      collectOrganizationIds(branch, acc);
-    }
+    collectOrganizationIdsFromBranch({ branch: (where as any)[key], acc });
   }
 };
+
+const hasBoundedAndBranch = ({
+  where,
+  passes,
+}: {
+  where: any;
+  passes: (clause: any) => boolean;
+}): boolean =>
+  Array.isArray(where.AND) &&
+  where.AND.some((clause: any) => validateRecursive(clause, passes));
+
+// OR semantics: every alternative branch must independently carry a
+// single-org predicate, otherwise the unbounded branch leaks rows.
+const hasBoundedOrBranches = ({
+  where,
+  passes,
+}: {
+  where: any;
+  passes: (clause: any) => boolean;
+}): boolean =>
+  Array.isArray(where.OR) &&
+  where.OR.length > 0 &&
+  where.OR.every((clause: any) => validateRecursive(clause, passes));
 
 const validateRecursive = (
   where: any,
@@ -337,19 +369,75 @@ const validateRecursive = (
 ): boolean => {
   if (!where || typeof where !== "object") return false;
   if (passes(where)) return true;
-  if (Array.isArray(where.AND)) {
-    for (const clause of where.AND) {
-      if (validateRecursive(clause, passes)) return true;
-    }
+  if (hasBoundedAndBranch({ where, passes })) return true;
+  return hasBoundedOrBranches({ where, passes });
+};
+
+const assertCreateDataCarriesOrganizationId = ({
+  data,
+  model,
+  action,
+}: {
+  data: any;
+  model: string;
+  action: Prisma.MiddlewareParams["action"];
+}) => {
+  const records = Array.isArray(data) ? data : [data];
+  const everyRecordHasOrg = records.every(
+    (record) => record && typeof record.organizationId === "string",
+  );
+  if (!everyRecordHasOrg) {
+    throw new Error(
+      `The ${action} action on the ${model} model requires an 'organizationId' in the data field`,
+    );
   }
-  // OR semantics: every alternative branch must independently carry a
-  // single-org predicate, otherwise the unbounded branch leaks rows.
-  if (Array.isArray(where.OR) && where.OR.length > 0) {
-    if (where.OR.every((clause: any) => validateRecursive(clause, passes))) {
-      return true;
-    }
+};
+
+// Single-organization invariant: a query may not target two orgs at once.
+const assertSingleOrganization = ({
+  where,
+  model,
+  action,
+}: {
+  where: any;
+  model: string;
+  action: Prisma.MiddlewareParams["action"];
+}) => {
+  const organizationIds = new Set<string>();
+  collectOrganizationIds(where, organizationIds);
+  if (organizationIds.size > 1) {
+    throw new Error(
+      `The ${action} action on the ${model} model must not span multiple organizations (found ${organizationIds.size})`,
+    );
   }
-  return false;
+};
+
+const singleOrgPredicate =
+  ({
+    config,
+    action,
+  }: {
+    config: OrgScopedModelConfig;
+    action: Prisma.MiddlewareParams["action"];
+  }) =>
+  (clause: any) =>
+    boundsToSingleOrg(clause) ||
+    (config.extraBound ? config.extraBound({ clause, action }) : false);
+
+// upsert also writes a create payload when the row is absent, so hold it to
+// the same "every create declares its owning organization" invariant.
+const assertUpsertCreateCarriesOrganizationId = ({
+  createData,
+  model,
+}: {
+  createData: any;
+  model: string;
+}) => {
+  if (!createData || typeof createData.organizationId !== "string") {
+    throw new Error(
+      `The upsert action on the ${model} model requires an 'organizationId' in the create payload`,
+    );
+  }
 };
 
 const _guardOrganizationId = ({
@@ -364,16 +452,11 @@ const _guardOrganizationId = ({
   const config = ORG_SCOPED_MODELS[model];
 
   if (action === "create" || action === "createMany") {
-    const data = params.args?.data;
-    const records = Array.isArray(data) ? data : [data];
-    const everyRecordHasOrg = records.every(
-      (record) => record && typeof record.organizationId === "string",
-    );
-    if (!everyRecordHasOrg) {
-      throw new Error(
-        `The ${action} action on the ${model} model requires an 'organizationId' in the data field`,
-      );
-    }
+    assertCreateDataCarriesOrganizationId({
+      data: params.args?.data,
+      model,
+      action,
+    });
     return;
   }
 
@@ -384,34 +467,19 @@ const _guardOrganizationId = ({
     );
   }
 
-  // Single-organization invariant: a query may not target two orgs at once.
-  const organizationIds = new Set<string>();
-  collectOrganizationIds(where, organizationIds);
-  if (organizationIds.size > 1) {
-    throw new Error(
-      `The ${action} action on the ${model} model must not span multiple organizations (found ${organizationIds.size})`,
-    );
-  }
+  assertSingleOrganization({ where, model, action });
 
-  const passes = (clause: any) =>
-    boundsToSingleOrg(clause) ||
-    (config.extraBound ? config.extraBound({ clause, action }) : false);
-
-  if (!validateRecursive(where, passes)) {
+  if (!validateRecursive(where, singleOrgPredicate({ config, action }))) {
     throw new Error(
       `The ${action} action on the ${model} model requires an 'organizationId', row id, or model-specific tenancy key in the where clause`,
     );
   }
 
-  // upsert also writes a create payload when the row is absent, so hold it to
-  // the same "every create declares its owning organization" invariant.
   if (action === "upsert") {
-    const createData = params.args?.create;
-    if (!createData || typeof createData.organizationId !== "string") {
-      throw new Error(
-        `The upsert action on the ${model} model requires an 'organizationId' in the create payload`,
-      );
-    }
+    assertUpsertCreateCarriesOrganizationId({
+      createData: params.args?.create,
+      model,
+    });
   }
 };
 

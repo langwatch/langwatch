@@ -43,21 +43,64 @@ function msToNanoString(ms: number): string {
   return String(ms * 1_000_000);
 }
 
-function buildSpanAttributes(span: Span): OtlpKeyValue[] {
+/** Attribute-shaped view of a span's usage/cost metrics (`span.metrics`). */
+function buildMetricAttributes(
+  metrics: NonNullable<Span["metrics"]>,
+): OtlpKeyValue[] {
   const attrs: OtlpKeyValue[] = [];
 
-  attrs.push(stringAttr(ATTR_KEYS.SPAN_TYPE, span.type));
+  if (metrics.prompt_tokens != null) {
+    attrs.push(
+      doubleAttr(ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS, metrics.prompt_tokens),
+    );
+  }
+  if (metrics.completion_tokens != null) {
+    attrs.push(
+      doubleAttr(
+        ATTR_KEYS.GEN_AI_USAGE_OUTPUT_TOKENS,
+        metrics.completion_tokens,
+      ),
+    );
+  }
+  if (metrics.reasoning_tokens != null) {
+    attrs.push(
+      doubleAttr(
+        ATTR_KEYS.GEN_AI_USAGE_REASONING_TOKENS,
+        metrics.reasoning_tokens,
+      ),
+    );
+  }
+  if (metrics.cache_read_input_tokens != null) {
+    attrs.push(
+      doubleAttr(
+        ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS,
+        metrics.cache_read_input_tokens,
+      ),
+    );
+  }
+  if (metrics.cache_creation_input_tokens != null) {
+    attrs.push(
+      doubleAttr(
+        ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS,
+        metrics.cache_creation_input_tokens,
+      ),
+    );
+  }
+  if (metrics.tokens_estimated != null) {
+    attrs.push(
+      boolAttr(ATTR_KEYS.LANGWATCH_TOKENS_ESTIMATED, metrics.tokens_estimated),
+    );
+  }
+  if (metrics.cost != null) {
+    attrs.push(doubleAttr(ATTR_KEYS.LANGWATCH_SPAN_COST, metrics.cost));
+  }
 
-  if (span.input) {
-    attrs.push(
-      stringAttr(ATTR_KEYS.LANGWATCH_INPUT, JSON.stringify(span.input)),
-    );
-  }
-  if (span.output) {
-    attrs.push(
-      stringAttr(ATTR_KEYS.LANGWATCH_OUTPUT, JSON.stringify(span.output)),
-    );
-  }
+  return attrs;
+}
+
+/** Attribute-shaped view of the LLM-only fields (model/vendor/RAG contexts). */
+function buildLlmSpanAttributes(span: Span): OtlpKeyValue[] {
+  const attrs: OtlpKeyValue[] = [];
 
   if ("model" in span && span.model) {
     attrs.push(stringAttr(ATTR_KEYS.GEN_AI_REQUEST_MODEL, span.model));
@@ -75,58 +118,29 @@ function buildSpanAttributes(span: Span): OtlpKeyValue[] {
     );
   }
 
+  return attrs;
+}
+
+function buildSpanAttributes(span: Span): OtlpKeyValue[] {
+  const attrs: OtlpKeyValue[] = [];
+
+  attrs.push(stringAttr(ATTR_KEYS.SPAN_TYPE, span.type));
+
+  if (span.input) {
+    attrs.push(
+      stringAttr(ATTR_KEYS.LANGWATCH_INPUT, JSON.stringify(span.input)),
+    );
+  }
+  if (span.output) {
+    attrs.push(
+      stringAttr(ATTR_KEYS.LANGWATCH_OUTPUT, JSON.stringify(span.output)),
+    );
+  }
+
+  attrs.push(...buildLlmSpanAttributes(span));
+
   if (span.metrics) {
-    if (span.metrics.prompt_tokens != null) {
-      attrs.push(
-        doubleAttr(
-          ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS,
-          span.metrics.prompt_tokens,
-        ),
-      );
-    }
-    if (span.metrics.completion_tokens != null) {
-      attrs.push(
-        doubleAttr(
-          ATTR_KEYS.GEN_AI_USAGE_OUTPUT_TOKENS,
-          span.metrics.completion_tokens,
-        ),
-      );
-    }
-    if (span.metrics.reasoning_tokens != null) {
-      attrs.push(
-        doubleAttr(
-          ATTR_KEYS.GEN_AI_USAGE_REASONING_TOKENS,
-          span.metrics.reasoning_tokens,
-        ),
-      );
-    }
-    if (span.metrics.cache_read_input_tokens != null) {
-      attrs.push(
-        doubleAttr(
-          ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS,
-          span.metrics.cache_read_input_tokens,
-        ),
-      );
-    }
-    if (span.metrics.cache_creation_input_tokens != null) {
-      attrs.push(
-        doubleAttr(
-          ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS,
-          span.metrics.cache_creation_input_tokens,
-        ),
-      );
-    }
-    if (span.metrics.tokens_estimated != null) {
-      attrs.push(
-        boolAttr(
-          ATTR_KEYS.LANGWATCH_TOKENS_ESTIMATED,
-          span.metrics.tokens_estimated,
-        ),
-      );
-    }
-    if (span.metrics.cost != null) {
-      attrs.push(doubleAttr(ATTR_KEYS.LANGWATCH_SPAN_COST, span.metrics.cost));
-    }
+    attrs.push(...buildMetricAttributes(span.metrics));
   }
 
   if (span.params) {
@@ -143,15 +157,10 @@ function buildSpanAttributes(span: Span): OtlpKeyValue[] {
   return attrs;
 }
 
-function buildResource({
-  reservedTraceMetadata,
-  customMetadata,
-  expectedOutput,
-}: {
-  reservedTraceMetadata: ReservedTraceMetadata;
-  customMetadata: CustomMetadata;
-  expectedOutput?: string | null;
-}): OtlpResource | null {
+/** Attribute-shaped view of the trace's reserved metadata fields. */
+function buildReservedMetadataAttributes(
+  reservedTraceMetadata: ReservedTraceMetadata,
+): OtlpKeyValue[] {
   const attrs: OtlpKeyValue[] = [];
 
   if (reservedTraceMetadata.thread_id) {
@@ -194,6 +203,15 @@ function buildResource({
     );
   }
 
+  return attrs;
+}
+
+/** Attribute-shaped view of the trace's free-form custom metadata. */
+function buildCustomMetadataAttributes(
+  customMetadata: CustomMetadata,
+): OtlpKeyValue[] {
+  const attrs: OtlpKeyValue[] = [];
+
   for (const [key, value] of Object.entries(customMetadata)) {
     if (value == null) continue;
     const attrKey = `langwatch.metadata.${key}`;
@@ -207,6 +225,23 @@ function buildResource({
       attrs.push(stringAttr(attrKey, JSON.stringify(value)));
     }
   }
+
+  return attrs;
+}
+
+function buildResource({
+  reservedTraceMetadata,
+  customMetadata,
+  expectedOutput,
+}: {
+  reservedTraceMetadata: ReservedTraceMetadata;
+  customMetadata: CustomMetadata;
+  expectedOutput?: string | null;
+}): OtlpResource | null {
+  const attrs: OtlpKeyValue[] = [
+    ...buildReservedMetadataAttributes(reservedTraceMetadata),
+    ...buildCustomMetadataAttributes(customMetadata),
+  ];
 
   if (expectedOutput) {
     attrs.push(stringAttr("langwatch.expected_output", expectedOutput));

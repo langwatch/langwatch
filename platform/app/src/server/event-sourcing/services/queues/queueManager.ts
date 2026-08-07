@@ -124,6 +124,32 @@ interface QueuedEventConsumerDefinition<E extends Event> {
   };
 }
 
+interface ProjectionQueueDefinition<E extends Event> {
+  name: string;
+  groupKeyFn?: (event: E) => string;
+  scoreFn?: (event: E) => number;
+  coalesceMaxBatch?: number;
+  options?: {
+    killSwitch?: KillSwitchOptions;
+  };
+}
+
+/**
+ * Resolved registration for a single command, keyed by command name in
+ * {@link QueueManager.initializeCommandQueues}'s handler registry.
+ */
+interface CommandRegistryEntry<E extends Event> {
+  handler: CommandHandler<Command<any>, E>;
+  schema: CommandSchema<any, CommandType>;
+  getAggregateId: (payload: any) => string;
+  getGroupKey?: (payload: any) => string;
+  options: CommandHandlerOptions<any>;
+  commandName: string;
+  commandType: CommandType;
+  killSwitchOptions?: KillSwitchOptions;
+  spanAttributes?: (payload: any) => Record<string, string | number | boolean>;
+}
+
 /**
  * Manages queue facades for event handlers, projections, commands, and reactors.
  *
@@ -376,49 +402,85 @@ export class QueueManager<EventType extends Event = Event> {
         continue;
       }
 
-      const customGroupKeyFn = handlerDef.options.groupKeyFn;
-      const groupKeyFn = this.buildGroupKey({
-        jobPath: `${jobPath}/${handlerName}`,
-        getTenantId: (event: any) => String(event.tenantId),
-        domainKeyFn: customGroupKeyFn
-          ? (event: any) => customGroupKeyFn(event)
-          : (event: any) =>
-              `${event.aggregateType}:${String(event.aggregateId)}`,
+      const entry = this.buildEventConsumerJobEntry({
+        handlerName,
+        handlerDef,
+        onEvent,
+        onEventBatch,
+        jobPath,
       });
-      const entry: JobRegistryEntry = {
-        groupKeyFn,
-        scoreFn: (event: any) => event.occurredAt ?? event.createdAt,
-        process: async (event: any) => {
-          await onEvent(handlerName, event, {
-            tenantId: event.tenantId,
-          });
-        },
-        processBatch:
-          onEventBatch &&
-          handlerDef.options.coalesceMaxBatch &&
-          handlerDef.options.coalesceMaxBatch > 1
-            ? async (events: any[]) => {
-                await onEventBatch(handlerName, events, {
-                  tenantId: events[0]?.tenantId,
-                });
-              }
-            : undefined,
-        coalesceMaxBatch: handlerDef.options.coalesceMaxBatch,
-        delay: handlerDef.options.delay,
-        deduplication: resolveDeduplicationStrategy(
-          handlerDef.options.deduplication,
-          customGroupKeyFn
-            ? (event: EventType) =>
-                `${String(event.tenantId)}:${customGroupKeyFn(event)}`
-            : this.createDefaultDeduplicationId.bind(this),
-        ),
-        spanAttributes: handlerDef.options.spanAttributes,
-      };
 
       const facade = this.createFacade<EventType>(jobType, handlerName, entry);
       this.queues.set(this.key(jobType, handlerName), facade);
       incrementCount();
     }
+  }
+
+  /**
+   * Builds the {@link JobRegistryEntry} for a single event-consumer (handler
+   * or subscriber) definition — group key, score, process/processBatch, and
+   * deduplication, exactly as {@link initializeEventConsumerQueues} built
+   * inline per handler.
+   */
+  private buildEventConsumerJobEntry({
+    handlerName,
+    handlerDef,
+    onEvent,
+    onEventBatch,
+    jobPath,
+  }: {
+    handlerName: string;
+    handlerDef: QueuedEventConsumerDefinition<EventType>;
+    onEvent: (
+      consumerName: string,
+      event: EventType,
+      context: EventStoreReadContext<EventType>,
+    ) => Promise<void>;
+    onEventBatch?: (
+      consumerName: string,
+      events: EventType[],
+      context: EventStoreReadContext<EventType>,
+    ) => Promise<void>;
+    jobPath: "map" | "subscriber";
+  }): JobRegistryEntry {
+    const customGroupKeyFn = handlerDef.options.groupKeyFn;
+    const groupKeyFn = this.buildGroupKey({
+      jobPath: `${jobPath}/${handlerName}`,
+      getTenantId: (event: any) => String(event.tenantId),
+      domainKeyFn: customGroupKeyFn
+        ? (event: any) => customGroupKeyFn(event)
+        : (event: any) => `${event.aggregateType}:${String(event.aggregateId)}`,
+    });
+
+    return {
+      groupKeyFn,
+      scoreFn: (event: any) => event.occurredAt ?? event.createdAt,
+      process: async (event: any) => {
+        await onEvent(handlerName, event, {
+          tenantId: event.tenantId,
+        });
+      },
+      processBatch:
+        onEventBatch &&
+        handlerDef.options.coalesceMaxBatch &&
+        handlerDef.options.coalesceMaxBatch > 1
+          ? async (events: any[]) => {
+              await onEventBatch(handlerName, events, {
+                tenantId: events[0]?.tenantId,
+              });
+            }
+          : undefined,
+      coalesceMaxBatch: handlerDef.options.coalesceMaxBatch,
+      delay: handlerDef.options.delay,
+      deduplication: resolveDeduplicationStrategy(
+        handlerDef.options.deduplication,
+        customGroupKeyFn
+          ? (event: EventType) =>
+              `${String(event.tenantId)}:${customGroupKeyFn(event)}`
+          : this.createDefaultDeduplicationId.bind(this),
+      ),
+      spanAttributes: handlerDef.options.spanAttributes,
+    };
   }
 
   initializeProjectionQueues({
@@ -427,18 +489,7 @@ export class QueueManager<EventType extends Event = Event> {
     onEventBatch,
     lane = { queueType: "projection", jobPath: "fold" },
   }: {
-    projections: Record<
-      string,
-      {
-        name: string;
-        groupKeyFn?: (event: EventType) => string;
-        scoreFn?: (event: EventType) => number;
-        coalesceMaxBatch?: number;
-        options?: {
-          killSwitch?: KillSwitchOptions;
-        };
-      }
-    >;
+    projections: Record<string, ProjectionQueueDefinition<EventType>>;
     onEvent: (
       projectionName: string,
       event: EventType,
@@ -464,47 +515,13 @@ export class QueueManager<EventType extends Event = Event> {
         continue;
       }
 
-      const customGroupKeyFn = projectionDef.groupKeyFn;
-      const groupKeyFn = this.buildGroupKey({
-        jobPath: `${lane.jobPath}/${projectionName}`,
-        getTenantId: (event: any) => String(event.tenantId),
-        domainKeyFn: customGroupKeyFn
-          ? (event: any) => customGroupKeyFn(event)
-          : (event: any) =>
-              `${event.aggregateType}:${String(event.aggregateId)}`,
+      const entry = this.buildProjectionJobEntry({
+        projectionName,
+        projectionDef,
+        onEvent,
+        onEventBatch,
+        lane,
       });
-      const coalesceMaxBatch = projectionDef.coalesceMaxBatch;
-      const entry: JobRegistryEntry = {
-        groupKeyFn,
-        scoreFn:
-          projectionDef.scoreFn ??
-          ((event: any) => event.occurredAt ?? event.createdAt),
-        process: async (event: any, delivery?: JobDelivery) => {
-          await onEvent(projectionName, event, {
-            tenantId: event.tenantId,
-            deliveryAttempt: delivery?.attempt,
-          });
-        },
-        // Same-group fold events are coalesced into one load/apply/store cycle.
-        // All events in a batch share the group (= same projection + aggregate),
-        // so the tenant is taken from the first event.
-        processBatch:
-          onEventBatch && coalesceMaxBatch && coalesceMaxBatch > 1
-            ? async (events: any[], delivery?: JobDelivery) => {
-                await onEventBatch(projectionName, events, {
-                  tenantId: events[0]?.tenantId,
-                  deliveryAttempt: delivery?.attempt,
-                });
-              }
-            : undefined,
-        coalesceMaxBatch,
-        spanAttributes: (event: any) => ({
-          "projection.name": projectionName,
-          "event.type": event.type,
-          "event.id": event.id,
-          "event.aggregate_id": String(event.aggregateId),
-        }),
-      };
 
       const facade = this.createFacade<EventType>(
         lane.queueType,
@@ -512,12 +529,91 @@ export class QueueManager<EventType extends Event = Event> {
         entry,
       );
       this.queues.set(this.key(lane.queueType, projectionName), facade);
-      if (lane.queueType === "stateProjection") {
-        this.stateProjectionCount++;
-      } else {
-        this.projectionCount++;
-      }
+      this.incrementProjectionLaneCount(lane.queueType);
     }
+  }
+
+  /** Increments the per-lane projection counter matching `initializeProjectionQueues`' original inline tally. */
+  private incrementProjectionLaneCount(
+    queueType: "projection" | "stateProjection",
+  ): void {
+    if (queueType === "stateProjection") {
+      this.stateProjectionCount++;
+    } else {
+      this.projectionCount++;
+    }
+  }
+
+  /**
+   * Builds the {@link JobRegistryEntry} for a single projection definition —
+   * group key, score, process/processBatch, and span attributes, exactly as
+   * {@link initializeProjectionQueues} built inline per projection.
+   */
+  private buildProjectionJobEntry({
+    projectionName,
+    projectionDef,
+    onEvent,
+    onEventBatch,
+    lane,
+  }: {
+    projectionName: string;
+    projectionDef: ProjectionQueueDefinition<EventType>;
+    onEvent: (
+      projectionName: string,
+      event: EventType,
+      context: EventStoreReadContext<EventType>,
+    ) => Promise<void>;
+    onEventBatch?: (
+      projectionName: string,
+      events: EventType[],
+      context: EventStoreReadContext<EventType>,
+    ) => Promise<void>;
+    lane: {
+      queueType: "projection" | "stateProjection";
+      jobPath: "fold" | "state";
+    };
+  }): JobRegistryEntry {
+    const customGroupKeyFn = projectionDef.groupKeyFn;
+    const groupKeyFn = this.buildGroupKey({
+      jobPath: `${lane.jobPath}/${projectionName}`,
+      getTenantId: (event: any) => String(event.tenantId),
+      domainKeyFn: customGroupKeyFn
+        ? (event: any) => customGroupKeyFn(event)
+        : (event: any) => `${event.aggregateType}:${String(event.aggregateId)}`,
+    });
+    const coalesceMaxBatch = projectionDef.coalesceMaxBatch;
+
+    return {
+      groupKeyFn,
+      scoreFn:
+        projectionDef.scoreFn ??
+        ((event: any) => event.occurredAt ?? event.createdAt),
+      process: async (event: any, delivery?: JobDelivery) => {
+        await onEvent(projectionName, event, {
+          tenantId: event.tenantId,
+          deliveryAttempt: delivery?.attempt,
+        });
+      },
+      // Same-group fold events are coalesced into one load/apply/store cycle.
+      // All events in a batch share the group (= same projection + aggregate),
+      // so the tenant is taken from the first event.
+      processBatch:
+        onEventBatch && coalesceMaxBatch && coalesceMaxBatch > 1
+          ? async (events: any[], delivery?: JobDelivery) => {
+              await onEventBatch(projectionName, events, {
+                tenantId: events[0]?.tenantId,
+                deliveryAttempt: delivery?.attempt,
+              });
+            }
+          : undefined,
+      coalesceMaxBatch,
+      spanAttributes: (event: any) => ({
+        "projection.name": projectionName,
+        "event.type": event.type,
+        "event.id": event.id,
+        "event.aggregate_id": String(event.aggregateId),
+      }),
+    };
   }
 
   initializeStateProjectionQueues(
@@ -557,22 +653,30 @@ export class QueueManager<EventType extends Event = Event> {
       return;
     }
 
-    // Step 1: Build handler registry
-    interface CommandRegistryEntry {
-      handler: CommandHandler<Command<any>, EventType>;
-      schema: CommandSchema<any, CommandType>;
-      getAggregateId: (payload: any) => string;
-      getGroupKey?: (payload: any) => string;
-      options: CommandHandlerOptions<any>;
-      commandName: string;
-      commandType: CommandType;
-      killSwitchOptions?: KillSwitchOptions;
-      spanAttributes?: (
-        payload: any,
-      ) => Record<string, string | number | boolean>;
+    const commandRegistry = this.buildCommandRegistry(commandRegistrations);
+    if (commandRegistry.size === 0) {
+      return;
     }
 
-    const commandRegistry = new Map<string, CommandRegistryEntry>();
+    for (const [cmdName, cmdEntry] of commandRegistry) {
+      this.registerCommandQueue({ cmdName, cmdEntry, storeEvents });
+    }
+  }
+
+  /**
+   * Step 1 of {@link initializeCommandQueues}: resolves each registration
+   * (handler instance, aggregate/group-key getters, dispatcher name) into a
+   * {@link CommandRegistryEntry}, keyed by command name.
+   */
+  private buildCommandRegistry<Payload extends Record<string, unknown>>(
+    commandRegistrations: Array<{
+      name: string;
+      handlerClass: CommandHandlerClass<any, any, EventType>;
+      handlerInstance?: CommandHandler<any, EventType>;
+      options?: CommandHandlerOptions<Payload>;
+    }>,
+  ): Map<string, CommandRegistryEntry<EventType>> {
+    const commandRegistry = new Map<string, CommandRegistryEntry<EventType>>();
 
     for (const registration of commandRegistrations) {
       const handlerClass = registration.handlerClass;
@@ -614,148 +718,224 @@ export class QueueManager<EventType extends Event = Event> {
       });
     }
 
-    if (commandRegistry.size === 0) {
-      return;
-    }
+    return commandRegistry;
+  }
 
-    // Step 2: Register each command in the global queue and create facades
-    for (const [cmdName, cmdEntry] of commandRegistry) {
-      const rawDedup = resolveDeduplicationStrategy(
-        cmdEntry.options.deduplication as
-          | DeduplicationStrategy<any>
-          | undefined,
-        (payload: any) => {
-          const key = cmdEntry.getGroupKey
+  /**
+   * Step 2 of {@link initializeCommandQueues}: registers one command's queue
+   * in the global queue and installs its validating facade.
+   */
+  private registerCommandQueue({
+    cmdName,
+    cmdEntry,
+    storeEvents,
+  }: {
+    cmdName: string;
+    cmdEntry: CommandRegistryEntry<EventType>;
+    storeEvents: (
+      events: EventType[],
+      context: EventStoreReadContext<EventType>,
+    ) => Promise<void>;
+  }): void {
+    const coalesceMaxBatch = cmdEntry.options.coalesceMaxBatch;
+    // A resolver decides per payload, so whether it coalesces is only known at
+    // dispatch — its presence is the opt-in. A plain number opts in above 1.
+    const coalescesAppends =
+      typeof coalesceMaxBatch === "function" || (coalesceMaxBatch ?? 1) > 1;
+
+    this.warnIfGroupedProducerWithoutCoalescing({
+      cmdName,
+      cmdEntry,
+      coalescesAppends,
+    });
+
+    const jobEntry = this.buildCommandJobEntry({
+      cmdName,
+      cmdEntry,
+      storeEvents,
+      coalesceMaxBatch,
+      coalescesAppends,
+    });
+
+    const baseFacade = this.createFacade<Record<string, unknown>>(
+      "command",
+      cmdName,
+      jobEntry,
+    );
+
+    const validatingFacade = this.wrapCommandFacadeWithValidation({
+      baseFacade,
+      cmdEntry,
+    });
+
+    this.queues.set(this.key("command", cmdName), validatingFacade);
+  }
+
+  /**
+   * ADR-066 pillar 2 visibility: a producer whose jobs funnel into a shared
+   * queue group and does NOT coalesce can still flood the event log one tiny
+   * insert per item under high fan-in. Both grouping shapes qualify —
+   * `serializeByAggregate` (many commands, one aggregate) and an explicit
+   * `getGroupKey` (many aggregates, one shard or bucket) — because the
+   * funnel, not the key that names it, is what parks items behind one
+   * consumer. Record the gap at registration so it can be found and closed,
+   * instead of surfacing only as ClickHouse small-parts pressure.
+   */
+  private warnIfGroupedProducerWithoutCoalescing({
+    cmdName,
+    cmdEntry,
+    coalescesAppends,
+  }: {
+    cmdName: string;
+    cmdEntry: CommandRegistryEntry<EventType>;
+    coalescesAppends: boolean;
+  }): void {
+    const isGroupedProducer =
+      Boolean(cmdEntry.options.serializeByAggregate) ||
+      Boolean(cmdEntry.getGroupKey);
+    if (isGroupedProducer && !coalescesAppends) {
+      this.logger.info(
+        { pipeline: this.pipelineName, command: cmdName },
+        "grouped command producer registered without append coalescing",
+      );
+    }
+  }
+
+  /**
+   * Builds the {@link JobRegistryEntry} for a single command — group key,
+   * score, process/processBatch (dispatching to {@link processCommand} /
+   * {@link processCommandBatch}), and deduplication.
+   */
+  private buildCommandJobEntry({
+    cmdName,
+    cmdEntry,
+    storeEvents,
+    coalesceMaxBatch,
+    coalescesAppends,
+  }: {
+    cmdName: string;
+    cmdEntry: CommandRegistryEntry<EventType>;
+    storeEvents: (
+      events: EventType[],
+      context: EventStoreReadContext<EventType>,
+    ) => Promise<void>;
+    coalesceMaxBatch: CommandHandlerOptions<any>["coalesceMaxBatch"];
+    coalescesAppends: boolean;
+  }): JobRegistryEntry {
+    const rawDedup = resolveDeduplicationStrategy(
+      cmdEntry.options.deduplication as DeduplicationStrategy<any> | undefined,
+      (payload: any) => {
+        const key = cmdEntry.getGroupKey
+          ? cmdEntry.getGroupKey(payload)
+          : cmdEntry.getAggregateId(payload);
+        return `${String(payload.tenantId)}:${this.aggregateType}:${String(key)}`;
+      },
+    );
+
+    const commandGroupKeyFn = this.buildGroupKey({
+      jobPath: cmdEntry.options.serializeByAggregate
+        ? "command"
+        : `command/${cmdName}`,
+      getTenantId: (payload: any) => String(payload.tenantId),
+      domainKeyFn: (payload: any) => {
+        const key = cmdEntry.options.serializeByAggregate
+          ? cmdEntry.getAggregateId(payload)
+          : cmdEntry.getGroupKey
             ? cmdEntry.getGroupKey(payload)
             : cmdEntry.getAggregateId(payload);
-          return `${String(payload.tenantId)}:${this.aggregateType}:${String(key)}`;
-        },
-      );
+        return `${this.aggregateType}:${String(key)}`;
+      },
+    });
 
-      const commandGroupKeyFn = this.buildGroupKey({
-        jobPath: cmdEntry.options.serializeByAggregate
-          ? "command"
-          : `command/${cmdName}`,
-        getTenantId: (payload: any) => String(payload.tenantId),
-        domainKeyFn: (payload: any) => {
-          const key = cmdEntry.options.serializeByAggregate
-            ? cmdEntry.getAggregateId(payload)
-            : cmdEntry.getGroupKey
-              ? cmdEntry.getGroupKey(payload)
-              : cmdEntry.getAggregateId(payload);
-          return `${this.aggregateType}:${String(key)}`;
-        },
-      });
-      const coalesceMaxBatch = cmdEntry.options.coalesceMaxBatch;
-      // A resolver decides per payload, so whether it coalesces is only known at
-      // dispatch — its presence is the opt-in. A plain number opts in above 1.
-      const coalescesAppends =
-        typeof coalesceMaxBatch === "function" || (coalesceMaxBatch ?? 1) > 1;
+    // Shared across the single and batched processors — same command, same
+    // store, same kill switch; only the payload arity differs.
+    const commandProcessParams = {
+      commandType: cmdEntry.commandType,
+      commandSchema: cmdEntry.schema,
+      handler: cmdEntry.handler,
+      getAggregateId: cmdEntry.getAggregateId,
+      storeEventsFn: storeEvents,
+      aggregateType: this.aggregateType,
+      commandName: cmdEntry.commandName,
+      pipelineName: this.pipelineName,
+      featureFlagService: this.featureFlagService,
+      killSwitchOptions: cmdEntry.killSwitchOptions,
+      logger,
+    };
 
-      // ADR-066 pillar 2 visibility: a producer whose jobs funnel into a shared
-      // queue group and does NOT coalesce can still flood the event log one tiny
-      // insert per item under high fan-in. Both grouping shapes qualify —
-      // `serializeByAggregate` (many commands, one aggregate) and an explicit
-      // `getGroupKey` (many aggregates, one shard or bucket) — because the
-      // funnel, not the key that names it, is what parks items behind one
-      // consumer. Record the gap at registration so it can be found and closed,
-      // instead of surfacing only as ClickHouse small-parts pressure.
-      const isGroupedProducer =
-        Boolean(cmdEntry.options.serializeByAggregate) ||
-        Boolean(cmdEntry.getGroupKey);
-      if (isGroupedProducer && !coalescesAppends) {
-        this.logger.info(
-          { pipeline: this.pipelineName, command: cmdName },
-          "grouped command producer registered without append coalescing",
-        );
-      }
-
-      // Shared across the single and batched processors — same command, same
-      // store, same kill switch; only the payload arity differs.
-      const commandProcessParams = {
-        commandType: cmdEntry.commandType,
-        commandSchema: cmdEntry.schema,
-        handler: cmdEntry.handler,
-        getAggregateId: cmdEntry.getAggregateId,
-        storeEventsFn: storeEvents,
-        aggregateType: this.aggregateType,
-        commandName: cmdEntry.commandName,
-        pipelineName: this.pipelineName,
-        featureFlagService: this.featureFlagService,
-        killSwitchOptions: cmdEntry.killSwitchOptions,
-        logger,
-      };
-
-      const jobEntry: JobRegistryEntry = {
-        groupKeyFn: commandGroupKeyFn,
-        scoreFn: cmdEntry.options.serializeByAggregate
-          ? () => Date.now()
-          : (payload: any) => occurredAtScore(payload),
-        process: async (payload: any) => {
-          await processCommand({ ...commandProcessParams, payload });
-        },
-        // ADR-066 pillar 2: when the command opts into coalescing, fold a hot
-        // aggregate's queued same-command jobs into one multi-row insert. The
-        // GroupQueue only drains same-`__jobName` siblings, so every payload
-        // here is this command type. Left undefined otherwise (per-job path).
-        processBatch: coalescesAppends
-          ? async (payloads: any[]) => {
-              await processCommandBatch({
-                ...commandProcessParams,
-                payloads,
-              });
-            }
-          : undefined,
-        coalesceMaxBatch,
-        coalesceMaxBytes: cmdEntry.options.coalesceMaxBytes,
-        delay: cmdEntry.options.delay,
-        deduplication: rawDedup,
-        spanAttributes: cmdEntry.spanAttributes,
-      };
-
-      const baseFacade = this.createFacade<Record<string, unknown>>(
-        "command",
-        cmdName,
-        jobEntry,
-      );
-
-      // Wrap with pre-send validation
-      const validatingFacade: EventSourcedQueueProcessor<any> = {
-        send: async (payload: any, options?: QueueSendOptions<any>) => {
-          const validation = cmdEntry.schema.validate(payload);
-          if (!validation.success) {
-            throw new ValidationError({
-              reason: `Invalid payload for command type "${cmdEntry.commandType}". Validation failed.`,
-              field: "payload",
-              context: {
-                commandType: cmdEntry.commandType,
-                zodIssues: mapZodIssuesToLogContext(validation.error.issues),
-              },
+    return {
+      groupKeyFn: commandGroupKeyFn,
+      scoreFn: cmdEntry.options.serializeByAggregate
+        ? () => Date.now()
+        : (payload: any) => occurredAtScore(payload),
+      process: async (payload: any) => {
+        await processCommand({ ...commandProcessParams, payload });
+      },
+      // ADR-066 pillar 2: when the command opts into coalescing, fold a hot
+      // aggregate's queued same-command jobs into one multi-row insert. The
+      // GroupQueue only drains same-`__jobName` siblings, so every payload
+      // here is this command type. Left undefined otherwise (per-job path).
+      processBatch: coalescesAppends
+        ? async (payloads: any[]) => {
+            await processCommandBatch({
+              ...commandProcessParams,
+              payloads,
             });
           }
-          return baseFacade.send(payload, options);
-        },
-        sendBatch: async (payloads: any[], options?: QueueSendOptions<any>) => {
-          for (const payload of payloads) {
-            const validation = cmdEntry.schema.validate(payload);
-            if (!validation.success) {
-              throw new ValidationError({
-                reason: `Invalid payload for command type "${cmdEntry.commandType}". Validation failed.`,
-                field: "payload",
-                context: {
-                  commandType: cmdEntry.commandType,
-                  zodIssues: mapZodIssuesToLogContext(validation.error.issues),
-                },
-              });
-            }
-          }
-          return baseFacade.sendBatch(payloads, options);
-        },
-        close: baseFacade.close,
-        waitUntilReady: baseFacade.waitUntilReady,
-      };
+        : undefined,
+      coalesceMaxBatch,
+      coalesceMaxBytes: cmdEntry.options.coalesceMaxBytes,
+      delay: cmdEntry.options.delay,
+      deduplication: rawDedup,
+      spanAttributes: cmdEntry.spanAttributes,
+    };
+  }
 
-      this.queues.set(this.key("command", cmdName), validatingFacade);
+  /**
+   * Wraps a command's base facade with pre-send schema validation, applied
+   * identically on `send` and each payload of `sendBatch`.
+   */
+  private wrapCommandFacadeWithValidation({
+    baseFacade,
+    cmdEntry,
+  }: {
+    baseFacade: EventSourcedQueueProcessor<Record<string, unknown>>;
+    cmdEntry: CommandRegistryEntry<EventType>;
+  }): EventSourcedQueueProcessor<any> {
+    return {
+      send: async (payload: any, options?: QueueSendOptions<any>) => {
+        this.validateCommandPayloadOrThrow({ cmdEntry, payload });
+        return baseFacade.send(payload, options);
+      },
+      sendBatch: async (payloads: any[], options?: QueueSendOptions<any>) => {
+        for (const payload of payloads) {
+          this.validateCommandPayloadOrThrow({ cmdEntry, payload });
+        }
+        return baseFacade.sendBatch(payloads, options);
+      },
+      close: baseFacade.close,
+      waitUntilReady: baseFacade.waitUntilReady,
+    };
+  }
+
+  /** Validates a command payload against its schema, throwing the same {@link ValidationError} shape on failure. */
+  private validateCommandPayloadOrThrow({
+    cmdEntry,
+    payload,
+  }: {
+    cmdEntry: CommandRegistryEntry<EventType>;
+    payload: any;
+  }): void {
+    const validation = cmdEntry.schema.validate(payload);
+    if (!validation.success) {
+      throw new ValidationError({
+        reason: `Invalid payload for command type "${cmdEntry.commandType}". Validation failed.`,
+        field: "payload",
+        context: {
+          commandType: cmdEntry.commandType,
+          zodIssues: mapZodIssuesToLogContext(validation.error.issues),
+        },
+      });
     }
   }
 

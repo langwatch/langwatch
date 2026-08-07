@@ -26,6 +26,17 @@ interface QueuedJob<Payload> {
   reject: (error: Error) => void;
 }
 
+function isSpanAttributeValue(
+  value: unknown,
+): value is string | number | boolean {
+  return (
+    value !== undefined &&
+    (typeof value === "string" ||
+      typeof value === "number" ||
+      typeof value === "boolean")
+  );
+}
+
 /**
  * Minimal in-memory queue processor for dev/test environments.
  * Processes jobs asynchronously with simple concurrency control.
@@ -99,6 +110,73 @@ export class EventSourcedQueueProcessorMemory<
     return `${this.queueName}:${payloadId}`;
   }
 
+  /**
+   * Squashes a send onto its in-flight dedup peer, or discards it while still
+   * suppressed post-dispatch. Returns true when the send was fully handled
+   * this way and the caller must not stage a new job.
+   */
+  private handleDeduplicatedSend(params: {
+    deduplicationId: string;
+    dedup: DeduplicationConfig<Payload> | undefined;
+    payload: Payload;
+    jobId: string;
+    now: number;
+    dispatchAt: number;
+    dedupExpiresAt: number | undefined;
+  }): boolean {
+    const {
+      deduplicationId,
+      dedup,
+      payload,
+      jobId,
+      now,
+      dispatchAt,
+      dedupExpiresAt,
+    } = params;
+
+    const suppressedUntil =
+      this.suppressedUntilByDeduplicationId.get(deduplicationId);
+    if (suppressedUntil !== undefined) {
+      if (suppressedUntil > now) {
+        this.logger.debug(
+          { queueName: this.queueName, jobId, deduplicationId },
+          "Discarded send: dedup id still suppressed after dispatch",
+        );
+        return true;
+      }
+      this.suppressedUntilByDeduplicationId.delete(deduplicationId);
+    }
+
+    const existingJob = this.pendingJobsByDeduplicationId.get(deduplicationId);
+    if (!existingJob) return false;
+
+    const expired =
+      existingJob.dedupExpiresAt !== undefined &&
+      existingJob.dedupExpiresAt <= now;
+    if (expired) {
+      // The window closed while the job waited. It still runs, but it
+      // stops absorbing sends so this one stages as genuinely new.
+      this.pendingJobsByDeduplicationId.delete(deduplicationId);
+      return false;
+    }
+
+    if (dedup?.replace !== false) {
+      existingJob.payload = payload;
+    }
+    // `extend` moves the DEADLINE, matching GroupQueue. Left off, the
+    // window stays pinned to the send that opened it, so a continuous
+    // stream cannot defer its own job indefinitely.
+    if (dedup?.extend !== false) {
+      existingJob.dispatchAt = dispatchAt;
+      existingJob.dedupExpiresAt = dedupExpiresAt;
+    }
+    this.logger.debug(
+      { queueName: this.queueName, jobId, deduplicationId },
+      "Squashed onto existing job with same deduplication ID",
+    );
+    return true;
+  }
+
   async send(
     payload: Payload,
     options?: QueueSendOptions<Payload>,
@@ -118,48 +196,19 @@ export class EventSourcedQueueProcessorMemory<
       dedup?.ttlMs === undefined ? undefined : now + dedup.ttlMs;
 
     // Simple job deduplication: squash onto existing job with same deduplication ID
-    if (deduplicationId) {
-      const suppressedUntil =
-        this.suppressedUntilByDeduplicationId.get(deduplicationId);
-      if (suppressedUntil !== undefined) {
-        if (suppressedUntil > now) {
-          this.logger.debug(
-            { queueName: this.queueName, jobId, deduplicationId },
-            "Discarded send: dedup id still suppressed after dispatch",
-          );
-          return;
-        }
-        this.suppressedUntilByDeduplicationId.delete(deduplicationId);
-      }
-
-      const existingJob =
-        this.pendingJobsByDeduplicationId.get(deduplicationId);
-      if (existingJob) {
-        const expired =
-          existingJob.dedupExpiresAt !== undefined &&
-          existingJob.dedupExpiresAt <= now;
-        if (expired) {
-          // The window closed while the job waited. It still runs, but it
-          // stops absorbing sends so this one stages as genuinely new.
-          this.pendingJobsByDeduplicationId.delete(deduplicationId);
-        } else {
-          if (dedup?.replace !== false) {
-            existingJob.payload = payload;
-          }
-          // `extend` moves the DEADLINE, matching GroupQueue. Left off, the
-          // window stays pinned to the send that opened it, so a continuous
-          // stream cannot defer its own job indefinitely.
-          if (dedup?.extend !== false) {
-            existingJob.dispatchAt = dispatchAt;
-            existingJob.dedupExpiresAt = dedupExpiresAt;
-          }
-          this.logger.debug(
-            { queueName: this.queueName, jobId, deduplicationId },
-            "Squashed onto existing job with same deduplication ID",
-          );
-          return;
-        }
-      }
+    if (
+      deduplicationId &&
+      this.handleDeduplicatedSend({
+        deduplicationId,
+        dedup,
+        payload,
+        jobId,
+        now,
+        dispatchAt,
+        dedupExpiresAt,
+      })
+    ) {
+      return;
     }
 
     // Queue job and process asynchronously
@@ -284,6 +333,40 @@ export class EventSourcedQueueProcessorMemory<
   }
 
   /**
+   * Runs `spanAttributes` and filters its result down to primitive values a
+   * span accepts. If it throws, logs and continues with no custom attributes
+   * rather than failing the job over an observability hook.
+   */
+  private extractCustomAttributes(
+    job: QueuedJob<Payload>,
+  ): Record<string, string | number | boolean> {
+    const customAttributes: Record<string, string | number | boolean> = {};
+    if (!this.spanAttributes) return customAttributes;
+    try {
+      const attributes = this.spanAttributes(job.payload);
+      // Filter out undefined values and convert to the expected type
+      for (const [key, value] of Object.entries(attributes)) {
+        if (isSpanAttributeValue(value)) {
+          customAttributes[key] = value;
+        }
+      }
+    } catch (error) {
+      // If spanAttributes throws, log error and continue with base attributes only
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      this.logger.error(
+        {
+          queueName: this.queueName,
+          jobId: job.jobId,
+          error: errorMessage,
+        },
+        "Failed to extract span attributes from payload",
+      );
+    }
+    return customAttributes;
+  }
+
+  /**
    * Processes a single job with tracing and error handling. The delay is
    * already spent — the scheduler holds a job in the queue until it is due.
    */
@@ -292,38 +375,10 @@ export class EventSourcedQueueProcessorMemory<
       "queue.name": this.queueName,
       "queue.job_id": job.jobId ?? "unknown",
     };
-
-    const customAttributes: Record<string, string | number | boolean> = {};
-    if (this.spanAttributes) {
-      try {
-        const attributes = this.spanAttributes(job.payload);
-        // Filter out undefined values and convert to the expected type
-        for (const [key, value] of Object.entries(attributes)) {
-          if (value !== undefined) {
-            if (
-              typeof value === "string" ||
-              typeof value === "number" ||
-              typeof value === "boolean"
-            ) {
-              customAttributes[key] = value;
-            }
-          }
-        }
-      } catch (error) {
-        // If spanAttributes throws, log error and continue with base attributes only
-        const errorMessage =
-          error instanceof Error ? error.message : String(error);
-        this.logger.error(
-          {
-            queueName: this.queueName,
-            jobId: job.jobId,
-            error: errorMessage,
-          },
-          "Failed to extract span attributes from payload",
-        );
-      }
-    }
-    const attributes = { ...baseAttributes, ...customAttributes };
+    const attributes = {
+      ...baseAttributes,
+      ...this.extractCustomAttributes(job),
+    };
 
     try {
       await this.tracer.withActiveSpan(

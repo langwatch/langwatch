@@ -78,6 +78,170 @@ function assertMoveStaysOutOfPersonalWorkspaces({
   }
 }
 
+/**
+ * Creates a new team to hold the project when the caller didn't pick an
+ * existing one — named from `newTeamName` or falling back to the project's
+ * own name — and makes the creating user its ADMIN via a role binding.
+ */
+async function ensureTeamForNewProject({
+  prisma,
+  organizationId,
+  userId,
+  newTeamName,
+  projectName,
+}: {
+  prisma: PrismaClient;
+  organizationId: string;
+  userId: string;
+  newTeamName: string | undefined;
+  projectName: string;
+}): Promise<string> {
+  const teamName = newTeamName ?? projectName;
+  const teamNanoId = nanoid();
+  const newTeamId = `team_${teamNanoId}`;
+  const teamSlug =
+    slugify(teamName, { lower: true, strict: true }) +
+    "-" +
+    newTeamId.substring(0, 6);
+  const team = await prisma.team.create({
+    data: {
+      id: newTeamId,
+      name: teamName,
+      slug: teamSlug,
+      organizationId,
+    },
+  });
+  await prisma.roleBinding.create({
+    data: {
+      id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+      organizationId,
+      userId,
+      role: TeamUserRole.ADMIN,
+      scopeType: RoleBindingScopeType.TEAM,
+      scopeId: team.id,
+    },
+  });
+  return team.id;
+}
+
+/**
+ * Best-effort: mint Langy's gateway virtual key so it shows up in the
+ * user's /virtual-keys list from day 1 (configurable model + fallback
+ * chain + spend tracking like any other VK). Same best-effort contract as
+ * the API key: failure here doesn't block project creation; the credential
+ * service re-attempts on first /chat call.
+ */
+async function provisionLangyVirtualKeyBestEffort({
+  prisma,
+  projectId,
+  organizationId,
+  actorUserId,
+}: {
+  prisma: PrismaClient;
+  projectId: string;
+  organizationId: string;
+  actorUserId: string;
+}): Promise<void> {
+  try {
+    await provisionLangyVirtualKey({
+      prisma,
+      projectId,
+      organizationId,
+      actorUserId,
+    });
+  } catch (error) {
+    captureException(toError(error), {
+      extra: {
+        projectId,
+        context: "provisionLangyVirtualKey:project.create",
+      },
+    });
+  }
+}
+
+/**
+ * When a project move is requested, validates the destination team exists,
+ * is active, and belongs to the same org, then enforces the
+ * personal-workspace boundary on the move itself.
+ */
+async function assertValidTeamMove({
+  prisma,
+  teamId,
+  project,
+}: {
+  prisma: PrismaClient;
+  teamId: string | undefined;
+  project: {
+    teamId: string;
+    isPersonal: boolean;
+    team: { organizationId: string };
+  };
+}): Promise<void> {
+  if (!teamId) return;
+
+  const destinationTeam = await prisma.team.findFirst({
+    where: {
+      id: teamId,
+      organizationId: project.team.organizationId,
+      archivedAt: null,
+    },
+    select: { id: true, isPersonal: true },
+  });
+  if (!destinationTeam) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message:
+        "Destination team not found, is archived, or belongs to a different organization",
+    });
+  }
+
+  assertMoveStaysOutOfPersonalWorkspaces({
+    isMovingTeams: teamId !== project.teamId,
+    isProjectPersonal: project.isPersonal,
+    isDestinationTeamPersonal: destinationTeam.isPersonal,
+  });
+}
+
+/** Builds the `project.update` patch from the mutation input, defaulting the two toggles from the current row. */
+function buildProjectUpdateData({
+  input,
+  project,
+}: {
+  input: {
+    name?: string;
+    language?: string;
+    framework?: string;
+    teamId?: string;
+    traceSharingEnabled?: boolean;
+    presenceEnabled?: boolean;
+    userLinkTemplate?: string;
+    s3Endpoint?: string;
+    s3AccessKeyId?: string;
+    s3SecretAccessKey?: string;
+    s3Bucket?: string;
+  };
+  project: { traceSharingEnabled: boolean; presenceEnabled: boolean };
+}): Prisma.ProjectUpdateInput {
+  return {
+    ...(input.name !== undefined && { name: input.name }),
+    ...(input.language !== undefined && { language: input.language }),
+    ...(input.framework !== undefined && { framework: input.framework }),
+    ...(input.userLinkTemplate !== undefined && {
+      userLinkTemplate: input.userLinkTemplate,
+    }),
+    ...(input.teamId && { teamId: input.teamId }),
+    traceSharingEnabled:
+      input.traceSharingEnabled ?? project.traceSharingEnabled,
+    presenceEnabled: input.presenceEnabled ?? project.presenceEnabled,
+    s3Endpoint: input.s3Endpoint ? encrypt(input.s3Endpoint) : null,
+    s3AccessKeyId: input.s3AccessKeyId ? encrypt(input.s3AccessKeyId) : null,
+    s3SecretAccessKey: input.s3SecretAccessKey
+      ? encrypt(input.s3SecretAccessKey)
+      : null,
+    s3Bucket: input.s3Bucket,
+  };
+}
+
 export const projectRouter = createTRPCRouter({
   create: protectedProcedure
     .input(
@@ -142,36 +306,15 @@ export const projectRouter = createTRPCRouter({
         });
       }
 
-      let teamId = input.teamId;
-      if (!teamId) {
-        const teamName = input.newTeamName ?? input.name;
-        const teamNanoId = nanoid();
-        const newTeamId = `team_${teamNanoId}`;
-        const teamSlug =
-          slugify(teamName, { lower: true, strict: true }) +
-          "-" +
-          newTeamId.substring(0, 6);
-        const team = await prisma.team.create({
-          data: {
-            id: newTeamId,
-            name: teamName,
-            slug: teamSlug,
-            organizationId: input.organizationId,
-          },
-        });
-        await prisma.roleBinding.create({
-          data: {
-            id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-            organizationId: input.organizationId,
-            userId: userId,
-            role: TeamUserRole.ADMIN,
-            scopeType: RoleBindingScopeType.TEAM,
-            scopeId: team.id,
-          },
-        });
-
-        teamId = team.id;
-      }
+      const teamId =
+        input.teamId ??
+        (await ensureTeamForNewProject({
+          prisma,
+          organizationId: input.organizationId,
+          userId,
+          newTeamName: input.newTeamName,
+          projectName: input.name,
+        }));
 
       const project = await prisma.project.create({
         data: {
@@ -189,26 +332,12 @@ export const projectRouter = createTRPCRouter({
       // gone — Langy now mints a per-turn, per-user session key scoped to exactly
       // what the caller holds; no long-lived project key is provisioned.)
 
-      // Best-effort: mint Langy's gateway virtual key so it shows up in the
-      // user's /virtual-keys list from day 1 (configurable model + fallback
-      // chain + spend tracking like any other VK). Same best-effort contract
-      // as the API key: failure here doesn't block project creation; the
-      // credential service re-attempts on first /chat call.
-      try {
-        await provisionLangyVirtualKey({
-          prisma,
-          projectId: project.id,
-          organizationId: input.organizationId,
-          actorUserId: userId,
-        });
-      } catch (error) {
-        captureException(toError(error), {
-          extra: {
-            projectId: project.id,
-            context: "provisionLangyVirtualKey:project.create",
-          },
-        });
-      }
+      await provisionLangyVirtualKeyBestEffort({
+        prisma,
+        projectId: project.id,
+        organizationId: input.organizationId,
+        actorUserId: userId,
+      });
 
       return { success: true, projectSlug: project.slug };
     }),
@@ -337,52 +466,11 @@ export const projectRouter = createTRPCRouter({
         });
       }
 
-      if (input.teamId) {
-        const destinationTeam = await prisma.team.findFirst({
-          where: {
-            id: input.teamId,
-            organizationId: project.team.organizationId,
-            archivedAt: null,
-          },
-          select: { id: true, isPersonal: true },
-        });
-        if (!destinationTeam) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message:
-              "Destination team not found, is archived, or belongs to a different organization",
-          });
-        }
-
-        assertMoveStaysOutOfPersonalWorkspaces({
-          isMovingTeams: input.teamId !== project.teamId,
-          isProjectPersonal: project.isPersonal,
-          isDestinationTeamPersonal: destinationTeam.isPersonal,
-        });
-      }
+      await assertValidTeamMove({ prisma, teamId: input.teamId, project });
 
       const updatedProject = await prisma.project.update({
         where: { id: input.projectId },
-        data: {
-          ...(input.name !== undefined && { name: input.name }),
-          ...(input.language !== undefined && { language: input.language }),
-          ...(input.framework !== undefined && { framework: input.framework }),
-          ...(input.userLinkTemplate !== undefined && {
-            userLinkTemplate: input.userLinkTemplate,
-          }),
-          ...(input.teamId && { teamId: input.teamId }),
-          traceSharingEnabled:
-            input.traceSharingEnabled ?? project.traceSharingEnabled,
-          presenceEnabled: input.presenceEnabled ?? project.presenceEnabled,
-          s3Endpoint: input.s3Endpoint ? encrypt(input.s3Endpoint) : null,
-          s3AccessKeyId: input.s3AccessKeyId
-            ? encrypt(input.s3AccessKeyId)
-            : null,
-          s3SecretAccessKey: input.s3SecretAccessKey
-            ? encrypt(input.s3SecretAccessKey)
-            : null,
-          s3Bucket: input.s3Bucket,
-        },
+        data: buildProjectUpdateData({ input, project }),
       });
 
       // If trace sharing was disabled, revoke all existing trace shares

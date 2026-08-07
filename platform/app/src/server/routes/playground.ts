@@ -21,6 +21,78 @@ import { nlpgoProxyBaseURL } from "~/server/nlpgo/nlpgoFetch";
 
 const errorCache: Record<string, any> = {};
 
+/** Resolves the `{mpId}/{model}` or legacy `{provider}/{model}` wire format
+ *  to its configured model provider. Accepts either the canonical `{mpId}/
+ *  {model}` format or the legacy `{provider}/{model}`. For mp-id values we
+ *  look up the MP by id; for legacy values we resolve to the single
+ *  accessible MP for that provider (today always narrowest-wins) exactly as
+ *  before. */
+function resolveModelProvider(
+  modelProviders: Record<string, any>,
+  model: string,
+): { providerKey: string; modelProvider: any } {
+  const providerKey = model.split("/")[0] as string;
+  const modelProvider = providerKey.startsWith("mp_")
+    ? (Object.values(modelProviders).find(
+        (mp) => (mp as any).id === providerKey,
+      ) as any)
+    : modelProviders[providerKey];
+  return { providerKey, modelProvider };
+}
+
+/** Builds the Vercel AI provider that proxies through nlpgo's in-process AI
+ *  Gateway (Go playground proxy: `/go/proxy/v1/*`, no LiteLLM). Wire shape
+ *  is x-litellm-* headers + OpenAI body, read by the gatewayproxy package
+ *  and dispatched in-process. */
+async function buildPlaygroundProvider({
+  model,
+  modelProvider,
+  projectId,
+}: {
+  model: string;
+  modelProvider: any;
+  projectId: string;
+}) {
+  const litellmParams = await prepareLitellmParams({
+    model,
+    modelProvider,
+    projectId,
+  });
+  const headers = Object.fromEntries(
+    Object.entries(litellmParams).map(([key, value]) => [
+      `x-litellm-${key}`,
+      value,
+    ]),
+  );
+
+  const baseURL = nlpgoProxyBaseURL({
+    baseURL: env.LANGWATCH_NLP_SERVICE,
+  });
+  return createOpenAI({
+    apiKey: litellmParams.api_key,
+    baseURL,
+    headers,
+  });
+}
+
+/** Shapes a `streamText` failure into the wire response, caching a 401/403
+ *  provider error under `cacheKey` so the next request short-circuits
+ *  straight to it (see the `errorCache` read above). Rethrows anything else. */
+function playgroundErrorResponse(c: any, e: any, cacheKey: string): Response {
+  try {
+    if (e.statusCode === 401 || e.statusCode === 403) {
+      const error = JSON.parse(e.cause.value.responseBody);
+      errorCache[cacheKey] = {
+        error: error.error.message,
+      };
+      return c.json(error, { status: 401 });
+    }
+  } catch {
+    /* safe json parse fallback */
+  }
+  throw e;
+}
+
 const secured = createServiceApp({ basePath: "/api" });
 
 secured
@@ -64,17 +136,11 @@ secured
       return c.json({ error: "Missing model header" }, { status: 400 });
     }
 
-    // Accept either the canonical `{mpId}/{model}` wire format or the
-    // legacy `{provider}/{model}`. For mp-id values we look up the MP by
-    // id; for legacy values we resolve to the single accessible MP for
-    // that provider (today always narrowest-wins) exactly as before.
     const modelProviders = await getProjectModelProviders(projectId);
-    const providerKey = model.split("/")[0] as string;
-    const modelProvider = providerKey.startsWith("mp_")
-      ? (Object.values(modelProviders as Record<string, any>).find(
-          (mp) => (mp as any).id === providerKey,
-        ) as any)
-      : (modelProviders as Record<string, any>)[providerKey];
+    const { providerKey, modelProvider } = resolveModelProvider(
+      modelProviders as Record<string, any>,
+      model,
+    );
     if (!modelProvider) {
       return c.json(
         { error: `Provider not configured: ${providerKey}` },
@@ -97,28 +163,10 @@ secured
       return c.json(previousError, { status: 401 });
     }
 
-    const litellmParams = await prepareLitellmParams({
+    const vercelProvider = await buildPlaygroundProvider({
       model,
       modelProvider,
       projectId,
-    });
-    const headers = Object.fromEntries(
-      Object.entries(litellmParams).map(([key, value]) => [
-        `x-litellm-${key}`,
-        value,
-      ]),
-    );
-
-    // Go playground proxy: nlpgo's /go/proxy/v1/* (in-process AI Gateway,
-    // no LiteLLM). Wire shape is x-litellm-* headers + OpenAI body, read by
-    // the gatewayproxy package and dispatched in-process.
-    const baseURL = nlpgoProxyBaseURL({
-      baseURL: env.LANGWATCH_NLP_SERVICE,
-    });
-    const vercelProvider = createOpenAI({
-      apiKey: litellmParams.api_key,
-      baseURL,
-      headers,
     });
 
     const systemPrompt = c.req.header("x-system-prompt");
@@ -137,18 +185,7 @@ secured
         headers: response.headers,
       });
     } catch (e: any) {
-      try {
-        if (e.statusCode === 401 || e.statusCode === 403) {
-          const error = JSON.parse(e.cause.value.responseBody);
-          errorCache[`${projectId}_${model}`] = {
-            error: error.error.message,
-          };
-          return c.json(error, { status: 401 });
-        }
-      } catch {
-        /* safe json parse fallback */
-      }
-      throw e;
+      return playgroundErrorResponse(c, e, `${projectId}_${model}`);
     }
   });
 

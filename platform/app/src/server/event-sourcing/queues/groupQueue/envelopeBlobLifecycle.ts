@@ -234,6 +234,79 @@ export class EnvelopeBlobLifecycle {
    * Each value's release still degrades to a warn + the TTL backstop rather
    * than throwing — one bad value must not abort the rest of the batch.
    */
+  private async releaseLeaseFor(params: {
+    lease: NonNullable<ReturnType<typeof readEnvelopeLease>>;
+    expected: TenantId | undefined;
+    groupId: string;
+  }): Promise<void> {
+    const { lease, expected, groupId } = params;
+    // Tenant guard: never release a lease whose ref isn't this group's
+    // tenant. A mis-routed or forged GQ2 value must not reclaim another
+    // tenant's blob on the fail-safe cleanup path (ADR-030 §5).
+    if (lease.ref.projectId !== expected) {
+      logger.warn(
+        {
+          projectId: expected,
+          refProjectId: lease.ref.projectId,
+          blobHash: lease.ref.hash,
+          groupId,
+        },
+        "Skipping blob release for a tenant-mismatched ref",
+      );
+      return;
+    }
+    try {
+      const graced = await this.blobLeases.release({
+        projectId: lease.ref.projectId,
+        hash: lease.ref.hash,
+        holderId: lease.holderId,
+        tier: lease.ref.tier,
+      });
+      if (graced) {
+        gqBlobReleaseGraceTotal.inc({
+          queue_name: this.queueName,
+          tier: lease.ref.tier,
+        });
+      }
+    } catch (err) {
+      logger.warn(
+        {
+          projectId: lease.ref.projectId,
+          blobHash: lease.ref.hash,
+          tier: lease.ref.tier,
+          err: redactStorageUrisInText(
+            err instanceof Error ? err.message : String(err),
+          ),
+        },
+        "Blob lease release failed; relying on lease expiry",
+      );
+    }
+  }
+
+  private async releaseOneValue(params: {
+    value: string;
+    groupId: string;
+    expected: TenantId | undefined;
+  }): Promise<void> {
+    const { value, groupId, expected } = params;
+    // Single parse per value: lease + GQ1 blobId from one splitEnvelope so a
+    // maxBatch=10 coalesced completion doesn't do ~20 redundant Buffer.from +
+    // JSON.parse (2026-06-24 review).
+    const { lease, blobId } = readEnvelopeRetirement(value);
+    if (lease) {
+      await this.releaseLeaseFor({ lease, expected, groupId });
+      return;
+    }
+    if (blobId) {
+      try {
+        await this.blobs.delete({ id: blobId });
+      } catch {
+        // GQ1 blobs have no shared lifecycle beyond their own TTL;
+        // best-effort cleanup only.
+      }
+    }
+  }
+
   async releaseLease({
     values,
     groupId,
@@ -243,64 +316,7 @@ export class EnvelopeBlobLifecycle {
   }): Promise<void> {
     const expected = this.projectIdFor(groupId);
     await Promise.all(
-      values.map(async (value) => {
-        // Single parse per value: lease + GQ1 blobId from one splitEnvelope so a
-        // maxBatch=10 coalesced completion doesn't do ~20 redundant Buffer.from +
-        // JSON.parse (2026-06-24 review).
-        const { lease, blobId } = readEnvelopeRetirement(value);
-        if (lease) {
-          // Tenant guard: never release a lease whose ref isn't this group's
-          // tenant. A mis-routed or forged GQ2 value must not reclaim another
-          // tenant's blob on the fail-safe cleanup path (ADR-030 §5).
-          if (lease.ref.projectId !== expected) {
-            logger.warn(
-              {
-                projectId: expected,
-                refProjectId: lease.ref.projectId,
-                blobHash: lease.ref.hash,
-                groupId,
-              },
-              "Skipping blob release for a tenant-mismatched ref",
-            );
-            return;
-          }
-          try {
-            const graced = await this.blobLeases.release({
-              projectId: lease.ref.projectId,
-              hash: lease.ref.hash,
-              holderId: lease.holderId,
-              tier: lease.ref.tier,
-            });
-            if (graced) {
-              gqBlobReleaseGraceTotal.inc({
-                queue_name: this.queueName,
-                tier: lease.ref.tier,
-              });
-            }
-          } catch (err) {
-            logger.warn(
-              {
-                projectId: lease.ref.projectId,
-                blobHash: lease.ref.hash,
-                tier: lease.ref.tier,
-                err: redactStorageUrisInText(
-                  err instanceof Error ? err.message : String(err),
-                ),
-              },
-              "Blob lease release failed; relying on lease expiry",
-            );
-          }
-          return;
-        }
-        if (blobId) {
-          try {
-            await this.blobs.delete({ id: blobId });
-          } catch {
-            // GQ1 blobs have no shared lifecycle beyond their own TTL;
-            // best-effort cleanup only.
-          }
-        }
-      }),
+      values.map((value) => this.releaseOneValue({ value, groupId, expected })),
     );
   }
 
@@ -319,63 +335,72 @@ export class EnvelopeBlobLifecycle {
    * loudly into its own warn) before the next squash on this group can start
    * its own.
    */
-  async transferLease({
-    newValue,
-    oldValue,
-    groupId,
-  }: {
+  /**
+   * A tenant-mismatched newValue must not acquire a foreign lease (the
+   * mirror of the release-side guard). Skips the foreign replacement; the
+   * guarded release retires the old lease only when its tenant matches.
+   */
+  private async bailTransferOnTenantMismatch(params: {
+    newLease: NonNullable<ReturnType<typeof readEnvelopeLease>>;
+    expected: TenantId | undefined;
+    groupId: string;
+    oldValue: string;
+  }): Promise<void> {
+    const { newLease, expected, groupId, oldValue } = params;
+    logger.warn(
+      {
+        projectId: expected,
+        refProjectId: newLease.ref.projectId,
+        blobHash: newLease.ref.hash,
+        groupId,
+      },
+      "Skipping blob acquire for a tenant-mismatched replacement ref",
+    );
+    await this.releaseLease({ values: [oldValue], groupId });
+  }
+
+  /**
+   * Fall back to ordered take+release when either side isn't a GQ2 lease, or
+   * when the old ref isn't this group's tenant — the guarded release then
+   * skips the foreign lease, leaving it to its TTL.
+   *
+   * This branch dominates during the GQ1 → GQ2 rollout window: new encodes
+   * are GQ2 but in-flight staged values are still GQ1, so `!oldLease` fires
+   * on every retry/squash. Take-then-release is ORDERED (not parallel
+   * fire-and-forget) so a release-before-acquire race can't drop the old
+   * blob before the new lease is recorded.
+   */
+  private async transferByTakeThenRelease(params: {
     newValue: string;
     oldValue: string;
     groupId: string;
+    newLease: ReturnType<typeof readEnvelopeLease>;
   }): Promise<void> {
-    const expected = this.projectIdFor(groupId);
-    const newLease = readEnvelopeLease(newValue);
-    const oldLease = readEnvelopeLease(oldValue);
-    // A tenant-mismatched newValue must not acquire a foreign lease (the
-    // mirror of the release-side guard). Skip the foreign replacement; the
-    // guarded release retires the old lease only when its tenant matches.
-    if (newLease && newLease.ref.projectId !== expected) {
+    const { newValue, oldValue, groupId, newLease } = params;
+    try {
+      await this.takeLeaseOrThrow(newValue);
+    } catch (err) {
       logger.warn(
         {
-          projectId: expected,
-          refProjectId: newLease.ref.projectId,
-          blobHash: newLease.ref.hash,
+          refProjectId: newLease?.ref.projectId,
+          blobHash: newLease?.ref.hash,
           groupId,
+          err: redactStorageUrisInText(
+            err instanceof Error ? err.message : String(err),
+          ),
         },
-        "Skipping blob acquire for a tenant-mismatched replacement ref",
+        "transfer fallback: acquire failed; skipping release to keep old blob alive under TTL",
       );
-      await this.releaseLease({ values: [oldValue], groupId });
       return;
     }
-    // Fall back to ordered take+release when either side isn't a GQ2 lease, or
-    // when the old ref isn't this group's tenant — the guarded release then
-    // skips the foreign lease, leaving it to its TTL.
-    //
-    // This branch dominates during the GQ1 → GQ2 rollout window: new encodes
-    // are GQ2 but in-flight staged values are still GQ1, so `!oldLease` fires
-    // on every retry/squash. Take-then-release is ORDERED (not parallel
-    // fire-and-forget) so a release-before-acquire race can't drop the old
-    // blob before the new lease is recorded.
-    if (!newLease || !oldLease || oldLease.ref.projectId !== expected) {
-      try {
-        await this.takeLeaseOrThrow(newValue);
-      } catch (err) {
-        logger.warn(
-          {
-            refProjectId: newLease?.ref.projectId,
-            blobHash: newLease?.ref.hash,
-            groupId,
-            err: redactStorageUrisInText(
-              err instanceof Error ? err.message : String(err),
-            ),
-          },
-          "transfer fallback: acquire failed; skipping release to keep old blob alive under TTL",
-        );
-        return;
-      }
-      await this.releaseLease({ values: [oldValue], groupId });
-      return;
-    }
+    await this.releaseLease({ values: [oldValue], groupId });
+  }
+
+  private async transferAtomic(params: {
+    newLease: NonNullable<ReturnType<typeof readEnvelopeLease>>;
+    oldLease: NonNullable<ReturnType<typeof readEnvelopeLease>>;
+  }): Promise<void> {
+    const { newLease, oldLease } = params;
     try {
       const graced = await this.blobLeases.transfer({
         newProjectId: newLease.ref.projectId,
@@ -405,6 +430,57 @@ export class EnvelopeBlobLifecycle {
         "Blob lease transfer failed; relying on the TTL backstop",
       );
     }
+  }
+
+  /**
+   * Atomically moves the lease from a retired value to its replacement (retry
+   * re-encode or dedup squash): one eval takes the new lease and drops the old.
+   * No transfer path deletes blobs. Falls back to
+   * ordered take+release when either side isn't a GQ2 lease.
+   *
+   * Awaited by the caller (2026-07-11 fix): this was previously fire-and-forget
+   * end to end, so a killed worker process — or simply a subsequent squash on
+   * the same group racing ahead before this one's Redis round trip landed —
+   * could interleave with another transfer/release for the same blob in
+   * whatever order the network happened to deliver them, rather than the
+   * caller's own call order. Awaiting makes each transfer complete (or fail
+   * loudly into its own warn) before the next squash on this group can start
+   * its own.
+   */
+  async transferLease({
+    newValue,
+    oldValue,
+    groupId,
+  }: {
+    newValue: string;
+    oldValue: string;
+    groupId: string;
+  }): Promise<void> {
+    const expected = this.projectIdFor(groupId);
+    const newLease = readEnvelopeLease(newValue);
+    const oldLease = readEnvelopeLease(oldValue);
+
+    if (newLease && newLease.ref.projectId !== expected) {
+      await this.bailTransferOnTenantMismatch({
+        newLease,
+        expected,
+        groupId,
+        oldValue,
+      });
+      return;
+    }
+
+    if (!newLease || !oldLease || oldLease.ref.projectId !== expected) {
+      await this.transferByTakeThenRelease({
+        newValue,
+        oldValue,
+        groupId,
+        newLease,
+      });
+      return;
+    }
+
+    await this.transferAtomic({ newLease, oldLease });
   }
 
   /**

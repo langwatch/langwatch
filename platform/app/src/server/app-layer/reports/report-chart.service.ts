@@ -176,34 +176,31 @@ async function loadGraphs({
   return [];
 }
 
-async function buildChart({
-  deps,
-  graph,
-  projectId,
-  from,
-  to,
-}: {
-  deps: ReportChartDeps;
-  graph: CustomGraph;
-  projectId: string;
-  from: number;
-  to: number;
-}): Promise<ReportChart> {
-  const graphData = graph.graph as unknown as CustomGraphInput;
-  const type = chartTypeOf(graphData.graphType);
-  const seriesInputs: SeriesInputType[] = (graphData.series ?? [])
-    .slice(0, MAX_SERIES)
-    .map((series) => ({
-      metric: series.metric,
-      aggregation: series.aggregation,
-      key: series.key,
-      subkey: series.subkey,
-      pipeline: series.pipeline,
-      filters: series.filters,
-      asPercent: series.asPercent,
-    }));
+/** Trims a graph's series list to the Slack cap and to the analytics query shape. */
+function buildChartSeriesInputs(
+  graphData: CustomGraphInput,
+): SeriesInputType[] {
+  return (graphData.series ?? []).slice(0, MAX_SERIES).map((series) => ({
+    metric: series.metric,
+    aggregation: series.aggregation,
+    key: series.key,
+    subkey: series.subkey,
+    pipeline: series.pipeline,
+    filters: series.filters,
+    asPercent: series.asPercent,
+  }));
+}
 
-  const empty: ReportChart = {
+/** The zero-data chart shape: returned as-is when there is nothing to plot,
+ *  and spread as the base of a populated chart below. */
+function emptyChart({
+  graph,
+  type,
+}: {
+  graph: CustomGraph;
+  type: ReportChart["type"];
+}): ReportChart {
+  return {
     id: graph.id,
     title: graph.name,
     type,
@@ -213,9 +210,26 @@ async function buildChart({
     total: 0,
     isEmpty: true,
   };
-  if (seriesInputs.length === 0) return empty;
+}
 
-  const timeseries = await deps.getTimeseries({
+async function fetchChartTimeseries({
+  deps,
+  graph,
+  graphData,
+  seriesInputs,
+  projectId,
+  from,
+  to,
+}: {
+  deps: ReportChartDeps;
+  graph: CustomGraph;
+  graphData: CustomGraphInput;
+  seriesInputs: SeriesInputType[];
+  projectId: string;
+  from: number;
+  to: number;
+}): Promise<TimeseriesResult> {
+  return deps.getTimeseries({
     projectId,
     startDate: from,
     endDate: to,
@@ -227,36 +241,52 @@ async function buildChart({
     // in the report's timezone, so the buckets only need to be stable.
     timeZone: "UTC",
   });
+}
 
-  const buckets = timeseries.currentPeriod;
-  if (buckets.length === 0) return empty;
+function buildPieChart({
+  empty,
+  buckets,
+  bucketKeys,
+  seriesInputs,
+  graphData,
+}: {
+  empty: ReportChart;
+  buckets: TimeseriesResult["currentPeriod"];
+  bucketKeys: string[];
+  seriesInputs: SeriesInputType[];
+  graphData: CustomGraphInput;
+}): ReportChart {
+  const segments = pieSegments({
+    buckets,
+    bucketKeys,
+    seriesInputs,
+    names: graphData.series ?? [],
+    groupBy: graphData.groupBy,
+  });
+  const total = segments.reduce((sum, segment) => sum + segment.value, 0);
+  return {
+    ...empty,
+    segments: segments.slice(0, MAX_SEGMENTS),
+    total,
+    // Slack rejects a pie whose segments are all zero, and a chart of nothing
+    // is not worth sending — fall back to the empty-report copy.
+    isEmpty: segments.length === 0 || total <= 0,
+  };
+}
 
-  // Result buckets key each series by `buildSeriesName(input, queryIndex)`, NOT
-  // by the series' display name — the two encodings differ, and reading by the
-  // display name silently yields zeroes.
-  const bucketKeys = seriesInputs.map((input, index) =>
-    buildSeriesName(input, index),
-  );
-
-  if (type === "pie") {
-    const segments = pieSegments({
-      buckets,
-      bucketKeys,
-      seriesInputs,
-      names: graphData.series ?? [],
-      groupBy: graphData.groupBy,
-    });
-    const total = segments.reduce((sum, segment) => sum + segment.value, 0);
-    return {
-      ...empty,
-      segments: segments.slice(0, MAX_SEGMENTS),
-      total,
-      // Slack rejects a pie whose segments are all zero, and a chart of nothing
-      // is not worth sending — fall back to the empty-report copy.
-      isEmpty: segments.length === 0 || total <= 0,
-    };
-  }
-
+function buildSeriesChart({
+  empty,
+  buckets,
+  bucketKeys,
+  seriesInputs,
+  graphData,
+}: {
+  empty: ReportChart;
+  buckets: TimeseriesResult["currentPeriod"];
+  bucketKeys: string[];
+  seriesInputs: SeriesInputType[];
+  graphData: CustomGraphInput;
+}): ReportChart {
   const timeScale = graphData.timeScale ?? 60;
   const categories = buckets.map((bucket) =>
     formatBucketLabel({ date: bucket.date, timeScale }),
@@ -289,6 +319,65 @@ async function buildChart({
       one.data.every((point) => point.value === 0),
     ),
   };
+}
+
+async function buildChart({
+  deps,
+  graph,
+  projectId,
+  from,
+  to,
+}: {
+  deps: ReportChartDeps;
+  graph: CustomGraph;
+  projectId: string;
+  from: number;
+  to: number;
+}): Promise<ReportChart> {
+  const graphData = graph.graph as unknown as CustomGraphInput;
+  const type = chartTypeOf(graphData.graphType);
+  const seriesInputs = buildChartSeriesInputs(graphData);
+
+  const empty = emptyChart({ graph, type });
+  if (seriesInputs.length === 0) return empty;
+
+  const timeseries = await fetchChartTimeseries({
+    deps,
+    graph,
+    graphData,
+    seriesInputs,
+    projectId,
+    from,
+    to,
+  });
+
+  const buckets = timeseries.currentPeriod;
+  if (buckets.length === 0) return empty;
+
+  // Result buckets key each series by `buildSeriesName(input, queryIndex)`, NOT
+  // by the series' display name — the two encodings differ, and reading by the
+  // display name silently yields zeroes.
+  const bucketKeys = seriesInputs.map((input, index) =>
+    buildSeriesName(input, index),
+  );
+
+  if (type === "pie") {
+    return buildPieChart({
+      empty,
+      buckets,
+      bucketKeys,
+      seriesInputs,
+      graphData,
+    });
+  }
+
+  return buildSeriesChart({
+    empty,
+    buckets,
+    bucketKeys,
+    seriesInputs,
+    graphData,
+  });
 }
 
 /**

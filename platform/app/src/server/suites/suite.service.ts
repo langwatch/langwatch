@@ -57,6 +57,63 @@ type ResolvedTargetReferences = {
   missing: SuiteTarget[];
 };
 
+// Positive filter so that future SuiteTarget["type"] additions must be
+// explicitly handled here instead of silently routing into the agent path.
+const partitionTargetsByType = (
+  targets: SuiteTarget[],
+): { agentTargets: SuiteTarget[]; promptTargets: SuiteTarget[] } => ({
+  agentTargets: targets.filter((t) => isSuiteAgentTargetType(t.type)),
+  promptTargets: targets.filter((t) => t.type === "prompt"),
+});
+
+const classifyAgentTargets = (
+  agentTargets: SuiteTarget[],
+  agentMap: Map<string, { archivedAt: Date | null }>,
+): {
+  active: SuiteTarget[];
+  archived: SuiteTarget[];
+  missing: SuiteTarget[];
+} => {
+  const active: SuiteTarget[] = [];
+  const archived: SuiteTarget[] = [];
+  const missing: SuiteTarget[] = [];
+
+  for (const target of agentTargets) {
+    const row = agentMap.get(target.referenceId);
+    if (!row) {
+      missing.push(target);
+    } else if (row.archivedAt) {
+      archived.push(target);
+    } else {
+      active.push(target);
+    }
+  }
+
+  return { active, archived, missing };
+};
+
+// Prompt targets use `deletedAt` (soft-delete) rather than `archivedAt`, so
+// they can only be "active" or "missing" -- never "archived". This asymmetry
+// exists because LlmPromptConfig does not yet support `archivedAt`.
+// See: https://github.com/langwatch/langwatch/issues/1889
+const classifyPromptTargets = (
+  promptTargets: SuiteTarget[],
+  promptExistingIds: Set<string>,
+): { active: SuiteTarget[]; missing: SuiteTarget[] } => {
+  const active: SuiteTarget[] = [];
+  const missing: SuiteTarget[] = [];
+
+  for (const target of promptTargets) {
+    if (promptExistingIds.has(target.referenceId)) {
+      active.push(target);
+    } else {
+      missing.push(target);
+    }
+  }
+
+  return { active, missing };
+};
+
 export class SuiteService {
   private readonly repository: SuiteRepository;
   private readonly scenarioRepository: ScenarioRepository;
@@ -537,55 +594,64 @@ export class SuiteService {
     organizationId: string;
   }): Promise<ResolvedTargetReferences> {
     const { targets, projectId, organizationId } = params;
+    const { agentTargets, promptTargets } = partitionTargetsByType(targets);
 
-    // Partition targets by type. Use a positive filter so that future SuiteTarget["type"] additions
-    // must be explicitly handled here instead of silently routing into the agent path.
-    const agentTargets = targets.filter((t) => isSuiteAgentTargetType(t.type));
-    const promptTargets = targets.filter((t) => t.type === "prompt");
+    const agentMap = await this.fetchAgentArchivalMap({
+      agentTargets,
+      projectId,
+    });
+    const promptExistingIds = await this.fetchPromptExistingIds({
+      promptTargets,
+      projectId,
+      organizationId,
+    });
 
-    // Batch agent targets (both HTTP and code agents live in the Agent table)
-    const agentRows =
-      agentTargets.length > 0
-        ? await this.agentRepository.findManyIncludingArchived({
-            ids: agentTargets.map((t) => t.referenceId),
-            projectId,
-          })
-        : [];
-    const agentMap = new Map(agentRows.map((r) => [r.id, r]));
+    const agentResult = classifyAgentTargets(agentTargets, agentMap);
+    const promptResult = classifyPromptTargets(
+      promptTargets,
+      promptExistingIds,
+    );
 
-    // Batch prompt targets
-    const promptExistingIds =
-      promptTargets.length > 0
-        ? await this.llmConfigRepository.findExistingIds({
-            ids: promptTargets.map((t) => t.referenceId),
-            projectId,
-            organizationId,
-          })
-        : new Set<string>();
+    return {
+      active: [...agentResult.active, ...promptResult.active],
+      archived: agentResult.archived,
+      missing: [...agentResult.missing, ...promptResult.missing],
+    };
+  }
 
-    const active: SuiteTarget[] = [];
-    const archived: SuiteTarget[] = [];
-    const missing: SuiteTarget[] = [];
+  // Batch agent targets (both HTTP and code agents live in the Agent table)
+  private async fetchAgentArchivalMap({
+    agentTargets,
+    projectId,
+  }: {
+    agentTargets: SuiteTarget[];
+    projectId: string;
+  }): Promise<Map<string, { archivedAt: Date | null }>> {
+    if (agentTargets.length === 0) return new Map();
 
-    for (const target of agentTargets) {
-      const row = agentMap.get(target.referenceId);
-      if (!row) {
-        missing.push(target);
-      } else if (row.archivedAt) {
-        archived.push(target);
-      } else {
-        active.push(target);
-      }
-    }
+    const agentRows = await this.agentRepository.findManyIncludingArchived({
+      ids: agentTargets.map((t) => t.referenceId),
+      projectId,
+    });
+    return new Map(agentRows.map((r) => [r.id, r]));
+  }
 
-    for (const target of promptTargets) {
-      if (promptExistingIds.has(target.referenceId)) {
-        active.push(target);
-      } else {
-        missing.push(target);
-      }
-    }
+  // Batch prompt targets
+  private async fetchPromptExistingIds({
+    promptTargets,
+    projectId,
+    organizationId,
+  }: {
+    promptTargets: SuiteTarget[];
+    projectId: string;
+    organizationId: string;
+  }): Promise<Set<string>> {
+    if (promptTargets.length === 0) return new Set();
 
-    return { active, archived, missing };
+    return this.llmConfigRepository.findExistingIds({
+      ids: promptTargets.map((t) => t.referenceId),
+      projectId,
+      organizationId,
+    });
   }
 }

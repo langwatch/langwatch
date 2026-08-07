@@ -11,12 +11,7 @@ import type { LangyTurnServiceDeps } from "./langy-turn.service";
 const logger = createLogger("langwatch:langy:turn-dependencies");
 const tracer = getLangWatchTracer("langwatch.langy.chat");
 
-/**
- * Resolves every project-scoped dependency in one latency window. allSettled is
- * intentional: each port has distinct domain-error mapping, so fail-fast would
- * lose the reason while providing no useful cancellation of the other calls.
- */
-export async function resolveLangyTurnBaseDependencies(args: {
+type LangyTurnBaseDependenciesArgs = {
   deps: Pick<
     LangyTurnServiceDeps,
     "conversations" | "credentials" | "resolveModel"
@@ -26,22 +21,23 @@ export async function resolveLangyTurnBaseDependencies(args: {
   session: Session;
   requestedConversationId: string | null;
   modelOverride?: string;
-}) {
-  const {
-    deps,
-    projectId,
-    userId,
-    session,
-    requestedConversationId,
-    modelOverride,
-  } = args;
-  const [
-    conversationResult,
-    modelResult,
-    credentialsResult,
-    egressResult,
-    mirrorTierResult,
-  ] = await tracer.withActiveSpan(
+};
+
+/**
+ * Fire every project-scoped dependency call in one latency window. allSettled
+ * is intentional: each port has distinct domain-error mapping, so fail-fast
+ * would lose the reason while providing no useful cancellation of the other
+ * calls. Split out of `resolveLangyTurnBaseDependencies`.
+ */
+async function fetchLangyTurnBaseDependencies({
+  deps,
+  projectId,
+  userId,
+  session,
+  requestedConversationId,
+  modelOverride,
+}: LangyTurnBaseDependenciesArgs) {
+  return tracer.withActiveSpan(
     "langy.chat.phase2_dependencies",
     {
       attributes: {
@@ -72,7 +68,31 @@ export async function resolveLangyTurnBaseDependencies(args: {
         deps.credentials.resolveMirrorTier({ projectId }),
       ]),
   );
+}
 
+type LangyTurnBaseDependenciesTuple = Awaited<
+  ReturnType<typeof fetchLangyTurnBaseDependencies>
+>;
+
+/**
+ * Validate the settled results and assemble the resolved dependency bundle.
+ * Split out of `resolveLangyTurnBaseDependencies`.
+ */
+function assembleLangyTurnBaseDependencies({
+  conversationResult,
+  modelResult,
+  credentialsResult,
+  egressResult,
+  mirrorTierResult,
+  projectId,
+}: {
+  conversationResult: LangyTurnBaseDependenciesTuple[0];
+  modelResult: LangyTurnBaseDependenciesTuple[1];
+  credentialsResult: LangyTurnBaseDependenciesTuple[2];
+  egressResult: LangyTurnBaseDependenciesTuple[3];
+  mirrorTierResult: LangyTurnBaseDependenciesTuple[4];
+  projectId: string;
+}) {
   if (conversationResult.status === "rejected") {
     throw conversationResult.reason;
   }
@@ -118,4 +138,30 @@ export async function resolveLangyTurnBaseDependencies(args: {
     // exactly when an override made the lookup unnecessary.
     resolvedModel: modelResult.value?.modelId ?? null,
   };
+}
+
+/**
+ * Resolves every project-scoped dependency in one latency window. allSettled is
+ * intentional: each port has distinct domain-error mapping, so fail-fast would
+ * lose the reason while providing no useful cancellation of the other calls.
+ */
+export async function resolveLangyTurnBaseDependencies(
+  args: LangyTurnBaseDependenciesArgs,
+) {
+  const [
+    conversationResult,
+    modelResult,
+    credentialsResult,
+    egressResult,
+    mirrorTierResult,
+  ] = await fetchLangyTurnBaseDependencies(args);
+
+  return assembleLangyTurnBaseDependencies({
+    conversationResult,
+    modelResult,
+    credentialsResult,
+    egressResult,
+    mirrorTierResult,
+    projectId: args.projectId,
+  });
 }

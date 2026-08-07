@@ -3,6 +3,7 @@ import { prisma } from "../db";
 import { resolveScopeChain } from "../scopes/resolveScopeChain";
 import type { ScopeTier } from "../scopes/scope.types";
 import { isCodexModel } from "./codexRestrictions";
+import type { LLMModelEntry } from "./llmModels.types";
 import { llmModels } from "./loadModelCatalog";
 
 // Inlined from escape-string-regexp to preserve the previous escaping behavior.
@@ -10,24 +11,56 @@ function escapeStringRegexp(value: string): string {
   return value.replace(/[|\\{}()[\]^$+*?.]/g, "\\$&").replace(/-/g, "\\x2d");
 }
 
-const getImportedModelCosts = () => {
-  const models = llmModels.models;
+type ImportedModelCost = {
+  regex: string;
+  inputCostPerToken: number;
+  outputCostPerToken: number;
+  cacheReadCostPerToken?: number;
+  cacheCreationCostPerToken?: number;
+  inputCostPerCharacter?: number;
+  inputCostPerSecond?: number;
+};
 
-  // Convert models to cost entries with regex patterns
-  const tokenModels: Record<
-    string,
-    {
-      regex: string;
-      inputCostPerToken: number;
-      outputCostPerToken: number;
-      cacheReadCostPerToken?: number;
-      cacheCreationCostPerToken?: number;
-      inputCostPerCharacter?: number;
-      inputCostPerSecond?: number;
-    }
-  > = {};
+const hasImportablePricing = (model: LLMModelEntry): boolean =>
+  model.pricing?.inputCostPerToken != null ||
+  model.pricing?.outputCostPerToken != null ||
+  model.pricing?.inputCostPerCharacter != null ||
+  model.pricing?.inputCostPerSecond != null;
 
-  for (const [modelId, model] of Object.entries(models)) {
+// Make vendor prefix optional in regex (e.g., both "gpt-4o" and "openai/gpt-4o" should match)
+const buildModelCostRegex = (modelId: string): string => {
+  const hasVendorPrefix = modelId.includes("/");
+  const vendorPrefix = hasVendorPrefix ? modelId.split("/")[0] : null;
+  const modelName = hasVendorPrefix
+    ? modelId.split("/").slice(1).join("/")
+    : modelId;
+
+  const escapedModelName = escapeStringRegexp(modelName)
+    // Convert hex-escaped hyphens (\x2d) and escaped hyphens (\-) to literal hyphens
+    .replaceAll("\\x2d", "-")
+    .replaceAll("\\-", "-")
+    // Fix for langchain using vertexai while litellm uses vertex_ai
+    .replace("vertex_ai", "(vertex_ai|vertexai)")
+    // Allow version numbers to use either dots or hyphens (e.g., "4.6" or "4-6")
+    .replaceAll("\\.", "[.-]")
+    .replace(/(\d)-(\d)/g, "$1[.-]$2");
+
+  const escapedVendorPrefix = hasVendorPrefix
+    ? escapeStringRegexp(vendorPrefix!)
+        .replaceAll("\\x2d", "-")
+        .replaceAll("\\-", "-")
+    : "";
+
+  return hasVendorPrefix
+    ? `^(${escapedVendorPrefix}\\/)?${escapedModelName}`
+    : `^${escapedModelName}`;
+};
+
+// Convert models to cost entries with regex patterns
+const collectTokenModels = (): Record<string, ImportedModelCost> => {
+  const tokenModels: Record<string, ImportedModelCost> = {};
+
+  for (const [modelId, model] of Object.entries(llmModels.models)) {
     // Codex models bill the user's ChatGPT plan, so the catalog prices them
     // at zero. A zero-rate entry can never price a span; all it would do is
     // shadow the identically named `openai/<model>` entry (the generated
@@ -36,62 +69,49 @@ const getImportedModelCosts = () => {
     // registry lets codex usage price from the underlying OpenAI entry,
     // which is what the bundled-cost presentation shows.
     if (isCodexModel(modelId)) continue;
-    if (
-      model.pricing?.inputCostPerToken != null ||
-      model.pricing?.outputCostPerToken != null ||
-      model.pricing?.inputCostPerCharacter != null ||
-      model.pricing?.inputCostPerSecond != null
-    ) {
-      // Make vendor prefix optional in regex (e.g., both "gpt-4o" and "openai/gpt-4o" should match)
-      const hasVendorPrefix = modelId.includes("/");
-      const vendorPrefix = hasVendorPrefix ? modelId.split("/")[0] : null;
-      const modelName = hasVendorPrefix
-        ? modelId.split("/").slice(1).join("/")
-        : modelId;
+    if (!hasImportablePricing(model)) continue;
 
-      const escapedModelName = escapeStringRegexp(modelName)
-        // Convert hex-escaped hyphens (\x2d) and escaped hyphens (\-) to literal hyphens
-        .replaceAll("\\x2d", "-")
-        .replaceAll("\\-", "-")
-        // Fix for langchain using vertexai while litellm uses vertex_ai
-        .replace("vertex_ai", "(vertex_ai|vertexai)")
-        // Allow version numbers to use either dots or hyphens (e.g., "4.6" or "4-6")
-        .replaceAll("\\.", "[.-]")
-        .replace(/(\d)-(\d)/g, "$1[.-]$2");
-
-      const escapedVendorPrefix = hasVendorPrefix
-        ? escapeStringRegexp(vendorPrefix!)
-            .replaceAll("\\x2d", "-")
-            .replaceAll("\\-", "-")
-        : "";
-
-      const regex = hasVendorPrefix
-        ? `^(${escapedVendorPrefix}\\/)?${escapedModelName}`
-        : `^${escapedModelName}`;
-
-      tokenModels[modelId] = {
-        regex,
-        inputCostPerToken: model.pricing.inputCostPerToken ?? 0,
-        outputCostPerToken: model.pricing.outputCostPerToken ?? 0,
-        cacheReadCostPerToken: model.pricing.inputCacheReadPerToken,
-        cacheCreationCostPerToken: model.pricing.inputCacheWritePerToken,
-        inputCostPerCharacter: model.pricing.inputCostPerCharacter,
-        inputCostPerSecond: model.pricing.inputCostPerSecond,
-      };
-    }
+    tokenModels[modelId] = {
+      regex: buildModelCostRegex(modelId),
+      inputCostPerToken: model.pricing.inputCostPerToken ?? 0,
+      outputCostPerToken: model.pricing.outputCostPerToken ?? 0,
+      cacheReadCostPerToken: model.pricing.inputCacheReadPerToken,
+      cacheCreationCostPerToken: model.pricing.inputCacheWritePerToken,
+      inputCostPerCharacter: model.pricing.inputCostPerCharacter,
+      inputCostPerSecond: model.pricing.inputCostPerSecond,
+    };
   }
 
-  // Exclude models with : after it if there is already the same model there without the :
-  const mergedModels = Object.entries(tokenModels)
-    .filter(([model_name, _]) => {
-      if (
-        model_name.includes(":") &&
-        model_name.split(":")[0]! in tokenModels
-      ) {
-        return false;
-      }
-      return true;
-    })
+  return tokenModels;
+};
+
+// Exclude models with : after it if there is already the same model there without the :
+const isShadowedBySuffixlessModel = (
+  modelName: string,
+  tokenModels: Record<string, ImportedModelCost>,
+): boolean =>
+  modelName.includes(":") && modelName.split(":")[0]! in tokenModels;
+
+type MergedModelCost = ImportedModelCost & { model: string };
+
+const hasAnyCost = (model: MergedModelCost): boolean =>
+  model.inputCostPerToken != null ||
+  model.outputCostPerToken != null ||
+  model.inputCostPerCharacter != null ||
+  model.inputCostPerSecond != null;
+
+// Exclude some vendors (openrouter is already excluded as we're using their API)
+const isRelevantVendor = (model: MergedModelCost): boolean =>
+  !model.model.includes("openrouter/");
+
+const getImportedModelCosts = () => {
+  const tokenModels = collectTokenModels();
+
+  const mergedModels: MergedModelCost[] = Object.entries(tokenModels)
+    .filter(
+      ([model_name, _]) =>
+        !isShadowedBySuffixlessModel(model_name, tokenModels),
+    )
     .map(([model_name, model]) => {
       return {
         model: model_name,
@@ -106,18 +126,9 @@ const getImportedModelCosts = () => {
     });
 
   // Exclude models with no costs
-  const paidModels = mergedModels.filter(
-    (model) =>
-      model.inputCostPerToken != null ||
-      model.outputCostPerToken != null ||
-      model.inputCostPerCharacter != null ||
-      model.inputCostPerSecond != null,
-  );
+  const paidModels = mergedModels.filter(hasAnyCost);
 
-  // Exclude some vendors (openrouter is already excluded as we're using their API)
-  const relevantModels = paidModels.filter(
-    (model) => !model.model.includes("openrouter/"),
-  );
+  const relevantModels = paidModels.filter(isRelevantVendor);
 
   return Object.fromEntries(
     relevantModels.map((model) => [model.model, model]),

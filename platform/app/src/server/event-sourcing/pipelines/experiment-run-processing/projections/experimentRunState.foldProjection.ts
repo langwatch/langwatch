@@ -85,6 +85,51 @@ function mergeTargetsJson(
   return JSON.stringify(Array.from(byId.values()));
 }
 
+function accumulateEvaluatorScore(params: {
+  event: EvaluatorResultEvent;
+  totalScoreSum: number;
+  scoreCount: number;
+  passedCount: number;
+  gradedCount: number;
+}): {
+  totalScoreSum: number;
+  scoreCount: number;
+  passedCount: number;
+  gradedCount: number;
+} {
+  const { event, totalScoreSum, scoreCount, passedCount, gradedCount } = params;
+  if (event.data.status !== "processed") {
+    return { totalScoreSum, scoreCount, passedCount, gradedCount };
+  }
+
+  const nextScoreSum =
+    event.data.score != null
+      ? totalScoreSum + Math.round(event.data.score * 10000)
+      : totalScoreSum;
+  const nextScoreCount = event.data.score != null ? scoreCount + 1 : scoreCount;
+
+  const nextGradedCount =
+    event.data.passed != null ? gradedCount + 1 : gradedCount;
+  const nextPassedCount =
+    event.data.passed != null && event.data.passed
+      ? passedCount + 1
+      : passedCount;
+
+  return {
+    totalScoreSum: nextScoreSum,
+    scoreCount: nextScoreCount,
+    passedCount: nextPassedCount,
+    gradedCount: nextGradedCount,
+  };
+}
+
+function computeAccumulatedCost(
+  totalCost: number | null,
+  cost: number | null | undefined,
+): number | null {
+  return cost != null ? (totalCost ?? 0) + cost : totalCost;
+}
+
 const experimentRunEvents = [
   experimentRunStartedEventSchema,
   targetResultEventSchema,
@@ -214,28 +259,16 @@ export class ExperimentRunStateFoldProjection
     event: EvaluatorResultEvent,
     state: ExperimentRunStateData,
   ): ExperimentRunStateData {
-    let {
-      TotalScoreSum: totalScoreSum,
-      ScoreCount: scoreCount,
-      PassedCount: passedCount,
-      GradedCount: gradedCount,
-      TotalCost: totalCost,
-    } = state;
+    const { totalScoreSum, scoreCount, passedCount, gradedCount } =
+      accumulateEvaluatorScore({
+        event,
+        totalScoreSum: state.TotalScoreSum,
+        scoreCount: state.ScoreCount,
+        passedCount: state.PassedCount,
+        gradedCount: state.GradedCount,
+      });
 
-    if (event.data.status === "processed") {
-      if (event.data.score != null) {
-        totalScoreSum += Math.round(event.data.score * 10000);
-        scoreCount += 1;
-      }
-      if (event.data.passed != null) {
-        gradedCount += 1;
-        if (event.data.passed) passedCount += 1;
-      }
-    }
-
-    if (event.data.cost != null) {
-      totalCost = (totalCost ?? 0) + event.data.cost;
-    }
+    const totalCost = computeAccumulatedCost(state.TotalCost, event.data.cost);
 
     const avgScoreBps =
       scoreCount > 0 ? Math.round(totalScoreSum / scoreCount) : null;

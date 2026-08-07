@@ -187,6 +187,68 @@ function extractVariablesFromExpression(
   }
 }
 
+/** The variable sets a tag contributes to while a template is scanned. */
+type TagVariableContext = {
+  inputVariables: Set<string>;
+  loopVariables: Set<string>;
+  assignedVariables: Set<string>;
+};
+
+/** Records the root of a dotted reference, unless it names a Liquid keyword. */
+function addRootInputVariable(
+  reference: string,
+  inputVariables: Set<string>,
+): void {
+  const rootVariable = reference.split(".")[0]!;
+  if (rootVariable && !LIQUID_KEYWORDS.has(rootVariable)) {
+    inputVariables.add(rootVariable);
+  }
+}
+
+function extractForLoopVariables(
+  parts: string[],
+  context: TagVariableContext,
+): void {
+  // {% for item in items %} - item is loop var, items is input var
+  // {% for i in (1..5) %} - i is loop var, (1..5) is a range literal (not a variable)
+  const iterator = parts[1]!;
+  const collection = parts[3]!;
+
+  context.loopVariables.add(iterator);
+
+  // Skip range literals like (1..5) or (1..items.size)
+  if (!collection.startsWith("(")) {
+    addRootInputVariable(collection, context.inputVariables);
+  }
+}
+
+function extractAssignedVariable(
+  parts: string[],
+  context: TagVariableContext,
+): void {
+  // {% assign greeting = 'Hello' %} - greeting is assigned
+  const assignedName = parts[1]!;
+  // Remove trailing = if attached
+  const cleanName = assignedName.replace(/=$/, "");
+  if (cleanName) {
+    context.assignedVariables.add(cleanName);
+  }
+}
+
+function extractConditionVariables(
+  parts: string[],
+  inputVariables: Set<string>,
+): void {
+  // {% if tone == 'formal' %} - extract variable identifiers from condition
+  for (let i = 1; i < parts.length; i++) {
+    const part = parts[i]!;
+    // Skip operators, string literals, numbers, and keywords
+    if (isOperatorOrLiteral(part)) continue;
+    // Extract root variable (handle dot notation)
+    addRootInputVariable(part, inputVariables);
+  }
+}
+
 /**
  * Extracts variables from a `{% ... %}` tag.
  * Handles for loops (identifies iterator vs collection), assign tags,
@@ -194,11 +256,7 @@ function extractVariablesFromExpression(
  */
 function extractVariablesFromTag(
   tag: string,
-  context: {
-    inputVariables: Set<string>;
-    loopVariables: Set<string>;
-    assignedVariables: Set<string>;
-  },
+  context: TagVariableContext,
 ): void {
   // Remove {% and %}
   const inner = tag.slice(2, -2).trim();
@@ -208,40 +266,11 @@ function extractVariablesFromTag(
   const keyword = parts[0]!;
 
   if (keyword === "for" && parts.length >= 4 && parts[2] === "in") {
-    // {% for item in items %} - item is loop var, items is input var
-    // {% for i in (1..5) %} - i is loop var, (1..5) is a range literal (not a variable)
-    const iterator = parts[1]!;
-    const collection = parts[3]!;
-
-    context.loopVariables.add(iterator);
-
-    // Skip range literals like (1..5) or (1..items.size)
-    if (!collection.startsWith("(")) {
-      const rootCollection = collection.split(".")[0]!;
-      if (rootCollection && !LIQUID_KEYWORDS.has(rootCollection)) {
-        context.inputVariables.add(rootCollection);
-      }
-    }
+    extractForLoopVariables(parts, context);
   } else if (keyword === "assign" && parts.length >= 2) {
-    // {% assign greeting = 'Hello' %} - greeting is assigned
-    const assignedName = parts[1]!;
-    // Remove trailing = if attached
-    const cleanName = assignedName.replace(/=$/, "");
-    if (cleanName) {
-      context.assignedVariables.add(cleanName);
-    }
+    extractAssignedVariable(parts, context);
   } else if (keyword === "if" || keyword === "elsif" || keyword === "unless") {
-    // {% if tone == 'formal' %} - extract variable identifiers from condition
-    for (let i = 1; i < parts.length; i++) {
-      const part = parts[i]!;
-      // Skip operators, string literals, numbers, and keywords
-      if (isOperatorOrLiteral(part)) continue;
-      // Extract root variable (handle dot notation)
-      const rootVariable = part.split(".")[0]!;
-      if (rootVariable && !LIQUID_KEYWORDS.has(rootVariable)) {
-        context.inputVariables.add(rootVariable);
-      }
-    }
+    extractConditionVariables(parts, context.inputVariables);
   }
   // else/endif/endfor etc. have no variables to extract
 }

@@ -137,6 +137,51 @@ export async function resolveProjectStorageDestination(
  *   file:///var/lib/langwatch/objects/...  -> file:///REDACTED/...
  *   azure-blob://acct/cont/proj/sha        -> azure-blob://REDACTED/REDACTED/proj/sha
  */
+// s3://bucket/projectId/sha256 and gs://bucket/projectId/sha256 — bucket
+// identifies the tenant's storage account; the rest is content-addressed.
+function redactBucketSchemeUri({
+  scheme,
+  rest,
+}: {
+  scheme: string;
+  rest: string;
+}): string {
+  const slash = rest.indexOf("/");
+  if (slash === -1) return `${scheme}://***`;
+  return `${scheme}://***${rest.slice(slash)}`;
+}
+
+// azure-blob://account/container/projectId/sha256 — first 2 path
+// segments identify the tenant's storage account; rest is content-
+// addressed and safe.
+function redactAzureBlobUri({
+  scheme,
+  rest,
+}: {
+  scheme: string;
+  rest: string;
+}): string {
+  const segments = rest.split("/");
+  const safe = segments.slice(2).join("/");
+  return `${scheme}://***/***${safe ? "/" + safe : ""}`;
+}
+
+// file:///<root>/<projectId>/<sha256> — root may encode the install
+// path of a self-host tenant; treat as sensitive.
+function redactFileUri({
+  scheme,
+  rest,
+}: {
+  scheme: string;
+  rest: string;
+}): string {
+  const slash = rest.indexOf("/", 1);
+  if (slash === -1) return `${scheme}:///***`;
+  const tail = rest.slice(slash);
+  const lastTwoSlashes = tail.lastIndexOf("/", tail.lastIndexOf("/") - 1);
+  return `${scheme}:///***${lastTwoSlashes !== -1 ? tail.slice(lastTwoSlashes) : ""}`;
+}
+
 export function redactStorageUri(uri: string): string {
   try {
     const colonSlashSlash = uri.indexOf("://");
@@ -148,28 +193,13 @@ export function redactStorageUri(uri: string): string {
     const rest = uri.slice(colonSlashSlash + 3);
 
     if (schemeLower === "s3" || schemeLower === "gs") {
-      // s3://bucket/projectId/sha256 and gs://bucket/projectId/sha256 — bucket
-      // identifies the tenant's storage account; the rest is content-addressed.
-      const slash = rest.indexOf("/");
-      if (slash === -1) return `${scheme}://***`;
-      return `${scheme}://***${rest.slice(slash)}`;
+      return redactBucketSchemeUri({ scheme, rest });
     }
     if (schemeLower === "azure-blob") {
-      // azure-blob://account/container/projectId/sha256 — first 2 path
-      // segments identify the tenant's storage account; rest is content-
-      // addressed and safe.
-      const segments = rest.split("/");
-      const safe = segments.slice(2).join("/");
-      return `${scheme}://***/***${safe ? "/" + safe : ""}`;
+      return redactAzureBlobUri({ scheme, rest });
     }
     if (schemeLower === "file") {
-      // file:///<root>/<projectId>/<sha256> — root may encode the install
-      // path of a self-host tenant; treat as sensitive.
-      const slash = rest.indexOf("/", 1);
-      if (slash === -1) return `${scheme}:///***`;
-      const tail = rest.slice(slash);
-      const lastTwoSlashes = tail.lastIndexOf("/", tail.lastIndexOf("/") - 1);
-      return `${scheme}:///***${lastTwoSlashes !== -1 ? tail.slice(lastTwoSlashes) : ""}`;
+      return redactFileUri({ scheme, rest });
     }
     return uri;
   } catch {

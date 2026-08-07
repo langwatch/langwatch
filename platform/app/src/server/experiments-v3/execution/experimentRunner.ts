@@ -23,6 +23,78 @@ import {
 
 const logger = createLogger("langwatch:experiments-v3:runner");
 
+const consumeOrchestratorEvents = async ({
+  orchestrator,
+  runId,
+  runUrl,
+}: {
+  orchestrator: AsyncGenerator<EvaluationV3Event>;
+  runId: string;
+  runUrl: string;
+}): Promise<void> => {
+  for await (const event of orchestrator) {
+    await runStateManager.addEvent(runId, event as EvaluationV3Event);
+
+    if (event.type === "done") {
+      await runStateManager.completeRun(runId, {
+        ...event.summary,
+        runUrl,
+      });
+      break;
+    }
+
+    if (event.type === "stopped") {
+      await runStateManager.stopRun(runId);
+      break;
+    }
+  }
+};
+
+const handleExecutionError = async ({
+  error,
+  runId,
+  experimentSlug,
+  projectId,
+}: {
+  error: unknown;
+  runId: string;
+  experimentSlug: string;
+  projectId: string;
+}): Promise<void> => {
+  // Through the same mapper the streaming path uses, so a polled run and a
+  // streamed one report a failure identically: a handled error keeps its
+  // code and travels as `domainError`; anything else is the unnamed-failure
+  // marker plus the trace id.
+  const failure = mapThrownErrorEvent({ error });
+  const code = failure.type === "error" ? failure.message : UNNAMED_FAILURE;
+  const traceId = failure.type === "error" ? failure.traceId : undefined;
+
+  // The raw message stops here. This log line is where it belongs — with
+  // the trace id that ties it to the run row the customer can see.
+  logger.error(
+    {
+      error,
+      runId,
+      traceId,
+      experimentSlug,
+      projectId,
+    },
+    "Execution error",
+  );
+  captureException(toError(error), {
+    extra: {
+      runId,
+      experimentSlug,
+      projectId,
+    },
+  });
+  await runStateManager.failRun(runId, {
+    code,
+    domainError: failure.type === "error" ? failure.domainError : undefined,
+    traceId,
+  });
+};
+
 export type StartPollingRunInput = Omit<
   OrchestratorInput,
   "runId" | "scope" | "experimentId"
@@ -70,54 +142,13 @@ export const startPollingRun = async (
         runId,
       });
 
-      for await (const event of orchestrator) {
-        await runStateManager.addEvent(runId, event as EvaluationV3Event);
-
-        if (event.type === "done") {
-          await runStateManager.completeRun(runId, {
-            ...event.summary,
-            runUrl,
-          });
-          break;
-        }
-
-        if (event.type === "stopped") {
-          await runStateManager.stopRun(runId);
-          break;
-        }
-      }
+      await consumeOrchestratorEvents({ orchestrator, runId, runUrl });
     } catch (error) {
-      // Through the same mapper the streaming path uses, so a polled run and a
-      // streamed one report a failure identically: a handled error keeps its
-      // code and travels as `domainError`; anything else is the unnamed-failure
-      // marker plus the trace id.
-      const failure = mapThrownErrorEvent({ error });
-      const code = failure.type === "error" ? failure.message : UNNAMED_FAILURE;
-      const traceId = failure.type === "error" ? failure.traceId : undefined;
-
-      // The raw message stops here. This log line is where it belongs — with
-      // the trace id that ties it to the run row the customer can see.
-      logger.error(
-        {
-          error,
-          runId,
-          traceId,
-          experimentSlug,
-          projectId: orchestratorInput.projectId,
-        },
-        "Execution error",
-      );
-      captureException(toError(error), {
-        extra: {
-          runId,
-          experimentSlug,
-          projectId: orchestratorInput.projectId,
-        },
-      });
-      await runStateManager.failRun(runId, {
-        code,
-        domainError: failure.type === "error" ? failure.domainError : undefined,
-        traceId,
+      await handleExecutionError({
+        error,
+        runId,
+        experimentSlug,
+        projectId: orchestratorInput.projectId,
       });
     }
   };

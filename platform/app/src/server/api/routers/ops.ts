@@ -34,6 +34,118 @@ import { connection } from "~/server/redis";
 
 const opsViewPermission = checkOpsPermission({ permission: "ops:view" });
 
+type StoredFeatureFlagRow = Awaited<
+  ReturnType<ReturnType<typeof getFeatureFlagStore>["listAll"]>
+>[number];
+
+// Postgres-row-derived fields, defaulted for when no row exists yet.
+function storedFlagRowDefaults(row: StoredFeatureFlagRow | undefined) {
+  return {
+    rules: row?.rules ?? [],
+    storedValue: row?.enabled ?? null,
+    lastEditedBy: row?.lastEditedBy ?? null,
+    updatedAt: row?.updatedAt ?? null,
+  };
+}
+
+// A registry-explicit flag, merged with its postgres row (if any) and env
+// override to produce one listing row.
+function buildExplicitFlagRow(
+  def: ReturnType<typeof listFeatureFlags>[number],
+  stored: StoredFeatureFlagRow[],
+) {
+  const row = stored.find((s) => s.key === def.key);
+  const rowDefaults = storedFlagRowDefaults(row);
+  const envOverride = checkFlagEnvOverride(def.key, def.legacyEnvVar);
+  const effective = resolveEffectiveForListing({
+    envOverride: envOverride ?? null,
+    rules: rowDefaults.rules,
+    rowEnabled: rowDefaults.storedValue,
+    registryDefault: def.defaultValue,
+  });
+  return {
+    key: def.key,
+    scope: def.scope,
+    defaultValue: def.defaultValue,
+    description: def.description,
+    family: def.family ?? null,
+    ...rowDefaults,
+    envOverride: envOverride ?? null,
+    effective,
+  };
+}
+
+function describeKillSwitchFlag(
+  desc: ReturnType<typeof getKillSwitchDescriptors>[number],
+  def: ReturnType<typeof resolveFlagDefinition>,
+): string {
+  if (def?.description) {
+    return `${def.description} (${desc.pipelineName}: ${desc.componentType} ${desc.componentName})`;
+  }
+  return `Pipeline ${desc.pipelineName} ${desc.componentType} ${desc.componentName}.`;
+}
+
+// A generated kill-switch descriptor from the live pipeline graph, merged
+// with its postgres row (if any) — the postgres value wins, the descriptor
+// provides the metadata. Pre-seeding every generated key means operators see
+// the full set of toggleable es-* switches even before anyone has flipped
+// them in postgres, which was the whole point of moving them off PostHog:
+// discoverability.
+function buildKillSwitchFlagRow(
+  desc: ReturnType<typeof getKillSwitchDescriptors>[number],
+  stored: StoredFeatureFlagRow[],
+) {
+  const row = stored.find((s) => s.key === desc.key);
+  const rowDefaults = storedFlagRowDefaults(row);
+  const def = resolveFlagDefinition(desc.key);
+  const envOverride = checkFlagEnvOverride(desc.key, def?.legacyEnvVar);
+  const effective = resolveEffectiveForListing({
+    envOverride: envOverride ?? null,
+    rules: rowDefaults.rules,
+    rowEnabled: rowDefaults.storedValue,
+    registryDefault: def?.defaultValue ?? false,
+  });
+  return {
+    key: desc.key,
+    scope: def?.scope ?? "SYSTEM",
+    defaultValue: def?.defaultValue ?? false,
+    description: describeKillSwitchFlag(desc, def),
+    family: def?.family ?? null,
+    ...rowDefaults,
+    envOverride: envOverride ?? null,
+    effective,
+  };
+}
+
+// A stored postgres row that matches neither an explicit registry entry nor
+// a generated descriptor. Either an orphan from a removed pipeline component
+// or a row for a key we no longer recognize; surfaced so operators can clean
+// up.
+function buildOrphanFlagRow(s: StoredFeatureFlagRow) {
+  const def = resolveFlagDefinition(s.key);
+  const envOverride = checkFlagEnvOverride(s.key, def?.legacyEnvVar);
+  const effective = resolveEffectiveForListing({
+    envOverride: envOverride ?? null,
+    rules: s.rules,
+    rowEnabled: s.enabled,
+    registryDefault: def?.defaultValue ?? false,
+  });
+  return {
+    key: s.key,
+    scope: def?.scope ?? "SYSTEM",
+    defaultValue: def?.defaultValue ?? false,
+    description:
+      def?.description ?? "Orphaned postgres flag row (no longer registered).",
+    family: def?.family ?? null,
+    storedValue: s.enabled,
+    rules: s.rules,
+    envOverride: envOverride ?? null,
+    effective,
+    lastEditedBy: s.lastEditedBy,
+    updatedAt: s.updatedAt,
+  };
+}
+
 // Status-probe variant of the ops:view middleware — populates `ctx.opsScope`
 // (with `kind: "none"` for non-ops users) without throwing FORBIDDEN. Lets
 // `getScope` be a probe that the global menu can poll on every page load
@@ -776,29 +888,9 @@ export const opsRouter = createTRPCRouter({
       const families = listFeatureFlagFamilies();
       const explicitKeys = new Set(explicit.map((e) => e.key));
 
-      const explicitRows = explicit.map((def) => {
-        const row = stored.find((s) => s.key === def.key);
-        const envOverride = checkFlagEnvOverride(def.key, def.legacyEnvVar);
-        const effective = resolveEffectiveForListing({
-          envOverride: envOverride ?? null,
-          rules: row?.rules ?? [],
-          rowEnabled: row?.enabled ?? null,
-          registryDefault: def.defaultValue,
-        });
-        return {
-          key: def.key,
-          scope: def.scope,
-          defaultValue: def.defaultValue,
-          description: def.description,
-          family: def.family ?? null,
-          storedValue: row?.enabled ?? null,
-          rules: row?.rules ?? [],
-          envOverride: envOverride ?? null,
-          effective,
-          lastEditedBy: row?.lastEditedBy ?? null,
-          updatedAt: row?.updatedAt ?? null,
-        };
-      });
+      const explicitRows = explicit.map((def) =>
+        buildExplicitFlagRow(def, stored),
+      );
 
       // Pre-seed every generated kill-switch key from the live pipeline
       // graph. Operators see the full set of toggleable es-* switches
@@ -812,30 +904,7 @@ export const opsRouter = createTRPCRouter({
       const familyKeysSeen = new Set<string>();
       const familyRows = generatedKillSwitches.map((desc) => {
         familyKeysSeen.add(desc.key);
-        const row = stored.find((s) => s.key === desc.key);
-        const def = resolveFlagDefinition(desc.key);
-        const envOverride = checkFlagEnvOverride(desc.key, def?.legacyEnvVar);
-        const effective = resolveEffectiveForListing({
-          envOverride: envOverride ?? null,
-          rules: row?.rules ?? [],
-          rowEnabled: row?.enabled ?? null,
-          registryDefault: def?.defaultValue ?? false,
-        });
-        return {
-          key: desc.key,
-          scope: def?.scope ?? "SYSTEM",
-          defaultValue: def?.defaultValue ?? false,
-          description: def?.description
-            ? `${def.description} (${desc.pipelineName}: ${desc.componentType} ${desc.componentName})`
-            : `Pipeline ${desc.pipelineName} ${desc.componentType} ${desc.componentName}.`,
-          family: def?.family ?? null,
-          storedValue: row?.enabled ?? null,
-          rules: row?.rules ?? [],
-          envOverride: envOverride ?? null,
-          effective,
-          lastEditedBy: row?.lastEditedBy ?? null,
-          updatedAt: row?.updatedAt ?? null,
-        };
+        return buildKillSwitchFlagRow(desc, stored);
       });
 
       // Stored postgres rows that match neither an explicit registry
@@ -844,31 +913,7 @@ export const opsRouter = createTRPCRouter({
       // surface them so operators can clean up.
       const orphanRows = stored
         .filter((s) => !explicitKeys.has(s.key) && !familyKeysSeen.has(s.key))
-        .map((s) => {
-          const def = resolveFlagDefinition(s.key);
-          const envOverride = checkFlagEnvOverride(s.key, def?.legacyEnvVar);
-          const effective = resolveEffectiveForListing({
-            envOverride: envOverride ?? null,
-            rules: s.rules,
-            rowEnabled: s.enabled,
-            registryDefault: def?.defaultValue ?? false,
-          });
-          return {
-            key: s.key,
-            scope: def?.scope ?? "SYSTEM",
-            defaultValue: def?.defaultValue ?? false,
-            description:
-              def?.description ??
-              "Orphaned postgres flag row (no longer registered).",
-            family: def?.family ?? null,
-            storedValue: s.enabled,
-            rules: s.rules,
-            envOverride: envOverride ?? null,
-            effective,
-            lastEditedBy: s.lastEditedBy,
-            updatedAt: s.updatedAt,
-          };
-        });
+        .map((s) => buildOrphanFlagRow(s));
 
       return {
         flags: [...explicitRows, ...familyRows, ...orphanRows],

@@ -78,6 +78,36 @@ function isCluster(client: IORedis | Cluster): client is Cluster {
   return typeof (client as Cluster).nodes === "function";
 }
 
+/**
+ * Filtering by project narrows in Redis rather than in Node, so a tenant
+ * lookup on a large keyspace does not stream every other tenant's keys back.
+ */
+function resolveScanPattern({
+  queueName,
+  projectId,
+}: {
+  queueName: string;
+  projectId?: string | null;
+}): string {
+  const prefix = redisBlobKeyPrefix(queueName);
+  return projectId ? `${prefix}${projectId}/*` : `${prefix}*/*`;
+}
+
+function parseScanCursors(cursor?: string | null): Record<string, string> {
+  return cursor ? (JSON.parse(cursor) as Record<string, string>) : {};
+}
+
+/** In cluster mode SCAN is per-node; standalone is a single synthetic node. */
+function resolveScanNodes(
+  redis: IORedis | Cluster,
+): Array<{ id: string; client: { scan: IORedis["scan"] } }> {
+  return isCluster(redis)
+    ? redis
+        .nodes("master")
+        .map((node, index) => ({ id: String(index), client: node }))
+    : [{ id: "0", client: redis }];
+}
+
 export class BlobStoreRedisRepository implements BlobStoreRepository {
   private readonly redis: IORedis | Cluster;
   private readonly sweeper: BlobSweeper;
@@ -142,46 +172,25 @@ export class BlobStoreRedisRepository implements BlobStoreRepository {
     projectId?: string | null;
   }): Promise<{ facts: BlobFacts[]; nextCursor: string | null }> {
     const pageSize = Math.min(Math.max(limit, 1), MAX_PAGE);
-    const prefix = redisBlobKeyPrefix(queueName);
-    // Filtering by project narrows in Redis rather than in Node, so a tenant
-    // lookup on a large keyspace does not stream every other tenant's keys back.
-    const pattern = projectId ? `${prefix}${projectId}/*` : `${prefix}*/*`;
-
-    const cursors: Record<string, string> = cursor
-      ? (JSON.parse(cursor) as Record<string, string>)
-      : {};
-    const nodes: Array<{ id: string; client: { scan: IORedis["scan"] } }> =
-      isCluster(this.redis)
-        ? this.redis
-            .nodes("master")
-            .map((node, index) => ({ id: String(index), client: node }))
-        : [{ id: "0", client: this.redis }];
+    const pattern = resolveScanPattern({ queueName, projectId });
+    const cursors = parseScanCursors(cursor);
+    const nodes = resolveScanNodes(this.redis);
 
     const keys: string[] = [];
     const nextCursors: Record<string, string> = {};
 
     for (const node of nodes) {
-      let nodeCursor = cursors[node.id] ?? "0";
       // A node already exhausted on a previous page stays exhausted.
       if (cursor && !(node.id in cursors)) continue;
-      let calls = 0;
-      do {
-        const [next, batch] = await node.client.scan(
-          nodeCursor,
-          "MATCH",
-          pattern,
-          "COUNT",
-          Math.min(pageSize * 2, 512),
-        );
-        nodeCursor = next;
-        keys.push(...batch);
-        calls += 1;
-      } while (
-        nodeCursor !== "0" &&
-        keys.length < pageSize &&
-        calls < MAX_SCAN_CALLS_PER_PAGE
-      );
-      if (nodeCursor !== "0") nextCursors[node.id] = nodeCursor;
+      const resumeCursor = cursors[node.id] ?? "0";
+      const result = await this.scanNode({
+        node,
+        resumeCursor,
+        pageSize,
+        pattern,
+      });
+      keys.push(...result.keys);
+      if (result.nextCursor !== null) nextCursors[node.id] = result.nextCursor;
     }
 
     return {
@@ -191,6 +200,43 @@ export class BlobStoreRedisRepository implements BlobStoreRepository {
           ? JSON.stringify(nextCursors)
           : null,
     };
+  }
+
+  /**
+   * Walks one SCAN cursor forward until the page is full or the node is
+   * exhausted, bounded by `MAX_SCAN_CALLS_PER_PAGE` calls.
+   */
+  private async scanNode({
+    node,
+    resumeCursor,
+    pageSize,
+    pattern,
+  }: {
+    node: { id: string; client: { scan: IORedis["scan"] } };
+    resumeCursor: string;
+    pageSize: number;
+    pattern: string;
+  }): Promise<{ keys: string[]; nextCursor: string | null }> {
+    const keys: string[] = [];
+    let nodeCursor = resumeCursor;
+    let calls = 0;
+    do {
+      const [next, batch] = await node.client.scan(
+        nodeCursor,
+        "MATCH",
+        pattern,
+        "COUNT",
+        Math.min(pageSize * 2, 512),
+      );
+      nodeCursor = next;
+      keys.push(...batch);
+      calls += 1;
+    } while (
+      nodeCursor !== "0" &&
+      keys.length < pageSize &&
+      calls < MAX_SCAN_CALLS_PER_PAGE
+    );
+    return { keys, nextCursor: nodeCursor !== "0" ? nodeCursor : null };
   }
 
   /**

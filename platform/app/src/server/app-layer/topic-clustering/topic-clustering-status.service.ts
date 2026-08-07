@@ -1,7 +1,10 @@
 import { TOPIC_CLUSTERING_STALE_RUN_MS } from "~/server/event-sourcing/pipelines/topic-clustering-processing/process-manager/topicClustering.process";
 import type { TopicClusteringRunHistoryEntry } from "~/server/event-sourcing/pipelines/topic-clustering-processing/projections/topicClusteringRunHistory.foldProjection";
 import { TOPIC_CLUSTERING_RUN_OUTCOME } from "~/server/event-sourcing/pipelines/topic-clustering-processing/schemas/constants";
-import type { TopicClusteringStatusRepository } from "./repositories/topic-clustering-status.repository";
+import type {
+  TopicClusteringRunProjectionRow,
+  TopicClusteringStatusRepository,
+} from "./repositories/topic-clustering-status.repository";
 
 export interface TopicClusteringStatus {
   lastRequestedAt: number | null;
@@ -58,6 +61,66 @@ export interface TopicClusteringStatus {
   nextRunAt: number | null;
 }
 
+type ProjectionDefaults = Pick<
+  TopicClusteringStatus,
+  | "lastRequestTrigger"
+  | "lastRunOutcome"
+  | "lastRunMode"
+  | "lastRunSkippedReason"
+  | "lastRunErrorCode"
+  | "isLastRunErrorUserActionable"
+  | "lastRunTracesProcessed"
+  | "lastRunTopicsCount"
+  | "lastRunSubtopicsCount"
+>;
+
+/** Fields the settings-page status reads straight off the projection, each defaulted independently when unset. */
+function mapProjectionDefaults(
+  projection: TopicClusteringRunProjectionRow | null,
+): ProjectionDefaults {
+  return {
+    lastRequestTrigger: projection?.LastRequestTrigger ?? null,
+    lastRunOutcome: projection?.LastRunOutcome ?? null,
+    lastRunMode: projection?.LastRunMode ?? null,
+    lastRunSkippedReason: projection?.LastRunSkippedReason ?? null,
+    lastRunErrorCode: projection?.LastRunErrorCode ?? null,
+    isLastRunErrorUserActionable:
+      projection?.LastRunErrorUserActionable ?? false,
+    lastRunTracesProcessed: projection?.LastRunTracesProcessed ?? 0,
+    lastRunTopicsCount: projection?.LastRunTopicsCount ?? 0,
+    lastRunSubtopicsCount: projection?.LastRunSubtopicsCount ?? 0,
+  };
+}
+
+/**
+ * A run is working right now, as recorded by `run_started`. The effect
+ * announces every page before working it, so this covers scheduled and
+ * manual runs alike, from the first page, including runs that finish in a
+ * single page. Cleared by the terminal `run_completed` / `run_failed` —
+ * and, because that terminal write is best-effort and can be lost, ALSO
+ * bounded by the scheduler's stale-run window from the run's start. An
+ * unbounded read here pinned the badge to "Running" and made the route
+ * refuse "Run now" until the next daily wake, even though the process
+ * itself would have preempted the dead run.
+ */
+function computeIsInProgress({
+  projection,
+  now,
+}: {
+  projection: TopicClusteringRunProjectionRow | null;
+  now: number;
+}): boolean {
+  return (
+    projection?.InProgressRunId != null &&
+    now -
+      // Rows folded before the column existed fall back to the latest
+      // applied event's business time — later than the true start, so the
+      // bound only ever errs toward "still running" for one extra window.
+      (projection.InProgressStartedAt ?? projection.OccurredAt) <
+      TOPIC_CLUSTERING_STALE_RUN_MS
+  );
+}
+
 /** Serves the settings page's clustering status read (ADR-051 §7). */
 export class TopicClusteringStatusService {
   constructor(
@@ -73,35 +136,23 @@ export class TopicClusteringStatusService {
 
     const lastRequestedAt = projection?.LastRequestedAt ?? null;
     const lastRunAt = projection?.LastRunAt ?? null;
-    const isInProgress =
-      projection?.InProgressRunId != null &&
-      this.now() -
-        // Rows folded before the column existed fall back to the latest
-        // applied event's business time — later than the true start, so the
-        // bound only ever errs toward "still running" for one extra window.
-        (projection.InProgressStartedAt ?? projection.OccurredAt) <
-        TOPIC_CLUSTERING_STALE_RUN_MS;
+    const isInProgress = computeIsInProgress({
+      projection,
+      now: this.now(),
+    });
+    const defaults = mapProjectionDefaults(projection);
 
     return {
       lastRequestedAt,
-      lastRequestTrigger: projection?.LastRequestTrigger ?? null,
       lastRunAt,
-      lastRunOutcome: projection?.LastRunOutcome ?? null,
-      lastRunMode: projection?.LastRunMode ?? null,
-      lastRunSkippedReason: projection?.LastRunSkippedReason ?? null,
-      lastRunErrorCode: projection?.LastRunErrorCode ?? null,
-      isLastRunErrorUserActionable:
-        projection?.LastRunErrorUserActionable ?? false,
-      lastRunTracesProcessed: projection?.LastRunTracesProcessed ?? 0,
-      lastRunTopicsCount: projection?.LastRunTopicsCount ?? 0,
-      lastRunSubtopicsCount: projection?.LastRunSubtopicsCount ?? 0,
+      ...defaults,
       isInProgress,
       isRunInFlight:
         isInProgress ||
         this.hasUnansweredRequest({
           lastRequestedAt,
           lastRunAt,
-          lastRequestTrigger: projection?.LastRequestTrigger ?? null,
+          lastRequestTrigger: defaults.lastRequestTrigger,
         }),
       nextRunAt: nextWakeAt?.getTime() ?? null,
     };

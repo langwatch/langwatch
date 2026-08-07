@@ -11,6 +11,7 @@ import {
 import {
   buildReportTemplateContext,
   type ReportChart,
+  type ReportTemplateContext,
   type ReportTraceRow,
 } from "@langwatch/automations/templating/templateContext";
 import { createLogger } from "@langwatch/observability";
@@ -19,7 +20,10 @@ import { Cron } from "croner";
 import type { sendRenderedSlackMessage } from "~/server/app-layer/automations/delivery/sendSlackWebhook";
 import type { postSlackChatMessage } from "~/server/app-layer/automations/delivery/slackWebApi";
 import { decryptSlackBotToken } from "~/server/app-layer/automations/providers/slack/server";
-import type { ReportSource } from "~/server/app-layer/automations/report.builder";
+import type {
+  ReportActionParams,
+  ReportSource,
+} from "~/server/app-layer/automations/report.builder";
 import { extractReportFromTriggerRow } from "~/server/app-layer/automations/report.builder";
 import type { ScheduledJobFire } from "~/server/app-layer/scheduler/scheduler.types";
 import type { sendRenderedTriggerEmail } from "~/server/mailer/triggerEmail";
@@ -153,6 +157,318 @@ function scheduleLabel(cron: string, timezone: string): string {
   return `on schedule \`${cron}\` (${timezone})`;
 }
 
+/** What `extractReportFromTriggerRow` hands back: the typed report shape plus
+ *  whatever destination keys (members, slackWebhook, …) rode along on the row. */
+type ReportRow = ReportActionParams & Record<string, unknown>;
+
+/** The report/Slack destination params, read off the trigger's own actionParams
+ *  (same JSON `report` was extracted from, just under its untyped shape). */
+type ReportDestinationParams = { members?: string[]; slackWebhook?: string };
+
+/** Loads the trigger a fire targets, or logs and returns `null` if it is gone
+ *  or has been switched off since the job was scheduled. */
+async function loadActiveReportTrigger({
+  deps,
+  fire,
+}: {
+  deps: ReportDispatchDeps;
+  fire: ScheduledJobFire;
+}): Promise<Trigger | null> {
+  const trigger = await deps.loadTrigger({
+    projectId: fire.projectId,
+    triggerId: fire.targetId,
+  });
+  if (!trigger?.active || trigger.deleted) {
+    logger.info(
+      { triggerId: fire.targetId, projectId: fire.projectId },
+      "Report trigger missing/inactive — skipping scheduled fire",
+    );
+    return null;
+  }
+  return trigger;
+}
+
+/** Parses the trigger's report shape, or logs and returns `null` if the row
+ *  is not a report (or a legacy shape this build can no longer read). */
+function parseReportOrWarn({
+  trigger,
+  fire,
+}: {
+  trigger: Trigger;
+  fire: ScheduledJobFire;
+}): ReportRow | null {
+  const report = extractReportFromTriggerRow(trigger.actionParams);
+  if (!report) {
+    logger.warn(
+      { triggerId: trigger.id, projectId: fire.projectId },
+      "Report trigger actionParams did not parse — skipping",
+    );
+    return null;
+  }
+  return report;
+}
+
+/**
+ * Every report carries its DATA, not just a link to it, over the window
+ * `[previous slot, this slot]` — exactly the period this fire is responsible
+ * for, so a monthly report summarises its month and a daily one its day.
+ */
+function computeReportWindow({
+  report,
+  fire,
+}: {
+  report: ReportRow;
+  fire: ScheduledJobFire;
+}): { from: number; to: number } {
+  const to = fire.slot.getTime();
+  const from =
+    to -
+    reportWindowMs({
+      cron: report.schedule.cron,
+      timezone: report.schedule.timezone,
+      slot: fire.slot,
+    });
+  return { from, to };
+}
+
+/**
+ * A trace-query report sends the traces matching its search query; a graph
+ * or dashboard report sends the plotted series of each panel.
+ */
+async function loadReportData({
+  deps,
+  report,
+  trigger,
+  project,
+  fire,
+  from,
+  to,
+}: {
+  deps: ReportDispatchDeps;
+  report: ReportRow;
+  trigger: Trigger;
+  project: Project;
+  fire: ScheduledJobFire;
+  from: number;
+  to: number;
+}): Promise<{ traces: ReportTraceRow[]; charts: ReportChart[] }> {
+  if (report.source.kind === "traceQuery") {
+    const traces = await deps.listReportTraces({
+      projectId: fire.projectId,
+      projectSlug: project.slug,
+      // The Subject facet (ADR-043) — the same search query the author writes
+      // and previews in the drawer. Empty means the whole window.
+      query: trigger.filterQuery ?? "",
+      from,
+      to,
+      limit: report.source.topN,
+    });
+    return { traces, charts: [] };
+  }
+  const charts = await deps.loadReportCharts({
+    projectId: fire.projectId,
+    source: report.source,
+    from,
+    to,
+  });
+  return { traces: [], charts };
+}
+
+async function deliverEmailReport({
+  trigger,
+  project,
+  params,
+  context,
+  deps,
+}: {
+  trigger: Trigger;
+  project: Project;
+  params: ReportDestinationParams;
+  context: ReportTemplateContext;
+  deps: ReportDispatchDeps;
+}): Promise<boolean> {
+  const recipients = params.members ?? [];
+  if (recipients.length === 0) return false;
+  const allowed = await deps.filterSuppressedRecipients({
+    projectId: project.id,
+    triggerId: trigger.id,
+    emails: recipients,
+  });
+  if (allowed.length === 0) return false;
+  const rendered = await renderTriggerEmail({
+    subjectTemplate: trigger.emailSubjectTemplate,
+    bodyTemplate: trigger.emailBodyTemplate,
+    context,
+    defaults: REPORT_TRIGGER_DEFAULTS,
+  });
+  await deps.sendEmail({
+    triggerEmails: allowed,
+    triggerId: trigger.id,
+    projectId: project.id,
+    subject: rendered.subject,
+    html: rendered.html,
+  });
+  return true;
+}
+
+/** ADR-041: a bot connection posts via the Web API with the gate open. */
+async function deliverSlackBotReport({
+  trigger,
+  slackParams,
+  templateType,
+  context,
+  deps,
+}: {
+  trigger: Trigger;
+  slackParams: SlackActionParams;
+  templateType: SlackTemplateType | null;
+  context: ReportTemplateContext;
+  deps: ReportDispatchDeps;
+}): Promise<boolean> {
+  const token = decryptSlackBotToken(slackParams);
+  const channel = slackParams.slackChannelId?.trim();
+  if (!token || !channel) return false;
+  const rendered = await renderTriggerSlack({
+    templateType,
+    template: trigger.slackTemplate,
+    context,
+    defaults: REPORT_TRIGGER_DEFAULTS,
+    allowGatedBlocks: true,
+  });
+  await deps.sendSlackBot({
+    token,
+    channel,
+    payload: rendered.payload,
+    triggerName: trigger.name,
+  });
+  return true;
+}
+
+async function deliverSlackWebhookReport({
+  trigger,
+  webhook,
+  templateType,
+  context,
+  deps,
+}: {
+  trigger: Trigger;
+  webhook: string | null;
+  templateType: SlackTemplateType | null;
+  context: ReportTemplateContext;
+  deps: ReportDispatchDeps;
+}): Promise<boolean> {
+  if (!webhook) return false;
+  const rendered = await renderTriggerSlack({
+    templateType,
+    template: trigger.slackTemplate,
+    context,
+    defaults: REPORT_TRIGGER_DEFAULTS,
+  });
+  await deps.sendSlack({
+    triggerWebhook: webhook,
+    triggerName: trigger.name,
+    payload: rendered.payload,
+  });
+  return true;
+}
+
+async function deliverSlackReport({
+  trigger,
+  params,
+  context,
+  deps,
+}: {
+  trigger: Trigger;
+  params: ReportDestinationParams;
+  context: ReportTemplateContext;
+  deps: ReportDispatchDeps;
+}): Promise<boolean> {
+  const templateType: SlackTemplateType | null =
+    trigger.slackTemplateType === "block_kit" ? "block_kit" : "string";
+
+  const slackParams = (trigger.actionParams ?? {}) as SlackActionParams;
+  if (slackDeliveryMethodOf(slackParams) === "bot") {
+    return deliverSlackBotReport({
+      trigger,
+      slackParams,
+      templateType,
+      context,
+      deps,
+    });
+  }
+
+  return deliverSlackWebhookReport({
+    trigger,
+    webhook: params.slackWebhook ?? null,
+    templateType,
+    context,
+    deps,
+  });
+}
+
+/**
+ * Reports whether the message actually went out — a report with no
+ * recipients, no webhook, or an unusable bot connection silently delivers
+ * nothing, and recording a fire for it would put a lie in the history.
+ */
+async function deliverReport({
+  trigger,
+  project,
+  params,
+  context,
+  deps,
+}: {
+  trigger: Trigger;
+  project: Project;
+  params: ReportDestinationParams;
+  context: ReportTemplateContext;
+  deps: ReportDispatchDeps;
+}): Promise<boolean> {
+  if (trigger.action === "SEND_EMAIL") {
+    return deliverEmailReport({ trigger, project, params, context, deps });
+  }
+
+  if (trigger.action === "SEND_SLACK_MESSAGE") {
+    return deliverSlackReport({ trigger, params, context, deps });
+  }
+
+  logger.warn(
+    { triggerId: trigger.id, action: trigger.action },
+    "Report trigger action is not a notify channel — skipping",
+  );
+  return false;
+}
+
+/**
+ * The report went out — record it, so the automations page can show when it
+ * last sent and what it has been doing. Best-effort: a bookkeeping failure
+ * must not fail (and so re-run) a report that already reached the customer.
+ */
+async function recordReportFire({
+  deps,
+  project,
+  trigger,
+  fire,
+}: {
+  deps: ReportDispatchDeps;
+  project: Project;
+  trigger: Trigger;
+  fire: ScheduledJobFire;
+}): Promise<void> {
+  try {
+    await deps.recordFire({
+      projectId: project.id,
+      triggerId: trigger.id,
+      firedAt: fire.slot,
+    });
+  } catch (error) {
+    logger.warn(
+      { triggerId: trigger.id, projectId: project.id, error },
+      "Report delivered but recording its fire failed",
+    );
+  }
+}
+
 /**
  * ADR-044 Phase 3c: the scheduler's report handler. When a report's
  * `ScheduledJob` comes due, load the trigger, fetch the data its source
@@ -169,70 +485,28 @@ export async function dispatchScheduledReport({
   deps: ReportDispatchDeps;
   fire: ScheduledJobFire;
 }): Promise<void> {
-  const trigger = await deps.loadTrigger({
-    projectId: fire.projectId,
-    triggerId: fire.targetId,
-  });
-  if (!trigger?.active || trigger.deleted) {
-    logger.info(
-      { triggerId: fire.targetId, projectId: fire.projectId },
-      "Report trigger missing/inactive — skipping scheduled fire",
-    );
-    return;
-  }
+  const trigger = await loadActiveReportTrigger({ deps, fire });
+  if (!trigger) return;
 
-  const report = extractReportFromTriggerRow(trigger.actionParams);
-  if (!report) {
-    logger.warn(
-      { triggerId: trigger.id, projectId: fire.projectId },
-      "Report trigger actionParams did not parse — skipping",
-    );
-    return;
-  }
+  const report = parseReportOrWarn({ trigger, fire });
+  if (!report) return;
 
   const project = await deps.loadProject(fire.projectId);
   if (!project) return;
 
-  const params = trigger.actionParams as {
-    members?: string[];
-    slackWebhook?: string;
-  };
+  const params = trigger.actionParams as ReportDestinationParams;
 
-  // Every report carries its DATA, not just a link to it, over the window
-  // `[previous slot, this slot]` — exactly the period this fire is responsible
-  // for, so a monthly report summarises its month and a daily one its day. A
-  // trace-query report sends the traces matching its search query; a graph or
-  // dashboard report sends the plotted series of each panel.
-  const to = fire.slot.getTime();
-  const from =
-    to -
-    reportWindowMs({
-      cron: report.schedule.cron,
-      timezone: report.schedule.timezone,
-      slot: fire.slot,
-    });
+  const { from, to } = computeReportWindow({ report, fire });
 
-  let traces: ReportTraceRow[] = [];
-  let charts: ReportChart[] = [];
-  if (report.source.kind === "traceQuery") {
-    traces = await deps.listReportTraces({
-      projectId: fire.projectId,
-      projectSlug: project.slug,
-      // The Subject facet (ADR-043) — the same search query the author writes
-      // and previews in the drawer. Empty means the whole window.
-      query: trigger.filterQuery ?? "",
-      from,
-      to,
-      limit: report.source.topN,
-    });
-  } else {
-    charts = await deps.loadReportCharts({
-      projectId: fire.projectId,
-      source: report.source,
-      from,
-      to,
-    });
-  }
+  const { traces, charts } = await loadReportData({
+    deps,
+    report,
+    trigger,
+    project,
+    fire,
+    from,
+    to,
+  });
 
   const context = buildReportTemplateContext({
     trigger: { id: trigger.id, name: trigger.name },
@@ -252,99 +526,14 @@ export async function dispatchScheduledReport({
     baseHost: deps.baseHost,
   });
 
-  // `deliver` reports whether the message actually went out — a report with no
-  // recipients, no webhook, or an unusable bot connection silently delivers
-  // nothing, and recording a fire for it would put a lie in the history.
-  const deliver = async (): Promise<boolean> => {
-    if (trigger.action === "SEND_EMAIL") {
-      const recipients = params.members ?? [];
-      if (recipients.length === 0) return false;
-      const allowed = await deps.filterSuppressedRecipients({
-        projectId: project.id,
-        triggerId: trigger.id,
-        emails: recipients,
-      });
-      if (allowed.length === 0) return false;
-      const rendered = await renderTriggerEmail({
-        subjectTemplate: trigger.emailSubjectTemplate,
-        bodyTemplate: trigger.emailBodyTemplate,
-        context,
-        defaults: REPORT_TRIGGER_DEFAULTS,
-      });
-      await deps.sendEmail({
-        triggerEmails: allowed,
-        triggerId: trigger.id,
-        projectId: project.id,
-        subject: rendered.subject,
-        html: rendered.html,
-      });
-      return true;
-    }
+  const delivered = await deliverReport({
+    trigger,
+    project,
+    params,
+    context,
+    deps,
+  });
+  if (!delivered) return;
 
-    if (trigger.action === "SEND_SLACK_MESSAGE") {
-      const templateType: SlackTemplateType | null =
-        trigger.slackTemplateType === "block_kit" ? "block_kit" : "string";
-
-      // ADR-041: a bot connection posts via the Web API with the gate open.
-      const slackParams = (trigger.actionParams ?? {}) as SlackActionParams;
-      if (slackDeliveryMethodOf(slackParams) === "bot") {
-        const token = decryptSlackBotToken(slackParams);
-        const channel = slackParams.slackChannelId?.trim();
-        if (!token || !channel) return false;
-        const rendered = await renderTriggerSlack({
-          templateType,
-          template: trigger.slackTemplate,
-          context,
-          defaults: REPORT_TRIGGER_DEFAULTS,
-          allowGatedBlocks: true,
-        });
-        await deps.sendSlackBot({
-          token,
-          channel,
-          payload: rendered.payload,
-          triggerName: trigger.name,
-        });
-        return true;
-      }
-
-      const webhook = params.slackWebhook ?? null;
-      if (!webhook) return false;
-      const rendered = await renderTriggerSlack({
-        templateType,
-        template: trigger.slackTemplate,
-        context,
-        defaults: REPORT_TRIGGER_DEFAULTS,
-      });
-      await deps.sendSlack({
-        triggerWebhook: webhook,
-        triggerName: trigger.name,
-        payload: rendered.payload,
-      });
-      return true;
-    }
-
-    logger.warn(
-      { triggerId: trigger.id, action: trigger.action },
-      "Report trigger action is not a notify channel — skipping",
-    );
-    return false;
-  };
-
-  if (!(await deliver())) return;
-
-  // The report went out — record it, so the automations page can show when it
-  // last sent and what it has been doing. Best-effort: a bookkeeping failure
-  // must not fail (and so re-run) a report that already reached the customer.
-  try {
-    await deps.recordFire({
-      projectId: project.id,
-      triggerId: trigger.id,
-      firedAt: fire.slot,
-    });
-  } catch (error) {
-    logger.warn(
-      { triggerId: trigger.id, projectId: project.id, error },
-      "Report delivered but recording its fire failed",
-    );
-  }
+  await recordReportFire({ deps, project, trigger, fire });
 }

@@ -482,6 +482,131 @@ const SUGGEST_COLUMN_MAP: Record<string, string> = {
   origin: TRACE_ORIGIN_CLICKHOUSE_EXPRESSION,
 };
 
+/** Distinct values fetched per facet in computeDiscover's batched + standalone passes. */
+const DISCOVER_TOP_N = 50;
+/**
+ * Distinct integer values fetched per `isDiscrete`-flagged facet. The exact
+ * distinct count comes back regardless of this cap, so the sidebar can
+ * still fall back to the slider when a facet exceeds its threshold.
+ */
+const DISCOVER_DISCRETE_VALUE_LIMIT = 50;
+
+type BatchedFacetSlot = {
+  categoricals: ExpressionCategoricalDef[];
+  ranges: RangeFacetDef[];
+};
+
+/** Outcome of a single computeDiscover task, tagged by which registry partition produced it. */
+type DiscoverTaskOutcome =
+  | { kind: "batch"; table: FacetTable; result: BatchedFacetResult }
+  | { kind: "standalone"; key: string; descriptor: FacetDescriptor }
+  | { kind: "discrete"; key: string; result: DiscreteFacetResult };
+
+/** Simple-expression categoricals share the batched ClickHouse scan; arrayJoin ones can't. */
+function isBatchableCategorical(
+  def: FacetDefinition,
+): def is ExpressionCategoricalDef {
+  return isExpressionCategorical(def) && !def.expression.includes("arrayJoin");
+}
+
+function getOrCreateFacetSlot(
+  batched: Map<FacetTable, BatchedFacetSlot>,
+  table: FacetTable,
+): BatchedFacetSlot {
+  const existing = batched.get(table);
+  if (existing) return existing;
+  const slot: BatchedFacetSlot = { categoricals: [], ranges: [] };
+  batched.set(table, slot);
+  return slot;
+}
+
+/**
+ * Partitions the registry: simple-expression facets per table go through
+ * the batched ClickHouse path; arrayJoin/queryBuilder/dynamic_keys facets
+ * can't share a scan and run independently.
+ */
+function partitionFacetRegistry(): {
+  batched: Map<FacetTable, BatchedFacetSlot>;
+  standalone: FacetDefinition[];
+} {
+  const batched = new Map<FacetTable, BatchedFacetSlot>();
+  const standalone: FacetDefinition[] = [];
+
+  for (const def of FACET_REGISTRY) {
+    if (def.kind === "categorical" && isBatchableCategorical(def)) {
+      getOrCreateFacetSlot(batched, def.table).categoricals.push(def);
+    } else if (def.kind === "range") {
+      getOrCreateFacetSlot(batched, def.table).ranges.push(def);
+    } else {
+      standalone.push(def);
+    }
+  }
+
+  return { batched, standalone };
+}
+
+/** Times a computeDiscover task and appends its wall-clock to the shared breakdown. */
+function timedTask<T>(
+  taskTimings: Array<{ label: string; durationMs: number }>,
+  label: string,
+  p: Promise<T>,
+): Promise<T> {
+  const t0 = Date.now();
+  return p.finally(() => {
+    taskTimings.push({ label, durationMs: Date.now() - t0 });
+  });
+}
+
+/** Splits computeDiscover's settled tasks by outcome kind, logging (and skipping) any rejection. */
+function partitionSettledDiscoverTasks(
+  settled: PromiseSettledResult<DiscoverTaskOutcome>[],
+): {
+  batchByTable: Map<FacetTable, BatchedFacetResult>;
+  standaloneByKey: Map<string, FacetDescriptor>;
+  discreteByKey: Map<string, DiscreteFacetResult>;
+} {
+  const batchByTable = new Map<FacetTable, BatchedFacetResult>();
+  const standaloneByKey = new Map<string, FacetDescriptor>();
+  const discreteByKey = new Map<string, DiscreteFacetResult>();
+
+  for (const result of settled) {
+    if (result.status === "rejected") {
+      discoverLogger.warn(
+        { error: String(result.reason) },
+        "Facet discovery query failed, omitting affected facets",
+      );
+      continue;
+    }
+    if (result.value.kind === "batch") {
+      batchByTable.set(result.value.table, result.value.result);
+    } else if (result.value.kind === "discrete") {
+      discreteByKey.set(result.value.key, result.value.result);
+    } else {
+      standaloneByKey.set(result.value.key, result.value.descriptor);
+    }
+  }
+
+  return { batchByTable, standaloneByKey, discreteByKey };
+}
+
+/**
+ * Teaser-redacts one list item's content fields when it falls before the
+ * visibility cutoff; passes through untouched otherwise.
+ */
+function teaserRedactTraceListItem(
+  item: TraceListItem,
+  visibilityCutoffMs: number,
+): TraceListItem {
+  if (item.timestamp >= visibilityCutoffMs) return item;
+  return {
+    ...item,
+    input: item.input ? teaserOf(item.input) : item.input,
+    output: item.output ? teaserOf(item.output) : item.output,
+    error: item.error ? teaserOf(item.error) : item.error,
+    labels: item.labels.map((label) => teaserOf(label)),
+  };
+}
+
 export class TraceListService {
   constructor(
     private readonly repository: TraceListRepository,
@@ -548,15 +673,7 @@ export class TraceListService {
       params.visibilityCutoffMs === undefined
         ? items
         : items.map((item) =>
-            item.timestamp < params.visibilityCutoffMs!
-              ? {
-                  ...item,
-                  input: item.input ? teaserOf(item.input) : item.input,
-                  output: item.output ? teaserOf(item.output) : item.output,
-                  error: item.error ? teaserOf(item.error) : item.error,
-                  labels: item.labels.map((label) => teaserOf(label)),
-                }
-              : item,
+            teaserRedactTraceListItem(item, params.visibilityCutoffMs!),
           );
 
     return {
@@ -714,177 +831,201 @@ export class TraceListService {
     if (this.discoverRefreshing.has(cacheKey)) return;
     this.discoverRefreshing.add(cacheKey);
 
-    void (async () => {
-      try {
-        // 60s lease (set on the dedicated lock cache) is enough for any
-        // single compute (timings cap around 5-8s on the slowest
-        // tenants) and self-clears on pod crash. We claim once per
-        // refresh attempt — if we lose the claim, another pod is
-        // already on it and its write will hydrate the value cache for
-        // every reader.
-        const claimed = await DISCOVER_REFRESH_LOCK_CACHE.claim(
-          cacheKey,
-          Date.now(),
-        );
-        if (!claimed) return;
+    void this.runDiscoverBackgroundRefresh(params, cacheKey);
+  }
 
-        const fresh = await this.computeDiscover(params);
-        await DISCOVER_CACHE.set(cacheKey, {
-          value: fresh,
-          timestamp: Date.now(),
-        });
-        // SSE push to any browser subscribed for this tenant. Empty
-        // payload — the client refetches via tRPC and hits the warm
-        // cache. We swallow throws because broadcast errors should
-        // never bubble up into the user-facing path (the cache write
-        // already succeeded).
-        try {
-          discoverBroadcaster?.(params.tenantId);
-        } catch (broadcastErr) {
-          discoverLogger.warn(
-            {
-              tenantId: params.tenantId,
-              cacheKey,
-              error:
-                broadcastErr instanceof Error
-                  ? broadcastErr.message
-                  : String(broadcastErr),
-            },
-            "discover_updated broadcast failed; clients will see new payload on next read",
-          );
-        }
-      } catch (err) {
-        discoverLogger.warn(
-          {
-            cacheKey,
-            error: err instanceof Error ? err.message : String(err),
-          },
-          "Background discover refresh failed; cached value still served",
-        );
-      } finally {
-        this.discoverRefreshing.delete(cacheKey);
-      }
-    })();
+  private async runDiscoverBackgroundRefresh(
+    params: DiscoverParams,
+    cacheKey: string,
+  ): Promise<void> {
+    try {
+      // 60s lease (set on the dedicated lock cache) is enough for any
+      // single compute (timings cap around 5-8s on the slowest
+      // tenants) and self-clears on pod crash. We claim once per
+      // refresh attempt — if we lose the claim, another pod is
+      // already on it and its write will hydrate the value cache for
+      // every reader.
+      const claimed = await DISCOVER_REFRESH_LOCK_CACHE.claim(
+        cacheKey,
+        Date.now(),
+      );
+      if (!claimed) return;
+
+      const fresh = await this.computeDiscover(params);
+      await DISCOVER_CACHE.set(cacheKey, {
+        value: fresh,
+        timestamp: Date.now(),
+      });
+      this.broadcastDiscoverUpdated(params.tenantId, cacheKey);
+    } catch (err) {
+      discoverLogger.warn(
+        {
+          cacheKey,
+          error: err instanceof Error ? err.message : String(err),
+        },
+        "Background discover refresh failed; cached value still served",
+      );
+    } finally {
+      this.discoverRefreshing.delete(cacheKey);
+    }
+  }
+
+  /**
+   * SSE push to any browser subscribed for this tenant. Empty payload — the
+   * client refetches via tRPC and hits the warm cache. We swallow throws
+   * because broadcast errors should never bubble up into the user-facing
+   * path (the cache write already succeeded).
+   */
+  private broadcastDiscoverUpdated(tenantId: string, cacheKey: string): void {
+    try {
+      discoverBroadcaster?.(tenantId);
+    } catch (broadcastErr) {
+      discoverLogger.warn(
+        {
+          tenantId,
+          cacheKey,
+          error:
+            broadcastErr instanceof Error
+              ? broadcastErr.message
+              : String(broadcastErr),
+        },
+        "discover_updated broadcast failed; clients will see new payload on next read",
+      );
+    }
   }
 
   private async computeDiscover(
     params: DiscoverParams,
   ): Promise<FacetDescriptor[]> {
-    const TOP_N = 50;
-    // Distinct integer values fetched per `isDiscrete`-flagged facet. The exact
-    // distinct count comes back regardless of this cap, so the sidebar can
-    // still fall back to the slider when a facet exceeds its threshold.
-    const DISCRETE_VALUE_LIMIT = 50;
+    const { batched, standalone } = partitionFacetRegistry();
 
-    // Partition the registry: simple-expression facets per table go through
-    // the batched ClickHouse path; arrayJoin/queryBuilder/dynamic_keys facets
-    // can't share a scan and run independently.
-    const batched = new Map<
-      FacetTable,
-      {
-        categoricals: ExpressionCategoricalDef[];
-        ranges: RangeFacetDef[];
-      }
-    >();
-    const standalone: FacetDefinition[] = [];
-
-    for (const def of FACET_REGISTRY) {
-      if (def.kind === "categorical") {
-        if (
-          isExpressionCategorical(def) &&
-          !def.expression.includes("arrayJoin")
-        ) {
-          const slot = batched.get(def.table) ?? {
-            categoricals: [],
-            ranges: [],
-          };
-          slot.categoricals.push(def);
-          batched.set(def.table, slot);
-        } else {
-          standalone.push(def);
-        }
-      } else if (def.kind === "range") {
-        const slot = batched.get(def.table) ?? {
-          categoricals: [],
-          ranges: [],
-        };
-        slot.ranges.push(def);
-        batched.set(def.table, slot);
-      } else {
-        standalone.push(def);
-      }
-    }
-
-    type Outcome =
-      | { kind: "batch"; table: FacetTable; result: BatchedFacetResult }
-      | { kind: "standalone"; key: string; descriptor: FacetDescriptor }
-      | { kind: "discrete"; key: string; result: DiscreteFacetResult };
-
-    const tasks: Promise<Outcome>[] = [];
     // Per-task wall-clock so a slow discover surfaces which query is at fault.
     const taskTimings: Array<{ label: string; durationMs: number }> = [];
     const startedAt = Date.now();
-    const wrap = <T>(label: string, p: Promise<T>): Promise<T> => {
-      const t0 = Date.now();
-      return p.finally(() => {
-        taskTimings.push({ label, durationMs: Date.now() - t0 });
-      });
-    };
 
-    for (const [table, slot] of batched) {
-      tasks.push(
-        wrap(
-          `batch:${table}`,
-          this.repository
-            .findBatchedFacets({
-              tenantId: params.tenantId,
-              timeRange: params.timeRange,
-              table,
-              timeColumn: TABLE_TIME_COLUMNS[table],
-              categoricalSpecs: slot.categoricals.map((d) => ({
-                key: d.key,
-                expression: d.expression,
-              })),
-              rangeSpecs: slot.ranges.map((d) => ({
-                key: d.key,
-                expression: d.expression,
-              })),
-              topN: TOP_N,
-            })
-            .then((result): Outcome => ({ kind: "batch", table, result })),
-        ),
-      );
+    const tasks: Promise<DiscoverTaskOutcome>[] = [
+      ...this.buildBatchFacetTasks({ params, batched, taskTimings }),
+      ...this.buildStandaloneFacetTasks({ params, standalone, taskTimings }),
+      ...this.buildDiscreteFacetTasks({ params, taskTimings }),
+    ];
+
+    const settled = await Promise.allSettled(tasks);
+    this.logSlowDiscover({
+      tenantId: params.tenantId,
+      totalMs: Date.now() - startedAt,
+      taskTimings,
+      taskCount: tasks.length,
+    });
+
+    const { batchByTable, standaloneByKey, discreteByKey } =
+      partitionSettledDiscoverTasks(settled);
+
+    return this.assembleDiscoverFacets({
+      params,
+      batchByTable,
+      standaloneByKey,
+      discreteByKey,
+    });
+  }
+
+  private buildBatchFacetTasks({
+    params,
+    batched,
+    taskTimings,
+  }: {
+    params: DiscoverParams;
+    batched: Map<FacetTable, BatchedFacetSlot>;
+    taskTimings: Array<{ label: string; durationMs: number }>;
+  }): Promise<DiscoverTaskOutcome>[] {
+    return Array.from(batched, ([table, slot]) =>
+      timedTask(
+        taskTimings,
+        `batch:${table}`,
+        this.repository
+          .findBatchedFacets({
+            tenantId: params.tenantId,
+            timeRange: params.timeRange,
+            table,
+            timeColumn: TABLE_TIME_COLUMNS[table],
+            categoricalSpecs: slot.categoricals.map((d) => ({
+              key: d.key,
+              expression: d.expression,
+            })),
+            rangeSpecs: slot.ranges.map((d) => ({
+              key: d.key,
+              expression: d.expression,
+            })),
+            topN: DISCOVER_TOP_N,
+          })
+          .then(
+            (result): DiscoverTaskOutcome => ({ kind: "batch", table, result }),
+          ),
+      ),
+    );
+  }
+
+  private buildStandaloneFacetTasks({
+    params,
+    standalone,
+    taskTimings,
+  }: {
+    params: DiscoverParams;
+    standalone: FacetDefinition[];
+    taskTimings: Array<{ label: string; durationMs: number }>;
+  }): Promise<DiscoverTaskOutcome>[] {
+    return standalone.map((def) =>
+      timedTask(
+        taskTimings,
+        `standalone:${def.kind}:${def.key}`,
+        this.discoverStandaloneFacet(def, params),
+      ),
+    );
+  }
+
+  private async discoverStandaloneFacet(
+    def: FacetDefinition,
+    params: DiscoverParams,
+  ): Promise<DiscoverTaskOutcome> {
+    let descriptor: FacetDescriptor;
+    switch (def.kind) {
+      case "categorical":
+        descriptor = await this.discoverCategorical(
+          def,
+          params,
+          DISCOVER_TOP_N,
+        );
+        break;
+      case "range":
+        descriptor = await this.discoverRange(def, params);
+        break;
+      case "dynamic_keys":
+        descriptor = await this.discoverDynamicKeys(
+          def,
+          params,
+          DISCOVER_TOP_N,
+        );
+        break;
     }
+    return { kind: "standalone", key: def.key, descriptor };
+  }
 
-    for (const def of standalone) {
-      tasks.push(
-        wrap(
-          `standalone:${def.kind}:${def.key}`,
-          (async (): Promise<Outcome> => {
-            let descriptor: FacetDescriptor;
-            switch (def.kind) {
-              case "categorical":
-                descriptor = await this.discoverCategorical(def, params, TOP_N);
-                break;
-              case "range":
-                descriptor = await this.discoverRange(def, params);
-                break;
-              case "dynamic_keys":
-                descriptor = await this.discoverDynamicKeys(def, params, TOP_N);
-                break;
-            }
-            return { kind: "standalone", key: def.key, descriptor };
-          })(),
-        ),
-      );
-    }
-
-    // Distinct-value discovery for `isDiscrete`-flagged integer facets. Runs as
-    // its own GROUP BY per facet — the batched range pass only yields min/max.
+  /**
+   * Distinct-value discovery for `isDiscrete`-flagged integer facets. Runs as
+   * its own GROUP BY per facet — the batched range pass only yields min/max.
+   */
+  private buildDiscreteFacetTasks({
+    params,
+    taskTimings,
+  }: {
+    params: DiscoverParams;
+    taskTimings: Array<{ label: string; durationMs: number }>;
+  }): Promise<DiscoverTaskOutcome>[] {
+    const tasks: Promise<DiscoverTaskOutcome>[] = [];
     for (const def of FACET_REGISTRY) {
       if (def.kind !== "range" || !def.isDiscrete) continue;
       tasks.push(
-        wrap(
+        timedTask(
+          taskTimings,
           `discrete:${def.key}`,
           this.repository
             .findDiscreteValues({
@@ -893,10 +1034,10 @@ export class TraceListService {
               table: def.table,
               timeColumn: TABLE_TIME_COLUMNS[def.table],
               column: def.expression,
-              limit: DISCRETE_VALUE_LIMIT,
+              limit: DISCOVER_DISCRETE_VALUE_LIMIT,
             })
             .then(
-              (result): Outcome => ({
+              (result): DiscoverTaskOutcome => ({
                 kind: "discrete",
                 key: def.key,
                 result,
@@ -905,44 +1046,45 @@ export class TraceListService {
         ),
       );
     }
+    return tasks;
+  }
 
-    const settled = await Promise.allSettled(tasks);
-    const totalMs = Date.now() - startedAt;
-    if (totalMs > 1500) {
-      taskTimings.sort((a, b) => b.durationMs - a.durationMs);
-      discoverLogger.info(
-        {
-          tenantId: params.tenantId,
-          totalMs,
-          breakdown: taskTimings.slice(0, 20),
-          taskCount: tasks.length,
-        },
-        "Discover wall-clock exceeded 1.5s — per-task breakdown",
-      );
-    }
+  private logSlowDiscover({
+    tenantId,
+    totalMs,
+    taskTimings,
+    taskCount,
+  }: {
+    tenantId: string;
+    totalMs: number;
+    taskTimings: Array<{ label: string; durationMs: number }>;
+    taskCount: number;
+  }): void {
+    if (totalMs <= 1500) return;
+    taskTimings.sort((a, b) => b.durationMs - a.durationMs);
+    discoverLogger.info(
+      {
+        tenantId,
+        totalMs,
+        breakdown: taskTimings.slice(0, 20),
+        taskCount,
+      },
+      "Discover wall-clock exceeded 1.5s — per-task breakdown",
+    );
+  }
 
-    const batchByTable = new Map<FacetTable, BatchedFacetResult>();
-    const standaloneByKey = new Map<string, FacetDescriptor>();
-    const discreteByKey = new Map<string, DiscreteFacetResult>();
-
-    for (const result of settled) {
-      if (result.status === "rejected") {
-        discoverLogger.warn(
-          { error: String(result.reason) },
-          "Facet discovery query failed, omitting affected facets",
-        );
-        continue;
-      }
-      if (result.value.kind === "batch") {
-        batchByTable.set(result.value.table, result.value.result);
-      } else if (result.value.kind === "discrete") {
-        discreteByKey.set(result.value.key, result.value.result);
-      } else {
-        standaloneByKey.set(result.value.key, result.value.descriptor);
-      }
-    }
-
-    // Assemble in registry order so the sidebar's group ordering is preserved.
+  /** Assembles the facet descriptors in registry order so the sidebar's group ordering is preserved. */
+  private async assembleDiscoverFacets({
+    params,
+    batchByTable,
+    standaloneByKey,
+    discreteByKey,
+  }: {
+    params: DiscoverParams;
+    batchByTable: Map<FacetTable, BatchedFacetResult>;
+    standaloneByKey: Map<string, FacetDescriptor>;
+    discreteByKey: Map<string, DiscreteFacetResult>;
+  }): Promise<FacetDescriptor[]> {
     const facets: FacetDescriptor[] = [];
     for (const def of FACET_REGISTRY) {
       const descriptor = await this.materializeDescriptor({
@@ -971,43 +1113,78 @@ export class TraceListService {
     discreteByKey: Map<string, DiscreteFacetResult>;
   }): Promise<FacetDescriptor | null> {
     if (def.kind === "categorical" && isExpressionCategorical(def)) {
-      if (def.expression.includes("arrayJoin")) {
-        return standaloneByKey.get(def.key) ?? null;
-      }
-      const batch = batchByTable.get(def.table);
-      const raw = batch?.categoricals[def.key];
-      if (!raw) return null;
-      const enriched =
-        def.key === "topic" || def.key === "subtopic"
-          ? await this.enrichTopicNames(params.tenantId, raw)
-          : raw;
-      return {
-        key: def.key,
-        kind: "categorical",
-        label: def.label,
-        group: def.group,
-        topValues: enriched.values,
-        totalDistinct: enriched.totalDistinct,
-      };
+      return this.materializeCategoricalDescriptor({
+        def,
+        params,
+        batchByTable,
+        standaloneByKey,
+      });
     }
 
     if (def.kind === "range") {
-      const batch = batchByTable.get(def.table);
-      const range = batch?.ranges[def.key];
-      if (!range) return null;
-      const discrete = def.isDiscrete ? discreteByKey.get(def.key) : undefined;
-      return {
-        key: def.key,
-        kind: "range",
-        label: def.label,
-        group: def.group,
-        min: range.min,
-        max: range.max,
-        ...(discrete ? { discrete } : {}),
-      };
+      return this.materializeRangeDescriptor({
+        def,
+        batchByTable,
+        discreteByKey,
+      });
     }
 
     return standaloneByKey.get(def.key) ?? null;
+  }
+
+  private async materializeCategoricalDescriptor({
+    def,
+    params,
+    batchByTable,
+    standaloneByKey,
+  }: {
+    def: ExpressionCategoricalDef;
+    params: DiscoverParams;
+    batchByTable: Map<FacetTable, BatchedFacetResult>;
+    standaloneByKey: Map<string, FacetDescriptor>;
+  }): Promise<FacetDescriptor | null> {
+    if (def.expression.includes("arrayJoin")) {
+      return standaloneByKey.get(def.key) ?? null;
+    }
+    const batch = batchByTable.get(def.table);
+    const raw = batch?.categoricals[def.key];
+    if (!raw) return null;
+    const enriched =
+      def.key === "topic" || def.key === "subtopic"
+        ? await this.enrichTopicNames(params.tenantId, raw)
+        : raw;
+    return {
+      key: def.key,
+      kind: "categorical",
+      label: def.label,
+      group: def.group,
+      topValues: enriched.values,
+      totalDistinct: enriched.totalDistinct,
+    };
+  }
+
+  private materializeRangeDescriptor({
+    def,
+    batchByTable,
+    discreteByKey,
+  }: {
+    def: RangeFacetDef;
+    batchByTable: Map<FacetTable, BatchedFacetResult>;
+    discreteByKey: Map<string, DiscreteFacetResult>;
+  }): FacetDescriptor | null {
+    const batch = batchByTable.get(def.table);
+    const range = batch?.ranges[def.key];
+    if (!range) return null;
+    const discrete = def.isDiscrete ? discreteByKey.get(def.key) : undefined;
+    return {
+      key: def.key,
+      kind: "range",
+      label: def.label,
+      group: def.group,
+      min: range.min,
+      max: range.max,
+      ...(discrete ? { discrete } : {}),
+    };
   }
 
   /** Per-pod dedup of in-flight background refreshes. */

@@ -325,11 +325,52 @@ export function initializeInProcessApp(): App {
   return initializeDefaultApp({ processRole: "all" });
 }
 
+/**
+ * The composition root. Wiring is one sequential pipeline: each `wire*` step
+ * takes the wiring accumulated so far, constructs its slice in the original
+ * order, and returns that accumulator grown by exactly the values later steps
+ * (or the App bag) read. Nothing is threaded through a closure over a mutable
+ * outer variable, and no construction or registration is reordered.
+ */
 export function initializeDefaultApp(options?: {
   processRole?: ProcessRole;
 }): App {
   if (globalForApp.__langwatch_app) return globalForApp.__langwatch_app;
 
+  const core = createRuntimeCore(options);
+  const coreServices = wireCoreServices(core);
+  const traceReads = wireTraceReadServices(coreServices);
+  const storage = wireSpanAndLogStorage(traceReads);
+  const domain = wireDomainServices(storage);
+  const analytics = wireAnalyticsAndRetention(domain);
+  const plans = wireEvaluationsAndPlans(analytics);
+  const billing = wireSaasBilling(plans);
+  const automations = wireAutomationServices(billing);
+  const sharing = wireDataRetentionAndSharing(automations);
+  const langyStores = wireLangyStores(sharing);
+  const folds = wirePipelineRepositories(langyStores);
+  const gateway = wireGatewayServices(folds);
+  const governance = wireGovernanceRepositories(gateway);
+  const eventSourcing = wireEventSourcing(governance);
+  const scheduling = wireScheduling(eventSourcing);
+  const pipelines = wirePipelineRegistry(scheduling);
+  const langy = wireLangyServices(pipelines);
+  const ingestion = wireSuiteRunsAndTraceIngestion(langy);
+  const telemetry = wireTelemetryCollection(ingestion);
+  const closeables = wireGracefulCloseables(telemetry);
+  const notifications = wireNotificationServices(closeables);
+  const wiring = wireOpsServices(notifications);
+
+  return initializeApp({
+    ...buildAppCoreDependencies(wiring),
+    ...buildAppPlatformDependencies(wiring),
+    ...buildAppDataDependencies(wiring),
+    ...buildAppServiceDependencies(wiring),
+    ...buildAppRuntimeDependencies(wiring),
+  });
+}
+
+function createRuntimeCore(options?: { processRole?: ProcessRole }) {
   const prisma = globalPrisma;
   const config = createAppConfigFromEnv({ processRole: options?.processRole });
 
@@ -360,6 +401,21 @@ export function initializeDefaultApp(options?: {
         db: config.redisDbIndex,
       });
 
+  return {
+    prisma,
+    config,
+    clickhouseEnabled,
+    resolveClickHouseClient,
+    runClusteringPage,
+    redis,
+  };
+}
+
+type RuntimeCore = ReturnType<typeof createRuntimeCore>;
+
+function wireCoreServices(ctx: RuntimeCore) {
+  const { prisma, clickhouseEnabled, resolveClickHouseClient, redis } = ctx;
+
   const broadcast = new BroadcastService(redis);
   const projects = traced(
     new ProjectService(new PrismaProjectRepository(prisma)),
@@ -388,6 +444,31 @@ export function initializeDefaultApp(options?: {
   const spanStorageRepository = clickhouseEnabled
     ? new SpanStorageClickHouseRepository(resolveClickHouseClient)
     : new NullSpanStorageRepository();
+
+  return {
+    ...ctx,
+    broadcast,
+    projects,
+    presence,
+    spanDedup,
+    blobStore,
+    ioExtractionService,
+    spanStorageRepository,
+  };
+}
+
+type WithCoreServices = ReturnType<typeof wireCoreServices>;
+
+function wireTraceReadServices(ctx: WithCoreServices) {
+  const {
+    prisma,
+    clickhouseEnabled,
+    resolveClickHouseClient,
+    broadcast,
+    blobStore,
+    ioExtractionService,
+    spanStorageRepository,
+  } = ctx;
 
   const traceSummary = traced(
     new TraceSummaryService(
@@ -440,6 +521,21 @@ export function initializeDefaultApp(options?: {
       eventType: "discover_updated",
     });
   });
+
+  return { ...ctx, traceSummary, evaluationRuns, topics, traceList };
+}
+
+type WithTraceReadServices = ReturnType<typeof wireTraceReadServices>;
+
+function wireSpanAndLogStorage(ctx: WithTraceReadServices) {
+  const {
+    clickhouseEnabled,
+    resolveClickHouseClient,
+    blobStore,
+    ioExtractionService,
+    spanStorageRepository,
+  } = ctx;
+
   const spanStorage = traced(
     new SpanStorageService(spanStorageRepository, {
       blobStore,
@@ -458,6 +554,15 @@ export function initializeDefaultApp(options?: {
     }),
     "LogRecordStorageService",
   );
+
+  return { ...ctx, spanStorage, logRecordStorage };
+}
+
+type WithSpanAndLogStorage = ReturnType<typeof wireSpanAndLogStorage>;
+
+function wireDomainServices(ctx: WithSpanAndLogStorage) {
+  const { prisma, config, blobStore, ioExtractionService } = ctx;
+
   const experiments = traced(
     ExperimentService.create(prisma),
     "ExperimentService",
@@ -485,6 +590,14 @@ export function initializeDefaultApp(options?: {
     }),
     "EvaluationExecutionService",
   );
+
+  return { ...ctx, experiments, organizations, evaluationExecution };
+}
+
+type WithDomainServices = ReturnType<typeof wireDomainServices>;
+
+function wireAnalyticsAndRetention(ctx: WithDomainServices) {
+  const { prisma, clickhouseEnabled, resolveClickHouseClient } = ctx;
 
   // Resolves the per-tenant retention cascade; shared by the DSPy CH repo
   // (which stamps dspy_steps as a traces-category table) and the data-retention
@@ -526,6 +639,30 @@ export function initializeDefaultApp(options?: {
     simulationReads.repository,
   );
   // SuiteRunService is created after pipeline registration (needs startSuiteRun command)
+
+  return {
+    ...ctx,
+    dataRetentionPolicyRepo,
+    retentionPolicyCache,
+    dspySteps,
+    analyticsService,
+    simulationReads,
+    scenarioRunExport,
+  };
+}
+
+type WithAnalyticsAndRetention = ReturnType<typeof wireAnalyticsAndRetention>;
+
+function wireEvaluationsAndPlans(ctx: WithAnalyticsAndRetention) {
+  const {
+    prisma,
+    config,
+    clickhouseEnabled,
+    resolveClickHouseClient,
+    organizations,
+    evaluationRuns,
+    evaluationExecution,
+  } = ctx;
 
   const evaluations = {
     runs: evaluationRuns,
@@ -585,6 +722,14 @@ export function initializeDefaultApp(options?: {
         }),
       );
 
+  return { ...ctx, evaluations, usage, planProvider };
+}
+
+type WithEvaluationsAndPlans = ReturnType<typeof wireEvaluationsAndPlans>;
+
+function wireSaasBilling(ctx: WithEvaluationsAndPlans) {
+  const { prisma, config, planProvider } = ctx;
+
   let subscription: SubscriptionService | undefined;
   let usageReportingService: StripeUsageReportingService | undefined;
   let webhookService: WebhookService | undefined;
@@ -619,6 +764,20 @@ export function initializeDefaultApp(options?: {
       getPostHog: () => getPostHogInstance(),
     });
   }
+
+  return {
+    ...ctx,
+    subscription,
+    usageReportingService,
+    webhookService,
+    stripeClient,
+  };
+}
+
+type WithSaasBilling = ReturnType<typeof wireSaasBilling>;
+
+function wireAutomationServices(ctx: WithSaasBilling) {
+  const { prisma, config, redis } = ctx;
 
   const monitors = traced(
     new MonitorService(new PrismaMonitorRepository(prisma)),
@@ -655,6 +814,30 @@ export function initializeDefaultApp(options?: {
         },
       })
     : undefined;
+
+  return {
+    ...ctx,
+    monitors,
+    triggers,
+    emailSuppressions,
+    triggerTemplates,
+    tokenizer,
+    nurturing,
+  };
+}
+
+type WithAutomationServices = ReturnType<typeof wireAutomationServices>;
+
+function wireDataRetentionAndSharing(ctx: WithAutomationServices) {
+  const {
+    prisma,
+    clickhouseEnabled,
+    resolveClickHouseClient,
+    redis,
+    projects,
+    dataRetentionPolicyRepo,
+    retentionPolicyCache,
+  } = ctx;
 
   const dataRetentionPolicyService = new DataRetentionPolicyService(
     dataRetentionPolicyRepo,
@@ -705,6 +888,16 @@ export function initializeDefaultApp(options?: {
   );
   const sharedTraceCache = createSharedTracePayloadCache(redis);
 
+  return { ...ctx, dataRetention, share, sharedTraceCache };
+}
+
+type WithDataRetentionAndSharing = ReturnType<
+  typeof wireDataRetentionAndSharing
+>;
+
+function wireLangyStores(ctx: WithDataRetentionAndSharing) {
+  const { prisma, redis } = ctx;
+
   const langyConversationRepository = new PrismaLangyConversationRepository(
     prisma,
   );
@@ -722,8 +915,42 @@ export function initializeDefaultApp(options?: {
     messages: createLangyTrustedMessageReader(langyMessageRepository),
   });
 
-  // Construct repositories at the composition root — ClickHouse-or-Memory decisions live here.
+  return {
+    ...ctx,
+    langyConversationRepository,
+    langyTurnAdmission,
+    langyMessageRepository,
+    langyAgentUrl,
+    langyInternalSecret,
+    langyWorker,
+    langyHandoffStore,
+    langyTokenBuffer,
+    langyTitleGenerator,
+  };
+}
+
+type WithLangyStores = ReturnType<typeof wireLangyStores>;
+
+/**
+ * Construct repositories at the composition root — ClickHouse-or-Memory
+ * decisions live here. The four groups run in the original declaration order;
+ * they are separate functions only so each stays a readable size.
+ */
+function wirePipelineRepositories(ctx: WithLangyStores) {
   const repositories: PipelineRepositories = {
+    ...buildRunStateRepositories(ctx),
+    ...buildTraceFoldRepositories(ctx),
+    ...buildAnalyticsFoldRepositories(ctx),
+    ...buildProjectionRepositories(ctx),
+  };
+
+  return { ...ctx, repositories };
+}
+
+function buildRunStateRepositories(ctx: WithLangyStores) {
+  const { clickhouseEnabled, resolveClickHouseClient } = ctx;
+
+  return {
     suiteRunState: clickhouseEnabled
       ? new SuiteRunStateRepositoryClickHouse(resolveClickHouseClient)
       : new SuiteRunStateRepositoryMemory(),
@@ -736,6 +963,13 @@ export function initializeDefaultApp(options?: {
     experimentIdLookup: clickhouseEnabled
       ? new ExperimentIdLookupClickHouseRepository(resolveClickHouseClient)
       : new NullExperimentIdLookupRepository(),
+  };
+}
+
+function buildTraceFoldRepositories(ctx: WithLangyStores) {
+  const { clickhouseEnabled, resolveClickHouseClient, traceSummary } = ctx;
+
+  return {
     traceSummaryFold: clickhouseEnabled
       ? new TraceSummaryClickHouseRepository(resolveClickHouseClient)
       : traceSummary.repository,
@@ -751,6 +985,13 @@ export function initializeDefaultApp(options?: {
     sessionMetricSeries: clickhouseEnabled
       ? new SessionMetricSeriesClickHouseRepository(resolveClickHouseClient)
       : new NullSessionMetricSeriesRepository(),
+  };
+}
+
+function buildAnalyticsFoldRepositories(ctx: WithLangyStores) {
+  const { clickhouseEnabled, resolveClickHouseClient } = ctx;
+
+  return {
     metricDataPointStorage: clickhouseEnabled
       ? new MetricDataPointClickHouseRepository({
           resolveClient: resolveClickHouseClient,
@@ -774,6 +1015,18 @@ export function initializeDefaultApp(options?: {
     experimentRunItemStorage: createExperimentRunItemAppendStore(
       clickhouseEnabled ? resolveClickHouseClient : null,
     ),
+  };
+}
+
+function buildProjectionRepositories(ctx: WithLangyStores) {
+  const {
+    prisma,
+    clickhouseEnabled,
+    resolveClickHouseClient,
+    langyTurnAdmission,
+  } = ctx;
+
+  return {
     langyConversationState: new PrismaLangyConversationProjectionRepository(
       prisma,
     ),
@@ -794,6 +1047,19 @@ export function initializeDefaultApp(options?: {
     topicModel: new PrismaTopicModelProjectionRepository(prisma),
     langyTurnAdmission,
   };
+}
+
+type WithPipelineRepositories = ReturnType<typeof wirePipelineRepositories>;
+
+function wireGatewayServices(ctx: WithPipelineRepositories) {
+  const {
+    prisma,
+    redis,
+    clickhouseEnabled,
+    resolveClickHouseClient,
+    repositories,
+    planProvider,
+  } = ctx;
 
   // The spend-command pipeline projects gateway_spend; it shares the
   // ClickHouse gate because the spend record has no PG fallback (a mutable
@@ -844,6 +1110,22 @@ export function initializeDefaultApp(options?: {
         }
       : undefined;
 
+  return {
+    ...ctx,
+    gatewaySpend,
+    webhookDelivery,
+    gatewayBudgetRepository,
+    gatewayVirtualKeySpendRepository,
+    gatewayWebhookEventsRepository,
+    gatewayDebits,
+  };
+}
+
+type WithGatewayServices = ReturnType<typeof wireGatewayServices>;
+
+function wireGovernanceRepositories(ctx: WithGatewayServices) {
+  const { clickhouseEnabled, resolveClickHouseClient } = ctx;
+
   // Governance's KPI rollup. One instance for the whole App: the reactor
   // sync writes through it, the spend-spike anomaly evaluator reads through
   // it — the same repository reference the process manager below takes and
@@ -888,6 +1170,36 @@ export function initializeDefaultApp(options?: {
       )
     : undefined;
 
+  return {
+    ...ctx,
+    governanceKpisRepository,
+    governanceKpisSync,
+    governanceOcsfEventsRepository,
+    governanceOcsfEventsSync,
+    governanceTraceActivityRepository,
+    personalUsageRepository,
+    billableEventsRepository,
+  };
+}
+
+type WithGovernanceRepositories = ReturnType<typeof wireGovernanceRepositories>;
+
+function wireEventSourcing(ctx: WithGovernanceRepositories) {
+  const {
+    prisma,
+    config,
+    clickhouseEnabled,
+    resolveClickHouseClient,
+    redis,
+    retentionPolicyCache,
+    repositories,
+    triggers,
+    emailSuppressions,
+    projects,
+    evaluations,
+    spanStorage,
+  } = ctx;
+
   const es = new EventSourcing({
     clickhouse: clickhouseEnabled ? resolveClickHouseClient : void 0,
     redis,
@@ -915,6 +1227,22 @@ export function initializeDefaultApp(options?: {
     traceSummaryRepository: repositories.traceSummaryFold,
     resolveClickHouseClient,
   });
+
+  return { ...ctx, es, automationPorts };
+}
+
+type WithEventSourcing = ReturnType<typeof wireEventSourcing>;
+
+function wireScheduling(ctx: WithEventSourcing) {
+  const {
+    prisma,
+    config,
+    redis,
+    triggers,
+    emailSuppressions,
+    traceList,
+    analyticsService,
+  } = ctx;
 
   // ADR-044 Phase 1: the generic calendar scheduler. No cron infra. A
   // worker-only in-process loop that sleeps until the soonest due
@@ -944,124 +1272,70 @@ export function initializeDefaultApp(options?: {
   // renders + dispatches on schedule (worker-only, same notify pipeline as
   // alerts). The scheduler registry is a process singleton.
   if (roleRunsWorkers(config.processRole)) {
-    schedulerRegistry.register({
-      targetType: REPORT_SCHEDULER_TARGET_TYPE,
-      handler: (fire) =>
-        dispatchScheduledReport({
-          deps: {
-            loadTrigger: ({ projectId, triggerId }) =>
-              prisma.trigger.findFirst({
-                where: { id: triggerId, projectId },
-              }),
-            loadProject: (projectId) =>
-              prisma.project.findUnique({ where: { id: projectId } }),
-            sendEmail: sendRenderedTriggerEmail,
-            sendSlack: sendRenderedSlackMessage,
-            sendSlackBot: postSlackChatMessage,
-            filterSuppressedRecipients: ({ projectId, triggerId, emails }) =>
-              emailSuppressions.filterSuppressed({
-                projectId,
-                triggerId,
-                emails,
-              }),
-            // The top-N traces matching the report's Subject query over its
-            // window, via the shared TraceListService. The ADR-043 filter DSL
-            // compiles the author's query straight into the bare-column
-            // `filterWhere` getList takes, so a "top matching traces" report
-            // finally matches on what the author asked for. (The older
-            // filters-OBJECT builder could not: it emits `ts.`-aliased
-            // conditions for a JOIN context, invalid here.)
-            listReportTraces: async ({
-              projectId,
-              projectSlug,
-              query,
-              from,
-              to,
-              limit,
-            }) => {
-              const page = await traceList.getList({
-                tenantId: projectId,
-                timeRange: { from, to },
-                sort: { columnId: "time", direction: "desc" },
-                page: 1,
-                pageSize: limit,
-                visibilityCutoffMs: null,
-                filterWhere:
-                  translateFilterToClickHouse(query, projectId, { from, to }) ??
-                  undefined,
-              });
-              const projectUrl = `${config.baseHost ?? env.BASE_HOST}/${projectSlug}`;
-              return page.items.map((item) =>
-                toReportTraceRow({ item, projectUrl }),
-              );
-            },
-            // A report's fire is a completed EVENT, not an open incident, so
-            // `resolvedAt` is stamped at write time. The list's "currently
-            // firing" read looks for `customGraphId != null AND resolvedAt IS
-            // NULL`, so a report row can never masquerade as a live alert.
-            recordFire: async ({ projectId, triggerId, firedAt }) => {
-              await prisma.triggerSent.create({
-                data: {
-                  projectId,
-                  triggerId,
-                  traceId: null,
-                  customGraphId: null,
-                  createdAt: firedAt,
-                  resolvedAt: firedAt,
-                },
-              });
-            },
-            loadReportCharts: ({ projectId, source, from, to }) =>
-              loadReportCharts({
-                deps: {
-                  loadCustomGraph: ({ projectId, customGraphId }) =>
-                    prisma.customGraph.findFirst({
-                      where: { id: customGraphId, projectId },
-                    }),
-                  loadDashboardGraphs: ({ projectId, dashboardId }) =>
-                    prisma.customGraph.findMany({
-                      where: { dashboardId, projectId },
-                      orderBy: [{ gridRow: "asc" }, { gridColumn: "asc" }],
-                    }),
-                  getTimeseries: (input) =>
-                    analyticsService.getTimeseries(input),
-                },
-                source,
-                projectId,
-                from,
-                to,
-              }),
-            baseHost: config.baseHost ?? env.BASE_HOST,
-          },
-          fire,
-        }),
+    registerReportSchedulerHandler({
+      prisma,
+      config,
+      emailSuppressions,
+      traceList,
+      analyticsService,
     });
-
-    // ADR-044 durable self-heal: the report upsert route writes the Trigger row
-    // and its ScheduledJob in two non-atomic steps, so a crash between them can
-    // leave an active report with no schedule. Repair any such gaps at boot
-    // (create-if-missing, race-safe on every worker). Fire-and-forget so boot is
-    // never blocked; a failure is logged, not fatal (the next boot retries).
-    const reconcileLogger = createLogger("langwatch:app-layer:scheduler");
-    void triggers
-      .reconcileReportSchedules()
-      .then(({ repaired }) => {
-        if (repaired > 0) {
-          reconcileLogger.info(
-            { repaired },
-            "Reconciled report schedules missing a ScheduledJob at boot",
-          );
-        }
-      })
-      .catch((error: unknown) => {
-        reconcileLogger.error(
-          { error: error instanceof Error ? error.message : String(error) },
-          "Report-schedule reconciliation failed at boot (will retry next boot)",
-        );
-      });
+    reconcileReportSchedulesAtBoot(triggers);
   }
 
+  return { ...ctx, scheduler };
+}
+
+type WithScheduling = ReturnType<typeof wireScheduling>;
+
+function wirePipelineRegistry(ctx: WithScheduling) {
+  const { prisma, config, redis } = ctx;
+
   const registry = new PipelineRegistry({
+    ...buildRegistryRuntimeConfig(ctx),
+    ...buildRegistryDomainConfig(ctx),
+  });
+  const commands = registry.registerAll();
+  (globalForApp as any).__scenarioExecutionHandle =
+    commands.scenarioExecutionHandle;
+
+  if (roleRunsWorkers(config.processRole)) {
+    startTopicClusteringSeeds({ prisma, redis, commands });
+  }
+
+  return { ...ctx, commands };
+}
+
+type PipelineRegistryConfig = ConstructorParameters<typeof PipelineRegistry>[0];
+
+function buildRegistryRuntimeConfig(
+  ctx: WithScheduling,
+): Pick<
+  PipelineRegistryConfig,
+  | "eventSourcing"
+  | "repositories"
+  | "redis"
+  | "broadcast"
+  | "langy"
+  | "automations"
+  | "topicClustering"
+  | "enterprisePipelines"
+> {
+  const {
+    prisma,
+    config,
+    redis,
+    broadcast,
+    es,
+    repositories,
+    langyTokenBuffer,
+    langyHandoffStore,
+    langyWorker,
+    langyTitleGenerator,
+    automationPorts,
+    runClusteringPage,
+  } = ctx;
+
+  return {
     eventSourcing: es,
     repositories,
     redis: redis!,
@@ -1089,6 +1363,49 @@ export function initializeDefaultApp(options?: {
       prisma,
       runsWorkers: roleRunsWorkers(config.processRole),
     },
+  };
+}
+
+function buildRegistryDomainConfig(
+  ctx: WithScheduling,
+): Pick<
+  PipelineRegistryConfig,
+  | "projects"
+  | "monitors"
+  | "triggers"
+  | "prisma"
+  | "organizations"
+  | "traces"
+  | "evaluations"
+  | "costRecorder"
+  | "billingCheckpoints"
+  | "usageReportingService"
+  | "gatewaySpend"
+  | "webhookDelivery"
+  | "gatewayDebits"
+  | "blobStore"
+  | "governanceKpisSync"
+  | "governanceOcsfEventsSync"
+> {
+  const {
+    prisma,
+    projects,
+    monitors,
+    triggers,
+    organizations,
+    traceSummary,
+    spanStorage,
+    evaluations,
+    usageReportingService,
+    gatewaySpend,
+    webhookDelivery,
+    gatewayDebits,
+    blobStore,
+    governanceKpisSync,
+    governanceOcsfEventsSync,
+  } = ctx;
+
+  return {
     projects,
     monitors,
     triggers,
@@ -1108,26 +1425,52 @@ export function initializeDefaultApp(options?: {
     blobStore,
     governanceKpisSync,
     governanceOcsfEventsSync,
-  });
-  const commands = registry.registerAll();
-  (globalForApp as any).__scenarioExecutionHandle =
-    commands.scenarioExecutionHandle;
+  };
+}
 
-  if (roleRunsWorkers(config.processRole)) {
-    // One-time background seeds on worker boot (ADR-051): topic-model
-    // history onto the event stream, and daily-wake schedules for
-    // pre-cutover projects. The module owns its own wiring, coordination,
-    // and error handling — a failure is logged and the next boot retries.
-    startTopicClusteringBootSeeds({
-      prisma,
-      redis: redis ?? null,
-      commands: {
-        recordTopics: (args) => commands.topicClustering.recordTopics(args),
-        requestClustering: (args) =>
-          commands.topicClustering.requestClustering(args),
-      },
-    });
-  }
+/**
+ * One-time background seeds on worker boot (ADR-051): topic-model history onto
+ * the event stream, and daily-wake schedules for pre-cutover projects. The
+ * module owns its own wiring, coordination, and error handling — a failure is
+ * logged and the next boot retries.
+ */
+function startTopicClusteringSeeds({
+  prisma,
+  redis,
+  commands,
+}: {
+  prisma: AppPrisma;
+  redis: RuntimeCore["redis"];
+  commands: AppCommands;
+}): void {
+  startTopicClusteringBootSeeds({
+    prisma,
+    redis: redis ?? null,
+    commands: {
+      recordTopics: (args) => commands.topicClustering.recordTopics(args),
+      requestClustering: (args) =>
+        commands.topicClustering.requestClustering(args),
+    },
+  });
+}
+
+type WithPipelineRegistry = ReturnType<typeof wirePipelineRegistry>;
+
+function wireLangyServices(ctx: WithPipelineRegistry) {
+  const {
+    prisma,
+    redis,
+    es,
+    commands,
+    langyConversationRepository,
+    langyMessageRepository,
+    langyAgentUrl,
+    langyInternalSecret,
+    langyWorker,
+    langyTokenBuffer,
+    langyHandoffStore,
+    langyTurnAdmission,
+  } = ctx;
 
   // Langy operational reads come from the Postgres projections; writes remain
   // commands against the canonical ClickHouse event log. The event READER feeds
@@ -1203,6 +1546,26 @@ export function initializeDefaultApp(options?: {
     messages: langyMessageRepository,
   });
 
+  return {
+    ...ctx,
+    langyConversations,
+    langyMessages,
+    langyGithubInstallations,
+    langyTurns,
+  };
+}
+
+type WithLangyServices = ReturnType<typeof wireLangyServices>;
+
+function wireSuiteRunsAndTraceIngestion(ctx: WithLangyServices) {
+  const {
+    clickhouseEnabled,
+    resolveClickHouseClient,
+    commands,
+    spanDedup,
+    blobStore,
+  } = ctx;
+
   const suiteRunService = SuiteRunService.create({
     resolveClickHouseClient: clickhouseEnabled ? resolveClickHouseClient : null,
     startSuiteRun: commands.suiteRuns.startSuiteRun,
@@ -1268,6 +1631,21 @@ export function initializeDefaultApp(options?: {
     "TraceRequestCollectionService",
   );
 
+  return { ...ctx, suiteRunService, traceCollection };
+}
+
+type WithTraceIngestion = ReturnType<typeof wireSuiteRunsAndTraceIngestion>;
+
+function wireTelemetryCollection(ctx: WithTraceIngestion) {
+  const {
+    commands,
+    traceSummary,
+    traceList,
+    spanStorage,
+    logRecordStorage,
+    traceCollection,
+  } = ctx;
+
   const logCollection = traced(
     new LogRequestCollectionService({
       recordLogRecords: commands.logs.recordLogRecord.sendBatch!,
@@ -1294,6 +1672,14 @@ export function initializeDefaultApp(options?: {
     logCollection,
     metricCollection,
   };
+
+  return { ...ctx, traces };
+}
+
+type WithTelemetryCollection = ReturnType<typeof wireTelemetryCollection>;
+
+function wireGracefulCloseables(ctx: WithTelemetryCollection) {
+  const { prisma, clickhouseEnabled, redis, broadcast, scheduler } = ctx;
 
   // Collect closeables for graceful shutdown
   const gracefulCloseables: Array<{
@@ -1334,6 +1720,14 @@ export function initializeDefaultApp(options?: {
     close: () => prisma.$disconnect(),
   });
 
+  return { ...ctx, gracefulCloseables };
+}
+
+type WithGracefulCloseables = ReturnType<typeof wireGracefulCloseables>;
+
+function wireNotificationServices(ctx: WithGracefulCloseables) {
+  const { prisma, config, organizations, usage, planProvider } = ctx;
+
   const notifications = NotificationService.create({
     config: {
       baseHost: config.baseHost,
@@ -1353,6 +1747,14 @@ export function initializeDefaultApp(options?: {
     notificationService: notifications,
     planProvider,
   });
+
+  return { ...ctx, notifications, usageLimits };
+}
+
+type WithNotificationServices = ReturnType<typeof wireNotificationServices>;
+
+function wireOpsServices(ctx: WithNotificationServices) {
+  const { prisma, redis, repositories } = ctx;
 
   const queueRepo = redis
     ? new QueueRedisRepository(redis)
@@ -1383,7 +1785,48 @@ export function initializeDefaultApp(options?: {
       : null,
   };
 
-  return initializeApp({
+  return { ...ctx, sharedCh, ops };
+}
+
+/** Everything the App bag builders below read, in its final wired form. */
+type AppWiring = ReturnType<typeof wireOpsServices>;
+
+function buildAppCoreDependencies(
+  ctx: AppWiring,
+): Pick<
+  AppDependencies,
+  | "config"
+  | "broadcast"
+  | "presence"
+  | "traces"
+  | "evaluations"
+  | "experiments"
+  | "triggers"
+  | "triggerTemplates"
+  | "emailSuppressions"
+  | "dspySteps"
+  | "analytics"
+  | "simulations"
+  | "suiteRuns"
+> {
+  const {
+    config,
+    broadcast,
+    presence,
+    traces,
+    evaluations,
+    experiments,
+    triggers,
+    triggerTemplates,
+    emailSuppressions,
+    dspySteps,
+    analyticsService,
+    simulationReads,
+    scenarioRunExport,
+    suiteRunService,
+  } = ctx;
+
+  return {
     config,
     broadcast,
     presence,
@@ -1397,6 +1840,33 @@ export function initializeDefaultApp(options?: {
     analytics: { service: analyticsService },
     simulations: { runs: simulationReads, export: scenarioRunExport },
     suiteRuns: { runs: suiteRunService },
+  };
+}
+
+function buildAppPlatformDependencies(
+  ctx: AppWiring,
+): Pick<
+  AppDependencies,
+  | "topicClustering"
+  | "gateway"
+  | "filters"
+  | "clickhouse"
+  | "billing"
+  | "usageStats"
+> {
+  const {
+    prisma,
+    clickhouseEnabled,
+    resolveClickHouseClient,
+    topics,
+    runClusteringPage,
+    gatewayBudgetRepository,
+    gatewayVirtualKeySpendRepository,
+    gatewaySpend,
+    gatewayWebhookEventsRepository,
+  } = ctx;
+
+  return {
     topicClustering: {
       status: new TopicClusteringStatusService(
         new PrismaTopicClusteringStatusRepository(prisma),
@@ -1431,6 +1901,31 @@ export function initializeDefaultApp(options?: {
         getClickHouseClientForOrganization,
       ),
     },
+  };
+}
+
+function buildAppDataDependencies(
+  ctx: AppWiring,
+): Pick<
+  AppDependencies,
+  | "scenarios"
+  | "governance"
+  | "billableEvents"
+  | "codingAgents"
+  | "storedObjects"
+  | "opsExplain"
+> {
+  const {
+    repositories,
+    sharedCh,
+    governanceOcsfEventsRepository,
+    governanceTraceActivityRepository,
+    governanceKpisRepository,
+    personalUsageRepository,
+    billableEventsRepository,
+  } = ctx;
+
+  return {
     scenarios: {
       // Boot-sweep-only: the two orphaned-run reconciliation sweeps read the
       // shared (cross-tenant) client directly rather than a per-tenant
@@ -1467,6 +1962,47 @@ export function initializeDefaultApp(options?: {
     opsExplain: {
       service: new OpsExplainService(new OpsExplainClickHouseRepository()),
     },
+  };
+}
+
+function buildAppServiceDependencies(
+  ctx: AppWiring,
+): Pick<
+  AppDependencies,
+  | "langy"
+  | "organizations"
+  | "projects"
+  | "tokenizer"
+  | "usage"
+  | "planProvider"
+  | "subscription"
+  | "webhookService"
+  | "stripeClient"
+  | "notifications"
+  | "nurturing"
+  | "usageLimits"
+> {
+  const {
+    prisma,
+    redis,
+    langyConversations,
+    langyTurns,
+    langyMessages,
+    langyGithubInstallations,
+    organizations,
+    projects,
+    tokenizer,
+    usage,
+    planProvider,
+    subscription,
+    webhookService,
+    stripeClient,
+    notifications,
+    nurturing,
+    usageLimits,
+  } = ctx;
+
+  return {
     // traced() gives every service call a `ClassName.method` span, same as
     // the rest of the app bag. Per-method, not per-frame: the streaming hot
     // paths (token buffer, relay frames) stay span-free by design.
@@ -1498,6 +2034,34 @@ export function initializeDefaultApp(options?: {
     notifications,
     nurturing,
     usageLimits,
+  };
+}
+
+function buildAppRuntimeDependencies(
+  ctx: AppWiring,
+): Pick<
+  AppDependencies,
+  | "retentionPolicyCache"
+  | "dataRetention"
+  | "share"
+  | "sharedTraceCache"
+  | "commands"
+  | "ops"
+  | "_eventSourcing"
+  | "_gracefulCloseables"
+> {
+  const {
+    es,
+    ops,
+    commands,
+    share,
+    sharedTraceCache,
+    dataRetention,
+    retentionPolicyCache,
+    gracefulCloseables,
+  } = ctx;
+
+  return {
     retentionPolicyCache,
     dataRetention,
     share,
@@ -1506,11 +2070,190 @@ export function initializeDefaultApp(options?: {
     ops,
     _eventSourcing: es,
     _gracefulCloseables: gracefulCloseables,
+  };
+}
+
+type AppPrisma = typeof globalPrisma;
+type AppAnalyticsService = ReturnType<typeof createAnalyticsService>;
+type ReportDispatchDeps = Parameters<typeof dispatchScheduledReport>[0]["deps"];
+
+/**
+ * ADR-044 Phase 3c: binds the report target type to the dispatch pipeline so a
+ * due report ScheduledJob renders + dispatches on schedule. The deps bag is
+ * rebuilt per fire, exactly as the inline registration did.
+ */
+function registerReportSchedulerHandler(deps: {
+  prisma: AppPrisma;
+  config: AppConfig;
+  emailSuppressions: EmailSuppressionService;
+  traceList: TraceListService;
+  analyticsService: AppAnalyticsService;
+}): void {
+  schedulerRegistry.register({
+    targetType: REPORT_SCHEDULER_TARGET_TYPE,
+    handler: (fire) =>
+      dispatchScheduledReport({ deps: buildScheduledReportDeps(deps), fire }),
   });
+}
+
+function buildScheduledReportDeps({
+  prisma,
+  config,
+  emailSuppressions,
+  traceList,
+  analyticsService,
+}: {
+  prisma: AppPrisma;
+  config: AppConfig;
+  emailSuppressions: EmailSuppressionService;
+  traceList: TraceListService;
+  analyticsService: AppAnalyticsService;
+}): ReportDispatchDeps {
+  return {
+    loadTrigger: ({ projectId, triggerId }) =>
+      prisma.trigger.findFirst({
+        where: { id: triggerId, projectId },
+      }),
+    loadProject: (projectId) =>
+      prisma.project.findUnique({ where: { id: projectId } }),
+    sendEmail: sendRenderedTriggerEmail,
+    sendSlack: sendRenderedSlackMessage,
+    sendSlackBot: postSlackChatMessage,
+    filterSuppressedRecipients: ({ projectId, triggerId, emails }) =>
+      emailSuppressions.filterSuppressed({
+        projectId,
+        triggerId,
+        emails,
+      }),
+    listReportTraces: buildReportTraceLister({ traceList, config }),
+    recordFire: async ({ projectId, triggerId, firedAt }) => {
+      await prisma.triggerSent.create({
+        data: {
+          projectId,
+          triggerId,
+          traceId: null,
+          customGraphId: null,
+          createdAt: firedAt,
+          resolvedAt: firedAt,
+        },
+      });
+    },
+    loadReportCharts: buildReportChartLoader({ prisma, analyticsService }),
+    baseHost: config.baseHost ?? env.BASE_HOST,
+  };
+}
+
+/**
+ * The top-N traces matching the report's Subject query over its window, via
+ * the shared TraceListService. The ADR-043 filter DSL compiles the author's
+ * query straight into the bare-column `filterWhere` getList takes, so a "top
+ * matching traces" report finally matches on what the author asked for. (The
+ * older filters-OBJECT builder could not: it emits `ts.`-aliased conditions
+ * for a JOIN context, invalid here.)
+ */
+function buildReportTraceLister({
+  traceList,
+  config,
+}: {
+  traceList: TraceListService;
+  config: AppConfig;
+}): ReportDispatchDeps["listReportTraces"] {
+  return async ({ projectId, projectSlug, query, from, to, limit }) => {
+    const page = await traceList.getList({
+      tenantId: projectId,
+      timeRange: { from, to },
+      sort: { columnId: "time", direction: "desc" },
+      page: 1,
+      pageSize: limit,
+      visibilityCutoffMs: null,
+      filterWhere:
+        translateFilterToClickHouse(query, projectId, { from, to }) ??
+        undefined,
+    });
+    const projectUrl = `${config.baseHost ?? env.BASE_HOST}/${projectSlug}`;
+    return page.items.map((item) => toReportTraceRow({ item, projectUrl }));
+  };
+}
+
+function buildReportChartLoader({
+  prisma,
+  analyticsService,
+}: {
+  prisma: AppPrisma;
+  analyticsService: AppAnalyticsService;
+}): ReportDispatchDeps["loadReportCharts"] {
+  return ({ projectId, source, from, to }) =>
+    loadReportCharts({
+      deps: {
+        loadCustomGraph: ({ projectId, customGraphId }) =>
+          prisma.customGraph.findFirst({
+            where: { id: customGraphId, projectId },
+          }),
+        loadDashboardGraphs: ({ projectId, dashboardId }) =>
+          prisma.customGraph.findMany({
+            where: { dashboardId, projectId },
+            orderBy: [{ gridRow: "asc" }, { gridColumn: "asc" }],
+          }),
+        getTimeseries: (input) => analyticsService.getTimeseries(input),
+      },
+      source,
+      projectId,
+      from,
+      to,
+    });
+}
+
+/**
+ * ADR-044 durable self-heal: the report upsert route writes the Trigger row
+ * and its ScheduledJob in two non-atomic steps, so a crash between them can
+ * leave an active report with no schedule. Repair any such gaps at boot
+ * (create-if-missing, race-safe on every worker). Fire-and-forget so boot is
+ * never blocked; a failure is logged, not fatal (the next boot retries).
+ */
+function reconcileReportSchedulesAtBoot(triggers: TriggerService): void {
+  const reconcileLogger = createLogger("langwatch:app-layer:scheduler");
+  void triggers
+    .reconcileReportSchedules()
+    .then(({ repaired }) => {
+      if (repaired > 0) {
+        reconcileLogger.info(
+          { repaired },
+          "Reconciled report schedules missing a ScheduledJob at boot",
+        );
+      }
+    })
+    .catch((error: unknown) => {
+      reconcileLogger.error(
+        { error: error instanceof Error ? error.message : String(error) },
+        "Report-schedule reconciliation failed at boot (will retry next boot)",
+      );
+    });
 }
 
 /** Tests — noop commands, null-backed services. */
 export function createTestApp(overrides?: Partial<AppDependencies>): App {
+  const test = buildTestFoundations(overrides);
+
+  return new App({
+    ...buildTestCoreDependencies(test),
+    ...buildTestEvaluationDependencies(test),
+    ...buildTestRunDependencies(test),
+    ...buildTestCodingAgentDependencies(),
+    ...buildTestLangyDependencies(test),
+    ...buildTestServiceDependencies(test),
+    ...buildTestCommandDependencies(test),
+    ...buildTestRuntimeDependencies(test),
+    ...overrides,
+  });
+}
+
+/**
+ * The stand-ins every test-App group below reads: one Prisma client, one
+ * retention cache, the single PinnedTraceService the share and pinning bags
+ * share, the `noop` command, and the config the overrides fold into. Built
+ * first so the groups take them as parameters rather than closing over them.
+ */
+function buildTestFoundations(overrides?: Partial<AppDependencies>) {
   const testPrisma = globalPrisma;
   const testRetentionPolicyRepo = new DataRetentionPolicyRepository(testPrisma);
   const testRetentionPolicyCache = new RetentionPolicyCache(
@@ -1558,7 +2301,33 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
   );
 
   const testBroadcast = new BroadcastService(null);
-  return new App({
+
+  return {
+    testPrisma,
+    testRetentionPolicyRepo,
+    testRetentionPolicyCache,
+    testPinnedTraceService,
+    testSimulationReads,
+    noop,
+    config,
+    nullOrganizations,
+    nullProjects,
+    testBroadcast,
+  };
+}
+
+type TestWiring = ReturnType<typeof buildTestFoundations>;
+
+function buildTestCoreDependencies({
+  config,
+  noop,
+  nullProjects,
+  testBroadcast,
+}: TestWiring): Pick<
+  AppDependencies,
+  "config" | "broadcast" | "presence" | "traces"
+> {
+  return {
     config,
     broadcast: testBroadcast,
     presence: new PresenceService({
@@ -1617,6 +2386,23 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
         ),
       };
     })(),
+  };
+}
+
+function buildTestEvaluationDependencies({
+  config,
+  testPrisma,
+}: TestWiring): Pick<
+  AppDependencies,
+  | "evaluations"
+  | "dspySteps"
+  | "analytics"
+  | "experiments"
+  | "triggers"
+  | "emailSuppressions"
+  | "triggerTemplates"
+> {
+  return {
     evaluations: {
       runs: traced(
         new EvaluationRunService(new NullEvaluationRunRepository()),
@@ -1667,6 +2453,28 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
           testFireTrigger(testDeps, input),
       };
     })(),
+  };
+}
+
+function buildTestRunDependencies({
+  noop,
+  testPrisma,
+  testSimulationReads,
+}: TestWiring): Pick<
+  AppDependencies,
+  | "simulations"
+  | "suiteRuns"
+  | "topicClustering"
+  | "gateway"
+  | "filters"
+  | "clickhouse"
+  | "billing"
+  | "usageStats"
+  | "scenarios"
+  | "governance"
+  | "billableEvents"
+> {
+  return {
     simulations: {
       runs: testSimulationReads,
       export: ScenarioRunExportService.create(testSimulationReads.repository),
@@ -1718,6 +2526,14 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       personalUsage: undefined,
     },
     billableEvents: undefined,
+  };
+}
+
+function buildTestCodingAgentDependencies(): Pick<
+  AppDependencies,
+  "codingAgents" | "storedObjects" | "opsExplain"
+> {
+  return {
     codingAgents: {
       sessions: new CodingAgentSessionService(
         new NullCodingAgentSessionRepository(),
@@ -1733,6 +2549,14 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
     opsExplain: {
       service: new OpsExplainService(new OpsExplainClickHouseRepository()),
     },
+  };
+}
+
+function buildTestLangyDependencies({
+  noop,
+  testPrisma,
+}: TestWiring): Pick<AppDependencies, "langy"> {
+  return {
     langy: {
       conversations: LangyConversationService.create({
         commands: {
@@ -1790,6 +2614,26 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       credentials: LangyCredentialService.create(testPrisma),
       feedbackPrompt: new LangyFeedbackPromptService({ redis: null }),
     },
+  };
+}
+
+function buildTestServiceDependencies({
+  nullOrganizations,
+  nullProjects,
+}: TestWiring): Pick<
+  AppDependencies,
+  | "organizations"
+  | "projects"
+  | "tokenizer"
+  | "usage"
+  | "planProvider"
+  | "subscription"
+  | "notifications"
+  | "nurturing"
+  | "usageLimits"
+  | "ops"
+> {
+  return {
     organizations: nullOrganizations,
     projects: nullProjects,
     tokenizer: new TokenizerService(new NullTokenizerClient()),
@@ -1818,103 +2662,147 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       blobStore: new BlobStoreService(new NullBlobStoreRepository()),
       metricsCollector: null,
     },
+  };
+}
+
+function buildTestCommandDependencies({
+  noop,
+}: TestWiring): Pick<AppDependencies, "commands"> {
+  return {
     commands: {
-      traces: {
-        recordSpan: noop,
-        assignTopic: noop,
-        recordLogContribution: noop,
-        recordMetricCorrelation: noop,
-        resolveOrigin: noop,
-        addAnnotation: noop,
-        removeAnnotation: noop,
-        bulkSyncAnnotations: noop,
-        changeTraceName: noop,
-      } satisfies AppCommands["traces"],
-      metrics: {
-        recordDataPoint: noop,
-      } satisfies AppCommands["metrics"],
-      logs: {
-        recordLogRecord: noop,
-      } satisfies AppCommands["logs"],
-      codingAgents: {
-        contributeSpanFacts: noop,
-        contributeLogFacts: noop,
-        contributeMetricFacts: noop,
-      } satisfies AppCommands["codingAgents"],
-      evaluations: {
-        executeEvaluation: noop,
-        startEvaluation: noop,
-        completeEvaluation: noop,
-        reportEvaluation: noop,
-      } as AppCommands["evaluations"],
-      experimentRuns: {
-        startExperimentRun: noop,
-        recordTargetResult: noop,
-        recordEvaluatorResult: noop,
-        computeExperimentRunMetrics: noop,
-        completeExperimentRun: noop,
-      } as AppCommands["experimentRuns"],
-      simulations: {
-        queueRun: noop,
-        startRun: noop,
-        messageSnapshot: noop,
-        textMessageStart: noop,
-        textMessageEnd: noop,
-        finishRun: noop,
-        cancelRun: noop,
-        deleteRun: noop,
-        computeRunMetrics: noop,
-      } as AppCommands["simulations"],
-      suiteRuns: {
-        startSuiteRun: noop,
-        recordSuiteRunItemStarted: noop,
-        completeSuiteRunItem: noop,
-      } as AppCommands["suiteRuns"],
-      langy: {
-        createConversation: noop,
-        forkConversation: noop,
-        recordMessage: noop,
-        importMessage: noop,
-        acceptAgentTurn: noop,
-        initiateToolCall: noop,
-        succeedToolCall: noop,
-        failToolCall: noop,
-        updatePlan: noop,
-        failAgentResponse: noop,
-        recordAgentResponse: noop,
-        archiveConversation: noop,
-        updateConversationMetadata: noop,
-        recordTurnHandoff: noop,
-        consumeTurnHandoff: noop,
-        generateConversationTitle: noop,
-      } as AppCommands["langy"],
-      topicClustering: {
-        requestClustering: noop,
-        recordClusteringRunStarted: noop,
-        recordClusteringRunCompleted: noop,
-        recordClusteringRunFailed: noop,
-        recordTopics: noop,
-      } as AppCommands["topicClustering"],
-      ...createNoopEnterprisePipelineCommands(),
-      billing: {
-        reportUsageForMonth: noop,
-      } as AppCommands["billing"],
-      automations: {
-        recordTriggerMatch: noop,
-      } as AppCommands["automations"],
-      scenarioExecutionHandle: {
-        reactor: {
-          name: "scenarioExecution",
-          options: { runIn: ["worker"] },
-          handle: async () => {
-            /* noop */
-          },
-        },
-        setPool: () => {
+      ...buildTestIngestionCommands(noop),
+      ...buildTestDomainCommands(noop),
+    },
+  };
+}
+
+type TestNoop = TestWiring["noop"];
+
+function buildTestIngestionCommands(
+  noop: TestNoop,
+): Pick<
+  AppCommands,
+  "traces" | "metrics" | "logs" | "codingAgents" | "evaluations"
+> {
+  return {
+    traces: {
+      recordSpan: noop,
+      assignTopic: noop,
+      recordLogContribution: noop,
+      recordMetricCorrelation: noop,
+      resolveOrigin: noop,
+      addAnnotation: noop,
+      removeAnnotation: noop,
+      bulkSyncAnnotations: noop,
+      changeTraceName: noop,
+    } satisfies AppCommands["traces"],
+    metrics: {
+      recordDataPoint: noop,
+    } satisfies AppCommands["metrics"],
+    logs: {
+      recordLogRecord: noop,
+    } satisfies AppCommands["logs"],
+    codingAgents: {
+      contributeSpanFacts: noop,
+      contributeLogFacts: noop,
+      contributeMetricFacts: noop,
+    } satisfies AppCommands["codingAgents"],
+    evaluations: {
+      executeEvaluation: noop,
+      startEvaluation: noop,
+      completeEvaluation: noop,
+      reportEvaluation: noop,
+    } as AppCommands["evaluations"],
+  };
+}
+
+function buildTestDomainCommands(
+  noop: TestNoop,
+): Omit<
+  AppCommands,
+  "traces" | "metrics" | "logs" | "codingAgents" | "evaluations"
+> {
+  return {
+    experimentRuns: {
+      startExperimentRun: noop,
+      recordTargetResult: noop,
+      recordEvaluatorResult: noop,
+      computeExperimentRunMetrics: noop,
+      completeExperimentRun: noop,
+    } as AppCommands["experimentRuns"],
+    simulations: {
+      queueRun: noop,
+      startRun: noop,
+      messageSnapshot: noop,
+      textMessageStart: noop,
+      textMessageEnd: noop,
+      finishRun: noop,
+      cancelRun: noop,
+      deleteRun: noop,
+      computeRunMetrics: noop,
+    } as AppCommands["simulations"],
+    suiteRuns: {
+      startSuiteRun: noop,
+      recordSuiteRunItemStarted: noop,
+      completeSuiteRunItem: noop,
+    } as AppCommands["suiteRuns"],
+    langy: {
+      createConversation: noop,
+      forkConversation: noop,
+      recordMessage: noop,
+      importMessage: noop,
+      acceptAgentTurn: noop,
+      initiateToolCall: noop,
+      succeedToolCall: noop,
+      failToolCall: noop,
+      updatePlan: noop,
+      failAgentResponse: noop,
+      recordAgentResponse: noop,
+      archiveConversation: noop,
+      updateConversationMetadata: noop,
+      recordTurnHandoff: noop,
+      consumeTurnHandoff: noop,
+      generateConversationTitle: noop,
+    } as AppCommands["langy"],
+    topicClustering: {
+      requestClustering: noop,
+      recordClusteringRunStarted: noop,
+      recordClusteringRunCompleted: noop,
+      recordClusteringRunFailed: noop,
+      recordTopics: noop,
+    } as AppCommands["topicClustering"],
+    ...createNoopEnterprisePipelineCommands(),
+    billing: {
+      reportUsageForMonth: noop,
+    } as AppCommands["billing"],
+    automations: {
+      recordTriggerMatch: noop,
+    } as AppCommands["automations"],
+    scenarioExecutionHandle: {
+      reactor: {
+        name: "scenarioExecution",
+        options: { runIn: ["worker"] },
+        handle: async () => {
           /* noop */
         },
       },
+      setPool: () => {
+        /* noop */
+      },
     },
+  };
+}
+
+function buildTestRuntimeDependencies({
+  testPrisma,
+  testRetentionPolicyRepo,
+  testRetentionPolicyCache,
+  testPinnedTraceService,
+}: TestWiring): Pick<
+  AppDependencies,
+  "retentionPolicyCache" | "dataRetention" | "share" | "sharedTraceCache"
+> {
+  return {
     retentionPolicyCache: testRetentionPolicyCache,
     dataRetention: {
       policy: new DataRetentionPolicyService(
@@ -1953,6 +2841,5 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
     // No Redis in the test preset: every open counts as a viewing and nothing
     // is cached, which is the stricter behaviour of both.
     sharedTraceCache: createSharedTracePayloadCache(null),
-    ...overrides,
-  });
+  };
 }

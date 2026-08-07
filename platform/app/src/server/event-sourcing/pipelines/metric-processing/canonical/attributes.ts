@@ -6,64 +6,94 @@ import type {
 import { integerDecimal } from "./numbers";
 import { isRecord, stableStringify, type UnknownRecord } from "./serialization";
 
+function canonicalBoolValue(boolValue: unknown): boolean {
+  return typeof boolValue === "string"
+    ? boolValue.toLowerCase() === "true"
+    : (boolValue as boolean);
+}
+
+function canonicalBytesValue(bytesValue: unknown): string {
+  const bytes =
+    bytesValue instanceof Uint8Array
+      ? bytesValue
+      : typeof bytesValue === "string"
+        ? Buffer.from(bytesValue, "base64")
+        : Buffer.from(
+            Object.entries(bytesValue as UnknownRecord)
+              .sort(([a], [b]) => Number(a) - Number(b))
+              .map(([, byte]) => Number(byte)),
+          );
+  return Buffer.from(bytes).toString("base64");
+}
+
+function canonicalDoubleValue(doubleValue: unknown): number | string {
+  const number = Number(doubleValue);
+  return Number.isFinite(number) ? number : String(doubleValue);
+}
+
+function canonicalArrayItems(arrayValue: UnknownRecord): unknown[] {
+  const values = Array.isArray(arrayValue.values) ? arrayValue.values : [];
+  return values.map((item) => canonicalAnyValue(item as OtlpAnyValue));
+}
+
+function canonicalKvlistItems(
+  kvlistValue: UnknownRecord,
+): Array<{ key: string; value: unknown }> {
+  const values = Array.isArray(kvlistValue.values)
+    ? (kvlistValue.values as OtlpKeyValue[])
+    : [];
+  return canonicalAttributes(values);
+}
+
+function isPresent(value: unknown): boolean {
+  return value !== undefined && value !== null;
+}
+
 export function canonicalAnyValue(
   value: OtlpAnyValue | UnknownRecord | undefined,
 ): unknown {
   if (!value) return { type: "empty" };
-  if (value.stringValue !== undefined && value.stringValue !== null) {
+  if (isPresent(value.stringValue)) {
     return { type: "string", value: value.stringValue };
   }
-  if (value.boolValue !== undefined && value.boolValue !== null) {
-    return {
-      type: "bool",
-      value:
-        typeof value.boolValue === "string"
-          ? value.boolValue.toLowerCase() === "true"
-          : value.boolValue,
-    };
+  if (isPresent(value.boolValue)) {
+    return { type: "bool", value: canonicalBoolValue(value.boolValue) };
   }
-  if (value.intValue !== undefined && value.intValue !== null) {
+  if (isPresent(value.intValue)) {
     return {
       type: "int",
       value: integerDecimal(value.intValue, { signed: true }),
     };
   }
-  if (value.doubleValue !== undefined && value.doubleValue !== null) {
-    const number = Number(value.doubleValue);
-    return {
-      type: "double",
-      value: Number.isFinite(number) ? number : String(value.doubleValue),
-    };
+  if (isPresent(value.doubleValue)) {
+    return { type: "double", value: canonicalDoubleValue(value.doubleValue) };
   }
-  if (value.bytesValue !== undefined && value.bytesValue !== null) {
-    const bytes =
-      value.bytesValue instanceof Uint8Array
-        ? value.bytesValue
-        : typeof value.bytesValue === "string"
-          ? Buffer.from(value.bytesValue, "base64")
-          : Buffer.from(
-              Object.entries(value.bytesValue as UnknownRecord)
-                .sort(([a], [b]) => Number(a) - Number(b))
-                .map(([, byte]) => Number(byte)),
-            );
-    return { type: "bytes", value: Buffer.from(bytes).toString("base64") };
+  if (isPresent(value.bytesValue)) {
+    return { type: "bytes", value: canonicalBytesValue(value.bytesValue) };
   }
-  if (value.arrayValue && isRecord(value.arrayValue)) {
-    const values = Array.isArray(value.arrayValue.values)
-      ? value.arrayValue.values
-      : [];
-    return {
-      type: "array",
-      value: values.map((item) => canonicalAnyValue(item as OtlpAnyValue)),
-    };
+  if (isRecord(value.arrayValue)) {
+    return { type: "array", value: canonicalArrayItems(value.arrayValue) };
   }
-  if (value.kvlistValue && isRecord(value.kvlistValue)) {
-    const values = Array.isArray(value.kvlistValue.values)
-      ? (value.kvlistValue.values as OtlpKeyValue[])
-      : [];
-    return { type: "kvlist", value: canonicalAttributes(values) };
+  if (isRecord(value.kvlistValue)) {
+    return { type: "kvlist", value: canonicalKvlistItems(value.kvlistValue) };
   }
   return { type: "empty" };
+}
+
+function scalarFromWrappedValue(
+  wrapped: UnknownRecord,
+): string | number | boolean | undefined {
+  switch (wrapped.type) {
+    case "string":
+    case "int":
+      return typeof wrapped.value === "string" ? wrapped.value : undefined;
+    case "bool":
+      return typeof wrapped.value === "boolean" ? wrapped.value : undefined;
+    case "double":
+      return typeof wrapped.value === "number" ? wrapped.value : undefined;
+    default:
+      return undefined;
+  }
 }
 
 /**
@@ -81,26 +111,8 @@ export function scalarsFromCanonicalAttributes(
     if (!isRecord(attribute) || typeof attribute.key !== "string") continue;
     const wrapped = attribute.value;
     if (!isRecord(wrapped)) continue;
-    switch (wrapped.type) {
-      case "string":
-      case "int":
-        if (typeof wrapped.value === "string") {
-          scalars[attribute.key] = wrapped.value;
-        }
-        break;
-      case "bool":
-        if (typeof wrapped.value === "boolean") {
-          scalars[attribute.key] = wrapped.value;
-        }
-        break;
-      case "double":
-        if (typeof wrapped.value === "number") {
-          scalars[attribute.key] = wrapped.value;
-        }
-        break;
-      default:
-        break;
-    }
+    const scalar = scalarFromWrappedValue(wrapped);
+    if (scalar !== undefined) scalars[attribute.key] = scalar;
   }
   return scalars;
 }

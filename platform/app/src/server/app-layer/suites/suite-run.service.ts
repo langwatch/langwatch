@@ -24,6 +24,42 @@ export type SuiteRunItem = {
   name: string | undefined;
 };
 
+/** Item pending queueRun dispatch, before ES dual-write shape is derived. */
+type PendingSuiteRunItem = {
+  scenarioId: string;
+  target: SuiteRunTarget;
+  repeat: number;
+  scenarioRunId: string;
+};
+
+/**
+ * Pre-generate scenarioRunIds and one pending item per (scenario, target,
+ * repeat) tuple. The same IDs are passed to the SDK via RunOptions.runId
+ * (see scenario-child-process.ts), ensuring the SDK's events use matching
+ * aggregate IDs.
+ */
+const buildPendingSuiteRunItems = (params: {
+  activeScenarioIds: string[];
+  activeTargets: SuiteRunTarget[];
+  repeatCount: number;
+}): PendingSuiteRunItem[] => {
+  const { activeScenarioIds, activeTargets, repeatCount } = params;
+  const items: PendingSuiteRunItem[] = [];
+  for (const scenarioId of activeScenarioIds) {
+    for (const target of activeTargets) {
+      for (let repeat = 0; repeat < repeatCount; repeat++) {
+        items.push({
+          scenarioId,
+          target,
+          repeat,
+          scenarioRunId: generate(KSUID_RESOURCES.SCENARIO_RUN).toString(),
+        });
+      }
+    }
+  }
+  return items;
+};
+
 /** Result of scheduling a suite run */
 export type SuiteRunResult = {
   batchRunId: string;
@@ -129,29 +165,51 @@ export class SuiteRunService {
       occurredAt: Date.now(),
     });
 
-    // Pre-generate scenarioRunIds and dispatch queueRun for each so QUEUED
-    // entries appear in ClickHouse immediately. The same IDs are passed to the
-    // SDK via RunOptions.runId (see scenario-child-process.ts), ensuring the
-    // SDK's events use matching aggregate IDs.
-    const items: Array<{
-      scenarioId: string;
-      target: SuiteRunTarget;
-      repeat: number;
-      scenarioRunId: string;
-    }> = [];
-    for (const scenarioId of activeScenarioIds) {
-      for (const target of activeTargets) {
-        for (let repeat = 0; repeat < repeatCount; repeat++) {
-          items.push({
-            scenarioId,
-            target,
-            repeat,
-            scenarioRunId: generate(KSUID_RESOURCES.SCENARIO_RUN).toString(),
-          });
-        }
-      }
-    }
+    // Dispatch queueRun for each pre-generated item so QUEUED entries appear
+    // in ClickHouse immediately. No explicit job scheduling beyond that — the
+    // execution reactor picks up queued events via the GroupQueue and spawns
+    // child processes in the execution pool.
+    const items = buildPendingSuiteRunItems({
+      activeScenarioIds,
+      activeTargets,
+      repeatCount,
+    });
+    await this.dispatchQueueRunCommands({
+      items,
+      projectId,
+      batchRunId,
+      setId,
+      scenarioNameMap,
+    });
 
+    logger.debug(
+      { suiteId, batchRunId, itemCount: items.length },
+      "Suite run queued via event-sourcing",
+    );
+
+    return {
+      batchRunId,
+      setId,
+      jobCount: items.length,
+      skippedArchived,
+      items: items.map((item) => ({
+        scenarioRunId: item.scenarioRunId,
+        scenarioId: item.scenarioId,
+        target: item.target,
+        name: scenarioNameMap.get(item.scenarioId),
+      })),
+    };
+  }
+
+  /** Dispatches queueRun for every pending item, tolerating individual failures. */
+  private async dispatchQueueRunCommands(params: {
+    items: PendingSuiteRunItem[];
+    projectId: string;
+    batchRunId: string;
+    setId: string;
+    scenarioNameMap: Map<string, string>;
+  }): Promise<void> {
+    const { items, projectId, batchRunId, setId, scenarioNameMap } = params;
     const now = Date.now();
     await Promise.allSettled(
       items.map((item) =>
@@ -173,27 +231,6 @@ export class SuiteRunService {
         }),
       ),
     );
-
-    // No explicit job scheduling — the execution reactor picks up queued events
-    // via the GroupQueue and spawns child processes in the execution pool.
-
-    logger.debug(
-      { suiteId, batchRunId, itemCount: items.length },
-      "Suite run queued via event-sourcing",
-    );
-
-    return {
-      batchRunId,
-      setId,
-      jobCount: items.length,
-      skippedArchived,
-      items: items.map((item) => ({
-        scenarioRunId: item.scenarioRunId,
-        scenarioId: item.scenarioId,
-        target: item.target,
-        name: scenarioNameMap.get(item.scenarioId),
-      })),
-    };
   }
 
   async getSuiteRunState(params: {

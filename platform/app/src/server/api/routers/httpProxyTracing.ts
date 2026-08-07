@@ -35,30 +35,38 @@ type TraceTestContext = {
  * - Authorization header values (Bearer, Basic, etc.)
  * - Custom auth header values (e.g., X-API-Key) when headerName is specified
  */
+function redactAuthorizationHeader(sanitized: Record<string, string>): void {
+  for (const key of Object.keys(sanitized)) {
+    if (key.toLowerCase() === "authorization") {
+      const parts = sanitized[key]!.split(" ");
+      sanitized[key] =
+        parts.length >= 2 ? `${parts[0]} [REDACTED]` : "[REDACTED]";
+    }
+  }
+}
+
+function redactCustomAuthHeader(
+  sanitized: Record<string, string>,
+  customAuthHeaderName: string,
+): void {
+  const customLower = customAuthHeaderName.toLowerCase();
+  for (const key of Object.keys(sanitized)) {
+    if (key.toLowerCase() === customLower) {
+      sanitized[key] = "[REDACTED]";
+    }
+  }
+}
+
 export function sanitizeHeadersForTrace(
   headers: Record<string, string>,
   customAuthHeaderName?: string,
 ): Record<string, string> {
   const sanitized = { ...headers };
 
-  for (const key of Object.keys(sanitized)) {
-    if (key.toLowerCase() === "authorization") {
-      const parts = sanitized[key]!.split(" ");
-      if (parts.length >= 2) {
-        sanitized[key] = `${parts[0]} [REDACTED]`;
-      } else {
-        sanitized[key] = "[REDACTED]";
-      }
-    }
-  }
+  redactAuthorizationHeader(sanitized);
 
   if (customAuthHeaderName) {
-    const customLower = customAuthHeaderName.toLowerCase();
-    for (const key of Object.keys(sanitized)) {
-      if (key.toLowerCase() === customLower) {
-        sanitized[key] = "[REDACTED]";
-      }
-    }
+    redactCustomAuthHeader(sanitized, customAuthHeaderName);
   }
 
   return sanitized;
@@ -113,6 +121,107 @@ export function buildTraceparentHeader({
   return `00-${traceId}-${spanId}-01`;
 }
 
+type AgentTestTraceResult = {
+  success: boolean;
+  response?: unknown;
+  extractedOutput?: string;
+  error?: string;
+  status?: number;
+  statusText?: string;
+  duration?: number;
+  responseHeaders?: Record<string, string>;
+};
+
+function buildAgentTestSpanInput({
+  testContext,
+  sanitizedHeaders,
+  requestBody,
+}: {
+  testContext: TraceTestContext;
+  sanitizedHeaders: Record<string, string>;
+  requestBody: string;
+}) {
+  return {
+    url: testContext.url,
+    method: testContext.method,
+    headers: sanitizedHeaders,
+    body: requestBody,
+    ...(testContext.output_path
+      ? { output_path: testContext.output_path }
+      : {}),
+  };
+}
+
+function buildAgentTestSpanOutput(result: AgentTestTraceResult) {
+  return {
+    ...(result.status !== undefined ? { status: result.status } : {}),
+    ...(result.response !== undefined ? { body: result.response } : {}),
+    ...(result.extractedOutput !== undefined
+      ? { extracted_output: result.extractedOutput }
+      : {}),
+    ...(result.error ? { error: result.error } : {}),
+  };
+}
+
+function buildAgentTestSpan({
+  traceId,
+  spanId,
+  testContext,
+  inputValue,
+  outputValue,
+  result,
+  now,
+}: {
+  traceId: string;
+  spanId: string;
+  testContext: TraceTestContext;
+  inputValue: ReturnType<typeof buildAgentTestSpanInput>;
+  outputValue: ReturnType<typeof buildAgentTestSpanOutput>;
+  result: AgentTestTraceResult;
+  now: number;
+}): Span {
+  return {
+    span_id: spanId,
+    trace_id: traceId,
+    type: "span",
+    name: `HTTP ${testContext.method} ${testContext.url}`,
+    input: { type: "json", value: inputValue },
+    output: { type: "json", value: outputValue },
+    error: result.success
+      ? null
+      : {
+          has_error: true,
+          message: result.error ?? "Request failed",
+          stacktrace: [],
+        },
+    timestamps: {
+      started_at: now - (result.duration ?? 0),
+      finished_at: now,
+    },
+  };
+}
+
+function buildAgentTestCustomMetadata({
+  agentId,
+  testContext,
+}: {
+  agentId: string;
+  testContext: TraceTestContext;
+}): CustomMetadata {
+  return {
+    type: "agent_test",
+    agent_id: agentId,
+    test_context: {
+      url: testContext.url,
+      method: testContext.method,
+      has_auth: testContext.has_auth,
+      ...(testContext.output_path
+        ? { output_path: testContext.output_path }
+        : {}),
+    },
+  };
+}
+
 /**
  * Creates a trace for an HTTP agent test execution and submits it to the collector.
  */
@@ -137,16 +246,7 @@ export async function createAgentTestTrace({
   requestBody: string;
   requestHeaders: Record<string, string>;
   customAuthHeaderName?: string;
-  result: {
-    success: boolean;
-    response?: unknown;
-    extractedOutput?: string;
-    error?: string;
-    status?: number;
-    statusText?: string;
-    duration?: number;
-    responseHeaders?: Record<string, string>;
-  };
+  result: AgentTestTraceResult;
 }) {
   const now = Date.now();
   const generated = generateTraceIds();
@@ -158,57 +258,21 @@ export async function createAgentTestTrace({
     customAuthHeaderName,
   );
 
-  const inputValue = {
-    url: testContext.url,
-    method: testContext.method,
-    headers: sanitizedHeaders,
-    body: requestBody,
-    ...(testContext.output_path
-      ? { output_path: testContext.output_path }
-      : {}),
-  };
+  const span = buildAgentTestSpan({
+    traceId,
+    spanId,
+    testContext,
+    inputValue: buildAgentTestSpanInput({
+      testContext,
+      sanitizedHeaders,
+      requestBody,
+    }),
+    outputValue: buildAgentTestSpanOutput(result),
+    result,
+    now,
+  });
 
-  const outputValue = {
-    ...(result.status !== undefined ? { status: result.status } : {}),
-    ...(result.response !== undefined ? { body: result.response } : {}),
-    ...(result.extractedOutput !== undefined
-      ? { extracted_output: result.extractedOutput }
-      : {}),
-    ...(result.error ? { error: result.error } : {}),
-  };
-
-  const span: Span = {
-    span_id: spanId,
-    trace_id: traceId,
-    type: "span",
-    name: `HTTP ${testContext.method} ${testContext.url}`,
-    input: { type: "json", value: inputValue },
-    output: { type: "json", value: outputValue },
-    error: result.success
-      ? null
-      : {
-          has_error: true,
-          message: result.error ?? "Request failed",
-          stacktrace: [],
-        },
-    timestamps: {
-      started_at: now - (result.duration ?? 0),
-      finished_at: now,
-    },
-  };
-
-  const customMetadata: CustomMetadata = {
-    type: "agent_test",
-    agent_id: agentId,
-    test_context: {
-      url: testContext.url,
-      method: testContext.method,
-      has_auth: testContext.has_auth,
-      ...(testContext.output_path
-        ? { output_path: testContext.output_path }
-        : {}),
-    },
-  };
+  const customMetadata = buildAgentTestCustomMetadata({ agentId, testContext });
 
   // PII redaction level is resolved downstream in the recordSpan pipeline from
   // the scoped data-privacy policy; ingestion passes the essential default

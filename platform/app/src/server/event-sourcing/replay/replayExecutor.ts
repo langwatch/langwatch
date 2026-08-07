@@ -112,54 +112,71 @@ export class FoldAccumulator {
     this._processed++;
   }
 
-  async flush(writeBatchSize = DEFAULT_WRITE_BATCH_SIZE): Promise<void> {
-    if (this.touchedKeys.size === 0) return;
-    if (writeBatchSize <= 0) throw new Error("writeBatchSize must be > 0");
+  private async buildTenantEntry(
+    scopedKey: string,
+  ): Promise<{ state: any; context: ProjectionStoreContext }> {
+    const tenantId = this.keyTenantIds.get(scopedKey)!;
+    const aggregateId = this.keyAggregateIds.get(scopedKey)!;
+    const projectionKey = scopedKey.slice(tenantId.length + 2);
+    return {
+      state: this.keyStates.get(scopedKey),
+      context: {
+        aggregateId,
+        tenantId: tenantId as TenantId,
+        key: projectionKey,
+        // Stamp resolved retention so replay-rebuilt rows honour the tenant's
+        // policy, matching the live dispatch path (buildStoreContext).
+        retentionPolicy: await this.resolveRetention(tenantId),
+      } as ProjectionStoreContext,
+    };
+  }
 
-    // Group by tenant so each CH INSERT targets a single tenant
+  /** Groups touched keys by tenant so each CH INSERT targets a single tenant. */
+  private async groupTouchedByTenant(): Promise<
+    Map<string, Array<{ state: any; context: ProjectionStoreContext }>>
+  > {
     const byTenant = new Map<
       string,
       Array<{ state: any; context: ProjectionStoreContext }>
     >();
-
     for (const scopedKey of this.touchedKeys) {
       const tenantId = this.keyTenantIds.get(scopedKey)!;
-      const aggregateId = this.keyAggregateIds.get(scopedKey)!;
-      const projectionKey = scopedKey.slice(tenantId.length + 2);
-
-      const entry = {
-        state: this.keyStates.get(scopedKey),
-        context: {
-          aggregateId,
-          tenantId: tenantId as TenantId,
-          key: projectionKey,
-          // Stamp resolved retention so replay-rebuilt rows honour the tenant's
-          // policy, matching the live dispatch path (buildStoreContext).
-          retentionPolicy: await this.resolveRetention(tenantId),
-        } as ProjectionStoreContext,
-      };
-
-      let list = byTenant.get(tenantId);
-      if (!list) {
-        list = [];
-        byTenant.set(tenantId, list);
-      }
-      list.push(entry);
-    }
-
-    const store = this.projection.store;
-    for (const [_tenantId, entries] of byTenant) {
-      if (store.storeBatch) {
-        for (let i = 0; i < entries.length; i += writeBatchSize) {
-          const chunk = entries.slice(i, i + writeBatchSize);
-          await store.storeBatch(chunk);
-        }
+      const entry = await this.buildTenantEntry(scopedKey);
+      const list = byTenant.get(tenantId);
+      if (list) {
+        list.push(entry);
       } else {
-        // Fallback: sequential single-entry writes
-        for (const entry of entries) {
-          await store.store(entry.state, entry.context);
-        }
+        byTenant.set(tenantId, [entry]);
       }
+    }
+    return byTenant;
+  }
+
+  private async writeTenantEntries(
+    entries: Array<{ state: any; context: ProjectionStoreContext }>,
+    writeBatchSize: number,
+  ): Promise<void> {
+    const store = this.projection.store;
+    if (store.storeBatch) {
+      for (let i = 0; i < entries.length; i += writeBatchSize) {
+        const chunk = entries.slice(i, i + writeBatchSize);
+        await store.storeBatch(chunk);
+      }
+    } else {
+      // Fallback: sequential single-entry writes
+      for (const entry of entries) {
+        await store.store(entry.state, entry.context);
+      }
+    }
+  }
+
+  async flush(writeBatchSize = DEFAULT_WRITE_BATCH_SIZE): Promise<void> {
+    if (this.touchedKeys.size === 0) return;
+    if (writeBatchSize <= 0) throw new Error("writeBatchSize must be > 0");
+
+    const byTenant = await this.groupTouchedByTenant();
+    for (const [, entries] of byTenant) {
+      await this.writeTenantEntries(entries, writeBatchSize);
     }
   }
 }
@@ -250,6 +267,45 @@ export class MapAccumulator {
     await this.drain(writeBatchSize);
   }
 
+  private async drainTenantEntries(params: {
+    tenantId: string;
+    entries: BufferedMapRecord[];
+    writeBatchSize: number;
+  }): Promise<void> {
+    const { tenantId, entries, writeBatchSize } = params;
+    // Resolve the tenant's retention once per drain (cached across drains) and
+    // stamp it on the write context so replay-rebuilt rows honour the tenant's
+    // policy instead of the store default — matching live dispatch.
+    const retentionPolicy = await this.resolveRetention(tenantId);
+    const store = this.projection.store;
+
+    if (store.bulkAppend) {
+      // One bulk write per TENANT chunk — never per aggregate. For
+      // spanStorage-style projections the aggregate is a single trace, so
+      // per-aggregate grouping degenerated into one awaited ClickHouse
+      // INSERT per trace (~200ms each, sequential) and dominated replay
+      // time. `bulkAppend` takes a tenant-scoped BulkAppendContext; records
+      // carry everything stores need per row.
+      const context: BulkAppendContext = {
+        tenantId: tenantId as TenantId,
+        retentionPolicy,
+      };
+      for (let i = 0; i < entries.length; i += writeBatchSize) {
+        const chunk = entries.slice(i, i + writeBatchSize).map((e) => e.record);
+        await store.bulkAppend(chunk, context);
+      }
+    } else {
+      // Sequential fallback: pass each record's original per-event context
+      // so stores that key off `context.aggregateId` get the real value.
+      for (const entry of entries) {
+        await store.append(entry.record, {
+          ...entry.context,
+          retentionPolicy,
+        });
+      }
+    }
+  }
+
   private async drain(writeBatchSize: number): Promise<void> {
     if (this.byTenant.size === 0) return;
 
@@ -259,41 +315,8 @@ export class MapAccumulator {
     this.byTenant = new Map();
     this.bufferedCount = 0;
 
-    const store = this.projection.store;
-
     for (const [tenantId, entries] of byTenant) {
-      // Resolve the tenant's retention once per drain (cached across drains) and
-      // stamp it on the write context so replay-rebuilt rows honour the tenant's
-      // policy instead of the store default — matching live dispatch.
-      const retentionPolicy = await this.resolveRetention(tenantId);
-
-      if (store.bulkAppend) {
-        // One bulk write per TENANT chunk — never per aggregate. For
-        // spanStorage-style projections the aggregate is a single trace, so
-        // per-aggregate grouping degenerated into one awaited ClickHouse
-        // INSERT per trace (~200ms each, sequential) and dominated replay
-        // time. `bulkAppend` takes a tenant-scoped BulkAppendContext; records
-        // carry everything stores need per row.
-        const context: BulkAppendContext = {
-          tenantId: tenantId as TenantId,
-          retentionPolicy,
-        };
-        for (let i = 0; i < entries.length; i += writeBatchSize) {
-          const chunk = entries
-            .slice(i, i + writeBatchSize)
-            .map((e) => e.record);
-          await store.bulkAppend(chunk, context);
-        }
-      } else {
-        // Sequential fallback: pass each record's original per-event context
-        // so stores that key off `context.aggregateId` get the real value.
-        for (const entry of entries) {
-          await store.append(entry.record, {
-            ...entry.context,
-            retentionPolicy,
-          });
-        }
-      }
+      await this.drainTenantEntries({ tenantId, entries, writeBatchSize });
     }
   }
 }

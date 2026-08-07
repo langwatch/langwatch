@@ -34,6 +34,33 @@ interface CommonLayout {
   downscaled: Map<string, { positive: BucketMap; negative: BucketMap }>;
 }
 
+/** The dense index range one side (positive/negative) spans across `points` at `scale`. */
+function sideIndexRange({
+  points,
+  scale,
+  side,
+}: {
+  points: CanonicalMetricDataPoint[];
+  scale: number;
+  side: "positive" | "negative";
+}): { low: number; high: number } {
+  let low = Number.POSITIVE_INFINITY;
+  let high = Number.NEGATIVE_INFINITY;
+  for (const point of points) {
+    const counts =
+      side === "positive"
+        ? point.positiveBucketCounts
+        : point.negativeBucketCounts;
+    if (counts.length === 0) continue;
+    const offset =
+      (side === "positive" ? point.positiveOffset : point.negativeOffset) ?? 0;
+    const divisor = 2 ** Math.max(0, (point.exponentialScale ?? 0) - scale);
+    low = Math.min(low, Math.floor(offset / divisor));
+    high = Math.max(high, Math.floor((offset + counts.length - 1) / divisor));
+  }
+  return { low, high };
+}
+
 /** Worst-case dense index span (per sign) the contributors merge to at `scale`. */
 function mergedIndexSpan({
   points,
@@ -44,21 +71,7 @@ function mergedIndexSpan({
 }): number {
   let span = 0;
   for (const side of ["positive", "negative"] as const) {
-    let low = Number.POSITIVE_INFINITY;
-    let high = Number.NEGATIVE_INFINITY;
-    for (const point of points) {
-      const counts =
-        side === "positive"
-          ? point.positiveBucketCounts
-          : point.negativeBucketCounts;
-      if (counts.length === 0) continue;
-      const offset =
-        (side === "positive" ? point.positiveOffset : point.negativeOffset) ??
-        0;
-      const divisor = 2 ** Math.max(0, (point.exponentialScale ?? 0) - scale);
-      low = Math.min(low, Math.floor(offset / divisor));
-      high = Math.max(high, Math.floor((offset + counts.length - 1) / divisor));
-    }
+    const { low, high } = sideIndexRange({ points, scale, side });
     if (high >= low) span = Math.max(span, high - low + 1);
   }
   return span;
@@ -207,6 +220,39 @@ function collectContributors({
   ]);
 }
 
+/** A point's merged contribution: its normalized (or differenced) buckets, and whether it was counted whole (vs. differenced). */
+function resolveExponentialPointContribution({
+  row,
+  point,
+  index,
+  all,
+  layout,
+}: {
+  row: MetricRollupRow;
+  point: CanonicalMetricDataPoint;
+  index: number;
+  all: CanonicalMetricDataPoint[];
+  layout: CommonLayout;
+}): { current: NormalizedPoint; usesWholePoint: boolean } {
+  const current = normalizePoint({ point, layout });
+  if (point.aggregationTemporality === "cumulative") {
+    const previousRaw = usablePredecessor({ point, all, index });
+    // Both sides share a threshold, so a mid-series threshold change no
+    // longer forces the whole point to be counted as a reset.
+    const delta = previousRaw
+      ? differenceExponentialPoint({
+          current,
+          previous: normalizePoint({ point: previousRaw, layout }),
+        })
+      : null;
+    if (delta) {
+      return { current: delta, usesWholePoint: false };
+    }
+    resetOrGap({ row, previous: previousPoint(all, index), current: point });
+  }
+  return { current, usesWholePoint: true };
+}
+
 /**
  * Rolls up exponential histograms onto one scale and one zero threshold. Both
  * are chosen across every contributing point — including the predecessors that
@@ -232,30 +278,13 @@ export function buildExponentialHistogramRow({
   let hasSum = false;
 
   for (const { point, index } of entries) {
-    let current = normalizePoint({ point, layout });
-    let usesWholePoint = point.aggregationTemporality !== "cumulative";
-
-    if (point.aggregationTemporality === "cumulative") {
-      const previousRaw = usablePredecessor({ point, all, index });
-      // Both sides share a threshold, so a mid-series threshold change no
-      // longer forces the whole point to be counted as a reset.
-      const delta = previousRaw
-        ? differenceExponentialPoint({
-            current,
-            previous: normalizePoint({ point: previousRaw, layout }),
-          })
-        : null;
-      if (!delta) {
-        resetOrGap({
-          row,
-          previous: previousPoint(all, index),
-          current: point,
-        });
-        usesWholePoint = true;
-      } else {
-        current = delta;
-      }
-    }
+    const { current, usesWholePoint } = resolveExponentialPointContribution({
+      row,
+      point,
+      index,
+      all,
+      layout,
+    });
 
     mergeMap(positive, current.positive);
     mergeMap(negative, current.negative);

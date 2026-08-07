@@ -86,35 +86,109 @@ export async function getRetentionPolicySnapshot(
   const organizationName = project?.team?.organization?.name ?? null;
 
   if (!organizationId) {
-    // Personal-account project (no org/team): only its own PROJECT scope.
-    const canWrite = await hasProjectPermission(
-      ctx as AuthedCtx,
-      projectId,
-      "project:update",
-    );
-    const name =
-      (
-        await ctx.prisma.project.findUnique({
-          where: { id: projectId },
-          select: { name: true },
-        })
-      )?.name ?? projectId;
-    return {
+    return await personalProjectSnapshot({
+      ctx,
       projectId,
       effective,
-      rules: [],
-      available: {
-        organization: null,
-        teams: [],
-        projects: canWrite
-          ? [{ id: projectId, name, teamId: project?.teamId ?? "" }]
-          : [],
-      },
-      // Personal-account projects have no org → no paid plan → no overrides.
-      canConfigureRetention: false,
-    };
+      teamId: project?.teamId ?? "",
+    });
   }
 
+  return await organizationSnapshot({
+    ctx,
+    app,
+    projectId,
+    effective,
+    organizationId,
+    organizationName,
+  });
+}
+
+/** Personal-account project (no org/team): only its own PROJECT scope. */
+async function personalProjectSnapshot({
+  ctx,
+  projectId,
+  effective,
+  teamId,
+}: {
+  ctx: ReadCtx;
+  projectId: string;
+  effective: ResolvedRetention;
+  teamId: string;
+}): Promise<RetentionPolicySnapshot> {
+  const canWrite = await hasProjectPermission(
+    ctx as AuthedCtx,
+    projectId,
+    "project:update",
+  );
+  const name =
+    (
+      await ctx.prisma.project.findUnique({
+        where: { id: projectId },
+        select: { name: true },
+      })
+    )?.name ?? projectId;
+  return {
+    projectId,
+    effective,
+    rules: [],
+    available: {
+      organization: null,
+      teams: [],
+      projects: canWrite ? [{ id: projectId, name, teamId }] : [],
+    },
+    // Personal-account projects have no org → no paid plan → no overrides.
+    canConfigureRetention: false,
+  };
+}
+
+function loadScopePermissions({
+  ctx,
+  organizationId,
+  orgTeams,
+  orgProjects,
+}: {
+  ctx: ReadCtx;
+  organizationId: string;
+  orgTeams: { id: string }[];
+  orgProjects: { id: string; teamId: string }[];
+}) {
+  const projectTeamId: Record<string, string> = {};
+  for (const p of orgProjects) projectTeamId[p.id] = p.teamId;
+
+  return Promise.all([
+    batchScopePermissions(ctx, {
+      organizationId,
+      teamIds: orgTeams.map((t) => t.id),
+      projectIds: [],
+      projectTeamId: {},
+      permission: "team:manage",
+    }),
+    batchScopePermissions(ctx, {
+      organizationId,
+      teamIds: [],
+      projectIds: orgProjects.map((p) => p.id),
+      projectTeamId,
+      permission: "project:update",
+    }),
+  ]);
+}
+
+async function organizationSnapshot({
+  ctx,
+  app,
+  projectId,
+  effective,
+  organizationId,
+  organizationName,
+}: {
+  ctx: ReadCtx;
+  app: ReturnType<typeof getApp>;
+  projectId: string;
+  effective: ResolvedRetention;
+  organizationId: string;
+  organizationName: string | null;
+}): Promise<RetentionPolicySnapshot> {
   const [orgTeams, orgProjects, rows, canManageOrg, canConfigureRetentionFlag] =
     await Promise.all([
       ctx.prisma.team.findMany({
@@ -139,25 +213,12 @@ export async function getRetentionPolicySnapshot(
       canConfigureRetention(organizationId, ctx.session?.user ?? null),
     ]);
 
-  const projectTeamId: Record<string, string> = {};
-  for (const p of orgProjects) projectTeamId[p.id] = p.teamId;
-
-  const [teamManage, projectUpdate] = await Promise.all([
-    batchScopePermissions(ctx, {
-      organizationId,
-      teamIds: orgTeams.map((t) => t.id),
-      projectIds: [],
-      projectTeamId: {},
-      permission: "team:manage",
-    }),
-    batchScopePermissions(ctx, {
-      organizationId,
-      teamIds: [],
-      projectIds: orgProjects.map((p) => p.id),
-      projectTeamId,
-      permission: "project:update",
-    }),
-  ]);
+  const [teamManage, projectUpdate] = await loadScopePermissions({
+    ctx,
+    organizationId,
+    orgTeams,
+    orgProjects,
+  });
 
   const teamName = new Map(orgTeams.map((t) => [t.id, t.name]));
   const projectName = new Map(orgProjects.map((p) => [p.id, p.name]));

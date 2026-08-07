@@ -238,6 +238,122 @@ function dedupedSlim(alias: string, dateClause: string): string {
 
 const SLIM_DATE_FILTER_BOTH_PERIODS = `AND ((OccurredAt >= {currentStart:DateTime64(3)} AND OccurredAt < {currentEnd:DateTime64(3)}) OR (OccurredAt >= {previousStart:DateTime64(3)} AND OccurredAt < {previousEnd:DateTime64(3)}))`;
 
+/** Value shape of a single entry in `AnalyticsTimeseriesBuilderInput["filters"]`. */
+type SlimFilterFieldValue =
+  | string[]
+  | Record<string, string[]>
+  | Record<string, Record<string, string[]>>;
+
+/**
+ * Filter fields that translate to a single `<column> IN ({p:Array(String)})`
+ * (or equivalent one-param) clause over the raw filter value verbatim. Each
+ * entry's `prefix` feeds the same `next(prefix)` param-naming scheme the
+ * hand-written cases used, so generated param names are unchanged.
+ */
+const SIMPLE_SLIM_FILTER_FIELDS: Partial<
+  Record<FilterField, { prefix: string; clause: (p: string) => string }>
+> = {
+  "topics.topics": {
+    prefix: "topic",
+    clause: (p) => `${ta}.TopicId IN ({${p}:Array(String)})`,
+  },
+  "topics.subtopics": {
+    prefix: "subtopic",
+    clause: (p) => `${ta}.SubTopicId IN ({${p}:Array(String)})`,
+  },
+  "metadata.user_id": {
+    prefix: "user",
+    clause: (p) => `${ta}.UserId IN ({${p}:Array(String)})`,
+  },
+  "metadata.thread_id": {
+    prefix: "thread",
+    clause: (p) => `${ta}.ConversationId IN ({${p}:Array(String)})`,
+  },
+  "metadata.customer_id": {
+    prefix: "customer",
+    clause: (p) => `${ta}.CustomerId IN ({${p}:Array(String)})`,
+  },
+  "metadata.labels": {
+    prefix: "labels",
+    clause: (p) => `hasAny(${ta}.Labels, {${p}:Array(String)})`,
+  },
+  "metadata.prompt_ids": {
+    // Stored as a JSON-string in Attributes['langwatch.prompt_ids']; slim
+    // keeps the key (reserved). Read & JSON-extract, then check any-match.
+    prefix: "promptIds",
+    clause: (p) =>
+      `hasAny(JSONExtract(${ta}.Attributes['langwatch.prompt_ids'], 'Array(String)'), {${p}:Array(String)})`,
+  },
+  "traces.origin": {
+    prefix: "origin",
+    clause: (p) => `${ta}.Origin IN ({${p}:Array(String)})`,
+  },
+  "traces.name": {
+    prefix: "name",
+    clause: (p) => `${ta}.TraceName IN ({${p}:Array(String)})`,
+  },
+};
+
+/** Shared shape for the per-filter-case helpers below. */
+interface SlimFilterClauseBuilderArgs {
+  rawValue: SlimFilterFieldValue;
+  clauses: string[];
+  filterParams: Record<string, unknown>;
+  next: (prefix: string) => string;
+}
+
+function addTracesErrorClause({
+  rawValue,
+  clauses,
+}: Pick<SlimFilterClauseBuilderArgs, "rawValue" | "clauses">): void {
+  // ES sends "true"/"false"; map to HasError boolean.
+  const vals = collectStringValues(rawValue);
+  if (vals.length === 0) return;
+  if (vals.includes("true") && !vals.includes("false")) {
+    clauses.push(`${ta}.HasError = true`);
+  } else if (vals.includes("false") && !vals.includes("true")) {
+    clauses.push(`${ta}.HasError = false`);
+  }
+}
+
+function addMetadataKeyClause({
+  rawValue,
+  clauses,
+  filterParams,
+  next,
+}: SlimFilterClauseBuilderArgs): void {
+  const keys = collectStringValues(rawValue);
+  if (keys.length === 0) return;
+  // Filter: trace has AT LEAST ONE of these keys in its (trimmed)
+  // Attributes map. mapContains() works on Map(String, String).
+  const exprs = keys.map((k, i) => {
+    const p = next(`metaKey${i}`);
+    filterParams[p] = k;
+    return `mapContains(${ta}.Attributes, {${p}:String})`;
+  });
+  clauses.push(`(${exprs.join(" OR ")})`);
+}
+
+function addMetadataValueClause({
+  rawValue,
+  clauses,
+  filterParams,
+  next,
+}: SlimFilterClauseBuilderArgs): void {
+  // Shape: Record<metaKey, string[]>
+  if (typeof rawValue !== "object" || Array.isArray(rawValue)) return;
+  for (const [metaKey, vals] of Object.entries(rawValue)) {
+    if (!Array.isArray(vals) || vals.length === 0) continue;
+    const pKey = next("metaValueKey");
+    filterParams[pKey] = metaKey;
+    const pVals = next("metaValueVals");
+    filterParams[pVals] = vals;
+    clauses.push(
+      `${ta}.Attributes[{${pKey}:String}] IN ({${pVals}:Array(String)})`,
+    );
+  }
+}
+
 /**
  * Translate the small slice of filter fields slim natively serves into a
  * WHERE fragment + params. Anything else MUST have been rejected by
@@ -260,104 +376,29 @@ function buildSlimFilterClauses(
     if (!hasFilterValues(rawValue)) continue;
     const field = rawField as FilterField;
 
+    const simple = SIMPLE_SLIM_FILTER_FIELDS[field];
+    if (simple) {
+      const p = next(simple.prefix);
+      params[p] = rawValue;
+      clauses.push(simple.clause(p));
+      continue;
+    }
+
     switch (field) {
-      case "topics.topics": {
-        const p = next("topic");
-        params[p] = rawValue;
-        clauses.push(`${ta}.TopicId IN ({${p}:Array(String)})`);
+      case "traces.error":
+        addTracesErrorClause({ rawValue, clauses });
         break;
-      }
-      case "topics.subtopics": {
-        const p = next("subtopic");
-        params[p] = rawValue;
-        clauses.push(`${ta}.SubTopicId IN ({${p}:Array(String)})`);
+      case "metadata.key":
+        addMetadataKeyClause({ rawValue, clauses, filterParams: params, next });
         break;
-      }
-      case "metadata.user_id": {
-        const p = next("user");
-        params[p] = rawValue;
-        clauses.push(`${ta}.UserId IN ({${p}:Array(String)})`);
-        break;
-      }
-      case "metadata.thread_id": {
-        const p = next("thread");
-        params[p] = rawValue;
-        clauses.push(`${ta}.ConversationId IN ({${p}:Array(String)})`);
-        break;
-      }
-      case "metadata.customer_id": {
-        const p = next("customer");
-        params[p] = rawValue;
-        clauses.push(`${ta}.CustomerId IN ({${p}:Array(String)})`);
-        break;
-      }
-      case "metadata.labels": {
-        const p = next("labels");
-        params[p] = rawValue;
-        clauses.push(`hasAny(${ta}.Labels, {${p}:Array(String)})`);
-        break;
-      }
-      case "metadata.prompt_ids": {
-        // Stored as a JSON-string in Attributes['langwatch.prompt_ids']; slim
-        // keeps the key (reserved). Read & JSON-extract, then check any-match.
-        const p = next("promptIds");
-        params[p] = rawValue;
-        clauses.push(
-          `hasAny(JSONExtract(${ta}.Attributes['langwatch.prompt_ids'], 'Array(String)'), {${p}:Array(String)})`,
-        );
-        break;
-      }
-      case "traces.origin": {
-        const p = next("origin");
-        params[p] = rawValue;
-        clauses.push(`${ta}.Origin IN ({${p}:Array(String)})`);
-        break;
-      }
-      case "traces.error": {
-        // ES sends "true"/"false"; map to HasError boolean.
-        const vals = collectStringValues(rawValue);
-        if (vals.length === 0) break;
-        if (vals.includes("true") && !vals.includes("false")) {
-          clauses.push(`${ta}.HasError = true`);
-        } else if (vals.includes("false") && !vals.includes("true")) {
-          clauses.push(`${ta}.HasError = false`);
-        }
-        break;
-      }
-      case "traces.name": {
-        const p = next("name");
-        params[p] = rawValue;
-        clauses.push(`${ta}.TraceName IN ({${p}:Array(String)})`);
-        break;
-      }
-      case "metadata.key": {
-        const keys = collectStringValues(rawValue);
-        if (keys.length === 0) break;
-        // Filter: trace has AT LEAST ONE of these keys in its (trimmed)
-        // Attributes map. mapContains() works on Map(String, String).
-        const exprs = keys.map((k, i) => {
-          const p = next(`metaKey${i}`);
-          params[p] = k;
-          return `mapContains(${ta}.Attributes, {${p}:String})`;
+      case "metadata.value":
+        addMetadataValueClause({
+          rawValue,
+          clauses,
+          filterParams: params,
+          next,
         });
-        clauses.push(`(${exprs.join(" OR ")})`);
         break;
-      }
-      case "metadata.value": {
-        // Shape: Record<metaKey, string[]>
-        if (typeof rawValue !== "object" || Array.isArray(rawValue)) break;
-        for (const [metaKey, vals] of Object.entries(rawValue)) {
-          if (!Array.isArray(vals) || vals.length === 0) continue;
-          const pKey = next("metaValueKey");
-          params[pKey] = metaKey;
-          const pVals = next("metaValueVals");
-          params[pVals] = vals;
-          clauses.push(
-            `${ta}.Attributes[{${pKey}:String}] IN ({${pVals}:Array(String)})`,
-          );
-        }
-        break;
-      }
       default:
         throw new Error(
           `Slim builder cannot serve filter "${field}". The router should have routed this to trace_summaries.`,
@@ -367,6 +408,31 @@ function buildSlimFilterClauses(
 
   const whereClause = clauses.length > 0 ? `AND ${clauses.join(" AND ")}` : "";
   return { whereClause, params };
+}
+
+/**
+ * Build the `<expr> AS <alias>` select fragment for one series. Split out of
+ * `buildSlimTimeseriesQuery` — this is the per-series validation +
+ * aggregation-expression assembly, called once per entry in `input.series`.
+ */
+function buildSlimSeriesSelectExpr(
+  s: AnalyticsTimeseriesBuilderInput["series"][number],
+  index: number,
+): string {
+  if (!isSlimEligibleTraceMetricKey(s.metric)) {
+    throw new Error(
+      `Slim builder cannot serve metric "${s.metric}". The router should have routed this to trace_summaries.`,
+    );
+  }
+  const alias = buildMetricAlias({
+    index,
+    metric: s.metric,
+    aggregation: s.aggregation,
+    key: s.key,
+    subkey: s.subkey,
+  });
+  const expr = slimAggExpression(s.aggregation, slimColumnFor(s.metric));
+  return `${expr} AS ${alias}`;
 }
 
 /**
@@ -409,21 +475,7 @@ export function buildSlimTimeseriesQuery(
   }
 
   for (let i = 0; i < input.series.length; i++) {
-    const s = input.series[i]!;
-    if (!isSlimEligibleTraceMetricKey(s.metric)) {
-      throw new Error(
-        `Slim builder cannot serve metric "${s.metric}". The router should have routed this to trace_summaries.`,
-      );
-    }
-    const alias = buildMetricAlias({
-      index: i,
-      metric: s.metric,
-      aggregation: s.aggregation,
-      key: s.key,
-      subkey: s.subkey,
-    });
-    const expr = slimAggExpression(s.aggregation, slimColumnFor(s.metric));
-    selectExprs.push(`${expr} AS ${alias}`);
+    selectExprs.push(buildSlimSeriesSelectExpr(input.series[i]!, i));
   }
 
   const groupByExprs: string[] = ["period"];

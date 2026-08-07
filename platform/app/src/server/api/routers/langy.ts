@@ -25,6 +25,7 @@ import {
 import {
   createLangyTokenBuffer,
   type LangyStreamEntry,
+  type LangyTokenBuffer,
 } from "~/server/app-layer/langy/streaming/langyTokenBuffer";
 import { createLangyTurnAccessStore } from "~/server/app-layer/langy/streaming/langyTurnAccess";
 import { decideSyntheticTerminal } from "~/server/app-layer/langy/streaming/langyTurnSettlement";
@@ -300,6 +301,88 @@ async function watchForMissedTerminal({
     if (settledStreak >= SETTLEMENT_CONFIRM_POLLS) return decision;
   }
   return null;
+}
+
+// Tear down on client disconnect OR the hard per-turn deadline, whichever
+// comes first — a wedged turn must not hold a blocking connection forever.
+function buildTurnStreamAbortSignal(clientSignal: AbortSignal | undefined) {
+  const signals: AbortSignal[] = [AbortSignal.timeout(AGENT_CHAT_TIMEOUT_MS)];
+  if (clientSignal) signals.push(clientSignal);
+  return AbortSignal.any(signals);
+}
+
+/**
+ * Tails the live edge of the turn stream from where the buffered prefix
+ * ended. A refresh mid-turn can miss the worker's terminal frame (its relay
+ * connection dropped before it) — `follow()` would then block until the hard
+ * per-turn deadline, leaving the UI on "Starting up…" for minutes though the
+ * turn already finished. While tailing the live edge, this also watches the
+ * durable fold + per-turn heartbeat; if the turn has settled with no terminal
+ * in the buffer, it synthesizes one so the client resolves.
+ */
+async function* followTurnStreamAfterPrefix({
+  projectId,
+  conversationId,
+  turnId,
+  userId,
+  buffer,
+  lastId,
+  signal,
+}: {
+  projectId: string;
+  conversationId: string;
+  turnId: string;
+  userId: string;
+  buffer: LangyTokenBuffer;
+  lastId: string;
+  signal: AbortSignal;
+}): AsyncGenerator<LangyStreamEntry> {
+  const settle = new AbortController();
+  const followSignal = AbortSignal.any([signal, settle.signal]);
+  let synthesized: LangyStreamEntry | null = null;
+
+  const watcher = watchForMissedTerminal({
+    projectId,
+    conversationId,
+    turnId,
+    userId,
+    buffer,
+    signal: followSignal,
+  })
+    .then((entry) => {
+      if (!entry) return;
+      synthesized = entry;
+      settle.abort(); // unblock the follow() below
+    })
+    // Attached HERE, not in a finally below: follow() can block for minutes,
+    // so a rejection would sit unhandled until then — and Node's default
+    // --unhandled-rejections=throw would take the process down first. A
+    // failed watcher just means no synthesized terminal.
+    .catch(() => undefined);
+
+  try {
+    for await (const { entry } of buffer.follow({
+      conversationId,
+      turnId,
+      fromId: lastId,
+      signal: followSignal,
+    })) {
+      yield entry;
+      if (entry.type === "end" || entry.type === "error") {
+        // A real terminal reached the buffer — never override it.
+        synthesized = null;
+        return;
+      }
+    }
+  } finally {
+    settle.abort();
+    await watcher; // already has its own .catch()
+  }
+
+  // follow() ended with no buffered terminal. If the watcher proved the turn
+  // settled, deliver the synthesized terminal so the UI resolves instead of
+  // hanging; the client reconciles the transcript via langy.messages.
+  if (synthesized) yield synthesized;
 }
 
 /**
@@ -931,14 +1014,8 @@ export const langyRouter = createTRPCRouter({
         redis: connection,
         blockingRedis: blocking,
       });
-      // Tear down on client disconnect OR the hard per-turn deadline, whichever
-      // comes first — a wedged turn must not hold a blocking connection forever.
-      const signals: AbortSignal[] = [
-        AbortSignal.timeout(AGENT_CHAT_TIMEOUT_MS),
-      ];
       // @ts-expect-error - signal is not typed
-      if (opts.signal) signals.push(opts.signal);
-      const signal = AbortSignal.any(signals);
+      const signal = buildTurnStreamAbortSignal(opts.signal);
 
       try {
         // Drain the buffered prefix, then tail the live edge from where it ended.
@@ -952,59 +1029,15 @@ export const langyRouter = createTRPCRouter({
           if (entry.type === "end" || entry.type === "error") terminal = true;
         }
         if (!terminal) {
-          // A refresh mid-turn can miss the worker's terminal frame (its relay
-          // connection dropped before it). follow() would then block until the
-          // hard per-turn deadline, leaving the UI on "Starting up…" for minutes
-          // though the turn already finished. While we tail the live edge, watch
-          // the durable fold + per-turn heartbeat; if the turn has settled with
-          // no terminal in the buffer, synthesize one so the client resolves.
-          const settle = new AbortController();
-          const followSignal = AbortSignal.any([signal, settle.signal]);
-          let synthesized: LangyStreamEntry | null = null;
-
-          const watcher = watchForMissedTerminal({
+          yield* followTurnStreamAfterPrefix({
             projectId,
             conversationId,
             turnId,
             userId,
             buffer,
-            signal: followSignal,
-          })
-            .then((entry) => {
-              if (!entry) return;
-              synthesized = entry;
-              settle.abort(); // unblock the follow() below
-            })
-            // Attached HERE, not in the finally below: follow() can block for
-            // minutes, so a rejection would sit unhandled until then — and Node's
-            // default --unhandled-rejections=throw would take the process down
-            // first. A failed watcher just means no synthesized terminal.
-            .catch(() => undefined);
-
-          try {
-            for await (const { entry } of buffer.follow({
-              conversationId,
-              turnId,
-              fromId: lastId,
-              signal: followSignal,
-            })) {
-              yield entry;
-              if (entry.type === "end" || entry.type === "error") {
-                // A real terminal reached the buffer — never override it.
-                synthesized = null;
-                return;
-              }
-            }
-          } finally {
-            settle.abort();
-            await watcher; // already has its own .catch()
-          }
-
-          // follow() ended with no buffered terminal. If the watcher proved the
-          // turn settled, deliver the synthesized terminal so the UI resolves
-          // instead of hanging; the client reconciles the transcript via
-          // langy.messages.
-          if (synthesized) yield synthesized;
+            lastId,
+            signal,
+          });
         }
       } finally {
         blocking.disconnect();

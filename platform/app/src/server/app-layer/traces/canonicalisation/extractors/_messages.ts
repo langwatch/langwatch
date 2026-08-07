@@ -8,6 +8,30 @@ import { isReplyTextPart } from "./_parts";
 // Shared message content extraction
 // ─────────────────────────────────────────────────────────────────────────
 
+// Content array (OpenAI multimodal / Strands / Anthropic)
+const contentArrayText = (msg: Record<string, unknown>): string | null => {
+  if (!Array.isArray(msg.content)) return null;
+  const texts = extractTextsFromParts(msg.content);
+  return texts.length > 0 ? texts.join("\n") : null;
+};
+
+// Object with numeric keys (reconstructed from flattened OTEL attributes like
+// gen_ai.prompt.0.content.0.text → {"0": {"text": "..."}} instead of [{"text": "..."}])
+const numericKeysContentText = (
+  msg: Record<string, unknown>,
+): string | null => {
+  if (!isObjectWithNumericKeys(msg.content)) return null;
+  const texts = extractTextsFromParts(numericKeysToArray(msg.content));
+  return texts.length > 0 ? texts.join("\n") : null;
+};
+
+// Parts array (Mastra / Vercel AI SDK)
+const partsArrayText = (msg: Record<string, unknown>): string | null => {
+  if (!Array.isArray(msg.parts)) return null;
+  const texts = extractTextsFromParts(msg.parts);
+  return texts.length > 0 ? texts.join("\n") : null;
+};
+
 /**
  * Extracts text content from a single message object.
  * Handles multiple message formats: OpenAI, Anthropic/Strands, Mastra parts, and generic.
@@ -22,32 +46,15 @@ export const extractMessageContentText = (message: unknown): string | null => {
   // String content (OpenAI format, most common)
   if (typeof msg.content === "string") return msg.content;
 
-  // Content array (OpenAI multimodal / Strands / Anthropic)
-  if (Array.isArray(msg.content)) {
-    const texts = extractTextsFromParts(msg.content);
-    if (texts.length > 0) return texts.join("\n");
-  }
-
-  // Object with numeric keys (reconstructed from flattened OTEL attributes like
-  // gen_ai.prompt.0.content.0.text → {"0": {"text": "..."}} instead of [{"text": "..."}])
-  if (isObjectWithNumericKeys(msg.content)) {
-    const texts = extractTextsFromParts(numericKeysToArray(msg.content));
-    if (texts.length > 0) return texts.join("\n");
-  }
-
-  // Parts array (Mastra / Vercel AI SDK)
-  if (Array.isArray(msg.parts)) {
-    const texts = extractTextsFromParts(msg.parts);
-    if (texts.length > 0) return texts.join("\n");
-  }
-
-  // Text field (some formats)
-  if (typeof msg.text === "string") return msg.text;
-
-  // Value field (LangWatch structured format)
-  if (typeof msg.value === "string") return msg.value;
-
-  return null;
+  return (
+    contentArrayText(msg) ??
+    numericKeysContentText(msg) ??
+    partsArrayText(msg) ??
+    // Text field (some formats)
+    (typeof msg.text === "string" ? msg.text : null) ??
+    // Value field (LangWatch structured format)
+    (typeof msg.value === "string" ? msg.value : null)
+  );
 };
 
 /**
@@ -57,33 +64,78 @@ export const extractMessageContentText = (message: unknown): string | null => {
  * {type:"tool_result", content:...} so unwrapped Anthropic typed blocks
  * still surface as a meaningful raw match.
  */
+const textFromToolUsePart = (input: unknown): string | null => {
+  try {
+    return JSON.stringify(input);
+  } catch {
+    // ignore unstringifiable inputs
+    return null;
+  }
+};
+
+const textFromToolResultPart = (content: unknown[]): string | null => {
+  const inner = extractTextsFromParts(content);
+  return inner.length > 0 ? inner.join("\n") : null;
+};
+
+// Each extractor returns `undefined` to signal "not this shape, try the
+// next one" and anything else (including `null`) to signal a terminal
+// match — mirrors the original if/else-if chain's fall-through semantics.
+const textFromTextField = (
+  p: Record<string, unknown>,
+): string | null | undefined =>
+  typeof p.text === "string" ? (isReplyTextPart(p) ? p.text : null) : void 0;
+
+const textFromContentField = (
+  p: Record<string, unknown>,
+): string | undefined => (typeof p.content === "string" ? p.content : void 0);
+
+const textFromThinkingField = (
+  p: Record<string, unknown>,
+): string | undefined =>
+  p.type === "thinking" && typeof p.thinking === "string" ? p.thinking : void 0;
+
+const textFromToolUseField = (
+  p: Record<string, unknown>,
+): string | null | undefined =>
+  p.type === "tool_use" && p.input != null
+    ? textFromToolUsePart(p.input)
+    : void 0;
+
+const textFromToolResultField = (
+  p: Record<string, unknown>,
+): string | null | undefined =>
+  p.type === "tool_result" && Array.isArray(p.content)
+    ? textFromToolResultPart(p.content)
+    : void 0;
+
+const PART_TEXT_EXTRACTORS: Array<
+  (p: Record<string, unknown>) => string | null | undefined
+> = [
+  textFromTextField,
+  textFromContentField,
+  textFromThinkingField,
+  textFromToolUseField,
+  textFromToolResultField,
+];
+
+const textFromPart = (part: unknown): string | null => {
+  if (typeof part === "string") return part;
+  if (!part || typeof part !== "object") return null;
+
+  const p = part as Record<string, unknown>;
+  for (const extract of PART_TEXT_EXTRACTORS) {
+    const result = extract(p);
+    if (result !== undefined) return result;
+  }
+  return null;
+};
+
 const extractTextsFromParts = (parts: unknown[]): string[] => {
   const texts: string[] = [];
   for (const part of parts) {
-    if (typeof part === "string") {
-      texts.push(part);
-      continue;
-    }
-    if (part && typeof part === "object") {
-      const p = part as Record<string, unknown>;
-      if (typeof p.text === "string") {
-        if (!isReplyTextPart(p)) continue;
-        texts.push(p.text);
-      } else if (typeof p.content === "string") {
-        texts.push(p.content);
-      } else if (p.type === "thinking" && typeof p.thinking === "string") {
-        texts.push(p.thinking);
-      } else if (p.type === "tool_use" && p.input != null) {
-        try {
-          texts.push(JSON.stringify(p.input));
-        } catch {
-          // ignore unstringifiable inputs
-        }
-      } else if (p.type === "tool_result" && Array.isArray(p.content)) {
-        const inner = extractTextsFromParts(p.content);
-        if (inner.length > 0) texts.push(inner.join("\n"));
-      }
-    }
+    const text = textFromPart(part);
+    if (text !== null) texts.push(text);
   }
   return texts;
 };

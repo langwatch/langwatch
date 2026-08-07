@@ -12,6 +12,7 @@ import {
   redactTypedAttributes,
 } from "./canonical/redaction";
 import { isRecord, type UnknownRecord } from "./canonical/serialization";
+import type { MetricKind } from "./schemas/metricDataPoint";
 
 export interface MetricPreparationResult {
   accepted: PreparedMetricPoint[];
@@ -52,6 +53,79 @@ function containerArray({
   return value;
 }
 
+/**
+ * Redactors mutate in place. Isolate shared resource/scope identity for every
+ * sibling point so a non-idempotent policy cannot compound its output and
+ * produce different SeriesIds within one OTLP request.
+ */
+async function prepareDataPoint({
+  pointRaw,
+  resourceTemplate,
+  scopeTemplate,
+  resourceMetric,
+  scopeMetric,
+  metric,
+  metricData,
+  kind,
+  args,
+  acceptedAt,
+  label,
+  accepted,
+  rejections,
+}: {
+  pointRaw: unknown;
+  resourceTemplate: UnknownRecord;
+  scopeTemplate: UnknownRecord;
+  resourceMetric: UnknownRecord;
+  scopeMetric: UnknownRecord;
+  metric: UnknownRecord;
+  metricData: UnknownRecord;
+  kind: MetricKind;
+  args: PrepareMetricDataPointsArgs;
+  acceptedAt: number;
+  label: string;
+  accepted: PreparedMetricPoint[];
+  rejections: RejectionLog;
+}): Promise<void> {
+  if (!isRecord(pointRaw)) {
+    rejections.reject(`metric ${label} contains a malformed data point`);
+    return;
+  }
+  const point = structuredClone(pointRaw);
+  const resource = structuredClone(resourceTemplate);
+  const scope = structuredClone(scopeTemplate);
+  try {
+    await redactTypedAttributes({
+      resourceAttributes: resource.attributes,
+      scopeAttributes: scope.attributes,
+      pointAttributes: point.attributes,
+      exemplarAttributes: point.exemplars,
+      redactionService: args.redactionService,
+      piiRedactionLevel: args.piiRedactionLevel,
+      tenantId: args.tenantId,
+    });
+    accepted.push(
+      buildPoint({
+        tenantId: args.tenantId,
+        organizationId: args.organizationId,
+        resourceMetric: { ...resourceMetric, resource },
+        scopeMetric: { ...scopeMetric, scope },
+        metric,
+        metricData,
+        point,
+        kind,
+        acceptedAt,
+      }),
+    );
+  } catch (error) {
+    rejections.reject(
+      `metric ${label}: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    );
+  }
+}
+
 async function prepareMetric({
   metric,
   resourceMetric,
@@ -90,46 +164,21 @@ async function prepareMetric({
   const scopeTemplate = isRecord(scopeMetric.scope) ? scopeMetric.scope : {};
 
   for (const pointRaw of metricData.dataPoints) {
-    if (!isRecord(pointRaw)) {
-      rejections.reject(`metric ${label} contains a malformed data point`);
-      continue;
-    }
-    const point = structuredClone(pointRaw);
-    // Redactors mutate in place. Isolate shared resource/scope identity for
-    // every sibling so a non-idempotent policy cannot compound its output and
-    // produce different SeriesIds within one OTLP request.
-    const resource = structuredClone(resourceTemplate);
-    const scope = structuredClone(scopeTemplate);
-    try {
-      await redactTypedAttributes({
-        resourceAttributes: resource.attributes,
-        scopeAttributes: scope.attributes,
-        pointAttributes: point.attributes,
-        exemplarAttributes: point.exemplars,
-        redactionService: args.redactionService,
-        piiRedactionLevel: args.piiRedactionLevel,
-        tenantId: args.tenantId,
-      });
-      accepted.push(
-        buildPoint({
-          tenantId: args.tenantId,
-          organizationId: args.organizationId,
-          resourceMetric: { ...resourceMetric, resource },
-          scopeMetric: { ...scopeMetric, scope },
-          metric,
-          metricData,
-          point,
-          kind,
-          acceptedAt,
-        }),
-      );
-    } catch (error) {
-      rejections.reject(
-        `metric ${label}: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
-      );
-    }
+    await prepareDataPoint({
+      pointRaw,
+      resourceTemplate,
+      scopeTemplate,
+      resourceMetric,
+      scopeMetric,
+      metric,
+      metricData,
+      kind,
+      args,
+      acceptedAt,
+      label,
+      accepted,
+      rejections,
+    });
   }
 }
 
@@ -140,6 +189,74 @@ interface PrepareMetricDataPointsArgs {
   piiRedactionLevel: PiiRedactionLevel;
   redactionService: RedactionService;
   acceptedAt?: number;
+}
+
+async function prepareScopeMetric({
+  scopeMetricRaw,
+  resourceMetric,
+  args,
+  acceptedAt,
+  accepted,
+  rejections,
+}: {
+  scopeMetricRaw: unknown;
+  resourceMetric: UnknownRecord;
+  args: PrepareMetricDataPointsArgs;
+  acceptedAt: number;
+  accepted: PreparedMetricPoint[];
+  rejections: RejectionLog;
+}): Promise<void> {
+  if (!isRecord(scopeMetricRaw)) return;
+  const scopeMetric = structuredClone(scopeMetricRaw) as UnknownRecord;
+  const metrics = containerArray({
+    value: scopeMetric.metrics,
+    label: "metrics",
+    rejections,
+  });
+  for (const metricRaw of metrics) {
+    if (!isRecord(metricRaw)) continue;
+    await prepareMetric({
+      metric: structuredClone(metricRaw) as UnknownRecord,
+      resourceMetric,
+      scopeMetric,
+      args,
+      acceptedAt,
+      accepted,
+      rejections,
+    });
+  }
+}
+
+async function prepareResourceMetric({
+  resourceMetricRaw,
+  args,
+  acceptedAt,
+  accepted,
+  rejections,
+}: {
+  resourceMetricRaw: unknown;
+  args: PrepareMetricDataPointsArgs;
+  acceptedAt: number;
+  accepted: PreparedMetricPoint[];
+  rejections: RejectionLog;
+}): Promise<void> {
+  if (!isRecord(resourceMetricRaw)) return;
+  const resourceMetric = structuredClone(resourceMetricRaw) as UnknownRecord;
+  const scopeMetrics = containerArray({
+    value: resourceMetric.scopeMetrics,
+    label: "scopeMetrics",
+    rejections,
+  });
+  for (const scopeMetricRaw of scopeMetrics) {
+    await prepareScopeMetric({
+      scopeMetricRaw,
+      resourceMetric,
+      args,
+      acceptedAt,
+      accepted,
+      rejections,
+    });
+  }
 }
 
 /**
@@ -160,34 +277,13 @@ export async function prepareMetricDataPoints(
     rejections,
   });
   for (const resourceMetricRaw of resourceMetrics) {
-    if (!isRecord(resourceMetricRaw)) continue;
-    const resourceMetric = structuredClone(resourceMetricRaw) as UnknownRecord;
-    const scopeMetrics = containerArray({
-      value: resourceMetric.scopeMetrics,
-      label: "scopeMetrics",
+    await prepareResourceMetric({
+      resourceMetricRaw,
+      args,
+      acceptedAt,
+      accepted,
       rejections,
     });
-    for (const scopeMetricRaw of scopeMetrics) {
-      if (!isRecord(scopeMetricRaw)) continue;
-      const scopeMetric = structuredClone(scopeMetricRaw) as UnknownRecord;
-      const metrics = containerArray({
-        value: scopeMetric.metrics,
-        label: "metrics",
-        rejections,
-      });
-      for (const metricRaw of metrics) {
-        if (!isRecord(metricRaw)) continue;
-        await prepareMetric({
-          metric: structuredClone(metricRaw) as UnknownRecord,
-          resourceMetric,
-          scopeMetric,
-          args,
-          acceptedAt,
-          accepted,
-          rejections,
-        });
-      }
-    }
   }
 
   return {

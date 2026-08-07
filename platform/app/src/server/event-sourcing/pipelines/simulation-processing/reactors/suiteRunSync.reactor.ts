@@ -35,6 +35,114 @@ export interface SuiteRunSyncReactorDeps {
   }) => Promise<void>;
 }
 
+async function syncSuiteRunStarted({
+  deps,
+  tenantId,
+  foldState,
+  occurredAt,
+}: {
+  deps: SuiteRunSyncReactorDeps;
+  tenantId: string;
+  foldState: SimulationRunStateData;
+  occurredAt: number;
+}): Promise<void> {
+  await deps.recordSuiteRunItemStarted({
+    tenantId,
+    batchRunId: foldState.BatchRunId,
+    scenarioRunId: foldState.ScenarioRunId,
+    scenarioId: foldState.ScenarioId,
+    occurredAt,
+  });
+
+  logger.debug(
+    {
+      tenantId,
+      batchRunId: foldState.BatchRunId,
+      scenarioRunId: foldState.ScenarioRunId,
+    },
+    "Dispatched recordSuiteRunItemStarted",
+  );
+}
+
+async function syncSuiteRunFinished({
+  deps,
+  tenantId,
+  foldState,
+  occurredAt,
+}: {
+  deps: SuiteRunSyncReactorDeps;
+  tenantId: string;
+  foldState: SimulationRunStateData;
+  occurredAt: number;
+}): Promise<void> {
+  await deps.completeSuiteRunItem({
+    tenantId,
+    batchRunId: foldState.BatchRunId,
+    scenarioRunId: foldState.ScenarioRunId,
+    scenarioId: foldState.ScenarioId,
+    status: foldState.Status,
+    verdict: foldState.Verdict ?? undefined,
+    durationMs: foldState.DurationMs ?? undefined,
+    reasoning: foldState.Reasoning ?? undefined,
+    error: foldState.Error ?? undefined,
+    occurredAt,
+  });
+
+  logger.debug(
+    {
+      tenantId,
+      batchRunId: foldState.BatchRunId,
+      scenarioRunId: foldState.ScenarioRunId,
+      status: foldState.Status,
+    },
+    "Dispatched completeSuiteRunItem",
+  );
+}
+
+async function dispatchSuiteRunSync({
+  deps,
+  tenantId,
+  foldState,
+  event,
+}: {
+  deps: SuiteRunSyncReactorDeps;
+  tenantId: string;
+  foldState: SimulationRunStateData;
+  event: SimulationProcessingEvent;
+}): Promise<void> {
+  try {
+    if (isSimulationRunStartedEvent(event)) {
+      await syncSuiteRunStarted({
+        deps,
+        tenantId,
+        foldState,
+        occurredAt: event.occurredAt,
+      });
+      return;
+    }
+
+    if (isSimulationRunFinishedEvent(event)) {
+      await syncSuiteRunFinished({
+        deps,
+        tenantId,
+        foldState,
+        occurredAt: event.occurredAt,
+      });
+      return;
+    }
+  } catch (error) {
+    logger.warn(
+      {
+        tenantId,
+        batchRunId: foldState.BatchRunId,
+        scenarioRunId: foldState.ScenarioRunId,
+        error: error instanceof Error ? error.message : String(error),
+      },
+      "Failed to sync simulation event to suite run pipeline — non-fatal",
+    );
+  }
+}
+
 /**
  * Cross-pipeline reactor that syncs simulation events to the suite run pipeline.
  *
@@ -62,63 +170,7 @@ export function createSuiteRunSyncReactor(
         return;
       }
 
-      try {
-        if (isSimulationRunStartedEvent(event)) {
-          await deps.recordSuiteRunItemStarted({
-            tenantId,
-            batchRunId: foldState.BatchRunId,
-            scenarioRunId: foldState.ScenarioRunId,
-            scenarioId: foldState.ScenarioId,
-            occurredAt: event.occurredAt,
-          });
-
-          logger.debug(
-            {
-              tenantId,
-              batchRunId: foldState.BatchRunId,
-              scenarioRunId: foldState.ScenarioRunId,
-            },
-            "Dispatched recordSuiteRunItemStarted",
-          );
-          return;
-        }
-
-        if (isSimulationRunFinishedEvent(event)) {
-          await deps.completeSuiteRunItem({
-            tenantId,
-            batchRunId: foldState.BatchRunId,
-            scenarioRunId: foldState.ScenarioRunId,
-            scenarioId: foldState.ScenarioId,
-            status: foldState.Status,
-            verdict: foldState.Verdict ?? undefined,
-            durationMs: foldState.DurationMs ?? undefined,
-            reasoning: foldState.Reasoning ?? undefined,
-            error: foldState.Error ?? undefined,
-            occurredAt: event.occurredAt,
-          });
-
-          logger.debug(
-            {
-              tenantId,
-              batchRunId: foldState.BatchRunId,
-              scenarioRunId: foldState.ScenarioRunId,
-              status: foldState.Status,
-            },
-            "Dispatched completeSuiteRunItem",
-          );
-          return;
-        }
-      } catch (error) {
-        logger.warn(
-          {
-            tenantId,
-            batchRunId: foldState.BatchRunId,
-            scenarioRunId: foldState.ScenarioRunId,
-            error: error instanceof Error ? error.message : String(error),
-          },
-          "Failed to sync simulation event to suite run pipeline — non-fatal",
-        );
-      }
+      await dispatchSuiteRunSync({ deps, tenantId, foldState, event });
     },
   };
 }

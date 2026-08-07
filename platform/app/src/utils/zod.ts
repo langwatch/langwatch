@@ -146,6 +146,38 @@ export function getZodIssueMessage(issue: ZodIssue): string {
 }
 
 /**
+ * Records the first message seen for the field an issue points at. Issues with
+ * an empty path, or whose field already has a message, are left alone.
+ */
+function recordFieldError({
+  fieldErrors,
+  issue,
+}: {
+  fieldErrors: Record<string, string>;
+  issue: ZodIssue;
+}): void {
+  if (!issue.path || issue.path.length === 0) return;
+  const fieldName = issue.path[0];
+  if (fieldName && typeof fieldName === "string" && !fieldErrors[fieldName]) {
+    fieldErrors[fieldName] = getZodIssueMessage(issue);
+  }
+}
+
+function recordUnionFieldErrors({
+  fieldErrors,
+  unionErrors,
+}: {
+  fieldErrors: Record<string, string>;
+  unionErrors: NonNullable<ZodErrorStructure["issues"][number]["unionErrors"]>;
+}): void {
+  unionErrors.forEach((unionError) => {
+    unionError.issues?.forEach((nestedIssue) => {
+      recordFieldError({ fieldErrors, issue: nestedIssue });
+    });
+  });
+}
+
+/**
  * Parses Zod error to extract field-specific error messages
  */
 export function parseZodFieldErrors(
@@ -158,30 +190,13 @@ export function parseZodFieldErrors(
     zodError.issues.forEach((issue) => {
       if (issue.unionErrors) {
         // Flatten union errors
-        issue.unionErrors.forEach((unionError) => {
-          unionError.issues?.forEach((nestedIssue) => {
-            if (nestedIssue.path && nestedIssue.path.length > 0) {
-              const fieldName = nestedIssue.path[0];
-              if (
-                fieldName &&
-                typeof fieldName === "string" &&
-                !fieldErrors[fieldName]
-              ) {
-                fieldErrors[fieldName] = getZodIssueMessage(nestedIssue);
-              }
-            }
-          });
+        recordUnionFieldErrors({
+          fieldErrors,
+          unionErrors: issue.unionErrors,
         });
-      } else if (issue.path && issue.path.length > 0) {
-        const fieldName = issue.path[0];
-        if (
-          fieldName &&
-          typeof fieldName === "string" &&
-          !fieldErrors[fieldName]
-        ) {
-          fieldErrors[fieldName] = getZodIssueMessage(issue);
-        }
+        return;
       }
+      recordFieldError({ fieldErrors, issue });
     });
   }
 

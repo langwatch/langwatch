@@ -130,7 +130,21 @@ export async function readCappedBody(
   const body = request.body;
   if (!body) return "";
 
-  const reader = body.getReader();
+  const { chunks, total } = await readCappedChunks({
+    reader: body.getReader(),
+    maxBytes,
+  });
+
+  return new TextDecoder().decode(concat(chunks, total));
+}
+
+async function readCappedChunks({
+  reader,
+  maxBytes,
+}: {
+  reader: ReadableStreamDefaultReader<Uint8Array>;
+  maxBytes: number;
+}): Promise<{ chunks: Uint8Array[]; total: number }> {
   const chunks: Uint8Array[] = [];
   let total = 0;
   try {
@@ -149,8 +163,7 @@ export async function readCappedBody(
     // oversized upload keeps streaming into a body nobody is reading.
     void reader.cancel().catch(() => void 0);
   }
-
-  return new TextDecoder().decode(concat(chunks, total));
+  return { chunks, total };
 }
 
 function concat(chunks: Uint8Array[], total: number): Uint8Array {
@@ -216,31 +229,36 @@ const isObject = (value: unknown): value is Record<string, unknown> =>
  * else still passes through to the collector untouched.
  */
 export function assertWalkableExport(resourceSpans: unknown[]): void {
-  const invalid = () => new RumPayloadInvalidError("Malformed payload");
-
   for (const resourceSpan of resourceSpans) {
     if (!isObject(resourceSpan)) throw invalid();
 
     const { resource, scopeSpans } = resourceSpan;
 
-    if (resource !== void 0) {
-      if (!isObject(resource)) throw invalid();
-      const { attributes } = resource;
-      if (attributes !== void 0) {
-        if (!Array.isArray(attributes)) throw invalid();
-        if (attributes.some((attribute) => !isObject(attribute)))
-          throw invalid();
-      }
-    }
+    assertWalkableResource(resource);
+    assertWalkableScopeSpans(scopeSpans);
+  }
+}
 
-    if (scopeSpans !== void 0) {
-      if (!Array.isArray(scopeSpans)) throw invalid();
-      for (const scopeSpan of scopeSpans) {
-        if (!isObject(scopeSpan)) throw invalid();
-        const { spans } = scopeSpan;
-        if (spans !== void 0 && !Array.isArray(spans)) throw invalid();
-      }
-    }
+const invalid = () => new RumPayloadInvalidError("Malformed payload");
+
+/** `stampIdentity` calls `.filter` on `resource.attributes`. */
+function assertWalkableResource(resource: unknown): void {
+  if (resource === void 0) return;
+  if (!isObject(resource)) throw invalid();
+  const { attributes } = resource;
+  if (attributes === void 0) return;
+  if (!Array.isArray(attributes)) throw invalid();
+  if (attributes.some((attribute) => !isObject(attribute))) throw invalid();
+}
+
+/** `countSpans` iterates `scopeSpans` and reads each `spans` length. */
+function assertWalkableScopeSpans(scopeSpans: unknown): void {
+  if (scopeSpans === void 0) return;
+  if (!Array.isArray(scopeSpans)) throw invalid();
+  for (const scopeSpan of scopeSpans) {
+    if (!isObject(scopeSpan)) throw invalid();
+    const { spans } = scopeSpan;
+    if (spans !== void 0 && !Array.isArray(spans)) throw invalid();
   }
 }
 

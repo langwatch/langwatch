@@ -43,6 +43,197 @@ export class PrismaLangyTurnAdmissionRepository
 {
   constructor(private readonly prisma: PrismaClient) {}
 
+  /**
+   * Resolve (and, when needed, claim-lease) the idempotency receipt for this
+   * send. Returns an `early` result the moment the receipt alone answers the
+   * claim (mismatch / replay / pending); otherwise the resolved receipt row,
+   * ready for the active-turn step. Split out of `claim`'s transaction.
+   */
+  private async resolveTurnRequestReceipt(
+    tx: Prisma.TransactionClient,
+    input: {
+      projectId: string;
+      userId: string;
+      idempotencyKey: string;
+      conversationId: string;
+      turnId: string;
+    },
+    lease: { now: Date; leaseExpiresAt: Date; claimToken: string },
+  ) {
+    const { now, leaseExpiresAt, claimToken } = lease;
+
+    let receipt = await tx.langyTurnRequest.findUnique({
+      where: {
+        // The tenant middleware requires the discriminator at the top
+        // level even when it is also inside the compound selector.
+        projectId: input.projectId,
+        projectId_userId_requestId: {
+          projectId: input.projectId,
+          userId: input.userId,
+          requestId: input.idempotencyKey,
+        },
+      },
+    });
+
+    // Same key, different content: the turn id is a hash of who+key+content,
+    // so a receipt whose turnId differs proves the key is being reused for a
+    // different send. Never replay it. (The DB column keeps its historical
+    // name `requestId`; the value stored there is the idempotency key. Known
+    // deploy-boundary window: a receipt admitted under the pre-hash id scheme
+    // mismatches a byte-identical retry arriving post-deploy — a 409 for the
+    // minutes around one deploy, accepted over carrying legacy-id
+    // compatibility forever.)
+    if (receipt && receipt.turnId !== input.turnId) {
+      return { early: { kind: "mismatch" as const } };
+    }
+
+    if (receipt?.status === COMMITTED) {
+      return {
+        early: {
+          kind: "replay" as const,
+          conversationId: receipt.conversationId,
+          turnId: receipt.turnId,
+        },
+      };
+    }
+
+    if (receipt && receipt.leaseExpiresAt > now) {
+      return { early: { kind: "pending" as const } };
+    }
+
+    if (receipt) {
+      const taken = await tx.langyTurnRequest.updateMany({
+        where: {
+          projectId: input.projectId,
+          id: receipt.id,
+          status: PREPARING,
+          leaseExpiresAt: { lte: now },
+        },
+        data: { leaseOwner: claimToken, leaseExpiresAt },
+      });
+      if (taken.count !== 1) return { early: { kind: "pending" as const } };
+      receipt = { ...receipt, leaseOwner: claimToken, leaseExpiresAt };
+    } else {
+      receipt = await tx.langyTurnRequest.create({
+        data: {
+          projectId: input.projectId,
+          userId: input.userId,
+          requestId: input.idempotencyKey,
+          conversationId: input.conversationId,
+          turnId: input.turnId,
+          status: PREPARING,
+          leaseOwner: claimToken,
+          leaseExpiresAt,
+        },
+      });
+    }
+
+    return { receipt };
+  }
+
+  /**
+   * A stranded active-turn row this claim may take over: a PREPARING row
+   * whose lease already expired, or a COMMITTED row abandoned long enough
+   * ago that no terminal event is coming (see `COMMITTED_ABANDON_MS`). Split
+   * out of `resolveActiveTurnClaim`.
+   */
+  private canReclaimActiveTurn(
+    active: { status: string; leaseExpiresAt: Date; updatedAt: Date },
+    now: Date,
+  ): boolean {
+    return (
+      (active.status === PREPARING && active.leaseExpiresAt <= now) ||
+      (active.status === COMMITTED &&
+        now.getTime() - active.updatedAt.getTime() > COMMITTED_ABANDON_MS)
+    );
+  }
+
+  /**
+   * Claim (or reject) the conversation's single-active-turn slot for the
+   * receipt resolved above. Split out of `claim`'s transaction.
+   */
+  private async resolveActiveTurnClaim(
+    tx: Prisma.TransactionClient,
+    input: { projectId: string; userId: string; idempotencyKey: string },
+    ctx: {
+      receipt: { id: string; conversationId: string; turnId: string };
+      now: Date;
+      leaseExpiresAt: Date;
+      claimToken: string;
+    },
+  ): Promise<LangyTurnAdmissionClaim> {
+    const { receipt, now, leaseExpiresAt, claimToken } = ctx;
+    // An expired receipt keeps its original identities. That is the point of
+    // the receipt: a later retry may have speculatively minted a fresh
+    // conversation id, but it must resume the first logical send.
+    const conversationId = receipt.conversationId;
+    const turnId = receipt.turnId;
+    const active = await tx.langyActiveTurn.findUnique({
+      where: {
+        projectId: input.projectId,
+        projectId_conversationId: {
+          projectId: input.projectId,
+          conversationId,
+        },
+      },
+    });
+
+    if (!active) {
+      await tx.langyActiveTurn.create({
+        data: {
+          projectId: input.projectId,
+          conversationId,
+          turnId,
+          requestId: input.idempotencyKey,
+          userId: input.userId,
+          status: PREPARING,
+          leaseOwner: claimToken,
+          leaseExpiresAt,
+        },
+      });
+    } else if (active.turnId === turnId) {
+      await tx.langyActiveTurn.update({
+        where: { id: active.id, projectId: input.projectId },
+        data: {
+          requestId: input.idempotencyKey,
+          userId: input.userId,
+          status: PREPARING,
+          leaseOwner: claimToken,
+          leaseExpiresAt,
+        },
+      });
+    } else if (this.canReclaimActiveTurn(active, now)) {
+      await tx.langyActiveTurn.update({
+        where: { id: active.id, projectId: input.projectId },
+        data: {
+          turnId,
+          requestId: input.idempotencyKey,
+          userId: input.userId,
+          status: PREPARING,
+          leaseOwner: claimToken,
+          leaseExpiresAt,
+        },
+      });
+    } else {
+      await tx.langyTurnRequest.deleteMany({
+        where: {
+          projectId: input.projectId,
+          id: receipt.id,
+          status: PREPARING,
+          leaseOwner: claimToken,
+        },
+      });
+      return { kind: "busy" as const };
+    }
+
+    return {
+      kind: "claimed" as const,
+      claimToken,
+      conversationId,
+      turnId,
+    };
+  }
+
   async claim(input: {
     projectId: string;
     userId: string;
@@ -60,145 +251,19 @@ export class PrismaLangyTurnAdmissionRepository
             );
             const claimToken = crypto.randomUUID();
 
-            let receipt = await tx.langyTurnRequest.findUnique({
-              where: {
-                // The tenant middleware requires the discriminator at the top
-                // level even when it is also inside the compound selector.
-                projectId: input.projectId,
-                projectId_userId_requestId: {
-                  projectId: input.projectId,
-                  userId: input.userId,
-                  requestId: input.idempotencyKey,
-                },
-              },
-            });
+            const receiptResolution = await this.resolveTurnRequestReceipt(
+              tx,
+              input,
+              { now, leaseExpiresAt, claimToken },
+            );
+            if ("early" in receiptResolution) return receiptResolution.early;
 
-            // Same key, different content: the turn id is a hash of
-            // who+key+content, so a receipt whose turnId differs proves the
-            // key is being reused for a different send. Never replay it.
-            // (The DB column keeps its historical name `requestId`; the value
-            // stored there is the idempotency key. Known deploy-boundary
-            // window: a receipt admitted under the pre-hash id scheme
-            // mismatches a byte-identical retry arriving post-deploy — a 409
-            // for the minutes around one deploy, accepted over carrying
-            // legacy-id compatibility forever.)
-            if (receipt && receipt.turnId !== input.turnId) {
-              return { kind: "mismatch" as const };
-            }
-
-            if (receipt?.status === COMMITTED) {
-              return {
-                kind: "replay" as const,
-                conversationId: receipt.conversationId,
-                turnId: receipt.turnId,
-              };
-            }
-
-            if (receipt && receipt.leaseExpiresAt > now) {
-              return { kind: "pending" as const };
-            }
-
-            if (receipt) {
-              const taken = await tx.langyTurnRequest.updateMany({
-                where: {
-                  projectId: input.projectId,
-                  id: receipt.id,
-                  status: PREPARING,
-                  leaseExpiresAt: { lte: now },
-                },
-                data: { leaseOwner: claimToken, leaseExpiresAt },
-              });
-              if (taken.count !== 1) return { kind: "pending" as const };
-              receipt = { ...receipt, leaseOwner: claimToken, leaseExpiresAt };
-            } else {
-              receipt = await tx.langyTurnRequest.create({
-                data: {
-                  projectId: input.projectId,
-                  userId: input.userId,
-                  requestId: input.idempotencyKey,
-                  conversationId: input.conversationId,
-                  turnId: input.turnId,
-                  status: PREPARING,
-                  leaseOwner: claimToken,
-                  leaseExpiresAt,
-                },
-              });
-            }
-
-            // An expired receipt keeps its original identities. That is the
-            // point of the receipt: a later retry may have speculatively minted
-            // a fresh conversation id, but it must resume the first logical send.
-            const conversationId = receipt.conversationId;
-            const turnId = receipt.turnId;
-            const active = await tx.langyActiveTurn.findUnique({
-              where: {
-                projectId: input.projectId,
-                projectId_conversationId: {
-                  projectId: input.projectId,
-                  conversationId,
-                },
-              },
-            });
-
-            if (!active) {
-              await tx.langyActiveTurn.create({
-                data: {
-                  projectId: input.projectId,
-                  conversationId,
-                  turnId,
-                  requestId: input.idempotencyKey,
-                  userId: input.userId,
-                  status: PREPARING,
-                  leaseOwner: claimToken,
-                  leaseExpiresAt,
-                },
-              });
-            } else if (active.turnId === turnId) {
-              await tx.langyActiveTurn.update({
-                where: { id: active.id, projectId: input.projectId },
-                data: {
-                  requestId: input.idempotencyKey,
-                  userId: input.userId,
-                  status: PREPARING,
-                  leaseOwner: claimToken,
-                  leaseExpiresAt,
-                },
-              });
-            } else if (
-              (active.status === PREPARING && active.leaseExpiresAt <= now) ||
-              (active.status === COMMITTED &&
-                now.getTime() - active.updatedAt.getTime() >
-                  COMMITTED_ABANDON_MS)
-            ) {
-              await tx.langyActiveTurn.update({
-                where: { id: active.id, projectId: input.projectId },
-                data: {
-                  turnId,
-                  requestId: input.idempotencyKey,
-                  userId: input.userId,
-                  status: PREPARING,
-                  leaseOwner: claimToken,
-                  leaseExpiresAt,
-                },
-              });
-            } else {
-              await tx.langyTurnRequest.deleteMany({
-                where: {
-                  projectId: input.projectId,
-                  id: receipt.id,
-                  status: PREPARING,
-                  leaseOwner: claimToken,
-                },
-              });
-              return { kind: "busy" as const };
-            }
-
-            return {
-              kind: "claimed" as const,
+            return this.resolveActiveTurnClaim(tx, input, {
+              receipt: receiptResolution.receipt,
+              now,
+              leaseExpiresAt,
               claimToken,
-              conversationId,
-              turnId,
-            };
+            });
           },
           { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
         );
@@ -215,6 +280,102 @@ export class PrismaLangyTurnAdmissionRepository
     throw new Error("unreachable: Langy turn admission retries exhausted");
   }
 
+  /**
+   * Commit the turn-request receipt row, or verify one of our writes (or a
+   * concurrent one) already did. Split out of `commit`'s transaction.
+   */
+  private async commitTurnRequestReceipt(
+    tx: Prisma.TransactionClient,
+    input: {
+      projectId: string;
+      userId: string;
+      idempotencyKey: string;
+      conversationId: string;
+      turnId: string;
+      claimToken: string;
+    },
+  ): Promise<void> {
+    const receiptUpdate = await tx.langyTurnRequest.updateMany({
+      where: {
+        projectId: input.projectId,
+        userId: input.userId,
+        requestId: input.idempotencyKey,
+        conversationId: input.conversationId,
+        turnId: input.turnId,
+        status: PREPARING,
+        leaseOwner: input.claimToken,
+      },
+      data: { status: COMMITTED, leaseExpiresAt: COMMITTED_LEASE },
+    });
+    if (receiptUpdate.count !== 1) {
+      const receipt = await tx.langyTurnRequest.findUnique({
+        where: {
+          projectId: input.projectId,
+          projectId_userId_requestId: {
+            projectId: input.projectId,
+            userId: input.userId,
+            requestId: input.idempotencyKey,
+          },
+        },
+      });
+      if (
+        receipt?.conversationId !== input.conversationId ||
+        receipt.turnId !== input.turnId ||
+        receipt.status !== COMMITTED
+      ) {
+        throw new Error(
+          `Langy turn admission receipt commit lost its claim for ${input.turnId}`,
+        );
+      }
+    }
+  }
+
+  /**
+   * Commit the active-turn row, or verify one of our writes (or a concurrent
+   * one) already did. Split out of `commit`'s transaction.
+   */
+  private async commitActiveTurn(
+    tx: Prisma.TransactionClient,
+    input: {
+      projectId: string;
+      conversationId: string;
+      turnId: string;
+      claimToken: string;
+    },
+  ): Promise<void> {
+    const activeUpdate = await tx.langyActiveTurn.updateMany({
+      where: {
+        projectId: input.projectId,
+        conversationId: input.conversationId,
+        turnId: input.turnId,
+        status: PREPARING,
+        leaseOwner: input.claimToken,
+      },
+      data: { status: COMMITTED, leaseExpiresAt: COMMITTED_LEASE },
+    });
+    if (activeUpdate.count !== 1) {
+      const active = await tx.langyActiveTurn.findUnique({
+        where: {
+          projectId: input.projectId,
+          projectId_conversationId: {
+            projectId: input.projectId,
+            conversationId: input.conversationId,
+          },
+        },
+      });
+      // A matching terminal event may already have released this row. A row
+      // for another turn is never an idempotent success.
+      if (
+        active &&
+        (active.turnId !== input.turnId || active.status !== COMMITTED)
+      ) {
+        throw new Error(
+          `Langy active-turn commit lost its claim for ${input.turnId}`,
+        );
+      }
+    }
+  }
+
   async commit(input: {
     projectId: string;
     userId: string;
@@ -224,71 +385,8 @@ export class PrismaLangyTurnAdmissionRepository
     claimToken: string;
   }): Promise<void> {
     await this.prisma.$transaction(async (tx) => {
-      const receiptUpdate = await tx.langyTurnRequest.updateMany({
-        where: {
-          projectId: input.projectId,
-          userId: input.userId,
-          requestId: input.idempotencyKey,
-          conversationId: input.conversationId,
-          turnId: input.turnId,
-          status: PREPARING,
-          leaseOwner: input.claimToken,
-        },
-        data: { status: COMMITTED, leaseExpiresAt: COMMITTED_LEASE },
-      });
-      if (receiptUpdate.count !== 1) {
-        const receipt = await tx.langyTurnRequest.findUnique({
-          where: {
-            projectId: input.projectId,
-            projectId_userId_requestId: {
-              projectId: input.projectId,
-              userId: input.userId,
-              requestId: input.idempotencyKey,
-            },
-          },
-        });
-        if (
-          receipt?.conversationId !== input.conversationId ||
-          receipt.turnId !== input.turnId ||
-          receipt.status !== COMMITTED
-        ) {
-          throw new Error(
-            `Langy turn admission receipt commit lost its claim for ${input.turnId}`,
-          );
-        }
-      }
-
-      const activeUpdate = await tx.langyActiveTurn.updateMany({
-        where: {
-          projectId: input.projectId,
-          conversationId: input.conversationId,
-          turnId: input.turnId,
-          status: PREPARING,
-          leaseOwner: input.claimToken,
-        },
-        data: { status: COMMITTED, leaseExpiresAt: COMMITTED_LEASE },
-      });
-      if (activeUpdate.count !== 1) {
-        const active = await tx.langyActiveTurn.findUnique({
-          where: {
-            projectId: input.projectId,
-            projectId_conversationId: {
-              projectId: input.projectId,
-              conversationId: input.conversationId,
-            },
-          },
-        });
-        // A matching terminal event may already have released this row. A row
-        // for another turn is never an idempotent success.
-        if (
-          active &&
-          (active.turnId !== input.turnId || active.status !== COMMITTED)
-        ) {
-          throw new Error(
-            `Langy active-turn commit lost its claim for ${input.turnId}`,
-          );
-        }
-      }
+      await this.commitTurnRequestReceipt(tx, input);
+      await this.commitActiveTurn(tx, input);
     });
   }
 

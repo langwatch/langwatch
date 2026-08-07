@@ -102,39 +102,92 @@ export interface ClusteringRunContext {
   page: number;
 }
 
-/**
- * Runs one clustering page for a project.
- *
- * The ClickHouse resolver is threaded in rather than imported: it is built once
- * in the composition root, and this parameter is what carries it here. The
- * worker path gets it from the clustering run port in `presets.ts`; the manual
- * task gets it from the App.
- */
-export const clusterTopicsForProject = async ({
-  projectId,
-  searchAfter,
-  runContext,
-  resolveClickHouseClient,
-}: {
-  projectId: string;
-  searchAfter?: [number, string];
-  runContext?: ClusteringRunContext;
-  resolveClickHouseClient: ClickHouseClientResolver;
-}): Promise<ClusteringPageOutcome> => {
+async function loadProjectOrThrow(projectId: string): Promise<Project> {
   const project = await prisma.project.findUnique({
     where: { id: projectId },
   });
   if (!project) {
     throw new Error("Project not found");
   }
+  return project;
+}
 
-  let clickhouse: ClickHouseClient;
+async function resolveClickHouseOrThrow({
+  resolveClickHouseClient,
+  projectId,
+}: {
+  resolveClickHouseClient: ClickHouseClientResolver;
+  projectId: string;
+}): Promise<ClickHouseClient> {
   try {
-    clickhouse = await resolveClickHouseClient(projectId);
+    return await resolveClickHouseClient(projectId);
   } catch {
     throw new Error(`ClickHouse client not available for project ${projectId}`);
   }
+}
 
+function partitionTopicIds(
+  topics: Array<{ id: string; parentId: string | null }>,
+): { topicIds: string[]; subtopicIds: string[] } {
+  return {
+    topicIds: topics
+      .filter((topic) => !topic.parentId)
+      .map((topic) => topic.id),
+    subtopicIds: topics
+      .filter((topic) => topic.parentId)
+      .map((topic) => topic.id),
+  };
+}
+
+function latestTopicCreatedAt(topics: Array<{ createdAt: Date }>): Date {
+  return topics.reduce((acc, topic) => {
+    return topic.createdAt > acc ? topic.createdAt : acc;
+  }, new Date(0));
+}
+
+/**
+ * The cadence gate throttles run STARTS only, so a continuation page
+ * (searchAfter present) never re-takes it. Page 1 of a batch run writes
+ * topics whose createdAt is "now"; if page 2 re-evaluated the gate it
+ * would always read those fresh topics as "recently clustered" and end
+ * the walk with a skip and no cursor — any batch backlog larger than one
+ * page silently stopped after page one. The run was approved when its
+ * first page passed the gate; later pages are the same run.
+ */
+function evaluateCadenceGate({
+  searchAfter,
+  isIncrementalProcessing,
+  lastTopicCreatedAt,
+  assignedTracesCount,
+}: {
+  searchAfter?: [number, string];
+  isIncrementalProcessing: boolean;
+  lastTopicCreatedAt: Date;
+  assignedTracesCount: number;
+}): { shouldSkip: boolean; daysFrequency: number } {
+  const daysFrequency =
+    assignedTracesCount < 100 ? 7 : assignedTracesCount < 500 ? 3 : 2;
+  const shouldSkip =
+    !searchAfter &&
+    !isIncrementalProcessing &&
+    lastTopicCreatedAt >
+      new Date(Date.now() - daysFrequency * 24 * 60 * 60 * 1000);
+  return { shouldSkip, daysFrequency };
+}
+
+async function fetchClusteringContext({
+  clickhouse,
+  projectId,
+}: {
+  clickhouse: ClickHouseClient;
+  projectId: string;
+}): Promise<{
+  assignedTracesCount: number;
+  topicIds: string[];
+  subtopicIds: string[];
+  isIncrementalProcessing: boolean;
+  lastTopicCreatedAt: Date;
+}> {
   const { totalTracesCount, recentTracesCount, assignedTracesCount } =
     await fetchCountsFromClickHouse({ clickhouse, projectId });
 
@@ -152,62 +205,42 @@ export const clusterTopicsForProject = async ({
     where: { projectId },
     select: { id: true, parentId: true, createdAt: true },
   });
-  const topicIds = topics
-    .filter((topic) => !topic.parentId)
-    .map((topic) => topic.id);
-  const subtopicIds = topics
-    .filter((topic) => topic.parentId)
-    .map((topic) => topic.id);
+  const { topicIds, subtopicIds } = partitionTopicIds(topics);
 
   // If we have topics and more than 1200 traces are already assigned, we are in incremental processing mode
   // This checks helps us getting back into batch mode if we simply delete all the topics for a given project
   const isIncrementalProcessing =
     topicIds.length > 0 && assignedTracesCount >= 1200;
 
-  const lastTopicCreatedAt = topics.reduce((acc, topic) => {
-    return topic.createdAt > acc ? topic.createdAt : acc;
-  }, new Date(0));
+  return {
+    assignedTracesCount,
+    topicIds,
+    subtopicIds,
+    isIncrementalProcessing,
+    lastTopicCreatedAt: latestTopicCreatedAt(topics),
+  };
+}
 
-  // The cadence gate throttles run STARTS only, so a continuation page
-  // (searchAfter present) never re-takes it. Page 1 of a batch run writes
-  // topics whose createdAt is "now"; if page 2 re-evaluated the gate it
-  // would always read those fresh topics as "recently clustered" and end
-  // the walk with a skip and no cursor — any batch backlog larger than one
-  // page silently stopped after page one. The run was approved when its
-  // first page passed the gate; later pages are the same run.
-  const daysFrequency =
-    assignedTracesCount < 100 ? 7 : assignedTracesCount < 500 ? 3 : 2;
-  if (
-    !searchAfter &&
-    !isIncrementalProcessing &&
-    lastTopicCreatedAt >
-      new Date(Date.now() - daysFrequency * 24 * 60 * 60 * 1000)
-  ) {
-    logger.info(
-      { projectId },
-      `skipping clustering for project as last topic from batch processing was created less than ${daysFrequency} days ago`,
-    );
-    return {
-      mode: "batch",
-      tracesProcessed: 0,
-      topicsCount: 0,
-      subtopicsCount: 0,
-      skippedReason: "recently_clustered",
-    };
-  }
-
-  logger.info(
-    {
-      projectId,
-      isIncrementalProcessing,
-      topicIds: topicIds.length,
-      subtopicIds: subtopicIds.length,
-      assignedTracesCount,
-      searchAfter,
-    },
-    "Starting trace search for topic clustering",
-  );
-
+async function fetchClusteringPage({
+  clickhouse,
+  projectId,
+  isIncrementalProcessing,
+  topicIds,
+  subtopicIds,
+  searchAfter,
+}: {
+  clickhouse: ClickHouseClient;
+  projectId: string;
+  isIncrementalProcessing: boolean;
+  topicIds: string[];
+  subtopicIds: string[];
+  searchAfter?: [number, string];
+}): Promise<{
+  traces: TopicClusteringTrace[];
+  minimumTraces: number;
+  mode: "batch" | "incremental";
+  nextSearchAfter?: [number, string];
+}> {
   const { traces, lastSort, returnedCount } = await fetchTracesFromClickHouse({
     clickhouse,
     projectId,
@@ -241,26 +274,29 @@ export const clusterTopicsForProject = async ({
   // one extra near-empty page before the walk ends.
   const nextSearchAfter = returnedCount > 10 && lastSort ? lastSort : undefined;
 
-  if (traces.length < minimumTraces) {
-    logger.info(
-      { projectId },
-      `less than ${minimumTraces} usable traces on this page, skipping clustering but still paging`,
-    );
-    return {
-      mode,
-      tracesProcessed: 0,
-      topicsCount: 0,
-      subtopicsCount: 0,
-      skippedReason: "not_enough_traces",
-      ...(nextSearchAfter ? { nextSearchAfter } : {}),
-    };
-  }
+  return { traces, minimumTraces, mode, nextSearchAfter };
+}
 
+async function runClusteringAndBuildOutcome({
+  isIncrementalProcessing,
+  project,
+  traces,
+  runContext,
+  mode,
+  nextSearchAfter,
+}: {
+  isIncrementalProcessing: boolean;
+  project: Project;
+  traces: TopicClusteringTrace[];
+  runContext?: ClusteringRunContext;
+  mode: "batch" | "incremental";
+  nextSearchAfter?: [number, string];
+}): Promise<ClusteringPageOutcome> {
   const summary = isIncrementalProcessing
     ? await incrementalClustering(project, traces, runContext)
     : await batchClusterTraces(project, traces, runContext);
 
-  logger.info({ projectId }, "done! project");
+  logger.info({ projectId: project.id }, "done! project");
 
   if (!summary) {
     // No topic model configured for this project/deployment — paging
@@ -281,6 +317,106 @@ export const clusterTopicsForProject = async ({
     subtopicsCount: summary.subtopicsCount,
     ...(nextSearchAfter ? { nextSearchAfter } : {}),
   };
+}
+
+/**
+ * Runs one clustering page for a project.
+ *
+ * The ClickHouse resolver is threaded in rather than imported: it is built once
+ * in the composition root, and this parameter is what carries it here. The
+ * worker path gets it from the clustering run port in `presets.ts`; the manual
+ * task gets it from the App.
+ */
+export const clusterTopicsForProject = async ({
+  projectId,
+  searchAfter,
+  runContext,
+  resolveClickHouseClient,
+}: {
+  projectId: string;
+  searchAfter?: [number, string];
+  runContext?: ClusteringRunContext;
+  resolveClickHouseClient: ClickHouseClientResolver;
+}): Promise<ClusteringPageOutcome> => {
+  const project = await loadProjectOrThrow(projectId);
+  const clickhouse = await resolveClickHouseOrThrow({
+    resolveClickHouseClient,
+    projectId,
+  });
+
+  const {
+    assignedTracesCount,
+    topicIds,
+    subtopicIds,
+    isIncrementalProcessing,
+    lastTopicCreatedAt,
+  } = await fetchClusteringContext({ clickhouse, projectId });
+
+  const { shouldSkip, daysFrequency } = evaluateCadenceGate({
+    searchAfter,
+    isIncrementalProcessing,
+    lastTopicCreatedAt,
+    assignedTracesCount,
+  });
+  if (shouldSkip) {
+    logger.info(
+      { projectId },
+      `skipping clustering for project as last topic from batch processing was created less than ${daysFrequency} days ago`,
+    );
+    return {
+      mode: "batch",
+      tracesProcessed: 0,
+      topicsCount: 0,
+      subtopicsCount: 0,
+      skippedReason: "recently_clustered",
+    };
+  }
+
+  logger.info(
+    {
+      projectId,
+      isIncrementalProcessing,
+      topicIds: topicIds.length,
+      subtopicIds: subtopicIds.length,
+      assignedTracesCount,
+      searchAfter,
+    },
+    "Starting trace search for topic clustering",
+  );
+
+  const { traces, minimumTraces, mode, nextSearchAfter } =
+    await fetchClusteringPage({
+      clickhouse,
+      projectId,
+      isIncrementalProcessing,
+      topicIds,
+      subtopicIds,
+      searchAfter,
+    });
+
+  if (traces.length < minimumTraces) {
+    logger.info(
+      { projectId },
+      `less than ${minimumTraces} usable traces on this page, skipping clustering but still paging`,
+    );
+    return {
+      mode,
+      tracesProcessed: 0,
+      topicsCount: 0,
+      subtopicsCount: 0,
+      skippedReason: "not_enough_traces",
+      ...(nextSearchAfter ? { nextSearchAfter } : {}),
+    };
+  }
+
+  return await runClusteringAndBuildOutcome({
+    isIncrementalProcessing,
+    project,
+    traces,
+    runContext,
+    mode,
+    nextSearchAfter,
+  });
 };
 
 // --- ClickHouse read helpers ---
@@ -358,54 +494,30 @@ export async function fetchCountsFromClickHouse({
   };
 }
 
-export async function fetchTracesFromClickHouse({
-  clickhouse,
-  projectId,
+type RawTraceRow = {
+  TraceId: string;
+  ComputedInput: string;
+  TopicId: string | null;
+  SubTopicId: string | null;
+  OccurredAtMs: string;
+};
+
+/**
+ * Builds the page CTE's HAVING clause: the topic/subtopic eligibility
+ * predicate for incremental mode, and the cursor predicate for pagination.
+ * Both run against the latest version of each trace (argMax over UpdatedAt).
+ */
+function buildPageHavingClause({
   isIncrementalProcessing,
   topicIds,
   subtopicIds,
   searchAfter,
 }: {
-  clickhouse: ClickHouseClient;
-  projectId: string;
   isIncrementalProcessing: boolean;
   topicIds: string[];
   subtopicIds: string[];
   searchAfter?: [number, string];
-}): Promise<TraceSearchResult> {
-  // Narrow FETCH window (49d, hot-tier only): bounds how far cursor-paging
-  // reads the heavy ComputedInput column, keeping it off S3 cold storage.
-  const fetchWindowStartMs = Date.now() - CLUSTERING_FETCH_WINDOW_DAYS * DAY_MS;
-
-  // Page selection runs on the lightweight key columns only: it picks the
-  // 2000 most-recent matching traces without ever reading ComputedInput.
-  // ComputedInput (a potentially large payload) is read in the outer query
-  // for those <=2000 traces alone — never across the whole 12-month window,
-  // which is what tipped this query into MEMORY_LIMIT_EXCEEDED. The topic
-  // and cursor predicates run against the latest version of each trace
-  // (argMax over UpdatedAt), so they live in the CTE's HAVING.
-  //
-  // The outer query deliberately does NOT filter on ComputedInput: empty /
-  // null inputs are dropped downstream by `extractInputFromComputed`, while
-  // the raw rows still carry the full page so `lastSort` (the pagination
-  // cursor) tracks the page boundary. Filtering here would advance the cursor
-  // by the surviving subset and could strand older eligible traces behind a
-  // run of empty-input traces.
-  //
-  // The outer query also has NO `ORDER BY` and NO outer `LIMIT`. The page CTE
-  // has already chosen the exact (<=2000) set of traces to return, so an outer
-  // sort would only re-order that fixed set — but `ORDER BY ... LIMIT` makes
-  // ClickHouse buffer a top-N of full rows, retaining every row's ComputedInput
-  // payload at once. For tenants with large inputs that buffer alone exceeded
-  // max_memory_usage_per_query (3.5 GiB) and the read failed with
-  // MEMORY_LIMIT_EXCEEDED. Without the sort the rows stream out (ComputedInput
-  // is read in small adaptive blocks and released), and the page ordering is
-  // reapplied in JS over the small result set below.
-  //
-  // An outer `LIMIT 2000` is also omitted: it would cap physical rows *before*
-  // the JS TraceId de-dupe, so if a trace had duplicate latest-version rows the
-  // cap could drop other selected TraceIds and break `returnedCount`/`lastSort`
-  // pagination. The page CTE bounds the result, so the cap is unnecessary.
+}): string {
   const pageHaving: string[] = [];
 
   if (
@@ -436,10 +548,55 @@ export async function fetchTracesFromClickHouse({
     )`);
   }
 
-  const pageHavingClause = pageHaving.length
-    ? `HAVING ${pageHaving.join(" AND ")}`
-    : "";
+  return pageHaving.length ? `HAVING ${pageHaving.join(" AND ")}` : "";
+}
 
+async function queryTracePage({
+  clickhouse,
+  projectId,
+  fetchWindowStartMs,
+  pageHavingClause,
+  topicIds,
+  subtopicIds,
+  searchAfter,
+}: {
+  clickhouse: ClickHouseClient;
+  projectId: string;
+  fetchWindowStartMs: number;
+  pageHavingClause: string;
+  topicIds: string[];
+  subtopicIds: string[];
+  searchAfter?: [number, string];
+}): Promise<RawTraceRow[]> {
+  // Page selection runs on the lightweight key columns only: it picks the
+  // 2000 most-recent matching traces without ever reading ComputedInput.
+  // ComputedInput (a potentially large payload) is read in the outer query
+  // for those <=2000 traces alone — never across the whole 12-month window,
+  // which is what tipped this query into MEMORY_LIMIT_EXCEEDED. The topic
+  // and cursor predicates run against the latest version of each trace
+  // (argMax over UpdatedAt), so they live in the CTE's HAVING.
+  //
+  // The outer query deliberately does NOT filter on ComputedInput: empty /
+  // null inputs are dropped downstream by `extractInputFromComputed`, while
+  // the raw rows still carry the full page so `lastSort` (the pagination
+  // cursor) tracks the page boundary. Filtering here would advance the cursor
+  // by the surviving subset and could strand older eligible traces behind a
+  // run of empty-input traces.
+  //
+  // The outer query also has NO `ORDER BY` and NO outer `LIMIT`. The page CTE
+  // has already chosen the exact (<=2000) set of traces to return, so an outer
+  // sort would only re-order that fixed set — but `ORDER BY ... LIMIT` makes
+  // ClickHouse buffer a top-N of full rows, retaining every row's ComputedInput
+  // payload at once. For tenants with large inputs that buffer alone exceeded
+  // max_memory_usage_per_query (3.5 GiB) and the read failed with
+  // MEMORY_LIMIT_EXCEEDED. Without the sort the rows stream out (ComputedInput
+  // is read in small adaptive blocks and released), and the page ordering is
+  // reapplied in JS over the small result set below.
+  //
+  // An outer `LIMIT 2000` is also omitted: it would cap physical rows *before*
+  // the JS TraceId de-dupe, so if a trace had duplicate latest-version rows the
+  // cap could drop other selected TraceIds and break `returnedCount`/`lastSort`
+  // pagination. The page CTE bounds the result, so the cap is unnecessary.
   const result = await clickhouse.query({
     query: `
       WITH page AS (
@@ -494,18 +651,27 @@ export async function fetchTracesFromClickHouse({
     clickhouse_settings: { max_threads: 2 },
   });
 
-  const rawRows = (await result.json()) as Array<{
-    TraceId: string;
-    ComputedInput: string;
-    TopicId: string | null;
-    SubTopicId: string | null;
-    OccurredAtMs: string;
-  }>;
+  return (await result.json()) as RawTraceRow[];
+}
 
-  // Reapply the page ordering (OccurredAt DESC, TraceId ASC) in JS. The query
-  // dropped its outer ORDER BY to avoid the top-N memory buffer (see above), so
-  // rows now arrive in scan order; sort the small (<=2000) result set here so
-  // the dedup-first-row and `lastSort` cursor logic below stay correct.
+/**
+ * Reapplies the page ordering (OccurredAt DESC, TraceId ASC) in JS. The query
+ * drops its outer ORDER BY to avoid the top-N memory buffer (see
+ * `queryTracePage`), so rows arrive in scan order; sorting the small (<=2000)
+ * result set here keeps the dedup-first-row and `lastSort` cursor logic
+ * correct.
+ *
+ * Also defensively de-duplicates by TraceId. The monotonic `UpdatedAt`
+ * invariant should make `(TenantId, TraceId, max(UpdatedAt))` match exactly
+ * one row per trace, but `returnedCount` / `lastSort` now drive pagination,
+ * so collapse any same-version duplicate here in JS rather than at the SQL
+ * layer — the per-key SQL dedup operator is banned in this path for OOM
+ * safety (it reads heavy columns for the whole granule; see
+ * trace-dedup-oom-safety.unit.test). Rows are ordered `OccurredAt DESC,
+ * TraceId ASC` (sorted here), so the first row per TraceId is the one the
+ * boundary cursor should land on.
+ */
+function sortAndDedupeRows(rawRows: RawTraceRow[]): RawTraceRow[] {
   rawRows.sort((a, b) => {
     const aTs = parseInt(a.OccurredAtMs, 10);
     const bTs = parseInt(b.OccurredAtMs, 10);
@@ -513,22 +679,24 @@ export async function fetchTracesFromClickHouse({
     return a.TraceId < b.TraceId ? -1 : a.TraceId > b.TraceId ? 1 : 0; // TraceId ASC
   });
 
-  // Defensive de-duplication by TraceId. The monotonic `UpdatedAt` invariant
-  // should make `(TenantId, TraceId, max(UpdatedAt))` match exactly one row per
-  // trace, but `returnedCount` / `lastSort` now drive pagination, so collapse
-  // any same-version duplicate here in JS rather than at the SQL layer — the
-  // per-key SQL dedup operator is banned in this path for OOM safety (it reads
-  // heavy columns for the whole granule; see trace-dedup-oom-safety.unit.test).
-  // Rows are ordered `OccurredAt DESC, TraceId ASC` (sorted above), so the first
-  // row per TraceId is the one the boundary cursor should land on.
   const seenTraceIds = new Set<string>();
-  const rows = rawRows.filter((row) => {
+  return rawRows.filter((row) => {
     if (seenTraceIds.has(row.TraceId)) return false;
     seenTraceIds.add(row.TraceId);
     return true;
   });
+}
 
-  const traces: TopicClusteringTrace[] = rows
+function mapRowsToTraces({
+  rows,
+  topicIds,
+  subtopicIds,
+}: {
+  rows: RawTraceRow[];
+  topicIds: string[];
+  subtopicIds: string[];
+}): TopicClusteringTrace[] {
+  return rows
     .map((row) => {
       const inputText = extractInputFromComputed(row.ComputedInput);
       if (!inputText || inputText === "<empty>") return null;
@@ -545,6 +713,47 @@ export async function fetchTracesFromClickHouse({
       };
     })
     .filter((t): t is TopicClusteringTrace => t !== null);
+}
+
+export async function fetchTracesFromClickHouse({
+  clickhouse,
+  projectId,
+  isIncrementalProcessing,
+  topicIds,
+  subtopicIds,
+  searchAfter,
+}: {
+  clickhouse: ClickHouseClient;
+  projectId: string;
+  isIncrementalProcessing: boolean;
+  topicIds: string[];
+  subtopicIds: string[];
+  searchAfter?: [number, string];
+}): Promise<TraceSearchResult> {
+  // Narrow FETCH window (49d, hot-tier only): bounds how far cursor-paging
+  // reads the heavy ComputedInput column, keeping it off S3 cold storage.
+  const fetchWindowStartMs = Date.now() - CLUSTERING_FETCH_WINDOW_DAYS * DAY_MS;
+
+  const pageHavingClause = buildPageHavingClause({
+    isIncrementalProcessing,
+    topicIds,
+    subtopicIds,
+    searchAfter,
+  });
+
+  const rawRows = await queryTracePage({
+    clickhouse,
+    projectId,
+    fetchWindowStartMs,
+    pageHavingClause,
+    topicIds,
+    subtopicIds,
+    searchAfter,
+  });
+
+  const rows = sortAndDedupeRows(rawRows);
+
+  const traces = mapRowsToTraces({ rows, topicIds, subtopicIds });
 
   const lastRow = rows[rows.length - 1];
   const lastSort: [number, string] | undefined = lastRow
@@ -554,6 +763,25 @@ export async function fetchTracesFromClickHouse({
   return { traces, lastSort, returnedCount: rows.length };
 }
 
+const orEmpty = (value: string): string => value || "<empty>";
+
+/**
+ * Unwraps ComputedInput's `.value` when it is itself a JSON-encoded
+ * `{ input }` wrapper. Falls back to the raw value whenever it isn't (either
+ * not JSON, or JSON without a usable `input` field).
+ */
+function unwrapNestedInputValue(value: string): string {
+  try {
+    const inner = JSON.parse(value);
+    if (typeof inner?.input === "string" && inner.input.length > 0) {
+      return inner.input;
+    }
+  } catch {
+    // value is already a string
+  }
+  return value;
+}
+
 /** Extract text from a ComputedInput JSON string (mirrors getExtractedInput logic) */
 function extractInputFromComputed(computedInput: string | null): string {
   if (!computedInput) return "<empty>";
@@ -561,25 +789,16 @@ function extractInputFromComputed(computedInput: string | null): string {
   try {
     const parsed = JSON.parse(computedInput);
     // ComputedInput is typically the already-extracted input value as JSON
-    if (typeof parsed === "string") return parsed || "<empty>";
+    if (typeof parsed === "string") return orEmpty(parsed);
     if (typeof parsed?.value === "string") {
-      let value = parsed.value;
-      try {
-        const inner = JSON.parse(value);
-        if (typeof inner?.input === "string" && inner.input.length > 0) {
-          value = inner.input;
-        }
-      } catch {
-        // value is already a string
-      }
-      return value || "<empty>";
+      return orEmpty(unwrapNestedInputValue(parsed.value));
     }
-    if (typeof parsed?.input === "string") return parsed.input || "<empty>";
+    if (typeof parsed?.input === "string") return orEmpty(parsed.input);
     return typeof parsed === "object"
       ? JSON.stringify(parsed)
-      : String(parsed) || "<empty>";
+      : orEmpty(String(parsed));
   } catch {
-    return computedInput || "<empty>";
+    return orEmpty(computedInput);
   }
 }
 
@@ -740,6 +959,163 @@ export const incrementalClustering = async (
   });
 };
 
+/**
+ * The topic model is recorded as an event; the Topic table is that event's
+ * projection (spec: specs/topic-clustering/topics-source-of-truth.feature).
+ * Batch mode REPLACES the model — but only when there is a new model to put
+ * back: an empty result from an otherwise successful call would leave the
+ * project with no topics at all, which is strictly worse than keeping the
+ * previous ones. Everything else merges. Ids pass through unchanged so
+ * ClickHouse TopicId/SubTopicId references stay valid.
+ *
+ * The projection applies asynchronously: the next incremental page may read
+ * a model that is one event behind. The merge event converges either way,
+ * and pages are minutes apart while projections settle in seconds.
+ */
+async function recordTopicModelUpdate({
+  projectId,
+  isIncremental,
+  topics,
+  subtopics,
+  runContext,
+}: {
+  projectId: string;
+  isIncremental: boolean;
+  topics: TopicClusteringTopic[];
+  subtopics: TopicClusteringSubtopic[];
+  runContext?: ClusteringRunContext;
+}): Promise<void> {
+  if (topics.length === 0 && subtopics.length === 0) return;
+
+  const embeddingsModel = await getProjectEmbeddingsModel(projectId);
+  // No clustering topics_recorded may be appended before the project's
+  // pre-ownership history is on the stream: per-aggregate log order then
+  // guarantees the seed folds first, so this event can never reconcile
+  // the table down to just its own delta. Idempotent (`seed:v1`) and a
+  // no-op once the projection owns the model.
+  await seedProjectTopicModel({
+    prisma,
+    recordTopics: (args) => getApp().topicClustering.recordTopics(args),
+    projectId,
+  });
+  await getApp().topicClustering.recordTopics({
+    tenantId: projectId,
+    occurredAt: Date.now(),
+    mode: !isIncremental && topics.length > 0 ? "replace" : "merge",
+    source: "clustering",
+    dedupeKey: runContext
+      ? `run:${runContext.runId}:page-${runContext.page}`
+      : `adhoc:${Date.now()}`,
+    topics: [
+      ...topics.map((topic) => ({
+        id: topic.id,
+        name: topic.name,
+        parentId: null,
+        embeddingsModel: embeddingsModel.model,
+        centroid: topic.centroid,
+        p95Distance: topic.p95_distance,
+        automaticallyGenerated: true,
+      })),
+      ...subtopics.map((subtopic) => ({
+        id: subtopic.id,
+        name: subtopic.name,
+        parentId: subtopic.parent_id,
+        embeddingsModel: embeddingsModel.model,
+        centroid: subtopic.centroid,
+        p95Distance: subtopic.p95_distance,
+        automaticallyGenerated: true,
+      })),
+    ],
+  });
+}
+
+/** Emits TopicAssignedEvents via command queue. */
+async function assignTopicsToTraces({
+  projectId,
+  isIncremental,
+  topics,
+  subtopics,
+  tracesToAssign,
+}: {
+  projectId: string;
+  isIncremental: boolean;
+  topics: TopicClusteringTopic[];
+  subtopics: TopicClusteringSubtopic[];
+  tracesToAssign: TopicClusteringResponse["traces"];
+}): Promise<void> {
+  if (tracesToAssign.length === 0) return;
+
+  try {
+    const app = getApp();
+
+    // Build topic name lookup maps
+    const topicNameMap = new Map(topics.map((t) => [t.id, t.name]));
+    const subtopicNameMap = new Map(subtopics.map((s) => [s.id, s.name]));
+
+    // Send commands in parallel (queue handles batching internally)
+    await Promise.all(
+      tracesToAssign.map(({ trace_id, topic_id, subtopic_id }) =>
+        app.traces.assignTopic({
+          tenantId: projectId,
+          traceId: trace_id,
+          topicId: topic_id,
+          topicName: topic_id ? (topicNameMap.get(topic_id) ?? null) : null,
+          subtopicId: subtopic_id,
+          subtopicName: subtopic_id
+            ? (subtopicNameMap.get(subtopic_id) ?? null)
+            : null,
+          isIncremental,
+          occurredAt: Date.now(),
+        }),
+      ),
+    );
+
+    logger.info(
+      { projectId, commandsSent: tracesToAssign.length },
+      "Sent AssignTopic commands to queue",
+    );
+  } catch (error) {
+    logger.error({ projectId, error }, "Failed to send AssignTopic commands");
+  }
+}
+
+async function recordClusteringCost({
+  projectId,
+  isIncremental,
+  cost,
+  tracesToAssign,
+  topics,
+  subtopics,
+}: {
+  projectId: string;
+  isIncremental: boolean;
+  cost: TopicClusteringResponse["cost"];
+  tracesToAssign: TopicClusteringResponse["traces"];
+  topics: TopicClusteringTopic[];
+  subtopics: TopicClusteringSubtopic[];
+}): Promise<void> {
+  if (!cost) return;
+
+  await prisma.cost.create({
+    data: {
+      id: `cost_${nanoid()}`,
+      projectId: projectId,
+      costType: CostType.CLUSTERING,
+      costName: "Topics Clustering",
+      referenceType: CostReferenceType.PROJECT,
+      referenceId: projectId,
+      amount: cost.amount,
+      currency: cost.currency,
+      extraInfo: {
+        traces_count: tracesToAssign.length,
+        topics_count: topics.length,
+        subtopics_count: subtopics.length,
+        is_incremental: isIncremental,
+      },
+    },
+  });
+}
+
 export const storeResults = async ({
   projectId,
   clusteringResult,
@@ -784,116 +1160,30 @@ export const storeResults = async ({
     "found new topics, subtopics and traces to assign for project",
   );
 
-  // The topic model is recorded as an event; the Topic table is that
-  // event's projection (spec: specs/topic-clustering/topics-source-of-truth
-  // .feature). Batch mode REPLACES the model — but only when there is a new
-  // model to put back: an empty result from an otherwise successful call
-  // would leave the project with no topics at all, which is strictly worse
-  // than keeping the previous ones. Everything else merges. Ids pass through
-  // unchanged so ClickHouse TopicId/SubTopicId references stay valid.
-  //
-  // The projection applies asynchronously: the next incremental page may
-  // read a model that is one event behind. The merge event converges either
-  // way, and pages are minutes apart while projections settle in seconds.
-  if (topics.length > 0 || subtopics.length > 0) {
-    const embeddingsModel = await getProjectEmbeddingsModel(projectId);
-    // No clustering topics_recorded may be appended before the project's
-    // pre-ownership history is on the stream: per-aggregate log order then
-    // guarantees the seed folds first, so this event can never reconcile
-    // the table down to just its own delta. Idempotent (`seed:v1`) and a
-    // no-op once the projection owns the model.
-    await seedProjectTopicModel({
-      prisma,
-      recordTopics: (args) => getApp().topicClustering.recordTopics(args),
-      projectId,
-    });
-    await getApp().topicClustering.recordTopics({
-      tenantId: projectId,
-      occurredAt: Date.now(),
-      mode: !isIncremental && topics.length > 0 ? "replace" : "merge",
-      source: "clustering",
-      dedupeKey: runContext
-        ? `run:${runContext.runId}:page-${runContext.page}`
-        : `adhoc:${Date.now()}`,
-      topics: [
-        ...topics.map((topic) => ({
-          id: topic.id,
-          name: topic.name,
-          parentId: null,
-          embeddingsModel: embeddingsModel.model,
-          centroid: topic.centroid,
-          p95Distance: topic.p95_distance,
-          automaticallyGenerated: true,
-        })),
-        ...subtopics.map((subtopic) => ({
-          id: subtopic.id,
-          name: subtopic.name,
-          parentId: subtopic.parent_id,
-          embeddingsModel: embeddingsModel.model,
-          centroid: subtopic.centroid,
-          p95Distance: subtopic.p95_distance,
-          automaticallyGenerated: true,
-        })),
-      ],
-    });
-  }
+  await recordTopicModelUpdate({
+    projectId,
+    isIncremental,
+    topics,
+    subtopics,
+    runContext,
+  });
 
-  // Emit TopicAssignedEvents via command queue
-  if (tracesToAssign.length > 0) {
-    try {
-      const app = getApp();
+  await assignTopicsToTraces({
+    projectId,
+    isIncremental,
+    topics,
+    subtopics,
+    tracesToAssign,
+  });
 
-      // Build topic name lookup maps
-      const topicNameMap = new Map(topics.map((t) => [t.id, t.name]));
-      const subtopicNameMap = new Map(subtopics.map((s) => [s.id, s.name]));
-
-      // Send commands in parallel (queue handles batching internally)
-      await Promise.all(
-        tracesToAssign.map(({ trace_id, topic_id, subtopic_id }) =>
-          app.traces.assignTopic({
-            tenantId: projectId,
-            traceId: trace_id,
-            topicId: topic_id,
-            topicName: topic_id ? (topicNameMap.get(topic_id) ?? null) : null,
-            subtopicId: subtopic_id,
-            subtopicName: subtopic_id
-              ? (subtopicNameMap.get(subtopic_id) ?? null)
-              : null,
-            isIncremental,
-            occurredAt: Date.now(),
-          }),
-        ),
-      );
-
-      logger.info(
-        { projectId, commandsSent: tracesToAssign.length },
-        "Sent AssignTopic commands to queue",
-      );
-    } catch (error) {
-      logger.error({ projectId, error }, "Failed to send AssignTopic commands");
-    }
-  }
-
-  if (cost) {
-    await prisma.cost.create({
-      data: {
-        id: `cost_${nanoid()}`,
-        projectId: projectId,
-        costType: CostType.CLUSTERING,
-        costName: "Topics Clustering",
-        referenceType: CostReferenceType.PROJECT,
-        referenceId: projectId,
-        amount: cost.amount,
-        currency: cost.currency,
-        extraInfo: {
-          traces_count: tracesToAssign.length,
-          topics_count: topics.length,
-          subtopics_count: subtopics.length,
-          is_incremental: isIncremental,
-        },
-      },
-    });
-  }
+  await recordClusteringCost({
+    projectId,
+    isIncremental,
+    cost,
+    tracesToAssign,
+    topics,
+    subtopics,
+  });
 
   return {
     topicsCount: topics.length,

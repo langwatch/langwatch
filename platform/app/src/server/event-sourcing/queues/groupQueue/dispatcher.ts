@@ -35,44 +35,9 @@ export class GroupQueueDispatcher {
     const run = async () => {
       while (!this.shutdownRequested) {
         try {
-          await this.waitForSignal();
-
-          let dispatched: number;
-          do {
-            dispatched = await this.dispatchBatch();
-            if (dispatched > 0) {
-              await new Promise((resolve) => setTimeout(resolve, 25));
-            }
-          } while (dispatched > 0 && !this.shutdownRequested);
-
-          // Drain signals that arrived during dispatch to prevent
-          // immediate re-wake from stale notifications
-          const signalKey = this.params.scripts.getSignalKey();
-          await this.params.blockingConnection.del(signalKey);
+          await this.runOneDispatchCycle();
         } catch (error) {
-          if (this.shutdownRequested) break;
-
-          const errorMessage =
-            error instanceof Error ? error.message : String(error);
-
-          if (errorMessage.includes("Connection is closed")) {
-            this.params.logger.debug(
-              { queueName: this.params.queueName },
-              "Redis connection closed, stopping dispatcher",
-            );
-            this.shutdownRequested = true;
-            break;
-          }
-
-          this.params.logger.error(
-            {
-              queueName: this.params.queueName,
-              error: errorMessage,
-            },
-            "Dispatcher loop error",
-          );
-
-          await new Promise((resolve) => setTimeout(resolve, 1000));
+          if (await this.handleLoopError(error)) break;
         }
       }
 
@@ -84,6 +49,50 @@ export class GroupQueueDispatcher {
     };
 
     void run();
+  }
+
+  private async runOneDispatchCycle(): Promise<void> {
+    await this.waitForSignal();
+
+    let dispatched: number;
+    do {
+      dispatched = await this.dispatchBatch();
+      if (dispatched > 0) {
+        await new Promise((resolve) => setTimeout(resolve, 25));
+      }
+    } while (dispatched > 0 && !this.shutdownRequested);
+
+    // Drain signals that arrived during dispatch to prevent
+    // immediate re-wake from stale notifications
+    const signalKey = this.params.scripts.getSignalKey();
+    await this.params.blockingConnection.del(signalKey);
+  }
+
+  /** Returns whether the dispatcher loop should stop. */
+  private async handleLoopError(error: unknown): Promise<boolean> {
+    if (this.shutdownRequested) return true;
+
+    const errorMessage = error instanceof Error ? error.message : String(error);
+
+    if (errorMessage.includes("Connection is closed")) {
+      this.params.logger.debug(
+        { queueName: this.params.queueName },
+        "Redis connection closed, stopping dispatcher",
+      );
+      this.shutdownRequested = true;
+      return true;
+    }
+
+    this.params.logger.error(
+      {
+        queueName: this.params.queueName,
+        error: errorMessage,
+      },
+      "Dispatcher loop error",
+    );
+
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    return false;
   }
 
   requestShutdown(): void {

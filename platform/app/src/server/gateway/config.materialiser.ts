@@ -515,6 +515,49 @@ function resolvePolicySideOfBundle(
   };
 }
 
+type CustomKeyPicker = (key: string) => string;
+
+const customKeyPicker =
+  (customKeys: Record<string, unknown>): CustomKeyPicker =>
+  (key) =>
+    typeof customKeys[key] === "string" ? (customKeys[key] as string) : "";
+
+const azureCredentials = (pick: CustomKeyPicker): Record<string, unknown> => ({
+  api_key: pick("AZURE_OPENAI_API_KEY") || pick("api-key"),
+  endpoint: pick("AZURE_OPENAI_ENDPOINT") || pick("AZURE_API_GATEWAY_BASE_URL"),
+  api_version:
+    pick("AZURE_OPENAI_API_VERSION") || pick("AZURE_API_GATEWAY_VERSION"),
+});
+
+const bedrockCredentials = (
+  pick: CustomKeyPicker,
+): Record<string, unknown> => ({
+  access_key: pick("AWS_ACCESS_KEY_ID"),
+  secret_key: pick("AWS_SECRET_ACCESS_KEY"),
+  session_token: pick("AWS_SESSION_TOKEN"),
+  region: pick("AWS_REGION_NAME") || pick("AWS_REGION"),
+});
+
+const vertexCredentials = (pick: CustomKeyPicker): Record<string, unknown> => ({
+  project_id: pick("VERTEXAI_PROJECT") || pick("GOOGLE_PROJECT_ID"),
+  project_number: pick("VERTEXAI_PROJECT_NUMBER"),
+  region: pick("VERTEXAI_LOCATION") || pick("GOOGLE_REGION"),
+  auth_credentials:
+    pick("GOOGLE_APPLICATION_CREDENTIALS") ||
+    pick("VERTEXAI_SERVICE_ACCOUNT_JSON"),
+});
+
+// Providers without a bespoke shape: take whatever single `*_API_KEY` the
+// customer stored.
+const inferredApiKeyCredentials = (
+  customKeys: Record<string, unknown>,
+): Record<string, unknown> => {
+  const apiKey = Object.entries(customKeys).find(([k]) =>
+    /_API_KEY$/.test(k),
+  )?.[1];
+  return { api_key: typeof apiKey === "string" ? apiKey : "" };
+};
+
 // Map ModelProvider.customKeys (env-var-style UPPER_SNAKE_CASE inherited
 // from the LiteLLM integration) to the Go gateway's per-provider
 // credential shape. See services/aigateway/internal/dispatch/account.go
@@ -522,38 +565,16 @@ function resolvePolicySideOfBundle(
 function buildCredentials(mp: ModelProvider): Record<string, unknown> {
   const provider = mp.provider;
   const customKeys = decryptCustomKeys(mp.customKeys);
-  const pick = (k: string): string =>
-    typeof customKeys[k] === "string" ? (customKeys[k] as string) : "";
+  const pick = customKeyPicker(customKeys);
 
   switch (provider) {
-    case "azure": {
-      return {
-        api_key: pick("AZURE_OPENAI_API_KEY") || pick("api-key"),
-        endpoint:
-          pick("AZURE_OPENAI_ENDPOINT") || pick("AZURE_API_GATEWAY_BASE_URL"),
-        api_version:
-          pick("AZURE_OPENAI_API_VERSION") || pick("AZURE_API_GATEWAY_VERSION"),
-      };
-    }
-    case "bedrock": {
-      return {
-        access_key: pick("AWS_ACCESS_KEY_ID"),
-        secret_key: pick("AWS_SECRET_ACCESS_KEY"),
-        session_token: pick("AWS_SESSION_TOKEN"),
-        region: pick("AWS_REGION_NAME") || pick("AWS_REGION"),
-      };
-    }
+    case "azure":
+      return azureCredentials(pick);
+    case "bedrock":
+      return bedrockCredentials(pick);
     case "vertex_ai":
-    case "vertex": {
-      return {
-        project_id: pick("VERTEXAI_PROJECT") || pick("GOOGLE_PROJECT_ID"),
-        project_number: pick("VERTEXAI_PROJECT_NUMBER"),
-        region: pick("VERTEXAI_LOCATION") || pick("GOOGLE_REGION"),
-        auth_credentials:
-          pick("GOOGLE_APPLICATION_CREDENTIALS") ||
-          pick("VERTEXAI_SERVICE_ACCOUNT_JSON"),
-      };
-    }
+    case "vertex":
+      return vertexCredentials(pick);
     case "openai_codex": {
       // OAuth session, not an API key: the gateway sends the access token as
       // the bearer and the ChatGPT account id as a header, and calls back to
@@ -602,12 +623,8 @@ function buildCredentials(mp: ModelProvider): Record<string, unknown> {
       return { api_key: pick("GROQ_API_KEY") };
     case "cloudflare":
       return { api_key: pick("CLOUDFLARE_API_KEY") };
-    default: {
-      const apiKey = Object.entries(customKeys).find(([k]) =>
-        /_API_KEY$/.test(k),
-      )?.[1];
-      return { api_key: typeof apiKey === "string" ? apiKey : "" };
-    }
+    default:
+      return inferredApiKeyCredentials(customKeys);
   }
 }
 

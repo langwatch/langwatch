@@ -6,11 +6,13 @@ import { PersonalWorkspaceService } from "@ee/governance/services/personalWorksp
 import { RoutingPolicyService } from "@ee/governance/services/routingPolicy.service";
 import { resolveAuthProvider } from "@ee/sso/sso-gate";
 import { createLogger } from "@langwatch/observability";
+import type { PrismaClient } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { compare, hash } from "bcrypt";
 import { z } from "zod";
 import { getApp } from "~/server/app-layer/app";
 import { NoAdminConfiguredError } from "~/server/app-layer/organizations/errors";
+import type { Session } from "~/server/auth";
 import {
   Auth0ApiError,
   changeAuth0Password,
@@ -33,6 +35,208 @@ import { checkOrganizationPermission, skipPermissionCheck } from "../rbac";
 import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
 
 const logger = createLogger("langwatch:user-router");
+
+async function assertPasswordChangeRateLimit(userId: string): Promise<void> {
+  // Per-user rate limit. BetterAuth's `/change-password` endpoint
+  // is gated by `sensitiveSessionMiddleware` which forces recent
+  // re-authentication; this tRPC mutation does NOT, so without a
+  // throttle a stolen session token could be used to brute-force
+  // the `currentPassword` to recover the user's plaintext (bcrypt
+  // is slow but not infinite). 5 attempts per 15 minutes per user
+  // mirrors `/forget-password`'s budget. Iter 49 of the migration
+  // audit (bug 36). Applies to the Auth0 path too — both to
+  // throttle brute-force against the Auth0 Authentication API
+  // and to avoid hammering Auth0 rate limits.
+  const limit = await rateLimit({
+    key: `user.changePassword:${userId}`,
+    windowSeconds: 60 * 15,
+    max: 5,
+  });
+  if (!limit.allowed) {
+    throw new TRPCError({
+      code: "TOO_MANY_REQUESTS",
+      message: "Too many password change attempts. Please try again later.",
+    });
+  }
+}
+
+/** Maps an Auth0 Management API failure to the TRPCError the wire contract expects. */
+function throwMappedAuth0PasswordChangeError(error: unknown): never {
+  if (error instanceof TRPCError) throw error;
+  if (error instanceof Auth0ApiError) {
+    if (error.code === "weak_password") {
+      // Auth0 tenant policy rejected the new password — show its
+      // message verbatim so the user knows what to fix.
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: error.message,
+      });
+    }
+    if (error.code === "insufficient_scope") {
+      throw new TRPCError({
+        code: "INTERNAL_SERVER_ERROR",
+        message:
+          "Auth0 is not authorized to update users. Ask an administrator to enable the update:users scope on the Auth0 Management M2M application.",
+      });
+    }
+    if (error.code === "password_grant_not_enabled") {
+      throw new TRPCError({
+        code: "INTERNAL_SERVER_ERROR",
+        message:
+          "Auth0 Password grant is not enabled on the Management M2M application. Ask an administrator to enable it under that application's Advanced Settings → Grant Types.",
+      });
+    }
+    if (error.code === "not_configured") {
+      throw new TRPCError({
+        code: "INTERNAL_SERVER_ERROR",
+        message:
+          "Auth0 is not configured on the server. Set AUTH0_ISSUER plus AUTH0_MGMT_CLIENT_ID/SECRET (or AUTH0_CLIENT_ID/SECRET).",
+      });
+    }
+    throw new TRPCError({
+      code: "INTERNAL_SERVER_ERROR",
+      message: "Could not update password with Auth0. Please try again later.",
+    });
+  }
+  throw error;
+}
+
+/**
+ * Best practice: invalidate all OTHER sessions of this user after a password
+ * change. The current tab stays logged in (the user just re-authenticated —
+ * by typing the current password, or, on the Auth0 branch, by Auth0 itself
+ * confirming it); any other device or stolen session is force-logged-out.
+ *
+ * Skipped during impersonation — the impersonator is the admin, and
+ * `ctx.session.sessionId` is the admin's session, so revoking "other"
+ * sessions for the impersonated user wouldn't keep the admin's tab open. In
+ * an impersonation context, password change shouldn't be exposed in the UI,
+ * but be defensive.
+ *
+ * On the Auth0 branch specifically: Auth0's OIDC sessions are managed by the
+ * Auth0 tenant, but the LangWatch *app* session is a BetterAuth row in our
+ * DB and is NOT invalidated by the Management API password change, so this
+ * same revoke is what keeps a stolen app session token from outliving a
+ * password rotation there too.
+ */
+async function revokeOtherSessionsIfNotImpersonating(ctx: {
+  prisma: PrismaClient;
+  session: Session;
+}): Promise<void> {
+  if (!ctx.session.user.impersonator && ctx.session.sessionId) {
+    await revokeOtherSessionsForUser({
+      prisma: ctx.prisma,
+      userId: ctx.session.user.id,
+      keepSessionId: ctx.session.sessionId,
+    });
+  }
+}
+
+/**
+ * The Auth0 branch of `changePassword`: only the Auth0 database connection
+ * (`auth0|<id>` providerAccountId) account has a password we can update via
+ * the Management API. Social identities linked through Auth0
+ * (google-oauth2|..., github|..., windowslive|...) are managed by their
+ * upstream IdPs — calling PATCH /api/v2/users with
+ * `connection: "Username-Password-Authentication"` on those would fail.
+ */
+async function changeAuth0AccountPassword({
+  ctx,
+  input,
+}: {
+  ctx: { prisma: PrismaClient; session: Session };
+  input: { currentPassword: string; newPassword: string };
+}): Promise<{ success: true }> {
+  const auth0Account = await ctx.prisma.account.findFirst({
+    where: {
+      userId: ctx.session.user.id,
+      provider: "auth0",
+      providerAccountId: { startsWith: "auth0|" },
+    },
+    select: { providerAccountId: true },
+  });
+
+  if (!auth0Account) {
+    throw new TRPCError({
+      code: "NOT_FOUND",
+      message:
+        "No Auth0 database (Email/Password) account is linked to this user. Password changes are only supported for that sign-in method.",
+    });
+  }
+
+  if (!ctx.session.user.email) {
+    throw new TRPCError({
+      code: "INTERNAL_SERVER_ERROR",
+      message: "Authenticated session is missing an email",
+    });
+  }
+
+  try {
+    const result = await changeAuth0Password({
+      email: ctx.session.user.email,
+      auth0UserId: auth0Account.providerAccountId,
+      currentPassword: input.currentPassword,
+      newPassword: input.newPassword,
+    });
+    if (!result.ok) {
+      throw new TRPCError({
+        code: "UNAUTHORIZED",
+        message: "Current password is incorrect",
+      });
+    }
+  } catch (error) {
+    throwMappedAuth0PasswordChangeError(error);
+  }
+
+  await revokeOtherSessionsIfNotImpersonating(ctx);
+  return { success: true };
+}
+
+/** The credential (email/password) branch of `changePassword`. */
+async function changeCredentialAccountPassword({
+  ctx,
+  input,
+}: {
+  ctx: { prisma: PrismaClient; session: Session };
+  input: { currentPassword: string; newPassword: string };
+}): Promise<{ success: true }> {
+  const credentialAccount = await ctx.prisma.account.findFirst({
+    where: {
+      userId: ctx.session.user.id,
+      provider: "credential",
+    },
+    select: { id: true, password: true },
+  });
+
+  if (!credentialAccount?.password) {
+    throw new TRPCError({
+      code: "NOT_FOUND",
+      message: "User not found or password not set",
+    });
+  }
+
+  const passwordMatch = await compare(
+    input.currentPassword,
+    credentialAccount.password,
+  );
+  if (!passwordMatch) {
+    throw new TRPCError({
+      code: "UNAUTHORIZED",
+      message: "Current password is incorrect",
+    });
+  }
+
+  const hashedPassword = await hash(input.newPassword, 10);
+
+  await ctx.prisma.account.update({
+    where: { id: credentialAccount.id },
+    data: { password: hashedPassword },
+  });
+
+  await revokeOtherSessionsIfNotImpersonating(ctx);
+
+  return { success: true };
+}
 
 export const userRouter = createTRPCRouter({
   getTraceExplorerTourPreference: protectedProcedure
@@ -291,6 +495,12 @@ export const userRouter = createTRPCRouter({
       // able to change it (the coerced UI offers the button). `changePassword`
       // requires the current password, so this is not the takeover vector
       // Decision 4's all-states block guards against.
+      // Resolved provider, not raw env (ADR-027): on a denied SSO deployment
+      // the platform gate coerces to email mode, and a user who recovered via
+      // the v6 password-reset path owns a `credential` account — they must be
+      // able to change it (the coerced UI offers the button). `changePassword`
+      // requires the current password, so this is not the takeover vector
+      // Decision 4's all-states block guards against.
       const provider = await resolveAuthProvider();
       if (provider !== "email" && provider !== "auth0") {
         throw new TRPCError({
@@ -299,179 +509,13 @@ export const userRouter = createTRPCRouter({
         });
       }
 
-      // Per-user rate limit. BetterAuth's `/change-password` endpoint
-      // is gated by `sensitiveSessionMiddleware` which forces recent
-      // re-authentication; this tRPC mutation does NOT, so without a
-      // throttle a stolen session token could be used to brute-force
-      // the `currentPassword` to recover the user's plaintext (bcrypt
-      // is slow but not infinite). 5 attempts per 15 minutes per user
-      // mirrors `/forget-password`'s budget. Iter 49 of the migration
-      // audit (bug 36). Applies to the Auth0 path too — both to
-      // throttle brute-force against the Auth0 Authentication API
-      // and to avoid hammering Auth0 rate limits.
-      const limit = await rateLimit({
-        key: `user.changePassword:${ctx.session.user.id}`,
-        windowSeconds: 60 * 15,
-        max: 5,
-      });
-      if (!limit.allowed) {
-        throw new TRPCError({
-          code: "TOO_MANY_REQUESTS",
-          message: "Too many password change attempts. Please try again later.",
-        });
-      }
+      await assertPasswordChangeRateLimit(ctx.session.user.id);
 
       if (provider === "auth0") {
-        // Only the Auth0 database connection (`auth0|<id>` providerAccountId)
-        // has a password we can update via the Management API. Social
-        // identities linked through Auth0 (google-oauth2|..., github|...,
-        // windowslive|...) are managed by their upstream IdPs — calling
-        // PATCH /api/v2/users with `connection: "Username-Password-Authentication"`
-        // on those would fail.
-        const auth0Account = await ctx.prisma.account.findFirst({
-          where: {
-            userId: ctx.session.user.id,
-            provider: "auth0",
-            providerAccountId: { startsWith: "auth0|" },
-          },
-          select: { providerAccountId: true },
-        });
-
-        if (!auth0Account) {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message:
-              "No Auth0 database (Email/Password) account is linked to this user. Password changes are only supported for that sign-in method.",
-          });
-        }
-
-        if (!ctx.session.user.email) {
-          throw new TRPCError({
-            code: "INTERNAL_SERVER_ERROR",
-            message: "Authenticated session is missing an email",
-          });
-        }
-
-        try {
-          const result = await changeAuth0Password({
-            email: ctx.session.user.email,
-            auth0UserId: auth0Account.providerAccountId,
-            currentPassword: input.currentPassword,
-            newPassword: input.newPassword,
-          });
-          if (!result.ok) {
-            throw new TRPCError({
-              code: "UNAUTHORIZED",
-              message: "Current password is incorrect",
-            });
-          }
-        } catch (error) {
-          if (error instanceof TRPCError) throw error;
-          if (error instanceof Auth0ApiError) {
-            if (error.code === "weak_password") {
-              // Auth0 tenant policy rejected the new password — show its
-              // message verbatim so the user knows what to fix.
-              throw new TRPCError({
-                code: "BAD_REQUEST",
-                message: error.message,
-              });
-            }
-            if (error.code === "insufficient_scope") {
-              throw new TRPCError({
-                code: "INTERNAL_SERVER_ERROR",
-                message:
-                  "Auth0 is not authorized to update users. Ask an administrator to enable the update:users scope on the Auth0 Management M2M application.",
-              });
-            }
-            if (error.code === "password_grant_not_enabled") {
-              throw new TRPCError({
-                code: "INTERNAL_SERVER_ERROR",
-                message:
-                  "Auth0 Password grant is not enabled on the Management M2M application. Ask an administrator to enable it under that application's Advanced Settings → Grant Types.",
-              });
-            }
-            if (error.code === "not_configured") {
-              throw new TRPCError({
-                code: "INTERNAL_SERVER_ERROR",
-                message:
-                  "Auth0 is not configured on the server. Set AUTH0_ISSUER plus AUTH0_MGMT_CLIENT_ID/SECRET (or AUTH0_CLIENT_ID/SECRET).",
-              });
-            }
-            throw new TRPCError({
-              code: "INTERNAL_SERVER_ERROR",
-              message:
-                "Could not update password with Auth0. Please try again later.",
-            });
-          }
-          throw error;
-        }
-
-        // Auth0's OIDC sessions are managed by the Auth0 tenant, but the
-        // LangWatch *app* session is a BetterAuth row in our DB and is NOT
-        // invalidated by the Management API password change. Revoke other
-        // devices' app sessions so a stolen session token cannot outlive a
-        // password rotation. Same impersonation safeguard as the email path.
-        if (!ctx.session.user.impersonator && ctx.session.sessionId) {
-          await revokeOtherSessionsForUser({
-            prisma: ctx.prisma,
-            userId: ctx.session.user.id,
-            keepSessionId: ctx.session.sessionId,
-          });
-        }
-        return { success: true };
+        return changeAuth0AccountPassword({ ctx, input });
       }
 
-      const credentialAccount = await ctx.prisma.account.findFirst({
-        where: {
-          userId: ctx.session.user.id,
-          provider: "credential",
-        },
-        select: { id: true, password: true },
-      });
-
-      if (!credentialAccount?.password) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "User not found or password not set",
-        });
-      }
-
-      const passwordMatch = await compare(
-        input.currentPassword,
-        credentialAccount.password,
-      );
-      if (!passwordMatch) {
-        throw new TRPCError({
-          code: "UNAUTHORIZED",
-          message: "Current password is incorrect",
-        });
-      }
-
-      const hashedPassword = await hash(input.newPassword, 10);
-
-      await ctx.prisma.account.update({
-        where: { id: credentialAccount.id },
-        data: { password: hashedPassword },
-      });
-
-      // Best practice: invalidate all OTHER sessions of this user after a
-      // password change. The current tab stays logged in (the user just
-      // re-authenticated by typing the current password); any other
-      // device or stolen session is force-logged-out. Skip during
-      // impersonation — the impersonator is the admin, and the
-      // ctx.session.sessionId is the admin's session, so revoking
-      // "other" sessions for the impersonated user wouldn't keep the
-      // admin's tab open. In an impersonation context, password change
-      // shouldn't be exposed in the UI, but be defensive.
-      if (!ctx.session.user.impersonator && ctx.session.sessionId) {
-        await revokeOtherSessionsForUser({
-          prisma: ctx.prisma,
-          userId: ctx.session.user.id,
-          keepSessionId: ctx.session.sessionId,
-        });
-      }
-
-      return { success: true };
+      return changeCredentialAccountPassword({ ctx, input });
     }),
   deactivate: protectedProcedure
     .input(z.object({ userId: z.string() }))

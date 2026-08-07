@@ -130,26 +130,33 @@ function clampLongStrings(value: unknown, depth = 0): unknown {
  * The full value is untouched in event_log (the eventref restores it); this
  * shapes ONLY the preview.
  */
-export function structuredIoPreview(
-  value: string,
-  maxBytes: number,
-): string | null {
-  if (Buffer.byteLength(value, "utf8") > PREVIEW_MAX_SOURCE_BYTES) return null;
-  const trimmed = value.trim();
-  if (!trimmed.startsWith("[") && !trimmed.startsWith("{")) return null;
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(trimmed);
-  } catch {
-    return null;
+/** Parses `value` as a JSON object/array eligible for structured preview, or undefined if not. */
+function parseJsonForPreview(value: string): unknown | undefined {
+  if (Buffer.byteLength(value, "utf8") > PREVIEW_MAX_SOURCE_BYTES) {
+    return undefined;
   }
-  if (parsed === null || typeof parsed !== "object") return null;
+  const trimmed = value.trim();
+  if (!trimmed.startsWith("[") && !trimmed.startsWith("{")) return undefined;
+  try {
+    const parsed = JSON.parse(trimmed);
+    return parsed !== null && typeof parsed === "object" ? parsed : undefined;
+  } catch {
+    return undefined;
+  }
+}
 
-  const clamped = clampLongStrings(parsed);
-  const clampedJson = JSON.stringify(clamped);
-  if (Buffer.byteLength(clampedJson, "utf8") <= maxBytes) return clampedJson;
-  if (!Array.isArray(clamped)) return null;
-
+/**
+ * Still over budget after string-clamping and the top level is an array:
+ * drop MIDDLE items, keeping the first message (system/developer context) and
+ * as much of the TAIL as fits — the latest user message and reply live there.
+ */
+function fitClampedArrayTail({
+  clamped,
+  maxBytes,
+}: {
+  clamped: unknown[];
+  maxBytes: number;
+}): string | null {
   const first = clamped[0];
   const firstSize = Buffer.byteLength(JSON.stringify(first), "utf8");
   // Brackets plus the first item; each kept tail item costs its size plus a comma.
@@ -164,6 +171,21 @@ export function structuredIoPreview(
   if (tail.length === 0 && clamped.length > 1) return null;
   const preview = JSON.stringify([first, ...tail]);
   return Buffer.byteLength(preview, "utf8") <= maxBytes ? preview : null;
+}
+
+export function structuredIoPreview(
+  value: string,
+  maxBytes: number,
+): string | null {
+  const parsed = parseJsonForPreview(value);
+  if (parsed === undefined) return null;
+
+  const clamped = clampLongStrings(parsed);
+  const clampedJson = JSON.stringify(clamped);
+  if (Buffer.byteLength(clampedJson, "utf8") <= maxBytes) return clampedJson;
+  if (!Array.isArray(clamped)) return null;
+
+  return fitClampedArrayTail({ clamped, maxBytes });
 }
 
 /**
@@ -210,6 +232,57 @@ export function leanForProjection(event: Event): Event {
  * CLONED attributes — so the original input event is byte-for-byte untouched. The clone only
  * happens on the "heavy" branch so the sub-threshold hot path stays allocation-free.
  */
+/** True when `attr` is an IO attribute over the preview budget (shared by the scan and lean passes). */
+function isOversizedIoAttr(attr: OtlpSpan["attributes"][number]): boolean {
+  return (
+    IO_ATTR_KEYS.has(attr.key) &&
+    typeof attr.value.stringValue === "string" &&
+    Buffer.byteLength(attr.value.stringValue, "utf8") > IO_PREVIEW_BYTES
+  );
+}
+
+// Step 1 (scan only): check whether any IO attr exceeds IO_PREVIEW_BYTES.
+function hasLargeIoAttr(attributes: OtlpSpan["attributes"]): boolean {
+  return attributes.some(isOversizedIoAttr);
+}
+
+// Step 4: IO-lean pass — run on the CLONED attributes so originals stay untouched.
+function leanIoAttributes({
+  clonedSpan,
+  eventId,
+}: {
+  clonedSpan: OtlpSpan;
+  eventId: string;
+}): void {
+  const ioLeanedAttrs: OtlpSpan["attributes"] = [];
+  const eventrefAttrs: OtlpSpan["attributes"] = [];
+
+  for (const attr of clonedSpan.attributes) {
+    if (!isOversizedIoAttr(attr)) {
+      ioLeanedAttrs.push(attr);
+      continue;
+    }
+    // Prefer the structure-preserving preview: a JSON chat payload stays
+    // VALID JSON under the budget so the fold still extracts the real
+    // user/assistant text. The byte cut is the fallback for non-JSON.
+    const preview =
+      structuredIoPreview(attr.value.stringValue as string, IO_PREVIEW_BYTES) ??
+      utf8Preview(attr.value.stringValue as string, IO_PREVIEW_BYTES);
+    ioLeanedAttrs.push({ key: attr.key, value: { stringValue: preview } });
+    // ADR-022: embed event.id so the read path can JOIN event_log by
+    // EventId without guessing. The eventref carries `{field, eventId}`;
+    // the read path uses both in `BlobStore.getFromEventLog`.
+    eventrefAttrs.push({
+      key: `${EVENTREF_ATTR_PREFIX}${attr.key}`,
+      value: {
+        stringValue: JSON.stringify({ field: attr.key, eventId }),
+      },
+    });
+  }
+
+  clonedSpan.attributes = [...ioLeanedAttrs, ...eventrefAttrs];
+}
+
 function leanSpanReceivedEvent(event: Event): Event {
   const data = event.data as {
     span?: OtlpSpan;
@@ -222,19 +295,7 @@ function leanSpanReceivedEvent(event: Event): Event {
   }
 
   const originalAttributes = data.span.attributes ?? [];
-
-  // Step 1 (scan only): check whether any IO attr exceeds IO_PREVIEW_BYTES.
-  let hasLargeIoAttr = false;
-  for (const attr of originalAttributes) {
-    if (
-      IO_ATTR_KEYS.has(attr.key) &&
-      typeof attr.value.stringValue === "string" &&
-      Buffer.byteLength(attr.value.stringValue, "utf8") > IO_PREVIEW_BYTES
-    ) {
-      hasLargeIoAttr = true;
-      break;
-    }
-  }
+  const needsIoLean = hasLargeIoAttr(originalAttributes);
 
   // Step 2 (scan only): check whether any surface that capOversizedAttributes walks
   // (span.attributes, span.events[].attributes, span.links[].attributes, resource.attributes)
@@ -246,7 +307,7 @@ function leanSpanReceivedEvent(event: Event): Event {
     DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES,
   );
 
-  if (!hasLargeIoAttr && !needsNonIoCap) {
+  if (!needsIoLean && !needsNonIoCap) {
     // Sub-threshold event — return original, no allocations.
     return event;
   }
@@ -259,39 +320,8 @@ function leanSpanReceivedEvent(event: Event): Event {
     ? structuredClone(data.resource)
     : null;
 
-  // Step 4: IO-lean pass — run on the CLONED attributes so originals stay untouched.
-  if (hasLargeIoAttr) {
-    const ioLeanedAttrs: OtlpSpan["attributes"] = [];
-    const eventrefAttrs: OtlpSpan["attributes"] = [];
-
-    for (const attr of clonedSpan.attributes) {
-      if (
-        IO_ATTR_KEYS.has(attr.key) &&
-        typeof attr.value.stringValue === "string" &&
-        Buffer.byteLength(attr.value.stringValue, "utf8") > IO_PREVIEW_BYTES
-      ) {
-        // Prefer the structure-preserving preview: a JSON chat payload stays
-        // VALID JSON under the budget so the fold still extracts the real
-        // user/assistant text. The byte cut is the fallback for non-JSON.
-        const preview =
-          structuredIoPreview(attr.value.stringValue, IO_PREVIEW_BYTES) ??
-          utf8Preview(attr.value.stringValue, IO_PREVIEW_BYTES);
-        ioLeanedAttrs.push({ key: attr.key, value: { stringValue: preview } });
-        // ADR-022: embed event.id so the read path can JOIN event_log by
-        // EventId without guessing. The eventref carries `{field, eventId}`;
-        // the read path uses both in `BlobStore.getFromEventLog`.
-        eventrefAttrs.push({
-          key: `${EVENTREF_ATTR_PREFIX}${attr.key}`,
-          value: {
-            stringValue: JSON.stringify({ field: attr.key, eventId: event.id }),
-          },
-        });
-      } else {
-        ioLeanedAttrs.push(attr);
-      }
-    }
-
-    clonedSpan.attributes = [...ioLeanedAttrs, ...eventrefAttrs];
+  if (needsIoLean) {
+    leanIoAttributes({ clonedSpan, eventId: event.id });
   }
 
   // Step 5: Cap non-IO / nested / binary values on the cloned span.

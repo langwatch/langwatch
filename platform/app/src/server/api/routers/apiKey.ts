@@ -4,6 +4,7 @@ import { RoleBindingScopeType, TeamUserRole } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import type { ApiKeyWithBindings } from "~/server/api-key/api-key.repository";
 import { ApiKeyService } from "~/server/api-key/api-key.service";
 import { permissionFormatSchema } from "~/server/rbac/custom-role-permissions";
 import { skipPermissionCheck } from "../rbac";
@@ -60,6 +61,26 @@ async function ensureCallerIsOrgMember(
   }
 }
 
+type ScopeNameMaps = {
+  orgName: Map<string, string>;
+  teamName: Map<string, string>;
+  projectName: Map<string, string>;
+};
+
+/** The display name for a role binding's scope, looked up by scope tier. */
+function resolveScopeName(
+  binding: { scopeType: RoleBindingScopeType; scopeId: string },
+  names: ScopeNameMaps,
+): string | null {
+  if (binding.scopeType === RoleBindingScopeType.ORGANIZATION) {
+    return names.orgName.get(binding.scopeId) ?? null;
+  }
+  if (binding.scopeType === RoleBindingScopeType.TEAM) {
+    return names.teamName.get(binding.scopeId) ?? null;
+  }
+  return names.projectName.get(binding.scopeId) ?? null;
+}
+
 const roleBindingSchema = z.object({
   role: z.nativeEnum(TeamUserRole),
   scopeType: z.nativeEnum(RoleBindingScopeType),
@@ -101,6 +122,152 @@ function refineRestrictedPermissions(
         path: ["permissions"],
       });
     }
+  }
+}
+
+type ListEnrichment = ScopeNameMaps & {
+  customRoleName: Map<string, string>;
+  customRolePermissions: Map<string, string[]>;
+  userName: Map<string, string | null>;
+  userEmail: Map<string, string | null>;
+};
+
+/** The `list` output's per-binding shape: display names resolved alongside the raw role binding. */
+function mapRoleBindingForList(
+  rb: ApiKeyWithBindings["roleBindings"][number],
+  names: ListEnrichment,
+) {
+  return {
+    id: rb.id,
+    role: rb.role,
+    customRoleId: rb.customRoleId,
+    customRoleName: rb.customRoleId
+      ? (names.customRoleName.get(rb.customRoleId) ?? null)
+      : null,
+    customRolePermissions: rb.customRoleId
+      ? (names.customRolePermissions.get(rb.customRoleId) ?? null)
+      : null,
+    scopeType: rb.scopeType,
+    scopeId: rb.scopeId,
+    scopeName: resolveScopeName(rb, names),
+  };
+}
+
+/** Every name lookup `list`'s output needs, batched once across all returned keys. */
+async function loadListEnrichment({
+  apiKeyService,
+  apiKeys,
+}: {
+  apiKeyService: ApiKeyService;
+  apiKeys: ApiKeyWithBindings[];
+}): Promise<ListEnrichment> {
+  const allBindings = apiKeys.flatMap((k) => k.roleBindings);
+  const { orgName, teamName, projectName, customRoleName, customRoles } =
+    await apiKeyService.enrichBindingsWithNames({
+      bindings: allBindings.map((rb) => ({
+        id: rb.id,
+        role: rb.role,
+        customRoleId: rb.customRoleId,
+        scopeType: rb.scopeType,
+        scopeId: rb.scopeId,
+      })),
+    });
+
+  const customRolePermissions = new Map(
+    customRoles.map((r) => [
+      r.id,
+      Array.isArray(r.permissions) ? (r.permissions as string[]) : [],
+    ]),
+  );
+
+  const { users } = await apiKeyService.enrichApiKeyList({ apiKeys });
+  const userName = new Map(users.map((u) => [u.id, u.name ?? u.email]));
+  const userEmail = new Map(users.map((u) => [u.id, u.email]));
+
+  return {
+    orgName,
+    teamName,
+    projectName,
+    customRoleName,
+    customRolePermissions,
+    userName,
+    userEmail,
+  };
+}
+
+/** Shapes one `list` row: the key's own fields plus its role bindings with names resolved. */
+function toApiKeyListItem({
+  apiKey,
+  names,
+}: {
+  apiKey: ApiKeyWithBindings;
+  names: ListEnrichment;
+}) {
+  return {
+    id: apiKey.id,
+    lookupIdPrefix: apiKey.lookupId.slice(0, 5),
+    name: apiKey.name,
+    description: apiKey.description,
+    permissionMode: apiKey.permissionMode,
+    userId: apiKey.userId,
+    userName: apiKey.userId
+      ? (names.userName.get(apiKey.userId) ?? null)
+      : null,
+    userEmail: apiKey.userId
+      ? (names.userEmail.get(apiKey.userId) ?? null)
+      : null,
+    createdByUserId: apiKey.createdByUserId,
+    createdByUserName: apiKey.createdByUserId
+      ? (names.userName.get(apiKey.createdByUserId) ?? null)
+      : null,
+    createdAt: apiKey.createdAt,
+    expiresAt: apiKey.expiresAt,
+    lastUsedAt: apiKey.lastUsedAt,
+    revokedAt: apiKey.revokedAt,
+    // Non-null marks this as an ingestion key (project-scoped, ingest-only
+    // write credential the `langwatch <tool>` CLI mints). null = regular
+    // personal / service key. Drives the API Keys page section split.
+    ingestSourceType: apiKey.ingestSourceType,
+    ingestionTemplateId: apiKey.ingestionTemplateId,
+    // Human label of the CLI device session that minted this ingestion key
+    // ("Rogerio's MacBook Pro"); null for keys without device provenance.
+    createdByDeviceLabel: apiKey.createdByDeviceLabel,
+    roleBindings: apiKey.roleBindings.map((rb) =>
+      mapRoleBindingForList(rb, names),
+    ),
+  };
+}
+
+/**
+ * Authorization for `create`: minting a service key, or assigning one to
+ * someone other than the caller, requires org admin.
+ */
+async function assertCanCreateApiKeyAs({
+  apiKeyService,
+  ctx,
+  input,
+  isService,
+}: {
+  apiKeyService: ApiKeyService;
+  ctx: { session: { user: { id: string } } };
+  input: { organizationId: string; assignedToUserId?: string };
+  isService: boolean;
+}): Promise<void> {
+  const assigningToOther =
+    !!input.assignedToUserId && input.assignedToUserId !== ctx.session.user.id;
+  if (!isService && !assigningToOther) return;
+
+  const callerIsAdmin = await apiKeyService.isOrgAdmin({
+    userId: ctx.session.user.id,
+    organizationId: input.organizationId,
+  });
+  if (!callerIsAdmin) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: isService
+        ? "Only organization admins can create service API keys"
+        : "Only organization admins can create API keys for other users",
+    });
   }
 }
 
@@ -146,12 +313,7 @@ export const apiKeyRouter = createTRPCRouter({
         )
         .map((b) => ({
           ...b,
-          scopeName:
-            b.scopeType === RoleBindingScopeType.ORGANIZATION
-              ? (orgName.get(b.scopeId) ?? null)
-              : b.scopeType === RoleBindingScopeType.TEAM
-                ? (teamName.get(b.scopeId) ?? null)
-                : (projectName.get(b.scopeId) ?? null),
+          scopeName: resolveScopeName(b, { orgName, teamName, projectName }),
           customRoleName: b.customRoleId
             ? (customRoleName.get(b.customRoleId) ?? null)
             : null,
@@ -224,76 +386,9 @@ export const apiKeyRouter = createTRPCRouter({
             organizationId: input.organizationId,
           });
 
-      const allBindings = apiKeys.flatMap((k) => k.roleBindings);
-      const { orgName, teamName, projectName, customRoleName, customRoles } =
-        await apiKeyService.enrichBindingsWithNames({
-          bindings: allBindings.map((rb) => ({
-            id: rb.id,
-            role: rb.role,
-            customRoleId: rb.customRoleId,
-            scopeType: rb.scopeType,
-            scopeId: rb.scopeId,
-          })),
-        });
+      const names = await loadListEnrichment({ apiKeyService, apiKeys });
 
-      const customRolePermissions = new Map(
-        customRoles.map((r) => [
-          r.id,
-          Array.isArray(r.permissions) ? (r.permissions as string[]) : [],
-        ]),
-      );
-
-      const { users } = await apiKeyService.enrichApiKeyList({ apiKeys });
-      const userName = new Map(users.map((u) => [u.id, u.name ?? u.email]));
-      const userEmail = new Map(users.map((u) => [u.id, u.email]));
-
-      return apiKeys.map((apiKey) => ({
-        id: apiKey.id,
-        lookupIdPrefix: apiKey.lookupId.slice(0, 5),
-        name: apiKey.name,
-        description: apiKey.description,
-        permissionMode: apiKey.permissionMode,
-        userId: apiKey.userId,
-        userName: apiKey.userId ? (userName.get(apiKey.userId) ?? null) : null,
-        userEmail: apiKey.userId
-          ? (userEmail.get(apiKey.userId) ?? null)
-          : null,
-        createdByUserId: apiKey.createdByUserId,
-        createdByUserName: apiKey.createdByUserId
-          ? (userName.get(apiKey.createdByUserId) ?? null)
-          : null,
-        createdAt: apiKey.createdAt,
-        expiresAt: apiKey.expiresAt,
-        lastUsedAt: apiKey.lastUsedAt,
-        revokedAt: apiKey.revokedAt,
-        // Non-null marks this as an ingestion key (project-scoped, ingest-only
-        // write credential the `langwatch <tool>` CLI mints). null = regular
-        // personal / service key. Drives the API Keys page section split.
-        ingestSourceType: apiKey.ingestSourceType,
-        ingestionTemplateId: apiKey.ingestionTemplateId,
-        // Human label of the CLI device session that minted this ingestion key
-        // ("Rogerio's MacBook Pro"); null for keys without device provenance.
-        createdByDeviceLabel: apiKey.createdByDeviceLabel,
-        roleBindings: apiKey.roleBindings.map((rb) => ({
-          id: rb.id,
-          role: rb.role,
-          customRoleId: rb.customRoleId,
-          customRoleName: rb.customRoleId
-            ? (customRoleName.get(rb.customRoleId) ?? null)
-            : null,
-          customRolePermissions: rb.customRoleId
-            ? (customRolePermissions.get(rb.customRoleId) ?? null)
-            : null,
-          scopeType: rb.scopeType,
-          scopeId: rb.scopeId,
-          scopeName:
-            rb.scopeType === RoleBindingScopeType.ORGANIZATION
-              ? (orgName.get(rb.scopeId) ?? null)
-              : rb.scopeType === RoleBindingScopeType.TEAM
-                ? (teamName.get(rb.scopeId) ?? null)
-                : (projectName.get(rb.scopeId) ?? null),
-        })),
-      }));
+      return apiKeys.map((apiKey) => toApiKeyListItem({ apiKey, names }));
     }),
 
   create: protectedProcedure
@@ -329,24 +424,7 @@ export const apiKeyRouter = createTRPCRouter({
       const isService = input.keyType === "service";
 
       // Service keys and assigning to another user both require admin
-      if (
-        isService ||
-        (input.assignedToUserId &&
-          input.assignedToUserId !== ctx.session.user.id)
-      ) {
-        const callerIsAdmin = await apiKeyService.isOrgAdmin({
-          userId: ctx.session.user.id,
-          organizationId: input.organizationId,
-        });
-        if (!callerIsAdmin) {
-          throw new TRPCError({
-            code: "FORBIDDEN",
-            message: isService
-              ? "Only organization admins can create service API keys"
-              : "Only organization admins can create API keys for other users",
-          });
-        }
-      }
+      await assertCanCreateApiKeyAs({ apiKeyService, ctx, input, isService });
 
       const targetUserId = isService
         ? null

@@ -15,6 +15,166 @@ import { skipPermissionCheck } from "../../rbac";
 import { organizationRouter } from "../organization";
 import { projectRouter } from "../project";
 
+// Every new org gets the standard AI tool catalog at creation, for every
+// intent: the /me portal must render tiles on its very first load instead of
+// the "no tools yet" empty state.
+//
+// Non-fatal by design, same contract as the personal-workspace ensure below:
+// a failure here must not cost the user the organization they just created,
+// and the aiTools.list read path lazily provisions the same set on first
+// portal load anyway.
+async function ensureDefaultAiToolCatalog({
+  ctx,
+  organizationId,
+}: {
+  ctx: { prisma: Parameters<typeof AiToolEntryService.create>[0] };
+  organizationId: string;
+}) {
+  try {
+    await AiToolEntryService.create(ctx.prisma).ensureDefaultCatalog({
+      organizationId,
+    });
+  } catch (error) {
+    captureException(toError(error), {
+      extra: {
+        origin: "onboarding.initializeOrganization.ensureDefaultCatalog",
+        organizationId,
+      },
+    });
+  }
+}
+
+// Governance-intent signups get their personal workspace here rather than
+// waiting for the first CLI login. That is where their usage lands, so
+// provisioning it now is what makes /me show something the moment onboarding
+// finishes instead of an empty shell whose contents depend on a command the
+// user has not run yet.
+//
+// Non-fatal by design, matching organization.acceptInvite: a failure here
+// must not cost the user the organization they just created, and
+// `user.personalContext` backfills lazily on the next session.
+async function ensurePersonalWorkspaceForGovernanceIntent({
+  ctx,
+  organizationId,
+  primaryIntent,
+}: {
+  ctx: {
+    prisma: ConstructorParameters<typeof PersonalWorkspaceService>[0];
+    session: {
+      user: { id: string; name?: string | null; email?: string | null };
+    };
+  };
+  organizationId: string;
+  primaryIntent: string | undefined;
+}) {
+  if (primaryIntent !== "AGENT_GOVERNANCE") return;
+
+  try {
+    const personalWorkspaceService = new PersonalWorkspaceService(ctx.prisma);
+    await personalWorkspaceService.ensure({
+      userId: ctx.session.user.id,
+      organizationId,
+      displayName: ctx.session.user.name,
+      displayEmail: ctx.session.user.email,
+    });
+  } catch (error) {
+    captureException(toError(error), {
+      extra: {
+        origin: "onboarding.initializeOrganization",
+        organizationId,
+      },
+    });
+  }
+}
+
+// Create project under the organization. Governance-intent signups skip it
+// (ADR-038 v6): their users live on /me and a project is only created when
+// the org later flips to LLMOps in settings.
+async function createOnboardingProjectIfNeeded({
+  ctx,
+  input,
+  orgResult,
+}: {
+  ctx: Parameters<typeof projectRouter.createCaller>[0];
+  input: {
+    primaryIntent?: "AGENT_GOVERNANCE" | "LLM_OPS";
+    projectName?: string;
+    language: string;
+    framework: string;
+  };
+  orgResult: {
+    organization: { id: string };
+    team: { id: string; name: string };
+  };
+}): Promise<string | null> {
+  if (input.primaryIntent === "AGENT_GOVERNANCE") return null;
+
+  const projectName = input.projectName ?? orgResult.team.name;
+  const projectCaller = projectRouter.createCaller(ctx);
+  const projectResult = await projectCaller.create({
+    organizationId: orgResult.organization.id,
+    teamId: orgResult.team.id,
+    name: projectName,
+    language: input.language,
+    framework: input.framework,
+  });
+  if (!projectResult.success) {
+    throw new TRPCError({
+      code: "INTERNAL_SERVER_ERROR",
+      message: "Failed to create project",
+    });
+  }
+  return projectResult.projectSlug;
+}
+
+async function notifyOnboardingSignup({
+  ctx,
+  input,
+  orgResult,
+}: {
+  ctx: {
+    session: {
+      user: { id: string; name?: string | null; email?: string | null };
+    };
+  };
+  input: {
+    phoneNumber?: string;
+    signUpData?: Parameters<typeof fireSignupNurturingCalls>[0]["signUpData"];
+    primaryIntent?: "AGENT_GOVERNANCE" | "LLM_OPS";
+  };
+  orgResult: { organization: { id: string; name: string } };
+}) {
+  try {
+    const signupPayload = {
+      userName: ctx.session.user.name,
+      userEmail: ctx.session.user.email,
+      organizationName: orgResult.organization.name,
+      phoneNumber: input.phoneNumber,
+      signUpData: input.signUpData,
+    };
+
+    await Promise.all([
+      getApp().notifications.sendSlackSignupEvent({
+        ...signupPayload,
+        utmCampaign: input.signUpData?.utmCampaign,
+      }),
+      getApp().notifications.sendHubspotSignupForm(signupPayload),
+    ]);
+  } catch (error) {
+    captureException(toError(error));
+  }
+
+  fireSignupNurturingCalls({
+    userId: ctx.session.user.id,
+    email: ctx.session.user.email,
+    name: ctx.session.user.name,
+    organizationId: orgResult.organization.id,
+    organizationName: orgResult.organization.name,
+    signUpData: input.signUpData,
+    primaryIntent: input.primaryIntent,
+  });
+}
+
 /**
  * Router for handling onboarding-related operations.
  */
@@ -62,109 +222,24 @@ export const onboardingRouter = createTRPCRouter({
           });
         }
 
-        // Every new org gets the standard AI tool catalog at creation, for
-        // every intent: the /me portal must render tiles on its very first
-        // load instead of the "no tools yet" empty state.
-        //
-        // Non-fatal by design, same contract as the personal-workspace
-        // ensure below: a failure here must not cost the user the
-        // organization they just created, and the aiTools.list read path
-        // lazily provisions the same set on first portal load anyway.
-        try {
-          await AiToolEntryService.create(ctx.prisma).ensureDefaultCatalog({
-            organizationId: orgResult.organization.id,
-          });
-        } catch (error) {
-          captureException(toError(error), {
-            extra: {
-              origin: "onboarding.initializeOrganization.ensureDefaultCatalog",
-              organizationId: orgResult.organization.id,
-            },
-          });
-        }
-
-        // Governance-intent signups get their personal workspace here rather
-        // than waiting for the first CLI login. That is where their usage
-        // lands, so provisioning it now is what makes /me show something the
-        // moment onboarding finishes instead of an empty shell whose contents
-        // depend on a command the user has not run yet.
-        //
-        // Non-fatal by design, matching organization.acceptInvite: a failure
-        // here must not cost the user the organization they just created, and
-        // `user.personalContext` backfills lazily on the next session.
-        if (input.primaryIntent === "AGENT_GOVERNANCE") {
-          try {
-            const personalWorkspaceService = new PersonalWorkspaceService(
-              ctx.prisma,
-            );
-            await personalWorkspaceService.ensure({
-              userId: ctx.session.user.id,
-              organizationId: orgResult.organization.id,
-              displayName: ctx.session.user.name,
-              displayEmail: ctx.session.user.email,
-            });
-          } catch (error) {
-            captureException(toError(error), {
-              extra: {
-                origin: "onboarding.initializeOrganization",
-                organizationId: orgResult.organization.id,
-              },
-            });
-          }
-        }
-
-        // Create project under the organization. Governance-intent signups
-        // skip it (ADR-038 v6): their users live on /me and a project is only
-        // created when the org later flips to LLMOps in settings.
-        let projectSlug: string | null = null;
-        if (input.primaryIntent !== "AGENT_GOVERNANCE") {
-          const projectName = input.projectName ?? orgResult.team.name;
-          const projectCaller = projectRouter.createCaller(ctx);
-          const projectResult = await projectCaller.create({
-            organizationId: orgResult.organization.id,
-            teamId: orgResult.team.id,
-            name: projectName,
-            language: input.language,
-            framework: input.framework,
-          });
-          if (!projectResult.success) {
-            throw new TRPCError({
-              code: "INTERNAL_SERVER_ERROR",
-              message: "Failed to create project",
-            });
-          }
-          projectSlug = projectResult.projectSlug;
-        }
-
-        try {
-          const signupPayload = {
-            userName: ctx.session.user.name,
-            userEmail: ctx.session.user.email,
-            organizationName: orgResult.organization.name,
-            phoneNumber: input.phoneNumber,
-            signUpData: input.signUpData,
-          };
-
-          await Promise.all([
-            getApp().notifications.sendSlackSignupEvent({
-              ...signupPayload,
-              utmCampaign: input.signUpData?.utmCampaign,
-            }),
-            getApp().notifications.sendHubspotSignupForm(signupPayload),
-          ]);
-        } catch (error) {
-          captureException(toError(error));
-        }
-
-        fireSignupNurturingCalls({
-          userId: ctx.session.user.id,
-          email: ctx.session.user.email,
-          name: ctx.session.user.name,
+        await ensureDefaultAiToolCatalog({
+          ctx,
           organizationId: orgResult.organization.id,
-          organizationName: orgResult.organization.name,
-          signUpData: input.signUpData,
+        });
+
+        await ensurePersonalWorkspaceForGovernanceIntent({
+          ctx,
+          organizationId: orgResult.organization.id,
           primaryIntent: input.primaryIntent,
         });
+
+        const projectSlug = await createOnboardingProjectIfNeeded({
+          ctx,
+          input,
+          orgResult,
+        });
+
+        await notifyOnboardingSignup({ ctx, input, orgResult });
 
         // Return success response with team and project slugs
         // (projectSlug is null for governance-intent signups)

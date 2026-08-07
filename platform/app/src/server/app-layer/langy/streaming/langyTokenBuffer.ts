@@ -545,6 +545,53 @@ export class LangyTokenBuffer {
   }
 
   /**
+   * One blocking `XREAD` against the follow stream, from `cursor`. Split out
+   * of `follow` purely to isolate the minimal-shape cast the raw redis client
+   * needs — no behavior change.
+   */
+  private async readFollowBatch(
+    reader: unknown,
+    key: string,
+    cursor: string,
+  ): Promise<Array<[string, Array<[string, string[]]>]> | null> {
+    return (await (
+      reader as {
+        xread(
+          ...args: (string | number)[]
+        ): Promise<Array<[string, Array<[string, string[]]>]>> | null;
+      }
+    ).xread(
+      "BLOCK",
+      LANGY_STREAMING.FOLLOW_BLOCK_MS,
+      "STREAMS",
+      key,
+      cursor,
+    )) as Array<[string, Array<[string, string[]]>]> | null;
+  }
+
+  /**
+   * Yield every entry in one `XREAD` batch, advancing `cursorRef` as it goes.
+   * Returns `true` when a terminal (`end`/`error`) entry was delivered — the
+   * caller stops following. `yield*`-delegated from `follow` so suspension
+   * order across the batch is exactly what inlining the loops would produce.
+   */
+  private async *drainFollowBatch(
+    res: Array<[string, Array<[string, string[]]>]>,
+    cursorRef: { cursor: string },
+  ): AsyncGenerator<LangyStreamRead, boolean, void> {
+    for (const [, rows] of res) {
+      for (const [id, fields] of rows) {
+        cursorRef.cursor = id;
+        const entry = decodeFields(fields);
+        if (!entry) continue;
+        yield { id, entry };
+        if (entry.type === "end" || entry.type === "error") return true;
+      }
+    }
+    return false;
+  }
+
+  /**
    * Async iterator over the live edge from `fromId`, ending after the terminal
    * (`end`/`error`) entry is delivered. Each `XREAD BLOCK` waits up to
    * FOLLOW_BLOCK_MS then re-checks, so a caller can bound total wait / observe
@@ -563,31 +610,12 @@ export class LangyTokenBuffer {
   }): AsyncGenerator<LangyStreamRead, void, void> {
     const key = this.streamKey(conversationId, turnId);
     const reader = this.redis.blocking ?? this.redis;
-    let cursor = fromId;
+    const cursorRef = { cursor: fromId };
     while (!signal?.aborted) {
-      const res = (await (
-        reader as {
-          xread(
-            ...args: (string | number)[]
-          ): Promise<Array<[string, Array<[string, string[]]>]>> | null;
-        }
-      ).xread(
-        "BLOCK",
-        LANGY_STREAMING.FOLLOW_BLOCK_MS,
-        "STREAMS",
-        key,
-        cursor,
-      )) as Array<[string, Array<[string, string[]]>]> | null;
+      const res = await this.readFollowBatch(reader, key, cursorRef.cursor);
       if (!res) continue; // block timed out; loop re-checks the abort signal
-      for (const [, rows] of res) {
-        for (const [id, fields] of rows) {
-          cursor = id;
-          const entry = decodeFields(fields);
-          if (!entry) continue;
-          yield { id, entry };
-          if (entry.type === "end" || entry.type === "error") return;
-        }
-      }
+      const done = yield* this.drainFollowBatch(res, cursorRef);
+      if (done) return;
     }
   }
 

@@ -59,6 +59,98 @@ export function parseLLMSpanMessages(
   return messages;
 }
 
+/** True for the LangWatch python-sdk's TypedValueJson chat-messages wrapper. */
+function isTypedChatMessagesEnvelope(
+  parsed: unknown,
+): parsed is { type: "chat_messages"; value: unknown[] } {
+  return (
+    !!parsed &&
+    typeof parsed === "object" &&
+    (parsed as { type?: unknown }).type === "chat_messages" &&
+    Array.isArray((parsed as { value?: unknown }).value)
+  );
+}
+
+function pushMessageItem(
+  out: ChatMessage[],
+  item: unknown,
+  defaultRole: "user" | "assistant",
+): void {
+  if (
+    item &&
+    typeof item === "object" &&
+    typeof (item as { content?: unknown }).content === "string"
+  ) {
+    const role = (item as { role?: unknown }).role;
+    out.push({
+      role: (typeof role === "string"
+        ? role
+        : defaultRole) as ChatMessage["role"],
+      content: (item as { content: string }).content,
+    });
+  }
+}
+
+function pushMessageItems(
+  out: ChatMessage[],
+  items: unknown[],
+  defaultRole: "user" | "assistant",
+): void {
+  for (const item of items) {
+    pushMessageItem(out, item, defaultRole);
+  }
+}
+
+/**
+ * Fallback for payloads that matched none of the message shapes: a wrapped
+ * `{value: string}` envelope, or the parsed value already being a string.
+ */
+function pushWrappedOrPlainString(
+  out: ChatMessage[],
+  parsed: unknown,
+  defaultRole: "user" | "assistant",
+): void {
+  const wrapped =
+    parsed && typeof parsed === "object"
+      ? (parsed as { value?: unknown }).value
+      : undefined;
+  if (typeof wrapped === "string") {
+    out.push({ role: defaultRole, content: wrapped });
+  } else if (typeof parsed === "string") {
+    out.push({ role: defaultRole, content: parsed });
+  }
+}
+
+/**
+ * Decodes one already-JSON-parsed payload into `out`, matching the three
+ * accepted wire shapes (typed chat-messages envelope, bare array, bare
+ * single message object) or falling back to a wrapped/plain string.
+ */
+function decodeParsedPayload(
+  out: ChatMessage[],
+  parsed: unknown,
+  defaultRole: "user" | "assistant",
+): void {
+  if (isTypedChatMessagesEnvelope(parsed)) {
+    // Normalize role for every entry the same way the bare-array and
+    // single-object branches do — an item with a missing or non-string
+    // role gets `defaultRole`. Pre-fix this branch trusted the typed-
+    // wrapper assertion and let invalid roles through, producing an
+    // inconsistent shape vs the sibling branches.
+    pushMessageItems(out, parsed.value, defaultRole);
+  } else if (Array.isArray(parsed)) {
+    pushMessageItems(out, parsed, defaultRole);
+  } else if (
+    parsed &&
+    typeof parsed === "object" &&
+    typeof (parsed as { content?: unknown }).content === "string"
+  ) {
+    pushMessageItem(out, parsed, defaultRole);
+  } else {
+    pushWrappedOrPlainString(out, parsed, defaultRole);
+  }
+}
+
 function pushDecoded(
   out: ChatMessage[],
   raw: string,
@@ -82,71 +174,7 @@ function pushDecoded(
   // pretending the LLM said nothing.
   const before = out.length;
 
-  if (
-    parsed &&
-    typeof parsed === "object" &&
-    (parsed as { type?: unknown }).type === "chat_messages" &&
-    Array.isArray((parsed as { value?: unknown }).value)
-  ) {
-    // Normalize role for every entry the same way the bare-array and
-    // single-object branches do — an item with a missing or non-string
-    // role gets `defaultRole`. Pre-fix this branch trusted the typed-
-    // wrapper assertion and let invalid roles through, producing an
-    // inconsistent shape vs the sibling branches.
-    for (const item of (parsed as { value: unknown[] }).value) {
-      if (
-        item &&
-        typeof item === "object" &&
-        typeof (item as { content?: unknown }).content === "string"
-      ) {
-        const role = (item as { role?: unknown }).role;
-        out.push({
-          role: (typeof role === "string"
-            ? role
-            : defaultRole) as ChatMessage["role"],
-          content: (item as { content: string }).content,
-        });
-      }
-    }
-  } else if (Array.isArray(parsed)) {
-    for (const item of parsed) {
-      if (
-        item &&
-        typeof item === "object" &&
-        typeof (item as { content?: unknown }).content === "string"
-      ) {
-        const role = (item as { role?: unknown }).role;
-        out.push({
-          role: (typeof role === "string"
-            ? role
-            : defaultRole) as ChatMessage["role"],
-          content: (item as { content: string }).content,
-        });
-      }
-    }
-  } else if (
-    parsed &&
-    typeof parsed === "object" &&
-    typeof (parsed as { content?: unknown }).content === "string"
-  ) {
-    const role = (parsed as { role?: unknown }).role;
-    out.push({
-      role: (typeof role === "string"
-        ? role
-        : defaultRole) as ChatMessage["role"],
-      content: (parsed as { content: string }).content,
-    });
-  } else {
-    const wrapped =
-      parsed && typeof parsed === "object"
-        ? (parsed as { value?: unknown }).value
-        : undefined;
-    if (typeof wrapped === "string") {
-      out.push({ role: defaultRole, content: wrapped });
-    } else if (typeof parsed === "string") {
-      out.push({ role: defaultRole, content: parsed });
-    }
-  }
+  decodeParsedPayload(out, parsed, defaultRole);
 
   // Last-resort fallback: a payload was present but every recognized
   // shape produced zero entries (empty array, malformed items,

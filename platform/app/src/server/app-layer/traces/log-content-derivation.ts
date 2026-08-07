@@ -141,17 +141,22 @@ function deriveFromRequestBody(body: string): Record<string, string> {
  * are on its own span. What we want here is the cheap, queryable shape — which
  * tools, how many.
  */
+function toolCallFromBlock(block: unknown): DerivedToolCall | null {
+  if (typeof block !== "object" || block === null) return null;
+  const b = block as Record<string, unknown>;
+  if (b.type !== "tool_use") return null;
+  const name = typeof b.name === "string" ? b.name : null;
+  if (name === null) return null;
+  return { id: typeof b.id === "string" ? b.id : "", name };
+}
+
 function readToolCalls(content: unknown): DerivedToolCall[] {
   if (!Array.isArray(content)) return [];
 
   const calls: DerivedToolCall[] = [];
   for (const block of content) {
-    if (typeof block !== "object" || block === null) continue;
-    const b = block as Record<string, unknown>;
-    if (b.type !== "tool_use") continue;
-    const name = typeof b.name === "string" ? b.name : null;
-    if (name === null) continue;
-    calls.push({ id: typeof b.id === "string" ? b.id : "", name });
+    const call = toolCallFromBlock(block);
+    if (call !== null) calls.push(call);
   }
   return calls;
 }

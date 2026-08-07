@@ -104,49 +104,55 @@ function pickLatestChat(
  * (e.g. `pro-preview`, `flash-lite`) so noisy spin-offs like
  * `flash-image-preview` don't sneak in as defaults.
  */
+function pickLatestOpenAI(suffix: LatestAliasSuffix): string | null {
+  const variant = suffix === "latest" ? "flagship" : "mini";
+  return (
+    pickLatestChat("openai", (id) => rankOpenAIChatModel({ id, variant })) ??
+    null
+  );
+}
+
+function pickLatestAnthropic(suffix: LatestAliasSuffix): string | null {
+  const family = suffix === "latest" ? "opus" : "sonnet";
+  return (
+    pickLatestChat("anthropic", (id) => {
+      const m = new RegExp(`^anthropic\\/claude-${family}-(\\d+)-(\\d+)$`).exec(
+        id,
+      );
+      if (!m) return null;
+      return { major: Number(m[1]), minor: Number(m[2]) };
+    }) ?? null
+  );
+}
+
+function pickLatestGemini(suffix: LatestAliasSuffix): string | null {
+  const allowed =
+    suffix === "latest"
+      ? new Set(["pro", "pro-preview"])
+      : new Set(["flash", "flash-lite", "flash-preview", "flash-lite-preview"]);
+  return (
+    pickLatestChat("gemini", (id) => {
+      const m = /^gemini\/gemini-(\d+)\.(\d+)-([a-z-]+)$/.exec(id);
+      if (!m) return null;
+      if (!allowed.has(m[3]!)) return null;
+      return { major: Number(m[1]), minor: Number(m[2]) };
+    }) ?? null
+  );
+}
+
+const LATEST_ALIAS_PICKERS: Record<
+  LatestAliasProvider,
+  (suffix: LatestAliasSuffix) => string | null
+> = {
+  openai: pickLatestOpenAI,
+  anthropic: pickLatestAnthropic,
+  gemini: pickLatestGemini,
+};
+
 export function resolveLatestAlias(model: string): string | null {
   const parts = parseLatestAlias(model);
   if (!parts) return null;
-  const { provider, suffix } = parts;
-  if (provider === "openai") {
-    const variant = suffix === "latest" ? "flagship" : "mini";
-    return (
-      pickLatestChat("openai", (id) => rankOpenAIChatModel({ id, variant })) ??
-      null
-    );
-  }
-  if (provider === "anthropic") {
-    const family = suffix === "latest" ? "opus" : "sonnet";
-    return (
-      pickLatestChat("anthropic", (id) => {
-        const m = new RegExp(
-          `^anthropic\\/claude-${family}-(\\d+)-(\\d+)$`,
-        ).exec(id);
-        if (!m) return null;
-        return { major: Number(m[1]), minor: Number(m[2]) };
-      }) ?? null
-    );
-  }
-  if (provider === "gemini") {
-    const allowed =
-      suffix === "latest"
-        ? new Set(["pro", "pro-preview"])
-        : new Set([
-            "flash",
-            "flash-lite",
-            "flash-preview",
-            "flash-lite-preview",
-          ]);
-    return (
-      pickLatestChat("gemini", (id) => {
-        const m = /^gemini\/gemini-(\d+)\.(\d+)-([a-z-]+)$/.exec(id);
-        if (!m) return null;
-        if (!allowed.has(m[3]!)) return null;
-        return { major: Number(m[1]), minor: Number(m[2]) };
-      }) ?? null
-    );
-  }
-  return null;
+  return LATEST_ALIAS_PICKERS[parts.provider](parts.suffix);
 }
 
 /**

@@ -1,3 +1,4 @@
+import type { EvaluationRunData } from "~/server/app-layer/evaluations/types";
 import {
   type ExpressionCategoricalDef,
   FACET_REGISTRY,
@@ -111,21 +112,20 @@ function crossRangeFacet(
 const evaluatorStatusRead: CategoricalRead = (t) =>
   t.evaluations == null ? UNSUPPORTED : t.evaluations.map((e) => e.status);
 
-// Re-expresses the `evaluatorVerdict` multiIf in JS — `error` wins, then the
-// 0/1/null `Passed` maps to fail/pass/unknown. Kept in lockstep with the SQL
-// expression on the `evaluatorVerdict` facet.
+// `error` wins, then the 0/1/null `Passed` maps to fail/pass/unknown. Kept in
+// lockstep with the SQL expression on the `evaluatorVerdict` facet.
+function evaluatorVerdictLabel(e: EvaluationRunData): string {
+  if (e.status === "error") return "error";
+  if (e.passed === true) return "pass";
+  if (e.passed === false) return "fail";
+  return "unknown";
+}
+
+// Re-expresses the `evaluatorVerdict` multiIf in JS.
 const evaluatorVerdictRead: CategoricalRead = (t) =>
   t.evaluations == null
     ? UNSUPPORTED
-    : t.evaluations.map((e) =>
-        e.status === "error"
-          ? "error"
-          : e.passed === true
-            ? "pass"
-            : e.passed === false
-              ? "fail"
-              : "unknown",
-      );
+    : t.evaluations.map(evaluatorVerdictLabel);
 
 const evaluatorScoreRead: RangeRead = (t) =>
   t.evaluations == null

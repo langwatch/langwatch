@@ -166,6 +166,160 @@ async function rewriteAttributeList({
   return changed ? out : attributes;
 }
 
+function resolveExtractionDeps(
+  deps: Partial<EdgeMediaExtractionDeps> | undefined,
+): EdgeMediaExtractionDeps {
+  return {
+    isEnabled: deps?.isEnabled ?? defaultIsEnabled,
+    hasContentDropRules:
+      deps?.hasContentDropRules ?? defaultHasContentDropRules,
+    createService:
+      deps?.createService ??
+      ((projectId: string) => createStoredObjectsService({ projectId })),
+  };
+}
+
+async function rewriteSpanEvents({
+  span,
+  projectId,
+  traceId,
+  service,
+  refs,
+  budget,
+}: {
+  span: OtlpSpan;
+  projectId: string;
+  traceId: string;
+  service: StoredObjectsService;
+  refs: ExtractedRef[];
+  budget: ExtractionBudget;
+}): Promise<{
+  events: NonNullable<OtlpSpan["events"]>;
+  eventsChanged: boolean;
+}> {
+  let eventsChanged = false;
+  const events = (span.events ?? []).map((event) => event);
+  for (let i = 0; i < events.length; i++) {
+    const event = events[i]!;
+    const rewritten = await rewriteAttributeList({
+      attributes: event.attributes,
+      projectId,
+      ownerId: traceId,
+      service,
+      refs,
+      budget,
+    });
+    if (rewritten !== event.attributes) {
+      eventsChanged = true;
+      events[i] = { ...event, attributes: rewritten };
+    }
+  }
+  return { events, eventsChanged };
+}
+
+// Budget drops are fail-open per part, never silent: the affected parts
+// ride through inline (today's behavior) and the drop is logged and
+// counted so a sustained rate is alertable.
+function reportBudgetDrops({
+  budget,
+  logger,
+  projectId,
+  traceId,
+  spanId,
+  extractedParts,
+}: {
+  budget: ExtractionBudget;
+  logger: EdgeMediaExtractionLogger;
+  projectId: string;
+  traceId: string;
+  spanId: string;
+  extractedParts: number;
+}): void {
+  if (
+    !(
+      budget.droppedByCap > 0 ||
+      budget.droppedByDeadline > 0 ||
+      budget.failedParts > 0
+    )
+  ) {
+    return;
+  }
+
+  if (budget.droppedByCap > 0)
+    getEdgeMediaExtractFailOpenCounter("part_cap").inc(budget.droppedByCap);
+  if (budget.droppedByDeadline > 0)
+    getEdgeMediaExtractFailOpenCounter("deadline").inc(
+      budget.droppedByDeadline,
+    );
+  if (budget.failedParts > 0)
+    getEdgeMediaExtractFailOpenCounter("part_store").inc(budget.failedParts);
+  logger.warn(
+    {
+      projectId,
+      traceId,
+      spanId,
+      extractedParts,
+      droppedByCap: budget.droppedByCap,
+      droppedByDeadline: budget.droppedByDeadline,
+      failedParts: budget.failedParts,
+    },
+    "span media extraction hit its budget — remaining parts stay inline",
+  );
+}
+
+function logExtractionSuccess({
+  logger,
+  projectId,
+  traceId,
+  spanId,
+  refs,
+}: {
+  logger: EdgeMediaExtractionLogger;
+  projectId: string;
+  traceId: string;
+  spanId: string;
+  refs: ExtractedRef[];
+}): void {
+  logger.info(
+    {
+      projectId,
+      traceId,
+      spanId,
+      storedObjectIds: refs.map((ref) => ref.id),
+      dedupHits: refs.filter((ref) => ref.isDuplicate).length,
+    },
+    `span media extraction externalized ${refs.length} stored object(s)`,
+  );
+}
+
+function logExtractionFailure({
+  err,
+  stage,
+  logger,
+  projectId,
+  traceId,
+  spanId,
+}: {
+  err: unknown;
+  stage: "flag_store" | "privacy_probe" | "storage";
+  logger: EdgeMediaExtractionLogger;
+  projectId: string;
+  traceId: string;
+  spanId: string;
+}): void {
+  getEdgeMediaExtractFailOpenCounter(stage).inc();
+  logger.warn(
+    {
+      projectId,
+      traceId,
+      spanId,
+      reason: stage,
+      error: err instanceof Error ? err.message : String(err),
+    },
+    "Edge media extraction failed — falling back to unmodified command data (fail-open)",
+  );
+}
+
 /**
  * Externalizes inline media from the span's attribute values, returning the
  * command data with parts rewritten to stored-object references — or the
@@ -184,14 +338,7 @@ export async function maybeExtractSpanMedia({
   const span = data.span;
   if (!spanCarriesMediaMarkers(span)) return data;
 
-  const resolved: EdgeMediaExtractionDeps = {
-    isEnabled: deps?.isEnabled ?? defaultIsEnabled,
-    hasContentDropRules:
-      deps?.hasContentDropRules ?? defaultHasContentDropRules,
-    createService:
-      deps?.createService ??
-      ((projectId: string) => createStoredObjectsService({ projectId })),
-  };
+  const resolved = resolveExtractionDeps(deps);
 
   const projectId = data.tenantId;
   const traceId = span.traceId as string;
@@ -221,68 +368,27 @@ export async function maybeExtractSpanMedia({
       budget,
     });
 
-    let eventsChanged = false;
-    const events = (span.events ?? []).map((event) => event);
-    for (let i = 0; i < events.length; i++) {
-      const event = events[i]!;
-      const rewritten = await rewriteAttributeList({
-        attributes: event.attributes,
-        projectId,
-        ownerId: traceId,
-        service,
-        refs,
-        budget,
-      });
-      if (rewritten !== event.attributes) {
-        eventsChanged = true;
-        events[i] = { ...event, attributes: rewritten };
-      }
-    }
+    const { events, eventsChanged } = await rewriteSpanEvents({
+      span,
+      projectId,
+      traceId,
+      service,
+      refs,
+      budget,
+    });
 
-    // Budget drops are fail-open per part, never silent: the affected parts
-    // ride through inline (today's behavior) and the drop is logged and
-    // counted so a sustained rate is alertable.
-    if (
-      budget.droppedByCap > 0 ||
-      budget.droppedByDeadline > 0 ||
-      budget.failedParts > 0
-    ) {
-      if (budget.droppedByCap > 0)
-        getEdgeMediaExtractFailOpenCounter("part_cap").inc(budget.droppedByCap);
-      if (budget.droppedByDeadline > 0)
-        getEdgeMediaExtractFailOpenCounter("deadline").inc(
-          budget.droppedByDeadline,
-        );
-      if (budget.failedParts > 0)
-        getEdgeMediaExtractFailOpenCounter("part_store").inc(
-          budget.failedParts,
-        );
-      logger.warn(
-        {
-          projectId,
-          traceId,
-          spanId,
-          extractedParts: refs.length,
-          droppedByCap: budget.droppedByCap,
-          droppedByDeadline: budget.droppedByDeadline,
-          failedParts: budget.failedParts,
-        },
-        "span media extraction hit its budget — remaining parts stay inline",
-      );
-    }
+    reportBudgetDrops({
+      budget,
+      logger,
+      projectId,
+      traceId,
+      spanId,
+      extractedParts: refs.length,
+    });
 
     if (attributes === span.attributes && !eventsChanged) return data;
 
-    logger.info(
-      {
-        projectId,
-        traceId,
-        spanId,
-        storedObjectIds: refs.map((ref) => ref.id),
-        dedupHits: refs.filter((ref) => ref.isDuplicate).length,
-      },
-      `span media extraction externalized ${refs.length} stored object(s)`,
-    );
+    logExtractionSuccess({ logger, projectId, traceId, spanId, refs });
 
     return {
       ...data,
@@ -293,17 +399,7 @@ export async function maybeExtractSpanMedia({
       },
     };
   } catch (err) {
-    getEdgeMediaExtractFailOpenCounter(stage).inc();
-    logger.warn(
-      {
-        projectId,
-        traceId,
-        spanId,
-        reason: stage,
-        error: err instanceof Error ? err.message : String(err),
-      },
-      "Edge media extraction failed — falling back to unmodified command data (fail-open)",
-    );
+    logExtractionFailure({ err, stage, logger, projectId, traceId, spanId });
     return data;
   }
 }

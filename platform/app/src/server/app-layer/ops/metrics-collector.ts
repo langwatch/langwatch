@@ -11,6 +11,7 @@ import {
 import type { QueueRepository } from "./repositories/queue.repository";
 import type {
   DashboardData,
+  GroupInfo,
   JobNameMetrics,
   PipelineNode,
   QueueInfo,
@@ -109,6 +110,154 @@ function normalizeJobType(jobType: string): string {
   return jobType;
 }
 
+type PipelineCountMap = Map<
+  string,
+  Map<string, Map<string, { pending: number; active: number; blocked: number }>>
+>;
+
+function ensurePipelinePath({
+  pipelineMap,
+  pName,
+  jType,
+  jName,
+}: {
+  pipelineMap: PipelineCountMap;
+  pName: string;
+  jType?: string;
+  jName?: string;
+}): void {
+  if (!pipelineMap.has(pName)) pipelineMap.set(pName, new Map());
+  if (!jType) return;
+  const normalized = normalizeJobType(jType);
+  const typeMap = pipelineMap.get(pName)!;
+  if (!typeMap.has(normalized)) typeMap.set(normalized, new Map());
+  if (!jName) return;
+  const nameMap = typeMap.get(normalized)!;
+  if (!nameMap.has(jName))
+    nameMap.set(jName, { pending: 0, active: 0, blocked: 0 });
+}
+
+function seedPipelinePaths({
+  pipelineMap,
+  seedKeys,
+}: {
+  pipelineMap: PipelineCountMap;
+  seedKeys: string[];
+}): void {
+  for (const key of seedKeys) {
+    const parts = key.split("/");
+    if (parts.length >= 1)
+      ensurePipelinePath({
+        pipelineMap,
+        pName: parts[0]!,
+        jType: parts[1],
+        jName: parts[2],
+      });
+  }
+}
+
+function accumulateGroupCount({
+  pipelineMap,
+  queue,
+  group,
+}: {
+  pipelineMap: PipelineCountMap;
+  queue: QueueInfo;
+  group: GroupInfo;
+}): void {
+  const pName = group.pipelineName ?? queue.displayName;
+  const jType = normalizeJobType(group.jobType ?? "default");
+  const jName = group.jobName ?? "default";
+
+  ensurePipelinePath({ pipelineMap, pName, jType, jName });
+  const nameMap = pipelineMap.get(pName)!.get(jType)!;
+  const existing = nameMap.get(jName)!;
+  existing.pending += group.pendingJobs;
+  existing.active += group.hasActiveJob ? 1 : 0;
+  existing.blocked += group.isBlocked ? 1 : 0;
+}
+
+function accumulatePipelineCounts({
+  pipelineMap,
+  queues,
+}: {
+  pipelineMap: PipelineCountMap;
+  queues: QueueInfo[];
+}): void {
+  for (const queue of queues) {
+    for (const group of queue.groups) {
+      accumulateGroupCount({ pipelineMap, queue, group });
+    }
+  }
+}
+
+function buildPipelineNameChildren(
+  nameMap: Map<string, { pending: number; active: number; blocked: number }>,
+): {
+  children: PipelineNode[];
+  pending: number;
+  active: number;
+  blocked: number;
+} {
+  const nameChildren: PipelineNode[] = [];
+  let pending = 0,
+    active = 0,
+    blocked = 0;
+
+  for (const [jName, counts] of nameMap) {
+    nameChildren.push({ name: jName, ...counts, children: [] });
+    pending += counts.pending;
+    active += counts.active;
+    blocked += counts.blocked;
+  }
+
+  return { children: nameChildren, pending, active, blocked };
+}
+
+function buildPipelineTypeChildren(
+  typeMap: Map<
+    string,
+    Map<string, { pending: number; active: number; blocked: number }>
+  >,
+): {
+  children: PipelineNode[];
+  pending: number;
+  active: number;
+  blocked: number;
+} {
+  const typeChildren: PipelineNode[] = [];
+  let pPending = 0,
+    pActive = 0,
+    pBlocked = 0;
+
+  for (const [jType, nameMap] of typeMap) {
+    const {
+      children: nameChildren,
+      pending,
+      active,
+      blocked,
+    } = buildPipelineNameChildren(nameMap);
+
+    typeChildren.push({
+      name: jType,
+      pending,
+      active,
+      blocked,
+      children: nameChildren,
+    });
+    pPending += pending;
+    pActive += active;
+    pBlocked += blocked;
+  }
+
+  return {
+    children: typeChildren,
+    pending: pPending,
+    active: pActive,
+    blocked: pBlocked,
+  };
+}
+
 export function buildPipelineTree({
   queues,
   seedKeys = [],
@@ -116,91 +265,244 @@ export function buildPipelineTree({
   queues: QueueInfo[];
   seedKeys?: string[];
 }): PipelineNode[] {
-  const pipelineMap = new Map<
-    string,
-    Map<
-      string,
-      Map<string, { pending: number; active: number; blocked: number }>
-    >
-  >();
+  const pipelineMap: PipelineCountMap = new Map();
 
-  const ensurePath = (pName: string, jType?: string, jName?: string) => {
-    if (!pipelineMap.has(pName)) pipelineMap.set(pName, new Map());
-    if (jType) {
-      const normalized = normalizeJobType(jType);
-      const typeMap = pipelineMap.get(pName)!;
-      if (!typeMap.has(normalized)) typeMap.set(normalized, new Map());
-      if (jName) {
-        const nameMap = typeMap.get(normalized)!;
-        if (!nameMap.has(jName))
-          nameMap.set(jName, { pending: 0, active: 0, blocked: 0 });
-      }
-    }
-  };
-
-  for (const key of seedKeys) {
-    const parts = key.split("/");
-    if (parts.length >= 1) ensurePath(parts[0]!, parts[1], parts[2]);
-  }
-
-  for (const queue of queues) {
-    for (const group of queue.groups) {
-      const pName = group.pipelineName ?? queue.displayName;
-      const jType = normalizeJobType(group.jobType ?? "default");
-      const jName = group.jobName ?? "default";
-
-      ensurePath(pName, jType, jName);
-      const nameMap = pipelineMap.get(pName)!.get(jType)!;
-      const existing = nameMap.get(jName)!;
-      existing.pending += group.pendingJobs;
-      existing.active += group.hasActiveJob ? 1 : 0;
-      existing.blocked += group.isBlocked ? 1 : 0;
-    }
-  }
+  seedPipelinePaths({ pipelineMap, seedKeys });
+  accumulatePipelineCounts({ pipelineMap, queues });
 
   const tree: PipelineNode[] = [];
   for (const [pName, typeMap] of pipelineMap) {
-    const typeChildren: PipelineNode[] = [];
-    let pPending = 0,
-      pActive = 0,
-      pBlocked = 0;
-
-    for (const [jType, nameMap] of typeMap) {
-      const nameChildren: PipelineNode[] = [];
-      let tPending = 0,
-        tActive = 0,
-        tBlocked = 0;
-
-      for (const [jName, counts] of nameMap) {
-        nameChildren.push({ name: jName, ...counts, children: [] });
-        tPending += counts.pending;
-        tActive += counts.active;
-        tBlocked += counts.blocked;
-      }
-
-      typeChildren.push({
-        name: jType,
-        pending: tPending,
-        active: tActive,
-        blocked: tBlocked,
-        children: nameChildren,
-      });
-      pPending += tPending;
-      pActive += tActive;
-      pBlocked += tBlocked;
-    }
+    const {
+      children: typeChildren,
+      pending,
+      active,
+      blocked,
+    } = buildPipelineTypeChildren(typeMap);
 
     tree.push({
       name: pName,
-      pending: pPending,
-      active: pActive,
-      blocked: pBlocked,
+      pending,
+      active,
+      blocked,
       children: typeChildren,
     });
   }
 
   tree.sort((a, b) => a.name.localeCompare(b.name));
   return tree;
+}
+
+function summarizeQueueTotals(queues: QueueInfo[]): {
+  totalGroups: number;
+  blockedGroups: number;
+  parkedGroups: number;
+  totalPendingJobs: number;
+} {
+  let totalGroups = 0;
+  let blockedGroups = 0;
+  let parkedGroups = 0;
+  let totalPendingJobs = 0;
+
+  for (const q of queues) {
+    totalGroups += q.groups.length;
+    blockedGroups += q.blockedGroupCount;
+    parkedGroups += q.parkedGroupCount;
+    totalPendingJobs += q.totalPendingJobs;
+  }
+
+  return { totalGroups, blockedGroups, parkedGroups, totalPendingJobs };
+}
+
+interface ErrorSummaryEntry {
+  normalizedMessage: string;
+  sampleMessage: string;
+  sampleStack: string | null;
+  count: number;
+  pipelineName: string | null;
+  queueName: string;
+  sampleGroupIds: string[];
+}
+
+function recordGroupError({
+  errorMap,
+  queue,
+  group,
+}: {
+  errorMap: Map<string, ErrorSummaryEntry>;
+  queue: QueueInfo;
+  group: GroupInfo;
+}): void {
+  if (!group.isBlocked || !group.errorMessage) return;
+  const normalized = normalizeErrorMessage(group.errorMessage);
+  const key = `${group.pipelineName ?? ""}::${normalized}`;
+  const existing = errorMap.get(key);
+  if (existing) {
+    existing.count++;
+    if (existing.sampleGroupIds.length < 5)
+      existing.sampleGroupIds.push(group.groupId);
+  } else {
+    errorMap.set(key, {
+      normalizedMessage: normalized,
+      sampleMessage: group.errorMessage,
+      sampleStack: group.errorStack,
+      count: 1,
+      pipelineName: group.pipelineName,
+      queueName: queue.name,
+      sampleGroupIds: [group.groupId],
+    });
+  }
+}
+
+function buildTopErrors(queues: QueueInfo[]): ErrorSummaryEntry[] {
+  const errorMap = new Map<string, ErrorSummaryEntry>();
+  for (const q of queues) {
+    for (const g of q.groups) {
+      recordGroupError({ errorMap, queue: q, group: g });
+    }
+  }
+  return Array.from(errorMap.values())
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 10);
+}
+
+interface JobNameCount {
+  pending: number;
+  active: number;
+  phase: "commands" | "projections" | "reactions";
+  pipelineName: string;
+}
+
+function flattenLatencyResults(
+  latencyResults: Array<[error: Error | null, result: unknown]>,
+): number[] {
+  const latencies: number[] = [];
+  for (const [, result] of latencyResults) {
+    if (!Array.isArray(result)) continue;
+    for (const raw of result) {
+      const ms = Number(raw);
+      if (Number.isFinite(ms) && ms >= 0) latencies.push(ms);
+    }
+  }
+  return latencies;
+}
+
+function flattenPausedKeyResults(
+  pausedResults: Array<[error: Error | null, result: unknown]>,
+): Set<string> {
+  const pausedKeysSet = new Set<string>();
+  for (const [, result] of pausedResults) {
+    if (Array.isArray(result)) {
+      for (const key of result) pausedKeysSet.add(key as string);
+    }
+  }
+  return pausedKeysSet;
+}
+
+function discoverPipelinePaths(queues: QueueInfo[]): Set<string> {
+  const discoveredPaths = new Set<string>();
+  for (const q of queues) {
+    for (const g of q.groups) {
+      const p = g.pipelineName ?? q.displayName;
+      const t = g.jobType ?? "default";
+      const n = g.jobName ?? "default";
+      discoveredPaths.add(`${p}/${t}/${n}`);
+    }
+  }
+  return discoveredPaths;
+}
+
+function computeInFlightTotals(queues: QueueInfo[]): {
+  totalPending: number;
+  totalActive: number;
+  totalInFlight: number;
+} {
+  let totalPending = 0;
+  let totalActive = 0;
+  for (const q of queues) {
+    totalPending += q.totalPendingJobs;
+    totalActive += q.activeGroupCount;
+  }
+  return {
+    totalPending,
+    totalActive,
+    totalInFlight: totalPending + totalActive,
+  };
+}
+
+function computeBlockedParkedTotals(queues: QueueInfo[]): {
+  totalBlockedCount: number;
+  totalParkedCount: number;
+} {
+  let totalBlockedCount = 0;
+  let totalParkedCount = 0;
+  for (const q of queues) {
+    totalBlockedCount += q.blockedGroupCount;
+    totalParkedCount += q.parkedGroupCount;
+  }
+  return { totalBlockedCount, totalParkedCount };
+}
+
+function extractUniqueJobNames(
+  jobNameCounts: Map<string, JobNameCount>,
+): Set<string> {
+  const uniqueJobNames = new Set<string>();
+  for (const [compositeKey] of jobNameCounts) {
+    uniqueJobNames.add(compositeKey.split("::")[1] ?? compositeKey);
+  }
+  return uniqueJobNames;
+}
+
+function buildJobNameTotals({
+  dedupedJobNames,
+  jobNameCounterResults,
+  queueCount,
+}: {
+  dedupedJobNames: string[];
+  jobNameCounterResults: Array<[error: Error | null, result: unknown]>;
+  queueCount: number;
+}): Map<string, { completed: number; failed: number }> {
+  const jobNameTotals = new Map<
+    string,
+    { completed: number; failed: number }
+  >();
+  for (let i = 0; i < dedupedJobNames.length; i++) {
+    let completed = 0;
+    let failed = 0;
+    for (let q = 0; q < queueCount; q++) {
+      const baseIdx = (i * queueCount + q) * 2;
+      completed += Number(jobNameCounterResults[baseIdx]?.[1] ?? 0);
+      failed += Number(jobNameCounterResults[baseIdx + 1]?.[1] ?? 0);
+    }
+    jobNameTotals.set(dedupedJobNames[i]!, { completed, failed });
+  }
+  return jobNameTotals;
+}
+
+function accumulateJobNameCount({
+  map,
+  queue,
+  group,
+}: {
+  map: Map<string, JobNameCount>;
+  queue: QueueInfo;
+  group: GroupInfo;
+}): void {
+  const jobName = group.jobName ?? "unknown";
+  const pipelineName = group.pipelineName ?? queue.displayName;
+  const phase = mapJobTypeToPhase(group.jobType);
+  const key = `${pipelineName}::${jobName}`;
+  const existing = map.get(key);
+  if (existing) {
+    existing.pending += group.pendingJobs;
+    existing.active += group.hasActiveJob ? 1 : 0;
+  } else {
+    map.set(key, {
+      pending: group.pendingJobs,
+      active: group.hasActiveJob ? 1 : 0,
+      phase,
+      pipelineName,
+    });
+  }
 }
 
 export class OpsMetricsCollector {
@@ -447,17 +749,8 @@ export class OpsMetricsCollector {
     const fullQueues = this.latestQueues;
     const redisInfo = this.latestRedisInfo;
 
-    let totalGroups = 0;
-    let blockedGroups = 0;
-    let parkedGroups = 0;
-    let totalPendingJobs = 0;
-
-    for (const q of fullQueues) {
-      totalGroups += q.groups.length;
-      blockedGroups += q.blockedGroupCount;
-      parkedGroups += q.parkedGroupCount;
-      totalPendingJobs += q.totalPendingJobs;
-    }
+    const { totalGroups, blockedGroups, parkedGroups, totalPendingJobs } =
+      summarizeQueueTotals(fullQueues);
 
     const treeSeedKeys = [
       ...new Set([...this.currentPausedKeys, ...this.knownPipelinePaths]),
@@ -467,44 +760,7 @@ export class OpsMetricsCollector {
       seedKeys: treeSeedKeys,
     });
 
-    const errorMap = new Map<
-      string,
-      {
-        normalizedMessage: string;
-        sampleMessage: string;
-        sampleStack: string | null;
-        count: number;
-        pipelineName: string | null;
-        queueName: string;
-        sampleGroupIds: string[];
-      }
-    >();
-    for (const q of fullQueues) {
-      for (const g of q.groups) {
-        if (!g.isBlocked || !g.errorMessage) continue;
-        const normalized = normalizeErrorMessage(g.errorMessage);
-        const key = `${g.pipelineName ?? ""}::${normalized}`;
-        const existing = errorMap.get(key);
-        if (existing) {
-          existing.count++;
-          if (existing.sampleGroupIds.length < 5)
-            existing.sampleGroupIds.push(g.groupId);
-        } else {
-          errorMap.set(key, {
-            normalizedMessage: normalized,
-            sampleMessage: g.errorMessage,
-            sampleStack: g.errorStack,
-            count: 1,
-            pipelineName: g.pipelineName,
-            queueName: q.name,
-            sampleGroupIds: [g.groupId],
-          });
-        }
-      }
-    }
-    const topErrors = Array.from(errorMap.values())
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 10);
+    const topErrors = buildTopErrors(fullQueues);
 
     const queues: QueueSummaryInfo[] = fullQueues.map(
       ({ groups: _groups, ...summary }) => summary,
@@ -560,45 +816,119 @@ export class OpsMetricsCollector {
     return phases;
   }
 
-  private buildJobNameCounts(queues: QueueInfo[]): Map<
-    string,
-    {
-      pending: number;
-      active: number;
-      phase: "commands" | "projections" | "reactions";
-      pipelineName: string;
-    }
-  > {
-    const map = new Map<
-      string,
-      {
-        pending: number;
-        active: number;
-        phase: "commands" | "projections" | "reactions";
-        pipelineName: string;
-      }
-    >();
+  private buildJobNameCounts(queues: QueueInfo[]): Map<string, JobNameCount> {
+    const map = new Map<string, JobNameCount>();
     for (const q of queues) {
       for (const g of q.groups) {
-        const jobName = g.jobName ?? "unknown";
-        const pipelineName = g.pipelineName ?? q.displayName;
-        const phase = mapJobTypeToPhase(g.jobType);
-        const key = `${pipelineName}::${jobName}`;
-        const existing = map.get(key);
-        if (existing) {
-          existing.pending += g.pendingJobs;
-          existing.active += g.hasActiveJob ? 1 : 0;
-        } else {
-          map.set(key, {
-            pending: g.pendingJobs,
-            active: g.hasActiveJob ? 1 : 0,
-            phase,
-            pipelineName,
-          });
-        }
+        accumulateJobNameCount({ map, queue: q, group: g });
       }
     }
     return map;
+  }
+
+  /** Fetches per-queue completed/failed totals and folds them against the
+   * previous snapshot to derive counts new since the last cycle. */
+  /** Folds one queue's fetched totals against its previous snapshot, then
+   * stores the new totals as the snapshot for the next cycle. Returns the
+   * delta since the previous cycle (zero on the first sighting of a name). */
+  private foldCounterDelta({
+    name,
+    completedTotal,
+    failedTotal,
+  }: {
+    name: string;
+    completedTotal: number;
+    failedTotal: number;
+  }): { completed: number; failed: number } {
+    const prevC = this.prevCompleted.get(name) ?? 0;
+    const prevF = this.prevFailed.get(name) ?? 0;
+    const hasPrev = this.prevCompleted.has(name);
+
+    this.prevCompleted.set(name, completedTotal);
+    this.prevFailed.set(name, failedTotal);
+
+    if (!hasPrev) return { completed: 0, failed: 0 };
+    return {
+      completed: Math.max(0, completedTotal - prevC),
+      failed: Math.max(0, failedTotal - prevF),
+    };
+  }
+
+  private async updateCompletedFailedCounters(): Promise<{
+    newCompleted: number;
+    newFailed: number;
+  }> {
+    const pipeline = this.redis.pipeline();
+    for (const name of this.groupQueueNames) {
+      pipeline.get(`${name}:gq:stats:completed`);
+      pipeline.get(`${name}:gq:stats:failed`);
+    }
+    const results = await pipeline.exec();
+    if (!results) return { newCompleted: 0, newFailed: 0 };
+
+    let newCompleted = 0;
+    let newFailed = 0;
+    for (let i = 0; i < this.groupQueueNames.length; i++) {
+      const delta = this.foldCounterDelta({
+        name: this.groupQueueNames[i]!,
+        completedTotal: Number(results[i * 2]?.[1] ?? 0),
+        failedTotal: Number(results[i * 2 + 1]?.[1] ?? 0),
+      });
+      newCompleted += delta.completed;
+      newFailed += delta.failed;
+    }
+
+    return { newCompleted, newFailed };
+  }
+
+  /** Pulls the raw per-job latency samples buffered since the last cycle.
+   * Skipped when nothing completed and a baseline already exists, since
+   * there is nothing new to read. */
+  private async collectLatencySamples(newCompleted: number): Promise<number[]> {
+    if (newCompleted <= 0 && this.hasBaseline) return [];
+
+    const latencyPipeline = this.redis.pipeline();
+    for (const name of this.groupQueueNames) {
+      latencyPipeline.lrange(`${name}:gq:stats:latencies-ms`, 0, -1);
+    }
+    const latencyResults = await latencyPipeline.exec();
+    if (!latencyResults) return [];
+
+    return flattenLatencyResults(latencyResults);
+  }
+
+  /** Derives current P50/P99 from the sampled latencies and rolls them into
+   * the running peaks. No-op when there is nothing to sample. */
+  private applyLatencyPercentiles(latencies: number[]): void {
+    if (latencies.length === 0) return;
+
+    latencies.sort((a, b) => a - b);
+    const p50Idx = Math.floor(latencies.length * 0.5);
+    const p99Idx = Math.min(
+      latencies.length - 1,
+      Math.floor(latencies.length * 0.99),
+    );
+    this.currentLatencyP50Ms = latencies[p50Idx]!;
+    this.currentLatencyP99Ms = latencies[p99Idx]!;
+    this.peakLatencyP50Ms = Math.max(
+      this.peakLatencyP50Ms,
+      this.currentLatencyP50Ms,
+    );
+    this.peakLatencyP99Ms = Math.max(
+      this.peakLatencyP99Ms,
+      this.currentLatencyP99Ms,
+    );
+  }
+
+  /** Stamps the persisted per-phase peaks onto this cycle's phase snapshot. */
+  private applyPeakPhasesInto(phases: DashboardData["phases"]): void {
+    for (const key of ["commands", "projections", "reactions"] as const) {
+      const pp = this.peakPhases[key]!;
+      phases[key].peakCompletedPerSec = pp.completedPerSec;
+      phases[key].peakFailedPerSec = pp.failedPerSec;
+      phases[key].peakLatencyP50Ms = pp.latencyP50Ms;
+      phases[key].peakLatencyP99Ms = pp.latencyP99Ms;
+    }
   }
 
   private async computeJobMetrics({
@@ -610,80 +940,13 @@ export class OpsMetricsCollector {
   }): Promise<{ newCompleted: number; newFailed: number }> {
     const phases = this.aggregatePhaseCounts(queues);
 
-    let newCompleted = 0;
-    let newFailed = 0;
+    const { newCompleted, newFailed } =
+      await this.updateCompletedFailedCounters();
 
-    const pipeline = this.redis.pipeline();
-    for (const name of this.groupQueueNames) {
-      pipeline.get(`${name}:gq:stats:completed`);
-      pipeline.get(`${name}:gq:stats:failed`);
-    }
-    const results = await pipeline.exec();
+    const latencies = await this.collectLatencySamples(newCompleted);
+    this.applyLatencyPercentiles(latencies);
 
-    if (results) {
-      for (let i = 0; i < this.groupQueueNames.length; i++) {
-        const name = this.groupQueueNames[i]!;
-        const completedTotal = Number(results[i * 2]?.[1] ?? 0);
-        const failedTotal = Number(results[i * 2 + 1]?.[1] ?? 0);
-
-        const prevC = this.prevCompleted.get(name) ?? 0;
-        const prevF = this.prevFailed.get(name) ?? 0;
-
-        if (this.prevCompleted.has(name)) {
-          newCompleted += Math.max(0, completedTotal - prevC);
-          newFailed += Math.max(0, failedTotal - prevF);
-        }
-
-        this.prevCompleted.set(name, completedTotal);
-        this.prevFailed.set(name, failedTotal);
-      }
-    }
-
-    const latencies: number[] = [];
-    if (newCompleted > 0 || !this.hasBaseline) {
-      const latencyPipeline = this.redis.pipeline();
-      for (const name of this.groupQueueNames) {
-        latencyPipeline.lrange(`${name}:gq:stats:latencies-ms`, 0, -1);
-      }
-      const latencyResults = await latencyPipeline.exec();
-
-      if (latencyResults) {
-        for (const [, result] of latencyResults) {
-          if (!Array.isArray(result)) continue;
-          for (const raw of result) {
-            const ms = Number(raw);
-            if (Number.isFinite(ms) && ms >= 0) latencies.push(ms);
-          }
-        }
-      }
-    }
-
-    if (latencies.length > 0) {
-      latencies.sort((a, b) => a - b);
-      const p50Idx = Math.floor(latencies.length * 0.5);
-      const p99Idx = Math.min(
-        latencies.length - 1,
-        Math.floor(latencies.length * 0.99),
-      );
-      this.currentLatencyP50Ms = latencies[p50Idx]!;
-      this.currentLatencyP99Ms = latencies[p99Idx]!;
-      this.peakLatencyP50Ms = Math.max(
-        this.peakLatencyP50Ms,
-        this.currentLatencyP50Ms,
-      );
-      this.peakLatencyP99Ms = Math.max(
-        this.peakLatencyP99Ms,
-        this.currentLatencyP99Ms,
-      );
-    }
-
-    for (const key of ["commands", "projections", "reactions"] as const) {
-      const pp = this.peakPhases[key]!;
-      phases[key].peakCompletedPerSec = pp.completedPerSec;
-      phases[key].peakFailedPerSec = pp.failedPerSec;
-      phases[key].peakLatencyP50Ms = pp.latencyP50Ms;
-      phases[key].peakLatencyP99Ms = pp.latencyP99Ms;
-    }
+    this.applyPeakPhasesInto(phases);
     this.currentPhases = phases;
 
     this.currentJobNameMetrics = await this.computeJobNameThroughput(
@@ -694,17 +957,14 @@ export class OpsMetricsCollector {
     return { newCompleted, newFailed };
   }
 
-  private async computeJobNameThroughput(
-    queues: QueueInfo[],
-    elapsed: number,
-  ): Promise<JobNameMetrics[]> {
-    const jobNameCounts = this.buildJobNameCounts(queues);
-
-    const uniqueJobNames = new Set<string>();
-    for (const [compositeKey] of jobNameCounts) {
-      uniqueJobNames.add(compositeKey.split("::")[1] ?? compositeKey);
-    }
-
+  /** Fetches per-job-name completed/failed totals across every group queue,
+   * in the order `dedupedJobNames` lists them. */
+  private async fetchJobNameCounterTotals(
+    uniqueJobNames: Set<string>,
+  ): Promise<{
+    dedupedJobNames: string[];
+    jobNameCounterResults: Array<[error: Error | null, result: unknown]>;
+  }> {
     const jobNameCounterPipeline = this.redis.pipeline();
     const dedupedJobNames: string[] = [];
     for (const jobName of uniqueJobNames) {
@@ -717,71 +977,97 @@ export class OpsMetricsCollector {
       dedupedJobNames.push(jobName);
     }
     const jobNameCounterResults =
-      dedupedJobNames.length > 0 ? await jobNameCounterPipeline.exec() : [];
+      dedupedJobNames.length > 0
+        ? ((await jobNameCounterPipeline.exec()) ?? [])
+        : [];
 
-    const jobNameTotals = new Map<
-      string,
-      { completed: number; failed: number }
-    >();
-    if (jobNameCounterResults) {
-      for (let i = 0; i < dedupedJobNames.length; i++) {
-        let completed = 0;
-        let failed = 0;
-        for (let q = 0; q < this.groupQueueNames.length; q++) {
-          const baseIdx = (i * this.groupQueueNames.length + q) * 2;
-          completed += Number(jobNameCounterResults[baseIdx]?.[1] ?? 0);
-          failed += Number(jobNameCounterResults[baseIdx + 1]?.[1] ?? 0);
-        }
-        jobNameTotals.set(dedupedJobNames[i]!, { completed, failed });
-      }
+    return { dedupedJobNames, jobNameCounterResults };
+  }
+
+  /** Builds a single job's throughput metric, folding its fetched totals
+   * against the previous cycle's snapshot and rolling the result into the
+   * running per-job-name peaks. Mutates `prevCompleted`/`prevFailed`/
+   * `peakJobNames` as a side effect, same as the inline version this
+   * replaces. */
+  private buildJobNameMetric({
+    compositeKey,
+    counts,
+    totals,
+    elapsed,
+  }: {
+    compositeKey: string;
+    counts: JobNameCount;
+    totals: { completed: number; failed: number };
+    elapsed: number;
+  }): JobNameMetrics {
+    const jobName = compositeKey.split("::")[1] ?? compositeKey;
+
+    const prevKey = `${JOB_NAME_COUNTER_PREFIX}${compositeKey}`;
+    const prevC = this.prevCompleted.get(prevKey) ?? 0;
+    const prevF = this.prevFailed.get(prevKey) ?? 0;
+
+    let completedPerSec = 0;
+    let failedPerSec = 0;
+    if (this.prevCompleted.has(prevKey) && elapsed > 0) {
+      completedPerSec = Math.max(0, totals.completed - prevC) / elapsed;
+      failedPerSec = Math.max(0, totals.failed - prevF) / elapsed;
     }
+    this.prevCompleted.set(prevKey, totals.completed);
+    this.prevFailed.set(prevKey, totals.failed);
+
+    const peak = this.peakJobNames.get(compositeKey) ?? {
+      completedPerSec: 0,
+      failedPerSec: 0,
+      latencyP50Ms: 0,
+      latencyP99Ms: 0,
+    };
+    peak.completedPerSec = Math.max(peak.completedPerSec, completedPerSec);
+    peak.failedPerSec = Math.max(peak.failedPerSec, failedPerSec);
+    this.peakJobNames.set(compositeKey, peak);
+
+    return {
+      jobName,
+      pipelineName: counts.pipelineName,
+      phase: counts.phase,
+      pending: counts.pending,
+      active: counts.active,
+      completedPerSec,
+      failedPerSec,
+      latencyP50Ms: 0,
+      latencyP99Ms: 0,
+      peakCompletedPerSec: peak.completedPerSec,
+      peakFailedPerSec: peak.failedPerSec,
+      peakLatencyP50Ms: peak.latencyP50Ms,
+      peakLatencyP99Ms: peak.latencyP99Ms,
+    };
+  }
+
+  private async computeJobNameThroughput(
+    queues: QueueInfo[],
+    elapsed: number,
+  ): Promise<JobNameMetrics[]> {
+    const jobNameCounts = this.buildJobNameCounts(queues);
+    const uniqueJobNames = extractUniqueJobNames(jobNameCounts);
+
+    const { dedupedJobNames, jobNameCounterResults } =
+      await this.fetchJobNameCounterTotals(uniqueJobNames);
+
+    const jobNameTotals = buildJobNameTotals({
+      dedupedJobNames,
+      jobNameCounterResults,
+      queueCount: this.groupQueueNames.length,
+    });
 
     const metrics: JobNameMetrics[] = [];
     for (const [compositeKey, counts] of jobNameCounts) {
       const jobName = compositeKey.split("::")[1] ?? compositeKey;
-
       const totals = jobNameTotals.get(jobName) ?? {
         completed: 0,
         failed: 0,
       };
-      const prevKey = `${JOB_NAME_COUNTER_PREFIX}${compositeKey}`;
-      const prevC = this.prevCompleted.get(prevKey) ?? 0;
-      const prevF = this.prevFailed.get(prevKey) ?? 0;
-
-      let completedPerSec = 0;
-      let failedPerSec = 0;
-      if (this.prevCompleted.has(prevKey) && elapsed > 0) {
-        completedPerSec = Math.max(0, totals.completed - prevC) / elapsed;
-        failedPerSec = Math.max(0, totals.failed - prevF) / elapsed;
-      }
-      this.prevCompleted.set(prevKey, totals.completed);
-      this.prevFailed.set(prevKey, totals.failed);
-
-      const peak = this.peakJobNames.get(compositeKey) ?? {
-        completedPerSec: 0,
-        failedPerSec: 0,
-        latencyP50Ms: 0,
-        latencyP99Ms: 0,
-      };
-      peak.completedPerSec = Math.max(peak.completedPerSec, completedPerSec);
-      peak.failedPerSec = Math.max(peak.failedPerSec, failedPerSec);
-      this.peakJobNames.set(compositeKey, peak);
-
-      metrics.push({
-        jobName,
-        pipelineName: counts.pipelineName,
-        phase: counts.phase,
-        pending: counts.pending,
-        active: counts.active,
-        completedPerSec,
-        failedPerSec,
-        latencyP50Ms: 0,
-        latencyP99Ms: 0,
-        peakCompletedPerSec: peak.completedPerSec,
-        peakFailedPerSec: peak.failedPerSec,
-        peakLatencyP50Ms: peak.latencyP50Ms,
-        peakLatencyP99Ms: peak.latencyP99Ms,
-      });
+      metrics.push(
+        this.buildJobNameMetric({ compositeKey, counts, totals, elapsed }),
+      );
     }
     return metrics;
   }
@@ -886,77 +1172,164 @@ export class OpsMetricsCollector {
     }
   }
 
+  /** Scans live queue state and Redis info in parallel, and caches both as
+   * the collector's latest snapshot. */
+  private async scanQueuesAndRedisInfo(): Promise<{
+    queues: QueueInfo[];
+    redisInfo: RedisInfo;
+  }> {
+    const [queues, redisInfo] = await Promise.all([
+      this.queueRepo.scanQueues({ queueNames: this.groupQueueNames }),
+      this.getRedisInfo(),
+    ]);
+    this.latestQueues = queues;
+    this.latestRedisInfo = redisInfo;
+    return { queues, redisInfo };
+  }
+
+  /** Derives this cycle's Redis engine-CPU percent from the previous sample
+   * and stores the new sample for next cycle. */
+  private updateRedisEngineCpu(redisInfo: RedisInfo): void {
+    const sampledAt = Date.now();
+    this.currentRedisEngineCpuPercent = computeEngineCpuPercent({
+      prev: this.prevRedisCpu,
+      nextUserSec: redisInfo.usedCpuUserMainThreadSeconds,
+      nextSysSec: redisInfo.usedCpuSysMainThreadSeconds,
+      nextSampledAt: sampledAt,
+    });
+    this.prevRedisCpu = {
+      userSec: redisInfo.usedCpuUserMainThreadSeconds,
+      sysSec: redisInfo.usedCpuSysMainThreadSeconds,
+      sampledAt,
+    };
+  }
+
+  private async refreshPausedKeys(): Promise<void> {
+    const pausedPipeline = this.redis.pipeline();
+    for (const name of this.groupQueueNames) {
+      pausedPipeline.smembers(`${name}:gq:paused-jobs`);
+    }
+    const pausedResults = await pausedPipeline.exec();
+    this.currentPausedKeys = Array.from(
+      flattenPausedKeyResults(pausedResults ?? []),
+    );
+  }
+
+  /** Records every pipeline/type/name path seen this cycle into the known-
+   * pipelines sorted set, and prunes entries older than 24h. No-op when
+   * nothing was discovered. */
+  private async recordDiscoveredPipelinePaths(
+    queues: QueueInfo[],
+  ): Promise<void> {
+    const discoveredPaths = discoverPipelinePaths(queues);
+    if (discoveredPaths.size === 0) return;
+
+    const timestamp = Date.now();
+    const pipelineBatch = this.redis.pipeline();
+    for (const path of discoveredPaths) {
+      pipelineBatch.zadd(KNOWN_PIPELINES_KEY, timestamp, path);
+    }
+    pipelineBatch.zremrangebyscore(
+      KNOWN_PIPELINES_KEY,
+      0,
+      timestamp - 86400 * 1000,
+    );
+    await pipelineBatch.exec();
+  }
+
+  private async refreshKnownPipelinePaths(): Promise<void> {
+    const knownPaths = await this.redis.zrange(KNOWN_PIPELINES_KEY, 0, 9999);
+    this.knownPipelinePaths = knownPaths;
+  }
+
+  /** Applies this cycle's completed/failed/ingested rates and rolls them
+   * into the running peaks. No-op before a baseline exists or when no time
+   * has elapsed (guards a divide-by-zero). */
+  private applyThroughputRates({
+    totalInFlight,
+    newCompleted,
+    newFailed,
+    elapsed,
+  }: {
+    totalInFlight: number;
+    newCompleted: number;
+    newFailed: number;
+    elapsed: number;
+  }): void {
+    if (!this.hasBaseline || elapsed <= 0) return;
+
+    this.currentCompletedPerSec =
+      Math.round((newCompleted / elapsed) * 100) / 100;
+    this.currentFailedPerSec = Math.round((newFailed / elapsed) * 100) / 100;
+
+    const ingestedDelta =
+      totalInFlight - this.lastTotalInFlight + newCompleted + newFailed;
+    this.currentIngestedPerSec =
+      Math.round((Math.max(0, ingestedDelta) / elapsed) * 100) / 100;
+
+    this.peakCompletedPerSec = Math.max(
+      this.peakCompletedPerSec,
+      this.currentCompletedPerSec,
+    );
+    this.peakFailedPerSec = Math.max(
+      this.peakFailedPerSec,
+      this.currentFailedPerSec,
+    );
+    this.peakIngestedPerSec = Math.max(
+      this.peakIngestedPerSec,
+      this.currentIngestedPerSec,
+    );
+  }
+
+  private pushThroughputPoint({
+    now,
+    totalPending,
+    totalBlockedCount,
+    totalParkedCount,
+  }: {
+    now: number;
+    totalPending: number;
+    totalBlockedCount: number;
+    totalParkedCount: number;
+  }): void {
+    this.throughputBuffer.push({
+      timestamp: now,
+      ingestedPerSec: this.currentIngestedPerSec,
+      completedPerSec: this.currentCompletedPerSec,
+      failedPerSec: this.currentFailedPerSec,
+      pendingCount: totalPending,
+      blockedCount: totalBlockedCount,
+      parkedCount: totalParkedCount,
+    });
+
+    if (this.throughputBuffer.length > THROUGHPUT_BUFFER_SIZE) {
+      this.throughputBuffer.shift();
+    }
+  }
+
+  private updateProcessCpuPercent(now: number): void {
+    const cpuNow = process.cpuUsage(this.lastCpuUsage);
+    const cpuElapsed = now - this.lastCpuTime;
+    if (cpuElapsed > 0) {
+      const totalCpuUs = cpuNow.user + cpuNow.system;
+      this.currentCpuPercent = (totalCpuUs / 1000 / cpuElapsed) * 100;
+    }
+    this.lastCpuUsage = process.cpuUsage();
+    this.lastCpuTime = now;
+  }
+
   async collect(): Promise<void> {
     if (this.isCollecting) return;
     this.isCollecting = true;
     try {
-      const [queues, redisInfo] = await Promise.all([
-        this.queueRepo.scanQueues({ queueNames: this.groupQueueNames }),
-        this.getRedisInfo(),
-      ]);
-      this.latestQueues = queues;
-      this.latestRedisInfo = redisInfo;
+      const { queues, redisInfo } = await this.scanQueuesAndRedisInfo();
+      this.updateRedisEngineCpu(redisInfo);
+      await this.refreshPausedKeys();
 
-      const sampledAt = Date.now();
-      this.currentRedisEngineCpuPercent = computeEngineCpuPercent({
-        prev: this.prevRedisCpu,
-        nextUserSec: redisInfo.usedCpuUserMainThreadSeconds,
-        nextSysSec: redisInfo.usedCpuSysMainThreadSeconds,
-        nextSampledAt: sampledAt,
-      });
-      this.prevRedisCpu = {
-        userSec: redisInfo.usedCpuUserMainThreadSeconds,
-        sysSec: redisInfo.usedCpuSysMainThreadSeconds,
-        sampledAt,
-      };
+      await this.recordDiscoveredPipelinePaths(queues);
+      await this.refreshKnownPipelinePaths();
 
-      const pausedPipeline = this.redis.pipeline();
-      for (const name of this.groupQueueNames) {
-        pausedPipeline.smembers(`${name}:gq:paused-jobs`);
-      }
-      const pausedResults = await pausedPipeline.exec();
-      const pausedKeysSet = new Set<string>();
-      if (pausedResults) {
-        for (const [, result] of pausedResults) {
-          if (Array.isArray(result)) {
-            for (const key of result) pausedKeysSet.add(key as string);
-          }
-        }
-      }
-      this.currentPausedKeys = Array.from(pausedKeysSet);
-
-      const discoveredPaths = new Set<string>();
-      for (const q of queues) {
-        for (const g of q.groups) {
-          const p = g.pipelineName ?? q.displayName;
-          const t = g.jobType ?? "default";
-          const n = g.jobName ?? "default";
-          discoveredPaths.add(`${p}/${t}/${n}`);
-        }
-      }
-      if (discoveredPaths.size > 0) {
-        const timestamp = Date.now();
-        const pipelineBatch = this.redis.pipeline();
-        for (const path of discoveredPaths) {
-          pipelineBatch.zadd(KNOWN_PIPELINES_KEY, timestamp, path);
-        }
-        pipelineBatch.zremrangebyscore(
-          KNOWN_PIPELINES_KEY,
-          0,
-          timestamp - 86400 * 1000,
-        );
-        await pipelineBatch.exec();
-      }
-      const knownPaths = await this.redis.zrange(KNOWN_PIPELINES_KEY, 0, 9999);
-      this.knownPipelinePaths = knownPaths;
-
-      let totalPending = 0;
-      let totalActive = 0;
-      for (const q of queues) {
-        totalPending += q.totalPendingJobs;
-        totalActive += q.activeGroupCount;
-      }
-      const totalInFlight = totalPending + totalActive;
+      const { totalPending, totalInFlight } = computeInFlightTotals(queues);
 
       const now = Date.now();
       const elapsed = (now - this.lastTimestamp) / 1000;
@@ -969,64 +1342,28 @@ export class OpsMetricsCollector {
       this.latestTotalCompleted += newCompleted;
       this.latestTotalFailed += newFailed;
 
-      if (this.hasBaseline && elapsed > 0) {
-        this.currentCompletedPerSec =
-          Math.round((newCompleted / elapsed) * 100) / 100;
-        this.currentFailedPerSec =
-          Math.round((newFailed / elapsed) * 100) / 100;
-
-        const ingestedDelta =
-          totalInFlight - this.lastTotalInFlight + newCompleted + newFailed;
-        this.currentIngestedPerSec =
-          Math.round((Math.max(0, ingestedDelta) / elapsed) * 100) / 100;
-
-        this.peakCompletedPerSec = Math.max(
-          this.peakCompletedPerSec,
-          this.currentCompletedPerSec,
-        );
-        this.peakFailedPerSec = Math.max(
-          this.peakFailedPerSec,
-          this.currentFailedPerSec,
-        );
-        this.peakIngestedPerSec = Math.max(
-          this.peakIngestedPerSec,
-          this.currentIngestedPerSec,
-        );
-      }
+      this.applyThroughputRates({
+        totalInFlight,
+        newCompleted,
+        newFailed,
+        elapsed,
+      });
 
       this.lastTotalInFlight = totalInFlight;
       this.lastTimestamp = now;
       this.hasBaseline = true;
 
-      let totalBlockedCount = 0;
-      let totalParkedCount = 0;
-      for (const q of queues) {
-        totalBlockedCount += q.blockedGroupCount;
-        totalParkedCount += q.parkedGroupCount;
-      }
+      const { totalBlockedCount, totalParkedCount } =
+        computeBlockedParkedTotals(queues);
 
-      this.throughputBuffer.push({
-        timestamp: now,
-        ingestedPerSec: this.currentIngestedPerSec,
-        completedPerSec: this.currentCompletedPerSec,
-        failedPerSec: this.currentFailedPerSec,
-        pendingCount: totalPending,
-        blockedCount: totalBlockedCount,
-        parkedCount: totalParkedCount,
+      this.pushThroughputPoint({
+        now,
+        totalPending,
+        totalBlockedCount,
+        totalParkedCount,
       });
 
-      if (this.throughputBuffer.length > THROUGHPUT_BUFFER_SIZE) {
-        this.throughputBuffer.shift();
-      }
-
-      const cpuNow = process.cpuUsage(this.lastCpuUsage);
-      const cpuElapsed = now - this.lastCpuTime;
-      if (cpuElapsed > 0) {
-        const totalCpuUs = cpuNow.user + cpuNow.system;
-        this.currentCpuPercent = (totalCpuUs / 1000 / cpuElapsed) * 100;
-      }
-      this.lastCpuUsage = process.cpuUsage();
-      this.lastCpuTime = now;
+      this.updateProcessCpuPercent(now);
 
       this.pruneStaleCounters();
       this.persistState().catch((err) => {

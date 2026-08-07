@@ -19,6 +19,59 @@ interface AlertActionParams {
   seriesName?: string;
 }
 
+const isValidGraphFilterEntry = ([key, value]: [string, unknown]): boolean =>
+  filterFieldsEnum.safeParse(key).success &&
+  (Array.isArray(value) || (typeof value === "object" && value !== null));
+
+// Basic validation to ensure filters have the expected structure
+const validateGraphFilters = (
+  filters: unknown,
+): Record<FilterField, string[] | Record<string, string[]>> | undefined => {
+  if (!filters || typeof filters !== "object") return undefined;
+
+  const validFilters = Object.fromEntries(
+    Object.entries(filters).filter(isValidGraphFilterEntry),
+  );
+
+  return Object.keys(validFilters).length > 0
+    ? (validFilters as Record<FilterField, string[] | Record<string, string[]>>)
+    : undefined;
+};
+
+const buildGraphAlertData = (
+  trigger: {
+    active: boolean;
+    deleted: boolean;
+    actionParams: unknown;
+    alertType: unknown;
+    action: unknown;
+    id: string;
+  } | null,
+) => {
+  if (!trigger?.active || trigger.deleted) return undefined;
+
+  const actionParams = trigger.actionParams as unknown as AlertActionParams & {
+    threshold: number;
+    operator: string;
+    timePeriod: number;
+  };
+  return {
+    enabled: true,
+    threshold: actionParams.threshold,
+    operator: actionParams.operator,
+    timePeriod: actionParams.timePeriod,
+    seriesName: actionParams.seriesName || "",
+    type: trigger.alertType,
+    action: trigger.action,
+    actionParams: {
+      members: actionParams.members,
+      slackWebhook: actionParams.slackWebhook,
+      seriesName: actionParams.seriesName,
+    },
+    triggerId: trigger.id,
+  };
+};
+
 export const graphsRouter = createTRPCRouter({
   create: protectedProcedure
     .input(
@@ -164,33 +217,7 @@ export const graphsRouter = createTRPCRouter({
         throw new TRPCError({ code: "NOT_FOUND", message: "Graph not found" });
       }
 
-      // Basic validation to ensure filters have the expected structure
-      let validatedFilters:
-        | Record<FilterField, string[] | Record<string, string[]>>
-        | undefined;
-
-      if (graph.filters && typeof graph.filters === "object") {
-        const validFilters: Record<string, unknown> = {};
-
-        for (const [key, value] of Object.entries(graph.filters)) {
-          if (filterFieldsEnum.safeParse(key).success) {
-            if (
-              Array.isArray(value) ||
-              (typeof value === "object" && value !== null)
-            ) {
-              validFilters[key] = value;
-            }
-          }
-        }
-
-        validatedFilters =
-          Object.keys(validFilters).length > 0
-            ? (validFilters as Record<
-                FilterField,
-                string[] | Record<string, string[]>
-              >)
-            : undefined;
-      }
+      const validatedFilters = validateGraphFilters(graph.filters);
 
       // Find associated trigger for custom graph alert using direct relation
       const trigger = await prisma.trigger.findUnique({
@@ -200,35 +227,10 @@ export const graphsRouter = createTRPCRouter({
         },
       });
 
-      let alertData = undefined;
-      if (trigger?.active && !trigger.deleted) {
-        const actionParams =
-          trigger.actionParams as unknown as AlertActionParams & {
-            threshold: number;
-            operator: string;
-            timePeriod: number;
-          };
-        alertData = {
-          enabled: true,
-          threshold: actionParams.threshold,
-          operator: actionParams.operator,
-          timePeriod: actionParams.timePeriod,
-          seriesName: actionParams.seriesName || "",
-          type: trigger.alertType,
-          action: trigger.action,
-          actionParams: {
-            members: actionParams.members,
-            slackWebhook: actionParams.slackWebhook,
-            seriesName: actionParams.seriesName,
-          },
-          triggerId: trigger.id,
-        };
-      }
-
       return {
         ...graph,
         filters: validatedFilters,
-        alert: alertData,
+        alert: buildGraphAlertData(trigger),
       };
     }),
   updateById: protectedProcedure

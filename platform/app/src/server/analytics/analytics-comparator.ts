@@ -10,6 +10,7 @@ import { createLogger } from "@langwatch/observability";
 import type {
   FeedbacksResult,
   FilterDataResult,
+  TimeseriesBucket,
   TimeseriesResult,
   TopDocumentsResult,
 } from "./types";
@@ -112,111 +113,137 @@ export class AnalyticsComparator {
     chResult: TimeseriesResult,
     discrepancies: string[],
   ): void {
-    if (esResult.currentPeriod.length !== chResult.currentPeriod.length) {
+    this.compareBucketSet({
+      esBuckets: esResult.currentPeriod,
+      chBuckets: chResult.currentPeriod,
+      periodLabel: "Current period",
+      bucketLabel: "Bucket",
+      discrepancies,
+    });
+
+    this.compareBucketSet({
+      esBuckets: esResult.previousPeriod,
+      chBuckets: chResult.previousPeriod,
+      periodLabel: "Previous period",
+      bucketLabel: "Previous bucket",
+      discrepancies,
+    });
+  }
+
+  /**
+   * Compare one set of timeseries buckets (current or previous period)
+   */
+  private compareBucketSet({
+    esBuckets,
+    chBuckets,
+    periodLabel,
+    bucketLabel,
+    discrepancies,
+  }: {
+    esBuckets: TimeseriesBucket[];
+    chBuckets: TimeseriesBucket[];
+    periodLabel: string;
+    bucketLabel: string;
+    discrepancies: string[];
+  }): void {
+    if (esBuckets.length !== chBuckets.length) {
       discrepancies.push(
-        `Current period bucket count: ES=${esResult.currentPeriod.length}, CH=${chResult.currentPeriod.length}`,
+        `${periodLabel} bucket count: ES=${esBuckets.length}, CH=${chBuckets.length}`,
       );
     }
 
     // Compare values within a tolerance
-    const minLength = Math.min(
-      esResult.currentPeriod.length,
-      chResult.currentPeriod.length,
-    );
+    const minLength = Math.min(esBuckets.length, chBuckets.length);
 
     for (let i = 0; i < minLength; i++) {
-      const esBucket = esResult.currentPeriod[i];
-      const chBucket = chResult.currentPeriod[i];
+      const esBucket = esBuckets[i];
+      const chBucket = chBuckets[i];
 
       if (!esBucket || !chBucket) continue;
 
-      // Use union of keys from both buckets to catch keys present only in one
-      const allKeys = new Set([
-        ...Object.keys(esBucket),
-        ...Object.keys(chBucket),
-      ]);
-
-      for (const key of allKeys) {
-        if (key === "date") continue;
-
-        const esValue = esBucket[key];
-        const chValue = chBucket[key];
-
-        // Report missing keys
-        if (esValue === undefined && chValue !== undefined) {
-          discrepancies.push(
-            `Bucket ${i} key ${key}: missing in ES, CH=${chValue}`,
-          );
-          continue;
-        }
-        if (chValue === undefined && esValue !== undefined) {
-          discrepancies.push(
-            `Bucket ${i} key ${key}: ES=${esValue}, missing in CH`,
-          );
-          continue;
-        }
-
-        if (typeof esValue === "number" && typeof chValue === "number") {
-          if (!this.valuesMatch(esValue, chValue)) {
-            discrepancies.push(
-              `Bucket ${i} key ${key}: ES=${esValue}, CH=${chValue}`,
-            );
-          }
-        }
-      }
+      this.compareBucketPair({
+        esBucket,
+        chBucket,
+        index: i,
+        bucketLabel,
+        discrepancies,
+      });
     }
+  }
 
-    // Compare previousPeriod buckets
-    if (esResult.previousPeriod.length !== chResult.previousPeriod.length) {
+  /**
+   * Compare a single pair of buckets key by key
+   */
+  private compareBucketPair({
+    esBucket,
+    chBucket,
+    index,
+    bucketLabel,
+    discrepancies,
+  }: {
+    esBucket: TimeseriesBucket;
+    chBucket: TimeseriesBucket;
+    index: number;
+    bucketLabel: string;
+    discrepancies: string[];
+  }): void {
+    // Use union of keys from both buckets to catch keys present only in one
+    const allKeys = new Set([
+      ...Object.keys(esBucket),
+      ...Object.keys(chBucket),
+    ]);
+
+    for (const key of allKeys) {
+      if (key === "date") continue;
+
+      this.compareBucketKey({
+        esValue: esBucket[key],
+        chValue: chBucket[key],
+        key,
+        index,
+        bucketLabel,
+        discrepancies,
+      });
+    }
+  }
+
+  /**
+   * Compare a single key's value between the two buckets
+   */
+  private compareBucketKey({
+    esValue,
+    chValue,
+    key,
+    index,
+    bucketLabel,
+    discrepancies,
+  }: {
+    esValue: TimeseriesBucket[string] | undefined;
+    chValue: TimeseriesBucket[string] | undefined;
+    key: string;
+    index: number;
+    bucketLabel: string;
+    discrepancies: string[];
+  }): void {
+    // Report missing keys
+    if (esValue === undefined && chValue !== undefined) {
       discrepancies.push(
-        `Previous period bucket count: ES=${esResult.previousPeriod.length}, CH=${chResult.previousPeriod.length}`,
+        `${bucketLabel} ${index} key ${key}: missing in ES, CH=${chValue}`,
       );
+      return;
+    }
+    if (chValue === undefined && esValue !== undefined) {
+      discrepancies.push(
+        `${bucketLabel} ${index} key ${key}: ES=${esValue}, missing in CH`,
+      );
+      return;
     }
 
-    const previousMinLength = Math.min(
-      esResult.previousPeriod.length,
-      chResult.previousPeriod.length,
-    );
-
-    for (let i = 0; i < previousMinLength; i++) {
-      const esBucket = esResult.previousPeriod[i];
-      const chBucket = chResult.previousPeriod[i];
-
-      if (!esBucket || !chBucket) continue;
-
-      // Use union of keys from both buckets to catch keys present only in one
-      const allKeys = new Set([
-        ...Object.keys(esBucket),
-        ...Object.keys(chBucket),
-      ]);
-
-      for (const key of allKeys) {
-        if (key === "date") continue;
-
-        const esValue = esBucket[key];
-        const chValue = chBucket[key];
-
-        // Report missing keys
-        if (esValue === undefined && chValue !== undefined) {
-          discrepancies.push(
-            `Previous bucket ${i} key ${key}: missing in ES, CH=${chValue}`,
-          );
-          continue;
-        }
-        if (chValue === undefined && esValue !== undefined) {
-          discrepancies.push(
-            `Previous bucket ${i} key ${key}: ES=${esValue}, missing in CH`,
-          );
-          continue;
-        }
-
-        if (typeof esValue === "number" && typeof chValue === "number") {
-          if (!this.valuesMatch(esValue, chValue)) {
-            discrepancies.push(
-              `Previous bucket ${i} key ${key}: ES=${esValue}, CH=${chValue}`,
-            );
-          }
-        }
+    if (typeof esValue === "number" && typeof chValue === "number") {
+      if (!this.valuesMatch(esValue, chValue)) {
+        discrepancies.push(
+          `${bucketLabel} ${index} key ${key}: ES=${esValue}, CH=${chValue}`,
+        );
       }
     }
   }

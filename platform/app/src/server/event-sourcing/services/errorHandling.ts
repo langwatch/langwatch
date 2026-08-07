@@ -338,73 +338,22 @@ export class ProjectionError extends NonCriticalError {
 }
 
 /**
- * Handles an error according to its category.
- * If the error is a BaseEventSourcingError, uses its category and context.
- * Otherwise, uses the provided category and context.
- *
- * @param error - The error to handle
- * @param category - The error category (used if error is not a BaseEventSourcingError)
- * @param logger - Optional logger for non-critical errors
- * @param context - Additional context for logging (merged with error context if available)
- * @throws {Error} If category is CRITICAL
+ * Acts on an already-resolved category: throws for CRITICAL, otherwise logs
+ * (if a logger is given) at the level matching NON_CRITICAL/RECOVERABLE.
+ * Shared by both branches of {@link handleError} so the BaseEventSourcingError
+ * path and the fallback path stay in lockstep.
  */
-export function handleError({
+function dispatchByCategory({
   error,
   category,
   logger,
-  context,
+  mergedContext,
 }: {
   error: unknown;
   category: ErrorCategory;
   logger?: ReturnType<typeof createLogger>;
-  context?: Record<string, unknown>;
+  mergedContext: Record<string, unknown>;
 }): void {
-  // If error is a BaseEventSourcingError, use its category and merge contexts
-  if (error instanceof BaseEventSourcingError) {
-    const errorCategory = error.category;
-    const mergedContext = {
-      ...error.getLogContext(),
-      ...context,
-      err: error,
-    };
-
-    switch (errorCategory) {
-      case ErrorCategory.CRITICAL:
-        // Critical errors always throw
-        throw error;
-
-      case ErrorCategory.NON_CRITICAL:
-        // Non-critical errors are logged but don't throw
-        if (logger) {
-          logger.error(
-            mergedContext,
-            "Non-critical error occurred, continuing operation",
-          );
-        }
-        break;
-
-      case ErrorCategory.RECOVERABLE:
-        // Recoverable errors are logged with retry indication
-        if (logger) {
-          logger.warn(
-            mergedContext,
-            "Recoverable error occurred, should retry",
-          );
-        }
-        // Don't throw - caller should implement retry logic
-        break;
-    }
-    return;
-  }
-
-  // Fallback for non-BaseEventSourcingError errors
-  const errorMessage = error instanceof Error ? error.message : String(error);
-  const mergedContext = {
-    ...context,
-    error: errorMessage,
-    err: error,
-  };
-
   switch (category) {
     case ErrorCategory.CRITICAL:
       // Critical errors always throw
@@ -428,6 +377,54 @@ export function handleError({
       // Don't throw - caller should implement retry logic
       break;
   }
+}
+
+/**
+ * Handles an error according to its category.
+ * If the error is a BaseEventSourcingError, uses its category and context.
+ * Otherwise, uses the provided category and context.
+ *
+ * @param error - The error to handle
+ * @param category - The error category (used if error is not a BaseEventSourcingError)
+ * @param logger - Optional logger for non-critical errors
+ * @param context - Additional context for logging (merged with error context if available)
+ * @throws {Error} If category is CRITICAL
+ */
+export function handleError({
+  error,
+  category,
+  logger,
+  context,
+}: {
+  error: unknown;
+  category: ErrorCategory;
+  logger?: ReturnType<typeof createLogger>;
+  context?: Record<string, unknown>;
+}): void {
+  // If error is a BaseEventSourcingError, use its category and merge contexts
+  if (error instanceof BaseEventSourcingError) {
+    const mergedContext = {
+      ...error.getLogContext(),
+      ...context,
+      err: error,
+    };
+    dispatchByCategory({
+      error,
+      category: error.category,
+      logger,
+      mergedContext,
+    });
+    return;
+  }
+
+  // Fallback for non-BaseEventSourcingError errors
+  const errorMessage = error instanceof Error ? error.message : String(error);
+  const mergedContext = {
+    ...context,
+    error: errorMessage,
+    err: error,
+  };
+  dispatchByCategory({ error, category, logger, mergedContext });
 }
 
 /**

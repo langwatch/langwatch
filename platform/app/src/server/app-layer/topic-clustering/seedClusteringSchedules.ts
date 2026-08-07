@@ -63,6 +63,33 @@ export interface BackfillDeps {
  * A single project's failure must never truncate the fleet: one bad project
  * is logged and skipped so the rest still gets scheduled.
  */
+type SeedProjectOutcome = "succeeded" | "failed" | "skipped";
+
+async function seedOneProjectSchedule({
+  deps,
+  projectId,
+  alreadyScheduled,
+}: {
+  deps: BackfillDeps;
+  projectId: string;
+  alreadyScheduled: Set<string>;
+}): Promise<SeedProjectOutcome> {
+  if (alreadyScheduled.has(projectId)) {
+    return "skipped";
+  }
+
+  try {
+    await deps.requestClustering({ projectId });
+    return "succeeded";
+  } catch (error) {
+    logger.error(
+      { error, projectId },
+      "failed to request topic clustering bootstrap for project; continuing with the rest",
+    );
+    return "failed";
+  }
+}
+
 export async function backfillTopicClusteringSchedules(
   deps: BackfillDeps,
 ): Promise<BackfillSummary> {
@@ -86,22 +113,12 @@ export async function backfillTopicClusteringSchedules(
 
     for (const project of page) {
       summary.scanned++;
-
-      if (alreadyScheduled.has(project.id)) {
-        summary.skipped++;
-        continue;
-      }
-
-      try {
-        await deps.requestClustering({ projectId: project.id });
-        summary.succeeded++;
-      } catch (error) {
-        summary.failed++;
-        logger.error(
-          { error, projectId: project.id },
-          "failed to request topic clustering bootstrap for project; continuing with the rest",
-        );
-      }
+      const outcome = await seedOneProjectSchedule({
+        deps,
+        projectId: project.id,
+        alreadyScheduled,
+      });
+      summary[outcome]++;
     }
 
     afterId = page[page.length - 1]!.id;

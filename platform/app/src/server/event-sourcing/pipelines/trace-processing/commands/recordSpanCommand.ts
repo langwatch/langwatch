@@ -180,207 +180,316 @@ export class RecordSpanCommand
           "tenant.id": command.tenantId,
         },
       },
-      async () => {
-        const { tenantId: tenantIdStr, data: commandData } = command;
-        const tenantId = createTenantId(tenantIdStr);
-
-        // ADR-022: Oversized command path — reconstitute span from S3 spool.
-        // When spoolRef is present, the command was spooled at the edge because
-        // the payload exceeded COMMAND_INLINE_THRESHOLD. Fetch the full span,
-        // then process normally.
-
-        // ADR-022: Guard — if the command carries a spoolRef but this handler
-        // has no blobStore, we MUST throw rather than silently proceeding.
-        // The edge cleared span.attributes to [] before spooling, so continuing
-        // without reconstitution would write a span with empty attributes to
-        // event_log — permanent, silent data loss (event_log is the sole source
-        // of truth). Throwing lets the command framework retry / surface the
-        // misconfiguration instead of corrupting durable storage.
-        if (commandData.spoolRef && !this.blobStore) {
-          throw new Error(
-            `ADR-022: command carries spoolRef "${commandData.spoolRef}" but this handler has no blobStore configured to reconstitute the span. Refusing to emit a span with cleared attributes (would be permanent data loss in event_log).`,
-          );
-        }
-
-        let resolvedCommandData = commandData;
-        if (commandData.spoolRef && this.blobStore) {
-          const spoolBody = await this.blobStore.getSpool(commandData.spoolRef);
-          // ADR-022: spool body is the full serialized RecordSpanCommandData.
-          // Merge the spooled span/resource/instrumentationScope fields back into
-          // the in-flight command (the queue message carries only spoolRef + id fields).
-          const parsed = JSON.parse(
-            spoolBody.toString("utf-8"),
-          ) as RecordSpanCommandData;
-          resolvedCommandData = {
-            ...commandData,
-            span: parsed.span,
-            resource: parsed.resource,
-            instrumentationScope: parsed.instrumentationScope,
-          };
-        }
-
-        const { traceId, spanId } = TraceRequestUtils.normalizeOtlpSpanIds(
-          resolvedCommandData.span,
-        );
-
-        this.logger.debug(
-          {
-            tenantId,
-            traceId,
-            spanId,
-          },
-          "Handling record span command",
-        );
-
-        // Clone span and resource before mutation to preserve command immutability
-        const spanToProcess = structuredClone(resolvedCommandData.span);
-        const resourceToProcess = resolvedCommandData.resource
-          ? structuredClone(resolvedCommandData.resource)
-          : null;
-
-        // Strip any user-submitted langwatch.reserved.* attributes — this domain
-        // is reserved for system-generated attributes only.
-        RecordSpanCommand.stripReservedAttributes(
-          spanToProcess,
-          resourceToProcess,
-          this.logger,
-        );
-
-        // Cap oversized attribute values (multi-MB base64 images, huge params)
-        // before this span becomes a folded event. The trace-processing fold
-        // state is read-modify-written in Redis per event; multi-MB values
-        // saturate the single-threaded command loop and collapse folding
-        // throughput. Capping here keeps the fold state small for every
-        // ingestion path that dispatches recordSpan (collector REST and OTLP).
-        //
-        // ADR-022: Skip the cap for spool-reconstituted spans. When a command
-        // carries a spoolRef, the full content has already bypassed the Redis
-        // pressure point and MUST be written to event_log in its entirety.
-        // The cap's purpose is Redis safety, not event_log correctness.
-        //
-        // SAFETY DEPENDENCY: this skip is only safe because `leanForProjection`
-        // runs UNCONDITIONALLY in eventSourcingService.ts (between storeEvents and
-        // dispatch) to lean the projection state. If that lean step is ever made
-        // conditional, spool-reconstituted (full-content) spans would re-introduce
-        // the Redis fold-state clog this cap otherwise guards against.
-        if (!commandData.spoolRef) {
-          const cappedAttributeCount = capOversizedAttributes(
-            spanToProcess,
-            resourceToProcess,
-          );
-          if (cappedAttributeCount > 0) {
-            this.logger.warn(
-              { tenantId, traceId, spanId, cappedAttributeCount },
-              "Capped oversized span attribute value(s) before ingestion",
-            );
-          }
-        }
-
-        const piiRedactionLevel =
-          resolvedCommandData.piiRedactionLevel ?? DEFAULT_PII_REDACTION_LEVEL;
-
-        // Run PII redaction, cost enrichment, and token estimation in parallel.
-        // Safe: PII modifies existing attr values; cost and tokens push new entries.
-        const [piiResult, costResult, tokenResult] = await Promise.allSettled([
-          this.deps.piiRedactionService.redactSpan({
-            span: spanToProcess,
-            resource: resourceToProcess,
-            piiRedactionLevel,
-            tenantId,
-          }),
-          this.deps.costEnrichmentService.enrichSpan(
-            spanToProcess,
-            tenantIdStr,
-          ),
-          this.deps.tokenEstimationService.estimateSpanTokens({
-            span: spanToProcess,
-            tenantId: tenantIdStr,
-          }),
-        ]);
-
-        // Cost enrichment is non-critical — log and continue
-        if (costResult.status === "rejected") {
-          this.logger.warn(
-            { error: costResult.reason },
-            "Cost enrichment failed, continuing without cost data",
-          );
-        }
-
-        // Token estimation is non-critical — log and continue
-        if (tokenResult.status === "rejected") {
-          this.logger.warn(
-            { error: tokenResult.reason },
-            "Token estimation failed, continuing without estimated tokens",
-          );
-        }
-
-        // PII redaction is critical — unredacted spans must not be emitted
-        if (piiResult.status === "rejected") {
-          this.logger.error(
-            { error: piiResult.reason },
-            "PII redaction failed, aborting span processing to prevent PII leak",
-          );
-          throw piiResult.reason instanceof Error
-            ? piiResult.reason
-            : new Error(String(piiResult.reason));
-        }
-
-        // Apply the scoped data-privacy DROP at this single span choke point,
-        // AFTER redaction (dropping a whole category makes redacting it moot).
-        // Doing it here, before the event is emitted, means both the stored
-        // span and the trace-summary fold (which derives ComputedInput/Output
-        // from the same event) never see the dropped categories. The drop fails
-        // open internally (a policy-resolution error keeps the span intact and
-        // is logged), so this call never aborts span processing.
-        const dropResult = await this.deps.contentDropService.dropSpanContent({
-          span: spanToProcess,
-          projectId: tenantIdStr,
-        });
-        if (dropResult.droppedCount > 0) {
-          this.logger.debug(
-            {
-              tenantId,
-              traceId,
-              spanId,
-              droppedCount: dropResult.droppedCount,
-              droppedCategories: dropResult.droppedCategories,
-            },
-            "Dropped span content per data-privacy policy",
-          );
-        }
-
-        const spanReceivedEvent = EventUtils.createEvent<SpanReceivedEvent>({
-          aggregateType: "trace",
-          aggregateId: traceId,
-          tenantId,
-          type: SPAN_RECEIVED_EVENT_TYPE,
-          version: SPAN_RECEIVED_EVENT_VERSION_LATEST,
-          data: {
-            span: spanToProcess,
-            resource: resourceToProcess,
-            instrumentationScope: resolvedCommandData.instrumentationScope,
-            piiRedactionLevel,
-          },
-          metadata: { traceId, spanId },
-          occurredAt: resolvedCommandData.occurredAt,
-          idempotencyKey: `${tenantIdStr}:${traceId}:${spanId}`,
-        });
-
-        this.logger.debug(
-          {
-            tenantId,
-            traceId,
-            spanId,
-            eventId: spanReceivedEvent.id,
-          },
-          "Emitting SpanReceivedEvent",
-        );
-
-        const events = [spanReceivedEvent];
-
-        return events;
-      },
+      async () => this.processRecordSpanCommand(command),
     );
+  }
+
+  private async processRecordSpanCommand(
+    command: Command<RecordSpanCommandData>,
+  ): Promise<SpanReceivedEvent[]> {
+    const { tenantId: tenantIdStr, data: commandData } = command;
+    const tenantId = createTenantId(tenantIdStr);
+
+    const resolvedCommandData = await this.resolveCommandData(commandData);
+
+    const { traceId, spanId } = TraceRequestUtils.normalizeOtlpSpanIds(
+      resolvedCommandData.span,
+    );
+
+    this.logger.debug(
+      { tenantId, traceId, spanId },
+      "Handling record span command",
+    );
+
+    // Clone span and resource before mutation to preserve command immutability
+    const spanToProcess = structuredClone(resolvedCommandData.span);
+    const resourceToProcess = resolvedCommandData.resource
+      ? structuredClone(resolvedCommandData.resource)
+      : null;
+
+    // Strip any user-submitted langwatch.reserved.* attributes — this domain
+    // is reserved for system-generated attributes only.
+    RecordSpanCommand.stripReservedAttributes(
+      spanToProcess,
+      resourceToProcess,
+      this.logger,
+    );
+
+    this.capOversizedAttributesIfNeeded({
+      spanToProcess,
+      resourceToProcess,
+      skipCap: Boolean(commandData.spoolRef),
+      tenantId,
+      traceId,
+      spanId,
+    });
+
+    const piiRedactionLevel =
+      resolvedCommandData.piiRedactionLevel ?? DEFAULT_PII_REDACTION_LEVEL;
+
+    await this.enrichSpan({
+      spanToProcess,
+      resourceToProcess,
+      piiRedactionLevel,
+      tenantId,
+      tenantIdStr,
+    });
+
+    await this.applyContentDrop({
+      spanToProcess,
+      tenantIdStr,
+      tenantId,
+      traceId,
+      spanId,
+    });
+
+    return [
+      this.buildSpanReceivedEvent({
+        resolvedCommandData,
+        spanToProcess,
+        resourceToProcess,
+        piiRedactionLevel,
+        traceId,
+        spanId,
+        tenantId,
+        tenantIdStr,
+      }),
+    ];
+  }
+
+  /**
+   * ADR-022: Oversized command path — reconstitute span from S3 spool. When
+   * spoolRef is present, the command was spooled at the edge because the
+   * payload exceeded COMMAND_INLINE_THRESHOLD.
+   *
+   * Guard: if the command carries a spoolRef but this handler has no
+   * blobStore, we MUST throw rather than silently proceeding. The edge
+   * cleared span.attributes to [] before spooling, so continuing without
+   * reconstitution would write a span with empty attributes to event_log —
+   * permanent, silent data loss (event_log is the sole source of truth).
+   * Throwing lets the command framework retry / surface the misconfiguration
+   * instead of corrupting durable storage.
+   */
+  private async resolveCommandData(
+    commandData: RecordSpanCommandData,
+  ): Promise<RecordSpanCommandData> {
+    if (commandData.spoolRef && !this.blobStore) {
+      throw new Error(
+        `ADR-022: command carries spoolRef "${commandData.spoolRef}" but this handler has no blobStore configured to reconstitute the span. Refusing to emit a span with cleared attributes (would be permanent data loss in event_log).`,
+      );
+    }
+
+    if (!commandData.spoolRef || !this.blobStore) {
+      return commandData;
+    }
+
+    const spoolBody = await this.blobStore.getSpool(commandData.spoolRef);
+    // ADR-022: spool body is the full serialized RecordSpanCommandData.
+    // Merge the spooled span/resource/instrumentationScope fields back into
+    // the in-flight command (the queue message carries only spoolRef + id fields).
+    const parsed = JSON.parse(
+      spoolBody.toString("utf-8"),
+    ) as RecordSpanCommandData;
+
+    return {
+      ...commandData,
+      span: parsed.span,
+      resource: parsed.resource,
+      instrumentationScope: parsed.instrumentationScope,
+    };
+  }
+
+  /**
+   * Caps oversized attribute values (multi-MB base64 images, huge params)
+   * before this span becomes a folded event. The trace-processing fold state
+   * is read-modify-written in Redis per event; multi-MB values saturate the
+   * single-threaded command loop and collapse folding throughput. Capping
+   * here keeps the fold state small for every ingestion path that dispatches
+   * recordSpan (collector REST and OTLP).
+   *
+   * ADR-022: `skipCap` is true for spool-reconstituted spans. When a command
+   * carries a spoolRef, the full content has already bypassed the Redis
+   * pressure point and MUST be written to event_log in its entirety. The
+   * cap's purpose is Redis safety, not event_log correctness.
+   *
+   * SAFETY DEPENDENCY: this skip is only safe because `leanForProjection`
+   * runs UNCONDITIONALLY in eventSourcingService.ts (between storeEvents and
+   * dispatch) to lean the projection state. If that lean step is ever made
+   * conditional, spool-reconstituted (full-content) spans would re-introduce
+   * the Redis fold-state clog this cap otherwise guards against.
+   */
+  private capOversizedAttributesIfNeeded(args: {
+    spanToProcess: OtlpSpan;
+    resourceToProcess: OtlpResource | null;
+    skipCap: boolean;
+    tenantId: TenantId;
+    traceId: string;
+    spanId: string;
+  }): void {
+    const {
+      spanToProcess,
+      resourceToProcess,
+      skipCap,
+      tenantId,
+      traceId,
+      spanId,
+    } = args;
+    if (skipCap) {
+      return;
+    }
+
+    const cappedAttributeCount = capOversizedAttributes(
+      spanToProcess,
+      resourceToProcess,
+    );
+    if (cappedAttributeCount > 0) {
+      this.logger.warn(
+        { tenantId, traceId, spanId, cappedAttributeCount },
+        "Capped oversized span attribute value(s) before ingestion",
+      );
+    }
+  }
+
+  /**
+   * Runs PII redaction, cost enrichment, and token estimation in parallel.
+   * Safe: PII modifies existing attr values; cost and tokens push new entries.
+   * Cost and token estimation are non-critical — log and continue. PII
+   * redaction is critical — unredacted spans must not be emitted.
+   */
+  private async enrichSpan(args: {
+    spanToProcess: OtlpSpan;
+    resourceToProcess: OtlpResource | null;
+    piiRedactionLevel: PIIRedactionLevel;
+    tenantId: TenantId;
+    tenantIdStr: string;
+  }): Promise<void> {
+    const {
+      spanToProcess,
+      resourceToProcess,
+      piiRedactionLevel,
+      tenantId,
+      tenantIdStr,
+    } = args;
+
+    const [piiResult, costResult, tokenResult] = await Promise.allSettled([
+      this.deps.piiRedactionService.redactSpan({
+        span: spanToProcess,
+        resource: resourceToProcess,
+        piiRedactionLevel,
+        tenantId,
+      }),
+      this.deps.costEnrichmentService.enrichSpan(spanToProcess, tenantIdStr),
+      this.deps.tokenEstimationService.estimateSpanTokens({
+        span: spanToProcess,
+        tenantId: tenantIdStr,
+      }),
+    ]);
+
+    if (costResult.status === "rejected") {
+      this.logger.warn(
+        { error: costResult.reason },
+        "Cost enrichment failed, continuing without cost data",
+      );
+    }
+
+    if (tokenResult.status === "rejected") {
+      this.logger.warn(
+        { error: tokenResult.reason },
+        "Token estimation failed, continuing without estimated tokens",
+      );
+    }
+
+    if (piiResult.status === "rejected") {
+      this.logger.error(
+        { error: piiResult.reason },
+        "PII redaction failed, aborting span processing to prevent PII leak",
+      );
+      throw piiResult.reason instanceof Error
+        ? piiResult.reason
+        : new Error(String(piiResult.reason));
+    }
+  }
+
+  /**
+   * Applies the scoped data-privacy DROP at this single span choke point,
+   * AFTER redaction (dropping a whole category makes redacting it moot).
+   * Doing it here, before the event is emitted, means both the stored span
+   * and the trace-summary fold (which derives ComputedInput/Output from the
+   * same event) never see the dropped categories. The drop fails open
+   * internally (a policy-resolution error keeps the span intact and is
+   * logged), so this call never aborts span processing.
+   */
+  private async applyContentDrop(args: {
+    spanToProcess: OtlpSpan;
+    tenantIdStr: string;
+    tenantId: TenantId;
+    traceId: string;
+    spanId: string;
+  }): Promise<void> {
+    const { spanToProcess, tenantIdStr, tenantId, traceId, spanId } = args;
+
+    const dropResult = await this.deps.contentDropService.dropSpanContent({
+      span: spanToProcess,
+      projectId: tenantIdStr,
+    });
+    if (dropResult.droppedCount > 0) {
+      this.logger.debug(
+        {
+          tenantId,
+          traceId,
+          spanId,
+          droppedCount: dropResult.droppedCount,
+          droppedCategories: dropResult.droppedCategories,
+        },
+        "Dropped span content per data-privacy policy",
+      );
+    }
+  }
+
+  private buildSpanReceivedEvent(args: {
+    resolvedCommandData: RecordSpanCommandData;
+    spanToProcess: OtlpSpan;
+    resourceToProcess: OtlpResource | null;
+    piiRedactionLevel: PIIRedactionLevel;
+    traceId: string;
+    spanId: string;
+    tenantId: TenantId;
+    tenantIdStr: string;
+  }): SpanReceivedEvent {
+    const {
+      resolvedCommandData,
+      spanToProcess,
+      resourceToProcess,
+      piiRedactionLevel,
+      traceId,
+      spanId,
+      tenantId,
+      tenantIdStr,
+    } = args;
+
+    const spanReceivedEvent = EventUtils.createEvent<SpanReceivedEvent>({
+      aggregateType: "trace",
+      aggregateId: traceId,
+      tenantId,
+      type: SPAN_RECEIVED_EVENT_TYPE,
+      version: SPAN_RECEIVED_EVENT_VERSION_LATEST,
+      data: {
+        span: spanToProcess,
+        resource: resourceToProcess,
+        instrumentationScope: resolvedCommandData.instrumentationScope,
+        piiRedactionLevel,
+      },
+      metadata: { traceId, spanId },
+      occurredAt: resolvedCommandData.occurredAt,
+      idempotencyKey: `${tenantIdStr}:${traceId}:${spanId}`,
+    });
+
+    this.logger.debug(
+      { tenantId, traceId, spanId, eventId: spanReceivedEvent.id },
+      "Emitting SpanReceivedEvent",
+    );
+
+    return spanReceivedEvent;
   }
 
   /**

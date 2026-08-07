@@ -158,36 +158,41 @@ function findLoneBareInclude(
  * `LogicalExpression`. Used to keep `addSameFieldOrValue` from re-wrapping
  * a value that's already part of a same-field OR group.
  */
+interface TagLocation {
+  start: number;
+  end: number;
+}
+
+function nodeIsInsideOrGroup(
+  node: LiqeQuery,
+  target: TagLocation,
+  underOr: boolean,
+): boolean {
+  if (node.type === "Tag") {
+    return (
+      underOr &&
+      node.location.start === target.start &&
+      node.location.end === target.end
+    );
+  }
+  if (node.type === "LogicalExpression") {
+    const isOr = node.operator.operator === "OR";
+    return (
+      nodeIsInsideOrGroup(node.left, target, underOr || isOr) ||
+      nodeIsInsideOrGroup(node.right, target, underOr || isOr)
+    );
+  }
+  if (node.type === "UnaryOperator") {
+    return nodeIsInsideOrGroup(node.operand, target, underOr);
+  }
+  if (node.type === "ParenthesizedExpression") {
+    return nodeIsInsideOrGroup(node.expression, target, underOr);
+  }
+  return false;
+}
+
 function isInsideOrGroup(ast: LiqeQuery, start: number, end: number): boolean {
-  let inside = false;
-  const visit = (node: LiqeQuery, underOr: boolean): void => {
-    if (inside) return;
-    if (node.type === "Tag") {
-      if (
-        underOr &&
-        node.location.start === start &&
-        node.location.end === end
-      ) {
-        inside = true;
-      }
-      return;
-    }
-    if (node.type === "LogicalExpression") {
-      const isOr = node.operator.operator === "OR";
-      visit(node.left, underOr || isOr);
-      visit(node.right, underOr || isOr);
-      return;
-    }
-    if (node.type === "UnaryOperator") {
-      visit(node.operand, underOr);
-      return;
-    }
-    if (node.type === "ParenthesizedExpression") {
-      visit(node.expression, underOr);
-    }
-  };
-  visit(ast, false);
-  return inside;
+  return nodeIsInsideOrGroup(ast, { start, end }, false);
 }
 
 /**

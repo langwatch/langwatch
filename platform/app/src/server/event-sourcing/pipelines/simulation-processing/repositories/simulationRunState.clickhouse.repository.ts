@@ -79,6 +79,82 @@ type ClickHouseSimulationRunWriteRecord = WithDateWrites<
   | "LastEventOccurredAt"
 >;
 
+function numberOrNullStrict(value: number | null): number | null {
+  return value === null ? null : Number(value);
+}
+
+function numberOrNullLoose(value: number | null | undefined): number | null {
+  return value === null || value === undefined ? null : Number(value);
+}
+
+function mapMessagesFromRecord(
+  record: ClickHouseSimulationRunRecord,
+): SimulationRunStateData["Messages"] {
+  const ids = record["Messages.Id"] ?? [];
+  return ids.map((Id, i) => ({
+    Id,
+    Role: record["Messages.Role"]?.[i] ?? "",
+    Content: record["Messages.Content"]?.[i] ?? "",
+    TraceId: record["Messages.TraceId"]?.[i] ?? "",
+    Rest: record["Messages.Rest"]?.[i] ?? "",
+  }));
+}
+
+function mapTimestampsFromRecord(record: ClickHouseSimulationRunRecord) {
+  return {
+    StartedAt: numberOrNullStrict(record.StartedAt),
+    QueuedAt: numberOrNullLoose(record.QueuedAt),
+    CreatedAt: Number(record.CreatedAt),
+    UpdatedAt: Number(record.UpdatedAt),
+    FinishedAt: numberOrNullStrict(record.FinishedAt),
+    ArchivedAt: numberOrNullStrict(record.ArchivedAt),
+    CancellationRequestedAt: numberOrNullLoose(record.CancellationRequestedAt),
+    LastSnapshotOccurredAt: Number(record.LastSnapshotOccurredAt ?? 0),
+    LastEventOccurredAt: Number(record.LastEventOccurredAt ?? 0),
+  };
+}
+
+function mapMessageColumnsFromData(
+  messages: SimulationRunStateData["Messages"],
+): Pick<
+  ClickHouseSimulationRunWriteRecord,
+  | "Messages.Id"
+  | "Messages.Role"
+  | "Messages.Content"
+  | "Messages.TraceId"
+  | "Messages.Rest"
+> {
+  return {
+    "Messages.Id": messages.map((m) => m.Id),
+    "Messages.Role": messages.map((m) => m.Role),
+    "Messages.Content": messages.map((m) => m.Content),
+    "Messages.TraceId": messages.map((m) => m.TraceId),
+    "Messages.Rest": messages.map((m) => m.Rest),
+  };
+}
+
+function dateOrNull(value: number | null): Date | null {
+  return value != null ? new Date(value) : null;
+}
+
+function dateOrEpoch(value: number): Date {
+  return value ? new Date(value) : new Date(0);
+}
+
+function mapTimestampColumnsFromData(data: SimulationRunStateData) {
+  return {
+    StartedAt: new Date(data.StartedAt ?? data.CreatedAt),
+    QueuedAt: dateOrNull(data.QueuedAt),
+    CreatedAt: data.CreatedAt != null ? new Date(data.CreatedAt) : new Date(),
+    UpdatedAt: new Date(data.UpdatedAt),
+    FinishedAt: dateOrNull(data.FinishedAt),
+    ArchivedAt: dateOrNull(data.ArchivedAt),
+    CancellationRequestedAt: dateOrNull(data.CancellationRequestedAt),
+    LastSnapshotOccurredAt: dateOrEpoch(data.LastSnapshotOccurredAt),
+    LastEventOccurredAt: dateOrEpoch(data.LastEventOccurredAt),
+  };
+}
+
 export class SimulationRunStateRepositoryClickHouse<
   ProjectionType extends Projection = Projection,
 > implements SimulationRunStateRepository<ProjectionType>
@@ -88,7 +164,6 @@ export class SimulationRunStateRepositoryClickHouse<
   private mapClickHouseRecordToProjectionData(
     record: ClickHouseSimulationRunRecord,
   ): SimulationRunStateData {
-    const ids = record["Messages.Id"] ?? [];
     return {
       ScenarioRunId: record.ScenarioRunId,
       ScenarioId: record.ScenarioId,
@@ -98,13 +173,7 @@ export class SimulationRunStateRepositoryClickHouse<
       Name: record.Name,
       Description: record.Description,
       Metadata: record.Metadata,
-      Messages: ids.map((Id, i) => ({
-        Id,
-        Role: record["Messages.Role"]?.[i] ?? "",
-        Content: record["Messages.Content"]?.[i] ?? "",
-        TraceId: record["Messages.TraceId"]?.[i] ?? "",
-        Rest: record["Messages.Rest"]?.[i] ?? "",
-      })),
+      Messages: mapMessagesFromRecord(record),
       TraceIds: record.TraceIds ?? [],
       Verdict: record.Verdict,
       Reasoning: record.Reasoning,
@@ -118,22 +187,7 @@ export class SimulationRunStateRepositoryClickHouse<
       TraceMetrics: record.TraceMetricsJson
         ? JSON.parse(record.TraceMetricsJson)
         : {},
-      StartedAt: record.StartedAt === null ? null : Number(record.StartedAt),
-      QueuedAt:
-        record.QueuedAt === null || record.QueuedAt === undefined
-          ? null
-          : Number(record.QueuedAt),
-      CreatedAt: Number(record.CreatedAt),
-      UpdatedAt: Number(record.UpdatedAt),
-      FinishedAt: record.FinishedAt === null ? null : Number(record.FinishedAt),
-      ArchivedAt: record.ArchivedAt === null ? null : Number(record.ArchivedAt),
-      CancellationRequestedAt:
-        record.CancellationRequestedAt === null ||
-        record.CancellationRequestedAt === undefined
-          ? null
-          : Number(record.CancellationRequestedAt),
-      LastSnapshotOccurredAt: Number(record.LastSnapshotOccurredAt ?? 0),
-      LastEventOccurredAt: Number(record.LastEventOccurredAt ?? 0),
+      ...mapTimestampsFromRecord(record),
     };
   }
 
@@ -162,11 +216,7 @@ export class SimulationRunStateRepositoryClickHouse<
       Name: data.Name,
       Description: data.Description,
       Metadata: data.Metadata,
-      "Messages.Id": data.Messages.map((m) => m.Id),
-      "Messages.Role": data.Messages.map((m) => m.Role),
-      "Messages.Content": data.Messages.map((m) => m.Content),
-      "Messages.TraceId": data.Messages.map((m) => m.TraceId),
-      "Messages.Rest": data.Messages.map((m) => m.Rest),
+      ...mapMessageColumnsFromData(data.Messages),
       TraceIds: data.TraceIds,
       Verdict: data.Verdict,
       Reasoning: data.Reasoning,
@@ -181,22 +231,7 @@ export class SimulationRunStateRepositoryClickHouse<
         Object.keys(data.TraceMetrics).length > 0
           ? JSON.stringify(data.TraceMetrics)
           : "",
-      StartedAt: new Date(data.StartedAt ?? data.CreatedAt),
-      QueuedAt: data.QueuedAt != null ? new Date(data.QueuedAt) : null,
-      CreatedAt: data.CreatedAt != null ? new Date(data.CreatedAt) : new Date(),
-      UpdatedAt: new Date(data.UpdatedAt),
-      FinishedAt: data.FinishedAt != null ? new Date(data.FinishedAt) : null,
-      ArchivedAt: data.ArchivedAt != null ? new Date(data.ArchivedAt) : null,
-      CancellationRequestedAt:
-        data.CancellationRequestedAt != null
-          ? new Date(data.CancellationRequestedAt)
-          : null,
-      LastSnapshotOccurredAt: data.LastSnapshotOccurredAt
-        ? new Date(data.LastSnapshotOccurredAt)
-        : new Date(0),
-      LastEventOccurredAt: data.LastEventOccurredAt
-        ? new Date(data.LastEventOccurredAt)
-        : new Date(0),
+      ...mapTimestampColumnsFromData(data),
       // Placeholder; storeProjection / storeProjectionBatch overwrite this with
       // the resolved retention (platform default when the tenant has none).
       _retention_days: PLATFORM_DEFAULT_RETENTION_DAYS,

@@ -10,6 +10,7 @@
 import type { OpenAIResponsesProviderOptions } from "@ai-sdk/openai";
 import { createLogger } from "@langwatch/observability";
 import { generateText } from "ai";
+import type { Context } from "hono";
 import { streamSSE } from "hono/streaming";
 import { CompletionCopilot } from "monacopilot";
 import { z } from "zod";
@@ -127,6 +128,157 @@ secured
 
 // ── POST /post_event ─────────────────────────────────────────────────
 
+/** Resolves the event's envs and datasets into a dispatchable message, or
+ *  the error response to return when it cannot be prepared. */
+async function loadStudioMessage({
+  c,
+  eventWithoutEnvs,
+  projectId,
+}: {
+  c: Context;
+  eventWithoutEnvs: StudioClientEvent;
+  projectId: string;
+}): Promise<
+  { ok: true; message: StudioClientEvent } | { ok: false; response: Response }
+> {
+  try {
+    const message = await loadDatasets(
+      await addEnvs(eventWithoutEnvs, projectId),
+      projectId,
+    );
+    return { ok: true, message };
+  } catch (error) {
+    // I-READY: loading a dataset that's still preparing (s3_jsonl normalize in
+    // flight) is a client-precondition failure, not a server fault — surface a
+    // clean 425 (mirroring the dataset REST layer) and skip the Sentry capture
+    // so an expected, transient state doesn't page anyone.
+    if (error instanceof DatasetNotReadyError) {
+      return {
+        ok: false,
+        response: c.json({ error: error.message }, { status: 425 }),
+      };
+    }
+    // A node reached dispatch without a model: fixable in the editor,
+    // not a server fault — 422 and no error capture.
+    if (error instanceof LlmModelNotSetError) {
+      return {
+        ok: false,
+        response: c.json(
+          { error: error.message, cause: error.cause },
+          { status: 422 },
+        ),
+      };
+    }
+    logger.error({ error, projectId }, "error");
+    captureException(toError(error), { extra: { projectId } });
+    return {
+      ok: false,
+      response: c.json({ error: (error as Error).message }, { status: 500 }),
+    };
+  }
+}
+
+/** The event types `studioBackendPostEvent` accepts; anything else is a
+ *  client/server contract mismatch. */
+function isKnownStudioEventType(type: StudioClientEvent["type"]): boolean {
+  switch (type) {
+    case "is_alive":
+    case "stop_execution":
+    case "execute_component":
+    case "execute_flow":
+    case "execute_evaluation":
+    case "stop_evaluation_execution":
+    case "execute_optimization":
+    case "stop_optimization_execution":
+      return true;
+    default:
+      return false;
+  }
+}
+
+/** Writes one `studioBackendPostEvent` failure to the SSE stream, shaped
+ *  per-component when the event names one, generically otherwise. */
+function writeStudioErrorEvent({
+  stream,
+  message,
+  error,
+}: {
+  stream: Parameters<Parameters<typeof streamSSE>[1]>[0];
+  message: StudioClientEvent;
+  error: unknown;
+}): void {
+  const errorMessage = error instanceof Error ? error.message : String(error);
+
+  if ("node_id" in message.payload && message.payload.node_id) {
+    void stream.writeSSE({
+      data: JSON.stringify({
+        type: "component_state_change",
+        payload: {
+          component_id: message.payload.node_id,
+          execution_state: {
+            status: "error",
+            error: errorMessage,
+            timestamps: { finished_at: Date.now() },
+          },
+        },
+      }),
+    });
+  } else {
+    void stream.writeSSE({
+      data: JSON.stringify({
+        type: "error",
+        payload: { message: errorMessage },
+      }),
+    });
+  }
+}
+
+/** Runs the message through the studio backend, forwarding server events to
+ *  the SSE stream and resolving once it signals "done" (with a grace period
+ *  for any trailing writes) or fails. */
+function runStudioEventStream({
+  stream,
+  projectId,
+  message,
+}: {
+  stream: Parameters<Parameters<typeof streamSSE>[1]>[0];
+  projectId: string;
+  message: StudioClientEvent;
+}): Promise<void> {
+  let resolved = false;
+  return new Promise<void>((resolve) => {
+    const resolveOnce = () => {
+      if (!resolved) {
+        resolved = true;
+        resolve();
+      }
+    };
+
+    void studioBackendPostEvent({
+      projectId,
+      message,
+      onEvent: (serverEvent: StudioServerEvent) => {
+        void stream.writeSSE({
+          data: JSON.stringify(serverEvent),
+        });
+
+        if (serverEvent.type === "done") {
+          setTimeout(() => {
+            resolveOnce();
+          }, 1000);
+        }
+      },
+    })
+      .catch((error: unknown) => {
+        logger.error({ error }, "Error handling message");
+        writeStudioErrorEvent({ stream, message, error });
+      })
+      .finally(() => {
+        resolveOnce();
+      });
+  });
+}
+
 secured
   .access(
     handlerManagedAuth({
@@ -168,49 +320,22 @@ secured
         );
       }
 
-      let message: StudioClientEvent;
-      try {
-        message = await loadDatasets(
-          await addEnvs(eventWithoutEnvs, projectId),
-          projectId,
-        );
-      } catch (error) {
-        // I-READY: loading a dataset that's still preparing (s3_jsonl normalize in
-        // flight) is a client-precondition failure, not a server fault — surface a
-        // clean 425 (mirroring the dataset REST layer) and skip the Sentry capture
-        // so an expected, transient state doesn't page anyone.
-        if (error instanceof DatasetNotReadyError) {
-          return c.json({ error: error.message }, { status: 425 });
-        }
-        // A node reached dispatch without a model: fixable in the editor,
-        // not a server fault — 422 and no error capture.
-        if (error instanceof LlmModelNotSetError) {
-          return c.json(
-            { error: error.message, cause: error.cause },
-            { status: 422 },
-          );
-        }
-        logger.error({ error, projectId }, "error");
-        captureException(toError(error), { extra: { projectId } });
-        return c.json({ error: (error as Error).message }, { status: 500 });
+      const loaded = await loadStudioMessage({
+        c,
+        eventWithoutEnvs,
+        projectId,
+      });
+      if (!loaded.ok) {
+        return loaded.response;
       }
+      const { message } = loaded;
 
-      switch (message.type) {
-        case "is_alive":
-        case "stop_execution":
-        case "execute_component":
-        case "execute_flow":
-        case "execute_evaluation":
-        case "stop_evaluation_execution":
-        case "execute_optimization":
-        case "stop_optimization_execution":
-          break;
-        default:
-          return c.json(
-            //@ts-expect-error
-            { error: `Unknown event type on server: ${message.type}` },
-            { status: 400 },
-          );
+      if (!isKnownStudioEventType(message.type)) {
+        return c.json(
+          //@ts-expect-error
+          { error: `Unknown event type on server: ${message.type}` },
+          { status: 400 },
+        );
       }
 
       // Optimization is DSPy-only; the Go engine dropped it. Stop events
@@ -227,64 +352,7 @@ secured
       }
 
       return streamSSE(c, async (stream) => {
-        let resolved = false;
-        const streamDone = new Promise<void>((resolve) => {
-          const resolveOnce = () => {
-            if (!resolved) {
-              resolved = true;
-              resolve();
-            }
-          };
-
-          void studioBackendPostEvent({
-            projectId,
-            message,
-            onEvent: (serverEvent: StudioServerEvent) => {
-              void stream.writeSSE({
-                data: JSON.stringify(serverEvent),
-              });
-
-              if (serverEvent.type === "done") {
-                setTimeout(() => {
-                  resolveOnce();
-                }, 1000);
-              }
-            },
-          })
-            .catch((error: unknown) => {
-              logger.error({ error }, "Error handling message");
-              const errorMessage =
-                error instanceof Error ? error.message : String(error);
-
-              if ("node_id" in message.payload && message.payload.node_id) {
-                void stream.writeSSE({
-                  data: JSON.stringify({
-                    type: "component_state_change",
-                    payload: {
-                      component_id: message.payload.node_id,
-                      execution_state: {
-                        status: "error",
-                        error: errorMessage,
-                        timestamps: { finished_at: Date.now() },
-                      },
-                    },
-                  }),
-                });
-              } else {
-                void stream.writeSSE({
-                  data: JSON.stringify({
-                    type: "error",
-                    payload: { message: errorMessage },
-                  }),
-                });
-              }
-            })
-            .finally(() => {
-              resolveOnce();
-            });
-        });
-
-        await streamDone;
+        await runStudioEventStream({ stream, projectId, message });
       });
     },
   );

@@ -134,6 +134,177 @@ export type VersionedPrompt = {
   parameters: Record<string, unknown>;
 };
 
+/** Everything `createPrompt` accepts: config metadata plus initial version data. */
+type CreatePromptParams = {
+  // Config data
+  projectId: string;
+  organizationId?: string;
+  handle: string;
+  scope?: PromptScope;
+  // Version data
+  authorId?: string;
+  prompt?: string;
+  messages?: z.infer<typeof messageSchema>[];
+  inputs?: z.infer<typeof inputsSchema>[];
+  outputs?: z.infer<typeof outputsSchema>[];
+  model?: string;
+  temperature?: number;
+  maxTokens?: number;
+  // Traditional sampling parameters
+  topP?: number;
+  frequencyPenalty?: number;
+  presencePenalty?: number;
+  // Other sampling parameters
+  seed?: number;
+  topK?: number;
+  minP?: number;
+  repetitionPenalty?: number;
+  // Reasoning parameter (canonical/unified field)
+  reasoning?: string;
+  verbosity?: string;
+  promptingTechnique?: z.infer<typeof promptingTechniqueSchema>;
+  demonstrations?: LatestConfigVersionSchema["configData"]["demonstrations"];
+  commitMessage?: string | null;
+  parameters?: Record<string, unknown>;
+};
+
+/** How a local prompt file reconciled against its server-side counterpart. */
+type SyncPromptResult = {
+  action: "created" | "updated" | "conflict" | "up_to_date";
+  prompt?: VersionedPrompt;
+  conflictInfo?: {
+    localVersion: number;
+    remoteVersion: number;
+    differences: string[];
+    remoteConfigData: ConfigData;
+    remoteParameters: Record<string, unknown>;
+  };
+};
+
+// Must run before comparison/creation so both code paths use the merged inputs.
+const withAutoDetectedInputs = (localConfigData: ConfigData) => ({
+  ...localConfigData,
+  inputs: mergeAutoDetectedInputs({
+    prompt: localConfigData.prompt,
+    messages: localConfigData.messages ?? [],
+    inputs: localConfigData.inputs ?? [],
+  }),
+});
+
+// The locked "input" variable always sorts first, then alphabetically.
+const byLockedInputThenAlphabetical = (
+  a: { identifier: string },
+  b: { identifier: string },
+): number => {
+  if (a.identifier === "input") return -1;
+  if (b.identifier === "input") return 1;
+  return a.identifier.localeCompare(b.identifier);
+};
+
+// Include all sampling parameters only when defined
+const definedSamplingFields = (existingPrompt: VersionedPrompt) => ({
+  ...(existingPrompt.temperature !== undefined && {
+    temperature: existingPrompt.temperature,
+  }),
+  ...(existingPrompt.maxTokens !== undefined && {
+    max_tokens: existingPrompt.maxTokens,
+  }),
+  ...(existingPrompt.topP !== undefined && {
+    top_p: existingPrompt.topP,
+  }),
+  ...(existingPrompt.frequencyPenalty !== undefined && {
+    frequency_penalty: existingPrompt.frequencyPenalty,
+  }),
+  ...(existingPrompt.presencePenalty !== undefined && {
+    presence_penalty: existingPrompt.presencePenalty,
+  }),
+  ...(existingPrompt.seed !== undefined && {
+    seed: existingPrompt.seed,
+  }),
+});
+
+const definedDecodingFields = (existingPrompt: VersionedPrompt) => ({
+  ...(existingPrompt.topK !== undefined && {
+    top_k: existingPrompt.topK,
+  }),
+  ...(existingPrompt.minP !== undefined && {
+    min_p: existingPrompt.minP,
+  }),
+  ...(existingPrompt.repetitionPenalty !== undefined && {
+    repetition_penalty: existingPrompt.repetitionPenalty,
+  }),
+  ...(existingPrompt.reasoning !== undefined && {
+    reasoning: existingPrompt.reasoning,
+  }),
+  ...(existingPrompt.verbosity !== undefined && {
+    verbosity: existingPrompt.verbosity,
+  }),
+});
+
+// Build remoteConfigData with ALL fields the schema expects.
+// Only include optional sampling parameters when they are defined
+// to avoid introducing false diffs from undefined values.
+const buildRemoteConfigData = (
+  existingPrompt: VersionedPrompt,
+): LatestConfigVersionSchema["configData"] => ({
+  model: existingPrompt.model,
+  prompt: existingPrompt.prompt,
+  messages: existingPrompt.messages.filter((msg) => msg.role !== "system"),
+  inputs: [...existingPrompt.inputs].sort(byLockedInputThenAlphabetical),
+  outputs: existingPrompt.outputs,
+  // response_format is derived from outputs, not stored separately
+  ...definedSamplingFields(existingPrompt),
+  ...definedDecodingFields(existingPrompt),
+});
+
+const toAuthorSummary = (
+  author: LlmConfigWithLatestVersion["latestVersion"]["author"],
+): VersionedPrompt["author"] =>
+  author
+    ? {
+        id: author.id,
+        name: author.name ?? null,
+        email: author.email ?? null,
+        image: author.image ?? null,
+      }
+    : null;
+
+const samplingParamsFromSource = (source: VersionedPrompt) => ({
+  temperature: source.temperature ?? undefined,
+  maxTokens: source.maxTokens ?? undefined,
+  // Traditional sampling parameters
+  topP: source.topP ?? undefined,
+  frequencyPenalty: source.frequencyPenalty ?? undefined,
+  presencePenalty: source.presencePenalty ?? undefined,
+  // Other sampling parameters
+  seed: source.seed ?? undefined,
+  topK: source.topK ?? undefined,
+  minP: source.minP ?? undefined,
+  repetitionPenalty: source.repetitionPenalty ?? undefined,
+});
+
+const reasoningParamsFromSource = (source: VersionedPrompt) => ({
+  // Reasoning parameter (canonical/unified field)
+  reasoning: source.reasoning ?? undefined,
+  verbosity: source.verbosity ?? undefined,
+  promptingTechnique: source.promptingTechnique ?? undefined,
+  demonstrations: source.demonstrations ?? undefined,
+  parameters: source.parameters ?? undefined,
+});
+
+const hasVersionData = (params: CreatePromptParams): boolean =>
+  Boolean(
+    params.prompt !== undefined ||
+      params.messages !== undefined ||
+      params.inputs !== undefined ||
+      params.outputs !== undefined ||
+      params.model !== undefined ||
+      params.temperature !== undefined ||
+      params.maxTokens !== undefined ||
+      params.promptingTechnique !== undefined ||
+      params.demonstrations !== undefined,
+  );
+
 /**
  * Service layer for managing LLM prompt configurations.
  * Handles business logic for prompt operations including handle formatting.
@@ -211,23 +382,7 @@ export class PromptService {
   }): Promise<VersionedPrompt | null> {
     const { idOrHandle, projectId } = params;
 
-    if (
-      params.tag &&
-      (params.version !== undefined || params.versionId !== undefined)
-    ) {
-      logger.warn(
-        {
-          idOrHandle,
-          tag: params.tag,
-          version: params.version,
-          versionId: params.versionId,
-        },
-        "Mutual exclusion: cannot specify both version/versionId and tag",
-      );
-      throw new TagValidationError(
-        "Cannot specify both 'version'/'versionId' and 'tag'. Use one or the other.",
-      );
-    }
+    this.assertTagAndVersionMutuallyExclusive(params);
 
     const organizationId =
       params.organizationId ??
@@ -242,40 +397,18 @@ export class PromptService {
     // If a tag is provided, resolve it to a versionId
     let resolvedVersionId = params.versionId;
     if (normalizedTag) {
-      const config = await this.repository.getPromptByIdOrHandle({
+      const taggedVersionId = await this.resolveTagToVersionId({
         idOrHandle,
         projectId,
         organizationId,
+        tag: normalizedTag,
       });
 
-      if (!config) {
+      if (taggedVersionId === null) {
         return null;
       }
 
-      const tagId = await this.resolveTagNameToId({
-        tagName: normalizedTag,
-        organizationId,
-      });
-
-      if (!tagId) {
-        throw new NotFoundError(
-          `Tag "${normalizedTag}" not found for prompt "${idOrHandle}"`,
-        );
-      }
-
-      const versionTag = await this.tagRepository.getByConfigAndTagId({
-        configId: config.id,
-        tagId,
-        projectId,
-      });
-
-      if (!versionTag) {
-        throw new NotFoundError(
-          `Tag "${normalizedTag}" not found for prompt "${idOrHandle}"`,
-        );
-      }
-
-      resolvedVersionId = versionTag.versionId;
+      resolvedVersionId = taggedVersionId;
     }
 
     const config = await this.repository.getConfigByIdOrHandleWithLatestVersion(
@@ -319,6 +452,85 @@ export class PromptService {
         latestVersionId,
       }),
     );
+  }
+
+  /**
+   * A tag names one version on its own, so pairing it with an explicit
+   * version or versionId is ambiguous rather than merely redundant.
+   */
+  private assertTagAndVersionMutuallyExclusive(params: {
+    idOrHandle: string;
+    version?: number;
+    versionId?: string;
+    tag?: string;
+  }): void {
+    if (
+      params.tag &&
+      (params.version !== undefined || params.versionId !== undefined)
+    ) {
+      logger.warn(
+        {
+          idOrHandle: params.idOrHandle,
+          tag: params.tag,
+          version: params.version,
+          versionId: params.versionId,
+        },
+        "Mutual exclusion: cannot specify both version/versionId and tag",
+      );
+      throw new TagValidationError(
+        "Cannot specify both 'version'/'versionId' and 'tag'. Use one or the other.",
+      );
+    }
+  }
+
+  /**
+   * The version a tag points at for a prompt, or `null` when the prompt
+   * itself does not exist.
+   *
+   * @throws NotFoundError when the prompt exists but the tag does not point at it
+   */
+  private async resolveTagToVersionId(params: {
+    idOrHandle: string;
+    projectId: string;
+    organizationId: string;
+    tag: string;
+  }): Promise<string | null> {
+    const { idOrHandle, projectId, organizationId, tag } = params;
+
+    const config = await this.repository.getPromptByIdOrHandle({
+      idOrHandle,
+      projectId,
+      organizationId,
+    });
+
+    if (!config) {
+      return null;
+    }
+
+    const tagId = await this.resolveTagNameToId({
+      tagName: tag,
+      organizationId,
+    });
+
+    if (!tagId) {
+      throw new NotFoundError(
+        `Tag "${tag}" not found for prompt "${idOrHandle}"`,
+      );
+    }
+
+    const versionTag = await this.tagRepository.getByConfigAndTagId({
+      configId: config.id,
+      tagId,
+      projectId,
+    });
+
+    if (!versionTag) {
+      throw new NotFoundError(
+        `Tag "${tag}" not found for prompt "${idOrHandle}"`,
+      );
+    }
+
+    return versionTag.versionId;
   }
 
   /**
@@ -400,55 +612,14 @@ export class PromptService {
    * @param params.schemaVersion - Optional schema version (defaults to latest)
    * @returns The created prompt configuration with its initial version
    */
-  async createPrompt(params: {
-    // Config data
-    projectId: string;
-    organizationId?: string;
-    handle: string;
-    scope?: PromptScope;
-    // Version data
-    authorId?: string;
-    prompt?: string;
-    messages?: z.infer<typeof messageSchema>[];
-    inputs?: z.infer<typeof inputsSchema>[];
-    outputs?: z.infer<typeof outputsSchema>[];
-    model?: string;
-    temperature?: number;
-    maxTokens?: number;
-    // Traditional sampling parameters
-    topP?: number;
-    frequencyPenalty?: number;
-    presencePenalty?: number;
-    // Other sampling parameters
-    seed?: number;
-    topK?: number;
-    minP?: number;
-    repetitionPenalty?: number;
-    // Reasoning parameter (canonical/unified field)
-    reasoning?: string;
-    verbosity?: string;
-    promptingTechnique?: z.infer<typeof promptingTechniqueSchema>;
-    demonstrations?: LatestConfigVersionSchema["configData"]["demonstrations"];
-    commitMessage?: string | null;
-    parameters?: Record<string, unknown>;
-  }): Promise<VersionedPrompt> {
+  async createPrompt(params: CreatePromptParams): Promise<VersionedPrompt> {
     const organizationId =
       params.organizationId ??
       (await this.getOrganizationIdFromProjectId(params.projectId));
     // If any of the version data is provided,
     // we should create a version from that data
     // and it's not consideered a draft
-    const shouldCreateVersion = Boolean(
-      params.prompt !== undefined ||
-        params.messages !== undefined ||
-        params.inputs !== undefined ||
-        params.outputs !== undefined ||
-        params.model !== undefined ||
-        params.temperature !== undefined ||
-        params.maxTokens !== undefined ||
-        params.promptingTechnique !== undefined ||
-        params.demonstrations !== undefined,
-    );
+    const shouldCreateVersion = hasVersionData(params);
 
     shouldCreateVersion &&
       this.versionService.assertNoSystemPromptConflict({
@@ -484,38 +655,7 @@ export class PromptService {
         copiedFromPromptId: null,
       },
       versionData: shouldCreateVersion
-        ? {
-            configData: this.transformToDbFormat({
-              prompt: params.prompt,
-              messages: params.messages,
-              inputs: params.inputs ?? [{ identifier: "input", type: "str" }],
-              outputs: params.outputs ?? [
-                { identifier: "output", type: "str" },
-              ],
-              model: params.model,
-              temperature: params.temperature,
-              maxTokens: params.maxTokens,
-              // Traditional sampling parameters
-              topP: params.topP,
-              frequencyPenalty: params.frequencyPenalty,
-              presencePenalty: params.presencePenalty,
-              // Other sampling parameters
-              seed: params.seed,
-              topK: params.topK,
-              minP: params.minP,
-              repetitionPenalty: params.repetitionPenalty,
-              // Reasoning parameter (canonical/unified field)
-              reasoning: params.reasoning,
-              verbosity: params.verbosity,
-              promptingTechnique: params.promptingTechnique,
-              demonstrations: params.demonstrations,
-            }) as LatestConfigVersionSchema["configData"],
-            schemaVersion: LATEST_SCHEMA_VERSION,
-            commitMessage: params.commitMessage ?? "Initial version",
-            authorId: params.authorId ?? null,
-            version: 1,
-            runtimeParameters: params.parameters ?? {},
-          }
+        ? this.buildInitialVersionData(params)
         : undefined,
     });
 
@@ -527,6 +667,43 @@ export class PromptService {
       config,
       newVersionId ? [{ name: "latest", versionId: newVersionId }] : [],
     );
+  }
+
+  /**
+   * The initial version a newly created prompt is seeded with, in the
+   * repository's storage format.
+   */
+  private buildInitialVersionData(params: CreatePromptParams) {
+    return {
+      configData: this.transformToDbFormat({
+        prompt: params.prompt,
+        messages: params.messages,
+        inputs: params.inputs ?? [{ identifier: "input", type: "str" }],
+        outputs: params.outputs ?? [{ identifier: "output", type: "str" }],
+        model: params.model,
+        temperature: params.temperature,
+        maxTokens: params.maxTokens,
+        // Traditional sampling parameters
+        topP: params.topP,
+        frequencyPenalty: params.frequencyPenalty,
+        presencePenalty: params.presencePenalty,
+        // Other sampling parameters
+        seed: params.seed,
+        topK: params.topK,
+        minP: params.minP,
+        repetitionPenalty: params.repetitionPenalty,
+        // Reasoning parameter (canonical/unified field)
+        reasoning: params.reasoning,
+        verbosity: params.verbosity,
+        promptingTechnique: params.promptingTechnique,
+        demonstrations: params.demonstrations,
+      }) as LatestConfigVersionSchema["configData"],
+      schemaVersion: LATEST_SCHEMA_VERSION,
+      commitMessage: params.commitMessage ?? "Initial version",
+      authorId: params.authorId ?? null,
+      version: 1,
+      runtimeParameters: params.parameters ?? {},
+    };
   }
 
   /**
@@ -690,23 +867,8 @@ export class PromptService {
       inputs: source.inputs ?? undefined,
       outputs: source.outputs ?? undefined,
       model: source.model ?? undefined,
-      temperature: source.temperature ?? undefined,
-      maxTokens: source.maxTokens ?? undefined,
-      // Traditional sampling parameters
-      topP: source.topP ?? undefined,
-      frequencyPenalty: source.frequencyPenalty ?? undefined,
-      presencePenalty: source.presencePenalty ?? undefined,
-      // Other sampling parameters
-      seed: source.seed ?? undefined,
-      topK: source.topK ?? undefined,
-      minP: source.minP ?? undefined,
-      repetitionPenalty: source.repetitionPenalty ?? undefined,
-      // Reasoning parameter (canonical/unified field)
-      reasoning: source.reasoning ?? undefined,
-      verbosity: source.verbosity ?? undefined,
-      promptingTechnique: source.promptingTechnique ?? undefined,
-      demonstrations: source.demonstrations ?? undefined,
-      parameters: source.parameters ?? undefined,
+      ...samplingParamsFromSource(source),
+      ...reasoningParamsFromSource(source),
     };
   }
 
@@ -1025,17 +1187,7 @@ export class PromptService {
     authorId?: string;
     commitMessage?: string;
     parameters?: Record<string, unknown>;
-  }): Promise<{
-    action: "created" | "updated" | "conflict" | "up_to_date";
-    prompt?: VersionedPrompt;
-    conflictInfo?: {
-      localVersion: number;
-      remoteVersion: number;
-      differences: string[];
-      remoteConfigData: ConfigData;
-      remoteParameters: Record<string, unknown>;
-    };
-  }> {
+  }): Promise<SyncPromptResult> {
     const {
       idOrHandle,
       localConfigData,
@@ -1046,15 +1198,7 @@ export class PromptService {
       commitMessage,
     } = params;
 
-    // Must run before comparison/creation so both code paths use the merged inputs.
-    const resolvedConfigData = {
-      ...localConfigData,
-      inputs: mergeAutoDetectedInputs({
-        prompt: localConfigData.prompt,
-        messages: localConfigData.messages ?? [],
-        inputs: localConfigData.inputs ?? [],
-      }),
-    };
+    const resolvedConfigData = withAutoDetectedInputs(localConfigData);
 
     // Check if prompt exists on server
     const existingPrompt = await this.getPromptByIdOrHandle({
@@ -1065,23 +1209,14 @@ export class PromptService {
 
     // Case 1: Prompt doesn't exist on server - create new
     if (!existingPrompt) {
-      // Convert snake_case resolvedConfigData to camelCase for createPrompt,
-      // which internally calls transformToDbFormat. Without this conversion,
-      // snake_case keys like max_tokens would be invisible to createPrompt's
-      // named params (maxTokens), causing data loss.
-      const camelCaseData = transformSnakeToCamel(
-        resolvedConfigData as unknown as Record<string, unknown>,
-      );
-
-      const createdPrompt = await this.createPrompt({
-        handle: idOrHandle,
+      const createdPrompt = await this.createPromptFromLocal({
+        idOrHandle,
+        resolvedConfigData,
         projectId,
         organizationId,
-        scope: "PROJECT" as PromptScope,
         authorId,
-        commitMessage: commitMessage ?? "Synced from local file",
+        commitMessage,
         parameters: params.parameters,
-        ...camelCaseData,
       });
 
       return {
@@ -1098,160 +1233,208 @@ export class PromptService {
     });
 
     const remoteVersion = existingPrompt.version;
-
-    // Build remoteConfigData with ALL fields the schema expects.
-    // Only include optional sampling parameters when they are defined
-    // to avoid introducing false diffs from undefined values.
-    const remoteConfigData: LatestConfigVersionSchema["configData"] = {
-      model: existingPrompt.model,
-      prompt: existingPrompt.prompt,
-      messages: existingPrompt.messages.filter((msg) => msg.role !== "system"),
-      inputs: [...existingPrompt.inputs].sort((a, b) => {
-        if (a.identifier === "input") return -1;
-        if (b.identifier === "input") return 1;
-        return a.identifier.localeCompare(b.identifier);
-      }),
-      outputs: existingPrompt.outputs,
-      // response_format is derived from outputs, not stored separately
-      // Include all sampling parameters only when defined
-      ...(existingPrompt.temperature !== undefined && {
-        temperature: existingPrompt.temperature,
-      }),
-      ...(existingPrompt.maxTokens !== undefined && {
-        max_tokens: existingPrompt.maxTokens,
-      }),
-      ...(existingPrompt.topP !== undefined && {
-        top_p: existingPrompt.topP,
-      }),
-      ...(existingPrompt.frequencyPenalty !== undefined && {
-        frequency_penalty: existingPrompt.frequencyPenalty,
-      }),
-      ...(existingPrompt.presencePenalty !== undefined && {
-        presence_penalty: existingPrompt.presencePenalty,
-      }),
-      ...(existingPrompt.seed !== undefined && {
-        seed: existingPrompt.seed,
-      }),
-      ...(existingPrompt.topK !== undefined && {
-        top_k: existingPrompt.topK,
-      }),
-      ...(existingPrompt.minP !== undefined && {
-        min_p: existingPrompt.minP,
-      }),
-      ...(existingPrompt.repetitionPenalty !== undefined && {
-        repetition_penalty: existingPrompt.repetitionPenalty,
-      }),
-      ...(existingPrompt.reasoning !== undefined && {
-        reasoning: existingPrompt.reasoning,
-      }),
-      ...(existingPrompt.verbosity !== undefined && {
-        verbosity: existingPrompt.verbosity,
-      }),
-    };
+    const remoteConfigData = buildRemoteConfigData(existingPrompt);
 
     // Case 2: Same version - check content
     if (localVersion === remoteVersion) {
-      const comparison = this.repository.compareConfigContent(
+      return await this.syncMatchingVersion({
+        existingPrompt,
         resolvedConfigData,
         remoteConfigData,
-      );
-
-      const parametersEqual = runtimeParametersEqual(
-        params.parameters,
-        existingPrompt.parameters,
-      );
-
-      if (comparison.isEqual && parametersEqual) {
-        // Content is the same - up to date
-        return { action: "up_to_date", prompt: existingPrompt };
-      } else {
-        // Content differs - create new version
-        const allDifferences = [
-          ...(comparison.differences ?? []),
-          ...diffRuntimeParameters({
-            localParameters: params.parameters,
-            remoteParameters: existingPrompt.parameters,
-          }),
-        ];
-        const updatedPrompt = await this.updatePrompt({
-          idOrHandle: existingPrompt.id,
-          projectId,
-          data: {
-            authorId,
-            commitMessage:
-              commitMessage ?? describeLocalFileUpdate(allDifferences),
-            ...this.transformToDbFormat(resolvedConfigData),
-            schemaVersion: SchemaVersion.V1_0,
-            parameters: params.parameters,
-          },
-        });
-
-        return {
-          action: "updated",
-          prompt: updatedPrompt,
-        };
-      }
+        projectId,
+        authorId,
+        commitMessage,
+        parameters: params.parameters,
+      });
     }
 
     // Case 3: Different versions
     if (localVersion && localVersion < remoteVersion) {
-      // Local is behind - check if local content differs from the version it's based on
-      const localBaseVersion = await this.repository.getConfigVersionByNumber({
+      return await this.syncVersionBehindRemote({
         idOrHandle,
-        versionNumber: localVersion,
+        localVersion,
+        remoteVersion,
+        existingPrompt,
+        resolvedConfigData,
+        remoteConfigData,
         projectId,
         organizationId,
+        parameters: params.parameters,
       });
-
-      if (localBaseVersion) {
-        const baseComparison = this.repository.compareConfigContent(
-          resolvedConfigData,
-          localBaseVersion.configData as Record<string, unknown>,
-        );
-
-        const baseParametersEqual = runtimeParametersEqual(
-          params.parameters,
-          localBaseVersion.runtimeParameters as
-            | Record<string, unknown>
-            | undefined,
-        );
-
-        if (baseComparison.isEqual && baseParametersEqual) {
-          // Local hasn't changed since base version - can safely update
-          return { action: "up_to_date", prompt: existingPrompt };
-        }
-      }
-
-      // Local has changes and is behind - conflict
-      return {
-        action: "conflict",
-        conflictInfo: {
-          localVersion,
-          remoteVersion,
-          differences:
-            this.repository.compareConfigContent(
-              resolvedConfigData,
-              remoteConfigData,
-            ).differences ?? [],
-          remoteConfigData,
-          remoteParameters: existingPrompt.parameters ?? {},
-        },
-      };
     }
 
     // Case 4: Local version is newer or unknown - assume conflict
+    return this.buildConflictResult({
+      localVersion: localVersion ?? 0,
+      remoteVersion,
+      existingPrompt,
+      resolvedConfigData,
+      remoteConfigData,
+    });
+  }
+
+  /**
+   * Creates a prompt the server has never seen from its local definition.
+   */
+  private async createPromptFromLocal(params: {
+    idOrHandle: string;
+    resolvedConfigData: ConfigData;
+    projectId: string;
+    organizationId: string;
+    authorId?: string;
+    commitMessage?: string;
+    parameters?: Record<string, unknown>;
+  }): Promise<VersionedPrompt> {
+    // Convert snake_case resolvedConfigData to camelCase for createPrompt,
+    // which internally calls transformToDbFormat. Without this conversion,
+    // snake_case keys like max_tokens would be invisible to createPrompt's
+    // named params (maxTokens), causing data loss.
+    const camelCaseData = transformSnakeToCamel(
+      params.resolvedConfigData as unknown as Record<string, unknown>,
+    );
+
+    return await this.createPrompt({
+      handle: params.idOrHandle,
+      projectId: params.projectId,
+      organizationId: params.organizationId,
+      scope: "PROJECT" as PromptScope,
+      authorId: params.authorId,
+      commitMessage: params.commitMessage ?? "Synced from local file",
+      parameters: params.parameters,
+      ...camelCaseData,
+    });
+  }
+
+  /**
+   * Local and remote sit on the same version, so the content decides:
+   * identical means up to date, anything else becomes a new version.
+   */
+  private async syncMatchingVersion(params: {
+    existingPrompt: VersionedPrompt;
+    resolvedConfigData: ConfigData;
+    remoteConfigData: LatestConfigVersionSchema["configData"];
+    projectId: string;
+    authorId?: string;
+    commitMessage?: string;
+    parameters?: Record<string, unknown>;
+  }): Promise<SyncPromptResult> {
+    const { existingPrompt, resolvedConfigData, remoteConfigData } = params;
+
+    const comparison = this.repository.compareConfigContent(
+      resolvedConfigData,
+      remoteConfigData,
+    );
+
+    const parametersEqual = runtimeParametersEqual(
+      params.parameters,
+      existingPrompt.parameters,
+    );
+
+    if (comparison.isEqual && parametersEqual) {
+      // Content is the same - up to date
+      return { action: "up_to_date", prompt: existingPrompt };
+    }
+
+    // Content differs - create new version
+    const allDifferences = [
+      ...(comparison.differences ?? []),
+      ...diffRuntimeParameters({
+        localParameters: params.parameters,
+        remoteParameters: existingPrompt.parameters,
+      }),
+    ];
+    const updatedPrompt = await this.updatePrompt({
+      idOrHandle: existingPrompt.id,
+      projectId: params.projectId,
+      data: {
+        authorId: params.authorId,
+        commitMessage:
+          params.commitMessage ?? describeLocalFileUpdate(allDifferences),
+        ...this.transformToDbFormat(resolvedConfigData),
+        schemaVersion: SchemaVersion.V1_0,
+        parameters: params.parameters,
+      },
+    });
+
+    return {
+      action: "updated",
+      prompt: updatedPrompt,
+    };
+  }
+
+  /**
+   * Local is behind remote: untouched since the version it was pulled from is
+   * safe to leave alone, anything else is a conflict for the caller to resolve.
+   */
+  private async syncVersionBehindRemote(params: {
+    idOrHandle: string;
+    localVersion: number;
+    remoteVersion: number;
+    existingPrompt: VersionedPrompt;
+    resolvedConfigData: ConfigData;
+    remoteConfigData: LatestConfigVersionSchema["configData"];
+    projectId: string;
+    organizationId: string;
+    parameters?: Record<string, unknown>;
+  }): Promise<SyncPromptResult> {
+    const { idOrHandle, localVersion, projectId, organizationId } = params;
+
+    // Local is behind - check if local content differs from the version it's based on
+    const localBaseVersion = await this.repository.getConfigVersionByNumber({
+      idOrHandle,
+      versionNumber: localVersion,
+      projectId,
+      organizationId,
+    });
+
+    if (localBaseVersion) {
+      const baseComparison = this.repository.compareConfigContent(
+        params.resolvedConfigData,
+        localBaseVersion.configData as Record<string, unknown>,
+      );
+
+      const baseParametersEqual = runtimeParametersEqual(
+        params.parameters,
+        localBaseVersion.runtimeParameters as
+          | Record<string, unknown>
+          | undefined,
+      );
+
+      if (baseComparison.isEqual && baseParametersEqual) {
+        // Local hasn't changed since base version - can safely update
+        return { action: "up_to_date", prompt: params.existingPrompt };
+      }
+    }
+
+    // Local has changes and is behind - conflict
+    return this.buildConflictResult({
+      localVersion,
+      remoteVersion: params.remoteVersion,
+      existingPrompt: params.existingPrompt,
+      resolvedConfigData: params.resolvedConfigData,
+      remoteConfigData: params.remoteConfigData,
+    });
+  }
+
+  private buildConflictResult(params: {
+    localVersion: number;
+    remoteVersion: number;
+    existingPrompt: VersionedPrompt;
+    resolvedConfigData: ConfigData;
+    remoteConfigData: LatestConfigVersionSchema["configData"];
+  }): SyncPromptResult {
     return {
       action: "conflict",
       conflictInfo: {
-        localVersion: localVersion ?? 0,
-        remoteVersion,
+        localVersion: params.localVersion,
+        remoteVersion: params.remoteVersion,
         differences:
           this.repository.compareConfigContent(
-            resolvedConfigData,
-            remoteConfigData,
+            params.resolvedConfigData,
+            params.remoteConfigData,
           ).differences ?? [],
-        remoteConfigData,
-        remoteParameters: existingPrompt.parameters ?? {},
+        remoteConfigData: params.remoteConfigData,
+        remoteParameters: params.existingPrompt.parameters ?? {},
       },
     };
   }
@@ -1338,14 +1521,7 @@ export class PromptService {
       outputs: configData.outputs,
       responseFormat: deriveResponseFormatFromOutputs(configData.outputs),
       authorId: config.latestVersion.authorId ?? null,
-      author: config.latestVersion.author
-        ? {
-            id: config.latestVersion.author.id,
-            name: config.latestVersion.author.name ?? null,
-            email: config.latestVersion.author.email ?? null,
-            image: config.latestVersion.author.image ?? null,
-          }
-        : null,
+      author: toAuthorSummary(config.latestVersion.author),
       updatedAt: config.updatedAt,
       createdAt: config.createdAt,
       demonstrations: configData.demonstrations,

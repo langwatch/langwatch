@@ -522,6 +522,62 @@ function nullableFloat(raw: number | string | null | undefined): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+// Feeds the same priority cascade (custom enrichment rates → static model
+// registry → SDK span cost) with the attributes the summary query selects.
+// Each entry sets `key: value || undefined` — falsy raw values (including
+// "") are stored as `undefined`, matching computeSpanCost's bracket-access
+// reads.
+function spanSummaryCostAttrs(row: SpanSummaryQueryRow): NormalizedAttributes {
+  const entries: Array<[string, string]> = [
+    [ATTR_KEYS.GEN_AI_RESPONSE_MODEL, row.ResponseModel],
+    [ATTR_KEYS.GEN_AI_REQUEST_MODEL, row.Model],
+    [ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS, row.CacheReadTokens],
+    [
+      ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS,
+      row.CacheCreationTokens,
+    ],
+    [ATTR_KEYS.GEN_AI_USAGE_INPUT_CHARS, row.InputChars],
+    [ATTR_KEYS.GEN_AI_USAGE_AUDIO_SECONDS, row.AudioSeconds],
+    [ATTR_KEYS.LANGWATCH_MODEL_INPUT_COST_PER_TOKEN, row.CustomInputRate],
+    [ATTR_KEYS.LANGWATCH_MODEL_OUTPUT_COST_PER_TOKEN, row.CustomOutputRate],
+    [
+      ATTR_KEYS.LANGWATCH_MODEL_CACHE_READ_COST_PER_TOKEN,
+      row.CustomCacheReadRate,
+    ],
+    [
+      ATTR_KEYS.LANGWATCH_MODEL_CACHE_CREATION_COST_PER_TOKEN,
+      row.CustomCacheCreationRate,
+    ],
+    [ATTR_KEYS.LANGWATCH_SPAN_COST, row.LwSpanCost],
+  ];
+  const attrs: Record<string, string | undefined> = {};
+  for (const [key, value] of entries) {
+    attrs[key] = value || undefined;
+  }
+  return attrs as NormalizedAttributes;
+}
+
+// Most ingest paths emit token counts but no `gen_ai.usage.cost` —
+// trace-level cost is computed at fold time from tokens × pricing.
+// Mirror that here so the waterfall can show a per-span cost.
+function computeSpanSummaryCost({
+  row,
+  inputTokens,
+  outputTokens,
+}: {
+  row: SpanSummaryQueryRow;
+  inputTokens: number | null;
+  outputTokens: number | null;
+}): number | null {
+  const computed = computeSpanCost({
+    attrs: spanSummaryCostAttrs(row),
+    model: row.ResponseModel || row.Model || undefined,
+    promptTokens: inputTokens,
+    completionTokens: outputTokens,
+  });
+  return computed > 0 ? computed : null;
+}
+
 export function mapSpanSummaryRow(row: SpanSummaryQueryRow): SpanSummaryRow {
   const explicitCost = attrNumber(row.Cost);
   const inputTokens = attrNumber(row.InputTokens);
@@ -529,42 +585,12 @@ export function mapSpanSummaryRow(row: SpanSummaryQueryRow): SpanSummaryRow {
   const cacheReadTokens = attrNumber(row.CacheReadTokens);
   const cacheCreationTokens = attrNumber(row.CacheCreationTokens);
 
-  // Most ingest paths emit token counts but no `gen_ai.usage.cost` —
-  // trace-level cost is computed at fold time from tokens × pricing.
-  // Mirror that here so the waterfall can show a per-span cost: feed
-  // the same priority cascade (custom enrichment rates → static model
-  // registry → SDK span cost) with the attributes this summary query
-  // already selects.
   // Some SDKs emit `gen_ai.usage.cost = 0` meaning "unknown" — treat any
   // non-positive explicit cost as absent so the computed fallback runs.
-  let cost = explicitCost !== null && explicitCost > 0 ? explicitCost : null;
-  if (cost === null) {
-    const computed = computeSpanCost({
-      attrs: {
-        [ATTR_KEYS.GEN_AI_RESPONSE_MODEL]: row.ResponseModel || undefined,
-        [ATTR_KEYS.GEN_AI_REQUEST_MODEL]: row.Model || undefined,
-        [ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]:
-          row.CacheReadTokens || undefined,
-        [ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS]:
-          row.CacheCreationTokens || undefined,
-        [ATTR_KEYS.GEN_AI_USAGE_INPUT_CHARS]: row.InputChars || undefined,
-        [ATTR_KEYS.GEN_AI_USAGE_AUDIO_SECONDS]: row.AudioSeconds || undefined,
-        [ATTR_KEYS.LANGWATCH_MODEL_INPUT_COST_PER_TOKEN]:
-          row.CustomInputRate || undefined,
-        [ATTR_KEYS.LANGWATCH_MODEL_OUTPUT_COST_PER_TOKEN]:
-          row.CustomOutputRate || undefined,
-        [ATTR_KEYS.LANGWATCH_MODEL_CACHE_READ_COST_PER_TOKEN]:
-          row.CustomCacheReadRate || undefined,
-        [ATTR_KEYS.LANGWATCH_MODEL_CACHE_CREATION_COST_PER_TOKEN]:
-          row.CustomCacheCreationRate || undefined,
-        [ATTR_KEYS.LANGWATCH_SPAN_COST]: row.LwSpanCost || undefined,
-      } as NormalizedAttributes,
-      model: row.ResponseModel || row.Model || undefined,
-      promptTokens: inputTokens,
-      completionTokens: outputTokens,
-    });
-    cost = computed > 0 ? computed : null;
-  }
+  const cost =
+    explicitCost !== null && explicitCost > 0
+      ? explicitCost
+      : computeSpanSummaryCost({ row, inputTokens, outputTokens });
 
   return {
     spanId: row.SpanId,
@@ -727,55 +753,68 @@ export function ensureStringRecord(
  *
  * @internal Exported for unit testing
  */
+const isJsonLike = (trimmed: string): boolean =>
+  (trimmed.startsWith("{") && trimmed.endsWith("}")) ||
+  (trimmed.startsWith("[") && trimmed.endsWith("]"));
+
+/** Returns the parsed JSON value, or undefined when `trimmed` isn't valid JSON. */
+function tryParseJson(trimmed: string): unknown {
+  try {
+    return JSON.parse(trimmed);
+  } catch {
+    return undefined;
+  }
+}
+
+// NOTE: Intentionally lossy for string values that look like decimal numbers
+// (e.g. zip codes "90210" → 90210). ClickHouse round-trip for originally-numeric
+// attributes is correct; pure string numerics may lose their string type.
+// Guard: skip conversion for integers beyond Number.MAX_SAFE_INTEGER to avoid precision loss.
+function decodeDecimalNumberString(
+  value: string,
+  trimmed: string,
+): number | string | undefined {
+  if (
+    trimmed === "" ||
+    !DECIMAL_NUMBER_RE.test(trimmed) ||
+    !Number.isFinite(Number(trimmed))
+  ) {
+    return undefined;
+  }
+  const num = Number(trimmed);
+  if (Number.isInteger(num) && Math.abs(num) > Number.MAX_SAFE_INTEGER) {
+    return value;
+  }
+  return num;
+}
+
+/** Reverses serializeAttributes for a single Map(String, String) entry. */
+function decodeAttributeValue(value: string): unknown {
+  // Boolean strings
+  if (value === "true") return true;
+  if (value === "false") return false;
+
+  // JSON objects and arrays
+  const trimmed = value.trim();
+  if (isJsonLike(trimmed)) {
+    const parsed = tryParseJson(trimmed);
+    if (parsed !== undefined) return parsed;
+    // Not valid JSON, fall through
+  }
+
+  const decoded = decodeDecimalNumberString(value, trimmed);
+  if (decoded !== undefined) return decoded;
+
+  // Keep as string
+  return value;
+}
+
 export function deserializeAttributes(
   attrs: Record<string, string>,
 ): Record<string, unknown> {
   const result: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(attrs)) {
-    // Boolean strings
-    if (value === "true") {
-      result[key] = true;
-      continue;
-    }
-    if (value === "false") {
-      result[key] = false;
-      continue;
-    }
-
-    // JSON objects and arrays
-    const trimmed = value.trim();
-    if (
-      (trimmed.startsWith("{") && trimmed.endsWith("}")) ||
-      (trimmed.startsWith("[") && trimmed.endsWith("]"))
-    ) {
-      try {
-        result[key] = JSON.parse(trimmed);
-        continue;
-      } catch {
-        // Not valid JSON, fall through
-      }
-    }
-
-    // NOTE: Intentionally lossy for string values that look like decimal numbers
-    // (e.g. zip codes "90210" → 90210). ClickHouse round-trip for originally-numeric
-    // attributes is correct; pure string numerics may lose their string type.
-    // Guard: skip conversion for integers beyond Number.MAX_SAFE_INTEGER to avoid precision loss.
-    if (
-      trimmed !== "" &&
-      DECIMAL_NUMBER_RE.test(trimmed) &&
-      Number.isFinite(Number(trimmed))
-    ) {
-      const num = Number(trimmed);
-      if (Number.isInteger(num) && Math.abs(num) > Number.MAX_SAFE_INTEGER) {
-        result[key] = value;
-        continue;
-      }
-      result[key] = num;
-      continue;
-    }
-
-    // Keep as string
-    result[key] = value;
+    result[key] = decodeAttributeValue(value);
   }
   return result;
 }
@@ -786,29 +825,34 @@ export function deserializeAttributes(
  *
  * @internal Exported for unit testing
  */
+/** Encodes a single attribute value for a Map(String, String) column, or undefined to skip it. */
+function encodeAttributeValue(value: unknown): string | undefined {
+  if (value === null || value === undefined) return undefined;
+  if (typeof value === "string") return value;
+  if (
+    typeof value === "number" ||
+    typeof value === "boolean" ||
+    typeof value === "bigint"
+  ) {
+    return String(value);
+  }
+  try {
+    const serialized = JSON.stringify(value);
+    return typeof serialized === "string" ? serialized : undefined;
+  } catch {
+    // skip unserializable attribute
+    return undefined;
+  }
+}
+
 export function serializeAttributes(
   attrs: Record<string, unknown>,
 ): Record<string, string> {
   const result: Record<string, string> = {};
   for (const [key, value] of Object.entries(attrs)) {
-    if (value === null || value === undefined) continue;
-    if (typeof value === "string") {
-      result[key] = value;
-    } else if (
-      typeof value === "number" ||
-      typeof value === "boolean" ||
-      typeof value === "bigint"
-    ) {
-      result[key] = String(value);
-    } else {
-      try {
-        const serialized = JSON.stringify(value);
-        if (typeof serialized === "string") {
-          result[key] = serialized;
-        }
-      } catch {
-        // skip unserializable attribute
-      }
+    const encoded = encodeAttributeValue(value);
+    if (encoded !== undefined) {
+      result[key] = encoded;
     }
   }
   return result;

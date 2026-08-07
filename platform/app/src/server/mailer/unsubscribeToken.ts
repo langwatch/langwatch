@@ -67,6 +67,35 @@ export function signUnsubscribeToken(payload: UnsubscribePayload): string {
   return `${encoded}.${sign(serialized)}`;
 }
 
+function hasValidSignature(serialized: string, providedSig: string): boolean {
+  const expectedSig = sign(serialized);
+  // Constant-time compare; bail before comparing if lengths differ since
+  // timingSafeEqual throws on mismatched buffer lengths.
+  const provided = Buffer.from(providedSig);
+  const expected = Buffer.from(expectedSig);
+  return (
+    provided.length === expected.length && timingSafeEqual(provided, expected)
+  );
+}
+
+function parseUnsubscribePayload(
+  serialized: string,
+): UnsubscribePayload | null {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(serialized);
+  } catch {
+    return null;
+  }
+  if (!parsed || typeof parsed !== "object") return null;
+  const { projectId, triggerId, email } = parsed as Record<string, unknown>;
+  if (typeof projectId !== "string" || typeof email !== "string") return null;
+  if (triggerId !== null && typeof triggerId !== "string") return null;
+  // Normalize on verify too (matching the sign-side normalization) so the
+  // returned email is always lowercased/trimmed regardless of token casing.
+  return normalize({ projectId, triggerId, email });
+}
+
 export function verifyUnsubscribeToken(
   token: string,
 ): UnsubscribePayload | null {
@@ -82,29 +111,7 @@ export function verifyUnsubscribeToken(
     return null;
   }
 
-  const expectedSig = sign(serialized);
-  // Constant-time compare; bail before comparing if lengths differ since
-  // timingSafeEqual throws on mismatched buffer lengths.
-  const provided = Buffer.from(providedSig);
-  const expected = Buffer.from(expectedSig);
-  if (
-    provided.length !== expected.length ||
-    !timingSafeEqual(provided, expected)
-  ) {
-    return null;
-  }
+  if (!hasValidSignature(serialized, providedSig)) return null;
 
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(serialized);
-  } catch {
-    return null;
-  }
-  if (!parsed || typeof parsed !== "object") return null;
-  const { projectId, triggerId, email } = parsed as Record<string, unknown>;
-  if (typeof projectId !== "string" || typeof email !== "string") return null;
-  if (triggerId !== null && typeof triggerId !== "string") return null;
-  // Normalize on verify too (matching the sign-side normalization) so the
-  // returned email is always lowercased/trimmed regardless of token casing.
-  return normalize({ projectId, triggerId, email });
+  return parseUnsubscribePayload(serialized);
 }

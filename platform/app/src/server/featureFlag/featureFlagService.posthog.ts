@@ -1,5 +1,6 @@
 import { createLogger } from "@langwatch/observability";
-import { getLangWatchTracer } from "langwatch";
+import { getLangWatchTracer, type LangWatchSpan } from "langwatch";
+import type { PostHog } from "posthog-node";
 import { getPostHogInstance } from "../posthog";
 import {
   FEATURE_FLAG_CACHE_TTL_MS,
@@ -36,6 +37,23 @@ import type {
  * @see dev/docs/adr/005-feature-flags.md for architecture decisions
  * @see FEATURE_FLAG_CACHE_TTL_MS for cache TTL configuration
  */
+const buildPersonProperties = ({
+  projectId,
+  orgId,
+}: {
+  projectId: string | undefined;
+  orgId: string | undefined;
+}): Record<string, string> => {
+  const personProperties: Record<string, string> = {};
+  if (projectId) {
+    personProperties.project_id = projectId;
+  }
+  if (orgId) {
+    personProperties.organization_id = orgId;
+  }
+  return personProperties;
+};
+
 export class FeatureFlagServicePostHog implements FeatureFlagServiceInterface {
   private readonly posthog: ReturnType<typeof getPostHogInstance>;
   private readonly logger = createLogger(
@@ -109,59 +127,85 @@ export class FeatureFlagServicePostHog implements FeatureFlagServiceInterface {
           return cachedResult.value;
         }
 
-        try {
-          // Build personProperties only with defined values
-          const personProperties: Record<string, string> = {};
-          if (projectId) {
-            personProperties.project_id = projectId;
-          }
-          if (orgId) {
-            personProperties.organization_id = orgId;
-          }
-
-          const posthogOptions = {
-            disableGeoip: true,
-            personProperties,
-          };
-
-          this.logger.debug(
-            { flagKey, distinctId, posthogOptions },
-            "Checking PostHog feature flag",
-          );
-
-          const isEnabled = await this.posthog.isFeatureEnabled(
-            flagKey,
-            distinctId,
-            posthogOptions,
-          );
-
-          this.logger.debug(
-            { flagKey, distinctId, isEnabled, posthogOptions },
-            "PostHog feature flag result",
-          );
-
-          const result = isEnabled ?? defaultValue;
-          await this.cache.set(cacheKey, result);
-
-          span.setAttribute("feature.flag.source", "posthog");
-          span.setAttribute("feature.flag.enabled", result);
-
-          return result;
-        } catch (error) {
-          this.logger.warn(
-            {
-              flagKey,
-              distinctId,
-              error: error instanceof Error ? error.message : error,
-            },
-            "Failed to check PostHog feature flag, using default value",
-          );
-          span.setAttribute("feature.flag.source", "posthog-error");
-
-          return defaultValue;
-        }
+        return await this.fetchFromPostHog({
+          posthog: this.posthog,
+          flagKey,
+          distinctId,
+          projectId,
+          orgId,
+          defaultValue,
+          cacheKey,
+          span,
+        });
       },
     );
+  }
+
+  /**
+   * Calls PostHog for a fresh evaluation, caching and tracing the result.
+   * Any failure (network, PostHog outage) falls back to defaultValue.
+   */
+  private async fetchFromPostHog({
+    posthog,
+    flagKey,
+    distinctId,
+    projectId,
+    orgId,
+    defaultValue,
+    cacheKey,
+    span,
+  }: {
+    posthog: PostHog;
+    flagKey: string;
+    distinctId: string;
+    projectId: string | undefined;
+    orgId: string | undefined;
+    defaultValue: boolean;
+    cacheKey: string;
+    span: LangWatchSpan;
+  }): Promise<boolean> {
+    try {
+      const posthogOptions = {
+        disableGeoip: true,
+        personProperties: buildPersonProperties({ projectId, orgId }),
+      };
+
+      this.logger.debug(
+        { flagKey, distinctId, posthogOptions },
+        "Checking PostHog feature flag",
+      );
+
+      const isEnabled = await posthog.isFeatureEnabled(
+        flagKey,
+        distinctId,
+        posthogOptions,
+      );
+
+      this.logger.debug(
+        { flagKey, distinctId, isEnabled, posthogOptions },
+        "PostHog feature flag result",
+      );
+
+      const result = isEnabled ?? defaultValue;
+      await this.cache.set(cacheKey, result);
+
+      span.setAttribute("feature.flag.source", "posthog");
+      span.setAttribute("feature.flag.enabled", result);
+
+      return result;
+    } catch (error) {
+      this.logger.warn(
+        {
+          flagKey,
+          distinctId,
+          error: error instanceof Error ? error.message : error,
+        },
+        "Failed to check PostHog feature flag, using default value",
+      );
+      span.setAttribute("feature.flag.source", "posthog-error");
+
+      return defaultValue;
+    }
   }
 
   /**

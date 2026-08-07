@@ -390,68 +390,110 @@ function collectClickHouseConditions({
   allParams: Record<string, unknown>;
   options: FilterConditionOptions;
 }): { conditions: string[]; hasUnsupported: boolean } {
-  const key = keys[0];
-  const subkey = keys[1];
-  const conditionBuilder = clickHouseFilterConditions[field];
-
   // BASE CASE: params is an array of values (leaf node)
   if (Array.isArray(params)) {
-    if (params.length === 0) {
-      return { conditions: [], hasUnsupported: false };
-    }
-
-    if (!conditionBuilder) {
-      return { conditions: [], hasUnsupported: true };
-    }
-
-    const paramId = `f${paramCounter.value++}`;
-    const result = conditionBuilder({
+    return buildLeafCondition({
+      field,
       values: params,
-      paramId,
-      key,
-      subkey,
+      keys,
+      paramCounter,
+      allParams,
       options,
     });
-    Object.assign(allParams, result.params);
-
-    return { conditions: [result.sql], hasUnsupported: false };
   }
 
   // RECURSIVE CASE: params is a nested object
   if (typeof params === "object" && params !== null) {
-    const nestedConditions: string[] = [];
-    let hasUnsupported = false;
-
-    for (const [nextKey, nextValue] of Object.entries(params)) {
-      const result = collectClickHouseConditions({
-        field,
-        params: nextValue as string[] | Record<string, unknown>,
-        keys: [...keys, nextKey], // Accumulate keys as we recurse
-        paramCounter,
-        allParams,
-        options,
-      });
-
-      if (result.hasUnsupported) hasUnsupported = true;
-      nestedConditions.push(...result.conditions);
-    }
-
-    if (nestedConditions.length === 0) {
-      return { conditions: [], hasUnsupported };
-    }
-
-    // OR together conditions at this level
-    if (nestedConditions.length === 1) {
-      return { conditions: nestedConditions, hasUnsupported };
-    }
-
-    return {
-      conditions: [`(${nestedConditions.join(" OR ")})`],
-      hasUnsupported,
-    };
+    return collectNestedClickHouseConditions({
+      field,
+      params,
+      keys,
+      paramCounter,
+      allParams,
+      options,
+    });
   }
 
   return { conditions: [], hasUnsupported: false };
+}
+
+function buildLeafCondition({
+  field,
+  values,
+  keys,
+  paramCounter,
+  allParams,
+  options,
+}: {
+  field: FilterField;
+  values: string[];
+  keys: string[];
+  paramCounter: { value: number };
+  allParams: Record<string, unknown>;
+  options: FilterConditionOptions;
+}): { conditions: string[]; hasUnsupported: boolean } {
+  if (values.length === 0) {
+    return { conditions: [], hasUnsupported: false };
+  }
+
+  const conditionBuilder = clickHouseFilterConditions[field];
+  if (!conditionBuilder) {
+    return { conditions: [], hasUnsupported: true };
+  }
+
+  const paramId = `f${paramCounter.value++}`;
+  const result = conditionBuilder({
+    values,
+    paramId,
+    key: keys[0],
+    subkey: keys[1],
+    options,
+  });
+  Object.assign(allParams, result.params);
+
+  return { conditions: [result.sql], hasUnsupported: false };
+}
+
+function collectNestedClickHouseConditions({
+  field,
+  params,
+  keys,
+  paramCounter,
+  allParams,
+  options,
+}: {
+  field: FilterField;
+  params: Record<string, unknown>;
+  keys: string[];
+  paramCounter: { value: number };
+  allParams: Record<string, unknown>;
+  options: FilterConditionOptions;
+}): { conditions: string[]; hasUnsupported: boolean } {
+  const nestedConditions: string[] = [];
+  let hasUnsupported = false;
+
+  for (const [nextKey, nextValue] of Object.entries(params)) {
+    const result = collectClickHouseConditions({
+      field,
+      params: nextValue as string[] | Record<string, unknown>,
+      keys: [...keys, nextKey], // Accumulate keys as we recurse
+      paramCounter,
+      allParams,
+      options,
+    });
+
+    if (result.hasUnsupported) hasUnsupported = true;
+    nestedConditions.push(...result.conditions);
+  }
+
+  return { conditions: orTogetherConditions(nestedConditions), hasUnsupported };
+}
+
+/** OR together the conditions collected at one nesting level. */
+function orTogetherConditions(conditions: string[]): string[] {
+  if (conditions.length === 0) return [];
+  if (conditions.length === 1) return conditions;
+  return [`(${conditions.join(" OR ")})`];
 }
 
 /**

@@ -1783,6 +1783,59 @@ const refreshScript = new CachedLuaScript(REFRESH_LUA);
 const restageAndBlockScript = new CachedLuaScript(RESTAGE_AND_BLOCK_LUA);
 const retryRestageScript = new CachedLuaScript(RETRY_RESTAGE_LUA);
 
+/**
+ * One job's ARGV slice for STAGE_BATCH_LUA, in call order. Extracted from
+ * {@link GroupStagingScripts.stageBatch} so the per-job flag defaulting stays
+ * readable without inflating that method's complexity — the argument order
+ * and count are unchanged, still 9 strings per job.
+ */
+function stageBatchJobArgs(job: {
+  stagedJobId: string;
+  groupId: string;
+  dispatchAfterMs: number;
+  dedupId: string;
+  dedupTtlMs: number;
+  jobDataJson: string;
+  shouldExtend?: boolean;
+  shouldReplace?: boolean;
+  shouldSurviveDispatch?: boolean;
+}): string[] {
+  return [
+    job.stagedJobId,
+    job.groupId,
+    String(job.dispatchAfterMs),
+    job.dedupId,
+    String(job.dedupTtlMs),
+    job.jobDataJson,
+    String((job.shouldExtend ?? true) ? 1 : 0),
+    String((job.shouldReplace ?? true) ? 1 : 0),
+    // 9th per-job arg (offset + 9 in the Lua). Kept in the per-job block,
+    // alongside the other dedup flags, so the trailing nowMs/globalBudget
+    // remain end-relative (ARGV[#ARGV-1]/ARGV[#ARGV]).
+    String((job.shouldSurviveDispatch ?? false) ? 1 : 0),
+  ];
+}
+
+/**
+ * STAGE_BATCH_LUA returns [newStagedCount, orphanedValues[]]. Tolerates a
+ * bare integer reply defensively (stale cached script mid-deploy).
+ */
+function parseStageBatchResult(result: unknown): {
+  newStagedCount: number;
+  orphanedValues: string[];
+} {
+  if (Array.isArray(result)) {
+    const [count, orphans] = result as [number, unknown];
+    return {
+      newStagedCount: Number(count),
+      orphanedValues: Array.isArray(orphans)
+        ? orphans.map((v) => (v == null ? "" : String(v)))
+        : [],
+    };
+  }
+  return { newStagedCount: Number(result), orphanedValues: [] };
+}
+
 export class GroupStagingScripts {
   private readonly keyPrefix: string;
   private readonly queueName: string;
@@ -1924,20 +1977,7 @@ export class GroupStagingScripts {
 
     const args: string[] = [this.keyPrefix, String(jobs.length)];
     for (const job of jobs) {
-      args.push(
-        job.stagedJobId,
-        job.groupId,
-        String(job.dispatchAfterMs),
-        job.dedupId,
-        String(job.dedupTtlMs),
-        job.jobDataJson,
-        String((job.shouldExtend ?? true) ? 1 : 0),
-        String((job.shouldReplace ?? true) ? 1 : 0),
-        // 9th per-job arg (offset + 9 in the Lua). Kept in the per-job block,
-        // alongside the other dedup flags, so the trailing nowMs/globalBudget
-        // remain end-relative (ARGV[#ARGV-1]/ARGV[#ARGV]).
-        String((job.shouldSurviveDispatch ?? false) ? 1 : 0),
-      );
+      args.push(...stageBatchJobArgs(job));
     }
     // Appended after all per-job args: nowMs then globalBudget last, so the Lua
     // reads globalBudget as ARGV[#ARGV] and nowMs as ARGV[#ARGV-1] regardless of
@@ -1954,18 +1994,7 @@ export class GroupStagingScripts {
       ...args,
     );
 
-    // STAGE_BATCH_LUA returns [newStagedCount, orphanedValues[]].
-    // Tolerate a bare integer reply defensively (stale cached script mid-deploy).
-    if (Array.isArray(result)) {
-      const [count, orphans] = result as [number, unknown];
-      return {
-        newStagedCount: Number(count),
-        orphanedValues: Array.isArray(orphans)
-          ? orphans.map((v) => (v == null ? "" : String(v)))
-          : [],
-      };
-    }
-    return { newStagedCount: Number(result), orphanedValues: [] };
+    return parseStageBatchResult(result);
   }
 
   /**

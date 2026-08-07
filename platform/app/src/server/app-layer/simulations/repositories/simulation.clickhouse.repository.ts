@@ -7,6 +7,7 @@ import {
 } from "~/server/scenarios/internal-set-id";
 import type {
   BatchHistoryItem,
+  BatchHistoryItemRun,
   ExternalSetSummary,
   ScenarioRunData,
   ScenarioSetData,
@@ -290,6 +291,106 @@ interface PreviewItemRow {
   MessagePreviewContents: string[];
 }
 
+/** One row of `getBatchHistoryForScenarioSet`'s step-1 batch-level aggregate page. */
+interface BatchAggregateRow {
+  BatchRunId: string;
+  TotalCount: string;
+  PassCount: string;
+  FailCount: string;
+  RunningCount: string;
+  LastUpdatedAt: string;
+  LastRunAt: string;
+  FirstCompletedAt: string;
+  AllCompletedAt: string;
+  MinStartedAt: string;
+  MaxStartedAt: string;
+}
+
+/** `getRunDataForAllSuites`'s BatchRunId -> NormalizedSetId lookup for its page. */
+function buildScenarioSetIdsByBatch(
+  pageRows: { BatchRunId: string; NormalizedSetId: string }[],
+): Record<string, string> {
+  const scenarioSetIds: Record<string, string> = {};
+  for (const row of pageRows) {
+    scenarioSetIds[row.BatchRunId] = row.NormalizedSetId;
+  }
+  return scenarioSetIds;
+}
+
+/** Groups the step-2 preview rows by the batch they belong to. */
+function groupPreviewItemsByBatchRunId(
+  itemRows: PreviewItemRow[],
+): Map<string, PreviewItemRow[]> {
+  const itemsByBatch = new Map<string, PreviewItemRow[]>();
+  for (const row of itemRows) {
+    const list = itemsByBatch.get(row.BatchRunId) ?? [];
+    list.push(row);
+    itemsByBatch.set(row.BatchRunId, list);
+  }
+  return itemsByBatch;
+}
+
+/** Maps one preview-item row to a sidebar run entry. */
+function mapPreviewItemToBatchHistoryRun({
+  row,
+  now,
+}: {
+  row: PreviewItemRow;
+  now: number;
+}): BatchHistoryItemRun {
+  const baseStatus = mapStatus(row.Status);
+  const durationMs = row.DurationMs != null ? parseInt(row.DurationMs, 10) : 0;
+  const perRunUpdatedAt = Number(row.UpdatedAt);
+  const hasFinished = row.FinishedAt != null && Number(row.FinishedAt) > 0;
+  const resolvedStatus = resolveRunStatus({
+    finishedStatus: hasFinished ? baseStatus : undefined,
+    lastEventTimestamp: perRunUpdatedAt,
+    now,
+  });
+  return {
+    scenarioRunId: row.ScenarioRunId,
+    name: row.Name,
+    description: row.Description,
+    status: resolvedStatus,
+    durationInMs: durationMs,
+    messagePreview: (row.MessagePreviewRoles ?? []).map((role, i) => ({
+      role,
+      content: row.MessagePreviewContents?.[i] ?? "",
+    })),
+  };
+}
+
+/** Assembles one batch's sidebar summary from its aggregate row and mapped items. */
+function buildBatchHistoryItem({
+  batchRow,
+  items,
+  lastUpdatedAt,
+}: {
+  batchRow: BatchAggregateRow;
+  items: BatchHistoryItemRun[];
+  lastUpdatedAt: number;
+}): BatchHistoryItem {
+  const stalledCount = items.filter((i) => i.status === "STALLED").length;
+  const runningCount = Number(batchRow.RunningCount) - stalledCount;
+
+  const firstCompletedAt = Number(batchRow.FirstCompletedAt);
+  const allCompletedAt = Number(batchRow.AllCompletedAt);
+
+  return {
+    batchRunId: batchRow.BatchRunId,
+    totalCount: Number(batchRow.TotalCount),
+    passCount: Number(batchRow.PassCount),
+    failCount: Number(batchRow.FailCount),
+    runningCount: Math.max(0, runningCount),
+    stalledCount,
+    lastRunAt: Number(batchRow.LastRunAt),
+    lastUpdatedAt,
+    firstCompletedAt: firstCompletedAt > 0 ? firstCompletedAt : null,
+    allCompletedAt: allCompletedAt > 0 ? allCompletedAt : null,
+    items,
+  };
+}
+
 export class SimulationClickHouseRepository implements SimulationRepository {
   constructor(private readonly resolveClient: ClickHouseClientResolver) {}
 
@@ -415,83 +516,29 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     totalCount: number;
   }> {
     const validatedLimit = Math.min(Math.max(1, limit), 100);
-    const decoded = cursor ? this.decodeCursor(cursor) : null;
-
-    const cursorPredicate = decoded
-      ? `((toString(toUnixTimestamp64Milli(max(CreatedAt))) < {cursorTs:String})
-         OR (toString(toUnixTimestamp64Milli(max(CreatedAt))) = {cursorTs:String} AND BatchRunId > {cursorBatchRunId:String}))`
-      : "1 = 1";
+    const { decoded, cursorPredicate } =
+      this.buildBatchHistoryCursorPredicate(cursor);
 
     const dateFilter = buildDateFilter({ startDate, endDate });
 
     const combinedHaving = `HAVING ${[cursorPredicate, dateFilter.havingClause].filter(Boolean).join(" AND ")}`;
 
     // Step 0: fetch total distinct batch count (runs in parallel with step 1)
-    const totalCountPromise = this.queryRows<{ TotalBatchCount: string }>(
-      `SELECT toString(count(DISTINCT BatchRunId)) AS TotalBatchCount
-       FROM ${TABLE_NAME}
-       WHERE TenantId = {tenantId:String}
-         AND ScenarioSetId IN ({scenarioSetIds:Array(String)})
-         ${dateFilter.whereClause}
-         AND ArchivedAt IS NULL
-         ${simulationRunDedupPredicate(`TenantId = {tenantId:String} AND ScenarioSetId IN ({scenarioSetIds:Array(String)}) ${dateFilter.whereClause}`)}`,
-      {
-        tenantId: projectId,
-        scenarioSetIds: expandSetIdFilter(scenarioSetId),
-        ...dateFilter.params,
-      },
-    );
+    const totalCountPromise = this.fetchTotalBatchCount({
+      projectId,
+      scenarioSetId,
+      dateFilter,
+    });
 
     // Step 1: fetch batch-level aggregates
-    const batchRowsPromise = this.queryRows<{
-      BatchRunId: string;
-      TotalCount: string;
-      PassCount: string;
-      FailCount: string;
-      RunningCount: string;
-      LastUpdatedAt: string;
-      LastRunAt: string;
-      FirstCompletedAt: string;
-      AllCompletedAt: string;
-      MinStartedAt: string;
-      MaxStartedAt: string;
-    }>(
-      `SELECT
-        BatchRunId,
-        toString(count())                                               AS TotalCount,
-        toString(countIf(Status = 'SUCCESS'))                          AS PassCount,
-        toString(countIf(Status IN ('FAILED','FAILURE','ERROR','CANCELLED'))) AS FailCount,
-        toString(countIf(Status IN ('IN_PROGRESS','PENDING')))         AS RunningCount,
-        toString(toUnixTimestamp64Milli(max(UpdatedAt)))               AS LastUpdatedAt,
-        toString(toUnixTimestamp64Milli(max(CreatedAt)))               AS LastRunAt,
-        toString(toUnixTimestamp64Milli(
-          minIf(UpdatedAt, Status IN ('SUCCESS','FAILED','FAILURE','ERROR','CANCELLED'))
-        )) AS FirstCompletedAt,
-        toString(toUnixTimestamp64Milli(
-          maxIf(UpdatedAt, Status NOT IN ('STALLED','IN_PROGRESS','PENDING'))
-        )) AS AllCompletedAt,
-        toString(toUnixTimestamp64Milli(min(StartedAt)))                AS MinStartedAt,
-        toString(toUnixTimestamp64Milli(max(StartedAt)))                AS MaxStartedAt
-       FROM ${TABLE_NAME}
-       WHERE TenantId = {tenantId:String}
-         AND ScenarioSetId IN ({scenarioSetIds:Array(String)})
-         ${dateFilter.whereClause}
-         AND ArchivedAt IS NULL
-         ${simulationRunDedupPredicate(`TenantId = {tenantId:String} AND ScenarioSetId IN ({scenarioSetIds:Array(String)}) ${dateFilter.whereClause}`)}
-       GROUP BY BatchRunId
-       ${combinedHaving}
-       ORDER BY LastRunAt DESC, BatchRunId ASC
-       LIMIT {fetchLimit:UInt32}`,
-      {
-        tenantId: projectId,
-        scenarioSetIds: expandSetIdFilter(scenarioSetId),
-        ...(decoded
-          ? { cursorTs: decoded.ts, cursorBatchRunId: decoded.batchRunId }
-          : {}),
-        ...dateFilter.params,
-        fetchLimit: String(validatedLimit + 1),
-      },
-    );
+    const batchRowsPromise = this.fetchBatchAggregatePage({
+      projectId,
+      scenarioSetId,
+      dateFilter,
+      combinedHaving,
+      decoded,
+      validatedLimit,
+    });
 
     const [totalCountRows, batchRows] = await Promise.all([
       totalCountPromise,
@@ -541,7 +588,151 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     const startedAtBounds = startedAtBoundsForPage(pageRows);
 
     // Step 2: fetch slim item rows (preview columns only)
-    const itemRows = await queryWindowed<PreviewItemRow[]>({
+    const itemRows = await this.fetchBatchHistoryPreviewItems({
+      projectId,
+      scenarioSetId,
+      batchRunIds,
+      startedAtBounds,
+    });
+
+    // Group items by batchRunId
+    const itemsByBatch = groupPreviewItemsByBatchRunId(itemRows);
+
+    const now = Date.now();
+    let globalLastUpdatedAt = 0;
+
+    const batches: BatchHistoryItem[] = pageRows.map((b) => {
+      const lastUpdatedAt = Number(b.LastUpdatedAt);
+      if (lastUpdatedAt > globalLastUpdatedAt)
+        globalLastUpdatedAt = lastUpdatedAt;
+
+      const items = (itemsByBatch.get(b.BatchRunId) ?? []).map((r) =>
+        mapPreviewItemToBatchHistoryRun({ row: r, now }),
+      );
+
+      return buildBatchHistoryItem({ batchRow: b, items, lastUpdatedAt });
+    });
+
+    return {
+      batches,
+      nextCursor,
+      hasMore,
+      lastUpdatedAt: globalLastUpdatedAt,
+      totalCount,
+    };
+  }
+
+  /** `getBatchHistoryForScenarioSet`'s cursor predicate, keyed on `max(CreatedAt)`. */
+  private buildBatchHistoryCursorPredicate(cursor?: string): {
+    decoded: CursorPayload | null;
+    cursorPredicate: string;
+  } {
+    const decoded = cursor ? this.decodeCursor(cursor) : null;
+    const cursorPredicate = decoded
+      ? `((toString(toUnixTimestamp64Milli(max(CreatedAt))) < {cursorTs:String})
+         OR (toString(toUnixTimestamp64Milli(max(CreatedAt))) = {cursorTs:String} AND BatchRunId > {cursorBatchRunId:String}))`
+      : "1 = 1";
+    return { decoded, cursorPredicate };
+  }
+
+  /** Step 0 of `getBatchHistoryForScenarioSet`: total distinct batch count. */
+  private async fetchTotalBatchCount({
+    projectId,
+    scenarioSetId,
+    dateFilter,
+  }: {
+    projectId: string;
+    scenarioSetId: string;
+    dateFilter: ReturnType<typeof buildDateFilter>;
+  }): Promise<{ TotalBatchCount: string }[]> {
+    return this.queryRows<{ TotalBatchCount: string }>(
+      `SELECT toString(count(DISTINCT BatchRunId)) AS TotalBatchCount
+       FROM ${TABLE_NAME}
+       WHERE TenantId = {tenantId:String}
+         AND ScenarioSetId IN ({scenarioSetIds:Array(String)})
+         ${dateFilter.whereClause}
+         AND ArchivedAt IS NULL
+         ${simulationRunDedupPredicate(`TenantId = {tenantId:String} AND ScenarioSetId IN ({scenarioSetIds:Array(String)}) ${dateFilter.whereClause}`)}`,
+      {
+        tenantId: projectId,
+        scenarioSetIds: expandSetIdFilter(scenarioSetId),
+        ...dateFilter.params,
+      },
+    );
+  }
+
+  /** Step 1 of `getBatchHistoryForScenarioSet`: batch-level aggregates. */
+  private async fetchBatchAggregatePage({
+    projectId,
+    scenarioSetId,
+    dateFilter,
+    combinedHaving,
+    decoded,
+    validatedLimit,
+  }: {
+    projectId: string;
+    scenarioSetId: string;
+    dateFilter: ReturnType<typeof buildDateFilter>;
+    combinedHaving: string;
+    decoded: CursorPayload | null;
+    validatedLimit: number;
+  }): Promise<BatchAggregateRow[]> {
+    return this.queryRows<BatchAggregateRow>(
+      `SELECT
+        BatchRunId,
+        toString(count())                                               AS TotalCount,
+        toString(countIf(Status = 'SUCCESS'))                          AS PassCount,
+        toString(countIf(Status IN ('FAILED','FAILURE','ERROR','CANCELLED'))) AS FailCount,
+        toString(countIf(Status IN ('IN_PROGRESS','PENDING')))         AS RunningCount,
+        toString(toUnixTimestamp64Milli(max(UpdatedAt)))               AS LastUpdatedAt,
+        toString(toUnixTimestamp64Milli(max(CreatedAt)))               AS LastRunAt,
+        toString(toUnixTimestamp64Milli(
+          minIf(UpdatedAt, Status IN ('SUCCESS','FAILED','FAILURE','ERROR','CANCELLED'))
+        )) AS FirstCompletedAt,
+        toString(toUnixTimestamp64Milli(
+          maxIf(UpdatedAt, Status NOT IN ('STALLED','IN_PROGRESS','PENDING'))
+        )) AS AllCompletedAt,
+        toString(toUnixTimestamp64Milli(min(StartedAt)))                AS MinStartedAt,
+        toString(toUnixTimestamp64Milli(max(StartedAt)))                AS MaxStartedAt
+       FROM ${TABLE_NAME}
+       WHERE TenantId = {tenantId:String}
+         AND ScenarioSetId IN ({scenarioSetIds:Array(String)})
+         ${dateFilter.whereClause}
+         AND ArchivedAt IS NULL
+         ${simulationRunDedupPredicate(`TenantId = {tenantId:String} AND ScenarioSetId IN ({scenarioSetIds:Array(String)}) ${dateFilter.whereClause}`)}
+       GROUP BY BatchRunId
+       ${combinedHaving}
+       ORDER BY LastRunAt DESC, BatchRunId ASC
+       LIMIT {fetchLimit:UInt32}`,
+      {
+        tenantId: projectId,
+        scenarioSetIds: expandSetIdFilter(scenarioSetId),
+        ...(decoded
+          ? { cursorTs: decoded.ts, cursorBatchRunId: decoded.batchRunId }
+          : {}),
+        ...dateFilter.params,
+        fetchLimit: String(validatedLimit + 1),
+      },
+    );
+  }
+
+  /**
+   * Step 2 of `getBatchHistoryForScenarioSet`: slim preview items for the
+   * page's batches, StartedAt-windowed (see the caller for why unwindowed
+   * would be wrong).
+   */
+  private async fetchBatchHistoryPreviewItems({
+    projectId,
+    scenarioSetId,
+    batchRunIds,
+    startedAtBounds,
+  }: {
+    projectId: string;
+    scenarioSetId: string;
+    batchRunIds: string[];
+    startedAtBounds: { minMs: number; maxMs: number } | null;
+  }): Promise<PreviewItemRow[]> {
+    return queryWindowed<PreviewItemRow[]>({
       table: TABLE_NAME,
       hintMs: startedAtBounds
         ? (startedAtBounds.minMs + startedAtBounds.maxMs) / 2
@@ -572,75 +763,6 @@ export class SimulationClickHouseRepository implements SimulationRepository {
         );
       },
     });
-
-    // Group items by batchRunId
-    const itemsByBatch = new Map<string, typeof itemRows>();
-    for (const row of itemRows) {
-      const list = itemsByBatch.get(row.BatchRunId) ?? [];
-      list.push(row);
-      itemsByBatch.set(row.BatchRunId, list);
-    }
-
-    const now = Date.now();
-    let globalLastUpdatedAt = 0;
-
-    const batches: BatchHistoryItem[] = pageRows.map((b) => {
-      const lastUpdatedAt = Number(b.LastUpdatedAt);
-      if (lastUpdatedAt > globalLastUpdatedAt)
-        globalLastUpdatedAt = lastUpdatedAt;
-
-      const items = (itemsByBatch.get(b.BatchRunId) ?? []).map((r) => {
-        const baseStatus = mapStatus(r.Status);
-        const durationMs =
-          r.DurationMs != null ? parseInt(r.DurationMs, 10) : 0;
-        const perRunUpdatedAt = Number(r.UpdatedAt);
-        const hasFinished = r.FinishedAt != null && Number(r.FinishedAt) > 0;
-        const resolvedStatus = resolveRunStatus({
-          finishedStatus: hasFinished ? baseStatus : undefined,
-          lastEventTimestamp: perRunUpdatedAt,
-          now,
-        });
-        return {
-          scenarioRunId: r.ScenarioRunId,
-          name: r.Name,
-          description: r.Description,
-          status: resolvedStatus,
-          durationInMs: durationMs,
-          messagePreview: (r.MessagePreviewRoles ?? []).map((role, i) => ({
-            role,
-            content: r.MessagePreviewContents?.[i] ?? "",
-          })),
-        };
-      });
-
-      const stalledCount = items.filter((i) => i.status === "STALLED").length;
-      const runningCount = Number(b.RunningCount) - stalledCount;
-
-      const firstCompletedAt = Number(b.FirstCompletedAt);
-      const allCompletedAt = Number(b.AllCompletedAt);
-
-      return {
-        batchRunId: b.BatchRunId,
-        totalCount: Number(b.TotalCount),
-        passCount: Number(b.PassCount),
-        failCount: Number(b.FailCount),
-        runningCount: Math.max(0, runningCount),
-        stalledCount,
-        lastRunAt: Number(b.LastRunAt),
-        lastUpdatedAt,
-        firstCompletedAt: firstCompletedAt > 0 ? firstCompletedAt : null,
-        allCompletedAt: allCompletedAt > 0 ? allCompletedAt : null,
-        items,
-      };
-    });
-
-    return {
-      batches,
-      nextCursor,
-      hasMore,
-      lastUpdatedAt: globalLastUpdatedAt,
-      totalCount,
-    };
   }
 
   async getRunDataForBatchRun({
@@ -881,17 +1003,11 @@ export class SimulationClickHouseRepository implements SimulationRepository {
   > {
     // Cheap timestamp check: skip heavy query if nothing changed
     if (sinceTimestamp !== undefined) {
-      const tsRows = await this.queryRows<{ LastUpdatedAt: string }>(
-        `SELECT toString(toUnixTimestamp64Milli(max(UpdatedAt))) AS LastUpdatedAt
-         FROM ${TABLE_NAME}
-         WHERE TenantId = {tenantId:String}
-           AND ArchivedAt IS NULL`,
-        { tenantId: projectId },
-      );
-      const lastUpdatedAt = Number(tsRows[0]?.LastUpdatedAt ?? "0");
-      if (lastUpdatedAt <= sinceTimestamp) {
-        return { changed: false, lastUpdatedAt };
-      }
+      const freshness = await this.checkAllSuitesFreshness({
+        projectId,
+        sinceTimestamp,
+      });
+      if (freshness) return freshness;
     }
 
     const validatedLimit = Math.min(Math.max(1, limit), 100);
@@ -908,11 +1024,102 @@ export class SimulationClickHouseRepository implements SimulationRepository {
 
     const combinedHaving = `HAVING ${[cursorPredicate, dateFilter.havingClause].filter(Boolean).join(" AND ")}`;
 
-    // NOTE: The aggregate is aliased as NormalizedSetId (not ScenarioSetId) on
-    // purpose — aliasing as ScenarioSetId would shadow the underlying column
-    // referenced in the dedup IN-tuple below, causing ClickHouse to reject the
-    // query with "Aggregate function ... is found in WHERE in query".
-    const batchRows = await this.queryRows<{
+    const batchRows = await this.fetchAllSuitesBatchPage({
+      projectId,
+      dateFilter,
+      combinedHaving,
+      decoded,
+      validatedLimit,
+    });
+
+    const hasMore = batchRows.length > validatedLimit;
+    const pageRows = hasMore ? batchRows.slice(0, validatedLimit) : batchRows;
+
+    if (pageRows.length === 0) {
+      return {
+        changed: true,
+        lastUpdatedAt: 0,
+        runs: [],
+        scenarioSetIds: {},
+        nextCursor: undefined,
+        hasMore: false,
+      };
+    }
+
+    const lastRow = pageRows[pageRows.length - 1]!;
+    const nextCursor = hasMore
+      ? this.encodeCursor(lastRow.MaxCreatedAt, lastRow.BatchRunId)
+      : undefined;
+
+    const scenarioSetIds = buildScenarioSetIdsByBatch(pageRows);
+
+    const batchRunIds = pageRows.map((r) => r.BatchRunId);
+    const runs = await this.getRunsForBatchIds({ projectId, batchRunIds });
+    const lastUpdatedAt = runs.reduce(
+      (max, r) => Math.max(max, r.timestamp),
+      0,
+    );
+
+    return {
+      changed: true,
+      lastUpdatedAt,
+      runs,
+      scenarioSetIds,
+      nextCursor,
+      hasMore,
+    };
+  }
+
+  /**
+   * `getRunDataForAllSuites`'s cheap timestamp check: `{ changed: false, ... }`
+   * when nothing changed since `sinceTimestamp`, `null` when the caller should
+   * proceed to the heavy read.
+   */
+  private async checkAllSuitesFreshness({
+    projectId,
+    sinceTimestamp,
+  }: {
+    projectId: string;
+    sinceTimestamp: number;
+  }): Promise<{ changed: false; lastUpdatedAt: number } | null> {
+    const tsRows = await this.queryRows<{ LastUpdatedAt: string }>(
+      `SELECT toString(toUnixTimestamp64Milli(max(UpdatedAt))) AS LastUpdatedAt
+         FROM ${TABLE_NAME}
+         WHERE TenantId = {tenantId:String}
+           AND ArchivedAt IS NULL`,
+      { tenantId: projectId },
+    );
+    const lastUpdatedAt = Number(tsRows[0]?.LastUpdatedAt ?? "0");
+    return lastUpdatedAt <= sinceTimestamp
+      ? { changed: false, lastUpdatedAt }
+      : null;
+  }
+
+  /**
+   * `getRunDataForAllSuites`'s batch-level aggregate page, across every
+   * scenario set for the tenant.
+   *
+   * NOTE: The aggregate is aliased as NormalizedSetId (not ScenarioSetId) on
+   * purpose — aliasing as ScenarioSetId would shadow the underlying column
+   * referenced in the dedup IN-tuple below, causing ClickHouse to reject the
+   * query with "Aggregate function ... is found in WHERE in query".
+   */
+  private async fetchAllSuitesBatchPage({
+    projectId,
+    dateFilter,
+    combinedHaving,
+    decoded,
+    validatedLimit,
+  }: {
+    projectId: string;
+    dateFilter: ReturnType<typeof buildDateFilter>;
+    combinedHaving: string;
+    decoded: CursorPayload | null;
+    validatedLimit: number;
+  }): Promise<
+    { BatchRunId: string; MaxCreatedAt: string; NormalizedSetId: string }[]
+  > {
+    return this.queryRows<{
       BatchRunId: string;
       MaxCreatedAt: string;
       NormalizedSetId: string;
@@ -939,46 +1146,6 @@ export class SimulationClickHouseRepository implements SimulationRepository {
         fetchLimit: String(validatedLimit + 1),
       },
     );
-
-    const hasMore = batchRows.length > validatedLimit;
-    const pageRows = hasMore ? batchRows.slice(0, validatedLimit) : batchRows;
-
-    if (pageRows.length === 0) {
-      return {
-        changed: true,
-        lastUpdatedAt: 0,
-        runs: [],
-        scenarioSetIds: {},
-        nextCursor: undefined,
-        hasMore: false,
-      };
-    }
-
-    const lastRow = pageRows[pageRows.length - 1]!;
-    const nextCursor = hasMore
-      ? this.encodeCursor(lastRow.MaxCreatedAt, lastRow.BatchRunId)
-      : undefined;
-
-    const scenarioSetIds: Record<string, string> = {};
-    for (const row of pageRows) {
-      scenarioSetIds[row.BatchRunId] = row.NormalizedSetId;
-    }
-
-    const batchRunIds = pageRows.map((r) => r.BatchRunId);
-    const runs = await this.getRunsForBatchIds({ projectId, batchRunIds });
-    const lastUpdatedAt = runs.reduce(
-      (max, r) => Math.max(max, r.timestamp),
-      0,
-    );
-
-    return {
-      changed: true,
-      lastUpdatedAt,
-      runs,
-      scenarioSetIds,
-      nextCursor,
-      hasMore,
-    };
   }
 
   async findLastUpdatedAt({

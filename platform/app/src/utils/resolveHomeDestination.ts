@@ -38,6 +38,21 @@ export interface HomeDestinationInput {
  *    last-visited project's home.
  *  - With no visit history, the persona resolver's destination stands.
  */
+function intentPinnedDestination({
+  resolverDestination,
+  lastVisitedHomeKind,
+  lastProjectSlug,
+}: Pick<
+  HomeDestinationInput,
+  "resolverDestination" | "lastVisitedHomeKind" | "lastProjectSlug"
+>): string {
+  if (resolverDestination === "/me") return resolverDestination;
+  if (lastVisitedHomeKind === "project" && lastProjectSlug) {
+    return `/${lastProjectSlug}`;
+  }
+  return resolverDestination;
+}
+
 export function resolveHomeDestination({
   resolverDestination,
   isOverride,
@@ -49,11 +64,11 @@ export function resolveHomeDestination({
   if (isOverride) return resolverDestination;
 
   if (intentPinned) {
-    if (resolverDestination === "/me") return resolverDestination;
-    if (lastVisitedHomeKind === "project" && lastProjectSlug) {
-      return `/${lastProjectSlug}`;
-    }
-    return resolverDestination;
+    return intentPinnedDestination({
+      resolverDestination,
+      lastVisitedHomeKind,
+      lastProjectSlug,
+    });
   }
 
   if (

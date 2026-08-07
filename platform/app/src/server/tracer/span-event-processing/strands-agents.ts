@@ -57,6 +57,73 @@ export function isStrandsAgentsInstrumentation(
   return false;
 }
 
+function buildStrandsToolMessage(attributes: DeepPartial<IKeyValue[]>) {
+  return {
+    role: attrStrVal(attributes, "role"),
+    content: jsonOrString(attrStrVal(attributes, "content")),
+    id: attrStrVal(attributes, "id"),
+  };
+}
+
+function buildStrandsChoiceMessage(attributes: DeepPartial<IKeyValue[]>) {
+  const finishReason = attrStrVal(attributes, "finish_reason");
+  const role = attrStrVal(attributes, "role");
+
+  return {
+    // Use the role, but fallback to "assistant" if we're at the end of a turn.
+    role:
+      role !== void 0
+        ? role
+        : finishReason === "end_turn"
+          ? "assistant"
+          : void 0,
+    content: jsonOrString(attrStrVal(attributes, "message")),
+    id: attrStrVal(attributes, "id"),
+    finish_reason: finishReason,
+    tool_result: jsonOrString(attrStrVal(attributes, "tool_result")),
+  };
+}
+
+function buildStrandsGenericMessage(
+  role: string,
+  attributes: DeepPartial<IKeyValue[]>,
+) {
+  return {
+    role,
+    content: jsonOrString(attrStrVal(attributes, "content")),
+    id: attrStrVal(attributes, "id"),
+  };
+}
+
+type StrandsAgentEvent = NonNullable<DeepPartial<ISpan>["events"]>[number];
+
+function processStrandsAgentEvent(
+  event: StrandsAgentEvent,
+  inputMessages: any[],
+  outputChoices: any[],
+): void {
+  if (!event?.name || !event.attributes) return;
+
+  if (event.name === "gen_ai.tool.message") {
+    inputMessages.push(buildStrandsToolMessage(event.attributes));
+    return;
+  }
+
+  if (event.name === "gen_ai.choice") {
+    outputChoices.push(buildStrandsChoiceMessage(event.attributes));
+    return;
+  }
+
+  if (/gen_ai\..+\.message/.test(event.name)) {
+    const nameParts = event.name.split(".");
+    if (nameParts.length < 3) return;
+
+    inputMessages.push(
+      buildStrandsGenericMessage(nameParts[1]!, event.attributes),
+    );
+  }
+}
+
 /**
  * Extracts input/output from strands-agents event format, which is a bit different from
  * the OpenTelemetry spec.
@@ -71,71 +138,7 @@ export function extractStrandsAgentsInputOutput(otelSpan: DeepPartial<ISpan>): {
   const outputChoices: any[] = [];
 
   for (const event of otelSpan.events) {
-    if (!event?.name || !event.attributes) continue;
-
-    switch (true) {
-      case event.name === "gen_ai.tool.message": {
-        inputMessages.push({
-          role: event.attributes.find((a) => a?.key === "role")?.value
-            ?.stringValue,
-          content: jsonOrString(
-            event.attributes.find((a) => a?.key === "content")?.value
-              ?.stringValue,
-          ),
-          id: event.attributes.find((a) => a?.key === "id")?.value?.stringValue,
-        });
-        break;
-      }
-
-      case event.name === "gen_ai.choice": {
-        const finishReason = event.attributes.find(
-          (a) => a?.key === "finish_reason",
-        )?.value?.stringValue;
-        const role = event.attributes.find((a) => a?.key === "role")?.value
-          ?.stringValue;
-
-        outputChoices.push({
-          // Use the role, but fallback to "assistant" if we're at the end of a turn.
-          role:
-            role !== void 0
-              ? role
-              : finishReason === "end_turn"
-                ? "assistant"
-                : void 0,
-          content: jsonOrString(
-            event.attributes.find((a) => a?.key === "message")?.value
-              ?.stringValue,
-          ),
-          id: event.attributes.find((a) => a?.key === "id")?.value?.stringValue,
-          finish_reason: event.attributes.find(
-            (a) => a?.key === "finish_reason",
-          )?.value?.stringValue,
-          tool_result: jsonOrString(
-            event.attributes.find((a) => a?.key === "tool_result")?.value
-              ?.stringValue,
-          ),
-        });
-        break;
-      }
-
-      case /gen_ai\..+\.message/.test(event.name): {
-        const nameParts = event.name.split(".");
-        if (nameParts.length < 3) break;
-        if (nameParts.length === 0) break;
-
-        inputMessages.push({
-          role: nameParts[1],
-          content: jsonOrString(
-            event.attributes.find((a) => a?.key === "content")?.value
-              ?.stringValue,
-          ),
-          id: event.attributes.find((a) => a?.key === "id")?.value?.stringValue,
-        });
-        break;
-      }
-      default:
-        break;
-    }
+    processStrandsAgentEvent(event, inputMessages, outputChoices);
   }
 
   return {
@@ -150,22 +153,24 @@ export function extractStrandsAgentsInputOutput(otelSpan: DeepPartial<ISpan>): {
   };
 }
 
+function resolveOtelStringValue(value: string): any {
+  if (isNumeric(value)) return value;
+
+  try {
+    return JSON.parse(value);
+  } catch {
+    return value;
+  }
+}
+
 /**
  * Resolves OpenTelemetry AnyValue to a JavaScript value, handling complex types recursively.
  */
 function resolveOtelAnyValue(anyValuePair?: DeepPartial<IAnyValue>): any {
   if (!anyValuePair) return void 0;
 
-  if (anyValuePair.stringValue != null) {
-    if (isNumeric(anyValuePair.stringValue)) return anyValuePair.stringValue;
-
-    try {
-      return JSON.parse(anyValuePair.stringValue);
-    } catch {
-      return anyValuePair.stringValue;
-    }
-  }
-
+  if (anyValuePair.stringValue != null)
+    return resolveOtelStringValue(anyValuePair.stringValue);
   if (anyValuePair.boolValue != null) return anyValuePair.boolValue;
   if (anyValuePair.intValue != null) return anyValuePair.intValue;
   if (anyValuePair.doubleValue != null) return anyValuePair.doubleValue;
@@ -183,6 +188,18 @@ function resolveOtelAnyValue(anyValuePair?: DeepPartial<IAnyValue>): any {
 /**
  * Converts OpenTelemetry attributes to nested attributes (reused from main processing).
  */
+// prepare the container for the next path segment
+function stepIntoPathContainer(
+  cursor: any,
+  key: string | number,
+  createsArray: boolean,
+): any {
+  if (typeof cursor[key] !== "object" || cursor[key] === null) {
+    cursor[key] = createsArray ? [] : {};
+  }
+  return cursor[key];
+}
+
 function otelAttributesToNestedAttributes(
   attributes: DeepPartial<IKeyValue[]> | undefined,
 ): Record<string, any> {
@@ -201,11 +218,7 @@ function otelAttributesToNestedAttributes(
       const segIsIndex = /^\d+$/.test(seg);
       const key = segIsIndex ? Number(seg) : seg;
 
-      // prepare the container for the next segment
-      if (typeof cursor[key] !== "object" || cursor[key] === null) {
-        cursor[key] = nextIsIndex ? [] : {};
-      }
-      cursor = cursor[key];
+      cursor = stepIntoPathContainer(cursor, key, nextIsIndex);
     });
 
     // detect leaf type and cast key to correct type
@@ -225,6 +238,25 @@ function isNumeric(n: any): boolean {
   return !isNaN(parseFloat(n)) && isFinite(n);
 }
 
+const isStrandsScopeOrGenAiKey = (key: string): boolean =>
+  key.startsWith("scope.") || key.startsWith("gen_ai.");
+
+function collectStrandsMetadataAttribute(
+  attr: DeepPartial<IKeyValue>,
+  metadata: Record<string, any>,
+): void {
+  if (!attr?.key || !attr.value) return;
+  if (isStrandsScopeOrGenAiKey(attr.key)) return;
+
+  // Extract the value using the same logic as the main OpenTelemetry processing
+  const value = resolveOtelAnyValue(attr.value);
+
+  // Only add non-empty values
+  if (value !== null && value !== undefined && value !== "") {
+    metadata[attr.key] = value;
+  }
+}
+
 /**
  * Extracts metadata from strands-agents spans that don't start with 'scope' or 'gen_ai'.
  * This function filters out attributes that should not be included in trace metadata.
@@ -238,20 +270,7 @@ export function extractStrandsAgentsMetadata(
   const metadata: Record<string, any> = {};
 
   for (const attr of otelSpan.attributes) {
-    if (!attr?.key || !attr.value) continue;
-
-    // Skip attributes that start with 'scope' or 'gen_ai'
-    if (attr.key.startsWith("scope.") || attr.key.startsWith("gen_ai.")) {
-      continue;
-    }
-
-    // Extract the value using the same logic as the main OpenTelemetry processing
-    const value = resolveOtelAnyValue(attr.value);
-
-    // Only add non-empty values
-    if (value !== null && value !== undefined && value !== "") {
-      metadata[attr.key] = value;
-    }
+    collectStrandsMetadataAttribute(attr, metadata);
   }
 
   return metadata;

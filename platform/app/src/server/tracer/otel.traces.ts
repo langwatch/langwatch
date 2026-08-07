@@ -113,49 +113,145 @@ export const openTelemetryTraceRequestToTracesForCollection = async (
   );
 };
 
+const OTEL_SPAN_ID_FIELDS = ["traceId", "spanId", "parentSpanId"] as const;
+
+function decodeSpanIds(span: DeepPartial<ISpan> | undefined): void {
+  if (!span) return;
+  for (const field of OTEL_SPAN_ID_FIELDS) {
+    const raw = (span as any)[field];
+    if (!raw) continue;
+    const decoded =
+      typeof raw === "string"
+        ? decodeBase64OpenTelemetryId(raw)
+        : decodeOpenTelemetryId(raw);
+    if (decoded) {
+      (span as any)[field] = decoded;
+    }
+  }
+}
+
 const decodeOpenTelemetryIds = (
   otelTrace: DeepPartial<IExportTraceServiceRequest>,
 ) => {
-  try {
-    for (const resourceSpan of otelTrace.resourceSpans ?? []) {
-      for (const scopeSpan of resourceSpan?.scopeSpans ?? []) {
-        for (const span of scopeSpan?.spans ?? []) {
-          if (span?.traceId) {
-            const decoded =
-              typeof span.traceId === "string"
-                ? decodeBase64OpenTelemetryId(span.traceId)
-                : decodeOpenTelemetryId(span.traceId);
-            if (decoded) {
-              span.traceId = decoded;
-            }
-          }
-          if (span?.spanId) {
-            const decoded =
-              typeof span.spanId === "string"
-                ? decodeBase64OpenTelemetryId(span.spanId)
-                : decodeOpenTelemetryId(span.spanId);
-            if (decoded) {
-              span.spanId = decoded;
-            }
-          }
-          if (span?.parentSpanId) {
-            const decoded =
-              typeof span.parentSpanId === "string"
-                ? decodeBase64OpenTelemetryId(span.parentSpanId)
-                : decodeOpenTelemetryId(span.parentSpanId);
-            if (decoded) {
-              span.parentSpanId = decoded;
-            }
-          }
-        }
+  for (const resourceSpan of otelTrace.resourceSpans ?? []) {
+    for (const scopeSpan of resourceSpan?.scopeSpans ?? []) {
+      for (const span of scopeSpan?.spans ?? []) {
+        decodeSpanIds(span);
       }
     }
-
-    return;
-  } catch (error) {
-    throw error;
   }
 };
+
+// telemetry.sdk.* are standard SDK-provenance resource attributes present on
+// every OTLP trace, which LangWatch has always surfaced as custom metadata.
+// Leave them there to preserve that behaviour and keep this change scoped to
+// the trace-identity keys Langy relies on (tag.tags, langwatch.thread.id, ...).
+function isReservedResourceAttributeKey(
+  key: string,
+  value: string | undefined,
+): boolean {
+  return (
+    key in openTelemetryToLangWatchMetadataMapping &&
+    !key.startsWith("telemetry.sdk.") &&
+    value != null
+  );
+}
+
+function collectResourceSpanAttributes(
+  resourceSpan: any,
+  customMetadata: Record<string, any>,
+  resourceReservedSource: Record<string, string | string[]>,
+): void {
+  for (const attribute of resourceSpan?.resource?.attributes ?? []) {
+    if (!attribute?.key) continue;
+    const value = attribute?.value?.stringValue;
+    if (isReservedResourceAttributeKey(attribute.key, value)) {
+      resourceReservedSource[attribute.key] = value;
+    } else {
+      customMetadata[attribute.key] = value;
+    }
+  }
+}
+
+// Collect OTLP resource attributes (shared by every span in the request).
+// Reserved keys (tag.tags -> labels, langwatch.thread.id -> thread_id, ...)
+// are hoisted to reserved trace metadata exactly as they are from span
+// attributes — Langy's opencode OTel plugin sets them on the resource, so
+// this is what makes its traces land labeled "langy" and grouped by
+// conversation. Everything else stays custom.
+function collectResourceMetadata(
+  otelTrace: DeepPartial<IExportTraceServiceRequest>,
+): {
+  customMetadata: Record<string, any>;
+  resourceReservedSource: Record<string, string | string[]>;
+} {
+  const customMetadata: Record<string, any> = {};
+  const resourceReservedSource: Record<string, string | string[]> = {};
+  for (const resourceSpan of otelTrace.resourceSpans ?? []) {
+    collectResourceSpanAttributes(
+      resourceSpan,
+      customMetadata,
+      resourceReservedSource,
+    );
+  }
+  return { customMetadata, resourceReservedSource };
+}
+
+function applyResourceReservedMetadata(
+  trace: TraceForCollection,
+  resourceReservedSource: Record<string, string | string[]>,
+): void {
+  if (Object.keys(resourceReservedSource).length === 0) return;
+
+  // tag.tags maps to labels (string[]); a resource attribute carries
+  // it as a single string (OTEL_RESOURCE_ATTRIBUTES can't express
+  // arrays), so coerce to an array before the reserved schema
+  // validates it.
+  if (typeof resourceReservedSource["tag.tags"] === "string") {
+    resourceReservedSource["tag.tags"] = resourceReservedSource["tag.tags"]
+      .split(",")
+      .map((tag: string) => tag.trim())
+      .filter(Boolean);
+  }
+  try {
+    const { reservedTraceMetadata, customMetadata: extraCustom } =
+      extractReservedAndCustomMetadata(
+        applyMappingsToMetadata(resourceReservedSource),
+      );
+    trace.reservedTraceMetadata = reservedTraceMetadata;
+    // Any reserved-source key the schema didn't claim falls back to
+    // custom metadata rather than being dropped.
+    Object.assign(trace.customMetadata, extraCustom);
+  } catch {
+    // Defensive: never let a malformed resource attribute break
+    // ingestion — keep the raw values as custom metadata.
+    Object.assign(trace.customMetadata, resourceReservedSource);
+  }
+}
+
+function addSpansForScope(
+  trace: TraceForCollection,
+  scopeSpan: any,
+  traceId: string,
+): void {
+  for (const span of scopeSpan?.spans ?? []) {
+    if (span?.traceId === traceId) {
+      addOpenTelemetrySpanAsSpan(trace, span, scopeSpan?.scope);
+    }
+  }
+}
+
+function addSpansForTrace(
+  trace: TraceForCollection,
+  otelTrace: DeepPartial<IExportTraceServiceRequest>,
+  traceId: string,
+): void {
+  for (const resourceSpan of otelTrace.resourceSpans ?? []) {
+    for (const scopeSpan of resourceSpan?.scopeSpans ?? []) {
+      addSpansForScope(trace, scopeSpan, traceId);
+    }
+  }
+}
 
 const openTelemetryTraceRequestToTraceForCollection = (
   traceId: string,
@@ -173,34 +269,8 @@ const openTelemetryTraceRequestToTraceForCollection = (
         );
         const otelTrace = cloneDeep(otelTrace_);
 
-        // Collect OTLP resource attributes (shared by every span in the
-        // request). Reserved keys (tag.tags -> labels, langwatch.thread.id ->
-        // thread_id, ...) are hoisted to reserved trace metadata exactly as
-        // they are from span attributes — Langy's opencode OTel plugin sets
-        // them on the resource, so this is what makes its traces land labeled
-        // "langy" and grouped by conversation. Everything else stays custom.
-        const customMetadata: Record<string, any> = {};
-        const resourceReservedSource: Record<string, string | string[]> = {};
-        for (const resourceSpan of otelTrace.resourceSpans ?? []) {
-          for (const attribute of resourceSpan?.resource?.attributes ?? []) {
-            if (!attribute?.key) continue;
-            const value = attribute?.value?.stringValue;
-            if (
-              attribute.key in openTelemetryToLangWatchMetadataMapping &&
-              // telemetry.sdk.* are standard SDK-provenance resource attributes
-              // present on every OTLP trace, which LangWatch has always
-              // surfaced as custom metadata. Leave them there to preserve that
-              // behaviour and keep this change scoped to the trace-identity
-              // keys Langy relies on (tag.tags, langwatch.thread.id, ...).
-              !attribute.key.startsWith("telemetry.sdk.") &&
-              value != null
-            ) {
-              resourceReservedSource[attribute.key] = value;
-            } else {
-              customMetadata[attribute.key] = value;
-            }
-          }
-        }
+        const { customMetadata, resourceReservedSource } =
+          collectResourceMetadata(otelTrace);
 
         const trace: TraceForCollection = {
           traceId,
@@ -210,44 +280,9 @@ const openTelemetryTraceRequestToTraceForCollection = (
           customMetadata,
         };
 
-        if (Object.keys(resourceReservedSource).length > 0) {
-          // tag.tags maps to labels (string[]); a resource attribute carries
-          // it as a single string (OTEL_RESOURCE_ATTRIBUTES can't express
-          // arrays), so coerce to an array before the reserved schema
-          // validates it.
-          if (typeof resourceReservedSource["tag.tags"] === "string") {
-            resourceReservedSource["tag.tags"] = resourceReservedSource[
-              "tag.tags"
-            ]
-              .split(",")
-              .map((tag: string) => tag.trim())
-              .filter(Boolean);
-          }
-          try {
-            const { reservedTraceMetadata, customMetadata: extraCustom } =
-              extractReservedAndCustomMetadata(
-                applyMappingsToMetadata(resourceReservedSource),
-              );
-            trace.reservedTraceMetadata = reservedTraceMetadata;
-            // Any reserved-source key the schema didn't claim falls back to
-            // custom metadata rather than being dropped.
-            Object.assign(trace.customMetadata, extraCustom);
-          } catch {
-            // Defensive: never let a malformed resource attribute break
-            // ingestion — keep the raw values as custom metadata.
-            Object.assign(trace.customMetadata, resourceReservedSource);
-          }
-        }
+        applyResourceReservedMetadata(trace, resourceReservedSource);
 
-        for (const resourceSpan of otelTrace.resourceSpans ?? []) {
-          for (const scopeSpan of resourceSpan?.scopeSpans ?? []) {
-            for (const span of scopeSpan?.spans ?? []) {
-              if (span?.traceId === traceId) {
-                addOpenTelemetrySpanAsSpan(trace, span, scopeSpan?.scope);
-              }
-            }
-          }
-        }
+        addSpansForTrace(trace, otelTrace, traceId);
 
         span.setAttribute("spans.count", trace.spans.length);
         span.setAttribute("evaluations.count", trace.evaluations?.length ?? 0);
@@ -284,6 +319,1315 @@ const parseTimestamp = (
   return unixNano ? Math.round(unixNano / 1000 / 1000) : undefined;
 };
 
+// Mutable accumulator threaded through the span-building pipeline below.
+// Every extraction/inference step below takes this single object so each
+// step stays a one-parameter function while still reading/writing the same
+// shared state the original inline implementation closed over.
+type SpanBuildState = {
+  readonly incomingSpan: DeepPartial<ISpan>;
+  readonly incomingScope: DeepPartial<IInstrumentationScope> | undefined;
+  readonly attributesMap: Record<string, any>;
+  readonly trace: TraceForCollection;
+  type: Span["type"];
+  model: LLMSpan["model"];
+  input: LLMSpan["input"];
+  output: LLMSpan["output"];
+  params: Span["params"];
+  metadata: Record<string, unknown>;
+  started_at: Span["timestamps"]["started_at"] | undefined;
+  finished_at: Span["timestamps"]["finished_at"] | undefined;
+  first_token_at: Span["timestamps"]["first_token_at"];
+  error: Span["error"];
+  metrics: LLMSpan["metrics"];
+  contexts: RAGChunk[];
+  name: string | undefined;
+};
+
+function recordCustomEvaluationEvent(
+  event: NonNullable<DeepPartial<ISpan>["events"]>[number],
+  trace: TraceForCollection,
+): void {
+  const jsonPayload = event.attributes?.find(
+    (attr) => attr?.key === "json_encoded_event",
+  )?.value?.stringValue;
+  if (!jsonPayload) {
+    logger.warn(
+      { event },
+      "event for `langwatch.evaluation.custom` has no json_encoded_event",
+    );
+    return;
+  }
+
+  try {
+    const parsedJsonPayload = JSON.parse(jsonPayload);
+    const evaluation = rESTEvaluationSchema.parse(parsedJsonPayload);
+
+    if (!trace.evaluations) trace.evaluations = [];
+    trace.evaluations.push(evaluation);
+  } catch (error) {
+    logger.error(
+      { error, jsonPayload },
+      "error parsing json_encoded_event from `langwatch.evaluation.custom`, event discarded",
+    );
+  }
+}
+
+function updateFirstTokenAtFromTimingEvent(
+  state: SpanBuildState,
+  event: NonNullable<DeepPartial<ISpan>["events"]>[number],
+): void {
+  const ts = parseTimestamp(event?.timeUnixNano);
+  if (ts && (!state.first_token_at || ts < state.first_token_at)) {
+    state.first_token_at = ts;
+  }
+}
+
+// First token at
+function computeFirstTokenAtFromEvents(state: SpanBuildState): void {
+  for (const event of state.incomingSpan?.events ?? []) {
+    if (!event) continue;
+
+    switch (event.name) {
+      case "First Token Stream Event":
+      case "llm.content.completion.chunk": {
+        updateFirstTokenAtFromTimingEvent(state, event);
+        break;
+      }
+      case "langwatch.evaluation.custom": {
+        recordCustomEvaluationEvent(event, state.trace);
+        break;
+      }
+
+      default:
+        break;
+    }
+  }
+}
+
+// Special handling for strands-agents Python SDK
+function applyStrandsAgentsInputOutput(state: SpanBuildState): void {
+  if (
+    !isStrandsAgentsInstrumentation(state.incomingScope, state.incomingSpan)
+  ) {
+    return;
+  }
+  const io = extractStrandsAgentsInputOutput(state.incomingSpan);
+  if (io) {
+    state.input = io.input;
+    state.output = io.output;
+  }
+}
+
+function applyFirstTokenAtFromAttributes(state: SpanBuildState): void {
+  const { attributesMap, started_at } = state;
+  if (started_at && attributesMap.gen_ai?.server?.time_to_first_token) {
+    state.first_token_at =
+      started_at +
+      parseInt((attributesMap as any).gen_ai.server.time_to_first_token, 10);
+  }
+
+  if (started_at && attributesMap.ai?.response?.msToFirstChunk) {
+    state.first_token_at =
+      started_at +
+      parseInt((attributesMap as any).ai.response.msToFirstChunk, 10);
+  }
+}
+
+const SPAN_KIND_TYPE_MAP: Array<{
+  stringKind: string;
+  enumKind: ESpanKind;
+  type: SpanTypes;
+}> = [
+  {
+    stringKind: "SPAN_KIND_SERVER",
+    enumKind: ESpanKind.SPAN_KIND_SERVER,
+    type: "server",
+  },
+  {
+    stringKind: "SPAN_KIND_CLIENT",
+    enumKind: ESpanKind.SPAN_KIND_CLIENT,
+    type: "client",
+  },
+  {
+    stringKind: "SPAN_KIND_PRODUCER",
+    enumKind: ESpanKind.SPAN_KIND_PRODUCER,
+    type: "producer",
+  },
+  {
+    stringKind: "SPAN_KIND_CONSUMER",
+    enumKind: ESpanKind.SPAN_KIND_CONSUMER,
+    type: "consumer",
+  },
+];
+
+function applySpanKindType(state: SpanBuildState): void {
+  const kind = state.incomingSpan.kind;
+  for (const { stringKind, enumKind, type } of SPAN_KIND_TYPE_MAP) {
+    if ((kind as any) === stringKind || kind === enumKind) {
+      state.type = type;
+    }
+  }
+}
+
+function applyVendorSpanKindType(
+  attributesMap: Record<string, any>,
+  vendorKey: "openinference" | "traceloop",
+): SpanTypes | undefined {
+  const kind_ = attributesMap[vendorKey]?.span?.kind;
+  if (!kind_) return undefined;
+  const normalized = kind_.toLowerCase();
+  if (!allowedSpanTypes.includes(normalized as SpanTypes)) return undefined;
+  delete attributesMap[vendorKey].span.kind;
+  return normalized as SpanTypes;
+}
+
+function applyOpeninferenceAndTraceloopSpanKindType(
+  state: SpanBuildState,
+): void {
+  for (const vendorKey of ["openinference", "traceloop"] as const) {
+    const inferred = applyVendorSpanKindType(state.attributesMap, vendorKey);
+    if (inferred) {
+      state.type = inferred;
+    }
+  }
+}
+
+function applyGenericTypeAttribute(state: SpanBuildState): void {
+  const { attributesMap } = state;
+  if (attributesMap?.type) {
+    state.type = attributesMap.type as SpanTypes;
+    attributesMap.type = void 0;
+  }
+}
+
+function applyLlmRequestTypeAndVercelAndToolType(state: SpanBuildState): void {
+  const { attributesMap } = state;
+  if (
+    attributesMap.llm?.request?.type === "chat" ||
+    attributesMap.llm?.request?.type === "completion"
+  ) {
+    state.type = "llm";
+    delete attributesMap.llm.request.type;
+  }
+  // vercel
+  if (attributesMap.ai && attributesMap.gen_ai) {
+    state.type = "llm";
+  }
+  if (attributesMap.operation?.name === "ai.toolCall") {
+    state.type = "tool";
+  }
+}
+
+// Agents
+function applyAgentType(state: SpanBuildState): void {
+  const { attributesMap, incomingSpan } = state;
+  if (attributesMap.gen_ai?.agent || attributesMap.agent?.name) {
+    // Strands agent
+    if (incomingSpan.name === "Model invoke") {
+      state.type = "llm";
+    } else {
+      state.type = "agent";
+    }
+  }
+}
+
+// GenAI semantic convention chat LLM calls (Strands, OpenClaw, etc.)
+// CLIENT span kind is standard for gen_ai LLM calls per the OTEL GenAI spec
+function applyGenAiOperationNameType(state: SpanBuildState): void {
+  const { attributesMap } = state;
+  if (
+    (state.type === "span" || state.type === "client") &&
+    attributesMap.gen_ai?.operation?.name === "chat"
+  ) {
+    state.type = "llm";
+  }
+  if (
+    (state.type === "span" || state.type === "client") &&
+    attributesMap.gen_ai?.operation?.name === "tool"
+  ) {
+    state.type = "tool";
+  }
+}
+
+// Type
+function inferSpanType(state: SpanBuildState): void {
+  applySpanKindType(state);
+  applyOpeninferenceAndTraceloopSpanKindType(state);
+  applyGenericTypeAttribute(state);
+  applyLlmRequestTypeAndVercelAndToolType(state);
+  applyAgentType(state);
+  applyGenAiOperationNameType(state);
+}
+
+// Extract metadata for agent spans from strands-agents
+function applyStrandsAgentMetadataForAgentType(state: SpanBuildState): void {
+  if (
+    state.type !== "agent" ||
+    !isStrandsAgentsInstrumentation(state.incomingScope, state.incomingSpan)
+  ) {
+    return;
+  }
+  const strandsMetadata = extractStrandsAgentsMetadata(state.incomingSpan);
+  if (Object.keys(strandsMetadata).length > 0) {
+    state.metadata = {
+      ...state.metadata,
+      ...strandsMetadata,
+    };
+  }
+}
+
+// infer for others otel gen_ai spec
+function applyGenAiResponseModelType(state: SpanBuildState): void {
+  if (
+    (state.type === "span" || state.type === "client") &&
+    state.attributesMap.gen_ai?.response?.model
+  ) {
+    state.type = "llm";
+  }
+}
+
+// Model
+function inferModel(state: SpanBuildState): void {
+  const { attributesMap } = state;
+  if (attributesMap.llm?.model_name) {
+    state.model = (attributesMap as any).llm.model_name;
+    attributesMap.llm.model_name = void 0;
+  }
+
+  if (attributesMap.gen_ai?.request?.model) {
+    state.model = (attributesMap as any).gen_ai.request.model;
+    attributesMap.gen_ai.request.model = void 0;
+  }
+
+  if (attributesMap.gen_ai?.response?.model) {
+    state.model = (attributesMap as any).gen_ai.response.model;
+    attributesMap.gen_ai.response.model = void 0;
+  }
+
+  if (
+    attributesMap.gen_ai &&
+    attributesMap.ai?.model &&
+    typeof attributesMap.ai.model === "object" &&
+    typeof (attributesMap.ai.model as any).id === "string"
+  ) {
+    const provider =
+      (attributesMap.ai.model as any).provider?.split(".")[0] ?? "";
+    state.model = [provider, (attributesMap as any).ai.model.id]
+      .filter(Boolean)
+      .join("/");
+    delete attributesMap.ai.model;
+  }
+}
+
+// GenAI semantic convention: gen_ai.input.messages (e.g. OpenClaw, OTEL GenAI spec)
+// We assign directly as chat_messages without Zod validation to avoid
+// stripping content fields that use provider-specific formats (e.g.
+// Anthropic tool_use/tool_result content blocks).
+function applyGenAiInputMessages(state: SpanBuildState): void {
+  const { attributesMap } = state;
+  if (
+    !state.input &&
+    attributesMap.gen_ai?.input?.messages &&
+    Array.isArray(attributesMap.gen_ai.input.messages)
+  ) {
+    const messages: ChatMessage[] = [];
+    // Prepend system instructions as a system message
+    if (attributesMap.gen_ai?.system_instructions) {
+      const raw = attributesMap.gen_ai.system_instructions;
+      // Keep the original value shape: string stays string, array stays array
+      const sysContent =
+        typeof raw === "string"
+          ? raw
+          : (raw as unknown as ChatMessage["content"]);
+      messages.push({ role: "system", content: sysContent });
+      delete (attributesMap as any).gen_ai.system_instructions;
+    }
+    messages.push(...(attributesMap.gen_ai.input.messages as ChatMessage[]));
+    state.input = { type: "chat_messages", value: messages };
+    delete (attributesMap as any).gen_ai.input.messages;
+  }
+}
+
+function applyLlmInputMessages(state: SpanBuildState): void {
+  const { attributesMap } = state;
+  if (
+    attributesMap.llm?.input_messages &&
+    Array.isArray(attributesMap.llm.input_messages)
+  ) {
+    const input_ = typedValueChatMessagesSchema.safeParse({
+      type: "chat_messages",
+      value: attributesMap.llm.input_messages.map(
+        (message: { message?: string }) => message.message,
+      ),
+    });
+
+    if (input_.success) {
+      state.input = input_.data as TypedValueChatMessages;
+      delete attributesMap.llm.input_messages;
+    }
+  }
+}
+
+function applyGenAiPromptArrayInput(state: SpanBuildState): void {
+  const { attributesMap } = state;
+  if (
+    !state.input &&
+    attributesMap.gen_ai?.prompt &&
+    Array.isArray(attributesMap.gen_ai.prompt)
+  ) {
+    const input_ = typedValueChatMessagesSchema.safeParse({
+      type: "chat_messages",
+      value: attributesMap.gen_ai.prompt,
+    });
+
+    if (input_.success) {
+      state.input = input_.data as TypedValueChatMessages;
+    } else {
+      state.input = {
+        type: "json",
+        value: attributesMap.gen_ai.prompt,
+      };
+    }
+    delete attributesMap.gen_ai.prompt;
+  }
+}
+
+function applyGenAiPromptStringInput(state: SpanBuildState): void {
+  const { attributesMap, trace } = state;
+  if (!state.input && typeof attributesMap.gen_ai?.prompt === "string") {
+    try {
+      const parsed = JSON.parse(attributesMap.gen_ai.prompt);
+      state.input = {
+        type: "json",
+        value: parsed,
+      };
+    } catch (error) {
+      logger.error(
+        {
+          error,
+          customerTraceId: trace.traceId,
+        },
+        "error parsing gen_ai.prompt",
+      );
+
+      state.output = {
+        type: "text",
+        value: attributesMap.gen_ai.prompt,
+      };
+    }
+    delete attributesMap.gen_ai.prompt;
+  }
+}
+
+function applyGenAiPromptMessagesInput(state: SpanBuildState): void {
+  const { attributesMap } = state;
+  if (
+    !state.input &&
+    attributesMap.gen_ai?.prompt?.messages &&
+    Array.isArray(attributesMap.gen_ai.prompt.messages)
+  ) {
+    const input_ = typedValueChatMessagesSchema.safeParse({
+      type: "chat_messages",
+      value: attributesMap.gen_ai.prompt.messages,
+    });
+
+    if (input_.success) {
+      state.input = input_.data as TypedValueChatMessages;
+      delete attributesMap.gen_ai.prompt;
+    } else {
+      state.input = {
+        type: "json",
+        value: attributesMap.gen_ai.prompt.messages,
+      };
+    }
+  }
+}
+
+// vercel
+function applyVercelPromptMessagesInput(state: SpanBuildState): void {
+  const { attributesMap } = state;
+  if (
+    !state.input &&
+    attributesMap.ai?.prompt?.messages &&
+    Array.isArray(attributesMap.ai.prompt.messages)
+  ) {
+    const input_ = typedValueChatMessagesSchema.safeParse({
+      type: "chat_messages",
+      value: attributesMap.ai.prompt.messages,
+    });
+
+    if (input_.success) {
+      state.input = input_.data as TypedValueChatMessages;
+      delete attributesMap.ai.prompt;
+    }
+  }
+}
+
+function applyVercelToolCallArgsInput(state: SpanBuildState): void {
+  const { attributesMap } = state;
+  if (
+    !state.input &&
+    state.type === "tool" &&
+    attributesMap.ai?.toolCall?.args
+  ) {
+    state.input = {
+      type: "json",
+      value: attributesMap.ai?.toolCall?.args,
+    };
+  }
+}
+
+function applyTraceloopEntityInput(state: SpanBuildState): void {
+  const { attributesMap } = state;
+  if (!state.input && attributesMap.traceloop?.entity?.input) {
+    state.input =
+      typeof attributesMap.traceloop.entity.input === "string"
+        ? {
+            type: "text",
+            value: attributesMap.traceloop.entity.input,
+          }
+        : {
+            type: "json",
+            value: attributesMap.traceloop.entity.input,
+          };
+
+    // Check for langchain metadata inside traceloop https://github.com/traceloop/openllmetry/issues/1783
+    const json = attributesMap.traceloop.entity.input;
+    if (
+      state.input.type === "json" &&
+      typeof json === "object" &&
+      json !== null &&
+      "metadata" in json &&
+      // @ts-ignore
+      typeof json.metadata === "object" &&
+      // @ts-ignore
+      !Array.isArray(json.metadata)
+    ) {
+      state.metadata = {
+        ...state.metadata,
+        ...json.metadata,
+      };
+
+      json.metadata = void 0;
+    }
+
+    attributesMap.traceloop.entity.input = void 0;
+  }
+}
+
+// Check for vercel metadata
+function applyVercelTelemetryMetadata(state: SpanBuildState): void {
+  const { attributesMap } = state;
+  if (
+    attributesMap.ai?.telemetry?.metadata &&
+    typeof attributesMap.ai.telemetry.metadata === "object"
+  ) {
+    state.metadata = {
+      ...state.metadata,
+      ...attributesMap.ai.telemetry.metadata,
+    };
+
+    attributesMap.ai.telemetry.metadata = void 0;
+  }
+}
+
+function applyGenericAttributesInputValue(state: SpanBuildState): void {
+  const { attributesMap } = state;
+  if (!state.input && attributesMap.input?.value) {
+    state.input =
+      typeof attributesMap.input.value === "string"
+        ? {
+            type: "text",
+            value: attributesMap.input.value,
+          }
+        : {
+            type: "json",
+            value: attributesMap.input.value,
+          };
+  }
+  delete attributesMap.input;
+}
+
+function applyCrewInputsInput(state: SpanBuildState): void {
+  const { attributesMap } = state;
+  if (!state.input && attributesMap.crew_inputs) {
+    state.input = {
+      type: "json",
+      value: attributesMap.crew_inputs,
+    };
+  }
+}
+
+// logfire
+function applyRawInputInput(state: SpanBuildState): void {
+  const { attributesMap } = state;
+  if (!state.input && attributesMap.raw_input) {
+    state.input = {
+      type: "chat_messages",
+      value: attributesMap.raw_input as any,
+    };
+  }
+}
+
+// Input
+function extractSpanInput(state: SpanBuildState): void {
+  applyGenAiInputMessages(state);
+  applyLlmInputMessages(state);
+  applyGenAiPromptArrayInput(state);
+  applyGenAiPromptStringInput(state);
+  applyGenAiPromptMessagesInput(state);
+  applyVercelPromptMessagesInput(state);
+  applyVercelToolCallArgsInput(state);
+  applyTraceloopEntityInput(state);
+  applyVercelTelemetryMetadata(state);
+  applyGenericAttributesInputValue(state);
+  applyCrewInputsInput(state);
+  applyRawInputInput(state);
+}
+
+// GenAI semantic convention: gen_ai.output.messages (e.g. OpenClaw, OTEL GenAI spec)
+// Assign directly without Zod validation to preserve all content fields.
+function applyGenAiOutputMessages(state: SpanBuildState): void {
+  const { attributesMap } = state;
+  if (
+    !state.output &&
+    attributesMap.gen_ai?.output?.messages &&
+    Array.isArray(attributesMap.gen_ai.output.messages)
+  ) {
+    state.output = {
+      type: "chat_messages",
+      value: attributesMap.gen_ai.output.messages as ChatMessage[],
+    };
+    delete (attributesMap as any).gen_ai.output.messages;
+  }
+}
+
+function applyLlmOutputMessagesArray(state: SpanBuildState): void {
+  const { attributesMap } = state;
+  if (
+    attributesMap.llm?.output_messages &&
+    Array.isArray(attributesMap.llm.output_messages)
+  ) {
+    const output_ = typedValueChatMessagesSchema.safeParse({
+      type: "chat_messages",
+      value: attributesMap.llm.output_messages.map(
+        (message: { message?: string }) => message.message,
+      ),
+    });
+
+    if (output_.success) {
+      state.output = output_.data as TypedValueChatMessages;
+      delete attributesMap.llm.output_messages;
+    }
+  }
+}
+
+function applyGenAiCompletionArrayOutput(state: SpanBuildState): void {
+  const { attributesMap } = state;
+  if (
+    !state.output &&
+    attributesMap.gen_ai?.completion &&
+    Array.isArray(attributesMap.gen_ai.completion)
+  ) {
+    const output_ = z
+      .object({
+        type: z.literal("chat_messages"),
+        value: z.array(chatMessageSchema.strict()),
+      })
+      .safeParse({
+        type: "chat_messages",
+        value: attributesMap.gen_ai.completion,
+      });
+
+    if (
+      output_.success &&
+      output_.data.value.length > 0 &&
+      Object.keys(output_.data.value[0]!).length > 0
+    ) {
+      state.output = output_.data as TypedValueChatMessages;
+    } else {
+      state.output = {
+        type: "json",
+        value: attributesMap.gen_ai.completion,
+      };
+    }
+    delete attributesMap.gen_ai.completion;
+  }
+}
+
+function applyGenAiCompletionNonArrayOutput(state: SpanBuildState): void {
+  const { attributesMap } = state;
+  if (
+    !state.output &&
+    attributesMap.gen_ai?.completion &&
+    !Array.isArray(attributesMap.gen_ai.completion)
+  ) {
+    state.output = {
+      type: "json",
+      value: attributesMap.gen_ai.completion,
+    };
+    delete attributesMap.gen_ai.completion;
+  }
+}
+
+function applyGenAiCompletionStringOutput(state: SpanBuildState): void {
+  const { attributesMap, trace } = state;
+  if (!state.output && typeof attributesMap.gen_ai?.completion === "string") {
+    try {
+      const parsed = JSON.parse(attributesMap.gen_ai.completion);
+      state.output = {
+        type: "json",
+        value: parsed,
+      };
+    } catch (error) {
+      logger.error(
+        {
+          error,
+          customerTraceId: trace.traceId,
+        },
+        "error parsing gen_ai.completion",
+      );
+
+      state.output = {
+        type: "text",
+        value: attributesMap.gen_ai.completion,
+      };
+    }
+    delete attributesMap.gen_ai.completion;
+  }
+}
+
+// vercel
+function applyVercelResponseOutput(state: SpanBuildState): void {
+  const { attributesMap } = state;
+  if (!state.output && attributesMap.ai?.response) {
+    const messages_: ChatMessage[] = [];
+    if (attributesMap.ai.response.text) {
+      messages_.push({
+        role: "assistant",
+        content: (attributesMap as any).ai.response.text,
+      });
+    }
+    if (attributesMap.ai.response.toolCalls) {
+      messages_.push({
+        tool_calls: (attributesMap as any).ai.response.toolCalls,
+      });
+    }
+
+    if (messages_.length > 0) {
+      state.output = {
+        type: "chat_messages",
+        value: messages_,
+      };
+    }
+  }
+}
+
+function applyVercelResponseObjectOutput(state: SpanBuildState): void {
+  const { attributesMap } = state;
+  if (!state.output && attributesMap.ai?.response?.object) {
+    state.output = {
+      type: "json",
+      value: (attributesMap as any).ai.response.object,
+    };
+    delete (attributesMap as any).ai.response.object;
+  }
+}
+
+function applyLlmOutputMessagesFallback(state: SpanBuildState): void {
+  const { attributesMap } = state;
+  if (!state.output && attributesMap.llm?.output_messages) {
+    state.output =
+      typeof attributesMap.llm.output_messages === "string"
+        ? {
+            type: "text",
+            value: (attributesMap as any).llm.output_messages,
+          }
+        : {
+            type: "json",
+            value: (attributesMap as any).llm.output_messages,
+          };
+    delete (attributesMap as any).llm.output_messages;
+  }
+}
+
+function applyTraceloopEntityOutput(state: SpanBuildState): void {
+  const { attributesMap } = state;
+  if (!state.output && attributesMap.traceloop?.entity?.output) {
+    state.output =
+      typeof attributesMap.traceloop.entity.output === "string"
+        ? {
+            type: "text",
+            value: (attributesMap as any).traceloop.entity.output,
+          }
+        : {
+            type: "json",
+            value: (attributesMap as any).traceloop.entity.output,
+          };
+    delete (attributesMap as any).traceloop.entity.output;
+  }
+}
+
+function applyGenericAttributesOutputValue(state: SpanBuildState): void {
+  const { attributesMap } = state;
+  if (!state.output && attributesMap.output?.value) {
+    state.output =
+      typeof attributesMap.output.value === "string"
+        ? {
+            type: "text",
+            value: (attributesMap as any).output.value,
+          }
+        : {
+            type: "json",
+            value: (attributesMap as any).output.value,
+          };
+  }
+  delete (attributesMap as any).output;
+}
+
+// logfire
+function applyLogfireEventOutput(state: SpanBuildState): void {
+  const { attributesMap } = state;
+  if (state.output) return;
+  if (!Array.isArray(attributesMap?.events)) return;
+
+  // event && typeof event === "object" -> this is needed as `null` is typeof object!
+  const event = attributesMap.events.find(
+    (event) =>
+      event &&
+      typeof event === "object" &&
+      event["event.name"] === "gen_ai.choice",
+  );
+  if (event?.message) {
+    state.output = {
+      type: "chat_messages",
+      value: [event.message],
+    };
+  }
+}
+
+// Output
+function extractSpanOutput(state: SpanBuildState): void {
+  applyGenAiOutputMessages(state);
+  applyLlmOutputMessagesArray(state);
+  applyGenAiCompletionArrayOutput(state);
+  applyGenAiCompletionNonArrayOutput(state);
+  applyGenAiCompletionStringOutput(state);
+  applyVercelResponseOutput(state);
+  applyVercelResponseObjectOutput(state);
+  applyLlmOutputMessagesFallback(state);
+  applyTraceloopEntityOutput(state);
+  applyGenericAttributesOutputValue(state);
+  applyLogfireEventOutput(state);
+}
+
+function mergeAttributesMetadata(state: SpanBuildState): void {
+  const { attributesMap } = state;
+  if (
+    attributesMap.metadata &&
+    typeof attributesMap.metadata === "object" &&
+    !Array.isArray(attributesMap.metadata)
+  ) {
+    state.metadata = {
+      ...state.metadata,
+      ...(attributesMap as any).metadata,
+    };
+
+    attributesMap.metadata = void 0;
+  }
+}
+
+function extractVercelUsageMetrics(state: SpanBuildState): void {
+  const { attributesMap } = state;
+  if (!attributesMap.ai?.usage) return;
+
+  if (typeof attributesMap.ai.usage.promptTokens === "number") {
+    state.metrics.prompt_tokens = attributesMap.ai.usage.promptTokens;
+    delete attributesMap.ai.usage.promptTokens;
+  }
+  if (typeof attributesMap.ai.usage.completionTokens === "number") {
+    state.metrics.completion_tokens = attributesMap.ai.usage.completionTokens;
+    delete attributesMap.ai.usage.completionTokens;
+  }
+}
+
+function extractGenAiPromptCompletionTokens(state: SpanBuildState): void {
+  const { attributesMap } = state;
+  if (typeof attributesMap.gen_ai.usage.prompt_tokens === "number") {
+    state.metrics.prompt_tokens = attributesMap.gen_ai.usage.prompt_tokens;
+  }
+  if (typeof attributesMap.gen_ai.usage.completion_tokens === "number") {
+    state.metrics.completion_tokens =
+      attributesMap.gen_ai.usage.completion_tokens;
+  }
+  // Spring AI
+  if (
+    attributesMap.gen_ai.usage.input_tokens &&
+    !isNaN(Number(attributesMap.gen_ai.usage.input_tokens))
+  ) {
+    state.metrics.prompt_tokens = Number(
+      attributesMap.gen_ai.usage.input_tokens,
+    );
+  }
+  if (
+    attributesMap.gen_ai.usage.output_tokens &&
+    !isNaN(Number(attributesMap.gen_ai.usage.output_tokens))
+  ) {
+    state.metrics.completion_tokens = Number(
+      attributesMap.gen_ai.usage.output_tokens,
+    );
+  }
+}
+
+function extractGenAiReasoningAndCacheTokens(state: SpanBuildState): void {
+  const { attributesMap } = state;
+  // Reasoning tokens (Traceloop/OpenLLMetry convention: gen_ai.usage.reasoning_tokens)
+  if (
+    attributesMap.gen_ai.usage.reasoning_tokens != null &&
+    !isNaN(Number(attributesMap.gen_ai.usage.reasoning_tokens))
+  ) {
+    state.metrics.reasoning_tokens = Number(
+      attributesMap.gen_ai.usage.reasoning_tokens,
+    );
+  }
+  // Cache tokens (OTEL semconv: gen_ai.usage.cache_read.input_tokens / gen_ai.usage.cache_creation.input_tokens)
+  if (
+    attributesMap.gen_ai.usage.cache_read?.input_tokens != null &&
+    !isNaN(Number(attributesMap.gen_ai.usage.cache_read.input_tokens))
+  ) {
+    state.metrics.cache_read_input_tokens = Number(
+      attributesMap.gen_ai.usage.cache_read.input_tokens,
+    );
+  }
+  if (
+    attributesMap.gen_ai.usage.cache_creation?.input_tokens != null &&
+    !isNaN(Number(attributesMap.gen_ai.usage.cache_creation.input_tokens))
+  ) {
+    state.metrics.cache_creation_input_tokens = Number(
+      attributesMap.gen_ai.usage.cache_creation.input_tokens,
+    );
+  }
+}
+
+function extractGenAiUsageMetrics(state: SpanBuildState): void {
+  if (!state.attributesMap.gen_ai?.usage) return;
+
+  extractGenAiPromptCompletionTokens(state);
+  extractGenAiReasoningAndCacheTokens(state);
+}
+
+// Metrics
+function extractMetrics(state: SpanBuildState): void {
+  extractVercelUsageMetrics(state);
+  extractGenAiUsageMetrics(state);
+}
+
+// Params
+function extractInvocationParams(state: SpanBuildState): void {
+  const { attributesMap } = state;
+  if (attributesMap.llm?.invocation_parameters) {
+    state.params = {
+      ...state.params,
+      ...(attributesMap.llm.invocation_parameters as Record<string, any>),
+    };
+    delete attributesMap.llm.invocation_parameters;
+  }
+
+  if (attributesMap.llm?.is_streaming) {
+    state.params = {
+      ...state.params,
+      stream:
+        attributesMap.llm.is_streaming &&
+        attributesMap.llm.is_streaming !== "false" &&
+        attributesMap.llm.is_streaming !== "False",
+    };
+    delete attributesMap.llm.is_streaming;
+  }
+}
+
+function extractReservedIdsFromAttributes(state: SpanBuildState): void {
+  const { attributesMap, trace } = state;
+  if (attributesMap.user?.id && typeof attributesMap.user.id === "string") {
+    trace.reservedTraceMetadata.user_id = attributesMap.user.id;
+    delete attributesMap.user.id;
+  }
+  if (
+    attributesMap.session?.id &&
+    typeof attributesMap.session.id === "string"
+  ) {
+    trace.reservedTraceMetadata.thread_id = attributesMap.session.id;
+    delete attributesMap.session.id;
+  }
+  if (
+    attributesMap.gen_ai?.conversation?.id &&
+    typeof attributesMap.gen_ai.conversation.id === "string"
+  ) {
+    trace.reservedTraceMetadata.thread_id =
+      attributesMap.gen_ai.conversation.id;
+    delete attributesMap.gen_ai.conversation.id;
+  }
+  if (attributesMap.tag?.tags && Array.isArray(attributesMap.tag.tags)) {
+    trace.reservedTraceMetadata.labels = attributesMap.tag.tags;
+    delete attributesMap.tag.tags;
+  }
+}
+
+// vercel
+function extractVercelToolParams(state: SpanBuildState): void {
+  const { attributesMap } = state;
+  if (attributesMap.ai?.prompt?.tools) {
+    state.params = {
+      ...state.params,
+      tools: attributesMap.ai.prompt.tools as any,
+    };
+    delete attributesMap.ai.prompt.tools;
+  }
+
+  if (attributesMap.ai?.prompt?.toolsChoice) {
+    state.params = {
+      ...state.params,
+      tool_choice: attributesMap.ai.prompt.toolsChoice as any,
+    };
+    delete attributesMap.ai.prompt.toolsChoice;
+  }
+}
+
+function buildExceptionSpanError(
+  state: SpanBuildState,
+  event: NonNullable<DeepPartial<ISpan>["events"]>[number],
+): Span["error"] {
+  const eventAttributes = otelAttributesToNestedAttributes(event?.attributes);
+
+  let errorMessage: string;
+  if (eventAttributes.exception?.message && eventAttributes.exception?.type) {
+    errorMessage = `${eventAttributes.exception.type}: ${eventAttributes.exception.message}`;
+  } else if (state.incomingSpan.status?.message) {
+    errorMessage = state.incomingSpan.status.message;
+  } else {
+    errorMessage = "Unknown Exception Occurred";
+  }
+
+  return {
+    has_error: true,
+    message: errorMessage,
+    stacktrace: eventAttributes.exception?.stacktrace
+      ? (eventAttributes.exception?.stacktrace as string).split("\n")
+      : [],
+  };
+}
+
+// Exception
+function extractSpanError(state: SpanBuildState): void {
+  const { incomingSpan } = state;
+  if (
+    (incomingSpan.status?.code as any) === "STATUS_CODE_ERROR" ||
+    (incomingSpan.status?.code as any) === 2 // EStatusCode.STATUS_CODE_ERROR
+  ) {
+    state.error = {
+      has_error: true,
+      message: incomingSpan.status?.message ?? "Exception",
+      stacktrace: [],
+    };
+  }
+
+  for (const event of incomingSpan?.events ?? []) {
+    if (event?.name === "exception") {
+      state.error = buildExceptionSpanError(state, event);
+    }
+  }
+}
+
+// Name
+// CrewAI's "Task._execute_core" span names itself after the executing agent
+// role, embedded in the input as `agent="...role='<role>'..."`.
+function resolveCrewAiTaskAgentName(
+  name: string | undefined,
+  input: LLMSpan["input"],
+): string | undefined {
+  if (name !== "Task._execute_core" || !(input?.value as any)?.agent) {
+    return name;
+  }
+  try {
+    return (input?.value as any).agent.match(/role='(.*?)'/)?.[1] ?? name;
+  } catch {
+    /* this is just a safe json parse fallback */
+    return name;
+  }
+}
+
+function inferSpanName(state: SpanBuildState): void {
+  const { attributesMap, incomingSpan } = state;
+  let name = resolveCrewAiTaskAgentName(incomingSpan.name, state.input);
+
+  // vercel
+  if (!name && state.type === "llm" && attributesMap.gen_ai && state.model) {
+    name = state.model;
+  }
+  if (state.type === "tool" && attributesMap.ai?.toolCall?.name) {
+    name = (attributesMap as any).ai.toolCall.name;
+  }
+  // Agent
+  if (!name && attributesMap.gen_ai?.agent?.name) {
+    name = (attributesMap as any).gen_ai.agent.name;
+  }
+
+  state.name = name;
+}
+
+// haystack RAG
+function extractHaystackRagContexts(state: SpanBuildState): void {
+  const { attributesMap } = state;
+  if (Array.isArray((attributesMap.retrieval as any)?.documents)) {
+    state.type = "rag";
+    for (const document of (attributesMap.retrieval as any).documents) {
+      const document_ = document.document;
+      if (document_?.content) {
+        state.contexts.push({
+          ...(document_.id ? { document_id: document_.id } : {}),
+          content: document_.content,
+        });
+      }
+    }
+  }
+}
+
+function applyLangwatchSpanType(state: SpanBuildState): void {
+  const { attributesMap } = state;
+  if (attributesMap.langwatch.span?.type) {
+    state.type = (attributesMap as any).langwatch.span.type;
+    (attributesMap as any).langwatch.span.type = void 0;
+  }
+}
+
+function applyLangwatchReservedIds(state: SpanBuildState): void {
+  const { attributesMap, trace } = state;
+  if (typeof attributesMap.langwatch.thread?.id === "string") {
+    trace.reservedTraceMetadata.thread_id = attributesMap.langwatch.thread.id;
+    (attributesMap as any).langwatch.thread.id = void 0;
+  }
+  if (typeof attributesMap.langwatch.user?.id === "string") {
+    trace.reservedTraceMetadata.user_id = attributesMap.langwatch.user.id;
+    (attributesMap as any).langwatch.user.id = void 0;
+  }
+  if (typeof attributesMap.langwatch.customer?.id === "string") {
+    trace.reservedTraceMetadata.customer_id =
+      attributesMap.langwatch.customer.id;
+    (attributesMap as any).langwatch.customer.id = void 0;
+  }
+}
+
+function applyLangwatchLabels(state: SpanBuildState): void {
+  const { attributesMap } = state;
+  if (Array.isArray(attributesMap.langwatch.labels)) {
+    state.metadata = {
+      ...state.metadata,
+      labels: attributesMap.langwatch.labels,
+    };
+    (attributesMap as any).langwatch.labels = void 0;
+  }
+  // Backward compatibility for legacy "langwatch.tags" attribute
+  if (
+    !state.metadata.labels &&
+    Array.isArray((attributesMap as any).langwatch.tags)
+  ) {
+    state.metadata = {
+      ...state.metadata,
+      labels: (attributesMap as any).langwatch.tags,
+    };
+    (attributesMap as any).langwatch.tags = void 0;
+  }
+}
+
+function applyLangwatchInputOutput(state: SpanBuildState): void {
+  const { attributesMap } = state;
+  if (attributesMap.langwatch.input) {
+    if (
+      Array.isArray(attributesMap.langwatch.input) &&
+      attributesMap.langwatch.input.length === 1
+    ) {
+      state.input = (attributesMap as any).langwatch.input[0];
+    } else {
+      state.input = (attributesMap as any).langwatch.input;
+    }
+    (attributesMap as any).langwatch.input = void 0;
+  }
+  if (attributesMap.langwatch.output) {
+    if (
+      Array.isArray(attributesMap.langwatch.output) &&
+      attributesMap.langwatch.output.length === 1
+    ) {
+      state.output = (attributesMap as any).langwatch.output[0];
+    } else {
+      state.output = (attributesMap as any).langwatch.output;
+    }
+    (attributesMap as any).langwatch.output = void 0;
+  }
+}
+
+function applyLangwatchRagContexts(state: SpanBuildState): void {
+  const { attributesMap } = state;
+  if (Array.isArray(attributesMap.langwatch.rag_contexts)) {
+    for (const ragContext of attributesMap.langwatch.rag_contexts as any) {
+      state.contexts.push(ragContext);
+    }
+    (attributesMap as any).langwatch.rag_contexts = void 0;
+  }
+}
+
+function applyLangwatchPromptIds(state: SpanBuildState): void {
+  const { attributesMap, trace } = state;
+  const prompt = attributesMap.langwatch.prompt;
+  if (!prompt) return;
+
+  if (typeof prompt?.id === "string") {
+    trace.reservedTraceMetadata.prompt_ids ??= [];
+    trace.reservedTraceMetadata.prompt_ids.push(prompt.id);
+  }
+  if (prompt?.version) {
+    const version = prompt.version;
+    if (typeof version?.id === "string") {
+      trace.reservedTraceMetadata.prompt_version_ids ??= [];
+      trace.reservedTraceMetadata.prompt_version_ids.push(version.id);
+    }
+  }
+}
+
+// Metrics
+function applyLangwatchMetrics(state: SpanBuildState): void {
+  const { attributesMap } = state;
+  if (!attributesMap.langwatch.metrics) return;
+  try {
+    state.metrics = {
+      ...state.metrics,
+      ...spanMetricsSchema.parse(attributesMap.langwatch.metrics as any),
+    };
+    delete (attributesMap as any).langwatch.metrics;
+  } catch {
+    // ignore
+  }
+}
+
+// Params
+function applyLangwatchParams(state: SpanBuildState): void {
+  const { attributesMap } = state;
+  if (!attributesMap.langwatch.params) return;
+  try {
+    state.params = {
+      ...state.params,
+      ...reservedSpanParamsSchema.parse(attributesMap.langwatch.params as any),
+    };
+    delete (attributesMap as any).langwatch.params;
+  } catch {
+    // ignore
+  }
+}
+
+// Timestamps
+function applyLangwatchTimestamps(state: SpanBuildState): void {
+  const { attributesMap } = state;
+  if (!attributesMap.langwatch.timestamps) return;
+  try {
+    const timestamps = spanTimestampsSchema
+      .partial()
+      .parse(attributesMap.langwatch.timestamps as any);
+    if (timestamps.started_at) {
+      state.started_at = timestamps.started_at;
+    }
+    if (timestamps.finished_at) {
+      state.finished_at = timestamps.finished_at;
+    }
+    if (timestamps.first_token_at) {
+      state.first_token_at = timestamps.first_token_at;
+    }
+    delete (attributesMap as any).langwatch.timestamps;
+  } catch {
+    // ignore
+  }
+}
+
+// langwatch
+function applyLangwatchAttributes(state: SpanBuildState): void {
+  const { attributesMap } = state;
+  if (
+    !(attributesMap.langwatch && typeof attributesMap.langwatch === "object")
+  ) {
+    return;
+  }
+
+  applyLangwatchSpanType(state);
+  applyLangwatchReservedIds(state);
+  applyLangwatchLabels(state);
+  applyLangwatchInputOutput(state);
+  applyLangwatchRagContexts(state);
+  applyLangwatchPromptIds(state);
+  applyLangwatchMetrics(state);
+  applyLangwatchParams(state);
+  applyLangwatchTimestamps(state);
+}
+
+// Metadata
+function applyMetadataMapping(state: SpanBuildState): void {
+  const { trace } = state;
+  const mappedMetadata = applyMappingsToMetadata(state.metadata);
+  const { reservedTraceMetadata, customMetadata } =
+    extractReservedAndCustomMetadata(mappedMetadata);
+
+  if (Object.keys(reservedTraceMetadata).length > 0) {
+    trace.reservedTraceMetadata = {
+      ...trace.reservedTraceMetadata,
+      ...reservedTraceMetadata,
+    };
+  }
+
+  if (Object.keys(customMetadata).length > 0) {
+    trace.customMetadata = {
+      ...trace.customMetadata,
+      ...customMetadata,
+    };
+  }
+}
+
+function buildFinalSpanTimestamps(state: SpanBuildState): Span["timestamps"] {
+  return {
+    ...(state.started_at ? { started_at: state.started_at } : {}),
+    ...(state.finished_at ? { finished_at: state.finished_at } : {}),
+    ...(state.first_token_at ? { first_token_at: state.first_token_at } : {}),
+  } as Span["timestamps"];
+}
+
+function buildFinalSpan(
+  state: SpanBuildState,
+): BaseSpan & { model?: LLMSpan["model"]; metrics?: LLMSpan["metrics"] } {
+  const { incomingSpan, incomingScope } = state;
+  state.params = {
+    ...state.params,
+    ...removeEmptyKeys(state.attributesMap),
+    ...(incomingScope ? { scope: incomingScope } : {}),
+  };
+
+  return {
+    span_id: incomingSpan.spanId as string,
+    trace_id: incomingSpan.traceId as string,
+    ...(incomingSpan.parentSpanId
+      ? { parent_id: incomingSpan.parentSpanId as string }
+      : {}),
+    name: state.name,
+    type: state.type,
+    ...(state.model ? { model: state.model } : {}),
+    input: state.input,
+    output: state.output,
+    ...(state.error ? { error: state.error } : {}),
+    ...(state.metrics && Object.keys(state.metrics).length > 0
+      ? { metrics: state.metrics }
+      : {}),
+    ...(state.contexts && state.contexts.length > 0
+      ? { contexts: state.contexts }
+      : {}),
+    params: state.params,
+    timestamps: buildFinalSpanTimestamps(state),
+  };
+}
+
 const addOpenTelemetrySpanAsSpan = (
   trace: TraceForCollection,
   incomingSpan: DeepPartial<ISpan>,
@@ -302,1048 +1646,60 @@ const addOpenTelemetrySpanAsSpan = (
           otelSpan.setAttribute("span.kind", incomingSpan.kind);
         }
 
-        let type: Span["type"] = "span";
-        let model: LLMSpan["model"] = undefined;
-        let input: LLMSpan["input"] = null;
-        let output: LLMSpan["output"] = null;
-        let params: Span["params"] = {};
-        let metadata: Record<string, unknown> = {};
-        let started_at: Span["timestamps"]["started_at"] | undefined =
-          parseTimestamp(incomingSpan.startTimeUnixNano);
-        let finished_at: Span["timestamps"]["finished_at"] | undefined =
-          parseTimestamp(incomingSpan.endTimeUnixNano);
-        let error: Span["error"] = null;
-        const attributesMap = otelAttributesToNestedAttributes(
-          incomingSpan.attributes,
-        );
-
-        // First token at
-        let first_token_at: Span["timestamps"]["first_token_at"] = null;
-        for (const event of incomingSpan?.events ?? []) {
-          if (!event) continue;
-
-          switch (event.name) {
-            case "First Token Stream Event":
-            case "llm.content.completion.chunk": {
-              const ts = parseTimestamp(event?.timeUnixNano);
-              if (ts && (!first_token_at || ts < first_token_at)) {
-                first_token_at = ts;
-              }
-              break;
-            }
-            case "langwatch.evaluation.custom": {
-              const jsonPayload = event.attributes?.find(
-                (attr) => attr?.key === "json_encoded_event",
-              )?.value?.stringValue;
-              if (!jsonPayload) {
-                logger.warn(
-                  { event },
-                  "event for `langwatch.evaluation.custom` has no json_encoded_event",
-                );
-                break;
-              }
-
-              try {
-                const parsedJsonPayload = JSON.parse(jsonPayload);
-                const evaluation =
-                  rESTEvaluationSchema.parse(parsedJsonPayload);
-
-                if (!trace.evaluations) trace.evaluations = [];
-                trace.evaluations.push(evaluation);
-              } catch (error) {
-                logger.error(
-                  { error, jsonPayload },
-                  "error parsing json_encoded_event from `langwatch.evaluation.custom`, event discarded",
-                );
-              }
-              break;
-            }
-
-            default:
-              break;
-          }
-        }
-
-        // Special handling for strands-agents Python SDK
-        if (isStrandsAgentsInstrumentation(incomingScope, incomingSpan)) {
-          const io = extractStrandsAgentsInputOutput(incomingSpan);
-          if (io) {
-            input = io.input;
-            output = io.output;
-          }
-        }
-
-        if (started_at && attributesMap.gen_ai?.server?.time_to_first_token) {
-          first_token_at =
-            started_at +
-            parseInt(
-              (attributesMap as any).gen_ai.server.time_to_first_token,
-              10,
-            );
-        }
-
-        if (started_at && attributesMap.ai?.response?.msToFirstChunk) {
-          first_token_at =
-            started_at +
-            parseInt((attributesMap as any).ai.response.msToFirstChunk, 10);
-        }
-
-        // Type
-        if (
-          (incomingSpan.kind as any) === "SPAN_KIND_SERVER" ||
-          incomingSpan.kind === ESpanKind.SPAN_KIND_SERVER
-        ) {
-          type = "server";
-        }
-        if (
-          (incomingSpan.kind as any) === "SPAN_KIND_CLIENT" ||
-          incomingSpan.kind === ESpanKind.SPAN_KIND_CLIENT
-        ) {
-          type = "client";
-        }
-        if (
-          (incomingSpan.kind as any) === "SPAN_KIND_PRODUCER" ||
-          incomingSpan.kind === ESpanKind.SPAN_KIND_PRODUCER
-        ) {
-          type = "producer";
-        }
-        if (
-          (incomingSpan.kind as any) === "SPAN_KIND_CONSUMER" ||
-          incomingSpan.kind === ESpanKind.SPAN_KIND_CONSUMER
-        ) {
-          type = "consumer";
-        }
-
-        if (attributesMap.openinference?.span?.kind) {
-          const kind_ = (
-            attributesMap as any
-          ).openinference.span.kind.toLowerCase();
-          if (allowedSpanTypes.includes(kind_ as SpanTypes)) {
-            type = kind_ as SpanTypes;
-            delete (attributesMap as any).openinference.span.kind;
-          }
-        }
-
-        if (attributesMap.traceloop?.span?.kind) {
-          const kind_ = (
-            attributesMap as any
-          ).traceloop.span.kind.toLowerCase();
-          if (allowedSpanTypes.includes(kind_ as SpanTypes)) {
-            type = kind_ as SpanTypes;
-            delete (attributesMap as any).traceloop.span.kind;
-          }
-        }
-
-        if (attributesMap?.type) {
-          type = attributesMap.type as SpanTypes;
-          attributesMap.type = void 0;
-        }
-
-        if (
-          attributesMap.llm?.request?.type === "chat" ||
-          attributesMap.llm?.request?.type === "completion"
-        ) {
-          type = "llm";
-          delete attributesMap.llm.request.type;
-        }
-        // vercel
-        if (attributesMap.ai && attributesMap.gen_ai) {
-          type = "llm";
-        }
-        if (attributesMap.operation?.name === "ai.toolCall") {
-          type = "tool";
-        }
-        // Agents
-        if (attributesMap.gen_ai?.agent || attributesMap.agent?.name) {
-          // Strands agent
-          if (incomingSpan.name === "Model invoke") {
-            type = "llm";
-          } else {
-            type = "agent";
-          }
-        }
-
-        // GenAI semantic convention chat LLM calls (Strands, OpenClaw, etc.)
-        // CLIENT span kind is standard for gen_ai LLM calls per the OTEL GenAI spec
-        if (
-          (type === "span" || type === "client") &&
-          attributesMap.gen_ai?.operation?.name === "chat"
-        ) {
-          type = "llm";
-        }
-        if (
-          (type === "span" || type === "client") &&
-          attributesMap.gen_ai?.operation?.name === "tool"
-        ) {
-          type = "tool";
-        }
-
-        // Extract metadata for agent spans from strands-agents
-        if (
-          type === "agent" &&
-          isStrandsAgentsInstrumentation(incomingScope, incomingSpan)
-        ) {
-          const strandsMetadata = extractStrandsAgentsMetadata(incomingSpan);
-          if (Object.keys(strandsMetadata).length > 0) {
-            metadata = {
-              ...metadata,
-              ...strandsMetadata,
-            };
-          }
-        }
-
-        // infer for others otel gen_ai spec
-        if (
-          (type === "span" || type === "client") &&
-          attributesMap.gen_ai?.response?.model
-        ) {
-          type = "llm";
-        }
-
-        // Model
-        if (attributesMap.llm?.model_name) {
-          model = (attributesMap as any).llm.model_name;
-          attributesMap.llm.model_name = void 0;
-        }
-
-        if (attributesMap.gen_ai?.request?.model) {
-          model = (attributesMap as any).gen_ai.request.model;
-          attributesMap.gen_ai.request.model = void 0;
-        }
-
-        if (attributesMap.gen_ai?.response?.model) {
-          model = (attributesMap as any).gen_ai.response.model;
-          attributesMap.gen_ai.response.model = void 0;
-        }
-
-        if (
-          attributesMap.gen_ai &&
-          attributesMap.ai?.model &&
-          typeof attributesMap.ai.model === "object" &&
-          typeof (attributesMap.ai.model as any).id === "string"
-        ) {
-          const provider =
-            (attributesMap.ai.model as any).provider?.split(".")[0] ?? "";
-          model = [provider, (attributesMap as any).ai.model.id]
-            .filter(Boolean)
-            .join("/");
-          delete attributesMap.ai.model;
-        }
-
-        // Input
-
-        // GenAI semantic convention: gen_ai.input.messages (e.g. OpenClaw, OTEL GenAI spec)
-        // We assign directly as chat_messages without Zod validation to avoid
-        // stripping content fields that use provider-specific formats (e.g.
-        // Anthropic tool_use/tool_result content blocks).
-        if (
-          !input &&
-          attributesMap.gen_ai?.input?.messages &&
-          Array.isArray(attributesMap.gen_ai.input.messages)
-        ) {
-          const messages: ChatMessage[] = [];
-          // Prepend system instructions as a system message
-          if (attributesMap.gen_ai?.system_instructions) {
-            const raw = attributesMap.gen_ai.system_instructions;
-            // Keep the original value shape: string stays string, array stays array
-            const sysContent =
-              typeof raw === "string"
-                ? raw
-                : (raw as unknown as ChatMessage["content"]);
-            messages.push({ role: "system", content: sysContent });
-            delete (attributesMap as any).gen_ai.system_instructions;
-          }
-          messages.push(
-            ...(attributesMap.gen_ai.input.messages as ChatMessage[]),
-          );
-          input = { type: "chat_messages", value: messages };
-          delete (attributesMap as any).gen_ai.input.messages;
-        }
-
-        if (
-          attributesMap.llm?.input_messages &&
-          Array.isArray(attributesMap.llm.input_messages)
-        ) {
-          const input_ = typedValueChatMessagesSchema.safeParse({
-            type: "chat_messages",
-            value: attributesMap.llm.input_messages.map(
-              (message: { message?: string }) => message.message,
-            ),
-          });
-
-          if (input_.success) {
-            input = input_.data as TypedValueChatMessages;
-            delete attributesMap.llm.input_messages;
-          }
-        }
-
-        if (
-          !input &&
-          attributesMap.gen_ai?.prompt &&
-          Array.isArray(attributesMap.gen_ai.prompt)
-        ) {
-          const input_ = typedValueChatMessagesSchema.safeParse({
-            type: "chat_messages",
-            value: attributesMap.gen_ai.prompt,
-          });
-
-          if (input_.success) {
-            input = input_.data as TypedValueChatMessages;
-          } else {
-            input = {
-              type: "json",
-              value: attributesMap.gen_ai.prompt,
-            };
-          }
-          delete attributesMap.gen_ai.prompt;
-        }
-
-        if (!input && typeof attributesMap.gen_ai?.prompt === "string") {
-          try {
-            const parsed = JSON.parse(attributesMap.gen_ai.prompt);
-            input = {
-              type: "json",
-              value: parsed,
-            };
-          } catch (error) {
-            logger.error(
-              {
-                error,
-                customerTraceId: trace.traceId,
-              },
-              "error parsing gen_ai.prompt",
-            );
-
-            output = {
-              type: "text",
-              value: attributesMap.gen_ai.prompt,
-            };
-          }
-          delete attributesMap.gen_ai.prompt;
-        }
-        if (
-          !input &&
-          attributesMap.gen_ai?.prompt?.messages &&
-          Array.isArray(attributesMap.gen_ai.prompt.messages)
-        ) {
-          const input_ = typedValueChatMessagesSchema.safeParse({
-            type: "chat_messages",
-            value: attributesMap.gen_ai.prompt.messages,
-          });
-
-          if (input_.success) {
-            input = input_.data as TypedValueChatMessages;
-            delete attributesMap.gen_ai.prompt;
-          } else {
-            input = {
-              type: "json",
-              value: attributesMap.gen_ai.prompt.messages,
-            };
-          }
-        }
-
-        // vercel
-        if (
-          !input &&
-          attributesMap.ai?.prompt?.messages &&
-          Array.isArray(attributesMap.ai.prompt.messages)
-        ) {
-          const input_ = typedValueChatMessagesSchema.safeParse({
-            type: "chat_messages",
-            value: attributesMap.ai.prompt.messages,
-          });
-
-          if (input_.success) {
-            input = input_.data as TypedValueChatMessages;
-            delete attributesMap.ai.prompt;
-          }
-        }
-        if (!input && type === "tool" && attributesMap.ai?.toolCall?.args) {
-          input = {
-            type: "json",
-            value: attributesMap.ai?.toolCall?.args,
-          };
-        }
-
-        if (!input && attributesMap.traceloop?.entity?.input) {
-          input =
-            typeof attributesMap.traceloop.entity.input === "string"
-              ? {
-                  type: "text",
-                  value: attributesMap.traceloop.entity.input,
-                }
-              : {
-                  type: "json",
-                  value: attributesMap.traceloop.entity.input,
-                };
-
-          // Check for langchain metadata inside traceloop https://github.com/traceloop/openllmetry/issues/1783
-          const json = attributesMap.traceloop.entity.input;
-          if (
-            input.type === "json" &&
-            typeof json === "object" &&
-            json !== null &&
-            "metadata" in json &&
-            // @ts-ignore
-            typeof json.metadata === "object" &&
-            // @ts-ignore
-            !Array.isArray(json.metadata)
-          ) {
-            metadata = {
-              ...metadata,
-              ...json.metadata,
-            };
-
-            json.metadata = void 0;
-          }
-
-          attributesMap.traceloop.entity.input = void 0;
-        }
-
-        // Check for vercel metadata
-        if (
-          attributesMap.ai?.telemetry?.metadata &&
-          typeof attributesMap.ai.telemetry.metadata === "object"
-        ) {
-          metadata = {
-            ...metadata,
-            ...attributesMap.ai.telemetry.metadata,
-          };
-
-          attributesMap.ai.telemetry.metadata = void 0;
-        }
-
-        if (!input && attributesMap.input?.value) {
-          input =
-            typeof attributesMap.input.value === "string"
-              ? {
-                  type: "text",
-                  value: attributesMap.input.value,
-                }
-              : {
-                  type: "json",
-                  value: attributesMap.input.value,
-                };
-        }
-        delete attributesMap.input;
-
-        if (!input && attributesMap.crew_inputs) {
-          input = {
-            type: "json",
-            value: attributesMap.crew_inputs,
-          };
-        }
-
-        // logfire
-        if (!input && attributesMap.raw_input) {
-          input = {
-            type: "chat_messages",
-            value: attributesMap.raw_input as any,
-          };
-        }
-
-        // Output
-
-        // GenAI semantic convention: gen_ai.output.messages (e.g. OpenClaw, OTEL GenAI spec)
-        // Assign directly without Zod validation to preserve all content fields.
-        if (
-          !output &&
-          attributesMap.gen_ai?.output?.messages &&
-          Array.isArray(attributesMap.gen_ai.output.messages)
-        ) {
-          output = {
-            type: "chat_messages",
-            value: attributesMap.gen_ai.output.messages as ChatMessage[],
-          };
-          delete (attributesMap as any).gen_ai.output.messages;
-        }
-
-        if (
-          attributesMap.llm?.output_messages &&
-          Array.isArray(attributesMap.llm.output_messages)
-        ) {
-          const output_ = typedValueChatMessagesSchema.safeParse({
-            type: "chat_messages",
-            value: attributesMap.llm.output_messages.map(
-              (message: { message?: string }) => message.message,
-            ),
-          });
-
-          if (output_.success) {
-            output = output_.data as TypedValueChatMessages;
-            delete attributesMap.llm.output_messages;
-          }
-        }
-
-        if (
-          !output &&
-          attributesMap.gen_ai?.completion &&
-          Array.isArray(attributesMap.gen_ai.completion)
-        ) {
-          const output_ = z
-            .object({
-              type: z.literal("chat_messages"),
-              value: z.array(chatMessageSchema.strict()),
-            })
-            .safeParse({
-              type: "chat_messages",
-              value: attributesMap.gen_ai.completion,
-            });
-
-          if (
-            output_.success &&
-            output_.data.value.length > 0 &&
-            Object.keys(output_.data.value[0]!).length > 0
-          ) {
-            output = output_.data as TypedValueChatMessages;
-          } else {
-            output = {
-              type: "json",
-              value: attributesMap.gen_ai.completion,
-            };
-          }
-          delete attributesMap.gen_ai.completion;
-        }
-
-        if (
-          !output &&
-          attributesMap.gen_ai?.completion &&
-          !Array.isArray(attributesMap.gen_ai.completion)
-        ) {
-          output = {
-            type: "json",
-            value: attributesMap.gen_ai.completion,
-          };
-          delete attributesMap.gen_ai.completion;
-        }
-
-        if (!output && typeof attributesMap.gen_ai?.completion === "string") {
-          try {
-            const parsed = JSON.parse(attributesMap.gen_ai.completion);
-            output = {
-              type: "json",
-              value: parsed,
-            };
-          } catch (error) {
-            logger.error(
-              {
-                error,
-                customerTraceId: trace.traceId,
-              },
-              "error parsing gen_ai.completion",
-            );
-
-            output = {
-              type: "text",
-              value: attributesMap.gen_ai.completion,
-            };
-          }
-          delete attributesMap.gen_ai.completion;
-        }
-
-        // vercel
-        if (!output && attributesMap.ai?.response) {
-          const messages_: ChatMessage[] = [];
-          if (attributesMap.ai.response.text) {
-            messages_.push({
-              role: "assistant",
-              content: (attributesMap as any).ai.response.text,
-            });
-          }
-          if (attributesMap.ai.response.toolCalls) {
-            messages_.push({
-              tool_calls: (attributesMap as any).ai.response.toolCalls,
-            });
-          }
-
-          if (messages_.length > 0) {
-            output = {
-              type: "chat_messages",
-              value: messages_,
-            };
-          }
-        }
-        if (!output && attributesMap.ai?.response?.object) {
-          output = {
-            type: "json",
-            value: (attributesMap as any).ai.response.object,
-          };
-          delete (attributesMap as any).ai.response.object;
-        }
-
-        if (!output && attributesMap.llm?.output_messages) {
-          output =
-            typeof attributesMap.llm.output_messages === "string"
-              ? {
-                  type: "text",
-                  value: (attributesMap as any).llm.output_messages,
-                }
-              : {
-                  type: "json",
-                  value: (attributesMap as any).llm.output_messages,
-                };
-          delete (attributesMap as any).llm.output_messages;
-        }
-
-        if (!output && attributesMap.traceloop?.entity?.output) {
-          output =
-            typeof attributesMap.traceloop.entity.output === "string"
-              ? {
-                  type: "text",
-                  value: (attributesMap as any).traceloop.entity.output,
-                }
-              : {
-                  type: "json",
-                  value: (attributesMap as any).traceloop.entity.output,
-                };
-          delete (attributesMap as any).traceloop.entity.output;
-        }
-
-        if (!output && attributesMap.output?.value) {
-          output =
-            typeof attributesMap.output.value === "string"
-              ? {
-                  type: "text",
-                  value: (attributesMap as any).output.value,
-                }
-              : {
-                  type: "json",
-                  value: (attributesMap as any).output.value,
-                };
-        }
-        delete (attributesMap as any).output;
-
-        // logfire
-        if (!output) {
-          if (Array.isArray(attributesMap?.events)) {
-            // event && typeof event === "object" -> this is needed as `null` is typeof object!
-            const event = attributesMap.events.find(
-              (event) =>
-                event &&
-                typeof event === "object" &&
-                event["event.name"] === "gen_ai.choice",
-            );
-            if (event?.message) {
-              output = {
-                type: "chat_messages",
-                value: [event.message],
-              };
-            }
-          }
-        }
-
-        if (
-          attributesMap.metadata &&
-          typeof attributesMap.metadata === "object" &&
-          !Array.isArray(attributesMap.metadata)
-        ) {
-          metadata = {
-            ...metadata,
-            ...(attributesMap as any).metadata,
-          };
-
-          attributesMap.metadata = void 0;
-        }
-
-        // Metrics
-        let metrics: LLMSpan["metrics"] = {};
-        if (attributesMap.ai?.usage) {
-          if (typeof attributesMap.ai.usage.promptTokens === "number") {
-            metrics.prompt_tokens = attributesMap.ai.usage.promptTokens;
-            delete attributesMap.ai.usage.promptTokens;
-          }
-          if (typeof attributesMap.ai.usage.completionTokens === "number") {
-            metrics.completion_tokens = attributesMap.ai.usage.completionTokens;
-            delete attributesMap.ai.usage.completionTokens;
-          }
-        }
-        if (attributesMap.gen_ai?.usage) {
-          if (typeof attributesMap.gen_ai.usage.prompt_tokens === "number") {
-            metrics.prompt_tokens = attributesMap.gen_ai.usage.prompt_tokens;
-          }
-          if (
-            typeof attributesMap.gen_ai.usage.completion_tokens === "number"
-          ) {
-            metrics.completion_tokens =
-              attributesMap.gen_ai.usage.completion_tokens;
-          }
-          // Spring AI
-          if (
-            attributesMap.gen_ai.usage.input_tokens &&
-            !isNaN(Number(attributesMap.gen_ai.usage.input_tokens))
-          ) {
-            metrics.prompt_tokens = Number(
-              attributesMap.gen_ai.usage.input_tokens,
-            );
-          }
-          if (
-            attributesMap.gen_ai.usage.output_tokens &&
-            !isNaN(Number(attributesMap.gen_ai.usage.output_tokens))
-          ) {
-            metrics.completion_tokens = Number(
-              attributesMap.gen_ai.usage.output_tokens,
-            );
-          }
-          // Reasoning tokens (Traceloop/OpenLLMetry convention: gen_ai.usage.reasoning_tokens)
-          if (
-            attributesMap.gen_ai.usage.reasoning_tokens != null &&
-            !isNaN(Number(attributesMap.gen_ai.usage.reasoning_tokens))
-          ) {
-            metrics.reasoning_tokens = Number(
-              attributesMap.gen_ai.usage.reasoning_tokens,
-            );
-          }
-          // Cache tokens (OTEL semconv: gen_ai.usage.cache_read.input_tokens / gen_ai.usage.cache_creation.input_tokens)
-          if (
-            attributesMap.gen_ai.usage.cache_read?.input_tokens != null &&
-            !isNaN(Number(attributesMap.gen_ai.usage.cache_read.input_tokens))
-          ) {
-            metrics.cache_read_input_tokens = Number(
-              attributesMap.gen_ai.usage.cache_read.input_tokens,
-            );
-          }
-          if (
-            attributesMap.gen_ai.usage.cache_creation?.input_tokens != null &&
-            !isNaN(
-              Number(attributesMap.gen_ai.usage.cache_creation.input_tokens),
-            )
-          ) {
-            metrics.cache_creation_input_tokens = Number(
-              attributesMap.gen_ai.usage.cache_creation.input_tokens,
-            );
-          }
-        }
-
-        // Params
-        if (attributesMap.llm?.invocation_parameters) {
-          params = {
-            ...params,
-            ...(attributesMap.llm.invocation_parameters as Record<string, any>),
-          };
-          delete attributesMap.llm.invocation_parameters;
-        }
-
-        if (attributesMap.llm?.is_streaming) {
-          params = {
-            ...params,
-            stream:
-              attributesMap.llm.is_streaming &&
-              attributesMap.llm.is_streaming !== "false" &&
-              attributesMap.llm.is_streaming !== "False",
-          };
-          delete attributesMap.llm.is_streaming;
-        }
-
-        if (
-          attributesMap.user?.id &&
-          typeof attributesMap.user.id === "string"
-        ) {
-          trace.reservedTraceMetadata.user_id = attributesMap.user.id;
-          delete attributesMap.user.id;
-        }
-        if (
-          attributesMap.session?.id &&
-          typeof attributesMap.session.id === "string"
-        ) {
-          trace.reservedTraceMetadata.thread_id = attributesMap.session.id;
-          delete attributesMap.session.id;
-        }
-        if (
-          attributesMap.gen_ai?.conversation?.id &&
-          typeof attributesMap.gen_ai.conversation.id === "string"
-        ) {
-          trace.reservedTraceMetadata.thread_id =
-            attributesMap.gen_ai.conversation.id;
-          delete attributesMap.gen_ai.conversation.id;
-        }
-        if (attributesMap.tag?.tags && Array.isArray(attributesMap.tag.tags)) {
-          trace.reservedTraceMetadata.labels = attributesMap.tag.tags;
-          delete attributesMap.tag.tags;
-        }
-
-        // vercel
-        if (attributesMap.ai?.prompt?.tools) {
-          params = {
-            ...params,
-            tools: attributesMap.ai.prompt.tools as any,
-          };
-          delete attributesMap.ai.prompt.tools;
-        }
-
-        if (attributesMap.ai?.prompt?.toolsChoice) {
-          params = {
-            ...params,
-            tool_choice: attributesMap.ai.prompt.toolsChoice as any,
-          };
-          delete attributesMap.ai.prompt.toolsChoice;
-        }
-
-        // Exception
-        if (
-          (incomingSpan.status?.code as any) === "STATUS_CODE_ERROR" ||
-          (incomingSpan.status?.code as any) === 2 // EStatusCode.STATUS_CODE_ERROR
-        ) {
-          error = {
-            has_error: true,
-            message: incomingSpan.status?.message ?? "Exception",
-            stacktrace: [],
-          };
-        }
-
-        for (const event of incomingSpan?.events ?? []) {
-          if (event?.name === "exception") {
-            const eventAttributes = otelAttributesToNestedAttributes(
-              event?.attributes,
-            );
-
-            let errorMessage: string;
-            if (
-              eventAttributes.exception?.message &&
-              eventAttributes.exception?.type
-            ) {
-              errorMessage = `${eventAttributes.exception.type}: ${eventAttributes.exception.message}`;
-            } else if (incomingSpan.status?.message) {
-              errorMessage = incomingSpan.status.message;
-            } else {
-              errorMessage = "Unknown Exception Occurred";
-            }
-
-            error = {
-              has_error: true,
-              message: errorMessage,
-              stacktrace: eventAttributes.exception?.stacktrace
-                ? (eventAttributes.exception?.stacktrace as string).split("\n")
-                : [],
-            };
-          }
-        }
-
-        // Name
-        let name = incomingSpan.name;
-        if (name === "Task._execute_core" && (input?.value as any)?.agent) {
-          try {
-            name =
-              (input?.value as any).agent.match(/role='(.*?)'/)?.[1] ?? name;
-          } catch {
-            /* this is just a safe json parse fallback */
-          }
-        }
-
-        // vercel
-        if (!name && type === "llm" && attributesMap.gen_ai && model) {
-          name = model;
-        }
-        if (type === "tool" && attributesMap.ai?.toolCall?.name) {
-          name = (attributesMap as any).ai.toolCall.name;
-        }
-        // Agent
-        if (!name && attributesMap.gen_ai?.agent?.name) {
-          name = (attributesMap as any).gen_ai.agent.name;
-        }
-
-        const contexts: RAGChunk[] = [];
-        // haystack RAG
-        if (Array.isArray((attributesMap.retrieval as any)?.documents)) {
-          type = "rag";
-          for (const document of (attributesMap.retrieval as any).documents) {
-            const document_ = document.document;
-            if (document_?.content) {
-              contexts.push({
-                ...(document_.id ? { document_id: document_.id } : {}),
-                content: document_.content,
-              });
-            }
-          }
-        }
-
-        // langwatch
-        if (
-          attributesMap.langwatch &&
-          typeof attributesMap.langwatch === "object"
-        ) {
-          if (attributesMap.langwatch.span?.type) {
-            type = (attributesMap as any).langwatch.span.type;
-            (attributesMap as any).langwatch.span.type = void 0;
-          }
-
-          if (typeof attributesMap.langwatch.thread?.id === "string") {
-            trace.reservedTraceMetadata.thread_id =
-              attributesMap.langwatch.thread.id;
-            (attributesMap as any).langwatch.thread.id = void 0;
-          }
-          if (typeof attributesMap.langwatch.user?.id === "string") {
-            trace.reservedTraceMetadata.user_id =
-              attributesMap.langwatch.user.id;
-            (attributesMap as any).langwatch.user.id = void 0;
-          }
-          if (typeof attributesMap.langwatch.customer?.id === "string") {
-            trace.reservedTraceMetadata.customer_id =
-              attributesMap.langwatch.customer.id;
-            (attributesMap as any).langwatch.customer.id = void 0;
-          }
-          if (Array.isArray(attributesMap.langwatch.labels)) {
-            metadata = {
-              ...metadata,
-              labels: attributesMap.langwatch.labels,
-            };
-            (attributesMap as any).langwatch.labels = void 0;
-          }
-          // Backward compatibility for legacy "langwatch.tags" attribute
-          if (
-            !metadata.labels &&
-            Array.isArray((attributesMap as any).langwatch.tags)
-          ) {
-            metadata = {
-              ...metadata,
-              labels: (attributesMap as any).langwatch.tags,
-            };
-            (attributesMap as any).langwatch.tags = void 0;
-          }
-
-          if (attributesMap.langwatch.input) {
-            if (
-              Array.isArray(attributesMap.langwatch.input) &&
-              attributesMap.langwatch.input.length === 1
-            ) {
-              input = (attributesMap as any).langwatch.input[0];
-            } else {
-              input = (attributesMap as any).langwatch.input;
-            }
-            (attributesMap as any).langwatch.input = void 0;
-          }
-          if (attributesMap.langwatch.output) {
-            if (
-              Array.isArray(attributesMap.langwatch.output) &&
-              attributesMap.langwatch.output.length === 1
-            ) {
-              output = (attributesMap as any).langwatch.output[0];
-            } else {
-              output = (attributesMap as any).langwatch.output;
-            }
-            (attributesMap as any).langwatch.output = void 0;
-          }
-          if (Array.isArray(attributesMap.langwatch.rag_contexts)) {
-            for (const ragContext of attributesMap.langwatch
-              .rag_contexts as any) {
-              contexts.push(ragContext);
-            }
-            (attributesMap as any).langwatch.rag_contexts = void 0;
-          }
-          const prompt = attributesMap.langwatch.prompt;
-          if (prompt) {
-            if (typeof prompt?.id === "string") {
-              trace.reservedTraceMetadata.prompt_ids ??= [];
-              trace.reservedTraceMetadata.prompt_ids.push(prompt.id);
-            }
-            if (prompt?.version) {
-              const version = prompt.version;
-              if (typeof version?.id === "string") {
-                trace.reservedTraceMetadata.prompt_version_ids ??= [];
-                trace.reservedTraceMetadata.prompt_version_ids.push(version.id);
-              }
-            }
-          }
-          // Metrics
-          if (attributesMap.langwatch.metrics) {
-            try {
-              metrics = {
-                ...metrics,
-                ...spanMetricsSchema.parse(
-                  attributesMap.langwatch.metrics as any,
-                ),
-              };
-              delete (attributesMap as any).langwatch.metrics;
-            } catch {
-              // ignore
-            }
-          }
-          // Params
-          if (attributesMap.langwatch.params) {
-            try {
-              params = {
-                ...params,
-                ...reservedSpanParamsSchema.parse(
-                  attributesMap.langwatch.params as any,
-                ),
-              };
-              delete (attributesMap as any).langwatch.params;
-            } catch {
-              // ignore
-            }
-          }
-          // Timestamps
-          if (attributesMap.langwatch.timestamps) {
-            try {
-              const timestamps = spanTimestampsSchema
-                .partial()
-                .parse(attributesMap.langwatch.timestamps as any);
-              if (timestamps.started_at) {
-                started_at = timestamps.started_at;
-              }
-              if (timestamps.finished_at) {
-                finished_at = timestamps.finished_at;
-              }
-              if (timestamps.first_token_at) {
-                first_token_at = timestamps.first_token_at;
-              }
-              delete (attributesMap as any).langwatch.timestamps;
-            } catch {
-              // ignore
-            }
-          }
-        }
-
-        // Metadata
-        const mappedMetadata = applyMappingsToMetadata(metadata);
-        const { reservedTraceMetadata, customMetadata } =
-          extractReservedAndCustomMetadata(mappedMetadata);
-
-        if (Object.keys(reservedTraceMetadata).length > 0) {
-          trace.reservedTraceMetadata = {
-            ...trace.reservedTraceMetadata,
-            ...reservedTraceMetadata,
-          };
-        }
-
-        if (Object.keys(customMetadata).length > 0) {
-          trace.customMetadata = {
-            ...trace.customMetadata,
-            ...customMetadata,
-          };
-        }
-
-        params = {
-          ...params,
-          ...removeEmptyKeys(attributesMap),
-          ...(incomingScope ? { scope: incomingScope } : {}),
+        const state: SpanBuildState = {
+          incomingSpan,
+          incomingScope,
+          attributesMap: otelAttributesToNestedAttributes(
+            incomingSpan.attributes,
+          ),
+          trace,
+          type: "span",
+          model: undefined,
+          input: null,
+          output: null,
+          params: {},
+          metadata: {},
+          started_at: parseTimestamp(incomingSpan.startTimeUnixNano),
+          finished_at: parseTimestamp(incomingSpan.endTimeUnixNano),
+          first_token_at: null,
+          error: null,
+          metrics: {},
+          contexts: [],
+          name: incomingSpan.name,
         };
 
-        const span: BaseSpan & {
-          model?: LLMSpan["model"];
-          metrics?: LLMSpan["metrics"];
-        } = {
-          span_id: incomingSpan.spanId as string,
-          trace_id: incomingSpan.traceId as string,
-          ...(incomingSpan.parentSpanId
-            ? { parent_id: incomingSpan.parentSpanId as string }
-            : {}),
-          name,
-          type,
-          ...(model ? { model } : {}),
-          input,
-          output,
-          ...(error ? { error } : {}),
-          ...(metrics && Object.keys(metrics).length > 0 ? { metrics } : {}),
-          ...(contexts && contexts.length > 0 ? { contexts } : {}),
-          params,
-          timestamps: {
-            ...(started_at ? { started_at } : {}),
-            ...(finished_at ? { finished_at } : {}),
-            ...(first_token_at ? { first_token_at } : {}),
-          } as Span["timestamps"],
-        };
+        computeFirstTokenAtFromEvents(state);
+        applyStrandsAgentsInputOutput(state);
+        applyFirstTokenAtFromAttributes(state);
 
-        trace.spans.push(span);
+        inferSpanType(state);
+        applyStrandsAgentMetadataForAgentType(state);
+        applyGenAiResponseModelType(state);
+
+        inferModel(state);
+
+        extractSpanInput(state);
+        extractSpanOutput(state);
+
+        mergeAttributesMetadata(state);
+
+        extractMetrics(state);
+
+        extractInvocationParams(state);
+        extractReservedIdsFromAttributes(state);
+        extractVercelToolParams(state);
+
+        extractSpanError(state);
+
+        inferSpanName(state);
+
+        extractHaystackRagContexts(state);
+
+        applyLangwatchAttributes(state);
+
+        applyMetadataMapping(state);
+
+        trace.spans.push(buildFinalSpan(state));
       } catch (error) {
         otelSpan.setStatus({
           code: SpanStatusCode.ERROR,
@@ -1355,6 +1711,18 @@ const addOpenTelemetrySpanAsSpan = (
     },
   );
 };
+
+// prepare the container for the next path segment
+function stepIntoPathContainer(
+  cursor: any,
+  key: string | number,
+  createsArray: boolean,
+): any {
+  if (typeof cursor[key] !== "object" || cursor[key] === null) {
+    cursor[key] = createsArray ? [] : {};
+  }
+  return cursor[key];
+}
 
 export function otelAttributesToNestedAttributes(
   attributes: DeepPartial<IKeyValue[]> | undefined,
@@ -1374,11 +1742,7 @@ export function otelAttributesToNestedAttributes(
       const segIsIndex = /^\d+$/.test(seg);
       const key = segIsIndex ? Number(seg) : seg;
 
-      // prepare the container for the next segment
-      if (typeof cursor[key] !== "object" || cursor[key] === null) {
-        cursor[key] = nextIsIndex ? [] : {};
-      }
-      cursor = cursor[key];
+      cursor = stepIntoPathContainer(cursor, key, nextIsIndex);
     });
 
     // detect leaf type and cast key to correct type
@@ -1393,28 +1757,35 @@ export function otelAttributesToNestedAttributes(
 
 const isNumeric = (n: any) => !isNaN(parseFloat(n)) && isFinite(n);
 
+function resolveOtelStringValue(value: string): any {
+  if (isNumeric(value)) return value;
+
+  try {
+    return JSON.parse(value);
+  } catch {
+    return value;
+  }
+}
+
+function unwrapLongInt(value: any): any {
+  return Long.isLong(value) ? value.toInt() : value;
+}
+
+function unwrapLongDouble(value: any): any {
+  return Long.isLong(value) ? value.toNumber() : value;
+}
+
 function resolveOtelAnyValue(anyValuePair?: DeepPartial<IAnyValue>): any {
   if (!anyValuePair) return void 0;
 
-  if (anyValuePair.stringValue != null) {
-    if (isNumeric(anyValuePair.stringValue)) return anyValuePair.stringValue;
-
-    try {
-      return JSON.parse(anyValuePair.stringValue);
-    } catch {
-      return anyValuePair.stringValue;
-    }
-  }
+  if (anyValuePair.stringValue != null)
+    return resolveOtelStringValue(anyValuePair.stringValue);
 
   if (anyValuePair.boolValue != null) return anyValuePair.boolValue;
   if (anyValuePair.intValue != null)
-    return Long.isLong(anyValuePair.intValue)
-      ? anyValuePair.intValue.toInt()
-      : anyValuePair.intValue;
+    return unwrapLongInt(anyValuePair.intValue);
   if (anyValuePair.doubleValue != null)
-    return Long.isLong(anyValuePair.doubleValue)
-      ? anyValuePair.doubleValue.toNumber()
-      : anyValuePair.doubleValue;
+    return unwrapLongDouble(anyValuePair.doubleValue);
   if (anyValuePair.bytesValue != null) return anyValuePair.bytesValue;
 
   if (anyValuePair.kvlistValue)
@@ -1451,40 +1822,48 @@ const maybeConvertLongBits = (value: any): number => {
   return value;
 };
 
+const isEmptyObjectValue = (value: any): boolean =>
+  value !== null &&
+  typeof value === "object" &&
+  !Array.isArray(value) &&
+  Object.keys(value).length === 0;
+
+const isEmptyArrayValue = (value: any): boolean =>
+  Array.isArray(value) && value.length === 0;
+
+const isEmptyValue = (value: any): boolean =>
+  value === null ||
+  value === undefined ||
+  isEmptyObjectValue(value) ||
+  isEmptyArrayValue(value);
+
+function cleanRemoveEmptyKeysEntry(
+  key: string,
+  value: any,
+  result: Record<string, any>,
+): void {
+  if (typeof value === "object" && value !== null) {
+    const cleanedValue = removeEmptyKeys(value as Record<string, any>);
+    if (!isEmptyValue(cleanedValue)) {
+      result[key] = cleanedValue;
+    }
+  } else if (!isEmptyValue(value)) {
+    result[key] = value;
+  }
+}
+
 const removeEmptyKeys = (obj: Record<string, any>): Record<string, any> => {
-  const isEmptyObject = (value: any): boolean =>
-    value !== null &&
-    typeof value === "object" &&
-    !Array.isArray(value) &&
-    Object.keys(value).length === 0;
-
-  const isEmptyArray = (value: any): boolean =>
-    Array.isArray(value) && value.length === 0;
-
-  const isEmpty = (value: any): boolean =>
-    value === null ||
-    value === undefined ||
-    isEmptyObject(value) ||
-    isEmptyArray(value);
-
   if (!obj) return obj;
 
   if (typeof obj === "string") return obj;
 
   if (Array.isArray(obj)) {
-    return obj.map(removeEmptyKeys).filter((v) => !isEmpty(v));
+    return obj.map(removeEmptyKeys).filter((v) => !isEmptyValue(v));
   }
 
   const result: Record<string, any> = {};
   for (const [key, value] of Object.entries(obj)) {
-    if (typeof value === "object" && value !== null) {
-      const cleanedValue = removeEmptyKeys(value as Record<string, any>);
-      if (!isEmpty(cleanedValue)) {
-        result[key] = cleanedValue;
-      }
-    } else if (!isEmpty(value)) {
-      result[key] = value;
-    }
+    cleanRemoveEmptyKeysEntry(key, value, result);
   }
 
   return Object.keys(result).length > 0 ? result : {};

@@ -23,6 +23,26 @@ const registry = llmModels as unknown as {
 
 const FLAGSHIP_PATTERN = /^([a-z0-9_-]+)\/([a-z]+)-(\d+)\.(\d+)$/;
 
+const flagshipVersion = (
+  model: RegistryEntry,
+  provider: string,
+  mode: "chat" | "embedding",
+): [number, number] | undefined => {
+  if (model.provider !== provider || model.mode !== mode) return undefined;
+  const match = FLAGSHIP_PATTERN.exec(model.id);
+  if (!match) return undefined;
+  const [, modelProvider, , major, minor] = match;
+  if (modelProvider !== provider) return undefined;
+  return [Number(major), Number(minor)];
+};
+
+const isNewerVersion = (
+  candidate: [number, number],
+  best: [number, number],
+): boolean =>
+  candidate[0] > best[0] ||
+  (candidate[0] === best[0] && candidate[1] > best[1]);
+
 export const getLatestFlagshipForProvider = (
   provider: string,
   mode: "chat" | "embedding" = "chat",
@@ -31,17 +51,10 @@ export const getLatestFlagshipForProvider = (
   let bestVersion: [number, number] = [-1, -1];
 
   for (const model of Object.values(registry.models)) {
-    if (model.provider !== provider || model.mode !== mode) continue;
-    const match = FLAGSHIP_PATTERN.exec(model.id);
-    if (!match) continue;
-    const [, modelProvider, , major, minor] = match;
-    if (modelProvider !== provider) continue;
-    const v: [number, number] = [Number(major), Number(minor)];
-    if (
-      v[0] > bestVersion[0] ||
-      (v[0] === bestVersion[0] && v[1] > bestVersion[1])
-    ) {
-      bestVersion = v;
+    const version = flagshipVersion(model, provider, mode);
+    if (!version) continue;
+    if (isNewerVersion(version, bestVersion)) {
+      bestVersion = version;
       bestId = model.id;
     }
   }

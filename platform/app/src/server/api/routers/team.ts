@@ -1,9 +1,11 @@
 import { generate } from "@langwatch/ksuid";
+import type { Prisma, PrismaClient } from "@prisma/client";
 import { RoleBindingScopeType, TeamUserRole } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import type { PlanProviderUser } from "~/server/app-layer/subscription/plan-provider";
 import {
   PERSONAL_TEAM_ARCHIVE_REFUSAL,
   PERSONAL_TEAM_MEMBERSHIP_REFUSAL,
@@ -60,6 +62,437 @@ const teamMemberRoleSchema = z
       }
     }
   });
+
+type TeamMemberInput = z.infer<typeof teamMemberRoleSchema>;
+
+const targetRoleForMember = (m: TeamMemberInput): TeamUserRole =>
+  isCustomRole(m.role) ? TeamUserRole.CUSTOM : (m.role as TeamUserRole);
+
+const targetCustomRoleIdForMember = (m: TeamMemberInput): string | null =>
+  isCustomRole(m.role) ? (m.customRoleId ?? null) : null;
+
+/**
+ * The displayed binding among a user's (possibly several, additive) TEAM
+ * bindings — the highest-privilege one, matching the read path
+ * (TEAM_ROLE_PRIORITY).
+ */
+function highestPriorityBinding<T extends { role: TeamUserRole }>(
+  bindings: T[],
+): T {
+  return [...bindings].sort(
+    (a, b) => TEAM_ROLE_PRIORITY[a.role] - TEAM_ROLE_PRIORITY[b.role],
+  )[0]!;
+}
+
+/**
+ * Custom-role team bindings require the enterprise plan. Looks the team's
+ * organization up itself (the `update` input carries only `teamId`) and
+ * skips both the lookup and the plan check entirely when no submitted
+ * member uses a custom role.
+ */
+async function assertUpdateAllowsCustomRoleMembers({
+  prisma,
+  teamId,
+  members,
+  actorUser,
+}: {
+  prisma: PrismaClient;
+  teamId: string;
+  members: TeamMemberInput[];
+  actorUser: PlanProviderUser;
+}): Promise<void> {
+  if (!members.some((m) => isCustomRole(m.role))) return;
+
+  const team = await prisma.team.findUnique({
+    where: { id: teamId },
+    select: { organizationId: true },
+  });
+  if (!team) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Team not found" });
+  }
+  await assertEnterprisePlan({
+    organizationId: team.organizationId,
+    user: actorUser,
+    errorMessage: ENTERPRISE_FEATURE_ERRORS.RBAC,
+  });
+}
+
+/**
+ * A personal team is single-member by definition: its owner holds the one
+ * ADMIN binding PersonalWorkspaceService provisions, and plan-limit counting
+ * exempts the team on that basis. Members and roles are therefore not
+ * editable here. Only submissions that keep the provisioned membership (or
+ * touch none at all, e.g. a rename) go through; everything else needs a
+ * shared team.
+ */
+function assertPersonalTeamMembershipUnchanged({
+  teamRecord,
+  members,
+}: {
+  teamRecord: { isPersonal: boolean; ownerUserId: string | null };
+  members: TeamMemberInput[];
+}): void {
+  if (!teamRecord.isPersonal) return;
+
+  const keepsProvisionedMembership =
+    members.length === 0 ||
+    (members.length === 1 &&
+      members[0]!.userId === teamRecord.ownerUserId &&
+      members[0]!.role === TeamUserRole.ADMIN);
+  if (!keepsProvisionedMembership) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: PERSONAL_TEAM_MEMBERSHIP_REFUSAL,
+    });
+  }
+}
+
+/** Every submitted custom-role member must point at a `custom` role that belongs to this org. */
+async function assertCustomRolesBelongToOrg({
+  prisma,
+  organizationId,
+  members,
+}: {
+  prisma: PrismaClient;
+  organizationId: string;
+  members: TeamMemberInput[];
+}): Promise<void> {
+  for (const member of members.filter((m) => isCustomRole(m.role))) {
+    if (!member.customRoleId) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: `customRoleId is required when role is a custom role for user ${member.userId}`,
+      });
+    }
+    const customRole = await prisma.customRole.findUnique({
+      where: { id: member.customRoleId },
+      select: { organizationId: true, kind: true },
+    });
+    if (customRole?.kind !== "custom") {
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: `Custom role ${member.customRoleId} not found`,
+      });
+    }
+    if (customRole.organizationId !== organizationId) {
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: `Custom role ${member.customRoleId} does not belong to team's organization`,
+      });
+    }
+  }
+}
+
+type CurrentTeamBinding = {
+  id: string;
+  userId: string | null;
+  role: TeamUserRole;
+  customRoleId: string | null;
+};
+
+/** Every existing TEAM RoleBinding for this team, grouped by the user it names. */
+async function loadCurrentTeamBindingsByUser({
+  tx,
+  organizationId,
+  teamId,
+}: {
+  tx: Prisma.TransactionClient;
+  organizationId: string;
+  teamId: string;
+}): Promise<Map<string, CurrentTeamBinding[]>> {
+  const currentBindings = await tx.roleBinding.findMany({
+    where: {
+      organizationId,
+      scopeType: RoleBindingScopeType.TEAM,
+      scopeId: teamId,
+      userId: { not: null },
+    },
+    select: { id: true, userId: true, role: true, customRoleId: true },
+  });
+  const currentBindingsByUser = new Map<string, CurrentTeamBinding[]>();
+  for (const binding of currentBindings) {
+    const list = currentBindingsByUser.get(binding.userId!) ?? [];
+    list.push(binding);
+    currentBindingsByUser.set(binding.userId!, list);
+  }
+  return currentBindingsByUser;
+}
+
+type MembershipBindingPlan = {
+  idsToRemove: string[];
+  toUpdate: Array<{
+    id: string;
+    role: TeamUserRole;
+    customRoleId: string | null;
+  }>;
+  toCreate: TeamMemberInput[];
+};
+
+type BindingChangeForMember =
+  | { kind: "create"; member: TeamMemberInput }
+  | {
+      kind: "update";
+      id: string;
+      role: TeamUserRole;
+      customRoleId: string | null;
+    }
+  | { kind: "remove"; id: string }
+  | { kind: "noop" };
+
+/**
+ * What one submitted member's displayed binding needs, if anything: create
+ * one when the user has none yet, leave it alone when the displayed binding
+ * already matches, update it in place, or — when the target grant already
+ * exists on ANOTHER of the user's bindings (updating into it would collide
+ * with the partial unique index) — remove the displayed one instead, since
+ * the grant is already present via the other binding.
+ */
+function planBindingChangeForMember({
+  member,
+  existing,
+}: {
+  member: TeamMemberInput;
+  existing: CurrentTeamBinding[];
+}): BindingChangeForMember {
+  if (existing.length === 0) {
+    return { kind: "create", member };
+  }
+
+  const role = targetRoleForMember(member);
+  const customRoleId = targetCustomRoleIdForMember(member);
+  const displayed = highestPriorityBinding(existing);
+  if (displayed.role === role && displayed.customRoleId === customRoleId) {
+    return { kind: "noop" }; // displayed binding already matches — nothing to do
+  }
+
+  const targetAlreadyHeld = existing.some(
+    (b) =>
+      b.id !== displayed.id &&
+      b.role === role &&
+      b.customRoleId === customRoleId,
+  );
+  return targetAlreadyHeld
+    ? { kind: "remove", id: displayed.id }
+    : { kind: "update", id: displayed.id, role, customRoleId };
+}
+
+/** Every binding id belonging to a user no longer in `members` — dropped unconditionally, unlike a submitted user's own (additive) bindings. */
+function idsForRemovedMembers({
+  members,
+  currentBindingsByUser,
+}: {
+  members: TeamMemberInput[];
+  currentBindingsByUser: Map<string, CurrentTeamBinding[]>;
+}): string[] {
+  const newMembersMap = new Map(members.map((m) => [m.userId, m]));
+  const idsToRemove: string[] = [];
+  for (const [userId, bindings] of currentBindingsByUser) {
+    if (!newMembersMap.has(userId)) {
+      idsToRemove.push(...bindings.map((b) => b.id));
+    }
+  }
+  return idsToRemove;
+}
+
+function applyBindingChangeToPlan(
+  plan: MembershipBindingPlan,
+  change: BindingChangeForMember,
+): void {
+  if (change.kind === "create") {
+    plan.toCreate.push(change.member);
+  } else if (change.kind === "update") {
+    plan.toUpdate.push({
+      id: change.id,
+      role: change.role,
+      customRoleId: change.customRoleId,
+    });
+  } else if (change.kind === "remove") {
+    plan.idsToRemove.push(change.id);
+  }
+}
+
+/**
+ * Diffs submitted members against current TEAM RoleBindings. A user can hold
+ * MORE THAN ONE TEAM binding on the same team (the partial unique indexes
+ * allow a built-in role plus additive custom-role grants at one scope), and
+ * RBAC unions them. This settings form shows and edits ONLY the displayed
+ * membership — the highest-privilege binding (same selection the read path
+ * uses, TEAM_ROLE_PRIORITY). So the plan updates just that binding and
+ * PRESERVES the user's other (additive) bindings; we must not delete them,
+ * or a routine autosaved edit would silently revoke custom-role grants.
+ * Removing a user from the team is unambiguous, so that path still drops
+ * all of their bindings.
+ */
+function planMembershipBindingChanges({
+  members,
+  currentBindingsByUser,
+}: {
+  members: TeamMemberInput[];
+  currentBindingsByUser: Map<string, CurrentTeamBinding[]>;
+}): MembershipBindingPlan {
+  const plan: MembershipBindingPlan = {
+    // Drop every binding belonging to a user no longer on the team.
+    idsToRemove: idsForRemovedMembers({ members, currentBindingsByUser }),
+    toUpdate: [],
+    toCreate: [],
+  };
+
+  // For each submitted user: edit only the displayed binding; leave the
+  // rest (additive grants) untouched.
+  for (const member of members) {
+    const existing = currentBindingsByUser.get(member.userId) ?? [];
+    const change = planBindingChangeForMember({ member, existing });
+    applyBindingChangeToPlan(plan, change);
+  }
+
+  return plan;
+}
+
+/** Applies a `planMembershipBindingChanges` plan: delete, then update, then create. */
+async function applyMembershipBindingChanges({
+  tx,
+  organizationId,
+  teamId,
+  plan,
+}: {
+  tx: Prisma.TransactionClient;
+  organizationId: string;
+  teamId: string;
+  plan: MembershipBindingPlan;
+}): Promise<void> {
+  if (plan.idsToRemove.length > 0) {
+    await tx.roleBinding.deleteMany({
+      where: { id: { in: plan.idsToRemove } },
+    });
+  }
+  for (const { id, role, customRoleId } of plan.toUpdate) {
+    await tx.roleBinding.update({
+      where: { id },
+      data: { role, customRoleId },
+    });
+  }
+  for (const member of plan.toCreate) {
+    await tx.roleBinding.create({
+      data: {
+        id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+        organizationId,
+        userId: member.userId,
+        role: targetRoleForMember(member),
+        customRoleId: targetCustomRoleIdForMember(member),
+        scopeType: RoleBindingScopeType.TEAM,
+        scopeId: teamId,
+      },
+    });
+  }
+}
+
+/**
+ * Custom-role team bindings require the enterprise plan; skips the check
+ * entirely when no submitted member uses one.
+ */
+async function assertCreateAllowsCustomRoleMembers({
+  members,
+  organizationId,
+  actorUser,
+}: {
+  members: TeamMemberInput[];
+  organizationId: string;
+  actorUser: PlanProviderUser;
+}): Promise<void> {
+  if (!members.some((m) => isCustomRole(m.role))) return;
+  await assertEnterprisePlan({
+    organizationId,
+    user: actorUser,
+    errorMessage: ENTERPRISE_FEATURE_ERRORS.RBAC,
+  });
+}
+
+/**
+ * Creates one member's TEAM RoleBinding on a just-created team, validating
+ * (for a custom role) that the customRoleId was supplied and belongs to
+ * this org.
+ */
+async function createMemberBindingForNewTeam({
+  tx,
+  organizationId,
+  team,
+  member,
+}: {
+  tx: Prisma.TransactionClient;
+  organizationId: string;
+  team: { id: string; organizationId: string };
+  member: TeamMemberInput;
+}): Promise<void> {
+  const memberIsCustomRole = isCustomRole(member.role);
+
+  if (memberIsCustomRole && !member.customRoleId) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: `customRoleId is required when role is a custom role for user ${member.userId}`,
+    });
+  }
+
+  const memberRole = memberIsCustomRole
+    ? TeamUserRole.CUSTOM
+    : (member.role as TeamUserRole);
+
+  if (memberIsCustomRole) {
+    // Verify the custom role belongs to the same organization and is user-assignable
+    const customRole = await tx.customRole.findUnique({
+      where: { id: member.customRoleId! },
+      select: { organizationId: true, kind: true },
+    });
+
+    if (
+      customRole?.kind !== "custom" ||
+      customRole.organizationId !== team.organizationId
+    ) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: `Custom role ${member.customRoleId} is invalid for this team`,
+      });
+    }
+  }
+
+  await tx.roleBinding.create({
+    data: {
+      id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+      organizationId,
+      userId: member.userId,
+      role: memberRole,
+      customRoleId: memberIsCustomRole ? (member.customRoleId ?? null) : null,
+      scopeType: RoleBindingScopeType.TEAM,
+      scopeId: team.id,
+    },
+  });
+}
+
+/** Fails closed: a brand-new team must end up with at least one ADMIN binding. */
+async function assertNewTeamHasAdmin({
+  tx,
+  organizationId,
+  teamId,
+}: {
+  tx: Prisma.TransactionClient;
+  organizationId: string;
+  teamId: string;
+}): Promise<void> {
+  const finalAdminCount = await tx.roleBinding.count({
+    where: {
+      organizationId,
+      scopeType: RoleBindingScopeType.TEAM,
+      scopeId: teamId,
+      role: TeamUserRole.ADMIN,
+    },
+  });
+
+  if (finalAdminCount === 0) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "Team must have at least one admin",
+    });
+  }
+}
 
 export const teamRouter = createTRPCRouter({
   getBySlug: protectedProcedure
@@ -192,26 +625,12 @@ export const teamRouter = createTRPCRouter({
     )
     .use(checkTeamPermission("team:manage"))
     .mutation(async ({ input, ctx }) => {
-      const hasCustomRoleMember = input.members.some((m) =>
-        isCustomRole(m.role),
-      );
-      if (hasCustomRoleMember) {
-        const team = await ctx.prisma.team.findUnique({
-          where: { id: input.teamId },
-          select: { organizationId: true },
-        });
-        if (!team) {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "Team not found",
-          });
-        }
-        await assertEnterprisePlan({
-          organizationId: team.organizationId,
-          user: ctx.session.user,
-          errorMessage: ENTERPRISE_FEATURE_ERRORS.RBAC,
-        });
-      }
+      await assertUpdateAllowsCustomRoleMembers({
+        prisma: ctx.prisma,
+        teamId: input.teamId,
+        members: input.members,
+        actorUser: ctx.session.user,
+      });
 
       const prisma = ctx.prisma;
 
@@ -225,60 +644,20 @@ export const teamRouter = createTRPCRouter({
       }
       const { organizationId } = teamRecord;
 
-      // A personal team is single-member by definition: its owner holds the
-      // one ADMIN binding PersonalWorkspaceService provisions, and plan-limit
-      // counting exempts the team on that basis. Members and roles are
-      // therefore not editable here. Only submissions that keep the
-      // provisioned membership (or touch none at all, e.g. a rename) go
-      // through; everything else needs a shared team.
-      if (teamRecord.isPersonal) {
-        const keepsProvisionedMembership =
-          input.members.length === 0 ||
-          (input.members.length === 1 &&
-            input.members[0]!.userId === teamRecord.ownerUserId &&
-            input.members[0]!.role === TeamUserRole.ADMIN);
-        if (!keepsProvisionedMembership) {
-          throw new TRPCError({
-            code: "FORBIDDEN",
-            message: PERSONAL_TEAM_MEMBERSHIP_REFUSAL,
-          });
-        }
-      }
+      assertPersonalTeamMembershipUnchanged({
+        teamRecord,
+        members: input.members,
+      });
       await assertUsersInOrganization(
         prisma,
         organizationId,
         input.members.map((member) => member.userId),
       );
-
-      // Validate custom roles belong to this org
-      if (input.members.some((m) => isCustomRole(m.role))) {
-        for (const member of input.members.filter((m) =>
-          isCustomRole(m.role),
-        )) {
-          if (!member.customRoleId) {
-            throw new TRPCError({
-              code: "BAD_REQUEST",
-              message: `customRoleId is required when role is a custom role for user ${member.userId}`,
-            });
-          }
-          const customRole = await prisma.customRole.findUnique({
-            where: { id: member.customRoleId },
-            select: { organizationId: true, kind: true },
-          });
-          if (customRole?.kind !== "custom") {
-            throw new TRPCError({
-              code: "NOT_FOUND",
-              message: `Custom role ${member.customRoleId} not found`,
-            });
-          }
-          if (customRole.organizationId !== organizationId) {
-            throw new TRPCError({
-              code: "FORBIDDEN",
-              message: `Custom role ${member.customRoleId} does not belong to team's organization`,
-            });
-          }
-        }
-      }
+      await assertCustomRolesBelongToOrg({
+        prisma,
+        organizationId,
+        members: input.members,
+      });
 
       return await prisma.$transaction(async (tx) => {
         // ── Rename team ──
@@ -289,117 +668,22 @@ export const teamRouter = createTRPCRouter({
 
         if (input.members.length === 0) return { success: true };
 
-        const newMembersMap = new Map(input.members.map((m) => [m.userId, m]));
-
         // ── RoleBinding ──
-        // A user can hold MORE THAN ONE TEAM binding on the same team (the
-        // partial unique indexes allow a built-in role plus additive custom-role
-        // grants at one scope), and RBAC unions them. This settings form shows
-        // and edits ONLY the displayed membership — the highest-privilege binding
-        // (same selection the read path uses, TEAM_ROLE_PRIORITY). So on save we
-        // update just that binding and PRESERVE the user's other (additive)
-        // bindings; we must not delete them, or a routine autosaved edit would
-        // silently revoke custom-role grants. Removing a user from the team is
-        // unambiguous, so that path still drops all of their bindings.
-        const currentBindings = await tx.roleBinding.findMany({
-          where: {
-            organizationId,
-            scopeType: RoleBindingScopeType.TEAM,
-            scopeId: input.teamId,
-            userId: { not: null },
-          },
-          select: { id: true, userId: true, role: true, customRoleId: true },
+        const currentBindingsByUser = await loadCurrentTeamBindingsByUser({
+          tx,
+          organizationId,
+          teamId: input.teamId,
         });
-        const currentBindingsByUser = new Map<string, typeof currentBindings>();
-        for (const binding of currentBindings) {
-          const list = currentBindingsByUser.get(binding.userId!) ?? [];
-          list.push(binding);
-          currentBindingsByUser.set(binding.userId!, list);
-        }
-
-        const targetRole = (m: (typeof input.members)[number]) =>
-          isCustomRole(m.role) ? TeamUserRole.CUSTOM : (m.role as TeamUserRole);
-        const targetCustomRoleId = (m: (typeof input.members)[number]) =>
-          isCustomRole(m.role) ? (m.customRoleId ?? null) : null;
-
-        // The displayed binding = highest-privilege one, matching the read path.
-        const displayedBinding = (bindings: typeof currentBindings) =>
-          [...bindings].sort(
-            (a, b) => TEAM_ROLE_PRIORITY[a.role] - TEAM_ROLE_PRIORITY[b.role],
-          )[0]!;
-
-        const idsToRemove: string[] = [];
-        const toUpdate: {
-          id: string;
-          role: TeamUserRole;
-          customRoleId: string | null;
-        }[] = [];
-        const toCreate: (typeof input.members)[number][] = [];
-
-        // Drop every binding belonging to a user no longer on the team.
-        for (const [userId, bindings] of currentBindingsByUser) {
-          if (!newMembersMap.has(userId)) {
-            idsToRemove.push(...bindings.map((b) => b.id));
-          }
-        }
-
-        // For each submitted user: edit only the displayed binding; leave the
-        // rest (additive grants) untouched.
-        for (const member of input.members) {
-          const existing = currentBindingsByUser.get(member.userId) ?? [];
-          const role = targetRole(member);
-          const customRoleId = targetCustomRoleId(member);
-          if (existing.length === 0) {
-            toCreate.push(member);
-            continue;
-          }
-          const displayed = displayedBinding(existing);
-          if (
-            displayed.role === role &&
-            displayed.customRoleId === customRoleId
-          ) {
-            continue; // displayed binding already matches — nothing to do
-          }
-          // If the target grant already exists on another binding, updating into
-          // it would collide with the partial unique index, so drop the
-          // displayed binding instead (the grant is already present).
-          const targetAlreadyHeld = existing.some(
-            (b) =>
-              b.id !== displayed.id &&
-              b.role === role &&
-              b.customRoleId === customRoleId,
-          );
-          if (targetAlreadyHeld) {
-            idsToRemove.push(displayed.id);
-          } else {
-            toUpdate.push({ id: displayed.id, role, customRoleId });
-          }
-        }
-
-        if (idsToRemove.length > 0) {
-          await tx.roleBinding.deleteMany({
-            where: { id: { in: idsToRemove } },
-          });
-        }
-        for (const { id, role, customRoleId } of toUpdate) {
-          await tx.roleBinding.update({
-            where: { id },
-            data: { role, customRoleId },
-          });
-        }
-        for (const member of toCreate) {
-          await tx.roleBinding.create({
-            data: {
-              id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-              organizationId,
-              userId: member.userId,
-              role: targetRole(member),
-              customRoleId: targetCustomRoleId(member),
-              scopeType: RoleBindingScopeType.TEAM,
-              scopeId: input.teamId,
-            },
-          });
-        }
+        const plan = planMembershipBindingChanges({
+          members: input.members,
+          currentBindingsByUser,
+        });
+        await applyMembershipBindingChanges({
+          tx,
+          organizationId,
+          teamId: input.teamId,
+          plan,
+        });
 
         return { success: true };
       });
@@ -414,16 +698,11 @@ export const teamRouter = createTRPCRouter({
     )
     .use(checkOrganizationPermission("organization:manage"))
     .mutation(async ({ input, ctx }) => {
-      const hasCustomRoleMember = input.members.some((m) =>
-        isCustomRole(m.role),
-      );
-      if (hasCustomRoleMember) {
-        await assertEnterprisePlan({
-          organizationId: input.organizationId,
-          user: ctx.session.user,
-          errorMessage: ENTERPRISE_FEATURE_ERRORS.RBAC,
-        });
-      }
+      await assertCreateAllowsCustomRoleMembers({
+        members: input.members,
+        organizationId: input.organizationId,
+        actorUser: ctx.session.user,
+      });
 
       const prisma = ctx.prisma;
 
@@ -451,68 +730,20 @@ export const teamRouter = createTRPCRouter({
         });
 
         for (const member of input.members) {
-          const memberIsCustomRole = isCustomRole(member.role);
-
-          if (memberIsCustomRole && !member.customRoleId) {
-            throw new TRPCError({
-              code: "BAD_REQUEST",
-              message: `customRoleId is required when role is a custom role for user ${member.userId}`,
-            });
-          }
-
-          const memberRole = memberIsCustomRole
-            ? TeamUserRole.CUSTOM
-            : (member.role as TeamUserRole);
-
-          if (memberIsCustomRole) {
-            // Verify the custom role belongs to the same organization and is user-assignable
-            const customRole = await tx.customRole.findUnique({
-              where: { id: member.customRoleId! },
-              select: { organizationId: true, kind: true },
-            });
-
-            if (
-              customRole?.kind !== "custom" ||
-              customRole.organizationId !== team.organizationId
-            ) {
-              throw new TRPCError({
-                code: "BAD_REQUEST",
-                message: `Custom role ${member.customRoleId} is invalid for this team`,
-              });
-            }
-          }
-
-          await tx.roleBinding.create({
-            data: {
-              id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-              organizationId: input.organizationId,
-              userId: member.userId,
-              role: memberRole,
-              customRoleId: memberIsCustomRole
-                ? (member.customRoleId ?? null)
-                : null,
-              scopeType: RoleBindingScopeType.TEAM,
-              scopeId: team.id,
-            },
+          await createMemberBindingForNewTeam({
+            tx,
+            organizationId: input.organizationId,
+            team,
+            member,
           });
         }
 
         // Post-creation validation: ensure we have at least one admin (direct user or group binding)
-        const finalAdminCount = await tx.roleBinding.count({
-          where: {
-            organizationId: input.organizationId,
-            scopeType: RoleBindingScopeType.TEAM,
-            scopeId: team.id,
-            role: TeamUserRole.ADMIN,
-          },
+        await assertNewTeamHasAdmin({
+          tx,
+          organizationId: input.organizationId,
+          teamId: team.id,
         });
-
-        if (finalAdminCount === 0) {
-          throw new TRPCError({
-            code: "FORBIDDEN",
-            message: "Team must have at least one admin",
-          });
-        }
 
         return team;
       });

@@ -3,6 +3,7 @@ import type { EventSubscriberDefinition } from "../../../subscribers/eventSubscr
 import { scalarsFromCanonicalAttributes } from "../../metric-processing/canonical/attributes";
 import { METRIC_DATA_POINT_RECEIVED_EVENT_TYPE } from "../../metric-processing/schemas/constants";
 import type { MetricProcessingEvent } from "../../metric-processing/schemas/events";
+import type { CanonicalMetricDataPoint } from "../../metric-processing/schemas/metricDataPoint";
 import type { ContributeMetricFactsCommandData } from "../schemas/commands";
 import {
   detectCodingAgent,
@@ -51,44 +52,75 @@ export function createCodingAgentMetricFactsDispatchSubscriber(deps: {
       // vocabulary maps arrives as one today.
       if (point.valueType === "none") return;
 
-      const attributes = parsePointAttributes(point.pointAttributesJson);
-      if (attributes === null) return;
-      const sessionKey = resolveConversationKey(attributes);
-      if (sessionKey === null) return;
+      const session = resolvePointSession(point);
+      if (session === null) return;
 
-      const value =
-        point.valueType === "double"
-          ? point.valueDouble
-          : point.valueInt !== null
-            ? Number(point.valueInt)
-            : null;
-      if (value === null || !Number.isFinite(value)) return;
+      const value = resolvePointValue(point);
+      if (value === null) return;
 
-      const isDelta = point.aggregationTemporality === "delta";
-
-      await deps.contributeMetricFacts({
-        tenantId: point.tenantId,
-        sessionId: sessionKey,
-        sessionKeySource: "provider",
-        agent: detectCodingAgent({
-          recordName: point.metricName,
-          scopeName: point.scopeName,
-          // Resource service.name is the only signal that separates Cowork
-          // from the Claude Code runtime it reuses; without it a session's
-          // metric contribution could first-writer-win the fold's agent to
-          // claude_code while its log contributions say claude_cowork.
-          serviceName: serviceNameFromResource(point.resourceAttributesJson),
-        }),
-        occurredAt: point.timeUnixMs,
-        seriesId: isDelta ? point.pointId : point.seriesId,
-        metricName: point.metricName,
-        unit: point.metricUnit || null,
-        attributes: liftScalarAttributes(attributes),
-        value,
-        dataPointCount: 1,
-        asOfUnixMs: point.timeUnixMs,
-      });
+      await deps.contributeMetricFacts(
+        toContributeMetricFactsCommand({ point, session, value }),
+      );
     },
+  };
+}
+
+function resolvePointSession(point: CanonicalMetricDataPoint): {
+  sessionKey: string;
+  attributes: Record<string, string | number | boolean>;
+} | null {
+  const attributes = parsePointAttributes(point.pointAttributesJson);
+  if (attributes === null) return null;
+  const sessionKey = resolveConversationKey(attributes);
+  if (sessionKey === null) return null;
+  return { sessionKey, attributes };
+}
+
+function resolvePointValue(point: CanonicalMetricDataPoint): number | null {
+  const value =
+    point.valueType === "double"
+      ? point.valueDouble
+      : point.valueInt !== null
+        ? Number(point.valueInt)
+        : null;
+  return value !== null && Number.isFinite(value) ? value : null;
+}
+
+function toContributeMetricFactsCommand({
+  point,
+  session,
+  value,
+}: {
+  point: CanonicalMetricDataPoint;
+  session: {
+    sessionKey: string;
+    attributes: Record<string, string | number | boolean>;
+  };
+  value: number;
+}): ContributeMetricFactsCommandData {
+  const isDelta = point.aggregationTemporality === "delta";
+
+  return {
+    tenantId: point.tenantId,
+    sessionId: session.sessionKey,
+    sessionKeySource: "provider",
+    agent: detectCodingAgent({
+      recordName: point.metricName,
+      scopeName: point.scopeName,
+      // Resource service.name is the only signal that separates Cowork
+      // from the Claude Code runtime it reuses; without it a session's
+      // metric contribution could first-writer-win the fold's agent to
+      // claude_code while its log contributions say claude_cowork.
+      serviceName: serviceNameFromResource(point.resourceAttributesJson),
+    }),
+    occurredAt: point.timeUnixMs,
+    seriesId: isDelta ? point.pointId : point.seriesId,
+    metricName: point.metricName,
+    unit: point.metricUnit || null,
+    attributes: liftScalarAttributes(session.attributes),
+    value,
+    dataPointCount: 1,
+    asOfUnixMs: point.timeUnixMs,
   };
 }
 

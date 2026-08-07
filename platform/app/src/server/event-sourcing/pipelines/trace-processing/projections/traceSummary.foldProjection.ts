@@ -198,6 +198,40 @@ function recordContextSize({
   attributes[RESERVED_CONTEXT_SIZE_AT_MS] = String(span.startTimeUnixMs);
 }
 
+/**
+ * Roll the per-span cache / reasoning token counts into trace-level sums.
+ * The merged attribute map only carries identity/metadata keys, so the
+ * raw gen_ai.usage.cache_* numbers never reach the drawer -- fold the sums
+ * in under reserved keys the popover reads directly.
+ */
+function accumulateReservedTokenSums({
+  span,
+  attributes,
+}: {
+  span: NormalizedSpan;
+  attributes: Record<string, string>;
+}): void {
+  const cacheTokens = spanCostService.isTokenAccumulationSkipped(span)
+    ? { cacheReadTokens: 0, cacheCreationTokens: 0, reasoningTokens: 0 }
+    : spanCostService.extractCacheTokens(span);
+  addReservedTokenSum(
+    attributes,
+    RESERVED_CACHE_READ_TOKENS,
+    cacheTokens.cacheReadTokens,
+  );
+  addReservedTokenSum(
+    attributes,
+    RESERVED_CACHE_CREATION_TOKENS,
+    cacheTokens.cacheCreationTokens,
+  );
+  addReservedTokenSum(
+    attributes,
+    RESERVED_REASONING_TOKENS,
+    cacheTokens.reasoningTokens,
+  );
+  recordContextSize({ attributes, span, cacheTokens });
+}
+
 /** @internal Exported for unit testing */
 export function applySpanToSummary({
   state,
@@ -233,29 +267,7 @@ export function applySpanToSummary({
     outputMediaRefs: io.outputMediaRefs,
   });
 
-  // Roll the per-span cache / reasoning token counts into trace-level sums.
-  // The merged attribute map only carries identity/metadata keys, so the
-  // raw gen_ai.usage.cache_* numbers never reach the drawer — fold the sums
-  // in under reserved keys the popover reads directly.
-  const cacheTokens = spanCostService.isTokenAccumulationSkipped(span)
-    ? { cacheReadTokens: 0, cacheCreationTokens: 0, reasoningTokens: 0 }
-    : spanCostService.extractCacheTokens(span);
-  addReservedTokenSum(
-    attributes,
-    RESERVED_CACHE_READ_TOKENS,
-    cacheTokens.cacheReadTokens,
-  );
-  addReservedTokenSum(
-    attributes,
-    RESERVED_CACHE_CREATION_TOKENS,
-    cacheTokens.cacheCreationTokens,
-  );
-  addReservedTokenSum(
-    attributes,
-    RESERVED_REASONING_TOKENS,
-    cacheTokens.reasoningTokens,
-  );
-  recordContextSize({ attributes, span, cacheTokens });
+  accumulateReservedTokenSums({ span, attributes });
 
   const newModels = spanCostService.extractModelsFromSpan(span);
   const models = mergeModelsMostRecentFirst(state.models, newModels);
@@ -325,31 +337,10 @@ interface LogContribution {
   nonBillable: boolean;
 }
 
-/**
- * Fold one log contribution into the summary: bump the reserved log
- * count, apply the input/output override semantics, merge the lifted
- * canonical langwatch.* attributes, and mirror them onto the top-level
- * TraceSummary columns the v2 drawer + /traces list read directly
- * (Models / TotalCost / TotalPromptTokenCount /
- * TotalCompletionTokenCount). Without this mirror a Path B log-only
- * trace ends up with the right strings on state.attributes but
- * trace.totalCost still NULL, so the drawer chip and the cost column
- * on /traces both render empty even though the data is sitting in CH.
- *
- * Each api_request event is its OWN turn. Cost + tokens are additive
- * across turns; models are a deduped set. Reading from
- * contribution.liftedAttributes (this event's contribution) rather
- * than mergedAttributes (the cumulative latest snapshot) is critical
- * for cost so we don't double-count across replays.
- */
-function applyLogContribution({
-  state,
-  contribution,
-}: {
-  state: TraceSummaryData;
-  contribution: LogContribution;
-}): TraceSummaryData {
-  const mergedAttributes = { ...state.attributes };
+/** Bump the reserved per-trace count of folded log records. */
+function incrementLogRecordCount(
+  mergedAttributes: Record<string, string>,
+): void {
   const logCount = parseInt(
     mergedAttributes["langwatch.reserved.log_record_count"] ?? "0",
     10,
@@ -357,7 +348,25 @@ function applyLogContribution({
   mergedAttributes["langwatch.reserved.log_record_count"] = String(
     logCount + 1,
   );
+}
 
+/**
+ * Apply this log contribution's input/output override semantics against the
+ * running state, mutating `mergedAttributes`' fallback markers to match.
+ */
+function applyLogIOOverrides({
+  state,
+  contribution,
+  mergedAttributes,
+}: {
+  state: TraceSummaryData;
+  contribution: LogContribution;
+  mergedAttributes: Record<string, string>;
+}): {
+  computedInput: string | null;
+  computedOutput: string | null;
+  outputSpanEndTimeMs: number;
+} {
   let computedInput = state.computedInput;
   let computedOutput = state.computedOutput;
   let outputSpanEndTimeMs = state.outputSpanEndTimeMs;
@@ -397,13 +406,24 @@ function applyLogContribution({
     }
   }
 
-  // The per-TTL cache-creation lift is a PER-CALL value that must accumulate,
-  // not overwrite: sum it into the reserved running totals and keep the
-  // per-call keys out of the generic last-write-wins merge below.
+  return { computedInput, computedOutput, outputSpanEndTimeMs };
+}
+
+/**
+ * The per-TTL cache-creation lift is a PER-CALL value that must accumulate,
+ * not overwrite: sum it into the reserved running totals and keep the
+ * per-call keys out of the generic last-write-wins merge in
+ * {@link mergeLiftedLogAttributes}.
+ */
+function applyLogCacheCreationLift({
+  liftedAttributes,
+  mergedAttributes,
+}: {
+  liftedAttributes: Record<string, unknown>;
+  mergedAttributes: Record<string, string>;
+}): void {
   const cacheCreation5m = Number(
-    contribution.liftedAttributes[
-      ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_5M_INPUT_TOKENS
-    ],
+    liftedAttributes[ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_5M_INPUT_TOKENS],
   );
   if (Number.isFinite(cacheCreation5m)) {
     addReservedTokenSum(
@@ -413,9 +433,7 @@ function applyLogContribution({
     );
   }
   const cacheCreation1h = Number(
-    contribution.liftedAttributes[
-      ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_1H_INPUT_TOKENS
-    ],
+    liftedAttributes[ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_1H_INPUT_TOKENS],
   );
   if (Number.isFinite(cacheCreation1h)) {
     addReservedTokenSum(
@@ -424,10 +442,21 @@ function applyLogContribution({
       cacheCreation1h,
     );
   }
+}
 
-  // The lifts are merged into mergedAttributes here so the reserved +
-  // log_count keys set above remain intact.
-  for (const [key, value] of Object.entries(contribution.liftedAttributes)) {
+/**
+ * The lifts are merged into mergedAttributes here so the reserved +
+ * log_count keys set earlier remain intact. The per-TTL cache-creation keys
+ * are excluded -- {@link applyLogCacheCreationLift} already summed them.
+ */
+function mergeLiftedLogAttributes({
+  liftedAttributes,
+  mergedAttributes,
+}: {
+  liftedAttributes: Record<string, unknown>;
+  mergedAttributes: Record<string, string>;
+}): void {
+  for (const [key, value] of Object.entries(liftedAttributes)) {
     if (
       key === ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_5M_INPUT_TOKENS ||
       key === ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_1H_INPUT_TOKENS
@@ -436,35 +465,156 @@ function applyLogContribution({
     }
     mergedAttributes[key] = String(value);
   }
+}
 
-  let models = state.models;
-  let totalCost = state.totalCost;
-  let nonBilledCost = state.nonBilledCost;
-  let totalPromptTokenCount = state.totalPromptTokenCount;
-  let totalCompletionTokenCount = state.totalCompletionTokenCount;
+function mergeLogContributionModel(
+  models: string[],
+  contribution: LogContribution,
+): string[] {
   const model = contribution.liftedAttributes["langwatch.model"];
   if (typeof model === "string" && model.length > 0) {
-    models = mergeModelsMostRecentFirst(models, [model]);
+    return mergeModelsMostRecentFirst(models, [model]);
   }
+  return models;
+}
+
+/**
+ * Cost is additive across turns. Reading from contribution.liftedAttributes
+ * (this event's own contribution) rather than the cumulative merged
+ * attributes is critical here so we don't double-count across replays.
+ */
+function accumulateLogCost({
+  totalCost,
+  nonBilledCost,
+  contribution,
+}: {
+  totalCost: number | null;
+  nonBilledCost: number | null;
+  contribution: LogContribution;
+}): { totalCost: number | null; nonBilledCost: number | null } {
   const cost = Number(contribution.liftedAttributes["langwatch.cost.usd"]);
-  if (Number.isFinite(cost) && cost > 0) {
-    totalCost = (totalCost ?? 0) + cost;
-    if (contribution.nonBillable) {
-      nonBilledCost = (nonBilledCost ?? 0) + cost;
-    }
+  if (!Number.isFinite(cost) || cost <= 0) {
+    return { totalCost, nonBilledCost };
   }
+  return {
+    totalCost: (totalCost ?? 0) + cost,
+    nonBilledCost: contribution.nonBillable
+      ? (nonBilledCost ?? 0) + cost
+      : nonBilledCost,
+  };
+}
+
+function accumulateLogTokenCounts({
+  totalPromptTokenCount,
+  totalCompletionTokenCount,
+  contribution,
+}: {
+  totalPromptTokenCount: number | null;
+  totalCompletionTokenCount: number | null;
+  contribution: LogContribution;
+}): {
+  totalPromptTokenCount: number | null;
+  totalCompletionTokenCount: number | null;
+} {
   const inputTokens = Number(
     contribution.liftedAttributes["langwatch.input_tokens"],
   );
-  if (Number.isFinite(inputTokens) && inputTokens > 0) {
-    totalPromptTokenCount = (totalPromptTokenCount ?? 0) + inputTokens;
-  }
+  const nextPromptTokenCount =
+    Number.isFinite(inputTokens) && inputTokens > 0
+      ? (totalPromptTokenCount ?? 0) + inputTokens
+      : totalPromptTokenCount;
   const outputTokens = Number(
     contribution.liftedAttributes["langwatch.output_tokens"],
   );
-  if (Number.isFinite(outputTokens) && outputTokens > 0) {
-    totalCompletionTokenCount = (totalCompletionTokenCount ?? 0) + outputTokens;
-  }
+  const nextCompletionTokenCount =
+    Number.isFinite(outputTokens) && outputTokens > 0
+      ? (totalCompletionTokenCount ?? 0) + outputTokens
+      : totalCompletionTokenCount;
+  return {
+    totalPromptTokenCount: nextPromptTokenCount,
+    totalCompletionTokenCount: nextCompletionTokenCount,
+  };
+}
+
+/**
+ * Each api_request event is its OWN turn. Cost + tokens are additive
+ * across turns; models are a deduped set.
+ */
+function accumulateLogModelsAndCost({
+  state,
+  contribution,
+}: {
+  state: TraceSummaryData;
+  contribution: LogContribution;
+}): {
+  models: string[];
+  totalCost: number | null;
+  nonBilledCost: number | null;
+  totalPromptTokenCount: number | null;
+  totalCompletionTokenCount: number | null;
+} {
+  const models = mergeLogContributionModel(state.models, contribution);
+  const { totalCost, nonBilledCost } = accumulateLogCost({
+    totalCost: state.totalCost,
+    nonBilledCost: state.nonBilledCost,
+    contribution,
+  });
+  const { totalPromptTokenCount, totalCompletionTokenCount } =
+    accumulateLogTokenCounts({
+      totalPromptTokenCount: state.totalPromptTokenCount,
+      totalCompletionTokenCount: state.totalCompletionTokenCount,
+      contribution,
+    });
+
+  return {
+    models,
+    totalCost,
+    nonBilledCost,
+    totalPromptTokenCount,
+    totalCompletionTokenCount,
+  };
+}
+
+/**
+ * Fold one log contribution into the summary: bump the reserved log
+ * count, apply the input/output override semantics, merge the lifted
+ * canonical langwatch.* attributes, and mirror them onto the top-level
+ * TraceSummary columns the v2 drawer + /traces list read directly
+ * (Models / TotalCost / TotalPromptTokenCount /
+ * TotalCompletionTokenCount). Without this mirror a Path B log-only
+ * trace ends up with the right strings on state.attributes but
+ * trace.totalCost still NULL, so the drawer chip and the cost column
+ * on /traces both render empty even though the data is sitting in CH.
+ */
+function applyLogContribution({
+  state,
+  contribution,
+}: {
+  state: TraceSummaryData;
+  contribution: LogContribution;
+}): TraceSummaryData {
+  const mergedAttributes = { ...state.attributes };
+  incrementLogRecordCount(mergedAttributes);
+
+  const { computedInput, computedOutput, outputSpanEndTimeMs } =
+    applyLogIOOverrides({ state, contribution, mergedAttributes });
+
+  applyLogCacheCreationLift({
+    liftedAttributes: contribution.liftedAttributes,
+    mergedAttributes,
+  });
+  mergeLiftedLogAttributes({
+    liftedAttributes: contribution.liftedAttributes,
+    mergedAttributes,
+  });
+
+  const {
+    models,
+    totalCost,
+    nonBilledCost,
+    totalPromptTokenCount,
+    totalCompletionTokenCount,
+  } = accumulateLogModelsAndCost({ state, contribution });
 
   // Same trace-level model metadata stamp the span path applies, so
   // log-only (Path B) traces also surface `metadata.model`.

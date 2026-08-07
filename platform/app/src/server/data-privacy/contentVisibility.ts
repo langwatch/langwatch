@@ -44,14 +44,27 @@ export function isContentVisible(
   if (!viewer.isMember && !viewer.isProjectOwner) return false;
   if (eff.disposition === "drop") return false;
   if (eff.disposition === "capture") return viewer.isMember;
-  const audience = eff.audience;
-  if (audience.allMembers && viewer.isMember) return true;
-  if (audience.admins && viewer.isAdmin) return true;
-  if (audience.members && viewer.isMemberRole) return true;
-  if (audience.viewers && viewer.isViewer) return true;
-  if (audience.projectOwner && viewer.isProjectOwner) return true;
-  if (audience.groupIds.some((id) => viewer.groupIds.includes(id))) return true;
-  return false;
+  return matchesAudience(eff.audience, viewer);
+}
+
+/** The audience clauses of a `restrict` category, any one of which admits the
+ *  viewer: the standard role groups, the project owner, or a named group. */
+function matchesAudience(
+  audience: ResolvedAudience,
+  viewer: ViewerFacts,
+): boolean {
+  const roleClauses: [inAudience: boolean, viewerHolds: boolean][] = [
+    [audience.allMembers, viewer.isMember],
+    [audience.admins, viewer.isAdmin],
+    [audience.members, viewer.isMemberRole],
+    [audience.viewers, viewer.isViewer],
+    [audience.projectOwner, viewer.isProjectOwner],
+  ];
+  if (
+    roleClauses.some(([inAudience, viewerHolds]) => inAudience && viewerHolds)
+  )
+    return true;
+  return audience.groupIds.some((id) => viewer.groupIds.includes(id));
 }
 
 /** A public (no-session) viewer may read only captured content. */

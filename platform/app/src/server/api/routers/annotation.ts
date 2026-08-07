@@ -144,6 +144,194 @@ const queueItemReferenceFilter = ({
   ],
 });
 
+const getUserAnnotationQueueIds = async ({
+  ctx,
+  projectId,
+  userId,
+}: {
+  ctx: { prisma: PrismaClient };
+  projectId: string;
+  userId: string;
+}): Promise<string[]> => {
+  const queues = await ctx.prisma.annotationQueue.findMany({
+    where: {
+      projectId,
+      members: {
+        some: {
+          userId,
+        },
+      },
+    },
+  });
+  return queues.map((queue) => queue.id);
+};
+
+const buildOptimizedQueueItemsWhereCondition = ({
+  input,
+  organizationId,
+  userId,
+  userQueueIds,
+}: {
+  input: {
+    projectId: string;
+    selectedAnnotations: string;
+    queueId?: string;
+  };
+  organizationId: string;
+  userId: string;
+  userQueueIds: string[];
+}): any => {
+  const whereCondition: any = {
+    ...queueItemReferenceFilter({
+      projectId: input.projectId,
+      organizationId,
+    }),
+    doneAt:
+      input.selectedAnnotations === "pending"
+        ? null
+        : input.selectedAnnotations === "completed"
+          ? { not: null }
+          : undefined,
+  };
+
+  if (input.queueId) {
+    // Pin the requested queue to the caller's project so a queue id from
+    // another tenant cannot surface its items here.
+    whereCondition.AND.push({
+      annotationQueue: {
+        id: input.queueId,
+        projectId: input.projectId,
+      },
+    });
+  } else if (userQueueIds.length > 0) {
+    // No specific queue requested: include items from the queues the caller
+    // belongs to, plus items assigned directly to them.
+    whereCondition.AND.push({
+      OR: [
+        {
+          annotationQueueId: {
+            in: userQueueIds,
+          },
+        },
+        {
+          userId: userId,
+        },
+      ],
+    });
+  } else {
+    // Default case - just user's items
+    whereCondition.userId = userId;
+  }
+
+  return whereCondition;
+};
+
+const fetchOptimizedQueueItems = ({
+  ctx,
+  input,
+  organizationId,
+  whereCondition,
+}: {
+  ctx: { prisma: PrismaClient };
+  input: {
+    projectId: string;
+    pageSize: number;
+    pageOffset: number;
+    allQueueItems?: boolean;
+  };
+  organizationId: string;
+  whereCondition: any;
+}) =>
+  ctx.prisma.annotationQueueItem.findMany({
+    where: whereCondition,
+    take: input.allQueueItems ? undefined : input.pageSize,
+    skip: input.allQueueItems ? undefined : input.pageOffset,
+    include: {
+      user: true,
+      createdByUser: true,
+
+      annotationQueue: {
+        include: {
+          members: {
+            where: {
+              user: {
+                orgMemberships: { some: { organizationId } },
+              },
+            },
+            include: {
+              user: true,
+            },
+          },
+          AnnotationQueueScores: {
+            where: { annotationScore: { projectId: input.projectId } },
+            include: {
+              annotationScore: true,
+            },
+          },
+        },
+      },
+    },
+    orderBy: {
+      createdAt: "desc",
+    },
+  });
+
+const fetchQueuesForOptimizedItems = ({
+  ctx,
+  input,
+  organizationId,
+  queueIds,
+}: {
+  ctx: { prisma: PrismaClient };
+  input: { projectId: string };
+  organizationId: string;
+  queueIds: string[];
+}) =>
+  ctx.prisma.annotationQueue.findMany({
+    where: {
+      id: { in: queueIds },
+      projectId: input.projectId,
+    },
+    include: {
+      members: {
+        where: {
+          user: {
+            orgMemberships: { some: { organizationId } },
+          },
+        },
+        include: {
+          user: true,
+        },
+      },
+      AnnotationQueueScores: {
+        where: { annotationScore: { projectId: input.projectId } },
+        include: {
+          annotationScore: true,
+        },
+      },
+      AnnotationQueueItems: {
+        where: {
+          projectId: input.projectId,
+          OR: [
+            { userId: null },
+            {
+              user: {
+                orgMemberships: { some: { organizationId } },
+              },
+            },
+          ],
+        },
+        include: {
+          user: true,
+          annotationQueue: true,
+        },
+      },
+    },
+    orderBy: {
+      createdAt: "desc",
+    },
+  });
+
 export const annotationRouter = createTRPCRouter({
   create: protectedProcedure
     .input(
@@ -700,109 +888,37 @@ export const annotationRouter = createTRPCRouter({
       const organizationId = await service.getProjectOrganizationId({
         projectId: input.projectId,
       });
-      let userQueueIds: string[] = [];
-
       // If a queue is selected, we don't need to check for user queues
-      if (input.showQueueAndUser) {
-        const queues = await ctx.prisma.annotationQueue.findMany({
-          where: {
+      const userQueueIds = input.showQueueAndUser
+        ? await getUserAnnotationQueueIds({
+            ctx,
             projectId: input.projectId,
-            members: {
-              some: {
-                userId: userId,
-              },
-            },
-          },
-        });
-        userQueueIds = queues.map((queue) => queue.id);
-      }
+            userId,
+          })
+        : [];
 
       // Get user protections for all trace fetching
       const protections = await getUserProtectionsForProject(ctx, {
         projectId: input.projectId,
       });
 
-      // Build the where condition based on the scenario
-      const whereCondition: any = {
-        ...queueItemReferenceFilter({
-          projectId: input.projectId,
-          organizationId,
-        }),
-        doneAt:
-          input.selectedAnnotations === "pending"
-            ? null
-            : input.selectedAnnotations === "completed"
-              ? { not: null }
-              : undefined,
-      };
-
-      if (input.queueId) {
-        // Pin the requested queue to the caller's project so a queue id from
-        // another tenant cannot surface its items here.
-        whereCondition.AND.push({
-          annotationQueue: {
-            id: input.queueId,
-            projectId: input.projectId,
-          },
-        });
-      } else if (userQueueIds.length > 0) {
-        // No specific queue requested: include items from the queues the caller
-        // belongs to, plus items assigned directly to them.
-        whereCondition.AND.push({
-          OR: [
-            {
-              annotationQueueId: {
-                in: userQueueIds,
-              },
-            },
-            {
-              userId: userId,
-            },
-          ],
-        });
-      } else {
-        // Default case - just user's items
-        whereCondition.userId = userId;
-      }
+      const whereCondition = buildOptimizedQueueItemsWhereCondition({
+        input,
+        organizationId,
+        userId,
+        userQueueIds,
+      });
 
       // Get total count for pagination
       const totalCount = await ctx.prisma.annotationQueueItem.count({
         where: whereCondition,
       });
 
-      // Get paginated queue items first
-      const queueItems = await ctx.prisma.annotationQueueItem.findMany({
-        where: whereCondition,
-        take: input.allQueueItems ? undefined : input.pageSize,
-        skip: input.allQueueItems ? undefined : input.pageOffset,
-        include: {
-          user: true,
-          createdByUser: true,
-
-          annotationQueue: {
-            include: {
-              members: {
-                where: {
-                  user: {
-                    orgMemberships: { some: { organizationId } },
-                  },
-                },
-                include: {
-                  user: true,
-                },
-              },
-              AnnotationQueueScores: {
-                where: { annotationScore: { projectId: input.projectId } },
-                include: {
-                  annotationScore: true,
-                },
-              },
-            },
-          },
-        },
-        orderBy: {
-          createdAt: "desc",
-        },
+      const queueItems = await fetchOptimizedQueueItems({
+        ctx,
+        input,
+        organizationId,
+        whereCondition,
       });
 
       // Get unique queue IDs from the items
@@ -814,50 +930,11 @@ export const annotationRouter = createTRPCRouter({
         ),
       ];
 
-      // Get the full queue data for these queues
-      const queues = await ctx.prisma.annotationQueue.findMany({
-        where: {
-          id: { in: queueIds },
-          projectId: input.projectId,
-        },
-        include: {
-          members: {
-            where: {
-              user: {
-                orgMemberships: { some: { organizationId } },
-              },
-            },
-            include: {
-              user: true,
-            },
-          },
-          AnnotationQueueScores: {
-            where: { annotationScore: { projectId: input.projectId } },
-            include: {
-              annotationScore: true,
-            },
-          },
-          AnnotationQueueItems: {
-            where: {
-              projectId: input.projectId,
-              OR: [
-                { userId: null },
-                {
-                  user: {
-                    orgMemberships: { some: { organizationId } },
-                  },
-                },
-              ],
-            },
-            include: {
-              user: true,
-              annotationQueue: true,
-            },
-          },
-        },
-        orderBy: {
-          createdAt: "desc",
-        },
+      const queues = await fetchQueuesForOptimizedItems({
+        ctx,
+        input,
+        organizationId,
+        queueIds,
       });
 
       // Enrich the paginated queue items with traces and annotations

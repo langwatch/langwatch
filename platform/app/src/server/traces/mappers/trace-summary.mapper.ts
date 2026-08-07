@@ -39,20 +39,11 @@ const FALLBACK_ATTRIBUTE_MAPPINGS: Record<string, keyof TraceMetadata> = {
   "langgraph.thread_id": "thread_id",
 };
 
-/**
- * Maps TraceSummaryData.attributes to the legacy TraceMetadata format.
- *
- * The Attributes map in ClickHouse stores various metadata using semantic
- * convention keys. These need to be mapped to the flat TraceMetadata structure.
- */
-export function mapAttributesToMetadata(
+/** Map known attributes to reserved fields (primary — last-wins within this set). */
+function applyReservedAttributeMappings(
+  metadata: TraceMetadata,
   attributes: Record<string, string>,
-  topicId: string | null,
-  subTopicId: string | null,
-): TraceMetadata {
-  const metadata: TraceMetadata = {};
-
-  // Map known attributes to reserved fields (primary — last-wins within this set)
+): void {
   for (const [attrKey, metadataKey] of Object.entries(
     RESERVED_ATTRIBUTE_MAPPINGS,
   )) {
@@ -61,8 +52,13 @@ export function mapAttributesToMetadata(
       metadata[metadataKey] = value;
     }
   }
+}
 
-  // Map fallback attributes (only if target field not already set)
+/** Map fallback attributes (only if target field not already set). */
+function applyFallbackAttributeMappings(
+  metadata: TraceMetadata,
+  attributes: Record<string, string>,
+): void {
   for (const [attrKey, metadataKey] of Object.entries(
     FALLBACK_ATTRIBUTE_MAPPINGS,
   )) {
@@ -71,63 +67,93 @@ export function mapAttributesToMetadata(
       metadata[metadataKey] = value;
     }
   }
+}
 
-  // Add topic IDs
+/** Add topic IDs. */
+function applyTopicIds(
+  metadata: TraceMetadata,
+  topicId: string | null,
+  subTopicId: string | null,
+): void {
   if (topicId) {
     metadata.topic_id = topicId;
   }
   if (subTopicId) {
     metadata.subtopic_id = subTopicId;
   }
+}
 
-  // Extract labels if present
+/** Extract labels if present. */
+function applyLabelsMetadata(
+  metadata: TraceMetadata,
+  attributes: Record<string, string>,
+): void {
   const labelsStr = attributes["langwatch.labels"] ?? attributes.labels;
-  if (labelsStr) {
-    try {
-      const labels = JSON.parse(labelsStr);
-      if (Array.isArray(labels)) {
-        metadata.labels = labels;
-      }
-    } catch {
-      // If not valid JSON, treat as single label
-      metadata.labels = [labelsStr];
+  if (!labelsStr) return;
+  try {
+    const labels = JSON.parse(labelsStr);
+    if (Array.isArray(labels)) {
+      metadata.labels = labels;
     }
+  } catch {
+    // If not valid JSON, treat as single label
+    metadata.labels = [labelsStr];
   }
+}
 
-  // Extract prompt IDs if present
+/** Extract prompt IDs if present. */
+function applyPromptIdsMetadata(
+  metadata: TraceMetadata,
+  attributes: Record<string, string>,
+): void {
   const promptIdsStr = attributes["langwatch.prompt_ids"];
-  if (promptIdsStr) {
-    try {
-      const promptIds = JSON.parse(promptIdsStr);
-      if (Array.isArray(promptIds)) {
-        metadata.prompt_ids = promptIds;
-      }
-    } catch {
-      // Ignore parse errors
+  if (!promptIdsStr) return;
+  try {
+    const promptIds = JSON.parse(promptIdsStr);
+    if (Array.isArray(promptIds)) {
+      metadata.prompt_ids = promptIds;
     }
+  } catch {
+    // Ignore parse errors
   }
+}
 
-  // The fold stamps `metadata.models` as a JSON array string (the set of
-  // models the trace's spans used, most-recent-first); surface it as a real
-  // array like labels/prompt_ids. `metadata.model` (the primary) flows
-  // through the generic passthrough below as a plain string.
-  // A value that is not a JSON array is not ours: it stays reachable through
-  // the generic passthrough below with its original string value.
+/**
+ * The fold stamps `metadata.models` as a JSON array string (the set of
+ * models the trace's spans used, most-recent-first); surface it as a real
+ * array like labels/prompt_ids. `metadata.model` (the primary) flows
+ * through the generic passthrough below as a plain string.
+ * A value that is not a JSON array is not ours: it stays reachable through
+ * the generic passthrough below with its original string value.
+ *
+ * @returns true when `metadata.models` was parsed as a JSON array — the
+ *   caller then excludes the raw `metadata.models` attribute from the
+ *   generic passthrough.
+ */
+function applyModelsMetadata(
+  metadata: TraceMetadata,
+  attributes: Record<string, string>,
+): boolean {
   const modelsStr = attributes["metadata.models"];
-  let modelsParsedAsArray = false;
-  if (modelsStr) {
-    try {
-      const models = JSON.parse(modelsStr);
-      if (Array.isArray(models)) {
-        metadata.models = models;
-        modelsParsedAsArray = true;
-      }
-    } catch {
-      // Ignore parse errors
+  if (!modelsStr) return false;
+  try {
+    const models = JSON.parse(modelsStr);
+    if (Array.isArray(models)) {
+      metadata.models = models;
+      return true;
     }
+  } catch {
+    // Ignore parse errors
   }
+  return false;
+}
 
-  // Add remaining attributes as custom metadata
+/** Add remaining attributes as custom metadata. */
+function applyCustomMetadata(
+  metadata: TraceMetadata,
+  attributes: Record<string, string>,
+  modelsParsedAsArray: boolean,
+): void {
   const knownKeys = new Set([
     ...Object.keys(RESERVED_ATTRIBUTE_MAPPINGS),
     ...Object.keys(FALLBACK_ATTRIBUTE_MAPPINGS),
@@ -150,7 +176,28 @@ export function mapAttributesToMetadata(
       : key;
     if (bareKey && metadata[bareKey] === undefined) metadata[bareKey] = value;
   }
+}
 
+/**
+ * Maps TraceSummaryData.attributes to the legacy TraceMetadata format.
+ *
+ * The Attributes map in ClickHouse stores various metadata using semantic
+ * convention keys. These need to be mapped to the flat TraceMetadata structure.
+ */
+export function mapAttributesToMetadata(
+  attributes: Record<string, string>,
+  topicId: string | null,
+  subTopicId: string | null,
+): TraceMetadata {
+  const metadata: TraceMetadata = {};
+
+  applyReservedAttributeMappings(metadata, attributes);
+  applyFallbackAttributeMappings(metadata, attributes);
+  applyTopicIds(metadata, topicId, subTopicId);
+  applyLabelsMetadata(metadata, attributes);
+  applyPromptIdsMetadata(metadata, attributes);
+  const modelsParsedAsArray = applyModelsMetadata(metadata, attributes);
+  applyCustomMetadata(metadata, attributes, modelsParsedAsArray);
   addOtelLogRecordCountAlias(metadata, attributes);
 
   return metadata;
@@ -305,6 +352,67 @@ function isStructuredValue(
 }
 
 /**
+ * Extracts text from an array of chat messages: for input mode, prefers the
+ * last user message; otherwise (and as a fallback) concatenates every
+ * message's text with newlines.
+ */
+function extractTextFromMessageArray(
+  messages: unknown[],
+  mode: "input" | "output",
+): string | null {
+  if (mode === "input") {
+    const lastUserText = extractLastUserMessageText(messages);
+    if (lastUserText) return lastUserText;
+  }
+  const texts = messages
+    .map((msg) => extractMessageContentText(msg))
+    .filter((t): t is string => t !== null);
+  return texts.length > 0 ? texts.join("\n") : null;
+}
+
+/** Result of {@link tryExtractFromStructuredValue}: `handled: false` tells the caller to fall through. */
+type StructuredValueExtraction =
+  | { handled: true; text: string | null }
+  | { handled: false };
+
+/**
+ * Attempts extraction from a LangWatch structured value wrapper
+ * (`{type: "json"|"chat_messages", value: ...}`). Returns `handled: false`
+ * when the wrapper's `type`/`value` shape isn't one of the recognized cases,
+ * so the caller falls through to treating `data` itself as a message.
+ */
+function tryExtractFromStructuredValue(
+  structured: { type: string; value: unknown },
+  mode: "input" | "output",
+): StructuredValueExtraction {
+  const { type, value } = structured;
+
+  if (type === "chat_messages" && Array.isArray(value)) {
+    return { handled: true, text: extractTextFromMessageArray(value, mode) };
+  }
+
+  if (type === "json" && typeof value === "object" && value !== null) {
+    // Extract text from state object using common field names
+    const fieldNames =
+      mode === "input" ? INPUT_FIELD_NAMES : OUTPUT_FIELD_NAMES;
+    return {
+      handled: true,
+      text: extractTextFromStateObject(
+        value as Record<string, unknown>,
+        fieldNames,
+      ),
+    };
+  }
+
+  // For other types, try to extract from the value
+  if (typeof value === "string") {
+    return { handled: true, text: value };
+  }
+
+  return { handled: false };
+}
+
+/**
  * Extracts human-readable text from various message formats.
  * Handles: chat messages arrays, structured values, state objects.
  *
@@ -318,49 +426,13 @@ function extractTextFromMessages(
 ): string | null {
   // Handle LangWatch structured value wrapper: {type: "json"|"chat_messages", value: ...}
   if (isStructuredValue(data)) {
-    const { type, value } = data;
-
-    if (type === "chat_messages" && Array.isArray(value)) {
-      // For input mode, extract only the last user message
-      if (mode === "input") {
-        const lastUserText = extractLastUserMessageText(value);
-        if (lastUserText) return lastUserText;
-      }
-      // Fallback: concatenate all messages
-      const texts = value
-        .map((msg) => extractMessageContentText(msg))
-        .filter((t): t is string => t !== null);
-      return texts.length > 0 ? texts.join("\n") : null;
-    }
-
-    if (type === "json" && typeof value === "object" && value !== null) {
-      // Extract text from state object using common field names
-      const fieldNames =
-        mode === "input" ? INPUT_FIELD_NAMES : OUTPUT_FIELD_NAMES;
-      return extractTextFromStateObject(
-        value as Record<string, unknown>,
-        fieldNames,
-      );
-    }
-
-    // For other types, try to extract from the value
-    if (typeof value === "string") {
-      return value;
-    }
+    const outcome = tryExtractFromStructuredValue(data, mode);
+    if (outcome.handled) return outcome.text;
   }
 
   // Handle array of messages directly
   if (Array.isArray(data)) {
-    // For input mode, extract only the last user message
-    if (mode === "input") {
-      const lastUserText = extractLastUserMessageText(data);
-      if (lastUserText) return lastUserText;
-    }
-    // Fallback: concatenate all messages
-    const texts = data
-      .map((msg) => extractMessageContentText(msg))
-      .filter((t): t is string => t !== null);
-    return texts.length > 0 ? texts.join("\n") : null;
+    return extractTextFromMessageArray(data, mode);
   }
 
   // Handle single message object
@@ -498,6 +570,66 @@ function createError(
   };
 }
 
+/** Extracts a `Record<string, number>` from `raw`; non-numeric entries are dropped. */
+function extractNumericRecord(raw: unknown): Record<string, number> {
+  const result: Record<string, number> = {};
+  if (typeof raw !== "object" || raw === null) return result;
+  for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
+    const num = Number(value);
+    if (Number.isFinite(num)) {
+      result[key] = num;
+    }
+  }
+  return result;
+}
+
+/** Extracts a `Record<string, string>` from `raw`, keeping only string values. */
+function extractStringRecord(raw: unknown): Record<string, string> {
+  const result: Record<string, string> = {};
+  if (typeof raw !== "object" || raw === null) return result;
+  for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
+    if (typeof value === "string") {
+      result[key] = value;
+    }
+  }
+  return result;
+}
+
+/**
+ * Builds an Event from a span carrying `event.type` in its attributes, or
+ * null when the span has no (or malformed) event data.
+ */
+function buildEventFromSpan({
+  span,
+  projectId,
+  traceId,
+}: {
+  span: Span;
+  projectId: string;
+  traceId: string;
+}): Event | null {
+  const eventObj = span.params?.event;
+  if (typeof eventObj !== "object" || eventObj === null) return null;
+
+  const eventRecord = eventObj as Record<string, unknown>;
+  const eventType = eventRecord.type;
+  if (typeof eventType !== "string" || !eventType) return null;
+
+  return {
+    event_id: span.span_id,
+    event_type: eventType,
+    project_id: projectId,
+    metrics: extractNumericRecord(eventRecord.metrics),
+    event_details: extractStringRecord(eventRecord.details),
+    trace_id: traceId,
+    timestamps: {
+      started_at: span.timestamps.started_at,
+      inserted_at: span.timestamps.started_at,
+      updated_at: span.timestamps.finished_at,
+    },
+  };
+}
+
 /**
  * Extracts Event objects from spans that have event.type in their attributes.
  * Events are stored in ClickHouse as spans with event.* span attributes.
@@ -515,51 +647,8 @@ export function extractEventsFromSpans({
   const events: Event[] = [];
 
   for (const span of spans) {
-    const eventObj = span.params?.event;
-    if (typeof eventObj !== "object" || eventObj === null) continue;
-
-    const eventRecord = eventObj as Record<string, unknown>;
-    const eventType = eventRecord.type;
-    if (typeof eventType !== "string" || !eventType) continue;
-
-    const metrics: Record<string, number> = {};
-    const rawMetrics = eventRecord.metrics;
-    if (typeof rawMetrics === "object" && rawMetrics !== null) {
-      for (const [key, value] of Object.entries(
-        rawMetrics as Record<string, unknown>,
-      )) {
-        const num = Number(value);
-        if (Number.isFinite(num)) {
-          metrics[key] = num;
-        }
-      }
-    }
-
-    const eventDetails: Record<string, string> = {};
-    const rawDetails = eventRecord.details;
-    if (typeof rawDetails === "object" && rawDetails !== null) {
-      for (const [key, value] of Object.entries(
-        rawDetails as Record<string, unknown>,
-      )) {
-        if (typeof value === "string") {
-          eventDetails[key] = value;
-        }
-      }
-    }
-
-    events.push({
-      event_id: span.span_id,
-      event_type: eventType,
-      project_id: projectId,
-      metrics,
-      event_details: eventDetails,
-      trace_id: traceId,
-      timestamps: {
-        started_at: span.timestamps.started_at,
-        inserted_at: span.timestamps.started_at,
-        updated_at: span.timestamps.finished_at,
-      },
-    });
+    const event = buildEventFromSpan({ span, projectId, traceId });
+    if (event) events.push(event);
   }
 
   return events;

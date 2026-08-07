@@ -7,6 +7,7 @@ import { nlpgoFetch } from "~/server/nlpgo/nlpgoFetch";
 import { prisma } from "../db";
 import {
   buildCodeEvaluatorDsl,
+  type CodeEvaluatorConfig,
   codeEvaluatorConfigSchema,
 } from "./codeEvaluator";
 
@@ -26,6 +27,95 @@ const coerceResultScalars = (result: Record<string, unknown>) => {
   }
   return result;
 };
+
+const serializeEvaluatorInputValue = (value: unknown): string => {
+  if (value === null || value === undefined) return "";
+  if (typeof value === "string") return value;
+  return JSON.stringify(value);
+};
+
+const buildCodeEvaluatorInputs = (
+  config: CodeEvaluatorConfig,
+  data: Record<string, unknown>,
+): Record<string, string> =>
+  Object.fromEntries(
+    config.inputs.map(({ identifier }) => [
+      identifier,
+      serializeEvaluatorInputValue(data[identifier]),
+    ]),
+  );
+
+/**
+ * Builds the single-node execution event, dispatches it to the engine, and
+ * translates the response envelope into an evaluation result.
+ */
+async function executeCodeEvaluatorWorkflow({
+  projectId,
+  evaluatorName,
+  config,
+  inputs,
+  traceId,
+  parentCausalityDepth,
+  parentTrace,
+}: {
+  projectId: string;
+  evaluatorName: string;
+  config: CodeEvaluatorConfig;
+  inputs: Record<string, string>;
+  traceId?: string;
+  parentCausalityDepth?: number;
+  parentTrace?: { traceId: string; parentSpanId: string };
+}): Promise<SingleEvaluationResult> {
+  const event: StudioClientEvent = {
+    type: "execute_flow",
+    payload: {
+      trace_id: traceId ?? `trace_${nanoid()}`,
+      workflow: buildCodeEvaluatorDsl({ name: evaluatorName, config }),
+      inputs: [inputs],
+      manual_execution_mode: false,
+      do_not_trace: false,
+      run_evaluations: false,
+      origin: "evaluation",
+    },
+  };
+
+  const eventWithEnvs = await addEnvs(event, projectId);
+
+  const response = await nlpgoFetch<{
+    result: Record<string, unknown>;
+    status: ExecutionStatus;
+    error?: { message?: string; traceback?: string };
+  }>({
+    projectId,
+    path: "/studio/execute_sync",
+    body: eventWithEnvs,
+    origin: "evaluation",
+    causalityDepth: parentCausalityDepth ?? 0,
+    parentTrace,
+  });
+
+  if (!response.ok) {
+    throw new Error(`Error running code evaluator: ${response.statusText}`);
+  }
+
+  const { result, status, error } = await response.json();
+
+  if (status !== "success") {
+    // The engine reports failures in the error envelope (the raised
+    // exception's message and traceback), not in result.
+    return {
+      status: "error",
+      details: error?.message ?? "Code evaluator execution failed",
+      error_type: "CODE_EVALUATOR_ERROR",
+      traceback: error?.traceback ? [error.traceback] : [],
+    };
+  }
+
+  return {
+    ...coerceResultScalars(result ?? {}),
+    status: "processed",
+  } as SingleEvaluationResult;
+}
 
 /**
  * Runs a stored code evaluator against already-mapped data, mirroring
@@ -55,70 +145,17 @@ export async function runCodeEvaluator({
       throw new Error(`Code evaluator not found: ${evaluatorId}`);
     }
     const config = codeEvaluatorConfigSchema.parse(evaluator.config);
+    const inputs = buildCodeEvaluatorInputs(config, data);
 
-    const inputs: Record<string, string> = Object.fromEntries(
-      config.inputs.map(({ identifier }) => {
-        const value = data[identifier];
-        return [
-          identifier,
-          value === null || value === undefined
-            ? ""
-            : typeof value === "string"
-              ? value
-              : JSON.stringify(value),
-        ];
-      }),
-    );
-
-    const event: StudioClientEvent = {
-      type: "execute_flow",
-      payload: {
-        trace_id: traceId ?? `trace_${nanoid()}`,
-        workflow: buildCodeEvaluatorDsl({ name: evaluator.name, config }),
-        inputs: [inputs],
-        manual_execution_mode: false,
-        do_not_trace: false,
-        run_evaluations: false,
-        origin: "evaluation",
-      },
-    };
-
-    const eventWithEnvs = await addEnvs(event, projectId);
-
-    const response = await nlpgoFetch<{
-      result: Record<string, unknown>;
-      status: ExecutionStatus;
-      error?: { message?: string; traceback?: string };
-    }>({
+    return await executeCodeEvaluatorWorkflow({
       projectId,
-      path: "/studio/execute_sync",
-      body: eventWithEnvs,
-      origin: "evaluation",
-      causalityDepth: parentCausalityDepth ?? 0,
+      evaluatorName: evaluator.name,
+      config,
+      inputs,
+      traceId,
+      parentCausalityDepth,
       parentTrace,
     });
-
-    if (!response.ok) {
-      throw new Error(`Error running code evaluator: ${response.statusText}`);
-    }
-
-    const { result, status, error } = await response.json();
-
-    if (status !== "success") {
-      // The engine reports failures in the error envelope (the raised
-      // exception's message and traceback), not in result.
-      return {
-        status: "error",
-        details: error?.message ?? "Code evaluator execution failed",
-        error_type: "CODE_EVALUATOR_ERROR",
-        traceback: error?.traceback ? [error.traceback] : [],
-      };
-    }
-
-    return {
-      ...coerceResultScalars(result ?? {}),
-      status: "processed",
-    } as SingleEvaluationResult;
   } catch (error) {
     return {
       status: "error",

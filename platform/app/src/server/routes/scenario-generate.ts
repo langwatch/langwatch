@@ -9,6 +9,7 @@
 
 import { createLogger } from "@langwatch/observability";
 import { generateObject } from "ai";
+import type { Context } from "hono";
 import { z } from "zod";
 import { hasProjectPermission } from "~/server/api/rbac";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
@@ -106,6 +107,73 @@ function scenarioGenerateTimeoutMs(): number {
 
 const secured = createServiceApp({ basePath: "/api/scenario" });
 
+/** Runs the scenario generation model call. Thrown errors are reported by
+ *  the caller via `scenarioGenerationErrorResponse`. */
+async function generateScenario({
+  prompt,
+  currentScenario,
+  projectId,
+}: z.infer<typeof requestSchema>) {
+  const model = await getVercelAIModel({
+    projectId,
+    featureKey: "scenarios.generator",
+  });
+
+  const userPrompt = currentScenario
+    ? `Current scenario:\n${JSON.stringify(currentScenario, null, 2)}\n\nUser request: ${prompt}`
+    : prompt;
+
+  return generateObject({
+    model,
+    schema: scenarioSchema,
+    system: SYSTEM_PROMPT,
+    prompt: userPrompt,
+    maxRetries: SCENARIO_GENERATE_MAX_RETRIES,
+    abortSignal: AbortSignal.timeout(scenarioGenerateTimeoutMs()),
+  });
+}
+
+/** Shapes the caught error from `generateScenario` into the wire response. */
+function scenarioGenerationErrorResponse(c: Context, error: unknown) {
+  // Handled Go-side failures (nlpgo / AI Gateway) arrive as a typed
+  // envelope on the AI SDK error — forward them with their kind so
+  // the browser can react (e.g. missing_provider → settings link).
+  const handled = nlpgoHandledErrorFrom(error);
+  if (handled) {
+    logger.warn(
+      { error: handled.serialize() },
+      "Scenario generation rejected by LLM gateway",
+    );
+    // The code, never `handled.message` — server copy stays server-side
+    // (ADR-045); the client keys its copy off `error.code`.
+    return c.json(
+      { error: handled.code, domainError: handled.serialize() },
+      { status: handled.httpStatus as 400 },
+    );
+  }
+
+  // The abort cap fired (slow/hung gateway). Answer with a clean, fast
+  // JSON envelope instead of leaving the request open for an upstream
+  // proxy to fill with an html timeout page (langwatch#5758).
+  if (isAbortLikeError(error)) {
+    logger.warn({ error }, "Scenario generation timed out");
+    return c.json(
+      {
+        error:
+          "Scenario generation took too long and was stopped. This is usually temporary — please try again in a moment.",
+      },
+      { status: 504 },
+    );
+  }
+
+  logger.error({ error }, "Error generating scenario");
+
+  const errorMessage =
+    error instanceof Error ? error.message : "Failed to generate scenario";
+
+  return c.json({ error: errorMessage }, { status: 500 });
+}
+
 secured
   .access(
     handlerManagedAuth({
@@ -131,11 +199,9 @@ secured
       return c.json({ error: "Invalid request body" }, { status: 400 });
     }
 
-    const { prompt, currentScenario, projectId } = body;
-
     const hasPermission = await hasProjectPermission(
       { prisma, session },
-      projectId,
+      body.projectId,
       "scenarios:manage",
     );
     if (!hasPermission) {
@@ -146,63 +212,10 @@ secured
     }
 
     try {
-      const model = await getVercelAIModel({
-        projectId,
-        featureKey: "scenarios.generator",
-      });
-
-      const userPrompt = currentScenario
-        ? `Current scenario:\n${JSON.stringify(currentScenario, null, 2)}\n\nUser request: ${prompt}`
-        : prompt;
-
-      const result = await generateObject({
-        model,
-        schema: scenarioSchema,
-        system: SYSTEM_PROMPT,
-        prompt: userPrompt,
-        maxRetries: SCENARIO_GENERATE_MAX_RETRIES,
-        abortSignal: AbortSignal.timeout(scenarioGenerateTimeoutMs()),
-      });
-
+      const result = await generateScenario(body);
       return c.json({ scenario: result.object });
     } catch (error) {
-      // Handled Go-side failures (nlpgo / AI Gateway) arrive as a typed
-      // envelope on the AI SDK error — forward them with their kind so
-      // the browser can react (e.g. missing_provider → settings link).
-      const handled = nlpgoHandledErrorFrom(error);
-      if (handled) {
-        logger.warn(
-          { error: handled.serialize() },
-          "Scenario generation rejected by LLM gateway",
-        );
-        // The code, never `handled.message` — server copy stays server-side
-        // (ADR-045); the client keys its copy off `error.code`.
-        return c.json(
-          { error: handled.code, domainError: handled.serialize() },
-          { status: handled.httpStatus as 400 },
-        );
-      }
-
-      // The abort cap fired (slow/hung gateway). Answer with a clean, fast
-      // JSON envelope instead of leaving the request open for an upstream
-      // proxy to fill with an html timeout page (langwatch#5758).
-      if (isAbortLikeError(error)) {
-        logger.warn({ error }, "Scenario generation timed out");
-        return c.json(
-          {
-            error:
-              "Scenario generation took too long and was stopped. This is usually temporary — please try again in a moment.",
-          },
-          { status: 504 },
-        );
-      }
-
-      logger.error({ error }, "Error generating scenario");
-
-      const errorMessage =
-        error instanceof Error ? error.message : "Failed to generate scenario";
-
-      return c.json({ error: errorMessage }, { status: 500 });
+      return scenarioGenerationErrorResponse(c, error);
     }
   });
 

@@ -126,22 +126,7 @@ export class BroadcastService {
     let cleanedCount = 0;
 
     for (const [tenantId, emitter] of this.eventEmitters.entries()) {
-      const listenerCount = this.emitterListenerCount(emitter);
-
-      if (listenerCount === 0) {
-        if (!this.emitterEmptyTimes.has(tenantId)) {
-          this.emitterEmptyTimes.set(tenantId, now);
-        } else {
-          const emptySince = this.emitterEmptyTimes.get(tenantId)!;
-          if (now - emptySince >= this.EMITTER_CLEANUP_TIMEOUT_MS) {
-            this.eventEmitters.delete(tenantId);
-            this.emitterEmptyTimes.delete(tenantId);
-            cleanedCount++;
-          }
-        }
-      } else {
-        this.emitterEmptyTimes.delete(tenantId);
-      }
+      if (this.reapEmitterIfStale({ tenantId, emitter, now })) cleanedCount++;
     }
 
     if (cleanedCount > 0) {
@@ -150,6 +135,40 @@ export class BroadcastService {
         "Cleaned up stale EventEmitters after timeout",
       );
     }
+  }
+
+  /**
+   * Tracks how long a single tenant's emitter has had zero listeners and
+   * deletes it once that has held for EMITTER_CLEANUP_TIMEOUT_MS. Returns
+   * whether this call deleted the emitter.
+   */
+  private reapEmitterIfStale({
+    tenantId,
+    emitter,
+    now,
+  }: {
+    tenantId: string;
+    emitter: EventEmitter;
+    now: number;
+  }): boolean {
+    const listenerCount = this.emitterListenerCount(emitter);
+
+    if (listenerCount !== 0) {
+      this.emitterEmptyTimes.delete(tenantId);
+      return false;
+    }
+
+    if (!this.emitterEmptyTimes.has(tenantId)) {
+      this.emitterEmptyTimes.set(tenantId, now);
+      return false;
+    }
+
+    const emptySince = this.emitterEmptyTimes.get(tenantId)!;
+    if (now - emptySince < this.EMITTER_CLEANUP_TIMEOUT_MS) return false;
+
+    this.eventEmitters.delete(tenantId);
+    this.emitterEmptyTimes.delete(tenantId);
+    return true;
   }
 
   /** Sum listener count across all event types for a single emitter. */

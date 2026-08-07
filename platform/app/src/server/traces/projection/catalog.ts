@@ -167,6 +167,65 @@ function field(
  */
 const FORBIDDEN_SEGMENTS = new Set(["__proto__", "constructor", "prototype"]);
 
+/** Trace-level metric field (`metrics.<key>`). total_cost is cost-gated. */
+function resolveMetricField({
+  path,
+  key,
+}: {
+  path: string;
+  key: string;
+}): ResolvedField | null {
+  const type = TRACE_METRICS[key];
+  if (!type) return null;
+  return field({
+    path,
+    type,
+    collection: null,
+    protection: key === "total_cost" ? "costs" : null,
+    outPath: ["metrics", key],
+    read: (t) => t.metrics?.[key] ?? null,
+  });
+}
+
+/** Trace-level metadata field (`metadata.<key>`), arbitrary key. */
+function resolveMetadataField({
+  path,
+  key,
+}: {
+  path: string;
+  key: string;
+}): ResolvedField | null {
+  if (!key) return null;
+  return field({
+    path,
+    type: "json",
+    collection: null,
+    protection: null,
+    outPath: ["metadata", key],
+    read: (t) => t.metadata?.[key] ?? null,
+  });
+}
+
+/** Evaluation element field (`evaluations.<key>`), read off each Evaluation. */
+function resolveEvaluationField({
+  path,
+  key,
+}: {
+  path: string;
+  key: string;
+}): ResolvedField | null {
+  const type = EVALUATION_FIELDS[key];
+  if (!type) return null;
+  return field({
+    path,
+    type,
+    collection: "evaluations",
+    protection: null,
+    outPath: [key],
+    read: (ev) => ev[key] ?? null,
+  });
+}
+
 /**
  * Resolve a single dotted-path to its {@link ResolvedField}, or null when the
  * path is not in the allowlist (the caller collects nulls into a 400).
@@ -182,43 +241,20 @@ export function resolveField(path: string): ResolvedField | null {
   if (scalar) return field({ path, collection: null, ...scalar });
 
   if (path.startsWith(PREFIX.metrics)) {
-    const key = path.slice(PREFIX.metrics.length);
-    const type = TRACE_METRICS[key];
-    if (!type) return null;
-    return field({
-      path,
-      type,
-      collection: null,
-      protection: key === "total_cost" ? "costs" : null,
-      outPath: ["metrics", key],
-      read: (t) => t.metrics?.[key] ?? null,
-    });
+    return resolveMetricField({ path, key: path.slice(PREFIX.metrics.length) });
   }
 
   if (path.startsWith(PREFIX.metadata)) {
-    const key = path.slice(PREFIX.metadata.length);
-    if (!key) return null;
-    return field({
+    return resolveMetadataField({
       path,
-      type: "json",
-      collection: null,
-      protection: null,
-      outPath: ["metadata", key],
-      read: (t) => t.metadata?.[key] ?? null,
+      key: path.slice(PREFIX.metadata.length),
     });
   }
 
   if (path.startsWith(PREFIX.evaluations)) {
-    const key = path.slice(PREFIX.evaluations.length);
-    const type = EVALUATION_FIELDS[key];
-    if (!type) return null;
-    return field({
+    return resolveEvaluationField({
       path,
-      type,
-      collection: "evaluations",
-      protection: null,
-      outPath: [key],
-      read: (ev) => ev[key] ?? null,
+      key: path.slice(PREFIX.evaluations.length),
     });
   }
 

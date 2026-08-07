@@ -208,6 +208,41 @@ export function existenceNeeds(value: string): "evaluations" | "events" | null {
   return null;
 }
 
+/**
+ * Raw (pre-negation) presence check for each built-in `has`/`none` value.
+ * `UNSUPPORTED` propagates straight through `evaluateExistence` without the
+ * `negated` polarity flip, matching the two collections that need rows the
+ * dispatcher may not have loaded.
+ */
+const PRESENCE_CHECKS: Record<
+  string,
+  (trace: InMemoryTrace) => boolean | Unsupported
+> = {
+  error: (trace) => trace.summary.containsErrorStatus,
+  eval: (trace) =>
+    trace.evaluations == null ? UNSUPPORTED : trace.evaluations.length > 0,
+  feedback: (trace) =>
+    trace.events == null
+      ? UNSUPPORTED
+      : trace.events.some((e) => e.name === "user_feedback"),
+  annotation: (trace) => trace.summary.annotationIds.length > 0,
+  conversation: (trace) =>
+    (trace.summary.attributes["gen_ai.conversation.id"] ?? "") !== "",
+  user: (trace) => (trace.summary.attributes["langwatch.user_id"] ?? "") !== "",
+  customer: (trace) =>
+    (trace.summary.attributes["langwatch.customer_id"] ?? "") !== "",
+  topic: (trace) => (trace.summary.topicId ?? "") !== "",
+  subtopic: (trace) => (trace.summary.subTopicId ?? "") !== "",
+  label: (trace) => {
+    const raw = trace.summary.attributes["langwatch.labels"] ?? "";
+    return raw !== "" && raw !== "[]";
+  },
+  model: (trace) => trace.summary.models.length > 0,
+  service: (trace) => (trace.summary.attributes["service.name"] ?? "") !== "",
+  traceName: (trace) => (trace.summary.traceName ?? "") !== "",
+  rootSpanType: (trace) => (trace.summary.rootSpanType ?? "") !== "",
+};
+
 function evaluateExistence(
   tag: TagToken,
   negated: boolean,
@@ -228,43 +263,11 @@ function evaluateExistence(
     return polarise(readAttribute(attrs, traceAttrKey) !== "");
   }
 
-  switch (value) {
-    case "error":
-      return polarise(trace.summary.containsErrorStatus);
-    case "eval":
-      if (trace.evaluations == null) return UNSUPPORTED;
-      return polarise(trace.evaluations.length > 0);
-    case "feedback":
-      if (trace.events == null) return UNSUPPORTED;
-      return polarise(trace.events.some((e) => e.name === "user_feedback"));
-    case "annotation":
-      return polarise(trace.summary.annotationIds.length > 0);
-    case "conversation":
-      return polarise((attrs["gen_ai.conversation.id"] ?? "") !== "");
-    case "user":
-      return polarise((attrs["langwatch.user_id"] ?? "") !== "");
-    case "customer":
-      return polarise((attrs["langwatch.customer_id"] ?? "") !== "");
-    case "topic":
-      return polarise((trace.summary.topicId ?? "") !== "");
-    case "subtopic":
-      return polarise((trace.summary.subTopicId ?? "") !== "");
-    case "label": {
-      const raw = attrs["langwatch.labels"] ?? "";
-      return polarise(raw !== "" && raw !== "[]");
-    }
-    case "model":
-      return polarise(trace.summary.models.length > 0);
-    case "service":
-      return polarise((attrs["service.name"] ?? "") !== "");
-    case "traceName":
-      return polarise((trace.summary.traceName ?? "") !== "");
-    case "rootSpanType":
-      return polarise((trace.summary.rootSpanType ?? "") !== "");
-    default:
-      // Unknown value throws on the SQL side — fail closed here.
-      return UNSUPPORTED;
-  }
+  // Unknown value throws on the SQL side — fail closed here.
+  const check = PRESENCE_CHECKS[value];
+  if (!check) return UNSUPPORTED;
+  const present = check(trace);
+  return present === UNSUPPORTED ? UNSUPPORTED : polarise(present);
 }
 
 const HAS_DEF: FieldDef = {

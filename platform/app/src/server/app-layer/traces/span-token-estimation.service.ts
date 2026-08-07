@@ -25,6 +25,20 @@ const TOKEN_COUNT_KEYS = {
 const GLOBAL_KILL_SWITCH_KEY = "token-estimation-killswitch";
 const PROJECT_KILL_SWITCH_KEY = "token-estimation-project-killswitch";
 
+function hasContentProperty(
+  msg: unknown,
+): msg is Record<string, unknown> & { content: unknown } {
+  return (
+    Boolean(msg) && typeof msg === "object" && "content" in (msg as object)
+  );
+}
+
+function messageContentText(content: unknown): string | null {
+  if (typeof content === "string") return content;
+  if (content !== null && content !== undefined) return JSON.stringify(content);
+  return null;
+}
+
 /**
  * Dependencies for OtlpSpanTokenEstimationService that can be injected for testing.
  */
@@ -88,42 +102,13 @@ export class OtlpSpanTokenEstimationService {
     // If both token counts are already present, nothing to estimate
     if (hasInputTokens && hasOutputTokens) return;
 
-    const pendingAttributes: OtlpSpan["attributes"] = [];
-    let estimated = false;
-
-    if (!hasInputTokens) {
-      const inputText = this.extractInputText(span);
-      if (inputText) {
-        const inputTokens = await this.deps.tokenizer.countTokens(
-          model,
-          inputText,
-        );
-        if (inputTokens !== undefined) {
-          pendingAttributes.push({
-            key: "gen_ai.usage.input_tokens",
-            value: { intValue: inputTokens },
-          });
-          estimated = true;
-        }
-      }
-    }
-
-    if (!hasOutputTokens) {
-      const outputText = this.extractOutputText(span);
-      if (outputText) {
-        const outputTokens = await this.deps.tokenizer.countTokens(
-          model,
-          outputText,
-        );
-        if (outputTokens !== undefined) {
-          pendingAttributes.push({
-            key: "gen_ai.usage.output_tokens",
-            value: { intValue: outputTokens },
-          });
-          estimated = true;
-        }
-      }
-    }
+    const { attributes: pendingAttributes, estimated } =
+      await this.collectPendingTokenAttributes({
+        span,
+        model,
+        hasInputTokens,
+        hasOutputTokens,
+      });
 
     if (estimated) {
       pendingAttributes.push({
@@ -136,6 +121,72 @@ export class OtlpSpanTokenEstimationService {
     if (pendingAttributes.length > 0) {
       span.attributes.push(...pendingAttributes);
     }
+  }
+
+  /**
+   * Computes a usage-token attribute for each direction that doesn't already
+   * have one. Iterates input then output, matching the original evaluation
+   * order.
+   */
+  private async collectPendingTokenAttributes({
+    span,
+    model,
+    hasInputTokens,
+    hasOutputTokens,
+  }: {
+    span: OtlpSpan;
+    model: string;
+    hasInputTokens: boolean;
+    hasOutputTokens: boolean;
+  }): Promise<{ attributes: OtlpSpan["attributes"]; estimated: boolean }> {
+    const attributes: OtlpSpan["attributes"] = [];
+    let estimated = false;
+
+    for (const direction of ["input", "output"] as const) {
+      const hasTokens =
+        direction === "input" ? hasInputTokens : hasOutputTokens;
+      if (hasTokens) continue;
+
+      const attribute = await this.computeTokenAttribute({
+        span,
+        model,
+        direction,
+      });
+      if (attribute) {
+        attributes.push(attribute);
+        estimated = true;
+      }
+    }
+
+    return { attributes, estimated };
+  }
+
+  /** Extracts text for the given direction, tokenizes it, and shapes the resulting usage attribute. Returns null when there is no text or the tokenizer declines to count it. */
+  private async computeTokenAttribute({
+    span,
+    model,
+    direction,
+  }: {
+    span: OtlpSpan;
+    model: string;
+    direction: "input" | "output";
+  }): Promise<OtlpSpan["attributes"][number] | null> {
+    const text =
+      direction === "input"
+        ? this.extractInputText(span)
+        : this.extractOutputText(span);
+    if (!text) return null;
+
+    const tokens = await this.deps.tokenizer.countTokens(model, text);
+    if (tokens === undefined) return null;
+
+    return {
+      key:
+        direction === "input"
+          ? "gen_ai.usage.input_tokens"
+          : "gen_ai.usage.output_tokens",
+      value: { intValue: tokens },
+    };
   }
 
   private async isDisabledByKillSwitch({
@@ -302,17 +353,10 @@ export class OtlpSpanTokenEstimationService {
   }
 
   private messagesArrayToText(messages: unknown[]): string | null {
-    const parts: string[] = [];
-    for (const msg of messages) {
-      if (msg && typeof msg === "object" && "content" in msg) {
-        const content = (msg as Record<string, unknown>).content;
-        if (typeof content === "string") {
-          parts.push(content);
-        } else if (content !== null && content !== undefined) {
-          parts.push(JSON.stringify(content));
-        }
-      }
-    }
+    const parts = messages
+      .filter(hasContentProperty)
+      .map((msg) => messageContentText(msg.content))
+      .filter((text): text is string => text !== null);
     return parts.length > 0 ? parts.join("\n") : null;
   }
 }

@@ -221,6 +221,166 @@ function isTerminalStatus(status: string): boolean {
   return TERMINAL_STATUSES.has(status);
 }
 
+// Content can be either:
+//   - a string (legacy SDK output, possibly a Python-repr-stringified array)
+//   - an array of rich-content parts (the canonical AG-UI/OpenAI shape,
+//     produced by the stored-objects extractor's rewrite pass)
+//   - null / undefined / something else (we tolerate by storing "")
+// We always serialize to a string for the parallel-array CH column. Array
+// content gets JSON.stringify'd; the renderer's safeJsonParseOrStringFallback
+// in flattenContent parses it back.
+function contentToString(content: unknown): string {
+  if (typeof content === "string") return content;
+  if (Array.isArray(content)) return JSON.stringify(content);
+  return "";
+}
+
+function buildMessageRowFromSnapshot({
+  message,
+  index,
+  rawScenarioRunId,
+  scenarioRunId,
+}: {
+  message: unknown;
+  index: number;
+  rawScenarioRunId: string;
+  scenarioRunId: string;
+}): SimulationMessageRow {
+  if (!isRecord(message)) {
+    throw new ValidationError({
+      reason: `Simulation ${rawScenarioRunId} failed with invalid message on index ${index}`,
+    });
+  }
+
+  const messageId = typeof message.id === "string" ? message.id : "";
+  const messageRole = typeof message.role === "string" ? message.role : "";
+  // Snapshots can arrive BEFORE the run-started event (see the StartedAt
+  // fallback in handleSimulationRunMessageSnapshot); on that path
+  // state.ScenarioRunId is still empty while the event already carries the
+  // id, so ctx falls back to the event's scenarioRunId to keep an oversized
+  // first snapshot's warn log locatable.
+  const ctx = { scenarioRunId, messageId, messageRole };
+
+  return {
+    Id: messageId,
+    Role: messageRole,
+    Content: capOversizedString({
+      value: contentToString(message.content),
+      maxBytes: MAX_MESSAGE_CONTENT_BYTES,
+      field: "Content",
+      ctx,
+    }),
+    TraceId: typeof message.trace_id === "string" ? message.trace_id : "",
+    Rest: capOversizedString({
+      value: buildMessageRestJson(message),
+      maxBytes: MAX_MESSAGE_REST_BYTES,
+      field: "Rest",
+      ctx,
+    }),
+  };
+}
+
+function buildMessageRowFromTextEnd({
+  event,
+  scenarioRunId,
+}: {
+  event: SimulationTextMessageEndEvent;
+  scenarioRunId: string;
+}): SimulationMessageRow {
+  // TextMessageEnd can also fold before the started event (the handler
+  // appends/pads even without a prior START); fall back to the event's
+  // scenarioRunId so the warn log carries the run identifier.
+  const ctx = {
+    scenarioRunId,
+    messageId: event.data.messageId,
+    messageRole: event.data.role,
+  };
+
+  return {
+    Id: event.data.messageId,
+    Role: event.data.role,
+    Content: capOversizedString({
+      value: event.data.content,
+      maxBytes: MAX_MESSAGE_CONTENT_BYTES,
+      field: "Content",
+      ctx,
+    }),
+    TraceId: event.data.traceId ?? "",
+    Rest: capOversizedString({
+      value: buildMessageRestJson(
+        (event.data.message ?? {}) as Record<string, unknown>,
+      ),
+      maxBytes: MAX_MESSAGE_REST_BYTES,
+      field: "Rest",
+      ctx,
+    }),
+  };
+}
+
+function upsertMessageRow({
+  messages,
+  row,
+  existingIndex,
+  messageIndex,
+}: {
+  messages: SimulationMessageRow[];
+  row: SimulationMessageRow;
+  existingIndex: number;
+  messageIndex: number | null | undefined;
+}): SimulationMessageRow[] {
+  if (existingIndex >= 0) {
+    return messages.map((m, i) => (i === existingIndex ? row : m));
+  }
+
+  if (messageIndex == null) {
+    return [...messages, row];
+  }
+
+  const updatedMessages = [...messages];
+  while (updatedMessages.length < messageIndex) {
+    updatedMessages.push({
+      Id: "",
+      Role: "",
+      Content: "",
+      TraceId: "",
+      Rest: "",
+    });
+  }
+  if (updatedMessages.length === messageIndex) {
+    updatedMessages.push(row);
+  } else {
+    updatedMessages[messageIndex] = row;
+  }
+  return updatedMessages;
+}
+
+// The status derivation priority: an explicit TERMINAL status takes
+// priority, otherwise derive from verdict. The explicit status arrives from
+// the scenario-events ingest route, whose schema types it as the full
+// ScenarioRunStatus enum — non-terminal members included. Taking it at face
+// value would write a non-terminal Status alongside FinishedAt, which is the
+// one state nothing can recover: the orphan reconciler skips it (FinishedAt
+// IS NULL) and read-time stall detection skips it (it only resolves
+// unfinished runs).
+function deriveFinishedStatus({
+  explicitStatus,
+  verdict,
+}: {
+  explicitStatus: string | undefined;
+  verdict: string | null;
+}): string {
+  if (explicitStatus && isTerminalStatus(explicitStatus)) {
+    return explicitStatus;
+  }
+  if (verdict === "success") {
+    return "SUCCESS";
+  }
+  if (verdict === "failure" || verdict === "inconclusive") {
+    return "FAILURE";
+  }
+  return "FAILURE";
+}
+
 const simulationRunEvents = [
   SimulationRunQueuedEventSchema,
   SimulationRunStartedEventSchema,
@@ -337,62 +497,22 @@ export class SimulationRunStateFoldProjection
     // Out-of-order protection: ignore snapshots older than the latest applied
     if (event.occurredAt <= state.LastSnapshotOccurredAt) return state;
 
+    const scenarioRunId = state.ScenarioRunId || event.data.scenarioRunId;
+
     return {
       ...state,
-      ScenarioRunId: state.ScenarioRunId || event.data.scenarioRunId,
+      ScenarioRunId: scenarioRunId,
       // Default StartedAt from event.occurredAt if snapshot arrives before started event
       StartedAt: state.StartedAt ?? event.occurredAt,
       LastSnapshotOccurredAt: event.occurredAt,
-      Messages: event.data.messages.map((m, i) => {
-        if (!isRecord(m)) {
-          throw new ValidationError({
-            reason: `Simulation ${state.ScenarioRunId} failed with invalid message on index ${i}`,
-          });
-        }
-
-        // Content can be either:
-        //   - a string (legacy SDK output, possibly a Python-repr-stringified array)
-        //   - an array of rich-content parts (the canonical AG-UI/OpenAI shape,
-        //     produced by the stored-objects extractor's rewrite pass)
-        //   - null / undefined / something else (we tolerate by storing "")
-        // We always serialize to a string for the parallel-array CH column.
-        // Array content gets JSON.stringify'd; the renderer's
-        // safeJsonParseOrStringFallback in flattenContent parses it back.
-        let content = "";
-        if (typeof m.content === "string") {
-          content = m.content;
-        } else if (Array.isArray(m.content)) {
-          content = JSON.stringify(m.content);
-        }
-
-        const messageId = typeof m.id === "string" ? m.id : "";
-        const messageRole = typeof m.role === "string" ? m.role : "";
-        // Snapshots can arrive BEFORE the run-started event (see
-        // `StartedAt: state.StartedAt ?? event.occurredAt` two lines up); on
-        // that path state.ScenarioRunId is still empty while the event already
-        // carries the id. Fall back so an oversized first snapshot's warn log
-        // is locatable instead of arriving id-less.
-        const scenarioRunId = state.ScenarioRunId || event.data.scenarioRunId;
-        const ctx = { scenarioRunId, messageId, messageRole };
-
-        return {
-          Id: messageId,
-          Role: messageRole,
-          Content: capOversizedString({
-            value: content,
-            maxBytes: MAX_MESSAGE_CONTENT_BYTES,
-            field: "Content",
-            ctx,
-          }),
-          TraceId: typeof m.trace_id === "string" ? m.trace_id : "",
-          Rest: capOversizedString({
-            value: buildMessageRestJson(m),
-            maxBytes: MAX_MESSAGE_REST_BYTES,
-            field: "Rest",
-            ctx,
-          }),
-        };
-      }),
+      Messages: event.data.messages.map((m, i) =>
+        buildMessageRowFromSnapshot({
+          message: m,
+          index: i,
+          rawScenarioRunId: state.ScenarioRunId,
+          scenarioRunId,
+        }),
+      ),
       TraceIds: Array.isArray(event.data.traceIds) ? event.data.traceIds : [],
       Status: statusAfter({
         state,
@@ -448,59 +568,14 @@ export class SimulationRunStateFoldProjection
     const existingIndex = state.Messages.findIndex(
       (m) => m.Id === event.data.messageId,
     );
-
-    // TextMessageEnd can also fold before the started event (the handler
-    // appends/pads even without a prior START); fall back to the event's
-    // scenarioRunId so the warn log carries the run identifier.
-    const ctx = {
-      scenarioRunId: state.ScenarioRunId || event.data.scenarioRunId,
-      messageId: event.data.messageId,
-      messageRole: event.data.role,
-    };
-    const row: SimulationMessageRow = {
-      Id: event.data.messageId,
-      Role: event.data.role,
-      Content: capOversizedString({
-        value: event.data.content,
-        maxBytes: MAX_MESSAGE_CONTENT_BYTES,
-        field: "Content",
-        ctx,
-      }),
-      TraceId: event.data.traceId ?? "",
-      Rest: capOversizedString({
-        value: buildMessageRestJson(
-          (event.data.message ?? {}) as Record<string, unknown>,
-        ),
-        maxBytes: MAX_MESSAGE_REST_BYTES,
-        field: "Rest",
-        ctx,
-      }),
-    };
-
-    let updatedMessages: SimulationMessageRow[];
-    if (existingIndex >= 0) {
-      updatedMessages = state.Messages.map((m, i) =>
-        i === existingIndex ? row : m,
-      );
-    } else if (event.data.messageIndex != null) {
-      updatedMessages = [...state.Messages];
-      while (updatedMessages.length < event.data.messageIndex) {
-        updatedMessages.push({
-          Id: "",
-          Role: "",
-          Content: "",
-          TraceId: "",
-          Rest: "",
-        });
-      }
-      if (updatedMessages.length === event.data.messageIndex) {
-        updatedMessages.push(row);
-      } else {
-        updatedMessages[event.data.messageIndex] = row;
-      }
-    } else {
-      updatedMessages = [...state.Messages, row];
-    }
+    const scenarioRunId = state.ScenarioRunId || event.data.scenarioRunId;
+    const row = buildMessageRowFromTextEnd({ event, scenarioRunId });
+    const updatedMessages = upsertMessageRow({
+      messages: state.Messages,
+      row,
+      existingIndex,
+      messageIndex: event.data.messageIndex,
+    });
 
     // Accumulate traceId if present and not duplicate
     const traceIds =
@@ -529,25 +604,10 @@ export class SimulationRunStateFoldProjection
 
     const results = event.data.results;
     const verdict = results?.verdict ?? null;
-
-    // Derive status: an explicit TERMINAL status takes priority, otherwise
-    // derive from verdict. The explicit status arrives from the scenario-events
-    // ingest route, whose schema types it as the full ScenarioRunStatus enum —
-    // non-terminal members included. Taking it at face value would write a
-    // non-terminal Status alongside FinishedAt below, which is the one state
-    // nothing can recover: the orphan reconciler skips it (FinishedAt IS NULL)
-    // and read-time stall detection skips it (it only resolves unfinished runs).
-    let status: string;
-    const explicit = event.data.status?.toUpperCase();
-    if (explicit && isTerminalStatus(explicit)) {
-      status = explicit;
-    } else if (verdict === "success") {
-      status = "SUCCESS";
-    } else if (verdict === "failure" || verdict === "inconclusive") {
-      status = "FAILURE";
-    } else {
-      status = "FAILURE";
-    }
+    const status = deriveFinishedStatus({
+      explicitStatus: event.data.status?.toUpperCase(),
+      verdict,
+    });
 
     return {
       ...state,

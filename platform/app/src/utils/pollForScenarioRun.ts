@@ -33,6 +33,100 @@ export type PollResult =
   | { success: true; scenarioRunId: string }
   | { success: false; error: "timeout" | "run_error"; scenarioRunId?: string };
 
+function isTerminalFailureStatus(status: string | undefined): boolean {
+  return (
+    status === ScenarioRunStatus.ERROR ||
+    status === ScenarioRunStatus.FAILED ||
+    status === ScenarioRunStatus.CANCELLED ||
+    status === ScenarioRunStatus.STALLED
+  );
+}
+
+function logPollingProgress({
+  attempt,
+  runs,
+}: {
+  attempt: number;
+  runs: ScenarioRun[];
+}): void {
+  if (attempt % 10 !== 0) return;
+
+  logger.info(
+    {
+      attempt,
+      runsCount: runs.length,
+      firstRun: runs[0]
+        ? {
+            scenarioRunId: runs[0].scenarioRunId,
+            status: runs[0].status,
+            messagesCount: runs[0].messages?.length ?? 0,
+          }
+        : null,
+    },
+    "Polling attempt",
+  );
+}
+
+function resolveRunOutcome(run: ScenarioRun): PollResult {
+  // Check for error/cancelled/stalled states first
+  if (isTerminalFailureStatus(run.status)) {
+    logger.info(
+      { status: run.status, scenarioRunId: run.scenarioRunId },
+      "Run terminated with error, cancelled, or stalled",
+    );
+    return {
+      success: false,
+      error: "run_error",
+      scenarioRunId: run.scenarioRunId,
+    };
+  }
+
+  // RUN_STARTED exists - return success so frontend can show progress
+  // The run page will display messages as they arrive
+  logger.info(
+    {
+      status: run.status,
+      hasMessages: run.messages && run.messages.length > 0,
+      scenarioRunId: run.scenarioRunId,
+    },
+    "Run ready",
+  );
+  return { success: true, scenarioRunId: run.scenarioRunId };
+}
+
+/**
+ * One poll cycle. Returns null when the caller should keep polling: either the
+ * fetch failed, or no run has surfaced yet.
+ */
+async function pollOnce({
+  fetchBatchRunData,
+  params,
+  attempt,
+}: {
+  fetchBatchRunData: FetchBatchRunData;
+  params: PollForRunParams;
+  attempt: number;
+}): Promise<PollResult | null> {
+  try {
+    logger.info({ attempt }, "Fetching batch run data");
+    const batchResult = await fetchBatchRunData(params);
+    const runs = batchResult.changed ? batchResult.runs : [];
+    logger.info({ attempt, runsCount: runs.length }, "Fetch completed");
+
+    logPollingProgress({ attempt, runs });
+
+    const run = runs[0];
+    if (runs.length > 0 && run?.scenarioRunId) {
+      return resolveRunOutcome(run);
+    }
+  } catch (error) {
+    logger.error({ error }, "Fetch error");
+    // Continue polling on error
+  }
+
+  return null;
+}
+
 /**
  * Polls for a scenario run to be available.
  *
@@ -58,66 +152,8 @@ export async function pollForScenarioRun(
   );
 
   for (let attempt = 0; attempt < MAX_POLLING_ATTEMPTS; attempt++) {
-    try {
-      logger.info({ attempt }, "Fetching batch run data");
-      const batchResult = await fetchBatchRunData(params);
-      const runs = batchResult.changed ? batchResult.runs : [];
-      logger.info({ attempt, runsCount: runs.length }, "Fetch completed");
-
-      if (attempt % 10 === 0) {
-        logger.info(
-          {
-            attempt,
-            runsCount: runs.length,
-            firstRun: runs[0]
-              ? {
-                  scenarioRunId: runs[0].scenarioRunId,
-                  status: runs[0].status,
-                  messagesCount: runs[0].messages?.length ?? 0,
-                }
-              : null,
-          },
-          "Polling attempt",
-        );
-      }
-
-      if (runs.length > 0 && runs[0]?.scenarioRunId) {
-        const run = runs[0];
-
-        // Check for error/cancelled/stalled states first
-        if (
-          run.status === ScenarioRunStatus.ERROR ||
-          run.status === ScenarioRunStatus.FAILED ||
-          run.status === ScenarioRunStatus.CANCELLED ||
-          run.status === ScenarioRunStatus.STALLED
-        ) {
-          logger.info(
-            { status: run.status, scenarioRunId: run.scenarioRunId },
-            "Run terminated with error, cancelled, or stalled",
-          );
-          return {
-            success: false,
-            error: "run_error",
-            scenarioRunId: run.scenarioRunId,
-          };
-        }
-
-        // RUN_STARTED exists - return success so frontend can show progress
-        // The run page will display messages as they arrive
-        logger.info(
-          {
-            status: run.status,
-            hasMessages: run.messages && run.messages.length > 0,
-            scenarioRunId: run.scenarioRunId,
-          },
-          "Run ready",
-        );
-        return { success: true, scenarioRunId: run.scenarioRunId };
-      }
-    } catch (error) {
-      logger.error({ error }, "Fetch error");
-      // Continue polling on error
-    }
+    const outcome = await pollOnce({ fetchBatchRunData, params, attempt });
+    if (outcome) return outcome;
 
     await new Promise((resolve) => setTimeout(resolve, POLLING_INTERVAL_MS));
   }

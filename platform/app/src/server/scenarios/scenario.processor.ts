@@ -347,6 +347,54 @@ export function parseChildProcessResult(
 }
 
 /**
+ * Report the outcome of a spawned child process: metrics, logging, and the
+ * matching cancelled/failed event emission.
+ */
+async function reportChildProcessOutcome({
+  result,
+  jobData,
+  deps,
+  jobLogger,
+  totalDurationMs,
+  childDurationMs,
+}: {
+  result: ScenarioExecutionResult;
+  jobData: ExecutionJobData;
+  deps: ProcessorDependencies;
+  jobLogger: ReturnType<typeof createScenarioLogger>;
+  totalDurationMs: number;
+  childDurationMs: number;
+}): Promise<void> {
+  if (result.success) {
+    getJobProcessingCounter("scenario", "completed").inc();
+    getJobProcessingDurationHistogram("scenario").observe(totalDurationMs);
+    jobLogger.info(
+      { success: true, totalDurationMs, childDurationMs },
+      "Scenario job completed",
+    );
+    return;
+  }
+
+  if (result.cancelled) {
+    jobLogger.info("Scenario job cancelled by user");
+    await handleCancelledJobResult(jobData, result.error, deps);
+    return;
+  }
+
+  getJobProcessingCounter("scenario", "failed").inc();
+  jobLogger.warn(
+    {
+      success: false,
+      error: result.error,
+      totalDurationMs,
+      childDurationMs,
+    },
+    "Scenario job completed with failure",
+  );
+  await handleFailedJobResult(jobData, result.error, deps);
+}
+
+/**
  * Execute a scenario run by spawning an isolated child process.
  *
  * Called by the ScenarioExecutionPool when a slot is available.
@@ -422,30 +470,253 @@ export async function executeScenarioRun(
     const totalDurationMs = Date.now() - startTime;
     const childDurationMs = Date.now() - childStartTime;
 
-    if (result.success) {
-      getJobProcessingCounter("scenario", "completed").inc();
-      getJobProcessingDurationHistogram("scenario").observe(totalDurationMs);
-      jobLogger.info(
-        { success: true, totalDurationMs, childDurationMs },
-        "Scenario job completed",
-      );
-    } else if (result.cancelled) {
-      jobLogger.info("Scenario job cancelled by user");
-      await handleCancelledJobResult(jobData, result.error, deps);
-    } else {
-      getJobProcessingCounter("scenario", "failed").inc();
-      jobLogger.warn(
-        {
-          success: false,
-          error: result.error,
-          totalDurationMs,
-          childDurationMs,
-        },
-        "Scenario job completed with failure",
-      );
-      await handleFailedJobResult(jobData, result.error, deps);
+    await reportChildProcessOutcome({
+      result,
+      jobData,
+      deps,
+      jobLogger,
+      totalDurationMs,
+      childDurationMs,
+    });
+  });
+}
+
+type ChildLogFn = (
+  level: "info" | "warn" | "error",
+  message: string,
+  extra?: Record<string, unknown>,
+) => void;
+
+/** Mutable state shared across a spawned child process's event handlers. */
+interface ChildProcessRunState {
+  stdout: string;
+  stderr: string;
+  resolved: boolean;
+}
+
+/**
+ * Build the child process env: the TLS trust for the runner's own fetch stack
+ * (EventReporter → platform, and the model API call) plus the whitelisted base
+ * env and telemetry/log-context vars. TLS forwards haven's trusted local CA
+ * when present; only in local non-SaaS dev does it fall back to relaxing TLS.
+ * Never in SaaS/prod. See resolveChildTlsEnv for the gating.
+ */
+function buildScenarioChildEnv({
+  jobData,
+  childProcessData,
+  telemetry,
+}: {
+  jobData: ExecutionJobData;
+  childProcessData: ChildProcessJobData;
+  telemetry: { endpoint: string; apiKey: string };
+}): NodeJS.ProcessEnv {
+  const { scenarioId, projectId, batchRunId, setId } = jobData;
+  const otelResourceAttrs = buildOtelResourceAttributes(
+    childProcessData.scenario.labels,
+  );
+  const logContext = encodeScenarioLogContext({
+    scenarioRunId: jobData.scenarioRunId,
+    batchRunId,
+    projectId,
+    scenarioId,
+    setId,
+  });
+  const tlsEnv = resolveChildTlsEnv({
+    isSaaS: !!env.IS_SAAS,
+    nodeEnv: process.env.NODE_ENV,
+    nodeExtraCaCerts: process.env.NODE_EXTRA_CA_CERTS,
+  });
+  return buildChildProcessEnv({
+    LANGWATCH_API_KEY: telemetry.apiKey,
+    LANGWATCH_ENDPOINT: telemetry.endpoint,
+    SCENARIO_HEADLESS: "true",
+    OTEL_RESOURCE_ATTRIBUTES: otelResourceAttrs,
+    [SCENARIO_LOG_CONTEXT_ENV]: logContext,
+    ...tlsEnv,
+  });
+}
+
+function createChildProcessCleanup({
+  child,
+  state,
+}: {
+  child: ChildProcess;
+  state: ChildProcessRunState;
+}): () => void {
+  return () => {
+    if (!state.resolved) {
+      state.resolved = true;
+      child.kill();
+    }
+  };
+}
+
+function handleChildProcessClose({
+  code,
+  jobData,
+  pool,
+  log,
+  state,
+  timeout,
+  resolve,
+}: {
+  code: number | null;
+  jobData: ExecutionJobData;
+  pool: ScenarioExecutionPool;
+  log: ChildLogFn;
+  state: ChildProcessRunState;
+  timeout: NodeJS.Timeout;
+  resolve: (result: ScenarioExecutionResult) => void;
+}): void {
+  clearTimeout(timeout);
+  pool.deregisterChild(jobData.scenarioRunId);
+  if (state.resolved) return;
+  state.resolved = true;
+
+  // Check if this was killed by the cancel subscription
+  if (pool.wasCancelled(jobData.scenarioRunId)) {
+    log("info", "Job cancelled via cancel broadcast");
+    resolve({
+      success: false,
+      error: "Job was cancelled",
+      cancelled: true,
+    });
+    return;
+  }
+
+  if (code !== 0) {
+    // Prefer the runner's own structured error (its flattened cause chain,
+    // e.g. the TLS reason) over the near-empty stderr — the failure handler
+    // classifies this string into a handled error for the drawer.
+    const childResult = parseChildProcessResult(state.stdout);
+    const error =
+      childResult?.error && childResult.error.trim().length > 0
+        ? childResult.error
+        : `Child process exited with code ${code}: ${state.stderr}`;
+    log("error", `Child process exited with code ${code}`, {
+      exitCode: code,
+      stderr: state.stderr,
+    });
+    resolve({
+      success: false,
+      error,
+    });
+    return;
+  }
+
+  log("info", "Scenario completed successfully", { exitCode: code });
+  resolve({ success: true });
+}
+
+function handleChildProcessError({
+  error,
+  jobData,
+  pool,
+  log,
+  state,
+  timeout,
+  resolve,
+}: {
+  error: Error;
+  jobData: ExecutionJobData;
+  pool: ScenarioExecutionPool;
+  log: ChildLogFn;
+  state: ChildProcessRunState;
+  timeout: NodeJS.Timeout;
+  resolve: (result: ScenarioExecutionResult) => void;
+}): void {
+  clearTimeout(timeout);
+  pool.deregisterChild(jobData.scenarioRunId);
+  if (state.resolved) return;
+  state.resolved = true;
+
+  log("error", `Child process error: ${error.message}`);
+  resolve({
+    success: false,
+    error: `Child process error: ${error.message}`,
+  });
+}
+
+function attachChildProcessHandlers({
+  child,
+  jobData,
+  pool,
+  log,
+  state,
+  timeout,
+  resolve,
+}: {
+  child: ChildProcess;
+  jobData: ExecutionJobData;
+  pool: ScenarioExecutionPool;
+  log: ChildLogFn;
+  state: ChildProcessRunState;
+  timeout: NodeJS.Timeout;
+  resolve: (result: ScenarioExecutionResult) => void;
+}): void {
+  child.stdout?.on("data", (data: Buffer) => {
+    const chunk = data.toString();
+    state.stdout += chunk;
+    const lines = chunk.trim().split("\n");
+    for (const line of lines) {
+      if (line) log("info", line);
     }
   });
+
+  child.stderr?.on("data", (data: Buffer) => {
+    state.stderr += data.toString();
+    const lines = data.toString().trim().split("\n");
+    for (const line of lines) {
+      if (line) log("warn", line);
+    }
+  });
+
+  child.on("close", (code) =>
+    handleChildProcessClose({
+      code,
+      jobData,
+      pool,
+      log,
+      state,
+      timeout,
+      resolve,
+    }),
+  );
+
+  child.on("error", (error) =>
+    handleChildProcessError({
+      error,
+      jobData,
+      pool,
+      log,
+      state,
+      timeout,
+      resolve,
+    }),
+  );
+}
+
+function writeChildProcessStdin({
+  child,
+  childProcessData,
+  log,
+}: {
+  child: ChildProcess;
+  childProcessData: ChildProcessJobData;
+  log: ChildLogFn;
+}): void {
+  if (!child.stdin) return;
+  child.stdin.on("error", (err) => {
+    log("warn", "Child stdin error", { error: err.message });
+  });
+  try {
+    child.stdin.write(JSON.stringify(childProcessData));
+    child.stdin.end();
+  } catch (err) {
+    log("warn", "Child stdin write failed", {
+      error: (err as Error).message,
+    });
+  }
 }
 
 /**
@@ -473,40 +744,14 @@ async function spawnScenarioChildProcess({
       component: "child-process",
     });
 
-    const log = (
-      level: "info" | "warn" | "error",
-      message: string,
-      extra?: Record<string, unknown>,
-    ) => {
+    const log: ChildLogFn = (level, message, extra) => {
       childLogger[level](extra ?? {}, message);
     };
 
-    const otelResourceAttrs = buildOtelResourceAttributes(
-      childProcessData.scenario.labels,
-    );
-    const logContext = encodeScenarioLogContext({
-      scenarioRunId: jobData.scenarioRunId,
-      batchRunId,
-      projectId,
-      scenarioId,
-      setId,
-    });
-    // TLS for the runner's own fetch stack (EventReporter → platform, and the
-    // model API call). Forwards haven's trusted local CA when present; only in
-    // local non-SaaS dev does it fall back to relaxing TLS. Never in SaaS/prod.
-    // See resolveChildTlsEnv for the gating.
-    const tlsEnv = resolveChildTlsEnv({
-      isSaaS: !!env.IS_SAAS,
-      nodeEnv: process.env.NODE_ENV,
-      nodeExtraCaCerts: process.env.NODE_EXTRA_CA_CERTS,
-    });
-    const childEnv = buildChildProcessEnv({
-      LANGWATCH_API_KEY: telemetry.apiKey,
-      LANGWATCH_ENDPOINT: telemetry.endpoint,
-      SCENARIO_HEADLESS: "true",
-      OTEL_RESOURCE_ATTRIBUTES: otelResourceAttrs,
-      [SCENARIO_LOG_CONTEXT_ENV]: logContext,
-      ...tlsEnv,
+    const childEnv = buildScenarioChildEnv({
+      jobData,
+      childProcessData,
+      telemetry,
     });
 
     const packageRoot = resolveAppPackageRoot();
@@ -529,16 +774,12 @@ async function spawnScenarioChildProcess({
     // Register in the pool so cancel broadcasts can find this child
     pool.registerChild(jobData.scenarioRunId, child);
 
-    let stderr = "";
-    let stdout = "";
-    let resolved = false;
-
-    const cleanup = () => {
-      if (!resolved) {
-        resolved = true;
-        child.kill();
-      }
+    const state: ChildProcessRunState = {
+      stdout: "",
+      stderr: "",
+      resolved: false,
     };
+    const cleanup = createChildProcessCleanup({ child, state });
 
     const timeout = setTimeout(() => {
       log("error", "Child process timed out", {
@@ -551,90 +792,17 @@ async function spawnScenarioChildProcess({
       });
     }, CHILD_PROCESS.TIMEOUT_MS);
 
-    child.stdout?.on("data", (data: Buffer) => {
-      const chunk = data.toString();
-      stdout += chunk;
-      const lines = chunk.trim().split("\n");
-      for (const line of lines) {
-        if (line) log("info", line);
-      }
+    attachChildProcessHandlers({
+      child,
+      jobData,
+      pool,
+      log,
+      state,
+      timeout,
+      resolve,
     });
 
-    child.stderr?.on("data", (data: Buffer) => {
-      stderr += data.toString();
-      const lines = data.toString().trim().split("\n");
-      for (const line of lines) {
-        if (line) log("warn", line);
-      }
-    });
-
-    child.on("close", (code) => {
-      clearTimeout(timeout);
-      pool.deregisterChild(jobData.scenarioRunId);
-      if (resolved) return;
-      resolved = true;
-
-      // Check if this was killed by the cancel subscription
-      if (pool.wasCancelled(jobData.scenarioRunId)) {
-        log("info", "Job cancelled via cancel broadcast");
-        resolve({
-          success: false,
-          error: "Job was cancelled",
-          cancelled: true,
-        });
-        return;
-      }
-
-      if (code !== 0) {
-        // Prefer the runner's own structured error (its flattened cause chain,
-        // e.g. the TLS reason) over the near-empty stderr — the failure handler
-        // classifies this string into a handled error for the drawer.
-        const childResult = parseChildProcessResult(stdout);
-        const error =
-          childResult?.error && childResult.error.trim().length > 0
-            ? childResult.error
-            : `Child process exited with code ${code}: ${stderr}`;
-        log("error", `Child process exited with code ${code}`, {
-          exitCode: code,
-          stderr,
-        });
-        resolve({
-          success: false,
-          error,
-        });
-        return;
-      }
-
-      log("info", "Scenario completed successfully", { exitCode: code });
-      resolve({ success: true });
-    });
-
-    child.on("error", (error) => {
-      clearTimeout(timeout);
-      pool.deregisterChild(jobData.scenarioRunId);
-      if (resolved) return;
-      resolved = true;
-
-      log("error", `Child process error: ${error.message}`);
-      resolve({
-        success: false,
-        error: `Child process error: ${error.message}`,
-      });
-    });
-
-    if (child.stdin) {
-      child.stdin.on("error", (err) => {
-        log("warn", "Child stdin error", { error: err.message });
-      });
-      try {
-        child.stdin.write(JSON.stringify(childProcessData));
-        child.stdin.end();
-      } catch (err) {
-        log("warn", "Child stdin write failed", {
-          error: (err as Error).message,
-        });
-      }
-    }
+    writeChildProcessStdin({ child, childProcessData, log });
   });
 }
 

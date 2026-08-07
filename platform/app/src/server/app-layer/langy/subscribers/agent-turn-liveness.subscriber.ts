@@ -68,6 +68,241 @@ function turnIdOf(event: LangyConversationProcessingEvent): string | null {
   return event.data.turnId ?? null;
 }
 
+type LangyTurnHandoffRecord = NonNullable<
+  Awaited<ReturnType<AgentTurnLivenessSubscriberDeps["handoffStore"]["read"]>>
+>;
+
+/** Split out of `handleAgentTurnLiveness`. */
+async function readLivenessConversationOrThrow(
+  deps: AgentTurnLivenessSubscriberDeps,
+  event: LangyConversationProcessingEvent,
+  { projectId, conversationId }: { projectId: string; conversationId: string },
+): Promise<LangyConversationLivenessRecord> {
+  const conversation = await deps.conversations.read({
+    projectId,
+    conversationId,
+  });
+  if (!conversation || !cursorHasReachedEvent(conversation.cursor, event)) {
+    throw projectionNotReadyError({
+      projectionName: "langyConversation",
+      eventId: event.id,
+    });
+  }
+  return conversation;
+}
+
+function isConversationRunningThisTurn(
+  conversation: LangyConversationLivenessRecord,
+  eventTurnId: string,
+): boolean {
+  return (
+    conversation.status === LANGY_CONVERSATION_STATUS.RUNNING &&
+    conversation.currentTurnId !== null &&
+    conversation.currentTurnId === eventTurnId
+  );
+}
+
+/**
+ * Only the FOUR event types this subscriber listens on ever re-arm this
+ * delayed check, and each is deduped to at most one pending check per turn. A
+ * turn whose last qualifying event lands early (e.g. its final tool call)
+ * then spends its tail in pure response generation gets exactly one check
+ * here — if the worker is still healthy at that instant, returning silently
+ * means NO further check is ever scheduled, so a crash a moment later is
+ * never caught and the turn stays RUNNING forever (observed as a
+ * `langy_turn_in_progress` 409 that no client-side retry ever resolves,
+ * because the server-side projection is genuinely stuck, not racing).
+ * Re-throwing a retryable DispatchError makes the group queue re-deliver this
+ * same check on its own schedule instead, floored at HEARTBEAT_GRACE_MS so
+ * healthy turns aren't repolled on the queue's fast initial exponential
+ * steps. This self-perpetuates until the turn leaves RUNNING (the guard
+ * above returns cleanly) or genuinely goes stale (the branch below fires) —
+ * bounded by the queue's own max attempts, which at a ~30s-and-growing
+ * cadence covers well over an hour, comfortably past any real turn duration.
+ * Split out of `handleAgentTurnLiveness`.
+ */
+function assertTurnStale(liveness: { stale: boolean }, turnId: string): void {
+  if (liveness.stale) return;
+  throw new DispatchError({
+    message: `langy turn ${turnId} still live; re-checking liveness`,
+    retryable: true,
+    retryAfterMs: LANGY_LIVENESS.HEARTBEAT_GRACE_MS,
+  });
+}
+
+/** Split out of `handleAgentTurnLiveness`. */
+async function resolveMatchingHandoff(
+  deps: AgentTurnLivenessSubscriberDeps,
+  {
+    projectId,
+    conversationId,
+    turnId,
+  }: { projectId: string; conversationId: string; turnId: string },
+): Promise<LangyTurnHandoffRecord | null> {
+  const candidateHandoff = await deps.handoffStore.read({
+    conversationId,
+    turnId,
+  });
+  return candidateHandoff?.projectId === projectId &&
+    candidateHandoff.conversationId === conversationId &&
+    candidateHandoff.turnId === turnId
+    ? candidateHandoff
+    : null;
+}
+
+/**
+ * This is the branch that kills a user's turn — it must never be silent.
+ * `reason` says which guard tripped: too stale to revive, or nothing to
+ * revive with. Split out of `handleAgentTurnLiveness`.
+ */
+async function failStalledTurn(
+  deps: AgentTurnLivenessSubscriberDeps,
+  {
+    projectId,
+    conversationId,
+    turnId,
+    stalledMs,
+    reason,
+  }: {
+    projectId: string;
+    conversationId: string;
+    turnId: string;
+    stalledMs: number;
+    reason: "stall_expired" | "no_handoff";
+  },
+): Promise<void> {
+  logger.warn(
+    { projectId, conversationId, turnId, stalledMs, reason },
+    "failing a stalled langy turn",
+  );
+  const error = serializeLangyTurnError(new LangyWorkerStoppedError());
+  await deps.buffer
+    .markError({ conversationId, turnId, error })
+    .catch(() => undefined);
+  await deps.failTurn.failTurn({ projectId, conversationId, turnId, error });
+}
+
+function dispatchIntentFor(
+  handoff: LangyTurnHandoffRecord,
+): "revive" | "create" | "continue" {
+  if (handoff.resumeToken) return "revive";
+  if (handoff.credentials.langwatchApiKey) return "create";
+  return "continue";
+}
+
+/** Split out of `handleAgentTurnLiveness`. Always throws — see the call site. */
+async function redriveStalledTurn(
+  deps: AgentTurnLivenessSubscriberDeps,
+  {
+    projectId,
+    conversationId,
+    turnId,
+    stalledMs,
+    handoff,
+  }: {
+    projectId: string;
+    conversationId: string;
+    turnId: string;
+    stalledMs: number;
+    handoff: LangyTurnHandoffRecord;
+  },
+): Promise<never> {
+  await deps.buffer
+    .appendStatus({
+      conversationId,
+      turnId,
+      status: "Reconnecting to the agent…",
+    })
+    .catch(() => undefined);
+
+  const intent = dispatchIntentFor(handoff);
+  const outcome = await deps.worker.dispatch({
+    intent,
+    conversationId,
+    turnId,
+    projectId,
+    userId: handoff.actorUserId,
+    runToken: handoff.runToken,
+    prompt: handoff.prompt,
+    system: handoff.system,
+    // A stalled turn's re-drive may land on a fresh worker; the seed keeps
+    // the conversation continuable there too.
+    ...(handoff.historySeed ? { historySeed: handoff.historySeed } : {}),
+    credentials: handoff.credentials,
+    ...(handoff.modelOverride ? { modelOverride: handoff.modelOverride } : {}),
+    ...(handoff.resumeToken ? { resumeToken: handoff.resumeToken } : {}),
+  });
+  logger.info(
+    { projectId, conversationId, turnId, stalledMs, outcome },
+    "Re-dispatched stalled Langy turn",
+  );
+  throw new LangyTurnDispatchRetry(
+    `langy turn ${turnId} stalled (${stalledMs}ms); re-driven, awaiting liveness`,
+  );
+}
+
+/**
+ * Delayed liveness check over a fresh operational read and the ephemeral Redis
+ * heartbeat. No projection snapshot or event-log read enters the decision.
+ * Split out of `createAgentTurnLivenessSubscriber` so it stays under the
+ * factory's own line/complexity budget.
+ */
+async function handleAgentTurnLiveness(
+  deps: AgentTurnLivenessSubscriberDeps,
+  clock: () => number,
+  event: LangyConversationProcessingEvent,
+): Promise<void> {
+  const projectId = event.tenantId;
+  const conversationId = String(event.aggregateId);
+  const eventTurnId = turnIdOf(event);
+  if (!eventTurnId) return;
+
+  const conversation = await readLivenessConversationOrThrow(deps, event, {
+    projectId,
+    conversationId,
+  });
+  if (!isConversationRunningThisTurn(conversation, eventTurnId)) return;
+
+  const turnId = eventTurnId;
+  const now = clock();
+  const liveness = await deps.buffer.liveness({
+    conversationId,
+    turnId,
+    now,
+    graceMs: LANGY_LIVENESS.HEARTBEAT_GRACE_MS,
+  });
+  assertTurnStale(liveness, turnId);
+
+  const stalledMs =
+    conversation.lastActivityAtMs === null
+      ? MAX_STALL_MS + 1
+      : now - conversation.lastActivityAtMs;
+  const handoff = await resolveMatchingHandoff(deps, {
+    projectId,
+    conversationId,
+    turnId,
+  });
+
+  if (stalledMs > MAX_STALL_MS || !handoff) {
+    await failStalledTurn(deps, {
+      projectId,
+      conversationId,
+      turnId,
+      stalledMs,
+      reason: stalledMs > MAX_STALL_MS ? "stall_expired" : "no_handoff",
+    });
+    return;
+  }
+
+  await redriveStalledTurn(deps, {
+    projectId,
+    conversationId,
+    turnId,
+    stalledMs,
+    handoff,
+  });
+}
+
 /**
  * Delayed liveness check over a fresh operational read and the ephemeral Redis
  * heartbeat. No projection snapshot or event-log read enters the decision.
@@ -87,145 +322,6 @@ export function createAgentTurnLivenessSubscriber(
         ttlMs: LANGY_LIVENESS.HEARTBEAT_GRACE_MS * 2,
       },
     },
-    async handle(event): Promise<void> {
-      const projectId = event.tenantId;
-      const conversationId = String(event.aggregateId);
-      const eventTurnId = turnIdOf(event);
-      if (!eventTurnId) return;
-
-      const conversation = await deps.conversations.read({
-        projectId,
-        conversationId,
-      });
-      if (!conversation || !cursorHasReachedEvent(conversation.cursor, event)) {
-        throw projectionNotReadyError({
-          projectionName: "langyConversation",
-          eventId: event.id,
-        });
-      }
-
-      if (
-        conversation.status !== LANGY_CONVERSATION_STATUS.RUNNING ||
-        conversation.currentTurnId === null ||
-        conversation.currentTurnId !== eventTurnId
-      ) {
-        return;
-      }
-
-      const turnId = conversation.currentTurnId;
-      const now = clock();
-      const liveness = await deps.buffer.liveness({
-        conversationId,
-        turnId,
-        now,
-        graceMs: LANGY_LIVENESS.HEARTBEAT_GRACE_MS,
-      });
-      if (!liveness.stale) {
-        // Only the FOUR event types above ever re-arm this delayed check, and
-        // each is deduped to at most one pending check per turn. A turn whose
-        // last qualifying event lands early (e.g. its final tool call) then
-        // spends its tail in pure response generation gets exactly one check
-        // here — if the worker is still healthy at that instant, returning
-        // silently means NO further check is ever scheduled, so a crash a
-        // moment later is never caught and the turn stays RUNNING forever
-        // (observed as a `langy_turn_in_progress` 409 that no client-side
-        // retry ever resolves, because the server-side projection is
-        // genuinely stuck, not racing). Re-throwing a retryable DispatchError
-        // makes the group queue re-deliver this same check on its own
-        // schedule instead, floored at HEARTBEAT_GRACE_MS so healthy turns
-        // aren't repolled on the queue's fast initial exponential steps. This
-        // self-perpetuates until the turn leaves RUNNING (the guard above
-        // returns cleanly) or genuinely goes stale (the branch below fires) —
-        // bounded by the queue's own max attempts, which at a ~30s-and-
-        // growing cadence covers well over an hour, comfortably past any
-        // real turn duration.
-        throw new DispatchError({
-          message: `langy turn ${turnId} still live; re-checking liveness`,
-          retryable: true,
-          retryAfterMs: LANGY_LIVENESS.HEARTBEAT_GRACE_MS,
-        });
-      }
-
-      const stalledMs =
-        conversation.lastActivityAtMs === null
-          ? MAX_STALL_MS + 1
-          : now - conversation.lastActivityAtMs;
-      const candidateHandoff = await deps.handoffStore.read({
-        conversationId,
-        turnId,
-      });
-      const handoff =
-        candidateHandoff?.projectId === projectId &&
-        candidateHandoff.conversationId === conversationId &&
-        candidateHandoff.turnId === turnId
-          ? candidateHandoff
-          : null;
-
-      if (stalledMs > MAX_STALL_MS || !handoff) {
-        // This is the branch that kills a user's turn — it must never be
-        // silent. `reason` says which guard tripped: too stale to revive, or
-        // nothing to revive with.
-        logger.warn(
-          {
-            projectId,
-            conversationId,
-            turnId,
-            stalledMs,
-            reason: stalledMs > MAX_STALL_MS ? "stall_expired" : "no_handoff",
-          },
-          "failing a stalled langy turn",
-        );
-        const error = serializeLangyTurnError(new LangyWorkerStoppedError());
-        await deps.buffer
-          .markError({ conversationId, turnId, error })
-          .catch(() => undefined);
-        await deps.failTurn.failTurn({
-          projectId,
-          conversationId,
-          turnId,
-          error,
-        });
-        return;
-      }
-
-      await deps.buffer
-        .appendStatus({
-          conversationId,
-          turnId,
-          status: "Reconnecting to the agent…",
-        })
-        .catch(() => undefined);
-
-      const intent = handoff.resumeToken
-        ? "revive"
-        : handoff.credentials.langwatchApiKey
-          ? "create"
-          : "continue";
-      const outcome = await deps.worker.dispatch({
-        intent,
-        conversationId,
-        turnId,
-        projectId,
-        userId: handoff.actorUserId,
-        runToken: handoff.runToken,
-        prompt: handoff.prompt,
-        system: handoff.system,
-        // A stalled turn's re-drive may land on a fresh worker; the seed keeps
-        // the conversation continuable there too.
-        ...(handoff.historySeed ? { historySeed: handoff.historySeed } : {}),
-        credentials: handoff.credentials,
-        ...(handoff.modelOverride
-          ? { modelOverride: handoff.modelOverride }
-          : {}),
-        ...(handoff.resumeToken ? { resumeToken: handoff.resumeToken } : {}),
-      });
-      logger.info(
-        { projectId, conversationId, turnId, stalledMs, outcome },
-        "Re-dispatched stalled Langy turn",
-      );
-      throw new LangyTurnDispatchRetry(
-        `langy turn ${turnId} stalled (${stalledMs}ms); re-driven, awaiting liveness`,
-      );
-    },
+    handle: (event) => handleAgentTurnLiveness(deps, clock, event),
   };
 }

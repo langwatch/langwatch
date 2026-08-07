@@ -55,6 +55,22 @@ export interface Session {
   sessionId?: string;
 }
 
+const appendHeaderValue = ({
+  headers,
+  key,
+  value,
+}: {
+  headers: Headers;
+  key: string;
+  value: string | string[];
+}): void => {
+  if (Array.isArray(value)) {
+    for (const x of value) headers.append(key, x);
+  } else {
+    headers.set(key, String(value));
+  }
+};
+
 const toHeaders = (
   input: IncomingHttpHeaders | Headers | undefined,
 ): Headers => {
@@ -63,14 +79,73 @@ const toHeaders = (
   const h = new Headers();
   for (const [k, v] of Object.entries(input)) {
     if (v == null) continue;
-    if (Array.isArray(v)) {
-      for (const x of v) h.append(k, x);
-    } else {
-      h.set(k, String(v));
-    }
+    appendHeaderValue({ headers: h, key: k, value: v });
   }
   return h;
 };
+
+type BetterAuthSessionResult = NonNullable<
+  Awaited<ReturnType<typeof auth.api.getSession>>
+>;
+
+const buildBaseSession = (result: BetterAuthSessionResult): Session => ({
+  user: {
+    id: result.user.id,
+    name: result.user.name ?? null,
+    email: result.user.email ?? null,
+    image: result.user.image ?? null,
+    pendingSsoSetup:
+      ((result.user as Record<string, unknown>).pendingSsoSetup as
+        | boolean
+        | undefined) ?? false,
+  },
+  expires:
+    result.session.expiresAt instanceof Date
+      ? result.session.expiresAt.toISOString()
+      : new Date(result.session.expiresAt).toISOString(),
+  sessionId: result.session.id,
+});
+
+type Impersonating = {
+  id?: string;
+  name?: string | null;
+  email?: string | null;
+  image?: string | null;
+  expires?: string | Date;
+};
+
+const isLiveImpersonation = (
+  impersonating: Impersonating | null | undefined,
+): impersonating is Impersonating & { id: string } =>
+  Boolean(
+    impersonating &&
+      typeof impersonating === "object" &&
+      impersonating.id &&
+      impersonating.expires &&
+      new Date(impersonating.expires) > new Date(),
+  );
+
+const buildImpersonatedSession = ({
+  baseSession,
+  impersonating,
+}: {
+  baseSession: Session;
+  impersonating: Impersonating & { id: string };
+}): Session => ({
+  ...baseSession,
+  user: {
+    id: impersonating.id,
+    name: impersonating.name ?? null,
+    email: impersonating.email ?? null,
+    image: impersonating.image ?? null,
+    impersonator: {
+      id: baseSession.user.id,
+      name: baseSession.user.name ?? null,
+      email: baseSession.user.email ?? null,
+      image: baseSession.user.image ?? null,
+    },
+  },
+});
 
 /**
  * Server-side session fetch. Wraps BetterAuth's `auth.api.getSession`.
@@ -94,23 +169,7 @@ export const getServerAuthSession = async (ctx: {
     const result = await auth.api.getSession({ headers });
     if (!result) return null;
 
-    const baseSession: Session = {
-      user: {
-        id: result.user.id,
-        name: result.user.name ?? null,
-        email: result.user.email ?? null,
-        image: result.user.image ?? null,
-        pendingSsoSetup:
-          ((result.user as Record<string, unknown>).pendingSsoSetup as
-            | boolean
-            | undefined) ?? false,
-      },
-      expires:
-        result.session.expiresAt instanceof Date
-          ? result.session.expiresAt.toISOString()
-          : new Date(result.session.expiresAt).toISOString(),
-      sessionId: result.session.id,
-    };
+    const baseSession: Session = buildBaseSession(result);
 
     // Admin impersonation compat: read Session.impersonating JSON directly.
     // We keep this legacy column (added in migration 20260406120000) so the
@@ -136,23 +195,11 @@ export const getServerAuthSession = async (ctx: {
     }
 
     const impersonating = dbSession.impersonating as
-      | {
-          id?: string;
-          name?: string | null;
-          email?: string | null;
-          image?: string | null;
-          expires?: string | Date;
-        }
+      | Impersonating
       | null
       | undefined;
 
-    if (
-      impersonating &&
-      typeof impersonating === "object" &&
-      impersonating.id &&
-      impersonating.expires &&
-      new Date(impersonating.expires) > new Date()
-    ) {
+    if (isLiveImpersonation(impersonating)) {
       // Verify the impersonation target still exists and isn't deactivated.
       // If the target was deleted or deactivated AFTER impersonation started,
       // fall through to the real admin session rather than acting on behalf
@@ -166,21 +213,7 @@ export const getServerAuthSession = async (ctx: {
         targetStillValid && !targetStillValid.deactivatedAt;
 
       if (isTargetActive) {
-        return {
-          ...baseSession,
-          user: {
-            id: impersonating.id,
-            name: impersonating.name ?? null,
-            email: impersonating.email ?? null,
-            image: impersonating.image ?? null,
-            impersonator: {
-              id: baseSession.user.id,
-              name: baseSession.user.name ?? null,
-              email: baseSession.user.email ?? null,
-              image: baseSession.user.image ?? null,
-            },
-          },
-        };
+        return buildImpersonatedSession({ baseSession, impersonating });
       }
       logger.warn(
         {

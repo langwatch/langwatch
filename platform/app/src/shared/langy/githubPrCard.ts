@@ -67,8 +67,8 @@ function num(value: unknown): number | undefined {
     : undefined;
 }
 
-/** Parse a `github.open_pr` tool part's output. Null if it isn't one. */
-export function parseGithubPrCard(output: unknown): GithubPrCardData | null {
+/** The tool output as a bag of fields, whether it arrived as JSON or an object. */
+function prOutputRecord(output: unknown): Record<string, unknown> | null {
   let raw: unknown = output;
   if (typeof output === "string") {
     try {
@@ -78,7 +78,42 @@ export function parseGithubPrCard(output: unknown): GithubPrCardData | null {
     }
   }
   if (!raw || typeof raw !== "object") return null;
-  const pr = raw as Record<string, unknown>;
+  return raw as Record<string, unknown>;
+}
+
+const ENRICHED_STRING_FIELDS = [
+  "title",
+  "headRef",
+  "baseRef",
+  "author",
+] as const;
+
+const ENRICHED_NUMBER_FIELDS = [
+  "additions",
+  "deletions",
+  "changedFiles",
+] as const;
+
+/** The GitHub-API half of the card — every field absent unless it parses. */
+function enrichedPrFields(
+  pr: Record<string, unknown>,
+): Partial<GithubPrCardData> {
+  const fields: Partial<GithubPrCardData> = {};
+  for (const key of ENRICHED_STRING_FIELDS) {
+    const value = str(pr[key]);
+    if (value) fields[key] = value;
+  }
+  for (const key of ENRICHED_NUMBER_FIELDS) {
+    const value = num(pr[key]);
+    if (value !== undefined) fields[key] = value;
+  }
+  return fields;
+}
+
+/** Parse a `github.open_pr` tool part's output. Null if it isn't one. */
+export function parseGithubPrCard(output: unknown): GithubPrCardData | null {
+  const pr = prOutputRecord(output);
+  if (!pr) return null;
 
   const owner = str(pr.owner);
   const repo = str(pr.repo);
@@ -98,19 +133,7 @@ export function parseGithubPrCard(output: unknown): GithubPrCardData | null {
     number,
     url,
     state,
-    ...(str(pr.title) ? { title: str(pr.title)! } : {}),
-    ...(str(pr.headRef) ? { headRef: str(pr.headRef)! } : {}),
-    ...(str(pr.baseRef) ? { baseRef: str(pr.baseRef)! } : {}),
-    ...(str(pr.author) ? { author: str(pr.author)! } : {}),
-    ...(num(pr.additions) !== undefined
-      ? { additions: num(pr.additions)! }
-      : {}),
-    ...(num(pr.deletions) !== undefined
-      ? { deletions: num(pr.deletions)! }
-      : {}),
-    ...(num(pr.changedFiles) !== undefined
-      ? { changedFiles: num(pr.changedFiles)! }
-      : {}),
+    ...enrichedPrFields(pr),
   };
 }
 

@@ -8,11 +8,34 @@ import {
   type SpanWithChildren,
 } from "./common";
 
+type RAGInputOutputMap = Record<
+  string,
+  { input: RAGSpan["input"]; output: RAGSpan["output"] }
+>;
+
+const computeRagInputOutput = (
+  span: SpanWithChildren,
+  inputOutputMap: RAGInputOutputMap,
+  fillInputOutputMap: (spans: Span[]) => Span[],
+): void => {
+  if (span.type !== "rag" || (span.input && span.output)) {
+    return;
+  }
+
+  const flatChildren = fillInputOutputMap(
+    flattenSpanTree(span.children, "inside-out"),
+  );
+  const input = getFirstInputAsText(flatChildren);
+  const output = getLastOutputAsText(flatChildren);
+
+  inputOutputMap[span.span_id] = {
+    input: span.input ? span.input : { type: "text", value: input },
+    output: span.output ? span.output : { type: "text", value: output },
+  };
+};
+
 export const addInputAndOutputForRAGs = (spans: Span[]): Span[] => {
-  const inputOutputMap: Record<
-    string,
-    { input: RAGSpan["input"]; output: RAGSpan["output"] }
-  > = {};
+  const inputOutputMap: RAGInputOutputMap = {};
 
   const fillInputOutputMap = (spans: Span[]): Span[] => {
     return spans.map((span) => {
@@ -29,21 +52,7 @@ export const addInputAndOutputForRAGs = (spans: Span[]): Span[] => {
   const recursiveExtractInputAndOutput = (spans: SpanWithChildren[]): void => {
     spans.forEach((span) => {
       recursiveExtractInputAndOutput(span.children);
-
-      if (span.type !== "rag" || (span.input && span.output)) {
-        return;
-      }
-
-      const flatChildren = fillInputOutputMap(
-        flattenSpanTree(span.children, "inside-out"),
-      );
-      const input = getFirstInputAsText(flatChildren);
-      const output = getLastOutputAsText(flatChildren);
-
-      inputOutputMap[span.span_id] = {
-        input: span.input ? span.input : { type: "text", value: input },
-        output: span.output ? span.output : { type: "text", value: output },
-      };
+      computeRagInputOutput(span, inputOutputMap, fillInputOutputMap);
     });
   };
 

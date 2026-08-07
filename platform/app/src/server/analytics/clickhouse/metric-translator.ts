@@ -466,6 +466,86 @@ function translateMetadataMetric({
 }
 
 /**
+ * Context available to a performance-metric column-expression builder:
+ * the two table aliases it may reference, and the shared `requiredJoins`
+ * list a builder may append to (e.g. span-level metrics joining `stored_spans`).
+ */
+type PerformanceColumnContext = {
+  ts: string;
+  ss: string;
+  requiredJoins: CHTable[];
+};
+
+/**
+ * Maps a performance.* or spans.metrics.* metric name to the raw SQL column
+ * expression `perfAgg` (below) wraps in the requested aggregation. Order
+ * doesn't matter here — unlike `translateAllFilters`'s priority chains,
+ * each metric owns exactly one entry.
+ */
+const performanceColumnExpressions: Record<
+  string,
+  (ctx: PerformanceColumnContext) => string
+> = {
+  "performance.completion_time": ({ ts }) => `${ts}.TotalDurationMs`,
+  "performance.first_token": ({ ts }) => `${ts}.TimeToFirstTokenMs`,
+  "performance.total_cost": ({ ts }) => `${ts}.TotalCost`,
+
+  // Cost actually billed per token: the whole list-price cost minus the
+  // bundled (non-billed) portion. NonBilledCost is the fold-time per-span
+  // sum; rows folded before that column existed (NULL) fall back to the
+  // legacy all-or-nothing langwatch.cost.non_billable boolean.
+  "performance.cost_billed": ({ ts }) =>
+    `(coalesce(${ts}.TotalCost, 0) - ${nonBilledCostExpression(ts)})`,
+
+  // Bundled / theoretical cost not billed per token (the list-price value of
+  // bundled-subscription usage). The grand total is performance.total_cost.
+  "performance.cost_non_billed": ({ ts }) => nonBilledCostExpression(ts),
+
+  "performance.prompt_tokens": ({ ts }) => `${ts}.TotalPromptTokenCount`,
+  "performance.completion_tokens": ({ ts }) =>
+    `${ts}.TotalCompletionTokenCount`,
+
+  // Sum of prompt + completion tokens (the "new content" delta, excludes cache)
+  "performance.total_tokens": ({ ts }) =>
+    `(coalesce(${ts}.TotalPromptTokenCount, 0) + coalesce(${ts}.TotalCompletionTokenCount, 0))`,
+
+  // Cache + reasoning sums are parked on reserved attribute keys by the fold
+  // (they never reach a dedicated column), so read them from the Attributes
+  // map at query time — no migration, works on every historical trace. The
+  // values are stored as strings; toUInt64OrZero handles missing/empty → 0.
+  "performance.cache_read_tokens": ({ ts }) =>
+    `toUInt64OrZero(${ts}.Attributes['langwatch.reserved.cache_read_tokens'])`,
+  "performance.cache_write_tokens": ({ ts }) =>
+    `toUInt64OrZero(${ts}.Attributes['langwatch.reserved.cache_creation_tokens'])`,
+  "performance.reasoning_tokens": ({ ts }) =>
+    `toUInt64OrZero(${ts}.Attributes['langwatch.reserved.reasoning_tokens'])`,
+
+  // Total tokens the model actually processed = input + output + cache read +
+  // cache write. Reasoning is a subset of completion, so it is NOT added again.
+  "performance.total_processed_tokens": ({ ts }) =>
+    `(coalesce(${ts}.TotalPromptTokenCount, 0) + coalesce(${ts}.TotalCompletionTokenCount, 0) + toUInt64OrZero(${ts}.Attributes['langwatch.reserved.cache_read_tokens']) + toUInt64OrZero(${ts}.Attributes['langwatch.reserved.cache_creation_tokens']))`,
+
+  // Uses pre-aggregated TokensPerSecond from trace_summaries.
+  // Avoids joining stored_spans and reading SpanAttributes (a Map column
+  // that includes large LLM prompt/completion text), which caused OOM.
+  "performance.tokens_per_second": ({ ts }) => `${ts}.TokensPerSecond`,
+
+  // Span-level prompt tokens (for grouping by span-level attributes like model)
+  // Uses canonical OTel name: gen_ai.usage.input_tokens
+  "spans.metrics.prompt_tokens": ({ ss, requiredJoins }) => {
+    requiredJoins.push("stored_spans");
+    return `toFloat64OrNull(${ss}.SpanAttributes['gen_ai.usage.input_tokens'])`;
+  },
+
+  // Span-level completion tokens (for grouping by span-level attributes like model)
+  // Uses canonical OTel name: gen_ai.usage.output_tokens
+  "spans.metrics.completion_tokens": ({ ss, requiredJoins }) => {
+    requiredJoins.push("stored_spans");
+    return `toFloat64OrNull(${ss}.SpanAttributes['gen_ai.usage.output_tokens'])`;
+  },
+};
+
+/**
  * Translate performance metrics
  *
  * All performance.* and spans.metrics.* percentile aggregations route through
@@ -498,173 +578,22 @@ function translatePerformanceMetric({
       percentileMode: "tdigest",
     });
 
-  switch (metric) {
-    case "performance.completion_time":
-      return {
-        selectExpression: perfAgg(`${ts}.TotalDurationMs`),
-        alias,
-        requiredJoins,
-        params: {},
-      };
-
-    case "performance.first_token":
-      return {
-        selectExpression: perfAgg(`${ts}.TimeToFirstTokenMs`),
-        alias,
-        requiredJoins,
-        params: {},
-      };
-
-    case "performance.total_cost":
-      return {
-        selectExpression: perfAgg(`${ts}.TotalCost`),
-        alias,
-        requiredJoins,
-        params: {},
-      };
-
-    // Cost actually billed per token: the whole list-price cost minus the
-    // bundled (non-billed) portion. NonBilledCost is the fold-time per-span
-    // sum; rows folded before that column existed (NULL) fall back to the
-    // legacy all-or-nothing langwatch.cost.non_billable boolean.
-    case "performance.cost_billed":
-      return {
-        selectExpression: perfAgg(
-          `(coalesce(${ts}.TotalCost, 0) - ${nonBilledCostExpression(ts)})`,
-        ),
-        alias,
-        requiredJoins,
-        params: {},
-      };
-
-    // Bundled / theoretical cost not billed per token (the list-price value of
-    // bundled-subscription usage). The grand total is performance.total_cost.
-    case "performance.cost_non_billed":
-      return {
-        selectExpression: perfAgg(nonBilledCostExpression(ts)),
-        alias,
-        requiredJoins,
-        params: {},
-      };
-
-    case "performance.prompt_tokens":
-      return {
-        selectExpression: perfAgg(`${ts}.TotalPromptTokenCount`),
-        alias,
-        requiredJoins,
-        params: {},
-      };
-
-    case "performance.completion_tokens":
-      return {
-        selectExpression: perfAgg(`${ts}.TotalCompletionTokenCount`),
-        alias,
-        requiredJoins,
-        params: {},
-      };
-
-    case "performance.total_tokens":
-      // Sum of prompt + completion tokens (the "new content" delta, excludes cache)
-      return {
-        selectExpression: perfAgg(
-          `(coalesce(${ts}.TotalPromptTokenCount, 0) + coalesce(${ts}.TotalCompletionTokenCount, 0))`,
-        ),
-        alias,
-        requiredJoins,
-        params: {},
-      };
-
-    // Cache + reasoning sums are parked on reserved attribute keys by the fold
-    // (they never reach a dedicated column), so read them from the Attributes
-    // map at query time — no migration, works on every historical trace. The
-    // values are stored as strings; toUInt64OrZero handles missing/empty → 0.
-    case "performance.cache_read_tokens":
-      return {
-        selectExpression: perfAgg(
-          `toUInt64OrZero(${ts}.Attributes['langwatch.reserved.cache_read_tokens'])`,
-        ),
-        alias,
-        requiredJoins,
-        params: {},
-      };
-
-    case "performance.cache_write_tokens":
-      return {
-        selectExpression: perfAgg(
-          `toUInt64OrZero(${ts}.Attributes['langwatch.reserved.cache_creation_tokens'])`,
-        ),
-        alias,
-        requiredJoins,
-        params: {},
-      };
-
-    case "performance.reasoning_tokens":
-      return {
-        selectExpression: perfAgg(
-          `toUInt64OrZero(${ts}.Attributes['langwatch.reserved.reasoning_tokens'])`,
-        ),
-        alias,
-        requiredJoins,
-        params: {},
-      };
-
-    // Total tokens the model actually processed = input + output + cache read +
-    // cache write. Reasoning is a subset of completion, so it is NOT added again.
-    case "performance.total_processed_tokens":
-      return {
-        selectExpression: perfAgg(
-          `(coalesce(${ts}.TotalPromptTokenCount, 0) + coalesce(${ts}.TotalCompletionTokenCount, 0) + toUInt64OrZero(${ts}.Attributes['langwatch.reserved.cache_read_tokens']) + toUInt64OrZero(${ts}.Attributes['langwatch.reserved.cache_creation_tokens']))`,
-        ),
-        alias,
-        requiredJoins,
-        params: {},
-      };
-
-    case "performance.tokens_per_second":
-      // Uses pre-aggregated TokensPerSecond from trace_summaries.
-      // Avoids joining stored_spans and reading SpanAttributes (a Map column
-      // that includes large LLM prompt/completion text), which caused OOM.
-      return {
-        selectExpression: perfAgg(`${ts}.TokensPerSecond`),
-        alias,
-        requiredJoins,
-        params: {},
-      };
-
-    case "spans.metrics.prompt_tokens":
-      // Span-level prompt tokens (for grouping by span-level attributes like model)
-      // Uses canonical OTel name: gen_ai.usage.input_tokens
-      requiredJoins.push("stored_spans");
-      return {
-        selectExpression: perfAgg(
-          `toFloat64OrNull(${ss}.SpanAttributes['gen_ai.usage.input_tokens'])`,
-        ),
-        alias,
-        requiredJoins,
-        params: {},
-      };
-
-    case "spans.metrics.completion_tokens":
-      // Span-level completion tokens (for grouping by span-level attributes like model)
-      // Uses canonical OTel name: gen_ai.usage.output_tokens
-      requiredJoins.push("stored_spans");
-      return {
-        selectExpression: perfAgg(
-          `toFloat64OrNull(${ss}.SpanAttributes['gen_ai.usage.output_tokens'])`,
-        ),
-        alias,
-        requiredJoins,
-        params: {},
-      };
-
-    default:
-      return {
-        selectExpression: `count() AS ${alias}`,
-        alias,
-        requiredJoins,
-        params: {},
-      };
+  const columnExprBuilder = performanceColumnExpressions[metric];
+  if (!columnExprBuilder) {
+    return {
+      selectExpression: `count() AS ${alias}`,
+      alias,
+      requiredJoins,
+      params: {},
+    };
   }
+
+  return {
+    selectExpression: perfAgg(columnExprBuilder({ ts, ss, requiredJoins })),
+    alias,
+    requiredJoins,
+    params: {},
+  };
 }
 
 /**
@@ -987,114 +916,96 @@ function translateThreadsMetric({
 }
 
 /**
- * Translate a pipeline aggregation (per-user, per-thread metrics)
+ * Resolve the pipeline (grouping) column for a pipeline aggregation.
+ * ES terms aggregation excludes null/missing values, so we just use the
+ * column directly and filter out empty values via HAVING clause.
  */
-export function translatePipelineAggregation({
-  metric,
-  aggregation,
-  pipelineField,
-  pipelineAggregation,
-  index,
-  key,
-  subkey,
-}: {
-  metric: string;
-  aggregation: AggregationTypes;
-  pipelineField: string;
-  pipelineAggregation: PipelineAggregationTypes;
-  index: number;
-  key?: string;
-  subkey?: string;
-}): MetricTranslation {
-  const ts = tableAliases.trace_summaries;
-  const alias = buildMetricAlias({ index, metric, aggregation, key, subkey });
-
-  // Get the pipeline field expression
-  // ES terms aggregation excludes null/missing values, so we just use the column directly
-  // and filter out empty values via HAVING clause
-  let pipelineColumn: string;
+function resolvePipelineColumn(pipelineField: string, ts: string): string {
   switch (pipelineField) {
     case "trace_id":
-      pipelineColumn = `${ts}.TraceId`;
-      break;
+      return `${ts}.TraceId`;
     case "user_id":
-      pipelineColumn = `${ts}.Attributes['langwatch.user_id']`;
-      break;
+      return `${ts}.Attributes['langwatch.user_id']`;
     case "thread_id":
-      pipelineColumn = `${ts}.Attributes['gen_ai.conversation.id']`;
-      break;
+      return `${ts}.Attributes['gen_ai.conversation.id']`;
     case "customer_id":
-      pipelineColumn = `${ts}.Attributes['langwatch.customer_id']`;
-      break;
+      return `${ts}.Attributes['langwatch.customer_id']`;
     default:
-      pipelineColumn = `${ts}.TraceId`;
+      return `${ts}.TraceId`;
   }
+}
 
-  // Get the inner metric translation
-  const innerMetric = translateMetric({
-    metric,
-    aggregation,
-    index,
-    key,
-    subkey,
-  });
+/**
+ * Special handling for threads.average_duration_per_thread with pipeline.
+ * This requires a 3-level aggregation:
+ * 1. Group by (user_id, thread_id), compute thread duration
+ * 2. Group by user_id, compute avg thread duration per user
+ * 3. Compute avg across users
+ */
+function buildThreadAverageDurationPipeline({
+  ts,
+  alias,
+  pipelineColumn,
+  pipelineAggregation,
+  innerMetric,
+}: {
+  ts: string;
+  alias: string;
+  pipelineColumn: string;
+  pipelineAggregation: PipelineAggregationTypes;
+  innerMetric: MetricTranslation;
+}): MetricTranslation {
+  const threadIdCol = `${ts}.Attributes['gen_ai.conversation.id']`;
+  // pipelineAggregation is typed as PipelineAggregationTypes (sum/avg/min/max)
+  // which matches CH function names directly
+  const outerAgg = pipelineAggregation;
 
-  // Special handling for threads.average_duration_per_thread with pipeline
-  // This requires a 3-level aggregation:
-  // 1. Group by (user_id, thread_id), compute thread duration
-  // 2. Group by user_id, compute avg thread duration per user
-  // 3. Compute avg across users
-  if (
-    metric === "threads.average_duration_per_thread" &&
-    innerMetric.requiresSubquery
-  ) {
-    const threadIdCol = `${ts}.Attributes['gen_ai.conversation.id']`;
-    // pipelineAggregation is typed as PipelineAggregationTypes (sum/avg/min/max)
-    // which matches CH function names directly
-    const outerAgg = pipelineAggregation;
-
-    // Build a nested subquery for 3-level aggregation
-    // Use trace_summaries.OccurredAt which is set to the trace's execution start time
-    // This matches ES's timestamps.started_at at the trace level
-    return {
-      selectExpression: `${outerAgg}(user_avg_duration) AS ${alias}`,
-      alias,
-      requiredJoins: innerMetric.requiredJoins,
-      params: innerMetric.params,
-      requiresSubquery: true,
-      subquery: {
-        // Inner: compute avg thread duration per user
-        innerSelect: `
-          pipeline_key,
-          avg(thread_duration) AS user_avg_duration
-        `,
-        innerGroupBy: "pipeline_key",
-        outerAggregation: `${outerAgg}(user_avg_duration) AS ${alias}`,
-        // Custom nested CTE for thread duration calculation
-        nestedSubquery: {
-          // Use trace_summaries.OccurredAt (= trace's execution start time)
-          // DateTime64 subtraction returns seconds, multiply by 1000 for milliseconds
-          // Filter out empty pipeline_key values via HAVING to match ES terms aggregation behavior
-          select: `${pipelineColumn} AS pipeline_key, ${threadIdCol} AS thread_id, least((max(${ts}.OccurredAt) - min(${ts}.OccurredAt)) * 1000, ${MAX_THREAD_SESSION_DURATION_MS}) AS thread_duration`,
-          groupBy: "pipeline_key, thread_id",
-          having: `thread_id IS NOT NULL AND toString(thread_id) != '' AND pipeline_key IS NOT NULL AND toString(pipeline_key) != ''`,
-        },
+  // Build a nested subquery for 3-level aggregation
+  // Use trace_summaries.OccurredAt which is set to the trace's execution start time
+  // This matches ES's timestamps.started_at at the trace level
+  return {
+    selectExpression: `${outerAgg}(user_avg_duration) AS ${alias}`,
+    alias,
+    requiredJoins: innerMetric.requiredJoins,
+    params: innerMetric.params,
+    requiresSubquery: true,
+    subquery: {
+      // Inner: compute avg thread duration per user
+      innerSelect: `
+        pipeline_key,
+        avg(thread_duration) AS user_avg_duration
+      `,
+      innerGroupBy: "pipeline_key",
+      outerAggregation: `${outerAgg}(user_avg_duration) AS ${alias}`,
+      // Custom nested CTE for thread duration calculation
+      nestedSubquery: {
+        // Use trace_summaries.OccurredAt (= trace's execution start time)
+        // DateTime64 subtraction returns seconds, multiply by 1000 for milliseconds
+        // Filter out empty pipeline_key values via HAVING to match ES terms aggregation behavior
+        select: `${pipelineColumn} AS pipeline_key, ${threadIdCol} AS thread_id, least((max(${ts}.OccurredAt) - min(${ts}.OccurredAt)) * 1000, ${MAX_THREAD_SESSION_DURATION_MS}) AS thread_duration`,
+        groupBy: "pipeline_key, thread_id",
+        having: `thread_id IS NOT NULL AND toString(thread_id) != '' AND pipeline_key IS NOT NULL AND toString(pipeline_key) != ''`,
       },
-    };
-  }
+    },
+  };
+}
 
-  // If inner metric already requires a subquery (e.g., other nested metrics),
-  // we can't nest it in a pipeline aggregation. Return null as a fallback.
-  if (innerMetric.requiresSubquery) {
-    return {
-      selectExpression: `NULL AS ${alias}`,
-      alias,
-      requiredJoins: innerMetric.requiredJoins,
-      params: innerMetric.params,
-      requiresSubquery: false, // Don't add to subquery metrics list
-    };
-  }
-
+/**
+ * Standard (non-threads-special-case) pipeline aggregation: nest the inner
+ * metric's select expression (alias stripped) as `inner_value` grouped by
+ * the pipeline key, then aggregate across pipeline keys in the outer scope.
+ */
+function buildStandardPipelineAggregation({
+  alias,
+  pipelineColumn,
+  pipelineAggregation,
+  innerMetric,
+}: {
+  alias: string;
+  pipelineColumn: string;
+  pipelineAggregation: PipelineAggregationTypes;
+  innerMetric: MetricTranslation;
+}): MetricTranslation {
   // pipelineAggregation is typed as PipelineAggregationTypes (sum/avg/min/max)
   // which matches CH function names directly
   const outerAgg = pipelineAggregation;
@@ -1120,4 +1031,70 @@ export function translatePipelineAggregation({
       outerAggregation: `${outerAgg}(inner_value) AS ${alias}`,
     },
   };
+}
+
+/**
+ * Translate a pipeline aggregation (per-user, per-thread metrics)
+ */
+export function translatePipelineAggregation({
+  metric,
+  aggregation,
+  pipelineField,
+  pipelineAggregation,
+  index,
+  key,
+  subkey,
+}: {
+  metric: string;
+  aggregation: AggregationTypes;
+  pipelineField: string;
+  pipelineAggregation: PipelineAggregationTypes;
+  index: number;
+  key?: string;
+  subkey?: string;
+}): MetricTranslation {
+  const ts = tableAliases.trace_summaries;
+  const alias = buildMetricAlias({ index, metric, aggregation, key, subkey });
+  const pipelineColumn = resolvePipelineColumn(pipelineField, ts);
+
+  // Get the inner metric translation
+  const innerMetric = translateMetric({
+    metric,
+    aggregation,
+    index,
+    key,
+    subkey,
+  });
+
+  if (
+    metric === "threads.average_duration_per_thread" &&
+    innerMetric.requiresSubquery
+  ) {
+    return buildThreadAverageDurationPipeline({
+      ts,
+      alias,
+      pipelineColumn,
+      pipelineAggregation,
+      innerMetric,
+    });
+  }
+
+  // If inner metric already requires a subquery (e.g., other nested metrics),
+  // we can't nest it in a pipeline aggregation. Return null as a fallback.
+  if (innerMetric.requiresSubquery) {
+    return {
+      selectExpression: `NULL AS ${alias}`,
+      alias,
+      requiredJoins: innerMetric.requiredJoins,
+      params: innerMetric.params,
+      requiresSubquery: false, // Don't add to subquery metrics list
+    };
+  }
+
+  return buildStandardPipelineAggregation({
+    alias,
+    pipelineColumn,
+    pipelineAggregation,
+    innerMetric,
+  });
 }

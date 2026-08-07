@@ -205,6 +205,188 @@ function isInheritedFromCause(message: string, cause: unknown): boolean {
   return current !== null && current !== undefined;
 }
 
+function extractLimitInfo(
+  cause: { limitType?: string; current?: number; max?: number } | undefined,
+): {
+  limitType: string;
+  current: number | undefined;
+  max: number | undefined;
+} | null {
+  return cause?.limitType
+    ? { limitType: cause.limitType, current: cause.current, max: cause.max }
+    : null;
+}
+
+/**
+ * Input validation arrives as a ZodError cause. Promote it to the shared
+ * ValidationError so it travels the one handled-error channel like every
+ * other failure: `fromZodError` flattens the issues into
+ * `meta.fieldErrors` / `meta.formErrors`, which is where the contents of the
+ * old sidecar `data.zodError` field now live. Mirrors what the Hono handler
+ * already does (packages/api/src/errors.ts::validationErrorFromZod).
+ */
+function resolveHandledError(cause: unknown): HandledError | null {
+  if (HandledError.isHandled(cause)) return cause;
+  if (cause instanceof ZodError) return ValidationError.fromZodError(cause);
+  return null;
+}
+
+/**
+ * Surface ModelNotConfiguredError on the wire so the frontend
+ * interceptor in `utils/trpcError.ts::extractMissingModelInfo` can
+ * open the missing-model modal. `cause` carries a stable
+ * discriminator (`code: "MODEL_NOT_CONFIGURED"`) plus the feature
+ * metadata the modal needs to render + deep-link.
+ */
+function extractMissingModelCause(cause: unknown) {
+  return cause instanceof ModelNotConfiguredError
+    ? {
+        code: cause.cause,
+        featureKey: cause.featureKey,
+        featureDisplayName: cause.featureDisplayName,
+        role: cause.role,
+        projectId: cause.projectId,
+      }
+    : null;
+}
+
+/**
+ * Surface AiCallFailedError on the wire so the frontend interceptor
+ * in `utils/trpcError.ts::extractAiCallFailedInfo` can show the
+ * "double-check your model configuration" toast. Same cause-channel
+ * as MODEL_NOT_CONFIGURED — different discriminator code.
+ * `originalErrorMessage` is deliberately NOT on this object. It is the
+ * provider's own response text, which routinely echoes credential material
+ * (an OpenAI 401 body is literally `Incorrect API key provided: sk-proj-…`),
+ * and when the call used a LangWatch-managed provider that key is ours, not
+ * the customer's. It stays on the server for the log line.
+ */
+function extractAiCallFailedCause(cause: unknown) {
+  return cause instanceof AiCallFailedError
+    ? {
+        code: cause.cause,
+        featureKey: cause.featureKey,
+        featureDisplayName: cause.featureDisplayName,
+        role: cause.role,
+      }
+    : null;
+}
+
+/**
+ * Surface ModelProviderDisabledError on the wire so the frontend
+ * can render a swap-to-parent toast. Carries the cascade-next
+ * alternate so the toast's primary CTA can be a one-click swap
+ * rather than a generic "open settings" deep link.
+ */
+function extractProviderDisabledCause(cause: unknown) {
+  return cause instanceof ModelProviderDisabledError
+    ? cause.toResponseBody()
+    : null;
+}
+
+function isInternalServerErrorShape(
+  error: { code?: string },
+  shape: any,
+): boolean {
+  return (
+    error.code === "INTERNAL_SERVER_ERROR" ||
+    shape?.data?.code === "INTERNAL_SERVER_ERROR"
+  );
+}
+
+/**
+ * Free-text error messages never cross the tRPC boundary. `data.error` (code,
+ * meta, tips, docsUrl — see SerializedHandledError, which deliberately has no
+ * message field) is the entire client contract for handled errors, and
+ * presentation is decided client-side by the code-keyed explainers. A
+ * HandledError's message is server copy — it can name env vars or internal
+ * services — so the wire carries only its stable code. Unhandled 5xx messages
+ * can contain Prisma models, SQL, or hostnames and collapse to a generic
+ * string. The original error remains on the TRPCError for loggerMiddleware,
+ * exception capture, and OTel span recording.
+ *
+ * `message` and `code` stay at the top level because they are JSON-RPC
+ * envelope fields the tRPC client itself runtime-checks (`isTRPCErrorResponse`
+ * requires a string message and a numeric code, and discards `data` entirely
+ * when either is missing) — not fields we chose.
+ */
+function resolveWireMessage({
+  handled,
+  isInternalServerError,
+  cause,
+  shapeMessage,
+}: {
+  handled: HandledError | null;
+  isInternalServerError: boolean;
+  cause: unknown;
+  shapeMessage: string;
+}): string {
+  if (handled) return handled.code;
+  if (isInternalServerError) return HandledError.toUserMessage(cause);
+  return shapeMessage;
+}
+
+/**
+ * Whether `message` is prose a procedure deliberately wrote for a person.
+ *
+ * The client renders this one (`readAuthoredMessage`) because #5984 left
+ * plain non-5xx messages alone on purpose: several hundred procedures throw
+ * a `TRPCError` carrying real copy, and replacing those with "we've been
+ * notified" tells the user to wait for something that will never change.
+ *
+ * But only the server can tell authored copy from an accident, and it needs
+ * `cause`, which never crosses the wire. Two accidents to exclude:
+ *
+ *   - `new TRPCError({ code: "NOT_FOUND" })` — tRPC defaults `message` to
+ *     the code NAME, so the customer would read "NOT_FOUND".
+ *   - `new TRPCError({ code: "BAD_REQUEST", cause: err })` — tRPC defaults
+ *     `message` to the CAUSE's message, so a driver string ("fetch failed",
+ *     "Invalid time value") would be presented as our own copy. That is the
+ *     leak #5984 closed at 5xx, reopened one status class down.
+ *
+ * What is NOT an accident is `new TRPCError({ code, message: <copy>, cause:
+ * err })` — passing `cause` for the log line while writing the sentence
+ * yourself. That is the majority shape in this codebase, and an earlier
+ * version of this gate rejected it wholesale on `cause === undefined`,
+ * which told an admin who mistyped a rule field to "try again in a moment".
+ * So the test is authored-vs-INHERITED, not caused-vs-uncaused.
+ *
+ * Deciding this here rather than by sniffing the message client-side is the
+ * difference between a fact and a guess.
+ */
+function resolveIsAuthoredMessage({
+  handled,
+  isInternalServerError,
+  shapeMessage,
+  cause,
+  errorCode,
+}: {
+  handled: HandledError | null;
+  isInternalServerError: boolean;
+  shapeMessage: unknown;
+  cause: unknown;
+  errorCode: string | undefined;
+}): boolean {
+  return (
+    !handled &&
+    !isInternalServerError &&
+    typeof shapeMessage === "string" &&
+    shapeMessage.length > 0 &&
+    shapeMessage !== errorCode &&
+    !isInheritedFromCause(shapeMessage, cause)
+  );
+}
+
+// tRPC includes stacks in development error shapes. Local callers should
+// exercise the same safe wire contract as production callers — including on
+// a plain 4xx, which used to keep its stack because this ran only for 5xx
+// and handled errors.
+function stripStackFromShapeData(shapeData: any) {
+  const clone = { ...shapeData };
+  delete clone.stack;
+  return clone;
+}
+
 /**
  * The wire contract for every failed tRPC call: what a client is allowed to
  * learn about an error, and in what shape.
@@ -223,134 +405,31 @@ export function errorFormatter({
   const cause = error.cause as
     | { limitType?: string; current?: number; max?: number }
     | undefined;
-  const limitInfo = cause?.limitType
-    ? {
-        limitType: cause.limitType,
-        current: cause.current,
-        max: cause.max,
-      }
-    : null;
+  const limitInfo = extractLimitInfo(cause);
 
-  // Input validation arrives as a ZodError cause. Promote it to the shared
-  // ValidationError so it travels the one handled-error channel like every
-  // other failure: `fromZodError` flattens the issues into
-  // `meta.fieldErrors` / `meta.formErrors`, which is where the contents of the
-  // old sidecar `data.zodError` field now live. Mirrors what the Hono handler
-  // already does (packages/api/src/errors.ts::validationErrorFromZod).
-  const handled = HandledError.isHandled(error.cause)
-    ? error.cause
-    : error.cause instanceof ZodError
-      ? ValidationError.fromZodError(error.cause)
-      : null;
-
+  const handled = resolveHandledError(error.cause);
   const domainError = handled?.serialize() ?? null;
 
-  // Surface ModelNotConfiguredError on the wire so the frontend
-  // interceptor in `utils/trpcError.ts::extractMissingModelInfo` can
-  // open the missing-model modal. `cause` carries a stable
-  // discriminator (`code: "MODEL_NOT_CONFIGURED"`) plus the feature
-  // metadata the modal needs to render + deep-link.
-  const missingModelCause =
-    error.cause instanceof ModelNotConfiguredError
-      ? {
-          code: error.cause.cause,
-          featureKey: error.cause.featureKey,
-          featureDisplayName: error.cause.featureDisplayName,
-          role: error.cause.role,
-          projectId: error.cause.projectId,
-        }
-      : null;
+  const missingModelCause = extractMissingModelCause(error.cause);
+  const aiCallFailedCause = extractAiCallFailedCause(error.cause);
+  const providerDisabledCause = extractProviderDisabledCause(error.cause);
 
-  // Surface AiCallFailedError on the wire so the frontend interceptor
-  // in `utils/trpcError.ts::extractAiCallFailedInfo` can show the
-  // "double-check your model configuration" toast. Same cause-channel
-  // as MODEL_NOT_CONFIGURED — different discriminator code.
-  // `originalErrorMessage` is deliberately NOT on this object. It is the
-  // provider's own response text, which routinely echoes credential material
-  // (an OpenAI 401 body is literally `Incorrect API key provided: sk-proj-…`),
-  // and when the call used a LangWatch-managed provider that key is ours, not
-  // the customer's. It stays on the server for the log line.
-  const aiCallFailedCause =
-    error.cause instanceof AiCallFailedError
-      ? {
-          code: error.cause.cause,
-          featureKey: error.cause.featureKey,
-          featureDisplayName: error.cause.featureDisplayName,
-          role: error.cause.role,
-        }
-      : null;
+  const isInternalServerError = isInternalServerErrorShape(error, shape);
+  const message = resolveWireMessage({
+    handled,
+    isInternalServerError,
+    cause: error.cause,
+    shapeMessage: shape.message,
+  });
+  const authored = resolveIsAuthoredMessage({
+    handled,
+    isInternalServerError,
+    shapeMessage: shape.message,
+    cause: error.cause,
+    errorCode: error.code,
+  });
 
-  // Surface ModelProviderDisabledError on the wire so the frontend
-  // can render a swap-to-parent toast. Carries the cascade-next
-  // alternate so the toast's primary CTA can be a one-click swap
-  // rather than a generic "open settings" deep link.
-  const providerDisabledCause =
-    error.cause instanceof ModelProviderDisabledError
-      ? error.cause.toResponseBody()
-      : null;
-
-  // Free-text error messages never cross the tRPC boundary. `data.error` (code,
-  // meta, tips, docsUrl — see SerializedHandledError, which deliberately has no
-  // message field) is the entire client contract for handled errors, and
-  // presentation is decided client-side by the code-keyed explainers. A
-  // HandledError's message is server copy — it can name env vars or internal
-  // services — so the wire carries only its stable code. Unhandled 5xx messages
-  // can contain Prisma models, SQL, or hostnames and collapse to a generic
-  // string. The original error remains on the TRPCError for loggerMiddleware,
-  // exception capture, and OTel span recording.
-  //
-  // `message` and `code` stay at the top level because they are JSON-RPC
-  // envelope fields the tRPC client itself runtime-checks (`isTRPCErrorResponse`
-  // requires a string message and a numeric code, and discards `data` entirely
-  // when either is missing) — not fields we chose.
-  const isInternalServerError =
-    error.code === "INTERNAL_SERVER_ERROR" ||
-    shape?.data?.code === "INTERNAL_SERVER_ERROR";
-  const message = handled
-    ? handled.code
-    : isInternalServerError
-      ? HandledError.toUserMessage(error.cause)
-      : shape.message;
-  // Whether `message` is prose a procedure deliberately wrote for a person.
-  //
-  // The client renders this one (`readAuthoredMessage`) because #5984 left
-  // plain non-5xx messages alone on purpose: several hundred procedures throw
-  // a `TRPCError` carrying real copy, and replacing those with "we've been
-  // notified" tells the user to wait for something that will never change.
-  //
-  // But only the server can tell authored copy from an accident, and it needs
-  // `cause`, which never crosses the wire. Two accidents to exclude:
-  //
-  //   - `new TRPCError({ code: "NOT_FOUND" })` — tRPC defaults `message` to
-  //     the code NAME, so the customer would read "NOT_FOUND".
-  //   - `new TRPCError({ code: "BAD_REQUEST", cause: err })` — tRPC defaults
-  //     `message` to the CAUSE's message, so a driver string ("fetch failed",
-  //     "Invalid time value") would be presented as our own copy. That is the
-  //     leak #5984 closed at 5xx, reopened one status class down.
-  //
-  // What is NOT an accident is `new TRPCError({ code, message: <copy>, cause:
-  // err })` — passing `cause` for the log line while writing the sentence
-  // yourself. That is the majority shape in this codebase, and an earlier
-  // version of this gate rejected it wholesale on `cause === undefined`,
-  // which told an admin who mistyped a rule field to "try again in a moment".
-  // So the test is authored-vs-INHERITED, not caused-vs-uncaused.
-  //
-  // Deciding this here rather than by sniffing the message client-side is the
-  // difference between a fact and a guess.
-  const isAuthoredMessage =
-    !handled &&
-    !isInternalServerError &&
-    typeof shape.message === "string" &&
-    shape.message.length > 0 &&
-    shape.message !== error.code &&
-    !isInheritedFromCause(shape.message, error.cause);
-
-  // tRPC includes stacks in development error shapes. Local callers should
-  // exercise the same safe wire contract as production callers — including on
-  // a plain 4xx, which used to keep its stack because this ran only for 5xx
-  // and handled errors.
-  const shapeData = { ...shape.data };
-  delete shapeData.stack;
+  const shapeData = stripStackFromShapeData(shape.data);
 
   return {
     ...shape,
@@ -363,9 +442,10 @@ export function errorFormatter({
         aiCallFailedCause ??
         limitInfo,
       error: domainError,
-      // See `isAuthoredMessage`. Absent/false means the client must not render
-      // `message` — it degrades to the generic unknown state instead.
-      authored: isAuthoredMessage,
+      // See `resolveIsAuthoredMessage`. Absent/false means the client must
+      // not render `message` — it degrades to the generic unknown state
+      // instead.
+      authored,
       // The trace id for EVERY failure, not just handled ones. An unhandled
       // error deliberately tells the client nothing about what went wrong
       // (ADR-045), which leaves support with nothing to correlate on — so the
@@ -506,6 +586,54 @@ function deriveAuditTarget(
   return firstId ? { targetKind, targetId: firstId } : { targetKind };
 }
 
+function idFromObject(obj: Record<string, unknown>): string | undefined {
+  return typeof obj.id === "string" ? obj.id : undefined;
+}
+
+/** One array item's id: direct ({id}), or one level of wrapper unwrap ({invite:{id}}) — shape 5. */
+function findIdInArrayItem(item: unknown): string | undefined {
+  if (!item || typeof item !== "object") return undefined;
+  const obj = item as Record<string, unknown>;
+  const direct = idFromObject(obj);
+  if (direct) return direct;
+  // One more level for {invites:[{invite:{id}}]} shape
+  for (const innerKey of Object.keys(obj)) {
+    const inner = obj[innerKey];
+    if (inner && typeof inner === "object" && !Array.isArray(inner)) {
+      const innerId = idFromObject(inner as Record<string, unknown>);
+      if (innerId) return innerId;
+    }
+  }
+  return undefined;
+}
+
+/** A named field's id when its value is an array — shapes 4/5: [{id}] or [{wrapper:{id}}]. */
+function findFirstIdInArrayField(child: unknown[]): string | undefined {
+  for (const item of child) {
+    const id = findIdInArrayItem(item);
+    if (id) return id;
+  }
+  return undefined;
+}
+
+/** A single named field's id, whichever of shapes 2/4/5/6 it turns out to be. */
+function findFirstIdInField(child: unknown): string | undefined {
+  if (Array.isArray(child)) return findFirstIdInArrayField(child);
+  if (child && typeof child === "object") {
+    return idFromObject(child as Record<string, unknown>);
+  }
+  return undefined;
+}
+
+/** One level of named-field walk into an object's own fields — shapes 2/6: {field:{id}} or {field:[{id}]}. */
+function findFirstIdInFields(obj: Record<string, unknown>): string | undefined {
+  for (const key of Object.keys(obj)) {
+    const id = findFirstIdInField(obj[key]);
+    if (id) return id;
+  }
+  return undefined;
+}
+
 function findFirstId(value: unknown): string | undefined {
   if (!value) return undefined;
   if (Array.isArray(value)) {
@@ -517,34 +645,13 @@ function findFirstId(value: unknown): string | undefined {
   }
   if (typeof value !== "object") return undefined;
   const obj = value as Record<string, unknown>;
-  if (typeof obj.id === "string") return obj.id;
+  const direct = idFromObject(obj);
+  if (direct) return direct;
   // One level of named-field walk into objects + arrays. We don't
   // recurse arbitrarily deep — the audit Target column is best-effort,
   // and an unbounded walk would surface unrelated ids buried in nested
   // payloads.
-  for (const key of Object.keys(obj)) {
-    const child = obj[key];
-    if (Array.isArray(child)) {
-      for (const item of child) {
-        if (item && typeof item === "object") {
-          const itemId = (item as Record<string, unknown>).id;
-          if (typeof itemId === "string") return itemId;
-          // One more level for {invites:[{invite:{id}}]} shape
-          for (const innerKey of Object.keys(item)) {
-            const inner = (item as Record<string, unknown>)[innerKey];
-            if (inner && typeof inner === "object" && !Array.isArray(inner)) {
-              const innerId = (inner as Record<string, unknown>).id;
-              if (typeof innerId === "string") return innerId;
-            }
-          }
-        }
-      }
-    } else if (child && typeof child === "object") {
-      const childId = (child as Record<string, unknown>).id;
-      if (typeof childId === "string") return childId;
-    }
-  }
-  return undefined;
+  return findFirstIdInFields(obj);
 }
 
 /**
@@ -915,6 +1022,65 @@ const handledErrorMiddleware = t.middleware(async ({ next }) => {
   return result;
 });
 
+type TrpcCallLogLevel = keyof Pick<
+  ReturnType<typeof createLogger>,
+  "info" | "warn" | "error"
+>;
+
+type TrpcErrorLogFacts = {
+  statusCode: number;
+  handledErrorCode?: string;
+  handledErrorFault?: string;
+  logLevel: TrpcCallLogLevel;
+  shouldCaptureException: boolean;
+};
+
+/**
+ * Everything a failed call's log line needs, derived once from the error:
+ * the accurate status, the handled-error fields (if any), the level to log
+ * at, and whether it's worth capturing as an exception.
+ */
+function resolveTrpcErrorLogFacts(error: unknown): TrpcErrorLogFacts {
+  // Derive HTTP status from the TRPCError code, not ctx.res.statusCode.
+  // The response status hasn't been set yet at middleware time — tRPC sets
+  // it later when serializing the response. So we map it ourselves.
+  const resolvedStatus =
+    error instanceof TRPCError ? getHTTPStatusCodeFromError(error) : 500;
+
+  const cause = error instanceof TRPCError ? error.cause : undefined;
+  // isHandled also matches an instance from a second copy of the package,
+  // which bare `instanceof` misses — see its brand check.
+  const handledCause = HandledError.isHandled(cause) ? cause : undefined;
+
+  // A handled error states its own status, and it is the accurate one: tRPC
+  // v10 has no code for 502/503/504, so an upstream failure resolves to 500
+  // through `handledErrorToTRPCCode` and would otherwise be counted against
+  // our own error budget every time a customer typos a base URL.
+  const statusCode = handledCause?.httpStatus ?? resolvedStatus;
+
+  // Handled errors log by fault attribution, not status: customer-fault
+  // errors are expected (warn — watched for spikes), while platform and
+  // provider failures are incidents worth an error line. Unhandled errors
+  // stay status-based.
+  const logLevel: TrpcCallLogLevel = handledCause
+    ? handledCause.fault === "customer"
+      ? "warn"
+      : "error"
+    : getLogLevelFromStatusCode(resolvedStatus);
+
+  return {
+    statusCode,
+    // Include handled error code + fault in log data for structured
+    // filtering (and spike alerting on handledErrorCode).
+    handledErrorCode: handledCause?.code,
+    handledErrorFault: handledCause?.fault,
+    logLevel,
+    // Only unhandled 5xx errors are captured as exceptions: handled errors
+    // are expected failure modes with typed causes, not bugs.
+    shouldCaptureException: resolvedStatus >= 500 && !handledCause,
+  };
+}
+
 /** Processes a tRPC call result and logs accordingly. Extracted for testability. */
 export function handleTrpcCallLogging({
   result,
@@ -946,49 +1112,16 @@ export function handleTrpcCallLogging({
   if (!result.ok) {
     logData.error = result.error;
 
-    // Derive HTTP status from the TRPCError code, not ctx.res.statusCode.
-    // The response status hasn't been set yet at middleware time — tRPC sets
-    // it later when serializing the response. So we map it ourselves.
-    const resolvedStatus =
-      result.error instanceof TRPCError
-        ? getHTTPStatusCodeFromError(result.error)
-        : 500;
-
-    const cause =
-      result.error instanceof TRPCError ? result.error.cause : undefined;
-    // isHandled also matches an instance from a second copy of the package,
-    // which bare `instanceof` misses — see its brand check.
-    const handledCause = HandledError.isHandled(cause) ? cause : undefined;
-
-    // A handled error states its own status, and it is the accurate one: tRPC
-    // v10 has no code for 502/503/504, so an upstream failure resolves to 500
-    // through `handledErrorToTRPCCode` and would otherwise be counted against
-    // our own error budget every time a customer typos a base URL.
-    logData.statusCode = handledCause?.httpStatus ?? resolvedStatus;
-
-    // Include handled error code + fault in log data for structured
-    // filtering (and spike alerting on handledErrorCode).
-    if (handledCause) {
-      logData.handledErrorCode = handledCause.code;
-      logData.handledErrorFault = handledCause.fault;
+    const facts = resolveTrpcErrorLogFacts(result.error);
+    logData.statusCode = facts.statusCode;
+    if (facts.handledErrorCode !== undefined) {
+      logData.handledErrorCode = facts.handledErrorCode;
+      logData.handledErrorFault = facts.handledErrorFault;
     }
-
-    // Only unhandled 5xx errors are captured as exceptions: handled errors
-    // are expected failure modes with typed causes, not bugs.
-    if (resolvedStatus >= 500 && !handledCause) {
+    if (facts.shouldCaptureException) {
       capture(toError(result.error));
     }
-
-    // Handled errors log by fault attribution, not status: customer-fault
-    // errors are expected (warn — watched for spikes), while platform and
-    // provider failures are incidents worth an error line. Unhandled errors
-    // stay status-based.
-    const logLevel = handledCause
-      ? handledCause.fault === "customer"
-        ? "warn"
-        : "error"
-      : getLogLevelFromStatusCode(resolvedStatus);
-    log[logLevel](logData, "trpc call");
+    log[facts.logLevel](logData, "trpc call");
   } else {
     log.info(logData, "trpc call");
   }

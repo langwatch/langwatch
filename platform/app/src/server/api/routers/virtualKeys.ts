@@ -44,7 +44,10 @@ import {
   virtualKeyBudgetInputSchema,
 } from "~/server/gateway/virtualKey.service";
 import { startOfCurrentMonthUTC } from "~/server/gateway/virtualKeySpend.clickhouse.repository";
-import { scopeAssignmentSchema } from "~/server/scopes/scope.types";
+import {
+  type ScopeAssignment,
+  scopeAssignmentSchema,
+} from "~/server/scopes/scope.types";
 import { authorizeInResolver } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
@@ -82,6 +85,64 @@ async function requireVisibleVk(
 const routingModeSchema = z.enum(["NONE", "FALLBACK_ALL", "POLICY"]);
 
 const idInput = z.object({ organizationId: z.string(), id: z.string() });
+
+/**
+ * Authorization for `update`: the caller needs `virtualKeys:update` on one
+ * of the key's EXISTING scopes, and — only when the request actually
+ * changes scoping — `manage` on every NEW scope (and, when re-pointing the
+ * trace project, manage on that project too). Order matches the inline
+ * checks it replaces: operate-on-existing first, then scopes, then trace
+ * project.
+ */
+async function authorizeVirtualKeyUpdate({
+  ctx,
+  input,
+  existing,
+}: {
+  ctx: { prisma: PrismaClient; session: Session };
+  input: {
+    organizationId: string;
+    scopes?: ScopeAssignment[];
+    traceProjectId?: string | null;
+  };
+  existing: Awaited<ReturnType<typeof requireExistingVk>>;
+}): Promise<void> {
+  // Mutating an existing key needs virtualKeys:update on one of the
+  // scopes it already lives in.
+  await assertActorCanOperateOnAnyScope(
+    { prisma: ctx.prisma, actor: sessionActor(ctx.session) },
+    existing.scopes,
+    "virtualKeys:update",
+  );
+  // Re-scoping additionally needs manage on every NEW scope, so a key
+  // can't be moved into a scope the caller doesn't control.
+  if (input.scopes) {
+    await assertActorCanManageAllScopes(
+      { prisma: ctx.prisma, actor: sessionActor(ctx.session) },
+      input.scopes,
+    );
+    await assertScopesBelongToOrg(
+      ctx.prisma,
+      input.organizationId,
+      input.scopes,
+    );
+  }
+  if (input.traceProjectId !== undefined) {
+    await assertTraceProjectBelongsToOrg(
+      ctx.prisma,
+      input.organizationId,
+      input.traceProjectId,
+    );
+    // Re-pointing the destination is the same decision as choosing
+    // it at create: it needs manage on the target project.
+    if (input.traceProjectId) {
+      await assertActorCanManageAllScopes(
+        { prisma: ctx.prisma, actor: sessionActor(ctx.session) },
+        [{ scopeType: "PROJECT", scopeId: input.traceProjectId }],
+      );
+    }
+  }
+}
 
 export const virtualKeysRouter = createTRPCRouter({
   // Visibility is membership-based, not permission-based: a caller sees a
@@ -370,41 +431,7 @@ export const virtualKeysRouter = createTRPCRouter({
         input.id,
         input.organizationId,
       );
-      // Mutating an existing key needs virtualKeys:update on one of the
-      // scopes it already lives in.
-      await assertActorCanOperateOnAnyScope(
-        { prisma: ctx.prisma, actor: sessionActor(ctx.session) },
-        existing.scopes,
-        "virtualKeys:update",
-      );
-      // Re-scoping additionally needs manage on every NEW scope, so a key
-      // can't be moved into a scope the caller doesn't control.
-      if (input.scopes) {
-        await assertActorCanManageAllScopes(
-          { prisma: ctx.prisma, actor: sessionActor(ctx.session) },
-          input.scopes,
-        );
-        await assertScopesBelongToOrg(
-          ctx.prisma,
-          input.organizationId,
-          input.scopes,
-        );
-      }
-      if (input.traceProjectId !== undefined) {
-        await assertTraceProjectBelongsToOrg(
-          ctx.prisma,
-          input.organizationId,
-          input.traceProjectId,
-        );
-        // Re-pointing the destination is the same decision as choosing
-        // it at create: it needs manage on the target project.
-        if (input.traceProjectId) {
-          await assertActorCanManageAllScopes(
-            { prisma: ctx.prisma, actor: sessionActor(ctx.session) },
-            [{ scopeType: "PROJECT", scopeId: input.traceProjectId }],
-          );
-        }
-      }
+      await authorizeVirtualKeyUpdate({ ctx, input, existing });
       const vkProjectId = await resolveVkProjectId(
         ctx.prisma,
         input.organizationId,

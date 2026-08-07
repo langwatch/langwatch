@@ -163,6 +163,92 @@ function isBareDataUri(value: string): boolean {
   );
 }
 
+function collectStringCandidate({
+  value,
+  depth,
+  path,
+  sites,
+}: {
+  value: string;
+  depth: number;
+  path: PathSeg[];
+  sites: CandidateSite[];
+}): void {
+  if (isBareDataUri(value)) {
+    sites.push({ path, node: value, kind: "bareDataUri" });
+    return;
+  }
+  if (
+    value.length < 2 ||
+    value.length > MAX_NESTED_JSON_BYTES ||
+    !containsMediaMarkers(value)
+  ) {
+    return;
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(value);
+  } catch {
+    return;
+  }
+  if (typeof parsed !== "object" || parsed === null) return;
+  collectCandidates({
+    value: parsed,
+    depth: depth + 1,
+    path: [...path, { json: true }],
+    sites,
+  });
+}
+
+function collectArrayCandidates({
+  value,
+  depth,
+  path,
+  sites,
+}: {
+  value: unknown[];
+  depth: number;
+  path: PathSeg[];
+  sites: CandidateSite[];
+}): void {
+  for (let i = 0; i < value.length; i++) {
+    collectCandidates({
+      value: value[i],
+      depth: depth + 1,
+      path: [...path, { index: i }],
+      sites,
+    });
+  }
+}
+
+function collectObjectCandidates({
+  value,
+  depth,
+  path,
+  sites,
+}: {
+  value: object;
+  depth: number;
+  path: PathSeg[];
+  sites: CandidateSite[];
+}): void {
+  // Part-first: a media part is a leaf — the rewritten reference has
+  // nothing left to extract inside it, so we never descend into parts.
+  if (isExtractableMediaPart(value)) {
+    sites.push({ path, node: value, kind: "part" });
+    return;
+  }
+  const obj = value as Record<string, unknown>;
+  for (const key of Object.keys(obj)) {
+    collectCandidates({
+      value: obj[key],
+      depth: depth + 1,
+      path: [...path, { key }],
+      sites,
+    });
+  }
+}
+
 function collectCandidates({
   value,
   depth,
@@ -177,61 +263,17 @@ function collectCandidates({
   if (value == null || depth > MAX_MEDIA_WALK_DEPTH) return;
 
   if (typeof value === "string") {
-    if (isBareDataUri(value)) {
-      sites.push({ path, node: value, kind: "bareDataUri" });
-      return;
-    }
-    if (
-      value.length < 2 ||
-      value.length > MAX_NESTED_JSON_BYTES ||
-      !containsMediaMarkers(value)
-    ) {
-      return;
-    }
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(value);
-    } catch {
-      return;
-    }
-    if (typeof parsed !== "object" || parsed === null) return;
-    collectCandidates({
-      value: parsed,
-      depth: depth + 1,
-      path: [...path, { json: true }],
-      sites,
-    });
+    collectStringCandidate({ value, depth, path, sites });
     return;
   }
 
   if (Array.isArray(value)) {
-    for (let i = 0; i < value.length; i++) {
-      collectCandidates({
-        value: value[i],
-        depth: depth + 1,
-        path: [...path, { index: i }],
-        sites,
-      });
-    }
+    collectArrayCandidates({ value, depth, path, sites });
     return;
   }
 
   if (typeof value === "object") {
-    // Part-first: a media part is a leaf — the rewritten reference has
-    // nothing left to extract inside it, so we never descend into parts.
-    if (isExtractableMediaPart(value)) {
-      sites.push({ path, node: value, kind: "part" });
-      return;
-    }
-    const obj = value as Record<string, unknown>;
-    for (const key of Object.keys(obj)) {
-      collectCandidates({
-        value: obj[key],
-        depth: depth + 1,
-        path: [...path, { key }],
-        sites,
-      });
-    }
+    collectObjectCandidates({ value, depth, path, sites });
   }
 }
 
@@ -243,39 +285,56 @@ interface StoredSite extends CandidateSite {
   replacement: unknown;
 }
 
+// Route the payload through the part vocabulary so audio gets the same
+// store-time WAV wrap (and mime handling) as an explicit part would.
+function dataUriToPart(
+  parsed: { mimeType: string; base64: string },
+  uri: string,
+): unknown {
+  if (parsed.mimeType.startsWith("audio/")) {
+    return {
+      type: "input_audio",
+      input_audio: { data: parsed.base64, mimeType: parsed.mimeType },
+    };
+  }
+  if (parsed.mimeType.startsWith("image/")) {
+    return { type: "image_url", image_url: { url: uri } };
+  }
+  return {
+    type: "binary",
+    mimeType: parsed.mimeType,
+    data: parsed.base64,
+  };
+}
+
+async function processBareDataUriSite(
+  site: CandidateSite,
+  params: WalkParams,
+  refs: ExtractedRef[],
+): Promise<StoredSite | null> {
+  const uri = site.node as string;
+  const parsed = parseBase64DataUri(uri);
+  if (!parsed) return null;
+  const asPart = dataUriToPart(parsed, uri);
+  const { ref } = await processContentPart({ part: asPart, ...params });
+  if (ref === null) return null;
+  refs.push(ref);
+  // The attribute stays a string: rewrite the whole value to the minted
+  // reference URL (the render-side collector surfaces bare reference
+  // strings symmetrically).
+  return {
+    ...site,
+    replacement: `/api/files/${params.projectId}/${ref.id}`,
+  };
+}
+
 async function processSite(
   site: CandidateSite,
   params: WalkParams,
   refs: ExtractedRef[],
 ): Promise<StoredSite | null> {
   if (site.kind === "bareDataUri") {
-    const uri = site.node as string;
-    const parsed = parseBase64DataUri(uri);
-    if (!parsed) return null;
-    // Route the payload through the part vocabulary so audio gets the same
-    // store-time WAV wrap (and mime handling) as an explicit part would.
-    const asPart = parsed.mimeType.startsWith("audio/")
-      ? {
-          type: "input_audio",
-          input_audio: { data: parsed.base64, mimeType: parsed.mimeType },
-        }
-      : parsed.mimeType.startsWith("image/")
-        ? { type: "image_url", image_url: { url: uri } }
-        : {
-            type: "binary",
-            mimeType: parsed.mimeType,
-            data: parsed.base64,
-          };
-    const { ref } = await processContentPart({ part: asPart, ...params });
-    if (ref === null) return null;
-    refs.push(ref);
-    // The attribute stays a string: rewrite the whole value to the minted
-    // reference URL (the render-side collector surfaces bare reference
-    // strings symmetrically).
-    return {
-      ...site,
-      replacement: `/api/files/${params.projectId}/${ref.id}`,
-    };
+    return processBareDataUriSite(site, params, refs);
   }
 
   const { part, ref } = await processContentPart({
@@ -335,6 +394,60 @@ async function storeCandidates({
 // Phase 3 — clone-on-write rebuild
 // ---------------------------------------------------------------------------
 
+// All remaining sites hop through this string's JSON boundary.
+function rebuildString(
+  value: string,
+  sites: StoredSite[],
+  segIndex: number,
+): unknown {
+  const inner = sites.filter((site) => "json" in site.path[segIndex]!);
+  if (inner.length === 0) return value;
+  const parsed: unknown = JSON.parse(value);
+  return JSON.stringify(rebuild(parsed, inner, segIndex + 1));
+}
+
+function rebuildArray(
+  value: unknown[],
+  sites: StoredSite[],
+  segIndex: number,
+): unknown {
+  const out = [...value];
+  const byIndex = new Map<number, StoredSite[]>();
+  for (const site of sites) {
+    const seg = site.path[segIndex]!;
+    if ("index" in seg) {
+      const group = byIndex.get(seg.index) ?? [];
+      group.push(site);
+      byIndex.set(seg.index, group);
+    }
+  }
+  for (const [index, group] of byIndex) {
+    out[index] = rebuild(out[index], group, segIndex + 1);
+  }
+  return out;
+}
+
+function rebuildObject(
+  value: Record<string, unknown>,
+  sites: StoredSite[],
+  segIndex: number,
+): unknown {
+  const out = { ...value };
+  const byKey = new Map<string, StoredSite[]>();
+  for (const site of sites) {
+    const seg = site.path[segIndex]!;
+    if ("key" in seg) {
+      const group = byKey.get(seg.key) ?? [];
+      group.push(site);
+      byKey.set(seg.key, group);
+    }
+  }
+  for (const [key, group] of byKey) {
+    out[key] = rebuild(out[key], group, segIndex + 1);
+  }
+  return out;
+}
+
 function rebuild(
   value: unknown,
   sites: StoredSite[],
@@ -343,46 +456,10 @@ function rebuild(
   const direct = sites.find((site) => site.path.length === segIndex);
   if (direct) return direct.replacement;
 
-  if (typeof value === "string") {
-    // All remaining sites hop through this string's JSON boundary.
-    const inner = sites.filter((site) => "json" in site.path[segIndex]!);
-    if (inner.length === 0) return value;
-    const parsed: unknown = JSON.parse(value);
-    return JSON.stringify(rebuild(parsed, inner, segIndex + 1));
-  }
-
-  if (Array.isArray(value)) {
-    const out = [...value];
-    const byIndex = new Map<number, StoredSite[]>();
-    for (const site of sites) {
-      const seg = site.path[segIndex]!;
-      if ("index" in seg) {
-        const group = byIndex.get(seg.index) ?? [];
-        group.push(site);
-        byIndex.set(seg.index, group);
-      }
-    }
-    for (const [index, group] of byIndex) {
-      out[index] = rebuild(out[index], group, segIndex + 1);
-    }
-    return out;
-  }
-
+  if (typeof value === "string") return rebuildString(value, sites, segIndex);
+  if (Array.isArray(value)) return rebuildArray(value, sites, segIndex);
   if (typeof value === "object" && value !== null) {
-    const out = { ...(value as Record<string, unknown>) };
-    const byKey = new Map<string, StoredSite[]>();
-    for (const site of sites) {
-      const seg = site.path[segIndex]!;
-      if ("key" in seg) {
-        const group = byKey.get(seg.key) ?? [];
-        group.push(site);
-        byKey.set(seg.key, group);
-      }
-    }
-    for (const [key, group] of byKey) {
-      out[key] = rebuild(out[key], group, segIndex + 1);
-    }
-    return out;
+    return rebuildObject(value as Record<string, unknown>, sites, segIndex);
   }
 
   return value;

@@ -49,6 +49,91 @@ export interface ParseTimeseriesRowsParams {
   readonly timeScale?: number | "full";
 }
 
+/** Whatever a `TimeseriesBucket`'s index signature accepts as a value. */
+type TimeseriesBucketValue =
+  | number
+  | string
+  | Record<string, Record<string, number>>;
+
+/**
+ * Apply one row's coerced series values onto a write target — either the
+ * bucket itself (ungrouped) or a group's sub-object (grouped). Split out of
+ * `parseTimeseriesRows` so the grouped/ungrouped branches share one series
+ * loop instead of two copies.
+ */
+function applySeriesToTarget(
+  row: AnalyticsTimeseriesRow,
+  series: readonly SeriesInputType[],
+  target: Record<string, TimeseriesBucketValue>,
+): void {
+  for (let i = 0; i < series.length; i++) {
+    const s = series[i]!;
+    const alias = buildMetricAlias({
+      index: i,
+      metric: s.metric,
+      aggregation: s.aggregation,
+      key: s.key,
+      subkey: s.subkey,
+    });
+    const seriesName = buildSeriesName(s, i);
+    const coerced = coerceNumber(row[alias]);
+    if (coerced !== null) target[seriesName] = coerced;
+  }
+}
+
+/**
+ * Rows without a date column (shouldn't happen on bucketed queries) share one
+ * stable sentinel bucket — a per-row timestamp would split same-period rows
+ * and break tripwire comparison on the bucket key.
+ */
+function bucketDateKey(
+  row: AnalyticsTimeseriesRow,
+  timeScale: number | "full" | undefined,
+): string {
+  if (timeScale === "full") return "full";
+  return typeof row.date === "string" ? row.date : "";
+}
+
+function getOrCreateBucket(
+  targetMap: Map<string, TimeseriesBucket>,
+  dateKey: string,
+): TimeseriesBucket {
+  let bucket = targetMap.get(dateKey);
+  if (!bucket) {
+    bucket = { date: dateKey };
+    targetMap.set(dateKey, bucket);
+  }
+  return bucket;
+}
+
+function applyRowToBucket({
+  row,
+  bucket,
+  series,
+  groupBy,
+}: {
+  row: AnalyticsTimeseriesRow;
+  bucket: TimeseriesBucket;
+  series: readonly SeriesInputType[];
+  groupBy?: string;
+}): void {
+  if (groupBy && row.group_key !== undefined && row.group_key !== null) {
+    const groupKey = String(row.group_key);
+    if (!bucket[groupBy]) bucket[groupBy] = {};
+    const groupData = bucket[groupBy] as Record<string, Record<string, number>>;
+    if (!groupData[groupKey]) groupData[groupKey] = {};
+    applySeriesToTarget(row, series, groupData[groupKey]!);
+  } else {
+    applySeriesToTarget(row, series, bucket);
+  }
+}
+
+function sortedBuckets(map: Map<string, TimeseriesBucket>): TimeseriesBucket[] {
+  return Array.from(map.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([, bucket]) => bucket);
+}
+
 export function parseTimeseriesRows(
   params: ParseTimeseriesRowsParams,
 ): TimeseriesResult {
@@ -61,75 +146,15 @@ export function parseTimeseriesRows(
 
   for (const row of rows) {
     const period = typeof row.period === "string" ? row.period : "";
-    // Rows without a date column (shouldn't happen on bucketed queries) share
-    // one stable sentinel bucket — a per-row timestamp would split same-period
-    // rows and break tripwire comparison on the bucket key.
-    const dateKey =
-      timeScale === "full"
-        ? "full"
-        : typeof row.date === "string"
-          ? row.date
-          : "";
-
+    const dateKey = bucketDateKey(row, timeScale);
     const targetMap =
       period === "current" ? bucketMap.current : bucketMap.previous;
-    let bucket = targetMap.get(dateKey);
-    if (!bucket) {
-      bucket = { date: dateKey };
-      targetMap.set(dateKey, bucket);
-    }
-
-    if (groupBy && row.group_key !== undefined && row.group_key !== null) {
-      const groupKey = String(row.group_key);
-      if (!bucket[groupBy]) bucket[groupBy] = {};
-      const groupData = bucket[groupBy] as Record<
-        string,
-        Record<string, number>
-      >;
-      if (!groupData[groupKey]) groupData[groupKey] = {};
-
-      for (let i = 0; i < series.length; i++) {
-        const s = series[i]!;
-        const alias = buildMetricAlias({
-          index: i,
-          metric: s.metric,
-          aggregation: s.aggregation,
-          key: s.key,
-          subkey: s.subkey,
-        });
-        const seriesName = buildSeriesName(s, i);
-        const coerced = coerceNumber(row[alias]);
-        if (coerced !== null) groupData[groupKey]![seriesName] = coerced;
-      }
-    } else {
-      for (let i = 0; i < series.length; i++) {
-        const s = series[i]!;
-        const alias = buildMetricAlias({
-          index: i,
-          metric: s.metric,
-          aggregation: s.aggregation,
-          key: s.key,
-          subkey: s.subkey,
-        });
-        const seriesName = buildSeriesName(s, i);
-        const coerced = coerceNumber(row[alias]);
-        if (coerced !== null) bucket[seriesName] = coerced;
-      }
-    }
+    const bucket = getOrCreateBucket(targetMap, dateKey);
+    applyRowToBucket({ row, bucket, series, groupBy });
   }
 
-  const previousPeriod: TimeseriesBucket[] = [];
-  for (const [_, bucket] of Array.from(bucketMap.previous.entries()).sort(
-    ([a], [b]) => a.localeCompare(b),
-  )) {
-    previousPeriod.push(bucket);
-  }
-  const currentPeriod: TimeseriesBucket[] = [];
-  for (const [_, bucket] of Array.from(bucketMap.current.entries()).sort(
-    ([a], [b]) => a.localeCompare(b),
-  )) {
-    currentPeriod.push(bucket);
-  }
+  const previousPeriod = sortedBuckets(bucketMap.previous);
+  const currentPeriod = sortedBuckets(bucketMap.current);
 
   // Correction when previous has more buckets than current.
   const correctedPrevious = previousPeriod.slice(
@@ -171,6 +196,114 @@ export function buildSeriesName(
 }
 
 /**
+ * True when `key` is the `groupBy` dimension's own bucket entry — its value
+ * is the per-group-value sub-object, not a metric.
+ */
+function isGroupDimensionEntry(
+  groupBy: string | undefined,
+  key: string,
+  value: TimeseriesBucketValue,
+): value is Record<string, Record<string, number>> {
+  return (
+    Boolean(groupBy) &&
+    key === groupBy &&
+    typeof value === "object" &&
+    value !== null
+  );
+}
+
+function addGroupedSubKeys(
+  groupData: Record<string, Record<string, number>>,
+  target: Set<string>,
+): void {
+  for (const metrics of Object.values(groupData)) {
+    for (const metricKey of Object.keys(metrics)) {
+      target.add(metricKey);
+    }
+  }
+}
+
+/**
+ * Scan every bucket's observed keys, splitting top-level metric keys from
+ * grouped metric sub-keys (nested inside the `groupBy` dimension's
+ * per-group-value objects). Split out of `normalizeMetricKeys`.
+ */
+function collectObservedMetricKeys(
+  buckets: readonly TimeseriesBucket[],
+  groupBy: string | undefined,
+): { allMetricKeys: Set<string>; allGroupedMetricSubKeys: Set<string> } {
+  const allMetricKeys = new Set<string>();
+  const allGroupedMetricSubKeys = new Set<string>();
+
+  for (const bucket of buckets) {
+    for (const key of Object.keys(bucket)) {
+      if (key === "date") continue;
+      const value = bucket[key];
+      if (isGroupDimensionEntry(groupBy, key, value)) {
+        addGroupedSubKeys(value, allGroupedMetricSubKeys);
+      } else {
+        allMetricKeys.add(key);
+      }
+    }
+  }
+
+  return { allMetricKeys, allGroupedMetricSubKeys };
+}
+
+function zeroFillTopLevel(
+  bucket: TimeseriesBucket,
+  topLevelFillKeys: Set<string>,
+  zeroFillableKeys: Set<string>,
+): void {
+  for (const key of topLevelFillKeys) {
+    if (bucket[key] === undefined && zeroFillableKeys.has(key)) {
+      bucket[key] = 0;
+    }
+  }
+}
+
+function zeroFillGroupData(
+  groupData: Record<string, Record<string, number>>,
+  groupedFillKeys: Set<string>,
+  zeroFillableKeys: Set<string>,
+): void {
+  for (const groupKey of Object.keys(groupData)) {
+    for (const metricKey of groupedFillKeys) {
+      if (
+        groupData[groupKey]![metricKey] === undefined &&
+        zeroFillableKeys.has(metricKey)
+      ) {
+        groupData[groupKey]![metricKey] = 0;
+      }
+    }
+  }
+}
+
+/**
+ * Default a bucket's zero-fillable additive keys (top-level + grouped) to 0
+ * when absent. Split out of `normalizeMetricKeys`.
+ */
+function zeroFillBucket({
+  bucket,
+  topLevelFillKeys,
+  groupedFillKeys,
+  zeroFillableKeys,
+  groupBy,
+}: {
+  bucket: TimeseriesBucket;
+  topLevelFillKeys: Set<string>;
+  groupedFillKeys: Set<string>;
+  zeroFillableKeys: Set<string>;
+  groupBy?: string;
+}): void {
+  zeroFillTopLevel(bucket, topLevelFillKeys, zeroFillableKeys);
+  if (groupBy && bucket[groupBy] && typeof bucket[groupBy] === "object") {
+    const groupData = bucket[groupBy] as Record<string, Record<string, number>>;
+    zeroFillGroupData(groupData, groupedFillKeys, zeroFillableKeys);
+  }
+}
+
+/**
  * Normalise metric keys across both periods. Ensures every bucket carries
  * every ADDITIVE metric (with a 0 default) so the frontend can compute %
  * change for series that ClickHouse returned NULL for in one of the periods.
@@ -198,30 +331,11 @@ function normalizeMetricKeys({
     if (isZeroWhenAbsentSeries(s)) zeroFillableKeys.add(buildSeriesName(s, i));
   });
 
-  const allMetricKeys = new Set<string>();
-  const allGroupedMetricSubKeys = new Set<string>();
-
-  for (const bucket of [...previousPeriod, ...currentPeriod]) {
-    for (const key of Object.keys(bucket)) {
-      if (key === "date") continue;
-      const value = bucket[key];
-      if (
-        groupBy &&
-        key === groupBy &&
-        typeof value === "object" &&
-        value !== null
-      ) {
-        const groupData = value as Record<string, Record<string, number>>;
-        for (const metrics of Object.values(groupData)) {
-          for (const metricKey of Object.keys(metrics)) {
-            allGroupedMetricSubKeys.add(metricKey);
-          }
-        }
-      } else {
-        allMetricKeys.add(key);
-      }
-    }
-  }
+  const allBuckets = [...previousPeriod, ...currentPeriod];
+  const { allMetricKeys, allGroupedMetricSubKeys } = collectObservedMetricKeys(
+    allBuckets,
+    groupBy,
+  );
 
   // Additive keys default even when the value was NULL in every row — the
   // observed-key sets alone would leave such a series absent everywhere. On a
@@ -235,28 +349,14 @@ function normalizeMetricKeys({
     ...zeroFillableKeys,
   ]);
 
-  for (const bucket of [...previousPeriod, ...currentPeriod]) {
-    for (const key of topLevelFillKeys) {
-      if (bucket[key] === undefined && zeroFillableKeys.has(key)) {
-        bucket[key] = 0;
-      }
-    }
-    if (groupBy && bucket[groupBy] && typeof bucket[groupBy] === "object") {
-      const groupData = bucket[groupBy] as Record<
-        string,
-        Record<string, number>
-      >;
-      for (const groupKey of Object.keys(groupData)) {
-        for (const metricKey of groupedFillKeys) {
-          if (
-            groupData[groupKey]![metricKey] === undefined &&
-            zeroFillableKeys.has(metricKey)
-          ) {
-            groupData[groupKey]![metricKey] = 0;
-          }
-        }
-      }
-    }
+  for (const bucket of allBuckets) {
+    zeroFillBucket({
+      bucket,
+      topLevelFillKeys,
+      groupedFillKeys,
+      zeroFillableKeys,
+      groupBy,
+    });
   }
 }
 

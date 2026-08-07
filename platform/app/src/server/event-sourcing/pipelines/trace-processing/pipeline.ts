@@ -6,6 +6,7 @@ import {
 } from "~/server/event-sourcing/pipelines/automations/subscribers/graphTriggerActivity.subscriber";
 import { definePipeline } from "../../";
 import type { TriggerContext } from "../../pipeline/processManagerDefinition";
+import type { StaticPipelineBuilderWithNameAndType } from "../../pipeline/staticBuilder";
 import type { FoldProjectionStore } from "../../projections/foldProjection.types";
 import type { AppendStore } from "../../projections/mapProjection.types";
 import type { ReactorDefinition } from "../../reactors/reactor.types";
@@ -125,17 +126,17 @@ export interface TraceProcessingPipelineDeps {
   subscribers?: EventSubscriberDefinition<TraceProcessingEvent>[];
 }
 
-/**
- * Creates the trace processing pipeline definition.
- *
- * This pipeline uses trace-level aggregates (aggregateId = traceId).
- * It aggregates span events into trace summary metrics (fold projection) and writes
- * individual spans to the stored_spans table (map projection).
- */
-export function createTraceProcessingPipeline(
-  deps: TraceProcessingPipelineDeps,
-) {
-  let builder = definePipeline<TraceProcessingEvent>()
+type TraceProcessingBuilder = StaticPipelineBuilderWithNameAndType<
+  any,
+  any,
+  any,
+  any,
+  any,
+  any
+>;
+
+function withCoreProjections(deps: TraceProcessingPipelineDeps) {
+  return definePipeline<TraceProcessingEvent>()
     .withName("trace_processing")
     .withAggregateType("trace")
     .withFoldProjection(
@@ -161,7 +162,14 @@ export function createTraceProcessingPipeline(
       new TraceAnalyticsRollupMapProjection({
         store: deps.traceAnalyticsRollupAppendStore,
       }),
-    )
+    );
+}
+
+function withTraceSummaryReactors<T extends TraceProcessingBuilder>(
+  builder: T,
+  deps: TraceProcessingPipelineDeps,
+): T {
+  return builder
     .withReactor("traceSummary", "originGate", deps.originGateReactor)
     .withReactor(
       "traceSummary",
@@ -188,7 +196,14 @@ export function createTraceProcessingPipeline(
       "traceSummary",
       "experimentMetricsSync",
       deps.experimentMetricsSyncReactor,
-    )
+    );
+}
+
+function withCoreSubscribers<T extends TraceProcessingBuilder>(
+  builder: T,
+  deps: TraceProcessingPipelineDeps,
+): T {
+  return builder
     .withSubscriber("triggerMatch", {
       fold: "traceSummary",
       events: [SPAN_RECEIVED_EVENT_TYPE, ORIGIN_RESOLVED_EVENT_TYPE],
@@ -213,15 +228,29 @@ export function createTraceProcessingPipeline(
       groupKeyFn: graphTriggerActivityGroupKey,
       handler: (event, context) =>
         deps.automations.graphActivityHandler(event, context),
-    })
-    .withReactor(
-      "spanStorage",
-      "spanStorageBroadcast",
-      deps.spanStorageBroadcastReactor,
-    );
+    });
+}
+
+function buildTraceProcessingPipelineBase(deps: TraceProcessingPipelineDeps) {
+  const withReactors = withTraceSummaryReactors(
+    withCoreProjections(deps),
+    deps,
+  );
+  return withCoreSubscribers(withReactors, deps).withReactor(
+    "spanStorage",
+    "spanStorageBroadcast",
+    deps.spanStorageBroadcastReactor,
+  );
+}
+
+function withOptionalExtensions<T extends TraceProcessingBuilder>(
+  builder: T,
+  deps: TraceProcessingPipelineDeps,
+): T {
+  let result = builder;
 
   if (deps.customerIoTraceSyncReactor) {
-    builder = builder.withReactor(
+    result = result.withReactor(
       "traceSummary",
       "customerIoTraceSync",
       deps.customerIoTraceSyncReactor,
@@ -229,7 +258,7 @@ export function createTraceProcessingPipeline(
   }
 
   if (deps.governanceKpisSyncReactor) {
-    builder = builder.withReactor(
+    result = result.withReactor(
       "traceSummary",
       "governanceKpisSync",
       deps.governanceKpisSyncReactor,
@@ -237,7 +266,7 @@ export function createTraceProcessingPipeline(
   }
 
   if (deps.governanceOcsfEventsSyncReactor) {
-    builder = builder.withReactor(
+    result = result.withReactor(
       "traceSummary",
       "governanceOcsfEventsSync",
       deps.governanceOcsfEventsSyncReactor,
@@ -245,7 +274,7 @@ export function createTraceProcessingPipeline(
   }
 
   if (deps.retentionOrphanSweepReactor) {
-    builder = builder.withReactor(
+    result = result.withReactor(
       "traceSummary",
       "retentionOrphanSweep",
       deps.retentionOrphanSweepReactor,
@@ -253,40 +282,51 @@ export function createTraceProcessingPipeline(
   }
 
   for (const subscriber of deps.subscribers ?? []) {
-    builder = builder.withEventSubscriber(subscriber.name, subscriber);
+    result = result.withEventSubscriber(subscriber.name, subscriber);
   }
 
-  // Span-command sharding: when the shard count is > 1, install a getGroupKey
-  // that spreads a trace's recordSpan commands across `traceId:<shard>`
-  // GroupQueue groups so a hot trace drains in parallel instead of one span at a
-  // time. When disabled (the default), install NO getGroupKey — the command
-  // falls back to getAggregateId, byte-identical to the historic per-trace key
-  // and with zero extra work on the span-ingest hot path. The count is clamped
-  // defensively so a caller constructing the pipeline directly (bypassing
-  // PipelineRegistry's env resolver) can't explode the number of groups. The
-  // command handler reads no trace state and the emitted span_received event
-  // still carries aggregateId = traceId, so the trace-summary fold (its own
-  // aggregate-keyed queue) is unaffected and the summary stays exact. See
-  // spanCommandGroupKey.ts and specs/event-sourcing/span-command-sharding.feature.
+  return result;
+}
+
+/**
+ * Span-command sharding: when the shard count is > 1, install a getGroupKey
+ * that spreads a trace's recordSpan commands across `traceId:<shard>`
+ * GroupQueue groups so a hot trace drains in parallel instead of one span at a
+ * time. When disabled (the default), install NO getGroupKey — the command
+ * falls back to getAggregateId, byte-identical to the historic per-trace key
+ * and with zero extra work on the span-ingest hot path. The count is clamped
+ * defensively so a caller constructing the pipeline directly (bypassing
+ * PipelineRegistry's env resolver) can't explode the number of groups. The
+ * command handler reads no trace state and the emitted span_received event
+ * still carries aggregateId = traceId, so the trace-summary fold (its own
+ * aggregate-keyed queue) is unaffected and the summary stays exact. See
+ * spanCommandGroupKey.ts and specs/event-sourcing/span-command-sharding.feature.
+ *
+ * ADR-066 pillar 2: a trace's spans all land in one group (or one of its
+ * shards), so a busy trace appends one tiny insert per span. Coalesce the
+ * group's queued spans into one multi-row insert instead.
+ *
+ * The bound is a resolver, not a constant, because of the ADR-022 spool. An
+ * over-threshold span is queued as a spoolRef with its attributes cleared, so
+ * its QUEUED size — the only size the drain's byte budget can weigh — is a few
+ * hundred bytes, while the span the handler reconstitutes from object storage
+ * is over 256 KB and has no upper bound. Folding those by count would let the
+ * byte budget wave through a batch whose true size it never saw. A spooled
+ * span therefore caps itself at 1 and is appended on its own, exactly as the
+ * oversized-item case is meant to behave; inline spans are bounded by
+ * COMMAND_INLINE_THRESHOLD, so for them the byte budget is honest and does the
+ * real work. The handler derives its event from its own command alone and
+ * never reads back a same-batch append, and its post-store spool cleanup runs
+ * per command, so both are safe to fold.
+ */
+function resolveRecordSpanOptions(deps: TraceProcessingPipelineDeps): {
+  deduplication: typeof RECORD_SPAN_DEDUPLICATION;
+  getGroupKey?: (payload: RecordSpanCommandData) => string;
+  coalesceMaxBatch: (payload: RecordSpanCommandData) => number;
+} {
   const spanCommandShardCount = clampSpanShardCount(
     deps.spanCommandShardCount ?? 1,
   );
-  // ADR-066 pillar 2: a trace's spans all land in one group (or one of its
-  // shards), so a busy trace appends one tiny insert per span. Coalesce the
-  // group's queued spans into one multi-row insert instead.
-  //
-  // The bound is a resolver, not a constant, because of the ADR-022 spool. An
-  // over-threshold span is queued as a spoolRef with its attributes cleared, so
-  // its QUEUED size — the only size the drain's byte budget can weigh — is a few
-  // hundred bytes, while the span the handler reconstitutes from object storage
-  // is over 256 KB and has no upper bound. Folding those by count would let the
-  // byte budget wave through a batch whose true size it never saw. A spooled
-  // span therefore caps itself at 1 and is appended on its own, exactly as the
-  // oversized-item case is meant to behave; inline spans are bounded by
-  // COMMAND_INLINE_THRESHOLD, so for them the byte budget is honest and does the
-  // real work. The handler derives its event from its own command alone and
-  // never reads back a same-batch append, and its post-store spool cleanup runs
-  // per command, so both are safe to fold.
   const recordSpanOptions: {
     deduplication: typeof RECORD_SPAN_DEDUPLICATION;
     getGroupKey?: (payload: RecordSpanCommandData) => string;
@@ -308,6 +348,25 @@ export function createTraceProcessingPipeline(
       });
     };
   }
+  return recordSpanOptions;
+}
+
+/**
+ * Creates the trace processing pipeline definition.
+ *
+ * This pipeline uses trace-level aggregates (aggregateId = traceId).
+ * It aggregates span events into trace summary metrics (fold projection) and writes
+ * individual spans to the stored_spans table (map projection).
+ */
+export function createTraceProcessingPipeline(
+  deps: TraceProcessingPipelineDeps,
+) {
+  const builder = withOptionalExtensions(
+    buildTraceProcessingPipelineBase(deps),
+    deps,
+  );
+
+  const recordSpanOptions = resolveRecordSpanOptions(deps);
 
   // ADR-022: When blobStore is provided, inject it into a pre-constructed
   // RecordSpanCommand instance so the worker can reconstitute oversized commands

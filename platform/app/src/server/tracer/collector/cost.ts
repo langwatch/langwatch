@@ -10,6 +10,12 @@ const logger = createLogger("langwatch:tracer:collector:cost");
 
 const tiktokenClient = new TiktokenClient();
 
+const hasAnyCostRate = (llmModelCost: MaybeStoredLLMModelCost): boolean =>
+  !!llmModelCost?.inputCostPerToken ||
+  !!llmModelCost?.outputCostPerToken ||
+  !!llmModelCost?.inputCostPerCharacter ||
+  !!llmModelCost?.inputCostPerSecond;
+
 export function estimateCost({
   llmModelCost,
   inputTokens,
@@ -37,24 +43,24 @@ export function estimateCost({
   inputCharacters?: number;
   audioSeconds?: number;
 }): number | undefined {
-  const hasAnyRate =
-    !!llmModelCost?.inputCostPerToken ||
-    !!llmModelCost?.outputCostPerToken ||
-    !!llmModelCost?.inputCostPerCharacter ||
-    !!llmModelCost?.inputCostPerSecond;
-  if (!hasAnyRate) return undefined;
+  if (!hasAnyCostRate(llmModelCost)) return undefined;
 
   const inputRate = llmModelCost.inputCostPerToken ?? 0;
   const cacheReadRate = llmModelCost.cacheReadCostPerToken ?? inputRate;
   const cacheCreationRate = llmModelCost.cacheCreationCostPerToken ?? inputRate;
 
-  return (
-    (inputTokens ?? 0) * inputRate +
-    (outputTokens ?? 0) * (llmModelCost.outputCostPerToken ?? 0) +
-    (cacheReadTokens ?? 0) * cacheReadRate +
-    (cacheCreationTokens ?? 0) * cacheCreationRate +
-    (inputCharacters ?? 0) * (llmModelCost.inputCostPerCharacter ?? 0) +
-    (audioSeconds ?? 0) * (llmModelCost.inputCostPerSecond ?? 0)
+  const costComponents: Array<[amount: number | undefined, rate: number]> = [
+    [inputTokens, inputRate],
+    [outputTokens, llmModelCost.outputCostPerToken ?? 0],
+    [cacheReadTokens, cacheReadRate],
+    [cacheCreationTokens, cacheCreationRate],
+    [inputCharacters, llmModelCost.inputCostPerCharacter ?? 0],
+    [audioSeconds, llmModelCost.inputCostPerSecond ?? 0],
+  ];
+
+  return costComponents.reduce(
+    (sum, [amount, rate]) => sum + (amount ?? 0) * rate,
+    0,
   );
 }
 

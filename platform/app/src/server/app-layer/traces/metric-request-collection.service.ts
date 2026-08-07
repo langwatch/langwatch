@@ -1,5 +1,8 @@
 import { createLogger } from "@langwatch/observability";
-import { SpanKind as ApiSpanKind } from "@opentelemetry/api";
+import {
+  SpanKind as ApiSpanKind,
+  type Span as OtelSpan,
+} from "@opentelemetry/api";
 import type { IExportMetricsServiceRequest } from "@opentelemetry/otlp-transformer";
 import { getLangWatchTracer } from "langwatch";
 import type { DeepPartial } from "~/utils/types";
@@ -57,6 +60,8 @@ export type MetricRequestCollectionResult =
 /** Returned in place of a persistence exception, which may name internals. */
 const PERSISTENCE_ERROR_MESSAGE = "failed to record data point";
 
+type AcceptedMetricDataPoints = MetricPreparationResult["accepted"];
+
 /**
  * Converts an OTLP request into immutable canonical data-point events. A bad
  * point is isolated from its siblings so the caller can return OTLP partial
@@ -105,93 +110,144 @@ export class MetricRequestCollectionService {
           resource_metric_count: metricRequest.resourceMetrics?.length ?? 0,
         },
       },
-      async (span): Promise<MetricRequestCollectionResult> => {
-        const acceptedAt = Date.now();
-        const preparation: MetricPreparationResult =
-          await prepareMetricDataPoints({
-            tenantId,
-            organizationId,
-            request: metricRequest,
-            piiRedactionLevel: piiRedactionLevelSchema.parse(piiRedactionLevel),
-            redactionService: this.piiRedactionService,
-            acceptedAt,
-          });
-
-        const acceptedDataPoints = preparation.accepted.length;
-        const rejectedDataPoints = preparation.rejectedDataPoints;
-        const errors = [...preparation.errors];
-
-        if (preparation.accepted.length > 0) {
-          try {
-            await this.deps.recordDataPoints(
-              preparation.accepted.map(({ dataPoint }) => dataPoint),
-            );
-          } catch (error) {
-            // Preparation errors describe the caller's own payload and are
-            // safe to return. A persistence failure is ours: its message can
-            // name internal hosts, tables and queries, so the sender gets a
-            // stable string and the detail goes to the log only.
-            span.setAttribute(
-              "metrics.ingestion.unavailable",
-              preparation.accepted.length,
-            );
-            this.logger.error(
-              {
-                error,
-                tenantId,
-                pointCount: preparation.accepted.length,
-                pointIds: preparation.accepted
-                  .slice(0, 10)
-                  .map(({ dataPoint }) => dataPoint.pointId),
-              },
-              "Failed to enqueue canonical metric data point batch",
-            );
-            return {
-              outcome: "unavailable",
-              errorMessage: PERSISTENCE_ERROR_MESSAGE,
-            };
-          }
-        }
-
-        if (acceptedDataPoints > 0) {
-          // Correlation is deliberately best-effort and separate from metric
-          // acceptance. A valid metric remains accepted if a trace fold is
-          // temporarily unavailable.
-          const correlations = preparation.accepted.flatMap(
-            ({ correlations }) => correlations,
-          );
-          if (correlations.length > 0) {
-            try {
-              await this.deps.recordMetricCorrelations(correlations);
-            } catch (error) {
-              this.logger.error(
-                {
-                  error,
-                  tenantId,
-                  correlationCount: correlations.length,
-                  pointIds: correlations
-                    .slice(0, 10)
-                    .map(({ pointId }) => pointId),
-                },
-                "Failed to enqueue metric exemplar correlation batch",
-              );
-            }
-          }
-        }
-
-        span.setAttribute("metrics.ingestion.successes", acceptedDataPoints);
-        span.setAttribute("metrics.ingestion.failures", rejectedDataPoints);
-
-        const errorMessage = errors.length
-          ? errors.join("; ").slice(0, 1024)
-          : undefined;
-        return {
-          outcome: "collected",
-          acceptedDataPoints,
-          rejectedDataPoints,
-          ...(errorMessage ? { errorMessage } : {}),
-        };
-      },
+      (span) =>
+        this.processOtlpMetricRequest({
+          tenantId,
+          organizationId,
+          metricRequest,
+          piiRedactionLevel,
+          otelSpanRef: span,
+        }),
     );
+  }
+
+  private async processOtlpMetricRequest({
+    tenantId,
+    organizationId,
+    metricRequest,
+    piiRedactionLevel,
+    otelSpanRef,
+  }: {
+    tenantId: string;
+    organizationId: string;
+    metricRequest: DeepPartial<IExportMetricsServiceRequest>;
+    piiRedactionLevel: string;
+    otelSpanRef: OtelSpan;
+  }): Promise<MetricRequestCollectionResult> {
+    const acceptedAt = Date.now();
+    const preparation: MetricPreparationResult = await prepareMetricDataPoints({
+      tenantId,
+      organizationId,
+      request: metricRequest,
+      piiRedactionLevel: piiRedactionLevelSchema.parse(piiRedactionLevel),
+      redactionService: this.piiRedactionService,
+      acceptedAt,
+    });
+
+    const acceptedDataPoints = preparation.accepted.length;
+    const rejectedDataPoints = preparation.rejectedDataPoints;
+    const errors = [...preparation.errors];
+
+    const persistenceFailure = await this.persistAcceptedDataPoints({
+      tenantId,
+      accepted: preparation.accepted,
+      otelSpanRef,
+    });
+    if (persistenceFailure) return persistenceFailure;
+
+    await this.persistMetricCorrelations({
+      tenantId,
+      accepted: preparation.accepted,
+    });
+
+    otelSpanRef.setAttribute("metrics.ingestion.successes", acceptedDataPoints);
+    otelSpanRef.setAttribute("metrics.ingestion.failures", rejectedDataPoints);
+
+    const errorMessage = errors.length
+      ? errors.join("; ").slice(0, 1024)
+      : undefined;
+    return {
+      outcome: "collected",
+      acceptedDataPoints,
+      rejectedDataPoints,
+      ...(errorMessage ? { errorMessage } : {}),
+    };
+  }
+
+  /**
+   * Persists the durably-accepted metric data points. Returns the
+   * `unavailable` result to short-circuit the caller when persistence
+   * fails — preparation errors describe the caller's own payload and are
+   * safe to return, but a persistence failure is ours: its message can name
+   * internal hosts, tables and queries, so the sender gets a stable string
+   * and the detail goes to the log only. Returns `null` on success (or when
+   * there was nothing to persist) so the caller continues.
+   */
+  private async persistAcceptedDataPoints({
+    tenantId,
+    accepted,
+    otelSpanRef,
+  }: {
+    tenantId: string;
+    accepted: AcceptedMetricDataPoints;
+    otelSpanRef: OtelSpan;
+  }): Promise<MetricRequestCollectionResult | null> {
+    if (accepted.length === 0) return null;
+    try {
+      await this.deps.recordDataPoints(
+        accepted.map(({ dataPoint }) => dataPoint),
+      );
+      return null;
+    } catch (error) {
+      otelSpanRef.setAttribute(
+        "metrics.ingestion.unavailable",
+        accepted.length,
+      );
+      this.logger.error(
+        {
+          error,
+          tenantId,
+          pointCount: accepted.length,
+          pointIds: accepted
+            .slice(0, 10)
+            .map(({ dataPoint }) => dataPoint.pointId),
+        },
+        "Failed to enqueue canonical metric data point batch",
+      );
+      return {
+        outcome: "unavailable",
+        errorMessage: PERSISTENCE_ERROR_MESSAGE,
+      };
+    }
+  }
+
+  /**
+   * Correlation is deliberately best-effort and separate from metric
+   * acceptance. A valid metric remains accepted if a trace fold is
+   * temporarily unavailable.
+   */
+  private async persistMetricCorrelations({
+    tenantId,
+    accepted,
+  }: {
+    tenantId: string;
+    accepted: AcceptedMetricDataPoints;
+  }): Promise<void> {
+    if (accepted.length === 0) return;
+    const correlations = accepted.flatMap(({ correlations }) => correlations);
+    if (correlations.length === 0) return;
+    try {
+      await this.deps.recordMetricCorrelations(correlations);
+    } catch (error) {
+      this.logger.error(
+        {
+          error,
+          tenantId,
+          correlationCount: correlations.length,
+          pointIds: correlations.slice(0, 10).map(({ pointId }) => pointId),
+        },
+        "Failed to enqueue metric exemplar correlation batch",
+      );
+    }
   }
 }

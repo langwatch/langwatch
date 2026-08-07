@@ -16,7 +16,10 @@
  * side — enough for a preview, never a payload.
  */
 
-import { collectMediaParts } from "~/shared/traces/mediaParts";
+import {
+  collectMediaParts,
+  type MediaPartData,
+} from "~/shared/traces/mediaParts";
 
 export interface TraceMediaRef {
   kind: "audio" | "image" | "video" | "file";
@@ -50,6 +53,27 @@ function isStoredObjectRefUrl(url: string): boolean {
   return url.startsWith("/api/files/") && !url.includes("..");
 }
 
+function binaryPartToRef(
+  part: Extract<MediaPartData, { type: "binary" }>,
+): TraceMediaRef | null {
+  if (!part.url || !isStoredObjectRefUrl(part.url)) return null;
+  const kind = kindFromMime(part.mimeType);
+  return {
+    kind,
+    url: part.url,
+    ...(part.filename ? { filename: part.filename } : {}),
+    ...(kind === "file" ? { mimeType: part.mimeType } : {}),
+  };
+}
+
+function mediaPartToRef(part: MediaPartData): TraceMediaRef | null {
+  if (part.type === "binary") return binaryPartToRef(part);
+  if (part.source.type === "url" && isStoredObjectRefUrl(part.source.value)) {
+    return { kind: part.type, url: part.source.value };
+  }
+  return null;
+}
+
 /**
  * Walks a span IO value (typed envelope, messages, nested JSON strings — the
  * same shapes `collectMediaParts` handles) and returns the compact reference
@@ -60,21 +84,8 @@ export function collectMediaRefs(value: unknown): TraceMediaRef[] {
   const refs: TraceMediaRef[] = [];
   for (const part of collectMediaParts(value)) {
     if (refs.length >= MAX_TRACE_MEDIA_REFS) break;
-    if (part.type === "binary") {
-      if (!part.url || !isStoredObjectRefUrl(part.url)) continue;
-      const kind = kindFromMime(part.mimeType);
-      refs.push({
-        kind,
-        url: part.url,
-        ...(part.filename ? { filename: part.filename } : {}),
-        ...(kind === "file" ? { mimeType: part.mimeType } : {}),
-      });
-    } else if (
-      part.source.type === "url" &&
-      isStoredObjectRefUrl(part.source.value)
-    ) {
-      refs.push({ kind: part.type, url: part.source.value });
-    }
+    const ref = mediaPartToRef(part);
+    if (ref) refs.push(ref);
   }
   return refs;
 }

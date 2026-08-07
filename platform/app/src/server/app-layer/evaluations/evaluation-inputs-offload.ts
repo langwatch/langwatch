@@ -367,6 +367,45 @@ export async function offloadInputsIfOversized({
 }
 
 /**
+ * Reads and parses the durable object backing an offload marker. Returns
+ * `undefined` (rather than throwing) when the object is missing or its
+ * content doesn't parse into a plain object - the caller falls back to the
+ * marker's preview in either case.
+ */
+async function readStoredInputsObject({
+  projectId,
+  storedObjectId,
+  storedObjects,
+}: {
+  projectId: string;
+  storedObjectId: string;
+  storedObjects: StoredObjectsService;
+}): Promise<Record<string, unknown> | undefined> {
+  const result = await storedObjects.getById({
+    projectId,
+    id: storedObjectId,
+  });
+  if (!result || !("stream" in result)) {
+    logger.warn(
+      { projectId, storedObjectId },
+      "Offloaded evaluation inputs object missing on read; returning marker with preview",
+    );
+    return undefined;
+  }
+  // Bound the read: the object we wrote is at most the hard ceiling, so a
+  // stream beyond it is a tampered/unexpected object and must not OOM.
+  const buffer = await streamToBuffer(
+    result.stream,
+    EVAL_INPUTS_HARD_CEILING_BYTES,
+  );
+  const parsed: unknown = JSON.parse(buffer.toString("utf8"));
+  if (typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)) {
+    return parsed as Record<string, unknown>;
+  }
+  return undefined;
+}
+
+/**
  * Resolves an offload marker back to the full inputs. Non-markers pass
  * through unchanged. Fail-safe: a missing/unreadable object returns the
  * marker as-is (so the caller still gets the preview) and logs a warning -
@@ -393,29 +432,12 @@ export async function resolveInputsMarker({
   }
 
   try {
-    const result = await storedObjects.getById({ projectId, id: marker.id });
-    if (!result || !("stream" in result)) {
-      logger.warn(
-        { projectId, storedObjectId: marker.id },
-        "Offloaded evaluation inputs object missing on read; returning marker with preview",
-      );
-      return inputs;
-    }
-    // Bound the read: the object we wrote is at most the hard ceiling, so a
-    // stream beyond it is a tampered/unexpected object and must not OOM.
-    const buffer = await streamToBuffer(
-      result.stream,
-      EVAL_INPUTS_HARD_CEILING_BYTES,
-    );
-    const parsed: unknown = JSON.parse(buffer.toString("utf8"));
-    if (
-      typeof parsed === "object" &&
-      parsed !== null &&
-      !Array.isArray(parsed)
-    ) {
-      return parsed as Record<string, unknown>;
-    }
-    return inputs;
+    const resolved = await readStoredInputsObject({
+      projectId,
+      storedObjectId: marker.id,
+      storedObjects,
+    });
+    return resolved ?? inputs;
   } catch (error) {
     logger.warn(
       {

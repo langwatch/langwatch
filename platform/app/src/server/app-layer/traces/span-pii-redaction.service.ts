@@ -559,6 +559,30 @@ export class OtlpSpanPiiRedactionService {
     // caller can mark a requested strict pass as incomplete.
     if (!options) return false;
 
+    const collected = this.collectLambdaRedactionEntries(span, resource);
+
+    if (collected.anySkipped) {
+      this.stampPiiRedactionStatus(span, collected.anyRedacted);
+    }
+
+    if (collected.entries.length === 0) {
+      return true;
+    }
+
+    await this.applyBatchRedaction(collected.entries, options);
+    return true;
+  }
+
+  /**
+   * Gathers every string value eligible for the analysis-service batch —
+   * span attributes/events/links, the status message, then resource
+   * attributes, in that order — tracking whether any value was skipped
+   * (over the length budget) or collected for redaction along the way.
+   */
+  private collectLambdaRedactionEntries(
+    span: OtlpSpan,
+    resource: OtlpResource | null,
+  ): { entries: StringEntry[]; anySkipped: boolean; anyRedacted: boolean } {
     const entries: StringEntry[] = [];
     let anySkipped = false;
     let anyRedacted = false;
@@ -602,25 +626,30 @@ export class OtlpSpanPiiRedactionService {
       anyRedacted ||= result.collected;
     }
 
-    if (anySkipped) {
-      const statusValue = anyRedacted ? "partial" : "none";
-      const existingIdx = span.attributes.findIndex(
-        (a) => a.key === ATTR_KEYS.LANGWATCH_RESERVED_PII_REDACTION_STATUS,
-      );
-      if (existingIdx !== -1) {
-        span.attributes[existingIdx]!.value = { stringValue: statusValue };
-      } else {
-        span.attributes.push({
-          key: ATTR_KEYS.LANGWATCH_RESERVED_PII_REDACTION_STATUS,
-          value: { stringValue: statusValue },
-        });
-      }
-    }
+    return { entries, anySkipped, anyRedacted };
+  }
 
-    if (entries.length === 0) {
-      return true;
+  /** Stamps (or updates) the redaction-status marker attribute in place. */
+  private stampPiiRedactionStatus(span: OtlpSpan, anyRedacted: boolean): void {
+    const statusValue = anyRedacted ? "partial" : "none";
+    const existingIdx = span.attributes.findIndex(
+      (a) => a.key === ATTR_KEYS.LANGWATCH_RESERVED_PII_REDACTION_STATUS,
+    );
+    if (existingIdx !== -1) {
+      span.attributes[existingIdx]!.value = { stringValue: statusValue };
+    } else {
+      span.attributes.push({
+        key: ATTR_KEYS.LANGWATCH_RESERVED_PII_REDACTION_STATUS,
+        value: { stringValue: statusValue },
+      });
     }
+  }
 
+  /** Sends the collected entries to the analysis-service batch and writes the redacted values back onto their owners in place. */
+  private async applyBatchRedaction(
+    entries: StringEntry[],
+    options: PIICheckOptions,
+  ): Promise<void> {
     const results = await this.deps.batchClearPII(
       entries.map((e) => e.text),
       options,
@@ -639,7 +668,6 @@ export class OtlpSpanPiiRedactionService {
         (entry.owner as Record<string, unknown>)[entry.field] = redacted;
       }
     }
-    return true;
   }
 
   /**

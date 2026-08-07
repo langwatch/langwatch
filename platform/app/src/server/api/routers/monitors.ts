@@ -1,5 +1,10 @@
 import { generate } from "@langwatch/ksuid";
-import { EvaluationExecutionMode, Prisma } from "@prisma/client";
+import {
+  EvaluationExecutionMode,
+  type Monitor,
+  Prisma,
+  type PrismaClient,
+} from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { customAlphabet } from "nanoid";
 import { ZodError, z } from "zod";
@@ -89,6 +94,87 @@ const findUniqueMonitorName = async (
   }
 
   return `${baseName} (${nextNumber})`;
+};
+
+const assertMonitorCopySourcePermission = async ({
+  ctx,
+  sourceProjectId,
+}: {
+  ctx: Parameters<typeof hasProjectPermission>[0];
+  sourceProjectId: string;
+}) => {
+  const hasSourcePermission = await hasProjectPermission(
+    ctx,
+    sourceProjectId,
+    "evaluations:manage",
+  );
+  if (!hasSourcePermission) {
+    throw new TRPCError({
+      code: "UNAUTHORIZED",
+      message:
+        "You do not have permission to manage evaluations in the source project",
+    });
+  }
+};
+
+// Evaluator-backed monitors keep their settings (and, for workflow
+// evaluators, the backing workflow) on a separate Evaluator record scoped
+// to the source project. Copy it across so the replica is self-contained
+// in the target project instead of dangling a cross-project reference.
+// Legacy wizard monitors have no evaluator — their settings live inline on
+// the monitor, so copying the monitor fields alone is enough.
+const copyMonitorEvaluator = async ({
+  ctx,
+  source,
+  sourceProjectId,
+  targetProjectId,
+}: {
+  ctx: Parameters<typeof copyEvaluatorToProject>[0]["ctx"];
+  source: Pick<Monitor, "evaluatorId">;
+  sourceProjectId: string;
+  targetProjectId: string;
+}): Promise<{
+  newEvaluatorId: string | null;
+  newWorkflowId: string | null;
+}> => {
+  if (!source.evaluatorId) {
+    return { newEvaluatorId: null, newWorkflowId: null };
+  }
+  const copiedEvaluator = await copyEvaluatorToProject({
+    ctx,
+    evaluatorId: source.evaluatorId,
+    sourceProjectId,
+    targetProjectId,
+  });
+  return {
+    newEvaluatorId: copiedEvaluator.id,
+    newWorkflowId: copiedEvaluator.workflowId,
+  };
+};
+
+// Roll back the evaluator (and its workflow) copied for this monitor so a
+// failed insert doesn't orphan them in the target project.
+const rollbackCopiedMonitorEvaluator = async ({
+  prisma,
+  newEvaluatorId,
+  newWorkflowId,
+  projectId,
+}: {
+  prisma: PrismaClient;
+  newEvaluatorId: string | null;
+  newWorkflowId: string | null;
+  projectId: string;
+}) => {
+  if (newEvaluatorId) {
+    await prisma.evaluator
+      .deleteMany({ where: { id: newEvaluatorId, projectId } })
+      .catch(() => undefined);
+  }
+  if (newWorkflowId) {
+    await prisma.workflow
+      .deleteMany({ where: { id: newWorkflowId, projectId } })
+      .catch(() => undefined);
+  }
 };
 
 export const monitorsRouter = createTRPCRouter({
@@ -262,18 +348,7 @@ export const monitorsRouter = createTRPCRouter({
       const { monitorId, projectId, sourceProjectId } = input;
       const prisma = ctx.prisma;
 
-      const hasSourcePermission = await hasProjectPermission(
-        ctx,
-        sourceProjectId,
-        "evaluations:manage",
-      );
-      if (!hasSourcePermission) {
-        throw new TRPCError({
-          code: "UNAUTHORIZED",
-          message:
-            "You do not have permission to manage evaluations in the source project",
-        });
-      }
+      await assertMonitorCopySourcePermission({ ctx, sourceProjectId });
 
       const source = await prisma.monitor.findFirst({
         where: { id: monitorId, projectId: sourceProjectId },
@@ -285,24 +360,12 @@ export const monitorsRouter = createTRPCRouter({
         });
       }
 
-      // Evaluator-backed monitors keep their settings (and, for workflow
-      // evaluators, the backing workflow) on a separate Evaluator record scoped
-      // to the source project. Copy it across so the replica is self-contained
-      // in the target project instead of dangling a cross-project reference.
-      // Legacy wizard monitors have no evaluator — their settings live inline on
-      // the monitor, so copying the monitor fields below is enough.
-      let newEvaluatorId: string | null = null;
-      let newWorkflowId: string | null = null;
-      if (source.evaluatorId) {
-        const copiedEvaluator = await copyEvaluatorToProject({
-          ctx,
-          evaluatorId: source.evaluatorId,
-          sourceProjectId,
-          targetProjectId: projectId,
-        });
-        newEvaluatorId = copiedEvaluator.id;
-        newWorkflowId = copiedEvaluator.workflowId;
-      }
+      const { newEvaluatorId, newWorkflowId } = await copyMonitorEvaluator({
+        ctx,
+        source,
+        sourceProjectId,
+        targetProjectId: projectId,
+      });
 
       const uniqueName = await findUniqueMonitorName(
         prisma,
@@ -336,18 +399,12 @@ export const monitorsRouter = createTRPCRouter({
           },
         });
       } catch (createError) {
-        // Roll back the evaluator (and its workflow) we copied for this monitor
-        // so a failed insert doesn't orphan them in the target project.
-        if (newEvaluatorId) {
-          await prisma.evaluator
-            .deleteMany({ where: { id: newEvaluatorId, projectId } })
-            .catch(() => undefined);
-        }
-        if (newWorkflowId) {
-          await prisma.workflow
-            .deleteMany({ where: { id: newWorkflowId, projectId } })
-            .catch(() => undefined);
-        }
+        await rollbackCopiedMonitorEvaluator({
+          prisma,
+          newEvaluatorId,
+          newWorkflowId,
+          projectId,
+        });
         throw createError;
       }
     }),

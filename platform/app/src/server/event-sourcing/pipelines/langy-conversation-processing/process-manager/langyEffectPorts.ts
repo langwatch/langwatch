@@ -119,6 +119,224 @@ function assertHandoffIdentity(params: {
 }
 
 /**
+ * Peek rather than consume: an outbox failure must be able to retry the same
+ * short-lived handoff until its normal TTL expires. Missing/expired is not
+ * recoverable by retrying this intent — the heartbeat-aware liveness
+ * subscriber owns terminalizing an abandoned turn.
+ */
+async function loadDispatchHandoff(params: {
+  handoffStore: Pick<LangyTurnHandoffStore, "read" | "stash">;
+  projectId: string;
+  conversationId: string;
+  turnId: string;
+}): Promise<LangyTurnHandoff | undefined> {
+  const { handoffStore, projectId, conversationId, turnId } = params;
+  const handoff = await handoffStore.read({ conversationId, turnId });
+  if (!handoff) {
+    logger.warn(
+      { projectId, conversationId, turnId },
+      "No Langy turn handoff found; leaving recovery to liveness",
+    );
+    return undefined;
+  }
+  assertHandoffIdentity({ handoff, projectId, conversationId, turnId });
+  return handoff;
+}
+
+function resolveDispatchIntent(
+  handoff: LangyTurnHandoff,
+): "create" | "revive" | "continue" {
+  if (handoff.resumeToken) return "revive";
+  return handoff.credentials.langwatchApiKey ? "create" : "continue";
+}
+
+function buildWorkerDispatchParams(params: {
+  intent: "create" | "revive" | "continue";
+  projectId: string;
+  conversationId: string;
+  turnId: string;
+  candidate: LangyTurnHandoff;
+}): Parameters<LangyWorkerPort["dispatch"]>[0] {
+  const { intent, projectId, conversationId, turnId, candidate } = params;
+  return {
+    intent,
+    projectId,
+    conversationId,
+    turnId,
+    userId: candidate.actorUserId,
+    runToken: candidate.runToken,
+    prompt: candidate.prompt,
+    system: candidate.system,
+    // The seed rides the re-drive too: this is exactly the path where a
+    // probe-hit turn lands on a worker that has since died, and the fresh
+    // session it spawns must still get the conversation so far.
+    ...(candidate.historySeed ? { historySeed: candidate.historySeed } : {}),
+    credentials: candidate.credentials,
+    ...(candidate.modelOverride
+      ? { modelOverride: candidate.modelOverride }
+      : {}),
+    ...(candidate.resumeToken ? { resumeToken: candidate.resumeToken } : {}),
+  };
+}
+
+/**
+ * A probe hit is only a latency hint: the worker may die before this durable
+ * effect reaches it. Recover the key from the actor identity in Postgres,
+ * persist it into the retryable handoff, then redrive once. Subsequent
+ * outbox/liveness deliveries reuse the same key rather than minting on every
+ * retry.
+ */
+async function recoverDispatchCredentials(params: {
+  deps: CreateLangyEffectPortsOptions;
+  dispatchHandoff: LangyTurnHandoff;
+  projectId: string;
+  conversationId: string;
+  turnId: string;
+}): Promise<LangyTurnHandoff> {
+  const { deps, dispatchHandoff, projectId, conversationId, turnId } = params;
+  const minted = await deps.mintSessionKey({
+    userId: dispatchHandoff.actorUserId,
+    projectId,
+    organizationId: dispatchHandoff.credentials.organizationId,
+  });
+  const recovered: LangyTurnHandoff = {
+    ...dispatchHandoff,
+    credentials: {
+      ...dispatchHandoff.credentials,
+      langwatchApiKey: minted.token,
+      langwatchApiKeyId: minted.apiKeyId,
+    },
+  };
+  try {
+    await deps.handoffStore.stash(recovered);
+  } catch (error) {
+    await deps
+      .revokeSessionKey({ apiKeyId: minted.apiKeyId, projectId })
+      .catch((revokeError) => {
+        logger.warn(
+          { revokeError, projectId, conversationId, turnId },
+          "failed to revoke unstashed Langy recovery key",
+        );
+      });
+    throw error;
+  }
+  return recovered;
+}
+
+/**
+ * A permanent rejection poisons the outbox if it is allowed to retry: the
+ * agent will answer the same 4xx forever, every ~minute, and every later
+ * turn queues behind it. Terminalize instead — durably fail the turn (the
+ * same path liveness uses for an abandoned one) and consume the intent.
+ */
+async function terminalizeRejectedDispatch(params: {
+  deps: CreateLangyEffectPortsOptions;
+  projectId: string;
+  conversationId: string;
+  turnId: string;
+}): Promise<void> {
+  const { deps, projectId, conversationId, turnId } = params;
+  logger.warn(
+    { projectId, conversationId, turnId },
+    "langy dispatch permanently rejected; terminalizing the turn",
+  );
+  const error = serializeLangyTurnError(new LangyDispatchRejectedError());
+  await deps
+    .markError({ conversationId, turnId, error })
+    .catch(() => undefined);
+  await deps.failTurn.failTurn({ projectId, conversationId, turnId, error });
+}
+
+async function dispatchLangyTurn(
+  deps: CreateLangyEffectPortsOptions,
+  {
+    projectId,
+    conversationId,
+    turnId,
+  }: LangyWorkerDispatchIntent & { projectId: string },
+): Promise<void> {
+  const handoff = await loadDispatchHandoff({
+    handoffStore: deps.handoffStore,
+    projectId,
+    conversationId,
+    turnId,
+  });
+  if (!handoff) return;
+
+  let dispatchHandoff = handoff;
+  let intent = resolveDispatchIntent(dispatchHandoff);
+  let outcome = await deps.worker.dispatch(
+    buildWorkerDispatchParams({
+      intent,
+      projectId,
+      conversationId,
+      turnId,
+      candidate: dispatchHandoff,
+    }),
+  );
+
+  if (
+    outcome === "credentialsRequired" &&
+    !dispatchHandoff.credentials.langwatchApiKey
+  ) {
+    dispatchHandoff = await recoverDispatchCredentials({
+      deps,
+      dispatchHandoff,
+      projectId,
+      conversationId,
+      turnId,
+    });
+    intent = resolveDispatchIntent(dispatchHandoff);
+    outcome = await deps.worker.dispatch(
+      buildWorkerDispatchParams({
+        intent,
+        projectId,
+        conversationId,
+        turnId,
+        candidate: dispatchHandoff,
+      }),
+    );
+  }
+
+  if (outcome === "accepted") return;
+
+  if (outcome === "rejected") {
+    await terminalizeRejectedDispatch({
+      deps,
+      projectId,
+      conversationId,
+      turnId,
+    });
+    return;
+  }
+
+  throw new LangyTurnDispatchRetry(
+    `langy dispatch not accepted (${outcome}) for turn ${turnId}`,
+  );
+}
+
+async function generateLangyTitle(
+  deps: CreateLangyEffectPortsOptions,
+  {
+    projectId,
+    conversationId,
+    turnId,
+  }: LangyGenerateTitleIntent & {
+    projectId: string;
+  },
+): Promise<void> {
+  const generated = await deps.titleGenerator({ projectId, conversationId });
+  if (!generated) return;
+  await deps.saveTitle({
+    projectId,
+    conversationId,
+    turnId,
+    title: generated.title,
+    model: generated.model,
+  });
+}
+
+/**
  * Live effect adapters for process-outbox delivery. The dispatcher owns the
  * consumer span and retry attempt; the worker and title generator own their
  * downstream spans.
@@ -128,153 +346,10 @@ export function createLangyEffectPorts(
 ): LangyEffectPorts {
   return {
     workerDispatch: {
-      async dispatchTurn({ projectId, conversationId, turnId }): Promise<void> {
-        // Peek rather than consume: an outbox failure must be able to retry the
-        // same short-lived handoff until its normal TTL expires.
-        const handoff = await deps.handoffStore.read({
-          conversationId,
-          turnId,
-        });
-        if (!handoff) {
-          // Missing/expired is not recoverable by retrying this intent. The
-          // heartbeat-aware liveness subscriber owns terminalizing an
-          // abandoned turn.
-          logger.warn(
-            { projectId, conversationId, turnId },
-            "No Langy turn handoff found; leaving recovery to liveness",
-          );
-          return;
-        }
-        assertHandoffIdentity({
-          handoff,
-          projectId,
-          conversationId,
-          turnId,
-        });
-
-        let dispatchHandoff = handoff;
-        let intent: "create" | "revive" | "continue" = handoff.resumeToken
-          ? "revive"
-          : handoff.credentials.langwatchApiKey
-            ? "create"
-            : "continue";
-        const dispatch = (candidate: LangyTurnHandoff) =>
-          deps.worker.dispatch({
-            intent,
-            projectId,
-            conversationId,
-            turnId,
-            userId: candidate.actorUserId,
-            runToken: candidate.runToken,
-            prompt: candidate.prompt,
-            system: candidate.system,
-            // The seed rides the re-drive too: this is exactly the path where
-            // a probe-hit turn lands on a worker that has since died, and the
-            // fresh session it spawns must still get the conversation so far.
-            ...(candidate.historySeed
-              ? { historySeed: candidate.historySeed }
-              : {}),
-            credentials: candidate.credentials,
-            ...(candidate.modelOverride
-              ? { modelOverride: candidate.modelOverride }
-              : {}),
-            ...(candidate.resumeToken
-              ? { resumeToken: candidate.resumeToken }
-              : {}),
-          });
-
-        let outcome = await dispatch(dispatchHandoff);
-
-        // A probe hit is only a latency hint: the worker may die before this
-        // durable effect reaches it. Recover the key from the actor identity in
-        // Postgres, persist it into the retryable handoff, then redrive once.
-        // Subsequent outbox/liveness deliveries reuse the same key rather than
-        // minting on every retry.
-        if (
-          outcome === "credentialsRequired" &&
-          !dispatchHandoff.credentials.langwatchApiKey
-        ) {
-          const minted = await deps.mintSessionKey({
-            userId: dispatchHandoff.actorUserId,
-            projectId,
-            organizationId: dispatchHandoff.credentials.organizationId,
-          });
-          dispatchHandoff = {
-            ...dispatchHandoff,
-            credentials: {
-              ...dispatchHandoff.credentials,
-              langwatchApiKey: minted.token,
-              langwatchApiKeyId: minted.apiKeyId,
-            },
-          };
-          try {
-            await deps.handoffStore.stash(dispatchHandoff);
-          } catch (error) {
-            await deps
-              .revokeSessionKey({ apiKeyId: minted.apiKeyId, projectId })
-              .catch((revokeError) => {
-                logger.warn(
-                  { revokeError, projectId, conversationId, turnId },
-                  "failed to revoke unstashed Langy recovery key",
-                );
-              });
-            throw error;
-          }
-          intent = dispatchHandoff.resumeToken ? "revive" : "create";
-          outcome = await dispatch(dispatchHandoff);
-        }
-
-        if (outcome === "accepted") return;
-
-        // A permanent rejection poisons the outbox if it is allowed to retry:
-        // the agent will answer the same 4xx forever, every ~minute, and every
-        // later turn queues behind it. Terminalize instead — durably fail the
-        // turn (the same path liveness uses for an abandoned one) and consume
-        // the intent.
-        if (outcome === "rejected") {
-          logger.warn(
-            { projectId, conversationId, turnId },
-            "langy dispatch permanently rejected; terminalizing the turn",
-          );
-          const error = serializeLangyTurnError(
-            new LangyDispatchRejectedError(),
-          );
-          await deps
-            .markError({ conversationId, turnId, error })
-            .catch(() => undefined);
-          await deps.failTurn.failTurn({
-            projectId,
-            conversationId,
-            turnId,
-            error,
-          });
-          return;
-        }
-
-        throw new LangyTurnDispatchRetry(
-          `langy dispatch not accepted (${outcome}) for turn ${turnId}`,
-        );
-      },
+      dispatchTurn: (params) => dispatchLangyTurn(deps, params),
     },
     titleGeneration: {
-      async generateTitle({
-        projectId,
-        conversationId,
-        turnId,
-      }): Promise<void> {
-        const generated = await deps.titleGenerator({
-          projectId,
-          conversationId,
-        });
-        if (!generated) return;
-        await deps.saveTitle({
-          projectId,
-          conversationId,
-          turnId,
-          title: generated.title,
-          model: generated.model,
-        });
-      },
+      generateTitle: (params) => generateLangyTitle(deps, params),
     },
   };
 }

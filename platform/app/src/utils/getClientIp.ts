@@ -33,6 +33,24 @@ function parseValidIp(ip: string): string | null {
   return null;
 }
 
+function parseValidIpFromHeaderValue(value: string | string[]): string | null {
+  if (Array.isArray(value)) {
+    // If header has multiple values, take the first one
+    return parseValidIp(value[0] ?? "");
+  }
+  return parseValidIp(value);
+}
+
+function ipFromHeaders(headers: NextApiRequest["headers"]): string | undefined {
+  for (const header of IP_HEADERS) {
+    const value = headers[header];
+    if (!value) continue;
+    const ip = parseValidIpFromHeaderValue(value);
+    if (ip) return ip;
+  }
+  return undefined;
+}
+
 export function getClientIp(
   req: NextApiRequest | undefined,
 ): string | undefined {
@@ -41,19 +59,8 @@ export function getClientIp(
   }
 
   // Check all headers
-  for (const header of IP_HEADERS) {
-    const value = req.headers[header];
-    if (value) {
-      if (Array.isArray(value)) {
-        // If header has multiple values, take the first one
-        const ip = parseValidIp(value[0] ?? "");
-        if (ip) return ip;
-      } else {
-        const ip = parseValidIp(value);
-        if (ip) return ip;
-      }
-    }
-  }
+  const fromHeaders = ipFromHeaders(req.headers);
+  if (fromHeaders) return fromHeaders;
 
   // Fallback to request socket
   if (req.socket?.remoteAddress) {

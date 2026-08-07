@@ -1,3 +1,4 @@
+import type { ClickHouseClient } from "@clickhouse/client";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { isStorageAnchoredVersion } from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
 import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
@@ -744,6 +745,137 @@ export class TraceListClickHouseRepository implements TraceListRepository {
     return { min: Number(row?.min_val ?? 0), max: Number(row?.max_val ?? 0) };
   }
 
+  // Tuple-typed arrayJoin packs every facet into a single row stream.
+  // Each (key, expression) pair becomes one (key, value) tuple per row.
+  private async queryBatchedCategoricalFacets({
+    client,
+    table,
+    whereClause,
+    dedupFilter,
+    queryParams,
+    categoricalSpecs,
+    topN,
+  }: {
+    client: ClickHouseClient;
+    table: FacetTableName;
+    whereClause: string;
+    dedupFilter: string;
+    queryParams: Record<string, unknown>;
+    categoricalSpecs: { key: string; expression: string }[];
+    topN: number;
+  }): Promise<Record<string, CategoricalFacetResult>> {
+    if (categoricalSpecs.length === 0) return {};
+
+    const tupleArray = categoricalSpecs
+      .map((s) => `(${this.quoteIdentifier(s.key)}, toString(${s.expression}))`)
+      .join(", ");
+
+    const query = `
+      SELECT facet_key, facet_value, cnt, total_distinct FROM (
+        SELECT
+          facet_key,
+          facet_value,
+          cnt,
+          count() OVER (PARTITION BY facet_key) AS total_distinct
+        FROM (
+          SELECT facet_key, facet_value, count() AS cnt FROM (
+            SELECT
+              arrayJoin([${tupleArray}]) AS kv,
+              kv.1 AS facet_key,
+              kv.2 AS facet_value
+            FROM ${table}
+            WHERE ${whereClause}
+              ${dedupFilter}
+          )
+          WHERE facet_value != ''
+          GROUP BY facet_key, facet_value
+        )
+      )
+      ORDER BY facet_key, cnt DESC
+      LIMIT {topN:UInt32} BY facet_key
+    `;
+
+    const result = await client.query({
+      query,
+      query_params: { ...queryParams, topN },
+      format: "JSONEachRow",
+    });
+
+    const rows = await result.json<{
+      facet_key: string;
+      facet_value: string;
+      cnt: number;
+      total_distinct: number;
+    }>();
+
+    const out: Record<string, CategoricalFacetResult> = {};
+    for (const spec of categoricalSpecs) {
+      out[spec.key] = { values: [], totalDistinct: 0 };
+    }
+    for (const row of rows) {
+      const bucket = out[row.facet_key];
+      if (!bucket) continue;
+      bucket.values.push({
+        value: row.facet_value,
+        count: Number(row.cnt),
+      });
+      bucket.totalDistinct = Number(row.total_distinct);
+    }
+    return out;
+  }
+
+  // Use indexed aliases so arbitrary registry keys can't collide with
+  // reserved SQL words or each other after sanitisation.
+  private async queryBatchedRangeFacets({
+    client,
+    table,
+    whereClause,
+    dedupFilter,
+    queryParams,
+    rangeSpecs,
+  }: {
+    client: ClickHouseClient;
+    table: FacetTableName;
+    whereClause: string;
+    dedupFilter: string;
+    queryParams: Record<string, unknown>;
+    rangeSpecs: { key: string; expression: string }[];
+  }): Promise<Record<string, { min: number; max: number }>> {
+    if (rangeSpecs.length === 0) return {};
+
+    const aggClauses = rangeSpecs
+      .flatMap((s, i) => [
+        `min(${s.expression}) AS r_${i}_min`,
+        `max(${s.expression}) AS r_${i}_max`,
+      ])
+      .join(", ");
+
+    const query = `
+      SELECT ${aggClauses}
+      FROM ${table}
+      WHERE ${whereClause}
+        ${dedupFilter}
+    `;
+
+    const result = await client.query({
+      query,
+      query_params: queryParams,
+      format: "JSONEachRow",
+    });
+
+    const rows = await result.json<Record<string, number | null>>();
+    const row = rows[0] ?? {};
+    const out: Record<string, { min: number; max: number }> = {};
+    for (let i = 0; i < rangeSpecs.length; i += 1) {
+      const spec = rangeSpecs[i]!;
+      out[spec.key] = {
+        min: Number(row[`r_${i}_min`] ?? 0),
+        max: Number(row[`r_${i}_max`] ?? 0),
+      };
+    }
+    return out;
+  }
+
   async findBatchedFacets(params: {
     tenantId: string;
     timeRange: { from: number; to: number; live?: boolean };
@@ -779,115 +911,24 @@ export class TraceListClickHouseRepository implements TraceListRepository {
 
     const client = await this.resolveClient(params.tenantId);
 
-    const categoricalsPromise: Promise<Record<string, CategoricalFacetResult>> =
-      params.categoricalSpecs.length === 0
-        ? Promise.resolve({})
-        : (async () => {
-            // Tuple-typed arrayJoin packs every facet into a single row stream.
-            // Each (key, expression) pair becomes one (key, value) tuple per row.
-            const tupleArray = params.categoricalSpecs
-              .map(
-                (s) =>
-                  `(${this.quoteIdentifier(s.key)}, toString(${s.expression}))`,
-              )
-              .join(", ");
-
-            const query = `
-              SELECT facet_key, facet_value, cnt, total_distinct FROM (
-                SELECT
-                  facet_key,
-                  facet_value,
-                  cnt,
-                  count() OVER (PARTITION BY facet_key) AS total_distinct
-                FROM (
-                  SELECT facet_key, facet_value, count() AS cnt FROM (
-                    SELECT
-                      arrayJoin([${tupleArray}]) AS kv,
-                      kv.1 AS facet_key,
-                      kv.2 AS facet_value
-                    FROM ${params.table}
-                    WHERE ${whereClause}
-                      ${dedupFilter}
-                  )
-                  WHERE facet_value != ''
-                  GROUP BY facet_key, facet_value
-                )
-              )
-              ORDER BY facet_key, cnt DESC
-              LIMIT {topN:UInt32} BY facet_key
-            `;
-
-            const result = await client.query({
-              query,
-              query_params: { ...queryParams, topN: params.topN },
-              format: "JSONEachRow",
-            });
-
-            const rows = await result.json<{
-              facet_key: string;
-              facet_value: string;
-              cnt: number;
-              total_distinct: number;
-            }>();
-
-            const out: Record<string, CategoricalFacetResult> = {};
-            for (const spec of params.categoricalSpecs) {
-              out[spec.key] = { values: [], totalDistinct: 0 };
-            }
-            for (const row of rows) {
-              const bucket = out[row.facet_key];
-              if (!bucket) continue;
-              bucket.values.push({
-                value: row.facet_value,
-                count: Number(row.cnt),
-              });
-              bucket.totalDistinct = Number(row.total_distinct);
-            }
-            return out;
-          })();
-
-    const rangesPromise: Promise<Record<string, { min: number; max: number }>> =
-      params.rangeSpecs.length === 0
-        ? Promise.resolve({})
-        : (async () => {
-            // Use indexed aliases so arbitrary registry keys can't collide
-            // with reserved SQL words or each other after sanitisation.
-            const aggClauses = params.rangeSpecs
-              .flatMap((s, i) => [
-                `min(${s.expression}) AS r_${i}_min`,
-                `max(${s.expression}) AS r_${i}_max`,
-              ])
-              .join(", ");
-
-            const query = `
-              SELECT ${aggClauses}
-              FROM ${params.table}
-              WHERE ${whereClause}
-                ${dedupFilter}
-            `;
-
-            const result = await client.query({
-              query,
-              query_params: queryParams,
-              format: "JSONEachRow",
-            });
-
-            const rows = await result.json<Record<string, number | null>>();
-            const row = rows[0] ?? {};
-            const out: Record<string, { min: number; max: number }> = {};
-            for (let i = 0; i < params.rangeSpecs.length; i += 1) {
-              const spec = params.rangeSpecs[i]!;
-              out[spec.key] = {
-                min: Number(row[`r_${i}_min`] ?? 0),
-                max: Number(row[`r_${i}_max`] ?? 0),
-              };
-            }
-            return out;
-          })();
-
     const [categoricals, ranges] = await Promise.all([
-      categoricalsPromise,
-      rangesPromise,
+      this.queryBatchedCategoricalFacets({
+        client,
+        table: params.table,
+        whereClause,
+        dedupFilter,
+        queryParams,
+        categoricalSpecs: params.categoricalSpecs,
+        topN: params.topN,
+      }),
+      this.queryBatchedRangeFacets({
+        client,
+        table: params.table,
+        whereClause,
+        dedupFilter,
+        queryParams,
+        rangeSpecs: params.rangeSpecs,
+      }),
     ]);
 
     return { categoricals, ranges };
@@ -1124,48 +1165,81 @@ function extractFacetAggregates(r: FacetRow): {
 // (parameterised + aliased per key) over re-introducing the full
 // Attributes Map projection — that read is what this change exists to
 // avoid.
+// Each entry maps a projected `Attr*` column to its canonical attribute key;
+// empty strings (ClickHouse's stand-in for a missing Map key) are skipped so
+// the list mapper's `?? null` / `?? ""` fallbacks fire.
+// Fold-summed cache / reasoning token counts are what the drawer header reads
+// to show the "Cache read" / "Cache write" / reasoning rows (the raw per-span
+// gen_ai.usage.cache_* values never reach the trace attribute map).
+// AttrLabels is JSON-encoded (e.g. '["prod","beta"]"); preserved raw here
+// because TraceSummaryData.attributes is string-valued — the list mapper
+// decodes it into a string[] for the Labels column.
+const LIST_ATTRIBUTE_COLUMNS: Array<{
+  column: keyof Pick<
+    ClickHouseSummaryRow,
+    | "AttrSpanName"
+    | "AttrServiceName"
+    | "AttrConversationId"
+    | "AttrUserId"
+    | "AttrOrigin"
+    | "AttrNonBillable"
+    | "AttrCacheReadTokens"
+    | "AttrInputMediaRefs"
+    | "AttrOutputMediaRefs"
+    | "AttrCacheCreationTokens"
+    | "AttrReasoningTokens"
+    | "AttrContextSizeTokens"
+    | "AttrLabels"
+  >;
+  key: string;
+}> = [
+  { column: "AttrSpanName", key: "langwatch.span.name" },
+  { column: "AttrServiceName", key: "service.name" },
+  { column: "AttrConversationId", key: "gen_ai.conversation.id" },
+  { column: "AttrUserId", key: "langwatch.user_id" },
+  { column: "AttrOrigin", key: "langwatch.origin" },
+  { column: "AttrNonBillable", key: "langwatch.cost.non_billable" },
+  {
+    column: "AttrCacheReadTokens",
+    key: "langwatch.reserved.cache_read_tokens",
+  },
+  {
+    column: "AttrInputMediaRefs",
+    key: "langwatch.reserved.media_refs.input",
+  },
+  {
+    column: "AttrOutputMediaRefs",
+    key: "langwatch.reserved.media_refs.output",
+  },
+  {
+    column: "AttrCacheCreationTokens",
+    key: "langwatch.reserved.cache_creation_tokens",
+  },
+  {
+    column: "AttrReasoningTokens",
+    key: "langwatch.reserved.reasoning_tokens",
+  },
+  {
+    column: "AttrContextSizeTokens",
+    key: "langwatch.reserved.context_size_tokens",
+  },
+  { column: "AttrLabels", key: "langwatch.labels" },
+];
+
+// The keys below match the explicit Attributes[...] projections in
+// `findAll`'s SELECT. To surface another attribute in the list, add it
+// in both places. If user-pinned attribute columns ever ship, prefer
+// extending the query input with an `extraAttributeKeys: string[]` list
+// (parameterised + aliased per key) over re-introducing the full
+// Attributes Map projection — that read is what this change exists to
+// avoid.
 function buildListAttributes(
   row: ClickHouseSummaryRow,
 ): Record<string, string> {
   const attributes: Record<string, string> = {};
-  if (row.AttrSpanName) attributes["langwatch.span.name"] = row.AttrSpanName;
-  if (row.AttrServiceName) attributes["service.name"] = row.AttrServiceName;
-  if (row.AttrConversationId) {
-    attributes["gen_ai.conversation.id"] = row.AttrConversationId;
+  for (const { column, key } of LIST_ATTRIBUTE_COLUMNS) {
+    const value = row[column];
+    if (value) attributes[key] = value;
   }
-  if (row.AttrUserId) attributes["langwatch.user_id"] = row.AttrUserId;
-  if (row.AttrOrigin) attributes["langwatch.origin"] = row.AttrOrigin;
-  if (row.AttrNonBillable) {
-    attributes["langwatch.cost.non_billable"] = row.AttrNonBillable;
-  }
-  // Fold-summed cache / reasoning token counts the drawer header reads to show
-  // the "Cache read" / "Cache write" / reasoning rows (the raw per-span
-  // gen_ai.usage.cache_* values never reach the trace attribute map).
-  if (row.AttrCacheReadTokens) {
-    attributes["langwatch.reserved.cache_read_tokens"] =
-      row.AttrCacheReadTokens;
-  }
-  if (row.AttrInputMediaRefs) {
-    attributes["langwatch.reserved.media_refs.input"] = row.AttrInputMediaRefs;
-  }
-  if (row.AttrOutputMediaRefs) {
-    attributes["langwatch.reserved.media_refs.output"] =
-      row.AttrOutputMediaRefs;
-  }
-  if (row.AttrCacheCreationTokens) {
-    attributes["langwatch.reserved.cache_creation_tokens"] =
-      row.AttrCacheCreationTokens;
-  }
-  if (row.AttrReasoningTokens) {
-    attributes["langwatch.reserved.reasoning_tokens"] = row.AttrReasoningTokens;
-  }
-  if (row.AttrContextSizeTokens) {
-    attributes["langwatch.reserved.context_size_tokens"] =
-      row.AttrContextSizeTokens;
-  }
-  // JSON-encoded array of trace labels (e.g. '["prod","beta"]'). Preserve the
-  // raw string here because TraceSummaryData.attributes is string-valued; the
-  // list mapper decodes it into a string[] for the Labels column.
-  if (row.AttrLabels) attributes["langwatch.labels"] = row.AttrLabels;
   return attributes;
 }

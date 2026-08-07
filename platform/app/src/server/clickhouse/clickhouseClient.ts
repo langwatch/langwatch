@@ -42,29 +42,54 @@ const privateClickHouseUrls = parsePrivateEnvVars(
   "ClickHouse",
 );
 
+// Format: <PREFIX><label>__<orgId>
+// Strip prefix, then take the last segment after "__" as orgId
+function parseOrgIdFromPrivateEnvKey(
+  key: string,
+  prefix: string,
+): string | undefined {
+  const suffix = key.slice(prefix.length);
+  const lastSep = suffix.lastIndexOf("__");
+  const orgId = lastSep >= 0 ? suffix.slice(lastSep + 2) : suffix;
+  return orgId || undefined;
+}
+
+function parsePrivateEnvEntry({
+  key,
+  value,
+  prefix,
+  label,
+}: {
+  key: string;
+  value: string | undefined;
+  prefix: string;
+  label: string;
+}): { orgId: string; value: string } | undefined {
+  if (!key.startsWith(prefix)) return undefined;
+
+  if (!value || value.trim() === "") {
+    logger.warn(
+      { envVar: key },
+      `Skipping private ${label} env var: empty value`,
+    );
+    return undefined;
+  }
+
+  const orgId = parseOrgIdFromPrivateEnvKey(key, prefix);
+  if (!orgId) return undefined;
+
+  return { orgId, value };
+}
+
 function parsePrivateEnvVars(
   prefix: string,
   label: string,
 ): Map<string, string> {
   const map = new Map<string, string>();
   for (const [key, value] of Object.entries(process.env)) {
-    if (!key.startsWith(prefix)) continue;
-
-    if (!value || value.trim() === "") {
-      logger.warn(
-        { envVar: key },
-        `Skipping private ${label} env var: empty value`,
-      );
-      continue;
-    }
-
-    // Format: <PREFIX><label>__<orgId>
-    // Strip prefix, then take the last segment after "__" as orgId
-    const suffix = key.slice(prefix.length);
-    const lastSep = suffix.lastIndexOf("__");
-    const orgId = lastSep >= 0 ? suffix.slice(lastSep + 2) : suffix;
-
-    if (!orgId) continue;
+    const entry = parsePrivateEnvEntry({ key, value, prefix, label });
+    if (!entry) continue;
+    const { orgId, value: envValue } = entry;
 
     if (map.has(orgId)) {
       throw new Error(
@@ -72,7 +97,7 @@ function parsePrivateEnvVars(
       );
     }
 
-    map.set(orgId, value);
+    map.set(orgId, envValue);
     logger.info(
       { orgId, envVar: key },
       `Loaded private ${label} URL from env var`,

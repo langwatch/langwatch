@@ -24,6 +24,84 @@ export interface CustomerIoTraceSyncReactorDeps {
   nurturing: NurturingService;
 }
 
+function fireFirstTraceNurturing({
+  nurturing,
+  projectId,
+  userId,
+  sdkLanguage,
+  sdkFramework,
+  traceOccurredAt,
+}: {
+  nurturing: NurturingService;
+  projectId: string;
+  userId: string;
+  sdkLanguage: string;
+  sdkFramework: string;
+  traceOccurredAt: string;
+}): void {
+  void nurturing
+    .identifyUser({
+      userId,
+      traits: {
+        has_traces: true,
+        sdk_language: sdkLanguage,
+        sdk_framework: sdkFramework,
+        first_trace_at: traceOccurredAt,
+      },
+    })
+    .catch((error) => {
+      logger.error(
+        { projectId, error },
+        "Failed to identify user for first trace",
+      );
+      captureException(toError(error));
+    });
+  void nurturing
+    .trackEvent({
+      userId,
+      event: "first_trace_integrated",
+      properties: {
+        sdk_language: sdkLanguage,
+        sdk_framework: sdkFramework,
+        project_id: projectId,
+      },
+    })
+    .catch((error) => {
+      logger.error(
+        { projectId, error },
+        "Failed to track first_trace_integrated event",
+      );
+      captureException(toError(error));
+    });
+}
+
+function fireSubsequentTraceNurturing({
+  nurturing,
+  projectId,
+  userId,
+  traceOccurredAt,
+}: {
+  nurturing: NurturingService;
+  projectId: string;
+  userId: string;
+  traceOccurredAt: string;
+}): void {
+  void nurturing
+    .identifyUser({
+      userId,
+      traits: {
+        last_trace_at: traceOccurredAt,
+      },
+    })
+    .catch((error) => {
+      logger.error(
+        { projectId, error },
+        "Failed to identify user for trace update",
+      );
+      captureException(toError(error));
+    });
+}
+
 /**
  * Reactor that syncs trace milestones and metrics to Customer.io.
  *
@@ -77,56 +155,22 @@ export function createCustomerIoTraceSyncReactor(
 
         if (!firstMessage) {
           // First trace — fire immediately, fire-and-forget
-          void deps.nurturing
-            .identifyUser({
-              userId,
-              traits: {
-                has_traces: true,
-                sdk_language: sdkLanguage,
-                sdk_framework: sdkFramework,
-                first_trace_at: traceOccurredAt,
-              },
-            })
-            .catch((error) => {
-              logger.error(
-                { projectId, error },
-                "Failed to identify user for first trace",
-              );
-              captureException(toError(error));
-            });
-          void deps.nurturing
-            .trackEvent({
-              userId,
-              event: "first_trace_integrated",
-              properties: {
-                sdk_language: sdkLanguage,
-                sdk_framework: sdkFramework,
-                project_id: projectId,
-              },
-            })
-            .catch((error) => {
-              logger.error(
-                { projectId, error },
-                "Failed to track first_trace_integrated event",
-              );
-              captureException(toError(error));
-            });
+          fireFirstTraceNurturing({
+            nurturing: deps.nurturing,
+            projectId,
+            userId,
+            sdkLanguage,
+            sdkFramework,
+            traceOccurredAt,
+          });
         } else {
           // Subsequent trace — debounced via makeJobId, fire-and-forget
-          void deps.nurturing
-            .identifyUser({
-              userId,
-              traits: {
-                last_trace_at: traceOccurredAt,
-              },
-            })
-            .catch((error) => {
-              logger.error(
-                { projectId, error },
-                "Failed to identify user for trace update",
-              );
-              captureException(toError(error));
-            });
+          fireSubsequentTraceNurturing({
+            nurturing: deps.nurturing,
+            projectId,
+            userId,
+            traceOccurredAt,
+          });
         }
       } catch (error) {
         logger.error(
