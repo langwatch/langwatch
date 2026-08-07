@@ -1154,9 +1154,12 @@ describe.skipIf(!hasTestcontainers)(
             })),
           );
 
+          // At-LEAST-8, not exactly 8: an over-delivery would never satisfy an
+          // exact-length wait, so the bug would surface as an opaque 30s
+          // timeout instead of the array diff below.
           await vi.waitFor(
             () => {
-              expect(processedInOrder.length).toBe(8);
+              expect(processedInOrder.length).toBeGreaterThanOrEqual(8);
             },
             { timeout: 30000, interval: 50 },
           );

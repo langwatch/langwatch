@@ -625,9 +625,9 @@ export class EventSourcing {
         // against a mixed batch (should never happen — the GroupQueue only
         // coalesces same-group jobs — but a stray payload must never be
         // misrouted to the wrong handler) and fall back to per-item processing.
-        const first = routed[0];
-        const batchHandler = first?.entry.processBatch;
-        if (!batchHandler || !routed.every((r) => r.entry === first.entry)) {
+        const firstEntry = routed[0]?.entry;
+        const batchHandler = firstEntry?.processBatch;
+        if (!batchHandler || !routed.every((r) => r.entry === firstEntry)) {
           for (const result of routed) {
             await result.entry.process(result.clean, delivery);
           }
