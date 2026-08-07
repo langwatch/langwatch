@@ -197,11 +197,9 @@ describe("requestLogging", () => {
     });
 
     /**
-     * Loki reads a field named `error` to decide a record's level, and that
-     * guess beats the severity we emitted. Records we deliberately log below
-     * error therefore have to carry their cause somewhere else, or they arrive
-     * as errors anyway — which is what buried the real 5xx behind 128k/day of
-     * handled 402s.
+     * A record we chose to log at warn should not carry a key that claims it
+     * failed. The level we meant is on `severity_text`; the payload must not
+     * argue with it.
      */
     describe("when the record is logged below error level", () => {
       const handledCustomer = Object.assign(new Error("over quota"), {

@@ -137,15 +137,20 @@ function extractRawQuery(params: unknown): string {
 /**
  * Report an attempt that failed and was raised to the caller.
  *
- * Warn, not error, and the cause off the `error` field — the same two rules,
- * for the same reason, as the vendor policy in `@langwatch/clickhouse-client`.
- * This wrapper does not know the outcome: a read's translated error is reported
- * at the request boundary, and an insert is issued from a job the queue
- * retries, which logs its own error and increments `gq_jobs_dropped_total` if
- * it ever truly gives up. Claiming a verdict here made recovered work read as
- * lost work — 17k records a day against zero jobs actually dropped — and
- * naming the field `error` had the log pipeline promote the record's level
- * regardless of the one chosen here.
+ * Warn, not error, and the cause off the `error` field — the same two rules as
+ * the vendor policy in `@langwatch/clickhouse-client`.
+ *
+ * The level is the substantive half. This wrapper does not know the outcome: a
+ * read's translated error is reported at the request boundary, and an insert is
+ * issued from a job the queue retries, which logs its own error and increments
+ * `gq_jobs_dropped_total` if it ever truly gives up. Claiming a verdict here
+ * made recovered work read as lost work — 17k records a day against zero jobs
+ * actually dropped.
+ *
+ * The field name is consistency, not a fix: a warn record should not carry a
+ * key asserting it failed. It does NOT change prod Loki's `detected_level`,
+ * which never sees these fields — see the note on `REQUEST_CAUSE_FIELD` in
+ * @langwatch/observability for why, and what actually fixes it.
  *
  * The failure is still counted: `incrementClickHouseQueryCount(_, "error")`
  * runs at every call site, and a rate is what the alerting is built on.

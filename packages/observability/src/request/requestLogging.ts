@@ -88,14 +88,21 @@ export function getLogLevelForRequest(
 /**
  * Where a cause is attached on a record that is NOT at error level.
  *
- * Loki derives `detected_level` from the presence of a field named `error` and
- * that guess beats the `severity_text` we actually emitted. So a handled 402,
- * logged at warn exactly as intended, arrived in Loki as an error — 128k a day
- * of them on one service, swamping the genuine 5xx and making every dashboard
- * and alert built on `detected_level` read the opposite of the truth.
+ * A record we chose to log at warn should not read as a failure to anything
+ * downstream, and a key called `error` is the loudest possible claim that it
+ * is. `severity_text` carries the level we meant; this keeps the payload from
+ * arguing with it. Same convention as `VENDOR_CAUSE_FIELD` and
+ * `RETRY_CAUSE_FIELD` in `@langwatch/clickhouse-client`, so all three agree.
  *
- * Same rule, and same reason, as `VENDOR_CAUSE_FIELD` in
- * `@langwatch/clickhouse-client`.
+ * What this does NOT fix, despite what those two modules claim: prod Loki's
+ * `detected_level`. Measured 2026-08-07 — Loki 3.3 reads the level by parsing
+ * the LOG LINE as JSON, and our lines are not JSON. fluent-bit promotes these
+ * fields to structured metadata and ships the bare message as the line, so Loki
+ * never sees this field at all and falls back to scanning the message text for
+ * "error" / "warn". `"error handling request"` contains the word, which is what
+ * promoted 129k handled 402s a day. Renaming a field the parser cannot reach
+ * changes nothing there; the fix is `discover_log_levels: false` on the Loki
+ * side, and `severity_text` as the only level anything queries.
  */
 export const REQUEST_CAUSE_FIELD = "requestError";
 
@@ -116,10 +123,10 @@ export function logHttpRequest(logger: Logger, data: RequestLogData): void {
   const level = getLogLevelForRequest(data.error, data.statusCode);
 
   if (data.error) {
-    // At error level the field keeps its name: `detected_level` and
-    // `severity_text` already agree there, and every 5xx dashboard slices on
-    // the `error_*` metadata the serializer derives from it. Only the levels
-    // where the two disagree are re-keyed.
+    // At error level the field keeps its name — the record IS a failure, and
+    // every 5xx dashboard slices on the `error_*` metadata the serializer
+    // derives from it. Only the levels where the name would misrepresent the
+    // record are re-keyed.
     if (level === "error") {
       logData.error = data.error;
     } else {
