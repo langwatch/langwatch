@@ -15,7 +15,7 @@ import type { UseFormReturn } from "react-hook-form";
 import NextLink from "~/utils/compat/next-link";
 import { useRouter } from "~/utils/compat/next-router";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import { evaluatorTempNameMap } from "../../server/evaluations/evaluatorDisplayNames";
+import { evaluatorDisplayName } from "../../server/evaluations/evaluatorDisplayNames";
 import {
   AVAILABLE_EVALUATORS,
   type EvaluatorDefinition,
@@ -233,8 +233,7 @@ export function EvaluatorSelection({
                           </Tag.Root>
                         )}
                         <Heading as="h2" size="sm">
-                          {evaluatorTempNameMap[evaluator.name] ??
-                            evaluator.name}
+                          {evaluatorDisplayName(evaluator.name)}
                         </Heading>
                       </HStack>
                       {evaluator.unavailable && (

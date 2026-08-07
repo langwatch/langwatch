@@ -21,3 +21,13 @@ export const evaluatorTempNameMap: Readonly<Record<string, string>> = {
   "Lingua Language Detection": "Language Detection",
   "Azure Prompt Shield": "Prompt Injection Detection",
 } as const;
+
+/**
+ * What to call an evaluator on screen: its override if it has one, otherwise
+ * the catalog name.
+ *
+ * Every caller was open-coding `map[name] ?? name`, which meant six copies of
+ * the same fallback and six chances to forget it.
+ */
+export const evaluatorDisplayName = (name: string): string =>
+  evaluatorTempNameMap[name] ?? name;
