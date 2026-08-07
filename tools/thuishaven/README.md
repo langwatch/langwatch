@@ -202,7 +202,7 @@ telemetry fan-out, holds the cross-worktree registry (`~/.langwatch/portless/
 registry/*.json`), and **reaps** stacks whose launcher has exited or whose
 heartbeat has gone stale (`HAVEN_IDLE_TTL`) — pulling routes down with them.
 
-The resolved config lands in `langwatch/.env.portless`, which every TS entry
+The resolved config lands in `platform/app/.env.portless`, which every TS entry
 point loads **last with `override: true`** so it beats anything pinned in `.env`
 (that repo runs `dotenv.config({ override: true })`).
 
@@ -229,7 +229,7 @@ registry, and dashboard stay the same.
   seeds idempotently. Nothing about the local dev identity is ever randomly
   generated — the same admin login, org/team/project/user IDs, and API
   tokens exist on every worktree and every machine. See the doc comment at
-  the top of `langwatch/prisma/seed.ts` for the exact values (admin email +
+  the top of `platform/app/prisma/seed.ts` for the exact values (admin email +
   password, ingestion key `sk-lw-local-development-key` (override
   `LANGWATCH_LOCAL_API_KEY`), a private full-access personal access token,
   and a public ingestion-only token).
@@ -268,7 +268,10 @@ registry, and dashboard stay the same.
   `--yes` skips the picker and applies only the safe categories. Agents (and
   any non-TTY) get the read-only report and delete nothing.
 - **`haven typecheck`.** Run `pnpm typecheck` under a machine-wide slot so parallel
-  tsgo runs across worktrees don't exhaust RAM (bounded by memory / CPU).
+  tsgo runs across worktrees don't exhaust RAM (bounded by memory / CPU). The
+  `typecheck` script slots itself too (`dev/scripts/check-queue.mjs`,
+  `CHECK_SLOTS`), so this command passes `CHECK_SLOTS=0` to the run it
+  spawns and stays the only thing counting it.
 - **AI-gated HMR.** `haven hmr on [--ttl 30s] | off` defers Vite reloads while an
   agent edits, then fires one catch-up reload — a human's browser isn't thrashed
   through broken intermediate states. Opt-in and always time-bounded.

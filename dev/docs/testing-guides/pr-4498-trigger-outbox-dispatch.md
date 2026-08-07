@@ -36,7 +36,7 @@ dispatches. Watch the worker startup log for `outbox runtime attached`.
 
 ```bash
 make quickstart all-local          # local CH + PG + Redis + app + workers
-pnpm dev                            # from langwatch/
+pnpm dev                            # from platform/app/
 ```
 
 - `prisma migrate deploy` runs automatically inside `all-local`. This PR

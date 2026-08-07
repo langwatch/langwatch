@@ -1,9 +1,9 @@
 # Input/Output Pretty mode — Markdown for plain text
 #
 # Implementation:
-#   langwatch/src/features/traces-v2/components/TraceDrawer/IOViewer.tsx
-#   langwatch/src/features/traces-v2/components/TraceDrawer/IOViewerBody.tsx
-#   langwatch/src/features/traces-v2/components/TraceDrawer/markdownView/RenderedMarkdown.tsx
+#   platform/app/src/features/traces-v2/components/TraceDrawer/IOViewer.tsx
+#   platform/app/src/features/traces-v2/components/TraceDrawer/IOViewerBody.tsx
+#   platform/app/src/features/traces-v2/components/TraceDrawer/markdownView/RenderedMarkdown.tsx
 #
 # Motivation (round 5): in the I/O viewer, "Pretty" already does
 # something useful for chat transcripts and JSON, but for plain-text

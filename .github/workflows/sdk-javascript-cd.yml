@@ -16,30 +16,28 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
 
-      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
         with:
           version: 10.24.0
 
       - name: Setup Node
-        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
         with:
           node-version: 24
           cache: pnpm
-          cache-dependency-path: "typescript-sdk/pnpm-lock.yaml"
           registry-url: "https://registry.npmjs.org"
 
       - name: Install dependencies
-        working-directory: typescript-sdk
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --filter "langwatch..."
 
       - name: Build
-        working-directory: ./typescript-sdk
+        working-directory: ./sdks/typescript
         run: pnpm build
 
       - name: Run tests
-        working-directory: ./typescript-sdk
+        working-directory: ./sdks/typescript
         env:
           # OpenAI traffic rides the LangWatch AI Gateway (virtual key +
           # gateway base URL), same as sdk-javascript-ci.yml.
@@ -56,14 +54,14 @@ jobs:
       ## before publishing
       ## NOTE(afr): Disabled for now as prompts tests are broken
       # - name: Run e2e tests
-      #   working-directory: ./typescript-sdk
+      #   working-directory: ./sdks/typescript
       #   env:
       #     OPENAI_API_KEY: ${{ secrets.TYPESCRIPT_SDK_OPENAI_API_KEY }}
       #     LANGWATCH_API_KEY: ${{ secrets.TYPESCRIPT_SDK_LANGWATCH_API_KEY }}
       #   run: pnpm test:e2e
 
       - name: Publish to npm
-        working-directory: ./typescript-sdk
+        working-directory: ./sdks/typescript
         run: pnpm publish --provenance --access public --no-git-checks
 
       - name: Get version from tag or manifest
@@ -72,7 +70,7 @@ jobs:
           if [ "${{ github.event_name }}" = "release" ]; then
             VERSION=${GITHUB_REF#refs/tags/typescript-sdk@v}
           else
-            VERSION=$(cat .github/.release-please-manifest.json | jq -r '."typescript-sdk"')
+            VERSION=$(cat .github/.release-please-manifest.json | jq -r '."sdks/typescript"')
           fi
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
 
@@ -81,6 +79,6 @@ jobs:
           SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL: ${{ secrets.SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL }}
         run: |
           bash .github/scripts/notify-slack-release.sh \
-            typescript-sdk/CHANGELOG.md \
+            sdks/typescript/CHANGELOG.md \
             "TypeScript SDK" \
             "${{ steps.get_version.outputs.version }}"

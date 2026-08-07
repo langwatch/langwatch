@@ -17,7 +17,7 @@
 - DSPy and LiteLLM are gone entirely. The engine is plain Go structs + a stateless prompt builder; the proxy is plain HTTP.
 
 **Non-goals**
-- Rewriting topic clustering in Go. It stays on Python, hosted by **langevals** (the workspace member at `langevals/evaluators/topic_clustering/`). The TS app routes topic clustering unconditionally to `${LANGEVALS_ENDPOINT}/topics/{batch,incremental}_clustering`. `langevals` remains a separate Python service (evaluators + presidio PII + topic clustering); it is **not** in scope for this removal.
+- Rewriting topic clustering in Go. It stays on Python, hosted by **langevals** (the workspace member at `services/langevals/evaluators/topic_clustering/`). The TS app routes topic clustering unconditionally to `${LANGEVALS_ENDPOINT}/topics/{batch,incremental}_clustering`. `langevals` remains a separate Python service (evaluators + presidio PII + topic clustering); it is **not** in scope for this removal.
 - Backwards-incompatible URL or DSL changes for customers. The Studio JSON schema is frozen; only internal interfaces moved.
 - Removing the code-block feature. User code blocks keep working via the bundled stdlib `python3` sandbox (§7).
 
@@ -28,7 +28,7 @@
 | Component | Repo | Path |
 |---|---|---|
 | Go NLP service (sole engine) | `langwatch` | `services/nlpgo/` (a subcommand of `cmd/service/main.go`) |
-| Self-hosted NLP image | `langwatch` | `Dockerfile.langwatch_nlp` (Go binary + slim stdlib `python3`) |
+| Self-hosted NLP image | `langwatch` | `infra/docker/Dockerfile.langwatch_nlp` (Go binary + slim stdlib `python3`) |
 | Helm | `langwatch` | `charts/langwatch/templates/langwatch_nlp/` (single Go container) |
 | BDD specs | `langwatch` | `specs/nlp-go/` |
 | Production Lambda artifact | `langwatch-saas` | `infrastructure/langwatch_nlp_lambda.tf` + saas runtime packaging |
@@ -309,7 +309,7 @@ On the LLM gateway-call span specifically:
 
 - Unit tests for translators, parsers, DAG resolver — `tests/unit/`.
 - Integration tests for engine + each block — `tests/integration/`. **Real HTTP server**, real fixtures from `langwatch_nlp/tests/`. No mocks for cross-component flow.
-- Provider matrix tests (Ash) — `tests/matrix/` with `//go:build live_<provider>` tags, real keys from `langwatch/.env`.
+- Provider matrix tests (Ash) — `tests/matrix/` with `//go:build live_<provider>` tags, real keys from `platform/app/.env`.
 - Each spec scenario in `specs/nlp-go/*.feature` MUST have at least one corresponding test. We do not ship without specs and tests aligned.
 
 ---

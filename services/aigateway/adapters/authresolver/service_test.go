@@ -323,6 +323,31 @@ func TestApplyChange_BudgetMutationWithoutProjectIDEvictsOrganization(t *testing
 	}
 }
 
+/** @scenario Disable and enable propagate through the change feed */
+func TestApplyChange_VkDisableAndEnableEvictTheKey(t *testing.T) {
+	resolver := &fakeResolver{}
+	svc, _ := newService(t, Options{Resolver: resolver, ConfigFetcher: resolver})
+
+	for _, kind := range []string{
+		ChangeKindVirtualKeyDisabled,
+		ChangeKindVirtualKeyEnabled,
+	} {
+		t.Run(kind, func(t *testing.T) {
+			matchingKey := hashKey("vk-lw-lifecycle-matching-" + kind)
+			otherKey := hashKey("vk-lw-lifecycle-other-" + kind)
+			svc.storeL1(matchingKey, &domain.Bundle{VirtualKeyID: "vk-flipped"})
+			svc.storeL1(otherKey, &domain.Bundle{VirtualKeyID: "vk-untouched"})
+
+			svc.applyChange("org-1", CacheChange{Kind: kind, VirtualKeyID: "vk-flipped"})
+
+			_, isMatchingPresent := svc.l1.Get(matchingKey)
+			_, isOtherPresent := svc.l1.Get(otherKey)
+			assert.False(t, isMatchingPresent, "a disabled or enabled key must be evicted so the next request re-resolves its status")
+			assert.True(t, isOtherPresent, "unrelated keys must remain cached")
+		})
+	}
+}
+
 // --- Background refresh classification --------------------------------------
 
 func TestRefreshBackground_TransportFailure_BumpsSoft(t *testing.T) {
@@ -404,23 +429,21 @@ func TestClassifyRefreshError(t *testing.T) {
 	}
 }
 
-// --- HardGrace=0 disables stale-while-error (legacy mode) -------------------
-
-func TestResolve_StaleEntry_HardGraceZero_DisablesStaleWhileError(t *testing.T) {
+// @scenario "a negative hard grace disables stale-while-error"
+func TestResolve_StaleEntry_NegativeHardGrace_DisablesStaleWhileError(t *testing.T) {
 	transportErr := herr.New(context.Background(), domain.ErrAuthUpstream, nil)
 	// Two returns: first call (foreground) fails, second (re-resolve after evict) also fails.
 	resolver := &fakeResolver{returns: []resolverReturn{{err: transportErr}, {err: transportErr}}}
 
-	// HardGrace explicitly set to a tiny non-zero value via a separate
-	// service to verify the contract: any entry stored with bundle.ExpiresAt
-	// already in the past will be hard-expired immediately, falling through
-	// to the cold-path L3 (which fails). This documents the legacy-mode
-	// behavior — operators can opt out of stale-while-error by setting
-	// HardGrace to a tiny duration.
+	// A negative HardGrace places the hard cap before the JWT exp, so an
+	// entry is hard-expired before it could ever be served stale and the
+	// resolve falls through to the cold-path L3 (which fails). This is the
+	// opt-out for deployments where serving a stale bundle is unacceptable;
+	// zero is "unset" and takes the 6h default instead.
 	svc, _ := newService(t, Options{
 		Resolver:      resolver,
 		ConfigFetcher: resolver,
-		HardGrace:     1 * time.Nanosecond,
+		HardGrace:     -1 * time.Second,
 	})
 	rawKey := "vk-lw-legacy"
 	seedExpiredEntry(t, svc, rawKey, "vk_legacy", 30*time.Second)

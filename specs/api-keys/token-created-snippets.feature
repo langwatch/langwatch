@@ -76,6 +76,38 @@ Feature: Token Created modal command snippets
     And the snippet displays a leading terminal prompt glyph ">_" on the left of the command (decorative — must not enter the copy buffer)
     And the executable name "codex" is visually distinct from its `--env` / `--` / `npx` flags and arguments
 
+  # A customer reported that only Claude Code and Codex appeared here, while the
+  # product documents the LangWatch MCP server for more assistants than that.
+  # The tabs are now driven by one list of assistants rather than hand-written
+  # pairs, so a supported assistant cannot be silently missing from the dialog.
+
+  @integration
+  Scenario: Every supported coding assistant has a tab
+    When the "Use with Code Assistants" section renders
+    Then there is one tab per coding assistant the product supports for the MCP server
+    And selecting a tab shows only that assistant's setup instructions
+
+  @integration
+  Scenario: An assistant with an install command shows a terminal snippet
+    When I select a tab for an assistant that installs the MCP server from the terminal
+    Then the "Run in your terminal" snippet renders inside the command-box style
+    And the snippet is that assistant's own command, carrying the freshly minted token
+
+  @integration
+  Scenario: An assistant without an install command points at its config file
+    When I select a tab for an assistant that has no terminal installer
+    Then no terminal command is offered for it
+    And the dialog names the config file that assistant reads
+    And the JSON config block below remains the thing to paste into it
+
+  @unit
+  Scenario: One list of coding assistants drives both the tabs and the config paths
+    # The dialog previously held two disagreeing lists: two tabs, and five
+    # editor config paths naming a different set of tools.
+    When this feature is implemented
+    Then the tab labels and the config-file paths are derived from a single list
+    And adding an assistant to that list is the only edit needed to surface it
+
   @integration
   Scenario: Terminal prompt glyph is not included in the copied value
     Given any terminal command snippet rendered with the ">_" prompt glyph
@@ -205,7 +237,7 @@ Feature: Token Created modal command snippets
 
   @unit
   Scenario: No new highlighting library is added
-    # Verifiable by grepping langwatch/package.json: no new syntax-highlighting dependency added.
+    # Verifiable by grepping platform/app/package.json: no new syntax-highlighting dependency added.
     # Per-render instantiation guard is covered by the Shiki singleton integration scenario above.
     When this feature is implemented
-    Then no syntax-highlighting library other than Shiki appears in langwatch/package.json
+    Then no syntax-highlighting library other than Shiki appears in platform/app/package.json

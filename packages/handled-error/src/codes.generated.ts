@@ -87,7 +87,7 @@ export const goErrorCodes = {
    *
    * @source services/aigateway/domain/errors.go
    */
-  codex_session_expired: { service: "aigateway" },
+  codex_session_expired: { service: "aigateway", httpStatus: 401 },
   /**
    * ConfigInvalid — is the herr code for configuration validation failures.
    *
@@ -120,6 +120,14 @@ export const goErrorCodes = {
    * @source services/langyagent/domain/errors.go
    */
   credentials_required: { service: "langyagent", httpStatus: 428 },
+  /**
+   * ErrEndUserRequired — A per-end-user budget template is active on this key
+   * and the request carried no end-user id: fail closed, a cap evadable by
+   * omitting a field is not a cap.
+   *
+   * @source services/aigateway/domain/errors.go
+   */
+  end_user_required: { service: "aigateway", httpStatus: 400 },
   /**
    * ErrGatewayUnavailable — signals the AI Gateway returned an error or is
    * unreachable.
@@ -221,6 +229,13 @@ export const goErrorCodes = {
    * @source services/langyagent/domain/errors.go
    */
   max_workers_reached: { service: "langyagent", httpStatus: 503 },
+  /**
+   * ErrMissingModel — is a request-shape error with its own stable identity so
+   * clients and rejection metrics do not have to infer it from prose.
+   *
+   * @source services/aigateway/domain/errors.go
+   */
+  missing_model: { service: "aigateway", httpStatus: 400 },
   /**
    * ErrModelNotAllowed
    *
@@ -343,6 +358,16 @@ export const goErrorCodes = {
    */
   unsupported_node_kind: { service: "nlpgo", httpStatus: 501 },
   /**
+   * ErrUnsupportedParameter — means the parameter policy refused a request
+   * parameter for the target lane: either the request depends on it
+   * functionally and the lane cannot honor it, or drop_tuning_params is false
+   * and the lane has no mapping for it. The code matches OpenAI's own
+   * parameter rejections so SDK error handling stays familiar.
+   *
+   * @source services/aigateway/domain/errors.go
+   */
+  unsupported_parameter: { service: "aigateway", httpStatus: 400 },
+  /**
    * ErrUpstreamHTTP — signals a non-2xx from an HTTP block's upstream.
    *
    * Also produced as a workflow NodeError type, so this one entry is the copy
@@ -354,11 +379,19 @@ export const goErrorCodes = {
    */
   upstream_http_error: { service: "nlpgo", httpStatus: 502 },
   /**
+   * ErrKeyDisabled — is the REVERSIBLE stop: the key material is intact and an
+   * administrator can re-enable it. Distinct from revoked (one-way) so tenant
+   * tooling can branch on which one it is.
+   *
+   * @source services/aigateway/domain/errors.go
+   */
+  virtual_key_disabled: { service: "aigateway", httpStatus: 403 },
+  /**
    * ErrKeyRevoked
    *
    * @source services/aigateway/domain/errors.go
    */
-  virtual_key_revoked: { service: "aigateway" },
+  virtual_key_revoked: { service: "aigateway", httpStatus: 403 },
   /**
    * ErrWorkerNotReady — signals a freshly spawned worker's opencode did not
    * become ready within LANGY_READINESS_TIMEOUT_MS.

@@ -32,14 +32,27 @@ on:
       - "pnpm-workspace.yaml"
       - "pnpm-lock.yaml"
       - "packages/server/**"
-      - "langevals/pyproject.toml"
-      - "langevals/uv.lock"
+      - "services/langevals/pyproject.toml"
+      - "services/langevals/uv.lock"
       - "services/aigateway/**"
       - "cmd/service/**"
-      - "langwatch/package.json"
-      - "langwatch/scripts/start.sh"
-      - "langwatch/scripts/check-ports.sh"
+      - "platform/app/package.json"
+      - "platform/app/scripts/start.sh"
+      - "platform/app/scripts/check-ports.sh"
       - ".github/workflows/npx-server-smoke.yml"
+      # The script that assembles the tarball. It decides what every npm user
+      # receives, so a change to it is precisely what this job exists to
+      # validate — but it was missing from this list, so two packaging bugs
+      # went out on a push that started no smoke run at all and looked green.
+      - "dev/scripts/pack-npm.sh"
+      # The manifests of every workspace member the app resolves. Since
+      # ADR-076 they are all in one workspace and the app depends on the SDK
+      # with `workspace:*`, so their dependencies — and their lifecycle
+      # scripts — are part of what an npx install resolves and RUNS. A
+      # `prepare` hook in the SDK took the packed artifact down before it
+      # served a request, on a push this job did not watch.
+      - "sdks/typescript/package.json"
+      - "packages/*/package.json"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -68,7 +81,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
 
       - name: Set LANGWATCH_HOME outside the workspace
         # Outside $GITHUB_WORKSPACE on purpose (see the "Run npx @langwatch/server
@@ -87,12 +100,12 @@ jobs:
           node --version || true
           go version || true
 
-      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v4
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v4
         with:
           node-version: "24"
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
         with:
           run_install: false
 
@@ -124,35 +137,69 @@ jobs:
       - name: Build @langwatch/server CLI
         run: pnpm --filter @langwatch/server-cli build
 
+      # Runs here because this job's path filter is already the exact set of
+      # files these assert about (the root manifest, the workspace definition,
+      # the lockfile, packages/server/**, the packing script) — and because
+      # nothing else in CI runs the CLI's tests at all, which would leave them
+      # reading as coverage while never executing. Placed before the boot so a
+      # workspace regression fails in seconds rather than 25 minutes.
+      # Scoped to this file rather than the CLI's whole suite: that suite has
+      # two failures that predate this branch (cli-doctor, identical on main),
+      # and surfacing those here would be a different change.
+      - name: Check the workspace invariants (ADR-076)
+        run: >
+          pnpm --filter @langwatch/server-cli run test:invariants
+
       # Same prebuild as npx-server-publish.yml: every published artifact
-      # ships langwatch/dist + mcp-server/dist (the publish sanity check
+      # ships platform/app/dist + mcp/typescript/dist (the publish sanity check
       # asserts both), so the artifact THIS job boots must carry them too —
       # otherwise the smoke exercises a tree shape no npm user ever receives
       # and pays a full on-runner vite build for it inside the health budget.
-      - name: Install langwatch app deps
-        run: pnpm -C langwatch install --frozen-lockfile --prod=false
-
+      # No separate app install: since ADR-076 langwatch/ is a member of the
+      # single root workspace, so "Install pnpm dependencies (workspace)"
+      # above already covers it. Same redundancy that was removed from
+      # npx-server-publish.yml.
       - name: Build langwatch app (vite + scenario + mcp + generated types)
-        run: pnpm -C langwatch run build
+        run: pnpm --filter "@langwatch/web..." run build
         env:
           NODE_ENV: production
 
       - name: Pack the npm tarball
         id: pack
         # Use the same wrapper as npx-server-publish.yml so the smoke tarball
-        # matches what end users get from npm (Apache LICENSE swap, exact
-        # files[] from package.json — no go.mod/cmd/, etc).
+        # matches what end users get from npm (exact files[] from
+        # package.json — no go.mod/cmd/, etc).
         run: |
           mkdir -p "$GITHUB_WORKSPACE/_pack"
-          bash scripts/pack-npm.sh --pack-destination "$GITHUB_WORKSPACE/_pack"
+          bash dev/scripts/pack-npm.sh --pack-destination "$GITHUB_WORKSPACE/_pack"
           tarball="$(ls "$GITHUB_WORKSPACE/_pack"/langwatch-server-*.tgz | head -n1)"
           echo "tarball=$tarball" >> "$GITHUB_OUTPUT"
           echo "Tarball: $tarball"
           ls -lh "$tarball"
           # Belt-and-suspenders: tarball must NOT ship Go source (silent
           # local-build foot-gun from beta.8 era).
-          if tar -tzf "$tarball" | grep -qE "^package/(go\.mod|cmd/|pkg/|services/)"; then
+          #
+          # Anchored at package/app/ since ADR-076 — the artifact is staged
+          # one level down so the workspace root is not the package root. The
+          # old `^package/(...)` anchor cannot match any path in the staged
+          # layout, so it would have passed unconditionally and stopped
+          # guarding anything.
+          #
+          # `services/` alone is too broad post-restructure: services/langevals
+          # is Python and IS in package.json's `files[]` (deliberately shipped),
+          # so a blanket services/ match false-positives on every run. Grep for
+          # go.mod/cmd/pkg/services, then subtract the known-non-Go services/
+          # subdirs — anything left under services/ is an unlisted (and thus
+          # unreviewed) directory, which stays worth failing on.
+          if tar -tzf "$tarball" | grep -E "^package/app/(go\.mod|cmd/|pkg/|services/)" \
+              | grep -v "^package/app/services/langevals/" | grep -q .; then
             echo "✗ tarball ships Go source dirs — local-build fallback regression."
+            exit 1
+          fi
+          # The lockfile is the whole reason for the staged layout: npm strips
+          # it from the package ROOT. Assert it arrived.
+          if ! tar -tzf "$tarball" | grep -qx "package/app/pnpm-lock.yaml"; then
+            echo "✗ tarball ships no lockfile — the end-user install would not be reproducible."
             exit 1
           fi
 
@@ -167,7 +214,7 @@ jobs:
           # (node_modules/@langwatch/server), so the run exercises the same
           # relocation + install path npm users get and the app tree is
           # exactly the published artifact. Booting the checkout instead
-          # masks packaging gaps: 3.6.0 shipped without langwatch/packages/*
+          # masks packaging gaps: 3.6.0 shipped without the runtime packages/*
           # (both .npmignore files still excluded the dir after runtime
           # packages moved in), every install died at first boot with
           # MODULE_NOT_FOUND, and every checkout-based smoke run passed.
@@ -185,7 +232,13 @@ jobs:
           install_dir="$RUNNER_TEMP/npx-server-smoke/node_modules/@langwatch/server"
           mkdir -p "$install_dir"
           tar -xzf "${{ steps.pack.outputs.tarball }}" -C "$install_dir" --strip-components=1
-          node "$install_dir/packages/server/dist/cli.cjs" start \
+          # Resolve the entrypoint from the manifest's `bin` rather than
+          # hardcoding it. The artifact is staged under app/ since ADR-076, and
+          # a hardcoded path silently stops matching the day the layout moves —
+          # which is exactly what this job exists to catch.
+          cli="$install_dir/$(node -p "Object.values(require('$install_dir/package.json').bin)[0]")"
+          test -f "$cli" || { echo "✗ bin entry does not resolve: $cli"; exit 1; }
+          node "$cli" start \
             --yes \
             --no-open \
             --port-base "$PORT_BASE" \

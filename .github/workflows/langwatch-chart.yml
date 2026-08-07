@@ -9,6 +9,20 @@ on:
       - "charts/langyagent/**"
       - "charts/lib/**"
       - ".github/workflows/langwatch-chart.yml"
+      # This job is the only thing in CI that builds the app image and runs a
+      # stack against it — publish-docker-app fires on `release: published`, so
+      # on a pull request nothing else touches the Dockerfile at all. Without
+      # these paths a change to how the image is assembled reaches a release
+      # unvalidated, which is exactly how a broken one nearly shipped: moving
+      # the pnpm install root left every dependency symlink in the runtime
+      # stage dangling, the build stayed green, and the container would have
+      # died on its first import.
+      - "infra/docker/Dockerfile"
+      - "infra/docker/Dockerfile.go_service"
+      - ".dockerignore"
+      - "pnpm-workspace.yaml"
+      - "pnpm-lock.yaml"
+      - "package.json"
   push:
     branches: [main]
     paths:
@@ -18,6 +32,20 @@ on:
       - "charts/langyagent/**"
       - "charts/lib/**"
       - ".github/workflows/langwatch-chart.yml"
+      # This job is the only thing in CI that builds the app image and runs a
+      # stack against it — publish-docker-app fires on `release: published`, so
+      # on a pull request nothing else touches the Dockerfile at all. Without
+      # these paths a change to how the image is assembled reaches a release
+      # unvalidated, which is exactly how a broken one nearly shipped: moving
+      # the pnpm install root left every dependency symlink in the runtime
+      # stage dangling, the build stayed green, and the container would have
+      # died on its first import.
+      - "infra/docker/Dockerfile"
+      - "infra/docker/Dockerfile.go_service"
+      - ".dockerignore"
+      - "pnpm-workspace.yaml"
+      - "pnpm-lock.yaml"
+      - "package.json"
 
 jobs:
   lint-template:
@@ -57,7 +85,7 @@ jobs:
           - name: scalable-prod
             flags: "-f examples/values-scalable-prod.yaml"
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5
         with:
           version: v3.12.0
@@ -66,6 +94,66 @@ jobs:
       - run: helm dependency build .
       - name: "helm template (${{ matrix.name }})"
         run: helm template lw . ${{ matrix.flags }} > /dev/null
+
+  langevals-sizing:
+    name: "langevals sizing"
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: charts/langwatch
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5
+        with:
+          version: v3.12.0
+      - run: helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+      - run: helm repo add langwatch https://langwatch.github.io/langwatch
+      - run: helm dependency build .
+      # lint-template above only proves the YAML renders. This asserts the
+      # numbers that reach the pod: the worker count the chart computed from
+      # the CPU allowance, and a memory ceiling that count can live within.
+      - name: "assert rendered worker count and memory ceiling"
+        run: ./tests/langevals-sizing.sh
+
+  email-gateway:
+    name: "email gateway"
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: charts/langwatch
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5
+        with:
+          version: v3.12.0
+      - run: helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+      - run: helm repo add langwatch https://langwatch.github.io/langwatch
+      - run: helm dependency build .
+      # The overlays above never enable email, so nothing there would notice a
+      # gateway that reaches only one Deployment. This renders both and compares
+      # them, and checks that an unconfigurable provider stops the render.
+      - name: "assert rendered email configuration"
+        run: ./tests/email-gateway.sh
+
+  sso-providers:
+    name: "sso providers"
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: charts/langwatch
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5
+        with:
+          version: v3.12.0
+      - run: helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+      - run: helm repo add langwatch https://langwatch.github.io/langwatch
+      - run: helm dependency build .
+      # A provider can be documented in the README and validated in the helpers
+      # while the Deployment never emits its variables, which looks exactly like
+      # the provider not being supported. Only rendering the container shows it.
+      - name: "assert rendered SSO provider configuration"
+        run: ./tests/sso-providers.sh
 
   e2e:
     name: "e2e: ${{ matrix.name }}"
@@ -87,12 +175,12 @@ jobs:
       run:
         working-directory: charts/langwatch
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5
         with:
           version: v3.12.0
       - name: Build clickhouse-serverless image
-        run: docker build -t langwatch/clickhouse-serverless:next ../../clickhouse-serverless/
+        run: docker build -t langwatch/clickhouse-serverless:next ../../infra/clickhouse-serverless/
       - name: Resolve app image
         if: matrix.build_app
         run: |
@@ -101,12 +189,12 @@ jobs:
           echo "APP_IMAGE=${APP_REPO}:${APP_TAG}" >> "$GITHUB_ENV"
       - name: Build app image
         if: matrix.build_app
-        run: docker build -t "$APP_IMAGE" ../..
+        run: docker build -t "$APP_IMAGE" -f ../../infra/docker/Dockerfile ../..
       # The gateway image isn't published to ghcr yet — build it locally so
       # the chart e2e can install. values-e2e.yaml overrides
       # gateway.image.{repository,tag,pullPolicy} to match.
       - name: Build gateway image
-        run: docker build -t langwatch/ai-gateway:e2e -f ../../Dockerfile.go_service ../..
+        run: docker build -t langwatch/ai-gateway:e2e -f ../../infra/docker/Dockerfile.go_service ../..
       - uses: helm/kind-action@ef37e7f390d99f746eb8b610417061a60e82a6cc # v1
         with:
           cluster_name: ${{ matrix.cluster }}

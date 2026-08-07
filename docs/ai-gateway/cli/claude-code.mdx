@@ -65,7 +65,7 @@ After one `claude` session:
 
 If traffic doesn't appear:
 
-- Run `claude --print "say hi"` and look at the exit status + the `X-LangWatch-Request-Id` header. If the request fails, the gateway emits a diagnostic error envelope (not a provider-opaque one).
+- Run `claude --print "say hi"` and look at the exit status + the `X-LangWatch-Gateway-Request-Id` header. If the request fails, the gateway emits a diagnostic error envelope (not a provider-opaque one).
 - Check the VK's allowed providers includes `anthropic`.
 - Check that the project's Anthropic model provider credential is configured (**Settings → Model Providers**).
 

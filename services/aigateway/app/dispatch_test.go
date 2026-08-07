@@ -20,7 +20,7 @@ import (
 type mockProvider struct {
 	dispatchFn func(ctx context.Context, req *domain.Request, cred domain.Credential) (*domain.Response, error)
 	streamFn   func(ctx context.Context, req *domain.Request, cred domain.Credential) (domain.StreamIterator, error)
-	listFn     func(ctx context.Context, creds []domain.Credential) ([]domain.Model, error)
+	listFn     func(ctx context.Context, creds []domain.Credential) ([]domain.Model, []domain.ModelDiscoveryGap, error)
 }
 
 func (m *mockProvider) Dispatch(ctx context.Context, req *domain.Request, cred domain.Credential) (*domain.Response, error) {
@@ -31,11 +31,11 @@ func (m *mockProvider) DispatchStream(ctx context.Context, req *domain.Request, 
 	return m.streamFn(ctx, req, cred)
 }
 
-func (m *mockProvider) ListModels(ctx context.Context, creds []domain.Credential) ([]domain.Model, error) {
+func (m *mockProvider) ListModels(ctx context.Context, creds []domain.Credential) ([]domain.Model, []domain.ModelDiscoveryGap, error) {
 	if m.listFn != nil {
 		return m.listFn(ctx, creds)
 	}
-	return nil, nil
+	return nil, nil, nil
 }
 
 type mockRateLimiter struct {
@@ -95,12 +95,16 @@ func (m *mockPolicy) Check(ctx context.Context, rules []domain.PolicyRule, body 
 }
 
 type mockModels struct {
-	resolveFn func(ctx context.Context, rawModel string, config domain.BundleConfig) (*domain.ResolvedModel, error)
+	resolveFn func(ctx context.Context, req *domain.Request, config domain.BundleConfig) (*domain.ResolvedModel, error)
 }
 
-func (m *mockModels) Resolve(ctx context.Context, rawModel string, config domain.BundleConfig) (*domain.ResolvedModel, error) {
+func (m *mockModels) Resolve(ctx context.Context, req *domain.Request, config domain.BundleConfig) (*domain.ResolvedModel, error) {
 	if m.resolveFn != nil {
-		return m.resolveFn(ctx, rawModel, config)
+		return m.resolveFn(ctx, req, config)
+	}
+	rawModel := ""
+	if req != nil {
+		rawModel = req.Model
 	}
 	return &domain.ResolvedModel{ModelID: rawModel, ProviderID: "openai", Source: domain.ModelSourceImplicit}, nil
 }
@@ -335,7 +339,7 @@ func TestHandleChat_ModelResolution(t *testing.T) {
 		},
 	}
 	models := &mockModels{
-		resolveFn: func(_ context.Context, _ string, _ domain.BundleConfig) (*domain.ResolvedModel, error) {
+		resolveFn: func(_ context.Context, _ *domain.Request, _ domain.BundleConfig) (*domain.ResolvedModel, error) {
 			return &domain.ResolvedModel{
 				ModelID:    "gpt-4-turbo",
 				ProviderID: domain.ProviderOpenAI,
@@ -555,7 +559,7 @@ func TestHandleChat_ModelAwareSkipsWrongProvider(t *testing.T) {
 		},
 	}
 	models := &mockModels{
-		resolveFn: func(_ context.Context, _ string, _ domain.BundleConfig) (*domain.ResolvedModel, error) {
+		resolveFn: func(_ context.Context, _ *domain.Request, _ domain.BundleConfig) (*domain.ResolvedModel, error) {
 			return &domain.ResolvedModel{
 				ModelID:    "claude-3-5-sonnet-20241022",
 				ProviderID: domain.ProviderAnthropic,
@@ -600,9 +604,9 @@ func TestHandleChat_ModelAwareImplicitInfersProvider(t *testing.T) {
 		},
 	}
 	models := &mockModels{
-		resolveFn: func(_ context.Context, raw string, _ domain.BundleConfig) (*domain.ResolvedModel, error) {
+		resolveFn: func(_ context.Context, req *domain.Request, _ domain.BundleConfig) (*domain.ResolvedModel, error) {
 			return &domain.ResolvedModel{
-				ModelID:    raw,
+				ModelID:    req.Model,
 				ProviderID: "", // implicit — dispatcher must infer
 				Source:     domain.ModelSourceImplicit,
 			}, nil

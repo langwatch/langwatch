@@ -293,21 +293,27 @@ app.kubernetes.io/instance: {{ .Release.Name }}
   {{- end }}
 {{- end }}
 
-{{/* Validate email provider secrets */}}
-{{- if .Values.app.email.enabled }}
-  {{- if eq .Values.app.email.provider "sendgrid" }}
-    {{- if .Values.app.email.providers.sendgrid.apiKey.secretKeyRef.name }}
-      {{- if empty .Values.app.email.providers.sendgrid.apiKey.secretKeyRef.key }}
-        {{- $errors = append $errors "app.email.providers.sendgrid.apiKey.secretKeyRef.name is set but key is empty" }}
-      {{- end }}
-    {{- else if empty .Values.app.email.providers.sendgrid.apiKey.value }}
-      {{- $errors = append $errors "app.email.enabled is true with sendgrid provider but apiKey is not configured" }}
-    {{- end }}
+{{/* Validate email provider secrets. Whether a gateway is configured at all is
+     langwatch.emailProviderGuard's job; this only catches a half-written
+     secret reference, which names a Secret but no key inside it. That reads as
+     configured to the guard and resolves to nothing at the container, so
+     without this it survives install and fails at the first send.
+
+     Only the selected gateway is checked, since no other gateway's settings
+     are rendered. */}}
+{{- $emailSecretRefs := dict
+      "sendgrid" (list (dict "path" "sendgrid.apiKey" "ref" .Values.app.email.providers.sendgrid.apiKey.secretKeyRef))
+      "resend"   (list (dict "path" "resend.apiKey"   "ref" .Values.app.email.providers.resend.apiKey.secretKeyRef))
+      "smtp"     (list (dict "path" "smtp.url"        "ref" .Values.app.email.providers.smtp.url.secretKeyRef)
+                       (dict "path" "smtp.password"   "ref" .Values.app.email.providers.smtp.password.secretKeyRef)) }}
+{{- range $field := (get $emailSecretRefs .Values.app.email.provider | default list) }}
+  {{- if and $field.ref.name (empty $field.ref.key) }}
+    {{- $errors = append $errors (printf "app.email.providers.%s.secretKeyRef.name is set but key is empty" $field.path) }}
   {{- end }}
 {{- end }}
 
 {{/* Validate NextAuth OAuth provider secrets */}}
-{{- $oauthProviders := list "auth0" "azureAd" "cognito" "github" "gitlab" "google" "okta" }}
+{{- $oauthProviders := list "auth0" "azureAd" "cognito" "github" "gitlab" "google" "okta" "onelogin" "oidc" }}
 {{- range $provider := $oauthProviders }}
   {{- $providerConfig := index $.Values.app.nextAuth.providers $provider }}
   {{- if $providerConfig }}
@@ -323,7 +329,7 @@ app.kubernetes.io/instance: {{ .Release.Name }}
       {{- end }}
     {{- end }}
     
-    {{- if and (has $provider (list "auth0" "cognito" "okta")) $providerConfig.issuer }}
+    {{- if and (has $provider (list "auth0" "cognito" "okta" "onelogin" "oidc")) $providerConfig.issuer }}
       {{- if $providerConfig.issuer.secretKeyRef.name }}
         {{- if not $providerConfig.issuer.secretKeyRef.key }}
           {{- $errors = append $errors (printf "app.nextAuth.providers.%s.issuer.secretKeyRef.name is set but key is empty" $provider) }}
@@ -557,6 +563,51 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
 {{/* ============================================================ */}}
+{{/* Email provider guard                                          */}}
+{{/* ============================================================ */}}
+
+{{/* Fail the render when app.email.provider names a gateway that nothing
+     configures. The app treats EMAIL_PROVIDER as authoritative and never falls
+     back to another gateway, so without this the mistake surfaces at the first
+     alert instead of at install time.
+
+     Skipped when extraEnvs or extraEnvFrom are in play: those can carry the
+     provider's settings (an SMTP_URL from a pre-existing Secret, AWS_REGION
+     alongside IRSA credentials) and the chart cannot see inside them. They
+     reach one Deployment each, though, while the gateway is shared by both, so
+     every Deployment that sends email has to have a source of its own for the
+     bypass to hold. */}}
+{{- define "langwatch.emailProviderGuard" -}}
+{{- if hasKey .Values.app.email "enabled" }}
+{{- fail "app.email.enabled no longer exists: naming app.email.provider is what turns email on. Set app.email.provider to sendgrid, ses, smtp or resend and remove app.email.enabled." }}
+{{- end }}
+{{- $provider := .Values.app.email.provider }}
+{{- if $provider }}
+{{- $providers := .Values.app.email.providers }}
+{{- $configured := dict
+      "sendgrid" (or $providers.sendgrid.apiKey.value $providers.sendgrid.apiKey.secretKeyRef.name)
+      "resend"   (or $providers.resend.apiKey.value $providers.resend.apiKey.secretKeyRef.name)
+      "smtp"     (or $providers.smtp.url.value $providers.smtp.url.secretKeyRef.name $providers.smtp.host)
+      "ses"      $providers.ses.region }}
+{{- if not (hasKey $configured $provider) }}
+{{- fail (printf "app.email.provider is %q, which is not one of: sendgrid, ses, smtp, resend." $provider) }}
+{{- end }}
+{{- if not (get $configured $provider) }}
+{{- $needed := list }}
+{{- if not (or .Values.app.extraEnvs .Values.app.extraEnvFrom) }}
+{{- $needed = append $needed "app.extraEnvs / app.extraEnvFrom" }}
+{{- end }}
+{{- if and .Values.workers.enabled (not (or .Values.workers.extraEnvs .Values.workers.extraEnvFrom)) }}
+{{- $needed = append $needed "workers.extraEnvs / workers.extraEnvFrom" }}
+{{- end }}
+{{- if $needed }}
+{{- fail (printf "app.email.provider is %q, but app.email.providers.%s is empty. Configure it, pick another provider, or supply its settings through %s. The web application sends invitations and password resets, the workers send scheduled reports and alert notifications, and each Deployment reads only its own extra environment." $provider $provider (join " and " $needed)) }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end -}}
+
+{{/* ============================================================ */}}
 {{/* Shared Environment Variables                                  */}}
 {{/* ============================================================ */}}
 {{/* Common env vars shared between app and workers deployments */}}
@@ -567,6 +618,16 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 
 - name: BASE_HOST
   value: {{ .Values.app.http.baseHost | default "http://localhost:5560" }}
+
+{{/* The address this installation answers on, and the one BetterAuth measures
+     every callback, redirect and same-origin check against. Shared rather than
+     app-only: the auth module is imported wherever the app code is, so a
+     workers or cronjob process without it boots into
+     "[better-auth] Base URL could not be determined" and builds its links off
+     nothing. Same value everywhere, so no process can disagree with another
+     about what this installation is called. */}}
+- name: NEXTAUTH_URL
+  value: {{ .Values.app.http.publicUrl | default .Values.app.http.baseHost | default "http://localhost:5560" }}
 
 - name: SKIP_ENV_VALIDATION
   value: {{ .Values.app.features.skipEnvValidation | default false | quote }}
@@ -820,6 +881,74 @@ app.kubernetes.io/instance: {{ .Release.Name }}
       name: {{ include "langwatch.appSecretName" . }}
       key: nextAuthSecret
 {{- end }}
+
+# Enterprise license. Optional: without one the deployment runs the open
+# source edition, which caps nothing it stores on your own infrastructure.
+# Setting it here entitles the whole instance, so an operator does not have
+# to activate a license per organization through the UI.
+#
+# In sharedEnv rather than the app Deployment because plan resolution runs in
+# the workers too, and a worker that reads a different entitlement than the
+# app would enforce different limits on the same organization.
+{{- include "langwatch.secretOrValue" (dict "envName" "LANGWATCH_LICENSE_KEY" "fieldValues" .Values.app.license.key) }}
+{{- include "langwatch.secretOrValue" (dict "envName" "LANGWATCH_LICENSE_PUBLIC_KEY" "fieldValues" .Values.app.license.publicKey) }}
+
+# Email gateway. Naming a provider is what turns email on. In sharedEnv rather
+# than the app Deployment because scheduled reports and alert notifications are
+# dispatched by the workers, so a workers pod without a gateway configured
+# fails every send it is responsible for.
+{{- include "langwatch.emailProviderGuard" . }}
+{{- if .Values.app.email.provider }}
+- name: EMAIL_DEFAULT_FROM
+  value: {{ .Values.app.email.defaultFrom | quote }}
+- name: EMAIL_PROVIDER
+  value: {{ .Values.app.email.provider | quote }}
+{{- if eq .Values.app.email.provider "sendgrid" }}
+{{- include "langwatch.secretOrValue" (dict "envName" "SENDGRID_API_KEY" "fieldValues" .Values.app.email.providers.sendgrid.apiKey) }}
+{{- end }}
+{{- if eq .Values.app.email.provider "ses" }}
+# USE_AWS_SES is what the mailer checks; credentials come from the pod's IAM
+# role (IRSA) unless AWS_* are supplied via app.extraEnvs.
+- name: USE_AWS_SES
+  value: "true"
+{{- /* Emitted only when set: an empty entry would shadow an AWS_REGION
+       supplied through app.extraEnvs / app.extraEnvFrom. */}}
+{{- if .Values.app.email.providers.ses.region }}
+- name: AWS_REGION
+  value: {{ .Values.app.email.providers.ses.region | quote }}
+{{- end }}
+{{- if .Values.app.email.providers.ses.endpoint }}
+- name: AWS_SES_ENDPOINT
+  value: {{ .Values.app.email.providers.ses.endpoint | quote }}
+{{- end }}
+{{- end }}
+{{- if eq .Values.app.email.provider "smtp" }}
+{{- if or .Values.app.email.providers.smtp.url.value .Values.app.email.providers.smtp.url.secretKeyRef.name }}
+{{- include "langwatch.secretOrValue" (dict "envName" "SMTP_URL" "fieldValues" .Values.app.email.providers.smtp.url) }}
+{{- else if .Values.app.email.providers.smtp.host }}
+- name: SMTP_HOST
+  value: {{ .Values.app.email.providers.smtp.host | quote }}
+{{- if .Values.app.email.providers.smtp.port }}
+- name: SMTP_PORT
+  value: {{ .Values.app.email.providers.smtp.port | quote }}
+{{- end }}
+{{- /* Emptiness, not truthiness: `secure: false` is a real setting
+       (force STARTTLS on 465) and must not be dropped. */}}
+{{- if ne (toString .Values.app.email.providers.smtp.secure) "" }}
+- name: SMTP_SECURE
+  value: {{ .Values.app.email.providers.smtp.secure | toString | quote }}
+{{- end }}
+{{- if .Values.app.email.providers.smtp.user }}
+- name: SMTP_USER
+  value: {{ .Values.app.email.providers.smtp.user | quote }}
+{{- include "langwatch.secretOrValue" (dict "envName" "SMTP_PASSWORD" "fieldValues" .Values.app.email.providers.smtp.password) }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- if eq .Values.app.email.provider "resend" }}
+{{- include "langwatch.secretOrValue" (dict "envName" "RESEND_API_KEY" "fieldValues" .Values.app.email.providers.resend.apiKey) }}
+{{- end }}
+{{- end }}
 {{- end }}
 
 {{/* ============================================================ */}}
@@ -906,6 +1035,47 @@ app.kubernetes.io/instance: {{ .Release.Name }}
   would still create the RWO PVC and mount it into multiple replicas — only
   one would attach, the others crash-loop (Sergio review 2026-05-20).
 */}}
+{{/*
+  Worker-pool size for the evaluations service, derived from the CPU the
+  container is actually allowed to use.
+
+  The service sizes its gunicorn pool from its own get_cpu_count(), whose
+  "Kubernetes" branch reads /sys/fs/cgroup/cpu/cpu.shares — a cgroup **v1**
+  path. Every current node runs cgroup v2, where that file does not exist, so
+  the lookup raises and it falls through to sched_getaffinity(), which reports
+  the NODE's CPU count. A container limited to 500m therefore forks one worker
+  per node core: eight on an 8-vCPU node, sixty-four on a 64-vCPU one.
+
+  That matters because the pool is not cheap. Each worker lazily loads its OWN
+  copy of every local model it serves (PII detection, language detection), so
+  resident memory grows by roughly 2.1Gi per worker as traffic round-robins
+  across the pool, until every worker holds every model. Measured on a 1-CPU
+  container on an 8-vCPU node: 11Gi and still climbing, having OOM-killed at
+  the chart's own 8Gi default. Pinned to one worker, the same load holds flat
+  at 2.5Gi.
+
+  CPU_COUNT is the env var get_cpu_count() honours before any of that
+  detection, so setting it from the limit restores the relationship an operator
+  expects: ask for less CPU, get a smaller pool and a smaller footprint.
+
+  Emitted only when the operator has not set CPU_COUNT in extraEnvs, so an
+  explicit choice always wins.
+*/}}
+{{- define "langwatch.langevals.cpuCount" -}}
+{{- $cpu := "" -}}
+{{- with .Values.langevals.resources -}}
+{{- $cpu = (dig "limits" "cpu" (dig "requests" "cpu" "" .) .) -}}
+{{- end -}}
+{{- $cpu = $cpu | toString -}}
+{{- if eq $cpu "" -}}
+1
+{{- else if hasSuffix "m" $cpu -}}
+{{- max 1 (ceil (divf (float64 (trimSuffix "m" $cpu)) 1000.0)) -}}
+{{- else -}}
+{{- max 1 (ceil (float64 $cpu)) -}}
+{{- end -}}
+{{- end -}}
+
 {{- define "langwatch.storedObjects.localFilesystemIsActive" -}}
 {{- if and .Values.app.storedObjects.localFilesystem.enabled (not .Values.app.dataplane.enabled) -}}
 true
@@ -944,4 +1114,93 @@ podAffinity:
   {{- else -}}
     {{- .Values.clickhouse.external.cluster -}}
   {{- end -}}
+{{- end -}}
+
+{{/*
+  Security contexts: a per-component override LAYERS onto the hardened global
+  default. The operator's key wins; every key they do not mention keeps its
+  default. Overriding one field is therefore never a way to drop the others.
+
+  Use mustMergeOverwrite, not coalesce: coalesce is all-or-nothing, taking the
+  component map whole as soon as it is non-empty, which makes a partial
+  override behave as a full replacement. deepCopy because mustMergeOverwrite
+  mutates its first argument and .Values.global is shared across every
+  component in the release.
+
+  Usage: {{- include "langwatch.podSecurityContext" (dict "ctx" . "component" .Values.app) }}
+*/}}
+{{- define "langwatch.podSecurityContext" -}}
+{{- $global := .ctx.Values.global.podSecurityContext | default dict -}}
+{{- /* Three levels, lowest priority first: global, then the component's uid
+       "base", then the operator's override.
+
+       `base` USED TO REPLACE global entirely (`.base | default $global`),
+       which quietly defeated the whole point of a global default: an operator
+       who raised the bar globally — seccompProfile.type: Localhost,
+       supplementalGroups, fsGroupChangePolicy — got it on app/workers/nlp/
+       langevals while the bundled PostgreSQL and Redis silently stayed on
+       whatever `base` happened to name. The two workloads holding data were
+       the two exempt from the hardening.
+
+       Now `base` pins ONLY the keys it actually names (the uid the image
+       requires, which the datastores cannot change), and every other global
+       key survives underneath it.
+
+       To DROP an inherited key rather than change it — e.g. runAsUser on
+       OpenShift, where the SCC assigns one from a range — set it to null:
+       `postgresql.podSecurityContext.runAsUser: null`. mustMergeOverwrite
+       keeps the explicit null, which renders as no value. */ -}}
+{{- $override := .component.podSecurityContext | default dict -}}
+{{- toYaml (mustMergeOverwrite (deepCopy $global) (.base | default dict) $override) -}}
+{{- end -}}
+
+{{- define "langwatch.containerSecurityContext" -}}
+{{- $global := .ctx.Values.global.containerSecurityContext | default dict -}}
+{{- $override := .component.containerSecurityContext | default dict -}}
+{{- toYaml (mustMergeOverwrite (deepCopy $global) $override) -}}
+{{- end -}}
+
+{{/*
+Ingress: validated + normalised `ingress.blockedPaths`, as a JSON array.
+Consume with: {{- $blocked := include "langwatch.ingress.blockedPaths" . | fromJsonArray }}
+
+Validation is security-relevant: a trailing slash, a missing leading slash, a
+bare "/" or a non-list value each leave the block rendered but inert. Rejected
+here, once, by name, so both consuming templates agree.
+*/}}
+{{- define "langwatch.ingress.blockedPaths" -}}
+  {{- $normalised := list -}}
+  {{- $raw := .Values.ingress.blockedPaths -}}
+  {{- if $raw -}}
+    {{- if not (kindIs "slice" $raw) -}}
+      {{- fail (printf "ingress.blockedPaths must be a list, got %s (%v). With --set, a list literal is assigned as a string — use --set-json 'ingress.blockedPaths=[\"/api/internal\"]', or set it in a values file." (kindOf $raw) $raw) -}}
+    {{- end -}}
+    {{- range $entry := $raw -}}
+      {{- $path := toString $entry -}}
+      {{- if not (hasPrefix "/" $path) -}}
+        {{- fail (printf "ingress.blockedPaths entry %q must be an absolute path beginning with \"/\". As written it renders an Ingress the API server rejects, and blocks nothing in the meantime." $path) -}}
+      {{- end -}}
+      {{- /* Reject rather than normalise. `trimSuffix "/"` strips exactly ONE
+             character, so "/api/internal//" became "/api/internal/" and the
+             nested-path guard then compared against a prefix no real request
+             path can match — rendering a blackhole rule that blocks nothing
+             while an app rule for /api/internal/status out-matched it. Silently
+             repairing operator input is what made that reachable; a security
+             control should refuse input it cannot interpret exactly. */ -}}
+      {{- if ne $path (trim $path) -}}
+        {{- fail (printf "ingress.blockedPaths entry %q has leading or trailing whitespace. Kubernetes matches the path literally, so the block would never fire. Remove the whitespace." $path) -}}
+      {{- end -}}
+      {{- if contains "//" $path -}}
+        {{- fail (printf "ingress.blockedPaths entry %q contains an empty path segment (\"//\"). No request path matches it, so the block would render but never fire. Use a single slash between segments." $path) -}}
+      {{- end -}}
+      {{- if eq $path "/" -}}
+        {{- fail "ingress.blockedPaths may not contain \"/\" — that would route the whole site to the blackhole. Block a specific prefix, or set ingress.enabled: false." -}}
+      {{- end -}}
+      {{- if hasSuffix "/" $path -}}
+        {{- fail (printf "ingress.blockedPaths entry %q must not end in a slash — with pathType: Prefix, %q already covers every path beneath it, and the trailing form silently fails to match the prefix itself." $path (trimSuffix "/" $path)) -}}
+      {{- end -}}
+      {{- $normalised = append $normalised $path -}}
+    {{- end -}}
+  {{- end -}}
+  {{- $normalised | uniq | toJson -}}
 {{- end -}}

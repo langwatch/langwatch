@@ -4,7 +4,7 @@
 
 **Status:** Proposed
 
-> **Lifecycle amendment (2026-07-18):** WP4 superseded the holder TTL and eager release/transfer decisions below with Redis-time, per-holder renewable leases. Release and transfer now mutate lease membership only; Redis expiry and the durable-store lifecycle reclaim shared bytes lazily. See the current [GroupQueue architecture](../../../langwatch/src/server/event-sourcing/queues/groupQueue/ARCHITECTURE.md#per-holder-renewable-leases).
+> **Lifecycle amendment (2026-07-18):** WP4 superseded the holder TTL and eager release/transfer decisions below with Redis-time, per-holder renewable leases. Release and transfer now mutate lease membership only; Redis expiry and the durable-store lifecycle reclaim shared bytes lazily. See the current [GroupQueue architecture](../../../platform/app/src/server/event-sourcing/queues/groupQueue/ARCHITECTURE.md#per-holder-renewable-leases).
 >
 > **Migration (WP4 → leases).** This ADR and ADR-029 ship in the same rolling deploy and share one migration; [ADR-029's WP4 amendment](./029-groupqueue-content-addressed-payload-store.md) is the authoritative copy. Restated here so this ADR stands alone:
 >

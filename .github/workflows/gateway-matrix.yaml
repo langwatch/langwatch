@@ -17,9 +17,9 @@ name: gateway-matrix
 # Touches needing this matrix:
 #   - services/aigateway/**          (gateway data plane)
 #   - pkg/**                         (shared HTTP/health helpers)
-#   - langwatch/src/server/gateway/  (control plane)
-#   - langwatch/src/server/event-sourcing/pipelines/trace-processing/
-#     reactors/gatewayBudgetSync.reactor.ts
+#   - platform/app/src/server/gateway/  (control plane)
+#   - platform/app/ee/governance/process-manager/gatewayDebits.process.ts
+#     (the sole writer of gateway budget debits)
 # Triggers:
 #   - PR push (path-filtered to gateway-relevant files only — doc-only
 #     PRs don't pay the ~$0.07 cost)
@@ -48,9 +48,9 @@ on:
       - 'cmd/**'
       - 'go.mod'
       - 'go.sum'
-      - 'langwatch/src/server/gateway/**'
-      - 'langwatch/src/server/event-sourcing/pipelines/trace-processing/reactors/gatewayBudgetSync.reactor.ts'
-      - 'langwatch/src/server/routes/gateway-internal.ts'
+      - 'platform/app/src/server/gateway/**'
+      - 'platform/app/ee/governance/process-manager/gatewayDebits.process.ts'
+      - 'platform/app/src/server/routes/gateway-internal.ts'
       - 'charts/gateway/**'
       - '.github/workflows/gateway-matrix.yaml'
   schedule:
@@ -150,33 +150,37 @@ jobs:
         ports: ['6379:6379']
 
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
           cache-dependency-path: go.sum
 
-      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
 
-      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v4
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v4
         with:
           node-version: '24'
           cache: 'pnpm'
-          cache-dependency-path: langwatch/pnpm-lock.yaml
+          cache-dependency-path: pnpm-lock.yaml
 
       - name: Install langwatch deps
-        working-directory: langwatch
-        run: pnpm install --frozen-lockfile
+        # node-pty (in the app's closure via mcp-server) falls back to
+        # `node-gyp rebuild` on linux, and this job bypasses the shared setup
+        # action that puts node-gyp on PATH.
+        run: |
+          npm install -g node-gyp@12.3.0
+          pnpm install --frozen-lockfile --filter "@langwatch/web..."
 
       - name: Apply DB migrations
-        working-directory: langwatch
+        working-directory: platform/app
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/langwatch
         run: pnpm prisma migrate deploy
 
       - name: Start control plane (background)
-        working-directory: langwatch
+        working-directory: platform/app
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/langwatch
           REDIS_URL: redis://localhost:6379

@@ -26,13 +26,19 @@ jobs:
     outputs:
       relevant: ${{ steps.detect.outputs.relevant }}
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          # The gate reads no working-tree content: on pull_request events
+          # dorny/paths-filter takes the changed-file list from the API, and
+          # every file this job needs on disk lives under .github/. Checking
+          # out the rest of the tree is pure runner time.
+          sparse-checkout: .github
       - uses: ./.github/actions/detect-changes
         id: detect
         with:
           filters: |
             relevant:
-              - 'clickhouse-serverless/**'
+              - 'infra/clickhouse-serverless/**'
               - 'charts/clickhouse-serverless/**'
               - '.github/workflows/clickhouse-serverless.yml'
 
@@ -43,13 +49,13 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: clickhouse-serverless
+        working-directory: infra/clickhouse-serverless
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: "1.26"
-          cache-dependency-path: clickhouse-serverless/go.sum
+          cache-dependency-path: infra/clickhouse-serverless/go.sum
       - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5
         with:
           version: v3.12.0
@@ -63,13 +69,13 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: clickhouse-serverless
+        working-directory: infra/clickhouse-serverless
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: "1.26"
-          cache-dependency-path: clickhouse-serverless/go.sum
+          cache-dependency-path: infra/clickhouse-serverless/go.sum
       - uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
       - run: make e2e
       - run: make e2e-cold

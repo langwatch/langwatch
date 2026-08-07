@@ -58,6 +58,22 @@ Feature: Hono API endpoint authorization and tenant isolation
       Then the route registry records the real permission, not "any authenticated"
 
     @unit
+    Scenario: A canonical family refuses unauthenticated calls canonically
+      Given a project-scoped app declaring the canonical error envelope
+      When a request arrives with no credentials
+      Then the response status is 401
+      And the body is the canonical error envelope with code "missing_credentials"
+      # Authentication runs beneath the family's own error handler, so this is
+      # the layer that answers a flat body unless the envelope is threaded to it.
+
+    @unit
+    Scenario: A legacy family keeps the flat error body its consumers parse
+      Given a project-scoped app that declares no envelope
+      When a request arrives with no credentials
+      Then the response status is 401
+      And the body is the flat legacy error shape
+
+    @unit
     Scenario: An any-method route enforces its policy on every method
       Given a route registered with .all and an internalSecret policy
       When the route is called with GET, POST, or DELETE

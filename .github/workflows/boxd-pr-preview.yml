@@ -125,7 +125,7 @@ jobs:
             -- "set -e; cd workspace/langwatch && \
                 git fetch origin 'pull/${{ github.event.pull_request.number }}/head:pr-head' && \
                 git checkout $sha && \
-                docker compose -f compose.yml -f compose.dev.yml up -d"
+                docker compose -f infra/compose.yml -f dev/compose.dev.yml up -d"
           boxd proxy set-port --vm "$pr" --port "$APP_PORT"
 
       - name: Health probe
@@ -151,7 +151,7 @@ jobs:
 
       - name: Comment preview URL on PR
         if: always() && env.BOXD_SKIP != 'true'
-        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
             const pr = context.issue.number;
@@ -208,7 +208,7 @@ jobs:
 
       - name: Update PR comment
         if: always() && env.BOXD_SKIP != 'true'
-        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
             const pr = context.issue.number;
@@ -263,7 +263,7 @@ jobs:
             --timeout 1500 \
             -- "set -e; cd workspace/langwatch && \
                 git fetch origin main && git reset --hard origin/main && \
-                docker compose -f compose.yml -f compose.dev.yml up -d --build"
+                docker compose -f infra/compose.yml -f dev/compose.dev.yml up -d --build"
 
       - name: Health probe staging
         if: env.BOXD_SKIP != 'true'

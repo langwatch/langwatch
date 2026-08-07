@@ -14,17 +14,17 @@ Feature: CI path filters skip unnecessary workflows on non-code changes
 
   Scenario: langwatch-app-ci stub matches real workflow job names
     Given langwatch-app-ci.yml defines jobs "typecheck", "test-unit", "test-integration", "lint", "build"
-    When a PR does not touch langwatch/ files
+    When a PR does not touch platform/app/ files
     Then langwatch-app-ci-unmodified.yml reports success for the same job names
 
   Scenario: mcp-javascript-ci stub matches real workflow job names
     Given mcp-javascript-ci.yml defines jobs "typecheck", "build_and_test"
-    When a PR does not touch mcp-server/ files
+    When a PR does not touch mcp/typescript/ files
     Then mcp-javascript-ci-unmodified.yml reports success for the same job names
 
   Scenario: sdk-javascript-ci stub matches real workflow job names
     Given sdk-javascript-ci.yml defines jobs "ci", "e2e"
-    When a PR does not touch typescript-sdk/ files
+    When a PR does not touch sdks/typescript/ files
     Then sdk-javascript-ci-unmodified.yml reports success for the same job names
 
   # ============================================================================
@@ -32,7 +32,7 @@ Feature: CI path filters skip unnecessary workflows on non-code changes
   # ============================================================================
 
   Scenario: e2e-ci has a complementary stub
-    Given e2e-ci.yml triggers on langwatch/, python-sdk/, and agentic-e2e-tests/ changes
+    Given e2e-ci.yml triggers on platform/app/, sdks/python/, and tests/agentic-e2e/ changes
     When a PR does not touch those directories
     Then e2e-ci-unmodified.yml reports success for all e2e-ci job names
 
@@ -53,6 +53,28 @@ Feature: CI path filters skip unnecessary workflows on non-code changes
   Scenario: Push to main always runs all workflows
     When a commit is pushed to the main branch
     Then all workflows run regardless of which files changed
+
+  # ============================================================================
+  # Dependency scanners are path-gated, secret and SAST scanners are not
+  # ============================================================================
+
+  Scenario: A PR with no Go changes does not run the Go advisory scanner
+    When a PR changes no Go source and no Go module manifest
+    Then govulncheck does not run
+    And gitleaks, trufflehog and semgrep still run
+
+  Scenario: A PR with no Python manifest changes does not run the Python advisory scanner
+    When a PR changes no requirements file and no pyproject
+    Then pip-audit does not run
+    And gitleaks, trufflehog and semgrep still run
+
+  Scenario: The scheduled scan runs every scanner
+    When the weekly code-scanners cron fires
+    Then govulncheck and pip-audit both run regardless of which files changed
+
+  Scenario: A merge queue entry runs every scanner
+    When a change enters the merge queue
+    Then govulncheck and pip-audit both run regardless of which files changed
 
   # ============================================================================
   # Safety invariants

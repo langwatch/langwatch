@@ -130,6 +130,6 @@ Replace the `splunk_hec_send` shim with your SIEM's appropriate HTTP-pull or ing
 ## Cross-references
 
 - [Compliance architecture](/ai-gateway/governance/compliance-architecture) — how the unified substrate underwrites SOC 2 / ISO 27001 / EU AI Act / GDPR / HIPAA-most-uses
-- [Per-origin retention](/ai-gateway/governance/retention) — `thirty_days` / `one_year` / `seven_years` retention classes; OCSF events are subject to the same retention as their source spans
+- [Governance data retention](/ai-gateway/governance/retention): OCSF events are kept as long as the spans they were derived from
 - [Anomaly rules](/ai-gateway/governance/anomaly-rules) — how AnomalyAlerts propagate into OCSF events with elevated severity
 - [Trace vs governance ingestion](/observability/trace-vs-activity-ingestion) — picking the right OTel URL for your scenario

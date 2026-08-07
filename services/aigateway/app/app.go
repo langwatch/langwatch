@@ -25,6 +25,7 @@ type App struct {
 	cache      CacheEvaluator
 	models     ModelResolver
 	traces     AITraceEmitter
+	spend      pipeline.SpendEmitter
 	metrics    MetricsRecorder
 	breaker    CircuitBreaker
 	logger     *zap.Logger
@@ -44,6 +45,9 @@ func WithPolicy(p PolicyMatcher) Option          { return func(app *App) { app.p
 func WithCache(c CacheEvaluator) Option          { return func(app *App) { app.cache = c } }
 func WithModels(m ModelResolver) Option          { return func(app *App) { app.models = m } }
 func WithTraces(t AITraceEmitter) Option         { return func(app *App) { app.traces = t } }
+
+// WithSpend wires the spend emitter that records billing lifecycle events.
+func WithSpend(e pipeline.SpendEmitter) Option   { return func(app *App) { app.spend = e } }
 func WithMetrics(m MetricsRecorder) Option       { return func(app *App) { app.metrics = m } }
 func WithCircuitBreaker(b CircuitBreaker) Option { return func(app *App) { app.breaker = b } }
 func WithLogger(l *zap.Logger) Option            { return func(app *App) { app.logger = l } }
@@ -72,6 +76,11 @@ func New(opts ...Option) *App {
 
 func (a *App) buildInterceptors() []pipeline.Interceptor {
 	var chain []pipeline.Interceptor
+	// Spend is OUTERMOST so every request that reaches the pipeline admits
+	// a spend record, including ones the chain itself rejects further down.
+	if a.spend != nil {
+		chain = append(chain, pipeline.Spend(a.spend))
+	}
 	if a.ratelimit != nil {
 		chain = append(chain, pipeline.RateLimit(a.ratelimit.Allow))
 	}
@@ -137,11 +146,18 @@ func (discardMetrics) WrapStream(iter domain.StreamIterator, _, _ string) domain
 // ListModels returns models available to the bundle's virtual key:
 // alias names, plus either the configured allowlist (authoritative when
 // set, anything outside it is blocked at dispatch, so upstream endpoints
-// are not queried) or models discovered from self-hosted endpoints in the
-// credential chain. Models matching a deny policy rule are filtered out.
-func (a *App) ListModels(ctx context.Context, bundle *domain.Bundle) ([]domain.Model, error) {
+// are not queried) or models discovered from the credential chain's
+// catalogs. Models matching a deny policy rule are filtered out.
+//
+// The second return reports discovery gaps: providers that dispatch can
+// route to but that contributed nothing to the list (catalog probe
+// failed, or the provider's models cannot be enumerated). Empty whenever discovery did
+// not run — a literal allowlist is authoritative, so there is no gap to
+// report.
+func (a *App) ListModels(ctx context.Context, bundle *domain.Bundle) ([]domain.Model, []domain.ModelDiscoveryGap, error) {
 	cfg := bundle.Config
 	var models []domain.Model
+	var gaps []domain.ModelDiscoveryGap
 	seen := make(map[string]bool)
 	add := func(m domain.Model) {
 		if m.ID == "" || seen[m.ID] {
@@ -177,31 +193,38 @@ func (a *App) ListModels(ctx context.Context, bundle *domain.Bundle) ([]domain.M
 			add(domain.Model{ID: id, Name: id, ProviderID: providerID})
 		}
 		if hasWildcards {
-			if err := a.addDiscovered(ctx, bundle, cfg, add); err != nil {
-				return nil, err
+			discoveredGaps, err := a.addDiscovered(ctx, bundle, cfg, add)
+			if err != nil {
+				return nil, nil, err
 			}
+			gaps = discoveredGaps
 		}
-	} else if err := a.addDiscovered(ctx, bundle, cfg, add); err != nil {
-		return nil, err
+	} else {
+		discoveredGaps, err := a.addDiscovered(ctx, bundle, cfg, add)
+		if err != nil {
+			return nil, nil, err
+		}
+		gaps = discoveredGaps
 	}
 
 	models = filterModelsByPolicy(models, cfg.PolicyRules, a.logger)
 	sort.Slice(models, func(i, j int) bool { return models[i].ID < models[j].ID })
-	return models, nil
+	return models, gaps, nil
 }
 
-// addDiscovered asks the credential chain's endpoints for their catalogs
-// and feeds the models the VK may actually request into add. Discovery
-// answers with whatever the endpoint serves, so the allowlist is applied
-// here too: dispatch rejects anything outside it, and listing a model
-// the VK cannot call is worse than omitting it.
-func (a *App) addDiscovered(ctx context.Context, bundle *domain.Bundle, cfg domain.BundleConfig, add func(domain.Model)) error {
+// addDiscovered asks the credential chain's catalogs for their models and
+// feeds the ones the VK may actually request into add, passing the
+// chain's discovery gaps through. Discovery answers with whatever the
+// endpoint serves, so the allowlist is applied here too: dispatch rejects
+// anything outside it, and listing a model the VK cannot call is worse
+// than omitting it.
+func (a *App) addDiscovered(ctx context.Context, bundle *domain.Bundle, cfg domain.BundleConfig, add func(domain.Model)) ([]domain.ModelDiscoveryGap, error) {
 	if a.providers == nil {
-		return nil
+		return nil, nil
 	}
-	discovered, err := a.providers.ListModels(ctx, bundle.Credentials)
+	discovered, gaps, err := a.providers.ListModels(ctx, bundle.Credentials)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	for _, m := range discovered {
 		if !cfg.AllowsModel(m.ID) {
@@ -209,7 +232,7 @@ func (a *App) addDiscovered(ctx context.Context, bundle *domain.Bundle, cfg doma
 		}
 		add(m)
 	}
-	return nil
+	return gaps, nil
 }
 
 // soleCredentialProviderID returns the credential chain's provider when

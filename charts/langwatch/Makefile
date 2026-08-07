@@ -26,9 +26,9 @@ deps:
 ## Build all images that have Dockerfiles in this repo
 images:
 	$(MAKE) -C $(CH_CHART) images
-	docker build -t $(APP_IMAGE) $(APP_DIR)
-	docker build -t $(NLP_IMAGE) -f $(APP_DIR)/Dockerfile.langwatch_nlp $(APP_DIR)
-	docker build -t $(LANGEVALS_IMAGE) -f $(APP_DIR)/Dockerfile.langevals $(APP_DIR)
+	docker build -t $(APP_IMAGE) -f $(APP_DIR)/infra/docker/Dockerfile $(APP_DIR)
+	docker build -t $(NLP_IMAGE) -f $(APP_DIR)/infra/docker/Dockerfile.langwatch_nlp $(APP_DIR)
+	docker build -t $(LANGEVALS_IMAGE) -f $(APP_DIR)/infra/docker/Dockerfile.langevals $(APP_DIR)
 
 ## Build + load all images into Kind
 images-local: images

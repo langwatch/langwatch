@@ -50,6 +50,72 @@ backup:
   incremental:
     schedule: "0 * * * *"          # every hour
 
+  # Alerting on backup freshness, rendered as Prometheus rules.
+  #
+  # The condition worth paging on is "no recent successful backup", which is not
+  # the same as "a job reported an error". A CronJob that is suspended, deleted,
+  # or silently rescheduled emits no failure event at all, so a failure-only
+  # alert stays quiet while backups stop happening. Every target below therefore
+  # gets a freshness alert as the primary signal; the failure alert is an extra,
+  # faster one that fires within a scrape of a bad run instead of waiting out the
+  # staleness window.
+  #
+  # Requires kube-state-metrics to be scraped by the Prometheus that loads these
+  # rules. Every expression is built from kube_cronjob_* and kube_job_* series;
+  # the chart adds no exporter of its own.
+  monitoring:
+    enabled: false
+
+    # Rendered into every alert as the runbook_url annotation. An alert whose
+    # recipient has nowhere to go gets muted, so this is worth setting.
+    runbookUrl: ""
+
+    # Merged into every alert's labels. Use it for Alertmanager or Grafana
+    # routing keys, e.g. {route: page, team: infra}.
+    additionalLabels: {}
+
+    # How long a backup may look broken before the alert fires. Applies to the
+    # freshness, suspension, and failure alerts.
+    for: "15m"
+
+    # How long the CronJob's metrics may be missing entirely before alerting.
+    # Longer than `for` because a kube-state-metrics restart briefly drops them.
+    absentFor: "30m"
+
+    # Emit a PrometheusRule instead of a plain ConfigMap. Needs the
+    # prometheus-operator CRDs; without them the manifest is rejected at install.
+    prometheusRule:
+      enabled: false
+      # Extra labels on the PrometheusRule object, for the operator's ruleSelector.
+      labels: {}
+
+    # Labels on the rules ConfigMap, for a rules sidecar or a Prometheus
+    # configmap mount to discover it.
+    configMapLabels:
+      langwatch.ai/prometheus-rules: "true"
+
+    # One entry per backup that has to stay fresh.
+    #
+    #   name           label used in alert text and on the `backup` label
+    #   cronjob        CronJob name suffix; the release fullname is prepended,
+    #                  so `backup-full` matches `<release>-clickhouse-backup-full`
+    #   cronjobName    exact CronJob name, for a CronJob this chart does not
+    #                  create and whose name does not start with the release
+    #                  fullname. Mutually exclusive with `cronjob`.
+    #   staleAfterHours  hours without a successful run before the backup counts
+    #                  as broken. Keep it above two scheduling intervals so one
+    #                  retried run does not page.
+    #
+    # A backup mechanism that is not a CronJob in this namespace has no
+    # kube-state-metrics series and cannot be watched from here; see the runbook.
+    targets:
+      - name: full
+        cronjob: backup-full
+        staleAfterHours: 26        # schedule is every 12h
+      - name: incremental
+        cronjob: backup-incremental
+        staleAfterHours: 3         # schedule is hourly
+
 # Authentication
 auth:
   password: ""         # Used as autogen seed when autogen.enabled=true and this is unset
@@ -111,6 +177,28 @@ keeper:
   storage:
     size: 10Gi
     storageClass: ""  # defaults to parent storage.storageClass
+
+# Writable scratch (emptyDir) for the paths ClickHouse and Keeper touch outside
+# their data PVC, so both can run with a read-only root filesystem.
+#
+# These are bounded on purpose. An unbounded emptyDir is backed by the node's
+# ephemeral storage, so a pod stuck in a merge/replication error loop can fill
+# the node and trigger DiskPressure evictions for unrelated workloads. With a
+# sizeLimit the kubelet evicts only the offending pod.
+#
+# logsSizeLimit is deliberately BELOW the image's own retention ceiling. The
+# chart renders `console: true` into config.d, but it does not disable the base
+# image's file logging, which rotates at 1000M x 10 for each of
+# clickhouse-server.log and clickhouse-server.err.log — roughly 20Gi if both
+# ever fill. Sizing the volume for that would defeat the point: the cap exists
+# so a pathological logger is evicted on its own quota long before it reaches
+# it. Normal operation stays far below 2Gi, and the pod's logs are on stdout
+# regardless, so cluster log collection is unaffected either way.
+#
+# Raise it if you deliberately want the full on-disk retention.
+scratch:
+  logsSizeLimit: 2Gi
+  tmpSizeLimit: 1Gi
 
 # ServiceAccount
 serviceAccount:
