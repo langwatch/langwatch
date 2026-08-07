@@ -6,10 +6,11 @@
  * session rows in ClickHouse, and the caller's real RBAC deciding which
  * projects appear and which of them carry money.
  *
- * The permission cuts are resolved through `batchScopePermissions`, the same
- * helper the REST endpoint calls, against RoleBindings seeded in Postgres. That
- * is the point: a test that handed the service a project list it wrote itself
- * would prove nothing about who can actually see what.
+ * The permission cuts, and the names each project appears under, are resolved
+ * through `resolveCallerProjectScope`, the very function both read surfaces
+ * call, against RoleBindings seeded in Postgres. That is the point: a test that
+ * handed the service a project list it wrote itself would prove nothing about
+ * who can actually see what.
  *
  * @see specs/coding-agent/pull-request-linkage.feature
  */
@@ -22,10 +23,13 @@ import {
 } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { batchScopePermissions, type Permission } from "~/server/api/rbac";
-import type { Session } from "~/server/auth";
+import type { Permission } from "~/server/api/rbac";
 import { prisma } from "~/server/db";
 import type { CodingAgentSessionEventRecord } from "~/server/event-sourcing/pipelines/coding-agent-processing/projections/codingAgentSessionEvents.mapProjection";
+import {
+  type CallerProjectScope,
+  resolveCallerProjectScope,
+} from "~/server/organizations/resolveCallerProjectScope";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import {
   startTestContainers,
@@ -104,37 +108,22 @@ async function grant({
   });
 }
 
-/** The caller's own permitted / priceable split, resolved the way REST does. */
-async function callerScope(): Promise<{
-  permittedProjectIds: string[];
-  costProjectIds: string[];
-}> {
-  const projects = await prisma.project.findMany({
-    where: { team: { organizationId }, archivedAt: null },
-    select: { id: true, teamId: true },
-  });
-  const ctx = {
-    prisma,
-    session: { user: { id: userId }, expires: "" } satisfies Session,
-  };
-  const args = {
-    organizationId,
-    teamIds: [],
-    projectIds: projects.map((p) => p.id),
-    projectTeamId: Object.fromEntries(projects.map((p) => [p.id, p.teamId])),
-  };
-  const [viewable, priceable] = await Promise.all([
-    batchScopePermissions(ctx, { ...args, permission: "traces:view" }),
-    batchScopePermissions(ctx, { ...args, permission: "cost:view" }),
-  ]);
-  const permittedProjectIds = projects
-    .map((p) => p.id)
-    .filter((id) => viewable.projects.get(id) === true);
+/** The caller's own cut, resolved by the very function both read surfaces call. */
+async function callerScope(): Promise<CallerProjectScope> {
+  return resolveCallerProjectScope({ userId, organizationId, prisma });
+}
+
+/**
+ * That same cut, narrowed to one project, for the cases that are about the
+ * rollup rather than about who may see what. The names come from the resolver
+ * either way, so a row is named here the way the page names it.
+ */
+async function scopedTo(projectId: string) {
+  const { projects } = await callerScope();
   return {
-    permittedProjectIds,
-    costProjectIds: permittedProjectIds.filter(
-      (id) => priceable.projects.get(id) === true,
-    ),
+    permittedProjectIds: [projectId],
+    costProjectIds: [projectId],
+    projects,
   };
 }
 
@@ -422,8 +411,7 @@ describe("pull request usage", () => {
     it("reports the sessions count, tokens and assistant cost over the whole lifetime", async () => {
       const usage = await service.getPullRequestUsage({
         ...query(),
-        permittedProjectIds: [visibleProjectId],
-        costProjectIds: [visibleProjectId],
+        ...(await scopedTo(visibleProjectId)),
       });
 
       // Both sessions count, including the one that ran three hours BEFORE the
@@ -435,6 +423,9 @@ describe("pull request usage", () => {
       expect(usage.pullRequest.headBranch).toBe(BRANCH);
       expect(usage.rows).toHaveLength(1);
       expect(usage.rows[0]?.projectId).toBe(visibleProjectId);
+      // A shared project speaks for the work that ran in it, by its own name.
+      expect(usage.rows[0]?.contributorLabel).toBe(`visible-${tag}`);
+      expect(usage.rows[0]?.contributorIsProject).toBe(true);
       expect(usage.rows[0]?.agent).toBe("claude_code");
       expect(usage.rows[0]?.models).toEqual(["claude-fable-5"]);
       // Seeded with a title on every session; none of it reaches the reader.
@@ -445,8 +436,7 @@ describe("pull request usage", () => {
     it("carries the billed and not billed halves, the per-model totals, and no title", async () => {
       const usage = await service.getPullRequestUsage({
         ...query(),
-        permittedProjectIds: [visibleProjectId],
-        costProjectIds: [visibleProjectId],
+        ...(await scopedTo(visibleProjectId)),
       });
 
       // Claude Code is the bundled assistant here, so the whole list price is
@@ -526,8 +516,7 @@ describe("pull request usage", () => {
     it("rolls it up all the same", async () => {
       const usage = await service.getPullRequestUsage({
         ...query(),
-        permittedProjectIds: [mixedCaseProjectId],
-        costProjectIds: [mixedCaseProjectId],
+        ...(await scopedTo(mixedCaseProjectId)),
       });
 
       expect(usage.totals.sessionsCount).toBe(1);
@@ -547,8 +536,7 @@ describe("pull request usage", () => {
         ...query(),
         repositoryHost: "GitHub.com",
         repositoryFullName: REPO_FULL_NAME.toUpperCase(),
-        permittedProjectIds: [visibleProjectId],
-        costProjectIds: [visibleProjectId],
+        ...(await scopedTo(visibleProjectId)),
       });
 
       expect(usage.pullRequest.prNumber).toBe(PR_NUMBER);
@@ -563,8 +551,7 @@ describe("pull request usage", () => {
         .getPullRequestUsage({
           ...query(),
           prNumber: 9999,
-          permittedProjectIds: [visibleProjectId],
-          costProjectIds: [visibleProjectId],
+          ...(await scopedTo(visibleProjectId)),
         })
         .catch((error: unknown) => error);
 

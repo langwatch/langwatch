@@ -5395,8 +5395,14 @@
                           "projectId": {
                             "type": "string"
                           },
-                          "userLabel": {
+                          "projectSlug": {
                             "type": "string"
+                          },
+                          "contributorLabel": {
+                            "type": "string"
+                          },
+                          "contributorIsProject": {
+                            "type": "boolean"
                           },
                           "agent": {
                             "type": "string"
@@ -5446,7 +5452,9 @@
                         },
                         "required": [
                           "projectId",
-                          "userLabel",
+                          "projectSlug",
+                          "contributorLabel",
+                          "contributorIsProject",
                           "agent",
                           "models",
                           "sessionsCount",
@@ -5681,7 +5689,7 @@
           }
         ],
         "summary": "Get pull request coding agent usage",
-        "description": "Assistant usage for one pull request: sessions, tokens and cost, grouped by project, reported user and agent, plus per-model totals, over the pull request's whole lifetime rather than a time window. Cost is reported three ways: what was billed per token, what a bundled subscription already covered, and the list-price total of both. Requires a personal-project API key; rows appear only for projects the calling user may view, and cost only for those they may price."
+        "description": "Assistant usage for one pull request: sessions, tokens and cost, grouped by contributor and agent, plus per-model totals, over the pull request's whole lifetime rather than a time window. Cost is reported three ways: what was billed per token, what a bundled subscription already covered, and the list-price total of both. Requires a personal-project API key; rows appear only for projects the calling user may view, and cost only for those they may price."
       }
     },
     "/api/dashboards": {

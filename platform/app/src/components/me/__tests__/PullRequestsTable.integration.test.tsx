@@ -93,6 +93,23 @@ function pinStatuses(statuses: unknown[]) {
   });
 }
 
+/**
+ * Every property that could set one cell's value apart from another's, read
+ * off the element as the browser resolved it. Compared whole rather than
+ * property by property, so a color branch reintroduced under any name is
+ * caught rather than only the one property a test happened to name.
+ */
+function renderedStyleOf(element: HTMLElement) {
+  const style = window.getComputedStyle(element);
+  return {
+    color: style.color,
+    backgroundColor: style.backgroundColor,
+    fontWeight: style.fontWeight,
+    textDecoration: style.textDecoration,
+    opacity: style.opacity,
+  };
+}
+
 function renderTable() {
   return render(
     <ChakraProvider value={defaultSystem}>
@@ -288,8 +305,8 @@ describe("the personal Pull Requests table", () => {
   });
 
   describe("given a row whose cost is partly not billed", () => {
-    /** @scenario "A bundled token cost reads as bundled money" */
-    it("draws the value in the bundled color and explains both halves", async () => {
+    /** @scenario "A bundled token cost reads like every other token cost" */
+    it("draws the value exactly like a billed one and keeps the split to the tooltip", async () => {
       pinUsage({
         rows: [
           mappedRow({
@@ -307,18 +324,18 @@ describe("the personal Pull Requests table", () => {
 
       renderTable();
 
-      const value = screen.getByText("$12.50");
-      // The money-nature signal lives on the value, never on the bar: the bar
-      // is reserved for the comparison against the visible page.
-      expect(value).toHaveStyle({ color: "var(--chakra-colors-purple-fg)" });
-      // A row billed per token keeps the default color, so the two never read
-      // the same.
-      expect(screen.getByText("$4.00")).not.toHaveStyle({
-        color: "var(--chakra-colors-purple-fg)",
-      });
+      const bundled = screen.getByText("$12.50");
+      const billed = screen.getByText("$4.00");
+      // Whatever the styling of a number in this column is, the two are the
+      // same number to a reader: any branch that sets one apart from the other
+      // fails here, whichever property it reaches for.
+      expect(renderedStyleOf(bundled)).toEqual(renderedStyleOf(billed));
+      expect(document.body.textContent).not.toContain("Non-billed");
 
-      await user.hover(value);
+      // The split is real and still reachable, one hover away.
+      await user.hover(bundled);
       expect(await screen.findByText("Non-billed")).toBeInTheDocument();
+      expect(await screen.findByText("Billed")).toBeInTheDocument();
       expect(
         await screen.findByText(/of the p95 of the visible pull requests/i),
       ).toBeInTheDocument();
@@ -407,15 +424,24 @@ describe("the personal Pull Requests table", () => {
   });
 
   describe("given a row whose contributors and models are known", () => {
+    /** @scenario "A row names who worked on the pull request" */
     it("names the contributors and the models behind the counts", async () => {
       pinUsage({
         rows: [
           mappedRow({
             contributorsSummary: [
-              { userLabel: "Riley", projectName: "Personal", sessionsCount: 2 },
               {
-                userLabel: "PR Reviewer",
-                projectName: "Gateway",
+                contributorLabel: "Riley Chase",
+                projectId: "project-1",
+                projectSlug: "riley-personal",
+                contributorIsProject: false,
+                sessionsCount: 2,
+              },
+              {
+                contributorLabel: "Gateway",
+                projectId: "project-2",
+                projectSlug: "gateway",
+                contributorIsProject: true,
                 sessionsCount: 1,
               },
             ],
@@ -435,11 +461,9 @@ describe("the personal Pull Requests table", () => {
 
       await user.hover(screen.getByText("6"));
       expect(
-        await screen.findByText("Riley (Personal): 2 sessions"),
+        await screen.findByText("Riley Chase: 2 sessions"),
       ).toBeInTheDocument();
-      expect(
-        await screen.findByText("PR Reviewer (Gateway): 1 session"),
-      ).toBeInTheDocument();
+      expect(await screen.findByText("Gateway: 1 session")).toBeInTheDocument();
     });
   });
 });

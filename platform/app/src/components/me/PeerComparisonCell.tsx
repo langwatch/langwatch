@@ -10,9 +10,8 @@ import { Tooltip } from "~/components/ui/tooltip";
  * The bar carries ONE signal, and only one: where this row sits among its
  * visible peers. It scales to the p95 of the column's own values, fills
  * completely and turns red at or past that mark, and is drawn in blue below
- * it. Anything else a value wants to say, bundled money for instance, is
- * said by the value's own color, never by the bar, so the two never compete
- * for the same glance.
+ * it. The value above it is a number like any other in its column, in the
+ * column's own color; anything more a value has to say is said on hover.
  *
  * Spec: specs/coding-agent/pull-request-linkage.feature.
  */
@@ -94,8 +93,6 @@ export interface PeerComparisonCellProps {
   formatValue: (value: number) => string;
   /** Phrase placed right after the value in the tooltip, e.g. "total tokens". */
   metricPhrase: string;
-  /** Colour of the value text. The bar never takes it. */
-  textColor?: string;
   /** Replaces the plain sentence when the value has more to explain. */
   tooltipContent?: React.ReactNode;
 }
@@ -106,7 +103,6 @@ export const PeerComparisonCell: React.FC<PeerComparisonCellProps> = ({
   hasStats,
   formatValue,
   metricPhrase,
-  textColor,
   tooltipContent,
 }) => {
   const sentence = peerComparisonSentence({
@@ -120,9 +116,7 @@ export const PeerComparisonCell: React.FC<PeerComparisonCellProps> = ({
 
   const body = (
     <VStack gap={1} align="end" width="full" cursor={content ? "help" : "auto"}>
-      <Text fontSize="sm" color={textColor}>
-        {formatValue(value)}
-      </Text>
+      <Text fontSize="sm">{formatValue(value)}</Text>
       <ComparisonBar value={value} p95={p95} hasStats={hasStats} />
     </VStack>
   );

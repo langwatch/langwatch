@@ -21,10 +21,19 @@
  * the same policy the ingestion receiver applies. The split is per agent and
  * all or nothing: a session's cost is either real spend or theoretical.
  *
+ * A contributor is a project, not a person, and rows group by (project, agent).
+ * Per-person attribution WITHIN a shared project is deliberately not offered:
+ * the only per-person key a session carries is an opaque id the agent reported
+ * about itself, which resolves to no LangWatch account and to no human being,
+ * so splitting a shared project by it would invent a distinction the data
+ * cannot support. A PERSONAL workspace holds one person by construction, so
+ * there the project resolves to that person's name, and that is the only place
+ * a name is claimed.
+ *
  * Numbers and names only. The rows carry counts, token buckets, an agent name,
- * a model list and the agent-reported user id — no session title, no prompt,
- * no file list. That is enforced by the ClickHouse read selecting only those
- * columns, and pinned by a test over the response's own keys.
+ * a model list and the contributor's resolved name, no session title, no
+ * prompt, no file list. That is enforced by the ClickHouse read selecting only
+ * those columns, and pinned by a test over the response's own keys.
  *
  * Spec: specs/coding-agent/pull-request-linkage.feature.
  */
@@ -120,11 +129,27 @@ export interface ModelUsage {
   costUsd: number | null;
 }
 
-/** One (project, user, agent) group's contribution to a pull request. */
-export interface PullRequestUsageRow extends CostSplit {
+/** How one project is named when it appears as a contributor. */
+export interface ContributorProject {
+  /** The project's slug, which addresses its pages. */
+  slug: string;
+  /** A person's name for a personal workspace, the project's name otherwise. */
+  contributorLabel: string;
+  /** Whether the label names a project a reader can open, or a person. */
+  isLinkable: boolean;
+}
+
+/** What one contributor is called, and whether the name opens anything. */
+interface ContributorIdentity {
   projectId: string;
-  /** The agent's reported identity, blank when the agent reported none. */
-  userLabel: string;
+  projectSlug: string;
+  contributorLabel: string;
+  /** True when the label is a project's name, false when it is a person's. */
+  contributorIsProject: boolean;
+}
+
+/** One (project, agent) group's contribution to a pull request. */
+export interface PullRequestUsageRow extends CostSplit, ContributorIdentity {
   agent: string;
   models: string[];
   sessionsCount: number;
@@ -151,11 +176,12 @@ export interface PullRequestUsage {
   modelBreakdown: ModelUsage[];
 }
 
-/** Who worked on a pull request, as a row's compact summary line. */
-export interface ContributorSummary {
-  /** The agent's reported identity, blank when the agent reported none. */
-  userLabel: string;
-  projectName: string;
+/**
+ * Who worked on a pull request, as a row's compact summary line. One line per
+ * contributor rather than per agent, because the line names contributors: an
+ * agent breakdown is what the detail's own contributor table is for.
+ */
+export interface ContributorSummary extends ContributorIdentity {
   sessionsCount: number;
 }
 
@@ -189,11 +215,6 @@ export interface PersonalPullRequestUsage {
   unlinked: UnlinkedBranchRollup[];
 }
 
-/** One contributor's line on the pull request detail. */
-export interface PullRequestContributorRow extends PullRequestUsageRow {
-  projectName: string;
-}
-
 /**
  * One session as the detail lists it: FACTS ONLY.
  *
@@ -203,12 +224,9 @@ export interface PullRequestContributorRow extends PullRequestUsageRow {
  * needs none of it. A test pins this row's key set so a title cannot be added
  * without somebody deciding to disclose it.
  */
-export interface PullRequestSessionFact {
+export interface PullRequestSessionFact extends ContributorIdentity {
   sessionId: string;
   startedAtMs: number;
-  /** The agent's reported identity, blank when the agent reported none. */
-  userLabel: string;
-  projectName: string;
   agent: string;
   totalTokens: number;
   costUsd: number | null;
@@ -217,7 +235,7 @@ export interface PullRequestSessionFact {
 export interface PullRequestDetail {
   pullRequest: PullRequestIdentity & { title: string };
   totals: PullRequestUsageTotals;
-  contributors: PullRequestContributorRow[];
+  contributors: PullRequestUsageRow[];
   modelBreakdown: ModelUsage[];
   sessions: PullRequestSessionFact[];
 }
@@ -290,6 +308,8 @@ export interface CallerScope {
   permittedProjectIds: string[];
   /** The subset of those the caller may also price. */
   costProjectIds: string[];
+  /** How each permitted project is named as a contributor, keyed by id. */
+  projects: Record<string, ContributorProject>;
 }
 
 export interface PullRequestUsageQuery extends CallerScope {
@@ -299,15 +319,8 @@ export interface PullRequestUsageQuery extends CallerScope {
   prNumber: number;
 }
 
-export interface PullRequestDetailQuery extends PullRequestUsageQuery {
-  /** Display names of the permitted projects, keyed by project id. */
-  projectNames: Record<string, string>;
-}
-
 export interface PersonalPullRequestUsageQuery extends CallerScope {
   projectId: string;
-  /** Display names of the permitted projects, keyed by project id. */
-  projectNames: Record<string, string>;
 }
 
 export class PullRequestUsageService {
@@ -341,11 +354,9 @@ export class PullRequestUsageService {
    * the detail surface. Facts only: see {@link PullRequestSessionFact}.
    */
   async getPullRequestDetail(
-    query: PullRequestDetailQuery,
+    query: PullRequestUsageQuery,
   ): Promise<PullRequestDetail> {
     const gathered = await this.gatherPullRequest(query);
-    const nameOf = (projectId: string) =>
-      query.projectNames[projectId] ?? projectId;
     const costProjects = new Set(query.costProjectIds);
 
     return {
@@ -354,10 +365,7 @@ export class PullRequestUsageService {
         title: gathered.target.title,
       },
       totals: totalsOf(gathered.rows),
-      contributors: gathered.rows.map((row) => ({
-        ...row,
-        projectName: nameOf(row.projectId),
-      })),
+      contributors: gathered.rows,
       modelBreakdown: gathered.modelBreakdown,
       sessions: [...gathered.sessions]
         .sort((a, b) => b.startedAtMs - a.startedAtMs)
@@ -365,8 +373,10 @@ export class PullRequestUsageService {
         .map((session) => ({
           sessionId: session.sessionId,
           startedAtMs: session.startedAtMs,
-          userLabel: session.userId,
-          projectName: nameOf(session.tenantId),
+          ...contributorOf({
+            projectId: session.tenantId,
+            projects: query.projects,
+          }),
           agent: session.agent,
           totalTokens: tokensOf(session),
           costUsd: costProjects.has(session.tenantId) ? session.costUsd : null,
@@ -383,7 +393,7 @@ export class PullRequestUsageService {
     projectId,
     permittedProjectIds,
     costProjectIds,
-    projectNames,
+    projects,
   }: PersonalPullRequestUsageQuery): Promise<PersonalPullRequestUsage> {
     const organizationId = await this.deps.resolveOrganizationId(projectId);
     if (!organizationId) return { rows: [], unlinked: [] };
@@ -435,7 +445,7 @@ export class PullRequestUsageService {
             pullRequests,
             permittedProjectIds,
             costProjectIds,
-            projectNames,
+            projects,
             organizationId,
             toMs,
           })),
@@ -474,7 +484,7 @@ export class PullRequestUsageService {
     pullRequests,
     permittedProjectIds,
     costProjectIds,
-    projectNames,
+    projects,
     organizationId,
     toMs,
   }: {
@@ -483,7 +493,7 @@ export class PullRequestUsageService {
     pullRequests: GithubPullRequestRow[];
     permittedProjectIds: string[];
     costProjectIds: string[];
-    projectNames: Record<string, string>;
+    projects: Record<string, ContributorProject>;
     organizationId: string;
     toMs: number;
   }): Promise<PersonalPullRequestRow[]> {
@@ -531,6 +541,7 @@ export class PullRequestUsageService {
         sessions: attached,
         costProjects,
         nonBillableAgents,
+        projects,
       });
       const totals = totalsOf(rows);
       return {
@@ -552,7 +563,7 @@ export class PullRequestUsageService {
         }),
         contributorsSummary: contributorsSummaryFor({
           sessions: attached,
-          projectNames,
+          projects,
         }),
       };
     });
@@ -628,6 +639,7 @@ export class PullRequestUsageService {
         sessions: attached,
         costProjects,
         nonBillableAgents,
+        projects: query.projects,
       }),
       modelBreakdown: modelBreakdownFor({
         sessions: attached,
@@ -718,20 +730,28 @@ function toIdentity(row: GithubPullRequestRow): PullRequestIdentity {
   };
 }
 
-/** Group the attached sessions by (project, reported user, agent). */
+/**
+ * Group the attached sessions by (project, agent), which is exactly what a
+ * reader sees: a contributor and the assistant it ran. The agent-reported user
+ * id is not part of the key, because it names nobody, and keying on it split
+ * one person's work into two near-identical rows whenever their agent changed
+ * the id it reported about itself.
+ */
 function groupRows({
   sessions,
   costProjects,
   nonBillableAgents,
+  projects,
 }: {
   sessions: CodingAgentBranchSessionRow[];
   costProjects: ReadonlySet<string>;
   nonBillableAgents: ReadonlySet<string>;
+  projects: Record<string, ContributorProject>;
 }): PullRequestUsageRow[] {
   const grouped = new Map<string, GroupedUsageRow>();
 
   for (const session of sessions) {
-    const key = [session.tenantId, session.userId, session.agent].join("\0");
+    const key = [session.tenantId, session.agent].join("\0");
     // A project carrying no cost data contributes tokens but leaves cost null,
     // rather than reporting an unpriced session as one that cost nothing.
     const priced = costProjects.has(session.tenantId);
@@ -740,7 +760,7 @@ function groupRows({
     if (existing) {
       addSessionToGroup({ group: existing, session, priced, nonBilled });
     } else {
-      grouped.set(key, startGroup({ session, priced, nonBilled }));
+      grouped.set(key, startGroup({ session, priced, nonBilled, projects }));
     }
   }
 
@@ -748,6 +768,27 @@ function groupRows({
     ...row,
     models: [...modelSet].sort(),
   }));
+}
+
+/**
+ * How one project is named on a row. Falls back to the project id when the
+ * caller handed over no entry for it, which only happens for a project outside
+ * the permission cut, whose sessions the read never returns in the first place.
+ */
+function contributorOf({
+  projectId,
+  projects,
+}: {
+  projectId: string;
+  projects: Record<string, ContributorProject>;
+}): ContributorIdentity {
+  const project = projects[projectId];
+  return {
+    projectId,
+    projectSlug: project?.slug ?? "",
+    contributorLabel: project?.contributorLabel ?? projectId,
+    contributorIsProject: project?.isLinkable ?? false,
+  };
 }
 
 /**
@@ -760,14 +801,15 @@ function startGroup({
   session,
   priced,
   nonBilled,
+  projects,
 }: {
   session: CodingAgentBranchSessionRow;
   priced: boolean;
   nonBilled: boolean;
+  projects: Record<string, ContributorProject>;
 }): GroupedUsageRow {
   return {
-    projectId: session.tenantId,
-    userLabel: session.userId,
+    ...contributorOf({ projectId: session.tenantId, projects }),
     agent: session.agent,
     models: [],
     modelSet: new Set(session.models),
@@ -897,22 +939,20 @@ function modelBreakdownFor({
 /** Who worked on a pull request, largest contribution first. */
 function contributorsSummaryFor({
   sessions,
-  projectNames,
+  projects,
 }: {
   sessions: CodingAgentBranchSessionRow[];
-  projectNames: Record<string, string>;
+  projects: Record<string, ContributorProject>;
 }): ContributorSummary[] {
   const grouped = new Map<string, ContributorSummary>();
   for (const session of sessions) {
-    const key = `${session.tenantId}\0${session.userId}`;
-    const existing = grouped.get(key);
+    const existing = grouped.get(session.tenantId);
     if (existing) {
       existing.sessionsCount += 1;
       continue;
     }
-    grouped.set(key, {
-      userLabel: session.userId,
-      projectName: projectNames[session.tenantId] ?? session.tenantId,
+    grouped.set(session.tenantId, {
+      ...contributorOf({ projectId: session.tenantId, projects }),
       sessionsCount: 1,
     });
   }

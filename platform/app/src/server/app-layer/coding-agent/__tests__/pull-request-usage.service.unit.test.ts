@@ -164,6 +164,20 @@ function serviceWith({
   return { service, listByRepositoryBranch, sumTokensByModelPerSession };
 }
 
+/** A personal workspace: named by the person who owns it, never linked. */
+const PERSONAL_PROJECT = {
+  slug: "riley-personal",
+  contributorLabel: "Riley Chase",
+  isLinkable: false,
+};
+
+/** A shared project: named by itself, and its name opens its traces. */
+const SHARED_PROJECT = {
+  slug: "gateway",
+  contributorLabel: "Gateway",
+  isLinkable: true,
+};
+
 const QUERY = {
   organizationId: "org-1",
   repositoryHost: "github.com",
@@ -171,15 +185,21 @@ const QUERY = {
   prNumber: 7,
   permittedProjectIds: ["project-1"],
   costProjectIds: ["project-1"],
+  projects: { "project-1": PERSONAL_PROJECT },
 };
-
-const DETAIL_QUERY = { ...QUERY, projectNames: { "project-1": "Personal" } };
 
 const PERSONAL_QUERY = {
   projectId: "project-1",
   permittedProjectIds: ["project-1"],
   costProjectIds: ["project-1"],
-  projectNames: { "project-1": "Personal" },
+  projects: { "project-1": PERSONAL_PROJECT },
+};
+
+/** Both projects readable: the caller's own workspace and a shared project. */
+const BOTH_PROJECTS = {
+  permittedProjectIds: ["project-1", "project-2"],
+  costProjectIds: ["project-1", "project-2"],
+  projects: { "project-1": PERSONAL_PROJECT, "project-2": SHARED_PROJECT },
 };
 
 /**
@@ -262,15 +282,17 @@ describe("PullRequestUsageService", () => {
         "billedCostUsd",
         "cacheCreationTokens",
         "cacheReadTokens",
+        "contributorIsProject",
+        "contributorLabel",
         "costUsd",
         "inputTokens",
         "models",
         "nonBilledCostUsd",
         "outputTokens",
         "projectId",
+        "projectSlug",
         "sessionsCount",
         "totalTokens",
-        "userLabel",
       ]);
       expect(Object.keys(usage.totals).sort()).toEqual([
         "billedCostUsd",
@@ -290,8 +312,12 @@ describe("PullRequestUsageService", () => {
     });
   });
 
-  describe("given sessions from two users on one pull request", () => {
-    it("groups them by project, reported user and agent", async () => {
+  // One person's agent can report a different id about itself from one session
+  // to the next, and that id names nobody either way, so keying rows on it
+  // showed one contributor twice with their work divided between the rows.
+  describe("given one project whose sessions report two agent identities", () => {
+    /** @scenario "One contributor and agent make one row, whatever the agent calls its user" */
+    it("makes one row per project and agent, never one per reported identity", async () => {
       const { service } = serviceWith({
         pullRequests: [pullRequestRow()],
         sessions: [
@@ -302,18 +328,58 @@ describe("PullRequestUsageService", () => {
             userId: "user-xyz",
             models: ["gpt-5-mini"],
           }),
+          sessionRow({ sessionId: "s4", userId: "user-xyz", agent: "codex" }),
         ],
       });
 
       const usage = await service.getPullRequestUsage(QUERY);
 
-      expect(usage.rows).toHaveLength(2);
       expect(
-        usage.rows.find((row) => row.userLabel === "user-abc")?.sessionsCount,
-      ).toBe(2);
-      expect(usage.totals.sessionsCount).toBe(3);
-      expect(usage.totals.totalTokens).toBe(3 * 180);
-      expect(usage.totals.costUsd).toBeCloseTo(4.5);
+        usage.rows.map((row) => [row.contributorLabel, row.agent]),
+      ).toEqual([
+        ["Riley Chase", "claude_code"],
+        ["Riley Chase", "codex"],
+      ]);
+      expect(
+        usage.rows.find((row) => row.agent === "claude_code")?.sessionsCount,
+      ).toBe(3);
+      expect(JSON.stringify(usage)).not.toContain("user-abc");
+      expect(usage.totals.sessionsCount).toBe(4);
+      expect(usage.totals.totalTokens).toBe(4 * 180);
+      expect(usage.totals.costUsd).toBeCloseTo(6);
+    });
+  });
+
+  describe("given a pull request worked on in a personal workspace and a shared project", () => {
+    /** @scenario "A personal workspace is named by the person whose work it is" */
+    it("names the personal workspace by its owner and never links it", async () => {
+      const { service } = serviceWith({
+        pullRequests: [pullRequestRow()],
+        sessions: [sessionRow({ tenantId: "project-1" })],
+      });
+
+      const usage = await service.getPullRequestUsage(QUERY);
+
+      expect(usage.rows[0]?.contributorLabel).toBe("Riley Chase");
+      expect(usage.rows[0]?.contributorIsProject).toBe(false);
+      expect(usage.rows[0]?.projectSlug).toBe("riley-personal");
+    });
+
+    /** @scenario "A shared project is named by the project the work ran in" */
+    it("names a shared project by itself and offers its slug to link to", async () => {
+      const { service } = serviceWith({
+        pullRequests: [pullRequestRow()],
+        sessions: [sessionRow({ tenantId: "project-2" })],
+      });
+
+      const usage = await service.getPullRequestUsage({
+        ...QUERY,
+        ...BOTH_PROJECTS,
+      });
+
+      expect(usage.rows[0]?.contributorLabel).toBe("Gateway");
+      expect(usage.rows[0]?.contributorIsProject).toBe(true);
+      expect(usage.rows[0]?.projectSlug).toBe("gateway");
     });
   });
 
@@ -524,9 +590,7 @@ describe("PullRequestUsageService", () => {
 
       const usage = await service.getForPersonalProject({
         ...PERSONAL_QUERY,
-        permittedProjectIds: ["project-1", "project-2"],
-        costProjectIds: ["project-1", "project-2"],
-        projectNames: { "project-1": "Personal", "project-2": "Gateway" },
+        ...BOTH_PROJECTS,
       });
 
       expect(listByRepositoryBranch).toHaveBeenCalledWith(
@@ -560,8 +624,8 @@ describe("PullRequestUsageService", () => {
       expect(usage.rows[0]?.costUsd).toBeCloseTo(1.5);
     });
 
-    /** @scenario "A row names who worked on the pull request and where" */
-    it("names each contributor, their project and how many sessions they ran", async () => {
+    /** @scenario "A row names who worked on the pull request" */
+    it("names each contributor once and how many sessions they ran", async () => {
       const { service } = personalServiceWith({
         pullRequests: [pullRequestRow()],
         personalSessions: [personalSessionRow({ sessionId: "mine" })],
@@ -571,10 +635,13 @@ describe("PullRequestUsageService", () => {
             tenantId: "project-1",
             userId: "riley",
           }),
+          // The same person on a second agent, which the summary counts under
+          // the one name rather than listing them twice.
           sessionRow({
             sessionId: "s2",
             tenantId: "project-1",
-            userId: "riley",
+            userId: "riley-2",
+            agent: "codex",
           }),
           sessionRow({
             sessionId: "s3",
@@ -586,14 +653,24 @@ describe("PullRequestUsageService", () => {
 
       const usage = await service.getForPersonalProject({
         ...PERSONAL_QUERY,
-        permittedProjectIds: ["project-1", "project-2"],
-        costProjectIds: ["project-1", "project-2"],
-        projectNames: { "project-1": "Personal", "project-2": "Gateway" },
+        ...BOTH_PROJECTS,
       });
 
       expect(usage.rows[0]?.contributorsSummary).toEqual([
-        { userLabel: "riley", projectName: "Personal", sessionsCount: 2 },
-        { userLabel: "reviewer", projectName: "Gateway", sessionsCount: 1 },
+        {
+          contributorLabel: "Riley Chase",
+          projectId: "project-1",
+          projectSlug: "riley-personal",
+          contributorIsProject: false,
+          sessionsCount: 2,
+        },
+        {
+          contributorLabel: "Gateway",
+          projectId: "project-2",
+          projectSlug: "gateway",
+          contributorIsProject: true,
+          sessionsCount: 1,
+        },
       ]);
     });
   });
@@ -614,8 +691,7 @@ describe("PullRequestUsageService", () => {
 
       const usage = await service.getForPersonalProject({
         ...PERSONAL_QUERY,
-        permittedProjectIds: ["project-1", "project-2"],
-        costProjectIds: ["project-1", "project-2"],
+        ...BOTH_PROJECTS,
       });
 
       expect(usage.unlinked).toHaveLength(1);
@@ -798,11 +874,11 @@ describe("PullRequestUsageService", () => {
         modelTotals: [modelTotalsRow({ sessionId: "newer" })],
       });
 
-      const detail = await service.getPullRequestDetail(DETAIL_QUERY);
+      const detail = await service.getPullRequestDetail(QUERY);
 
       expect(detail.pullRequest.title).toBe("Link sessions to pull requests");
       expect(detail.totals.sessionsCount).toBe(2);
-      expect(detail.contributors[0]?.projectName).toBe("Personal");
+      expect(detail.contributors[0]?.contributorLabel).toBe("Riley Chase");
       expect(detail.modelBreakdown[0]?.model).toBe("claude-fable-5");
       expect(detail.sessions.map((session) => session.sessionId)).toEqual([
         "newer",
@@ -817,18 +893,20 @@ describe("PullRequestUsageService", () => {
         sessions: [sessionRow()],
       });
 
-      const detail = await service.getPullRequestDetail(DETAIL_QUERY);
+      const detail = await service.getPullRequestDetail(QUERY);
 
       // The session row's own key set, pinned. A title added here would be a
       // disclosure nobody decided on.
       expect(Object.keys(detail.sessions[0]!).sort()).toEqual([
         "agent",
+        "contributorIsProject",
+        "contributorLabel",
         "costUsd",
-        "projectName",
+        "projectId",
+        "projectSlug",
         "sessionId",
         "startedAtMs",
         "totalTokens",
-        "userLabel",
       ]);
     });
   });

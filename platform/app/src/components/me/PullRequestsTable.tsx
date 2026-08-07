@@ -37,9 +37,11 @@ import { formatShortDate } from "./shortDate";
  * not been opened yet are listed underneath rather than dropped, and stay the
  * viewer's own work.
  *
- * Two signals share the numeric columns and never collide: the bar under a
- * value says how the row compares to the other rows on this page, and the
- * color of the token cost says whether that money was really spent.
+ * Every numeric column reads the same way: the value, and a thin bar under it
+ * saying how the row compares to the other rows on this page. Whether the
+ * token cost was really spent or covered by a bundled plan is a detail of the
+ * money rather than a different kind of number, so it lives in the value's
+ * tooltip and never in its color.
  *
  * Spec: specs/coding-agent/pull-request-linkage.feature.
  */
@@ -71,9 +73,15 @@ interface ModelUsage {
   costUsd: number | null;
 }
 
+/**
+ * Who worked on a pull request. A contributor is a person when the work ran in
+ * their own workspace, and the project itself when it ran in a shared one.
+ */
 interface ContributorSummary {
-  userLabel: string;
-  projectName: string;
+  contributorLabel: string;
+  projectId: string;
+  projectSlug: string;
+  contributorIsProject: boolean;
   sessionsCount: number;
 }
 
@@ -119,9 +127,6 @@ const STATUS_PALETTES: Record<PullRequestStatus, string> = {
 
 /** The placeholder for a value a row does not have. */
 const MISSING_VALUE = "—";
-
-/** What a contributor is called when the agent reported no identity. */
-const UNATTRIBUTED = "Unattributed";
 
 const refKeyOf = (ref: {
   repositoryHost: string;
@@ -188,36 +193,14 @@ export function PullRequestsTable({ projectId }: { projectId: string }) {
     redirectToProjectOnboarding: false,
   });
   const canManageOrganization = hasPermission("organization:manage");
-  const { openDrawer } = useDrawer();
-
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState<number>(DEFAULT_PAGE_SIZE);
 
   const usageQuery = api.codingAgents.pullRequestUsage.useQuery(
     { projectId },
     { refetchOnWindowFocus: false },
   );
-
   const rows = useMemo<PullRequestListRow[]>(
     () => toListRows(usageQuery.data),
     [usageQuery.data],
-  );
-  const visibleRows = useMemo(
-    () => rows.slice((page - 1) * pageSize, page * pageSize),
-    [rows, page, pageSize],
-  );
-  const statuses = useLiveStatuses({ projectId, rows: visibleRows });
-
-  // Both columns are compared against the page the reader is looking at, and
-  // each against its own values: a pull request can be heavy on tokens and
-  // cheap in money, or the reverse, so one shared scale would misread both.
-  const tokenStats = useMemo(
-    () => percentileStats(visibleRows.map((row) => row.totalTokens)),
-    [visibleRows],
-  );
-  const costStats = useMemo(
-    () => percentileStats(visibleRows.map((row) => row.costUsd ?? 0)),
-    [visibleRows],
   );
 
   if (usageQuery.isLoading) {
@@ -253,6 +236,34 @@ export function PullRequestsTable({ projectId }: { projectId: string }) {
   }
 
   return (
+    <ListedPullRequests
+      projectId={projectId}
+      rows={rows}
+      installUrl={connection.installUrl}
+      canManageOrganization={canManageOrganization}
+    />
+  );
+}
+
+/** The rows themselves, one page at a time, once there are rows to show. */
+const ListedPullRequests: React.FC<{
+  projectId: string;
+  rows: PullRequestListRow[];
+  installUrl: string | null;
+  canManageOrganization: boolean;
+}> = ({ projectId, rows, installUrl, canManageOrganization }) => {
+  const { openDrawer } = useDrawer();
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState<number>(DEFAULT_PAGE_SIZE);
+
+  const visibleRows = useMemo(
+    () => rows.slice((page - 1) * pageSize, page * pageSize),
+    [rows, page, pageSize],
+  );
+  const statuses = useLiveStatuses({ projectId, rows: visibleRows });
+  const { tokenStats, costStats } = usePageStats(visibleRows);
+
+  return (
     <VStack align="stretch" gap={3} width="full">
       <ListTable size="sm">
         <TableHeaderRow />
@@ -267,21 +278,11 @@ export function PullRequestsTable({ projectId }: { projectId: string }) {
                   : undefined
               }
               isStatusLoading={statuses.isLoading}
-              installUrl={connection.installUrl}
+              installUrl={installUrl}
               canManageOrganization={canManageOrganization}
               tokenStats={tokenStats}
               costStats={costStats}
-              onOpenDetail={
-                row.pullRequest
-                  ? () =>
-                      openDrawer("pullRequestDetail", {
-                        projectId,
-                        repositoryHost: row.repositoryHost,
-                        repositoryFullName: row.repositoryFullName,
-                        prNumber: row.pullRequest?.number ?? 0,
-                      })
-                  : undefined
-              }
+              onOpenDetail={detailOpenerFor({ row, projectId, openDrawer })}
             />
           ))}
         </Table.Body>
@@ -300,6 +301,45 @@ export function PullRequestsTable({ projectId }: { projectId: string }) {
       />
     </VStack>
   );
+};
+
+/**
+ * Where each numeric column's values sit, measured against the page the reader
+ * is looking at, and each column against its own values: a pull request can be
+ * heavy on tokens and cheap in money, or the reverse, so one shared scale
+ * would misread both.
+ */
+function usePageStats(rows: PullRequestListRow[]) {
+  const tokenStats = useMemo(
+    () => percentileStats(rows.map((row) => row.totalTokens)),
+    [rows],
+  );
+  const costStats = useMemo(
+    () => percentileStats(rows.map((row) => row.costUsd ?? 0)),
+    [rows],
+  );
+  return { tokenStats, costStats };
+}
+
+/** What clicking a row does. A branch with no pull request opens nothing. */
+function detailOpenerFor({
+  row,
+  projectId,
+  openDrawer,
+}: {
+  row: PullRequestListRow;
+  projectId: string;
+  openDrawer: ReturnType<typeof useDrawer>["openDrawer"];
+}): (() => void) | undefined {
+  const pullRequest = row.pullRequest;
+  if (!pullRequest) return undefined;
+  return () =>
+    openDrawer("pullRequestDetail", {
+      projectId,
+      repositoryHost: row.repositoryHost,
+      repositoryFullName: row.repositoryFullName,
+      prNumber: pullRequest.number,
+    });
 }
 
 /** The status map key for a row that has a pull request. */
@@ -465,15 +505,8 @@ const SessionsCell: React.FC<{ row: PullRequestListRow }> = ({ row }) => {
       content={
         <VStack align="start" gap={0.5} maxWidth="full">
           {row.contributorsSummary.map((contributor) => (
-            // An agent reports its own identity, often as a long unbroken
-            // hash. Without a break it sizes the line past the tooltip and
-            // paints over the table underneath.
-            <Text
-              key={`${contributor.projectName} ${contributor.userLabel}`}
-              wordBreak="break-all"
-            >
-              {contributor.userLabel || UNATTRIBUTED} ({contributor.projectName}
-              ): {contributor.sessionsCount}{" "}
+            <Text key={contributor.projectId}>
+              {contributor.contributorLabel}: {contributor.sessionsCount}{" "}
               {contributor.sessionsCount === 1 ? "session" : "sessions"}
             </Text>
           ))}
@@ -521,8 +554,10 @@ const ModelsCell: React.FC<{ models: ModelUsage[] }> = ({ models }) => {
 };
 
 /**
- * The list-price cost of the row, colored by whether that money was really
- * spent, and barred by how the row compares to the rest of the page.
+ * The list-price cost of the row, read exactly like every other number here:
+ * one value, one comparison bar. Money a bundled plan already covered is still
+ * that same list price, so it is explained on hover rather than set apart by a
+ * color the reader would have to learn.
  */
 const TokenCostCell: React.FC<{
   row: PullRequestListRow;
@@ -553,7 +588,6 @@ const TokenCostCell: React.FC<{
       hasStats={stats.hasStats}
       formatValue={(value) => formatCost(value)}
       metricPhrase="in token cost"
-      textColor={isBundled ? "purple.fg" : undefined}
       tooltipContent={
         isBundled ? (
           <VStack align="stretch" gap={2}>

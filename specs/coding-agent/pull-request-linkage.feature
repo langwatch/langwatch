@@ -8,7 +8,7 @@
 #   platform/app/src/server/app-layer/coding-agent/pull-request-usage.service.ts       (org-first usage rollup)
 #   platform/app/src/server/app-layer/coding-agent/coding-agent-source-type.ts         (agent id to ingestion source type)
 #   platform/app/src/server/app-layer/coding-agent/repositories/coding-agent-session-events.repository.ts (per-model totals)
-#   platform/app/src/server/organizations/resolveCallerProjectScope.ts                 (the caller's permission cut, shared by both read surfaces)
+#   platform/app/src/server/organizations/resolveCallerProjectScope.ts                 (the caller's permission cut and how each project is named, shared by both read surfaces)
 #   platform/app/src/app/api/coding-agent/[[...route]]/                                (the usage REST endpoint)
 #   platform/app/src/pages/me/pull-requests.tsx                                        (the personal Pull Requests page)
 #   platform/app/src/components/me/PullRequestsTable.tsx                               (the table)
@@ -25,7 +25,10 @@
 # survives branch recycling and sessions that ran before the PR was opened.
 # PR STATUS is always fetched live by the reader, never maintained by the queue;
 # the stored state is only a fallback label. The usage rollup is organization
-# first and RBAC-scoped: numbers only, never content.
+# first and RBAC-scoped: numbers only, never content. Work is attributed to a
+# PROJECT, named by the person who owns it when the project is one person's
+# workspace; the id an agent reports about its own user names nobody and is
+# never shown.
 
 Feature: Pull request linkage
 
@@ -208,11 +211,70 @@ Rule: A personal row asks a personal question and answers with the organization'
     When the Pull Requests page lists it
     Then the branch reports only the viewer's own sessions
 
-  @unit
-  Scenario: A row names who worked on the pull request and where
-    Given a pull request worked on by two people in different projects
+  @unit @integration
+  Scenario: A row names who worked on the pull request
+    Given a pull request worked on by two contributors
     When the Pull Requests page lists it
-    Then the row names each contributor, their project and how many sessions they ran
+    Then the row names each contributor once and how many sessions they ran
+
+Rule: A contributor is a person or a project, never an agent-reported id
+
+  # A session carries one per-person key, an id the agent reported about its own
+  # user. It resolves to no account and to no human being, and one person's
+  # agent can report a different one from run to run. So work is attributed to
+  # the project it ran in: a personal workspace holds one person and is named by
+  # them, a shared project is named by itself and opens its own traces. A split
+  # by person WITHIN a shared project is deliberately not offered, because there
+  # is no key that could honestly make it.
+
+  @unit @integration
+  Scenario: A personal workspace is named by the person whose work it is
+    Given sessions that ran in someone's own workspace
+    When the pull request usage is read
+    Then the contributor is that person's name
+    And the name opens nothing, because the workspace is theirs alone
+
+  @unit @integration
+  Scenario: A shared project is named by the project the work ran in
+    Given sessions that ran in a project shared by a team
+    When the pull request usage is read
+    Then the contributor is the project's name
+    And the name opens that project's traces
+
+  @unit
+  Scenario: One contributor and agent make one row, whatever the agent calls its user
+    Given one contributor whose sessions report two different agent identities
+    When the pull request usage is read
+    Then they appear as one row per agent they used
+    And no agent-reported identity appears anywhere in the answer
+
+  @integration
+  Scenario: A personal workspace resolves to the person who owns it
+    Given a personal workspace whose only member has a name
+    When the caller's project scope is resolved
+    Then the workspace is named by that person
+    And a shared project in the same organization is named by itself
+
+  @integration
+  Scenario: A person with no display name is named by their email address
+    Given a personal workspace whose only member has no name
+    When the caller's project scope is resolved
+    Then the workspace is named by that member's email address
+
+  @integration
+  Scenario: A personal workspace nobody is a member of keeps its own name
+    Given a personal workspace with no member
+    When the caller's project scope is resolved
+    Then the workspace is named by itself
+    And the name still opens nothing
+
+  # Members answer "who worked here" only where the answer is one person, and
+  # reading them for every team would cost a query nothing displays.
+  @integration
+  Scenario: Members are read for personal teams alone
+    Given an organization holding personal workspaces and shared projects
+    When the caller's project scope is resolved
+    Then members are read once, for the personal teams only
 
 Rule: Token cost is split into what was billed and what was only theoretical
 
@@ -287,7 +349,7 @@ Rule: The pull request detail answers with facts and never with content
   Scenario: The sessions list never carries a session title
     Given sessions with titles and transcripts
     When the pull request detail is read
-    Then each session carries its start time, contributor, project, agent, tokens and cost only
+    Then each session carries its start time, contributor, agent, tokens and cost only
 
 Rule: The Pull Requests table compares a row against the page it is on
 
@@ -315,11 +377,15 @@ Rule: The Pull Requests table compares a row against the page it is on
     When the count is formatted
     Then it reads in millions rather than thousands
 
+  # One column, one way of reading it. Bundled money is the same list price as
+  # any other, so setting it apart by color asked the reader to learn a legend
+  # to read a number, and read as a different KIND of number rather than as the
+  # same number with something more to say about it.
   @integration
-  Scenario: A bundled token cost reads as bundled money
+  Scenario: A bundled token cost reads like every other token cost
     Given a row whose cost is partly not billed
     When the table draws its token cost
-    Then the value is drawn in the bundled colour
+    Then the value is drawn exactly as a billed value is
     And its tooltip carries the billed and not billed split beside the page comparison
 
   @integration
@@ -341,10 +407,10 @@ Rule: The Pull Requests table compares a row against the page it is on
     Then the pull request is read by its number rather than refused
 
   @integration
-  Scenario: A contributor named by a long identity keeps the whole of it
-    Given a contributor whose agent reported a long identity
+  Scenario: A contributor named by a long name keeps the whole of it
+    Given a contributor whose project carries a long name
     When the detail lists the contributors
-    Then the identity is cut to fit its column and stays available in full
+    Then the name is cut to fit its column and stays available in full
 
   @integration
   Scenario: The table shows one page of pull requests at a time

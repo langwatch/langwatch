@@ -271,9 +271,15 @@ const costSplitShape = {
   nonBilledCostUsd: z.number().nullable(),
 };
 
+// One contributor's line. A contributor is a project: a personal workspace is
+// named by the person who owns it, a shared one by itself. There is no
+// per-person split inside a shared project, because the only per-person key a
+// session carries is an opaque id the agent reported about itself.
 const usageRowSchema = z.object({
   projectId: z.string(),
-  userLabel: z.string(),
+  projectSlug: z.string(),
+  contributorLabel: z.string(),
+  contributorIsProject: z.boolean(),
   agent: z.string(),
   models: z.array(z.string()),
   sessionsCount: z.number(),
@@ -341,7 +347,7 @@ secured.access(requires("traces:view")).get(
     summary: "Get pull request coding agent usage",
     description:
       "Assistant usage for one pull request: sessions, tokens and cost, " +
-      "grouped by project, reported user and agent, plus per-model totals, " +
+      "grouped by contributor and agent, plus per-model totals, " +
       "over the pull request's whole lifetime rather than a time window. " +
       "Cost is reported three ways: what was billed per token, what a bundled " +
       "subscription already covered, and the list-price total of both. " +
@@ -405,14 +411,14 @@ secured.access(requires("traces:view")).get(
       });
     }
 
-    // Project names stay out of this answer: the REST rollup names projects by
-    // id, as its response schema says, and the display names the in-app
-    // surfaces use are not part of the published contract.
-    const { permittedProjectIds, costProjectIds } =
-      await resolveCallerProjectScope({
-        userId: callerUserId,
-        organizationId,
-      });
+    // The same permission cut the in-app surfaces resolve, names included: a
+    // caller reading this rollup is building something that has to say WHO the
+    // usage belongs to, and the agent-reported id it used to get instead
+    // resolved to nobody.
+    const scope = await resolveCallerProjectScope({
+      userId: callerUserId,
+      organizationId,
+    });
 
     return c.json(
       await getApp().codingAgents.pullRequestUsage.getPullRequestUsage({
@@ -420,8 +426,7 @@ secured.access(requires("traces:view")).get(
         repositoryHost: query.data.host,
         repositoryFullName: query.data.repository,
         prNumber: query.data.pullRequest,
-        permittedProjectIds,
-        costProjectIds,
+        ...scope,
       }),
     );
   },

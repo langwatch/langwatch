@@ -29,20 +29,21 @@ import { formatShortDate } from "./shortDate";
  * One pull request in full: what it cost, who worked on it, what each model
  * consumed, and the sessions that ran on it.
  *
- * Facts only. The sessions section lists start times, contributors, projects,
- * agents, tokens and cost, and deliberately never a session's title or any of
- * its content: titles are derived content and are gated on the session
- * surfaces that own them. The read behind this drawer carries none, so there
- * is nothing here to leak.
+ * Facts only. The sessions section lists start times, contributors, agents,
+ * tokens and cost, and deliberately never a session's title or any of its
+ * content: titles are derived content and are gated on the session surfaces
+ * that own them. The read behind this drawer carries none, so there is nothing
+ * here to leak.
+ *
+ * A contributor is a person when the work ran in their own workspace, and the
+ * project itself when it ran in a shared one, where it opens that project's
+ * traces.
  *
  * Spec: specs/coding-agent/pull-request-linkage.feature.
  */
 
 /** The placeholder for a value a row does not have. */
 const MISSING_VALUE = "—";
-
-/** What a contributor is called when the agent reported no identity. */
-const UNATTRIBUTED = "Unattributed";
 
 type PullRequestStatus = "open" | "draft" | "merged" | "closed";
 
@@ -91,7 +92,7 @@ export function PullRequestDetailDrawer({
     <Drawer.Root
       open={true}
       placement="end"
-      // Two six-column tables of facts: a narrower drawer cuts the money off
+      // Two five-column tables of facts: a narrower drawer cuts the money off
       // the right of both of them.
       size="xl"
       onOpenChange={() => closeDrawer()}
@@ -230,6 +231,8 @@ const SummaryRow: React.FC<{ detail: DetailPayload }> = ({ detail }) => {
               {MISSING_VALUE}
             </Text>
           ) : isBundled ? (
+            // Bundled money is the same list price as any other, so it reads
+            // the same and explains itself on hover instead.
             <Tooltip
               content={
                 <CostBreakdownTooltipContent
@@ -240,12 +243,7 @@ const SummaryRow: React.FC<{ detail: DetailPayload }> = ({ detail }) => {
                 />
               }
             >
-              <Text
-                fontSize="lg"
-                fontWeight="medium"
-                color="purple.fg"
-                cursor="help"
-              >
+              <Text fontSize="lg" fontWeight="medium" cursor="help">
                 {formatCost(totals.costUsd)}
               </Text>
             </Tooltip>
@@ -268,14 +266,38 @@ const SummaryRow: React.FC<{ detail: DetailPayload }> = ({ detail }) => {
 };
 
 /**
- * The width the agent-reported identity is allowed to take.
+ * The width a contributor's name is allowed to take.
  *
- * An agent names its user however it likes, and several report a long unbroken
- * hash. Left alone that one value sizes the whole table past the drawer and
- * pushes the numbers out of sight, so the column is bounded and anything
- * longer is cut with the whole value on hover.
+ * A shared project can be named at any length, and left alone one long name
+ * sizes the whole table past the drawer and pushes the numbers out of sight,
+ * so the column is bounded and anything longer is cut with the whole name on
+ * hover.
  */
-const CONTRIBUTOR_COLUMN_WIDTH = "180px";
+const CONTRIBUTOR_COLUMN_WIDTH = "220px";
+
+/** One contributor's name: a person, or a project that opens its traces. */
+const ContributorName: React.FC<{
+  contributor: {
+    contributorLabel: string;
+    projectSlug: string;
+    contributorIsProject: boolean;
+  };
+}> = ({ contributor }) => (
+  <Table.Cell
+    fontSize="sm"
+    maxWidth={CONTRIBUTOR_COLUMN_WIDTH}
+    truncate
+    title={contributor.contributorLabel}
+  >
+    {contributor.contributorIsProject && contributor.projectSlug ? (
+      <Link href={`/${contributor.projectSlug}/traces`} color="blue.fg">
+        {contributor.contributorLabel}
+      </Link>
+    ) : (
+      contributor.contributorLabel
+    )}
+  </Table.Cell>
+);
 
 const ContributorsSection: React.FC<{
   contributors: DetailPayload["contributors"];
@@ -289,7 +311,6 @@ const ContributorsSection: React.FC<{
           <Table.Header>
             <Table.Row>
               <Table.ColumnHeader>Contributor</Table.ColumnHeader>
-              <Table.ColumnHeader>Project</Table.ColumnHeader>
               <Table.ColumnHeader>Agent</Table.ColumnHeader>
               <Table.ColumnHeader textAlign="end">Sessions</Table.ColumnHeader>
               <Table.ColumnHeader textAlign="end">Tokens</Table.ColumnHeader>
@@ -300,20 +321,8 @@ const ContributorsSection: React.FC<{
           </Table.Header>
           <Table.Body>
             {contributors.map((contributor) => (
-              <Table.Row
-                key={`${contributor.projectId} ${contributor.userLabel} ${contributor.agent}`}
-              >
-                <Table.Cell
-                  fontSize="sm"
-                  maxWidth={CONTRIBUTOR_COLUMN_WIDTH}
-                  truncate
-                  title={contributor.userLabel || UNATTRIBUTED}
-                >
-                  {contributor.userLabel || UNATTRIBUTED}
-                </Table.Cell>
-                <Table.Cell fontSize="sm" color="fg.muted">
-                  {contributor.projectName}
-                </Table.Cell>
+              <Table.Row key={`${contributor.projectId} ${contributor.agent}`}>
+                <ContributorName contributor={contributor} />
                 <Table.Cell fontSize="sm" color="fg.muted">
                   {contributor.agent || MISSING_VALUE}
                 </Table.Cell>
@@ -323,15 +332,7 @@ const ContributorsSection: React.FC<{
                 <Table.Cell textAlign="end" fontSize="sm">
                   {formatTokens(contributor.totalTokens)}
                 </Table.Cell>
-                <Table.Cell
-                  textAlign="end"
-                  fontSize="sm"
-                  color={
-                    (contributor.nonBilledCostUsd ?? 0) > 0
-                      ? "purple.fg"
-                      : undefined
-                  }
-                >
+                <Table.Cell textAlign="end" fontSize="sm">
                   {contributor.costUsd === null
                     ? MISSING_VALUE
                     : formatCost(contributor.costUsd)}
@@ -411,7 +412,6 @@ const SessionsSection: React.FC<{
             <Table.Row>
               <Table.ColumnHeader>Started</Table.ColumnHeader>
               <Table.ColumnHeader>Contributor</Table.ColumnHeader>
-              <Table.ColumnHeader>Project</Table.ColumnHeader>
               <Table.ColumnHeader>Agent</Table.ColumnHeader>
               <Table.ColumnHeader textAlign="end">Tokens</Table.ColumnHeader>
               <Table.ColumnHeader textAlign="end">
@@ -429,17 +429,7 @@ const SessionsSection: React.FC<{
                     minute: "2-digit",
                   })}
                 </Table.Cell>
-                <Table.Cell
-                  fontSize="sm"
-                  maxWidth={CONTRIBUTOR_COLUMN_WIDTH}
-                  truncate
-                  title={session.userLabel || UNATTRIBUTED}
-                >
-                  {session.userLabel || UNATTRIBUTED}
-                </Table.Cell>
-                <Table.Cell fontSize="sm" color="fg.muted">
-                  {session.projectName}
-                </Table.Cell>
+                <ContributorName contributor={session} />
                 <Table.Cell fontSize="sm" color="fg.muted">
                   {session.agent || MISSING_VALUE}
                 </Table.Cell>

@@ -153,7 +153,7 @@ async function scopeFor({
 }): Promise<CallerProjectScope> {
   const organizationId = await resolveOrganizationId(projectId);
   if (!organizationId) {
-    return { permittedProjectIds: [], costProjectIds: [], projectNames: {} };
+    return { permittedProjectIds: [], costProjectIds: [], projects: {} };
   }
   return resolveCallerProjectScope({ userId, organizationId });
 }

@@ -237,6 +237,21 @@ describe("Feature: Pull request usage REST API", () => {
       );
     });
 
+    /** @scenario "A shared project is named by the project the work ran in" */
+    it("names each row's contributor rather than an agent-reported identity", () => {
+      // A caller of this endpoint is building something that has to say WHO
+      // the usage belongs to, which the agent's own id could never answer.
+      expect(answer().rows?.items?.required).toEqual(
+        expect.arrayContaining([
+          "projectId",
+          "projectSlug",
+          "contributorLabel",
+          "contributorIsProject",
+        ]),
+      );
+      expect(answer().rows?.items?.required).not.toContain("userLabel");
+    });
+
     it("publishes the per-model totals", () => {
       expect(answer().modelBreakdown?.items?.required).toEqual(
         expect.arrayContaining(["model", "totalTokens", "costUsd"]),

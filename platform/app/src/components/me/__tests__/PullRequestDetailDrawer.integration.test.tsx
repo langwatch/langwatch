@@ -11,6 +11,7 @@
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
@@ -94,8 +95,9 @@ function detailPayload(over: Record<string, unknown> = {}) {
     contributors: [
       {
         projectId: "project-1",
-        projectName: "Personal",
-        userLabel: "Riley",
+        projectSlug: "riley-personal",
+        contributorLabel: "Riley Chase",
+        contributorIsProject: false,
         agent: "claude_code",
         models: ["claude-fable-5"],
         sessionsCount: 2,
@@ -124,13 +126,54 @@ function detailPayload(over: Record<string, unknown> = {}) {
       {
         sessionId: "session-a",
         startedAtMs: Date.parse("2026-07-01T10:30:00Z"),
-        userLabel: "Riley",
-        projectName: "Personal",
+        projectId: "project-1",
+        projectSlug: "riley-personal",
+        contributorLabel: "Riley Chase",
+        contributorIsProject: false,
         agent: "claude_code",
         totalTokens: 4_000,
         costUsd: 5,
       },
     ],
+    ...over,
+  };
+}
+
+/**
+ * Every property that could set one cost cell apart from another, read off the
+ * element as the browser resolved it. Compared whole rather than property by
+ * property, so a color branch reintroduced under any name is caught rather
+ * than only the one property a test happened to name.
+ */
+function renderedStyleOf(element: HTMLElement) {
+  const style = window.getComputedStyle(element);
+  return {
+    color: style.color,
+    backgroundColor: style.backgroundColor,
+    fontWeight: style.fontWeight,
+    textDecoration: style.textDecoration,
+    opacity: style.opacity,
+  };
+}
+
+/** One contributor line, filled in around whatever a case pins. */
+function contributorRow(over: Record<string, unknown> = {}) {
+  return {
+    projectId: "project-1",
+    projectSlug: "riley-personal",
+    contributorLabel: "Riley Chase",
+    contributorIsProject: false,
+    agent: "claude_code",
+    models: ["claude-fable-5"],
+    sessionsCount: 1,
+    inputTokens: 1,
+    outputTokens: 1,
+    cacheReadTokens: 1,
+    cacheCreationTokens: 1,
+    totalTokens: 4,
+    costUsd: 1,
+    billedCostUsd: 1,
+    nonBilledCostUsd: 0,
     ...over,
   };
 }
@@ -180,14 +223,10 @@ describe("the pull request detail drawer", () => {
         screen.getByRole("heading", { name: "Sessions" }),
       ).toBeInTheDocument();
       expect(screen.getByText("10.0K")).toBeInTheDocument();
-      // Bundled money reads in its own color here too.
-      expect(screen.getByText("$12.50")).toHaveStyle({
-        color: "var(--chakra-colors-purple-fg)",
-      });
+      expect(screen.getByText("$12.50")).toBeInTheDocument();
 
       expect(screen.getByText("Contributors")).toBeInTheDocument();
-      expect(screen.getAllByText("Riley").length).toBeGreaterThan(0);
-      expect(screen.getAllByText("Personal").length).toBeGreaterThan(0);
+      expect(screen.getAllByText("Riley Chase").length).toBeGreaterThan(0);
 
       expect(screen.getByText("Models")).toBeInTheDocument();
       expect(screen.getByText("claude-fable-5")).toBeInTheDocument();
@@ -203,6 +242,45 @@ describe("the pull request detail drawer", () => {
       // Nothing that could be a session's own title reaches the reader: the
       // read carries none, and this drawer renders only what it carries.
       expect(document.body.textContent).not.toContain("session-a");
+    });
+  });
+
+  describe("given a pull request whose cost is partly not billed", () => {
+    /** @scenario "A bundled token cost reads like every other token cost" */
+    it("draws a bundled value exactly like a billed one and keeps the split to the tooltip", async () => {
+      pinDetail(
+        detailPayload({
+          contributors: [
+            contributorRow({
+              agent: "claude_code",
+              costUsd: 10,
+              billedCostUsd: 0,
+              nonBilledCostUsd: 10,
+            }),
+            contributorRow({
+              agent: "codex",
+              costUsd: 10,
+              billedCostUsd: 10,
+              nonBilledCostUsd: 0,
+            }),
+          ],
+        }),
+      );
+      const user = userEvent.setup();
+
+      renderDrawer();
+
+      const [bundled, billed] = screen.getAllByText("$10.00");
+      // Whatever the styling of a number in this column is, the two are the
+      // same number to a reader: any branch that sets one apart from the
+      // other fails here, whichever property it reaches for.
+      expect(renderedStyleOf(bundled!)).toEqual(renderedStyleOf(billed!));
+      expect(document.body.textContent).not.toContain("Non-billed");
+
+      // The split is real and still reachable, one hover away.
+      await user.hover(screen.getByText("$12.50"));
+      expect(await screen.findByText("Non-billed")).toBeInTheDocument();
+      expect(await screen.findByText("Billed")).toBeInTheDocument();
     });
   });
 
@@ -272,28 +350,56 @@ describe("the pull request detail drawer", () => {
     });
   });
 
-  describe("given a contributor whose agent reported a long identity", () => {
-    /** @scenario "A contributor named by a long identity keeps the whole of it" */
-    it("keeps the whole identity reachable beside the cut-down cell", () => {
-      const identity = "f".repeat(64);
+  describe("given a contributor named by a long project name", () => {
+    /** @scenario "A contributor named by a long name keeps the whole of it" */
+    it("keeps the whole name reachable beside the cut-down cell", () => {
+      const name = "Platform Reliability and Developer Experience".repeat(3);
       pinDetail(
         detailPayload({
           contributors: [
+            contributorRow({
+              projectId: "project-2",
+              projectSlug: "platform-reliability",
+              contributorLabel: name,
+              contributorIsProject: true,
+            }),
+          ],
+        }),
+      );
+
+      renderDrawer();
+
+      // The cell is bounded, so the name only stays readable because the whole
+      // of it is carried alongside the text that had to be cut.
+      const cell = screen.getAllByText(name)[0]?.closest("td");
+      expect(cell).toHaveAttribute("title", name);
+    });
+  });
+
+  describe("given work that ran in a shared project", () => {
+    /** @scenario "A shared project is named by the project the work ran in" */
+    it("names the project and opens its traces, and never an agent-reported id", () => {
+      pinDetail(
+        detailPayload({
+          contributors: [
+            contributorRow({
+              projectId: "project-2",
+              projectSlug: "gateway",
+              contributorLabel: "Gateway",
+              contributorIsProject: true,
+            }),
+          ],
+          sessions: [
             {
-              projectId: "project-1",
-              projectName: "Personal",
-              userLabel: identity,
+              sessionId: "session-b",
+              startedAtMs: Date.parse("2026-07-01T10:30:00Z"),
+              projectId: "project-2",
+              projectSlug: "gateway",
+              contributorLabel: "Gateway",
+              contributorIsProject: true,
               agent: "claude_code",
-              models: ["claude-fable-5"],
-              sessionsCount: 1,
-              inputTokens: 1,
-              outputTokens: 1,
-              cacheReadTokens: 1,
-              cacheCreationTokens: 1,
-              totalTokens: 4,
-              costUsd: 1,
-              billedCostUsd: 1,
-              nonBilledCostUsd: 0,
+              totalTokens: 4_000,
+              costUsd: 5,
             },
           ],
         }),
@@ -301,10 +407,27 @@ describe("the pull request detail drawer", () => {
 
       renderDrawer();
 
-      // The cell is bounded, so the identity only stays readable because the
-      // whole of it is carried alongside the text that had to be cut.
-      const cell = screen.getAllByText(identity)[0];
-      expect(cell).toHaveAttribute("title", identity);
+      for (const link of screen.getAllByText("Gateway")) {
+        expect(link.closest("a")).toHaveAttribute("href", "/gateway/traces");
+      }
+      // The columns a contributor used to share with a separate project cell
+      // are gone: the contributor IS the project when the work is shared.
+      expect(
+        screen.queryByRole("columnheader", { name: "Project" }),
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  describe("given work that ran in someone's own workspace", () => {
+    /** @scenario "A personal workspace is named by the person whose work it is" */
+    it("names the person and links nothing", () => {
+      pinDetail(detailPayload());
+
+      renderDrawer();
+
+      for (const name of screen.getAllByText("Riley Chase")) {
+        expect(name.closest("a")).toBeNull();
+      }
     });
   });
 

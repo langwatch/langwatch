@@ -5,7 +5,7 @@ import { prisma as defaultPrisma } from "~/server/db";
 
 /**
  * The organization's projects split by what one caller may do with each: read
- * traces, and price them.
+ * traces, and price them, plus how each one is named to a reader.
  *
  * Two separate cuts on purpose. `traces:view` decides whether a project's work
  * appears at all; `cost:view` decides whether that work carries money. A
@@ -21,13 +21,35 @@ import { prisma as defaultPrisma } from "~/server/db";
  *
  * Spec: specs/coding-agent/pull-request-linkage.feature.
  */
+export interface CallerProjectDisplay {
+  /** The project's own name. */
+  name: string;
+  /** The project's slug, which addresses its pages. */
+  slug: string;
+  /** Whether the project is one person's workspace rather than a shared one. */
+  isPersonal: boolean;
+  /**
+   * Who work in this project is attributed to. A personal workspace is one
+   * person, so it is named by that person; a shared project is named by
+   * itself, because the work inside it belongs to the project rather than to
+   * anyone the platform can identify.
+   */
+  contributorLabel: string;
+  /**
+   * Whether `contributorLabel` names a project a reader can open, rather than
+   * a person. Personal workspaces never link: the label is somebody's name,
+   * and the workspace behind it is theirs alone.
+   */
+  isLinkable: boolean;
+}
+
 export interface CallerProjectScope {
   /** Projects the caller may read. Work outside it never appears. */
   permittedProjectIds: string[];
   /** The subset of those the caller may also price. */
   costProjectIds: string[];
-  /** Display names of the permitted projects, keyed by project id. */
-  projectNames: Record<string, string>;
+  /** How each permitted project is named to a reader, keyed by project id. */
+  projects: Record<string, CallerProjectDisplay>;
 }
 
 export async function resolveCallerProjectScope({
@@ -41,10 +63,16 @@ export async function resolveCallerProjectScope({
 }): Promise<CallerProjectScope> {
   const projects = await prisma.project.findMany({
     where: { team: { organizationId }, archivedAt: null },
-    select: { id: true, name: true, teamId: true },
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      teamId: true,
+      isPersonal: true,
+    },
   });
   if (projects.length === 0) {
-    return { permittedProjectIds: [], costProjectIds: [], projectNames: {} };
+    return { permittedProjectIds: [], costProjectIds: [], projects: {} };
   }
 
   const projectTeamId = Object.fromEntries(
@@ -70,13 +98,62 @@ export async function resolveCallerProjectScope({
     (project) => viewable.projects.get(project.id) === true,
   );
   const permittedProjectIds = permitted.map((project) => project.id);
+  const ownerNames = await personalTeamOwnerNames({
+    prisma,
+    teamIds: permitted
+      .filter((project) => project.isPersonal)
+      .map((project) => project.teamId),
+  });
+
   return {
     permittedProjectIds,
     costProjectIds: permittedProjectIds.filter(
       (id) => priceable.projects.get(id) === true,
     ),
-    projectNames: Object.fromEntries(
-      permitted.map((project) => [project.id, project.name]),
+    projects: Object.fromEntries(
+      permitted.map((project) => [
+        project.id,
+        {
+          name: project.name,
+          slug: project.slug,
+          isPersonal: project.isPersonal,
+          contributorLabel: project.isPersonal
+            ? (ownerNames.get(project.teamId) ?? project.name)
+            : project.name,
+          isLinkable: !project.isPersonal,
+        } satisfies CallerProjectDisplay,
+      ]),
     ),
   };
+}
+
+/**
+ * The person behind each personal workspace, keyed by team id.
+ *
+ * One query for every personal team at once, and never for a shared one: a
+ * shared team's members are not an answer to "who worked here", so fetching
+ * them would cost a read that nothing displays. A personal team holds exactly
+ * one member, and the earliest one wins if a team ever holds more.
+ */
+async function personalTeamOwnerNames({
+  prisma,
+  teamIds,
+}: {
+  prisma: PrismaClient;
+  teamIds: string[];
+}): Promise<Map<string, string>> {
+  if (teamIds.length === 0) return new Map();
+  const members = await prisma.teamUser.findMany({
+    where: { teamId: { in: teamIds } },
+    select: { teamId: true, user: { select: { name: true, email: true } } },
+    orderBy: { createdAt: "asc" },
+  });
+
+  const names = new Map<string, string>();
+  for (const member of members) {
+    if (names.has(member.teamId)) continue;
+    const label = member.user.name?.trim() || member.user.email?.trim();
+    if (label) names.set(member.teamId, label);
+  }
+  return names;
 }
