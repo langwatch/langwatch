@@ -88,6 +88,10 @@ const SKIP_PATHS: Record<string, string> = {
     UNDOCUMENTED_GOVERNED_ANALYTICS_SQL,
   "/api/v1/projects/{projectId}/analytics/schema":
     UNDOCUMENTED_GOVERNED_ANALYTICS_SQL,
+  "/api/v1/projects/{projectId}/analytics/charts":
+    UNDOCUMENTED_GOVERNED_ANALYTICS_SQL,
+  "/api/v1/projects/{projectId}/analytics/charts/{chartId}":
+    UNDOCUMENTED_GOVERNED_ANALYTICS_SQL,
 };
 
 const ENDPOINT_GROUPS: EndpointGroup[] = [
