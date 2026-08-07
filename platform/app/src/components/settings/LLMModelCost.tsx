@@ -245,7 +245,7 @@ function ActionsMenu({
         {id && (
           <Menu.Item
             value="delete"
-            color="red.fg"
+            color="red.fgMuted"
             onClick={(event) => {
               event.stopPropagation();
 

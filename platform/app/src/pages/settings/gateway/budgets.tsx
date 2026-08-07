@@ -541,7 +541,7 @@ function ScopeCell({
       {scopeTarget && (
         <HStack gap={1}>
           {vkHref ? (
-            <Link href={vkHref} color="orange.fg" fontSize="xs">
+            <Link href={vkHref} color="orange.fgMuted" fontSize="xs">
               {scopeTarget.name}
             </Link>
           ) : (

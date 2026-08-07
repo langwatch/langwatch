@@ -36,7 +36,7 @@ export function OverSeatsCallout({
       data-testid="over-seats-callout"
     >
       <HStack align="start" gap={4}>
-        <Box color="orange.fg" paddingTop={1}>
+        <Box color="orange.fgMuted" paddingTop={1}>
           <UserMinus size={20} />
         </Box>
         <VStack align="start" gap={2} flex={1}>

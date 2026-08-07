@@ -246,7 +246,7 @@ export function ToolCatalogEditor({
           padding={4}
         >
           <HStack alignItems="start" gap={3}>
-            <Box color="orange.fg" paddingTop="2px">
+            <Box color="orange.fgMuted" paddingTop="2px">
               <PackageOpen size={20} />
             </Box>
             <VStack align="start" gap={2} flex={1} minWidth={0}>

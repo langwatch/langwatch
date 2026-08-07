@@ -226,7 +226,7 @@ function MyUsagePage() {
                             position="absolute"
                             bottom={0}
                             width="full"
-                            backgroundColor="blue.solid"
+                            backgroundColor="blue.solidMuted"
                             borderRadius="sm"
                             height={`${Math.max(2, billedPct)}%`}
                           />
@@ -304,7 +304,7 @@ function MyUsagePage() {
                             top={0}
                             height="full"
                             width={`${Math.max(tool.billedUsd > 0 ? 2 : 0, billedPct)}%`}
-                            backgroundColor="blue.solid"
+                            backgroundColor="blue.solidMuted"
                           />
                         )}
                       </Box>
@@ -517,7 +517,7 @@ function CostSeriesLegend({
       />
       <LegendChip
         label="Billed"
-        color="blue.solid"
+        color="blue.solidMuted"
         active={showBilled}
         onClick={onToggleBilled}
       />

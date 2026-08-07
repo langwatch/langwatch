@@ -319,7 +319,7 @@ export const LicenseGeneratorForm = forwardRef<
             <Text fontSize="sm" fontWeight="medium" color="green.fg">
               License generated and downloaded!
             </Text>
-            <Text fontSize="sm" color="green.fg">
+            <Text fontSize="sm" color="green.fgMuted">
               The license file has been saved as{" "}
               <Text as="span" fontFamily="mono" fontWeight="medium">
                 {sanitizedName}.langwatch-license

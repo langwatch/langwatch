@@ -74,7 +74,7 @@ function SeatsProrationPreview({
             {currentSeats}
           </Text>
         </VStack>
-        <Text fontSize="xl" color="fg.subtle" alignSelf="center">
+        <Text fontSize="xl" color="fg.faint" alignSelf="center">
           →
         </Text>
         <VStack align="end" gap={1}>

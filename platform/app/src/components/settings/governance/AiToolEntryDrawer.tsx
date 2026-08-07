@@ -933,7 +933,7 @@ function ModelProviderFields({
               <Alert.Description fontSize="xs">
                 This provider has no enabled credential yet. Tiles will publish
                 but VK issuance will 502 until you{" "}
-                <Link href="/settings/model-providers" color="orange.fg">
+                <Link href="/settings/model-providers" color="orange.fgMuted">
                   configure it
                 </Link>
                 .

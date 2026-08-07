@@ -174,7 +174,7 @@ export function FieldInfoTooltip({
             {resolvedHref && (
               <Link
                 href={resolvedHref}
-                color="orange.fg"
+                color="orange.fgMuted"
                 fontSize="xs"
                 fontWeight="medium"
                 isExternal={isExternal}

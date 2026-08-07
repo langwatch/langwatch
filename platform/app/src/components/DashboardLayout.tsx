@@ -733,7 +733,7 @@ export const DashboardLayout = ({
                 borderColor="orange.500/15"
               >
                 <Info size={12} color="var(--chakra-colors-orange-400)" />
-                <Text fontSize="xs" color="orange.solid">
+                <Text fontSize="xs" color="orange.solidMuted">
                   Platform-wide - not scoped to a project
                 </Text>
               </HStack>
@@ -761,7 +761,7 @@ export const DashboardLayout = ({
             </HStack>
           ) : (
             <Text paddingLeft={2}>
-              <Link href="/auth/signin" color="orange.fg" fontWeight="600">
+              <Link href="/auth/signin" color="orange.fgMuted" fontWeight="600">
                 Sign in
               </Link>{" "}
               to LangWatch to monitor your projects
@@ -833,7 +833,7 @@ export const DashboardLayout = ({
                   name={user?.name ?? undefined}
                   image={user?.image ?? undefined}
                   size="xs"
-                  backgroundColor="orange.solid"
+                  backgroundColor="orange.solidMuted"
                   color="white"
                   width="28px"
                   height="28px"

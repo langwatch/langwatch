@@ -114,7 +114,7 @@ export function LicenseDetailsCard({
             borderRadius="md"
             width="full"
           >
-            <Text fontSize="sm" color="red.fg">
+            <Text fontSize="sm" color="red.fgMuted">
               Your license file is corrupted and cannot be read. Please upload a
               valid license or contact support.
             </Text>
@@ -192,7 +192,7 @@ export function LicenseDetailsCard({
             <Text
               fontSize="sm"
               fontWeight="medium"
-              color={isExpired ? "orange.fg" : undefined}
+              color={isExpired ? "orange.fgMuted" : undefined}
             >
               {formatLicenseDate(status.expiresAt)}
             </Text>

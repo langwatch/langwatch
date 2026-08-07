@@ -230,7 +230,7 @@ export function VirtualKeyProviderAccessSection({
           {invalidReason && (
             <Text
               fontSize="xs"
-              color="red.fg"
+              color="red.fgMuted"
               data-testid="vk-providers-invalid"
             >
               {invalidReason}

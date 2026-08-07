@@ -202,7 +202,7 @@ export const TraceMessages = React.forwardRef(function TraceMessages(
             <Message
               author={project?.name ?? ""}
               avatar={
-                <Avatar.Root size="sm" background="orange.solid">
+                <Avatar.Root size="sm" background="orange.solidMuted">
                   <Avatar.Fallback name={project?.name} />
                 </Avatar.Root>
               }
@@ -222,7 +222,7 @@ export const TraceMessages = React.forwardRef(function TraceMessages(
                 <VStack alignItems="flex-start" gap={2} paddingY={2}>
                   <Box
                     fontSize="11px"
-                    color="red.solid"
+                    color="red.solidMuted"
                     textTransform="uppercase"
                     fontWeight="bold"
                   >

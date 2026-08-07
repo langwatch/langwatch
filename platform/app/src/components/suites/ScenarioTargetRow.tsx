@@ -38,10 +38,10 @@ const STATUS_CIRCLE_COLORS: Record<string, string> = {
   [ScenarioRunStatus.ERROR]: "red.solid",
   [ScenarioRunStatus.STALLED]: "yellow.solid",
   [ScenarioRunStatus.CANCELLED]: "gray.emphasized",
-  [ScenarioRunStatus.IN_PROGRESS]: "orange.solid",
+  [ScenarioRunStatus.IN_PROGRESS]: "orange.solidMuted",
   [ScenarioRunStatus.PENDING]: "gray.emphasized",
-  [ScenarioRunStatus.QUEUED]: "blue.solid",
-  [ScenarioRunStatus.RUNNING]: "orange.solid",
+  [ScenarioRunStatus.QUEUED]: "blue.solidMuted",
+  [ScenarioRunStatus.RUNNING]: "orange.solidMuted",
 };
 
 function MetricsTooltipContent({

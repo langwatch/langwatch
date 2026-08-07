@@ -23,6 +23,6 @@ export const durationColor = (
   return duration > thresholds[metric].red
     ? "red"
     : duration > thresholds[metric].yellow
-      ? "yellow.fg"
+      ? "yellow.fgMuted"
       : "green";
 };

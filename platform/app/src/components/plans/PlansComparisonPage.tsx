@@ -331,7 +331,7 @@ export function PlansComparisonPage({
             variant="subtle"
             size="sm"
             _hover={{
-              bgColor: "orange.solid",
+              bgColor: "orange.solidMuted",
               color: "bg.muted",
             }}
             onClick={() =>

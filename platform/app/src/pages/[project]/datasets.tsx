@@ -415,7 +415,7 @@ function DatasetsPage() {
                                 )}
                                 <Menu.Item
                                   value="delete"
-                                  color="red.fg"
+                                  color="red.fgMuted"
                                   onClick={(event) => {
                                     event.stopPropagation();
                                     showDeleteDialog({

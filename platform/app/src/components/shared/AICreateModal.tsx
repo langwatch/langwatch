@@ -511,7 +511,7 @@ function GeneratingState({ text, assistant }: GeneratingStateProps) {
             width="60px"
             height="60px"
             borderWidth="2px"
-            color="orange.solid"
+            color="orange.solidMuted"
           />
         </Box>
         <VStack gap={1}>

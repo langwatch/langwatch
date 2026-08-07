@@ -440,7 +440,7 @@ export function TryItOut({
                             livePassesPreconditions ? undefined : "bg.muted"
                           }
                           color={
-                            livePassesPreconditions ? undefined : "fg.subtle"
+                            livePassesPreconditions ? undefined : "fg.faint"
                           }
                         >
                           <Table.Cell
@@ -504,7 +504,7 @@ export function TryItOut({
                                 lineClamp={1}
                                 maxWidth="250px"
                                 display="block"
-                                color="red.solid"
+                                color="red.solidMuted"
                               >
                                 Error
                                 {trace.error.message ? ": " : ""}

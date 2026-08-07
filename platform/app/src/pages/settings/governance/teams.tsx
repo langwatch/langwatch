@@ -132,7 +132,7 @@ function GovernanceTeamsListPage() {
         <HStack alignItems="end">
           <VStack align="start" gap={1}>
             <Text fontSize="xs" color="fg.muted">
-              <Link href="/settings/governance" color="blue.fg">
+              <Link href="/settings/governance" color="blue.fgMuted">
                 ← AI Governance
               </Link>{" "}
               · All teams

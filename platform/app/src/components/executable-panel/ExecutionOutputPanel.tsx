@@ -244,11 +244,11 @@ const renderExecutionOutputs = (
         nodeType === "evaluator" && identifier === "passed" && value === true;
 
       const textColor = isSkipped
-        ? "yellow.fg"
+        ? "yellow.fgMuted"
         : isFail
-          ? "red.fg"
+          ? "red.fgMuted"
           : isSuccess
-            ? "green.fg"
+            ? "green.fgMuted"
             : "fg.muted";
 
       return (
@@ -259,11 +259,11 @@ const renderExecutionOutputs = (
           gap={3}
           color={
             isSkipped
-              ? "yellow.fg"
+              ? "yellow.fgMuted"
               : isFail
-                ? "red.fg"
+                ? "red.fgMuted"
                 : isSuccess
-                  ? "green.fg"
+                  ? "green.fgMuted"
                   : undefined
           }
         >

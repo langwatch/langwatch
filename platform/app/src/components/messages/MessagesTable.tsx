@@ -521,7 +521,7 @@ export function MessagesTable({
               })
             }
           >
-            <OverflownTextWithTooltip color="red.solid">
+            <OverflownTextWithTooltip color="red.solidMuted">
               {trace.error.message}
             </OverflownTextWithTooltip>
           </Table.Cell>
@@ -916,7 +916,7 @@ export function MessagesTable({
         <Icon
           width={4}
           height={4}
-          color="blue.solid"
+          color="blue.solidMuted"
           cursor="pointer"
           onClick={() => sortBy(columnKey)}
           marginTop="5px"

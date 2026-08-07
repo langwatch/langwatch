@@ -466,7 +466,7 @@ function StatTile({
   const body = (
     <Stat.Root>
       <Stat.Label>{label}</Stat.Label>
-      <Stat.ValueText color={tone === "red" ? "red.fg" : undefined}>
+      <Stat.ValueText color={tone === "red" ? "red.fgMuted" : undefined}>
         {value}
       </Stat.ValueText>
     </Stat.Root>

@@ -65,7 +65,7 @@ export function EvaluatorSelectionBox({
               )}
             </VStack>
           </HStack>
-          <Box color="fg.subtle">
+          <Box color="fg.faint">
             <ChevronRight size={20} />
           </Box>
         </HStack>
@@ -87,7 +87,7 @@ export function EvaluatorSelectionBox({
     >
       <HStack justify="space-between" width="full">
         <Text color="fg.subtle">{placeholder}</Text>
-        <Box color="fg.subtle">
+        <Box color="fg.faint">
           <ChevronRight size={20} />
         </Box>
       </HStack>

@@ -72,7 +72,7 @@ export function DropzonePrompt({ multiple = false }: { multiple?: boolean }) {
     <VStack gap={2}>
       <Box
         className="lw-dropzone-icon"
-        color="blue.solid"
+        color="blue.solidMuted"
         transition="transform 0.2s ease"
         transformOrigin="center"
       >

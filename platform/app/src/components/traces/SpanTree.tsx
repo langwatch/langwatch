@@ -167,7 +167,7 @@ const SpanNode: React.FC<SpanNodeProps> = ({ span, level, isNew }) => {
         <VStack align="start">
           <HStack>
             <HoverableBigText
-              color={!span.name && !("model" in span) ? "fg.subtle" : undefined}
+              color={!span.name && !("model" in span) ? "fg.faint" : undefined}
               maxWidth="300px"
               lineClamp={1}
               expandable={false}

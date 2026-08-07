@@ -552,6 +552,45 @@ jobs:
         working-directory: platform/app
         run: pnpm lint
 
+      # The analyzer plugins are the house rules Biome has no built-in for.
+      # `pnpm lint` covers them, but only once they are REGISTERED: between
+      # #6010 and this change `no-raw-error-toast.grit` sat unregistered in
+      # biome-plugins/ and `lint:plugins` ran `--only=plugin` against an empty
+      # list — green, having checked nothing.
+      #
+      # So assert the plugins still MATCH before trusting the zero they report
+      # on real code. Each fixtures file is a set of deliberate violations; a
+      # pattern that drifts (a renamed node kind, a regex that stopped
+      # anchoring) compiles fine, matches nothing, and would otherwise pass
+      # this job forever for the same reason a dead smoke detector is silent.
+      - name: Enforce analyzer plugins
+        working-directory: platform/app
+        run: |
+          set -euo pipefail
+          pnpm lint:plugins
+
+          # The fixtures live outside src/, which is deliberate — under src/
+          # they would fail the very gate they defend. That also puts them
+          # outside biome's scan scope, so copy each one IN to measure it and
+          # take it straight back out. Same trick as the vitest CI canary below.
+          floor() {
+            file="$1"; want="$2"
+            probe="src/_plugin_fixture_probe.tsx"
+            cp "$file" "$probe"
+            got=$(pnpm exec biome lint --only=plugin --max-diagnostics=none \
+              --reporter=json "$probe" 2>/dev/null \
+              | jq '[.diagnostics[] | select(.category == "plugin")] | length')
+            rm -f "$probe"
+            echo "$(basename "$file"): $got violations (floor $want)"
+            if [ "$got" -lt "$want" ]; then
+              echo "::error::$file matched $got violations, expected at least $want — a plugin pattern has stopped matching."
+              exit 1
+            fi
+          }
+
+          floor biome-plugins/__tests__/semantic-color-tokens.fixtures.tsx 11
+          floor biome-plugins/__tests__/no-raw-error-toast.fixtures.tsx 18
+
       - name: Set up reviewdog
         if: github.event_name == 'pull_request'
         uses: reviewdog/action-setup@d8a7baabd7f3e8544ee4dbde3ee41d0011c3a93f # v1.5.0

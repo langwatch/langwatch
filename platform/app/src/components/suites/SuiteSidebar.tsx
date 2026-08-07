@@ -457,7 +457,7 @@ function RunSummaryLine({
       >
         {passRate === null ? "-" : `${Math.round(passRate)}%`}
       </Text>
-      <Text fontSize="xs" color="fg.subtle">
+      <Text fontSize="xs" color="fg.faint">
         ·
       </Text>
       <Text fontSize="xs" color="fg.subtle">

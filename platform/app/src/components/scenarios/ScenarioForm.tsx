@@ -115,7 +115,7 @@ export function ScenarioForm({ defaultValues, formRef }: ScenarioFormProps) {
             {...register("situation")}
             placeholder="e.g., A frustrated premium subscriber who was charged twice..."
             rows={5}
-            _placeholder={{ color: "fg.subtle", fontStyle: "italic" }}
+            _placeholder={{ color: "fg.faint", fontStyle: "italic" }}
           />
           <Field.ErrorText>{errors.situation?.message}</Field.ErrorText>
         </Field.Root>

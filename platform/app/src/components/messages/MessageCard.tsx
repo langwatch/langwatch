@@ -372,7 +372,7 @@ export function MessageCard({
                   <Box
                     width={2}
                     height={2}
-                    background="red.solid"
+                    background="red.solidMuted"
                     borderRadius="100%"
                   ></Box>
                   <Text>Exception ocurred</Text>

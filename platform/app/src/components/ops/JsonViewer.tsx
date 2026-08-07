@@ -97,7 +97,7 @@ function renderValue(
     return [
       <TokenSpan
         key={path}
-        color="red.solid"
+        color="red.solidMuted"
         path={path}
         changedPaths={ctx.changedPaths}
       >
@@ -110,7 +110,7 @@ function renderValue(
     return [
       <TokenSpan
         key={path}
-        color="purple.solid"
+        color="purple.solidMuted"
         path={path}
         changedPaths={ctx.changedPaths}
       >
@@ -123,7 +123,7 @@ function renderValue(
     return [
       <TokenSpan
         key={path}
-        color="orange.solid"
+        color="orange.solidMuted"
         path={path}
         changedPaths={ctx.changedPaths}
       >
@@ -138,7 +138,7 @@ function renderValue(
     return [
       <TokenSpan
         key={path}
-        color="green.solid"
+        color="green.solidMuted"
         path={path}
         changedPaths={ctx.changedPaths}
       >
@@ -231,7 +231,7 @@ function renderValue(
       lines.push(
         <DiffLine key={childPath} highlight={isChanged}>
           {padding}
-          <Text as="span" color="cyan.solid">
+          <Text as="span" color="cyan.solidMuted">
             {`"${key}"`}
           </Text>
           {": "}

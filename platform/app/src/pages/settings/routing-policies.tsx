@@ -366,7 +366,7 @@ function RoutingPoliciesPage() {
             padding={4}
           >
             <HStack alignItems="start" gap={3}>
-              <Box color="orange.fg" paddingTop="2px">
+              <Box color="orange.fgMuted" paddingTop="2px">
                 <Lightbulb size={18} />
               </Box>
               <VStack align="start" gap={1}>
@@ -1060,7 +1060,7 @@ function ProviderCredentialPicker({
                     {id}
                   </Text>
                   {option?.disabledAt && (
-                    <Text fontSize="xs" color="orange.fg">
+                    <Text fontSize="xs" color="orange.fgMuted">
                       Disabled - requests will skip this credential
                     </Text>
                   )}
@@ -1475,7 +1475,7 @@ function RoutingPolicyDrawer({
                 padding={3}
               >
                 <HStack alignItems="start" gap={2}>
-                  <Box color="red.fg" paddingTop="2px">
+                  <Box color="red.fgMuted" paddingTop="2px">
                     <X size={14} />
                   </Box>
                   <VStack align="start" gap={0} flex={1} minWidth={0}>

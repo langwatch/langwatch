@@ -73,7 +73,11 @@ export function LLMModelDisplay({
           lineClamp={1}
           wordBreak="break-all"
           color={
-            isProviderMissing ? "red.fg" : isDisabled ? "fg.muted" : undefined
+            isProviderMissing
+              ? "red.fgMuted"
+              : isDisabled
+                ? "fg.muted"
+                : undefined
           }
           textDecoration={
             isProviderMissing || isDisabled ? "line-through" : undefined
@@ -88,7 +92,7 @@ export function LLMModelDisplay({
         )}
       </VStack>
       {isProviderMissing && (
-        <HStack gap={1} color="red.fg" flexShrink={0}>
+        <HStack gap={1} color="red.fgMuted" flexShrink={0}>
           <AlertTriangle size={14} aria-hidden />
           <Text
             fontSize="xs"

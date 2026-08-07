@@ -451,7 +451,7 @@ function RowTrailing({
           as="button"
           gap={1}
           fontSize="13px"
-          color="blue.fg"
+          color="blue.fgMuted"
           cursor="pointer"
           aria-label={`Confirm columns for ${file.name}`}
           onClick={onToggle}
@@ -486,7 +486,7 @@ function RowTrailing({
       );
     case "ready":
       return (
-        <HStack gap={1} color="green.fg" fontSize="13px">
+        <HStack gap={1} color="green.fgMuted" fontSize="13px">
           <CheckCircle size={14} />
           <Text>Ready</Text>
         </HStack>
@@ -749,7 +749,7 @@ export function BulkUploadDrawer({
               >
                 <Text>{bulk.counts.total} files</Text>
                 {bulk.counts.ready > 0 && (
-                  <Text color="green.fg">{bulk.counts.ready} ready</Text>
+                  <Text color="green.fgMuted">{bulk.counts.ready} ready</Text>
                 )}
                 {bulk.counts.preparing > 0 && (
                   <Text color="blue.solid">

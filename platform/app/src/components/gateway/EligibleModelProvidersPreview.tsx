@@ -312,7 +312,7 @@ export function ConfigureModelProvidersLink({
       href={href}
       target="_blank"
       rel="noopener noreferrer"
-      color="blue.fg"
+      color="blue.fgMuted"
       fontSize="xs"
     >
       <HStack gap={1} alignItems="center">

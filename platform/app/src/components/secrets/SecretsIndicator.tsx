@@ -52,7 +52,7 @@ export function SecretsIndicator({
           as="button"
           gap={1}
           fontSize="13px"
-          color="fg.subtle"
+          color="fg.faint"
           cursor="pointer"
           _hover={{ color: "white" }}
           paddingX={2}

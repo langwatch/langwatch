@@ -78,7 +78,7 @@ export function DatasetPreview({
                   Error rendering the dataset, please refresh the page
                 </Text>
                 {process.env.NODE_ENV === "development" && (
-                  <Text fontSize="sm" color="red.fg">
+                  <Text fontSize="sm" color="red.fgMuted">
                     {error instanceof Error ? error.message : String(error)}
                   </Text>
                 )}

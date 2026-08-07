@@ -10,7 +10,7 @@ import { Circle, HStack, Text } from "@chakra-ui/react";
  * based on the pass rate percentage. Returns gray for null (no verdict runs).
  */
 export const getPassRateGradientColor = (passRate: number | null): string => {
-  if (passRate === null) return "fg.subtle";
+  if (passRate === null) return "fg.faint";
 
   // Clamp to 0-100
   const rate = Math.max(0, Math.min(100, passRate));

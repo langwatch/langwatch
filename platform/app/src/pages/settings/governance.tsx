@@ -326,7 +326,7 @@ function GovernanceOverviewPage() {
             teams.length > 0 ? (
               <Link
                 href="/settings/governance/teams"
-                color="blue.fg"
+                color="blue.fgMuted"
                 fontSize="sm"
               >
                 View all teams →
@@ -355,7 +355,7 @@ function GovernanceOverviewPage() {
             users.length > 0 ? (
               <Link
                 href="/settings/governance/users"
-                color="blue.fg"
+                color="blue.fgMuted"
                 fontSize="sm"
               >
                 View all users →
@@ -383,7 +383,7 @@ function GovernanceOverviewPage() {
           actions={
             <Link
               href="/settings/governance/departments"
-              color="blue.fg"
+              color="blue.fgMuted"
               fontSize="sm"
             >
               Manage departments →
@@ -439,7 +439,7 @@ function GovernanceOverviewPage() {
               </Text>
               <Link
                 href="/settings/governance/ingestion-sources"
-                color="blue.fg"
+                color="blue.fgMuted"
               >
                 + Add a source
               </Link>
@@ -540,7 +540,7 @@ function SessionPolicySection({ organizationId }: { organizationId: string }) {
           expiry.
         </Text>
         {isInvalid && (
-          <Text fontSize="xs" color="red.fg">
+          <Text fontSize="xs" color="red.fgMuted">
             Enter an integer between 0 and 365.
           </Text>
         )}
@@ -592,7 +592,7 @@ function SetupItem({
           {description}
         </Text>
       </VStack>
-      <Link href={href} color="blue.fg">
+      <Link href={href} color="blue.fgMuted">
         {ctaLabel}
       </Link>
     </HStack>
@@ -723,7 +723,7 @@ const SOURCE_STATUS_ICON = {
 } as const;
 
 const SOURCE_STATUS_COLOR = {
-  active: "green.fg",
+  active: "green.fgMuted",
   awaiting_first_event: "orange.solid",
   disabled: "fg.muted",
 } as const;
@@ -775,9 +775,9 @@ function SourceChip({ source }: { source: SourceHealth }) {
 type AnomalySeverity = "critical" | "warning" | "info";
 
 const SEVERITY_COLOR: Record<AnomalySeverity, string> = {
-  critical: "red.fg",
+  critical: "red.fgMuted",
   warning: "orange.solid",
-  info: "blue.fg",
+  info: "blue.fgMuted",
 };
 
 function AnomalyRow({

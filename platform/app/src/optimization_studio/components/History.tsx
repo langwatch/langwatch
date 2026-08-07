@@ -243,7 +243,7 @@ export function HistoryPopover({ onClose }: { onClose: () => void }) {
                   <HStack fontSize="12px">
                     <UserAvatar
                       size="2xs"
-                      backgroundColor="orange.solid"
+                      backgroundColor="orange.solidMuted"
                       color="white"
                       width="16px"
                       height="16px"

@@ -270,7 +270,7 @@ export default function BatchEvaluation({
                       <Text>
                         <Box
                           display="inline-block"
-                          background="yellow.solid"
+                          background="yellow.solidMuted"
                           borderRadius="100%"
                           width={2}
                           height={2}
@@ -284,7 +284,7 @@ export default function BatchEvaluation({
                       <Text>
                         <Box
                           display="inline-block"
-                          background="red.solid"
+                          background="red.solidMuted"
                           borderRadius="100%"
                           width={2}
                           height={2}

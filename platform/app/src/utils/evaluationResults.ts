@@ -203,14 +203,14 @@ export const parseEvaluationResult = (
  */
 export const EVALUATION_STATUS_COLORS = {
   pending: "gray.emphasized",
-  running: "blue.solid",
+  running: "blue.solidMuted",
   passed: "green.solid",
   failed: "red.solid",
   processed: "blue.solid", // Neutral color for score-only evaluators (no pass/fail)
   // Errors get one step deeper red than a fail verdict — distinct
   // enough to read as "the evaluator broke" without going so dark it
   // looks like a different colour entirely.
-  error: "red.fg",
+  error: "red.fgMuted",
   // Skipped is a setup state, not a verdict — light grey (closer to
   // the muted bg than to fg) keeps it from competing for attention
   // next to real pass/fail rows.

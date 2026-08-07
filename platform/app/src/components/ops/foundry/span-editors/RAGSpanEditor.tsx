@@ -22,7 +22,7 @@ export function RAGSpanEditor({ span }: { span: SpanConfig }) {
       bg="teal.500/5"
       p={4}
     >
-      <Text fontSize="sm" fontWeight="semibold" color="teal.solid" mb={3}>
+      <Text fontSize="sm" fontWeight="semibold" color="teal.solidMuted" mb={3}>
         RAG Contexts
       </Text>
       <Flex direction="column" gap={3}>
@@ -43,7 +43,7 @@ export function RAGSpanEditor({ span }: { span: SpanConfig }) {
                 size="xs"
                 variant="ghost"
                 color="fg.muted"
-                _hover={{ color: "red.solid" }}
+                _hover={{ color: "red.solidMuted" }}
                 onClick={() =>
                   updateSpan(span.id, {
                     rag: { contexts: contexts.filter((_, j) => j !== i) },

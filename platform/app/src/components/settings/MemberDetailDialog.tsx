@@ -372,7 +372,7 @@ export function MemberDetailDialog({
                         <Link
                           href="/settings/groups"
                           fontSize="xs"
-                          color="blue.solid"
+                          color="blue.solidMuted"
                         >
                           No access configured
                         </Link>

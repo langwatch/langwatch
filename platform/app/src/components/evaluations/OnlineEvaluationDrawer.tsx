@@ -1113,7 +1113,7 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
                           color="blue.solid"
                           cursor="pointer"
                           textDecoration="underline"
-                          _hover={{ color: "blue.fg" }}
+                          _hover={{ color: "blue.fgMuted" }}
                           onClick={() => {
                             setSelectedEvaluator(null);
                             form.setValue("name", "");
@@ -1234,7 +1234,7 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
                                 size="sm"
                                 variant="ghost"
                                 onClick={() => removePrecondition(index)}
-                                color="fg.subtle"
+                                color="fg.faint"
                               >
                                 <X size={16} />
                               </Button>

@@ -6,9 +6,9 @@ import type { ChatMessage, LLMConfig, SpanConfig } from "../types";
 
 const ROLE_COLORS: Record<string, string> = {
   system: "purple.solid",
-  user: "green.solid",
-  assistant: "blue.solid",
-  tool: "yellow.solid",
+  user: "green.solidMuted",
+  assistant: "blue.solidMuted",
+  tool: "yellow.solidMuted",
 };
 
 export function LLMSpanEditor({ span }: { span: SpanConfig }) {
@@ -36,7 +36,7 @@ export function LLMSpanEditor({ span }: { span: SpanConfig }) {
       bg="blue.500/5"
       p={4}
     >
-      <Text fontSize="sm" fontWeight="semibold" color="blue.solid" mb={3}>
+      <Text fontSize="sm" fontWeight="semibold" color="blue.solidMuted" mb={3}>
         LLM Configuration
       </Text>
 
@@ -131,7 +131,7 @@ export function LLMSpanEditor({ span }: { span: SpanConfig }) {
               size="xs"
               variant="ghost"
               color="fg.muted"
-              _hover={{ color: "red.solid" }}
+              _hover={{ color: "red.solidMuted" }}
               onClick={() =>
                 updateLLM({ messages: messages.filter((_, j) => j !== i) })
               }

@@ -492,7 +492,7 @@ function ProjectSection({
             <Button
               size="xs"
               variant="ghost"
-              color="fg.subtle"
+              color="fg.faint"
               onClick={(e) => {
                 e.stopPropagation();
                 openDrawer("editProject", {
@@ -548,12 +548,12 @@ function ProjectSection({
                       <Link
                         href="/settings/groups"
                         fontSize="xs"
-                        color="purple.solid"
+                        color="purple.solidMuted"
                       >
                         via {m.viaGroupName}
                       </Link>
                     ) : (
-                      <Text fontSize="xs" color="fg.subtle">
+                      <Text fontSize="xs" color="fg.faint">
                         from team
                       </Text>
                     )}
@@ -585,7 +585,7 @@ function ProjectSection({
                     <Box flex={1}>
                       <Text display="inline">{m.name}</Text>
                       {m.source === "override" && m.teamRole && (
-                        <Text as="span" fontSize="xs" color="fg.subtle" ml={2}>
+                        <Text as="span" fontSize="xs" color="fg.faint" ml={2}>
                           team role: {m.teamRole}
                         </Text>
                       )}
@@ -603,7 +603,9 @@ function ProjectSection({
                         size="xs"
                         variant="ghost"
                         color={
-                          m.source === "override" ? "orange.solid" : "fg.subtle"
+                          m.source === "override"
+                            ? "orange.solidMuted"
+                            : "fg.faint"
                         }
                         title={
                           m.source === "override"
@@ -635,7 +637,7 @@ function ProjectSection({
 
             {/* Empty state */}
             {projectLevel.length === 0 && inherited.length > 0 && (
-              <Text fontSize="xs" color="fg.subtle" fontStyle="italic" mt={2}>
+              <Text fontSize="xs" color="fg.faint" fontStyle="italic" mt={2}>
                 No project-level overrides. Everyone uses their team role.
               </Text>
             )}
@@ -790,7 +792,7 @@ function TeamCard({
               href={`/settings/teams/${team.slug}`}
               onClick={(e) => e.stopPropagation()}
             >
-              <Button size="xs" variant="ghost" color="fg.subtle">
+              <Button size="xs" variant="ghost" color="fg.faint">
                 <Pencil size={13} />
                 Edit
               </Button>
@@ -829,7 +831,7 @@ function TeamCard({
               </HStack>
 
               {team.directMembers.length === 0 ? (
-                <Text fontSize="sm" color="fg.subtle" fontStyle="italic">
+                <Text fontSize="sm" color="fg.faint" fontStyle="italic">
                   No members yet.
                 </Text>
               ) : (
@@ -857,7 +859,7 @@ function TeamCard({
                         <Link
                           href="/settings/groups"
                           fontSize="xs"
-                          color="purple.solid"
+                          color="purple.solidMuted"
                         >
                           via {m.viaGroupName}
                         </Link>
@@ -880,7 +882,7 @@ function TeamCard({
                         <Button
                           size="xs"
                           variant="ghost"
-                          color="fg.subtle"
+                          color="fg.faint"
                           loading={deleteBinding.isPending}
                           onClick={() =>
                             deleteBinding.mutate({
@@ -900,7 +902,7 @@ function TeamCard({
                   </HStack>
                 ))
               )}
-              <Text fontSize="xs" color="fg.subtle" mt={2}>
+              <Text fontSize="xs" color="fg.faint" mt={2}>
                 Editing a role here changes their team-level access, inherited
                 by all projects below.
               </Text>
@@ -938,7 +940,7 @@ function TeamCard({
                     <Badge colorPalette={roleBadgeColor(m.role)} size="sm">
                       {m.role}
                     </Badge>
-                    <Text fontSize="xs" color="fg.subtle">
+                    <Text fontSize="xs" color="fg.faint">
                       on
                     </Text>
                     <Badge colorPalette="green" size="sm">
@@ -946,7 +948,7 @@ function TeamCard({
                     </Badge>
                     <Link
                       fontSize="xs"
-                      color="purple.solid"
+                      color="purple.solidMuted"
                       href="#"
                       onClick={(e) => {
                         e.preventDefault();
@@ -990,7 +992,7 @@ function TeamCard({
                 )}
               </HStack>
               {team.projects.length === 0 ? (
-                <Text fontSize="sm" color="fg.subtle" fontStyle="italic">
+                <Text fontSize="sm" color="fg.faint" fontStyle="italic">
                   No projects yet.
                 </Text>
               ) : (

@@ -160,7 +160,7 @@ const APICard: React.FC = () => {
           <Alert.Root
             size="sm"
             borderStartWidth="3px"
-            borderStartColor="orange.solid"
+            borderStartColor="orange.solidMuted"
             colorPalette="orange"
             title="Waiting for first trace..."
           >

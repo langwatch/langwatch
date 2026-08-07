@@ -822,12 +822,12 @@ export const VariableMappingInput = ({
                     borderRadius="4px"
                     marginBottom={1}
                   >
-                    <Text fontSize="xs" color="blue.fg">
+                    <Text fontSize="xs" color="blue.fgMuted">
                       {inProgressPath.path
                         .map((s) => s.replace(/_/g, " "))
                         .join(" → ")}
                     </Text>
-                    <Text fontSize="xs" color="blue.solid">
+                    <Text fontSize="xs" color="blue.solidMuted">
                       →
                     </Text>
                   </HStack>

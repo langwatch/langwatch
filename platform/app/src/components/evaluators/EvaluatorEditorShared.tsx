@@ -1040,7 +1040,7 @@ export function EvaluatorEditorHeading({
           openDelay={0}
           showArrow
         >
-          <Circle size="10px" bg="orange.solid" />
+          <Circle size="10px" bg="orange.solidMuted" />
         </Tooltip>
       )}
     </>

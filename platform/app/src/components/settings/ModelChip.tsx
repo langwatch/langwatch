@@ -76,7 +76,7 @@ export function ModelChip({
         <Text
           fontSize={size === "sm" ? "xs" : "sm"}
           lineClamp={1}
-          color={invalid ? "red.fg" : undefined}
+          color={invalid ? "red.fgMuted" : undefined}
           textDecoration={invalid ? "line-through" : undefined}
         >
           <Text as="span" fontWeight="medium">
@@ -99,14 +99,14 @@ export function ModelChip({
           fontSize={size === "sm" ? "xs" : "sm"}
           lineClamp={1}
           wordBreak="break-all"
-          color={invalid ? "red.fg" : undefined}
+          color={invalid ? "red.fgMuted" : undefined}
           textDecoration={invalid ? "line-through" : undefined}
         >
           {family || model}
         </Text>
       )}
       {invalid && (
-        <HStack gap={1} color="red.fg" flexShrink={0}>
+        <HStack gap={1} color="red.fgMuted" flexShrink={0}>
           <AlertTriangle size={size === "sm" ? 12 : 14} aria-hidden />
           <Text
             fontSize={size === "sm" ? "2xs" : "xs"}

@@ -148,7 +148,7 @@ const STATUS_META: Record<
   string,
   { icon: typeof CircleCheck; label: string; color: string }
 > = {
-  active: { icon: CircleCheck, label: "Active", color: "green.500" },
+  active: { icon: CircleCheck, label: "Active", color: "green.solid" },
   awaiting_first_event: {
     icon: CircleDashed,
     label: "Awaiting first event",
@@ -377,7 +377,7 @@ function IngestionSourcesPage() {
               Configure cross-platform feeds for the activity monitor. Each
               source maps an external AI platform into the normalised activity
               stream via OTel push, webhook, or S3 audit drops.{" "}
-              <Link href="/governance" color="blue.600">
+              <Link href="/governance" color="blue.fgMuted">
                 Back to governance
               </Link>
               .
@@ -552,7 +552,7 @@ function SourceRow({
           <Link
             href={`/settings/governance/ingestion-sources/${source.id}`}
             color="fg"
-            _hover={{ color: "orange.600" }}
+            _hover={{ color: "orange.fgMuted" }}
           >
             <Text fontSize="sm" fontWeight="medium">
               {source.name}
@@ -697,7 +697,7 @@ function SourceComposerDrawer({
                 </Text>
                 <Input
                   size="sm"
-                  backgroundColor="white"
+                  backgroundColor="bg.panel"
                   value={composer.name}
                   onChange={(e) =>
                     setComposer({ ...composer, name: e.target.value })
@@ -717,7 +717,7 @@ function SourceComposerDrawer({
               </Text>
               <Textarea
                 size="sm"
-                backgroundColor="white"
+                backgroundColor="bg.panel"
                 rows={2}
                 value={composer.description}
                 onChange={(e) =>
@@ -879,7 +879,7 @@ function SourceEditDrawer({
               </Text>
               <Input
                 size="sm"
-                backgroundColor="white"
+                backgroundColor="bg.panel"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
               />
@@ -890,7 +890,7 @@ function SourceEditDrawer({
               </Text>
               <Textarea
                 size="sm"
-                backgroundColor="white"
+                backgroundColor="bg.panel"
                 rows={2}
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
@@ -1215,7 +1215,7 @@ function ParserConfigFields({
           <Text fontSize="xs" fontWeight="medium">
             {f.label}
             {f.required && (
-              <Text as="span" color="red.500" marginLeft={1}>
+              <Text as="span" color="red.solid" marginLeft={1}>
                 *
               </Text>
             )}
@@ -1223,7 +1223,7 @@ function ParserConfigFields({
           {f.key === "parserDsl" || f.key === "eventMappingDsl" ? (
             <Textarea
               size="sm"
-              backgroundColor="white"
+              backgroundColor="bg.panel"
               rows={6}
               value={values[f.key] ?? ""}
               onChange={(e) => onChange({ ...values, [f.key]: e.target.value })}
@@ -1233,7 +1233,7 @@ function ParserConfigFields({
           ) : (
             <Input
               size="sm"
-              backgroundColor="white"
+              backgroundColor="bg.panel"
               type={
                 f.key === "credentialsToken" ||
                 f.key === "clientSecret" ||
@@ -1276,7 +1276,7 @@ function PullScheduleField({
       </Text>
       <Input
         size="sm"
-        backgroundColor="white"
+        backgroundColor="bg.panel"
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={defaultSchedule}
@@ -1551,7 +1551,7 @@ function SecretModal({
                   project API key - different auth, same trace store. See{" "}
                   <Link
                     href="https://docs.langwatch.ai/observability/trace-vs-activity-ingestion"
-                    color="blue.600"
+                    color="blue.fgMuted"
                   >
                     Choosing the right OTel endpoint
                   </Link>

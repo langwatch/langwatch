@@ -1,62 +1,77 @@
-Feature: Colours in the app come from semantic tokens
+Feature: Color props come from semantic tokens
   The app's palette is defined once, as semantic tokens, so every surface
-  follows the colour mode. A raw palette shade written straight into a colour
-  prop is fixed in both modes, so it reads correctly in light and then goes
-  dark-on-dark — the failure the tokens exist to prevent.
+  follows the color mode. A raw palette shade written straight into a color
+  prop is fixed in both modes, so it reads correctly in whichever mode the
+  author had open and then goes dark-on-dark in the other — the failure the
+  tokens exist to prevent.
 
-  A check runs on every pull request and fails when a raw shade reaches a
-  colour prop, naming the file, the line and the token to use instead.
+  The check is a Biome analyzer plugin
+  (platform/app/biome-plugins/semantic-color-tokens.grit), so it runs in the
+  editor, in `pnpm lint`, and in CI from one rule rather than a bespoke
+  checker. It names the token whose LIGHT value is the shade it replaces, so a
+  fix is a swap and not a redesign.
 
   Background:
-    Given the app defines semantic tokens for foreground, background, border
-    And each palette also carries solid, subtle, muted, emphasized and fg
+    Given the app defines semantic tokens for foreground, background and border
+    And each palette also carries solid, solidMuted, subtle, muted, emphasized,
+      fg and fgMuted
 
-  Scenario: A raw shade in a colour prop fails the check
-    Given a component sets a colour prop to "gray.500"
-    When the check runs
-    Then it fails
-    And it reports the file and line
+  Scenario: A raw shade in a color prop is reported
+    Given a component sets a color prop to "gray.500"
+    When the linter runs
+    Then it reports an error
     And it names "fg.subtle" as the token to use
 
-  Scenario: A raw shade inside an expression fails the check
-    Given a component sets a colour prop to a ternary choosing "blue.500"
-    When the check runs
-    Then it fails
-    And it names "blue.solid" as the token to use
+  Scenario: A raw shade inside an expression is reported
+    Given a component sets a color prop to a ternary choosing "blue.500"
+    When the linter runs
+    Then it reports an error
 
-  Scenario: A raw shade in a pseudo-state object fails the check
+  Scenario: A raw shade in a pseudo-state object is reported
     Given a component sets a hover style with a background of "gray.50"
-    When the check runs
-    Then it fails
-    And it names "bg.subtle" as the token to use
+    When the linter runs
+    Then it reports an error
+
+  Scenario: A raw shade in a per-mode object is reported
+    Given a component sets a border to base "gray.200" and dark "border"
+    When the linter runs
+    Then it reports an error
+    Because the token already carries both modes and the pair is redundant
 
   Scenario: A semantic token passes
-    Given a component sets a colour prop to "fg.muted"
-    When the check runs
-    Then it passes
+    Given a component sets a color prop to "fg.muted"
+    When the linter runs
+    Then it reports nothing
 
-  Scenario: The theme definition may name raw shades
-    Given the file defines the semantic tokens themselves
-    When the check runs
-    Then it passes
-    Because a token has to resolve to a concrete shade somewhere
+  Scenario: A value that is not a color prop passes
+    Given a constant named legacyCtaColor holds "orange.700"
+    When the linter runs
+    Then it reports nothing
+    Because the rule anchors on the prop, not on every string in the file
 
-  Scenario: A surface that is dark in both colour modes may name raw shades
-    Given the file is listed as a fixed-palette surface
-    And it renders a terminal whose background does not follow the colour mode
-    When the check runs
-    Then it passes
+  Scenario: A deliberate fixed-color surface opts out with a reason
+    Given a CTA sits on a gradient that does not follow the color mode
+    And the line carries a "biome-ignore lint/plugin" comment with a reason
+    When the linter runs
+    Then it reports nothing
 
-  Scenario: A categorical identity palette may name raw shades
-    Given the file is listed as a categorical palette
-    And it assigns one fixed colour per feature or span type
-    When the check runs
-    Then it passes
-    Because the colour identifies the thing rather than theming a surface
+  Scenario: A file that defines or owns a palette opts out wholesale
+    Given the file carries a "biome-ignore-all lint/plugin" comment with a reason
+    When the linter runs
+    Then it reports nothing for that file
+    Because a token has to resolve to a concrete shade somewhere, and a
+      categorical identity color does not theme a surface
 
-  Scenario: An exempt file that no longer exists fails the check
-    Given a file is listed as exempt
-    And that file has been deleted or renamed
-    When the check runs
-    Then it fails
-    So that the exemption list cannot rot unnoticed
+  Scenario: The rule must still match its own fixtures
+    Given a fixtures file of deliberate violations
+    When CI runs the plugin over it
+    Then the violation count is at or above the recorded floor
+    So that a pattern which silently stops matching fails the build instead of
+      reporting a clean tree
+
+  Scenario: A plugin that is not registered fails the fixtures floor
+    Given an analyzer plugin file exists but is absent from biome.jsonc
+    When CI runs the plugin over its fixtures
+    Then the violation count is zero
+    And the build fails
+    So that an unregistered plugin cannot pass by checking nothing

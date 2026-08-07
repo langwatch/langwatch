@@ -107,7 +107,7 @@ function CapabilityRow({
           target="_blank"
           rel="noopener noreferrer"
           fontSize="sm"
-          color="blue.fg"
+          color="blue.fgMuted"
         >
           <HStack gap={1}>
             <Text>Setup guide</Text>
@@ -155,7 +155,7 @@ function SsoConfiguredButUnlicensedNotice() {
       data-testid="sso-unlicensed-notice"
     >
       <HStack align="start" gap={3}>
-        <Box color="orange.fg" paddingTop={0.5}>
+        <Box color="orange.fgMuted" paddingTop={0.5}>
           <TriangleAlert size={18} />
         </Box>
         <VStack align="start" gap={1}>

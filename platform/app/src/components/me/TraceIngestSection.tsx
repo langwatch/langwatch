@@ -377,7 +377,7 @@ function RawOtlpAdvancedTile() {
           </Text>
           <Link
             href="/me/configure#otlp"
-            color="orange.fg"
+            color="orange.fgMuted"
             fontSize="xs"
             fontWeight="medium"
           >

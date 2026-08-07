@@ -670,7 +670,7 @@ function AuditLogPage() {
                       </Table.Cell>
                       <Table.Cell>
                         {log.error ? (
-                          <Text fontSize="sm" color="red.fg">
+                          <Text fontSize="sm" color="red.fgMuted">
                             {log.error}
                           </Text>
                         ) : (

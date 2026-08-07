@@ -1,3 +1,6 @@
+// biome-ignore-all lint/plugin: one canonical color per parameter — categorical identity, not a
+// themed surface
+
 /**
  * Parameter Registry
  *

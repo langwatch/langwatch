@@ -68,11 +68,11 @@ function GovernanceUserDetailPage() {
       <VStack align="stretch" gap={4} width="full" maxW="container.xl">
         <VStack align="start" gap={1}>
           <Text fontSize="xs" color="fg.muted">
-            <Link href="/settings/governance" color="blue.fg">
+            <Link href="/settings/governance" color="blue.fgMuted">
               ← AI Governance
             </Link>{" "}
             ·{" "}
-            <Link href="/settings/governance/users" color="blue.fg">
+            <Link href="/settings/governance/users" color="blue.fgMuted">
               All users
             </Link>
           </Text>
@@ -134,7 +134,7 @@ function GovernanceUserDetailPage() {
                 <>
                   <Link
                     href={`/${personalProject.projectSlug}/traces`}
-                    color="blue.fg"
+                    color="blue.fgMuted"
                     fontSize="sm"
                     fontWeight="medium"
                   >
@@ -153,7 +153,7 @@ function GovernanceUserDetailPage() {
               )}
               <Link
                 href="/settings/governance"
-                color="blue.fg"
+                color="blue.fgMuted"
                 fontSize="sm"
                 fontWeight="medium"
               >

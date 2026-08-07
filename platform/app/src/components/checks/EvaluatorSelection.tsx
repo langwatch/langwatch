@@ -199,7 +199,7 @@ export function EvaluatorSelection({
                         query: router.query,
                       });
                     }}
-                    color={isDisabled ? "fg.subtle" : undefined}
+                    color={isDisabled ? "fg.faint" : undefined}
                     background={isDisabled ? "bg.subtle" : "white"}
                   >
                     <VStack align="start" gap={4} position="relative">

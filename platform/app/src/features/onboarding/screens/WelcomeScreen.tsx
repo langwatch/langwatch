@@ -286,7 +286,7 @@ export const WelcomeScreen: React.FC = () => {
                   borderRadius="full"
                   bg={
                     currentVisibleIndex === idx
-                      ? "orange.solid"
+                      ? "orange.solidMuted"
                       : idx < currentVisibleIndex
                         ? "orange.muted"
                         : "bg.emphasized"

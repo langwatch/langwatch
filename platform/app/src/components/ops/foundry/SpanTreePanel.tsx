@@ -29,7 +29,7 @@ function SpanTreeNode({ span, depth }: { span: SpanConfig; depth: number }) {
         cursor="pointer"
         fontSize="xs"
         bg={isSelected ? "orange.500/10" : "transparent"}
-        color={isSelected ? "orange.solid" : "fg.default"}
+        color={isSelected ? "orange.solidMuted" : "fg.default"}
         _hover={{ bg: isSelected ? "orange.500/10" : "bg.subtle" }}
         onClick={() => selectSpan(span.id)}
         role="group"
@@ -49,7 +49,7 @@ function SpanTreeNode({ span, depth }: { span: SpanConfig; depth: number }) {
           {span.type}
         </Text>
         {span.status === "error" && (
-          <Text color="red.solid" fontWeight="bold">
+          <Text color="red.solidMuted" fontWeight="bold">
             !
           </Text>
         )}
@@ -95,7 +95,7 @@ function SpanTreeNode({ span, depth }: { span: SpanConfig; depth: number }) {
             size="2xs"
             variant="ghost"
             color="fg.muted"
-            _hover={{ color: "red.solid" }}
+            _hover={{ color: "red.solidMuted" }}
             onClick={(e) => {
               e.stopPropagation();
               removeSpan(span.id);

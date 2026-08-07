@@ -332,7 +332,7 @@ function AnomalyRulesPage() {
               <Text color="fg.muted" fontSize="sm" maxW="3xl">
                 Define thresholds that page on-call when activity drifts. Rules
                 surface on the{" "}
-                <Link href="/governance" color="blue.600">
+                <Link href="/governance" color="blue.fgMuted">
                   governance overview
                 </Link>{" "}
                 once they fire.
@@ -583,7 +583,7 @@ function RuleComposer({
                 </Text>
                 <Input
                   size="sm"
-                  backgroundColor="white"
+                  backgroundColor="bg.panel"
                   value={composer.name}
                   onChange={(e) =>
                     setComposer({ ...composer, name: e.target.value })
@@ -620,7 +620,7 @@ function RuleComposer({
               </Text>
               <Textarea
                 size="sm"
-                backgroundColor="white"
+                backgroundColor="bg.panel"
                 rows={2}
                 value={composer.description}
                 onChange={(e) =>
@@ -637,7 +637,7 @@ function RuleComposer({
                 </Text>
                 <Input
                   size="sm"
-                  backgroundColor="white"
+                  backgroundColor="bg.panel"
                   list="rule-type-suggestions"
                   value={composer.ruleType}
                   onChange={(e) => {
@@ -670,7 +670,7 @@ function RuleComposer({
                   <code>after_hours</code>, …) are{" "}
                   <Link
                     href="/ai-gateway/governance/anomaly-rules"
-                    color="blue.600"
+                    color="blue.fgMuted"
                   >
                     preview
                   </Link>{" "}
@@ -710,7 +710,7 @@ function RuleComposer({
                       size="xs"
                       variant="ghost"
                       fontSize="xs"
-                      color="blue.600"
+                      color="blue.fgMuted"
                       onClick={() =>
                         setScopeIdMode((m) =>
                           m === "picker" ? "custom" : "picker",
@@ -761,7 +761,7 @@ function RuleComposer({
                   ) : (
                     <Input
                       size="sm"
-                      backgroundColor="white"
+                      backgroundColor="bg.panel"
                       value={composer.scopeId}
                       onChange={(e) =>
                         setComposer({ ...composer, scopeId: e.target.value })
@@ -790,7 +790,7 @@ function RuleComposer({
                     "/ai-governance/anomaly-rules#threshold-config",
                   )}
                   isExternal
-                  color="blue.600"
+                  color="blue.fgMuted"
                   fontSize="xs"
                   fontWeight="medium"
                 >
@@ -802,7 +802,7 @@ function RuleComposer({
               </HStack>
               <Textarea
                 size="sm"
-                backgroundColor="white"
+                backgroundColor="bg.panel"
                 rows={4}
                 fontFamily="mono"
                 value={composer.thresholdConfig}
@@ -819,14 +819,14 @@ function RuleComposer({
 
             <Box
               borderWidth="1px"
-              borderColor="purple.300"
-              backgroundColor="purple.50"
+              borderColor="purple.emphasized"
+              backgroundColor="purple.subtle"
               padding={3}
               borderRadius="sm"
             >
-              <Text fontSize="xs" color="purple.900">
+              <Text fontSize="xs" color="purple.fg">
                 <strong>Alert destinations:</strong> alerts surface on the{" "}
-                <Link href="/governance" color="blue.600">
+                <Link href="/governance" color="blue.fgMuted">
                   governance dashboard
                 </Link>{" "}
                 today. Slack, PagerDuty, webhook, and email destinations ship in
@@ -834,7 +834,7 @@ function RuleComposer({
                 destination fields then. (See{" "}
                 <Link
                   href="/ai-gateway/governance/anomaly-rules"
-                  color="blue.600"
+                  color="blue.fgMuted"
                 >
                   anomaly rules docs
                 </Link>{" "}
@@ -886,15 +886,25 @@ function ThresholdPreview({
   const summary = summariseThresholdConfig(ruleType, raw);
   const palette =
     summary.kind === "ok"
-      ? { bg: "blue.50", border: "blue.300", fg: "blue.900", label: "Preview" }
+      ? {
+          bg: "blue.subtle",
+          border: "blue.300",
+          fg: "blue.900",
+          label: "Preview",
+        }
       : summary.kind === "unsupported"
         ? {
-            bg: "orange.50",
+            bg: "orange.subtle",
             border: "orange.300",
             fg: "orange.900",
             label: "Won't fire",
           }
-        : { bg: "red.50", border: "red.300", fg: "red.900", label: "Invalid" };
+        : {
+            bg: "red.subtle",
+            border: "red.300",
+            fg: "red.900",
+            label: "Invalid",
+          };
   return (
     <Box
       borderWidth="1px"

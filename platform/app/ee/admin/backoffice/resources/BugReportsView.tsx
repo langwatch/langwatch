@@ -219,7 +219,7 @@ function BugReportDrawer({
         <Drawer.CloseTrigger />
         <Drawer.Body>
           {report.error && (
-            <Text color="red.500" fontSize="sm">
+            <Text color="red.solid" fontSize="sm">
               {report.error.message}
             </Text>
           )}

@@ -268,7 +268,7 @@ export function IngestionTemplatesEditor({
           OTTL authoring guide:{" "}
           <Link
             href="/docs/ai-governance/ingestion-templates"
-            color="orange.fg"
+            color="orange.fgMuted"
           >
             two-tier trust model
           </Link>

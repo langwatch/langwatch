@@ -229,7 +229,7 @@ export function LLMMetrics() {
                   <Tabs.Indicator
                     mt="-1.5px"
                     height="4px"
-                    bg="orange.solid"
+                    bg="orange.solidMuted"
                     borderRadius="1px"
                     bottom={0}
                   />
