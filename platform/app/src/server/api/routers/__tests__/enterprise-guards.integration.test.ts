@@ -6,7 +6,11 @@
  *
  * Requires: PostgreSQL database (Prisma)
  */
-import { OrganizationUserRole, TeamUserRole } from "@prisma/client";
+import {
+  OrganizationUserRole,
+  RoleBindingScopeType,
+  TeamUserRole,
+} from "@prisma/client";
 import { nanoid } from "nanoid";
 import {
   afterAll,
@@ -161,6 +165,7 @@ describe("enterprise feature guards", () => {
       ["organizationUser", { organizationId }],
       ["organization", { id: organizationId }],
       ["user", { email: `test-${testNamespace}@example.com` }],
+      ["user", { email: `test-2-${testNamespace}@example.com` }],
     ]);
   });
 
@@ -627,9 +632,41 @@ describe("enterprise feature guards", () => {
         mockGetActivePlan.mockResolvedValue(freePlan);
         const caller = createCaller();
 
+        // Demote a second admin rather than the caller: the caller is the
+        // team's only admin, and demoting yourself as last admin is refused
+        // (cannot_remove_self_as_last_admin), which is not the plan gate
+        // this test pins.
+        const target = await prisma.user.create({
+          data: {
+            name: "Second Team Admin",
+            email: `test-2-${testNamespace}@example.com`,
+          },
+        });
+        await prisma.organizationUser.create({
+          data: {
+            userId: target.id,
+            organizationId,
+            role: OrganizationUserRole.MEMBER,
+          },
+        });
+        await prisma.teamUser.create({
+          data: { userId: target.id, teamId, role: TeamUserRole.ADMIN },
+        });
+        // The role update reads and rewrites TEAM-scoped role bindings, so
+        // membership has to exist there too, not only in TeamUser.
+        await prisma.roleBinding.create({
+          data: {
+            organizationId,
+            userId: target.id,
+            role: TeamUserRole.ADMIN,
+            scopeType: RoleBindingScopeType.TEAM,
+            scopeId: teamId,
+          },
+        });
+
         const result = await caller.organization.updateTeamMemberRole({
           teamId,
-          userId,
+          userId: target.id,
           role: TeamUserRole.MEMBER,
         });
 
