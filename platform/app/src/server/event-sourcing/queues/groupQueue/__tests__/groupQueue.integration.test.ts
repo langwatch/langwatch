@@ -1103,6 +1103,71 @@ describe.skipIf(!hasTestcontainers)(
         });
       });
 
+      describe("when payloads arrive out of order and the batch is bisected", () => {
+        it("still processes every payload in the queue's order, across sub-batches", async () => {
+          // The contiguity check above proves each sub-batch is internally
+          // ordered. It cannot see the order the sub-batches RUN in — a
+          // descent that took the right half first would satisfy it while
+          // folding later events before earlier ones. This pins the global
+          // sequence, which is the property a fold actually depends on.
+          //
+          // Every payload shares one score so they all become due together and
+          // coalesce into a single root; `sendBatch` then breaks the tie by
+          // position (`dispatchAfterMs = score + delay + index`), so the
+          // queue's arrival order IS the send order. Sending id-shuffled makes
+          // the two differ, so a bisector keyed on the id rather than on the
+          // queue's sequence would be caught.
+          const MAX_WORKABLE = 2;
+          const processedInOrder: number[] = [];
+          const attemptedSizes: number[] = [];
+
+          const queue = createQueue(
+            async (p) => {
+              processedInOrder.push(Number(p.id.slice(1)));
+            },
+            {
+              processBatch: async (ps) => {
+                attemptedSizes.push(ps.length);
+                if (ps.length > MAX_WORKABLE) {
+                  throw new Error("batch exceeded the downstream budget");
+                }
+                for (const p of ps as TestPayload[]) {
+                  processedInOrder.push(Number(p.id.slice(1)));
+                }
+              },
+              coalesceMaxBatch: () => 50,
+              score: (p) => Number(p.value),
+            },
+          );
+          await queue.waitUntilReady();
+
+          const dueAt = Date.now() + 2500;
+          const sendOrder = [5, 2, 7, 0, 4, 1, 6, 3];
+          await queue.sendBatch(
+            sendOrder.map((i) => ({
+              id: `j${i}`,
+              groupId: "group-a",
+              value: String(dueAt),
+            })),
+          );
+
+          await vi.waitFor(
+            () => {
+              expect(processedInOrder.length).toBe(8);
+            },
+            { timeout: 30000, interval: 50 },
+          );
+
+          // Guard against the test going vacuous: it only says anything about
+          // bisection if a batch too large to process was actually split.
+          expect(Math.max(...attemptedSizes)).toBeGreaterThan(MAX_WORKABLE);
+
+          // Globally in the queue's order: every payload folded after the one
+          // the queue sequenced before it, however the descent carved the batch.
+          expect(processedInOrder).toEqual(sendOrder);
+        });
+      });
+
       describe("when a coalesced batch fails only because it is too large", () => {
         it("halves it until it fits and commits every payload once", async () => {
           const MAX_WORKABLE = 2;
