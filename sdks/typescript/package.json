@@ -85,7 +85,7 @@
     "@types/prompts": "^2.4.9",
     "@typescript/native-preview": "7.0.0-dev.20260705.1",
     "@vercel/otel": "^1.13.0",
-    "@vitest/coverage-v8": "^4.1.0",
+    "@vitest/coverage-v8": "^4.1.10",
     "dotenv-cli": "^11.0.0",
     "esbuild": "^0.28.1",
     "eslint": "^9.32.0",
@@ -99,7 +99,7 @@
     "tsup": "^8.5.0",
     "typescript": "^5.9.2",
     "typescript-eslint": "^8.38.0",
-    "vitest": "^4.1.0",
+    "vitest": "^4.1.10",
     "vitest-mock-extended": "^4.0.0",
     "yaml": "^2.8.1"
   },
