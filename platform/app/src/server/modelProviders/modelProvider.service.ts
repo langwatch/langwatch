@@ -7,10 +7,16 @@ import { KEY_CHECK, MASKED_KEY_PLACEHOLDER } from "../../utils/constants";
 import type { CustomModelsInput } from "./customModel.schema";
 import { toLegacyCompatibleCustomModels } from "./customModel.schema";
 import {
+  type ValidationResult,
+  validateProviderApiKey,
+} from "../api/routers/providerValidation";
+import { rateLimit } from "../rateLimit";
+import {
   ModelProviderAnchorRequiredError,
   ModelProviderDeprecatedError,
   ModelProviderNotFoundError,
   ModelProviderScopesRequiredError,
+  ModelProviderTestRateLimitedError,
 } from "./errors";
 import { rowCannotServeEmbeddings } from "./geminiDoor";
 import {
@@ -133,6 +139,52 @@ function assertRowCarriesScopes(row: { id: string; scopes: unknown[] }): void {
   if (row.scopes.length === 0) {
     throw new ModelProviderNotFoundError();
   }
+}
+
+/**
+ * How many credential checks one organization may run per window, and how
+ * many the whole instance may run.
+ *
+ * Two buckets rather than one. The per-organization budget is what keeps a
+ * single tenant from turning the settings page into an outbound request
+ * generator; the global one is what keeps a hundred tenants doing something
+ * reasonable each from adding up to something that is not. Both are generous
+ * against real use — a person checking their providers clicks a handful of
+ * times — and tight against a loop.
+ */
+const TEST_CONNECTION_WINDOW_SECONDS = 60;
+const TEST_CONNECTION_PER_ORGANIZATION = 20;
+const TEST_CONNECTION_GLOBAL = 500;
+
+async function assertTestConnectionWithinBudget(
+  organizationId: string,
+): Promise<void> {
+  const perOrganization = await rateLimit({
+    key: `model-provider-test:org:${organizationId}`,
+    windowSeconds: TEST_CONNECTION_WINDOW_SECONDS,
+    max: TEST_CONNECTION_PER_ORGANIZATION,
+  });
+  if (!perOrganization.allowed) {
+    throw new ModelProviderTestRateLimitedError({
+      retryAfterSeconds: retryAfterFrom(perOrganization.resetAt),
+    });
+  }
+
+  const global = await rateLimit({
+    key: "model-provider-test:global",
+    windowSeconds: TEST_CONNECTION_WINDOW_SECONDS,
+    max: TEST_CONNECTION_GLOBAL,
+  });
+  if (!global.allowed) {
+    throw new ModelProviderTestRateLimitedError({
+      retryAfterSeconds: retryAfterFrom(global.resetAt),
+    });
+  }
+}
+
+/** Whole seconds until the window resets, never below one. */
+function retryAfterFrom(resetAt: number): number {
+  return Math.max(1, Math.ceil((resetAt - Date.now()) / 1000));
 }
 
 function pickAdvancedFields(input: AdvancedGatewayInput): AdvancedGatewayInput {
@@ -779,6 +831,77 @@ export class ModelProviderService {
       return await this.repository.delete(id);
     }
     return await this.repository.deleteByProvider(provider, projectId!);
+  }
+
+  /**
+   * Checks a credential that is already saved, on demand.
+   *
+   * Distinct from the save-time probe in three ways, each of them load-bearing.
+   *
+   * It takes a row id and no endpoint. The save-time path accepts a base URL
+   * from the caller, which is reasonable there — the caller supplies the key
+   * too, so there is nothing to escalate. Here the credential comes out of
+   * storage and is one the caller may never have been allowed to read, so
+   * accepting a destination would let anyone who can edit a provider have this
+   * server post the key wherever they liked. The row's own endpoint is the
+   * only one used.
+   *
+   * It is anchored by id against the organization rather than looked up by
+   * provider name inside a project. `findByProvider` matches PROJECT-scope
+   * grants only, so the org- and team-scoped rows the settings list happily
+   * displays would come back empty and be reported as having no credential.
+   *
+   * And it gates the way the delete path gates, with both guards. The
+   * scope-carrying check is not redundant in front of the per-scope check:
+   * `assertCanManageAllScopes` iterates the scope list, so an empty list
+   * satisfies it vacuously, and the org-anchored lookup has no scope
+   * predicate to stop such a row being addressed by id.
+   */
+  async testConnection(
+    input: {
+      modelProviderId: string;
+      projectId?: string;
+      organizationId?: string;
+    },
+    ctx: AuthzContext,
+  ): Promise<ValidationResult> {
+    const { modelProviderId, projectId, organizationId } = input;
+
+    const anchor = await this.resolveOrganizationAnchor({
+      projectId,
+      organizationId,
+    });
+    if (!anchor) {
+      throw new ModelProviderAnchorRequiredError("project_or_organization");
+    }
+
+    const existing = await this.repository.findByIdForOrganization(
+      modelProviderId,
+      anchor,
+    );
+    if (!existing) {
+      throw new ModelProviderNotFoundError();
+    }
+
+    assertRowCarriesScopes(existing);
+    await assertCanManageAllScopes(
+      ctx,
+      existing.scopes.map((s) => ({
+        scopeType: s.scopeType as "ORGANIZATION" | "TEAM" | "PROJECT",
+        scopeId: s.scopeId,
+      })),
+    );
+
+    // After authz, before the outbound request: a caller who cannot manage
+    // the row should be refused rather than throttled, and no amount of
+    // clicking should turn this page into an egress amplifier. The
+    // organization is the unit that matters — rows multiply freely across
+    // provider types and projects, so a per-row budget caps nothing.
+    await assertTestConnectionWithinBudget(anchor);
+
+    const customKeys = (existing.customKeys ?? {}) as Record<string, string>;
+
+    return await validateProviderApiKey(existing.provider, customKeys);
   }
 
   /**

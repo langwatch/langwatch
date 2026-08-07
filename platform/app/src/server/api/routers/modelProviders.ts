@@ -281,6 +281,39 @@ export const modelProviderRouter = createTRPCRouter({
     }),
 
   /**
+   * Checks a credential that is already saved.
+   *
+   * A mutation despite reading rather than writing, for reasons the shape of
+   * a query would defeat rather than merely fail to help. A query is a GET
+   * that react-query refetches on window focus and replays from cache inside
+   * `staleTime` — so a customer could read a verdict this page never asked
+   * for, about a moment that has passed. And `ProviderUnreachableError` is a
+   * 502, which the client's retry policy does not exclude, so one click at a
+   * hanging provider would become five outbound requests. The same reasoning
+   * is written out above for `validateApiKey`.
+   *
+   * The input carries a row id and no endpoint. See `testConnection` in the
+   * service for why the absence is the point.
+   */
+  testConnection: protectedProcedure
+    .input(
+      z
+        .object({
+          ...tenantAnchorSchema,
+          modelProviderId: z.string(),
+        })
+        .superRefine(requireTenantAnchor),
+    )
+    .use(checkProjectOrOrganizationPermission("project:update"))
+    .mutation(async ({ input, ctx }) => {
+      const service = ModelProviderService.create(ctx.prisma);
+      return await service.testConnection(input, {
+        prisma: ctx.prisma,
+        session: ctx.session,
+      });
+    }),
+
+  /**
    * Codex sign-in, step 1: ask OpenAI for a device code. Nothing is stored —
    * the pending sign-in's identifiers travel to the client and come back on
    * every poll, so polling works across server instances.

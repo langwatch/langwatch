@@ -544,6 +544,19 @@ const presentations = {
     describe: () =>
       "It may have been removed, or it isn't available here. Reload to see the current list.",
   },
+  model_provider_test_rate_limited: {
+    // Nothing is wrong with the credential — we simply stopped asking. Saying
+    // "wait" without saying how long invites the customer to keep clicking,
+    // which is the behaviour the limit exists to stop, so the number rides in
+    // `meta` and gets read back here.
+    title: "Too many connection tests",
+    describe: (error) => {
+      const seconds = Number(error.meta.retryAfterSeconds);
+      return Number.isFinite(seconds) && seconds > 0
+        ? `Wait about ${seconds} second${seconds === 1 ? "" : "s"} and try again.`
+        : "Wait a moment and try again.";
+    },
+  },
   provider_key_invalid: {
     // The provider positively identified the credential as wrong, which is the
     // one refusal a new key actually fixes. Deliberately says nothing about

@@ -11,13 +11,24 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { BrainCircuit, Edit, MoreVertical, Plus, Trash2 } from "lucide-react";
+import {
+  BrainCircuit,
+  Edit,
+  MoreVertical,
+  PlugZap,
+  Plus,
+  Trash2,
+} from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { modelProviderIcons } from "~/components/modelProviders/iconsMap";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { useAllModelProvidersList } from "~/hooks/useAllModelProvidersList";
 import { useAvailableScopes } from "~/hooks/useAvailableScopes";
 import { useDrawer } from "~/hooks/useDrawer";
+import {
+  type ConnectionTestState,
+  useModelProviderConnectionTest,
+} from "~/hooks/useModelProviderConnectionTest";
 import { useUrlScopeFilter } from "~/hooks/useUrlScopeFilter";
 import { api } from "~/utils/api";
 import SettingsLayout from "../../components/SettingsLayout";
@@ -59,6 +70,12 @@ export default function ModelsPage() {
   const rowActionsDisabledReason = !hasModelProvidersManagePermission
     ? "You need model provider manage permissions to edit or delete providers."
     : undefined;
+  // Verdicts live for as long as the page is open and are keyed by row, so
+  // testing one provider never overwrites what another just reported.
+  const connectionTests = useModelProviderConnectionTest({
+    projectId,
+    organizationId,
+  });
   // Flat, uncollapsed list — see useAllModelProvidersList for why this
   // table can't use the collapsed Record from useModelProvidersSettings.
   const {
@@ -331,11 +348,20 @@ export default function ModelsPage() {
                             <Box width="24px" height="24px">
                               {providerIcon}
                             </Box>
-                            <Text>
-                              {(provider as any).name ??
-                                providerSpec?.name ??
-                                provider.provider}
-                            </Text>
+                            <VStack gap={0} align="start">
+                              <Text>
+                                {(provider as any).name ??
+                                  providerSpec?.name ??
+                                  provider.provider}
+                              </Text>
+                              <ConnectionTestVerdict
+                                state={
+                                  provider.id
+                                    ? connectionTests.results[provider.id]
+                                    : undefined
+                                }
+                              />
+                            </VStack>
                           </HStack>
                         </Table.Cell>
                         <Table.Cell>
@@ -391,6 +417,24 @@ export default function ModelsPage() {
                                     >
                                       <Edit size={14} />
                                       Edit Provider
+                                    </Box>
+                                  </Menu.Item>
+                                  <Menu.Item
+                                    value="test"
+                                    disabled={!provider.id}
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      if (!provider.id) return;
+                                      void connectionTests.test(provider.id);
+                                    }}
+                                  >
+                                    <Box
+                                      display="flex"
+                                      alignItems="center"
+                                      gap={2}
+                                    >
+                                      <PlugZap size={14} />
+                                      Test Connection
                                     </Box>
                                   </Menu.Item>
                                   <Menu.Item
@@ -542,6 +586,47 @@ export default function ModelsPage() {
  * inert with that reason on hover, and no menu is mounted at all, so
  * adding can never open onto a list of providers that lead nowhere.
  */
+/**
+ * What the last connection test said about this row.
+ *
+ * Three states, rendered three different ways on purpose. A check that could
+ * not run reads as neutral rather than green: it is not a pass, and dressing
+ * it as one would tell a customer their configuration is fine on the strength
+ * of never having asked.
+ */
+function ConnectionTestVerdict({
+  state,
+}: {
+  state: ConnectionTestState | undefined;
+}) {
+  if (!state) return null;
+
+  if (state.status === "testing") {
+    return (
+      <Text fontSize="xs" color="fg.muted">
+        Testing…
+      </Text>
+    );
+  }
+
+  if (state.status === "works") {
+    return (
+      <Text fontSize="xs" color="green.fg">
+        Connection works
+      </Text>
+    );
+  }
+
+  return (
+    <Text
+      fontSize="xs"
+      color={state.status === "refused" ? "red.fg" : "fg.muted"}
+    >
+      {state.message}
+    </Text>
+  );
+}
+
 function AddModelProviderMenu({
   children,
   addableProviders,

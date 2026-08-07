@@ -26,8 +26,49 @@ import { modelProviders } from "../../modelProviders/registry";
  * `explainSerializedError`.
  */
 export type ValidationResult =
-  | { valid: true }
-  | { valid: false; domainError: SerializedHandledError };
+  | { outcome: "verified"; valid: true }
+  | { outcome: "refused"; valid: false; domainError: SerializedHandledError }
+  | { outcome: "unchecked"; valid: true; reason: UncheckedReason };
+
+/**
+ * Why a check never reached the provider.
+ *
+ * These used to be indistinguishable from a pass, which was safe for exactly
+ * as long as the answer stayed inside the save path: a skip should not block
+ * a save, so `valid: true` was the right thing to return. Put the same value
+ * in front of a customer and it becomes a claim we cannot support — six of
+ * the sixteen registered providers reach one of these paths, so a control
+ * that read `valid` alone would report more than a third of the list as
+ * working without having sent a packet.
+ *
+ * `valid` still says what the save path needs. `outcome` says what a reader
+ * needs. Neither has to lie for the other.
+ */
+export type UncheckedReason =
+  /** Complex or non-probeable auth — AWS, gcloud, subscription-key services. */
+  | "provider_not_probeable"
+  /** The stored key came back as the masked placeholder, not a credential. */
+  | "credential_masked"
+  /** Nothing is stored and no environment variable supplies one. */
+  | "no_credential"
+  /** No endpoint is known or configured, so there is nowhere to ask. */
+  | "no_endpoint"
+  /** Not a provider in the registry. */
+  | "unknown_provider";
+
+const verified = (): ValidationResult => ({ outcome: "verified", valid: true });
+
+const refused = (domainError: SerializedHandledError): ValidationResult => ({
+  outcome: "refused",
+  valid: false,
+  domainError,
+});
+
+const unchecked = (reason: UncheckedReason): ValidationResult => ({
+  outcome: "unchecked",
+  valid: true,
+  reason,
+});
 
 /**
  * Authentication strategy for API key validation.
@@ -85,8 +126,29 @@ const AGENT_PLATFORM_PROBE_BODY = JSON.stringify({
   generationConfig: { maxOutputTokens: 1 },
 });
 
-/** Providers with complex auth (AWS, gcloud, etc.) that skip validation */
-const SKIP_VALIDATION = new Set(["bedrock", "vertex_ai", "azure"]);
+/**
+ * Providers we will not probe, and must not pretend to have probed.
+ *
+ * `bedrock`, `vertex_ai` and `azure` are here for the original reason: their
+ * credentials are AWS signatures, gcloud application-default credentials and
+ * deployment-scoped Azure keys, none of which a models listing exercises.
+ *
+ * `azure_safety` is here because leaving it out was a bug waiting for a
+ * caller. It is a content-safety service, not a language model: it
+ * authenticates with `Ocp-Apim-Subscription-Key` and has no `/models` route.
+ * Nothing in this module excluded it, and it carries an endpoint field, so a
+ * stored endpoint was enough to send it down the bearer branch and have a
+ * perfectly good credential reported as refused. Until now the only thing
+ * standing in the way was `isLlmProvider` in the settings form — a client-side
+ * gate, in front of one of several callers. The rule belongs here, where every
+ * caller passes.
+ */
+const NOT_PROBEABLE = new Set([
+  "bedrock",
+  "vertex_ai",
+  "azure",
+  "azure_safety",
+]);
 
 /**
  * Validation endpoints for providers that are not part of the onboarding
@@ -841,7 +903,7 @@ async function runProbeChain({
     const outcome = await probeOnce({ candidate, context, deadline });
 
     if (outcome.accepted) {
-      return { valid: true };
+      return verified();
     }
 
     failures.push(outcome.failure);
@@ -867,7 +929,7 @@ async function runProbeChain({
     });
   }
 
-  return { valid: false, domainError: chosen.domainError };
+  return refused(chosen.domainError);
 }
 
 /**
@@ -888,11 +950,11 @@ export async function validateKeyWithCustomUrl(
 ): Promise<ValidationResult> {
   const providerDef = modelProviders[provider as keyof typeof modelProviders];
   if (!providerDef) {
-    return { valid: true }; // Unknown provider, skip validation
+    return unchecked("unknown_provider");
   }
 
-  if (SKIP_VALIDATION.has(provider)) {
-    return { valid: true };
+  if (NOT_PROBEABLE.has(provider)) {
+    return unchecked("provider_not_probeable");
   }
 
   const apiKeyField = providerDef.apiKey;
@@ -914,10 +976,7 @@ export async function validateKeyWithCustomUrl(
   }
 
   if (!apiKey) {
-    return {
-      valid: false,
-      domainError: new ProviderKeyMissingError({ provider }).serialize(),
-    };
+    return refused(new ProviderKeyMissingError({ provider }).serialize());
   }
 
   // Start from what's stored, not from a blank object: a provider whose
@@ -970,12 +1029,11 @@ export async function validateProviderApiKey(
   // Get provider definition from registry
   const providerDef = modelProviders[provider as keyof typeof modelProviders];
   if (!providerDef) {
-    return { valid: true }; // Unknown provider, skip validation
+    return unchecked("unknown_provider");
   }
 
-  // Skip validation for providers with complex auth (AWS, gcloud, etc.)
-  if (SKIP_VALIDATION.has(provider)) {
-    return { valid: true };
+  if (NOT_PROBEABLE.has(provider)) {
+    return unchecked("provider_not_probeable");
   }
 
   // Extract API key and base URL using registry field names
@@ -989,14 +1047,14 @@ export async function validateProviderApiKey(
 
   // Skip validation if API key is masked (user editing existing provider without changing key)
   if (apiKey === MASKED_KEY_PLACEHOLDER) {
-    return { valid: true };
+    return unchecked("credential_masked");
   }
 
   // Skip validation if no API key provided (schema validation handles required fields)
   // For custom provider, only skip if no base URL either
   if (!apiKey) {
     if (provider !== "custom" || !baseUrl) {
-      return { valid: true };
+      return unchecked("no_credential");
     }
   }
 
@@ -1031,12 +1089,17 @@ export async function validateProviderApiKey(
   // builds its URL from AGENT_PLATFORM_API_ROOT and never needs a base
   // URL. Without the exemption, a legacy `google_agent_platform` row —
   // whose onboarding tile (the source of providerDefaultBaseUrls) is gone
-  // — returned `valid: true` after ZERO requests: a green check on a key
-  // that was never probed.
+  // — returned a pass after ZERO requests: a green check on a key that was
+  // never probed.
+  //
+  // Both halves of that fix are here. The exemption decides WHEN we
+  // decline to ask; `unchecked` decides what we SAY when we do. A skip that
+  // reports itself as a pass is the same defect one step later, which is
+  // why the return is not `valid: true`.
   const hasAgentPlatformDoor =
     !!agentPlatform.project && !!agentPlatform.location;
   if (!baseUrl && !defaultBaseUrl && !hasAgentPlatformDoor) {
-    return { valid: true };
+    return unchecked("no_endpoint");
   }
 
   return runProbeChain({

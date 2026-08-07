@@ -376,3 +376,121 @@ Feature: Credential Validation
     Given the base URL I entered never answers
     When validation runs
     Then the failure is attributed to the provider
+
+  # ──────────────────────────────────────────────────────────────────────
+  # Testing a credential that is already saved.
+  #
+  # Everything above happens while a credential is being entered. This part
+  # is about the one already stored: a customer who has finished configuring
+  # a provider wants to know they filled it in correctly, without editing a
+  # key the form deliberately never shows them.
+  #
+  # The whole section rests on one rule. A check that cannot run is not a
+  # check that passed. Six of the sixteen providers cannot be probed at all,
+  # and for those the honest answer is that we did not look — reporting them
+  # as working would be worse than offering nothing, because the customer
+  # would stop looking too.
+  # ──────────────────────────────────────────────────────────────────────
+
+  @unit
+  Scenario: Testing a saved provider uses the credential already stored
+    Given I have a configured provider
+    When I test the connection from the provider list
+    Then the stored credential is used
+    And I am not asked to enter the key again
+
+  @unit
+  Scenario: A working credential says so
+    Given I have a configured provider whose credential the provider accepts
+    When I test the connection
+    Then I am told the connection works
+
+  @unit
+  Scenario: A refused credential is explained in our own words
+    Given I have a configured provider whose credential the provider refuses
+    When I test the connection
+    Then I am told the credential was refused
+    And the provider's own sentence is not part of what I am told
+
+  @unit
+  Scenario: A provider we cannot check says so instead of reporting success
+    Given I have a configured provider that cannot be checked automatically
+    When I test the connection
+    Then I am told the connection could not be checked
+    And I am not told the connection works
+
+  @unit
+  Scenario: Testing an organization-scoped provider reaches its credential
+    Given I have a provider configured at the organization scope
+    When I test the connection from the provider list
+    Then the stored credential is found
+    And I am not told the provider has no credential
+
+  @unit
+  Scenario: A test never accepts an endpoint from the caller
+    Given I have a configured provider
+    When I test the connection
+    Then the endpoint already saved on the provider is used
+    And an endpoint supplied with the request is refused
+
+  @unit
+  Scenario: Testing a provider I cannot manage is refused
+    Given a provider configured at a scope I cannot manage
+    When I test its connection
+    Then the test is refused
+    And the credential is never sent anywhere
+
+  @unit
+  Scenario: A provider row carrying no scopes is not testable
+    Given a provider row that grants no scopes at all
+    When I test its connection
+    Then the row is reported as not found
+    And the credential is never sent anywhere
+
+  @unit
+  Scenario: Repeated tests are limited per organization
+    Given I have tested connections many times in quick succession
+    When I test another connection
+    Then I am told to wait before testing again
+
+  # The result of a check has three answers, and for a long time it had two.
+  # A skipped probe returning the same value as a successful one is only
+  # harmless while the answer is used to decide whether a save may proceed;
+  # the moment a customer reads it, it becomes a false statement.
+
+  @unit
+  Scenario: A skipped check is distinguishable from a successful one
+    Given a provider whose credential is never actually probed
+    When the check runs
+    Then the result says the check did not run
+    And the result is not the same as a successful check
+
+  @unit
+  Scenario: Every reason a check does not run is reported as unchecked
+    Given a check that does not reach the provider
+    When the reason is that the provider uses credentials we cannot probe
+    Or the reason is that the credential is masked
+    Or the reason is that no credential is stored
+    Or the reason is that the provider has no endpoint to probe
+    Or the reason is that the provider is not one we recognize
+    Then each of them reports that the check did not run
+
+  # A provider that could not be asked at all is covered above, under the
+  # unreachable-provider scenarios. It stays a raised error rather than a
+  # third verdict: "we never got an answer" is the absence of one, and
+  # folding it in here would make `unchecked` mean both "we chose not to
+  # ask" and "we asked and nothing came back", which are different problems
+  # with different next steps.
+
+  @unit
+  Scenario: Content safety credentials are never probed as a language model
+    Given a content safety provider with an endpoint saved
+    When the check runs
+    Then the result says the check did not run
+    And the credential is not sent to a models endpoint
+
+  @unit
+  Scenario: Saving is unaffected by the third answer
+    Given a credential whose check did not run
+    When it is saved
+    Then the save proceeds exactly as it did before

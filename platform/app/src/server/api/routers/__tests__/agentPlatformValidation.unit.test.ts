@@ -190,7 +190,7 @@ describe("validateProviderApiKey for gemini's two Google doors", () => {
         AGENT_PLATFORM_CREDENTIALS,
       );
 
-      expect(result).toEqual({ valid: true });
+      expect(result.outcome).toBe("verified");
     });
   });
 
