@@ -230,6 +230,20 @@ export function MemberDetailDialog({
 
   const userDirectBindings = directBindings.data ?? [];
 
+  // The organization-scoped row that mirrors the member's seat is managed by
+  // the seat selector above, not by this list: deleting it would leave the
+  // seat without its binding and the next role change would just recreate it.
+  // Custom-role and off-seat organization rows are real grants and stay
+  // removable.
+  const mirrorsTheSeat = (binding: {
+    role: string;
+    customRoleId?: string | null;
+    scopeType: RoleBindingScopeType;
+  }) =>
+    binding.scopeType === RoleBindingScopeType.ORGANIZATION &&
+    !binding.customRoleId &&
+    binding.role === (member.role as string);
+
   return (
     <Dialog.Root
       open={open}
@@ -317,29 +331,32 @@ export function MemberDetailDialog({
                             {b.scopeName ?? b.scopeId}
                           </Badge>
                           <Spacer />
-                          {b.scopeType !== RoleBindingScopeType.PROJECT && (
-                            <Button
-                              size="xs"
-                              variant="ghost"
-                              color={markedForRemoval ? "blue.500" : "fg.muted"}
-                              aria-label={
-                                markedForRemoval
-                                  ? "Undo removal"
-                                  : "Remove binding"
-                              }
-                              onClick={() =>
-                                setPendingBindingRemovals((prev) => {
-                                  const next = new Set(prev);
-                                  next.has(b.id)
-                                    ? next.delete(b.id)
-                                    : next.add(b.id);
-                                  return next;
-                                })
-                              }
-                            >
-                              <X size={14} />
-                            </Button>
-                          )}
+                          {b.scopeType !== RoleBindingScopeType.PROJECT &&
+                            !mirrorsTheSeat(b) && (
+                              <Button
+                                size="xs"
+                                variant="ghost"
+                                color={
+                                  markedForRemoval ? "blue.500" : "fg.muted"
+                                }
+                                aria-label={
+                                  markedForRemoval
+                                    ? "Undo removal"
+                                    : "Remove binding"
+                                }
+                                onClick={() =>
+                                  setPendingBindingRemovals((prev) => {
+                                    const next = new Set(prev);
+                                    next.has(b.id)
+                                      ? next.delete(b.id)
+                                      : next.add(b.id);
+                                    return next;
+                                  })
+                                }
+                              >
+                                <X size={14} />
+                              </Button>
+                            )}
                         </HStack>
                       );
                     })}

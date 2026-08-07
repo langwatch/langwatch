@@ -458,6 +458,44 @@ describe("<MemberDetailDialog/>", () => {
     });
   });
 
+  describe("given the member holds the organization row their seat grants", () => {
+    beforeEach(() => {
+      mockListForUserData.current = [
+        {
+          id: "mirror-1",
+          role: "MEMBER",
+          customRoleId: null,
+          customRoleName: null,
+          scopeType: RoleBindingScopeType.ORGANIZATION,
+          scopeId: "org-1",
+          scopeName: "Acme",
+        },
+        {
+          id: "extra-1",
+          role: "VIEWER",
+          customRoleId: null,
+          customRoleName: null,
+          scopeType: RoleBindingScopeType.ORGANIZATION,
+          scopeId: "org-1",
+          scopeName: "Acme",
+        },
+      ];
+    });
+
+    describe("when the admin looks for a way to remove it", () => {
+      /** @scenario The seat's own organization access is changed through the seat selector */
+      it("offers none on the mirror row, and keeps it on other organization rows", () => {
+        renderDialog();
+
+        // Only the off-seat VIEWER row is removable; the MEMBER row mirrors
+        // the member's seat and is managed by the seat selector.
+        expect(
+          screen.getAllByRole("button", { name: /remove binding/i }),
+        ).toHaveLength(1);
+      });
+    });
+  });
+
   describe("when the same access row is staged twice", () => {
     /** @scenario An access row the member already holds appears once */
     it("keeps a single staged row", () => {

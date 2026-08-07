@@ -95,7 +95,8 @@ async function setUserScopeBinding({
 }): Promise<void> {
   const rows = await tx.roleBinding.findMany({
     where: { organizationId, userId, scopeType, scopeId },
-    orderBy: { createdAt: "asc" },
+    // id breaks createdAt ties so the same row is kept on every execution
+    orderBy: [{ createdAt: "asc" }, { id: "asc" }],
     select: { id: true },
   });
   const [keep, ...extras] = rows;

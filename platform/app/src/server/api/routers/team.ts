@@ -7,6 +7,7 @@ import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import {
   PERSONAL_TEAM_ARCHIVE_REFUSAL,
   PERSONAL_TEAM_MEMBERSHIP_REFUSAL,
+  TeamLastAdminRequiredError,
 } from "~/server/app-layer/teams/team.service";
 import { assertUsersInOrganization } from "~/server/organizations/assertUsersInOrganization";
 import { TEAM_ROLE_PRIORITY, TeamService } from "~/server/teams/team.service";
@@ -399,6 +400,29 @@ export const teamRouter = createTRPCRouter({
               scopeId: input.teamId,
             },
           });
+        }
+
+        // The same rule the per-member path enforces: a team-local save cannot
+        // take the team's last admin away, whether it demotes them or drops
+        // them from the list. Only checked when the team had an admin to lose,
+        // so a team a seat correction already left without one stays editable
+        // here — which is also where somebody gets promoted back to Admin.
+        const hadAdmin = currentBindings.some(
+          (b) => b.role === TeamUserRole.ADMIN,
+        );
+        if (hadAdmin) {
+          const adminsAfter = await tx.roleBinding.count({
+            where: {
+              organizationId,
+              scopeType: RoleBindingScopeType.TEAM,
+              scopeId: input.teamId,
+              role: TeamUserRole.ADMIN,
+              userId: { not: null },
+            },
+          });
+          if (adminsAfter === 0) {
+            throw new TeamLastAdminRequiredError(input.name);
+          }
         }
 
         return { success: true };

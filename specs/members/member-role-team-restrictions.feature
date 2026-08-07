@@ -259,6 +259,26 @@ Feature: Member Role Team Restrictions
     And the refusal names the team
 
   @integration
+  Scenario: Saving the team form cannot take its last admin away
+    Given a member is the only admin of a shared team
+    When the team is saved with that member demoted or dropped from the list
+    Then the save is refused
+    And the refusal names the team
+    And the team keeps its admin
+
+  @integration
+  Scenario: The team form hands the admin role to somebody else in one save
+    Given a member is the only admin of a shared team
+    When the team is saved promoting somebody else to admin and demoting them
+    Then the save goes through
+
+  @integration
+  Scenario: A team already without a team admin stays editable
+    Given a seat correction left a team with no team admin
+    When the team is saved with a membership change
+    Then the save goes through
+
+  @integration
   Scenario: Editing one team's members still refuses to remove its last admin
     Given a member is the only admin of a shared team
     When an organization admin changes that team role from the team's own members

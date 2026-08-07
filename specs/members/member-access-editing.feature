@@ -55,3 +55,9 @@ Feature: Editing a member's access
   Scenario: A picked access row saves without pressing Add
     When the admin fills in a complete access row and saves without adding it
     Then the save includes that access
+
+  Scenario: The seat's own organization access is changed through the seat selector
+    Given the member holds the organization access their seat grants
+    When the admin looks for a way to remove that access
+    Then there is none
+    And other organization access stays removable
