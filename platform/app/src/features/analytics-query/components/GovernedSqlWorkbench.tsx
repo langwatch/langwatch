@@ -166,15 +166,18 @@ function QueryCardHeader({
   );
 }
 
-export function GovernedSqlWorkbench({ projectId }: GovernedSqlWorkbenchProps) {
-  const schema = useGovernedSqlSchema({ projectId });
-  const query = useGovernedSqlQuery({ projectId });
-
-  const [schemaVisible, setSchemaVisible] = useState(true);
-
-  // The editor hands back a writer once Monaco has mounted. Until then, and in
-  // any environment without it, an insert appends to the draft instead of
-  // silently doing nothing.
+/**
+ * Writing into the draft. The editor hands back a writer once Monaco has
+ * mounted; until then, and in any environment without it, an insert appends to
+ * the draft instead of silently doing nothing.
+ */
+function useDraftInsert({
+  query,
+  exampleSql,
+}: {
+  query: ReturnType<typeof useGovernedSqlQuery>;
+  exampleSql: string | undefined;
+}) {
   const insertRef = useRef<((text: string) => void) | null>(null);
   const registerInsert = useCallback(
     (insert: ((text: string) => void) | null) => {
@@ -183,34 +186,44 @@ export function GovernedSqlWorkbench({ projectId }: GovernedSqlWorkbenchProps) {
     [],
   );
 
-  const { draft } = query.state;
+  const draftSql = query.state.draft.sql;
   const { setSql } = query;
-  const failure = useMemo(() => failureView(query.state), [query.state]);
-
   const handleInsert = useCallback(
     (text: string) => {
       const insert = insertRef.current;
       if (insert) return insert(text);
 
-      const current = draft.sql;
       setSql(
-        current.length === 0
+        draftSql.length === 0
           ? text
-          : `${current}${current.endsWith("\n") ? "" : "\n"}${text}`,
+          : `${draftSql}${draftSql.endsWith("\n") ? "" : "\n"}${text}`,
       );
     },
-    [draft.sql, setSql],
+    [draftSql, setSql],
   );
 
   // What the empty state offers: the first dataset's example, written into the
   // draft. The example text is the schema response's own, so an empty workbench
   // with no schema simply offers nothing.
-  const exampleSql = schema.model.datasets[0]?.exampleSql;
   const insertExample = useMemo(
     () =>
       exampleSql === undefined ? undefined : () => handleInsert(exampleSql),
     [exampleSql, handleInsert],
   );
+
+  return { registerInsert, handleInsert, insertExample };
+}
+
+export function GovernedSqlWorkbench({ projectId }: GovernedSqlWorkbenchProps) {
+  const schema = useGovernedSqlSchema({ projectId });
+  const query = useGovernedSqlQuery({ projectId });
+
+  const [schemaVisible, setSchemaVisible] = useState(true);
+  const { registerInsert, handleInsert, insertExample } = useDraftInsert({
+    query,
+    exampleSql: schema.model.datasets[0]?.exampleSql,
+  });
+  const failure = useMemo(() => failureView(query.state), [query.state]);
 
   return (
     <HStack
@@ -222,21 +235,7 @@ export function GovernedSqlWorkbench({ projectId }: GovernedSqlWorkbenchProps) {
       data-testid="governed-sql-workbench"
     >
       {schemaVisible && (
-        <Box
-          width="292px"
-          flexShrink={0}
-          overflowY="auto"
-          background="bg.panel"
-          borderRightWidth="1px"
-          borderColor="border"
-        >
-          <GovernedSchemaBrowser
-            model={schema.model}
-            isLoading={schema.isLoading}
-            error={schema.error}
-            onInsert={handleInsert}
-          />
-        </Box>
+        <SchemaSidebar schema={schema} onInsert={handleInsert} />
       )}
 
       <Box
@@ -251,52 +250,14 @@ export function GovernedSqlWorkbench({ projectId }: GovernedSqlWorkbenchProps) {
         {/* The query card hugs its statement; the result card below takes
             every remaining pixel. This split is the page's shape — inverting
             it is what buries a result under an empty editor. */}
-        <Box
-          flexShrink={0}
-          background="bg.panel"
-          borderWidth="1px"
-          borderColor="border"
-          borderRadius="10px"
-          boxShadow="xs"
-          overflow="hidden"
-        >
-          <QueryCardHeader
-            schemaVisible={schemaVisible}
-            onToggleSchema={() => setSchemaVisible((visible) => !visible)}
-            actionLabel={query.actionLabel}
-            runnable={draft.sql.trim().length > 0 && !query.state.inFlight}
-            inFlight={query.state.inFlight}
-            // Always the draft, under either label. When the label reads
-            // "Reload" the draft is byte-identical to what produced the visible
-            // result, so this IS a reload — and unlike `reload()` it can never
-            // re-send a superseded submission the member is no longer looking
-            // at.
-            onRun={query.runQuery}
-            onCancel={query.cancelQuery}
-          />
-
-          <GovernedSqlEditor
-            sql={draft.sql}
-            onChange={setSql}
-            schema={schema.model}
-            markers={failure.markers}
-            registerInsert={registerInsert}
-            onRun={query.runQuery}
-          />
-
-          <Box
-            borderTopWidth="1px"
-            borderColor="border"
-            background="bg.subtle"
-            paddingX={3}
-            paddingY={2}
-          >
-            <GovernedSqlParametersEditor
-              onChange={query.setParameters}
-              missingParameters={failure.missingParameters}
-            />
-          </Box>
-        </Box>
+        <QueryCard
+          query={query}
+          schemaModel={schema.model}
+          failure={failure}
+          registerInsert={registerInsert}
+          schemaVisible={schemaVisible}
+          onToggleSchema={() => setSchemaVisible((visible) => !visible)}
+        />
 
         <Box
           background="bg.panel"
@@ -319,6 +280,99 @@ export function GovernedSqlWorkbench({ projectId }: GovernedSqlWorkbenchProps) {
         </Box>
       </Box>
     </HStack>
+  );
+}
+
+function SchemaSidebar({
+  schema,
+  onInsert,
+}: {
+  schema: ReturnType<typeof useGovernedSqlSchema>;
+  onInsert: (text: string) => void;
+}) {
+  return (
+    <Box
+      width="292px"
+      flexShrink={0}
+      overflowY="auto"
+      background="bg.panel"
+      borderRightWidth="1px"
+      borderColor="border"
+    >
+      <GovernedSchemaBrowser
+        model={schema.model}
+        isLoading={schema.isLoading}
+        error={schema.error}
+        onInsert={onInsert}
+      />
+    </Box>
+  );
+}
+
+function QueryCard({
+  query,
+  schemaModel,
+  failure,
+  registerInsert,
+  schemaVisible,
+  onToggleSchema,
+}: {
+  query: ReturnType<typeof useGovernedSqlQuery>;
+  schemaModel: ReturnType<typeof useGovernedSqlSchema>["model"];
+  failure: FailureView;
+  registerInsert: (insert: ((text: string) => void) | null) => void;
+  schemaVisible: boolean;
+  onToggleSchema: () => void;
+}) {
+  const { draft } = query.state;
+
+  return (
+    <Box
+      flexShrink={0}
+      background="bg.panel"
+      borderWidth="1px"
+      borderColor="border"
+      borderRadius="10px"
+      boxShadow="xs"
+      overflow="hidden"
+    >
+      <QueryCardHeader
+        schemaVisible={schemaVisible}
+        onToggleSchema={onToggleSchema}
+        actionLabel={query.actionLabel}
+        runnable={draft.sql.trim().length > 0 && !query.state.inFlight}
+        inFlight={query.state.inFlight}
+        // Always the draft, under either label. When the label reads
+        // "Reload" the draft is byte-identical to what produced the visible
+        // result, so this IS a reload — and unlike `reload()` it can never
+        // re-send a superseded submission the member is no longer looking
+        // at.
+        onRun={query.runQuery}
+        onCancel={query.cancelQuery}
+      />
+
+      <GovernedSqlEditor
+        sql={draft.sql}
+        onChange={query.setSql}
+        schema={schemaModel}
+        markers={failure.markers}
+        registerInsert={registerInsert}
+        onRun={query.runQuery}
+      />
+
+      <Box
+        borderTopWidth="1px"
+        borderColor="border"
+        background="bg.subtle"
+        paddingX={3}
+        paddingY={2}
+      >
+        <GovernedSqlParametersEditor
+          onChange={query.setParameters}
+          missingParameters={failure.missingParameters}
+        />
+      </Box>
+    </Box>
   );
 }
 

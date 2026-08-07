@@ -111,66 +111,9 @@ function SpecPolicyPanel({
       data-testid="vega-spec-policy-panel"
     >
       {valid ? (
-        <>
-          <Badge
-            size="sm"
-            variant="subtle"
-            colorPalette="green"
-            borderRadius="full"
-            marginBottom={2}
-          >
-            Valid
-          </Badge>
-          <Text fontSize="12px" color="fg.muted" lineHeight="1.6">
-            {summaryLine}
-          </Text>
-        </>
+        <SpecValidSummary summaryLine={summaryLine} />
       ) : (
-        <>
-          <Badge
-            size="sm"
-            variant="subtle"
-            colorPalette="red"
-            borderRadius="full"
-            marginBottom={2}
-          >
-            Refused
-          </Badge>
-          <Stack gap={2} data-testid="vega-spec-editor-problems">
-            {errors.map((error, index) => (
-              <Box
-                key={`${error.rule}-${error.path}-${index}`}
-                borderWidth="1px"
-                borderColor="border"
-                borderRadius="8px"
-                overflow="hidden"
-                background="bg.panel"
-                data-error-code={error.code}
-              >
-                <Text
-                  fontFamily="mono"
-                  fontSize="11px"
-                  fontWeight="700"
-                  color="red.fg"
-                  paddingX={3}
-                  paddingY={1.5}
-                  borderBottomWidth="1px"
-                  borderColor="border"
-                >
-                  {error.path}
-                </Text>
-                <Text
-                  fontSize="12px"
-                  lineHeight="1.6"
-                  paddingX={3}
-                  paddingY={2}
-                >
-                  {error.message}
-                </Text>
-              </Box>
-            ))}
-          </Stack>
-        </>
+        <SpecRefusals errors={errors} />
       )}
 
       {valid && onViewChart && (
@@ -190,6 +133,78 @@ function SpecPolicyPanel({
         </Button>
       )}
 
+      <PolicyAcceptsReference />
+    </Box>
+  );
+}
+
+function SpecValidSummary({ summaryLine }: { summaryLine: string }) {
+  return (
+    <>
+      <Badge
+        size="sm"
+        variant="subtle"
+        colorPalette="green"
+        borderRadius="full"
+        marginBottom={2}
+      >
+        Valid
+      </Badge>
+      <Text fontSize="12px" color="fg.muted" lineHeight="1.6">
+        {summaryLine}
+      </Text>
+    </>
+  );
+}
+
+function SpecRefusals({ errors }: { errors: readonly VegaValidationError[] }) {
+  return (
+    <>
+      <Badge
+        size="sm"
+        variant="subtle"
+        colorPalette="red"
+        borderRadius="full"
+        marginBottom={2}
+      >
+        Refused
+      </Badge>
+      <Stack gap={2} data-testid="vega-spec-editor-problems">
+        {errors.map((error, index) => (
+          <Box
+            key={`${error.rule}-${error.path}-${index}`}
+            borderWidth="1px"
+            borderColor="border"
+            borderRadius="8px"
+            overflow="hidden"
+            background="bg.panel"
+            data-error-code={error.code}
+          >
+            <Text
+              fontFamily="mono"
+              fontSize="11px"
+              fontWeight="700"
+              color="red.fg"
+              paddingX={3}
+              paddingY={1.5}
+              borderBottomWidth="1px"
+              borderColor="border"
+            >
+              {error.path}
+            </Text>
+            <Text fontSize="12px" lineHeight="1.6" paddingX={3} paddingY={2}>
+              {error.message}
+            </Text>
+          </Box>
+        ))}
+      </Stack>
+    </>
+  );
+}
+
+function PolicyAcceptsReference() {
+  return (
+    <>
       <Text
         fontSize="10.5px"
         fontWeight="700"
@@ -241,7 +256,7 @@ function SpecPolicyPanel({
         Refusals name the exact JSON pointer they refer to. Warnings inform
         without blocking.
       </Text>
-    </Box>
+    </>
   );
 }
 
@@ -251,109 +266,21 @@ export function GovernedSqlChartMode({
   view = "chart",
   onOpenSpecification,
 }: GovernedSqlChartModeProps) {
-  // The starter follows each new result shape until the member edits it. An
-  // edited specification is their work and is never replaced behind their
-  // back; the reset button hands the current result's starter back and
-  // resumes following.
-  const [specState, setSpecState] = useState(() => ({
-    shape: shapeOf(result),
-    text: starterFor(result),
-    edited: false,
-  }));
-
-  const shape = shapeOf(result);
-  if (!specState.edited && specState.shape !== shape) {
-    // Adjusting state during render is React's sanctioned shape for state
-    // that derives from a changed prop: it re-renders before painting.
-    setSpecState({ shape, text: starterFor(result), edited: false });
-  }
-
-  const specText = specState.text;
-  const setSpecText = (text: string) =>
-    setSpecState((current) => ({ ...current, text, edited: true }));
-  const resetSpecText = () =>
-    setSpecState({ shape, text: starterFor(result), edited: false });
-
-  const datasets = useMemo(
-    () => ({ [GOVERNED_QUERY_RESULT_DATASET]: result.rows }),
-    [result.rows],
-  );
-  const columnsByDataset = useMemo(
-    () => ({ [GOVERNED_QUERY_RESULT_DATASET]: result.columns }),
-    [result.columns],
-  );
-
-  const parsed = useMemo(() => parseVegaLiteSpecText(specText), [specText]);
-  const errors = useMemo(
-    (): readonly VegaValidationError[] =>
-      parsed.ok
-        ? refusalsOf(
-            validateVegaLiteSpec({
-              spec: parsed.spec,
-              columnsByDataset,
-              rowCountsByDataset: {
-                [GOVERNED_QUERY_RESULT_DATASET]: result.rows.length,
-              },
-            }),
-          )
-        : parsed.errors,
-    [parsed, columnsByDataset, result.rows.length],
-  );
+  const { specText, setSpecText, resetSpecText } = useFollowingSpecText(result);
+  const { datasets, columnsByDataset, parsed, errors } = useSpecValidation({
+    result,
+    specText,
+  });
 
   if (view === "specification") {
     return (
-      <HStack
-        align="stretch"
-        gap={0}
-        height="full"
-        minHeight="280px"
-        data-testid="governed-sql-spec-mode"
-      >
-        <VStack align="stretch" gap={0} flex="1" minWidth={0}>
-          <HStack
-            gap={2}
-            paddingX={4}
-            paddingY={2}
-            borderBottomWidth="1px"
-            borderColor="border"
-          >
-            <Text
-              fontSize="10.5px"
-              fontWeight="700"
-              letterSpacing="0.05em"
-              textTransform="uppercase"
-              color="fg.subtle"
-            >
-              Chart specification
-            </Text>
-            <Text fontSize="10.5px" color="fg.subtle">
-              Vega-Lite v6 · the example follows each new result until you edit
-              — your edits are never overwritten
-            </Text>
-            <Box flex="1" />
-            <Button
-              size="xs"
-              variant="outline"
-              onClick={resetSpecText}
-              data-testid="vega-spec-reset"
-            >
-              Reset to the example
-            </Button>
-          </HStack>
-          <Box flex="1" minHeight="240px">
-            <VegaLiteSpecEditor
-              specText={specText}
-              onSpecTextChange={setSpecText}
-              errors={errors}
-            />
-          </Box>
-        </VStack>
-        <SpecPolicyPanel
-          errors={errors}
-          summaryLine={`Describes a chart over the ${result.rows.length} returned rows. Edits apply as you type.`}
-          onViewChart={undefined}
-        />
-      </HStack>
+      <SpecificationView
+        specText={specText}
+        onSpecTextChange={setSpecText}
+        onReset={resetSpecText}
+        errors={errors}
+        rowCount={result.rows.length}
+      />
     );
   }
 
@@ -395,6 +322,141 @@ export function GovernedSqlChartMode({
         <GovernedChartFailure errors={parsed.errors} />
       )}
     </VStack>
+  );
+}
+
+/**
+ * The specification text, following each new result shape until the member
+ * edits it. An edited specification is their work and is never replaced behind
+ * their back; reset hands the current result's starter back and resumes
+ * following.
+ */
+function useFollowingSpecText(result: GovernedSqlChartResult) {
+  const [specState, setSpecState] = useState(() => ({
+    shape: shapeOf(result),
+    text: starterFor(result),
+    edited: false,
+  }));
+
+  const shape = shapeOf(result);
+  if (!specState.edited && specState.shape !== shape) {
+    // Adjusting state during render is React's sanctioned shape for state
+    // that derives from a changed prop: it re-renders before painting.
+    setSpecState({ shape, text: starterFor(result), edited: false });
+  }
+
+  return {
+    specText: specState.text,
+    setSpecText: (text: string) =>
+      setSpecState((current) => ({ ...current, text, edited: true })),
+    resetSpecText: () =>
+      setSpecState({ shape, text: starterFor(result), edited: false }),
+  };
+}
+
+/** The parse and the policy's verdict, recomputed only when their inputs move. */
+function useSpecValidation({
+  result,
+  specText,
+}: {
+  result: GovernedSqlChartResult;
+  specText: string;
+}) {
+  const datasets = useMemo(
+    () => ({ [GOVERNED_QUERY_RESULT_DATASET]: result.rows }),
+    [result.rows],
+  );
+  const columnsByDataset = useMemo(
+    () => ({ [GOVERNED_QUERY_RESULT_DATASET]: result.columns }),
+    [result.columns],
+  );
+
+  const parsed = useMemo(() => parseVegaLiteSpecText(specText), [specText]);
+  const errors = useMemo(
+    (): readonly VegaValidationError[] =>
+      parsed.ok
+        ? refusalsOf(
+            validateVegaLiteSpec({
+              spec: parsed.spec,
+              columnsByDataset,
+              rowCountsByDataset: {
+                [GOVERNED_QUERY_RESULT_DATASET]: result.rows.length,
+              },
+            }),
+          )
+        : parsed.errors,
+    [parsed, columnsByDataset, result.rows.length],
+  );
+
+  return { datasets, columnsByDataset, parsed, errors };
+}
+
+function SpecificationView({
+  specText,
+  onSpecTextChange,
+  onReset,
+  errors,
+  rowCount,
+}: {
+  specText: string;
+  onSpecTextChange: (text: string) => void;
+  onReset: () => void;
+  errors: readonly VegaValidationError[];
+  rowCount: number;
+}) {
+  return (
+    <HStack
+      align="stretch"
+      gap={0}
+      height="full"
+      minHeight="280px"
+      data-testid="governed-sql-spec-mode"
+    >
+      <VStack align="stretch" gap={0} flex="1" minWidth={0}>
+        <HStack
+          gap={2}
+          paddingX={4}
+          paddingY={2}
+          borderBottomWidth="1px"
+          borderColor="border"
+        >
+          <Text
+            fontSize="10.5px"
+            fontWeight="700"
+            letterSpacing="0.05em"
+            textTransform="uppercase"
+            color="fg.subtle"
+          >
+            Chart specification
+          </Text>
+          <Text fontSize="10.5px" color="fg.subtle">
+            Vega-Lite v6 · the example follows each new result until you edit —
+            your edits are never overwritten
+          </Text>
+          <Box flex="1" />
+          <Button
+            size="xs"
+            variant="outline"
+            onClick={onReset}
+            data-testid="vega-spec-reset"
+          >
+            Reset to the example
+          </Button>
+        </HStack>
+        <Box flex="1" minHeight="240px">
+          <VegaLiteSpecEditor
+            specText={specText}
+            onSpecTextChange={onSpecTextChange}
+            errors={errors}
+          />
+        </Box>
+      </VStack>
+      <SpecPolicyPanel
+        errors={errors}
+        summaryLine={`Describes a chart over the ${rowCount} returned rows. Edits apply as you type.`}
+        onViewChart={undefined}
+      />
+    </HStack>
   );
 }
 
