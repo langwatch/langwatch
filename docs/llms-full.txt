@@ -36770,8 +36770,6 @@ For measuring the quality of your RAG, check for hallucinations with faithfulnes
 
 | Evaluator | Description |
 | --------- | ----------- |
-| [Ragas Context Precision](/api-reference/evaluators/ragas-context-precision) | This metric evaluates whether all of the ground-truth relevant items present in the contexts are ranked higher or not. Higher scores indicate better precision. |
-| [Ragas Context Recall](/api-reference/evaluators/ragas-context-recall) | This evaluator measures the extent to which the retrieved context aligns with the annotated answer, treated as the ground truth. Higher values indicate better performance. |
 | [Ragas Faithfulness](/api-reference/evaluators/ragas-faithfulness) | This evaluator assesses the extent to which the generated answer is consistent with the provided context. Higher scores indicate better faithfulness to the context, useful for detecting hallucinations. |
 | [Context F1](/api-reference/evaluators/context-f1) | Balances between precision and recall for context retrieval, increasing it means a better signal-to-noise ratio. Uses traditional string distance metrics. |
 | [Context Precision](/api-reference/evaluators/context-precision) | Measures how accurate is the retrieval compared to expected contexts, increasing it means less noise in the retrieval. Uses traditional string distance metrics. |
@@ -36812,10 +36810,6 @@ Miscellaneous evaluators
 | [Off Topic Evaluator](/api-reference/evaluators/off-topic-evaluator) | Detect off-topic messages using LangWatch’s Off Topic Evaluator to enforce domain boundaries during AI agent testing. |
 | [Query Resolution](/api-reference/evaluators/query-resolution) | This evaluator checks if all the user queries in the conversation were resolved. Useful to detect when the bot doesn't know how to answer or can't help the user. |
 | [Semantic Similarity Evaluator](/api-reference/evaluators/semantic-similarity-evaluator) | Allows you to check for semantic similarity or dissimilarity between input and output and a target value, so you can avoid sentences that you don't want to be present without having to match on the exact text. |
-| [Ragas Answer Correctness](/api-reference/evaluators/ragas-answer-correctness) | Computes with an LLM a weighted combination of factual as well as semantic similarity between the generated answer and the expected output. |
-| [Ragas Answer Relevancy](/api-reference/evaluators/ragas-answer-relevancy) | Legacy version of [Ragas Response Relevancy](/api-reference/evaluators/ragas-response-relevancy) — kept for backward compatibility. Prefer Response Relevancy for new evaluations. |
-| [Ragas Context Relevancy](/api-reference/evaluators/ragas-context-relevancy) | This metric gauges the relevancy of the retrieved context, calculated based on both the question and contexts. The values fall within the range of (0, 1), with higher values indicating better relevancy. |
-| [Ragas Context Utilization](/api-reference/evaluators/ragas-context-utilization) | This metric evaluates whether all of the output relevant items present in the contexts are ranked higher or not. Higher scores indicate better utilization. |
 
 
 ## Quick Start
@@ -60099,8 +60093,6 @@ For measuring the quality of your RAG, check for hallucinations with faithfulnes
 
 | Evaluator | Description |
 | --------- | ----------- |
-| [Ragas Context Precision](/api-reference/evaluators/ragas-context-precision) | This metric evaluates whether all of the ground-truth relevant items present in the contexts are ranked higher or not. Higher scores indicate better precision. |
-| [Ragas Context Recall](/api-reference/evaluators/ragas-context-recall) | This evaluator measures the extent to which the retrieved context aligns with the annotated answer, treated as the ground truth. Higher values indicate better performance. |
 | [Ragas Faithfulness](/api-reference/evaluators/ragas-faithfulness) | This evaluator assesses the extent to which the generated answer is consistent with the provided context. Higher scores indicate better faithfulness to the context, useful for detecting hallucinations. |
 | [Context F1](/api-reference/evaluators/context-f1) | Balances between precision and recall for context retrieval, increasing it means a better signal-to-noise ratio. Uses traditional string distance metrics. |
 | [Context Precision](/api-reference/evaluators/context-precision) | Measures how accurate is the retrieval compared to expected contexts, increasing it means less noise in the retrieval. Uses traditional string distance metrics. |
@@ -60141,10 +60133,6 @@ Miscellaneous evaluators
 | [Off Topic Evaluator](/api-reference/evaluators/off-topic-evaluator) | Detect off-topic messages using LangWatch’s Off Topic Evaluator to enforce domain boundaries during AI agent testing. |
 | [Query Resolution](/api-reference/evaluators/query-resolution) | This evaluator checks if all the user queries in the conversation were resolved. Useful to detect when the bot doesn't know how to answer or can't help the user. |
 | [Semantic Similarity Evaluator](/api-reference/evaluators/semantic-similarity-evaluator) | Allows you to check for semantic similarity or dissimilarity between input and output and a target value, so you can avoid sentences that you don't want to be present without having to match on the exact text. |
-| [Ragas Answer Correctness](/api-reference/evaluators/ragas-answer-correctness) | Computes with an LLM a weighted combination of factual as well as semantic similarity between the generated answer and the expected output. |
-| [Ragas Answer Relevancy](/api-reference/evaluators/ragas-answer-relevancy) | Legacy version of [Ragas Response Relevancy](/api-reference/evaluators/ragas-response-relevancy) — kept for backward compatibility. Prefer Response Relevancy for new evaluations. |
-| [Ragas Context Relevancy](/api-reference/evaluators/ragas-context-relevancy) | This metric gauges the relevancy of the retrieved context, calculated based on both the question and contexts. The values fall within the range of (0, 1), with higher values indicating better relevancy. |
-| [Ragas Context Utilization](/api-reference/evaluators/ragas-context-utilization) | This metric evaluates whether all of the output relevant items present in the contexts are ranked higher or not. Higher scores indicate better utilization. |
 
 
 ## Running Evaluations
@@ -60269,59 +60257,10 @@ openapi: post /langevals/query_resolution/evaluate
 ---
 ---
 
-# FILE: ./api-reference/evaluators/ragas-answer-correctness.mdx
-
----
-openapi: post /legacy/ragas_answer_correctness/evaluate
----
----
-
-# FILE: ./api-reference/evaluators/ragas-answer-relevancy.mdx
-
----
-openapi: post /legacy/ragas_answer_relevancy/evaluate
----
----
-
-# FILE: ./api-reference/evaluators/ragas-context-precision.mdx
-
----
-openapi: post /legacy/ragas_context_precision/evaluate
----
----
-
-# FILE: ./api-reference/evaluators/ragas-context-recall.mdx
-
----
-openapi: post /legacy/ragas_context_recall/evaluate
----
----
-
-# FILE: ./api-reference/evaluators/ragas-context-relevancy.mdx
-
----
-openapi: post /legacy/ragas_context_relevancy/evaluate
----
----
-
-# FILE: ./api-reference/evaluators/ragas-context-utilization.mdx
-
----
-openapi: post /legacy/ragas_context_utilization/evaluate
----
----
-
-# FILE: ./api-reference/evaluators/ragas-faithfulness-1.mdx
-
----
-openapi: post /ragas/faithfulness/evaluate
----
----
-
 # FILE: ./api-reference/evaluators/ragas-faithfulness.mdx
 
 ---
-openapi: post /legacy/ragas_faithfulness/evaluate
+openapi: post /ragas/faithfulness/evaluate
 ---
 ---
 
