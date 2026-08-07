@@ -8,12 +8,16 @@ summaries because both are unbounded ledger reads: walk them with
 ``iterate`` and ``iter_summaries``, or page them deliberately with
 ``list_page`` and ``summaries_page``.
 
+Both reads take the SAME filters. A reconciliation checksums the rollups
+and diffs the events when a checksum disagrees, so a divergence can be
+walked on exactly the narrowing that produced it.
+
 All routes are organization-anchored: authenticate with an organization
 API key (``sk-lw-...``) via ``langwatch.setup``. Uses httpx via the
 generated REST API client for HTTP transport.
 """
 
-from typing import Any, Dict, Iterator, Optional
+from typing import Any, Dict, Iterator, Mapping, Optional, Sequence, Union
 
 import httpx
 
@@ -27,6 +31,56 @@ from langwatch.utils.gateway_http import (
     walk_cursor_pages,
 )
 from langwatch.utils.initialization import ensure_setup
+
+FilterValue = Optional[Union[str, Sequence[str]]]
+"""One value or many. Many means "any of these"; naming two different
+filters narrows."""
+
+MetadataFilter = Optional[Mapping[str, Union[str, Sequence[str]]]]
+"""Your own request metadata, e.g. ``{"customer_tier": "gold"}``. Several
+values for one key widen that key; several keys narrow."""
+
+_FILTER_PARAMS = (
+    "project_id",
+    "team_id",
+    "external_id",
+    "virtual_key_id",
+    "end_user_id",
+    "principal_user_id",
+    "model",
+    "provider_key",
+    "request_type",
+    "label",
+)
+"""Filter names that go on the wire unchanged, in the order the API
+documents them. Repeating a parameter is how the API widens it."""
+
+
+def _spend_filter_params(filters: Mapping[str, Any]) -> Dict[str, Any]:
+    """The query parameters for a set of spend filters.
+
+    A value that is a list is left as one: httpx repeats the parameter once
+    per element, which is what widens the filter server-side. A filter left
+    unset sends nothing; one set to an empty list sends nothing either,
+    since httpx has no parameter to repeat, and the server reads an absent
+    filter as "do not narrow on this".
+    """
+    params: Dict[str, Any] = {}
+    for name in _FILTER_PARAMS:
+        value = filters.get(name)
+        if value is not None:
+            params[name] = list(value) if isinstance(value, (list, tuple)) else value
+    metadata = filters.get("metadata")
+    if metadata:
+        pairs = []
+        for key, value in metadata.items():
+            values = value if isinstance(value, (list, tuple)) else [value]
+            pairs.extend(f"{key}:{one}" for one in values)
+        params["metadata"] = pairs
+    status = filters.get("status")
+    if status is not None:
+        params["status"] = status
+    return params
 
 
 class SpendEventsFacade:
@@ -57,29 +111,49 @@ class SpendEventsFacade:
         to_ms: int,
         cursor: Optional[str] = None,
         limit: Optional[int] = None,
-        virtual_key_id: Optional[str] = None,
-        end_user_id: Optional[str] = None,
-        project_id: Optional[str] = None,
-        model: Optional[str] = None,
+        project_id: FilterValue = None,
+        team_id: FilterValue = None,
+        external_id: FilterValue = None,
+        virtual_key_id: FilterValue = None,
+        end_user_id: FilterValue = None,
+        principal_user_id: FilterValue = None,
+        model: FilterValue = None,
+        provider_key: FilterValue = None,
+        request_type: FilterValue = None,
+        label: FilterValue = None,
+        metadata: MetadataFilter = None,
         status: Optional[str] = None,
     ) -> Dict[str, Any]:
         """One page of spend event envelopes over the 13-month ledger, as
-        {data, next_cursor}: diff by gateway_request_id."""
+        {data, next_cursor}: diff by gateway_request_id.
+
+        ``team_id`` is resolved to the projects that team owns and
+        ``external_id`` to the keys carrying it, so a team with no projects
+        and an external id nobody minted both match nothing rather than
+        everything."""
         params: Dict[str, Any] = {"from": from_ms, "to": to_ms}
         if cursor is not None:
             params["cursor"] = cursor
         if limit is not None:
             params["limit"] = limit
-        if virtual_key_id is not None:
-            params["virtual_key_id"] = virtual_key_id
-        if end_user_id is not None:
-            params["end_user_id"] = end_user_id
-        if project_id is not None:
-            params["project_id"] = project_id
-        if model is not None:
-            params["model"] = model
-        if status is not None:
-            params["status"] = status
+        params.update(
+            _spend_filter_params(
+                {
+                    "project_id": project_id,
+                    "team_id": team_id,
+                    "external_id": external_id,
+                    "virtual_key_id": virtual_key_id,
+                    "end_user_id": end_user_id,
+                    "principal_user_id": principal_user_id,
+                    "model": model,
+                    "provider_key": provider_key,
+                    "request_type": request_type,
+                    "label": label,
+                    "metadata": metadata,
+                    "status": status,
+                }
+            )
+        )
         response = self._http().get("/api/gateway/v1/spend-events", params=params)
         raise_for_status(response, operation="list spend events")
         return response.json()
@@ -90,10 +164,17 @@ class SpendEventsFacade:
         from_ms: int,
         to_ms: int,
         limit: Optional[int] = None,
-        virtual_key_id: Optional[str] = None,
-        end_user_id: Optional[str] = None,
-        project_id: Optional[str] = None,
-        model: Optional[str] = None,
+        project_id: FilterValue = None,
+        team_id: FilterValue = None,
+        external_id: FilterValue = None,
+        virtual_key_id: FilterValue = None,
+        end_user_id: FilterValue = None,
+        principal_user_id: FilterValue = None,
+        model: FilterValue = None,
+        provider_key: FilterValue = None,
+        request_type: FilterValue = None,
+        label: FilterValue = None,
+        metadata: MetadataFilter = None,
         status: Optional[str] = None,
     ) -> Iterator[Dict[str, Any]]:
         """Every spend event in the window, one envelope at a time, fetching
@@ -101,17 +182,27 @@ class SpendEventsFacade:
 
         Lazy on purpose: the window is a ledger range, so collecting it into
         a list first is a memory bound nobody chose."""
+        filters: Dict[str, Any] = {
+            "project_id": project_id,
+            "team_id": team_id,
+            "external_id": external_id,
+            "virtual_key_id": virtual_key_id,
+            "end_user_id": end_user_id,
+            "principal_user_id": principal_user_id,
+            "model": model,
+            "provider_key": provider_key,
+            "request_type": request_type,
+            "label": label,
+            "metadata": metadata,
+            "status": status,
+        }
         for page in walk_cursor_pages(
             lambda cursor: self.list_page(
                 from_ms=from_ms,
                 to_ms=to_ms,
                 cursor=cursor,
                 limit=limit,
-                virtual_key_id=virtual_key_id,
-                end_user_id=end_user_id,
-                project_id=project_id,
-                model=model,
-                status=status,
+                **filters,
             )
         ):
             yield from page["data"]
@@ -119,13 +210,26 @@ class SpendEventsFacade:
     def summaries_page(
         self,
         *,
-        group_by: str,
+        group_by: Union[str, Sequence[str]],
         from_ms: int,
         to_ms: int,
         cursor: Optional[str] = None,
         limit: Optional[int] = None,
-        virtual_key_id: Optional[str] = None,
-        project_id: Optional[str] = None,
+        bucket: Optional[str] = None,
+        timezone: Optional[str] = None,
+        allow_unstable: bool = False,
+        project_id: FilterValue = None,
+        team_id: FilterValue = None,
+        external_id: FilterValue = None,
+        virtual_key_id: FilterValue = None,
+        end_user_id: FilterValue = None,
+        principal_user_id: FilterValue = None,
+        model: FilterValue = None,
+        provider_key: FilterValue = None,
+        request_type: FilterValue = None,
+        label: FilterValue = None,
+        metadata: MetadataFilter = None,
+        status: Optional[str] = None,
     ) -> Dict[str, Any]:
         """One page of reconciliation checksums, as {data, next_cursor}.
 
@@ -133,16 +237,56 @@ class SpendEventsFacade:
         it comes back null: a full page does not mean the window held
         nothing more, so a reconciler that reads one page under-counts
         every key past the limit.
-        group_by: "virtual_key" or "end_user"."""
-        params: Dict[str, Any] = {"group_by": group_by, "from": from_ms, "to": to_ms}
+
+        group_by: one or two of "virtual_key", "end_user", "project",
+        "model", "provider", "principal", "request_type". Each row's ``key``
+        is the first dimension's value and ``group`` names them all, so two
+        rows may share a key.
+
+        bucket: "none" (the default), "hour" or "day", falling on the
+        boundaries of ``timezone`` (an IANA zone, UTC by default).
+
+        Grouping by model or provider, or into time buckets, is REFUSED with
+        ``gateway_spend_group_by_unstable`` over a window recent enough that
+        outcomes can still arrive: until a request settles, the model and
+        provider recorded against it are the ones that were asked for, and
+        they are replaced by the ones that actually served it. A page walk
+        over a group that can move counts some requests twice and misses
+        others. Reconciling closed periods never meets this; pass
+        ``allow_unstable`` for a live view where the shape is enough."""
+        params: Dict[str, Any] = {
+            "group_by": group_by if isinstance(group_by, str) else ",".join(group_by),
+            "from": from_ms,
+            "to": to_ms,
+        }
         if cursor is not None:
             params["cursor"] = cursor
         if limit is not None:
             params["limit"] = limit
-        if virtual_key_id is not None:
-            params["virtual_key_id"] = virtual_key_id
-        if project_id is not None:
-            params["project_id"] = project_id
+        if bucket is not None:
+            params["bucket"] = bucket
+        if timezone is not None:
+            params["timezone"] = timezone
+        if allow_unstable:
+            params["allow_unstable"] = "true"
+        params.update(
+            _spend_filter_params(
+                {
+                    "project_id": project_id,
+                    "team_id": team_id,
+                    "external_id": external_id,
+                    "virtual_key_id": virtual_key_id,
+                    "end_user_id": end_user_id,
+                    "principal_user_id": principal_user_id,
+                    "model": model,
+                    "provider_key": provider_key,
+                    "request_type": request_type,
+                    "label": label,
+                    "metadata": metadata,
+                    "status": status,
+                }
+            )
+        )
         response = self._http().get("/api/gateway/v1/spend-summaries", params=params)
         raise_for_status(response, operation="spend summaries")
         return response.json()
@@ -150,12 +294,25 @@ class SpendEventsFacade:
     def iter_summaries(
         self,
         *,
-        group_by: str,
+        group_by: Union[str, Sequence[str]],
         from_ms: int,
         to_ms: int,
         limit: Optional[int] = None,
-        virtual_key_id: Optional[str] = None,
-        project_id: Optional[str] = None,
+        bucket: Optional[str] = None,
+        timezone: Optional[str] = None,
+        allow_unstable: bool = False,
+        project_id: FilterValue = None,
+        team_id: FilterValue = None,
+        external_id: FilterValue = None,
+        virtual_key_id: FilterValue = None,
+        end_user_id: FilterValue = None,
+        principal_user_id: FilterValue = None,
+        model: FilterValue = None,
+        provider_key: FilterValue = None,
+        request_type: FilterValue = None,
+        label: FilterValue = None,
+        metadata: MetadataFilter = None,
+        status: Optional[str] = None,
     ) -> Iterator[Dict[str, Any]]:
         """Every rollup row in the window, walking the cursor for you.
 
@@ -163,6 +320,23 @@ class SpendEventsFacade:
         totals right does not depend on remembering to page. Each row
         carries event_count, settled_count, the token classes, and integer
         nano-USD cost."""
+        rest: Dict[str, Any] = {
+            "bucket": bucket,
+            "timezone": timezone,
+            "allow_unstable": allow_unstable,
+            "project_id": project_id,
+            "team_id": team_id,
+            "external_id": external_id,
+            "virtual_key_id": virtual_key_id,
+            "end_user_id": end_user_id,
+            "principal_user_id": principal_user_id,
+            "model": model,
+            "provider_key": provider_key,
+            "request_type": request_type,
+            "label": label,
+            "metadata": metadata,
+            "status": status,
+        }
         for page in walk_cursor_pages(
             lambda cursor: self.summaries_page(
                 group_by=group_by,
@@ -170,8 +344,7 @@ class SpendEventsFacade:
                 to_ms=to_ms,
                 cursor=cursor,
                 limit=limit,
-                virtual_key_id=virtual_key_id,
-                project_id=project_id,
+                **rest,
             )
         ):
             yield from page["data"]

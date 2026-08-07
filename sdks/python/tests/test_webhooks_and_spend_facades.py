@@ -233,6 +233,153 @@ def test_spend_events_page_sends_the_project_and_model_filters():
     assert page["next_cursor"] is None
 
 
+def test_both_spend_reads_take_the_same_filter_vocabulary():
+    """A reconciliation checksums the rollups and diffs the events when a
+    checksum disagrees, so it has to be able to ask both the same question.
+    Repeating a parameter widens it; naming two narrows."""
+    seen: List[Dict[str, List[str]]] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(
+            {
+                name: request.url.params.get_list(name)
+                for name in (
+                    "team_id",
+                    "external_id",
+                    "principal_user_id",
+                    "provider_key",
+                    "request_type",
+                    "label",
+                    "model",
+                )
+            }
+        )
+        return httpx.Response(200, json={"data": [], "next_cursor": None})
+
+    facade = SpendEventsFacade(FakeRestClient(handler))
+    filters: Dict[str, Any] = {
+        "team_id": "team_1",
+        "external_id": ["cust_a", "cust_b"],
+        "principal_user_id": "user_1",
+        "provider_key": ["openai", "anthropic"],
+        "request_type": "chat",
+        "label": ["prod"],
+        "model": ["gpt-5-mini", "claude-sonnet-5"],
+    }
+
+    facade.list_page(from_ms=1, to_ms=2, **filters)
+    facade.summaries_page(group_by="project", from_ms=1, to_ms=2, **filters)
+
+    assert len(seen) == 2
+    assert seen[0] == seen[1], "the two reads must narrow identically"
+    assert seen[0]["external_id"] == ["cust_a", "cust_b"]
+    assert seen[0]["model"] == ["gpt-5-mini", "claude-sonnet-5"]
+    assert seen[0]["team_id"] == ["team_1"]
+
+
+def test_metadata_filters_ride_as_key_colon_value():
+    """Several values for one key widen that key, several keys narrow, so a
+    dict of lists is the shape a caller already thinks in."""
+    seen: List[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.extend(request.url.params.get_list("metadata"))
+        return httpx.Response(200, json={"data": [], "next_cursor": None})
+
+    facade = SpendEventsFacade(FakeRestClient(handler))
+    facade.list_page(
+        from_ms=1,
+        to_ms=2,
+        metadata={"tier": ["gold", "silver"], "region": "eu"},
+    )
+
+    assert sorted(seen) == ["region:eu", "tier:gold", "tier:silver"]
+
+
+def test_summaries_page_joins_the_grouping_and_carries_the_bucket():
+    """Two dimensions go on the wire comma-separated, and a bucket needs the
+    zone its boundaries fall on or a day means something different per
+    caller."""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.params.get("group_by") == "model,provider"
+        assert request.url.params.get("bucket") == "day"
+        assert request.url.params.get("timezone") == "Europe/Amsterdam"
+        assert request.url.params.get("allow_unstable") == "true"
+        return httpx.Response(200, json={"data": [], "next_cursor": None})
+
+    facade = SpendEventsFacade(FakeRestClient(handler))
+    facade.summaries_page(
+        group_by=["model", "provider"],
+        from_ms=1,
+        to_ms=2,
+        bucket="day",
+        timezone="Europe/Amsterdam",
+        allow_unstable=True,
+    )
+
+
+def test_iter_summaries_keeps_the_grouping_and_filters_on_every_page():
+    """A walk that dropped them on page two would fold rows from a different
+    question into the same checksum."""
+    pages = [
+        {"data": [{"key": "gpt-5-mini"}], "next_cursor": "c1"},
+        {"data": [{"key": "claude-sonnet-5"}], "next_cursor": None},
+    ]
+    seen: List[httpx.QueryParams] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request.url.params)
+        return httpx.Response(200, json=pages[len(seen) - 1])
+
+    facade = SpendEventsFacade(FakeRestClient(handler))
+    rows = list(
+        facade.iter_summaries(
+            group_by="model",
+            from_ms=1,
+            to_ms=2,
+            bucket="hour",
+            provider_key=["openai"],
+            metadata={"tier": "gold"},
+            allow_unstable=True,
+        )
+    )
+
+    assert [r["key"] for r in rows] == ["gpt-5-mini", "claude-sonnet-5"]
+    assert len(seen) == 2
+    for params in seen:
+        assert params.get("group_by") == "model"
+        assert params.get("bucket") == "hour"
+        assert params.get("provider_key") == "openai"
+        assert params.get("metadata") == "tier:gold"
+        assert params.get("allow_unstable") == "true"
+    assert seen[1].get("cursor") == "c1"
+
+
+def test_a_movable_grouping_surfaces_the_refusal_code():
+    """Refused rather than served approximately: a page walk over a group
+    whose rows can still move counts some requests twice and misses others,
+    and a checksum built on that disagrees with the books silently."""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            400,
+            json={
+                "error": {
+                    "code": "gateway_spend_group_by_unstable",
+                    "meta": {"settles_at": "2026-08-07T05:30:00.000Z"},
+                }
+            },
+        )
+
+    facade = SpendEventsFacade(FakeRestClient(handler))
+    with pytest.raises(LangWatchApiError) as raised:
+        facade.summaries_page(group_by="model", from_ms=1, to_ms=2)
+
+    assert raised.value.code == "gateway_spend_group_by_unstable"
+    assert raised.value.body["error"]["meta"]["settles_at"].startswith("2026-")
+
+
 def test_spend_events_iterate_walks_every_page():
     handler, seen_cursors = paged(
         [

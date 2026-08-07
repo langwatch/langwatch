@@ -42,6 +42,7 @@ import {
   MAX_GROUP_BY_KEYS,
   SPEND_BUCKETS,
   SPEND_GROUP_BY_KEYS,
+  type SpendGroupByKey,
 } from "~/server/gateway/spendGrouping";
 import { resolveSpendScope } from "~/server/gateway/spendScope";
 import { USD_DISPLAY_STRING_FORMAT } from "~/server/gateway/wireMoney";
@@ -247,18 +248,36 @@ secured.hono.onError(handleGatewaySpendApiError);
  * useful page size, and a caller who wants a third is really asking for the
  * events read.
  */
-const groupBySchema = z
-  .string()
-  .transform((raw) => raw.split(",").map((part) => part.trim()))
-  .pipe(
-    z
-      .array(z.enum(SPEND_GROUP_BY_KEYS))
-      .min(1)
-      .max(MAX_GROUP_BY_KEYS)
-      .refine((keys) => new Set(keys).size === keys.length, {
-        message: "group_by cannot repeat a dimension",
-      }),
+/**
+ * One or two dimensions, comma separated.
+ *
+ * Validated inside the transform rather than piped into an array schema so a
+ * refusal names `group_by` and not `group_by.0`. The caller sent one string;
+ * an index they never wrote maps onto nothing a client can point at, and
+ * `meta.fields` exists precisely so a client can point at something.
+ */
+const groupBySchema = z.string().transform((raw, ctx): SpendGroupByKey[] => {
+  const keys = raw.split(",").map((part) => part.trim());
+  const refuse = (message: string): typeof z.NEVER => {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message });
+    return z.NEVER;
+  };
+  const unknown = keys.filter(
+    (key) => !SPEND_GROUP_BY_KEYS.includes(key as SpendGroupByKey),
   );
+  if (unknown.length > 0) {
+    return refuse(
+      `group_by must name one or two of ${SPEND_GROUP_BY_KEYS.join(", ")}`,
+    );
+  }
+  if (keys.length > MAX_GROUP_BY_KEYS) {
+    return refuse(`group_by takes at most ${MAX_GROUP_BY_KEYS} dimensions`);
+  }
+  if (new Set(keys).size !== keys.length) {
+    return refuse("group_by cannot repeat a dimension");
+  }
+  return keys as SpendGroupByKey[];
+});
 
 const spendSummariesQuerySchema = z
   .object({

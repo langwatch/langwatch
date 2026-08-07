@@ -3086,6 +3086,40 @@ for event in langwatch.spend_events.iterate(from_ms=from_ms, to_ms=to_ms, virtua
 
 `iterSummaries` / `iter_summaries` and `iterate` stream rows and fetch pages behind you. Use `summariesPage` / `summaries_page` and `listPage` / `list_page` when you want to hold the cursor yourself, for example to checkpoint a long reconciliation across runs.
 
+Both grains take the same filters, so a divergence can be walked on exactly the narrowing that produced it. Pass an array to widen a filter and name two filters to narrow:
+
+<CodeGroup>
+
+```typescript TypeScript
+for await (const row of langwatch.spendEvents.iterSummaries({
+  groupBy: ["model", "end_user"],
+  bucket: "day",
+  timezone: "Europe/Amsterdam",
+  from, to,
+  model: ["gpt-5-mini", "claude-opus-5"],
+  metadata: { customer_tier: "gold" },
+})) {
+  bill(row.group, row.bucket_start, row.cost.nano_usd);
+}
+```
+
+```python Python
+for row in langwatch.spend_events.iter_summaries(
+    group_by=["model", "end_user"],
+    bucket="day",
+    timezone="Europe/Amsterdam",
+    from_ms=from_ms,
+    to_ms=to_ms,
+    model=["gpt-5-mini", "claude-opus-5"],
+    metadata={"customer_tier": "gold"},
+):
+    bill(row["group"], row["bucket_start"], row["cost"]["nano_usd"])
+```
+
+</CodeGroup>
+
+The full vocabulary and the one grouping that is refused rather than served approximately are in [Narrowing and grouping](/ai-gateway/cookbooks/metering-and-rebilling#narrowing-and-grouping).
+
 ### The settled work queue
 
 `GET /api/gateway/v1/spend-events?status=settled&from=...&to=...` lists requests recorded without a price. Each is bounded, visible, and resolvable; when a late confirmation supersedes one, it leaves this queue and the completed event carries the money.
