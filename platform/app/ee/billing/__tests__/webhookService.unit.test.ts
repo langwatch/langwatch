@@ -438,7 +438,7 @@ describe("webhookService", () => {
         });
       });
 
-      /** @scenario A threshold failure raises an alert for manual follow-up */
+      /** @scenario An annual subscription gets a billing threshold after checkout completes */
       it("does not alert when the threshold is applied successfully", async () => {
         setupLinkedCheckout();
         mockStripeInstance.subscriptions.retrieve.mockResolvedValue(
