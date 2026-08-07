@@ -1,10 +1,10 @@
 /**
  * Shared seeding for the management REST API integration suites.
  *
- * Every family authenticates the same way — an organization on a plan the
+ * Every family authenticates the same way: an organization on a plan the
  * suite controls, an admin member, an explicit ORGANIZATION-ADMIN role
  * binding, and an organization-scoped API key minted through the real
- * `ApiKeyService` — so the six suites build on one seed instead of six
+ * `ApiKeyService`, so the six suites build on one seed instead of six
  * hand-rolled copies that drift.
  *
  * The plan is a `vi.fn` the caller installs into `createTestApp`'s plan

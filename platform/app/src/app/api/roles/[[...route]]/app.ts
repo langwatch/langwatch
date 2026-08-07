@@ -9,7 +9,7 @@
  *
  * `GET /permissions` publishes the catalog custom roles are built from: every
  * resource with its actions, annotated with whether the resource only takes
- * effect at organization scope (ADR-021) — the write-time refusal the role
+ * effect at organization scope (ADR-021): the write-time refusal the role
  * bindings API enforces for those.
  */
 import type { BaseApp, VersionBuilder } from "@langwatch/api";
@@ -293,7 +293,7 @@ const registerItemEndpoints = (v: RolesVersion): void => {
       params: idParamsSchema,
       output: z.object({ success: z.literal(true) }),
       description:
-        "Delete a custom role. A role that anything still holds — a legacy team assignment or a role binding — answers 409 custom_role_in_use with the counts in meta.",
+        "Delete a custom role. A role that anything still holds, a legacy team assignment or a role binding, answers 409 custom_role_in_use with the counts in meta.",
       docs: { operationId: "deleteRole", tags: ["Roles"] },
     },
     deleteRoleHandler,

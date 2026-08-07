@@ -7,7 +7,7 @@
  * `security` names the instance credential rather than an organization key:
  * this family exists before any organization does. On SaaS, and on
  * deployments that have not configured `LANGWATCH_INSTANCE_ADMIN_API_KEY`,
- * every path answers 404 — the reference documents the self-hosted
+ * every path answers 404; the reference documents the self-hosted
  * capability.
  */
 import type { DescribeRouteOptions, OpenApiSpecsOptions } from "hono-openapi";

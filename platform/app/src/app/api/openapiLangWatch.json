@@ -37252,7 +37252,7 @@
             "required": true
           }
         ],
-        "description": "Delete a custom role. A role that anything still holds — a legacy team assignment or a role binding — answers 409 custom_role_in_use with the counts in meta."
+        "description": "Delete a custom role. A role that anything still holds, a legacy team assignment or a role binding, answers 409 custom_role_in_use with the counts in meta."
       }
     },
     "/api/scim-tokens": {

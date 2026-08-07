@@ -6,7 +6,7 @@
  * The one management surface that exists before any organization does. It
  * authenticates against the instance credential, hands back a bootstrap
  * admin key that immediately works against the management APIs, refuses a
- * taken slug deterministically, and is absent — 404, not forbidden — when
+ * taken slug deterministically, and is absent (404, not forbidden) when
  * the credential is not configured or the deployment is cloud.
  */
 import { nanoid } from "nanoid";

@@ -1,8 +1,8 @@
 /**
  * The role-bindings management REST family.
  *
- * A binding grants one role to exactly one principal — a user, a group, or an
- * API key — at one scope. Every reference is validated against the caller's
+ * A binding grants one role to exactly one principal (a user, a group, or an
+ * API key) at one scope. Every reference is validated against the caller's
  * organization before the write, an identical declaration answers a
  * deterministic 409 (`role_binding_already_exists`), and a custom role that
  * carries an organization-exclusive permission is refused at team or project

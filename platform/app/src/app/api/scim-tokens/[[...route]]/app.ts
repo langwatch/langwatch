@@ -5,7 +5,7 @@
  * shown exactly once, in the create response; listing describes tokens (id,
  * description, timestamps) and never returns a value or a hash. Revocation is
  * immediate and idempotent: an id that does not exist in the caller's
- * organization — including one already revoked — answers 404
+ * organization (including one already revoked) answers 404
  * `scim_token_not_found`, which a provisioning tool treats as already done.
  */
 

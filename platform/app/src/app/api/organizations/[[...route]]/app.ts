@@ -1,5 +1,5 @@
 /**
- * Instance-administrator organization provisioning — self-hosted only.
+ * Instance-administrator organization provisioning, self-hosted only.
  *
  * The one management surface that exists before any organization does, so it
  * authenticates against the instance (the `LANGWATCH_INSTANCE_ADMIN_API_KEY`
@@ -8,7 +8,7 @@
  * organization to resolve, no plan to gate on, and no RBAC principal.
  *
  * Availability is a per-request property: when the credential is not
- * configured, or the deployment is SaaS, every path answers 404 — the family
+ * configured, or the deployment is SaaS, every path answers 404: the family
  * is absent, not forbidden. The routes stay mounted and policy-registered
  * either way, so the route-policy registry and the composed router can never
  * disagree about them, and the OpenAPI document (which describes the

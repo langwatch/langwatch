@@ -4,7 +4,7 @@
  * The factory's whole job is that one declaration per endpoint feeds two
  * consumers that must never disagree: the route-policy registry the
  * authorization audit reads, and the enforcement chain that refuses requests.
- * These tests pin both halves structurally — every mount shape lands in the
+ * These tests pin both halves structurally: every mount shape lands in the
  * registry (dated, latest, bare, and both version-namespace guards), the
  * enforcement chain runs auth, then the permission check, then the plan gate,
  * and an endpoint that never declared a policy cannot build at all.

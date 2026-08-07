@@ -6,7 +6,7 @@
  * the response. Action names follow `management.<resource>.<verb>`.
  *
  * The actor is the user the credential acts as; a service key acts as nobody,
- * so it is recorded as `apikey:<id>` — still one stable string per credential,
+ * so it is recorded as `apikey:<id>`, still one stable string per credential,
  * so an audit reader can group a provisioning run's writes.
  */
 import { auditLog } from "@ee/audit-log/auditLog";

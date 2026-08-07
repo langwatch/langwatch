@@ -17,7 +17,7 @@ export interface CreateApiKeyOptions {
   description?: string;
   expiresAt?: string;
   projectId?: string[];
-  /** Repeatable `role:scopeType:scopeId` — precisely what the key may reach. */
+  /** Repeatable `role:scopeType:scopeId`: precisely what the key may reach. */
   binding?: string[];
   /** Repeatable `resource:action`, for a restricted key. */
   permission?: string[];
@@ -31,7 +31,7 @@ export interface CreateApiKeyOptions {
  * in whatever format the caller asked for (utils/output.ts).
  *
  * `data` deliberately includes `result.token`. This is the ONE moment the token
- * exists — the server never returns it again — and the human output prints it
+ * exists (the server never returns it again) and the human output prints it
  * in full for exactly that reason, as did the previous `--format json` branch.
  * Withholding it from the machine payload would make `api-key create -o json`
  * useless for the scripted case it exists to serve.
