@@ -438,7 +438,6 @@ export const scenarioEventsRouter = createTRPCRouter({
       // registered forever.
       const signal =
         opts.ctx.signal ??
-        // @ts-expect-error - tRPC v10 does not type `signal` on procedure opts
         (opts.signal as AbortSignal | undefined);
 
       try {

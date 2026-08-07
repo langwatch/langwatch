@@ -33,6 +33,7 @@ export default function EditTraceCheck() {
   );
   const updateCheck = api.monitors.update.useMutation();
   const deleteCheck = api.monitors.delete.useMutation();
+  const utils = api.useUtils();
   const [isConfirmDeleteOpen, setIsConfirmDeleteOpen] = useState(false);
 
   const onSubmit = async (data: CheckConfigFormData) => {
@@ -53,7 +54,10 @@ export default function EditTraceCheck() {
         },
       });
       void router.push(`/${project.slug}/online-evaluations`);
-      check.remove();
+      void utils.monitors.getById.invalidate({
+        id: checkId,
+        projectId: project.id,
+      });
     } catch {
       toaster.create({
         title: "Failed to update check",

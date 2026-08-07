@@ -75,9 +75,9 @@ export function useAdminUpdate<T>(
   >({
     mutationFn: ({ id, data }) => adminClient.update<T>(resource, id, data),
     ...options,
-    onSuccess: async (res, vars, onMutateResult, context) => {
+    onSuccess: async (...args) => {
       await qc.invalidateQueries({ queryKey: rootKey(resource) });
-      options?.onSuccess?.(res, vars, onMutateResult, context);
+      options?.onSuccess?.(...args);
     },
   });
 }
@@ -90,9 +90,9 @@ export function useAdminCreate<T>(
   return useMutation<DataResult<T>, Error, Record<string, unknown>>({
     mutationFn: (data) => adminClient.create<T>(resource, data),
     ...options,
-    onSuccess: async (res, vars, onMutateResult, context) => {
+    onSuccess: async (...args) => {
       await qc.invalidateQueries({ queryKey: rootKey(resource) });
-      options?.onSuccess?.(res, vars, onMutateResult, context);
+      options?.onSuccess?.(...args);
     },
   });
 }

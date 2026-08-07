@@ -917,7 +917,7 @@ export const RunDetails = React.memo(
                         Error loading step data
                       </Table.Cell>
                     </Table.Row>
-                  ) : dspyStep.data.examples.length === 0 ? (
+                  ) : dspyStep.data?.examples.length === 0 ? (
                     <Table.Row>
                       <Table.Cell colSpan={4}>No entries</Table.Cell>
                     </Table.Row>
@@ -1018,7 +1018,7 @@ export const RunDetails = React.memo(
                       Error loading step data
                     </Table.Cell>
                   </Table.Row>
-                ) : dspyStep.data.llm_calls.length === 0 ? (
+                ) : dspyStep.data?.llm_calls.length === 0 ? (
                   <Table.Row>
                     <Table.Cell colSpan={6}>No entries</Table.Cell>
                   </Table.Row>

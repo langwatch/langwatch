@@ -1,12 +1,12 @@
+import react from "@vitejs/plugin-react";
 import dotenv from "dotenv";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
-import { defineConfig, type Plugin, type UserConfig } from "vite";
-import react from "@vitejs/plugin-react";
 import path from "path";
 import { generate as generateSelfsigned } from "selfsigned";
+import { defineConfig, type Plugin, type UserConfig } from "vite";
 import { shikiManualChunk } from "./src/features/traces-v2/components/TraceDrawer/markdownView/shikiChunking";
-import { havenHmrGate } from "./vite/havenHmrGate";
 import { ASSET_URL_GLOBAL } from "./src/server/asset-base";
+import { havenHmrGate } from "./vite/havenHmrGate";
 
 // Load `.env` into the Vite config's process environment. Vite normally
 // only exposes `VITE_*` vars to client code — but this config itself
@@ -23,7 +23,9 @@ dotenv.config({
   quiet: true,
 });
 
-const FRONTEND_PORT = parseInt(process.env.LANGWATCH_APP_PORT ?? process.env.PORT ?? "5560");
+const FRONTEND_PORT = parseInt(
+  process.env.LANGWATCH_APP_PORT ?? process.env.PORT ?? "5560",
+);
 const API_PORT = FRONTEND_PORT + 1000;
 
 // When `LANGWATCH_DEV_HTTP2=1` is set, Vite serves the SPA over
@@ -41,7 +43,8 @@ const API_PROTOCOL = USE_HTTP2 ? "https" : "http";
 const API_TARGET =
   process.env.LANGWATCH_PORTLESS === "1"
     ? `http://127.0.0.1:${process.env.LANGWATCH_API_PORT ?? API_PORT}`
-    : (process.env.LANGWATCH_API_URL ?? `${API_PROTOCOL}://localhost:${API_PORT}`);
+    : (process.env.LANGWATCH_API_URL ??
+      `${API_PROTOCOL}://localhost:${API_PORT}`);
 
 /**
  * Load (and lazily generate) the dev TLS credentials. Mirrors
@@ -50,9 +53,10 @@ const API_TARGET =
  * the race benign — whichever loses the race overwrites with the same
  * effective contents, and subsequent reads find a valid pair.
  */
-async function loadDevHttpsCredentials(): Promise<
-  { cert: Buffer; key: Buffer } | null
-> {
+async function loadDevHttpsCredentials(): Promise<{
+  cert: Buffer;
+  key: Buffer;
+} | null> {
   if (!USE_HTTP2) return null;
 
   if (process.env.DEV_HTTPS_CERT && process.env.DEV_HTTPS_KEY) {
@@ -63,8 +67,7 @@ async function loadDevHttpsCredentials(): Promise<
   }
 
   const cacheDir =
-    process.env.LANGWATCH_DEV_CERT_DIR ??
-    path.join(__dirname, ".dev-certs");
+    process.env.LANGWATCH_DEV_CERT_DIR ?? path.join(__dirname, ".dev-certs");
   const certPath = path.join(cacheDir, "dev.pem");
   const keyPath = path.join(cacheDir, "dev-key.pem");
 
@@ -118,7 +121,11 @@ function patchObjectInspectBrowserStub(): Plugin {
     name: "patch-object-inspect-browser-stub",
     enforce: "pre",
     resolveId(id, importer) {
-      if (id === "./util.inspect" && importer && importer.includes("/object-inspect/")) {
+      if (
+        id === "./util.inspect" &&
+        importer &&
+        importer.includes("/object-inspect/")
+      ) {
         return noopPath;
       }
       return undefined;
@@ -145,222 +152,235 @@ export default defineConfig(async (): Promise<UserConfig> => {
   }
 
   return {
-  plugins: [react(), patchObjectInspectBrowserStub(), havenHmrGate()],
-  resolve: {
-    alias: {
-      // Path aliases (matching tsconfig paths)
-      "~": path.resolve(__dirname, "./src"),
-      "@app": path.resolve(__dirname, "./src/server/app-layer"),
-      "@ee": path.resolve(__dirname, "./ee"),
+    plugins: [react(), patchObjectInspectBrowserStub(), havenHmrGate()],
+    resolve: {
+      alias: {
+        // The generated Prisma client's `client.ts` entry hard-imports the node
+        // runtime (`@prisma/client/runtime/client` → `node:url`), which vite
+        // externalizes — evaluating it in the browser throws and blanks every
+        // page. Frontend files import it for enums and types; the old
+        // `@prisma/client` package routed those through its `browser` package
+        // field, but the generated client is plain source with no package.json,
+        // so the browser bundle is pointed at the generated browser entry here.
+        "~/generated/prisma/client": path.resolve(
+          __dirname,
+          "./src/generated/prisma/browser.ts",
+        ),
+        // Path aliases (matching tsconfig paths)
+        "~": path.resolve(__dirname, "./src"),
+        "@app": path.resolve(__dirname, "./src/server/app-layer"),
+        "@ee": path.resolve(__dirname, "./ee"),
+      },
+      // ONE zod instance for the app AND linked workspace packages
+      // (@langwatch/langy): zod v3 instanceof-checks its own classes (e.g.
+      // z.record's key/value overload detection), so a second physical copy
+      // resolved from a package's own node_modules silently mis-parses.
+      dedupe: ["zod"],
     },
-    // ONE zod instance for the app AND linked workspace packages
-    // (@langwatch/langy): zod v3 instanceof-checks its own classes (e.g.
-    // z.record's key/value overload detection), so a second physical copy
-    // resolved from a package's own node_modules silently mis-parses.
-    dedupe: ["zod"],
-  },
-  define: {
-    // Literal replacements for process.env references in browser code.
-    // Vite auto-handles NODE_ENV but not arbitrary env vars.
-    "process.env.NODE_ENV": JSON.stringify(process.env.NODE_ENV ?? "development"),
-    "process.env.PINO_LOG_LEVEL": JSON.stringify("info"),
-    // Catch-all: prevent ReferenceError for any other process.env.* access
-    // that slips into client code (e.g. dead branches behind typeof window checks)
-    "process.env.BASE_HOST": "undefined",
-    "process.env.PORT": "undefined",
-    "process.env.SKIP_ENV_VALIDATION": "undefined",
-    "process.env.BUILD_TIME": "undefined",
-    "process.env.VERCEL": "undefined",
-    "process.env.VERCEL_URL": "undefined",
-  },
-  optimizeDeps: {
-    // DEV-ONLY: optimizeDeps never touches the production build (prod bundles
-    // Shiki via the manualChunks rule below). Pre-bundle the whole Shiki
-    // ecosystem at dev-server start so the server doesn't discover Shiki's
-    // Oniguruma WASM engine + langs/themes lazily on the first /traces
-    // navigation and re-optimize mid-session. That re-optimization invalidates
-    // the in-flight `.vite/deps/wasm-*.js` (onig.wasm, ~620KB) request the span
-    // highlighter awaits, leaving the trace drawer stuck on "loading spans".
-    include: [
-      "shiki",
-      "@shikijs/core",
-      "@shikijs/engine-oniguruma",
-      "@shikijs/langs",
-      "@shikijs/themes",
-    ],
-  },
-  build: {
-    outDir: "dist/client",
-    sourcemap: true,
-    rollupOptions: {
-      output: {
-        manualChunks(id: string) {
-          // Shiki chunk-splitting lives in shikiChunking.ts (dependency-free) so
-          // its guard test can exercise the real logic. It keeps the core + base
-          // grammars/themes eager and splits the other ~340 grammars into lazy
-          // chunks — removing the ~9.5 MB raw / 1.66 MB gzip eager Shiki chunk
-          // that used to load on every page. See that file for the boot-cycle
-          // rationale.
-          return shikiManualChunk(id);
+    define: {
+      // Literal replacements for process.env references in browser code.
+      // Vite auto-handles NODE_ENV but not arbitrary env vars.
+      "process.env.NODE_ENV": JSON.stringify(
+        process.env.NODE_ENV ?? "development",
+      ),
+      "process.env.PINO_LOG_LEVEL": JSON.stringify("info"),
+      // Catch-all: prevent ReferenceError for any other process.env.* access
+      // that slips into client code (e.g. dead branches behind typeof window checks)
+      "process.env.BASE_HOST": "undefined",
+      "process.env.PORT": "undefined",
+      "process.env.SKIP_ENV_VALIDATION": "undefined",
+      "process.env.BUILD_TIME": "undefined",
+      "process.env.VERCEL": "undefined",
+      "process.env.VERCEL_URL": "undefined",
+    },
+    optimizeDeps: {
+      // DEV-ONLY: optimizeDeps never touches the production build (prod bundles
+      // Shiki via the manualChunks rule below). Pre-bundle the whole Shiki
+      // ecosystem at dev-server start so the server doesn't discover Shiki's
+      // Oniguruma WASM engine + langs/themes lazily on the first /traces
+      // navigation and re-optimize mid-session. That re-optimization invalidates
+      // the in-flight `.vite/deps/wasm-*.js` (onig.wasm, ~620KB) request the span
+      // highlighter awaits, leaving the trace drawer stuck on "loading spans".
+      include: [
+        "shiki",
+        "@shikijs/core",
+        "@shikijs/engine-oniguruma",
+        "@shikijs/langs",
+        "@shikijs/themes",
+      ],
+    },
+    build: {
+      outDir: "dist/client",
+      sourcemap: true,
+      rollupOptions: {
+        output: {
+          manualChunks(id: string) {
+            // Shiki chunk-splitting lives in shikiChunking.ts (dependency-free) so
+            // its guard test can exercise the real logic. It keeps the core + base
+            // grammars/themes eager and splits the other ~340 grammars into lazy
+            // chunks — removing the ~9.5 MB raw / 1.66 MB gzip eager Shiki chunk
+            // that used to load on every page. See that file for the boot-cycle
+            // rationale.
+            return shikiManualChunk(id);
+          },
         },
       },
     },
-  },
-  experimental: {
-    // ADR-086: the base for content-hashed assets is chosen at container start,
-    // not build time — one image serves self-host same-origin and SaaS from a
-    // commit-prefixed CDN. Emit every JS-referenced asset URL as a call to the
-    // runtime resolver defined by the served HTML shell (src/server/asset-base.ts);
-    // keep CSS-referenced assets relative to the CSS file (which lives under the
-    // same base, so fonts/images resolve on the CDN); leave HTML entry refs
-    // base-absolute for the server to rewrite; leave public/ assets same-origin.
-    renderBuiltUrl(filename, { type, hostType }) {
-      if (type === "public") return undefined;
-      if (hostType === "js") {
-        // Self-defaulting so the built bundle is usable even when the server
-        // hasn't injected the resolver: `vite preview`, the boot-smoke, and any
-        // raw-`dist/` static server fall back to same-origin ("/"+path). Read
-        // via `globalThis` (defined in the main document AND in Web Worker
-        // scopes, where `window` is undefined) so a worker chunk degrades to
-        // same-origin instead of throwing. The server sets
-        // `globalThis.__lwAssetUrl` to the CDN prefixer when LANGWATCH_ASSET_BASE
-        // is configured.
-        return {
-          runtime: `(globalThis.${ASSET_URL_GLOBAL}||function(p){return "/"+p})(${JSON.stringify(
-            filename,
-          )})`,
-        };
-      }
-      if (hostType === "css") return { relative: true };
-      return undefined;
-    },
-  },
-  server: {
-    watch: {
-      ignored: [
-        "**/.git/**",
-        "**/node_modules/.pnpm/**",
-        "**/.pnpm-store/**",
-        "**/dist/**",
-        "**/.next/**",
-        "**/coverage/**",
-        // Any dev-server tee target (server.log, server-qa.log, ...): the
-        // server appends on every request, so watching one turns each page
-        // load into a full-reload loop.
-        "**/server*.log",
-        // Working files agents keep under .claude/tmp, per the repo
-        // convention. A dev-server log teed there reloads the page on every
-        // request, same trap as above under a different name. Agent
-        // worktrees also live under .claude/worktrees, and chokidar
-        // matches ignore globs against full paths, so from a worktree
-        // root any pattern containing .claude/worktrees matches every
-        // file in the tree and blinds the watcher entirely. From a
-        // worktree only .claude/tmp is ignored (worktrees do not nest);
-        // from the main root the entire .claude tree, nested worktree
-        // copies included, stays ignored as before.
-        ...(process.cwd().includes("/.claude/")
-          ? ["**/.claude/tmp/**"]
-          : ["**/.claude/**"]),
-      ],
-      // Docker-on-macOS bind mounts don't surface inotify events reliably,
-      // so Vite's default fs.watch sits silent on edits made from the host.
-      // Polling at 250ms is the standard workaround and HMR fires
-      // immediately. Native macOS / Linux hosts opt out via
-      // `LANGWATCH_VITE_NO_POLLING=1` to dodge the CPU tax.
-      ...(process.env.LANGWATCH_VITE_NO_POLLING === "1"
-        ? {}
-        : { usePolling: true, interval: 250 }),
-    },
-    // Frontend port (default 5560, configurable via PORT env var)
-    host: true,
-    allowedHosts: true,
-    port: FRONTEND_PORT,
-    strictPort: true,
-    // HTTPS+HTTP/2 when LANGWATCH_DEV_HTTP2=1. Vite negotiates h2 over
-    // TLS automatically when `https` is set. Both Vite and the API
-    // share the same auto-generated cert so the browser only has to
-    // trust one cert for the whole stack.
-    ...(devHttpsCredentials
-      ? {
-          https: {
-            cert: devHttpsCredentials.cert,
-            key: devHttpsCredentials.key,
-          },
+    experimental: {
+      // ADR-086: the base for content-hashed assets is chosen at container start,
+      // not build time — one image serves self-host same-origin and SaaS from a
+      // commit-prefixed CDN. Emit every JS-referenced asset URL as a call to the
+      // runtime resolver defined by the served HTML shell (src/server/asset-base.ts);
+      // keep CSS-referenced assets relative to the CSS file (which lives under the
+      // same base, so fonts/images resolve on the CDN); leave HTML entry refs
+      // base-absolute for the server to rewrite; leave public/ assets same-origin.
+      renderBuiltUrl(filename, { type, hostType }) {
+        if (type === "public") return undefined;
+        if (hostType === "js") {
+          // Self-defaulting so the built bundle is usable even when the server
+          // hasn't injected the resolver: `vite preview`, the boot-smoke, and any
+          // raw-`dist/` static server fall back to same-origin ("/"+path). Read
+          // via `globalThis` (defined in the main document AND in Web Worker
+          // scopes, where `window` is undefined) so a worker chunk degrades to
+          // same-origin instead of throwing. The server sets
+          // `globalThis.__lwAssetUrl` to the CDN prefixer when LANGWATCH_ASSET_BASE
+          // is configured.
+          return {
+            runtime: `(globalThis.${ASSET_URL_GLOBAL}||function(p){return "/"+p})(${JSON.stringify(
+              filename,
+            )})`,
+          };
         }
-      : {}),
-    // Proxy API requests to the Hono backend (PORT + 1000). `ws: true`
-    // forwards WebSocket upgrades for the tRPC WS transport at /api/trpc-ws.
-    //
-    // The MCP routes (/mcp, /sse, /messages, /oauth/*, /.well-known/oauth-*)
-    // are registered directly on the Node HTTP server in start.ts (NOT
-    // mounted under /api), so they need explicit proxy entries here for
-    // external MCP clients (e.g. Claude Code adding the LangWatch MCP
-    // server in dev) to reach them via the canonical FRONTEND_PORT. The
-    // production server (start.ts) listens on a single port so this
-    // splitting is dev-only.
-    proxy: {
-      // The tRPC WS transport enforces a same-origin allowlist (built from
-      // NEXTAUTH_URL) and fail-closes on a missing/mismatched Origin. The
-      // catch-all `/api` proxy below sets `changeOrigin: true`, which rewrites
-      // the WS handshake Origin so the backend sees a null/foreign origin and
-      // rejects every upgrade — silently breaking all WS-backed workbench
-      // state. A dedicated, earlier entry keeps the browser's real Origin.
-      "/api/trpc-ws": {
-        target: API_TARGET,
-        changeOrigin: false,
-        ws: true,
-        secure: false,
-      },
-      "/api": {
-        target: API_TARGET,
-        changeOrigin: true,
-        ws: true,
-        // Self-signed dev cert — don't fail the proxy on cert verification.
-        // No-op when API is on plain HTTP.
-        secure: false,
-      },
-      // Exact-match only ("^...$") — a plain "/mcp" prefix also swallows the
-      // /mcp/authorize frontend page route (src/pages/mcp/authorize.tsx),
-      // sending it to the API server, which has no dev-mode page fallback.
-      // server.proxy regexes test against the full req.url (path + query),
-      // so the optional "(?:\?.*)?" is required or a query-bearing request
-      // like "/mcp?sessionId=..." falls through to the frontend instead.
-      "^/mcp(?:\\?.*)?$": {
-        target: API_TARGET,
-        changeOrigin: true,
-        secure: false,
-      },
-      "^/mcp/health(?:\\?.*)?$": {
-        target: API_TARGET,
-        changeOrigin: true,
-        secure: false,
-      },
-      "/sse": {
-        target: API_TARGET,
-        changeOrigin: true,
-        secure: false,
-      },
-      "/messages": {
-        target: API_TARGET,
-        changeOrigin: true,
-        secure: false,
-      },
-      "/oauth": {
-        target: API_TARGET,
-        changeOrigin: true,
-        secure: false,
-      },
-      "/.well-known/oauth-protected-resource": {
-        target: API_TARGET,
-        changeOrigin: true,
-        secure: false,
-      },
-      "/.well-known/oauth-authorization-server": {
-        target: API_TARGET,
-        changeOrigin: true,
-        secure: false,
+        if (hostType === "css") return { relative: true };
+        return undefined;
       },
     },
-  },
+    server: {
+      watch: {
+        ignored: [
+          "**/.git/**",
+          "**/node_modules/.pnpm/**",
+          "**/.pnpm-store/**",
+          "**/dist/**",
+          "**/.next/**",
+          "**/coverage/**",
+          // Any dev-server tee target (server.log, server-qa.log, ...): the
+          // server appends on every request, so watching one turns each page
+          // load into a full-reload loop.
+          "**/server*.log",
+          // Working files agents keep under .claude/tmp, per the repo
+          // convention. A dev-server log teed there reloads the page on every
+          // request, same trap as above under a different name. Agent
+          // worktrees also live under .claude/worktrees, and chokidar
+          // matches ignore globs against full paths, so from a worktree
+          // root any pattern containing .claude/worktrees matches every
+          // file in the tree and blinds the watcher entirely. From a
+          // worktree only .claude/tmp is ignored (worktrees do not nest);
+          // from the main root the entire .claude tree, nested worktree
+          // copies included, stays ignored as before.
+          ...(process.cwd().includes("/.claude/")
+            ? ["**/.claude/tmp/**"]
+            : ["**/.claude/**"]),
+        ],
+        // Docker-on-macOS bind mounts don't surface inotify events reliably,
+        // so Vite's default fs.watch sits silent on edits made from the host.
+        // Polling at 250ms is the standard workaround and HMR fires
+        // immediately. Native macOS / Linux hosts opt out via
+        // `LANGWATCH_VITE_NO_POLLING=1` to dodge the CPU tax.
+        ...(process.env.LANGWATCH_VITE_NO_POLLING === "1"
+          ? {}
+          : { usePolling: true, interval: 250 }),
+      },
+      // Frontend port (default 5560, configurable via PORT env var)
+      host: true,
+      allowedHosts: true,
+      port: FRONTEND_PORT,
+      strictPort: true,
+      // HTTPS+HTTP/2 when LANGWATCH_DEV_HTTP2=1. Vite negotiates h2 over
+      // TLS automatically when `https` is set. Both Vite and the API
+      // share the same auto-generated cert so the browser only has to
+      // trust one cert for the whole stack.
+      ...(devHttpsCredentials
+        ? {
+            https: {
+              cert: devHttpsCredentials.cert,
+              key: devHttpsCredentials.key,
+            },
+          }
+        : {}),
+      // Proxy API requests to the Hono backend (PORT + 1000). `ws: true`
+      // forwards WebSocket upgrades for the tRPC WS transport at /api/trpc-ws.
+      //
+      // The MCP routes (/mcp, /sse, /messages, /oauth/*, /.well-known/oauth-*)
+      // are registered directly on the Node HTTP server in start.ts (NOT
+      // mounted under /api), so they need explicit proxy entries here for
+      // external MCP clients (e.g. Claude Code adding the LangWatch MCP
+      // server in dev) to reach them via the canonical FRONTEND_PORT. The
+      // production server (start.ts) listens on a single port so this
+      // splitting is dev-only.
+      proxy: {
+        // The tRPC WS transport enforces a same-origin allowlist (built from
+        // NEXTAUTH_URL) and fail-closes on a missing/mismatched Origin. The
+        // catch-all `/api` proxy below sets `changeOrigin: true`, which rewrites
+        // the WS handshake Origin so the backend sees a null/foreign origin and
+        // rejects every upgrade — silently breaking all WS-backed workbench
+        // state. A dedicated, earlier entry keeps the browser's real Origin.
+        "/api/trpc-ws": {
+          target: API_TARGET,
+          changeOrigin: false,
+          ws: true,
+          secure: false,
+        },
+        "/api": {
+          target: API_TARGET,
+          changeOrigin: true,
+          ws: true,
+          // Self-signed dev cert — don't fail the proxy on cert verification.
+          // No-op when API is on plain HTTP.
+          secure: false,
+        },
+        // Exact-match only ("^...$") — a plain "/mcp" prefix also swallows the
+        // /mcp/authorize frontend page route (src/pages/mcp/authorize.tsx),
+        // sending it to the API server, which has no dev-mode page fallback.
+        // server.proxy regexes test against the full req.url (path + query),
+        // so the optional "(?:\?.*)?" is required or a query-bearing request
+        // like "/mcp?sessionId=..." falls through to the frontend instead.
+        "^/mcp(?:\\?.*)?$": {
+          target: API_TARGET,
+          changeOrigin: true,
+          secure: false,
+        },
+        "^/mcp/health(?:\\?.*)?$": {
+          target: API_TARGET,
+          changeOrigin: true,
+          secure: false,
+        },
+        "/sse": {
+          target: API_TARGET,
+          changeOrigin: true,
+          secure: false,
+        },
+        "/messages": {
+          target: API_TARGET,
+          changeOrigin: true,
+          secure: false,
+        },
+        "/oauth": {
+          target: API_TARGET,
+          changeOrigin: true,
+          secure: false,
+        },
+        "/.well-known/oauth-protected-resource": {
+          target: API_TARGET,
+          changeOrigin: true,
+          secure: false,
+        },
+        "/.well-known/oauth-authorization-server": {
+          target: API_TARGET,
+          changeOrigin: true,
+          secure: false,
+        },
+      },
+    },
   };
 });
