@@ -87,7 +87,7 @@ export const goErrorCodes = {
    *
    * @source services/aigateway/domain/errors.go
    */
-  codex_session_expired: { service: "aigateway" },
+  codex_session_expired: { service: "aigateway", httpStatus: 401 },
   /**
    * ConfigInvalid — is the herr code for configuration validation failures.
    *
@@ -229,6 +229,13 @@ export const goErrorCodes = {
    * @source services/langyagent/domain/errors.go
    */
   max_workers_reached: { service: "langyagent", httpStatus: 503 },
+  /**
+   * ErrMissingModel — is a request-shape error with its own stable identity so
+   * clients and rejection metrics do not have to infer it from prose.
+   *
+   * @source services/aigateway/domain/errors.go
+   */
+  missing_model: { service: "aigateway", httpStatus: 400 },
   /**
    * ErrModelNotAllowed
    *

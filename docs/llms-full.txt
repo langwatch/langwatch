@@ -1907,6 +1907,7 @@ Errors (like successes) always carry:
 
 - `X-LangWatch-Gateway-Request-Id: req_<hex>`, use this when filing support tickets. It is the same id that appears as `gateway_request_id` on spend events and webhook envelopes, so it joins a failing call to its billing records.
 - `X-LangWatch-Provider`, present when the error originated from an upstream provider (absent for gateway-internal errors).
+- `X-LangWatch-Handled-Error`, the top-level `error.code`, present on every LangWatch-authored error. A forwarded provider error is not LangWatch-authored, so this header is absent (or stripped, if the provider's own response happened to set it) on those responses — use it to tell the two apart rather than guessing from the body shape.
 
 ## Type enum
 
@@ -1928,7 +1929,8 @@ Errors (like successes) always carry:
 | `provider_error` | `502` | An upstream provider returned a non-recoverable error and fallback (if any) was exhausted. |
 | `circuit_open` | `503` | Repeated upstream 5xx/timeout/network failures opened the credential's circuit breaker, so the gateway declined to dial the provider for this request. Retryable; the breaker probes the upstream again after its cooldown. Answered 4xx (rate limits, quota, bad requests) never open the breaker. |
 | `upstream_timeout` | `504` | An upstream provider exceeded `timeout_ms` and fallback (if any) was exhausted. |
-| `bad_request` | `400` | Validation error on the incoming payload (e.g. missing `model`). |
+| `bad_request` | `400` | Validation error on the incoming payload. |
+| `missing_model` | `400` | The request names no model. `message` and `meta.request_type` say where that endpoint expects one. |
 | `unsupported_parameter` | `400` | The parameter policy refused a request parameter for the target lane: either the request depends on it functionally and the lane cannot honor it, or `drop_tuning_params` is `false` and the lane has no mapping for it. The message names the parameter, the lane, and why. See [Parameter mapping](/ai-gateway/parameter-mapping). |
 | `payload_too_large` | `413` | Request body exceeded `SERVER_MAX_REQUEST_BODY_BYTES` (default 32 MiB). Rejected at the edge, before auth, resolve-key, or any upstream dispatch, so a 1 GB drive-by scan never pressures the pod memory limit. Declared `Content-Length` above the cap returns 413 immediately without draining the socket; chunked unknown-length bodies trip a `*http.MaxBytesError` at the cap. |
 | `internal_error` | `500` | Unclassified gateway error. `X-LangWatch-Gateway-Request-Id` is how we trace it. |
@@ -8887,6 +8889,25 @@ The gateway serves `GET /metrics` on its main HTTP port (`5563` by default, the 
 | `gateway_cache_rule_hits_total` | counter | `rule_id`, `mode_applied` | Bundle-baked cache rule matches. `mode_applied` is `RESPECT`, `FORCE`, or `DISABLE` |
 | `gateway_guardrail_verdicts_total` | counter | `direction`, `verdict` | Guardrail decisions. `direction` is `request`, `response`, or `stream_chunk`; `verdict` is `allow`, `block`, `modify`, or `fail_open`. `fail_open` means the traffic passed unchecked, on any direction. It is the default outcome for `stream_chunk`, which never stalls a stream on policy, and opt-in for the other two |
 | `gateway_rate_limit_denied_total` | counter | `dimension`, `vk_id` | Requests denied by the virtual-key rate limiter. `dimension` is `rpm` or `rpd` |
+| `gateway_client_rejects_total` | counter | `code`, `vk_id` | Requests **the gateway itself** rejected as the caller's fault after authentication, by gateway error code (`missing_model`, `bad_request`, `model_not_allowed`, `budget_exceeded`, `payload_too_large`, …) and by the virtual key that sent them. These are logged at `info`, so this counter is the only signal that will move when one client loops on a malformed body. Alert on a sustained per-key rate rather than on any single rejection |
+
+Three things this counter deliberately excludes, because all three would make a per-key alert on it fire for keys doing nothing wrong:
+
+- **Authentication failures.** A missing or unresolvable key is rejected before the request has a key to attribute it to. Watch `gateway_http_requests_total{status="401"}` instead.
+- **Provider rejections.** An upstream 4xx (an OpenAI 429, an Anthropic 402) is the caller's fault too, but it is not the gateway rejecting the client — counting it would turn a bad hour at a provider into an alert that reads as client misbehaviour. Those live on `gateway_provider_attempts_total{outcome="rate_limit"}` and the upstream status on `gateway_http_requests_total`.
+- **Gateway rate limiting.** A key legitimately sustained at its RPM/RPD ceiling would otherwise pin this counter too, muting the exact alert it exists for. Watch `gateway_rate_limit_denied_total` instead.
+
+To find a client stuck in a rejection loop, rank by key, then drill into the one that stands out:
+
+```promql
+topk(5, sum by (vk_id) (rate(gateway_client_rejects_total{code!=""}[15m])))
+```
+
+Copy the complete `vk_id` from that result, then replace `<full-vk-id>` for the code breakdown:
+
+```promql
+sum by (code) (rate(gateway_client_rejects_total{vk_id="<full-vk-id>"}[15m]))
+```
 
 ### Streaming
 
@@ -53061,7 +53082,7 @@ floor narrow enough to be free-as-in-beer-AND-as-in-speech:
   default 5-role RBAC catalog (ADMIN, MEMBER, EXTERNAL + per-resource
   view/manage actions) is Apache 2.0.
 - **SCIM provisioning** is Enterprise. Apache 2.0 customers can still
-  use SSO (Okta, Auth0, Azure AD) for sign-in.
+  use SSO (Okta, Auth0, Azure AD, AWS Cognito, OneLogin) for sign-in.
 
 ## Migrating from Apache 2.0 to Enterprise
 
@@ -53090,7 +53111,7 @@ queryable; gated surfaces re-gate.
 - [AI Governance → Compliance architecture](/ai-governance/compliance-architecture): substrate mechanisms underlying the table above
 - [AI Governance → Open-core licensing](/ai-governance/overview#open-core-licensing): the layered enforcement (UI, tRPC, service, CLI)
 - [Self-hosting → Security](/self-hosting/security): TLS, env secrets, network boundaries
-- [Self-hosting → Configuration → SSO](/self-hosting/configuration/sso): Okta, Auth0, Azure AD wiring
+- [Self-hosting → Configuration → SSO](/self-hosting/configuration/sso): Okta, Auth0, Azure AD, AWS Cognito and OneLogin wiring
 
 ---
 
@@ -54158,6 +54179,8 @@ description: "Set up Single Sign-On for LangWatch with your identity provider"
 
 LangWatch supports SSO with the identity providers below. Choose one and configure it as described.
 
+If your provider is not named here and speaks OpenID Connect, use the generic [`oidc`](#any-other-openid-connect-provider) provider. The named entries exist because each has setup steps worth spelling out, not because the others are unsupported.
+
 <Warning>
 **SSO requires an Enterprise license.** Setting the environment variables is not enough on its own: a deployment with an identity provider configured but no license runs in email mode, the identity-provider button is not shown on the sign-in page, and SSO sign-in routes are refused. Email sign-in and **Forgot password** stay available so nobody is locked out, though **Forgot password** can only deliver if outbound email is configured. If everyone on an unlicensed deployment signs in through SSO, set `LANGWATCH_LICENSE_KEY` or configure SMTP before upgrading, see [Editions and licensing](/self-hosting/licensing).
 
@@ -54170,11 +54193,14 @@ The decision is made once at startup, so a license activated on a running server
 |----------|--------------------------|----------|
 | Email/Password | `email` (default) | Nothing extra |
 | Auth0 | `auth0` | Client ID, Client Secret, Issuer |
+| AWS Cognito | `cognito` | Client ID, Client Secret, Issuer |
 | Azure AD | `azure-ad` | Client ID, Client Secret, Tenant ID |
 | GitHub | `github` | Client ID, Client Secret |
 | GitLab | `gitlab` | Client ID, Client Secret |
 | Google | `google` | Client ID, Client Secret |
 | Okta | `okta` | Client ID, Client Secret, Issuer |
+| OneLogin | `onelogin` | Client ID, Client Secret, Issuer |
+| Any other OpenID Connect provider | `oidc` | Client ID, Client Secret, Issuer |
 
 ## OAuth Redirect URL
 
@@ -54184,7 +54210,7 @@ When configuring your identity provider, set the redirect/callback URL to:
 https://your-langwatch-domain.com/api/auth/callback/{provider}
 ```
 
-Replace `{provider}` with: `auth0`, `azure-ad`, `github`, `gitlab`, `google`, or `okta`. This is the same value you set as `NEXTAUTH_PROVIDER`.
+Replace `{provider}` with: `auth0`, `azure-ad`, `cognito`, `github`, `gitlab`, `google`, `okta`, `onelogin`, or `oidc`. This is the same value you set as `NEXTAUTH_PROVIDER`.
 
 <Note>
 A `NEXTAUTH_PROVIDER` value LangWatch does not recognise, or one whose client credentials are missing, starts the deployment in email mode and logs which provider it could not mount. That keeps a licensed deployment signable-in while you correct the value, rather than pointing the sign-in page at an identity provider that was never wired up.
@@ -54230,6 +54256,44 @@ Or via environment variables:
 | `AUTH0_CLIENT_ID` | Your Auth0 client ID |
 | `AUTH0_CLIENT_SECRET` | Your Auth0 client secret |
 | `AUTH0_ISSUER` | `https://your-tenant.auth0.com` |
+
+### AWS Cognito
+
+1. In the [Cognito console](https://console.aws.amazon.com/cognito/), open your user pool and give it a hosted-UI domain if it does not have one yet (**App integration > Domain**)
+2. Create an app client with a client secret, and set its **Allowed callback URL** to `https://your-domain.com/api/auth/callback/cognito`
+3. Under the app client's login pages, enable the **Authorization code grant** flow and the `openid`, `email` and `profile` scopes
+4. Configure in Helm:
+
+```yaml
+app:
+  nextAuth:
+    provider: cognito
+    providers:
+      cognito:
+        clientId:
+          secretKeyRef: { name: langwatch-sso, key: cognitoClientId }
+        clientSecret:
+          secretKeyRef: { name: langwatch-sso, key: cognitoClientSecret }
+        issuer:
+          value: "https://cognito-idp.eu-central-1.amazonaws.com/eu-central-1_abc123"
+```
+
+Or via environment variables:
+
+| Variable | Value |
+|----------|-------|
+| `NEXTAUTH_PROVIDER` | `cognito` |
+| `COGNITO_CLIENT_ID` | Your app client ID |
+| `COGNITO_CLIENT_SECRET` | Your app client secret |
+| `COGNITO_ISSUER` | `https://cognito-idp.<region>.amazonaws.com/<userPoolId>` |
+
+<Note>
+The issuer is the user pool's own issuer, not the hosted-UI domain. LangWatch reads the hosted-UI endpoints from the issuer's discovery document, so the domain never has to be configured separately. You can confirm a pool's issuer is reachable with:
+
+```bash
+curl https://cognito-idp.<region>.amazonaws.com/<userPoolId>/.well-known/openid-configuration
+```
+</Note>
 
 ### Azure AD
 
@@ -54335,6 +54399,75 @@ app:
 | `OKTA_CLIENT_ID` | Client ID |
 | `OKTA_CLIENT_SECRET` | Client secret |
 | `OKTA_ISSUER` | `https://your-org.okta.com` |
+
+### OneLogin
+
+1. In the [OneLogin Admin portal](https://www.onelogin.com/), add an **OpenID Connect (OIDC)** application
+2. Set the **Redirect URI** to `https://your-domain.com/api/auth/callback/onelogin`
+3. Under **SSO**, set the application type to **Web** so it is issued a client secret, and note the Client ID and Client Secret
+
+```yaml
+app:
+  nextAuth:
+    provider: onelogin
+    providers:
+      onelogin:
+        clientId:
+          secretKeyRef: { name: langwatch-sso, key: oneloginClientId }
+        clientSecret:
+          secretKeyRef: { name: langwatch-sso, key: oneloginClientSecret }
+        issuer:
+          value: "https://your-subdomain.onelogin.com/oidc/2"
+```
+
+| Variable | Value |
+|----------|-------|
+| `NEXTAUTH_PROVIDER` | `onelogin` |
+| `ONELOGIN_CLIENT_ID` | Client ID |
+| `ONELOGIN_CLIENT_SECRET` | Client secret |
+| `ONELOGIN_ISSUER` | `https://your-subdomain.onelogin.com/oidc/2` |
+
+<Note>
+If OneLogin sits behind another identity provider, for example a Cognito user pool that federates to it, point LangWatch at whichever one it talks to directly and let that one handle the hop. LangWatch only needs one OIDC issuer.
+</Note>
+
+### Any other OpenID Connect provider
+
+Any provider that publishes an OpenID Connect discovery document and supports the authorization code flow with PKCE works without being named above: Keycloak, Authentik, Zitadel, Ping, JumpCloud, a self-hosted IdP, whatever you run.
+
+1. Register an OIDC client with your provider, with the authorization code flow and the `openid`, `email` and `profile` scopes
+2. Set its redirect URI to `https://your-domain.com/api/auth/callback/oidc`
+
+```yaml
+app:
+  nextAuth:
+    provider: oidc
+    providers:
+      oidc:
+        clientId:
+          secretKeyRef: { name: langwatch-sso, key: oidcClientId }
+        clientSecret:
+          secretKeyRef: { name: langwatch-sso, key: oidcClientSecret }
+        issuer:
+          value: "https://idp.example.com"
+```
+
+| Variable | Value |
+|----------|-------|
+| `NEXTAUTH_PROVIDER` | `oidc` |
+| `OIDC_CLIENT_ID` | Client ID |
+| `OIDC_CLIENT_SECRET` | Client secret |
+| `OIDC_ISSUER` | Whatever your provider publishes `.well-known/openid-configuration` under |
+
+<Note>
+Check the issuer is right by fetching its discovery document, which is exactly what LangWatch does at sign-in:
+
+```bash
+curl https://idp.example.com/.well-known/openid-configuration
+```
+
+JSON back means the issuer is right. LangWatch then reads `authorization_endpoint`, `token_endpoint` and `userinfo_endpoint` from that document, so all three have to be there, and the client you registered has to allow the authorization code flow with PKCE.
+</Note>
 
 ## Domain-to-Organization Mapping
 

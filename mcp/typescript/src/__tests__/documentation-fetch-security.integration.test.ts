@@ -3,10 +3,13 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { initConfig } from "../config.js";
 import { fetchDocumentation, resolveDocumentationUrl } from "../documentation-fetch.js";
+import { countingVerifier } from "./support/http-server-harness.js";
+
+const TEST_API_KEY = "security-regression-test";
 
 const MCP_HEADERS = {
   Accept: "application/json, text/event-stream",
-  Authorization: "Bearer security-regression-test",
+  Authorization: `Bearer ${TEST_API_KEY}`,
   "Content-Type": "application/json",
 };
 
@@ -95,7 +98,10 @@ describe("MCP documentation fetch security", () => {
 
       initConfig({ endpoint: "https://app.langwatch.ai" });
       const { startHttpServer } = await import("../http-server.js");
-      const started = await startHttpServer({ port: 0 });
+      // These cases are about SSRF in the documentation tools, so the key check
+      // is stubbed to keep the test on its own subject.
+      const { verifier } = countingVerifier([TEST_API_KEY]);
+      const started = await startHttpServer({ port: 0, apiKeyVerifier: verifier });
       mcpServer = started.server;
       mcpPort = started.port;
 

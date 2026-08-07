@@ -8,14 +8,14 @@ import (
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
 
-// ResolveModelFunc resolves a raw model string against bundle config.
-type ResolveModelFunc func(ctx context.Context, rawModel string, config domain.BundleConfig) (*domain.ResolvedModel, error)
+// ResolveModelFunc resolves a request's model against bundle config.
+type ResolveModelFunc func(ctx context.Context, req *domain.Request, config domain.BundleConfig) (*domain.ResolvedModel, error)
 
 // ModelResolve creates an interceptor that resolves model aliases and
 // rewrites the request body with the canonical model name.
 func ModelResolve(resolve ResolveModelFunc) Interceptor {
 	return PreOnly("model_resolve", func(ctx context.Context, call *Call) error {
-		resolved, err := resolve(ctx, call.Request.Model, call.Bundle.Config)
+		resolved, err := resolve(ctx, call.Request, call.Bundle.Config)
 		if err != nil {
 			return err
 		}

@@ -6,6 +6,7 @@ import {
   hasProjectPermission,
   hasTeamPermission,
 } from "../api/rbac";
+import { CODING_ASSISTANT_SURFACES_ONLY_NEEDLE } from "./codexRefusalMessage";
 import {
   isModelAllowedAsRoleDefault,
   isModelAllowedForFeature,
@@ -121,7 +122,7 @@ function sanitizeConfig(raw: Record<string, unknown>): Record<string, string> {
       : isModelAllowedForFeature({ modelId: value, featureKey: key });
     if (!allowed) {
       throw new Error(
-        `"${value}" serves the coding-assistant surfaces only and cannot be set for "${key}".`,
+        `"${value}" ${CODING_ASSISTANT_SURFACES_ONLY_NEEDLE} and cannot be set for "${key}".`,
       );
     }
     clean[key] = value;
@@ -272,7 +273,7 @@ export async function setRoleAtScope(
     !isModelAllowedAsRoleDefault(params.model, params.role)
   ) {
     throw new Error(
-      `"${params.model}" serves the coding-assistant surfaces only and cannot be a ${params.role} role default.`,
+      `"${params.model}" ${CODING_ASSISTANT_SURFACES_ONLY_NEEDLE} and cannot be a ${params.role} role default.`,
     );
   }
   await upsertKeyAtScope(ctx, {
@@ -309,7 +310,7 @@ export async function setFeatureAtScope(
     })
   ) {
     throw new Error(
-      `"${params.model}" serves the coding-assistant surfaces only and cannot be the model for "${params.featureKey}".`,
+      `"${params.model}" ${CODING_ASSISTANT_SURFACES_ONLY_NEEDLE} and cannot be the model for "${params.featureKey}".`,
     );
   }
   await upsertKeyAtScope(ctx, {
