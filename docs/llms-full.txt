@@ -3036,7 +3036,7 @@ GET /api/gateway/v1/spend-events?from=1751328000000&to=1753920000000&cursor=...
 
 - `from` and `to` (unix milliseconds) are **required**, must be safe integers, and `from <= to`; the walk is a ranged read by contract.
 - Pages are **stable under live writes**: rows are served in insert order, so a row folded late is picked up by a later page of the same walk instead of being skipped. Offset pagination cannot promise that; cursors can.
-- Filters: `virtual_key_id`, `end_user_id`, `project_id`, `model`, and `status` (`success`, `error`, `admitted`, `confirmed`, `failed`, `settled`). `limit` defaults to 50, max 200.
+- Filters: `project_id`, `team_id`, `external_id`, `virtual_key_id`, `end_user_id`, `principal_user_id`, `model`, `provider_key`, `request_type`, `label`, `metadata`, and `status` (`success`, `error`, `admitted`, `confirmed`, `failed`, `settled`). The same twelve narrow the summaries. `limit` defaults to 50, max 200.
 - Rows come back as the same canonical envelopes the webhooks deliver, plus `next_cursor`. Diff by `gateway_request_id`.
 - A garbled `cursor` is refused with `400` rather than silently restarting the walk.
 - In-flight requests appear with `status=admitted` and null quantities (typed `gateway.request.admitted` on this surface only; they are never pushed). Treat them as not yet billable.
@@ -3088,7 +3088,7 @@ for event in langwatch.spend_events.iterate(from_ms=from_ms, to_ms=to_ms, virtua
 
 Both grains take the same filters, so a divergence can be walked on exactly the narrowing that produced it. Pass an array to widen a filter and name two filters to narrow.
 
-The window below is the closed month declared above, which matters: grouping by `model` or `provider`, or into time buckets, is refused on a window recent enough that outcomes can still arrive. Reconcile closed periods and you never meet it; for a live view, send `allowUnstable` and read the result as approximate.
+The window below is the closed month declared above, which matters: grouping by `model` or `provider`, or into time buckets, is refused on a window recent enough that outcomes can still arrive. Reconcile closed periods and you never meet it; for a live view, opt out and read the result as approximate: `allow_unstable=true` over REST, `allowUnstable` from the TypeScript SDK, `allow_unstable` from Python.
 
 
 <CodeGroup>
@@ -5901,7 +5901,7 @@ curl -sS "$LW/api/gateway/v1/spend-summaries?group_by=virtual_key&from=$FROM_MS&
 # compare event_count and cost.nano_usd per key against your ledger
 ```
 
-Matching totals mean no aggregate divergence. They are not proof that both systems hold the same `gateway_request_id` set, since a different set can sum the same, so a biller that needs request-level certainty walks the events regardless. On divergence, walk `spend-events` for that key and window by cursor and compare `gateway_request_id` counts per id rather than set membership: one request dropped and another booked twice leaves the id sets looking close and the money wrong. The ids whose counts disagree are your fix list. Both reads take the same filters, so you can narrow the walk to exactly what the checksum covered. For a delivery gap (receiver outage, endpoint auto-disabled), [replay](/ai-gateway/billing-events#replay) the gap window to your endpoint, honoring your downstream biller's dedup window.
+Matching totals mean no aggregate divergence. They are not proof that both systems hold the same `gateway_request_id` set, since a different set can sum the same, so a biller that needs request-level certainty walks the events regardless. On divergence, walk `spend-events` for that key and window by cursor and compare `gateway_request_id` counts per id rather than set membership: one request dropped and another booked twice leaves the id sets looking close and the money wrong. The ids whose counts disagree are your drops and duplicates. If every count agrees and the totals still differ, no request is missing and the same request is priced differently on each side, so compare `cost.nano_usd` per id rather than its presence. Both reads take the same filters, so you can narrow the walk to exactly what the checksum covered. For a delivery gap (receiver outage, endpoint auto-disabled), [replay](/ai-gateway/billing-events#replay) the gap window to your endpoint, honoring your downstream biller's dedup window.
 
 ### Narrowing and grouping
 

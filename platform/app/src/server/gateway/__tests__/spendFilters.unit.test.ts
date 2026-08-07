@@ -2,6 +2,7 @@
  * @vitest-environment node
  */
 import { describe, expect, it } from "vitest";
+import type { z } from "zod";
 
 import {
   buildSpendFilterClauses,
@@ -11,7 +12,17 @@ import {
   spendFiltersSchema,
 } from "../spendFilters";
 
-describe("the shared spend filter vocabulary", () => {
+/** Which fields a parse rejected, so a refusal test can name the rule it
+ *  meant rather than settling for "something threw". */
+function issuePaths(result: {
+  success: boolean;
+  error?: z.ZodError;
+}): string[] {
+  if (result.success) throw new Error("expected the parse to be refused");
+  return (result.error?.issues ?? []).map((issue) => issue.path.join("."));
+}
+
+describe("given the shared spend filter vocabulary", () => {
   describe("when a filter appears once in the query", () => {
     it("accepts the bare string hono hands back", () => {
       // Hono gives a string for one occurrence and an array for repeats, so a
@@ -81,17 +92,27 @@ describe("the shared spend filter vocabulary", () => {
       // A key with a colon is unaddressable in `key:value`, so accepting it
       // here would let the screen set a filter no reconciliation script can
       // reproduce, which is the drift this module exists to prevent.
-      expect(() =>
-        spendFiltersSchema.parse({
-          metadata: [{ key: "region:env", values: ["eu"] }],
-        }),
-      ).toThrow();
+      //
+      // The path is asserted, not just the rejection: this input is otherwise
+      // valid, so a test that only proves "something threw" would keep passing
+      // if the colon rule were dropped and some unrelated rule tripped instead.
+      expect(
+        issuePaths(
+          spendFiltersSchema.safeParse({
+            metadata: [{ key: "region:env", values: ["eu"] }],
+          }),
+        ),
+      ).toEqual(["metadata.0.key"]);
     });
 
     it("refuses an empty metadata value", () => {
-      expect(() =>
-        spendFiltersSchema.parse({ metadata: [{ key: "tier", values: [""] }] }),
-      ).toThrow();
+      expect(
+        issuePaths(
+          spendFiltersSchema.safeParse({
+            metadata: [{ key: "tier", values: [""] }],
+          }),
+        ),
+      ).toEqual(["metadata.0.values.0"]);
     });
   });
 
