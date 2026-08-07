@@ -44,7 +44,9 @@ interface ProviderReportedPrice {
   /** The provider's amount in USD. A string keeps every digit it published. */
   costUsd: string | number;
   costStatus: PulledUsageCostStatus;
-  quantities: PulledUsageQuantities;
+  // No `quantities`. This path never reads them — the provider already priced
+  // the item — and requiring them made every caller hand over data the
+  // function ignores, which reads as if the quantities affected the figure.
 }
 
 /**

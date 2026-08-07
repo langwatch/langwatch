@@ -94,6 +94,10 @@ describe("building one pulled usage record", () => {
         observedAt: OBSERVED_AT,
       });
 
+      // The half the name claims and the assertions used to omit: losing the
+      // team must not lose the organization too, or the cost is unattributed
+      // outright rather than attributed one level up.
+      expect(record?.organizationId).toBe("org_acme");
       expect(record?.teamId).toBeNull();
       // Every existing pull writer lands under the hidden governance project.
       // A cost record must not: that project is invisible to the customer, so

@@ -71,11 +71,18 @@ const SOURCE_ROW = {
   sourceType: "anthropic_admin",
   status: "active",
   parserConfig: { adapter: "test_adapter" },
-};
+} as const;
 
-function usageEvent(hint: Record<string, unknown> = {}) {
+function usageEvent(
+  hint: Record<string, unknown> = {},
+  // The provider's own identity for the item. Overridable because two events
+  // in one run are two DIFFERENT provider rows; sharing this id would model
+  // the same item twice, and both `itemKey` and the OCSF event identity are
+  // derived from it.
+  sourceEventId = "usage:2026-08-01:ws_1",
+) {
   return {
-    source_event_id: "usage:2026-08-01:ws_1",
+    source_event_id: sourceEventId,
     event_timestamp: "2026-08-01T00:00:00.000Z",
     actor: "",
     action: "usage_report",
@@ -95,7 +102,10 @@ function usageEvent(hint: Record<string, unknown> = {}) {
   };
 }
 
-const auditOnlyEvent = { ...usageEvent(), extra: { ip: "1.2.3.4" } };
+const auditOnlyEvent = {
+  ...usageEvent(),
+  extra: { ip: "1.2.3.4" },
+} as const;
 
 beforeEach(() => {
   findUnique.mockReset().mockResolvedValue(SOURCE_ROW);
@@ -152,7 +162,10 @@ describe("the pull effect's pulled-usage emit seam", () => {
       runOnce.mockResolvedValue({
         events: [
           usageEvent(),
-          usageEvent({ dimensions: { workspaceId: "ws_2" } }),
+          usageEvent(
+            { dimensions: { workspaceId: "ws_2" } },
+            "usage:2026-08-01:ws_2",
+          ),
         ],
         cursor: null,
         errorCount: 0,
@@ -214,7 +227,10 @@ describe("the pull effect's pulled-usage emit seam", () => {
 
     it("resolves the flag once per run, not once per usage item", async () => {
       runOnce.mockResolvedValue({
-        events: [usageEvent(), usageEvent({ dimensions: { w: "2" } })],
+        events: [
+          usageEvent(),
+          usageEvent({ dimensions: { w: "2" } }, "usage:2026-08-01:ws_2"),
+        ],
         cursor: null,
         errorCount: 0,
       });
@@ -276,7 +292,10 @@ describe("the pull effect's pulled-usage emit seam", () => {
       runOnce.mockResolvedValue({
         events: [
           usageEvent(),
-          usageEvent({ dimensions: { workspaceId: "ws_2" } }),
+          usageEvent(
+            { dimensions: { workspaceId: "ws_2" } },
+            "usage:2026-08-01:ws_2",
+          ),
         ],
         cursor: "next",
         errorCount: 0,
