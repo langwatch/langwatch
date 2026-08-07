@@ -623,7 +623,7 @@ function PublishModalContent({
         <Dialog.CloseTrigger />
         <Dialog.Body>
           <VStack align="start" width="full" gap={10}>
-            <Text fontSize="15px" color="black">
+            <Text fontSize="15px" color="fg">
               Publish your workflow to make it available via API, as a component
               to other workflows, or as a custom evaluator.
             </Text>
