@@ -312,8 +312,15 @@
 						//                              skip was implemented, repaired
 						//                              or removed. Conditional
 						//                              skipIf(env) remains allowed.
-						//   noMisplacedAssertion 172  — mostly custom assertion
-						//                              helpers; verify before promoting
+						//   noMisplacedAssertion 172  — verified 2026-08: these are named
+						//                              assertion helpers (expectX/assertX)
+						//                              called from it(), a house-approved
+						//                              pattern. Biome has no
+						//                              assertFunctionNames-style exemption
+						//                              (checked `biome explain`, 2.5.1), so
+						//                              this rule stays warn PERMANENTLY —
+						//                              do not chase it to zero; the diff
+						//                              gate already blocks new violations
 						"noFocusedTests": "error",
 						"noDuplicateTestHooks": "error",
 						"noExportsInTest": "warn",
