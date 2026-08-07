@@ -430,7 +430,11 @@ describe("gateway spend filtering (real PG + real CH)", () => {
       // would agree on a subset. Proven here against the real pinned server,
       // on a table shaped exactly like gateway_spend, so a ClickHouse upgrade
       // that changed this would fail rather than quietly under-report.
-      const table = `gateway_spend_premigration_${suffix}`;
+      // A table name is an identifier, not a bindable value, so it is spelled
+      // into the DDL below. nanoid's alphabet includes `-`, which ends the
+      // identifier mid-token and fails to parse, so roughly a fifth of runs
+      // would die on a syntax error rather than on the property under test.
+      const table = `gateway_spend_premigration_${suffix.replace(/[^A-Za-z0-9_]/g, "_")}`;
       const client = ch();
       await client.command({
         query: `
