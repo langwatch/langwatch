@@ -104,7 +104,7 @@ jobs:
         with:
           go-version-file: go.mod
           cache-dependency-path: go.sum
-      - run: go test -count=1 -race ./services/aigateway/... ./services/nlpgo/... ./pkg/... ./tools/migrationorder/... ./tools/thuishaven/... ./tools/herrgen/...
+      - run: go test -count=1 -race ./services/aigateway/... ./services/nlpgo/... ./pkg/... ./tools/migrationorder/... ./tools/thuishaven/... ./tools/herrgen/... ./tools/semantictokens/...
 
   lint:
     needs: changes

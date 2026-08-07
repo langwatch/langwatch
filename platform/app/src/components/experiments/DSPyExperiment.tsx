@@ -1311,7 +1311,7 @@ export function DSPyRunsScoresChart({
                 value="Best"
                 position="top"
                 offset={10}
-                fill={getRawColorValue("gray.700")}
+                fill={getRawColorValue("fg.muted")}
                 fontSize="12px"
               />
             </ReferenceDot>

@@ -1,0 +1,50 @@
+name: semantic-tokens
+
+# Fails a PR that writes a raw Chakra palette shade into a colour prop.
+#
+# The app's palette is defined once as semantic tokens, each carrying a light
+# value and a dark value. A raw shade — color="gray.500", borderColor="red.700"
+# — carries only one, so it reads correctly in whichever mode the author had
+# open and then goes dark-on-dark in the other. The check names the token with
+# the same light value, so the fix is a swap rather than a redesign.
+#
+# Surfaces that really are fixed in both modes (a terminal, a banner over a
+# fixed gradient) opt out with a `semantic-tokens-ignore` comment carrying the
+# reason, or with an entry in ExemptFiles for a whole file.
+#
+# Spec: specs/ci/semantic-color-tokens.feature
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - "platform/app/src/**"
+      - "tools/semantictokens/**"
+      - "cmd/semantictokens/**"
+      - ".github/workflows/semantic-tokens.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: semantic-tokens-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  semantic-tokens:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
+        with:
+          persist-credentials: false
+
+      - name: Setup Go
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+
+      - name: Check colour props use semantic tokens
+        run: go run ./cmd/semantictokens

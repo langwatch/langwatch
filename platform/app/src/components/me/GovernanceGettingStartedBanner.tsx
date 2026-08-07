@@ -121,7 +121,7 @@ export function GovernanceGettingStartedBanner() {
               // The mesh gradient behind this hero is fixed in both colour
               // modes, so the CTA's white fill and dark orange text must be too.
               bg="white"
-              color="orange.700"
+              color="orange.700" // semantic-tokens-ignore: fixed-gradient hero
               fontWeight="600"
               paddingX={4}
               boxShadow="0 1px 2px rgba(0,0,0,0.12)"
