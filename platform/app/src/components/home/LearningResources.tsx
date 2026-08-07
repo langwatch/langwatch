@@ -91,7 +91,7 @@ function ColophonLink({
       fontFamily="mono"
       fontSize="10.5px"
       color="fg.subtle"
-      _hover={{ color: "orange.500" }}
+      _hover={{ color: "orange.solid" }}
     >
       {children}
     </Link>

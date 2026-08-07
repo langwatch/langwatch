@@ -145,7 +145,7 @@ export function GuardrailAttachmentsSection({
           {projectSlug ? (
             <Link
               href="/settings/gateway/guardrails"
-              color="blue.500"
+              color="blue.solid"
               fontWeight="medium"
             >
               Create one

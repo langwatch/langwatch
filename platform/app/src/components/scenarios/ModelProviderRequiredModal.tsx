@@ -22,7 +22,7 @@ export function ModelProviderRequiredModal({
         </Dialog.Header>
         <Dialog.Body>
           <VStack gap={4} py={4} align="center" justify="center">
-            <Box p={3} borderRadius="full" bg="orange.100" color="orange.600">
+            <Box p={3} borderRadius="full" bg="orange.muted" color="orange.fg">
               <Icon as={AlertTriangle} boxSize={6} />
             </Box>
             <Text color="fg.muted" fontSize="sm" textAlign="center">

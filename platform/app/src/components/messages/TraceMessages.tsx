@@ -151,7 +151,7 @@ export const TraceMessages = React.forwardRef(function TraceMessages(
               ? "1px solid"
               : "none"
           }
-          borderColor={highlighted ? "blue.200" : "border"}
+          borderColor={highlighted ? "blue.muted" : "border"}
           onMouseEnter={() => setShowTools(true)}
           onMouseMove={() => setShowTools(true)}
           onMouseLeave={() => setShowTools(false)}
@@ -202,7 +202,7 @@ export const TraceMessages = React.forwardRef(function TraceMessages(
             <Message
               author={project?.name ?? ""}
               avatar={
-                <Avatar.Root size="sm" background="orange.400">
+                <Avatar.Root size="sm" background="orange.solidMuted">
                   <Avatar.Fallback name={project?.name} />
                 </Avatar.Root>
               }
@@ -222,13 +222,13 @@ export const TraceMessages = React.forwardRef(function TraceMessages(
                 <VStack alignItems="flex-start" gap={2} paddingY={2}>
                   <Box
                     fontSize="11px"
-                    color="red.400"
+                    color="red.solidMuted"
                     textTransform="uppercase"
                     fontWeight="bold"
                   >
                     Exception
                   </Box>
-                  <Text color="red.900">{trace.error.message}</Text>
+                  <Text color="red.fg">{trace.error.message}</Text>
                 </VStack>
               ) : trace.output?.value &&
                 (isJson(stringifyIfObject(trace.output.value)) ||

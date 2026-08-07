@@ -72,7 +72,7 @@ export function HorizontalFormControl({
             {...(size === "sm" && {
               fontSize: "12px",
               textTransform: "uppercase",
-              color: "gray.500",
+              color: "fg.subtle",
               fontWeight: "bold",
             })}
             {...(direction === "vertical" && {

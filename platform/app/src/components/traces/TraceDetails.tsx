@@ -392,7 +392,7 @@ export function TraceDetails(props: {
                 <Text
                   borderRadius={"md"}
                   paddingX={2}
-                  backgroundColor={"green.500"}
+                  backgroundColor={"green.solid"}
                   color={"white"}
                   fontSize={"sm"}
                 >

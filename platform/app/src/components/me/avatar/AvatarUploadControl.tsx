@@ -57,7 +57,7 @@ function AvatarEditButton({
         right="0"
         width="18px"
         height="18px"
-        bg="orange.500"
+        bg="orange.solid"
         color="white"
         borderRadius="full"
         borderWidth="2px"

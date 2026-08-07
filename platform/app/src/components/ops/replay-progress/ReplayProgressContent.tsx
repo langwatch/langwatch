@@ -273,7 +273,7 @@ function LiveRunView({
 
             {status.state === "failed" && status.error && (
               <Box bg="red.subtle" padding={3} borderRadius="md">
-                <Text textStyle="xs" color="red.500">
+                <Text textStyle="xs" color="red.solid">
                   {status.error}
                 </Text>
               </Box>
@@ -379,19 +379,19 @@ function HistoricalRunView({
                 padding={3}
                 borderRadius="md"
                 borderWidth="1px"
-                borderColor="red.200"
+                borderColor="red.muted"
               >
                 <Text
                   textStyle="xs"
                   fontWeight="medium"
-                  color="red.500"
+                  color="red.solid"
                   marginBottom={1}
                 >
                   Error
                 </Text>
                 <Text
                   textStyle="xs"
-                  color="red.500"
+                  color="red.solid"
                   whiteSpace="pre-wrap"
                   wordBreak="break-word"
                 >

@@ -284,7 +284,7 @@ export function WorkflowCard({
                 </Menu.Item>
                 <Menu.Item
                   value="delete"
-                  color="red.500"
+                  color="red.solid"
                   onClick={() => setIsDeleteDialogOpen(true)}
                 >
                   <Trash2 size={16} /> Delete

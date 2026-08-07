@@ -246,10 +246,10 @@ function ResponseDisplay({ result }: { result: HttpTestResult }) {
         <HStack
           justify="space-between"
           padding={3}
-          bg={result.success ? "green.50" : "red.50"}
+          bg={result.success ? "green.subtle" : "red.subtle"}
           borderRadius="md"
           borderWidth="1px"
-          borderColor={result.success ? "green.200" : "red.200"}
+          borderColor={result.success ? "green.muted" : "red.muted"}
         >
           <HStack gap={3}>
             {result.status !== undefined && (
@@ -329,13 +329,13 @@ function ResponseDisplay({ result }: { result: HttpTestResult }) {
       {result.extractedOutput !== undefined && (
         <Box
           padding={3}
-          bg="blue.50"
+          bg="blue.subtle"
           borderRadius="md"
           borderWidth="1px"
-          borderColor="blue.200"
+          borderColor="blue.muted"
         >
           <HStack justify="space-between" marginBottom={2}>
-            <Text fontSize="sm" fontWeight="medium" color="blue.700">
+            <Text fontSize="sm" fontWeight="medium" color="blue.fg">
               Extracted Output (JSONPath)
             </Text>
             <CopyButton

@@ -107,7 +107,7 @@ function DocumentsMetrics() {
               <Tabs.Indicator
                 mt="-1.5px"
                 height="4px"
-                bg="orange.400"
+                bg="orange.solidMuted"
                 borderRadius="1px"
                 bottom={0}
               />
@@ -196,7 +196,7 @@ function CustomReportsSection({ slug }: { slug: string }) {
                 width="full"
                 cursor="pointer"
                 borderColor="border"
-                _hover={{ borderColor: "orange.400", shadow: "sm" }}
+                _hover={{ borderColor: "orange.emphasized", shadow: "sm" }}
                 transition="all 0.15s ease"
               >
                 <Card.Body paddingX={4} paddingY={3}>

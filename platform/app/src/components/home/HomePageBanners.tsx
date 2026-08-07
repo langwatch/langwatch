@@ -741,7 +741,7 @@ export function HomePageBanners({
                       fontWeight="600"
                       /* A step deeper than orange.fg on light: over the white
                          bloom the default reads brownish; dark keeps it. */
-                      color={{ base: "orange.700", _dark: "orange.fg" }}
+                      color={{ base: "orange.fg", _dark: "orange.fg" }}
                     >
                       {slide.badge}
                     </chakra.span>
@@ -1006,6 +1006,8 @@ export function HomePageBanners({
                     <HStack gap={2} marginTop={1.5}>
                       <Button
                         size="sm"
+                        // Shader gradient behind this banner is fixed in both
+                        // colour modes, so the CTA's white fill must be too.
                         bg="white"
                         color={s.legacyCtaColor}
                         fontWeight="600"

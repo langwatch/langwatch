@@ -1,3 +1,6 @@
+// biome-ignore-all lint/plugin: the tooltip is forced black in both color modes, so the text on it
+// must not follow the mode either
+
 import { Box, type BoxProps, HStack, Text, VStack } from "@chakra-ui/react";
 import { useEffect, useRef, useState } from "react";
 import { isJson } from "../utils/isJson";

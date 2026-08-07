@@ -22,7 +22,12 @@ export function PromptSpanEditor({ span }: { span: SpanConfig }) {
       bg="yellow.500/5"
       p={4}
     >
-      <Text fontSize="sm" fontWeight="semibold" color="yellow.400" mb={3}>
+      <Text
+        fontSize="sm"
+        fontWeight="semibold"
+        color="yellow.solidMuted"
+        mb={3}
+      >
         Prompt Configuration
       </Text>
       <Flex gap={3} mb={3}>
@@ -102,7 +107,7 @@ export function PromptSpanEditor({ span }: { span: SpanConfig }) {
               size="xs"
               variant="ghost"
               color="fg.muted"
-              _hover={{ color: "red.400" }}
+              _hover={{ color: "red.solidMuted" }}
               onClick={() => {
                 const next = { ...variables };
                 delete next[key];

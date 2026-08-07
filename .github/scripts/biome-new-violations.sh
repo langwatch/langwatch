@@ -91,6 +91,17 @@ BASE_APP="$(app_dir "$BASE_TREE")"
 rm -f "$BASE_TREE/$BASE_APP"/biome.json "$BASE_TREE/$BASE_APP"/biome.jsonc
 cp "$REPO_ROOT/$HEAD_APP/biome.jsonc" "$BASE_TREE/$BASE_APP/biome.jsonc"
 
+# The head config's `plugins` entries are paths relative to it, so the analyzer
+# plugins have to travel with it. A PR that ADDS a plugin names a .grit file the
+# base tree does not have; biome then fails to load the config outright, writes
+# no rdjson, and the guard below reports "could not lint the merge base" for a
+# tree that is perfectly fine. Same reasoning as the config copy above and the
+# node_modules symlink below: both sides must resolve identically.
+if [ -d "$REPO_ROOT/$HEAD_APP/biome-plugins" ]; then
+  rm -rf "$BASE_TREE/$BASE_APP/biome-plugins"
+  cp -R "$REPO_ROOT/$HEAD_APP/biome-plugins" "$BASE_TREE/$BASE_APP/biome-plugins"
+fi
+
 # Both sides must resolve the same dependencies or the type-aware rules
 # (noFloatingPromises, noMisusedPromises) disagree for reasons that have nothing
 # to do with the diff. Symlinking is enough -- biome only reads them.

@@ -229,7 +229,7 @@ export function TargetSelector({
                     cursor="pointer"
                     bg={
                       isAgentTarget(value) && value.id === agent.id
-                        ? "blue.50"
+                        ? "blue.subtle"
                         : "transparent"
                     }
                     _hover={{ bg: "bg.subtle" }}
@@ -249,7 +249,7 @@ export function TargetSelector({
                       {agent.name}
                     </Text>
                     {isAgentTarget(value) && value.id === agent.id && (
-                      <Text color="blue.500" fontSize="sm">
+                      <Text color="blue.solid" fontSize="sm">
                         ✓
                       </Text>
                     )}
@@ -264,7 +264,7 @@ export function TargetSelector({
                 _hover={{ bg: "bg.subtle" }}
                 borderTopWidth="1px"
                 borderColor="border.muted"
-                color="blue.500"
+                color="blue.solid"
                 onClick={handleCreateAgent}
               >
                 <Plus size={14} />
@@ -301,7 +301,7 @@ export function TargetSelector({
                     cursor="pointer"
                     bg={
                       value?.type === "prompt" && value.id === prompt.id
-                        ? "blue.50"
+                        ? "blue.subtle"
                         : "transparent"
                     }
                     _hover={{ bg: "bg.subtle" }}
@@ -314,7 +314,7 @@ export function TargetSelector({
                       {prompt.handle ?? prompt.id}
                     </Text>
                     {value?.type === "prompt" && value.id === prompt.id && (
-                      <Text color="blue.500" fontSize="sm">
+                      <Text color="blue.solid" fontSize="sm">
                         ✓
                       </Text>
                     )}
@@ -329,7 +329,7 @@ export function TargetSelector({
                 _hover={{ bg: "bg.subtle" }}
                 borderTopWidth="1px"
                 borderColor="border.muted"
-                color="blue.500"
+                color="blue.solid"
                 onClick={handleCreatePrompt}
               >
                 <Plus size={14} />

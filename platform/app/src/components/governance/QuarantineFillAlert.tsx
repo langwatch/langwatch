@@ -74,7 +74,7 @@ export function QuarantineFillAlert({
             <Link
               href="/settings/governance/ingestion-sources"
               fontSize="sm"
-              color="orange.600"
+              color="orange.fgMuted"
             >
               Review ingestion sources →
             </Link>

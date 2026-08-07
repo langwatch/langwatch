@@ -180,7 +180,7 @@ export function CodeEditorModal({
               left: 0,
               right: 0,
               height: "2px",
-              bg: "blue.400",
+              bg: "blue.solidMuted",
             }}
           >
             <LuFileCode size={14} />

@@ -213,7 +213,7 @@ export const ChatBox = ({
                   mb={2}
                 >
                   <Text
-                    bg="blue.500"
+                    bg="blue.solid"
                     color="white"
                     p={2}
                     borderRadius="lg"

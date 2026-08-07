@@ -187,7 +187,7 @@ const renderExecutionError = (executionState: ExecutionState) => {
         Error
       </Text>
       <OutputBox
-        color="red.700"
+        color="red.fg"
         value={executionState.error ?? "No error message captured"}
       />
     </VStack>
@@ -219,7 +219,7 @@ const renderExecutionOutputs = (
           fontSize="13px"
           fontWeight="bold"
           textTransform="uppercase"
-          color="gray.600"
+          color="fg.muted"
         >
           Condition
         </Text>
@@ -244,12 +244,12 @@ const renderExecutionOutputs = (
         nodeType === "evaluator" && identifier === "passed" && value === true;
 
       const textColor = isSkipped
-        ? "yellow.600"
+        ? "yellow.fgMuted"
         : isFail
-          ? "red.600"
+          ? "red.fgMuted"
           : isSuccess
-            ? "green.600"
-            : "gray.600";
+            ? "green.fgMuted"
+            : "fg.muted";
 
       return (
         <VStack
@@ -259,11 +259,11 @@ const renderExecutionOutputs = (
           gap={3}
           color={
             isSkipped
-              ? "yellow.600"
+              ? "yellow.fgMuted"
               : isFail
-                ? "red.600"
+                ? "red.fgMuted"
                 : isSuccess
-                  ? "green.600"
+                  ? "green.fgMuted"
                   : undefined
           }
         >

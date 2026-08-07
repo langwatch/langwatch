@@ -33,15 +33,15 @@ type ScenarioTargetRowProps = {
 };
 
 const STATUS_CIRCLE_COLORS: Record<string, string> = {
-  [ScenarioRunStatus.SUCCESS]: "green.500",
-  [ScenarioRunStatus.FAILED]: "red.500",
-  [ScenarioRunStatus.ERROR]: "red.500",
-  [ScenarioRunStatus.STALLED]: "yellow.500",
-  [ScenarioRunStatus.CANCELLED]: "gray.400",
-  [ScenarioRunStatus.IN_PROGRESS]: "orange.400",
-  [ScenarioRunStatus.PENDING]: "gray.400",
-  [ScenarioRunStatus.QUEUED]: "blue.400",
-  [ScenarioRunStatus.RUNNING]: "orange.400",
+  [ScenarioRunStatus.SUCCESS]: "green.solid",
+  [ScenarioRunStatus.FAILED]: "red.solid",
+  [ScenarioRunStatus.ERROR]: "red.solid",
+  [ScenarioRunStatus.STALLED]: "yellow.solid",
+  [ScenarioRunStatus.CANCELLED]: "gray.emphasized",
+  [ScenarioRunStatus.IN_PROGRESS]: "orange.solidMuted",
+  [ScenarioRunStatus.PENDING]: "gray.emphasized",
+  [ScenarioRunStatus.QUEUED]: "blue.solidMuted",
+  [ScenarioRunStatus.RUNNING]: "orange.solidMuted",
 };
 
 function MetricsTooltipContent({
@@ -155,7 +155,7 @@ function StatusCircle({ status }: { status: ScenarioRunStatus }) {
       width="10px"
       height="10px"
       borderRadius="full"
-      bg={STATUS_CIRCLE_COLORS[status] ?? "gray.400"}
+      bg={STATUS_CIRCLE_COLORS[status] ?? "gray.emphasized"}
       flexShrink={0}
     />
   );
@@ -246,7 +246,7 @@ export function ScenarioTargetRow({
               paddingY={0.5}
               borderRadius="md"
               border="1px solid"
-              borderColor="gray.300"
+              borderColor="border.emphasized"
               fontSize="xs"
               color="fg.default"
               cursor={isCancelling ? "default" : "pointer"}
@@ -255,7 +255,7 @@ export function ScenarioTargetRow({
               _hover={
                 isCancelling
                   ? undefined
-                  : { bg: "gray.100", borderColor: "gray.400" }
+                  : { bg: "bg.muted", borderColor: "border.emphasized" }
               }
               onClick={(e: React.MouseEvent) => {
                 e.stopPropagation();
@@ -292,7 +292,7 @@ export function ScenarioTargetRow({
                 )}
                 {scenarioRun.totalCost != null && (
                   <>
-                    <Text color="gray.300">{"⋅"}</Text>
+                    <Text color="fg.subtle">{"⋅"}</Text>
                     <Text fontSize="xs">
                       {formatCost(scenarioRun.totalCost)}
                     </Text>

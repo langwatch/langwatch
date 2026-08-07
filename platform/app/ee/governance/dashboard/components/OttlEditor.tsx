@@ -235,13 +235,13 @@ export function OttlEditor({
       {hasStarter && isEmpty && (
         <Box
           borderWidth="1px"
-          borderColor="orange.300"
-          backgroundColor="orange.50"
+          borderColor="orange.emphasized"
+          backgroundColor="orange.subtle"
           borderRadius="md"
           padding={3}
         >
           <HStack alignItems="center" gap={3}>
-            <Box color="orange.600">
+            <Box color="orange.fgMuted">
               <FileText size={18} />
             </Box>
             <VStack align="start" gap={0} flex={1}>
@@ -314,9 +314,9 @@ export function OttlEditor({
                   // run all stay neutral.
                   backgroundColor={
                     showError
-                      ? "red.500"
+                      ? "red.solid"
                       : isWritten && status?.validity === "valid"
-                        ? "green.400"
+                        ? "green.solid"
                         : "border.muted"
                   }
                   flexShrink={0}
@@ -326,11 +326,11 @@ export function OttlEditor({
                   rows={2}
                   fontFamily="mono"
                   fontSize="xs"
-                  backgroundColor="white"
+                  backgroundColor="bg.panel"
                   value={stmt}
                   onChange={(e) => updateAt(idx, e.target.value)}
                   placeholder={`set(attributes["langwatch.cost.usd"], attributes["cost_usd"]) where attributes["event.name"] == "api_request"`}
-                  borderColor={showError ? "red.300" : undefined}
+                  borderColor={showError ? "red.emphasized" : undefined}
                 />
                 <IconButton
                   size="xs"
@@ -344,7 +344,7 @@ export function OttlEditor({
               {showError && (
                 <Text
                   fontSize="xs"
-                  color="red.600"
+                  color="red.fgMuted"
                   marginLeft="14px"
                   marginTop={0.5}
                 >

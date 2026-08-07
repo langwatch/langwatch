@@ -188,7 +188,7 @@ export function EvaluatorSelection({
                       isDisabled
                         ? undefined
                         : {
-                            background: "gray.200",
+                            background: "bg.emphasized",
                           }
                     }
                     onClick={() => {
@@ -199,8 +199,8 @@ export function EvaluatorSelection({
                         query: router.query,
                       });
                     }}
-                    color={isDisabled ? "gray.400" : undefined}
-                    background={isDisabled ? "gray.50" : "white"}
+                    color={isDisabled ? "fg.faint" : undefined}
+                    background={isDisabled ? "bg.subtle" : "white"}
                   >
                     <VStack align="start" gap={4} position="relative">
                       {evaluator.isGuardrail && (
@@ -212,7 +212,7 @@ export function EvaluatorSelection({
                             position="absolute"
                             right="-12px"
                             top="-12px"
-                            background="blue.100"
+                            background="blue.muted"
                             borderRadius="100%"
                             padding="4px"
                           >
@@ -315,8 +315,8 @@ export function EvaluatorSelection({
                               >
                                 <Badge
                                   colorPalette="blue"
-                                  backgroundColor="blue.50"
-                                  color="blue.700"
+                                  backgroundColor="blue.subtle"
+                                  color="blue.fg"
                                   whiteSpace="nowrap"
                                 >
                                   Requires Expected Output
@@ -341,8 +341,8 @@ export function EvaluatorSelection({
                               >
                                 <Badge
                                   colorPalette="purple"
-                                  backgroundColor="purple.50"
-                                  color="purple.700"
+                                  backgroundColor="purple.subtle"
+                                  color="purple.fg"
                                   whiteSpace="nowrap"
                                 >
                                   Requires Expected Contexts
@@ -372,7 +372,7 @@ export function EvaluatorSelection({
                   justifyContent="center"
                   minHeight="200px"
                   _hover={{
-                    background: "gray.50",
+                    background: "bg.subtle",
                     textDecoration: "none",
                   }}
                 >

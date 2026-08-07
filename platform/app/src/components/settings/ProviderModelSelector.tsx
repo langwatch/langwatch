@@ -224,7 +224,7 @@ export const ProviderModelSelector = React.memo(function ProviderModelSelector({
           fontFamily="mono"
           lineClamp={1}
           wordBreak="break-all"
-          color={isUnknown ? "gray.500" : undefined}
+          color={isUnknown ? "fg.subtle" : undefined}
         >
           {selectedItem?.label ??
             modelDisplayLabel({ fullModelId: model, displayNames })}

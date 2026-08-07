@@ -432,7 +432,7 @@ function EvaluatorCard({
                 e.stopPropagation();
                 onDelete();
               }}
-              color="red.500"
+              color="red.solid"
               data-testid={`evaluator-delete-${evaluator.id}`}
             >
               <LuTrash2 size={14} />

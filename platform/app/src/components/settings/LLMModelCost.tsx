@@ -94,7 +94,7 @@ export function LLMModelCost(props: { projectId?: string }) {
                 <Table.Cell>
                   <Text
                     truncate
-                    color={!!row.updatedAt ? "green.500" : undefined}
+                    color={!!row.updatedAt ? "green.solid" : undefined}
                   >
                     {row.model}
                   </Text>
@@ -108,7 +108,7 @@ export function LLMModelCost(props: { projectId?: string }) {
                   >
                     <Code
                       truncate
-                      color={!!row.updatedAt ? "green.500" : undefined}
+                      color={!!row.updatedAt ? "green.solid" : undefined}
                       height="32px"
                       lineHeight="22px"
                       borderRadius="6px"
@@ -127,7 +127,7 @@ export function LLMModelCost(props: { projectId?: string }) {
                     justifyContent="space-between"
                     paddingX={4}
                     marginX={2}
-                    color={!!row.id ? "green.500" : undefined}
+                    color={!!row.id ? "green.solid" : undefined}
                   >
                     {row.inputCostPerToken?.toLocaleString("fullwide", {
                       useGrouping: false,
@@ -140,7 +140,7 @@ export function LLMModelCost(props: { projectId?: string }) {
                     justifyContent="space-between"
                     paddingX={4}
                     marginX={2}
-                    color={!!row.id ? "green.500" : undefined}
+                    color={!!row.id ? "green.solid" : undefined}
                   >
                     {row.outputCostPerToken?.toLocaleString("fullwide", {
                       useGrouping: false,
@@ -153,7 +153,7 @@ export function LLMModelCost(props: { projectId?: string }) {
                     justifyContent="space-between"
                     paddingX={4}
                     marginX={2}
-                    color={!!row.id ? "green.500" : undefined}
+                    color={!!row.id ? "green.solid" : undefined}
                   >
                     {row.cacheReadCostPerToken?.toLocaleString("fullwide", {
                       useGrouping: false,
@@ -166,7 +166,7 @@ export function LLMModelCost(props: { projectId?: string }) {
                     justifyContent="space-between"
                     paddingX={4}
                     marginX={2}
-                    color={!!row.id ? "green.500" : undefined}
+                    color={!!row.id ? "green.solid" : undefined}
                   >
                     {row.cacheCreationCostPerToken?.toLocaleString("fullwide", {
                       useGrouping: false,
@@ -245,7 +245,7 @@ function ActionsMenu({
         {id && (
           <Menu.Item
             value="delete"
-            color="red.600"
+            color="red.fgMuted"
             onClick={(event) => {
               event.stopPropagation();
 

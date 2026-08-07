@@ -110,7 +110,9 @@ export function FacetSection({
           }
         }}
         _hover={{
-          borderColor: complete ? "colorPalette.emphasized" : "orange.400",
+          borderColor: complete
+            ? "colorPalette.emphasized"
+            : "orange.emphasized",
         }}
       >
         <HStack gap={2} align="center">

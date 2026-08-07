@@ -316,7 +316,7 @@ export function EditAutomationFilterDrawer({
                 </Text>
                 <Box
                   border="1px solid"
-                  borderColor={codeError ? "red.500" : "border"}
+                  borderColor={codeError ? "red.emphasized" : "border"}
                   borderRadius="md"
                   overflow="hidden"
                   height="400px"
@@ -345,7 +345,7 @@ export function EditAutomationFilterDrawer({
                   />
                 </Box>
                 {codeError && (
-                  <Text fontSize="sm" color="red.500">
+                  <Text fontSize="sm" color="red.solid">
                     {codeError}
                   </Text>
                 )}

@@ -121,7 +121,7 @@ export function ReportGrid({
               </HStack>
               <Box
                 flex={1}
-                background="gray.50"
+                background="bg.subtle"
                 borderRadius="md"
                 display="flex"
                 alignItems="center"

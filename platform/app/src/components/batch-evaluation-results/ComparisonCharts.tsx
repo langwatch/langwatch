@@ -1234,7 +1234,7 @@ export const ComparisonCharts = ({
                             borderRadius="sm"
                             bg={
                               visibleMetrics.has(metric.id)
-                                ? "blue.500"
+                                ? "blue.solid"
                                 : "transparent"
                             }
                             display="flex"

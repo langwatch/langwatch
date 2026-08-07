@@ -206,7 +206,7 @@ export function AddCustomModelDialog({
               helper="Exactly as your provider specifies it, e.g. a fine-tune ID or deployment name"
               error={
                 errors.modelId ? (
-                  <Text color="red.500" fontSize="xs">
+                  <Text color="red.solid" fontSize="xs">
                     {errors.modelId}
                   </Text>
                 ) : undefined
@@ -225,7 +225,7 @@ export function AddCustomModelDialog({
               helper="How this model appears in selectors across LangWatch"
               error={
                 errors.displayName ? (
-                  <Text color="red.500" fontSize="xs">
+                  <Text color="red.solid" fontSize="xs">
                     {errors.displayName}
                   </Text>
                 ) : undefined
@@ -244,7 +244,7 @@ export function AddCustomModelDialog({
               helper="Maximum number of output tokens the model supports"
               error={
                 errors.maxTokens ? (
-                  <Text color="red.500" fontSize="xs">
+                  <Text color="red.solid" fontSize="xs">
                     {errors.maxTokens}
                   </Text>
                 ) : undefined

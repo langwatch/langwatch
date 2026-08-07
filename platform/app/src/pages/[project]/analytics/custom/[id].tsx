@@ -36,7 +36,7 @@ export default function EditCustomAnalyticsPage() {
         <Text fontSize="xl" fontWeight="bold">
           Graph not found
         </Text>
-        <Text color="gray.600">
+        <Text color="fg.muted">
           The graph you are looking for does not exist or you do not have access
           to it.
         </Text>

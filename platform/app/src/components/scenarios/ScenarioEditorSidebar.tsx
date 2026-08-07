@@ -34,7 +34,7 @@ export function ScenarioEditorSidebar({ form }: ScenarioEditorSidebarProps) {
 
             <VStack align="stretch" gap={3}>
               <HStack align="start" gap={3}>
-                <Icon color="green.500" mt={0.5}>
+                <Icon color="green.solid" mt={0.5}>
                   <CircleDot size={16} />
                 </Icon>
                 <VStack align="start" gap={0}>
@@ -49,7 +49,7 @@ export function ScenarioEditorSidebar({ form }: ScenarioEditorSidebarProps) {
               </HStack>
 
               <HStack align="start" gap={3}>
-                <Icon color="yellow.500" mt={0.5}>
+                <Icon color="yellow.solid" mt={0.5}>
                   <TriangleAlert size={16} />
                 </Icon>
                 <VStack align="start" gap={0}>
@@ -63,7 +63,7 @@ export function ScenarioEditorSidebar({ form }: ScenarioEditorSidebarProps) {
               </HStack>
 
               <HStack align="start" gap={3}>
-                <Icon color="purple.500" mt={0.5}>
+                <Icon color="purple.solid" mt={0.5}>
                   <Users size={16} />
                 </Icon>
                 <VStack align="start" gap={0}>
@@ -77,7 +77,7 @@ export function ScenarioEditorSidebar({ form }: ScenarioEditorSidebarProps) {
               </HStack>
 
               <HStack align="start" gap={3}>
-                <Icon color="blue.500" mt={0.5}>
+                <Icon color="blue.solid" mt={0.5}>
                   <MessageSquare size={16} />
                 </Icon>
                 <VStack align="start" gap={0}>
@@ -104,25 +104,25 @@ export function ScenarioEditorSidebar({ form }: ScenarioEditorSidebarProps) {
 
             <List.Root gap={2} listStyleType="none">
               <List.Item fontSize="xs" color="fg.muted">
-                <List.Indicator asChild color="blue.500">
+                <List.Indicator asChild color="blue.solid">
                   <Check size={14} />
                 </List.Indicator>
                 Start with small simulations to validate quickly
               </List.Item>
               <List.Item fontSize="xs" color="fg.muted">
-                <List.Indicator asChild color="blue.500">
+                <List.Indicator asChild color="blue.solid">
                   <Check size={14} />
                 </List.Indicator>
                 Use specific prompts for better results
               </List.Item>
               <List.Item fontSize="xs" color="fg.muted">
-                <List.Indicator asChild color="blue.500">
+                <List.Indicator asChild color="blue.solid">
                   <Check size={14} />
                 </List.Indicator>
                 Include edge cases in your testing
               </List.Item>
               <List.Item fontSize="xs" color="fg.muted">
-                <List.Indicator asChild color="blue.500">
+                <List.Indicator asChild color="blue.solid">
                   <Check size={14} />
                 </List.Indicator>
                 Review metrics after each run

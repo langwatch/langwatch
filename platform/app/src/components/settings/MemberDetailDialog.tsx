@@ -271,7 +271,9 @@ export function MemberDetailDialog({
                             <Button
                               size="xs"
                               variant="ghost"
-                              color={markedForRemoval ? "blue.500" : "fg.muted"}
+                              color={
+                                markedForRemoval ? "blue.solid" : "fg.muted"
+                              }
                               aria-label={
                                 markedForRemoval
                                   ? "Undo removal"
@@ -370,7 +372,7 @@ export function MemberDetailDialog({
                         <Link
                           href="/settings/groups"
                           fontSize="xs"
-                          color="blue.400"
+                          color="blue.solidMuted"
                         >
                           No access configured
                         </Link>

@@ -375,19 +375,27 @@ export function BatchEvaluationV2RunList({
               width="100%"
               cursor="pointer"
               role="button"
-              background="gray.200"
+              background="bg.emphasized"
               _hover={{
-                background: "gray.100",
+                background: "bg.muted",
               }}
               gap={3}
             >
               <VersionBox minWidth={hasAnyVersion ? "48px" : "0"} />
               <VStack align="start" gap={2} width="100%" paddingRight={2}>
                 <HStack width="100%">
-                  <Skeleton height="12px" background="gray.400" flexGrow={1} />
+                  <Skeleton
+                    height="12px"
+                    background="bg.emphasized"
+                    flexGrow={1}
+                  />
                   <Spinner size="xs" flexShrink={0} />
                 </HStack>
-                <Skeleton width="100%" height="12px" background="gray.400" />
+                <Skeleton
+                  width="100%"
+                  height="12px"
+                  background="bg.emphasized"
+                />
               </VStack>
             </HStack>
           )}
@@ -409,11 +417,13 @@ export function BatchEvaluationV2RunList({
                 cursor="pointer"
                 role="button"
                 background={
-                  selectedRun?.runId === run.runId ? "gray.200" : "none"
+                  selectedRun?.runId === run.runId ? "bg.emphasized" : "none"
                 }
                 _hover={{
                   background:
-                    selectedRun?.runId === run.runId ? "gray.200" : "gray.100",
+                    selectedRun?.runId === run.runId
+                      ? "bg.emphasized"
+                      : "bg.muted",
                 }}
                 onClick={(e) => {
                   e.stopPropagation();
@@ -431,7 +441,7 @@ export function BatchEvaluationV2RunList({
                     minWidth={hasAnyVersion ? "48px" : "0"}
                     backgroundColor={
                       run.timestamps.stoppedAt
-                        ? "red.200"
+                        ? "red.muted"
                         : getColorForString("colors", run.runId).color
                     }
                   />
@@ -505,7 +515,7 @@ export function BatchEvaluationV2RunList({
                       <Box
                         width="6px"
                         height="6px"
-                        background="red.300"
+                        background="red.muted"
                         borderRadius="full"
                       />
                     )}

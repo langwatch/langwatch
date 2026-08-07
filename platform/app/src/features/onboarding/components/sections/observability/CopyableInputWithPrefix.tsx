@@ -36,14 +36,14 @@ export function CopyableInputWithPrefix({
       position="relative"
       borderRadius="xl"
       border="1px solid"
-      borderColor="gray.200"
+      borderColor="border"
       bg="bg.panel/70"
       backdropFilter="blur(24px) saturate(1.4)"
       boxShadow="0 4px 30px rgba(0,0,0,0.06)"
       overflow="hidden"
       transition="all 0.2s ease"
       _hover={{
-        borderColor: "gray.300",
+        borderColor: "border.emphasized",
         boxShadow: "0 8px 40px rgba(0,0,0,0.08)",
       }}
     >

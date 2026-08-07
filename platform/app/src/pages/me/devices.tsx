@@ -128,12 +128,12 @@ function MyDevicesPage() {
             gap={2}
             paddingY={2}
             paddingX={3}
-            backgroundColor="red.50"
+            backgroundColor="red.subtle"
             borderRadius="sm"
             borderWidth="1px"
-            borderColor="red.300"
+            borderColor="red.emphasized"
           >
-            <Text fontSize="xs" color="red.700" flex={1}>
+            <Text fontSize="xs" color="red.fg" flex={1}>
               Revoke every device on your account? You'll need to re-run{" "}
               <code>langwatch login</code> on each device after this.
             </Text>
@@ -247,7 +247,7 @@ function DeviceRow({
       align="stretch"
       gap={2}
       borderWidth="1px"
-      borderColor={isPendingRevoke ? "red.300" : "border.muted"}
+      borderColor={isPendingRevoke ? "red.emphasized" : "border.muted"}
       borderRadius="sm"
       padding={3}
     >
@@ -292,10 +292,10 @@ function DeviceRow({
           gap={2}
           paddingY={2}
           paddingX={3}
-          backgroundColor="red.50"
+          backgroundColor="red.subtle"
           borderRadius="sm"
         >
-          <Text fontSize="xs" color="red.700" flex={1}>
+          <Text fontSize="xs" color="red.fg" flex={1}>
             Revoke this device? The CLI on {session.hostname ?? "this device"}{" "}
             will start failing immediately.
           </Text>

@@ -88,7 +88,7 @@ describe("RedisStatTiles", () => {
         });
         const memoryStat = screen.getByTestId("redis-memory-stat");
         expect(memoryStat.textContent).toContain("95%");
-        // Chakra v3 applies `color="red.500"` via a CSS variable on a class,
+        // Chakra v3 applies `color="red.solid"` via a CSS variable on a class,
         // not inline style — pin the warning state via data-warning.
         expect(memoryStat.getAttribute("data-warning")).toBe("true");
       });

@@ -222,7 +222,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           >
             <Icon
               boxSize={3.5}
-              color={{ base: "orange.500", _dark: "orange.fg" }}
+              color={{ base: "orange.solid", _dark: "orange.fg" }}
             >
               {showSamplePreview ? <Tent /> : <Compass />}
             </Icon>

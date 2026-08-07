@@ -1,3 +1,7 @@
+// biome-ignore-all lint/plugin: one canonical brand color per feature, not a
+// themed surface — the color identifies the feature and must stay the same in
+// both color modes. See dev/docs/best_practices/feature-icons.md.
+
 /**
  * Shared icon and color definitions for features across the application.
  * This ensures consistency between the sidebar, quick access links, and recent items.

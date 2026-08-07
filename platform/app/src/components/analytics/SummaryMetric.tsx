@@ -152,12 +152,12 @@ export function SummaryMetricValue({
 
   const changeColor =
     change === undefined || change === 0
-      ? "gray.500"
+      ? "fg.subtle"
       : increaseReversal === 0
         ? "fg.muted"
         : change * increaseReversal > 0
-          ? "green.500"
-          : "red.500";
+          ? "green.solid"
+          : "red.solid";
 
   return (
     <VStack align="start" gap={1}>

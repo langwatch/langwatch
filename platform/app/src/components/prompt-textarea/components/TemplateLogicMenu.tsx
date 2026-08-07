@@ -202,7 +202,7 @@ export const TemplateLogicMenu = ({
                     gap={2}
                     cursor="pointer"
                     borderRadius="4px"
-                    background={isHighlighted ? "blue.50" : undefined}
+                    background={isHighlighted ? "blue.subtle" : undefined}
                     onMouseMove={() => {
                       if (isKeyboardNav || highlightedIndex !== index) {
                         setIsKeyboardNav(false);
@@ -246,7 +246,7 @@ export const TemplateLogicMenu = ({
             display="flex"
             alignItems="center"
             gap={1}
-            _hover={{ color: "blue.500" }}
+            _hover={{ color: "blue.solid" }}
           >
             Learn template syntax
             <ExternalLink size={10} />

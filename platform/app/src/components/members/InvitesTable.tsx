@@ -151,7 +151,7 @@ export function InvitesTable({
                               {isAdmin && (
                                 <Menu.Item
                                   value="delete"
-                                  color="red.500"
+                                  color="red.solid"
                                   onClick={() => onDeleteInvite(invite.id)}
                                 >
                                   <Trash2 size={16} />

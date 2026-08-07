@@ -371,7 +371,7 @@ export function BudgetCreateDrawer({
                 </Text>
               )}
               {scopeKind === "GROUP" && groupsQuery.isError && (
-                <Text fontSize="xs" color="red.600" marginTop={1}>
+                <Text fontSize="xs" color="red.fgMuted" marginTop={1}>
                   Groups could not be loaded.
                 </Text>
               )}

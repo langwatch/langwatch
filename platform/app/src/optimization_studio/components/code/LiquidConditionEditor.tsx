@@ -131,9 +131,9 @@ export function LiquidConditionEditor({
   }, [applyMarkers]);
 
   const borderColor = validation.error
-    ? "red.400"
+    ? "red.solidMuted"
     : validation.missingVariables.length > 0
-      ? "orange.400"
+      ? "orange.solidMuted"
       : "border";
 
   return (
@@ -205,7 +205,7 @@ export function LiquidConditionEditor({
       {validation.error ? (
         <Text
           fontSize="12px"
-          color="red.500"
+          color="red.solid"
           data-testid="if-else-condition-error"
         >
           {validation.error}
@@ -213,7 +213,7 @@ export function LiquidConditionEditor({
       ) : validation.missingVariables.length > 0 ? (
         <Text
           fontSize="12px"
-          color="orange.600"
+          color="orange.fgMuted"
           data-testid="if-else-condition-warning"
         >
           Unknown input

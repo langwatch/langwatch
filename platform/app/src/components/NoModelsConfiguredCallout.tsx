@@ -113,7 +113,7 @@ export function NoModelsConfiguredCallout({
           data-testid="no-models-configured-cta"
           flexShrink={0}
           // Visual hover only — the wrapper handles the actual nav.
-          _hover={{ bg: "gray.200" }}
+          _hover={{ bg: "bg.emphasized" }}
           pointerEvents="none"
         >
           <HStack gap={1}>

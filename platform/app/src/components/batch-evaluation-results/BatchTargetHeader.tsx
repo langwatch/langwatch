@@ -63,7 +63,7 @@ const SummaryTooltipContent = ({
         <Text fontWeight="medium">
           {aggregates.completedRows}/{aggregates.totalRows}
           {aggregates.errorRows > 0 && (
-            <Text as="span" color="red.300" marginLeft={1}>
+            <Text as="span" color="red.solid" marginLeft={1}>
               ({aggregates.errorRows}{" "}
               {aggregates.errorRows === 1 ? "error" : "errors"})
             </Text>
@@ -196,7 +196,7 @@ const SummaryTooltipContent = ({
                   </Text>
                 )}
                 {evaluator.errors > 0 && (
-                  <Text fontSize="11px" color="red.300">
+                  <Text fontSize="11px" color="red.solid">
                     {evaluator.errors}{" "}
                     {evaluator.errors === 1 ? "error" : "errors"}
                   </Text>
@@ -309,7 +309,7 @@ const SummaryBadge = memo(function SummaryBadge({
 
         {/* Errors indicator */}
         {aggregates.errorRows > 0 && (
-          <Text color="red.500" fontWeight="medium">
+          <Text color="red.solid" fontWeight="medium">
             {aggregates.errorRows}{" "}
             {aggregates.errorRows === 1 ? "error" : "errors"}
           </Text>

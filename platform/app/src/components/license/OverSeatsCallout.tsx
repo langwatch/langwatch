@@ -27,17 +27,16 @@ export function OverSeatsCallout({
   return (
     <Box
       borderWidth="1px"
-      borderColor="orange.300"
-      backgroundColor="orange.50"
+      borderColor="orange.emphasized"
+      backgroundColor="orange.subtle"
       borderRadius="lg"
       padding={5}
       width="full"
       marginBottom={4}
       data-testid="over-seats-callout"
-      _dark={{ backgroundColor: "orange.950", borderColor: "orange.700" }}
     >
       <HStack align="start" gap={4}>
-        <Box color="orange.600" paddingTop={1}>
+        <Box color="orange.fgMuted" paddingTop={1}>
           <UserMinus size={20} />
         </Box>
         <VStack align="start" gap={2} flex={1}>

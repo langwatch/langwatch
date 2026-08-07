@@ -13,7 +13,7 @@ export const SetupLayout = ({
       width="full"
       height="full"
       minHeight="100vh"
-      backgroundColor="gray.300"
+      backgroundColor="bg.emphasized"
       paddingTop={16}
     >
       <Head>

@@ -303,7 +303,7 @@ export function CompactEmailPreview({
         overflow="hidden"
         height={previewHeight}
         minHeight="120px"
-        bg="white"
+        bg="bg.panel"
         css={{ resize: "vertical" }}
       >
         <iframe

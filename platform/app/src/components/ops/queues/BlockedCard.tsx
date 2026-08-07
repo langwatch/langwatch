@@ -115,7 +115,7 @@ export function BlockedCard({ queueNames }: { queueNames: string[] }) {
             gap={2}
             flexWrap="wrap"
           >
-            <Text textStyle="sm" fontWeight="medium" color="red.500">
+            <Text textStyle="sm" fontWeight="medium" color="red.solid">
               Blocked — {blockedQuery.data.totalBlocked} groups,{" "}
               {clusters.length} error patterns
             </Text>
@@ -215,7 +215,7 @@ export function BlockedCard({ queueNames }: { queueNames: string[] }) {
                       <Table.Row key={rowKey}>
                         <Table.Cell textAlign="end">
                           <Text
-                            color="red.500"
+                            color="red.solid"
                             fontWeight="medium"
                             textStyle="xs"
                           >

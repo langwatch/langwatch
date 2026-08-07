@@ -731,7 +731,7 @@ export function ScopeChipPicker<
         </Select.Root>
         {showSummary && (
           <Box>
-            <Text fontSize="xs" color="gray.600">
+            <Text fontSize="xs" color="fg.muted">
               {summariseSelection(scopes)}
             </Text>
           </Box>
@@ -928,7 +928,7 @@ export function ScopeChipPicker<
       )}
       {showSummary && (
         <Box>
-          <Text fontSize="xs" color="gray.600">
+          <Text fontSize="xs" color="fg.muted">
             {summariseSelection(scopes)}
           </Text>
         </Box>

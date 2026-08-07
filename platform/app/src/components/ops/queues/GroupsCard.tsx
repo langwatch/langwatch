@@ -463,7 +463,7 @@ export function GroupsCard({ queueNames }: { queueNames: string[] }) {
                               <Text
                                 textStyle="xs"
                                 fontFamily="mono"
-                                color="orange.500"
+                                color="orange.solid"
                               >
                                 {group.retryCount}
                               </Text>
@@ -480,7 +480,7 @@ export function GroupsCard({ queueNames }: { queueNames: string[] }) {
                           <Table.Cell>
                             <Text
                               textStyle="xs"
-                              color={overdue ? "orange.500" : "fg.muted"}
+                              color={overdue ? "orange.solid" : "fg.muted"}
                               fontWeight={overdue ? "medium" : undefined}
                             >
                               {formatTimeAgo(group.oldestJobMs)}

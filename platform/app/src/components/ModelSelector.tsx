@@ -303,7 +303,11 @@ export const ModelSelector = React.memo(function ModelSelector({
         lineClamp={1}
         wordBreak="break-all"
         color={
-          isProviderMissing ? "red.600" : isUnknown ? "gray.500" : undefined
+          isProviderMissing
+            ? "red.fgMuted"
+            : isUnknown
+              ? "fg.subtle"
+              : undefined
         }
         textDecoration={isProviderMissing ? "line-through" : undefined}
       >
@@ -315,7 +319,7 @@ export const ModelSelector = React.memo(function ModelSelector({
           positioning={{ placement: "top" }}
           showArrow
         >
-          <HStack gap={1} color="red.600" flexShrink={0}>
+          <HStack gap={1} color="red.fgMuted" flexShrink={0}>
             <AlertTriangle size={size === "sm" ? 12 : 14} aria-hidden />
             <Text
               fontSize={size === "sm" ? "2xs" : "xs"}

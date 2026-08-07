@@ -286,10 +286,10 @@ export const WelcomeScreen: React.FC = () => {
                   borderRadius="full"
                   bg={
                     currentVisibleIndex === idx
-                      ? "orange.400"
+                      ? "orange.solidMuted"
                       : idx < currentVisibleIndex
-                        ? "orange.300"
-                        : "gray.200"
+                        ? "orange.muted"
+                        : "bg.emphasized"
                   }
                   transition="all 0.3s ease"
                 />

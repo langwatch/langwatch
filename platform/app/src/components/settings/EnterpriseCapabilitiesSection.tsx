@@ -107,7 +107,7 @@ function CapabilityRow({
           target="_blank"
           rel="noopener noreferrer"
           fontSize="sm"
-          color="blue.600"
+          color="blue.fgMuted"
         >
           <HStack gap={1}>
             <Text>Setup guide</Text>
@@ -158,18 +158,17 @@ function SsoConfiguredButNotInUseNotice() {
   return (
     <Box
       borderWidth="1px"
-      borderColor="orange.300"
-      backgroundColor="orange.50"
+      borderColor="orange.emphasized"
+      backgroundColor="orange.subtle"
       borderRadius="lg"
       padding={4}
       width="full"
       data-testid={
         unlicensed ? "sso-unlicensed-notice" : "sso-not-started-notice"
       }
-      _dark={{ backgroundColor: "orange.950", borderColor: "orange.700" }}
     >
       <HStack align="start" gap={3}>
-        <Box color="orange.600" paddingTop={0.5}>
+        <Box color="orange.fgMuted" paddingTop={0.5}>
           <TriangleAlert size={18} />
         </Box>
         <VStack align="start" gap={1}>

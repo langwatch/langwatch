@@ -58,7 +58,7 @@ export function ActiveOperationsSection({ data }: { data: DashboardData }) {
                 href={`/ops/projections/${replayStatus.runId}`}
                 style={{ textDecoration: "none" }}
               >
-                <Text textStyle="xs" color="blue.500" cursor="pointer">
+                <Text textStyle="xs" color="blue.solid" cursor="pointer">
                   View progress
                 </Text>
               </NextLink>

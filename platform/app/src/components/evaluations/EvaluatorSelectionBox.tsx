@@ -45,7 +45,7 @@ export function EvaluatorSelectionBox({
       >
         <HStack justify="space-between" width="full">
           <HStack gap={3}>
-            <Box color="green.500">
+            <Box color="green.solid">
               <CheckCircle size={20} />
             </Box>
             <VStack width="full" align="start" lineHeight={1} textAlign="left">
@@ -55,7 +55,7 @@ export function EvaluatorSelectionBox({
               {showSlug && selectedEvaluator.slug && (
                 <Text
                   fontSize="xs"
-                  color="gray.500"
+                  color="fg.subtle"
                   fontFamily="mono"
                   fontWeight="normal"
                   lineClamp={1}
@@ -65,7 +65,7 @@ export function EvaluatorSelectionBox({
               )}
             </VStack>
           </HStack>
-          <Box color="gray.400">
+          <Box color="fg.faint">
             <ChevronRight size={20} />
           </Box>
         </HStack>
@@ -86,8 +86,8 @@ export function EvaluatorSelectionBox({
       boxShadow="inset 0 -2px 5px 0px rgba(0, 0, 0, 0.03)"
     >
       <HStack justify="space-between" width="full">
-        <Text color="gray.500">{placeholder}</Text>
-        <Box color="gray.400">
+        <Text color="fg.subtle">{placeholder}</Text>
+        <Box color="fg.faint">
           <ChevronRight size={20} />
         </Box>
       </HStack>

@@ -29,7 +29,7 @@ export function FilterIconWithBadge({
           width="12px"
           height="12px"
           borderRadius="12px"
-          background="red.500"
+          background="red.solid"
           position="absolute"
           top="-4px"
           right="-4px"

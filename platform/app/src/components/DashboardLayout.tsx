@@ -683,7 +683,7 @@ export const DashboardLayout = ({
             right="-100px"
             bottom={0}
             w="400px"
-            background={user?.impersonator ? "blue.300" : "orange.300"}
+            background={user?.impersonator ? "blue.muted" : "orange.muted"}
             filter="blur(40px)"
             pointerEvents="none"
           ></Box>
@@ -733,7 +733,7 @@ export const DashboardLayout = ({
                 borderColor="orange.500/15"
               >
                 <Info size={12} color="var(--chakra-colors-orange-400)" />
-                <Text fontSize="xs" color="orange.400">
+                <Text fontSize="xs" color="orange.solidMuted">
                   Platform-wide - not scoped to a project
                 </Text>
               </HStack>
@@ -761,7 +761,7 @@ export const DashboardLayout = ({
             </HStack>
           ) : (
             <Text paddingLeft={2}>
-              <Link href="/auth/signin" color="orange.600" fontWeight="600">
+              <Link href="/auth/signin" color="orange.fgMuted" fontWeight="600">
                 Sign in
               </Link>{" "}
               to LangWatch to monitor your projects
@@ -833,7 +833,7 @@ export const DashboardLayout = ({
                   name={user?.name ?? undefined}
                   image={user?.image ?? undefined}
                   size="xs"
-                  backgroundColor="orange.400"
+                  backgroundColor="orange.solidMuted"
                   color="white"
                   width="28px"
                   height="28px"
@@ -963,7 +963,7 @@ export const DashboardLayout = ({
                     status="warning"
                     width="full"
                     borderBottom="1px solid"
-                    borderBottomColor="yellow.300"
+                    borderBottomColor="yellow.emphasized"
                     borderTopLeftRadius="2xl"
                   >
                     <Alert.Indicator />
@@ -994,8 +994,8 @@ export const DashboardLayout = ({
                     borderBottom="1px solid"
                     borderBottomColor={
                       usage.data.messageLimitInfo.status === "exceeded"
-                        ? "red.300"
-                        : "yellow.300"
+                        ? "red.emphasized"
+                        : "yellow.emphasized"
                     }
                   >
                     <Alert.Indicator />
@@ -1033,7 +1033,7 @@ export const DashboardLayout = ({
                     status="warning"
                     width="full"
                     borderBottom="1px solid"
-                    borderBottomColor="yellow.300"
+                    borderBottomColor="yellow.emphasized"
                   >
                     <Alert.Indicator />
                     <Alert.Content>
@@ -1114,7 +1114,11 @@ export const DashboardLayout = ({
 
               {publicEnv.data?.DEMO_PROJECT_SLUG &&
                 publicEnv.data.DEMO_PROJECT_SLUG === router.query.project && (
-                  <HStack width="full" backgroundColor="orange.400" padding={1}>
+                  <HStack
+                    width="full"
+                    backgroundColor="orange.solid"
+                    padding={1}
+                  >
                     <Spacer />
                     <Text fontSize="sm">
                       Viewing Demo Project - Go back to yours{" "}

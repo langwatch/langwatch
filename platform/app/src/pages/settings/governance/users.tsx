@@ -123,7 +123,7 @@ function GovernanceUsersListPage() {
         <HStack alignItems="end">
           <VStack align="start" gap={1}>
             <Text fontSize="xs" color="fg.muted">
-              <Link href="/settings/governance" color="blue.600">
+              <Link href="/settings/governance" color="blue.fgMuted">
                 ← AI Governance
               </Link>{" "}
               · All users
@@ -235,9 +235,9 @@ function Row({ user }: { user: SpendByUser }) {
   const trendColor = !user.hasPriorBaseline
     ? "fg.muted"
     : user.trendVsPreviousPct > 25
-      ? "orange.500"
+      ? "orange.solid"
       : user.trendVsPreviousPct < -25
-        ? "blue.500"
+        ? "blue.solid"
         : "fg.muted";
   return (
     <Link

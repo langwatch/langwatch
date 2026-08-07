@@ -154,7 +154,7 @@ const SpanNode: React.FC<SpanNodeProps> = ({ span, level, isNew }) => {
         <HStack gap={4}>
           <Box
             background="bg.panel"
-            borderColor={span.error ? "red.400" : "border.emphasized"}
+            borderColor={span.error ? "red.emphasized" : "border.emphasized"}
             borderWidth="3px"
             borderRadius="100%"
             width="12px"
@@ -167,7 +167,7 @@ const SpanNode: React.FC<SpanNodeProps> = ({ span, level, isNew }) => {
         <VStack align="start">
           <HStack>
             <HoverableBigText
-              color={!span.name && !("model" in span) ? "gray.400" : undefined}
+              color={!span.name && !("model" in span) ? "fg.faint" : undefined}
               maxWidth="300px"
               lineClamp={1}
               expandable={false}

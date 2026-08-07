@@ -172,7 +172,7 @@ export function AgentCard({
                     {onDelete && (
                       <Menu.Item
                         value="delete"
-                        color="red.500"
+                        color="red.solid"
                         onClick={(e) => {
                           e.stopPropagation();
                           onDelete();

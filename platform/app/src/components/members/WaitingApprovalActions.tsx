@@ -28,7 +28,7 @@ export function WaitingApprovalActions({
         aria-label="Approve"
         variant="ghost"
         size="sm"
-        color="green.500"
+        color="green.solid"
         onClick={() => onApprove(inviteId)}
       >
         <Check size={16} />
@@ -37,7 +37,7 @@ export function WaitingApprovalActions({
         aria-label="Reject"
         variant="ghost"
         size="sm"
-        color="red.500"
+        color="red.solid"
         onClick={() => onReject(inviteId)}
       >
         <X size={16} />

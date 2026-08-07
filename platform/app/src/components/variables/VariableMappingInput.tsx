@@ -659,7 +659,7 @@ export const VariableMappingInput = ({
         // borderRadius={isMissing ? "md" : undefined}
         paddingX={isMissing ? 1 : undefined}
         _focusWithin={{
-          borderColor: isMissing ? "orange.fg" : "blue.500",
+          borderColor: isMissing ? "orange.fg" : "blue.emphasized",
           boxShadow: isMissing
             ? "var(--chakra-colors-orange-emphasized) 0px 1px 0px 0px"
             : "var(--chakra-colors-blue-500) 0px 1px 0px 0px",
@@ -822,12 +822,12 @@ export const VariableMappingInput = ({
                     borderRadius="4px"
                     marginBottom={1}
                   >
-                    <Text fontSize="xs" color="blue.600">
+                    <Text fontSize="xs" color="blue.fgMuted">
                       {inProgressPath.path
                         .map((s) => s.replace(/_/g, " "))
                         .join(" → ")}
                     </Text>
-                    <Text fontSize="xs" color="blue.400">
+                    <Text fontSize="xs" color="blue.solidMuted">
                       →
                     </Text>
                   </HStack>

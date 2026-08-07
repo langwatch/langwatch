@@ -428,7 +428,7 @@ export const EditModelProviderForm = ({
   return (
     <VStack gap={4} align="start" width="full">
       {isStaleMiss && (
-        <Text color="red.500" fontSize="sm">
+        <Text color="red.solid" fontSize="sm">
           This provider configuration no longer exists. It may have been deleted
           from another session.
         </Text>

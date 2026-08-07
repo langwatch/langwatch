@@ -224,7 +224,7 @@ export default function BatchEvaluation({
         align="center"
         alignItems="stretch"
         justify="center"
-        background="gray.50"
+        background="bg.subtle"
         padding={6}
         gap={6}
       >
@@ -238,7 +238,7 @@ export default function BatchEvaluation({
                   </Text>
                   <HStack
                     align="end"
-                    color={score < 0.5 ? "red.500" : "green.500"}
+                    color={score < 0.5 ? "red.solid" : "green.solid"}
                   >
                     <Text fontSize="26px" fontWeight="300">
                       {typeof score === "number"
@@ -270,7 +270,7 @@ export default function BatchEvaluation({
                       <Text>
                         <Box
                           display="inline-block"
-                          background="yellow.400"
+                          background="yellow.solidMuted"
                           borderRadius="100%"
                           width={2}
                           height={2}
@@ -284,7 +284,7 @@ export default function BatchEvaluation({
                       <Text>
                         <Box
                           display="inline-block"
-                          background="red.400"
+                          background="red.solidMuted"
                           borderRadius="100%"
                           width={2}
                           height={2}
@@ -455,9 +455,9 @@ export default function BatchEvaluation({
                                 <Table.Cell
                                   color={
                                     evaluation.status === "skipped"
-                                      ? "yellow.700"
+                                      ? "yellow.fg"
                                       : evaluation.status === "error"
-                                        ? "red.700"
+                                        ? "red.fg"
                                         : undefined
                                   }
                                 >
@@ -471,11 +471,11 @@ export default function BatchEvaluation({
                                       passedOrScoreMetric[evaluationKey] ===
                                       "score"
                                         ? evaluation.score < 0.5
-                                          ? "red.500"
-                                          : "green.500"
+                                          ? "red.solid"
+                                          : "green.solid"
                                         : evaluation.passed
-                                          ? "green.500"
-                                          : "red.500"
+                                          ? "green.solid"
+                                          : "red.solid"
                                     }
                                   >
                                     {passedOrScoreMetric[evaluationKey] ===
@@ -493,9 +493,9 @@ export default function BatchEvaluation({
                                     maxWidth={300}
                                     color={
                                       evaluation.status === "skipped"
-                                        ? "yellow.700"
+                                        ? "yellow.fg"
                                         : evaluation.status === "error"
-                                          ? "red.700"
+                                          ? "red.fg"
                                           : undefined
                                     }
                                   >

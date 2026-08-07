@@ -413,12 +413,12 @@ export function DSPyExperimentRunList({
                 !selectedRuns || selectedRuns.includes(run.runId) ? 1 : 0.5
               }
               background={
-                selectedRuns?.includes(run.runId) ? "gray.200" : "none"
+                selectedRuns?.includes(run.runId) ? "bg.emphasized" : "none"
               }
               _hover={{
                 background: selectedRuns?.includes(run.runId)
-                  ? "gray.200"
-                  : "gray.100",
+                  ? "bg.emphasized"
+                  : "bg.muted",
               }}
               onClick={(e) => {
                 e.stopPropagation();
@@ -447,7 +447,7 @@ export function DSPyExperimentRunList({
                     <HStack width="100%">
                       <Skeleton
                         height="12px"
-                        background="gray.400"
+                        background="bg.emphasized"
                         flexGrow={1}
                       />
                       <Spinner size="xs" flexShrink={0} />
@@ -455,7 +455,7 @@ export function DSPyExperimentRunList({
                     <Skeleton
                       width="100%"
                       height="12px"
-                      background="gray.400"
+                      background="bg.emphasized"
                     />
                   </VStack>
                 </>
@@ -472,7 +472,7 @@ export function DSPyExperimentRunList({
                       height="24px"
                       minWidth="24px"
                       minHeight="24px"
-                      background="gray.300"
+                      background="bg.emphasized"
                       borderRadius="100%"
                       backgroundColor={
                         getColorForString("colors", run.runId).color
@@ -487,7 +487,7 @@ export function DSPyExperimentRunList({
                           height="12px"
                           minWidth="12px"
                           minHeight="12px"
-                          background="gray.300"
+                          background="bg.emphasized"
                           borderRadius="100%"
                           backgroundColor={
                             getColorForString("colors", run.runId).color
@@ -579,7 +579,7 @@ export const RunDetails = React.memo(
                   <Box
                     width="18px"
                     height="18px"
-                    background="gray.300"
+                    background="bg.emphasized"
                     borderRadius="100%"
                     backgroundColor={
                       getColorForString("colors", dspyStepSummary.run_id).color
@@ -658,7 +658,7 @@ export const RunDetails = React.memo(
                 paddingX={4}
                 fontWeight={500}
                 color="fg.muted"
-                background="gray.100"
+                background="bg.muted"
               >
                 <Text>Step {dspyStepSummary.index}</Text>
               </Center>
@@ -782,7 +782,7 @@ export const RunDetails = React.memo(
                   {dspyStep.isLoading ? (
                     Array.from({ length: 3 }).map((_, index) => (
                       <Table.Row key={index}>
-                        <Table.Cell background="gray.50">&nbsp;</Table.Cell>
+                        <Table.Cell background="bg.subtle">&nbsp;</Table.Cell>
                         <Table.Cell>
                           <Skeleton width="100%" height="30px" />
                         </Table.Cell>
@@ -799,7 +799,7 @@ export const RunDetails = React.memo(
                     ))
                   ) : dspyStep.error ? (
                     <Table.Row>
-                      <Table.Cell colSpan={5} color="red.600">
+                      <Table.Cell colSpan={5} color="red.fgMuted">
                         Error loading step data
                       </Table.Cell>
                     </Table.Row>
@@ -814,7 +814,10 @@ export const RunDetails = React.memo(
                           predictor?.extended_signature ?? predictor?.signature;
                         return (
                           <Table.Row key={index}>
-                            <Table.Cell background="gray.50" textAlign="center">
+                            <Table.Cell
+                              background="bg.subtle"
+                              textAlign="center"
+                            >
                               {index + 1}
                             </Table.Cell>
                             <Table.Cell>{name}</Table.Cell>
@@ -895,7 +898,7 @@ export const RunDetails = React.memo(
                   {dspyStep.isLoading ? (
                     Array.from({ length: 3 }).map((_, index) => (
                       <Table.Row key={index}>
-                        <Table.Cell background="gray.50">&nbsp;</Table.Cell>
+                        <Table.Cell background="bg.subtle">&nbsp;</Table.Cell>
                         <Table.Cell>
                           <Skeleton width="100%" height="30px" />
                         </Table.Cell>
@@ -909,7 +912,7 @@ export const RunDetails = React.memo(
                     ))
                   ) : dspyStep.error ? (
                     <Table.Row>
-                      <Table.Cell colSpan={4} color="red.600">
+                      <Table.Cell colSpan={4} color="red.fgMuted">
                         Error loading step data
                       </Table.Cell>
                     </Table.Row>
@@ -920,7 +923,7 @@ export const RunDetails = React.memo(
                   ) : dspyStep.data ? (
                     dspyStep.data.examples.map((example, index) => (
                       <Table.Row key={index}>
-                        <Table.Cell background="gray.50" textAlign="center">
+                        <Table.Cell background="bg.subtle" textAlign="center">
                           {index + 1}
                         </Table.Cell>
                         <Table.Cell>
@@ -993,7 +996,7 @@ export const RunDetails = React.memo(
                 {dspyStep.isLoading ? (
                   Array.from({ length: 3 }).map((_, index) => (
                     <Table.Row key={index}>
-                      <Table.Cell background="gray.50">&nbsp;</Table.Cell>
+                      <Table.Cell background="bg.subtle">&nbsp;</Table.Cell>
                       <Table.Cell>
                         <Skeleton width="100%" height="30px" />
                       </Table.Cell>
@@ -1010,7 +1013,7 @@ export const RunDetails = React.memo(
                   ))
                 ) : dspyStep.error ? (
                   <Table.Row>
-                    <Table.Cell colSpan={6} color="red.600">
+                    <Table.Cell colSpan={6} color="red.fgMuted">
                       Error loading step data
                     </Table.Cell>
                   </Table.Row>
@@ -1025,7 +1028,7 @@ export const RunDetails = React.memo(
                       llmCall.response?.output;
                     return (
                       <Table.Row key={index}>
-                        <Table.Cell background="gray.50" textAlign="center">
+                        <Table.Cell background="bg.subtle" textAlign="center">
                           {index + 1}
                         </Table.Cell>
                         <Table.Cell>{llmCall.model}</Table.Cell>
@@ -1186,7 +1189,7 @@ export function DSPyRunsScoresChart({
   const getColor = (runId: string) => {
     const [name, number] = getColorForString("colors", runId).color.split(".");
     if (!name || !number) {
-      return getRawColorValue("gray.300");
+      return getRawColorValue("bg.emphasized");
     }
 
     return getRawColorValue(`${name}.${number}`);
@@ -1308,7 +1311,7 @@ export function DSPyRunsScoresChart({
                 value="Best"
                 position="top"
                 offset={10}
-                fill={getRawColorValue("gray.700")}
+                fill={getRawColorValue("fg.muted")}
                 fontSize="12px"
               />
             </ReferenceDot>

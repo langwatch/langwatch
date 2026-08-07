@@ -100,7 +100,7 @@ export function GroupDetailDialog({
                     <Text textStyle="xs" color="fg.muted">
                       Retries
                     </Text>
-                    <Text textStyle="sm" fontFamily="mono" color="orange.500">
+                    <Text textStyle="sm" fontFamily="mono" color="orange.solid">
                       {detail.retryCount}
                     </Text>
                   </VStack>
@@ -110,7 +110,7 @@ export function GroupDetailDialog({
                     <Text textStyle="xs" color="fg.muted">
                       Active Job
                     </Text>
-                    <Text textStyle="xs" fontFamily="mono" color="green.500">
+                    <Text textStyle="xs" fontFamily="mono" color="green.solid">
                       {detail.activeJobId}
                     </Text>
                   </VStack>
@@ -155,7 +155,7 @@ export function GroupDetailDialog({
                     <Card.Body padding={3}>
                       <Text
                         textStyle="xs"
-                        color="red.500"
+                        color="red.solid"
                         whiteSpace="pre-wrap"
                         wordBreak="break-word"
                       >

@@ -361,7 +361,7 @@ export function EvaluateModalContent({
         // eslint-disable-next-line @typescript-eslint/no-misused-promises
         onSubmit={form.handleSubmit(onSubmit)}
         borderTop="5px solid"
-        borderTopColor="green.400"
+        borderTopColor="green.emphasized"
       >
         <Dialog.Header>
           <Dialog.Title fontWeight={600}>Evaluate Workflow</Dialog.Title>
