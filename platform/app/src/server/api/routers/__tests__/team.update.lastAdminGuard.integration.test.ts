@@ -121,6 +121,48 @@ describe("given a team whose only admin is one of its members", () => {
     });
   });
 
+  describe("when a group with a member also holds the Admin role on the team", () => {
+    /** @scenario A group that administers the team counts as its admin */
+    it("lets its only directly assigned admin be demoted", async () => {
+      await fixture.withAdminGroupOn({
+        teamId: fixture.onlyAdminTeamId,
+        memberUserId: fixture.companionUserId,
+        run: async () => {
+          await expect(
+            saveTeam([
+              { userId: fixture.soloUserId, role: TeamUserRole.VIEWER },
+            ]),
+          ).resolves.toMatchObject({ success: true });
+
+          await expect(
+            fixture.teamRoleOf({
+              userId: fixture.soloUserId,
+              teamId: fixture.onlyAdminTeamId,
+            }),
+          ).resolves.toBe(TeamUserRole.VIEWER);
+        },
+      });
+    });
+  });
+
+  describe("when the only group holding the Admin role has no members", () => {
+    /** @scenario A group with no members does not keep a team administered */
+    it("still refuses to demote the only directly assigned admin", async () => {
+      await fixture.withAdminGroupOn({
+        teamId: fixture.onlyAdminTeamId,
+        run: async () => {
+          await expect(
+            saveTeam([
+              { userId: fixture.soloUserId, role: TeamUserRole.VIEWER },
+            ]),
+          ).rejects.toMatchObject({
+            cause: { code: "team_last_admin_required" },
+          });
+        },
+      });
+    });
+  });
+
   describe("when the team already has no team admin at all", () => {
     /** @scenario A team already without a team admin stays editable */
     it("still accepts a membership change", async () => {

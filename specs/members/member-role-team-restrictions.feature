@@ -284,3 +284,31 @@ Feature: Member Role Team Restrictions
     When an organization admin changes that team role from the team's own members
     Then the change is refused
     And the refusal names the team
+
+  # "Has an admin" counts people, not binding rows. A group holding the Admin
+  # role on a team administers it through every one of its members, which is
+  # how SCIM-provisioned organizations grant access, so a guard that counts
+  # only directly assigned admins refuses changes the team can absorb, and
+  # treats a team administered entirely through a group as having no admin
+  # at all.
+
+  @integration
+  Scenario: A group that administers the team counts as its admin
+    Given a member is the only directly assigned admin of a shared team
+    And a group with at least one member holds the Admin role on that team
+    When they are demoted, from the team form or from the team's own members
+    Then the save goes through
+
+  @integration
+  Scenario: A group with no members does not keep a team administered
+    Given a member is the only directly assigned admin of a shared team
+    And a group with no members holds the Admin role on that team
+    When the team is saved with that member demoted
+    Then the save is refused
+    And the refusal names the team
+
+  @integration
+  Scenario: A team administered only through a group accepts member edits
+    Given a team whose only Admin role is held by a group with members
+    When an organization admin changes another member's role on that team
+    Then the change is saved

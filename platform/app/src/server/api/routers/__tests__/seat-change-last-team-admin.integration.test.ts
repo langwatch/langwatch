@@ -121,6 +121,25 @@ describe("given a member who is the only admin of shared teams", () => {
       );
     });
 
+    /** @scenario The teams left without a team admin are named back to the admin */
+    it("leaves out a team a group with members still administers", async () => {
+      await fixture.withAdminGroupOn({
+        teamId: fixture.onlyAdminTeamId,
+        memberUserId: fixture.companionUserId,
+        run: async () => {
+          const result = await moveSoloUserTo(OrganizationUserRole.EXTERNAL);
+
+          const reportedIds = result.teamsLeftWithoutAdmin.map(
+            (team) => team.id,
+          );
+          expect(reportedIds).not.toContain(fixture.onlyAdminTeamId);
+          // The sibling team has no group covering it, so the report still
+          // fires where nobody is actually left.
+          expect(reportedIds).toContain(fixture.alsoOnlyAdminTeamId);
+        },
+      });
+    });
+
     /** @scenario Moving the only admin of a shared team to a Lite Member seat goes through */
     it("leaves the team administered by the organization's admins", async () => {
       await moveSoloUserTo(OrganizationUserRole.EXTERNAL);

@@ -10,6 +10,7 @@ import {
   TeamLastAdminRequiredError,
 } from "~/server/app-layer/teams/team.service";
 import { assertUsersInOrganization } from "~/server/organizations/assertUsersInOrganization";
+import { computeEffectiveAdminUserIds } from "~/server/teams/effective-team-admins";
 import { TEAM_ROLE_PRIORITY, TeamService } from "~/server/teams/team.service";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { slugify } from "~/utils/slugify";
@@ -404,23 +405,22 @@ export const teamRouter = createTRPCRouter({
 
         // The same rule the per-member path enforces: a team-local save cannot
         // take the team's last admin away, whether it demotes them or drops
-        // them from the list. Only checked when the team had an admin to lose,
-        // so a team a seat correction already left without one stays editable
-        // here — which is also where somebody gets promoted back to Admin.
+        // them from the list. "Has an admin" counts group-expanded admins too;
+        // this form cannot edit group bindings, so a team a group administers
+        // never trips it. Only checked when the team had a direct admin to
+        // lose (that is the only kind this save can take away), so a team a
+        // seat correction already left without one stays editable here — which
+        // is also where somebody gets promoted back to Admin.
         const hadAdmin = currentBindings.some(
           (b) => b.role === TeamUserRole.ADMIN,
         );
         if (hadAdmin) {
-          const adminsAfter = await tx.roleBinding.count({
-            where: {
-              organizationId,
-              scopeType: RoleBindingScopeType.TEAM,
-              scopeId: input.teamId,
-              role: TeamUserRole.ADMIN,
-              userId: { not: null },
-            },
+          const adminsAfter = await computeEffectiveAdminUserIds({
+            tx,
+            organizationId,
+            teamId: input.teamId,
           });
-          if (adminsAfter === 0) {
+          if (adminsAfter.size === 0) {
             throw new TeamLastAdminRequiredError(input.name);
           }
         }

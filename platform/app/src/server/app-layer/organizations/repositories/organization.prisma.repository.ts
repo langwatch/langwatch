@@ -13,6 +13,10 @@ import {
 } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { findSharedTeamIds } from "~/server/role-bindings/personal-team-scope";
+import {
+  computeEffectiveAdminUserIds,
+  projectAdminUserIdsWithoutDirectRole,
+} from "~/server/teams/effective-team-admins";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { encrypt } from "~/utils/encryption";
 import {
@@ -854,21 +858,18 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
           ? TeamUserRole.CUSTOM
           : (teamRoleUpdate.role as TeamUserRole);
         const shouldClearCustomRole = !updateIsCustomRole;
-        const isDemotingLastAdmin =
+        const demotesAnAdmin =
           currentMembership.role === TeamUserRole.ADMIN &&
           nextRole !== TeamUserRole.ADMIN;
 
-        if (isDemotingLastAdmin) {
-          const teamAdminCount = await tx.roleBinding.count({
-            where: {
-              organizationId,
-              scopeType: RoleBindingScopeType.TEAM,
-              scopeId: teamId,
-              role: TeamUserRole.ADMIN,
-              userId: { not: null },
-            },
+        if (demotesAnAdmin) {
+          const adminsAfter = await projectAdminUserIdsWithoutDirectRole({
+            tx,
+            organizationId,
+            teamId,
+            userId,
           });
-          if (teamAdminCount <= 1) {
+          if (adminsAfter.size === 0) {
             // A caller who named this team asked for a team-local change, and a
             // team needs an admin. A seat correction did not name it: the
             // decision was about one person's seat, every shared team is still
@@ -972,17 +973,13 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
           throw new LiteMemberViewerOnlyError(team.name);
         }
 
-        const adminCount = await tx.roleBinding.count({
-          where: {
-            organizationId: team.organizationId,
-            scopeType: RoleBindingScopeType.TEAM,
-            scopeId: teamId,
-            role: TeamUserRole.ADMIN,
-            userId: { not: null },
-          },
+        const effectiveAdminUserIds = await computeEffectiveAdminUserIds({
+          tx,
+          organizationId: team.organizationId,
+          teamId,
         });
 
-        if (adminCount === 0) {
+        if (effectiveAdminUserIds.size === 0) {
           throw new TeamLastAdminRequiredError(team.name);
         }
 
@@ -1005,12 +1002,20 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
 
         const isTargetUserAdmin = targetUserBinding.role === TeamUserRole.ADMIN;
 
-        if (adminCount === 1 && isTargetUserAdmin) {
-          if (userId === currentUserId) {
-            throw new CannotRemoveSelfAsLastAdminError(team.name);
-          }
+        if (isTargetUserAdmin) {
+          const adminsAfter = await projectAdminUserIdsWithoutDirectRole({
+            tx,
+            organizationId: team.organizationId,
+            teamId,
+            userId,
+          });
+          if (adminsAfter.size === 0) {
+            if (userId === currentUserId) {
+              throw new CannotRemoveSelfAsLastAdminError(team.name);
+            }
 
-          throw new TeamLastAdminRequiredError(team.name);
+            throw new TeamLastAdminRequiredError(team.name);
+          }
         }
 
         await setUserScopeBinding({
@@ -1023,17 +1028,13 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
           customRoleId: storedCustomRoleId,
         });
 
-        const finalAdminCount = await tx.roleBinding.count({
-          where: {
-            organizationId: team.organizationId,
-            scopeType: RoleBindingScopeType.TEAM,
-            scopeId: teamId,
-            role: TeamUserRole.ADMIN,
-            userId: { not: null },
-          },
+        const finalAdminUserIds = await computeEffectiveAdminUserIds({
+          tx,
+          organizationId: team.organizationId,
+          teamId,
         });
 
-        if (finalAdminCount === 0) {
+        if (finalAdminUserIds.size === 0) {
           throw new TeamLastAdminRequiredError(team.name);
         }
       });
@@ -1070,17 +1071,13 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
           }
         }
 
-        const adminCount = await tx.roleBinding.count({
-          where: {
-            organizationId: team.organizationId,
-            scopeType: RoleBindingScopeType.TEAM,
-            scopeId: teamId,
-            role: TeamUserRole.ADMIN,
-            userId: { not: null },
-          },
+        const effectiveAdminUserIds = await computeEffectiveAdminUserIds({
+          tx,
+          organizationId: team.organizationId,
+          teamId,
         });
 
-        if (adminCount === 0) {
+        if (effectiveAdminUserIds.size === 0) {
           throw new TeamLastAdminRequiredError(team.name);
         }
 
@@ -1105,12 +1102,20 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
         const wouldDemoteAdmin =
           isTargetUserAdmin && role !== TeamUserRole.ADMIN;
 
-        if (adminCount === 1 && wouldDemoteAdmin) {
-          if (userId === currentUserId) {
-            throw new CannotRemoveSelfAsLastAdminError(team.name);
-          }
+        if (wouldDemoteAdmin) {
+          const adminsAfter = await projectAdminUserIdsWithoutDirectRole({
+            tx,
+            organizationId: team.organizationId,
+            teamId,
+            userId,
+          });
+          if (adminsAfter.size === 0) {
+            if (userId === currentUserId) {
+              throw new CannotRemoveSelfAsLastAdminError(team.name);
+            }
 
-          throw new TeamLastAdminRequiredError(team.name);
+            throw new TeamLastAdminRequiredError(team.name);
+          }
         }
 
         await setUserScopeBinding({
@@ -1123,17 +1128,13 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
           customRoleId: null,
         });
 
-        const finalAdminCount = await tx.roleBinding.count({
-          where: {
-            organizationId: team.organizationId,
-            scopeType: RoleBindingScopeType.TEAM,
-            scopeId: teamId,
-            role: TeamUserRole.ADMIN,
-            userId: { not: null },
-          },
+        const finalAdminUserIds = await computeEffectiveAdminUserIds({
+          tx,
+          organizationId: team.organizationId,
+          teamId,
         });
 
-        if (finalAdminCount === 0) {
+        if (finalAdminUserIds.size === 0) {
           throw new TeamLastAdminRequiredError(team.name);
         }
       });

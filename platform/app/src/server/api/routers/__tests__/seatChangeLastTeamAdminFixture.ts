@@ -307,6 +307,59 @@ async function removeSeed({
   ]);
 }
 
+/**
+ * A group holding the Admin role on a team, the way SCIM provisioning grants
+ * it. The last-admin guards count the group's members as the team's admins, so
+ * suites use this to assert a demotion the group can absorb goes through, and
+ * that an empty group (no `memberUserId`) keeps nothing administered. Rows are
+ * removed on the way out so `resetMemberships` stays truthful between tests.
+ */
+async function withAdminGroupOn({
+  prisma,
+  organizationId,
+  ns,
+  teamId,
+  memberUserId,
+  run,
+}: {
+  prisma: PrismaClient;
+  organizationId: string;
+  ns: string;
+  teamId: string;
+  memberUserId?: string;
+  run: () => Promise<void>;
+}) {
+  const group = await prisma.group.create({
+    data: {
+      organizationId,
+      name: "Provisioned admins",
+      slug: `provisioned-admins-${ns}`,
+    },
+  });
+  if (memberUserId) {
+    await prisma.groupMembership.create({
+      data: { userId: memberUserId, groupId: group.id },
+    });
+  }
+  const binding = await prisma.roleBinding.create({
+    data: {
+      id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+      organizationId,
+      groupId: group.id,
+      role: TeamUserRole.ADMIN,
+      scopeType: RoleBindingScopeType.TEAM,
+      scopeId: teamId,
+    },
+  });
+  try {
+    await run();
+  } finally {
+    await prisma.roleBinding.deleteMany({ where: { id: binding.id } });
+    await prisma.groupMembership.deleteMany({ where: { groupId: group.id } });
+    await prisma.group.deleteMany({ where: { id: group.id } });
+  }
+}
+
 function callerAsAdmin(seed: SeatChangeSeed) {
   return appRouter.createCaller(
     createInnerTRPCContext({
@@ -384,6 +437,24 @@ export async function createSeatChangeFixture({
 
     organizationRoleOfSoloUser: () =>
       organizationRoleOf({ prisma, organizationId, userId: seed.soloUserId }),
+
+    withAdminGroupOn: ({
+      teamId,
+      memberUserId,
+      run,
+    }: {
+      teamId: string;
+      memberUserId?: string;
+      run: () => Promise<void>;
+    }) =>
+      withAdminGroupOn({
+        prisma,
+        organizationId,
+        ns,
+        teamId,
+        memberUserId,
+        run,
+      }),
 
     resetMemberships: () => resetMemberships({ prisma, seed }),
 
