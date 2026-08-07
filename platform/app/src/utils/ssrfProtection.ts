@@ -504,6 +504,18 @@ export const validateUrlForSSRF = createSSRFValidator({
 
 const MAX_REDIRECTS = 10;
 
+/**
+ * What a caller sees when it asked us not to follow redirects and the
+ * endpoint sent one anyway.
+ *
+ * Exported because a caller that wants to tell this apart from a genuine
+ * connection failure has nothing else to match on — this is raised as a plain
+ * `Error`. Importing the constant is what keeps a reword from silently turning
+ * every refused redirect back into "could not be reached" at the far end.
+ */
+export const REDIRECT_REFUSED_MESSAGE =
+  "Redirects are not followed for this destination — the endpoint must answer directly.";
+
 export interface SSRFSafeFetchOptions extends RequestInit {
   _redirectCount?: number;
   /**
@@ -644,9 +656,7 @@ export async function fetchWithResolvedIp(
       const location = response.headers.get("location");
       if (location) {
         if (init?.followRedirects === false) {
-          throw new Error(
-            "Redirects are not followed for this destination — the endpoint must answer directly.",
-          );
+          throw new Error(REDIRECT_REFUSED_MESSAGE);
         }
         if (redirectCount >= MAX_REDIRECTS) {
           throw new Error(`Too many redirects (max ${MAX_REDIRECTS})`);

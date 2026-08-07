@@ -18,8 +18,11 @@ import { validateProviderApiKey } from "../providerValidation";
 
 // The probe goes out through the SSRF-validated fetch rather than
 // `global.fetch`, so that is the seam these tests stand in for.
+// Only the fetch is stood in for; the rest of the module stays real, so the
+// redirect message the production matcher compares against is the true one.
 const mockFetch = vi.fn();
-vi.mock("../../../utils/ssrfProtection", () => ({
+vi.mock("../../../utils/ssrfProtection", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../../utils/ssrfProtection")>()),
   ssrfSafeFetch: (...args: unknown[]) => mockFetch(...args),
 }));
 

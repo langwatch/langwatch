@@ -9,7 +9,10 @@ import {
   providerDefaultBaseUrls,
 } from "../../features/onboarding/regions/model-providers/registry";
 import { MASKED_KEY_PLACEHOLDER } from "../../utils/constants";
-import { ssrfSafeFetch } from "../../utils/ssrfProtection";
+import {
+  REDIRECT_REFUSED_MESSAGE,
+  ssrfSafeFetch,
+} from "../../utils/ssrfProtection";
 import { ModelProviderRepository } from "./modelProvider.repository";
 import { modelProviders } from "./registry";
 
@@ -876,14 +879,13 @@ function unreachableFailure(context: ProbeContext): RankedFailure {
  * when what they need to change is a URL — the misdiagnosis this module
  * exists to remove, and one three previous fixes were about.
  *
- * Detected by message because the helper raises a plain `Error`; the test
- * below pins the coupling so a reworded message fails loudly rather than
- * silently folding back into "unreachable".
+ * Detected by message because the helper raises a plain `Error`. The message
+ * is imported from the helper rather than copied, so a reword moves both sides
+ * together — a local copy would have left this matching nothing and every
+ * redirect quietly degrading back to "could not be reached".
  */
-const REDIRECT_REFUSED_MARKER = "Redirects are not followed";
-
 function isRefusedRedirect(err: unknown): boolean {
-  return err instanceof Error && err.message.includes(REDIRECT_REFUSED_MARKER);
+  return err instanceof Error && err.message === REDIRECT_REFUSED_MESSAGE;
 }
 
 function redirectedFailure(context: ProbeContext): RankedFailure {
@@ -1119,12 +1121,17 @@ export async function validateKeyWithCustomUrl({
  * ```
  */
 /**
- * Every reason we would decline to ask, gathered in one place.
+ * The credential-shaped reasons we decline to ask: nothing usable to send, or
+ * nowhere to send it.
  *
- * `null` means the probe can go ahead. Kept separate from the probe itself
- * because these are the answers a customer reads as "we did not check", and
- * having them in one list is what stops a future branch quietly returning a
- * pass instead — the failure this whole third verdict exists to prevent.
+ * `null` means the probe can go ahead. The two provider-shaped reasons —
+ * an unrecognised provider, and one whose auth we cannot exercise — are
+ * decided by the callers before they get here, because both need the registry
+ * entry this function is deliberately not given.
+ *
+ * Kept out of the probe because these are the answers a customer reads as "we
+ * did not check", and a branch that quietly returned a pass instead is the
+ * failure the third verdict exists to prevent.
  */
 function whyNotCheckable({
   provider,

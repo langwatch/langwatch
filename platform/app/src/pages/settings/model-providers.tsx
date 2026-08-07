@@ -356,7 +356,7 @@ export default function ModelsPage() {
                             </Box>
                             <VStack gap={0} align="start">
                               <Text>
-                                {(provider as any).name ??
+                                {(provider as { name?: string }).name ??
                                   providerSpec?.name ??
                                   provider.provider}
                               </Text>

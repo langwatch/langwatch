@@ -94,9 +94,16 @@ function toState(result: ConnectionTestResult): ConnectionTestState {
   // described as "can't be tested automatically" — a confident sentence about
   // a verdict nobody has classified. This turns that into a compile error at
   // the moment the server grows one.
+  //
+  // The discriminator only, never the payload: this message reaches
+  // `describeError` in the caller's catch, which can render a plain Error's
+  // text to the customer, and nothing promises a future outcome's fields are
+  // free of credential material.
   const unhandled: never = result;
   throw new Error(
-    `Unhandled connection test outcome: ${JSON.stringify(unhandled)}`,
+    `Unhandled connection test outcome: ${String(
+      (unhandled as { outcome?: unknown }).outcome,
+    )}`,
   );
 }
 

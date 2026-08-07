@@ -3,12 +3,17 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // The probe goes out through the SSRF-validated fetch, not `global.fetch`, so
 // that is what these tests stand in for. Mocking the global would leave the
 // real validator in the path and every assertion here would be about DNS.
+// Only the fetch is stood in for. Everything else — notably the message the
+// helper raises on a refused redirect — comes from the real module, so a
+// reword there breaks this test instead of quietly passing it.
 const mockFetch = vi.fn();
-vi.mock("../../../utils/ssrfProtection", () => ({
+vi.mock("../../../utils/ssrfProtection", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../../utils/ssrfProtection")>()),
   ssrfSafeFetch: (...args: unknown[]) => mockFetch(...args),
 }));
 
 import { MASKED_KEY_PLACEHOLDER } from "../../../utils/constants";
+import { REDIRECT_REFUSED_MESSAGE } from "../../../utils/ssrfProtection";
 import {
   ProviderUnreachableError,
   type ValidationResult,
@@ -1088,15 +1093,11 @@ describe("given a check that never reached the provider", () => {
 
     /** @scenario "A redirect is reported as a redirect, not as unreachable" */
     it("says the endpoint redirected rather than that it could not be reached", async () => {
-      // What the SSRF helper raises when it declines a hop. Matching on the
-      // message is a coupling, so this test is where it is pinned: reword the
-      // helper and this fails loudly instead of silently folding the case back
-      // into "check your network connection".
-      mockFetch.mockRejectedValueOnce(
-        new Error(
-          "Redirects are not followed for this destination — the endpoint must answer directly.",
-        ),
-      );
+      // The helper's own message, imported rather than retyped. A copy here
+      // would have pinned nothing: reword the helper and both the production
+      // matcher and this test would keep agreeing with each other while every
+      // real redirect degraded back to "check your network connection".
+      mockFetch.mockRejectedValueOnce(new Error(REDIRECT_REFUSED_MESSAGE));
 
       const result = await validateProviderApiKey("custom", {
         CUSTOM_API_KEY: "sk-test",
