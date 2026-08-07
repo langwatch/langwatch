@@ -14,6 +14,37 @@ import { resolveDataPrivacy } from "./resolveDataPrivacy";
  * TTL layer on top. A `null` value means the project has no resolvable scope
  * context (no org anchor); the service maps that to the platform default.
  */
+/** Sentinel for a cached blob too old to read; the caller recomputes. */
+const UNREADABLE = Symbol("unreadable");
+
+/**
+ * Old and new pods share this Redis cache for the whole of a rolling deploy,
+ * so a blob can predate any field added since the writer last shipped. The
+ * deserialised value is cast to a type it may not satisfy, which is why every
+ * collection is defaulted here rather than at the ~20 call sites that walk it.
+ * A blob missing `categories` is beyond defaulting, so it reads as a miss.
+ */
+function reviveCached(
+  cached: ResolvedDataPrivacy | null,
+): ResolvedDataPrivacy | null | typeof UNREADABLE {
+  if (cached === null) return null;
+  if (!cached.categories || !cached.pii || !cached.secrets) return UNREADABLE;
+
+  return {
+    ...cached,
+    pii: {
+      ...cached.pii,
+      entities: cached.pii.entities ?? [],
+      exceptPatterns: cached.pii.exceptPatterns ?? [],
+    },
+    secrets: {
+      ...cached.secrets,
+      customPatterns: cached.secrets.customPatterns ?? [],
+    },
+    customAttributes: cached.customAttributes ?? [],
+  };
+}
+
 export class DataPrivacyPolicyCache {
   private readonly cache: TtlCache<ResolvedDataPrivacy | null>;
 
@@ -23,7 +54,10 @@ export class DataPrivacyPolicyCache {
 
   async resolve(projectId: string): Promise<ResolvedDataPrivacy | null> {
     const cached = await this.cache.get(projectId);
-    if (cached !== undefined) return cached;
+    if (cached !== undefined) {
+      const revived = reviveCached(cached);
+      if (revived !== UNREADABLE) return revived;
+    }
 
     const resolved = await this.loadResolved(projectId);
     await this.cache.set(projectId, resolved);

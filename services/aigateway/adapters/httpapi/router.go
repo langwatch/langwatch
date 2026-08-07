@@ -51,11 +51,10 @@ type RouterDeps struct {
 	// Required when OTTLServer is set.
 	InternalSecret string
 	// MaxRequestBodyBytes caps the per-request body size. 0 falls back to
-	// config.DefaultMaxRequestBodyBytes (128 MiB) — sized for large-context
-	// LLM workloads where legitimate requests run tens of MB (a 10M-token
-	// text context alone is ~40-50 MB). Set higher on enterprise deployments
-	// that send full-context multi-image / media payloads; lower on public
-	// edge deployments to tighten DDoS protection.
+	// config.DefaultMaxRequestBodyBytes (32 MiB), which fits a 1M-context
+	// multimodal payload. Raise it on a deployment that legitimately sends
+	// more, lower it on a public edge deployment to tighten DDoS
+	// protection.
 	MaxRequestBodyBytes int64
 	// HeartbeatInterval sets how often a non-streaming response writes a
 	// keep-alive byte while dispatch is still in flight, so a large-context
@@ -73,6 +72,13 @@ type RouterDeps struct {
 	// answer 503: a gateway that cannot observe its control plane must not
 	// report itself healthy to a public status page.
 	Status StatusReporter
+	// ControlPlaneBaseURL is the resolved control-plane target this
+	// gateway process ships spend, budget and auth traffic to. Surfaced
+	// read-only on GET /debug/control-plane so dev tooling can tell a
+	// stale or foreign gateway apart from this worktree's own before
+	// reusing an already-bound port (specs/setup/
+	// aigateway-control-plane-target.feature).
+	ControlPlaneBaseURL string
 }
 
 // NewRouter creates the chi router with all gateway routes mounted.
@@ -115,6 +121,13 @@ func NewRouter(deps RouterDeps) http.Handler {
 	if deps.Metrics != nil {
 		r.Handle("/metrics", deps.Metrics.Handler())
 	}
+
+	// Unauthenticated and kept off the public ingress the same way as the
+	// probes and /metrics above (charts/gateway/templates/ingress.yaml
+	// allowlists only /v1 and the exact /health path). Reveals nothing but
+	// a URL: dev tooling polls it to verify an already-running gateway
+	// before trusting it on a reused port.
+	r.Get("/debug/control-plane", debugControlPlaneHandler(deps.ControlPlaneBaseURL))
 
 	r.Route("/v1", func(v1 chi.Router) {
 		v1.Use(AuthMiddleware(deps.App.Auth()))

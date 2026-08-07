@@ -23,8 +23,10 @@ const {
   mockUpdateMemberRole,
   mockApplyMemberBindings,
   mockInvalidateListForUser,
+  mockInvalidateListForOrg,
   mockInvalidateOrgWithMembers,
   mockInvalidateGetAll,
+  mockInvalidateGetUsage,
   mockToasterCreate,
   mockListForUserData,
   mockListForMemberData,
@@ -32,8 +34,10 @@ const {
   mockUpdateMemberRole: vi.fn(),
   mockApplyMemberBindings: vi.fn(),
   mockInvalidateListForUser: vi.fn().mockResolvedValue(undefined),
+  mockInvalidateListForOrg: vi.fn().mockResolvedValue(undefined),
   mockInvalidateOrgWithMembers: vi.fn().mockResolvedValue(undefined),
   mockInvalidateGetAll: vi.fn().mockResolvedValue(undefined),
+  mockInvalidateGetUsage: vi.fn().mockResolvedValue(undefined),
   mockToasterCreate: vi.fn(),
   mockListForUserData: {
     current: [] as Array<{
@@ -55,6 +59,7 @@ vi.mock("~/utils/api", () => ({
     useContext: () => ({
       roleBinding: {
         listForUser: { invalidate: mockInvalidateListForUser },
+        listForOrg: { invalidate: mockInvalidateListForOrg },
       },
       organization: {
         getOrganizationWithMembersAndTheirTeams: {
@@ -62,6 +67,7 @@ vi.mock("~/utils/api", () => ({
         },
         getAll: { invalidate: mockInvalidateGetAll },
       },
+      limits: { getUsage: { invalidate: mockInvalidateGetUsage } },
     }),
     roleBinding: {
       listForUser: {
@@ -180,7 +186,10 @@ describe("<MemberDetailDialog/>", () => {
     vi.clearAllMocks();
     mockListForUserData.current = [];
     mockListForMemberData.current = [];
-    mockUpdateMemberRole.mockResolvedValue(undefined);
+    mockUpdateMemberRole.mockResolvedValue({
+      success: true,
+      teamsLeftWithoutAdmin: [],
+    });
     mockApplyMemberBindings.mockResolvedValue(undefined);
   });
 
@@ -241,6 +250,36 @@ describe("<MemberDetailDialog/>", () => {
         role: OrganizationUserRole.EXTERNAL,
       });
       expect(mockApplyMemberBindings).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given the server answers without the affected-teams field", () => {
+    beforeEach(() => {
+      // A rollout window: this build reads a field an older server does not
+      // send, and by the time it reads it the save has already happened.
+      // Telling somebody their successful save failed is the worse outcome, so
+      // the field is optional to the client even though it is not to the API.
+      mockUpdateMemberRole.mockResolvedValue({ success: true });
+    });
+
+    describe("when the organization role is saved", () => {
+      it("still reports the save as done", async () => {
+        renderDialog();
+
+        fireEvent.click(screen.getByTestId("org-role-field"));
+        fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
+
+        await vi.waitFor(() => {
+          expect(mockToasterCreate).toHaveBeenCalled();
+        });
+        const toast = mockToasterCreate.mock.calls.at(-1)?.[0];
+        expect(toast).toMatchObject({
+          title: "Member updated",
+          type: "success",
+        });
+        // Nothing to disclose, so nothing is claimed about any team.
+        expect(toast?.description).toBeUndefined();
+      });
     });
   });
 

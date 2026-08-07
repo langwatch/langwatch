@@ -219,6 +219,12 @@ export function createEnvConfig() {
           .optional(),
       ),
       GOOGLE_APPLICATION_CREDENTIALS: z.string().optional(),
+      // Opt out of Google Cloud DLP entirely. When set, the google_dlp PII
+      // check is refused and the heavy @google-cloud/dlp SDK (generated protos
+      // via google-gax/grpc — one of the largest single deps in the server
+      // graph) is never imported. Off by default so DLP stays available for
+      // deployments that have configured GOOGLE_APPLICATION_CREDENTIALS.
+      LANGWATCH_DISABLE_GOOGLE_DLP: z.boolean().optional(),
       AZURE_OPENAI_ENDPOINT: z.string().optional(),
       AZURE_OPENAI_KEY: z.string().optional(),
       OPENAI_API_KEY: z.string().optional(),
@@ -407,6 +413,17 @@ export function createEnvConfig() {
       OKTA_CLIENT_SECRET: z.string().optional(),
       OKTA_ISSUER: z.string().optional(),
 
+      // OneLogin
+      ONELOGIN_CLIENT_ID: z.string().optional(),
+      ONELOGIN_CLIENT_SECRET: z.string().optional(),
+      ONELOGIN_ISSUER: z.string().optional(),
+
+      // Any other OpenID Connect provider. Its endpoints are discovered from
+      // the issuer, so there is nothing to configure beyond these three.
+      OIDC_CLIENT_ID: z.string().optional(),
+      OIDC_CLIENT_SECRET: z.string().optional(),
+      OIDC_ISSUER: z.string().optional(),
+
       POSTHOG_KEY: z.string().optional(),
       POSTHOG_HOST: z.string().optional(),
       // Feature Flags Secure API key (phs_*) — or a legacy Personal API key
@@ -491,6 +508,8 @@ export function createEnvConfig() {
       REDIS_DB_INDEX: process.env.REDIS_DB_INDEX,
       GOOGLE_APPLICATION_CREDENTIALS:
         process.env.GOOGLE_APPLICATION_CREDENTIALS,
+      LANGWATCH_DISABLE_GOOGLE_DLP:
+        process.env.LANGWATCH_DISABLE_GOOGLE_DLP?.toLowerCase() === "true",
       AZURE_OPENAI_ENDPOINT: process.env.AZURE_OPENAI_ENDPOINT,
       AZURE_OPENAI_KEY: process.env.AZURE_OPENAI_KEY,
       OPENAI_API_KEY: process.env.OPENAI_API_KEY,
@@ -588,6 +607,12 @@ export function createEnvConfig() {
       OKTA_CLIENT_ID: process.env.OKTA_CLIENT_ID,
       OKTA_CLIENT_SECRET: process.env.OKTA_CLIENT_SECRET,
       OKTA_ISSUER: process.env.OKTA_ISSUER,
+      ONELOGIN_CLIENT_ID: process.env.ONELOGIN_CLIENT_ID,
+      ONELOGIN_CLIENT_SECRET: process.env.ONELOGIN_CLIENT_SECRET,
+      ONELOGIN_ISSUER: process.env.ONELOGIN_ISSUER,
+      OIDC_CLIENT_ID: process.env.OIDC_CLIENT_ID,
+      OIDC_CLIENT_SECRET: process.env.OIDC_CLIENT_SECRET,
+      OIDC_ISSUER: process.env.OIDC_ISSUER,
       OTEL_EXPORTER_OTLP_ENDPOINT: process.env.OTEL_EXPORTER_OTLP_ENDPOINT,
       CLICKHOUSE_CLUSTER: process.env.CLICKHOUSE_CLUSTER,
       LANGWATCH_LICENSE_PUBLIC_KEY: process.env.LANGWATCH_LICENSE_PUBLIC_KEY,

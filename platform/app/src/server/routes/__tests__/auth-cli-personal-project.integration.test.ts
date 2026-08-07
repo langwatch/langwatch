@@ -49,10 +49,15 @@ vi.mock("~/server/api/rbac", async (importActual) => {
 import { hasProjectPermission } from "~/server/api/rbac";
 import { prisma } from "~/server/db";
 import {
+  getTestClickHouseClient,
   startTestContainers,
   stopTestContainers,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
 import { connection as redisConnection } from "~/server/redis";
+import {
+  clearClickHouseTestApp,
+  installClickHouseTestApp,
+} from "~/test-utils/clickhouseTestApp";
 import { app as meApp } from "../../../app/api/me/[[...route]]/app";
 import { app } from "../auth-cli";
 
@@ -270,6 +275,12 @@ let exchange: ExchangeSuccess;
 
 beforeAll(async () => {
   await startTestContainers();
+  // The routes and workers under test take their ClickHouse repositories
+  // from the App rather than resolving a client, so the fixture has to
+  // provide one or they fail with "App not initialized".
+  installClickHouseTestApp({
+    resolveClient: async () => getTestClickHouseClient(),
+  });
   await seedCallerOrg();
   await seedOtherMemberWorkspace();
 
@@ -279,6 +290,7 @@ beforeAll(async () => {
 }, 120_000);
 
 afterAll(async () => {
+  await clearClickHouseTestApp();
   // organizationId, not principalUserId-in-list: the tenancy guard
   // extension on VirtualKey only honours scalar tenancy predicates; the
   // in-list form is rejected and the catch would hide the leak.

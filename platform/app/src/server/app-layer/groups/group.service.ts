@@ -6,10 +6,7 @@ import type {
   RoleBindingScopeType,
   TeamUserRole,
 } from "@prisma/client";
-import {
-  PERSONAL_TEAM_MEMBERSHIP_REFUSAL,
-  PersonalTeamProtectedError,
-} from "~/server/app-layer/teams/team.service";
+import { PersonalWorkspaceNotManagedHereError } from "~/server/app-layer/teams/team.service";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { slugify } from "~/utils/slugify";
 import type {
@@ -50,12 +47,16 @@ export class GroupRestService {
    * A personal team holds exactly its owner, which is why plan limits exempt
    * it. A group binding would make it multi-member by proxy while it still
    * counts as nobody's, so group bindings never point at one.
+   *
+   * Handed on as a handled error so the REST boundary answers 403 with a code.
+   * It used to be a plain `Error`, which `handleGroupError` had nowhere to put,
+   * so a caller naming a personal scope was told the server had fallen over.
    */
   private async assertNoPersonalTeamScope(
     scopes: Array<{ scopeType: RoleBindingScopeType; scopeId: string }>,
   ): Promise<void> {
     if (await this.repo.anyScopeIsPersonalTeam(scopes)) {
-      throw new PersonalTeamProtectedError(PERSONAL_TEAM_MEMBERSHIP_REFUSAL);
+      throw new PersonalWorkspaceNotManagedHereError();
     }
   }
 

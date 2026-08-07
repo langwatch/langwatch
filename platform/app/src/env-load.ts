@@ -30,11 +30,17 @@
  */
 import dotenv from "dotenv";
 import { existsSync } from "fs";
+import { keepProcessNodeEnv } from "./server/env-mode-guard";
 
 const quiet = process.env.NODE_ENV !== "development";
+const nodeEnvBeforeDotenv = process.env.NODE_ENV;
 dotenv.config({ override: true, quiet });
 dotenv.config({
   path: ".env.portless",
   override: true,
   quiet: quiet || !existsSync(".env.portless"),
 });
+// NODE_ENV is a runtime mode, not configuration — enforce the "stays
+// shell-only" rule the comment above promises, so a NODE_ENV=development line
+// in .env can't silently de-productionize `pnpm start`.
+keepProcessNodeEnv({ valueBeforeDotenv: nodeEnvBeforeDotenv });

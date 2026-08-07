@@ -23,11 +23,7 @@
 import type { PrismaClient } from "@prisma/client";
 
 import { env } from "~/env.mjs";
-import {
-  getClickHouseClientForProject,
-  isClickHouseEnabled,
-} from "~/server/clickhouse/clickhouseClient";
-import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
+import type { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
 import { GatewayBudgetService } from "~/server/gateway/budget.service";
 import { AiToolEntryService } from "./aiToolEntry.service";
 import { resolveGatewayBaseUrl } from "./gatewayUrl";
@@ -121,10 +117,34 @@ const SCOPE_RANK: Record<string, number> = {
 };
 
 export class CliBootstrapService {
-  constructor(private readonly prisma: PrismaClient) {}
+  private readonly prisma: PrismaClient;
+  /**
+   * The gateway budget ledger, from the App. `undefined` on a deployment
+   * without ClickHouse, in which case {@link resolveBudget} short-circuits
+   * to the empty budget rather than falling back to Postgres spend — the
+   * CLI ceremony has always reported "no budget data" when the ledger
+   * isn't reachable, not a stale PG figure.
+   */
+  private readonly budgetRepository:
+    | GatewayBudgetClickHouseRepository
+    | undefined;
 
-  static create(prisma: PrismaClient): CliBootstrapService {
-    return new CliBootstrapService(prisma);
+  constructor({
+    prisma,
+    budgetRepository,
+  }: {
+    prisma: PrismaClient;
+    budgetRepository: GatewayBudgetClickHouseRepository | undefined;
+  }) {
+    this.prisma = prisma;
+    this.budgetRepository = budgetRepository;
+  }
+
+  static create(deps: {
+    prisma: PrismaClient;
+    budgetRepository: GatewayBudgetClickHouseRepository | undefined;
+  }): CliBootstrapService {
+    return new CliBootstrapService(deps);
   }
 
   async resolve(input: {
@@ -232,20 +252,14 @@ export class CliBootstrapService {
     });
     const personalVk = vks[0];
 
-    if (!personalVk || !isClickHouseEnabled()) {
+    if (!personalVk || !this.budgetRepository) {
       return { monthlyLimitUsd: null, monthlyUsedUsd: 0, period: "MONTHLY" };
     }
 
-    const chRepo = new GatewayBudgetClickHouseRepository(async (projectId) => {
-      const client = await getClickHouseClientForProject(projectId);
-      if (!client) {
-        throw new Error(
-          `ClickHouse enabled but no client for project ${projectId}`,
-        );
-      }
-      return client;
-    });
-    const budgetService = GatewayBudgetService.create(this.prisma, chRepo);
+    const budgetService = GatewayBudgetService.create(
+      this.prisma,
+      this.budgetRepository,
+    );
     const decision = await budgetService.check({
       organizationId: input.organizationId,
       teamId: input.teamId,

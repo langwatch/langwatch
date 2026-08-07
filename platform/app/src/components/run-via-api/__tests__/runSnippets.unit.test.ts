@@ -149,6 +149,42 @@ describe("buildRunSnippet", () => {
     });
   });
 
+  describe("when the shell snippet polls for the run to finish", () => {
+    const shell = () =>
+      buildRunSnippet({
+        ...baseInput,
+        dataSource: "attached",
+        lang: "shell",
+      });
+
+    it("bounds the poll loop instead of looping forever", () => {
+      expect(shell()).not.toContain("while true");
+      expect(shell()).toContain("MAX_ATTEMPTS");
+    });
+
+    it("gives up on a 404 rather than polling a run that cannot appear", () => {
+      const snippet = shell();
+      expect(snippet).toContain("%{http_code}");
+      expect(snippet).toContain('if [ "$CODE" = "404" ]');
+      expect(snippet).toContain("giving up");
+    });
+
+    it("gives up on any other non-200 status instead of parsing it as the run body", () => {
+      const snippet = shell();
+      expect(snippet).toContain('if [ "$CODE" != "200" ]');
+    });
+
+    it("breaks on every terminal status the API can report", () => {
+      expect(shell()).toContain(
+        'case "$STATUS" in completed|failed|stopped|interrupted) break;; esac',
+      );
+    });
+
+    it("does not advertise an events stream the API does not serve", () => {
+      expect(shell()).not.toContain("/events");
+    });
+  });
+
   describe("given the experiment kind", () => {
     it("calls the experiment SDK entry points", () => {
       const input = { ...baseInput, kind: "experiment" as const };

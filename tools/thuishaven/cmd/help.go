@@ -74,6 +74,11 @@ ENVIRONMENT
     HAVEN_TYPECHECK_MAX_RSS_MB   Kill a typecheck run over this RSS (default 6144
                                  = 6 GiB) or over 10 minutes wall-clock — a
                                  runaway tsgo shouldn't sit on a slot forever.
+    CHECK_SLOTS=N                The sibling knob outside haven: caps concurrent
+                                 "pnpm typecheck" and "pnpm lint" runs machine
+                                 wide (0 disables). "haven typecheck" sets it to
+                                 0 for the run it spawns, holding its own slot
+                                 instead.
     LANGWATCH_SEED=1             Seed the DB during up.
     HAVEN_IDLE_TTL=4h            Reap a stack whose heartbeat is older than this.
     HAVEN_DB_TTL=336h            Background-prune databases whose worktree has not

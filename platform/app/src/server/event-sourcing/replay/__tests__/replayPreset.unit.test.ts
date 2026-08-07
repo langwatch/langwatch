@@ -12,10 +12,6 @@ vi.mock("../../../app-layer/app", () => ({
   getApp: vi.fn(),
 }));
 
-vi.mock("../../../clickhouse/clickhouseClient", () => ({
-  getClickHouseClientForProject: vi.fn(),
-}));
-
 vi.mock(
   "../../../app-layer/evaluations/repositories/evaluation-run.clickhouse.repository",
   () => ({ EvaluationRunClickHouseRepository: class {} }),
@@ -96,6 +92,7 @@ function stubApp(definitions: unknown[]) {
   mockedGetApp.mockReturnValue({
     eventSourcing: { definitions },
     retentionPolicyCache: {},
+    clickhouse: { enabled: true, resolveClient: vi.fn() },
   } as unknown as ReturnType<typeof getApp>);
 }
 

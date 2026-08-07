@@ -22,13 +22,13 @@ import {
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useModelSelectionOptions } from "~/components/ModelSelector";
-import { Link } from "~/components/ui/link";
-import { Tooltip } from "~/components/ui/tooltip";
-import { LANGY_CHAT_FEATURE_KEY } from "~/server/modelProviders/codexRestrictions";
 import {
   modelProviderIcons,
   ProviderIconGlyph,
-} from "~/server/modelProviders/iconsMap";
+} from "~/components/modelProviders/iconsMap";
+import { Link } from "~/components/ui/link";
+import { Tooltip } from "~/components/ui/tooltip";
+import { LANGY_CHAT_FEATURE_KEY } from "~/server/modelProviders/codexRestrictions";
 import { getModelById } from "~/server/modelProviders/registry";
 import {
   type LangyModelGroup,

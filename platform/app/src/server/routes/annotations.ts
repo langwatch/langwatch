@@ -245,42 +245,40 @@ secured.access(annotationsManageAuth).patch("/annotations/:id", async (c) => {
   }
 });
 
-// ---------- GET|POST /api/annotations/trace/:trace ----------
-secured
-  .access(annotationsViewAuth)
-  .get("/annotations/trace/:trace", async (c) => {
-    const auth = await authenticateRequest(c, "annotations:view");
-    if ("error" in auth) {
-      return c.json(auth.body, auth.status);
-    }
-    const { project, markUsed } = auth;
+// ---------- GET|POST /api/annotations/trace/:id ----------
+secured.access(annotationsViewAuth).get("/annotations/trace/:id", async (c) => {
+  const auth = await authenticateRequest(c, "annotations:view");
+  if ("error" in auth) {
+    return c.json(auth.body, auth.status);
+  }
+  const { project, markUsed } = auth;
 
-    try {
-      const trace = c.req.param("trace");
-      const annotationsByTrace = await prisma.annotation.findMany({
-        where: { traceId: trace, projectId: project.id },
-      });
+  try {
+    const trace = c.req.param("id");
+    const annotationsByTrace = await prisma.annotation.findMany({
+      where: { traceId: trace, projectId: project.id },
+    });
 
-      markUsed();
-      return c.json({ data: annotationsByTrace ?? [] });
-    } catch (e) {
-      logger.error(
-        { error: e, trace: c.req.param("trace"), projectId: project.id },
-        "error fetching annotations for trace",
-      );
-      return c.json(
-        {
-          status: "error",
-          message: e instanceof Error ? e.message : "Internal server error.",
-        },
-        500,
-      );
-    }
-  });
+    markUsed();
+    return c.json({ data: annotationsByTrace ?? [] });
+  } catch (e) {
+    logger.error(
+      { error: e, trace: c.req.param("id"), projectId: project.id },
+      "error fetching annotations for trace",
+    );
+    return c.json(
+      {
+        status: "error",
+        message: e instanceof Error ? e.message : "Internal server error.",
+      },
+      500,
+    );
+  }
+});
 
 secured
   .access(annotationsCreateAuth)
-  .post("/annotations/trace/:trace", async (c) => {
+  .post("/annotations/trace/:id", async (c) => {
     // `:create` (not `:manage`) — same fix as evaluators' POST route. Creating
     // is a lesser privilege than update/delete, and LANGY_CANDIDATE_PERMISSIONS
     // only ever grants annotations:create, never :manage. PATCH/DELETE above
@@ -295,7 +293,7 @@ secured
       const body = await c.req.json();
       const comment = body.comment as string;
       const isThumbsUp = body.isThumbsUp;
-      const trace = c.req.param("trace");
+      const trace = c.req.param("id");
       const email = body.email as string;
 
       if (!comment || typeof comment !== "string") {
@@ -343,7 +341,7 @@ secured
       return c.json({ data: addAnnotation });
     } catch (e) {
       logger.error(
-        { error: e, trace: c.req.param("trace"), projectId: project.id },
+        { error: e, trace: c.req.param("id"), projectId: project.id },
         "error creating annotation",
       );
       return c.json(

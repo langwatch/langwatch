@@ -11,6 +11,10 @@ import {
 import { AlertTriangle, Search } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { LuSettings2 } from "react-icons/lu";
+import {
+  modelProviderIcons,
+  ProviderIconGlyph,
+} from "~/components/modelProviders/iconsMap";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import {
   isCodexModel,
@@ -20,10 +24,6 @@ import {
   buildCustomModelDisplayNames,
   modelDisplayLabel,
 } from "../server/modelProviders/customModelDisplayNames";
-import {
-  modelProviderIcons,
-  ProviderIconGlyph,
-} from "../server/modelProviders/iconsMap";
 import type { MaybeStoredModelProvider } from "../server/modelProviders/registry";
 import { allLitellmModels } from "../server/modelProviders/registry";
 import { api } from "../utils/api";

@@ -34,7 +34,6 @@ import {
 import { PromptTagRepository } from "~/server/prompt-config/repositories/prompt-tag.repository";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { prisma } from "../../../db";
-import { LICENSE_LIMIT_ERRORS } from "../../../license-enforcement/license-limit-guard";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
 import {
@@ -239,7 +238,10 @@ describe("organization member role plan limit enforcement", () => {
           }),
         ).rejects.toMatchObject({
           code: "FORBIDDEN",
-          message: LICENSE_LIMIT_ERRORS.MEMBER_LITE_LIMIT,
+          cause: {
+            code: "resource_limit_exceeded",
+            meta: { limitType: "membersLite" },
+          },
         });
       });
 
@@ -263,7 +265,7 @@ describe("organization member role plan limit enforcement", () => {
             organizationId,
             role: OrganizationUserRole.EXTERNAL,
           }),
-        ).resolves.toEqual({ success: true });
+        ).resolves.toMatchObject({ success: true });
 
         const updated = await prisma.organizationUser.findUnique({
           where: {
@@ -326,7 +328,10 @@ describe("organization member role plan limit enforcement", () => {
           }),
         ).rejects.toMatchObject({
           code: "FORBIDDEN",
-          message: LICENSE_LIMIT_ERRORS.MEMBER_LITE_LIMIT,
+          cause: {
+            code: "resource_limit_exceeded",
+            meta: { limitType: "membersLite" },
+          },
         });
       });
 
@@ -347,7 +352,7 @@ describe("organization member role plan limit enforcement", () => {
             userId: targetUserId,
             role: TeamUserRole.VIEWER,
           }),
-        ).resolves.toEqual({ success: true });
+        ).resolves.toMatchObject({ success: true });
 
         // Read the BINDING, not the `TeamUser` row. `updateTeamMemberRole`
         // replaces the TEAM-scoped RoleBinding and leaves the legacy row

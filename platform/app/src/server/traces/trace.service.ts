@@ -1,15 +1,13 @@
 import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "@prisma/client";
 import { getLangWatchTracer } from "langwatch";
+import { getApp } from "~/server/app-layer/app";
 import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
 import {
   CODING_AGENT_ORIGIN,
   enrichCodingAgentSpansFromLogs,
 } from "~/server/app-layer/traces/claude-code-log-enrichment";
-import {
-  createDefaultLogRecordStorageService,
-  type LogRecordStorageService,
-} from "~/server/app-layer/traces/log-record-storage.service";
+import type { LogRecordStorageService } from "~/server/app-layer/traces/log-record-storage.service";
 import type { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
 import { prisma as defaultPrisma } from "~/server/db";
 import { EvaluationService } from "~/server/evaluations/evaluation.service";
@@ -208,7 +206,7 @@ export class TraceService {
     );
     this.evaluationService = EvaluationService.create();
     // Injected store for the read-time Claude Code content enrichment; the
-    // default comes from the app-layer factory built LAZILY on first use (see
+    // default comes LAZILY from the App on first use (see
     // logRecordStorageService), so construction here stays free of ClickHouse
     // wiring. Non-enriching callers and unit tests that never hit the
     // coding-agent path pay nothing.
@@ -216,15 +214,14 @@ export class TraceService {
   }
 
   /**
-   * The log-record store for read-time Claude Code content enrichment, built
-   * lazily so a TraceService that never enriches (or a unit test that never
-   * exercises the coding-agent-origin path) never constructs the
-   * ClickHouse-backed default.
+   * The log-record store for read-time Claude Code content enrichment, taken
+   * lazily from `getApp().traces.logRecords` so a TraceService that never
+   * enriches (or a unit test that never exercises the coding-agent-origin
+   * path) never touches the App singleton.
    */
   private logRecordStorageService(): LogRecordStorageService {
     if (this.injectedLogRecordStorage) return this.injectedLogRecordStorage;
-    return (this.cachedLogRecordStorage ??=
-      createDefaultLogRecordStorageService());
+    return (this.cachedLogRecordStorage ??= getApp().traces.logRecords);
   }
 
   /**

@@ -4,7 +4,7 @@
  *
  * Concurrency is a correctness question for this suite rather than a speed
  * knob. Its fixtures share one ClickHouse database and one Redis instance:
- * BullMQ keys a queue by name alone, so two files building the same pipeline
+ * groupQueue keys a queue by name alone, so two files building the same pipeline
  * consume each other's jobs, and the suites that replay goose migrations
  * rebuild shared rollup tables in place, so a file reading such a table while
  * another replays sees it mid-swap: a column that briefly does not exist, or

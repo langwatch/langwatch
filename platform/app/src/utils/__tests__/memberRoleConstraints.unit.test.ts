@@ -143,7 +143,7 @@ describe("memberRoleConstraints", () => {
     describe("when organization role is Lite Member", () => {
       /** @scenario Switching from Member to Lite Member auto-corrects team role to Viewer */
       /** @scenario Switching from Admin to Lite Member auto-corrects team role to Viewer */
-      /** @scenario Saving a Lite Member update enforces Viewer team role in every team */
+      /** @scenario Saving a Lite Member update enforces Viewer team role in every shared team */
       it("forces Admin to Viewer", () => {
         expect(
           getAutoCorrectedTeamRoleForOrganizationRole({
