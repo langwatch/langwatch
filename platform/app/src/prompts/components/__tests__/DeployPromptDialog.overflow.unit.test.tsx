@@ -233,7 +233,9 @@ describe("Scenario: Version Select inputs stay within the modal width", () => {
       ],
     });
 
-    const { container } = renderDialog();
+    // The dialog portals its content out of the render container, so the rows
+    // are only reachable from the document root.
+    const { baseElement } = renderDialog();
 
     await waitFor(() => {
       expect(screen.getByLabelText("Production version")).toBeInTheDocument();
@@ -241,7 +243,7 @@ describe("Scenario: Version Select inputs stay within the modal width", () => {
 
     // Each Select.Root rendered for a tag row must carry the anti-overflow
     // flex props that clamp the trigger to the row width.
-    const selectRoots = container.querySelectorAll(
+    const selectRoots = baseElement.querySelectorAll(
       '[data-testid="select-root"]',
     );
     expect(selectRoots.length).toBeGreaterThan(0);
