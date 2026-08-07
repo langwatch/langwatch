@@ -10,6 +10,7 @@
  * Decision: ADR-088 (Decisions 6 and 7).
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { ZodError } from "zod";
 
 // `vi.hoisted` so the mock factory can close over `fetchMock` — `vi.mock` is
 // lifted above every declaration in the file, which is what forces the dynamic
@@ -161,27 +162,84 @@ describe("the Anthropic Admin puller", () => {
       expect(record?.costNanoUsd).toBe(1_234_567_890_123);
     });
 
-    it("refuses a non-USD amount rather than inventing a rate", async () => {
+    it("drops a non-USD row rather than inventing a rate, and keeps the rest", async () => {
       fetchMock.mockResolvedValue(
         jsonResponse({
           ...COST_PAGE,
           data: [
             {
               starting_at: "2026-08-01T00:00:00Z",
-              results: [{ ...COST_PAGE.data[0]!.results[0], currency: "EUR" }],
+              results: [
+                { ...COST_PAGE.data[0]!.results[0], currency: "EUR" },
+                COST_PAGE.data[0]!.results[0],
+              ],
             },
           ],
         }),
       );
 
-      await expect(
-        new AnthropicAdminPuller().runOnce(RUN_OPTIONS, {
-          adapter: "anthropic_admin",
-          report: "cost",
-          bucketWidth: "1d",
-          schedule: "0 * * * *",
-        }),
-      ).rejects.toThrow(/USD/);
+      const result = await new AnthropicAdminPuller().runOnce(RUN_OPTIONS, {
+        adapter: "anthropic_admin",
+        report: "cost",
+        bucketWidth: "1d",
+        schedule: "0 * * * *",
+      });
+
+      // The unsupported row is gone and the USD row beside it survived. A
+      // throw here would have unwound the whole run — and since the row is
+      // non-USD on every retry, it would have wedged the source permanently.
+      expect(result.events).toHaveLength(1);
+      expect(result.errorCount).toBe(0);
+      const record = buildPulledUsageRecord({
+        event: result.events[0]!,
+        source: SOURCE,
+        observedAt: OBSERVED_AT,
+      });
+      expect(record?.costNanoUsd).toBe(1_234_567_890_123);
+    });
+
+    it("asks for the daily bucket the cost report actually supports", async () => {
+      fetchMock.mockResolvedValue(jsonResponse(COST_PAGE));
+
+      await new AnthropicAdminPuller().runOnce(RUN_OPTIONS, {
+        adapter: "anthropic_admin",
+        report: "cost",
+        // Deliberately not 1d: the cost report is daily-only, so the request
+        // and the restatement key both have to ignore this.
+        bucketWidth: "1h",
+        schedule: "0 * * * *",
+      });
+
+      expect(String(fetchMock.mock.calls[0]?.[0])).toContain("bucket_width=1d");
+    });
+
+    it("keys a cost bucket identically however the source is configured", async () => {
+      fetchMock.mockResolvedValue(jsonResponse(COST_PAGE));
+      const puller = new AnthropicAdminPuller();
+      const base = {
+        adapter: "anthropic_admin" as const,
+        report: "cost" as const,
+        schedule: "0 * * * *",
+      };
+
+      const hourly = await puller.runOnce(RUN_OPTIONS, {
+        ...base,
+        bucketWidth: "1h",
+      });
+      const daily = await puller.runOnce(RUN_OPTIONS, {
+        ...base,
+        bucketWidth: "1d",
+      });
+
+      // An operator editing bucketWidth must not re-key unchanged cost
+      // buckets; that would record the same spend a second time.
+      const keyFor = (event: (typeof hourly.events)[number]) =>
+        buildPulledUsageRecord({
+          event,
+          source: SOURCE,
+          observedAt: OBSERVED_AT,
+        })?.restatementKey;
+      expect(keyFor(daily.events[0]!)).toBe(keyFor(hourly.events[0]!));
     });
   });
 
@@ -227,6 +285,68 @@ describe("the Anthropic Admin puller", () => {
     });
   });
 
+  describe("when a page claims more pages but names none", () => {
+    it("refuses, rather than advancing the watermark past what it never read", async () => {
+      fetchMock.mockResolvedValue(
+        jsonResponse({ ...USAGE_PAGE, has_more: true, next_page: null }),
+      );
+
+      // Treating this as drained would move `startingAt` to the last bucket
+      // read and the unread pages would never be fetched again — a window of
+      // spend lost with nothing reporting a failure.
+      await expect(
+        new AnthropicAdminPuller().runOnce(RUN_OPTIONS, {
+          adapter: "anthropic_admin",
+          report: "usage",
+          bucketWidth: "1d",
+          schedule: "0 * * * *",
+        }),
+      ).rejects.toThrow(/has_more/);
+    });
+  });
+
+  describe("when a provider value contains the identity delimiter", () => {
+    it("keeps two distinct rows from collapsing onto one identity", async () => {
+      const bucket = (description: string, costType: string) => ({
+        starting_at: "2026-08-01T00:00:00Z",
+        results: [
+          {
+            ...COST_PAGE.data[0]!.results[0],
+            description,
+            cost_type: costType,
+          },
+        ],
+      });
+      const puller = new AnthropicAdminPuller();
+      const config = {
+        adapter: "anthropic_admin" as const,
+        report: "cost" as const,
+        bucketWidth: "1d" as const,
+        schedule: "0 * * * *",
+      };
+
+      // The delimiter moved across the description/costType boundary, so the
+      // two rows join to the byte-identical string when nothing is encoded:
+      // "…:a:b:c" either way. Both fields keep the same total colon count,
+      // which is what makes this a true collision rather than a near miss.
+      fetchMock.mockResolvedValue(
+        jsonResponse({ ...COST_PAGE, data: [bucket("a:b", "c")] }),
+      );
+      const first = await puller.runOnce(RUN_OPTIONS, config);
+      fetchMock.mockResolvedValue(
+        jsonResponse({ ...COST_PAGE, data: [bucket("a", "b:c")] }),
+      );
+      const second = await puller.runOnce(RUN_OPTIONS, config);
+
+      // `description` is free text Anthropic writes and can hold the ":" the
+      // identity is joined on. Unencoded, these two distinct provider rows
+      // produce one source_event_id — and that is the OCSF sink's dedup key.
+      expect(second.events[0]!.source_event_id).not.toBe(
+        first.events[0]!.source_event_id,
+      );
+    });
+  });
+
   describe("when the transport fails", () => {
     it("leaves the cursor where it was so the window is retried", async () => {
       fetchMock.mockRejectedValue(new Error("connection reset"));
@@ -250,8 +370,10 @@ describe("the Anthropic Admin puller", () => {
       );
       expect(result.events).toHaveLength(0);
     });
+  });
 
-    it("refuses to run without an admin key", async () => {
+  describe("when the source has no admin key", () => {
+    it("refuses to run, before reaching the network at all", async () => {
       const result = await new AnthropicAdminPuller().runOnce(
         { cursor: null },
         {
@@ -267,16 +389,25 @@ describe("the Anthropic Admin puller", () => {
     });
   });
 
-  describe("its configuration", () => {
-    it("cannot be told to pull usage and cost at once", () => {
-      const puller = new AnthropicAdminPuller();
-
-      expect(() =>
-        puller.validateConfig({
+  describe("when the config names both reports", () => {
+    it("refuses on the report field itself, not on some incidental error", () => {
+      let error: unknown;
+      try {
+        new AnthropicAdminPuller().validateConfig({
           adapter: "anthropic_admin",
           report: ["usage", "cost"],
-        }),
-      ).toThrow();
+        });
+      } catch (thrown) {
+        error = thrown;
+      }
+
+      // A bare `.toThrow()` would pass on any error at all, which would not
+      // prove the exclusivity this asserts. Pin it to `report`: pulling both
+      // reports would count the same spend twice (ADR-088 Decision 6).
+      expect(error).toBeInstanceOf(ZodError);
+      expect((error as ZodError).issues.map((i) => i.path.join("."))).toContain(
+        "report",
+      );
     });
   });
 });
