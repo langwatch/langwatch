@@ -223,12 +223,54 @@ type SpecShape = {
  * tomorrow is stamped without anyone remembering to.
  */
 function stampSecurityFromRegistry(spec: SpecShape): void {
+  const registry = indexRegistryByOperation();
+
+  for (const { routePath, operationKey, operation } of documentedOperations(
+    spec,
+  )) {
+    const credentialClass =
+      registry.byOperation.get(operationKey) ??
+      registry.byAnyMethodPath.get(routePath);
+    if (!credentialClass) continue;
+    operation.security = securityForCredentialClass({
+      operationKey,
+      credentialClass,
+    });
+  }
+}
+
+/** Every operation object in the document, with the key the registry uses. */
+function* documentedOperations(spec: SpecShape): Generator<{
+  routePath: string;
+  operationKey: string;
+  operation: { security?: unknown };
+}> {
+  for (const [routePath, item] of Object.entries(spec.paths ?? {})) {
+    for (const [method, operation] of Object.entries(item)) {
+      if (!operation || typeof operation !== "object") continue;
+      yield {
+        routePath,
+        operationKey: `${method.toUpperCase()} ${routePath}`,
+        operation: operation as { security?: unknown },
+      };
+    }
+  }
+}
+
+/**
+ * The route registry keyed the way a document path is spelled.
+ *
+ * Any-method routes are kept in their own index rather than expanded into
+ * verbs, so a specific registration on the same path still wins, and so a
+ * documented verb of an `.all(...)` route is stamped rather than left
+ * inheriting the document default, which is the one outcome the stamping
+ * exists to prevent.
+ */
+function indexRegistryByOperation(): {
+  byOperation: Map<string, CredentialClass>;
+  byAnyMethodPath: Map<string, CredentialClass>;
+} {
   const byOperation = new Map<string, CredentialClass>();
-  // An any-method route answers for every verb the document gives its path.
-  // Kept apart so a specific registration on the same path still wins, and
-  // so a documented verb of an `.all(...)` route is stamped rather than left
-  // inheriting the document default, which is the one outcome this whole
-  // function exists to prevent.
   const byAnyMethodPath = new Map<string, CredentialClass>();
   for (const route of allRegisteredRoutes()) {
     // Hono spells params `:id`, the document spells them `{id}`.
@@ -239,16 +281,5 @@ function stampSecurityFromRegistry(spec: SpecShape): void {
     }
     byOperation.set(`${route.method} ${documented}`, route.credentialClass);
   }
-
-  for (const [routePath, item] of Object.entries(spec.paths ?? {})) {
-    for (const [method, operation] of Object.entries(item)) {
-      if (!operation || typeof operation !== "object") continue;
-      const operationKey = `${method.toUpperCase()} ${routePath}`;
-      const credentialClass =
-        byOperation.get(operationKey) ?? byAnyMethodPath.get(routePath);
-      if (!credentialClass) continue;
-      (operation as { security?: unknown }).security =
-        securityForCredentialClass({ operationKey, credentialClass });
-    }
-  }
+  return { byOperation, byAnyMethodPath };
 }

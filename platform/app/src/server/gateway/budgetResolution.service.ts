@@ -77,20 +77,25 @@ export type ResolvedBudget = {
 type PrismaLike = PrismaClient | Prisma.TransactionClient;
 
 /**
- * Every budget that constrains this target, one entry per enforcement
- * bucket. Ordered by (scopeType, budget id) so callers, bundles, and
- * snapshots stay byte-stable across runs.
+ * Which budget scopes this request could match, as one OR list.
+ *
+ * A scope missing here is a budget that silently never fires, so each arm
+ * says what it covers rather than leaving it to the reader.
  */
-export async function resolveApplicableBudgets(
-  client: PrismaLike,
-  target: BudgetResolutionTarget,
-): Promise<ResolvedBudget[]> {
+async function scopePredicatesFor({
+  client,
+  target,
+}: {
+  client: PrismaLike;
+  target: BudgetResolutionTarget;
+}): Promise<Prisma.GatewayBudgetWhereInput[]> {
   const ors: Prisma.GatewayBudgetWhereInput[] = [
     { scopeType: "ORGANIZATION", scopeId: target.organizationId },
   ];
   if (target.virtualKeyId) {
     ors.push({ scopeType: "VIRTUAL_KEY", scopeId: target.virtualKeyId });
   }
+
   // A request belongs to the team its traces land in AND to every team its
   // key is scoped to. Those two differ whenever the key is not scoped to
   // exactly one project, because the trace project then falls back to the
@@ -127,18 +132,30 @@ export async function resolveApplicableBudgets(
   // GROUP budgets only enforce through a member. A key with no principal
   // (a shared org/team/project key) has nobody to charge the per-member
   // bucket to, so group budgets do not apply to it at all.
-  let groupIds: string[] = [];
-  if (target.principalUserId) {
-    ors.push({ scopeType: "PRINCIPAL", scopeId: target.principalUserId });
-    groupIds = await memberGroupIds(
-      client,
-      target.organizationId,
-      target.principalUserId,
-    );
-    if (groupIds.length > 0) {
-      ors.push({ scopeType: "GROUP", scopeId: { in: groupIds } });
-    }
+  if (!target.principalUserId) return ors;
+
+  ors.push({ scopeType: "PRINCIPAL", scopeId: target.principalUserId });
+  const groupIds = await memberGroupIds(
+    client,
+    target.organizationId,
+    target.principalUserId,
+  );
+  if (groupIds.length > 0) {
+    ors.push({ scopeType: "GROUP", scopeId: { in: groupIds } });
   }
+  return ors;
+}
+
+/**
+ * Every budget that constrains this target, one entry per enforcement
+ * bucket. Ordered by (scopeType, budget id) so callers, bundles, and
+ * snapshots stay byte-stable across runs.
+ */
+export async function resolveApplicableBudgets(
+  client: PrismaLike,
+  target: BudgetResolutionTarget,
+): Promise<ResolvedBudget[]> {
+  const ors = await scopePredicatesFor({ client, target });
 
   const rows = await client.gatewayBudget.findMany({
     where: {
@@ -147,7 +164,6 @@ export async function resolveApplicableBudgets(
       OR: ors,
     },
   });
-
   const resolved = rows.map((budget) => {
     if (budget.scopeType === "GROUP") {
       return {

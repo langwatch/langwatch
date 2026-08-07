@@ -116,27 +116,44 @@ export function credentialClassFor({
   scope,
   policy,
 }: {
-  scope: "project" | "organization" | "service" | "session";
+  scope: AppScope;
   policy: AccessPolicy;
 }): CredentialClass {
   if (policy.kind === "public") return "none";
   if (policy.kind === "internal") return "internal";
   if (policy.kind === "handlerManaged") {
-    if (policy.credential === "internal") return "internal";
-    if (policy.credential === "session") return "session";
-    // apiKey / both, on an app whose scope names no key family of its own.
-    if (scope === "service" || scope === "session") return "project_api_key";
+    return handlerManagedCredentialClass({
+      scope,
+      credential: policy.credential,
+    });
   }
-  switch (scope) {
-    case "project":
-      return "project_api_key";
-    case "organization":
-      return "organization_api_key";
-    case "service":
-      return "internal";
-    case "session":
-      return "session";
-  }
+  return CLASS_BY_APP_SCOPE[scope];
+}
+
+/** The app families a route can be mounted on. */
+type AppScope = "project" | "organization" | "service" | "session";
+
+/** What each app answers for a route that does not opt out of its family. */
+const CLASS_BY_APP_SCOPE: Record<AppScope, CredentialClass> = {
+  project: "project_api_key",
+  organization: "organization_api_key",
+  service: "internal",
+  session: "session",
+};
+
+/** @see credentialClassFor, which is where the reasoning lives. */
+function handlerManagedCredentialClass({
+  scope,
+  credential,
+}: {
+  scope: AppScope;
+  credential: HandlerCredential;
+}): CredentialClass {
+  if (credential === "internal") return "internal";
+  if (credential === "session") return "session";
+  // apiKey / both, on an app whose scope names no key family of its own.
+  if (scope === "service" || scope === "session") return "project_api_key";
+  return CLASS_BY_APP_SCOPE[scope];
 }
 
 /**

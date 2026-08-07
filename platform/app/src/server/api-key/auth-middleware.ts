@@ -328,6 +328,40 @@ type AuthRefusal = {
 };
 
 /**
+ * What to tell a caller whose token resolved to no organization.
+ *
+ * A working key of the wrong family gets its own answer. The one message this
+ * used to give asserted "Project API keys cannot be used here" at a typo and
+ * at a revoked key too, sending people to check a credential class that was
+ * never the problem. Everything else stays deliberately vague: telling "no
+ * such key" apart from "revoked key" for an unauthenticated caller would
+ * confirm which secrets exist.
+ */
+function refusalForUnresolvedOrg(
+  reason: Extract<OrgResolution, { ok: false }>["reason"],
+): AuthRefusal {
+  if (reason === "wrong_credential_class") {
+    return {
+      status: 401,
+      code: "credential_class_mismatch",
+      legacyError: "Unauthorized",
+      message:
+        "This endpoint needs an organization API key. The key sent is a project API key.",
+      meta: {
+        required: "organization_api_key",
+        presented: "project_api_key",
+      },
+    };
+  }
+  return {
+    status: 401,
+    code: "invalid_credentials",
+    legacyError: "Unauthorized",
+    message: "Invalid credentials.",
+  };
+}
+
+/**
  * The organization behind a credential, or the reason there isn't one.
  *
  * Split out so the middleware above reads as "resolve, then set context":
@@ -380,45 +414,12 @@ async function resolveOrgPrincipal({
     };
   }
 
-  // A working key of the wrong family gets its own answer. The one message
-  // this used to give asserted "Project API keys cannot be used here" at a
-  // typo and at a revoked key too, sending people to check a credential
-  // class that was never the problem.
-  if (!resolution.ok && resolution.reason === "wrong_credential_class") {
-    orgLogger.warn(
-      { ...diag, hasToken: true },
-      "Org auth failed: project key presented to an organization endpoint",
-    );
-    return {
-      ok: false,
-      refusal: {
-        status: 401,
-        code: "credential_class_mismatch",
-        legacyError: "Unauthorized",
-        message:
-          "This endpoint needs an organization API key. The key sent is a project API key.",
-        meta: {
-          required: "organization_api_key",
-          presented: "project_api_key",
-        },
-      },
-    };
-  }
-
   if (!resolution.ok) {
     orgLogger.warn(
-      { ...diag, hasToken: true },
-      "Org auth failed: invalid credentials",
+      { ...diag, hasToken: true, reason: resolution.reason },
+      "Org auth failed",
     );
-    return {
-      ok: false,
-      refusal: {
-        status: 401,
-        code: "invalid_credentials",
-        legacyError: "Unauthorized",
-        message: "Invalid credentials.",
-      },
-    };
+    return { ok: false, refusal: refusalForUnresolvedOrg(resolution.reason) };
   }
 
   const resolved = resolution.resolved;

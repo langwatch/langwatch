@@ -60,6 +60,28 @@ type ApiDocument = {
 
 const document = JSON.parse(readFileSync(SPEC_PATH, "utf8")) as ApiDocument;
 
+/** Every documented operation on a public surface, with what it must publish. */
+function publicOperations(): Array<{
+  operationKey: string;
+  scheme: string;
+  published: unknown;
+}> {
+  const operations = [];
+  for (const [path, item] of Object.entries(document.paths)) {
+    const surface = surfaceFor(path);
+    if (!surface) continue;
+    for (const [method, operation] of Object.entries(item)) {
+      if (!operation || typeof operation !== "object") continue;
+      operations.push({
+        operationKey: `${method.toUpperCase()} ${path}`,
+        scheme: surface.scheme as string,
+        published: operation.security ?? null,
+      });
+    }
+  }
+  return operations;
+}
+
 describe("credentialClassFor", () => {
   describe("given routes mounted on each kind of app", () => {
     /** @scenario "A route publishes the credential class it actually enforces" */
@@ -227,33 +249,25 @@ describe("the published API description", () => {
       // publishes the project key, as long as some other operation still
       // publishes the organization one, and that operation is precisely the
       // one an integrator would then fail on.
-      const wrong: string[] = [];
-      const seenSchemes = new Set<string>();
-      let checked = 0;
-      for (const [path, item] of Object.entries(document.paths)) {
-        const surface = surfaceFor(path);
-        if (!surface) continue;
-        for (const [method, operation] of Object.entries(item)) {
-          if (!operation || typeof operation !== "object") continue;
-          checked += 1;
-          const expected = [{ [surface.scheme]: [] }];
-          if (
-            JSON.stringify(operation.security ?? null) !==
-            JSON.stringify(expected)
-          ) {
-            wrong.push(
-              `${method.toUpperCase()} ${path} published ${JSON.stringify(
-                operation.security ?? null,
-              )}, expected ${JSON.stringify(expected)}`,
-            );
-            continue;
-          }
-          seenSchemes.add(surface.scheme);
-        }
-      }
+      const operations = publicOperations();
+      const wrong = operations
+        .filter(
+          (op) =>
+            JSON.stringify(op.published) !==
+            JSON.stringify([{ [op.scheme]: [] }]),
+        )
+        .map(
+          (op) =>
+            `${op.operationKey} published ${JSON.stringify(op.published)}, expected [{"${op.scheme}":[]}]`,
+        );
+      const seenSchemes = new Set(
+        operations
+          .filter((op) => !wrong.some((w) => w.startsWith(op.operationKey)))
+          .map((op) => op.scheme),
+      );
 
       expect(wrong).toEqual([]);
-      expect(checked).toBeGreaterThan(0);
+      expect(operations.length).toBeGreaterThan(0);
       // Both families are present, which is the whole point: the document
       // used to answer project_api_key for every operation, including the
       // organization-scoped ones a project key can never reach.
