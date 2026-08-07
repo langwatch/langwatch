@@ -14,8 +14,34 @@ Feature: Structured Logging for ClickHouse Queries
   @unit @regression
   Scenario: Query failures are logged with structured metadata
     When a ClickHouse query fails
-    Then a structured error log is emitted with source, operation, durationMs, and error
+    Then a structured log is emitted with source, operation, durationMs, and the cause
     And the log is tagged with source "clickhouse" to distinguish from general application errors
+
+  # ---------------------------------------------------------------------------
+  # Who owns the verdict
+  #
+  # A failed attempt is raised to a caller, and the caller is what knows how the
+  # story ends: a read has its translated error surfaced at the request
+  # boundary, and an insert is issued from a job the queue retries and, if it
+  # finally gives up, drops loudly with its own error record and counter.
+  #
+  # This wrapper sees none of that. Reporting each attempt as an error made
+  # recovered work indistinguishable from lost work — 17k records a day on one
+  # service against zero jobs actually dropped. So the attempt is reported, and
+  # the verdict is left to whoever has it.
+  # ---------------------------------------------------------------------------
+
+  @unit @regression
+  Scenario: A failed attempt raised to the caller is not itself an error
+    When a ClickHouse query fails and the error is raised to the caller
+    Then the attempt is logged at warning level
+    And the failure is still counted for alerting
+
+  @unit @regression
+  Scenario: The cause never rides on a field named error
+    When a ClickHouse attempt fails
+    Then the cause is attached under a field that is not named "error"
+    And the record's level is not promoted by the log pipeline
 
   @unit @regression
   Scenario: Query successes are logged at debug level
