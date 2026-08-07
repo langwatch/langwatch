@@ -176,7 +176,6 @@ export function buildPulledUsageRecord({
           costUsd: hint.costUsd ?? event.cost_usd,
           // Present by the schema's own refinement on this branch.
           costStatus: hint.costStatus!,
-          quantities,
         })
       : pricePulledUsage({
           basis: PULLED_USAGE_COST_BASIS.COMPUTED,

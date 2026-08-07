@@ -26,7 +26,6 @@ describe("pricing one pulled usage item", () => {
         basis: "provider_reported",
         costUsd: "12.345678901",
         costStatus: "exact",
-        quantities: QUANTITIES,
       });
 
       expect(priced.costStatus).toBe("exact");
@@ -49,7 +48,6 @@ describe("pricing one pulled usage item", () => {
         basis: "provider_reported",
         costUsd: "3.5",
         costStatus: "estimate",
-        quantities: QUANTITIES,
       });
 
       expect(priced.costBasis).toBe("provider_reported");
@@ -67,7 +65,6 @@ describe("pricing one pulled usage item", () => {
           basis: "provider_reported",
           costUsd: "90071992.547409911",
           costStatus: "exact",
-          quantities: QUANTITIES,
         }),
       ).toThrow(/refusing to round/i);
     });
