@@ -9,8 +9,9 @@
  *
  * Snippets render through the shared CodePreview — the same surface the
  * traces empty state and onboarding screens use — so the dialog reads like
- * the rest of the product. CodePreview loads the Shiki engine lazily inside
- * its adapter, so the settings page bundle never carries it statically.
+ * the rest of the product. CodePreview itself defers the Shiki engine via
+ * `await import("shiki")` inside its adapter; the one static shiki path into
+ * this page is the pre-existing JsonHighlight → shikiAdapter import below.
  * `copyText` feeds the clipboard the real value regardless of reveal state.
  *
  * @see specs/api-keys/token-created-snippets.feature
