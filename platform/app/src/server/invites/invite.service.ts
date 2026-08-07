@@ -139,6 +139,12 @@ interface CreateInvitesInviteInput {
   }>;
 }
 
+/** The validated team side of one requested invite. */
+interface ResolvedInviteTeams {
+  teamAssignments: TeamAssignmentInput[];
+  teamIdsString: string;
+}
+
 /**
  * Input for creating a member invite request (WAITING_APPROVAL status).
  */
@@ -548,108 +554,12 @@ export class InviteService {
     invite: CreateInvitesInviteInput;
     strict: boolean;
   }): Promise<CreateAdminInviteInput | null> {
-    let teamAssignments: TeamAssignmentInput[] = [];
-    let teamIdsString = "";
-
-    if (invite.teams && invite.teams.length > 0) {
-      const teamIds = invite.teams.map((team) => team.teamId);
-      const validTeamIds = await this.validateTeamIds({
-        teamIds,
-        organizationId,
-      });
-
-      if (strict) {
-        const invalidTeamId = teamIds.find(
-          (teamId) => !validTeamIds.includes(teamId),
-        );
-        if (invalidTeamId) {
-          throw new TeamNotInOrganizationError(invalidTeamId);
-        }
-      }
-      if (validTeamIds.length === 0) {
-        return null;
-      }
-
-      teamAssignments = invite.teams
-        .filter((team) => validTeamIds.includes(team.teamId))
-        .map((team) => {
-          const isCustomString =
-            typeof team.role === "string" && isCustomRole(team.role);
-          const isCustom = isCustomString || team.role === TeamUserRole.CUSTOM;
-          return {
-            teamId: team.teamId,
-            role: isCustom ? TeamUserRole.CUSTOM : (team.role as TeamUserRole),
-            customRoleId:
-              isCustom && team.customRoleId ? team.customRoleId : undefined,
-          };
-        })
-        .filter((team) => {
-          if (team.role === TeamUserRole.CUSTOM && !team.customRoleId) {
-            if (strict) {
-              throw new CustomRoleIdRequiredError();
-            }
-            return false;
-          }
-          return true;
-        });
-
-      const customRoleIds = teamAssignments
-        .filter((team) => team.customRoleId)
-        .map((team) => team.customRoleId!);
-      if (customRoleIds.length > 0) {
-        const validCustomRoles = await this.prisma.customRole.findMany({
-          where: {
-            id: { in: customRoleIds },
-            organizationId,
-            kind: CUSTOM_ROLE_KIND.CUSTOM,
-          },
-          select: { id: true },
-        });
-        const validCustomRoleIds = new Set(
-          validCustomRoles.map((role) => role.id),
-        );
-        const invalidRoleId = customRoleIds.find(
-          (id) => !validCustomRoleIds.has(id),
-        );
-        if (invalidRoleId) {
-          if (strict) {
-            throw new CustomRoleNotAssignableError(invalidRoleId);
-          }
-          return null;
-        }
-      }
-
-      teamIdsString = validTeamIds.join(",");
-    } else if (invite.teamIds?.trim()) {
-      const teamIdArray = invite.teamIds
-        .split(",")
-        .map((teamId) => teamId.trim())
-        .filter(Boolean);
-
-      const validTeamIds = await this.validateTeamIds({
-        teamIds: teamIdArray,
-        organizationId,
-      });
-
-      if (strict) {
-        const invalidTeamId = teamIdArray.find(
-          (teamId) => !validTeamIds.includes(teamId),
-        );
-        if (invalidTeamId) {
-          throw new TeamNotInOrganizationError(invalidTeamId);
-        }
-      }
-      if (validTeamIds.length === 0) {
-        return null;
-      }
-
-      teamAssignments = validTeamIds.map((teamId) => ({
-        teamId,
-        role: ORGANIZATION_TO_TEAM_ROLE_MAP[invite.role],
-      }));
-
-      teamIdsString = validTeamIds.join(",");
-    } else {
+    const resolvedTeams = await this.resolveInviteTeams({
+      organizationId,
+      invite,
+      strict,
+    });
+    if (!resolvedTeams) {
       return null;
     }
 
@@ -661,9 +571,233 @@ export class InviteService {
       email: invite.email,
       role: invite.role,
       organizationId,
-      teamIds: teamIdsString,
-      teamAssignments: teamAssignments.length > 0 ? teamAssignments : undefined,
+      teamIds: resolvedTeams.teamIdsString,
+      teamAssignments:
+        resolvedTeams.teamAssignments.length > 0
+          ? resolvedTeams.teamAssignments
+          : undefined,
     };
+  }
+
+  /**
+   * The team side of one requested invite, from whichever form the request
+   * used: explicit team role entries, or the legacy comma-separated team id
+   * list. Returns null when the invite names no teams at all, or when
+   * lenient validation drops it entirely.
+   */
+  private async resolveInviteTeams({
+    organizationId,
+    invite,
+    strict,
+  }: {
+    organizationId: string;
+    invite: CreateInvitesInviteInput;
+    strict: boolean;
+  }): Promise<ResolvedInviteTeams | null> {
+    if (invite.teams && invite.teams.length > 0) {
+      return this.resolveExplicitInviteTeams({
+        organizationId,
+        teams: invite.teams,
+        strict,
+      });
+    }
+    if (invite.teamIds?.trim()) {
+      return this.resolveLegacyInviteTeams({
+        organizationId,
+        teamIds: invite.teamIds,
+        role: invite.role,
+        strict,
+      });
+    }
+    return null;
+  }
+
+  /**
+   * Resolves explicit team role entries: the teams must belong to the
+   * organization, custom-role forms are normalized, and the custom roles
+   * must be assignable. Returns null when lenient validation drops the
+   * invite (no valid teams, or an invalid custom role).
+   */
+  private async resolveExplicitInviteTeams({
+    organizationId,
+    teams,
+    strict,
+  }: {
+    organizationId: string;
+    teams: NonNullable<CreateInvitesInviteInput["teams"]>;
+    strict: boolean;
+  }): Promise<ResolvedInviteTeams | null> {
+    const teamIds = teams.map((team) => team.teamId);
+    const validTeamIds = await this.validateTeamIds({
+      teamIds,
+      organizationId,
+    });
+
+    if (strict) {
+      this.assertAllTeamIdsValid({ requestedTeamIds: teamIds, validTeamIds });
+    }
+    if (validTeamIds.length === 0) {
+      return null;
+    }
+
+    const teamAssignments = this.normalizeTeamAssignments({
+      teams,
+      validTeamIds,
+      strict,
+    });
+
+    const customRolesValid = await this.validateInviteCustomRoles({
+      organizationId,
+      teamAssignments,
+      strict,
+    });
+    if (!customRolesValid) {
+      return null;
+    }
+
+    return { teamAssignments, teamIdsString: validTeamIds.join(",") };
+  }
+
+  /**
+   * Resolves the legacy comma-separated team id form: each valid team gets
+   * the default team role for the invite's organization role. Returns null
+   * when lenient validation leaves no valid teams.
+   */
+  private async resolveLegacyInviteTeams({
+    organizationId,
+    teamIds,
+    role,
+    strict,
+  }: {
+    organizationId: string;
+    teamIds: string;
+    role: OrganizationUserRole;
+    strict: boolean;
+  }): Promise<ResolvedInviteTeams | null> {
+    const teamIdArray = teamIds
+      .split(",")
+      .map((teamId) => teamId.trim())
+      .filter(Boolean);
+
+    const validTeamIds = await this.validateTeamIds({
+      teamIds: teamIdArray,
+      organizationId,
+    });
+
+    if (strict) {
+      this.assertAllTeamIdsValid({
+        requestedTeamIds: teamIdArray,
+        validTeamIds,
+      });
+    }
+    if (validTeamIds.length === 0) {
+      return null;
+    }
+
+    return {
+      teamAssignments: validTeamIds.map((teamId) => ({
+        teamId,
+        role: ORGANIZATION_TO_TEAM_ROLE_MAP[role],
+      })),
+      teamIdsString: validTeamIds.join(","),
+    };
+  }
+
+  /** Refuses the first requested team id that is not in the organization. */
+  private assertAllTeamIdsValid({
+    requestedTeamIds,
+    validTeamIds,
+  }: {
+    requestedTeamIds: string[];
+    validTeamIds: string[];
+  }): void {
+    const invalidTeamId = requestedTeamIds.find(
+      (teamId) => !validTeamIds.includes(teamId),
+    );
+    if (invalidTeamId) {
+      throw new TeamNotInOrganizationError(invalidTeamId);
+    }
+  }
+
+  /**
+   * Narrows explicit team role entries to valid teams only, folding the
+   * `custom:{roleId}` string form and `CUSTOM` into TeamUserRole.CUSTOM. An
+   * assignment naming a custom role without its id is refused in strict
+   * mode and dropped in lenient mode.
+   */
+  private normalizeTeamAssignments({
+    teams,
+    validTeamIds,
+    strict,
+  }: {
+    teams: NonNullable<CreateInvitesInviteInput["teams"]>;
+    validTeamIds: string[];
+    strict: boolean;
+  }): TeamAssignmentInput[] {
+    return teams
+      .filter((team) => validTeamIds.includes(team.teamId))
+      .map((team) => {
+        const isCustomString =
+          typeof team.role === "string" && isCustomRole(team.role);
+        const isCustom = isCustomString || team.role === TeamUserRole.CUSTOM;
+        return {
+          teamId: team.teamId,
+          role: isCustom ? TeamUserRole.CUSTOM : (team.role as TeamUserRole),
+          customRoleId:
+            isCustom && team.customRoleId ? team.customRoleId : undefined,
+        };
+      })
+      .filter((team) => {
+        if (team.role === TeamUserRole.CUSTOM && !team.customRoleId) {
+          if (strict) {
+            throw new CustomRoleIdRequiredError();
+          }
+          return false;
+        }
+        return true;
+      });
+  }
+
+  /**
+   * True when every custom role named by these assignments is assignable in
+   * this organization. In strict mode an invalid custom role is refused
+   * instead; in lenient mode the caller drops the whole invite.
+   */
+  private async validateInviteCustomRoles({
+    organizationId,
+    teamAssignments,
+    strict,
+  }: {
+    organizationId: string;
+    teamAssignments: TeamAssignmentInput[];
+    strict: boolean;
+  }): Promise<boolean> {
+    const customRoleIds = teamAssignments
+      .filter((team) => team.customRoleId)
+      .map((team) => team.customRoleId!);
+    if (customRoleIds.length === 0) {
+      return true;
+    }
+
+    const validCustomRoles = await this.prisma.customRole.findMany({
+      where: {
+        id: { in: customRoleIds },
+        organizationId,
+        kind: CUSTOM_ROLE_KIND.CUSTOM,
+      },
+      select: { id: true },
+    });
+    const validCustomRoleIds = new Set(validCustomRoles.map((role) => role.id));
+    const invalidRoleId = customRoleIds.find(
+      (id) => !validCustomRoleIds.has(id),
+    );
+    if (invalidRoleId) {
+      if (strict) {
+        throw new CustomRoleNotAssignableError(invalidRoleId);
+      }
+      return false;
+    }
+    return true;
   }
 
   /**

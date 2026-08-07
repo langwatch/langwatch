@@ -74,6 +74,58 @@ async function teamNameFor({
   return team?.name ?? null;
 }
 
+/** A credential-bearing settings value encrypted at rest; cleared values store null. */
+function encryptedOrNull(value: string | null): string | null {
+  return value ? encrypt(value) : null;
+}
+
+/**
+ * The profile fields of a partial settings write: only the fields present on
+ * the input are written.
+ */
+function profileSettingsData(
+  input: UpdateOrganizationSettingsInput,
+): Prisma.OrganizationUpdateInput {
+  return {
+    ...(input.name !== undefined ? { name: input.name } : {}),
+    ...(input.supportContact !== undefined
+      ? { supportContact: input.supportContact?.trim() || null }
+      : {}),
+    ...(input.presenceEnabled !== undefined
+      ? { presenceEnabled: input.presenceEnabled }
+      : {}),
+    ...(input.traceSharingEnabled !== undefined
+      ? { traceSharingEnabled: input.traceSharingEnabled }
+      : {}),
+    ...(input.primaryIntent !== undefined
+      ? { primaryIntent: input.primaryIntent }
+      : {}),
+  };
+}
+
+/**
+ * The stored-objects (S3) fields of a partial settings write: only the fields
+ * present on the input are written, and credential-bearing ones are encrypted.
+ */
+function storageSettingsData(
+  input: UpdateOrganizationSettingsInput,
+): Prisma.OrganizationUpdateInput {
+  return {
+    ...(input.s3Endpoint !== undefined
+      ? { s3Endpoint: encryptedOrNull(input.s3Endpoint) }
+      : {}),
+    ...(input.s3AccessKeyId !== undefined
+      ? { s3AccessKeyId: encryptedOrNull(input.s3AccessKeyId) }
+      : {}),
+    ...(input.s3SecretAccessKey !== undefined
+      ? { s3SecretAccessKey: encryptedOrNull(input.s3SecretAccessKey) }
+      : {}),
+    ...(input.s3Bucket !== undefined
+      ? { s3Bucket: input.s3Bucket || null }
+      : {}),
+  };
+}
+
 export class PrismaOrganizationRepository implements OrganizationRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
@@ -697,39 +749,8 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
     await this.prisma.organization.update({
       where: { id: input.organizationId },
       data: {
-        ...(input.name !== undefined ? { name: input.name } : {}),
-        ...(input.supportContact !== undefined
-          ? { supportContact: input.supportContact?.trim() || null }
-          : {}),
-        ...(input.presenceEnabled !== undefined
-          ? { presenceEnabled: input.presenceEnabled }
-          : {}),
-        ...(input.traceSharingEnabled !== undefined
-          ? { traceSharingEnabled: input.traceSharingEnabled }
-          : {}),
-        ...(input.primaryIntent !== undefined
-          ? { primaryIntent: input.primaryIntent }
-          : {}),
-        ...(input.s3Endpoint !== undefined
-          ? { s3Endpoint: input.s3Endpoint ? encrypt(input.s3Endpoint) : null }
-          : {}),
-        ...(input.s3AccessKeyId !== undefined
-          ? {
-              s3AccessKeyId: input.s3AccessKeyId
-                ? encrypt(input.s3AccessKeyId)
-                : null,
-            }
-          : {}),
-        ...(input.s3SecretAccessKey !== undefined
-          ? {
-              s3SecretAccessKey: input.s3SecretAccessKey
-                ? encrypt(input.s3SecretAccessKey)
-                : null,
-            }
-          : {}),
-        ...(input.s3Bucket !== undefined
-          ? { s3Bucket: input.s3Bucket || null }
-          : {}),
+        ...profileSettingsData(input),
+        ...storageSettingsData(input),
       },
     });
   }

@@ -149,6 +149,91 @@ function clientFromRepo(repo: OrganizationRepository): PrismaClient {
 }
 
 /**
+ * The union of permissions granted by the custom roles behind these team
+ * bindings, or undefined when none apply. Feeds seat classification, which
+ * treats a member whose custom roles grant only view permissions as a Lite
+ * Member.
+ */
+async function collectCustomRolePermissions({
+  prisma,
+  organizationId,
+  currentTeamBindings,
+}: {
+  prisma: PrismaClient;
+  organizationId: string;
+  currentTeamBindings: Array<{ customRoleId: string | null }>;
+}): Promise<string[] | undefined> {
+  const customRoleIds = currentTeamBindings
+    .map((binding) => binding.customRoleId)
+    .filter((id): id is string => !!id);
+  if (customRoleIds.length === 0) return undefined;
+  const customRoles = await prisma.customRole.findMany({
+    where: { id: { in: customRoleIds }, organizationId },
+    select: { permissions: true },
+  });
+  const allPermissions: string[] = [];
+  for (const customRole of customRoles) {
+    if (customRole.permissions) {
+      allPermissions.push(...(customRole.permissions as string[]));
+    }
+  }
+  return allPermissions.length > 0 ? allPermissions : undefined;
+}
+
+/**
+ * The two plan gates on a member role change, in order: the seat
+ * classification check (a Lite Member gaining non-view permissions re-checks
+ * the full-member seats), then the Enterprise requirement on custom-role
+ * assignments.
+ */
+async function assertPlanPermitsRoleChange({
+  prisma,
+  organizationId,
+  currentRole,
+  userPermissions,
+  role,
+  teamRoleUpdates,
+  planUser,
+}: {
+  prisma: PrismaClient;
+  organizationId: string;
+  currentRole: OrganizationUserRole;
+  userPermissions: string[] | undefined;
+  role: OrganizationUserRole;
+  teamRoleUpdates?: Array<{ role: string }>;
+  planUser?: PlanProviderUser;
+}): Promise<void> {
+  const changeType = getRoleChangeType(
+    currentRole,
+    userPermissions,
+    role,
+    undefined,
+  );
+
+  const subscriptionLimits = await getApp().planProvider.getActivePlan({
+    organizationId,
+    user: planUser,
+  });
+  const licenseRepo = new LicenseEnforcementRepository(prisma);
+  await assertMemberTypeLimitNotExceeded(
+    changeType,
+    organizationId,
+    licenseRepo,
+    subscriptionLimits,
+  );
+
+  const hasCustomRoleAssignment = (teamRoleUpdates ?? []).some(
+    (update) => typeof update.role === "string" && isCustomRole(update.role),
+  );
+  if (hasCustomRoleAssignment) {
+    assertEnterprisePlanType({
+      planType: subscriptionLimits.type,
+      errorMessage: ENTERPRISE_FEATURE_ERRORS.RBAC,
+    });
+  }
+}
+
+/**
  * Organization-level queries and mutations delegated from the tRPC router.
  * License checks remain in the router layer (they require request-scoped user context).
  */
@@ -605,52 +690,21 @@ export class OrganizationService {
       role: binding.role,
     }));
 
-    const userPermissions = await (async () => {
-      const customRoleIds = currentTeamBindings
-        .map((binding) => binding.customRoleId)
-        .filter((id): id is string => !!id);
-      if (customRoleIds.length === 0) return undefined;
-      const customRoles = await prisma.customRole.findMany({
-        where: { id: { in: customRoleIds }, organizationId },
-        select: { permissions: true },
-      });
-      const allPermissions: string[] = [];
-      for (const customRole of customRoles) {
-        if (customRole.permissions) {
-          allPermissions.push(...(customRole.permissions as string[]));
-        }
-      }
-      return allPermissions.length > 0 ? allPermissions : undefined;
-    })();
+    const userPermissions = await collectCustomRolePermissions({
+      prisma,
+      organizationId,
+      currentTeamBindings,
+    });
 
-    const changeType = getRoleChangeType(
-      currentMember.role,
+    await assertPlanPermitsRoleChange({
+      prisma,
+      organizationId,
+      currentRole: currentMember.role,
       userPermissions,
       role,
-      undefined,
-    );
-
-    const subscriptionLimits = await getApp().planProvider.getActivePlan({
-      organizationId,
-      user: params.planUser,
+      teamRoleUpdates,
+      planUser: params.planUser,
     });
-    const licenseRepo = new LicenseEnforcementRepository(prisma);
-    await assertMemberTypeLimitNotExceeded(
-      changeType,
-      organizationId,
-      licenseRepo,
-      subscriptionLimits,
-    );
-
-    const hasCustomRoleAssignment = (teamRoleUpdates ?? []).some(
-      (update) => typeof update.role === "string" && isCustomRole(update.role),
-    );
-    if (hasCustomRoleAssignment) {
-      assertEnterprisePlanType({
-        planType: subscriptionLimits.type,
-        errorMessage: ENTERPRISE_FEATURE_ERRORS.RBAC,
-      });
-    }
 
     return await this.updateMemberRole({
       organizationId,

@@ -323,12 +323,7 @@ export function createOrgAuthMiddleware({
     });
 
     if (!outcome.ok) {
-      if (refusals === "throw") {
-        // The infra-failure branch carries the original error; rethrow it
-        // plain so it stays an unhandled 500, not a fake handled one.
-        if (outcome.refusal.cause !== undefined) throw outcome.refusal.cause;
-        throw new OrgAuthRefusedError(outcome.refusal);
-      }
+      if (refusals === "throw") raiseOrgAuthRefusal(outcome.refusal);
       return c.json(refusal(outcome.refusal), outcome.refusal.status as 401);
     }
 
@@ -367,6 +362,16 @@ type AuthRefusal = {
    */
   cause?: unknown;
 };
+
+/**
+ * Turns a refusal into the exception the throwing mode raises. The
+ * infra-failure branch carries the original error; it is rethrown plain so
+ * it stays an unhandled 500, not a fake handled one.
+ */
+function raiseOrgAuthRefusal(refusal: AuthRefusal): never {
+  if (refusal.cause !== undefined) throw refusal.cause;
+  throw new OrgAuthRefusedError(refusal);
+}
 
 /**
  * The organization behind a credential, or the reason there isn't one.
