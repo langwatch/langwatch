@@ -12,6 +12,7 @@ export {
   requiresOnProject,
 } from "./access-policy";
 export {
+  isHttpMethod,
   type SecurityRequirement,
   securityForCredentialClass,
 } from "./openapi-security";

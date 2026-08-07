@@ -21,6 +21,7 @@ import {
   credentialClassFor,
   handlerManagedAuth,
   internalSecret,
+  isHttpMethod,
   publicEndpoint,
   requires,
   securityForCredentialClass,
@@ -66,20 +67,23 @@ function publicOperations(): Array<{
   scheme: string;
   published: unknown;
 }> {
-  const operations = [];
-  for (const [path, item] of Object.entries(document.paths)) {
+  return Object.entries(document.paths).flatMap(([path, item]) => {
     const surface = surfaceFor(path);
-    if (!surface) continue;
-    for (const [method, operation] of Object.entries(item)) {
-      if (!operation || typeof operation !== "object") continue;
-      operations.push({
+    if (!surface) return [];
+    // Same filter the generator applies. Path metadata such as `servers` is an
+    // array, so a `typeof` check alone reports it as an operation with no
+    // security, which would fail this test on a document that is correct.
+    return Object.entries(item)
+      .filter(
+        ([method, operation]) =>
+          isHttpMethod(method) && !!operation && typeof operation === "object",
+      )
+      .map(([method, operation]) => ({
         operationKey: `${method.toUpperCase()} ${path}`,
         scheme: surface.scheme as string,
         published: operation.security ?? null,
-      });
-    }
-  }
-  return operations;
+      }));
+  });
 }
 
 describe("credentialClassFor", () => {
@@ -185,6 +189,38 @@ describe("credentialClassFor", () => {
       expect(
         credentialClassFor({ scope, policy: handlerManaged(credential) }),
       ).toBe(expected);
+    });
+  });
+});
+
+describe("isHttpMethod", () => {
+  describe("given the members a Path Item can hold", () => {
+    it("names the eight operations and nothing else", () => {
+      for (const method of [
+        "get",
+        "put",
+        "post",
+        "delete",
+        "options",
+        "head",
+        "patch",
+        "trace",
+      ]) {
+        expect(isHttpMethod(method)).toBe(true);
+        expect(isHttpMethod(method.toUpperCase())).toBe(true);
+      }
+      // `servers` and `parameters` are arrays, so a walker that decides by
+      // `typeof === "object"` treats them as operations and stamps `security`
+      // onto them, which is a document that no longer validates.
+      for (const member of [
+        "servers",
+        "parameters",
+        "summary",
+        "description",
+        "$ref",
+      ]) {
+        expect(isHttpMethod(member)).toBe(false);
+      }
     });
   });
 });

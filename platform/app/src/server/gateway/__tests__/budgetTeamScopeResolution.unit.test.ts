@@ -64,10 +64,13 @@ describe("team-scope budget resolution", () => {
         teamScopeIds: ["team_platform"],
       });
 
-      await resolveApplicableBudgets(client, {
-        organizationId: "org_1",
-        virtualKeyId: "vk_1",
-        teamId: "team_governance",
+      await resolveApplicableBudgets({
+        client: client,
+        target: {
+          organizationId: "org_1",
+          virtualKeyId: "vk_1",
+          teamId: "team_governance",
+        },
       });
 
       const asked = teamIdsAsked(findMany);
@@ -80,10 +83,13 @@ describe("team-scope budget resolution", () => {
         teamScopeIds: ["team_platform"],
       });
 
-      await resolveApplicableBudgets(client, {
-        organizationId: "org_1",
-        virtualKeyId: "vk_1",
-        teamId: "team_platform",
+      await resolveApplicableBudgets({
+        client: client,
+        target: {
+          organizationId: "org_1",
+          virtualKeyId: "vk_1",
+          teamId: "team_platform",
+        },
       });
 
       expect(teamClauses(findMany)).toHaveLength(1);
@@ -97,11 +103,14 @@ describe("team-scope budget resolution", () => {
         teamScopeIds: ["team_from_database"],
       });
 
-      await resolveApplicableBudgets(client, {
-        organizationId: "org_1",
-        virtualKeyId: null,
-        teamId: null,
-        scopedTeamIds: ["team_from_draft"],
+      await resolveApplicableBudgets({
+        client: client,
+        target: {
+          organizationId: "org_1",
+          virtualKeyId: null,
+          teamId: null,
+          scopedTeamIds: ["team_from_draft"],
+        },
       });
 
       expect(teamIdsAsked(findMany)).toEqual(["team_from_draft"]);
@@ -113,10 +122,13 @@ describe("team-scope budget resolution", () => {
     it("asks for no team at all rather than for an empty one", async () => {
       const { client, findMany } = prismaStub({ teamScopeIds: [] });
 
-      await resolveApplicableBudgets(client, {
-        organizationId: "org_1",
-        virtualKeyId: null,
-        teamId: null,
+      await resolveApplicableBudgets({
+        client: client,
+        target: {
+          organizationId: "org_1",
+          virtualKeyId: null,
+          teamId: null,
+        },
       });
 
       // No clause at all, not a clause matching nothing: an empty `in` would

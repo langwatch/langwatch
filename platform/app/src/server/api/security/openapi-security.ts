@@ -4,6 +4,32 @@ import type { CredentialClass } from "./access-policy";
 export type SecurityRequirement = Record<string, never[]>;
 
 /**
+ * The fixed set of Path Item members that are operations, per OpenAPI 3.1.
+ *
+ * A Path Item also holds `servers`, `parameters`, `summary`, `description` and
+ * `$ref`, and the first two are arrays, which are objects to `typeof`. Walking
+ * a path item by value shape therefore mistakes them for operations, and
+ * stamping `security` onto `servers` produces a document that no longer
+ * validates. Nothing in the document carries those members today, which is
+ * exactly why this has to be a rule rather than an observation.
+ */
+const HTTP_METHODS = new Set([
+  "get",
+  "put",
+  "post",
+  "delete",
+  "options",
+  "head",
+  "patch",
+  "trace",
+]);
+
+/** Whether a Path Item member names an operation rather than path metadata. */
+export function isHttpMethod(member: string): boolean {
+  return HTTP_METHODS.has(member.toLowerCase());
+}
+
+/**
  * Which security schemes the published document offers for each credential
  * class.
  *

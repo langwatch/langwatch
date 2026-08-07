@@ -135,11 +135,11 @@ async function scopePredicatesFor({
   if (!target.principalUserId) return ors;
 
   ors.push({ scopeType: "PRINCIPAL", scopeId: target.principalUserId });
-  const groupIds = await memberGroupIds(
+  const groupIds = await memberGroupIds({
     client,
-    target.organizationId,
-    target.principalUserId,
-  );
+    organizationId: target.organizationId,
+    userId: target.principalUserId,
+  });
   if (groupIds.length > 0) {
     ors.push({ scopeType: "GROUP", scopeId: { in: groupIds } });
   }
@@ -151,10 +151,13 @@ async function scopePredicatesFor({
  * bucket. Ordered by (scopeType, budget id) so callers, bundles, and
  * snapshots stay byte-stable across runs.
  */
-export async function resolveApplicableBudgets(
-  client: PrismaLike,
-  target: BudgetResolutionTarget,
-): Promise<ResolvedBudget[]> {
+export async function resolveApplicableBudgets({
+  client,
+  target,
+}: {
+  client: PrismaLike;
+  target: BudgetResolutionTarget;
+}): Promise<ResolvedBudget[]> {
   const ors = await scopePredicatesFor({ client, target });
 
   const rows = await client.gatewayBudget.findMany({
@@ -257,11 +260,15 @@ export const PROVIDER_BUCKET_SEPARATOR = "|provider:";
  * org so a user in several orgs never drags another org's group
  * budget into this one's cascade.
  */
-async function memberGroupIds(
-  client: PrismaLike,
-  organizationId: string,
-  userId: string,
-): Promise<string[]> {
+async function memberGroupIds({
+  client,
+  organizationId,
+  userId,
+}: {
+  client: PrismaLike;
+  organizationId: string;
+  userId: string;
+}): Promise<string[]> {
   const memberships = await client.groupMembership.findMany({
     where: { userId, group: { organizationId } },
     select: { groupId: true },

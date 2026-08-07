@@ -134,12 +134,12 @@ export function credentialClassFor({
 type AppScope = "project" | "organization" | "service" | "session";
 
 /** What each app answers for a route that does not opt out of its family. */
-const CLASS_BY_APP_SCOPE: Record<AppScope, CredentialClass> = {
+const CLASS_BY_APP_SCOPE = {
   project: "project_api_key",
   organization: "organization_api_key",
   service: "internal",
   session: "session",
-};
+} as const satisfies Record<AppScope, CredentialClass>;
 
 /** @see credentialClassFor, which is where the reasoning lives. */
 function handlerManagedCredentialClass({

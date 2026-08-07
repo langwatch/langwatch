@@ -21,6 +21,7 @@ import rawCurrentSpec from "../app/api/openapiLangWatch.json";
 import {
   allRegisteredRoutes,
   type CredentialClass,
+  isHttpMethod,
   securityForCredentialClass,
 } from "../server/api/security";
 
@@ -246,15 +247,31 @@ function* documentedOperations(spec: SpecShape): Generator<{
   operation: { security?: unknown };
 }> {
   for (const [routePath, item] of Object.entries(spec.paths ?? {})) {
-    for (const [method, operation] of Object.entries(item)) {
-      if (!operation || typeof operation !== "object") continue;
+    for (const [method, operation] of operationsOf(item)) {
       yield {
         routePath,
         operationKey: `${method.toUpperCase()} ${routePath}`,
-        operation: operation as { security?: unknown },
+        operation,
       };
     }
   }
+}
+
+/**
+ * The operation members of one Path Item.
+ *
+ * Filtered by method name rather than by value shape: a Path Item also holds
+ * `servers` and `parameters`, both arrays, and an array is an object to
+ * `typeof`. Stamping `security` onto `servers` produces a document that no
+ * longer validates.
+ */
+function operationsOf(
+  item: Record<string, unknown>,
+): Array<[string, { security?: unknown }]> {
+  return Object.entries(item).filter(
+    (entry): entry is [string, { security?: unknown }] =>
+      isHttpMethod(entry[0]) && !!entry[1] && typeof entry[1] === "object",
+  );
 }
 
 /**

@@ -80,18 +80,21 @@ export async function resolveApplicableBudgetsForDraftKey(
     traceProjectId: draft.traceProjectId,
   });
 
-  const resolved = await resolveApplicableBudgets(prisma, {
-    organizationId: draft.organizationId,
-    virtualKeyId: draft.virtualKeyId,
-    teamId: traceProject?.teamId ?? null,
-    // Passed explicitly rather than read from the key: a draft has no key
-    // row yet, and the drawer has to preview the set the key will resolve
-    // once it is saved, not the smaller set it can look up today.
-    scopedTeamIds: draft.scopes
-      .filter((scope) => scope.scopeType === "TEAM")
-      .map((scope) => scope.scopeId),
-    projectId: traceProject?.id ?? null,
-    principalUserId: draft.principalUserId,
+  const resolved = await resolveApplicableBudgets({
+    client: prisma,
+    target: {
+      organizationId: draft.organizationId,
+      virtualKeyId: draft.virtualKeyId,
+      teamId: traceProject?.teamId ?? null,
+      // Passed explicitly rather than read from the key: a draft has no key
+      // row yet, and the drawer has to preview the set the key will resolve
+      // once it is saved, not the smaller set it can look up today.
+      scopedTeamIds: draft.scopes
+        .filter((scope) => scope.scopeType === "TEAM")
+        .map((scope) => scope.scopeId),
+      projectId: traceProject?.id ?? null,
+      principalUserId: draft.principalUserId,
+    },
   });
   if (resolved.length === 0) return [];
 

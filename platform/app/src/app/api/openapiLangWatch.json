@@ -42489,7 +42489,7 @@
           }
         ],
         "summary": "Read one end user's spend",
-        "description": "Windowed spend rollup for one external end user across the organization (the /customer/info-style read a rebilling integration polls). `cap` is the applicable attributed-user budget cap and its remaining headroom once such a budget template applies; null until then.",
+        "description": "Windowed spend rollup for one external end user across the organization (the /customer/info-style read a rebilling integration polls). `caps` lists every attributed-user budget that applies to this end user, each with its limit and the spend against it. It is an empty array until such a budget template applies, never null.",
         "security": [
           {
             "admin_api_key": []

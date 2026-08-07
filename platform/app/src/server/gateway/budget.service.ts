@@ -1396,12 +1396,15 @@ export class GatewayBudgetService {
     // Same resolver the bundle and the debits process use, so what
     // enforces here is exactly what the key was told applies to it.
     const resolved = (
-      await resolveApplicableBudgets(this.prisma, {
-        organizationId: input.organizationId,
-        teamId: input.teamId,
-        projectId: input.projectId,
-        virtualKeyId: input.virtualKeyId,
-        principalUserId: input.principalUserId,
+      await resolveApplicableBudgets({
+        client: this.prisma,
+        target: {
+          organizationId: input.organizationId,
+          teamId: input.teamId,
+          projectId: input.projectId,
+          virtualKeyId: input.virtualKeyId,
+          principalUserId: input.principalUserId,
+        },
       })
     ).filter((r) => budgetAppliesToProvider(r.budget, input.providerKey));
     const applicable = resolved.map((r) => r.budget);
