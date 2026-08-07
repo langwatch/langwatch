@@ -179,7 +179,6 @@ var removed = map[string]string{
 	"cleanup":       "haven clean",
 	"prune":         "haven clean",
 	"moron":         "haven git",
-	"setup":         "nothing — `haven up` bootstraps the machine itself (portless install, CA trust, proxy)",
 }
 
 // table is the whole CLI surface, in help order.
@@ -394,6 +393,16 @@ var table = []commandSpec{
 			{long: "--agent-id", takesValue: true, value: "<id>", summary: "the sub-agent this run belongs to — picks the shorter wait ceiling its prompt cache needs"},
 		},
 		run: runHeavy,
+	},
+	{
+		name:    "setup",
+		summary: "install optional integrations into this checkout (interactive; nothing is assumed)",
+		args:    "[feature…]",
+		maxArgs: -1,
+		flags: []flagSpec{
+			{long: "--list", summary: "what can be installed, and what each one does"},
+		},
+		run: runSetup,
 	},
 	{
 		name:    "gate",

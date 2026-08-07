@@ -1,48 +1,61 @@
 package app
 
 import (
+	"fmt"
 	"os"
-
-	"go.uber.org/zap"
 )
 
-// The gate hook is registered per checkout, in this worktree's own
-// .claude/settings.local.json, and `haven up` writes it the same way it writes
-// .env.portless.
+// Feature is an optional integration `haven setup` can install into this
+// checkout. Optional is the operative word: these change how OTHER tools
+// behave, so haven offers them and does not assume them — `up` installs
+// nothing from this list.
+type Feature struct {
+	Name    string
+	Summary string
+	// Detail is the paragraph a human reads before choosing.
+	Detail string
+}
+
+// Features is the list, in the order `haven setup` offers them.
+var Features = []Feature{{
+	Name:    "gate-hook",
+	Summary: "queue heavy commands from Claude Code so parallel agents can't take the machine",
+	Detail: "Registers `haven gate` as a PreToolUse hook in this worktree's\n" +
+		"    .claude/settings.local.json (gitignored, so it stays yours). Test runs,\n" +
+		"    typechecks and builds started by an agent then take a machine-wide slot\n" +
+		"    instead of all landing at once. Hooks are read at session start, so new\n" +
+		"    Claude Code sessions pick it up.",
+}}
+
+// InstallFeature installs one feature by name and reports whether it changed
+// anything — so re-running setup is a no-op rather than a duplicate.
+func (o *Orchestrator) InstallFeature(name string) (bool, error) {
+	switch name {
+	case "gate-hook":
+		return o.installGateHook()
+	default:
+		return false, fmt.Errorf("unknown feature %q", name)
+	}
+}
+
+// installGateHook registers the gate in this checkout's own Claude settings.
 //
-// Three things make that the right home rather than the user's global config.
-//
-// It is SCOPED: it governs heavy commands in this repo, so it belongs to this
-// repo, not to every project on the machine. It is UNTRACKED — .gitignore
-// carries `**/.claude/settings.local.json*`, while .claude/settings.json is
-// checked in — so writing here configures your checkout without committing a
-// hook to everyone else's. And it is PER WORKTREE: `git rev-parse
-// --show-toplevel` resolves to the worktree's own root, so each one gets its
-// own file, which is exactly right when each also gets its own stack.
-//
-// That scoping is why this can be part of `up` at all. Reaching into
-// ~/.claude to change how a different tool behaves everywhere would be a
-// decision to ask for; writing a dev-environment setting into the checkout
-// haven is already provisioning is the same thing haven does with the overlay.
-func (o *Orchestrator) ensureGateHook() {
+// .claude/settings.local.json, deliberately: .gitignore carries
+// `**/.claude/settings.local.json*` while .claude/settings.json is checked in,
+// so this configures the developer's checkout without committing a hook into
+// everyone else's. The root comes from git's own toplevel, which in a worktree
+// resolves to that worktree — so each gets its own, matching the fact that
+// each already gets its own stack, slug and .env.portless.
+func (o *Orchestrator) installGateHook() (bool, error) {
 	if o.cfg.RepoRoot == "" {
-		return
+		return false, fmt.Errorf("no repository root: run this from inside a checkout")
 	}
 	self, err := os.Executable()
 	if err != nil || self == "" {
 		// Without an absolute path the hook would depend on haven being on PATH,
-		// which `make haven install` makes optional. Better no hook than one that
-		// fails to exec on every tool call.
-		return
+		// which `make haven install` makes optional. A hook that cannot exec would
+		// fire on every single tool call, so refuse rather than install a trap.
+		return false, fmt.Errorf("cannot resolve haven's own path; run `make haven install` first")
 	}
-	installed, err := o.store.EnsureClaudeHook(o.cfg.RepoRoot, self+" gate")
-	switch {
-	case err != nil:
-		// Never fatal to `up`. A stack that will not start because a hook could
-		// not be written would be a worse trade than a machine without a governor.
-		o.log.Warn("could not register the haven gate hook", zap.Error(err))
-	case installed:
-		o.log.Info("registered haven gate in this worktree's .claude/settings.local.json",
-			zap.String("note", "hooks are read at session start, so new Claude Code sessions pick it up"))
-	}
+	return o.store.EnsureClaudeHook(o.cfg.RepoRoot, self+" gate")
 }
