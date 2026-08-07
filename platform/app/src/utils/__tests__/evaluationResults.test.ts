@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   EVALUATION_STATUS_COLORS,
+  EVALUATION_STATUS_TONES,
   getEvalChipDisplay,
   getStatusLabel,
   parseEvaluationResult,
@@ -414,35 +415,39 @@ describe("parseEvaluationResult", () => {
 });
 
 describe("EVALUATION_STATUS_COLORS", () => {
-  it("has correct color for pending (gray)", () => {
-    expect(EVALUATION_STATUS_COLORS.pending).toBe("gray.400");
+  // A raw palette shade (gray.400, red.600) is one fixed value, so a status dot
+  // written that way reads correctly in one colour mode and disappears in the
+  // other. Every entry has to be a semantic token, which carries both.
+  // Enforced repo-wide by cmd/semantictokens.
+  it("gives every status a semantic token rather than a raw palette shade", () => {
+    for (const [status, color] of Object.entries(EVALUATION_STATUS_COLORS)) {
+      expect(color, `${status} should not be a raw shade`).not.toMatch(
+        /\.\d{2,3}$/,
+      );
+    }
   });
 
-  it("has correct color for running (blue)", () => {
-    expect(EVALUATION_STATUS_COLORS.running).toBe("blue.400");
-  });
-
-  it("has correct color for passed (green)", () => {
-    expect(EVALUATION_STATUS_COLORS.passed).toBe("green.500");
-  });
-
-  it("has correct color for failed (red)", () => {
-    expect(EVALUATION_STATUS_COLORS.failed).toBe("red.500");
-  });
-
-  it("has correct color for processed (blue - neutral)", () => {
-    expect(EVALUATION_STATUS_COLORS.processed).toBe("blue.500");
-  });
-
-  it("uses a deeper red for error than for fail so the two states stay distinct", () => {
-    expect(EVALUATION_STATUS_COLORS.error).toBe("red.600");
+  it("keeps error visually distinct from fail, so a broken evaluator does not read as a verdict", () => {
     expect(EVALUATION_STATUS_COLORS.error).not.toBe(
       EVALUATION_STATUS_COLORS.failed,
     );
   });
 
-  it("renders skipped as a light bg-style gray — it's a setup state, not a verdict, so it shouldn't compete with real pass/fail", () => {
-    expect(EVALUATION_STATUS_COLORS.skipped).toBe("gray.300");
+  it("keeps skipped distinct from pending — one is a setup state, the other is in flight", () => {
+    expect(EVALUATION_STATUS_COLORS.skipped).not.toBe(
+      EVALUATION_STATUS_COLORS.pending,
+    );
+  });
+
+  it("pairs each tone's foreground with a semantic token too", () => {
+    for (const [status, tone] of Object.entries(EVALUATION_STATUS_TONES)) {
+      expect(tone.fg, `${status} fg should not be a raw shade`).not.toMatch(
+        /\.\d{2,3}$/,
+      );
+      expect(tone.bg, `${status} bg should not be a raw shade`).not.toMatch(
+        /\.\d{2,3}$/,
+      );
+    }
   });
 });
 
