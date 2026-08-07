@@ -91,6 +91,81 @@ describe("isTransientClickHouseError", () => {
           isTransientClickHouseError({ error: new Error("Timeout error.") }),
         ).toBe(true);
       });
+
+      it("tolerates the message without its trailing stop", () => {
+        expect(
+          isTransientClickHouseError({ error: new Error("Timeout error") }),
+        ).toBe(true);
+      });
+    });
+
+    describe("when the driver names the error instead", () => {
+      it("retries", () => {
+        const error = Object.assign(new Error("socket hang up"), {
+          name: "TimeoutError",
+        });
+
+        expect(isTransientClickHouseError({ error })).toBe(true);
+      });
+    });
+
+    /**
+     * ClickHouse echoes the failing statement back inside its error text. A
+     * message-anywhere match on "timeout" therefore made permanent failures —
+     * a syntax error, a missing table — look transient whenever the QUERY
+     * happened to mention the word, and each one burned the full retry budget
+     * against a server that could never succeed.
+     */
+    describe("when a permanent failure merely quotes a query mentioning timeout", () => {
+      it("does not retry a syntax error", () => {
+        const error = new Error(
+          "Code: 62. DB::Exception: Syntax error: failed at position 8: " +
+            "SELECT timeout_ms FROM traces WHERE. (SYNTAX_ERROR)",
+        );
+
+        expect(isTransientClickHouseError({ error })).toBe(false);
+      });
+
+      it("does not retry an unknown-table error quoting a SETTINGS clause", () => {
+        const error = new Error(
+          "Code: 60. DB::Exception: Table default.nope does not exist. " +
+            "Query: SELECT 1 SETTINGS receive_timeout = 5. (UNKNOWN_TABLE)",
+        );
+
+        expect(isTransientClickHouseError({ error })).toBe(false);
+      });
+
+      it("does not retry an unknown column literally named timeout", () => {
+        const error = new Error(
+          "Code: 47. DB::Exception: Unknown expression identifier 'timeout'. " +
+            "(UNKNOWN_IDENTIFIER)",
+        );
+
+        expect(isTransientClickHouseError({ error })).toBe(false);
+      });
+    });
+
+    /**
+     * The timeouts ClickHouse reports itself still have to retry — they just
+     * arrive as codes or as the caller's fragments rather than as free text.
+     */
+    describe("when ClickHouse reports its own timeout", () => {
+      it("retries TIMEOUT_EXCEEDED via the caller's fragments", () => {
+        expect(
+          isTransientClickHouseError({
+            error: new Error("Code: 159. DB::Exception: TIMEOUT_EXCEEDED"),
+            transientMessageFragments: ["TIMEOUT_EXCEEDED"],
+          }),
+        ).toBe(true);
+      });
+
+      it("retries a socket timeout via its code", () => {
+        const error = Object.assign(new Error("connect ETIMEDOUT 10.0.0.1"), {
+          code: "ETIMEDOUT",
+        });
+
+        expect(isTransientClickHouseError({ error })).toBe(true);
+      });
     });
   });
 
