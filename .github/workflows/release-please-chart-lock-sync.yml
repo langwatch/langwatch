@@ -2,22 +2,30 @@ name: release-please-chart-lock-sync
 
 # Keep charts/langwatch/Chart.lock honest on release-please PRs.
 #
-# release-please bumps charts/gateway/Chart.yaml `$.version` and `$.appVersion`
-# in lockstep with the umbrella `langwatch` package on every release (per
-# release-please-config.json `.` extra-files), but it cannot recompute the
-# sha256 digest in Chart.lock. helm 3.12's `dependency build` hashes both the
-# Chart.yaml dependencies AND the Chart.lock resolved versions together — so
-# the freshly-bumped sub-chart version invalidates the digest, and every
-# downstream chart workflow (template CI, e2e, release-langwatch-chart) fails
-# with `can't get a valid version for dependency langwatch-gateway` /
-# `the lock file (Chart.lock) is out of sync with the dependencies file`.
+# release-please bumps a sub-chart's Chart.yaml `$.version` on release, but it
+# cannot recompute the resolved versions in charts/langwatch/Chart.lock. helm
+# resolves a local `file://` dependency against the version recorded in the
+# lock, so a sub-chart released past that version makes `dependency build` fail
+# with `can't get a valid version for dependency <name>`, taking every
+# downstream chart workflow (template CI, e2e, release-langwatch-chart) with it.
 #
-# This workflow watches release-please's umbrella PR, runs
-# `helm dependency update`, and pushes the regenerated Chart.lock back to the
-# PR branch so the lock stays meaningful end-to-end. We push with a PAT
-# (RELEASE_PLEASE_TOKEN — same one release-please-sdks.yml uses) so the new
-# commit re-triggers the chart CI; pushes authored by the default GITHUB_TOKEN
-# do NOT trigger downstream workflows.
+# Two release shapes reach the lock, and both need the sync:
+#   - `langwatch`, the umbrella, which bumps charts/gateway and
+#     charts/langyagent in lockstep with itself (release-please-config.json `.`
+#     extra-files).
+#   - `clickhouse-serverless`, which is its own release-please component and
+#     moves on its own cadence.
+#
+# This workflow watches those PRs, runs `helm dependency update`, and pushes the
+# regenerated Chart.lock back to the PR branch so the lock stays meaningful
+# end-to-end. We push with a PAT (RELEASE_PLEASE_TOKEN, the same one
+# release-please-sdks.yml uses) so the new commit re-triggers the chart CI;
+# pushes authored by the default GITHUB_TOKEN do NOT trigger downstream
+# workflows.
+#
+# The sync only works because charts/langwatch/Chart.yaml constrains its local
+# sub-charts with a `>= 0.0.0` range. An exact pin fails `dependency update`
+# itself once the sub-chart moves past it, so there would be no lock to push.
 
 on:
   pull_request_target:
@@ -25,6 +33,7 @@ on:
     paths:
       - "charts/gateway/Chart.yaml"
       - "charts/langwatch/Chart.yaml"
+      - "charts/clickhouse-serverless/Chart.yaml"
 
 permissions:
   contents: write
@@ -39,7 +48,8 @@ jobs:
     # the upstream repo, so this is the right tightening.
     if: |
       github.event.pull_request.head.repo.full_name == github.repository &&
-      startsWith(github.head_ref, 'release-please--branches--main--components--langwatch')
+      (startsWith(github.head_ref, 'release-please--branches--main--components--langwatch') ||
+       startsWith(github.head_ref, 'release-please--branches--main--components--clickhouse-serverless'))
     steps:
       - name: Checkout PR branch
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
