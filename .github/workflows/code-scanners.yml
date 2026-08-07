@@ -114,17 +114,31 @@ jobs:
       # first-party actions/* or an already-approved pin, and this workflow's
       # first run ended in startup_failure with the third-party action as its
       # only unapproved reference. A pinned release tarball needs no allowlist.
+      # Each tarball is verified against the checksum file its release
+      # publishes before anything is extracted — this job exists to catch
+      # compromised credentials, so its own supply chain does not get to be a
+      # `curl | tar`. The checksum file comes from the same release, so this
+      # does not defend against a compromised release, only against a swapped
+      # or truncated asset — which is also what pipefail is for: without it a
+      # failed curl is masked by the tar it feeds.
       - name: Install scanners
         run: |
-          gitleaks_version=8.30.0
-          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${gitleaks_version}/gitleaks_${gitleaks_version}_linux_x64.tar.gz" \
-            | tar -xz -C /usr/local/bin gitleaks
-          gitleaks --version
-
-          trufflehog_version=3.96.0
-          curl -sSfL "https://github.com/trufflesecurity/trufflehog/releases/download/v${trufflehog_version}/trufflehog_${trufflehog_version}_linux_amd64.tar.gz" \
-            | tar -xz -C /usr/local/bin trufflehog
-          trufflehog --version
+          set -euo pipefail
+          install_verified() {
+            local name="$1" version="$2" repo="$3" asset="$4" checksums="$5"
+            local dir
+            dir="$(mktemp -d)"
+            curl -sSfL "https://github.com/${repo}/releases/download/v${version}/${asset}" -o "$dir/$asset"
+            curl -sSfL "https://github.com/${repo}/releases/download/v${version}/${checksums}" -o "$dir/checksums.txt"
+            (cd "$dir" && grep -F "  $asset" checksums.txt | sha256sum --check --strict)
+            tar -xz -C /usr/local/bin -f "$dir/$asset" "$name"
+            rm -rf "$dir"
+            "$name" --version
+          }
+          install_verified gitleaks 8.30.0 gitleaks/gitleaks \
+            gitleaks_8.30.0_linux_x64.tar.gz gitleaks_8.30.0_checksums.txt
+          install_verified trufflehog 3.96.0 trufflesecurity/trufflehog \
+            trufflehog_3.96.0_linux_amd64.tar.gz trufflehog_3.96.0_checksums.txt
 
       # Runs BEFORE the gate it protects, against throwaway repositories built
       # to match the ref layout actions/checkout leaves behind. A gate scoped to

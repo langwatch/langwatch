@@ -35,7 +35,14 @@ git branch --force "$scan_branch" HEAD >/dev/null
 
 if [ "$event" = "pull_request" ]; then
   base_ref="${BASE_REF:?BASE_REF is required on a pull_request}"
-  git fetch --no-tags --quiet origin "+refs/heads/$base_ref:refs/remotes/origin/$base_ref"
+  # actions/checkout with fetch-depth: 0 already brings this ref, so in CI the
+  # fetch is a freshness refresh, not a requirement. It must not fail the gate
+  # when the ref is already present: under `set -e` a transient network error
+  # (or a credential-less fetch on a private fork) would otherwise paint a red
+  # check that has nothing to do with secrets.
+  git fetch --no-tags --quiet origin "+refs/heads/$base_ref:refs/remotes/origin/$base_ref" \
+    || git rev-parse --verify --quiet "refs/remotes/origin/$base_ref" >/dev/null \
+    || { echo "::error::cannot fetch or resolve base ref $base_ref" >&2; exit 1; }
   base_commit="$(git merge-base "$scan_branch" "origin/$base_ref")"
 else
   base_commit=""
@@ -55,15 +62,17 @@ fi
 
 # A scan can be scoped to nothing as easily as to the wrong thing, and both
 # report the same green check. If the range under test adds or modifies a file,
-# the scanner has to have read something.
+# the scanner has to have read something. `$1` is the scanner's parsed
+# work-done counter — chunks for trufflehog, commits for gitleaks; empty when
+# the counter line was missing, which fails too (an unparseable report proves
+# as little as an empty one).
 assert_scan_was_not_empty() {
-  local output="$1" chunks
+  local counted="$1"
 
   [ -n "$base_commit" ] || return 0
   git diff --quiet --diff-filter=AM "$base_commit" "$scan_branch" && return 0
 
-  chunks="$(printf '%s' "$output" | sed -n 's/.*"chunks": *\([0-9][0-9]*\).*/\1/p' | tail -1)"
-  if [ -n "$chunks" ] && [ "$chunks" -gt 0 ]; then
+  if [ -n "$counted" ] && [ "$counted" -gt 0 ]; then
     return 0
   fi
 
@@ -85,7 +94,16 @@ case "$scanner" in
     else
       log_opts="-1"
     fi
-    exec gitleaks git --redact --no-banner --no-color --verbose --log-opts="$log_opts" .
+    set +e
+    output="$(gitleaks git --redact --no-banner --no-color --verbose --log-opts="$log_opts" . 2>&1)"
+    status=$?
+    set -e
+    printf '%s\n' "$output"
+
+    # gitleaks reports "N commits scanned." where trufflehog reports chunks.
+    commits="$(printf '%s' "$output" | sed -n 's/.*INF \([0-9][0-9]*\) commits scanned.*/\1/p' | tail -1)"
+    assert_scan_was_not_empty "$commits" || exit 1
+    exit "$status"
     ;;
 
   trufflehog)
@@ -108,7 +126,8 @@ case "$scanner" in
     set -e
     printf '%s\n' "$output"
 
-    assert_scan_was_not_empty "$output" || exit 1
+    chunks="$(printf '%s' "$output" | sed -n 's/.*"chunks": *\([0-9][0-9]*\).*/\1/p' | tail -1)"
+    assert_scan_was_not_empty "$chunks" || exit 1
     exit "$status"
     ;;
 

@@ -196,42 +196,65 @@ test_secret_added_then_deleted_within_the_pull_request_still_fails() {
     "trufflehog fails on a secret that is added and removed inside the same pull request"
 }
 
-# @scenario "A scan that examines no content while the pull request changes files fails loudly"
-test_scan_that_examines_no_content_fails_loudly() {
-  local work stub
-  work="$(build_checkout vacuous none)"
-
-  # A stand-in that reports a clean, entirely empty scan — the shape a mis-aimed
-  # `--branch` produces, and the one that is indistinguishable from a real pass
-  # by exit code alone.
-  stub="$WORKSPACE/stub-bin"
+# Runs the gate with a stubbed scanner that reports a clean, entirely empty
+# scan — the shape a mis-aimed scope produces, and the one that is
+# indistinguishable from a real pass by exit code alone.
+run_scan_with_empty_stub() {
+  local scanner="$1" work="$2" stub rc=0
+  stub="$WORKSPACE/stub-bin-$scanner"
   mkdir -p "$stub"
-  cat >"$stub/trufflehog" <<'STUB'
+  case "$scanner" in
+    trufflehog)
+      cat >"$stub/trufflehog" <<'STUB'
 #!/usr/bin/env bash
 echo 'info-0 trufflehog finished scanning {"chunks": 0, "bytes": 0, "verified_secrets": 0}'
 exit 0
 STUB
-  chmod +x "$stub/trufflehog"
+      ;;
+    gitleaks)
+      cat >"$stub/gitleaks" <<'STUB'
+#!/usr/bin/env bash
+echo '12:00AM INF 0 commits scanned.'
+echo '12:00AM INF no leaks found'
+exit 0
+STUB
+      ;;
+  esac
+  chmod +x "$stub"/*
 
-  local rc=0
   set +e
   LAST_OUTPUT="$(
     PATH="$stub:$PATH" \
       EVENT_NAME=pull_request \
       BASE_REF=main \
       SECRETS_SCAN_TRUFFLEHOG_MODE=offline \
-      bash "$SCAN" trufflehog "$work" 2>&1
+      bash "$SCAN" "$scanner" "$work" 2>&1
   )"
   rc=$?
   set -e
+  return $rc
+}
 
-  if [ "$rc" -ne 0 ]; then
-    record yes "an empty scan over a non-empty pull request is a failure"
+# @scenario "A scan that examines no content while the pull request changes files fails loudly"
+test_scan_that_examines_no_content_fails_loudly() {
+  local work
+  work="$(build_checkout vacuous none)"
+
+  if run_scan_with_empty_stub trufflehog "$work"; then
+    record no "an empty trufflehog scan over a non-empty pull request is a failure"
   else
-    record no "an empty scan over a non-empty pull request is a failure"
+    record yes "an empty trufflehog scan over a non-empty pull request is a failure"
   fi
   assert_output_contains "reached no commits" \
     "the failure says the scan reached no commits"
+
+  # The same safeguard covers gitleaks — the spec rule is "both scanners are
+  # scoped the same way", and a scope can be mis-aimed on either.
+  if run_scan_with_empty_stub gitleaks "$work"; then
+    record no "an empty gitleaks scan over a non-empty pull request is a failure"
+  else
+    record yes "an empty gitleaks scan over a non-empty pull request is a failure"
+  fi
 }
 
 # @scenario "The pattern scanner ignores a secret on an unrelated branch"

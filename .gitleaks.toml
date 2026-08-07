@@ -93,7 +93,7 @@ regexes = ['''(0123456789abcdef){4}''']
 # whole file, AND or no AND, and the accompanying `regexes` change nothing —
 # verified by planting a second, unrelated AWS key in this file and watching it
 # go unreported. Fixing that entry (and its comment, which claims a narrowing it
-# does not get) is #6681's deferred half.
+# does not get) is tracked in #6684.
 [[allowlists]]
 description = "AWS-shaped fixture credentials planted by the secrets-gate scoping tests"
 regexes = [
