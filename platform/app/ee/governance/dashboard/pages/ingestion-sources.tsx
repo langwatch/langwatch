@@ -67,6 +67,7 @@ type SourceType =
   | "copilot_studio"
   | "openai_compliance"
   | "claude_compliance"
+  | "databricks_genie"
   | "s3_custom"
   | "http_custom";
 
@@ -123,6 +124,13 @@ const SOURCE_TYPE_OPTIONS: Array<{
     label: "Anthropic Claude Enterprise Compliance",
     mode: "pull",
     blurb: "Polls Anthropic's compliance API with a workspace API key.",
+  },
+  {
+    value: "databricks_genie",
+    label: "Databricks AI/BI Genie",
+    mode: "pull",
+    blurb:
+      "Records who asked what in Genie and the SQL it ran against your warehouse. Needs a workspace token that can read every Genie space you want covered.",
   },
   {
     value: "s3_custom",
@@ -190,6 +198,7 @@ const PULL_ADAPTER_FOR_SOURCE: Partial<Record<SourceType, string>> = {
   copilot_studio: "copilot_studio",
   openai_compliance: "openai_compliance",
   claude_compliance: "claude_compliance",
+  databricks_genie: "databricks_genie",
   http_custom: "http_polling",
 };
 
@@ -203,6 +212,7 @@ const PULL_SCHEDULE_DEFAULTS: Record<string, string> = {
   copilot_studio: "*/15 * * * *",
   openai_compliance: "*/15 * * * *",
   claude_compliance: "*/15 * * * *",
+  databricks_genie: "*/15 * * * *",
   http_polling: "*/15 * * * *",
 };
 
@@ -1036,6 +1046,27 @@ const PARSER_FIELDS: Record<SourceType, FieldDef[]> = {
       key: "pollEverySec",
       label: "Polling cadence (seconds)",
       placeholder: "300",
+    },
+  ],
+  databricks_genie: [
+    {
+      key: "workspaceUrl",
+      label: "Workspace URL",
+      placeholder: "https://adb-1234567890123456.7.azuredatabricks.net",
+      required: true,
+    },
+    {
+      key: "token",
+      label: "Workspace token",
+      placeholder: "dapi...",
+      hint: "A personal access token or OAuth token for a service principal that can read every Genie space you want covered. We encrypt this server-side.",
+      required: true,
+    },
+    {
+      key: "spaceIds",
+      label: "Genie space IDs (optional)",
+      placeholder: "Leave empty to cover every space the token can see",
+      hint: "Comma-separated. Empty is the usual setting — new spaces are then covered the day someone creates them.",
     },
   ],
   s3_custom: [
