@@ -149,14 +149,38 @@ function pulledTotalsFor(params: { tenantId: string; scopeIds: string[] }) {
   });
 }
 
-/** The OCSF audit rows one pull landed, oldest first. */
+/**
+ * The OCSF audit rows one tenant holds, oldest first — deduplicated the way
+ * production reads them.
+ *
+ * `governance_ocsf_events` is a `ReplacingMergeTree(LastUpdatedAt)` keyed on
+ * `(TenantId, EventId)`, and collapsing happens at MERGE time, which may be
+ * seconds away or never. A naked SELECT therefore returns one row per INSERT,
+ * not one per event — so a message the lag window legitimately re-reads shows
+ * up twice and a test asserting "recorded once" fails on a schedule nobody
+ * controls.
+ *
+ * This mirrors `GovernanceOcsfEventsClickHouseRepository.findAll`: the
+ * IN-tuple dedup against `max(LastUpdatedAt)`, which is the house pattern
+ * precisely because the subquery selects only keys — `RawOcsfJson` is a heavy
+ * column, and `LIMIT 1 BY` would materialise it for whole granules.
+ *
+ * Reading anything other than what production reads would make these tests
+ * assert a view of the data no customer ever sees.
+ */
 async function ocsfRowsFor(tenantId: string) {
   const result = await ch.query({
     query: `
       SELECT EventId, ActorEmail, ActionName, TargetName, SourceType, RawOcsfJson
       FROM governance_ocsf_events
       WHERE TenantId = {tenantId:String}
-      ORDER BY EventTime ASC`,
+        AND (TenantId, EventId, LastUpdatedAt) IN (
+          SELECT TenantId, EventId, max(LastUpdatedAt)
+          FROM governance_ocsf_events
+          WHERE TenantId = {tenantId:String}
+          GROUP BY TenantId, EventId
+        )
+      ORDER BY EventTime ASC, EventId ASC`,
     query_params: { tenantId },
     format: "JSONEachRow",
   });
