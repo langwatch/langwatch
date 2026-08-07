@@ -97,8 +97,19 @@ function postCollector(body: unknown) {
   });
 }
 
+/**
+ * The rejection record, insisted upon. Returning it optionally let a missing
+ * record surface as "cannot read .issues of undefined" from whichever
+ * assertion happened to run first, which names neither the test nor the cause.
+ */
 function rejectionLog() {
-  return logCalls.find((c) => c.message.startsWith("invalid "));
+  const log = logCalls.find((c) => c.message.startsWith("invalid "));
+  if (!log) {
+    throw new Error(
+      `no rejection was logged; saw: ${logCalls.map((c) => c.message).join(", ") || "nothing"}`,
+    );
+  }
+  return log;
 }
 
 /** Everything we handed the log sink and Sentry, as one searchable string. */
@@ -138,25 +149,25 @@ describe("POST /api/collector validation diagnostics", () => {
       /** @scenario A validation failure is a client error, not a server error */
       it("logs the rejection as a client error, not a server error", async () => {
         await postCollector({ trace_id: "trace-1", spans: [badSpan] });
-        expect(rejectionLog()?.level).toBe("warn");
+        expect(rejectionLog().level).toBe("warn");
       });
 
       /** @scenario A rejected span reports the failing path and rule */
       it("names the failing path", async () => {
         await postCollector({ trace_id: "trace-1", spans: [badSpan] });
-        const paths = rejectionLog()?.fields.issues.map((i: any) => i.path);
+        const paths = rejectionLog().fields.issues.map((i: any) => i.path);
         expect(paths.join(" ")).toContain("timestamps.started_at");
       });
 
       it("reports the rule that rejected it", async () => {
         await postCollector({ trace_id: "trace-1", spans: [badSpan] });
-        const codes = rejectionLog()?.fields.issues.map((i: any) => i.code);
+        const codes = rejectionLog().fields.issues.map((i: any) => i.code);
         expect(codes).toContain("invalid_type");
       });
 
       it("counts the issues", async () => {
         await postCollector({ trace_id: "trace-1", spans: [badSpan] });
-        expect(rejectionLog()?.fields.issueCount).toBeGreaterThan(0);
+        expect(rejectionLog().fields.issueCount).toBeGreaterThan(0);
       });
 
       /** @scenario Customer values never reach the log */
@@ -207,12 +218,12 @@ describe("POST /api/collector validation diagnostics", () => {
 
     it("logs the rejection at warning level", async () => {
       await postCollector({ trace_id: { nested: "bad" }, spans: [] });
-      expect(rejectionLog()?.level).toBe("warn");
+      expect(rejectionLog().level).toBe("warn");
     });
 
     it("carries structured issues rather than a serialised error", async () => {
       await postCollector({ trace_id: { nested: "bad" }, spans: [] });
-      expect(Array.isArray(rejectionLog()?.fields.issues)).toBe(true);
+      expect(Array.isArray(rejectionLog().fields.issues)).toBe(true);
     });
   });
 

@@ -252,15 +252,25 @@ describe("readOtlpBody", () => {
   });
 
   describe("given a body that does not decompress", () => {
-    it("is reported as unreadable rather than as a server fault", async () => {
-      const notGzip = new Uint8Array([0, 1, 2, 3, 4, 5, 6, 7]);
-      const req = requestWithStream(streamOf(notGzip), {
+    /** A fresh request each time - a stream cannot be read twice. */
+    const undecompressable = () =>
+      requestWithStream(streamOf(new Uint8Array([0, 1, 2, 3, 4, 5, 6, 7])), {
         headers: { "content-encoding": "gzip" },
       });
 
-      await expect(readOtlpBody(req)).rejects.toBeInstanceOf(
+    /** @scenario A body that does not decompress is the sender's fault */
+    it("is reported as unreadable rather than as a server fault", async () => {
+      await expect(readOtlpBody(undecompressable())).rejects.toBeInstanceOf(
         OtlpBodyUnreadableError,
       );
+    });
+
+    it("answers 400 and attributes it to the sender", async () => {
+      await expect(readOtlpBody(undecompressable())).rejects.toMatchObject({
+        code: "ERR_BODY_UNREADABLE",
+        httpStatus: 400,
+        fault: "customer",
+      });
     });
 
     it("still reads a well-formed compressed body", async () => {
