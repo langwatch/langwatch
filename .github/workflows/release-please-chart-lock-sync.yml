@@ -12,17 +12,24 @@ name: release-please-chart-lock-sync
 # with `can't get a valid version for dependency langwatch-gateway` /
 # `the lock file (Chart.lock) is out of sync with the dependencies file`.
 #
-# This workflow watches release-please's umbrella PR, runs
-# `helm dependency update`, and pushes the regenerated Chart.lock back to the
-# PR branch so the lock stays meaningful end-to-end. We push with a PAT
-# (RELEASE_PLEASE_TOKEN — same one release-please-sdks.yml uses) so the new
-# commit re-triggers the chart CI; pushes authored by the default GITHUB_TOKEN
-# do NOT trigger downstream workflows.
+# The same staleness bites independently released chart components:
+# `clickhouse-serverless` has its own release-please component, and its
+# version bump invalidates the umbrella lock exactly the same way (the 0.3.0
+# release shipped with the lock still recording 0.2.0 and broke every chart
+# job on main). So this watches every chart-touching release-please PR, not
+# just the umbrella one.
+#
+# This workflow runs `helm dependency update` and pushes the regenerated
+# Chart.lock back to the PR branch so the lock stays meaningful end-to-end.
+# We push with a PAT (RELEASE_PLEASE_TOKEN — same one release-please-sdks.yml
+# uses) so the new commit re-triggers the chart CI; pushes authored by the
+# default GITHUB_TOKEN do NOT trigger downstream workflows.
 
 on:
   pull_request_target:
     types: [opened, synchronize, reopened]
     paths:
+      - "charts/clickhouse-serverless/Chart.yaml"
       - "charts/gateway/Chart.yaml"
       - "charts/langwatch/Chart.yaml"
 
@@ -39,7 +46,7 @@ jobs:
     # the upstream repo, so this is the right tightening.
     if: |
       github.event.pull_request.head.repo.full_name == github.repository &&
-      startsWith(github.head_ref, 'release-please--branches--main--components--langwatch')
+      startsWith(github.head_ref, 'release-please--branches--main--components--')
     steps:
       - name: Checkout PR branch
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
