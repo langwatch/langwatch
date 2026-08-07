@@ -112,6 +112,47 @@ Feature: Model Provider Configuration
     Then the original API key "sk-actual123" is preserved
     And the base URL is updated to "https://custom.openai.com/v1"
 
+  # Headers live in their own column and are read from there. Folding them into
+  # the credential bag replaced it, and an Azure provider came back holding the
+  # header and nothing else.
+  @integration
+  Scenario: Adding an extra header keeps the stored Azure credentials
+    Given I have "azure" provider configured with an API key and an endpoint
+    When I open the model provider configuration drawer for "azure"
+    And I leave every credential field untouched
+    And I add an extra header "api-key" with a value
+    And I click "Save"
+    Then no credentials are sent with the save
+    And the stored API key and endpoint are preserved
+
+  # A stored header comes back masked and the form wraps it with a display-only
+  # concealed flag, so comparing the objects whole reported a dirty form over an
+  # untouched one and left Save live.
+  @integration
+  Scenario: A stored extra header does not make the form dirty on open
+    Given I have "azure" provider configured with an extra header
+    When I open the model provider configuration drawer for "azure"
+    And I change nothing
+    Then the Save button is disabled
+
+  # Emptying a field is an edit. Without this there was no way to remove a
+  # credential at all, because Save never enabled over a cleared field.
+  @integration
+  Scenario: Clearing a stored API key enables Save
+    Given I have "openai" provider configured with API key "sk-actual123"
+    When I open the model provider configuration drawer for "openai"
+    And I clear the API key field
+    Then the Save button is enabled
+
+  # The Azure schema accepts anything, so the loss was silent. The server now
+  # says no rather than trusting every provider schema to be strict.
+  @integration
+  Scenario: A header-only payload is refused instead of dropping credentials
+    Given I have "azure" provider configured with an API key and an endpoint
+    When a write sends credentials naming none of the provider's fields
+    Then the write is rejected
+    And the stored API key and endpoint are preserved
+
   @integration @unimplemented
   Scenario: Configure API keys from environment variables
     Given I have "openai" provider enabled via environment variable "OPENAI_API_KEY"
