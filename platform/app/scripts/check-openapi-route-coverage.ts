@@ -20,8 +20,9 @@
  *      handler that has none, so the annotation is the precondition, not a
  *      nicety
  *   2. the route's Hono app is imported by `src/tasks/generateOpenAPISpec.ts`
- *   3. its prefix is in that file's `APP_DERIVED_PREFIXES`, or the merge keeps
- *      whatever the JSON already said
+ *   3. the app emits the route, so the merge treats its `/api/<namespace>` as
+ *      app-owned and refreshes it; otherwise the merge keeps whatever the JSON
+ *      already said
  *
  * So the answer to "can we just generate the spec for everything?" is yes,
  * mechanically — annotate the handler and import its app — and the reason it
@@ -466,7 +467,7 @@ function formatUnexplained(routes: RegisteredRoute[]): string[] {
   lines.push(
     "",
     "Publish it: add describeRoute({...}) to the handler, import its app in",
-    "src/tasks/generateOpenAPISpec.ts, add its prefix to APP_DERIVED_PREFIXES,",
+    "src/tasks/generateOpenAPISpec.ts and its spec into the appSpecs list,",
     "then run `pnpm run task generateOpenAPISpec`.",
     "",
     "Or record why it stays unpublished, in UNPUBLISHED in this file.",
