@@ -380,6 +380,84 @@ func TestLLMProxy_ScrubsUpstreamRelayedProseFromMarkedEnvelopes(t *testing.T) {
 	})
 }
 
+// @scenario "Upstream-relayed prose is scrubbed from nested attempt reasons too"
+func TestLLMProxy_ScrubsUpstreamRelayedProseAtEveryDepth(t *testing.T) {
+	// A chain_exhausted envelope's own sentence is harmless — it says the
+	// chain ran out. What each provider actually said, including the key an
+	// invalid-credential rejection quotes back at us, is one level down in
+	// the per-attempt reasons. Scrubbing only the root keeps exactly the
+	// sentences worth scrubbing.
+	const firstKey = "sk-proj-NOT-A-REAL-KEY-ONE"
+	const secondKey = "sk-ant-NOT-A-REAL-KEY-TWO"
+	body := `{"error":{"type":"chain_exhausted","code":"chain_exhausted",` +
+		`"message":"every credential in the chain failed",` +
+		`"reasons":[` +
+		`{"type":"provider_error","code":"provider_error","message":"Incorrect API key provided: ` + firstKey + `",` +
+		`"reasons":[{"type":"rate_limited","code":"rate_limited","message":"and again for ` + secondKey + `"}]},` +
+		`{"type":"provider_timeout","code":"provider_timeout","message":"upstream took too long"}` +
+		`]}}`
+
+	gateway := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set(herr.HandledErrorHeader, "chain_exhausted")
+		w.WriteHeader(http.StatusBadGateway)
+		_, _ = io.WriteString(w, body)
+	}))
+	defer gateway.Close()
+
+	relay := startRelay(t)
+	token, _ := relay.Register(WorkerInfo{ConversationID: "c", GatewayBaseURL: gateway.URL, LLMVirtualKey: "vk"})
+	relay.SetTurnContext(token, turnContext())
+
+	resp, err := http.Post(relay.LLMBaseURLFor(token)+"/chat/completions", "application/json", strings.NewReader(`{}`))
+	if err != nil {
+		t.Fatalf("proxied LLM call: %v", err)
+	}
+	_, _ = io.Copy(io.Discard, resp.Body)
+	resp.Body.Close()
+
+	e, ok := relay.LastLLMError(token)
+	if !ok {
+		t.Fatal("LastLLMError must expose the captured herr")
+	}
+
+	var codes []herr.Code
+	var walk func(herr.E, int)
+	walk = func(node herr.E, depth int) {
+		codes = append(codes, node.Code)
+		if msg, ok := node.Meta["message"]; ok {
+			t.Errorf("relayed message survived at depth %d under %q: %v", depth, node.Code, msg)
+		}
+		for _, reason := range node.Reasons {
+			if nested, ok := reason.(herr.E); ok {
+				walk(nested, depth+1)
+			}
+		}
+	}
+	walk(e, 0)
+
+	// The typed chain is the whole reason the envelope is worth keeping, so
+	// dropping prose must not cost the codes a client branches on.
+	want := []herr.Code{"chain_exhausted", "provider_error", "rate_limited", "provider_timeout"}
+	if len(codes) != len(want) {
+		t.Fatalf("walked codes = %v, want %v", codes, want)
+	}
+	for i, code := range want {
+		if codes[i] != code {
+			t.Errorf("code at %d = %q, want %q", i, codes[i], code)
+		}
+	}
+
+	// Belt and braces against a future capture path that stringifies the
+	// whole error: neither fake key may appear anywhere in it.
+	rendered := fmt.Sprintf("%+v", e)
+	for _, key := range []string{firstKey, secondKey} {
+		if strings.Contains(rendered, key) {
+			t.Errorf("captured error still renders %q", key)
+		}
+	}
+}
+
 // @scenario "The gateway's provider header rides into an untyped capture"
 func TestLLMProxy_CapturesProviderIdentityOnUntypedFailures(t *testing.T) {
 	gateway := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {

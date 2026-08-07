@@ -612,14 +612,30 @@ var upstreamRelayCodes = map[herr.Code]bool{
 }
 
 // scrubUpstreamRelayedProse deletes the upstream-derived message (and any
-// tips) from a typed envelope whose top-level code relays provider text,
+// tips) from every node of a typed envelope whose code relays provider text,
 // so the relay never trusts what the gateway itself only forwarded.
+//
+// It walks the reason chain rather than stopping at the top, because the
+// wrapper codes are precisely the ones that carry the prose one level down:
+// chain_exhausted's own message says the chain ran out, and it is the
+// per-attempt provider_error REASONS underneath that hold what each provider
+// said. Scrubbing only the root would delete the harmless sentence and keep
+// the ones written for whoever holds the API key.
 func scrubUpstreamRelayedProse(e *herr.E) {
-	if !upstreamRelayCodes[e.Code] {
-		return
+	if upstreamRelayCodes[e.Code] {
+		delete(e.Meta, "message")
+		delete(e.Meta, "tips")
 	}
-	delete(e.Meta, "message")
-	delete(e.Meta, "tips")
+	for i, reason := range e.Reasons {
+		nested, ok := reason.(herr.E)
+		if !ok {
+			continue
+		}
+		// herr.E is a value type, so the scrubbed copy has to be written
+		// back over the slot it came from or the edit is lost.
+		scrubUpstreamRelayedProse(&nested)
+		e.Reasons[i] = nested
+	}
 }
 
 // isGatewayEnvelope reports whether a failed response body is the gateway's

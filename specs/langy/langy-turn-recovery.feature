@@ -164,6 +164,17 @@ Feature: Langy recovers from a failed turn without making the user re-ask
     Then its message and tips are dropped before the capture
     And a marked envelope for a gateway-authored rejection keeps its message
 
+  # A chain that exhausted its credentials says so in its own harmless
+  # sentence, and holds what each provider actually said one level down, in a
+  # per-attempt reason. Scrubbing only the outermost message would keep every
+  # sentence that was worth scrubbing.
+  @unit
+  Scenario: Upstream-relayed prose is scrubbed from nested attempt reasons too
+    Given a marked LangWatch envelope wraps per-attempt upstream-relay reasons
+    When the relay decodes it as a trusted handled error
+    Then every relayed message in the reason chain is dropped, at any depth
+    And the typed codes of those reasons survive intact
+
   # A real envelope can arrive unmarked: an older gateway pod mid-rollout, or
   # a hop that strips the header. Trust stays strict, but the mismatch must be
   # diagnosable rather than a silent downgrade to generic copy.
