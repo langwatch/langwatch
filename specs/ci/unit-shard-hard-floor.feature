@@ -59,3 +59,9 @@ Feature: The unit shard hard floor reports what it never finished
     When the hard floor fires afterwards
     Then no file is named
     And the shard exits zero
+
+  @unit
+  Scenario: A second run in the same process is counted on its own
+    Given a run already finished in this process
+    When another run starts
+    Then the message counts only the second run's test files

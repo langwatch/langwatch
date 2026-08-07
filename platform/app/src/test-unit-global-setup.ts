@@ -36,10 +36,24 @@ const DEFAULT_HARD_FLOOR_MS = 4 * 60 * 1000;
  * it outside CI, which is how the exit path is exercised on a laptop: `CI=1`
  * would also flip pool sizing, worker memory, and, in the integration config,
  * testcontainers.
+ *
+ * A value that is not a positive number is announced rather than dropped. It
+ * leaves the floor disarmed outside CI and back on the default inside it,
+ * which looks exactly like the variable working, so the one line here is all
+ * the signal a typo ever gets.
  */
-function resolveHardFloorMs(): number | null {
-  const override = Number(process.env.LANGWATCH_UNIT_HARD_FLOOR_MS);
+export function resolveHardFloorMs(): number | null {
+  const raw = process.env.LANGWATCH_UNIT_HARD_FLOOR_MS?.trim();
+  const override = Number(raw);
   if (Number.isFinite(override) && override > 0) return override;
+
+  if (raw) {
+    // eslint-disable-next-line no-console
+    console.warn(
+      `[unit globalSetup] LANGWATCH_UNIT_HARD_FLOOR_MS is "${raw}", which is not a positive number of milliseconds, so it was ignored`,
+    );
+  }
+
   return process.env.CI ? DEFAULT_HARD_FLOOR_MS : null;
 }
 

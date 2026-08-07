@@ -12,7 +12,8 @@
  * Only the variables the replayed migrations use are supported; an
  * unrecognised `${...}` placeholder throws instead of reaching ClickHouse.
  */
-import { open, readFile, rm, stat } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
+import { open, readFile, rename, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { ClickHouseClient } from "@clickhouse/client";
@@ -130,10 +131,13 @@ export async function replayGooseMigrationUp({
     ),
   );
 
-  await withReplayLock(database, async () => {
-    for (const query of queries) {
-      await client.command({ query });
-    }
+  await withReplayLock({
+    database,
+    run: async () => {
+      for (const query of queries) {
+        await client.command({ query });
+      }
+    },
   });
 }
 
@@ -168,24 +172,37 @@ const LOCK_WAIT_TIMEOUT_MS = 90_000;
  */
 const LOCK_STALE_MS = 30_000;
 
-export async function withReplayLock<T>(
-  database: string,
-  run: () => Promise<T>,
-): Promise<T> {
+export async function withReplayLock<T>({
+  database,
+  run,
+}: {
+  database: string;
+  run: () => Promise<T>;
+}): Promise<T> {
   const lockPath = join(
     tmpdir(),
     `langwatch-migration-replay-${database}.lock`,
   );
-  await acquireLock(lockPath);
+  const owner = await acquireLock(lockPath);
   try {
     return await run();
   } finally {
-    await rm(lockPath, { force: true });
+    await releaseLock({ lockPath, owner });
   }
 }
 
+/**
+ * Who holds the lock, unique per acquisition rather than per process.
+ *
+ * A pid alone cannot tell a holder from its replacement: the same process can
+ * take the lock again after its first one was broken as stale, and pids are
+ * reused across runs. Every removal below is guarded on this token, so a
+ * holder only ever removes the lock it can prove is its own.
+ */
+const newOwnerToken = (): string => `${process.pid}-${randomUUID()}`;
+
 /** Exclusive-create as the primitive: `wx` fails rather than truncates. */
-async function tryTakeLock(lockPath: string): Promise<boolean> {
+async function tryTakeLock(lockPath: string, owner: string): Promise<boolean> {
   let handle: Awaited<ReturnType<typeof open>>;
   try {
     handle = await open(lockPath, "wx");
@@ -194,11 +211,16 @@ async function tryTakeLock(lockPath: string): Promise<boolean> {
     throw error;
   }
   try {
-    await handle.writeFile(`${process.pid}`);
+    await handle.writeFile(owner);
   } finally {
     await handle.close();
   }
   return true;
+}
+
+/** The token in the lock file, or null once it has gone. */
+async function lockOwner(lockPath: string): Promise<string | null> {
+  return readFile(lockPath, "utf-8").catch(() => null);
 }
 
 /** How long the current holder has had it, or 0 once it has let go. */
@@ -208,21 +230,82 @@ async function lockHeldForMs(lockPath: string): Promise<number> {
     .catch(() => 0);
 }
 
-async function acquireLock(lockPath: string): Promise<void> {
-  const deadline = Date.now() + LOCK_WAIT_TIMEOUT_MS;
+/**
+ * Removes the lock only while this holder still owns it.
+ *
+ * An unconditional remove would delete a replacement's lock: once this
+ * holder's own lock has been broken as stale, whatever sits at the path
+ * belongs to somebody else, and taking it away puts two replays inside the
+ * critical section at once.
+ */
+async function releaseLock({
+  lockPath,
+  owner,
+}: {
+  lockPath: string;
+  owner: string;
+}): Promise<void> {
+  await removeLockOwnedBy({ lockPath, expectedOwner: owner });
+}
 
-  while (!(await tryTakeLock(lockPath))) {
-    // A crashed holder must not wedge every later suite, so a lock older than
-    // any replay could legitimately take is broken rather than waited on.
-    if ((await lockHeldForMs(lockPath)) > LOCK_STALE_MS) {
-      await rm(lockPath, { force: true });
-      continue;
-    }
+/**
+ * Removes the lock file, but only while it still holds `expectedOwner`.
+ * Answers whether it did.
+ *
+ * The rename is the atomic step: exactly one racer can move a given path, so
+ * the winner is the only one that gets to decide what happens next. It can
+ * still move a file that was replaced between the read and the rename, which
+ * is why the token is re-checked afterwards and a stranger's lock is put back
+ * where it was.
+ */
+async function removeLockOwnedBy({
+  lockPath,
+  expectedOwner,
+}: {
+  lockPath: string;
+  expectedOwner: string;
+}): Promise<boolean> {
+  const claimPath = `${lockPath}.claim-${randomUUID()}`;
+  try {
+    await rename(lockPath, claimPath);
+  } catch {
+    return false;
+  }
+  if ((await lockOwner(claimPath)) === expectedOwner) {
+    await rm(claimPath, { force: true });
+    return true;
+  }
+  // A live holder's lock, moved by a claim that was already out of date. Put
+  // it back; if the path has been retaken in the meantime that holder is the
+  // live one, so this copy is simply dropped.
+  await rename(claimPath, lockPath).catch(() => rm(claimPath, { force: true }));
+  return false;
+}
+
+async function acquireLock(lockPath: string): Promise<string> {
+  const deadline = Date.now() + LOCK_WAIT_TIMEOUT_MS;
+  const owner = newOwnerToken();
+
+  while (!(await tryTakeLock(lockPath, owner))) {
     if (Date.now() > deadline) {
       throw new Error(
         `timed out waiting for the migration replay lock at ${lockPath}`,
       );
     }
+    // A crashed holder must not wedge every later suite, so a lock older than
+    // any replay could legitimately take is broken rather than waited on. The
+    // break is bound to the holder that was measured: between the age check
+    // and the removal the corpse can be replaced by a live holder, and
+    // removing that one would put two replays inside the critical section.
+    const observedOwner = await lockOwner(lockPath);
+    if (
+      observedOwner !== null &&
+      (await lockHeldForMs(lockPath)) > LOCK_STALE_MS &&
+      (await removeLockOwnedBy({ lockPath, expectedOwner: observedOwner }))
+    ) {
+      continue;
+    }
     await new Promise((resolve) => setTimeout(resolve, LOCK_POLL_MS));
   }
+  return owner;
 }

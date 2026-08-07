@@ -10,7 +10,7 @@
  * "table already exists" or "table does not exist" from a migration whose own
  * statements are perfectly ordered.
  */
-import { stat, utimes, writeFile } from "node:fs/promises";
+import { readFile, rm, stat, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -43,8 +43,8 @@ describe("given two callers reaching the same database at once", () => {
       };
 
       await Promise.all([
-        withReplayLock(key, body("a")),
-        withReplayLock(key, body("b")),
+        withReplayLock({ database: key, run: body("a") }),
+        withReplayLock({ database: key, run: body("b") }),
       ]);
 
       expect(maxInside).toBe(1);
@@ -69,8 +69,8 @@ describe("given callers on different databases", () => {
       };
 
       await Promise.all([
-        withReplayLock(first, body),
-        withReplayLock(second, body),
+        withReplayLock({ database: first, run: body }),
+        withReplayLock({ database: second, run: body }),
       ]);
 
       expect(maxInside).toBe(2);
@@ -90,9 +90,68 @@ describe("given a lock left behind by a process that died holding it", () => {
       await utimes(lockPath, longAgo, longAgo);
 
       const startedAt = Date.now();
-      await expect(withReplayLock(key, async () => "ran")).resolves.toBe("ran");
+      await expect(
+        withReplayLock({ database: key, run: async () => "ran" }),
+      ).resolves.toBe("ran");
 
       expect(Date.now() - startedAt).toBeLessThan(5_000);
+    });
+  });
+});
+
+describe("given a stale lock several callers arrive at together", () => {
+  describe("when they all try to break it", () => {
+    // Breaking a corpse and taking its place are two steps, so the lock a
+    // waiter measured can be a live replacement's by the time it removes it.
+    // Removing that one puts two replays inside the critical section, which is
+    // exactly what the lock exists to prevent.
+    it("still lets only one of them run at a time", async () => {
+      const key = freshKey();
+      const lockPath = lockPathFor(key);
+      await writeFile(lockPath, "999999");
+      const longAgo = new Date(Date.now() - 45_000);
+      await utimes(lockPath, longAgo, longAgo);
+
+      let inside = 0;
+      let maxInside = 0;
+      const body = async () => {
+        inside += 1;
+        maxInside = Math.max(maxInside, inside);
+        await sleep(30);
+        inside -= 1;
+      };
+
+      await Promise.all(
+        Array.from({ length: 4 }, () =>
+          withReplayLock({ database: key, run: body }),
+        ),
+      );
+
+      expect(maxInside).toBe(1);
+    });
+  });
+});
+
+describe("given a holder whose lock was broken and taken by somebody else", () => {
+  describe("when it finishes and releases", () => {
+    it("leaves the replacement's lock where it is", async () => {
+      const key = freshKey();
+      const lockPath = lockPathFor(key);
+
+      await withReplayLock({
+        database: key,
+        run: async () => {
+          // What a stale break followed by a fresh acquisition looks like from
+          // this holder's side: the file at the path is no longer its own.
+          await rm(lockPath, { force: true });
+          await writeFile(lockPath, "replacement-owner");
+        },
+      });
+
+      await expect(readFile(lockPath, "utf-8")).resolves.toBe(
+        "replacement-owner",
+      );
+      await rm(lockPath, { force: true });
     });
   });
 });
@@ -103,13 +162,18 @@ describe("given a replay that throws", () => {
       const key = freshKey();
 
       await expect(
-        withReplayLock(key, () => Promise.reject(new Error("replay blew up"))),
+        withReplayLock({
+          database: key,
+          run: () => Promise.reject(new Error("replay blew up")),
+        }),
       ).rejects.toThrow("replay blew up");
 
       await expect(stat(lockPathFor(key))).rejects.toMatchObject({
         code: "ENOENT",
       });
-      await expect(withReplayLock(key, async () => "ran")).resolves.toBe("ran");
+      await expect(
+        withReplayLock({ database: key, run: async () => "ran" }),
+      ).resolves.toBe("ran");
     });
   });
 });
@@ -122,10 +186,13 @@ describe("given a replay in progress", () => {
       const key = freshKey();
       let heldDuringRun = false;
 
-      await withReplayLock(key, async () => {
-        heldDuringRun = await stat(lockPathFor(key))
-          .then(() => true)
-          .catch(() => false);
+      await withReplayLock({
+        database: key,
+        run: async () => {
+          heldDuringRun = await stat(lockPathFor(key))
+            .then(() => true)
+            .catch(() => false);
+        },
       });
 
       expect(heldDuringRun).toBe(true);

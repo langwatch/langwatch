@@ -64,6 +64,20 @@ function moduleTally(): ModuleTally {
 }
 
 /**
+ * Drops both carriers, for a test driving the reporter directly.
+ *
+ * It lives beside the keys rather than beside the tests so that renaming one
+ * cannot quietly turn the reset into a no-op, which would leave each test
+ * inheriting the previous one's tally and make the suite pass or fail on
+ * ordering.
+ */
+export function resetShardState(): void {
+  const carrier = globalThis as StateCarrier;
+  delete carrier[FAILURE_FLAG];
+  delete carrier[MODULE_TALLY];
+}
+
+/**
  * How much of the shard's file list actually made it through, and the absolute
  * paths of the files vitest started and never reported a result for, sorted.
  *
@@ -100,9 +114,21 @@ interface ReportedTestModule {
 }
 
 export default class ShardFailureReporter {
-  /** The file list this shard was handed, before any of it runs. */
+  /**
+   * The file list this shard was handed, before any of it runs.
+   *
+   * Every count goes back to zero, not just `selected`: the carrier is a
+   * global and a second run in the same process shares it, so totals left by
+   * the first would accumulate under a fresh `selected` and print lines like
+   * "1 selected, 3 started" while hiding the `started < selected` slow-shard
+   * diagnostic behind them.
+   */
   onTestRunStart(specifications: readonly unknown[]): void {
-    moduleTally().selected = specifications.length;
+    const tally = moduleTally();
+    tally.selected = specifications.length;
+    tally.started = 0;
+    tally.reported = 0;
+    tally.inFlight.clear();
   }
 
   /**
@@ -110,9 +136,13 @@ export default class ShardFailureReporter {
    * holds what is genuinely running (bounded by the worker count) rather than
    * the whole shard. Entering at queue time rather than at onTestModuleStart
    * is what catches a file that hangs during import, before any test runs.
+   *
+   * A file already in flight is ignored, so the counter and the set agree on
+   * how many files are open.
    */
   onTestModuleQueued(testModule: ReportedTestModule): void {
     const tally = moduleTally();
+    if (tally.inFlight.has(testModule.moduleId)) return;
     tally.started += 1;
     tally.inFlight.add(testModule.moduleId);
   }

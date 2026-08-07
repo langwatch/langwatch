@@ -7,22 +7,17 @@
  * @see src/test-unit-global-setup.ts
  * @see specs/ci/unit-shard-hard-floor.feature
  */
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { hardFloorReport } from "../../test-unit-global-setup";
+import {
+  hardFloorReport,
+  resolveHardFloorMs,
+} from "../../test-unit-global-setup";
 import ShardFailureReporter, {
+  resetShardState,
   shardModuleTally,
   shardSawFailure,
 } from "../shardFailureReporter";
-
-const FAILURE_FLAG = "__langwatchShardSawTestFailure";
-const MODULE_TALLY = "__langwatchShardTestModuleTally";
-
-function resetShardState(): void {
-  const carrier = globalThis as Record<string, unknown>;
-  delete carrier[FAILURE_FLAG];
-  delete carrier[MODULE_TALLY];
-}
 
 /** The event vitest emits for a module, reduced to what the reporter reads. */
 function module(moduleId: string): { moduleId: string } {
@@ -226,6 +221,96 @@ describe("given a shard the finalize wedge is holding open", () => {
       reporter.onTestRunEnd([], [new Error("boom")], "passed");
 
       expect(shardSawFailure()).toBe(true);
+    });
+  });
+});
+
+describe("given the counters behind the floor's log line", () => {
+  afterEach(resetShardState);
+
+  describe("when a second run starts in the same process", () => {
+    /** @scenario "A second run in the same process is counted on its own" */
+    it("counts the new file list alone", () => {
+      const reporter = new ShardFailureReporter();
+      reporter.onTestRunStart([
+        module("src/a.unit.test.ts"),
+        module("src/b.unit.test.ts"),
+      ]);
+      reporter.onTestModuleQueued(module("src/a.unit.test.ts"));
+      reporter.onTestModuleEnd(module("src/a.unit.test.ts"));
+      reporter.onTestModuleQueued(module("src/b.unit.test.ts"));
+      reporter.onTestModuleEnd(module("src/b.unit.test.ts"));
+
+      reporter.onTestRunStart([module("src/a.unit.test.ts")]);
+
+      expect(shardModuleTally()).toEqual({
+        selected: 1,
+        started: 0,
+        reported: 0,
+        unreportedFiles: [],
+      });
+      expect(report().lines[1]).toBe(
+        "[unit globalSetup] test files: 1 selected, 0 started, 0 reported a result",
+      );
+    });
+  });
+
+  describe("when the same file is queued twice while still in flight", () => {
+    it("counts it once, so the count and the in-flight set agree", () => {
+      const reporter = new ShardFailureReporter();
+      reporter.onTestRunStart([module("src/a.unit.test.ts")]);
+      reporter.onTestModuleQueued(module("src/a.unit.test.ts"));
+      reporter.onTestModuleQueued(module("src/a.unit.test.ts"));
+
+      expect(shardModuleTally()).toEqual({
+        selected: 1,
+        started: 1,
+        reported: 0,
+        unreportedFiles: ["src/a.unit.test.ts"],
+      });
+    });
+  });
+});
+
+describe("given how long the shard may stay alive before the floor fires", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+  });
+
+  describe("when the override names a positive number of milliseconds", () => {
+    it("arms the floor at that number, CI or not", () => {
+      vi.stubEnv("LANGWATCH_UNIT_HARD_FLOOR_MS", "1500");
+      vi.stubEnv("CI", "");
+
+      expect(resolveHardFloorMs()).toBe(1500);
+    });
+  });
+
+  describe("when the override is absent", () => {
+    it("leaves the floor disarmed off CI and says nothing", () => {
+      const warn = vi
+        .spyOn(console, "warn")
+        .mockImplementation(() => undefined);
+      vi.stubEnv("LANGWATCH_UNIT_HARD_FLOOR_MS", "");
+      vi.stubEnv("CI", "");
+
+      expect(resolveHardFloorMs()).toBeNull();
+      expect(warn).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the override is set to something that is not a duration", () => {
+    it("falls back to the default and names the value it ignored", () => {
+      const warn = vi
+        .spyOn(console, "warn")
+        .mockImplementation(() => undefined);
+      vi.stubEnv("LANGWATCH_UNIT_HARD_FLOOR_MS", "4m");
+      vi.stubEnv("CI", "1");
+
+      expect(resolveHardFloorMs()).toBe(4 * 60 * 1000);
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(String(warn.mock.calls[0]?.[0])).toContain('"4m"');
     });
   });
 });
