@@ -78,6 +78,9 @@ export function MemberDetailDialog({
   const [pendingBindingAdditions, setPendingBindingAdditions] = useState<
     PendingBinding[]
   >([]);
+  // The input row holds a complete draft the admin never pressed Add on. It
+  // counts as a change so Save is enabled, and the save flushes it.
+  const [hasDraftBinding, setHasDraftBinding] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
   const bindingInputRef = useRef<BindingInputRowHandle>(null);
@@ -86,6 +89,7 @@ export function MemberDetailDialog({
     setPendingRole(member.role);
     setPendingBindingRemovals(new Set());
     setPendingBindingAdditions([]);
+    setHasDraftBinding(false);
   };
 
   useEffect(() => {
@@ -108,7 +112,7 @@ export function MemberDetailDialog({
   const hasBindingChanges =
     pendingBindingRemovals.size > 0 || pendingBindingAdditions.length > 0;
   const roleChanged = pendingRole !== member.role;
-  const hasChanges = hasBindingChanges || roleChanged;
+  const hasChanges = hasBindingChanges || roleChanged || hasDraftBinding;
 
   const stageAddition = (binding: PendingBinding) => {
     const alreadyHeld = (directBindings.data ?? []).some(
@@ -380,6 +384,7 @@ export function MemberDetailDialog({
                   ref={bindingInputRef}
                   organizationId={organizationId}
                   onAdd={stageAddition}
+                  onReadyChange={setHasDraftBinding}
                 />
               </Box>
             )}

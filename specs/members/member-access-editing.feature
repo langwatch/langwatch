@@ -28,6 +28,7 @@ Feature: Editing a member's access
     And saves
     Then the save succeeds
     And the member is on a Lite Member seat
+    And the member no longer holds the removed team access
 
   Scenario: A member's save cannot remove another principal's access
     Given the staged removals name an access row belonging to another member and one belonging to a group
@@ -41,12 +42,16 @@ Feature: Editing a member's access
     When the admin opens the member's details
     Then the member's groups are listed rather than refused
 
-  Scenario: A failed save re-reads the member's access
-    Given the seat change landed but the access batch then failed
+  Scenario: A failed save shows the member's access as it now is
+    Given the seat change landed but the access change then failed
     When the admin sees the failure
-    Then the dialog re-reads the member's access
-    And does not keep showing rows the save already changed
+    Then the dialog shows the member's access as the server has it
+    And not the rows the save already changed
 
-  Scenario: An access row the member already holds is not staged twice
-    When the admin stages an access row identical to one already listed
-    Then the dialog keeps a single row for that access
+  Scenario: An access row the member already holds appears once
+    When the admin adds an access row identical to one already listed
+    Then the dialog lists that access exactly once
+
+  Scenario: A picked access row saves without pressing Add
+    When the admin fills in a complete access row and saves without adding it
+    Then the save includes that access

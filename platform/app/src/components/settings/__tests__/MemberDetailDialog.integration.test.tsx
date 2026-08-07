@@ -124,32 +124,65 @@ vi.mock("../GroupBindingInputRow", async () => {
   const actual = await vi.importActual<
     typeof import("../GroupBindingInputRow")
   >("../GroupBindingInputRow");
-  return {
-    ...actual,
-    BindingInputRow: ({
+  const React = await vi.importActual<typeof import("react")>("react");
+
+  const STUB_BINDING: PendingBinding = {
+    roleValue: "MEMBER",
+    role: "MEMBER",
+    customRoleId: undefined,
+    customRoleName: undefined,
+    scopeType: RoleBindingScopeType.TEAM,
+    scopeId: "team-1",
+    scopeName: "Team One",
+  };
+
+  // Mirrors the real row's two paths: Add commits the draft, while a filled
+  // but never-added draft reports readiness and hands itself over on flush.
+  const BindingInputRow = React.forwardRef(function StubBindingInputRow(
+    {
       onAdd,
+      onReadyChange,
     }: {
       organizationId: string;
       onAdd: (binding: PendingBinding) => void;
-    }) => (
-      <button
-        type="button"
-        data-testid="stub-add-binding"
-        onClick={() =>
-          onAdd({
-            roleValue: "MEMBER",
-            role: "MEMBER",
-            customRoleId: undefined,
-            customRoleName: undefined,
-            scopeType: RoleBindingScopeType.TEAM,
-            scopeId: "team-1",
-            scopeName: "Team One",
-          })
-        }
-      >
-        Stage binding
-      </button>
-    ),
+      onReadyChange?: (isReady: boolean) => void;
+    },
+    ref: React.Ref<{ flush: () => PendingBinding | null }>,
+  ) {
+    const isFilled = React.useRef(false);
+    React.useImperativeHandle(ref, () => ({
+      flush: () => {
+        if (!isFilled.current) return null;
+        isFilled.current = false;
+        return STUB_BINDING;
+      },
+    }));
+    return (
+      <>
+        <button
+          type="button"
+          data-testid="stub-add-binding"
+          onClick={() => onAdd(STUB_BINDING)}
+        >
+          Stage binding
+        </button>
+        <button
+          type="button"
+          data-testid="stub-fill-draft"
+          onClick={() => {
+            isFilled.current = true;
+            onReadyChange?.(true);
+          }}
+        >
+          Fill draft
+        </button>
+      </>
+    );
+  });
+
+  return {
+    ...actual,
+    BindingInputRow,
   };
 });
 
@@ -402,7 +435,7 @@ describe("<MemberDetailDialog/>", () => {
     });
 
     describe("when the admin stages it again", () => {
-      /** @scenario An access row the member already holds is not staged twice */
+      /** @scenario An access row the member already holds appears once */
       it("keeps a single row for that access", () => {
         renderDialog();
 
@@ -413,7 +446,7 @@ describe("<MemberDetailDialog/>", () => {
         expect(screen.queryByRole("button", { name: /undo add/i })).toBeNull();
       });
 
-      /** @scenario An access row the member already holds is not staged twice */
+      /** @scenario An access row the member already holds appears once */
       it("leaves nothing to save", () => {
         renderDialog();
 
@@ -426,7 +459,7 @@ describe("<MemberDetailDialog/>", () => {
   });
 
   describe("when the same access row is staged twice", () => {
-    /** @scenario An access row the member already holds is not staged twice */
+    /** @scenario An access row the member already holds appears once */
     it("keeps a single staged row", () => {
       renderDialog();
 
@@ -439,13 +472,41 @@ describe("<MemberDetailDialog/>", () => {
     });
   });
 
+  describe("when a complete access row was filled in but never added", () => {
+    /** @scenario A picked access row saves without pressing Add */
+    it("enables Save and includes the row in the save", async () => {
+      renderDialog();
+
+      const save = screen.getByRole("button", { name: /^save$/i });
+      expect(save.hasAttribute("disabled")).toBe(true);
+
+      fireEvent.click(screen.getByTestId("stub-fill-draft"));
+      expect(save.hasAttribute("disabled")).toBe(false);
+
+      fireEvent.click(save);
+
+      await vi.waitFor(() => {
+        expect(mockApplyMemberBindings).toHaveBeenCalledTimes(1);
+      });
+      expect(mockApplyMemberBindings.mock.calls[0]?.[0]).toMatchObject({
+        bindingsToCreate: [
+          {
+            role: "MEMBER",
+            scopeType: RoleBindingScopeType.TEAM,
+            scopeId: "team-1",
+          },
+        ],
+      });
+    });
+  });
+
   describe("given the access batch fails after the seat change landed", () => {
     beforeEach(() => {
       mockApplyMemberBindings.mockRejectedValue(new Error("boom"));
     });
 
     describe("when the admin saves both changes", () => {
-      /** @scenario A failed save re-reads the member's access */
+      /** @scenario A failed save shows the member's access as it now is */
       it("re-reads the member's access instead of trusting the staged view", async () => {
         renderDialog();
 

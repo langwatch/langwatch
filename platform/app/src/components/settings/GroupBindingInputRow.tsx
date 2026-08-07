@@ -9,7 +9,13 @@ import {
 } from "@chakra-ui/react";
 import { RoleBindingScopeType } from "@prisma/client";
 import { Search } from "lucide-react";
-import { forwardRef, useImperativeHandle, useMemo, useState } from "react";
+import {
+  forwardRef,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useState,
+} from "react";
 import { InputGroup } from "~/components/ui/input-group";
 import { Select } from "~/components/ui/select";
 import { toaster } from "~/components/ui/toaster";
@@ -85,11 +91,23 @@ export const BindingInputRow = forwardRef<
   {
     organizationId: string;
     onAdd: (binding: PendingBinding) => void;
+    /**
+     * Reports whether the row currently holds a complete, addable draft. The
+     * dialog counts that draft as a pending change, so Save works on a row
+     * the admin picked but never pressed Add on — the save flushes it.
+     */
+    onReadyChange?: (isReady: boolean) => void;
     buttonLabel?: string;
     isPending?: boolean;
   }
 >(function BindingInputRow(
-  { organizationId, onAdd, buttonLabel = "Add", isPending = false },
+  {
+    organizationId,
+    onAdd,
+    onReadyChange,
+    buttonLabel = "Add",
+    isPending = false,
+  },
   ref,
 ) {
   const [scopeType, setScopeType] = useState<RoleBindingScopeType>(
@@ -202,6 +220,10 @@ export const BindingInputRow = forwardRef<
   const isReady =
     isDirty &&
     (scopeId !== "" || scopeType === RoleBindingScopeType.ORGANIZATION);
+
+  useEffect(() => {
+    onReadyChange?.(isReady);
+  }, [isReady, onReadyChange]);
 
   function buildBinding(): PendingBinding {
     const cid = customRoleId;

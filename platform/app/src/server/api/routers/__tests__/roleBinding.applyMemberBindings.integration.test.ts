@@ -151,14 +151,13 @@ describe("given an organization admin editing a member's access", () => {
     });
   });
 
-  describe("when the seat change rewrote the rows before the bindings applied", () => {
+  describe("when the seat change corrected the rows before the bindings applied", () => {
     /** @scenario Moving to a Lite Member seat while removing an access row saves cleanly */
-    it("saves the whole edit cleanly", async () => {
-      // The dialog's exact order: the staged removal ids are read before the
-      // save, the organization role applies first and corrects every team row
-      // down to Viewer (delete + recreate, new ids), and only then does the
-      // binding batch land, carrying ids that no longer exist.
-      const staleBinding = await soloTeamBinding(fixture.onlyAdminTeamId);
+    it("saves the whole edit cleanly, and the removal lands", async () => {
+      // The dialog's exact order: the removal ids are staged before the save,
+      // the organization role applies first and corrects every team row down
+      // to Viewer, and only then does the binding batch arrive.
+      const stagedBinding = await soloTeamBinding(fixture.onlyAdminTeamId);
 
       await fixture.callerAsAdmin().organization.updateMemberRole({
         organizationId: fixture.organizationId,
@@ -166,10 +165,24 @@ describe("given an organization admin editing a member's access", () => {
         role: OrganizationUserRole.EXTERNAL,
       });
 
+      // The correction updates the row in place, so the id the admin staged
+      // still names the same row after the seat change.
       await expect(
-        applyForSoloUser({ bindingIdsToDelete: [staleBinding!.id] }),
+        soloTeamBinding(fixture.onlyAdminTeamId),
+      ).resolves.toMatchObject({
+        id: stagedBinding!.id,
+        role: TeamUserRole.VIEWER,
+      });
+
+      await expect(
+        applyForSoloUser({ bindingIdsToDelete: [stagedBinding!.id] }),
       ).resolves.toMatchObject({ success: true });
 
+      // Which is why the removal the admin decided on is honoured, rather
+      // than silently superseded by the correction.
+      await expect(
+        soloTeamBinding(fixture.onlyAdminTeamId),
+      ).resolves.toBeNull();
       await expect(fixture.organizationRoleOfSoloUser()).resolves.toBe(
         OrganizationUserRole.EXTERNAL,
       );
