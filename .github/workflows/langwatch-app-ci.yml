@@ -139,6 +139,7 @@ jobs:
               - 'services/langevals/**'
               - 'langwatch_server/**'
               - 'dev/scripts/**'
+              - '.github/scripts/**'
               - '.github/workflows/langwatch-app-ci.yml'
 
   typecheck:

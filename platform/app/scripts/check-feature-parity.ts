@@ -104,6 +104,11 @@ const DEFAULT_BATS_TEST_ROOTS: string[] = [
  * comments may sit between the two.
  */
 const DEFAULT_SHELL_TEST_ROOTS: string[] = [
+  // CI's own shell steps. The secrets gate is scoped by a shell script and
+  // proved correct by running the real scanners against fixture repositories,
+  // which is neither a vitest nor a bats suite — without this root, scenarios
+  // about which commits a blocking gate examines could only be @unimplemented.
+  ".github/scripts/__tests__",
   "charts/langwatch/tests",
   // The gateway subchart carries its own drain-timing suite, run by the
   // `helm` job in go-services.yaml rather than by the umbrella chart's

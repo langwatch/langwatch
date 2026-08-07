@@ -107,59 +107,67 @@ jobs:
       # A committed credential is never acceptable, so this is blocking from
       # the start rather than phased. #5708 is the precedent.
       #
-      # The binary, not gitleaks-action: that action requires a paid
-      # GITLEAKS_LICENSE for organisation-owned repositories and fails without
-      # one. The CLI is Apache-2.0 and unrestricted.
-      - name: gitleaks
+      # The binaries, not gitleaks-action / trufflesecurity/trufflehog. The
+      # gitleaks action requires a paid GITLEAKS_LICENSE for organisation-owned
+      # repositories and fails without one; the CLI is Apache-2.0 and
+      # unrestricted. For trufflehog, every other `uses:` in this repo is a
+      # first-party actions/* or an already-approved pin, and this workflow's
+      # first run ended in startup_failure with the third-party action as its
+      # only unapproved reference. A pinned release tarball needs no allowlist.
+      # Each tarball is verified against the checksum file its release
+      # publishes before anything is extracted — this job exists to catch
+      # compromised credentials, so its own supply chain does not get to be a
+      # `curl | tar`. The checksum file comes from the same release, so this
+      # does not defend against a compromised release, only against a swapped
+      # or truncated asset — which is also what pipefail is for: without it a
+      # failed curl is masked by the tar it feeds.
+      - name: Install scanners
         run: |
-          version=8.30.0
-          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${version}/gitleaks_${version}_linux_x64.tar.gz" \
-            | tar -xz -C /usr/local/bin gitleaks
-          gitleaks --version
-          # Scoped to this branch's own commits, not all history. A repository
-          # this age has rotated credentials still sitting in old objects
-          # (#5708); scanning everything would fail every PR for something no
-          # PR author did, and the gate would be off within a day.
-          # --verbose because without it gitleaks prints only "leaks found: N"
-          # and nothing about WHERE, which makes a blocking gate impossible to
-          # act on from the log alone. --redact keeps the matched value itself
-          # out of CI output; the file, line, rule id and fingerprint still
-          # print, which is what an author needs. Rule + path is also exactly
-          # what an entry in `.gitleaks.toml` is keyed on.
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            BASE="${{ github.base_ref }}"
-            git fetch --no-tags origin "+refs/heads/$BASE:refs/remotes/origin/$BASE"
-            gitleaks git --redact --no-banner --no-color --verbose --log-opts="origin/$BASE..HEAD" .
-          else
-            gitleaks git --redact --no-banner --no-color --verbose --log-opts="-1" .
-          fi
+          set -euo pipefail
+          install_verified() {
+            local name="$1" version="$2" repo="$3" asset="$4" checksums="$5"
+            local dir
+            dir="$(mktemp -d)"
+            curl -sSfL "https://github.com/${repo}/releases/download/v${version}/${asset}" -o "$dir/$asset"
+            curl -sSfL "https://github.com/${repo}/releases/download/v${version}/${checksums}" -o "$dir/checksums.txt"
+            (cd "$dir" && grep -F "  $asset" checksums.txt | sha256sum --check --strict)
+            tar -xz -C /usr/local/bin -f "$dir/$asset" "$name"
+            rm -rf "$dir"
+            "$name" --version
+          }
+          install_verified gitleaks 8.30.0 gitleaks/gitleaks \
+            gitleaks_8.30.0_linux_x64.tar.gz gitleaks_8.30.0_checksums.txt
+          install_verified trufflehog 3.96.0 trufflesecurity/trufflehog \
+            trufflehog_3.96.0_linux_amd64.tar.gz trufflehog_3.96.0_checksums.txt
+
+      # Runs BEFORE the gate it protects, against throwaway repositories built
+      # to match the ref layout actions/checkout leaves behind. A gate scoped to
+      # the wrong commits is indistinguishable from a correct one by exit code
+      # alone — this is what tells them apart, on this runner, with these binary
+      # versions. See specs/ci/secrets-scan-scoping.feature.
+      - name: Scoping tests
+        run: bash .github/scripts/__tests__/secrets-scan.test.sh
+
+      # Both scanners are scoped to the commits under test and nothing else, by
+      # .github/scripts/secrets-scan.sh. They ran inline here until #6681, when
+      # only one of the two turned out to be scoped: trufflehog's git source
+      # walks `git log --all` — every ref in the clone — unless it is given a
+      # `--branch`, so one branch's finding failed every open pull request in
+      # the repository. Separate steps so a failure names which scanner found it.
+      - name: gitleaks
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+        run: bash .github/scripts/secrets-scan.sh gitleaks
 
       # gitleaks matches patterns; trufflehog additionally VERIFIES a candidate
-      # against the provider, so it catches live credentials that do not match
-      # a known shape. --only-verified keeps it to secrets proven live, which
-      # is what makes it safe to block on.
-      #
-      # The binary rather than trufflesecurity/trufflehog, for the same reason
-      # as gitleaks above: every other `uses:` in this repo is a first-party
-      # actions/* or an already-approved pin, and this workflow's first run
-      # ended in startup_failure with the third-party action as its only
-      # unapproved reference. A pinned release tarball needs no allowlist.
+      # against the provider, so it catches live credentials that do not match a
+      # known shape, and blocks only on ones the provider confirms are live.
       - name: trufflehog
-        run: |
-          version=3.96.0
-          curl -sSfL "https://github.com/trufflesecurity/trufflehog/releases/download/v${version}/trufflehog_${version}_linux_amd64.tar.gz" \
-            | tar -xz -C /usr/local/bin trufflehog
-          trufflehog --version
-          # Same scoping as gitleaks. --only-verified means it blocks only on a
-          # credential the provider confirms is live, so a historical rotated
-          # one does not stop the queue.
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            trufflehog git "file://$(pwd)" \
-              --since-commit "$(git merge-base HEAD "origin/${{ github.base_ref }}")" \
-              --only-verified --fail --no-update
-          else
-            trufflehog git "file://$(pwd)" --max-depth=1 --only-verified --fail --no-update
-          fi
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+        run: bash .github/scripts/secrets-scan.sh trufflehog
 
   sast:
     name: semgrep (changed lines)
