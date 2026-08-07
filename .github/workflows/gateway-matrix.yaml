@@ -64,7 +64,18 @@ permissions:
 concurrency:
   # Serialize runs against the shared matrix-* VKs and budgets so
   # parallel invocations don't double-count spend on the same key.
-  group: gateway-matrix-shared-vks
+  #
+  # Only runs that actually dial providers need that lock, and this
+  # group must therefore stay in step with the job guard below: a run
+  # the guard skips holds no VK, and holding it here has a cost of its
+  # own. With `cancel-in-progress: false` GitHub keeps exactly one
+  # pending run per group and cancels the older one, so a release PR
+  # sitting in the shared group evicts whichever real PR is queued
+  # behind it. Release PRs re-push on every merge to main and reach
+  # this workflow only because the chart version lives under
+  # charts/gateway/, so left in the shared group they are both the
+  # commonest run and the one with nothing to prove.
+  group: ${{ startsWith(github.head_ref, 'release-please') && format('gateway-matrix-release-{0}', github.head_ref) || 'gateway-matrix-shared-vks' }}
   cancel-in-progress: false
 
 jobs:
@@ -75,10 +86,14 @@ jobs:
     # deliberately strips secrets on `pull_request` from forks, so a
     # live-credential matrix can never succeed there — running it
     # would only produce phantom red checks for external contributors).
+    # Skip release PRs too: they bump `charts/gateway/Chart.yaml` and
+    # nothing else this workflow watches, so the matrix would spend
+    # live provider calls proving a version string still answers.
     if: |
       github.event_name != 'pull_request' ||
       (github.event.pull_request.draft == false &&
-       github.event.pull_request.head.repo.fork == false)
+       github.event.pull_request.head.repo.fork == false &&
+       !startsWith(github.head_ref, 'release-please'))
     env:
       GATEWAY_URL: http://localhost:5563
       LW_BASE_URL: http://localhost:5560
