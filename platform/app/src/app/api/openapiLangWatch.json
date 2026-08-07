@@ -5036,6 +5036,9 @@
                     "truncated": {
                       "type": "boolean"
                     },
+                    "followsTimeWindow": {
+                      "type": "boolean"
+                    },
                     "diagnostics": {
                       "type": "array",
                       "items": {
@@ -5071,6 +5074,7 @@
                     "rows",
                     "statistics",
                     "truncated",
+                    "followsTimeWindow",
                     "diagnostics"
                   ]
                 }
@@ -5207,6 +5211,21 @@
                         }
                       ]
                     }
+                  },
+                  "timeWindow": {
+                    "type": "object",
+                    "properties": {
+                      "start": {
+                        "type": "string"
+                      },
+                      "end": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "start",
+                      "end"
+                    ]
                   }
                 },
                 "required": [
