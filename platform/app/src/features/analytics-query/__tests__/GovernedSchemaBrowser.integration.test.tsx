@@ -187,5 +187,18 @@ describe("the governed schema browser", () => {
         ).not.toBeInTheDocument();
       });
     });
+
+    describe("when the member reads what the browser says about time", () => {
+      /** @scenario "The schema browser names the reserved period parameters where SQL is written" */
+      it("names both reserved parameters and the half-open interval they describe", () => {
+        renderBrowser();
+
+        const note = screen.getByText(/Declare \{period_start:DateTime\}/);
+        expect(note).toHaveTextContent("{period_end:DateTime}");
+        expect(note).toHaveTextContent(
+          ">= {period_start:DateTime} AND < {period_end:DateTime}",
+        );
+      });
+    });
   });
 });

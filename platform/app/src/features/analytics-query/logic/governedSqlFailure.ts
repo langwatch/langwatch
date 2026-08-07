@@ -24,6 +24,8 @@ export const GOVERNED_SQL_UNPARSEABLE_CODE = "governed_sql_unparseable";
 export const GOVERNED_SQL_NOT_PERMITTED_CODE = "governed_sql_not_permitted";
 export const GOVERNED_SQL_PARAMETER_MISSING_CODE =
   "governed_sql_parameter_missing";
+export const GOVERNED_SQL_RESERVED_PARAMETER_SUPPLIED_CODE =
+  "governed_sql_reserved_parameter_supplied";
 export const GOVERNED_SQL_UNAVAILABLE_CODE = "governed_sql_unavailable";
 export const GOVERNED_SQL_TIMEOUT_CODE = "query_timeout";
 
@@ -47,14 +49,19 @@ export interface GovernedSqlFailure {
   /** The handled code, or `undefined` when the failure was not a handled one. */
   readonly code: string | undefined;
   readonly violations: readonly GovernedSqlViolationView[];
-  /** Parameters the statement declared and the request left unset. */
-  readonly missingParameters: readonly string[];
+  /**
+   * The parameter names the refusal named — left unset, or set when they were
+   * the surface's to set. Which of the two it is depends on {@link code}, so the
+   * reader that renders them is what decides; this only lifts the list off the
+   * payload.
+   */
+  readonly parameters: readonly string[];
 }
 
 const NO_FAILURE: GovernedSqlFailure = {
   code: undefined,
   violations: [],
-  missingParameters: [],
+  parameters: [],
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -113,7 +120,7 @@ export function readGovernedSqlFailure(error: unknown): GovernedSqlFailure {
   return {
     code: handled.code,
     violations: violationsOf(handled.meta.violations),
-    missingParameters: stringsOf(handled.meta.parameters),
+    parameters: stringsOf(handled.meta.parameters),
   };
 }
 

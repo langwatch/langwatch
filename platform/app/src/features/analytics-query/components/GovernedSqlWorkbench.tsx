@@ -16,8 +16,16 @@
 
 import { Box, Button, HStack, Kbd, Spinner, Text } from "@chakra-ui/react";
 import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
-import { type ReactNode, useCallback, useMemo, useRef, useState } from "react";
+import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
+import { usePeriodSelector } from "~/components/PeriodSelector";
 import { showErrorToast } from "~/features/errors";
 
 import { useGovernedSqlQuery } from "../hooks/useGovernedSqlQuery";
@@ -25,6 +33,7 @@ import { useGovernedSqlSchema } from "../hooks/useGovernedSqlSchema";
 import { useSavedWorkbenchCharts } from "../hooks/useSavedWorkbenchCharts";
 import {
   GOVERNED_SQL_PARAMETER_MISSING_CODE,
+  GOVERNED_SQL_RESERVED_PARAMETER_SUPPLIED_CODE,
   type GovernedSqlEditorMarker,
   governedSqlEditorMarkers,
   readGovernedSqlFailure,
@@ -32,6 +41,7 @@ import {
 import {
   type GovernedSqlParameterValue,
   type GovernedSqlRequestState,
+  type GovernedSqlTimeWindowValues,
   isGovernedSqlResultStale,
 } from "../logic/governedSqlRequestState";
 
@@ -42,6 +52,7 @@ import {
   GovernedSqlResultPane,
   type GovernedSqlResultView,
 } from "./GovernedSqlResultPane";
+import { GovernedSqlTimeWindowEditor } from "./GovernedSqlTimeWindowEditor";
 import { LazyGovernedSqlChartMode } from "./LazyGovernedSqlChartMode";
 import { SavedChartsToolbar } from "./SavedChartsToolbar";
 
@@ -49,10 +60,15 @@ import { SavedChartsToolbar } from "./SavedChartsToolbar";
 interface FailureView {
   readonly markers: readonly GovernedSqlEditorMarker[];
   readonly missingParameters: readonly string[];
+  readonly reservedParameters: readonly string[];
 }
 
 /** Stable identity, so an unchanged "nothing to report" never re-renders a form. */
-const NO_FAILURE_VIEW: FailureView = { markers: [], missingParameters: [] };
+const NO_FAILURE_VIEW: FailureView = {
+  markers: [],
+  missingParameters: [],
+  reservedParameters: [],
+};
 
 /**
  * The chart's accessible description of what it draws: the submitted statement
@@ -80,12 +96,73 @@ function failureView(state: GovernedSqlRequestState): FailureView {
   const failure = readGovernedSqlFailure(outcome.error);
   return {
     markers: governedSqlEditorMarkers(failure),
-    // Only this code's names belong on the parameters form; every other
+    // The payload carries one list of names; only the code says what they
+    // mean, so only the code decides which form answers them. Every other
     // refusal is about the statement.
     missingParameters:
       failure.code === GOVERNED_SQL_PARAMETER_MISSING_CODE
-        ? failure.missingParameters
+        ? failure.parameters
         : [],
+    reservedParameters:
+      failure.code === GOVERNED_SQL_RESERVED_PARAMETER_SUPPLIED_CODE
+        ? failure.parameters
+        : [],
+  };
+}
+
+/**
+ * Whether the visible answer's statement followed the page's period.
+ *
+ * `undefined` until a result says so: the backend is the only thing that parses
+ * the SQL, and a stale answer describes a statement the member has since
+ * rewritten — labelling the draft with it would be a claim about a query that
+ * was never run.
+ */
+function followsTimeWindowOf(
+  state: GovernedSqlRequestState,
+): boolean | undefined {
+  if (state.outcome?.kind !== "result") return undefined;
+  if (isGovernedSqlResultStale(state)) return undefined;
+  return state.outcome.result.followsTimeWindow;
+}
+
+/**
+ * The period the next submission reports over: the page's, unless the member
+ * has overridden it for this query.
+ *
+ * The page's period is the default rather than a starting value that then drifts
+ * — an unoverridden workbench follows the period selector for as long as it is
+ * open, which is what makes authoring behave the way the dashboard will.
+ */
+function useWorkbenchTimeWindow({
+  query,
+}: {
+  query: ReturnType<typeof useGovernedSqlQuery>;
+}) {
+  const { period } = usePeriodSelector();
+  const [override, setOverride] = useState<GovernedSqlTimeWindowValues | null>(
+    null,
+  );
+
+  const pagePeriod = useMemo(
+    () => ({
+      start: period.startDate.getTime(),
+      end: period.endDate.getTime(),
+    }),
+    [period.startDate, period.endDate],
+  );
+  const value = override ?? pagePeriod;
+
+  const { setTimeWindow } = query;
+  useEffect(() => {
+    setTimeWindow(value);
+  }, [setTimeWindow, value]);
+
+  return {
+    value,
+    overridden: override !== null,
+    onOverride: setOverride,
+    onFollowPage: useCallback(() => setOverride(null), []),
   };
 }
 
@@ -322,6 +399,7 @@ export function GovernedSqlWorkbench({ projectId }: GovernedSqlWorkbenchProps) {
   });
   const failure = useMemo(() => failureView(query.state), [query.state]);
   const wiring = useSavedChartWiring({ projectId, query });
+  const timeWindow = useWorkbenchTimeWindow({ query });
 
   return (
     <HStack
@@ -356,6 +434,7 @@ export function GovernedSqlWorkbench({ projectId }: GovernedSqlWorkbenchProps) {
           schemaVisible={schemaVisible}
           onToggleSchema={() => setSchemaVisible((visible) => !visible)}
           wiring={wiring}
+          timeWindow={timeWindow}
         />
 
         <Box
@@ -421,6 +500,7 @@ function QueryCard({
   schemaVisible,
   onToggleSchema,
   wiring,
+  timeWindow,
 }: {
   query: ReturnType<typeof useGovernedSqlQuery>;
   schemaModel: ReturnType<typeof useGovernedSqlSchema>["model"];
@@ -429,6 +509,7 @@ function QueryCard({
   schemaVisible: boolean;
   onToggleSchema: () => void;
   wiring: ReturnType<typeof useSavedChartWiring>;
+  timeWindow: ReturnType<typeof useWorkbenchTimeWindow>;
 }) {
   const { draft } = query.state;
 
@@ -478,11 +559,23 @@ function QueryCard({
         background="bg.subtle"
         paddingX={3}
         paddingY={2}
+        display="flex"
+        flexDirection="column"
+        gap={3}
       >
+        <GovernedSqlTimeWindowEditor
+          value={timeWindow.value}
+          overridden={timeWindow.overridden}
+          onOverride={timeWindow.onOverride}
+          onFollowPage={timeWindow.onFollowPage}
+          followsTimeWindow={followsTimeWindowOf(query.state)}
+        />
+
         <GovernedSqlParametersEditor
           key={`parameters-${wiring.openedRevision}`}
           onChange={query.setParameters}
           missingParameters={failure.missingParameters}
+          reservedParameters={failure.reservedParameters}
           {...(wiring.openedParameters
             ? { initialParameters: wiring.openedParameters }
             : {})}
