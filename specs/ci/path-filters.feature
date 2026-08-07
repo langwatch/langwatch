@@ -55,6 +55,28 @@ Feature: CI path filters skip unnecessary workflows on non-code changes
     Then all workflows run regardless of which files changed
 
   # ============================================================================
+  # Dependency scanners are path-gated, secret and SAST scanners are not
+  # ============================================================================
+
+  Scenario: A PR with no Go changes does not run the Go advisory scanner
+    When a PR changes no Go source and no Go module manifest
+    Then govulncheck does not run
+    And gitleaks, trufflehog and semgrep still run
+
+  Scenario: A PR with no Python manifest changes does not run the Python advisory scanner
+    When a PR changes no requirements file and no pyproject
+    Then pip-audit does not run
+    And gitleaks, trufflehog and semgrep still run
+
+  Scenario: The scheduled scan runs every scanner
+    When the weekly code-scanners cron fires
+    Then govulncheck and pip-audit both run regardless of which files changed
+
+  Scenario: A merge queue entry runs every scanner
+    When a change enters the merge queue
+    Then govulncheck and pip-audit both run regardless of which files changed
+
+  # ============================================================================
   # Safety invariants
   # ============================================================================
 

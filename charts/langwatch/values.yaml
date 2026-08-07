@@ -223,6 +223,16 @@ app:
     # chart-default installs boot past the post-#3541 required-env validation.
     langwatchEndpoint: ""
 
+  # Base URL for content-hashed frontend assets (JS/CSS chunks). Empty (default)
+  # serves them same-origin straight from the pod, exactly as before. Set to a
+  # commit-prefixed CDN base — e.g. "https://cdn.langwatch.ai/git-<short-sha>/" — so
+  # a rolling deploy never strands a browser on a 404: every past build's assets
+  # remain under their own immutable prefix. The deploy pipeline both uploads
+  # dist/client/assets to that prefix and sets this value for the same SHA. See
+  # ADR-086. Rendered into the LANGWATCH_ASSET_BASE env var when non-empty.
+  ## @param app.assetBase [string, default: ""] CDN base URL for content-hashed assets; empty = serve same-origin from the pod.
+  assetBase: ""
+
   # Feature flags to enable/disable specific functionality
   ## @extra app.features Feature flags for the app.
   ## @param app.features.skipEnvValidation [default: false] Skip env var validation (dev only).
@@ -376,17 +386,22 @@ app:
       storageClassName: ""
 
   # Email notification configuration
-  # Enables sending alerts and notifications via email
+  # Naming a provider is what turns email on, so there is one switch rather
+  # than a toggle and a name that can disagree with each other.
   ## @extra app.email Email provider configuration.
-  ## @param app.email.enabled [default: false] Enable email notifications.
   ## @param app.email.defaultFrom [string] Default "from" address.
-  ## @param app.email.provider [string, default: sendgrid] Email provider.
+  ## @param app.email.provider [string] Email provider. Empty sends no email.
   email:
-    enabled: false
     defaultFrom: ""
-    # Email provider to use. Options: sendgrid (default)
-    # When set to 'sendgrid', enables SendGrid integration
-    provider: sendgrid
+    # Gateway to send through: sendgrid, ses, smtp or resend. Leave empty and
+    # LangWatch sends no email at all.
+    # Use 'smtp' for an internal relay, Azure Communication Services, Office 365,
+    # Postmark, Mailgun or any other gateway that speaks SMTP.
+    # Deployments whose only egress is a corporate proxy can set HTTPS_PROXY and
+    # NO_PROXY through app.extraEnvs; every gateway that calls a vendor API over
+    # HTTPS routes through it. Only smtp ignores them, on purpose, because an
+    # internal relay is reached directly.
+    provider: ""
 
     providers:
       ## @extra app.email.providers.sendgrid Sendgrid provider configuration.
@@ -395,6 +410,42 @@ app:
         apiKey:
           value: ""
           ## @param app.email.providers.sendgrid.apiKey.secretKeyRef [object] Secret ref for SendGrid API key.
+          secretKeyRef: { name: "", key: "" }
+
+      ## @extra app.email.providers.ses AWS SES provider configuration.
+      ## @param app.email.providers.ses.region [string] AWS region for SES.
+      ## @param app.email.providers.ses.endpoint [string] Override the SES endpoint (VPC endpoint or egress relay).
+      ses:
+        region: ""
+        endpoint: ""
+
+      ## @extra app.email.providers.smtp SMTP relay configuration.
+      ## @param app.email.providers.smtp.url.value [string] Full SMTP connection URL. Takes precedence over the discrete settings.
+      ## @param app.email.providers.smtp.host [string] SMTP host, when not using a URL.
+      ## @param app.email.providers.smtp.port [string] SMTP port. Defaults to 587.
+      ## @param app.email.providers.smtp.secure [string] Force implicit TLS ("true") or STARTTLS ("false"). Defaults to true on port 465.
+      ## @param app.email.providers.smtp.user [string] Username. Omit for an unauthenticated internal relay.
+      smtp:
+        url:
+          value: ""
+          ## @param app.email.providers.smtp.url.secretKeyRef [object] Secret ref for the SMTP URL.
+          secretKeyRef: { name: "", key: "" }
+        host: ""
+        port: ""
+        secure: ""
+        user: ""
+        ## @param app.email.providers.smtp.password.value [string] SMTP password.
+        password:
+          value: ""
+          ## @param app.email.providers.smtp.password.secretKeyRef [object] Secret ref for the SMTP password.
+          secretKeyRef: { name: "", key: "" }
+
+      ## @extra app.email.providers.resend Resend provider configuration.
+      ## @param app.email.providers.resend.apiKey.value [string] Resend API key.
+      resend:
+        apiKey:
+          value: ""
+          ## @param app.email.providers.resend.apiKey.secretKeyRef [object] Secret ref for the Resend API key.
           secretKeyRef: { name: "", key: "" }
 
   # Enterprise license, applied to the whole instance.
@@ -987,6 +1038,13 @@ langevals:
 
   # Resource requirements for evaluation tasks
   # Higher memory requirements due to model loading and evaluation
+  #
+  # The CPU limit here also sizes the service's worker pool, via the CPU_COUNT
+  # the chart derives from it: each worker loads its own copy of every local
+  # model it serves (~2.1Gi), so memory scales with the pool. Raise the CPU and
+  # the memory together, or pin the pool with a CPU_COUNT of your own in
+  # extraEnvs. See langwatch.langevals.cpuCount in templates/_helpers.tpl.
+  #
   # See: https://kubespec.dev/v1/Pod#spec.containers.resources
   ## @extra langevals.resources Resource requests and limits.
   ## @param langevals.resources.requests.cpu [string, default: 1000m] Requested CPU.

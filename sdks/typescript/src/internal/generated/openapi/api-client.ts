@@ -282,136 +282,6 @@ export interface paths {
         };
         trace?: never;
     };
-    "/api/api-keys": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List API keys
-         * @description List all API keys owned by the authenticated user in this organization. Requires organization:view permission.
-         */
-        get: operations["listApiKeys"];
-        put?: never;
-        /**
-         * Create an API key
-         * @description Create a new API key. For service keys, pass keyType:"service". Optionally scope to specific projects via projectIds (ADMIN on each). Omit projectIds for full org access. The plaintext token is returned once — store it securely.
-         */
-        post: operations["createApiKey"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/api-keys/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /**
-         * Revoke an API key
-         * @description Revoke (soft-delete) an API key. Revoked keys can no longer authenticate. Requires organization:manage permission.
-         */
-        delete: operations["revokeApiKey"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/experiments/runs/{runId}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** @description Get the current status of an evaluation run for polling. Returns progress while running, and summary when completed. */
-        get: operations["getEvaluationsV3RunStatus"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/experiments/{slug}/run": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** @description Start execution of a saved Evaluations V3 experiment by slug. Returns immediately with a runId for polling, or streams SSE events if Accept: text/event-stream header is provided. */
-        post: operations["postEvaluationsV3Run"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/projects": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List projects
-         * @description List all non-archived projects for the organization (paginated). Requires an admin API key with project:view permission.
-         */
-        get: operations["listProjects"];
-        put?: never;
-        /**
-         * Create a project
-         * @description Create a new project in the organization. Returns the project with its API key (sk-lw-...) for sending traces. Provide either teamId (existing team) or newTeamName (creates a new team). Requires project:create permission.
-         */
-        post: operations["createProject"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/projects/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get a project
-         * @description Get a project by ID, including its API key. Requires project:view permission.
-         */
-        get: operations["getProject"];
-        put?: never;
-        post?: never;
-        /**
-         * Archive a project
-         * @description Soft-delete (archive) a project. Archived projects are excluded from list responses. Requires project:delete permission.
-         */
-        delete: operations["archiveProject"];
-        options?: never;
-        head?: never;
-        /**
-         * Update a project
-         * @description Update project fields. Only provided fields are changed. Requires project:update permission.
-         */
-        patch: operations["updateProject"];
-        trace?: never;
-    };
     "/api/trace/search": {
         parameters: {
             query?: never;
@@ -810,6 +680,202 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/teams": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List all non-archived teams for the organization (paginated) */
+        get: operations["getApiTeams"];
+        put?: never;
+        /** @description Create a new team that can group projects and members */
+        post: operations["postApiTeams"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/teams/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Get a team by its id */
+        get: operations["getApiTeamsById"];
+        put?: never;
+        post?: never;
+        /** @description Archive a team (soft-delete) */
+        delete: operations["deleteApiTeamsById"];
+        options?: never;
+        head?: never;
+        /** @description Update a team by its id */
+        patch: operations["patchApiTeamsById"];
+        trace?: never;
+    };
+    "/api/teams/{id}/members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List members of a team */
+        get: operations["getApiTeamsByIdMembers"];
+        put?: never;
+        /** @description Add a member to a team */
+        post: operations["postApiTeamsByIdMembers"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/teams/{id}/members/{userId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** @description Remove a member from a team */
+        delete: operations["deleteApiTeamsByIdMembersByUserId"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/teams/{id}/projects": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List projects in a team */
+        get: operations["getApiTeamsByIdProjects"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/groups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List all groups for the organization */
+        get: operations["getApiGroups"];
+        put?: never;
+        /** @description Create a new group */
+        post: operations["postApiGroups"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/groups/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Get a group with members and bindings */
+        get: operations["getApiGroupsById"];
+        put?: never;
+        post?: never;
+        /** @description Delete a group */
+        delete: operations["deleteApiGroupsById"];
+        options?: never;
+        head?: never;
+        /** @description Rename a group */
+        patch: operations["patchApiGroupsById"];
+        trace?: never;
+    };
+    "/api/groups/{id}/members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List members of a group */
+        get: operations["getApiGroupsByIdMembers"];
+        put?: never;
+        /** @description Add a member to a group */
+        post: operations["postApiGroupsByIdMembers"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/groups/{id}/members/{userId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** @description Remove a member from a group */
+        delete: operations["deleteApiGroupsByIdMembersByUserId"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/groups/{id}/bindings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List role bindings for a group */
+        get: operations["getApiGroupsByIdBindings"];
+        put?: never;
+        /** @description Add a role binding to a group */
+        post: operations["postApiGroupsByIdBindings"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/groups/{id}/bindings/{bindingId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** @description Remove a role binding from a group */
+        delete: operations["deleteApiGroupsByIdBindingsByBindingId"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/agents": {
         parameters: {
             query?: never;
@@ -845,6 +911,50 @@ export interface paths {
         head?: never;
         /** @description Update an agent by its id */
         patch: operations["patchApiAgentsById"];
+        trace?: never;
+    };
+    "/api/api-keys": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List API keys
+         * @description List all API keys owned by the authenticated user in this organization. Requires organization:view permission.
+         */
+        get: operations["listApiKeys"];
+        put?: never;
+        /**
+         * Create an API key
+         * @description Create a new API key. For service keys, pass keyType:"service". Optionally scope to specific projects via projectIds (ADMIN on each). Omit projectIds for full org access. The plaintext token is returned once — store it securely.
+         */
+        post: operations["createApiKey"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/api-keys/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Revoke an API key
+         * @description Revoke (soft-delete) an API key. Revoked keys can no longer authenticate. Requires organization:manage permission.
+         */
+        delete: operations["revokeApiKey"];
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/analytics/timeseries": {
@@ -1197,6 +1307,386 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/experiments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List experiments for the project
+         * @description List experiments for the project. Includes a runs count and last-run timestamp per experiment.
+         */
+        get: operations["getApiExperiments"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/evaluations/list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the built-in evaluators
+         * @description List every evaluator this server ships with, along with the `data` fields each one needs and the settings it accepts. The keys of `evaluators` are the ids you put in the evaluate path. The list is the same for every caller and needs no credential.
+         */
+        get: operations["getApiEvaluationsList"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/evaluations/batch/log_results": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Report batch evaluation results
+         * @description Report the rows of a batch evaluation against an experiment, so its scores and progress show up in the app. This is the second half of an SDK batch evaluation: create the experiment with `POST /api/experiment/init`, then post rows here as they finish. Identify the experiment by either `experiment_id` or `experiment_slug`. Bodies up to 20MB are accepted.
+         */
+        post: operations["postApiEvaluationsBatchLog_results"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/evaluations/{evaluator}/evaluate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run an evaluator
+         * @description Run one evaluator over a single input and get its score back. Built-in evaluators whose id has two segments, such as `ragas/faithfulness`, are addressed with the two-segment form of this path. Bodies up to 30MB are accepted.
+         */
+        post: operations["postApiEvaluationsByEvaluatorEvaluate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/evaluations/{evaluator}/{subpath}/evaluate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run a namespaced evaluator
+         * @description Run one evaluator whose id has two segments, such as `ragas/faithfulness` or `langevals/valid_format`. Identical to the single-segment form in every other respect; the id is simply split across two path segments.
+         */
+        post: operations["postApiEvaluationsByEvaluatorBySubpathEvaluate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/guardrails/{evaluator}/evaluate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run an evaluator as a guardrail
+         * @description Run an evaluator inline and gate on one boolean. Same call as the evaluate path with `as_guardrail` set: every outcome carries `passed`, so an evaluator that skips or fails does not block the request it was guarding. Check `passed` and let the request through when it is true.
+         */
+        post: operations["postApiGuardrailsByEvaluatorEvaluate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dataset/evaluate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Evaluate a dataset
+         * @description Run one evaluator across a saved dataset and record the result against an experiment. Name the dataset by slug and the evaluator the same way the evaluate endpoints do; results are grouped under `experimentSlug`, or under a generated batch id when you omit it.
+         */
+        post: operations["postApiDatasetEvaluate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/experiments/{slug}/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run an experiment
+         * @description Start a run of a saved experiment, addressed by slug. Returns a runId to poll straight away. Send `Accept: text/event-stream` instead to stream progress events until the run finishes.
+         */
+        post: operations["postApiExperimentsBySlugRun"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/experiments/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List runs of an experiment
+         * @description Runs recorded for one experiment, newest first. Page through them with `page` and `pageSize`.
+         */
+        get: operations["getApiExperimentsRuns"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/experiments/runs/{runId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Poll a run
+         * @description Current state of one run. Returns progress while it is going and a summary once it finishes, so a CI job can poll this until `status` leaves `running`.
+         */
+        get: operations["getApiExperimentsRunsByRunId"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/experiments/runs/{runId}/results": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read run results
+         * @description Every dataset row of a run with what the target predicted, plus one entry per evaluator per row. Runs older than the status cache need `experimentSlug` as well, since a run id is only unique within its experiment.
+         */
+        get: operations["getApiExperimentsRunsByRunIdResults"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/analytics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Query analytics timeseries (legacy path)
+         * @description Query analytics timeseries with metrics, aggregations and filters. Identical to `POST /api/analytics/timeseries`, which is the path to use in new integrations; this one stays for callers written against it.
+         */
+        post: operations["postApiAnalytics"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dspy/log_steps": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Report DSPy optimizer steps
+         * @description Report the steps of a DSPy optimizer run against an experiment, so the run's progress and scores show up in the app. Send the steps as an array; the optimizer typically posts each batch as it finishes. Bodies up to 20MB are accepted.
+         */
+        post: operations["postApiDspyLog_steps"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/experiment/init": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create an experiment
+         * @description Create an experiment, or return the existing one when the slug is already taken. This is the first call in an experiment run: take the slug back, report results against it, and every run under that slug groups together in the app. The SDKs call this endpoint for you.
+         */
+        post: operations["postApiExperimentInit"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/optimization/{workflowId}/{versionId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run a workflow version (legacy path)
+         * @description Run one pinned version of an Optimization Studio workflow synchronously. Identical to `POST /api/workflows/{workflowId}/{versionId}/run`, which is the path to use in new integrations; this one stays for callers written against it.
+         */
+        post: operations["postApiOptimizationByWorkflowIdByVersionId"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/track_event": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Track an event (legacy path)
+         * @description Record a customer event against a trace or thread. Identical to `POST /api/events/track`, which is the path to use in new integrations; this one stays for callers written against it. Supply `event_id` yourself to make the call idempotent.
+         */
+        post: operations["postApiTrack_event"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/trigger/slack": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create a Slack alert trigger
+         * @description Create a trigger that posts to a Slack incoming webhook when traces match its filters. The `/api/triggers` family supersedes this narrower form, which stays for callers written against it.
+         */
+        post: operations["postApiTriggerSlack"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/workflows/{workflowId}/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run a workflow
+         * @description Run an Optimization Studio workflow synchronously and return its output. Runs the workflow's published version; address a specific version with the `{versionId}` form of this path.
+         */
+        post: operations["postApiWorkflowsByWorkflowIdRun"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/workflows/{workflowId}/{versionId}/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run a specific workflow version
+         * @description Run one pinned version of an Optimization Studio workflow synchronously and return its output. Use this when a caller must keep hitting the same version as the workflow is edited.
+         */
+        post: operations["postApiWorkflowsByWorkflowIdByVersionIdRun"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/gateway/v1/virtual-keys": {
         parameters: {
             query?: never;
@@ -1212,7 +1702,7 @@ export interface paths {
         put?: never;
         /**
          * Create virtual key
-         * @description Mints a new virtual key and returns the secret exactly once. The caller MUST persist the `secret` value — LangWatch stores only a hash. `scopes` defaults to the caller's project; org- and team-scoped keys require a scoped API key holding `virtualKeys:manage` at each requested scope. An org- or team-scoped key also needs a place for its traces and spend to land: pass `trace_project_id` (needs `virtualKeys:manage` on that project), or the organization's governance project is used, and creation refuses with `trace_project_required` when neither exists.
+         * @description Mints a new virtual key and returns the secret exactly once. The caller MUST persist the `secret` value, because LangWatch stores only a hash. `scopes` defaults to the caller's project; org- and team-scoped keys require a scoped API key holding `virtualKeys:manage` at each requested scope. An org- or team-scoped key also needs a place for its traces and spend to land: pass `trace_project_id` (needs `virtualKeys:manage` on that project), or the organization's governance project is used, and creation refuses with `trace_project_required` when neither exists. Send `Idempotency-Key` to make a retry safe: a replay returns the original response including its `secret`, which is the only way to recover a secret whose response was lost in transit.
          */
         post: operations["postApiGatewayV1Virtual-keys"];
         delete?: never;
@@ -1237,7 +1727,7 @@ export interface paths {
         head?: never;
         /**
          * Update virtual key
-         * @description Partial update — send only the fields you want to change. `scopes` replaces the entire visibility set and requires `virtualKeys:manage` at every NEW scope. `config` is deep-merged. `budget` upserts the key's own cap; explicit null archives it.
+         * @description Partial update: send only the fields you want to change. `scopes` replaces the entire visibility set and requires `virtualKeys:manage` at every NEW scope. `config` is deep-merged. `budget` upserts the key's own cap; explicit null archives it.
          */
         patch: operations["patchApiGatewayV1Virtual-keysById"];
         trace?: never;
@@ -1251,7 +1741,7 @@ export interface paths {
         };
         /**
          * Read a virtual key's spend
-         * @description Aggregate spend and request count for one key over a window given in epoch milliseconds (default: current UTC calendar month). Reads the cost path (`trace_summaries`) — the same source the dashboard's key list and Usage tab read — so this number, the UI column, and the Usage page agree by construction. Returns 412 `spend_source_unavailable` on deploys without a ClickHouse spend source rather than a $0.00 that cannot be told apart from a zero-spend key.
+         * @description Aggregate spend and request count for one key over a window given in epoch milliseconds (default: current UTC calendar month). Reads the cost path (`trace_summaries`), the same source the dashboard's key list and Usage tab read, so this number, the UI column, and the Usage page agree by construction. Returns 412 `spend_source_unavailable` on deploys without a ClickHouse spend source rather than a $0.00 that cannot be told apart from a zero-spend key.
          */
         get: operations["getApiGatewayV1Virtual-keysByIdSpend"];
         put?: never;
@@ -1375,13 +1865,13 @@ export interface paths {
         };
         /**
          * List budgets
-         * @description Returns the non-archived budgets in the caller's organization across all seven scope types (organization / team / project / virtual_key / principal / group / attributed_user), with live `spent_usd` from the spend ledger. Newest first, paged by cursor: follow `next_cursor` until it comes back null. Filter with `scope_type` (comma-separated), which is applied in the query, so `limit` counts rows returned. `group` rows are per-member allowances: `limit_usd` is what EACH member may spend, while `spent_usd` is the group's summed spend, and `member_count` says how many members the allowance currently covers. `attributed_user` rows are per-person templates: `limit_usd` is what EACH end user may spend, `end_users_seen` counts the end users with spend this period, and `end_users_over` how many of them are at or over that limit. `spend_available: false` means spend could not be totalled, and both `spent_usd` and `spent_nano_usd` are then null rather than a stale figure a caller could read as real money. Every amount is published twice: `_usd` is the display string, `_nano_usd` is the canonical integer in the same nano-USD unit the spend events carry, so a budget and its spend reconcile without parsing decimals.
+         * @description Returns the non-archived budgets in the caller's organization across all seven scope types (organization / team / project / virtual_key / principal / group / attributed_user), with live `spent_usd` from the spend ledger. Newest first, paged by cursor: follow `next_cursor` until it comes back null. Filter with `scope_type` (comma-separated), which is applied in the query, so `limit` counts rows returned. `group` rows are per-member allowances: `limit_usd` is what EACH member may spend, while `spent_usd` is the group's summed spend, and `member_count` says how many members the allowance currently covers. `attributed_user` rows are per-person templates: `limit_usd` is what EACH end user may spend, `end_users_seen` counts the end users with spend this period, and `end_users_over` how many of them are at or over that limit. A template's own `spent_usd` and `spent_nano_usd` are null because one allowance per person has no single total to report; each person's figure is in `GET /spend-summaries` and the seat buckets. `spend_available: false` means spend could not be totalled at all, and both fields are null for that reason instead, rather than a stale figure a caller could read as real money. Every amount is published twice: `_usd` is the display string, `_nano_usd` is the canonical integer in the same nano-USD unit the spend events carry, so a budget and its spend reconcile without parsing decimals.
          */
         get: operations["getApiGatewayV1Budgets"];
         put?: never;
         /**
          * Create budget
-         * @description Creates an organization-owned budget. The scope discriminates which resource the budget covers (organization / team / project / virtual_key / principal / group). `group` budgets are per-member allowances and require a deployment with the ClickHouse spend ledger (`group_budget_requires_clickhouse` otherwise). `provider_key` optionally pins the budget to one model provider.
+         * @description Creates an organization-owned budget. The scope discriminates which resource the budget covers (organization / team / project / virtual_key / principal / group). `group` budgets are per-member allowances and require a deployment with the ClickHouse spend ledger (`group_budget_requires_clickhouse` otherwise). `provider_key` optionally pins the budget to one model provider. `cycle_anchor_at` optionally phases the window off a chosen instant instead of the calendar, for budgets that have to line up with a billing date. Send `Idempotency-Key` to make a retry safe.
          */
         post: operations["postApiGatewayV1Budgets"];
         delete?: never;
@@ -1399,21 +1889,21 @@ export interface paths {
         };
         /**
          * Get budget
-         * @description One budget, in exactly the row shape `GET /budgets` returns, including the live spend enrichment and the per-person `end_users_seen` / `end_users_over` standing on attributed-user templates. Archived budgets are not returned. `spend_available: false` means spend could not be totalled, and `spent_usd` / `spent_nano_usd` are null rather than a figure that cannot be told apart from zero spend.
+         * @description One budget, in exactly the row shape `GET /budgets` returns, including the live spend enrichment and the per-person `end_users_seen` / `end_users_over` standing on attributed-user templates. Archived budgets are not returned. `spend_available: false` means spend could not be totalled, and `spent_usd` / `spent_nano_usd` are null rather than a figure that cannot be told apart from zero spend. A per-person template reports null there too, because one allowance per person has no single total; each person's figure is in `GET /spend-summaries` and the seat buckets.
          */
         get: operations["getApiGatewayV1BudgetsById"];
         put?: never;
         post?: never;
         /**
          * Archive budget
-         * @description Soft-delete — the row is marked archived and no longer counted by the budget engine. Historical ledger entries are retained.
+         * @description Soft-delete: the row is marked archived and no longer counted by the budget engine. Historical ledger entries are retained.
          */
         delete: operations["deleteApiGatewayV1BudgetsById"];
         options?: never;
         head?: never;
         /**
          * Update budget
-         * @description Partial update — scope and window are immutable after create. Use explicit null to clear timezone / description.
+         * @description Partial update. Scope, window and cycle_anchor_at are immutable after create. Use explicit null to clear timezone / description.
          */
         patch: operations["patchApiGatewayV1BudgetsById"];
         trace?: never;
@@ -1477,7 +1967,7 @@ export interface paths {
         put?: never;
         /**
          * Create a cache rule
-         * @description Matchers are ANDed across non-null fields; at least one matcher is required. Mode is one of respect/force/disable. TTL is clamped to [0, 86400]. Salt is an optional cache-bust tag (max 64 chars). All writes emit a ChangeEvent so the gateway picks up the new rule within 30 s via its /changes long-poll.
+         * @description Matchers are ANDed across non-null fields; at least one matcher is required. Mode is one of respect/force/disable. TTL is clamped to [0, 86400]. Salt is an optional cache-bust tag (max 64 chars). All writes emit a ChangeEvent so the gateway picks up the new rule within 30 s via its /changes long-poll. Send `Idempotency-Key` to make a retry safe.
          */
         post: operations["postApiGatewayV1Cache-rules"];
         delete?: never;
@@ -1502,7 +1992,7 @@ export interface paths {
         post?: never;
         /**
          * Archive a cache rule
-         * @description Soft-delete — sets archivedAt. The rule stops matching new requests. Audit log retains before/after snapshots. Returns the archived row.
+         * @description Soft-delete: sets archivedAt. The rule stops matching new requests. Audit log retains before/after snapshots. Returns the archived row.
          */
         delete: operations["deleteApiGatewayV1Cache-rulesById"];
         options?: never;
@@ -1994,6 +2484,98 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/projects": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List projects
+         * @description List all non-archived projects for the organization (paginated). Requires an admin API key with project:view permission.
+         */
+        get: operations["listProjects"];
+        put?: never;
+        /**
+         * Create a project
+         * @description Create a new project in the organization. Returns the project with its API key (sk-lw-...) for sending traces. Provide either teamId (existing team) or newTeamName (creates a new team). Requires project:create permission.
+         */
+        post: operations["createProject"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get a project
+         * @description Get a project by ID, including its API key. Requires project:view permission.
+         */
+        get: operations["getProject"];
+        put?: never;
+        post?: never;
+        /**
+         * Archive a project
+         * @description Soft-delete (archive) a project. Archived projects are excluded from list responses. Requires project:delete permission.
+         */
+        delete: operations["archiveProject"];
+        options?: never;
+        head?: never;
+        /**
+         * Update a project
+         * @description Update project fields. Only provided fields are changed. Requires project:update permission.
+         */
+        patch: operations["updateProject"];
+        trace?: never;
+    };
+    "/api/projects/{id}/api-key": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get the project API key
+         * @description Read the project's API key, the credential SDKs and the ingestion endpoints authenticate with. Requires an admin API key holding project:update on this project.
+         */
+        get: operations["getProjectApiKey"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{id}/regenerate-api-key": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Regenerate the project API key
+         * @description Issue a new API key for the project and invalidate the previous one immediately. Anything still sending the old key starts failing authentication as soon as this returns, so roll it out before calling this. Requires an admin API key holding project:manage.
+         */
+        post: operations["regenerateProjectApiKey"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/secrets": {
         parameters: {
             query?: never;
@@ -2268,10 +2850,16 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description List the organization's webhook endpoints */
+        /**
+         * List webhook endpoints
+         * @description List the organization's webhook endpoints
+         */
         get: operations["getApiWebhooksV1Endpoints"];
         put?: never;
-        /** @description Create a webhook endpoint. The signing secret is returned ONCE in this response and never again; roll it to get a new one. */
+        /**
+         * Create a webhook endpoint
+         * @description Create a webhook endpoint. The signing secret is returned ONCE in this response and never again; roll it to get a new one. Send `Idempotency-Key` to make a retry safe: a replay returns the original response including its `secret`, which is the only way to recover a secret whose response was lost in transit.
+         */
         post: operations["postApiWebhooksV1Endpoints"];
         delete?: never;
         options?: never;
@@ -2286,15 +2874,24 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Get one webhook endpoint */
+        /**
+         * Get a webhook endpoint
+         * @description Get one webhook endpoint
+         */
         get: operations["getApiWebhooksV1EndpointsById"];
         put?: never;
         post?: never;
-        /** @description Archive a webhook endpoint */
+        /**
+         * Archive a webhook endpoint
+         * @description Archive a webhook endpoint
+         */
         delete: operations["deleteApiWebhooksV1EndpointsById"];
         options?: never;
         head?: never;
-        /** @description Update a webhook endpoint's url, event subscriptions, or status (`active` re-enables, `disabled` pauses; re-enabling does not re-send the gap, replay covers it) */
+        /**
+         * Update a webhook endpoint
+         * @description Update a webhook endpoint's url, event subscriptions, or status (`active` re-enables, `disabled` pauses; re-enabling does not re-send the gap, replay covers it)
+         */
         patch: operations["patchApiWebhooksV1EndpointsById"];
         trace?: never;
     };
@@ -2307,7 +2904,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Roll the endpoint's signing secret. The new secret is returned ONCE; deliveries sign with it immediately. */
+        /**
+         * Roll an endpoint's signing secret
+         * @description Roll the endpoint's signing secret. The new secret is returned ONCE; deliveries sign with it immediately.
+         */
         post: operations["postApiWebhooksV1EndpointsByIdRoll-secret"];
         delete?: never;
         options?: never;
@@ -2324,7 +2924,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Send a signed test event through the full delivery path. Contract: the route answers 200 whenever the test itself ran; data.delivered says whether the receiver accepted it, so clients must read the body, not the status code. */
+        /**
+         * Send a test event to an endpoint
+         * @description Send a signed test event through the full delivery path. Contract: the route answers 200 whenever the test itself ran; data.delivered says whether the receiver accepted it, so clients must read the body, not the status code.
+         */
         post: operations["postApiWebhooksV1EndpointsByIdTest"];
         delete?: never;
         options?: never;
@@ -2339,7 +2942,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description The endpoint's delivery log: every attempt with the receiver's HTTP status, latency, and error */
+        /**
+         * List an endpoint's delivery attempts
+         * @description The endpoint's delivery log: every attempt with the receiver's HTTP status, latency, and error
+         */
         get: operations["getApiWebhooksV1EndpointsByIdDeliveries"];
         put?: never;
         post?: never;
@@ -2356,7 +2962,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Delivery health. The headline number is oldest_undelivered_age_ms, the feed's staleness: age of the oldest envelope still buffered or retrying. Also: DLQ depth, failure streak, sends/min, success rate, and p95 latency over the last hour. */
+        /**
+         * Read an endpoint's delivery health
+         * @description Delivery health. The headline number is oldest_undelivered_age_ms, the feed's staleness: age of the oldest envelope still buffered or retrying. Also: DLQ depth, failure streak, sends/min, success rate, and p95 latency over the last hour.
+         */
         get: operations["getApiWebhooksV1EndpointsByIdHealth"];
         put?: never;
         post?: never;
@@ -2373,7 +2982,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description The event catalog: every subscribable type, grouped by family; types marked emitting=false are declared contracts whose producers have not shipped yet */
+        /**
+         * List subscribable event types
+         * @description The event catalog: every subscribable type, grouped by family; types marked emitting=false are declared contracts whose producers have not shipped yet
+         */
         get: operations["getApiWebhooksV1Event-types"];
         put?: never;
         post?: never;
@@ -2390,7 +3002,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description The organization's emitted-events log for the request families: cursor-paged, newest first, filter by type and created range. Webhooks are push over this log, never the only copy of it. SERVES `gateway.request.completed` and `gateway.request.settled` ONLY. The governance families (`gateway.budget.*`, `gateway.virtual_key.*`) are delivered by webhook but are not retained in a queryable log, so they cannot be listed or replayed here; any other type returns an empty page rather than an error, so a client can probe forward-compatibly. */
+        /**
+         * List emitted events
+         * @description The organization's emitted-events log for the request families: cursor-paged, newest first, filter by type and created range. Webhooks are push over this log, never the only copy of it. SERVES `gateway.request.completed` and `gateway.request.settled` ONLY. The governance families (`gateway.budget.*`, `gateway.virtual_key.*`) are delivered by webhook but are not retained in a queryable log, so they cannot be listed or replayed here; any other type returns an empty page rather than an error, so a client can probe forward-compatibly.
+         */
         get: operations["getApiWebhooksV1Events"];
         put?: never;
         post?: never;
@@ -2407,7 +3022,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description One emitted event by its id, as it was delivered. Serves the same families the events log serves. A 404 covers every reason the log cannot answer -- never emitted, past the retention horizon, or belonging to another organization -- because telling those apart would confirm the existence of another tenant's request ids. */
+        /**
+         * Get one emitted event
+         * @description One emitted event by its id, as it was delivered. Serves the same families the events log serves. A 404 covers every reason the log cannot answer -- never emitted, past the retention horizon, or belonging to another organization -- because telling those apart would confirm the existence of another tenant's request ids.
+         */
         get: operations["getApiWebhooksV1EventsById"];
         put?: never;
         post?: never;
@@ -2424,7 +3042,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Reconciliation checksum fast path: per-key spend rollups grouped by virtual key or end user, with token classes and integer nano-USD cost. Settled (unpriced) requests are counted separately as settled_count and never included in cost sums. Diff individual items via /spend-events only when a checksum diverges. Paged by group key ascending: follow next_cursor until it comes back null, because a page that is full does not mean the window held nothing more. */
+        /**
+         * List spend summaries
+         * @description Reconciliation checksum fast path: per-key spend rollups grouped by virtual key or end user, with token classes and integer nano-USD cost. Settled (unpriced) requests are counted separately as settled_count and never included in cost sums. Diff individual items via /spend-events only when a checksum diverges. Paged by group key ascending: follow next_cursor until it comes back null, because a page that is full does not mean the window held nothing more.
+         */
         get: operations["getApiGatewayV1Spend-summaries"];
         put?: never;
         post?: never;
@@ -2441,7 +3062,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Cursor-paged pull over the per-request spend record, ascending by insert order so rows folded late are never skipped by an in-flight cursor. Events are the same canonical objects webhook deliveries carry. Retention is a fixed 13 months, which bounds reconciliation and replay. When feeding a downstream biller, mind its dedup window (Metronome 34 days, Stripe meters 24h+): re-pulling older ranges into a biller past its window can double-bill. */
+        /**
+         * List spend events
+         * @description Cursor-paged pull over the per-request spend record, ascending by insert order so rows folded late are never skipped by an in-flight cursor. Events are the same canonical objects webhook deliveries carry. Retention is a fixed 13 months, which bounds reconciliation and replay. When feeding a downstream biller, mind its dedup window (Metronome 34 days, Stripe meters 24h+): re-pulling older ranges into a biller past its window can double-bill.
+         */
         get: operations["getApiGatewayV1Spend-events"];
         put?: never;
         post?: never;
@@ -2458,7 +3082,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Windowed spend rollup for one external end user across the organization (the /customer/info-style read a rebilling integration polls). `cap` is the applicable attributed-user budget cap and its remaining headroom once such a budget template applies; null until then. */
+        /**
+         * Read one end user's spend
+         * @description Windowed spend rollup for one external end user across the organization (the /customer/info-style read a rebilling integration polls). `cap` is the applicable attributed-user budget cap and its remaining headroom once such a budget template applies; null until then.
+         */
         get: operations["getApiGatewayV1End-usersByIdSpend"];
         put?: never;
         post?: never;
@@ -2477,7 +3104,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Re-delivers the window's spend envelopes to ONE endpoint through the normal delivery path (per-endpoint stream, retry ladder, delivery log), honoring the endpoint's event subscriptions. Envelope ids are UNCHANGED: your consumer's event-id dedup decides what a redelivery means. Mind your downstream billing system's finite dedup window (Metronome 34 days, Stripe 24h+): replaying older than that window can double-bill on your side, so prefer pull-and-diff for old ranges. The window is capped at 7 days and 10,000 envelopes per call; both caps are checked before any delivery is queued, so a refused replay ships nothing. */
+        /**
+         * Replay spend events to an endpoint
+         * @description Re-delivers the window's spend envelopes to ONE endpoint through the normal delivery path (per-endpoint stream, retry ladder, delivery log), honoring the endpoint's event subscriptions. Envelope ids are UNCHANGED: your consumer's event-id dedup decides what a redelivery means. Mind your downstream billing system's finite dedup window (Metronome 34 days, Stripe 24h+): replaying older than that window can double-bill on your side, so prefer pull-and-diff for old ranges. The window is capped at 7 days and 10,000 envelopes per call; both caps are checked before any delivery is queued, so a refused replay ships nothing.
+         */
         post: operations["postApiGatewayV1Spend-eventsReplay"];
         delete?: never;
         options?: never;
@@ -2895,572 +3525,6 @@ export interface operations {
             };
         };
     };
-    listApiKeys: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description List of API keys */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        data?: components["schemas"]["ApiKeyInfo"][];
-                    };
-                };
-            };
-            /** @description Invalid or missing API key token */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Insufficient permissions (requires organization:view) */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    createApiKey: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    /** @description Human-readable name for this token */
-                    name: string;
-                    /** @description Optional description */
-                    description?: string;
-                    /**
-                     * Format: date-time
-                     * @description Optional expiration date (ISO 8601)
-                     */
-                    expiresAt?: string;
-                    /** @description Role bindings that define what this token can access */
-                    bindings: {
-                        /**
-                         * @description Role to grant
-                         * @enum {string}
-                         */
-                        role: "ADMIN" | "MEMBER" | "VIEWER";
-                        /**
-                         * @description Scope level
-                         * @enum {string}
-                         */
-                        scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
-                        /** @description ID of the organization, team, or project */
-                        scopeId: string;
-                    }[];
-                    /**
-                     * @description personal = tied to a user. service = not tied to any user, for automation.
-                     * @default personal
-                     * @enum {string}
-                     */
-                    keyType?: "personal" | "service";
-                    /** @description For service keys with restricted scope: list of project IDs to grant ADMIN access to. Omit for full org access. */
-                    projectIds?: string[];
-                };
-            };
-        };
-        responses: {
-            /** @description API key created. The token field contains the plaintext key — it is only shown once. */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        /** @description Plaintext API key token (sk-lw-...). Store securely — shown only once. */
-                        token?: string;
-                        apiKey?: {
-                            id?: string;
-                            name?: string;
-                            /** Format: date-time */
-                            createdAt?: string;
-                        };
-                    };
-                };
-            };
-            /** @description Invalid or missing API key token */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Requested binding exceeds the creator's own permissions, or scope does not belong to this organization */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Validation error (missing name, empty bindings, etc.) */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    revokeApiKey: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description API key ID */
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description API key revoked successfully */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        success?: boolean;
-                    };
-                };
-            };
-            /** @description Invalid or missing API key token */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Not authorized to revoke this API key (owned by another user) */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description API key not found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description API key is already revoked */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    getEvaluationsV3RunStatus: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description The run ID returned from POST /api/experiments/{slug}/run */
-                runId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Run status */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        runId: string;
-                        /** @enum {string} */
-                        status: "pending" | "running" | "completed" | "failed" | "stopped";
-                        /** @description Number of cells completed */
-                        progress: number;
-                        /** @description Total number of cells */
-                        total: number;
-                        /** @description Unix timestamp when run started */
-                        startedAt?: number;
-                        /** @description Unix timestamp when run finished (only present when completed/failed/stopped) */
-                        finishedAt?: number;
-                        /** @description Execution summary (only present when completed) */
-                        summary?: {
-                            runId?: string;
-                            totalCells?: number;
-                            completedCells?: number;
-                            failedCells?: number;
-                            /** @description Total execution time in milliseconds */
-                            duration?: number;
-                            /** @description URL to view the run in LangWatch */
-                            runUrl?: string;
-                        };
-                        /** @description Error message (only present when failed) */
-                        error?: string;
-                    };
-                };
-            };
-            /** @description Unauthorized - Missing or invalid API key */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                    };
-                };
-            };
-            /** @description Run not found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                    };
-                };
-            };
-        };
-    };
-    postEvaluationsV3Run: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description The slug of the evaluation to run */
-                slug: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Run started successfully */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        /** @description Unique identifier for this run */
-                        runId: string;
-                        /**
-                         * @description Initial status of the run
-                         * @enum {string}
-                         */
-                        status: "running";
-                        /** @description Total number of cells to execute */
-                        total: number;
-                        /** @description URL to view the run in LangWatch */
-                        runUrl?: string;
-                    };
-                    "text/event-stream": string;
-                };
-            };
-            /** @description Unauthorized - Missing or invalid API key */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                    };
-                };
-            };
-            /** @description Evaluation not found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                    };
-                };
-            };
-        };
-    };
-    listProjects: {
-        parameters: {
-            query?: {
-                page?: number;
-                limit?: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Paginated list of projects */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        data?: components["schemas"]["Project"][];
-                        pagination?: components["schemas"]["Pagination"];
-                    };
-                };
-            };
-            /** @description Invalid or missing API key token */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Insufficient permissions for this operation */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    createProject: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    /** @description Project name */
-                    name: string;
-                    /** @description ID of an existing team to assign the project to */
-                    teamId?: string;
-                    /** @description Name for a new team to create and assign the project to */
-                    newTeamName?: string;
-                    /** @description Programming language (e.g. python, typescript) */
-                    language: string;
-                    /** @description Framework (e.g. langchain, vercel-ai, openai) */
-                    framework: string;
-                };
-            };
-        };
-        responses: {
-            /** @description Project created. Returns a scoped service API key for this project. */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Project"] & {
-                        /** @description Scoped service API key with ADMIN on this project (sk-lw-..._...). Store securely — shown only once. */
-                        serviceApiKey?: string;
-                        /** @description ID of the auto-created service key, for management via DELETE /api/api-keys/{id}. */
-                        serviceApiKeyId?: string;
-                    };
-                };
-            };
-            /** @description Team does not belong to this organization */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Invalid or missing API key token */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Insufficient permissions (requires project:create) */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description A project with this name already exists in the team */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Validation error (missing required fields) */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    getProject: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Project ID (project_...) */
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Project details. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Project"];
-                };
-            };
-            /** @description Invalid or missing API key token */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Insufficient permissions for this operation */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Project not found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    archiveProject: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Project ID */
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Project archived */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        id?: string;
-                        name?: string;
-                        /** Format: date-time */
-                        archivedAt?: string;
-                    };
-                };
-            };
-            /** @description Invalid or missing API key token */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Insufficient permissions (requires project:delete) */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Project not found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    updateProject: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Project ID */
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    name?: string;
-                    language?: string;
-                    framework?: string;
-                    /** @enum {string} */
-                    piiRedactionLevel?: "STRICT" | "ESSENTIAL" | "DISABLED";
-                };
-            };
-        };
-        responses: {
-            /** @description Updated project */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Project"];
-                };
-            };
-            /** @description Invalid or missing API key token */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Insufficient permissions (requires project:update) */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Project not found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
     "getApiModel-defaults": {
         parameters: {
             query?: never;
@@ -3799,6 +3863,308 @@ export interface operations {
             };
         };
     };
+    getApiTeams: {
+        parameters: {
+            query?: {
+                page?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: never;
+    };
+    postApiTeams: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    name: string;
+                };
+            };
+        };
+        responses: never;
+    };
+    getApiTeamsById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: never;
+    };
+    deleteApiTeamsById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: never;
+    };
+    patchApiTeamsById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    name?: string;
+                };
+            };
+        };
+        responses: never;
+    };
+    getApiTeamsByIdMembers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: never;
+    };
+    postApiTeamsByIdMembers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    userId: string;
+                    /**
+                     * @default MEMBER
+                     * @enum {string}
+                     */
+                    role?: "ADMIN" | "MEMBER" | "VIEWER" | "CUSTOM";
+                };
+            };
+        };
+        responses: never;
+    };
+    deleteApiTeamsByIdMembersByUserId: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: never;
+    };
+    getApiTeamsByIdProjects: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: never;
+    };
+    getApiGroups: {
+        parameters: {
+            query?: {
+                page?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: never;
+    };
+    postApiGroups: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    name: string;
+                    bindings?: {
+                        /** @enum {string} */
+                        role: "ADMIN" | "MEMBER" | "VIEWER" | "CUSTOM";
+                        customRoleId?: string;
+                        /** @enum {string} */
+                        scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
+                        scopeId: string;
+                    }[];
+                    memberIds?: string[];
+                };
+            };
+        };
+        responses: never;
+    };
+    getApiGroupsById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: never;
+    };
+    deleteApiGroupsById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: never;
+    };
+    patchApiGroupsById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    name: string;
+                };
+            };
+        };
+        responses: never;
+    };
+    getApiGroupsByIdMembers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: never;
+    };
+    postApiGroupsByIdMembers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    userId: string;
+                };
+            };
+        };
+        responses: never;
+    };
+    deleteApiGroupsByIdMembersByUserId: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: never;
+    };
+    getApiGroupsByIdBindings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: never;
+    };
+    postApiGroupsByIdBindings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    role: "ADMIN" | "MEMBER" | "VIEWER" | "CUSTOM";
+                    customRoleId?: string;
+                    /** @enum {string} */
+                    scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
+                    scopeId: string;
+                };
+            };
+        };
+        responses: never;
+    };
+    deleteApiGroupsByIdBindingsByBindingId: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                bindingId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: never;
+    };
     getApiAgents: {
         parameters: {
             query?: {
@@ -3881,6 +4247,171 @@ export interface operations {
             };
         };
         responses: never;
+    };
+    listApiKeys: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description List of API keys */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data?: components["schemas"]["ApiKeyInfo"][];
+                    };
+                };
+            };
+            /** @description Invalid or missing API key token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Insufficient permissions (requires organization:view) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    createApiKey: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    /**
+                     * @description A personal key acts as the user who created it and needs explicit bindings. A service key is not tied to a user.
+                     * @default personal
+                     * @enum {string}
+                     */
+                    keyType?: "personal" | "service";
+                    /** @description Human-readable name for this key */
+                    name: string;
+                    description?: string;
+                    /** @description ISO 8601 timestamp after which the key stops working */
+                    expiresAt?: string;
+                    /** @description What this key may do, and where. Required for a personal key. */
+                    bindings?: {
+                        /** @enum {string} */
+                        role: "ADMIN" | "MEMBER" | "VIEWER";
+                        /** @enum {string} */
+                        scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
+                        scopeId: string;
+                    }[];
+                    /** @description Service keys only: restricts the key to these projects */
+                    projectIds?: string[];
+                };
+            };
+        };
+        responses: {
+            /** @description API key created. The token field contains the plaintext key — it is only shown once. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Plaintext API key token (sk-lw-...). Store securely — shown only once. */
+                        token?: string;
+                        apiKey?: {
+                            id?: string;
+                            name?: string;
+                            /** Format: date-time */
+                            createdAt?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Invalid or missing API key token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Requested binding exceeds the creator's own permissions, or scope does not belong to this organization */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation error (missing name, empty bindings, etc.) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    revokeApiKey: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description API key ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description API key revoked successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        success?: boolean;
+                    };
+                };
+            };
+            /** @description Invalid or missing API key token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not authorized to revoke this API key (owned by another user) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description API key not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description API key is already revoked */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
     };
     postApiAnalyticsTimeseries: {
         parameters: {
@@ -5380,6 +5911,2769 @@ export interface operations {
             };
         };
     };
+    getApiExperiments: {
+        parameters: {
+            query?: {
+                /** @description 1-based page number */
+                page?: number;
+                /** @description Experiments per page, capped at 200 */
+                pageSize?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        experiments: {
+                            id: string;
+                            slug: string;
+                            name: string | null;
+                            type: string;
+                            workflowId: string | null;
+                            createdAt: string;
+                            updatedAt: string;
+                            runsCount: number;
+                            lastRunAt: string | null;
+                        }[];
+                        pagination: {
+                            page: number;
+                            pageSize: number;
+                            totalHits: number;
+                            hasMore: boolean;
+                        };
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    getApiEvaluationsList: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The evaluator catalogue */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Keyed by evaluator id, the value you put in the evaluate path */
+                        evaluators: {
+                            [key: string]: {
+                                /** @description Display name of the evaluator */
+                                name: string;
+                                description: string;
+                                category: string;
+                                docsUrl?: string;
+                                /** @description Whether this evaluator can gate a request as a guardrail */
+                                isGuardrail: boolean;
+                                /** @description `data` keys the evaluate call must supply */
+                                requiredFields: string[];
+                                optionalFields: string[];
+                                /** @description Each setting's default and description */
+                                settings: {
+                                    [key: string]: unknown;
+                                };
+                                /** @description JSON Schema for this evaluator's settings object */
+                                settings_json_schema: {
+                                    [key: string]: unknown;
+                                };
+                                /** @description Server-side variables the evaluator needs configured */
+                                envVars: string[];
+                                /** @description What its score, passed and label mean */
+                                result: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                        };
+                    };
+                };
+            };
+        };
+    };
+    postApiEvaluationsBatchLog_results: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    run_id?: string;
+                    workflow_version_id?: string | null;
+                    progress?: number | null;
+                    total?: number | null;
+                    dataset?: {
+                        index: number;
+                        target_id?: string | null;
+                        entry: {
+                            [key: string]: unknown;
+                        };
+                        predicted?: {
+                            [key: string]: unknown;
+                        };
+                        cost?: number | null;
+                        duration?: number | null;
+                        error?: string | null;
+                        trace_id?: string | null;
+                    }[];
+                    evaluations?: {
+                        evaluator: string;
+                        name?: string | null;
+                        target_id?: string | null;
+                        status: "processed" | "skipped" | "error";
+                        index: number;
+                        duration?: number | null;
+                        inputs?: {
+                            [key: string]: unknown;
+                        };
+                        score?: number | null;
+                        label?: string | null;
+                        passed?: boolean | null;
+                        details?: string | null;
+                        cost?: number | null;
+                    }[];
+                } & {
+                    experiment_id?: string | null;
+                    experiment_slug?: string | null;
+                    run_id: string | null;
+                    workflow_id?: string | null;
+                    name?: string | null;
+                    targets?: ({
+                        id: string;
+                        name: string;
+                        prompt_id?: string | null;
+                        prompt_version?: number | null;
+                        agent_id?: string | null;
+                        evaluator_id?: string | null;
+                        model?: string | null;
+                        metadata?: {
+                            [key: string]: string | number | boolean;
+                        } | null;
+                    } & {
+                        type?: "prompt" | "agent" | "evaluator" | "workflow" | "custom";
+                    })[] | null;
+                    timestamps?: {
+                        created_at?: number | null;
+                        finished_at?: number | null;
+                        stopped_at?: number | null;
+                    };
+                };
+            };
+        };
+        responses: {
+            /** @description The rows were recorded */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Human-readable confirmation */
+                        message: string;
+                    };
+                };
+            };
+            /** @description The request was not sent as application/json, failed validation, named neither experiment_id nor experiment_slug, or carried timestamps in seconds rather than milliseconds */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Set when the request was rejected before validation */
+                        message?: string;
+                        /** @description Set when the body parsed and then failed validation */
+                        error?: string;
+                    };
+                };
+            };
+            /** @description Missing or invalid API key */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The failure, as a sentence */
+                        error: string;
+                        /** @description Stable failure code, on the failures that carry one */
+                        kind?: string;
+                        /** @description What the code needs to be acted on, such as the missing field */
+                        meta?: {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+            };
+            /** @description The API key lacks evaluations:manage */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The failure, as a sentence */
+                        error: string;
+                        /** @description Stable failure code, on the failures that carry one */
+                        kind?: string;
+                        /** @description What the code needs to be acted on, such as the missing field */
+                        meta?: {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    postApiEvaluationsByEvaluatorEvaluate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Which evaluator to run. Either a built-in id (`ragas/faithfulness`), the slug of a monitor configured in this project, or `evaluators/{slug|id}` for a saved evaluator. `GET /api/evaluations/list` returns the built-in ids. */
+                evaluator: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description What the evaluator scores. Which fields are required depends on the evaluator; its own entry under Built-in Evaluators lists them. */
+                    data: {
+                        [key: string]: unknown;
+                    };
+                    /** @description Per-call overrides of the evaluator's settings. Anything omitted falls back to the saved evaluator or monitor, then to the evaluator's own defaults. */
+                    settings?: {
+                        [key: string]: unknown;
+                    };
+                    /** @description Attaches the result to a trace you already sent */
+                    trace_id?: string | null;
+                    /** @description Supply your own id to make the call idempotent */
+                    evaluation_id?: string | null;
+                    evaluator_id?: string | null;
+                    /** @description Overrides the name the result is recorded under */
+                    name?: string | null;
+                    /** @description Evaluate as a guardrail: a skipped or failed evaluation answers `passed` rather than an error, so a caller can gate on one field. The /api/guardrails path sets this for you. */
+                    as_guardrail?: boolean | null;
+                };
+            };
+        };
+        responses: {
+            /** @description The evaluator ran, declined, or failed. Branch on `status`; in guardrail mode `passed` is set on all three. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        status: "processed";
+                        score?: number;
+                        passed?: boolean;
+                        label?: string;
+                        details?: string;
+                        /** @description What running the evaluator cost */
+                        cost?: {
+                            currency: string;
+                            amount: number;
+                        };
+                        /** @description The evaluator's own output, unprocessed */
+                        raw_response?: unknown;
+                    } | {
+                        /** @constant */
+                        status: "skipped";
+                        /** @description Why the evaluator declined to score this input */
+                        details?: string;
+                        /** @description Always true in guardrail mode, so a skip does not block */
+                        passed?: boolean;
+                    } | {
+                        /** @constant */
+                        status: "error";
+                        /**
+                         * @description Constant: the evaluator's own type is not exposed
+                         * @constant
+                         */
+                        error_type: "EVALUATOR_ERROR";
+                        details: string;
+                        /** @description Always true in guardrail mode, so a failure does not block */
+                        passed?: boolean;
+                    };
+                };
+            };
+            /** @description The body was not valid JSON, failed validation, or omitted a field this evaluator requires */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The failure, as a sentence */
+                        error: string;
+                        /** @description Stable failure code, on the failures that carry one */
+                        kind?: string;
+                        /** @description What the code needs to be acted on, such as the missing field */
+                        meta?: {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+            };
+            /** @description Missing or invalid API key */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The failure, as a sentence */
+                        error: string;
+                        /** @description Stable failure code, on the failures that carry one */
+                        kind?: string;
+                        /** @description What the code needs to be acted on, such as the missing field */
+                        meta?: {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+            };
+            /** @description The API key lacks evaluations:manage */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The failure, as a sentence */
+                        error: string;
+                        /** @description Stable failure code, on the failures that carry one */
+                        kind?: string;
+                        /** @description What the code needs to be acted on, such as the missing field */
+                        meta?: {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+            };
+            /** @description No evaluator answers to that id */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The failure, as a sentence */
+                        error: string;
+                        /** @description Stable failure code, on the failures that carry one */
+                        kind?: string;
+                        /** @description What the code needs to be acted on, such as the missing field */
+                        meta?: {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    postApiEvaluationsByEvaluatorBySubpathEvaluate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description First segment of the evaluator id, such as `ragas` */
+                evaluator: string;
+                /** @description Second segment of the evaluator id, such as `faithfulness` */
+                subpath: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description What the evaluator scores. Which fields are required depends on the evaluator; its own entry under Built-in Evaluators lists them. */
+                    data: {
+                        [key: string]: unknown;
+                    };
+                    /** @description Per-call overrides of the evaluator's settings. Anything omitted falls back to the saved evaluator or monitor, then to the evaluator's own defaults. */
+                    settings?: {
+                        [key: string]: unknown;
+                    };
+                    /** @description Attaches the result to a trace you already sent */
+                    trace_id?: string | null;
+                    /** @description Supply your own id to make the call idempotent */
+                    evaluation_id?: string | null;
+                    evaluator_id?: string | null;
+                    /** @description Overrides the name the result is recorded under */
+                    name?: string | null;
+                    /** @description Evaluate as a guardrail: a skipped or failed evaluation answers `passed` rather than an error, so a caller can gate on one field. The /api/guardrails path sets this for you. */
+                    as_guardrail?: boolean | null;
+                };
+            };
+        };
+        responses: {
+            /** @description The evaluator ran, declined, or failed. Branch on `status`; in guardrail mode `passed` is set on all three. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        status: "processed";
+                        score?: number;
+                        passed?: boolean;
+                        label?: string;
+                        details?: string;
+                        /** @description What running the evaluator cost */
+                        cost?: {
+                            currency: string;
+                            amount: number;
+                        };
+                        /** @description The evaluator's own output, unprocessed */
+                        raw_response?: unknown;
+                    } | {
+                        /** @constant */
+                        status: "skipped";
+                        /** @description Why the evaluator declined to score this input */
+                        details?: string;
+                        /** @description Always true in guardrail mode, so a skip does not block */
+                        passed?: boolean;
+                    } | {
+                        /** @constant */
+                        status: "error";
+                        /**
+                         * @description Constant: the evaluator's own type is not exposed
+                         * @constant
+                         */
+                        error_type: "EVALUATOR_ERROR";
+                        details: string;
+                        /** @description Always true in guardrail mode, so a failure does not block */
+                        passed?: boolean;
+                    };
+                };
+            };
+            /** @description The body was not valid JSON, failed validation, or omitted a field this evaluator requires */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The failure, as a sentence */
+                        error: string;
+                        /** @description Stable failure code, on the failures that carry one */
+                        kind?: string;
+                        /** @description What the code needs to be acted on, such as the missing field */
+                        meta?: {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+            };
+            /** @description Missing or invalid API key */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The failure, as a sentence */
+                        error: string;
+                        /** @description Stable failure code, on the failures that carry one */
+                        kind?: string;
+                        /** @description What the code needs to be acted on, such as the missing field */
+                        meta?: {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+            };
+            /** @description The API key lacks evaluations:manage */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The failure, as a sentence */
+                        error: string;
+                        /** @description Stable failure code, on the failures that carry one */
+                        kind?: string;
+                        /** @description What the code needs to be acted on, such as the missing field */
+                        meta?: {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+            };
+            /** @description No evaluator answers to that id */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The failure, as a sentence */
+                        error: string;
+                        /** @description Stable failure code, on the failures that carry one */
+                        kind?: string;
+                        /** @description What the code needs to be acted on, such as the missing field */
+                        meta?: {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    postApiGuardrailsByEvaluatorEvaluate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Which evaluator to run. Either a built-in id (`ragas/faithfulness`), the slug of a monitor configured in this project, or `evaluators/{slug|id}` for a saved evaluator. `GET /api/evaluations/list` returns the built-in ids. */
+                evaluator: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description What the evaluator scores. Which fields are required depends on the evaluator; its own entry under Built-in Evaluators lists them. */
+                    data: {
+                        [key: string]: unknown;
+                    };
+                    /** @description Per-call overrides of the evaluator's settings. Anything omitted falls back to the saved evaluator or monitor, then to the evaluator's own defaults. */
+                    settings?: {
+                        [key: string]: unknown;
+                    };
+                    /** @description Attaches the result to a trace you already sent */
+                    trace_id?: string | null;
+                    /** @description Supply your own id to make the call idempotent */
+                    evaluation_id?: string | null;
+                    evaluator_id?: string | null;
+                    /** @description Overrides the name the result is recorded under */
+                    name?: string | null;
+                    /** @description Evaluate as a guardrail: a skipped or failed evaluation answers `passed` rather than an error, so a caller can gate on one field. The /api/guardrails path sets this for you. */
+                    as_guardrail?: boolean | null;
+                };
+            };
+        };
+        responses: {
+            /** @description The evaluator ran, declined, or failed. Branch on `status`; in guardrail mode `passed` is set on all three. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        status: "processed";
+                        score?: number;
+                        passed?: boolean;
+                        label?: string;
+                        details?: string;
+                        /** @description What running the evaluator cost */
+                        cost?: {
+                            currency: string;
+                            amount: number;
+                        };
+                        /** @description The evaluator's own output, unprocessed */
+                        raw_response?: unknown;
+                    } | {
+                        /** @constant */
+                        status: "skipped";
+                        /** @description Why the evaluator declined to score this input */
+                        details?: string;
+                        /** @description Always true in guardrail mode, so a skip does not block */
+                        passed?: boolean;
+                    } | {
+                        /** @constant */
+                        status: "error";
+                        /**
+                         * @description Constant: the evaluator's own type is not exposed
+                         * @constant
+                         */
+                        error_type: "EVALUATOR_ERROR";
+                        details: string;
+                        /** @description Always true in guardrail mode, so a failure does not block */
+                        passed?: boolean;
+                    };
+                };
+            };
+            /** @description The body was not valid JSON, failed validation, or omitted a field this evaluator requires */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The failure, as a sentence */
+                        error: string;
+                        /** @description Stable failure code, on the failures that carry one */
+                        kind?: string;
+                        /** @description What the code needs to be acted on, such as the missing field */
+                        meta?: {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+            };
+            /** @description Missing or invalid API key */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The failure, as a sentence */
+                        error: string;
+                        /** @description Stable failure code, on the failures that carry one */
+                        kind?: string;
+                        /** @description What the code needs to be acted on, such as the missing field */
+                        meta?: {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+            };
+            /** @description The API key lacks evaluations:manage */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The failure, as a sentence */
+                        error: string;
+                        /** @description Stable failure code, on the failures that carry one */
+                        kind?: string;
+                        /** @description What the code needs to be acted on, such as the missing field */
+                        meta?: {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+            };
+            /** @description No evaluator answers to that id */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The failure, as a sentence */
+                        error: string;
+                        /** @description Stable failure code, on the failures that carry one */
+                        kind?: string;
+                        /** @description What the code needs to be acted on, such as the missing field */
+                        meta?: {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    postApiDatasetEvaluate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description Which evaluator to run, addressed the same way the evaluate endpoints address it */
+                    evaluation: string;
+                    /** @description The saved dataset to evaluate */
+                    datasetSlug: string;
+                    /** @description Groups the results under an experiment. Omit it and a batch id is generated instead. */
+                    experimentSlug?: string;
+                    /** @description Older name for experimentSlug, used when that is absent */
+                    batchId?: string;
+                    /** @description Extra fields merged into every row before evaluating */
+                    data?: {
+                        [key: string]: unknown;
+                    } | null;
+                    /** @description Per-call overrides of the evaluator's settings */
+                    settings?: {
+                        [key: string]: unknown;
+                    } | null;
+                };
+            };
+        };
+        responses: {
+            /** @description The evaluator ran; branch on `status` */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        status: "processed";
+                        score?: number;
+                        passed?: boolean;
+                        label?: string;
+                        details?: string;
+                        /** @description What running the evaluator cost */
+                        cost?: {
+                            currency: string;
+                            amount: number;
+                        };
+                        /** @description The evaluator's own output, unprocessed */
+                        raw_response?: unknown;
+                    } | {
+                        /** @constant */
+                        status: "skipped";
+                        /** @description Why the evaluator declined to score this input */
+                        details?: string;
+                        /** @description Always true in guardrail mode, so a skip does not block */
+                        passed?: boolean;
+                    } | {
+                        /** @constant */
+                        status: "error";
+                        /**
+                         * @description Constant: the evaluator's own type is not exposed
+                         * @constant
+                         */
+                        error_type: "EVALUATOR_ERROR";
+                        details: string;
+                        /** @description Always true in guardrail mode, so a failure does not block */
+                        passed?: boolean;
+                    };
+                };
+            };
+            /** @description The body was not valid JSON, failed validation, or named an evaluator that does not exist */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Set when the request was rejected before validation */
+                        message?: string;
+                        /** @description Set when the body parsed and then failed validation */
+                        error?: string;
+                    };
+                };
+            };
+            /** @description Missing or invalid API key */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Set when the request was rejected before validation */
+                        message?: string;
+                        /** @description Set when the body parsed and then failed validation */
+                        error?: string;
+                    };
+                };
+            };
+            /** @description The API key lacks evaluations:manage */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The failure, as a sentence */
+                        error: string;
+                        /** @description Stable failure code, on the failures that carry one */
+                        kind?: string;
+                        /** @description What the code needs to be acted on, such as the missing field */
+                        meta?: {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+            };
+            /** @description No dataset with that slug */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The failure, as a sentence */
+                        error: string;
+                        /** @description Stable failure code, on the failures that carry one */
+                        kind?: string;
+                        /** @description What the code needs to be acted on, such as the missing field */
+                        meta?: {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    postApiExperimentsBySlugRun: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    /** @description Rows to evaluate inline, instead of the experiment's saved dataset. Mutually exclusive with dataset_id. */
+                    data?: {
+                        [key: string]: unknown;
+                    }[];
+                    /** @description A saved dataset to evaluate, instead of the one the experiment is configured with. Mutually exclusive with data. */
+                    dataset_id?: string;
+                    /** @description Constant inputs applied to every row, overriding fields of the same name */
+                    parameters?: {
+                        [key: string]: string | number | boolean;
+                    };
+                    /** @description Run only these rows of the dataset, by zero-based index */
+                    row_indices?: number[];
+                };
+            };
+        };
+        responses: {
+            /** @description Run started */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Identifier to poll this run with */
+                        runId: string;
+                        /** @constant */
+                        status: "running";
+                        /** @description Number of cells this run will execute */
+                        total: number;
+                        /** @description Link to the run in the LangWatch app */
+                        runUrl?: string;
+                    };
+                    "text/event-stream": string;
+                };
+            };
+            /** @description The body was not valid JSON, failed input validation, or the experiment has no dataset configured */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                    };
+                };
+            };
+            /** @description Missing or invalid API key, or the key lacks the permission */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Stable failure code; branch on this */
+                        error: string;
+                        message?: string;
+                        /** @description Who the failure is attributable to: customer, platform, provider */
+                        fault?: string;
+                        tips?: string[];
+                        docsUrl?: string;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description No such experiment or run in this project */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Stable failure code; branch on this */
+                        error: string;
+                        message?: string;
+                        /** @description Who the failure is attributable to: customer, platform, provider */
+                        fault?: string;
+                        tips?: string[];
+                        docsUrl?: string;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getApiExperimentsRuns: {
+        parameters: {
+            query: {
+                /** @description Slug of the experiment whose runs you want */
+                experimentSlug: string;
+                /** @description 1-based page number */
+                page?: number;
+                /** @description Runs per page, capped at 200 */
+                pageSize?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Runs for the experiment */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        experimentId: string;
+                        experimentSlug: string;
+                        runs: {
+                            experimentId: string;
+                            runId: string;
+                            workflowVersion: {
+                                id: string;
+                                version: string;
+                                commitMessage: string;
+                                author: {
+                                    name: string | null;
+                                    image: string | null;
+                                } | null;
+                            } | null;
+                            timestamps: {
+                                createdAt: number;
+                                updatedAt: number;
+                                finishedAt?: number | null;
+                                stoppedAt?: number | null;
+                            };
+                            progress?: number | null;
+                            total?: number | null;
+                            summary: {
+                                datasetCost?: number;
+                                evaluationsCost?: number;
+                                datasetAverageCost?: number;
+                                datasetAverageDuration?: number;
+                                evaluationsAverageCost?: number;
+                                evaluationsAverageDuration?: number;
+                                evaluations: {
+                                    [key: string]: {
+                                        name: string;
+                                        averageScore: number | null;
+                                        averagePassed?: number;
+                                    };
+                                };
+                            };
+                        }[];
+                        pagination: {
+                            page: number;
+                            pageSize: number;
+                            totalHits: number;
+                            hasMore: boolean;
+                        };
+                    };
+                };
+            };
+            /** @description experimentSlug was not supplied */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                    };
+                };
+            };
+            /** @description Missing or invalid API key, or the key lacks the permission */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Stable failure code; branch on this */
+                        error: string;
+                        message?: string;
+                        /** @description Who the failure is attributable to: customer, platform, provider */
+                        fault?: string;
+                        tips?: string[];
+                        docsUrl?: string;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description No such experiment or run in this project */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Stable failure code; branch on this */
+                        error: string;
+                        message?: string;
+                        /** @description Who the failure is attributable to: customer, platform, provider */
+                        fault?: string;
+                        tips?: string[];
+                        docsUrl?: string;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getApiExperimentsRunsByRunId: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                runId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Run state */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        runId: string;
+                        /** @enum {string} */
+                        status: "pending" | "running" | "completed" | "failed" | "stopped";
+                        /** @description Cells finished so far */
+                        progress: number;
+                        /** @description Cells in the run */
+                        total: number;
+                        /** @description Unix milliseconds */
+                        startedAt?: number;
+                        /** @description Unix milliseconds; set once the run is no longer running */
+                        finishedAt?: number;
+                        /** @description Present when completed */
+                        summary?: {
+                            runId: string;
+                            /** @description Cells the run set out to execute */
+                            totalCells: number;
+                            completedCells: number;
+                            failedCells: number;
+                            /** @description Wall-clock milliseconds */
+                            duration: number;
+                            /** @description Non-zero means some rows may be missing from the stored results */
+                            chDispatchFailures?: number;
+                            timestamps: {
+                                startedAt: number;
+                                finishedAt?: number;
+                                stoppedAt?: number;
+                            };
+                            targets?: {
+                                targetId: string;
+                                name: string;
+                                passed: number;
+                                failed: number;
+                                avgLatency: number;
+                                totalCost: number;
+                            }[];
+                            evaluators?: {
+                                evaluatorId: string;
+                                name: string;
+                                passed: number;
+                                failed: number;
+                                passRate: number;
+                                avgScore?: number;
+                            }[];
+                            totalPassed?: number;
+                            totalFailed?: number;
+                            passRate?: number;
+                            totalCost?: number;
+                            /** @description Link to the run in the LangWatch app */
+                            runUrl?: string;
+                        };
+                        /** @description Stable failure code, present when failed. Not display copy: render your own wording keyed on it. */
+                        error?: string;
+                        /** @description The full failure envelope, when the failure carried one */
+                        domainError?: {
+                            /** @description Stable failure code; branch on this */
+                            code: string;
+                            /** @description Deprecated alias of code, for older clients */
+                            kind: string;
+                            message?: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            httpStatus?: number;
+                            /** @description Who the failure is attributable to: customer, platform, provider */
+                            fault?: string;
+                            traceId?: string;
+                            tips?: string[];
+                            docsUrl?: string;
+                        };
+                        /** @description Trace id for failures that carry no code, to quote in support */
+                        traceId?: string;
+                    };
+                };
+            };
+            /** @description Missing or invalid API key, or the key lacks the permission */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Stable failure code; branch on this */
+                        error: string;
+                        message?: string;
+                        /** @description Who the failure is attributable to: customer, platform, provider */
+                        fault?: string;
+                        tips?: string[];
+                        docsUrl?: string;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description No such experiment or run in this project */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Stable failure code; branch on this */
+                        error: string;
+                        message?: string;
+                        /** @description Who the failure is attributable to: customer, platform, provider */
+                        fault?: string;
+                        tips?: string[];
+                        docsUrl?: string;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getApiExperimentsRunsByRunIdResults: {
+        parameters: {
+            query?: {
+                /** @description Owning experiment. Required once the run has aged out of the status cache. */
+                experimentSlug?: string;
+            };
+            header?: never;
+            path: {
+                runId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Rows and evaluations for the run */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        experimentId: string;
+                        runId: string;
+                        projectId: string;
+                        workflowVersionId?: string | null;
+                        progress?: number | null;
+                        total?: number | null;
+                        /** @description Resolves the targetId each dataset row and evaluation carries */
+                        targets?: {
+                            id: string;
+                            name: string;
+                            type: string;
+                            promptId?: string | null;
+                            promptVersion?: number | null;
+                            agentId?: string | null;
+                            evaluatorId?: string | null;
+                            model?: string | null;
+                            metadata?: {
+                                [key: string]: string | number | boolean;
+                            } | null;
+                        }[] | null;
+                        /** @description One row per dataset entry, with what the target predicted */
+                        dataset: {
+                            index: number;
+                            targetId?: string | null;
+                            entry: {
+                                [key: string]: unknown;
+                            };
+                            predicted?: {
+                                [key: string]: unknown;
+                            };
+                            cost?: number | null;
+                            duration?: number | null;
+                            /** @description The engine's own string. Prefer domainError.code to branch on */
+                            error?: string | null;
+                            /** @description Set on rows written since failures started carrying codes */
+                            domainError?: {
+                                /** @description Stable failure code; branch on this */
+                                code: string;
+                                /** @description Deprecated alias of code, for older clients */
+                                kind: string;
+                                message?: string;
+                                meta?: {
+                                    [key: string]: unknown;
+                                };
+                                httpStatus?: number;
+                                /** @description Who the failure is attributable to: customer, platform, provider */
+                                fault?: string;
+                                traceId?: string;
+                                tips?: string[];
+                                docsUrl?: string;
+                            };
+                            traceId?: string | null;
+                        }[];
+                        /** @description One row per evaluator per dataset entry */
+                        evaluations: {
+                            evaluator: string;
+                            name?: string | null;
+                            targetId?: string | null;
+                            /** @enum {string} */
+                            status: "processed" | "skipped" | "error";
+                            index: number;
+                            score?: number | null;
+                            label?: string | null;
+                            passed?: boolean | null;
+                            details?: string | null;
+                            cost?: number | null;
+                            duration?: number | null;
+                            inputs?: {
+                                [key: string]: unknown;
+                            } | null;
+                        }[];
+                        timestamps: {
+                            createdAt: number;
+                            updatedAt: number;
+                            finishedAt?: number | null;
+                            stoppedAt?: number | null;
+                        };
+                    };
+                };
+            };
+            /** @description Missing or invalid API key, or the key lacks the permission */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Stable failure code; branch on this */
+                        error: string;
+                        message?: string;
+                        /** @description Who the failure is attributable to: customer, platform, provider */
+                        fault?: string;
+                        tips?: string[];
+                        docsUrl?: string;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description No such experiment or run in this project */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Stable failure code; branch on this */
+                        error: string;
+                        message?: string;
+                        /** @description Who the failure is attributable to: customer, platform, provider */
+                        fault?: string;
+                        tips?: string[];
+                        docsUrl?: string;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    postApiAnalytics: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    startDate: number;
+                    endDate: number;
+                    query?: string;
+                    /** @default {} */
+                    filters?: {
+                        "topics.topics": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "topics.subtopics": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "metadata.user_id": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "metadata.thread_id": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "metadata.customer_id": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "metadata.labels": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "metadata.key": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "metadata.value": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "metadata.prompt_ids": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "traces.origin": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "traces.error": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "traces.name": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "spans.type": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "spans.model": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "evaluations.evaluator_id": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "evaluations.evaluator_id.guardrails_only": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "evaluations.evaluator_id.has_passed": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "evaluations.evaluator_id.has_score": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "evaluations.evaluator_id.has_label": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "evaluations.passed": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "evaluations.score": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "evaluations.state": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "evaluations.label": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "events.event_type": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "events.metrics.key": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "events.metrics.value": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "events.event_details.key": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "annotations.hasAnnotation": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                    };
+                    traceIds?: string[];
+                    negateFilters?: boolean;
+                    series: {
+                        /** @enum {string} */
+                        metric: "metadata.trace_id" | "metadata.user_id" | "metadata.thread_id" | "metadata.span_type" | "sentiment.thumbs_up_down" | "performance.completion_time" | "performance.first_token" | "performance.total_cost" | "performance.cost_billed" | "performance.cost_non_billed" | "performance.prompt_tokens" | "performance.completion_tokens" | "performance.cache_read_tokens" | "performance.cache_write_tokens" | "performance.reasoning_tokens" | "performance.total_processed_tokens" | "performance.total_tokens" | "performance.tokens_per_second" | "events.event_type" | "events.event_score" | "events.event_details" | "evaluations.evaluation_score" | "evaluations.evaluation_pass_rate" | "evaluations.evaluation_runs" | "threads.average_duration_per_thread";
+                        key?: string;
+                        subkey?: string;
+                        /** @enum {string} */
+                        aggregation: "terms" | "cardinality" | "avg" | "sum" | "min" | "max" | "median" | "p99" | "p95" | "p90";
+                        pipeline?: {
+                            /** @enum {string} */
+                            field: "trace_id" | "user_id" | "thread_id" | "customer_id";
+                            /** @enum {string} */
+                            aggregation: "sum" | "avg" | "min" | "max";
+                        };
+                        filters?: {
+                            "topics.topics": string[] | {
+                                [key: string]: string[];
+                            } | {
+                                [key: string]: {
+                                    [key: string]: string[];
+                                };
+                            };
+                            "topics.subtopics": string[] | {
+                                [key: string]: string[];
+                            } | {
+                                [key: string]: {
+                                    [key: string]: string[];
+                                };
+                            };
+                            "metadata.user_id": string[] | {
+                                [key: string]: string[];
+                            } | {
+                                [key: string]: {
+                                    [key: string]: string[];
+                                };
+                            };
+                            "metadata.thread_id": string[] | {
+                                [key: string]: string[];
+                            } | {
+                                [key: string]: {
+                                    [key: string]: string[];
+                                };
+                            };
+                            "metadata.customer_id": string[] | {
+                                [key: string]: string[];
+                            } | {
+                                [key: string]: {
+                                    [key: string]: string[];
+                                };
+                            };
+                            "metadata.labels": string[] | {
+                                [key: string]: string[];
+                            } | {
+                                [key: string]: {
+                                    [key: string]: string[];
+                                };
+                            };
+                            "metadata.key": string[] | {
+                                [key: string]: string[];
+                            } | {
+                                [key: string]: {
+                                    [key: string]: string[];
+                                };
+                            };
+                            "metadata.value": string[] | {
+                                [key: string]: string[];
+                            } | {
+                                [key: string]: {
+                                    [key: string]: string[];
+                                };
+                            };
+                            "metadata.prompt_ids": string[] | {
+                                [key: string]: string[];
+                            } | {
+                                [key: string]: {
+                                    [key: string]: string[];
+                                };
+                            };
+                            "traces.origin": string[] | {
+                                [key: string]: string[];
+                            } | {
+                                [key: string]: {
+                                    [key: string]: string[];
+                                };
+                            };
+                            "traces.error": string[] | {
+                                [key: string]: string[];
+                            } | {
+                                [key: string]: {
+                                    [key: string]: string[];
+                                };
+                            };
+                            "traces.name": string[] | {
+                                [key: string]: string[];
+                            } | {
+                                [key: string]: {
+                                    [key: string]: string[];
+                                };
+                            };
+                            "spans.type": string[] | {
+                                [key: string]: string[];
+                            } | {
+                                [key: string]: {
+                                    [key: string]: string[];
+                                };
+                            };
+                            "spans.model": string[] | {
+                                [key: string]: string[];
+                            } | {
+                                [key: string]: {
+                                    [key: string]: string[];
+                                };
+                            };
+                            "evaluations.evaluator_id": string[] | {
+                                [key: string]: string[];
+                            } | {
+                                [key: string]: {
+                                    [key: string]: string[];
+                                };
+                            };
+                            "evaluations.evaluator_id.guardrails_only": string[] | {
+                                [key: string]: string[];
+                            } | {
+                                [key: string]: {
+                                    [key: string]: string[];
+                                };
+                            };
+                            "evaluations.evaluator_id.has_passed": string[] | {
+                                [key: string]: string[];
+                            } | {
+                                [key: string]: {
+                                    [key: string]: string[];
+                                };
+                            };
+                            "evaluations.evaluator_id.has_score": string[] | {
+                                [key: string]: string[];
+                            } | {
+                                [key: string]: {
+                                    [key: string]: string[];
+                                };
+                            };
+                            "evaluations.evaluator_id.has_label": string[] | {
+                                [key: string]: string[];
+                            } | {
+                                [key: string]: {
+                                    [key: string]: string[];
+                                };
+                            };
+                            "evaluations.passed": string[] | {
+                                [key: string]: string[];
+                            } | {
+                                [key: string]: {
+                                    [key: string]: string[];
+                                };
+                            };
+                            "evaluations.score": string[] | {
+                                [key: string]: string[];
+                            } | {
+                                [key: string]: {
+                                    [key: string]: string[];
+                                };
+                            };
+                            "evaluations.state": string[] | {
+                                [key: string]: string[];
+                            } | {
+                                [key: string]: {
+                                    [key: string]: string[];
+                                };
+                            };
+                            "evaluations.label": string[] | {
+                                [key: string]: string[];
+                            } | {
+                                [key: string]: {
+                                    [key: string]: string[];
+                                };
+                            };
+                            "events.event_type": string[] | {
+                                [key: string]: string[];
+                            } | {
+                                [key: string]: {
+                                    [key: string]: string[];
+                                };
+                            };
+                            "events.metrics.key": string[] | {
+                                [key: string]: string[];
+                            } | {
+                                [key: string]: {
+                                    [key: string]: string[];
+                                };
+                            };
+                            "events.metrics.value": string[] | {
+                                [key: string]: string[];
+                            } | {
+                                [key: string]: {
+                                    [key: string]: string[];
+                                };
+                            };
+                            "events.event_details.key": string[] | {
+                                [key: string]: string[];
+                            } | {
+                                [key: string]: {
+                                    [key: string]: string[];
+                                };
+                            };
+                            "annotations.hasAnnotation": string[] | {
+                                [key: string]: string[];
+                            } | {
+                                [key: string]: {
+                                    [key: string]: string[];
+                                };
+                            };
+                        };
+                        asPercent?: boolean;
+                    }[];
+                    /** @enum {string} */
+                    groupBy?: "topics.topics" | "traces.trace_name" | "metadata.user_id" | "metadata.thread_id" | "metadata.customer_id" | "metadata.labels" | "metadata.model" | "metadata.span_type" | "sentiment.thumbs_up_down" | "events.event_type" | "evaluations.evaluation_passed" | "evaluations.evaluation_label" | "evaluations.evaluation_processing_state" | "error.has_error";
+                    groupByKey?: string;
+                    timeScale?: "full" | number;
+                    timeZone: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Timeseries data for the requested range and the one before it */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description One row per time bucket over the requested range */
+                        currentPeriod: {
+                            [key: string]: unknown;
+                        }[];
+                        /** @description The same range shifted back by its own length, for comparison */
+                        previousPeriod: {
+                            [key: string]: unknown;
+                        }[];
+                    };
+                };
+            };
+            /** @description The body was not valid JSON, or failed validation */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Set when the request was rejected before validation */
+                        message?: string;
+                        /** @description Set when the body parsed and then failed validation */
+                        error?: string;
+                    };
+                };
+            };
+            /** @description Missing or invalid API key */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        message: string;
+                    };
+                };
+            };
+            /** @description The API key lacks analytics:view */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Stable failure code; branch on this */
+                        error: string;
+                        message?: string;
+                        /** @description Who the failure is attributable to: customer, platform, provider */
+                        fault?: string;
+                        tips?: string[];
+                        docsUrl?: string;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    postApiDspyLog_steps: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": ({
+                    run_id: string;
+                    workflow_version_id?: string | null;
+                    index: string;
+                    score: number;
+                    label: string;
+                    optimizer: {
+                        name: string;
+                        parameters: {
+                            [key: string]: unknown;
+                        };
+                    };
+                    predictors: {
+                        name: string;
+                        predictor: {
+                            __class__?: string;
+                        } & {
+                            [key: string]: unknown;
+                        };
+                    }[];
+                } & {
+                    experiment_id?: string | null;
+                    experiment_slug?: string | null;
+                    timestamps: {
+                        created_at: number;
+                    };
+                    examples: {
+                        example: {
+                            __class__?: string;
+                        } & {
+                            [key: string]: unknown;
+                        };
+                        pred: {
+                            __class__?: string;
+                        } & {
+                            [key: string]: unknown;
+                        };
+                        score: number;
+                        trace?: {
+                            input: {
+                                __class__?: string;
+                            } & {
+                                [key: string]: unknown;
+                            };
+                            pred: {
+                                __class__?: string;
+                            } & {
+                                [key: string]: unknown;
+                            };
+                        }[] | null;
+                    }[];
+                    llm_calls: {
+                        __class__: string;
+                        response: {
+                            __class__?: string;
+                        } & {
+                            [key: string]: unknown;
+                        };
+                        model?: string | null;
+                        prompt_tokens?: number | null;
+                        completion_tokens?: number | null;
+                        cost?: number | null;
+                    }[];
+                })[];
+            };
+        };
+        responses: {
+            /** @description Every step in the batch was recorded */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Human-readable confirmation */
+                        message: string;
+                    };
+                };
+            };
+            /** @description The body was not valid JSON, failed validation, or carried timestamps in seconds rather than milliseconds */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Set when the request was rejected before validation */
+                        message?: string;
+                        /** @description Set when the body parsed and then failed validation */
+                        error?: string;
+                    };
+                };
+            };
+            /** @description Missing or invalid API key */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        message: string;
+                    };
+                };
+            };
+            /** @description The API key lacks experiments:manage */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Stable failure code; branch on this */
+                        error: string;
+                        message?: string;
+                        /** @description Who the failure is attributable to: customer, platform, provider */
+                        fault?: string;
+                        tips?: string[];
+                        docsUrl?: string;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description A step could not be stored. The cause is on our side and is logged with the run and step ids; retrying the batch is safe. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Set when the request was rejected before validation */
+                        message?: string;
+                        /** @description Set when the body parsed and then failed validation */
+                        error?: string;
+                    };
+                };
+            };
+        };
+    };
+    postApiExperimentInit: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description Stable slug you choose. Reusing it returns the same experiment instead of creating another, which is what makes repeated runs land together. */
+                    experiment_slug?: string;
+                    /** @description Existing experiment id, as an alternative to the slug */
+                    experiment_id?: string;
+                    /**
+                     * @description BATCH_EVALUATION_V2 for SDK batch evaluations, DSPY for optimizer runs
+                     * @enum {string}
+                     */
+                    experiment_type: "DSPY" | "BATCH_EVALUATION" | "BATCH_EVALUATION_V2";
+                    /** @description Display name, used only when the experiment is created */
+                    experiment_name?: string;
+                    /** @description Optimization Studio workflow this experiment belongs to */
+                    workflowId?: string;
+                } | unknown | unknown;
+            };
+        };
+        responses: {
+            /** @description The experiment, created or already existing */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Slug of the experiment, created or existing */
+                        slug: string;
+                        /** @description Path to the experiment in the LangWatch app */
+                        path: string;
+                    };
+                };
+            };
+            /** @description The body was not valid JSON, or neither experiment_slug nor experiment_id was supplied */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Set when the body was not valid JSON */
+                        message: string;
+                    } | {
+                        /** @description The validation failure as a sentence, not a code: neither identifier was supplied, or a field had the wrong type */
+                        error: string;
+                    };
+                };
+            };
+            /** @description Missing or invalid API key */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        message: string;
+                    };
+                };
+            };
+            /** @description The API key lacks experiments:manage, or the plan's experiment limit is already reached */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Stable failure code; branch on this */
+                        error: string;
+                        message?: string;
+                        /** @description Who the failure is attributable to: customer, platform, provider */
+                        fault?: string;
+                        tips?: string[];
+                        docsUrl?: string;
+                        /** @description Which plan limit was reached, on resource_limit_exceeded */
+                        limitType?: string;
+                        /** @description Experiments already in use */
+                        current?: number;
+                        /** @description What the plan allows */
+                        max?: number;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    postApiOptimizationByWorkflowIdByVersionId: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workflowId: string;
+                versionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        responses: {
+            /** @description The workflow finished; `result` holds its output fields */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /**
+                         * @description Execution state the run finished in
+                         * @enum {string}
+                         */
+                        status: "idle" | "waiting" | "running" | "success" | "error" | "skipped";
+                        /** @description The workflow's output fields, named as the workflow names them */
+                        result?: {
+                            [key: string]: unknown;
+                        } | null;
+                    };
+                };
+            };
+            /** @description The request was not sent as application/json, or the body was not valid JSON */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        message: string;
+                    };
+                };
+            };
+            /** @description Missing or invalid API key */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        message: string;
+                    };
+                };
+            };
+            /** @description The API key lacks workflows:manage */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Stable failure code; branch on this */
+                        error: string;
+                        message?: string;
+                        /** @description Who the failure is attributable to: customer, platform, provider */
+                        fault?: string;
+                        tips?: string[];
+                        docsUrl?: string;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description No such workflow, or it has never been published */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Stable failure code; branch on this */
+                        error: string;
+                        message?: string;
+                        /** @description Who the failure is attributable to: customer, platform, provider */
+                        fault?: string;
+                        tips?: string[];
+                        docsUrl?: string;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    postApiTrack_event: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    event_type: string;
+                    metrics: {
+                        [key: string]: number;
+                    };
+                    trace_id: string;
+                } & {
+                    event_id?: string;
+                    event_details?: {
+                        [key: string]: string | null;
+                    };
+                    timestamp?: number;
+                };
+            };
+        };
+        responses: {
+            /** @description The event was accepted */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Human-readable confirmation */
+                        message: string;
+                    };
+                };
+            };
+            /** @description The body was not valid JSON, or failed validation */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Set when the request was rejected before validation */
+                        message?: string;
+                        /** @description Set when the body parsed and then failed validation */
+                        error?: string;
+                    };
+                };
+            };
+            /** @description Missing or invalid API key */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        message: string;
+                    };
+                };
+            };
+            /** @description The API key lacks traces:create */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Stable failure code; branch on this */
+                        error: string;
+                        message?: string;
+                        /** @description Who the failure is attributable to: customer, platform, provider */
+                        fault?: string;
+                        tips?: string[];
+                        docsUrl?: string;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    postApiTriggerSlack: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /**
+                     * Format: uri
+                     * @description Incoming webhook URL the alert is posted to
+                     */
+                    slack_webhook: string;
+                    /** @description How the trigger is listed in the app */
+                    name: string;
+                    /** @description Extra line included with each alert */
+                    message?: string;
+                    /**
+                     * @description Which traces the trigger fires on. An empty object fires on all of them.
+                     * @default {}
+                     */
+                    filters?: {
+                        "topics.topics": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "topics.subtopics": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "metadata.user_id": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "metadata.thread_id": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "metadata.customer_id": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "metadata.labels": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "metadata.key": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "metadata.value": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "metadata.prompt_ids": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "traces.origin": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "traces.error": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "traces.name": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "spans.type": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "spans.model": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "evaluations.evaluator_id": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "evaluations.evaluator_id.guardrails_only": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "evaluations.evaluator_id.has_passed": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "evaluations.evaluator_id.has_score": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "evaluations.evaluator_id.has_label": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "evaluations.passed": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "evaluations.score": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "evaluations.state": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "evaluations.label": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "events.event_type": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "events.metrics.key": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "events.metrics.value": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "events.event_details.key": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "annotations.hasAnnotation": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                    };
+                    /** @enum {string} */
+                    alert_type: "CRITICAL" | "WARNING" | "INFO";
+                };
+            };
+        };
+        responses: {
+            /** @description The trigger was created */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Human-readable confirmation */
+                        message: string;
+                    };
+                };
+            };
+            /** @description The body was not valid JSON, or failed validation */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        message: string;
+                        /** @description The individual validation failures, when present */
+                        errors?: {
+                            [key: string]: unknown;
+                        }[];
+                    };
+                };
+            };
+            /** @description Missing or invalid API key */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        message: string;
+                    };
+                };
+            };
+            /** @description The API key lacks triggers:manage */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Stable failure code; branch on this */
+                        error: string;
+                        message?: string;
+                        /** @description Who the failure is attributable to: customer, platform, provider */
+                        fault?: string;
+                        tips?: string[];
+                        docsUrl?: string;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    postApiWorkflowsByWorkflowIdRun: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workflowId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        responses: {
+            /** @description The workflow finished; `result` holds its output fields */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /**
+                         * @description Execution state the run finished in
+                         * @enum {string}
+                         */
+                        status: "idle" | "waiting" | "running" | "success" | "error" | "skipped";
+                        /** @description The workflow's output fields, named as the workflow names them */
+                        result?: {
+                            [key: string]: unknown;
+                        } | null;
+                    };
+                };
+            };
+            /** @description The request was not sent as application/json, or the body was not valid JSON */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        message: string;
+                    };
+                };
+            };
+            /** @description Missing or invalid API key */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        message: string;
+                    };
+                };
+            };
+            /** @description The API key lacks workflows:manage */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Stable failure code; branch on this */
+                        error: string;
+                        message?: string;
+                        /** @description Who the failure is attributable to: customer, platform, provider */
+                        fault?: string;
+                        tips?: string[];
+                        docsUrl?: string;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description No such workflow, or it has never been published */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Stable failure code; branch on this */
+                        error: string;
+                        message?: string;
+                        /** @description Who the failure is attributable to: customer, platform, provider */
+                        fault?: string;
+                        tips?: string[];
+                        docsUrl?: string;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    postApiWorkflowsByWorkflowIdByVersionIdRun: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workflowId: string;
+                versionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        responses: {
+            /** @description The workflow finished; `result` holds its output fields */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /**
+                         * @description Execution state the run finished in
+                         * @enum {string}
+                         */
+                        status: "idle" | "waiting" | "running" | "success" | "error" | "skipped";
+                        /** @description The workflow's output fields, named as the workflow names them */
+                        result?: {
+                            [key: string]: unknown;
+                        } | null;
+                    };
+                };
+            };
+            /** @description The request was not sent as application/json, or the body was not valid JSON */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        message: string;
+                    };
+                };
+            };
+            /** @description Missing or invalid API key */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        message: string;
+                    };
+                };
+            };
+            /** @description The API key lacks workflows:manage */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Stable failure code; branch on this */
+                        error: string;
+                        message?: string;
+                        /** @description Who the failure is attributable to: customer, platform, provider */
+                        fault?: string;
+                        tips?: string[];
+                        docsUrl?: string;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description No such workflow, or it has never been published */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Stable failure code; branch on this */
+                        error: string;
+                        message?: string;
+                        /** @description Who the failure is attributable to: customer, platform, provider */
+                        fault?: string;
+                        tips?: string[];
+                        docsUrl?: string;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
     "getApiGatewayV1Virtual-keys": {
         parameters: {
             query?: {
@@ -5521,7 +8815,10 @@ export interface operations {
     "postApiGatewayV1Virtual-keys": {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description A caller-chosen key, 8 to 255 characters, that makes this create safe to retry. The first request to use a key runs normally and its response is stored for 24 hours. A later request with the same key and the same body is not executed again: it returns the stored response, marked with `X-Idempotent-Replay: true`. The same key with a different body is refused 409 `idempotency_error`, as is a retry sent while the original is still running. Only successful responses are stored, so a create that failed can simply be retried with the same key. */
+                "Idempotency-Key"?: string;
+            };
             path?: never;
             cookie?: never;
         };
@@ -5639,6 +8936,8 @@ export interface operations {
             /** @description Virtual key created */
             201: {
                 headers: {
+                    /** @description Present and `true` only when this body came from a stored response rather than a fresh execution. Absent on the first use of a key, and on every request that carries no key. */
+                    "X-Idempotent-Replay"?: "true";
                     [name: string]: unknown;
                 };
                 content: {
@@ -5720,6 +9019,26 @@ export interface operations {
             };
             /** @description Caller lacks virtualKeys:manage at a requested scope */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Conflict */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -7121,8 +10440,12 @@ export interface operations {
                             metadata: {
                                 [key: string]: string;
                             };
+                            /** @description Start of the period `spent_usd` covers, computed at read time. For an anchored budget this is its own cycle's start, not the calendar period's. */
                             current_period_started_at: string;
+                            /** @description When the current period gives way to the next. Far-future for total and manual windows, which do not roll on their own. */
                             resets_at: string;
+                            /** @description The instant this budget's cycle is phased to. Null means no anchor: a calendar-aligned cyclic window, or one of the two windows that do not cycle (total, manual). */
+                            cycle_anchor_at: string | null;
                             last_reset_at: string | null;
                             archived_at: string | null;
                             created_at: string;
@@ -7221,7 +10544,10 @@ export interface operations {
     postApiGatewayV1Budgets: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description A caller-chosen key, 8 to 255 characters, that makes this create safe to retry. The first request to use a key runs normally and its response is stored for 24 hours. A later request with the same key and the same body is not executed again: it returns the stored response, marked with `X-Idempotent-Replay: true`. The same key with a different body is refused 409 `idempotency_error`, as is a retry sent while the original is still running. Only successful responses are stored, so a create that failed can simply be retried with the same key. */
+                "Idempotency-Key"?: string;
+            };
             path?: never;
             cookie?: never;
         };
@@ -7271,6 +10597,11 @@ export interface operations {
                     metadata?: {
                         [key: string]: string;
                     };
+                    /**
+                     * Format: date-time
+                     * @description Phases the budget's cycle off this instant instead of the calendar, so a `month` budget anchored 2026-01-17T09:00:00Z starts a fresh period every 17th at 09:00 UTC. Omit for calendar alignment, which is the default and unchanged behaviour. A month cycle anchored past the 28th clamps into shorter months and springs back: anchored on the 31st gives Feb 28, then Mar 31. Immutable after create, since moving it would redraw periods the budget has already reported and enforced on. Rejected with `gateway_budget_cycle_anchor_invalid` on `total` and `manual`, which do not cycle.
+                     */
+                    cycle_anchor_at?: string;
                 };
             };
         };
@@ -7278,6 +10609,8 @@ export interface operations {
             /** @description Budget created */
             201: {
                 headers: {
+                    /** @description Present and `true` only when this body came from a stored response rather than a fresh execution. Absent on the first use of a key, and on every request that carries no key. */
+                    "X-Idempotent-Replay"?: "true";
                     [name: string]: unknown;
                 };
                 content: {
@@ -7308,8 +10641,12 @@ export interface operations {
                             metadata: {
                                 [key: string]: string;
                             };
+                            /** @description Start of the period `spent_usd` covers, computed at read time. For an anchored budget this is its own cycle's start, not the calendar period's. */
                             current_period_started_at: string;
+                            /** @description When the current period gives way to the next. Far-future for total and manual windows, which do not roll on their own. */
                             resets_at: string;
+                            /** @description The instant this budget's cycle is phased to. Null means no anchor: a calendar-aligned cyclic window, or one of the two windows that do not cycle (total, manual). */
+                            cycle_anchor_at: string | null;
                             last_reset_at: string | null;
                             archived_at: string | null;
                             created_at: string;
@@ -7362,6 +10699,26 @@ export interface operations {
             };
             /** @description Forbidden */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Conflict */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -7446,8 +10803,12 @@ export interface operations {
                             metadata: {
                                 [key: string]: string;
                             };
+                            /** @description Start of the period `spent_usd` covers, computed at read time. For an anchored budget this is its own cycle's start, not the calendar period's. */
                             current_period_started_at: string;
+                            /** @description When the current period gives way to the next. Far-future for total and manual windows, which do not roll on their own. */
                             resets_at: string;
+                            /** @description The instant this budget's cycle is phased to. Null means no anchor: a calendar-aligned cyclic window, or one of the two windows that do not cycle (total, manual). */
+                            cycle_anchor_at: string | null;
                             last_reset_at: string | null;
                             archived_at: string | null;
                             created_at: string;
@@ -7605,8 +10966,12 @@ export interface operations {
                             metadata: {
                                 [key: string]: string;
                             };
+                            /** @description Start of the period `spent_usd` covers, computed at read time. For an anchored budget this is its own cycle's start, not the calendar period's. */
                             current_period_started_at: string;
+                            /** @description When the current period gives way to the next. Far-future for total and manual windows, which do not roll on their own. */
                             resets_at: string;
+                            /** @description The instant this budget's cycle is phased to. Null means no anchor: a calendar-aligned cyclic window, or one of the two windows that do not cycle (total, manual). */
+                            cycle_anchor_at: string | null;
                             last_reset_at: string | null;
                             archived_at: string | null;
                             created_at: string;
@@ -7758,8 +11123,12 @@ export interface operations {
                             metadata: {
                                 [key: string]: string;
                             };
+                            /** @description Start of the period `spent_usd` covers, computed at read time. For an anchored budget this is its own cycle's start, not the calendar period's. */
                             current_period_started_at: string;
+                            /** @description When the current period gives way to the next. Far-future for total and manual windows, which do not roll on their own. */
                             resets_at: string;
+                            /** @description The instant this budget's cycle is phased to. Null means no anchor: a calendar-aligned cyclic window, or one of the two windows that do not cycle (total, manual). */
+                            cycle_anchor_at: string | null;
                             last_reset_at: string | null;
                             archived_at: string | null;
                             created_at: string;
@@ -7905,8 +11274,12 @@ export interface operations {
                             metadata: {
                                 [key: string]: string;
                             };
+                            /** @description Start of the period `spent_usd` covers, computed at read time. For an anchored budget this is its own cycle's start, not the calendar period's. */
                             current_period_started_at: string;
+                            /** @description When the current period gives way to the next. Far-future for total and manual windows, which do not roll on their own. */
                             resets_at: string;
+                            /** @description The instant this budget's cycle is phased to. Null means no anchor: a calendar-aligned cyclic window, or one of the two windows that do not cycle (total, manual). */
+                            cycle_anchor_at: string | null;
                             last_reset_at: string | null;
                             archived_at: string | null;
                             created_at: string;
@@ -8356,7 +11729,10 @@ export interface operations {
     "postApiGatewayV1Cache-rules": {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description A caller-chosen key, 8 to 255 characters, that makes this create safe to retry. The first request to use a key runs normally and its response is stored for 24 hours. A later request with the same key and the same body is not executed again: it returns the stored response, marked with `X-Idempotent-Replay: true`. The same key with a different body is refused 409 `idempotency_error`, as is a retry sent while the original is still running. Only successful responses are stored, so a create that failed can simply be retried with the same key. */
+                "Idempotency-Key"?: string;
+            };
             path?: never;
             cookie?: never;
         };
@@ -8390,6 +11766,8 @@ export interface operations {
             /** @description Created */
             201: {
                 headers: {
+                    /** @description Present and `true` only when this body came from a stored response rather than a fresh execution. Absent on the first use of a key, and on every request that carries no key. */
+                    "X-Idempotent-Replay"?: "true";
                     [name: string]: unknown;
                 };
                 content: {
@@ -8461,6 +11839,26 @@ export interface operations {
             };
             /** @description Forbidden */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Conflict */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -14149,6 +17547,362 @@ export interface operations {
             };
         };
     };
+    listProjects: {
+        parameters: {
+            query?: {
+                page?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Paginated list of projects */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data?: components["schemas"]["Project"][];
+                        pagination?: components["schemas"]["Pagination"];
+                    };
+                };
+            };
+            /** @description Invalid or missing API key token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Insufficient permissions for this operation */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    createProject: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    /** @description Project name */
+                    name: string;
+                    /** @description Id of an existing team to put the project in */
+                    teamId?: string;
+                    /** @description Create a team with this name and put the project in it */
+                    newTeamName?: string;
+                    /** @description Programming language, such as python or typescript */
+                    language: string;
+                    /** @description Framework in use, such as langchain or openai */
+                    framework: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Project created. Returns a scoped service API key for this project. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Project"] & {
+                        /** @description Scoped service API key with ADMIN on this project (sk-lw-..._...). Store securely — shown only once. */
+                        serviceApiKey?: string;
+                        /** @description ID of the auto-created service key, for management via DELETE /api/api-keys/{id}. */
+                        serviceApiKeyId?: string;
+                    };
+                };
+            };
+            /** @description Team does not belong to this organization */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Invalid or missing API key token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Insufficient permissions (requires project:create) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description A project with this name already exists in the team */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation error (missing required fields) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    getProject: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Project ID (project_...) */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Project details. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Project"];
+                };
+            };
+            /** @description Invalid or missing API key token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Insufficient permissions for this operation */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Project not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    archiveProject: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Project ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Project archived */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id?: string;
+                        name?: string;
+                        /** Format: date-time */
+                        archivedAt?: string;
+                    };
+                };
+            };
+            /** @description Invalid or missing API key token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Insufficient permissions (requires project:delete) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Project not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    updateProject: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Project ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    name?: string;
+                    language?: string;
+                    framework?: string;
+                    /** @description Moves the project to this team */
+                    teamId?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Updated project */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Project"];
+                };
+            };
+            /** @description Invalid or missing API key token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Insufficient permissions (requires project:update) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Project not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    getProjectApiKey: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Project id */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The project's API key */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Send as X-Auth-Token, Bearer, or Basic */
+                        apiKey: string;
+                    };
+                };
+            };
+            /** @description Invalid or missing API key token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Insufficient permissions for this operation */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No project with that id in this organization */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    regenerateProjectApiKey: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Project id */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The new API key. The previous one no longer authenticates. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Send as X-Auth-Token, Bearer, or Basic */
+                        apiKey: string;
+                    };
+                };
+            };
+            /** @description Invalid or missing API key token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Insufficient permissions for this operation */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No project with that id in this organization */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     getApiSecrets: {
         parameters: {
             query?: never;
@@ -16800,7 +20554,10 @@ export interface operations {
     postApiWebhooksV1Endpoints: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description A caller-chosen key, 8 to 255 characters, that makes this create safe to retry. The first request to use a key runs normally and its response is stored for 24 hours. A later request with the same key and the same body is not executed again: it returns the stored response, marked with `X-Idempotent-Replay: true`. The same key with a different body is refused 409 `idempotency_error`, as is a retry sent while the original is still running. Only successful responses are stored, so a create that failed can simply be retried with the same key. */
+                "Idempotency-Key"?: string;
+            };
             path?: never;
             cookie?: never;
         };
@@ -16819,6 +20576,8 @@ export interface operations {
             /** @description The endpoint, with the signing secret this body alone carries */
             201: {
                 headers: {
+                    /** @description Present and `true` only when this body came from a stored response rather than a fresh execution. Absent on the first use of a key, and on every request that carries no key. */
+                    "X-Idempotent-Replay"?: "true";
                     [name: string]: unknown;
                 };
                 content: {
@@ -16886,6 +20645,26 @@ export interface operations {
             };
             /** @description Forbidden */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Conflict */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

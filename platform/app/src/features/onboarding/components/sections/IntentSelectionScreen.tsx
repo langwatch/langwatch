@@ -4,6 +4,12 @@ import { ChartNoAxesColumn, Telescope } from "lucide-react";
 import type React from "react";
 import { useAnalytics } from "react-contextual-analytics";
 import { useOnboardingFormContext } from "../../contexts/form-context";
+import {
+  accentChipBg,
+  accentChipBorder,
+  selectedSurfaceBg,
+  selectedSurfaceBorder,
+} from "./shared/accent-surface";
 
 interface IntentOption {
   value: OrganizationIntent;
@@ -60,8 +66,8 @@ export const IntentSelectionScreen: React.FC = () => {
             textAlign="left"
             borderRadius="2xl"
             border="2px solid"
-            borderColor={isSelected ? "orange.400" : "border.muted"}
-            bg={isSelected ? "orange.50" : "bg.panel"}
+            borderColor={isSelected ? selectedSurfaceBorder : "border.muted"}
+            bg={isSelected ? selectedSurfaceBg : "bg.panel"}
             px={5}
             py={4}
             cursor="pointer"
@@ -74,12 +80,13 @@ export const IntentSelectionScreen: React.FC = () => {
           >
             <HStack gap={4} align="center">
               <Box
+                data-testid="intent-icon-chip"
                 flexShrink={0}
                 p={3}
                 borderRadius="xl"
-                bg="orange.50"
+                bg={accentChipBg}
                 border="1px solid"
-                borderColor="orange.100"
+                borderColor={accentChipBorder}
               >
                 <Icon color="orange.500" boxSize={6}>
                   <opt.icon strokeWidth={1.5} />

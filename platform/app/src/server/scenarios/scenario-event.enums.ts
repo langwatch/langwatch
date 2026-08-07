@@ -22,9 +22,9 @@ export enum ScenarioEventType {
 
 /**
  * Domain-level statuses persisted in ES/ClickHouse (PENDING, IN_PROGRESS, …).
- * QUEUED and RUNNING were originally transient BullMQ overlays, but QUEUED is
- * now written to ClickHouse via the fold projection when a queueRun command is
- * dispatched. RUNNING maps to BullMQ "active" and remains a UI-only overlay.
+ * QUEUED is written to ClickHouse via the fold projection when a queueRun
+ * command is dispatched. RUNNING maps to a job the queue is executing and
+ * remains a UI-only overlay.
  */
 export enum ScenarioRunStatus {
   SUCCESS = "SUCCESS",
@@ -34,9 +34,9 @@ export enum ScenarioRunStatus {
   PENDING = "PENDING",
   FAILED = "FAILED",
   STALLED = "STALLED",
-  /** BullMQ waiting state - job is queued but not yet picked up by a worker */
+  /** Queue waiting state - job is queued but not yet picked up by a worker */
   QUEUED = "QUEUED",
-  /** BullMQ active state - job is being executed by a worker */
+  /** Queue active state - job is being executed by a worker */
   RUNNING = "RUNNING",
 }
 

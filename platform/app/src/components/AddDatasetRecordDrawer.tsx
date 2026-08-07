@@ -294,6 +294,8 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
           <form onSubmit={handleSubmit(onSubmit)}>
             <VStack paddingX={6}>
               <DatasetSelector
+                isLoading={datasets.isLoading}
+                isError={datasets.isError}
                 datasets={datasets.data}
                 localStorageDatasetId={datasetId}
                 errors={errors}

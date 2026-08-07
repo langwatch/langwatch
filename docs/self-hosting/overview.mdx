@@ -16,10 +16,16 @@ helm repo update
 helm pull langwatch/langwatch --untar
 helm install langwatch ./langwatch \
   --namespace langwatch --create-namespace \
-  -f langwatch/examples/values-local.yaml
+  --set autogen.enabled=true \
+  -f langwatch/examples/overlays/size-dev.yaml \
+  --wait --timeout 10m
 ```
 
-See [Kubernetes (Helm)](/self-hosting/deployment/kubernetes-helm) for full setup instructions.
+That fits a small cluster at roughly 2.6 CPU and 6.7 Gi of requests, and generates its own secrets so there is nothing to prepare first. Auto-generated secrets change on every reinstall, so swap them for real ones before you rely on the deployment: see [Kubernetes (Helm)](/self-hosting/deployment/kubernetes-helm) for full setup instructions.
+
+Reach the UI with `kubectl -n langwatch port-forward svc/langwatch-app 5560:5560`.
+
+`examples/values-local.yaml` is a different thing and is not the one to start with: it pins every image to a `local` tag with `pullPolicy: Never`, which only resolves on a Kind cluster you have loaded those images into with `make images-local`. On any other cluster the pods sit in `ErrImageNeverPull`. See [Local Kubernetes](/self-hosting/deployment/kubernetes-local) if that is what you want.
 
 Running on AWS? Langy's sandboxed runtime needs one extra step on EKS: see [enabling Langy on EKS](/self-hosting/langy/setup#eks).
 </Tip>

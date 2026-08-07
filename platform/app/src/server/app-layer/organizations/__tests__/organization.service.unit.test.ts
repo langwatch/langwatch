@@ -100,7 +100,9 @@ describe("OrganizationService", () => {
     };
 
     beforeEach(() => {
-      vi.mocked(mockRepo.updateMemberRole).mockResolvedValue(undefined);
+      vi.mocked(mockRepo.updateMemberRole).mockResolvedValue({
+        teamsLeftWithoutAdmin: [],
+      });
     });
 
     describe("when a team role update targets a different user", () => {

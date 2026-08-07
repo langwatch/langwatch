@@ -42,6 +42,9 @@ function makeDeps(graph: unknown) {
   const deps = defaultGraphTriggerHeartbeatDeps({
     triggers: {} as TriggerService,
     prisma,
+    resolveClickHouseClient: async () => {
+      throw new Error("no ClickHouse in this test");
+    },
   });
 
   return { deps, findFirst };

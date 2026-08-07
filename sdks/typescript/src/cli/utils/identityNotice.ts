@@ -35,6 +35,7 @@ import { createHash } from "node:crypto";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import chalk from "chalk";
+import { normalizeEndpoint } from "../../internal/endpoint";
 import { configPath } from "./governance/config";
 
 /** How long one showing of the notice keeps later ones quiet. */
@@ -121,7 +122,7 @@ async function fetchProjectName(
 ): Promise<string | undefined> {
   try {
     const res = await fetchImpl(
-      `${endpoint.replace(/\/+$/, "")}/api/me/project`,
+      `${normalizeEndpoint(endpoint)}/api/me/project`,
       {
         headers: {
           Authorization: `Bearer ${apiKey}`,

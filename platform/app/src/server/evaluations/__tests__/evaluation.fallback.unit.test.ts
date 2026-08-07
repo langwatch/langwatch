@@ -1,12 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-
-const getClickHouseClientForProjectMock = vi.hoisted(() => vi.fn());
-
-vi.mock("~/server/clickhouse/clickhouseClient", () => ({
-  getClickHouseClientForProject: getClickHouseClientForProjectMock,
-}));
-
-import { EvaluationService } from "../evaluation.service";
+import { serviceOver } from "./support/evaluationServiceOver";
 
 /**
  * Build a fake ClickHouse client whose `query` inspects the SQL and either
@@ -54,9 +47,8 @@ describe("EvaluationService memory-limit fallback", () => {
     describe("when fetching evaluations for a single trace", () => {
       it("retries without Inputs and still returns the verdicts", async () => {
         const client = clientThatOOMsOnInputs([ROW]);
-        getClickHouseClientForProjectMock.mockResolvedValue(client);
+        const service = serviceOver(client);
 
-        const service = EvaluationService.create();
         const result = await service.getEvaluationsForTrace({
           projectId: "project_test",
           traceId: "trace-1",
@@ -73,9 +65,8 @@ describe("EvaluationService memory-limit fallback", () => {
     describe("when fetching evaluations for multiple traces", () => {
       it("retries without Inputs and groups the verdicts by trace", async () => {
         const client = clientThatOOMsOnInputs([ROW]);
-        getClickHouseClientForProjectMock.mockResolvedValue(client);
+        const service = serviceOver(client);
 
-        const service = EvaluationService.create();
         const result = await service.getEvaluationsMultiple({
           projectId: "project_test",
           traceIds: ["trace-1"],

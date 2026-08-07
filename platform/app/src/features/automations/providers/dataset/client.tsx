@@ -171,6 +171,8 @@ function DatasetConfigForm({
     <VStack align="stretch" gap={3}>
       <DatasetSelector
         datasets={datasets.data}
+        isLoading={datasets.isLoading}
+        isError={datasets.isError}
         localStorageDatasetId={slice.datasetId}
         errors={{}}
         setValue={(_field: string, value: string) => selectDataset(value)}

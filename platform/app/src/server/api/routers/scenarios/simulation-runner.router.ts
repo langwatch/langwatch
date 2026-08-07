@@ -99,7 +99,7 @@ export const simulationRunnerRouter = createTRPCRouter({
       );
 
       // Dispatch queueRun command first so QUEUED state is written to ClickHouse
-      // before the BullMQ job is scheduled — same pattern as SuiteRunService.startRun()
+      // before the execution job is scheduled — same pattern as SuiteRunService.startRun()
       try {
         await getApp().simulations.queueRun({
           tenantId: input.projectId,

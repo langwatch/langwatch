@@ -1,12 +1,15 @@
 import type { WebhookDeliveryOutcome } from "@prisma/client";
 
 /**
- * Read + write repository over `WebhookDelivery` — the per-attempt delivery
- * log behind a webhook automation's "recent fires" drill-down (ADR-040 §6).
- * A slim facts table: outcome, status, latency, capped error message, plus a
- * truncated failure response for debugging (industry-baseline plaintext,
- * GitHub/Stripe style). Our request content is never stored; the response
- * dies with the row in the 30-day prune.
+ * The automations channel's read + write access to the shared webhook delivery
+ * log — the per-attempt table behind a webhook automation's "recent fires"
+ * drill-down (ADR-040 §6). A slim facts table: outcome, status, latency, capped
+ * error message, plus a truncated failure response for debugging
+ * (industry-baseline plaintext, GitHub/Stripe style). Our request content is
+ * never stored; the response dies with the row in the 30-day prune.
+ *
+ * Both webhook channels write into that one table now, discriminated by
+ * `channel`; this repository only ever sees the automations rows.
  */
 
 /** The debugging context a failed attempt keeps — the receiver's truncated
@@ -54,7 +57,8 @@ export interface WebhookDeliveryRepository {
     limit: number;
   }): Promise<WebhookDeliveryRow[]>;
 
-  /** Delete rows older than `before`; returns how many were removed (the
-   *  30-day prune, ADR-040 §6). */
-  deleteOlderThan(params: { before: Date }): Promise<number>;
+  /** Run the shared 30-day retention sweep over the delivery log; returns how
+   *  many rows were removed (ADR-040 §6). Prunes BOTH channels, because they
+   *  share the table and the bound. */
+  pruneExpired(now?: Date): Promise<number>;
 }

@@ -54,7 +54,7 @@ OpenAI-shaped. Additional LangWatch headers:
 ```http
 HTTP/1.1 200 OK
 Content-Type: application/json
-X-LangWatch-Request-Id: grq_01HZX9K3M...
+X-LangWatch-Gateway-Request-Id: req_c2bf5df0b8449f1d1838c4b98dd850
 X-LangWatch-Provider: openai
 X-LangWatch-Model: gpt-5-mini
 X-LangWatch-Cache: miss
@@ -84,7 +84,7 @@ data: {"id":"chatcmpl-…","object":"chat.completion.chunk","choices":[{"index":
 data: [DONE]
 ```
 
-A response header `X-LangWatch-Request-Id` is emitted on the first frame. Mid-stream failures close the connection with a terminal `event: error` frame (see [Errors](/ai-gateway/api/errors#streaming-errors)).
+A response header `X-LangWatch-Gateway-Request-Id` is emitted on the first frame. Mid-stream failures close the connection with a terminal `event: error` frame (see [Errors](/ai-gateway/api/errors#streaming-errors)).
 
 ## Error handling
 
@@ -96,7 +96,7 @@ All errors use the OpenAI-compatible envelope documented at [Errors](/ai-gateway
 - `429 rate_limit_exceeded`, VK, project, org rate limit.
 - `502 provider_error`, `504 upstream_timeout`, upstream provider exhausted (possibly after fallback).
 
-Every error carries `X-LangWatch-Request-Id`, use it for support tickets and to jump straight to the trace in the LangWatch UI.
+Errors from an authenticated request carry `X-LangWatch-Gateway-Request-Id`. Use it for support tickets and to jump straight to the trace in the LangWatch UI.
 
 ## Example (Python)
 
@@ -115,7 +115,7 @@ resp = client.chat.completions.create(
 )
 
 print(resp.choices[0].message.content)
-print("Request id:", resp.response.headers["X-LangWatch-Request-Id"])
+print("Request id:", resp.response.headers["X-LangWatch-Gateway-Request-Id"])
 ```
 
 ## Example (curl)

@@ -82,12 +82,34 @@ const DEFAULT_TEST_ROOTS: string[] = [
  * bats, not vitest — without this scan path, scenarios that describe
  * shell behavior would have no way to satisfy parity and would be stuck
  * on `@unimplemented` forever. Bats bindings use the same `@scenario`
- * token, expressed as a hash-comment directly above an `@test "..." {`
- * line.
+ * token, expressed as a hash-comment above an `@test "..." {` line —
+ * blank lines and further comments may sit between the two.
  */
 const DEFAULT_BATS_TEST_ROOTS: string[] = [
   "dev/scripts/__tests__",
   "platform/app/scripts/__tests__",
+];
+
+/**
+ * Roots scanned for `.sh` shell tests. Helm chart behaviour is verified by
+ * rendering the chart, which needs helm and its built dependencies, so those
+ * suites live beside the chart and run in the chart workflow rather than under
+ * vitest or bats. Without this scan path their scenarios could only be
+ * @unimplemented or bound to assertions on template *text* — and asserting
+ * that a template contains `ceil` passes just as happily when it says `floor`,
+ * which is the vacuous check rendering exists to replace.
+ *
+ * Bindings use the same `@scenario` token as bats, expressed as a
+ * hash-comment above a `test_<name>() {` function — blank lines and further
+ * comments may sit between the two.
+ */
+const DEFAULT_SHELL_TEST_ROOTS: string[] = [
+  "charts/langwatch/tests",
+  // The gateway subchart carries its own drain-timing suite, run by the
+  // `helm` job in go-services.yaml rather than by the umbrella chart's
+  // workflow, because that job is what the gateway chart's path filter
+  // already triggers.
+  "charts/gateway/tests",
 ];
 
 /**
@@ -328,7 +350,6 @@ const LEGACY_INERT: string[] = [
   "specs/ci/pr-impact-map.feature",
   "specs/claude/drive-pr.feature",
   "specs/claude/telemetry-turn-bounding.feature",
-  "specs/clickhouse/windowed-read-fallback.feature",
   "specs/coding-agent/personal-usage.feature",
   "specs/components/code-block-editor.feature",
   "specs/data-retention/data-size-metering.feature",
@@ -453,7 +474,6 @@ const LEGACY_INERT: string[] = [
   "specs/mcp-server/project-tools.feature",
   "specs/mcp-server/prompt-tools.feature",
   "specs/mcp-server/scenario-tool-formatters.feature",
-  "specs/members/member-role-team-restrictions.feature",
   "specs/migration/vite-migration.feature",
   "specs/model-config/anthropic-empty-content.feature",
   "specs/model-config/litellm-reasoning-params.feature",
@@ -502,7 +522,6 @@ const LEGACY_INERT: string[] = [
   "specs/ops/local-observability-stack.feature",
   "specs/ops/production-bundle-integrity.feature",
   "specs/otlp/canonical-log-ingestion.feature",
-  "specs/otlp/canonical-metric-ingestion.feature",
   "specs/projects/create-project-drawer.feature",
   "specs/projects/project-list-refresh.feature",
   "specs/prompts/custom-prompt-tags.feature",
@@ -531,12 +550,11 @@ const LEGACY_INERT: string[] = [
   "specs/scenarios/scenario-library.feature",
   "specs/scenarios/stalled-scenario-runs.feature",
   "specs/secrets/secrets-manager.feature",
-  // Helm chart behaviour. Cannot be bound: the tests that verify these
-  // scenarios are charts/langwatch/tests/e2e-overlays.sh, which the checker
-  // does not scan — it reads .bats files under DEFAULT_BATS_TEST_ROOTS, and
-  // these are .sh under charts/. Binding them means either porting those
-  // suites to bats or teaching the checker a shell-test root; until then a
-  // deny-list entry is honest and an "all bound ✓" is not.
+  // Helm chart behaviour, verified by charts/langwatch/tests/e2e-overlays.sh.
+  // The checker now scans that directory (DEFAULT_SHELL_TEST_ROOTS), so these
+  // are bindable: annotate the suite's test functions with `# @scenario` and
+  // drop the file from this list. Until someone does, the scenarios are all
+  // @e2e @unimplemented and the file yields nothing to enforce.
   "specs/security/helm-strict-admission.feature",
   "specs/security/ingress-internal-path-block.feature",
   "specs/security/org-level-tenancy-enforcement.feature",
@@ -576,7 +594,6 @@ const LEGACY_INERT: string[] = [
   "specs/traces-v2/conversation-turn-ledger.feature",
   "specs/traces-v2/data-layer.feature",
   "specs/traces-v2/editable-trace-name-alignment.feature",
-  "specs/traces-v2/evaluations.feature",
   "specs/traces-v2/facet-perspectives.feature",
   "specs/traces-v2/flame-graph.feature",
   "specs/traces-v2/grouping-engine.feature",
@@ -633,6 +650,7 @@ const LEGACY_INERT: string[] = [
 
 const TEST_FILE_RE = /\.test\.tsx?$/;
 const BATS_FILE_RE = /\.bats$/;
+const SHELL_TEST_FILE_RE = /\.sh$/;
 const GO_TEST_FILE_RE = /_test\.go$/;
 const PYTHON_TEST_FILE_RE = /^test_.+\.py$/;
 const FEATURE_FILE_RE = /\.feature$/;
@@ -899,6 +917,28 @@ function isNextLineBatsTest(lines: string[], startLineIdx: number): boolean {
     if (trimmed === "") continue;
     if (trimmed.startsWith("#")) continue;
     return /^@test\b/.test(trimmed);
+  }
+  return false;
+}
+
+/**
+ * Shell binding form. Mirrors the bats rule, with a shell function standing in
+ * for `@test`, so an annotation still has to introduce the thing that runs —
+ * the next line that is neither blank nor a comment must be the function:
+ *
+ *   # @scenario "A fractional allowance rounds up to a whole worker"
+ *   test_fractional_allowance_rounds_up() {
+ *
+ * The `test_` prefix is required: it keeps a stray annotation above a helper
+ * from counting as a binding.
+ */
+function isNextLineShellTest(lines: string[], startLineIdx: number): boolean {
+  for (let i = startLineIdx; i < lines.length; i++) {
+    const line = lines[i] ?? "";
+    const trimmed = line.trim();
+    if (trimmed === "") continue;
+    if (trimmed.startsWith("#")) continue;
+    return /^test_[A-Za-z0-9_]*[ \t]*\([ \t]*\)[ \t]*\{/.test(trimmed);
   }
   return false;
 }
@@ -1218,33 +1258,60 @@ function collectPythonBindings(testRoots: string[]): CollectedBinding[] {
   return bindings;
 }
 
-function collectBatsBindings(testRoots: string[]): CollectedBinding[] {
+/**
+ * Hash-comment binding collector, shared by the bats and shell suites: both
+ * spell the annotation `# @scenario "..."` and both require the next line that
+ * is neither blank nor a comment to be the thing that runs. Only "what counts
+ * as a test file" and "what counts as a test line" differ.
+ */
+function hashCommentBindingsInFile(
+  file: string,
+  isTestLine: (lines: string[], startLineIdx: number) => boolean,
+): CollectedBinding[] {
+  const lines = readFileSync(file, "utf8").split("\n");
   const bindings: CollectedBinding[] = [];
-  const files: string[] = [];
-  for (const r of testRoots) {
-    files.push(
-      ...walkFiles(resolve(REPO_ROOT, r), (n) => BATS_FILE_RE.test(n)),
-    );
-  }
 
-  for (const file of files) {
-    const src = readFileSync(file, "utf8");
-    const lines = src.split("\n");
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i] ?? "";
-      const m = line.match(BATS_ANNOTATION_RE);
-      if (!m) continue;
-      const title = (m[1] ?? m[2] ?? "").trim();
-      if (!title) continue;
-      if (!isNextLineBatsTest(lines, i + 1)) continue;
-      bindings.push({
-        title,
-        ref: { file: relative(REPO_ROOT, file), line: i + 1 },
-      });
-    }
+  for (let i = 0; i < lines.length; i++) {
+    const m = (lines[i] ?? "").match(BATS_ANNOTATION_RE);
+    const title = (m?.[1] ?? m?.[2] ?? "").trim();
+    if (!title || !isTestLine(lines, i + 1)) continue;
+    bindings.push({
+      title,
+      ref: { file: relative(REPO_ROOT, file), line: i + 1 },
+    });
   }
 
   return bindings;
+}
+
+function collectHashCommentBindings({
+  testRoots,
+  fileMatches,
+  isTestLine,
+}: {
+  testRoots: string[];
+  fileMatches: (name: string) => boolean;
+  isTestLine: (lines: string[], startLineIdx: number) => boolean;
+}): CollectedBinding[] {
+  return testRoots
+    .flatMap((r) => walkFiles(resolve(REPO_ROOT, r), fileMatches))
+    .flatMap((file) => hashCommentBindingsInFile(file, isTestLine));
+}
+
+function collectBatsBindings(testRoots: string[]): CollectedBinding[] {
+  return collectHashCommentBindings({
+    testRoots,
+    fileMatches: (n) => BATS_FILE_RE.test(n),
+    isTestLine: isNextLineBatsTest,
+  });
+}
+
+function collectShellBindings(testRoots: string[]): CollectedBinding[] {
+  return collectHashCommentBindings({
+    testRoots,
+    fileMatches: (n) => SHELL_TEST_FILE_RE.test(n),
+    isTestLine: isNextLineShellTest,
+  });
 }
 
 function indexByTitle(bindings: CollectedBinding[]): Map<string, BindingRef[]> {
@@ -1452,10 +1519,28 @@ function validateExemptionList({
   return errors;
 }
 
-function main(): void {
-  const args = process.argv.slice(2);
-  const asJson = args.includes("--json");
+/**
+ * Everything the check has worked out, before any of it is printed or judged.
+ * The report, the verdict and the JSON payload are three views of this one
+ * value, so none of them can disagree with the others about what was found.
+ */
+interface ParityAnalysis {
+  enforced: Report[];
+  legacy: LegacyReport[];
+  /** Inert files, whether excused or not — a count worth printing on its own. */
+  inert: InertReport[];
+  /** Inert files LEGACY_INERT excuses, and so still tolerated. */
+  exemptInert: InertReport[];
+  /** Inert files nobody has excused. Fatal. */
+  newInert: InertReport[];
+  /** Entries that no longer belong on their list, and must leave it. Fatal. */
+  staleLegacy: LegacyReport[];
+  staleInert: string[];
+  unknownAnnotations: UnknownAnnotation[];
+  listErrors: string[];
+}
 
+function analyzeParity(): ParityAnalysis {
   const allFeatures = discoverFeatureFiles();
   const listErrors = [
     ...validateExemptionList({
@@ -1473,6 +1558,7 @@ function main(): void {
   const bindings = [
     ...collectAllBindings(DEFAULT_TEST_ROOTS),
     ...collectBatsBindings(DEFAULT_BATS_TEST_ROOTS),
+    ...collectShellBindings(DEFAULT_SHELL_TEST_ROOTS),
     ...collectGoBindings(DEFAULT_GO_TEST_ROOTS),
     ...collectPythonBindings(DEFAULT_PYTHON_TEST_ROOTS),
   ];
@@ -1502,99 +1588,139 @@ function main(): void {
     }
   }
 
-  // Legacy-list hygiene: every entry must still have at least one unbound
-  // scenario. If a file is fully bound, it must be removed from the list.
-  const staleLegacy = legacy.filter((r) => r.unbound === 0);
-
   // Inert floor. A file that declares scenarios and enforces none of them is a
   // failure unless it was already in that state when the floor was introduced.
   const inertSet = new Set(LEGACY_INERT);
   const inert = enforced.filter(isInert).map(toInertReport);
-  const newInert = inert.filter((r) => !inertSet.has(r.feature));
-  const exemptInert = inert.filter((r) => inertSet.has(r.feature));
-
-  // Ratchet hygiene: an entry that is no longer inert has been fixed, and must
-  // leave the list so it can never silently regress.
   const inertFeatures = new Set(inert.map((r) => r.feature));
-  const staleInert = LEGACY_INERT.filter(
-    (f) => allFeatures.includes(f) && !inertFeatures.has(f),
+
+  return {
+    enforced,
+    legacy,
+    inert,
+    exemptInert: inert.filter((r) => inertSet.has(r.feature)),
+    newInert: inert.filter((r) => !inertSet.has(r.feature)),
+    // Legacy-list hygiene: every entry must still have at least one unbound
+    // scenario. If a file is fully bound, it must be removed from the list.
+    staleLegacy: legacy.filter((r) => r.unbound === 0),
+    // Ratchet hygiene: an entry that is no longer inert has been fixed, and
+    // must leave the list so it can never silently regress.
+    staleInert: LEGACY_INERT.filter(
+      (f) => allFeatures.includes(f) && !inertFeatures.has(f),
+    ),
+    unknownAnnotations,
+    listErrors,
+  };
+}
+
+function printParityReport(a: ParityAnalysis): void {
+  console.log("Feature-file parity check");
+  console.log("=========================");
+  console.log(
+    `Enforced: ${a.enforced.length} file(s) · Legacy: ${a.legacy.length} file(s) · Inert: ${a.inert.length} file(s)`,
   );
+
+  for (const r of a.enforced) printEnforcedReport(r);
+  printLegacySummary(a.legacy);
+  printInertSummary(a.exemptInert);
+  printNewInert(a.newInert);
+  printUnknownAnnotations(a.unknownAnnotations);
+}
+
+/**
+ * Why the check fails, in the words the failure is reported with. Empty means
+ * it passes: the verdict and the message come from the same list, so the check
+ * cannot exit non-zero without saying what for.
+ */
+function fatalReasons(a: ParityAnalysis): string[] {
+  const reasons: string[] = [];
+  const enforcedUnbound = a.enforced.reduce((s, r) => s + r.unbound.length, 0);
+
+  if (enforcedUnbound > 0) {
+    reasons.push(`${enforcedUnbound} unbound scenario(s) in enforced files`);
+  }
+  if (a.unknownAnnotations.length > 0) {
+    reasons.push(`${a.unknownAnnotations.length} unknown annotation(s)`);
+  }
+  if (a.staleLegacy.length > 0) {
+    reasons.push(
+      `${a.staleLegacy.length} fully-bound file(s) still in LEGACY_UNBOUND — remove them from the list: ${a.staleLegacy
+        .map((r) => r.feature)
+        .join(", ")}`,
+    );
+  }
+  if (a.newInert.length > 0) {
+    reasons.push(
+      `${a.newInert.length} file(s) enforce no scenario at all (nothing in them is tagged @unit/@integration/@e2e/@regression)`,
+    );
+  }
+  if (a.staleInert.length > 0) {
+    reasons.push(
+      `${a.staleInert.length} file(s) in LEGACY_INERT now enforce scenarios — remove them from the list: ${a.staleInert.join(
+        ", ",
+      )}`,
+    );
+  }
+  if (a.listErrors.length > 0) {
+    reasons.push(`${a.listErrors.length} exemption-list error(s)`);
+  }
+
+  return reasons;
+}
+
+function printOkSummary(a: ParityAnalysis): void {
+  const enforcedTotal = a.enforced.reduce((s, r) => s + r.scenarios.length, 0);
+  const legacyUnbound = a.legacy.reduce((s, r) => s + r.unbound, 0);
+  console.log(
+    `\nOK: ${enforcedTotal} enforced scenario(s) bound across ${a.enforced.length} file(s).`,
+  );
+  if (a.legacy.length > 0) {
+    console.log(
+      `    ${legacyUnbound} unbound scenario(s) tolerated in ${a.legacy.length} legacy file(s).`,
+    );
+  }
+  if (a.exemptInert.length > 0) {
+    const invisible = a.exemptInert.reduce((s, r) => s + r.totalScenarios, 0);
+    console.log(
+      `    ${a.exemptInert.length} file(s) exempted via LEGACY_INERT enforce nothing at all — ${invisible} scenario(s) are invisible to this check.`,
+    );
+  }
+}
+
+function main(): void {
+  const asJson = process.argv.slice(2).includes("--json");
+  const analysis = analyzeParity();
 
   if (asJson) {
     console.log(
       JSON.stringify(
         {
-          enforced,
-          legacy,
-          unknownAnnotations,
-          listErrors,
-          staleLegacy: staleLegacy.map((r) => r.feature),
-          inert: exemptInert,
-          newInert,
-          staleInert,
+          enforced: analysis.enforced,
+          legacy: analysis.legacy,
+          unknownAnnotations: analysis.unknownAnnotations,
+          listErrors: analysis.listErrors,
+          staleLegacy: analysis.staleLegacy.map((r) => r.feature),
+          inert: analysis.exemptInert,
+          newInert: analysis.newInert,
+          staleInert: analysis.staleInert,
         },
         null,
         2,
       ),
     );
   } else {
-    console.log("Feature-file parity check");
-    console.log("=========================");
-    console.log(
-      `Enforced: ${enforced.length} file(s) · Legacy: ${legacy.length} file(s) · Inert: ${inert.length} file(s)`,
-    );
-
-    for (const r of enforced) printEnforcedReport(r);
-    printLegacySummary(legacy);
-    printInertSummary(exemptInert);
-    printNewInert(newInert);
-    printUnknownAnnotations(unknownAnnotations);
+    printParityReport(analysis);
   }
 
-  const enforcedUnbound = enforced.reduce((s, r) => s + r.unbound.length, 0);
-  const hasFatal =
-    enforcedUnbound > 0 ||
-    unknownAnnotations.length > 0 ||
-    listErrors.length > 0 ||
-    staleLegacy.length > 0 ||
-    newInert.length > 0 ||
-    staleInert.length > 0;
-
-  if (hasFatal) {
+  const reasons = fatalReasons(analysis);
+  if (reasons.length > 0) {
     if (!asJson) {
-      const parts: string[] = [];
-      if (enforcedUnbound > 0) {
-        parts.push(`${enforcedUnbound} unbound scenario(s) in enforced files`);
-      }
-      if (unknownAnnotations.length > 0) {
-        parts.push(`${unknownAnnotations.length} unknown annotation(s)`);
-      }
-      if (staleLegacy.length > 0) {
-        parts.push(
-          `${staleLegacy.length} fully-bound file(s) still in LEGACY_UNBOUND — remove them from the list: ${staleLegacy
-            .map((r) => r.feature)
-            .join(", ")}`,
-        );
-      }
-      if (newInert.length > 0) {
-        parts.push(
-          `${newInert.length} file(s) enforce no scenario at all (nothing in them is tagged @unit/@integration/@e2e/@regression)`,
-        );
-      }
-      if (staleInert.length > 0) {
-        parts.push(
-          `${staleInert.length} file(s) in LEGACY_INERT now enforce scenarios — remove them from the list: ${staleInert.join(
-            ", ",
-          )}`,
-        );
-      }
-      if (listErrors.length > 0) {
-        parts.push(`${listErrors.length} exemption-list error(s)`);
-      }
       // The list name is already inside each message.
-      for (const err of listErrors) console.error(`Exemption list: ${err}`);
+      for (const err of analysis.listErrors) {
+        console.error(`Exemption list: ${err}`);
+      }
       console.error(
-        `FAIL: ${parts.join(
+        `FAIL: ${reasons.join(
           ", ",
         )}. See spec-binding convention in dev/docs/TESTING_PHILOSOPHY.md.`,
       );
@@ -1602,24 +1728,7 @@ function main(): void {
     process.exit(1);
   }
 
-  if (!asJson) {
-    const enforcedTotal = enforced.reduce((s, r) => s + r.scenarios.length, 0);
-    const legacyUnbound = legacy.reduce((s, r) => s + r.unbound, 0);
-    console.log(
-      `\nOK: ${enforcedTotal} enforced scenario(s) bound across ${enforced.length} file(s).`,
-    );
-    if (legacy.length > 0) {
-      console.log(
-        `    ${legacyUnbound} unbound scenario(s) tolerated in ${legacy.length} legacy file(s).`,
-      );
-    }
-    if (exemptInert.length > 0) {
-      const invisible = exemptInert.reduce((s, r) => s + r.totalScenarios, 0);
-      console.log(
-        `    ${exemptInert.length} file(s) exempted via LEGACY_INERT enforce nothing at all — ${invisible} scenario(s) are invisible to this check.`,
-      );
-    }
-  }
+  if (!asJson) printOkSummary(analysis);
 }
 
 /**

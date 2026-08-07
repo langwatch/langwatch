@@ -31,6 +31,7 @@ import {
   DEFAULT_MAPPINGS,
   migrateLegacyMappings,
 } from "../../server/evaluations/evaluationMappings";
+import { evaluatorDisplayName } from "../../server/evaluations/evaluatorDisplayNames";
 import {
   type Evaluators,
   type EvaluatorTypes,
@@ -55,7 +56,7 @@ import { HorizontalFormControl } from "../HorizontalFormControl";
 import { Tooltip } from "../ui/tooltip";
 import DynamicZodForm from "./DynamicZodForm";
 import { EvaluationManualIntegration } from "./EvaluationManualIntegration";
-import { EvaluatorSelection, evaluatorTempNameMap } from "./EvaluatorSelection";
+import { EvaluatorSelection } from "./EvaluatorSelection";
 import { PreconditionsField } from "./PreconditionsField";
 import { TryItOut } from "./TryItOut";
 
@@ -204,9 +205,9 @@ export default function CheckConfigForm({
     if (!checkType) return;
 
     let defaultName = getEvaluatorDefinitions(checkType)?.name;
-    defaultName = evaluatorTempNameMap[defaultName ?? ""] ?? defaultName;
+    if (defaultName) defaultName = evaluatorDisplayName(defaultName);
     const allDefaultNames = Object.values(availableEvaluators).map(
-      (evaluator) => evaluatorTempNameMap[evaluator.name] ?? evaluator.name,
+      (evaluator) => evaluatorDisplayName(evaluator.name),
     );
     if (!nameValue || allDefaultNames.includes(nameValue)) {
       form.setValue(
@@ -300,9 +301,9 @@ export default function CheckConfigForm({
                     <VStack align="start" width="full">
                       <HStack gap={0} width="full">
                         <Text>
-                          {evaluatorTempNameMap[
-                            availableEvaluators[checkType].name
-                          ] ?? availableEvaluators[checkType].name}
+                          {evaluatorDisplayName(
+                            availableEvaluators[checkType].name,
+                          )}
                         </Text>
                         <Button
                           variant="ghost"

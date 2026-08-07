@@ -34,11 +34,14 @@ import type {
   SpanSummaryPage,
   SpanSummaryPageCursor,
   SpanSummaryRow,
+  TraceEventRollup,
+  TraceEventRollupParams,
 } from "./span-storage.repository";
 import {
   clampSpanReadLimit,
   LANGWATCH_SIGNAL_BUCKETS,
   MAX_DERIVATION_SPANS,
+  MAX_EVENT_NAMES_PER_TRACE,
   MAX_LIGHT_SPAN_READ_ROWS,
 } from "./span-storage.repository";
 
@@ -128,6 +131,47 @@ const FULL_SPAN_SELECT = `
   \`Links.TraceId\` AS Links_TraceId,
   \`Links.SpanId\` AS Links_SpanId,
   \`Links.Attributes\` AS Links_Attributes
+`;
+
+/**
+ * {@link FULL_SPAN_SELECT} minus the `Events.*` / `Links.*` nested columns, for
+ * internal derivation consumers that read scalar span/resource attributes and
+ * never touch a span's events or links.
+ *
+ * Not a micro-optimisation. Those nested columns are what production throws
+ * `Attempt to read after eof (while reading column Links.Attributes)` on — the
+ * failure ran to thousands of lines an hour, and because this read backs a
+ * queue handler, every one of them re-staged the job and re-ran the read on
+ * backoff. Dropping columns the consumer never reads removes the error class
+ * and the retry load it generated in one move.
+ *
+ * {@link mapChRowToNormalized} already tolerates their absence — it defaults
+ * both nested groups to `[]` — so a span mapped from this projection carries
+ * empty `events` and `links`. That is why this select is NOT a drop-in for the
+ * UI read: only use it where empty events/links are correct, never where a
+ * caller renders them.
+ */
+const DERIVATION_SPAN_SELECT = `
+  SpanId,
+  TraceId,
+  TenantId,
+  ParentSpanId,
+  ParentTraceId,
+  ParentIsRemote,
+  Sampled,
+  toUnixTimestamp64Milli(StartTime) AS StartTimeMs,
+  toUnixTimestamp64Milli(EndTime) AS EndTimeMs,
+  DurationMs,
+  SpanName,
+  SpanKind,
+  ResourceAttributes,
+  SpanAttributes,
+  StatusCode,
+  StatusMessage,
+  ScopeName,
+  ScopeVersion,
+  Cost,
+  NonBilledCost
 `;
 
 /**
@@ -316,6 +360,95 @@ function dedupInTuple(extraInnerWhere: string): string {
 }
 
 /**
+ * {@link dedupInTuple} for a batch of traces — same election, same caveat
+ * about which predicates may be pushed into the subquery, `IN` over the page's
+ * ids instead of one `TraceId`.
+ */
+function dedupInTupleForTraceIds(extraInnerWhere: string): string {
+  return `(TenantId, TraceId, SpanId, UpdatedAt) IN (
+    SELECT TenantId, TraceId, SpanId, max(UpdatedAt)
+    FROM ${TABLE_NAME}
+    WHERE TenantId = {tenantId:String}
+      AND TraceId IN {traceIds:Array(String)}
+      ${extraInnerWhere}
+    GROUP BY TenantId, TraceId, SpanId
+  )`;
+}
+
+/**
+ * One row per (trace, event name) for a page of traces, ordered so the first
+ * name a trace recorded comes first.
+ *
+ * Three stages, innermost out: elect each span's latest version and keep only
+ * the ones carrying events, expand those spans' `Events.*` arrays, then
+ * collapse to one row per (trace, event name).
+ *
+ * The window aggregates run over the whole per-trace partition and
+ * `LIMIT ... BY` trims afterwards, so a trimmed trace still reports the totals
+ * of everything it recorded, not of what survived the trim.
+ */
+function traceEventRollupQuery(): string {
+  const partitionAnd =
+    "AND StartTime >= fromUnixTimestamp64Milli({fromMs:Int64}) " +
+    "AND StartTime <= fromUnixTimestamp64Milli({toMs:Int64})";
+
+  return `
+    SELECT
+      traceId,
+      name,
+      nameCount,
+      firstTimestamp,
+      sum(nameCount) OVER (PARTITION BY traceId) AS totalCount,
+      count() OVER (PARTITION BY traceId) AS distinctCount
+    FROM (
+      SELECT
+        TraceId AS traceId,
+        event_name AS name,
+        count() AS nameCount,
+        toUnixTimestamp64Milli(min(event_timestamp)) AS firstTimestamp
+      FROM (
+        SELECT
+          TraceId,
+          "Events.Timestamp" AS Events_Timestamp,
+          "Events.Name" AS Events_Name
+        FROM ${TABLE_NAME}
+        WHERE TenantId = {tenantId:String}
+          AND TraceId IN {traceIds:Array(String)}
+          AND notEmpty("Events.Name")
+          ${partitionAnd}
+          AND ${dedupInTupleForTraceIds(partitionAnd)}
+      )
+      ARRAY JOIN
+        Events_Timestamp AS event_timestamp,
+        Events_Name AS event_name
+      GROUP BY traceId, name
+    )
+    ORDER BY traceId ASC, firstTimestamp ASC, name ASC
+    LIMIT {maxNames:UInt32} BY traceId
+  `;
+}
+
+/** Gather {@link traceEventRollupQuery}'s flat rows into one rollup per trace. */
+function toTraceEventRollups(
+  rows: TraceEventRollupRow[],
+): Record<string, TraceEventRollup> {
+  const rollups: Record<string, TraceEventRollup> = {};
+  for (const row of rows) {
+    const rollup = (rollups[row.traceId] ??= {
+      names: [],
+      totalCount: asNumber(row.totalCount),
+      distinctCount: asNumber(row.distinctCount),
+    });
+    rollup.names.push({
+      name: row.name,
+      count: asNumber(row.nameCount),
+      firstTimestamp: asNumber(row.firstTimestamp),
+    });
+  }
+  return rollups;
+}
+
+/**
  * Per-bucket key matchers for the LangWatch signals projection. Each entry
  * compiles to one ClickHouse boolean expression over `mapKeys(SpanAttributes)`.
  * Order must match `LANGWATCH_SIGNAL_BUCKETS` in span-storage.repository.ts —
@@ -469,6 +602,20 @@ interface TraceEventRow {
   timestamp: string | number;
   name: string;
   attributes: Record<string, string>;
+}
+
+interface TraceEventRollupRow {
+  traceId: string;
+  name: string;
+  nameCount: string | number;
+  firstTimestamp: string | number;
+  totalCount: string | number;
+  distinctCount: string | number;
+}
+
+/** JSONEachRow renders 64-bit integers as strings; narrow both back to number. */
+function asNumber(value: string | number): number {
+  return typeof value === "string" ? parseInt(value, 10) : value;
 }
 
 function mapEventRow(row: EventRow): ElasticSearchEvent {
@@ -1071,6 +1218,12 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
    * call would fall straight through to the unbounded fragment and scan every
    * partition, cold S3 tier included — precisely what this read promises not
    * to do, and per retry.
+   *
+   * **Returns a span with empty `events` and `links`**: it reads
+   * {@link DERIVATION_SPAN_SELECT}, which omits those nested columns because no
+   * derivation consumer reads them and they are what this read fails on. Do not
+   * reach for this method to render a span — {@link getSpanByIds} is the read
+   * that returns one whole.
    */
   async findNormalizedSpanById({
     tenantId,
@@ -1091,7 +1244,16 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
         fallback: "none",
         isEmpty: (row) => row === null,
         run: (window) =>
-          this.fetchNormalizedSpanRow({ tenantId, traceId, spanId, window }),
+          this.fetchNormalizedSpanRow({
+            tenantId,
+            traceId,
+            spanId,
+            window,
+            // Derivation consumers lift scalar attributes only; the nested
+            // Events/Links columns are both unused here and the source of the
+            // `Attempt to read after eof` failures this read retries on.
+            select: DERIVATION_SPAN_SELECT,
+          }),
       });
     } catch (error) {
       logger.error(
@@ -1119,6 +1281,11 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
    * SINGLE_SPAN_FETCH_SETTINGS above. The doc's "Anti-Pattern 1"
    * rule predates LazilyRead and isn't load-bearing on this shape.
    *
+   * `select` is the caller's projection: the UI read takes the whole span, the
+   * derivation read takes {@link DERIVATION_SPAN_SELECT}. Everything else about
+   * the query — key predicate, dedup form, settings — is identical, which is
+   * why it stays one method rather than two near-copies.
+   *
    * KNOWN MISMATCH, pre-existing: the engine's version column is `StartTime`
    * (`ReplacingMergeTree(StartTime)`), not `UpdatedAt`. So a span re-exported
    * with a CHANGED StartTime answers last-written-wins before a merge and
@@ -1130,17 +1297,19 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     traceId,
     spanId,
     window,
+    select = FULL_SPAN_SELECT,
   }: {
     tenantId: string;
     traceId: string;
     spanId: string;
     window: WindowFragment | null;
+    select?: string;
   }): Promise<NormalizedSpan | null> {
     const partition = partitionFragment(window);
     const client = await this.resolveClient(tenantId);
     const result = await client.query({
       query: `
-        SELECT ${FULL_SPAN_SELECT}
+        SELECT ${select}
         FROM ${TABLE_NAME}
         WHERE TenantId = {tenantId:String}
           AND TraceId = {traceId:String}
@@ -1456,6 +1625,56 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
           error: error instanceof Error ? error.message : String(error),
         },
         "Failed to get trace events by trace ID from ClickHouse",
+      );
+      throw error;
+    }
+  }
+
+  async getTraceEventRollupsByTraceIds({
+    tenantId,
+    traceIds,
+    timeRange,
+  }: TraceEventRollupParams): Promise<Record<string, TraceEventRollup>> {
+    EventUtils.validateTenantId(
+      { tenantId },
+      "SpanStorageClickHouseRepository.getTraceEventRollupsByTraceIds",
+    );
+
+    if (traceIds.length === 0) return {};
+
+    try {
+      const client = await this.resolveClient(tenantId);
+      // The page's traces all occurred inside the list's range, and a span
+      // starts no earlier than its trace does, so padding both ends by the
+      // standard partition window covers every span of every trace on the
+      // page without widening to a full-history scan. It is the same window
+      // the per-trace detail read uses, which is what keeps the list and the
+      // drawer agreeing on what a trace recorded.
+      const fromMs = timeRange.from - DEFAULT_PARTITION_WINDOW_MS;
+      const toMs = timeRange.to + DEFAULT_PARTITION_WINDOW_MS;
+      const result = await client.query({
+        query: traceEventRollupQuery(),
+        query_params: {
+          tenantId,
+          traceIds,
+          fromMs,
+          toMs,
+          maxNames: MAX_EVENT_NAMES_PER_TRACE,
+        },
+        format: "JSONEachRow",
+      });
+
+      return toTraceEventRollups(
+        (await result.json()) as TraceEventRollupRow[],
+      );
+    } catch (error) {
+      logger.error(
+        {
+          tenantId,
+          traceCount: traceIds.length,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        "Failed to get trace event rollups from ClickHouse",
       );
       throw error;
     }

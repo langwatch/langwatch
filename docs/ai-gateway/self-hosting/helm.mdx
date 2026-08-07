@@ -83,7 +83,7 @@ gateway:
   # Edge protection. Cap request body before auth runs so a misconfigured
   # caller can't OOM the pod. 10 MiB fits ~3 MiB prompts plus base64 images.
   security:
-    maxRequestBodyBytes: 10485760                 # 10 MiB
+    maxRequestBodyBytes: 33554432                 # 32 MiB
 ```
 
 The full set of overridable fields lives in `charts/gateway/values.yaml` (canonical for everything not exposed at the umbrella surface). All defaults are production-safe; you should only need to override `controlPlane.baseUrl`, `secrets.existingSecretName`, `ingress.host`, and the OTLP endpoint.
@@ -150,8 +150,10 @@ See [Config → Secret rotation](/ai-gateway/self-hosting/config#secret-rotation
 
 Two control-plane components must be running for the gateway to function fully:
 
-- **`langwatch-app`** on `gateway.controlPlane.baseUrl` (default `http://langwatch-app:5560`). The gateway hits `/api/internal/gateway/resolve-key`, `/config`, `/changes`, and `/guardrail-check` synchronously. If unreachable, the gateway extends its cached entries via stale-while-error (see `LW_GATEWAY_AUTH_CACHE_SOFT_BUMP`, `HARD_GRACE`) but new VKs cannot resolve and rate limits cannot tighten.
+- **`langwatch-app`** on `gateway.controlPlane.baseUrl` (default `http://langwatch-app:5560`). The gateway hits `/api/internal/gateway/resolve-key`, `/config`, `/changes`, and `/guardrail-check` synchronously. If unreachable, the gateway extends its cached entries via stale-while-error (see `LW_GATEWAY_AUTH_CACHE_SOFT_BUMP_SECONDS`, `LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS`) but new VKs cannot resolve and rate limits cannot tighten.
 - **`langwatch-workers`** running the event-sourcing pipelines. **Budget enforcement depends on this.** The gateway does NOT debit budgets directly: it emits spend commands, and the workers' debits process prices them and inserts ledger rows into ClickHouse. The `gateway_budget_scope_totals_mv` materialized view aggregates spend, and the bundle the gateway long-polls for is built from that view. **If `workers.enabled: false`, the gateway still serves traffic but spend never accumulates against budgets, so hard-cap scopes will not block at the configured limit.** Self-hosters running the umbrella chart get workers by default; standalone `charts/gateway` installs MUST point at a control plane that has the worker pipeline running.
+
+  The gateway side of that pipeline is `spend.enabled`, on by default. It is what writes each request's spend record to the on-disk spool a background drainer ships to the control plane, so **turning it off leaves the gateway serving traffic that costs money and debits nothing**: budgets sit at zero and stop enforcing. Turn it off only while running a gateway newer than a control plane that has no spend ingest route yet, and even then leaving it on is the safer degraded state, because the drainer retries on backoff and the spool is bounded. Watch `gateway_spend_spool_dropped_total`: every drop is spend nobody bills.
 
 ## Networking
 
@@ -169,7 +171,7 @@ See [Scaling](/ai-gateway/self-hosting/scaling) for HPA configuration, replica s
 ## High availability
 
 - Run ≥2 replicas with a PodDisruptionBudget (chart default `minAvailable: 1`) so rolling updates don't remove every pod simultaneously.
-- The auth-cache stale-while-error grace window (`LW_GATEWAY_AUTH_CACHE_SOFT_BUMP`, `HARD_GRACE`) keeps replicas serving with cached VK bundles when the control plane is briefly offline. See [Auth-cache stale-while-error](/ai-gateway/self-hosting/config#auth-cache) for the soft/hard-grace knobs.
+- The auth-cache stale-while-error grace window (`LW_GATEWAY_AUTH_CACHE_SOFT_BUMP_SECONDS`, `LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS`) keeps replicas serving with cached VK bundles when the control plane is briefly offline. See [Auth-cache stale-while-error](/ai-gateway/self-hosting/config#auth-cache) for the soft/hard-grace knobs.
 - The Redis L2 cache (`gateway.redis.url`) is **forward-compat surface today**: the v1 gateway has no Redis client, so this knob is a no-op. v1.1 will wire it for replica-warm-up on HPA scale-out. Don't rely on it for cold-start coverage in v1; the auth-cache grace window is the only operational backstop.
 
 ## Monitoring
@@ -371,29 +373,33 @@ Rolling deploys, HPA scale-downs, and voluntary pod evictions all invoke SIGTERM
 
 1. **SIGTERM received.** `ctx.Done()` fires.
 2. **Flip readiness + gauge.** `/readyz` starts returning `503 {"status":"draining"}`; `gateway_draining{pod=...}` goes to 1.
-3. **Pre-drain wait** (`shutdown.preDrainWait`, default 5 s). Gives the LB endpoint controller (nginx-ingress + kube-proxy) time to remove the pod from service endpoints. EKS-observed propagation is 3-4 s; 5 s has margin. During this window the pod is refusing new work via `/readyz` but `/livez` + `/startupz` stay green so kubelet doesn't short-circuit the drain.
-4. **Graceful close.** `server.Shutdown(Timeout=15s)` blocks until every in-flight handler exits, then force-closes. Streaming handlers that honour request context cancellation finish cleanly within the grace.
+3. **Pre-drain wait** (`shutdown.preDrainWaitSeconds`, default 5). Gives the LB endpoint controller (nginx-ingress + kube-proxy) time to remove the pod from service endpoints. EKS-observed propagation is 3-4 s; 5 s has margin. During this window the pod is refusing new work via `/readyz` but `/healthz` + `/startupz` stay green so kubelet doesn't short-circuit the drain.
+4. **Graceful close.** `server.Shutdown` blocks up to `shutdown.timeoutSeconds` (default 60) until every in-flight handler exits, then force-closes. Streaming handlers that honour request context cancellation finish cleanly within the grace.
 
 ```yaml
 gateway:
   shutdown:
-    preDrainWait: 5s
-    timeout: 15s
-  terminationGracePeriodSeconds: 30   # MUST be ≥ preDrainWait + timeout + slack
+    preDrainWaitSeconds: 5
+    timeoutSeconds: 60
+  terminationGracePeriodSeconds: 75   # MUST be ≥ preDrainWaitSeconds + timeoutSeconds + slack
 ```
+
+`timeoutSeconds` defaults above the gateway's 45 s non-streaming heartbeat interval on purpose. That interval is the line between a request that is merely slow and one that is stuck, so a shorter window would cut off exactly the requests the heartbeat exists to keep alive. Narrow it and the gateway says so at boot with a `graceful_shutdown_shorter_than_heartbeat_interval` warning.
 
 ### Invariant
 
-`terminationGracePeriodSeconds ≥ preDrainWait + timeout + slack`. Violate this and k8s SIGKILLs the pod mid-drain. The chart defaults 5 + 15 + 10-slack = 30 which matches the template.
+`terminationGracePeriodSeconds ≥ preDrainWaitSeconds + timeoutSeconds + slack`. Violate this and k8s SIGKILLs the pod mid-drain. The chart defaults 5 + 60 + 10-slack = 75 which matches the template, enforced in CI (`.github/workflows/go-services.yaml`'s `helm` job renders the chart and checks this invariant directly).
 
-If your LB propagation is slower than EKS (e.g. cloud LB with 10+ second endpoint propagation), bump `preDrainWait` **and** `terminationGracePeriodSeconds` together:
+The two keys are a plain count of seconds. A values file still carrying the duration-string names `shutdown.preDrainWait` or `shutdown.timeout` fails `helm template` with a message naming the key to use instead, rather than installing a release whose drain timing silently ignores them.
+
+If your LB propagation is slower than EKS (e.g. cloud LB with 10+ second endpoint propagation), bump `preDrainWaitSeconds` **and** `terminationGracePeriodSeconds` together:
 
 ```yaml
 gateway:
   shutdown:
-    preDrainWait: 15s
-    timeout: 20s
-  terminationGracePeriodSeconds: 45   # 15 + 20 + 10 slack
+    preDrainWaitSeconds: 15
+    timeoutSeconds: 60
+  terminationGracePeriodSeconds: 85   # 15 + 60 + 10 slack
 ```
 
 ### Observability
@@ -421,12 +427,12 @@ Edge protection lives under a dedicated `security` stanza separate from per-upst
 ```yaml
 gateway:
   security:
-    maxRequestBodyBytes: 10485760   # 10 MiB, default
+    maxRequestBodyBytes: 33554432   # 32 MiB, default
 ```
 
 Why not `budget` or `upstream`? These three concerns fail in different directions and alert differently:
 - `security`, edge, fails fast with 413, operator bumps when large base64 images are legitimate;
-- `budget`, accounting, reconciles asynchronously via the span-to-ledger path, operator investigates spend accumulation (see [Recipe 6](/ai-gateway/cookbooks/production-runbook#recipe-6-budget-spend-not-accumulating));
+- `budget`, accounting, reconciles asynchronously from the spend commands the gateway emits, operator investigates spend accumulation (see [Recipe 6](/ai-gateway/cookbooks/production-runbook#recipe-6-budget-spend-not-accumulating));
 - `upstream`, per-provider, fails mid-flight with circuit-breaker trips.
 
 The chart's ConfigMap renders the int as `%d` (the chart's test render catches a YAML scientific-notation gotcha, Go's `ParseInt` rejects `1.048576e+07`). If you override this value in a custom `values.yaml`, write integer literals, not floats.

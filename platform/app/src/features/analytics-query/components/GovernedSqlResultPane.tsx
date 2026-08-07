@@ -387,14 +387,7 @@ export function GovernedSqlResultPane({
   const panelIdFor = (target: GovernedSqlResultView) =>
     `${panelIdBase}-${target}`;
 
-  const stale = isGovernedSqlResultStale(state);
-  const failure =
-    state.outcome?.kind === "error"
-      ? readGovernedSqlFailure(state.outcome.error)
-      : undefined;
-  const result =
-    state.outcome?.kind === "result" ? state.outcome.result : undefined;
-  const chip = resultChip({ state, failure, stale });
+  const { stale, failure, result, chip } = readPaneModel(state);
 
   const changeView = (next: GovernedSqlResultView) => {
     if (next !== "table") setChartAreaVisited(true);
@@ -404,19 +397,10 @@ export function GovernedSqlResultPane({
 
   if (state.outcome === null) {
     return (
-      <VStack
-        align="stretch"
-        flex="1"
-        minHeight={0}
-        gap={0}
-        data-testid="governed-sql-result-pane"
-      >
-        {state.inFlight ? (
-          <RunningState />
-        ) : (
-          <EmptyState {...(onInsertExample ? { onInsertExample } : {})} />
-        )}
-      </VStack>
+      <NoOutcomePane
+        inFlight={state.inFlight}
+        onInsertExample={onInsertExample}
+      />
     );
   }
 
@@ -431,102 +415,208 @@ export function GovernedSqlResultPane({
       overflowY="auto"
       data-testid="governed-sql-result-pane"
     >
-      <HStack
-        gap={3}
-        paddingX={3}
-        paddingY={2}
-        borderBottomWidth="1px"
-        borderColor="border"
-        flexShrink={0}
-      >
-        {result && (
-          <ViewTabs
-            view={view}
-            onViewChange={changeView}
-            panelIdFor={panelIdFor}
-          />
-        )}
-        {chip && (
-          <Badge
-            size="sm"
-            variant="subtle"
-            colorPalette={chip.palette}
-            borderRadius="full"
-            title={chip.title}
-            data-testid="governed-sql-result-chip"
-          >
-            {chip.label}
-          </Badge>
-        )}
-        {stale && <StaleNotice onRun={onRun} />}
-        <Box flex="1" />
-        {state.inFlight && (
-          <HStack gap={2} color="fg.muted" data-testid="governed-sql-loading">
-            <Spinner size="xs" />
-            <Text fontSize="12px">Running…</Text>
-          </HStack>
-        )}
-      </HStack>
+      <ResultHeader
+        tabs={
+          result ? (
+            <ViewTabs
+              view={view}
+              onViewChange={changeView}
+              panelIdFor={panelIdFor}
+            />
+          ) : undefined
+        }
+        chip={chip}
+        stale={stale}
+        onRun={onRun}
+        inFlight={state.inFlight}
+      />
 
       {state.outcome.kind === "error" && failure && (
-        <Stack gap={3} padding={5} overflowY="auto">
-          <HandledErrorAlert
-            error={state.outcome.error}
-            fallbackTitle="Couldn't run the query"
-          />
-          {/* Locations are also marked in the editor; they are repeated here so
-              a refusal that names several positions can be read as a list. */}
-          <ViolationList failure={failure} />
-          {failure.code === GOVERNED_SQL_UNPARSEABLE_CODE &&
-            failure.violations.every((violation) => !violation.at) && (
-              <Text fontSize="12.5px" color="fg.muted">
-                The refusal did not say where in the statement the problem is.
-              </Text>
-            )}
-        </Stack>
+        <FailureBlock error={state.outcome.error} failure={failure} />
       )}
 
       {result && (
-        <>
-          {result.truncated && <TruncationBanner result={result} />}
-
-          <Box
-            flex="1"
-            minHeight={0}
-            overflow="auto"
-            role="tabpanel"
-            id={panelIdFor("table")}
-            display={view === "table" ? undefined : "none"}
-          >
-            <GovernedSqlResultTable result={result} />
-          </Box>
-
-          {renderChartArea && chartAreaVisited && (
-            <Box
-              flex="1"
-              // A floor rather than 0: a chart cut off mid-bar reads as broken,
-              // so past this the panel scrolls instead of shrinking.
-              minHeight="280px"
-              overflow="auto"
-              role="tabpanel"
-              id={
-                view === "specification"
-                  ? panelIdFor("specification")
-                  : panelIdFor("chart")
-              }
-              display={view === "table" ? "none" : undefined}
-              padding={view === "specification" ? 0 : 4}
-            >
-              {renderChartArea(view, openSpecification)}
-            </Box>
-          )}
-
-          <Box borderTopWidth="1px" borderColor="border" flexShrink={0}>
-            <GovernedSqlDiagnostics diagnostics={result.diagnostics} />
-            <GovernedSqlResultMeta statistics={result.statistics} />
-          </Box>
-        </>
+        <ResultBody
+          result={result}
+          view={view}
+          panelIdFor={panelIdFor}
+          chartArea={
+            renderChartArea && chartAreaVisited
+              ? renderChartArea(view, openSpecification)
+              : undefined
+          }
+        />
       )}
     </VStack>
+  );
+}
+
+/** What the last submission left to show, read once per render. */
+function readPaneModel(state: GovernedSqlRequestState) {
+  const stale = isGovernedSqlResultStale(state);
+  const failure =
+    state.outcome?.kind === "error"
+      ? readGovernedSqlFailure(state.outcome.error)
+      : undefined;
+  const result =
+    state.outcome?.kind === "result" ? state.outcome.result : undefined;
+  return {
+    stale,
+    failure,
+    result,
+    chip: resultChip({ state, failure, stale }),
+  };
+}
+
+/** Before any outcome exists: the first run in flight, or the untouched pane. */
+function NoOutcomePane({
+  inFlight,
+  onInsertExample,
+}: {
+  inFlight: boolean;
+  onInsertExample: (() => void) | undefined;
+}) {
+  return (
+    <VStack
+      align="stretch"
+      flex="1"
+      minHeight={0}
+      gap={0}
+      data-testid="governed-sql-result-pane"
+    >
+      {inFlight ? (
+        <RunningState />
+      ) : (
+        <EmptyState {...(onInsertExample ? { onInsertExample } : {})} />
+      )}
+    </VStack>
+  );
+}
+
+function ResultHeader({
+  tabs,
+  chip,
+  stale,
+  onRun,
+  inFlight,
+}: {
+  tabs: ReactNode | undefined;
+  chip: ResultChip | undefined;
+  stale: boolean;
+  onRun: () => void;
+  inFlight: boolean;
+}) {
+  return (
+    <HStack
+      gap={3}
+      paddingX={3}
+      paddingY={2}
+      borderBottomWidth="1px"
+      borderColor="border"
+      flexShrink={0}
+    >
+      {tabs}
+      {chip && <ResultChipBadge chip={chip} />}
+      {stale && <StaleNotice onRun={onRun} />}
+      <Box flex="1" />
+      {inFlight && (
+        <HStack gap={2} color="fg.muted" data-testid="governed-sql-loading">
+          <Spinner size="xs" />
+          <Text fontSize="12px">Running…</Text>
+        </HStack>
+      )}
+    </HStack>
+  );
+}
+
+function ResultChipBadge({ chip }: { chip: ResultChip }) {
+  return (
+    <Badge
+      size="sm"
+      variant="subtle"
+      colorPalette={chip.palette}
+      borderRadius="full"
+      title={chip.title}
+      data-testid="governed-sql-result-chip"
+    >
+      {chip.label}
+    </Badge>
+  );
+}
+
+function FailureBlock({
+  error,
+  failure,
+}: {
+  error: unknown;
+  failure: GovernedSqlFailure;
+}) {
+  return (
+    <Stack gap={3} padding={5} overflowY="auto">
+      <HandledErrorAlert error={error} fallbackTitle="Couldn't run the query" />
+      {/* Locations are also marked in the editor; they are repeated here so
+          a refusal that names several positions can be read as a list. */}
+      <ViolationList failure={failure} />
+      {failure.code === GOVERNED_SQL_UNPARSEABLE_CODE &&
+        failure.violations.every((violation) => !violation.at) && (
+          <Text fontSize="12.5px" color="fg.muted">
+            The refusal did not say where in the statement the problem is.
+          </Text>
+        )}
+    </Stack>
+  );
+}
+
+function ResultBody({
+  result,
+  view,
+  panelIdFor,
+  chartArea,
+}: {
+  result: GovernedSqlQueryResult;
+  view: GovernedSqlResultView;
+  panelIdFor: (view: GovernedSqlResultView) => string;
+  chartArea: ReactNode | undefined;
+}) {
+  return (
+    <>
+      {result.truncated && <TruncationBanner result={result} />}
+
+      <Box
+        flex="1"
+        minHeight={0}
+        overflow="auto"
+        role="tabpanel"
+        id={panelIdFor("table")}
+        display={view === "table" ? undefined : "none"}
+      >
+        <GovernedSqlResultTable result={result} />
+      </Box>
+
+      {chartArea !== undefined && (
+        <Box
+          flex="1"
+          // A floor rather than 0: a chart cut off mid-bar reads as broken,
+          // so past this the panel scrolls instead of shrinking.
+          minHeight="280px"
+          overflow="auto"
+          role="tabpanel"
+          id={
+            view === "specification"
+              ? panelIdFor("specification")
+              : panelIdFor("chart")
+          }
+          display={view === "table" ? "none" : undefined}
+          padding={view === "specification" ? 0 : 4}
+        >
+          {chartArea}
+        </Box>
+      )}
+
+      <Box borderTopWidth="1px" borderColor="border" flexShrink={0}>
+        <GovernedSqlDiagnostics diagnostics={result.diagnostics} />
+        <GovernedSqlResultMeta statistics={result.statistics} />
+      </Box>
+    </>
   );
 }

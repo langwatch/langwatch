@@ -1,4 +1,5 @@
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
+import { isStorageAnchoredVersion } from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
 import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
 import type { FacetQuery } from "../facet-registry";
 import type { TraceSummaryData } from "../types";
@@ -43,6 +44,10 @@ interface ClickHouseSummaryRow extends TraceSummaryFieldsBase {
   AttrInputMediaRefs: string;
   AttrOutputMediaRefs: string;
   LastEventOccurredAt: number;
+  /** The row's projection stamp; see the OccurredAt decode in `toTraceListItem`. */
+  Version?: string;
+  /** The span timing baseline column added by migration 00072 (ADR-087). */
+  EarliestSpanStartMs?: number | string;
 }
 
 /**
@@ -184,6 +189,8 @@ export class TraceListClickHouseRepository implements TraceListRepository {
           AttrContextSizeTokens,
           AttrLabels,
           toUnixTimestamp64Milli(OccurredAt) AS OccurredAt,
+          Version,
+          EarliestSpanStartMs,
           toUnixTimestamp64Milli(CreatedAt) AS CreatedAt,
           toUnixTimestamp64Milli(UpdatedAt) AS UpdatedAt,
           ComputedIOSchemaVersion,
@@ -239,6 +246,8 @@ export class TraceListClickHouseRepository implements TraceListRepository {
             Attributes['langwatch.reserved.context_size_tokens'] AS AttrContextSizeTokens,
             Attributes['langwatch.labels'] AS AttrLabels,
             OccurredAt,
+            Version,
+            EarliestSpanStartMs,
             CreatedAt,
             UpdatedAt,
             ComputedIOSchemaVersion,
@@ -1008,7 +1017,14 @@ export class TraceListClickHouseRepository implements TraceListRepository {
       annotationIds: row.AnnotationIds ?? [],
       sizeBytes: Number(row.SizeBytes ?? 0),
       attributes: buildListAttributes(row),
-      occurredAt: Number(row.OccurredAt),
+      // `OccurredAt` is the frozen storage anchor since ADR-087 and
+      // `EarliestSpanStartMs` is the span timing baseline it used to double as.
+      // A row at an older stamp predates the split and carries both in the one
+      // column, which is why this is version-gated rather than a bare read.
+      storageAnchorMs: Number(row.OccurredAt),
+      occurredAt: isStorageAnchoredVersion(row.Version)
+        ? Number(row.EarliestSpanStartMs ?? 0)
+        : Number(row.OccurredAt),
       createdAt: Number(row.CreatedAt),
       updatedAt: Number(row.UpdatedAt),
       LastEventOccurredAt: Number(row.LastEventOccurredAt ?? 0),
