@@ -289,11 +289,20 @@ describe("memory-safety", () => {
        * that all query() invocations include the settings parameter.
        */
       /** @scenario All query execution paths include memory safety settings */
-      it("passes clickhouse_settings to every .query() call in clickhouse-analytics.service.ts", () => {
+      it("passes clickhouse_settings to every .query() call in legacy-analytics-backend.clickhouse.repository.ts", () => {
+        // The queries moved out of clickhouse-analytics.service.ts (which now
+        // delegates to a repository) so the client is reached through the App
+        // instead of resolved in the service — see
+        // src/server/clickhouse/__tests__/clientAccessBoundary.unit.test.ts.
         const servicePath = path.resolve(
           __dirname,
           "..",
-          "clickhouse-analytics.service.ts",
+          "..",
+          "..",
+          "app-layer",
+          "analytics",
+          "repositories",
+          "legacy-analytics-backend.clickhouse.repository.ts",
         );
         const source = fs.readFileSync(servicePath, "utf-8");
 

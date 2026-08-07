@@ -5,7 +5,6 @@ import {
 } from "@ee/webhooks/entitlement";
 import { WEBHOOK_EVENT_TYPES } from "@ee/webhooks/eventRegistry";
 import { WebhookEndpointService } from "@ee/webhooks/webhookEndpoint.service";
-import { WebhookEventsClickHouseRepository } from "@ee/webhooks/webhookEvents.clickhouse.repository";
 import {
   WebhookEventNotFoundError,
   WebhookEventsService,
@@ -24,7 +23,7 @@ import {
 } from "~/server/api/idempotency";
 import { createOrgApp, requires } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
-import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
+import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
 import { PrismaProcessStore } from "~/server/event-sourcing/process-manager/stores/prismaProcessStore";
 import { toStoredEnum, toWireEnum } from "~/server/gateway/wireEnums";
@@ -54,17 +53,20 @@ const health = new WebhookHealthService({
   endpoints,
   processStore: new PrismaProcessStore(prisma),
 });
-const eventsRepository = new WebhookEventsClickHouseRepository(
-  async (tenantId) => {
-    const client = await getClickHouseClientForProject(tenantId);
-    if (!client) throw new Error("ClickHouse is not configured");
-    return client;
-  },
-);
-const eventsService = new WebhookEventsService({
-  prisma,
-  repository: eventsRepository,
-});
+
+/**
+ * Resolved per call rather than at module scope, so every route shares the
+ * one repository `getApp()` hands out instead of minting its own, and the
+ * deployment's ClickHouse configuration is read at request time, not once
+ * at import time. Undefined on a deployment without ClickHouse — the
+ * emitted-events log has no fallback store — which this reports the same
+ * way the old inline resolver did: a plain "not configured" refusal.
+ */
+function requireEventsService(): WebhookEventsService {
+  const repository = getApp().gateway.webhookEvents;
+  if (!repository) throw new Error("ClickHouse is not configured");
+  return new WebhookEventsService({ prisma, repository });
+}
 
 /**
  * Enterprise gate for the whole surface, delegating to the one shared
@@ -764,7 +766,7 @@ secured.access(requires("webhookEndpoints:view")).get(
     // The service maps emitted types to row statuses and serves an empty
     // page for unknown types, so consumers can probe forward-compatibly
     // without an error.
-    const page = await eventsService.getEmittedEvents({
+    const page = await requireEventsService().getEmittedEvents({
       organizationId: organization.id,
       fromMs: query.from,
       toMs: query.to,
@@ -794,7 +796,7 @@ secured.access(requires("webhookEndpoints:view")).get(
   }),
   async (c) => {
     const organization = c.get("organization") as Organization;
-    const event = await eventsService.getEmittedEventById({
+    const event = await requireEventsService().getEmittedEventById({
       organizationId: organization.id,
       id: c.req.param("id"),
     });

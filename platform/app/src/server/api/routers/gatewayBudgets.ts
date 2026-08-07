@@ -8,12 +8,12 @@
  */
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
+import { getApp } from "~/server/app-layer/app";
 import {
   GatewayBudgetService,
   type GatewayBudgetWithSeats,
 } from "~/server/gateway/budget.service";
 import { effectiveBudgetPeriod } from "~/server/gateway/budgetPeriod";
-import { chRepoOrUndefined } from "~/server/gateway/clickhouseRepos";
 import {
   providerLabelFor,
   resolveProviderLabels,
@@ -59,7 +59,7 @@ export const gatewayBudgetsRouter = createTRPCRouter({
       await requireOrgAccess(ctx, input.organizationId);
       const service = GatewayBudgetService.create(
         ctx.prisma,
-        chRepoOrUndefined(),
+        getApp().gateway.budgets,
       );
       const { budgets, spendAvailable, scopeReach } =
         await service.listWithHealth(input.organizationId);
@@ -90,7 +90,7 @@ export const gatewayBudgetsRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       const service = GatewayBudgetService.create(
         ctx.prisma,
-        chRepoOrUndefined(),
+        getApp().gateway.budgets,
       );
       const { budgets, spendAvailable, scopeReach } =
         await service.listForProjectWithHealth(input.projectId);
@@ -126,7 +126,7 @@ export const gatewayBudgetsRouter = createTRPCRouter({
       await requireOrgAccess(ctx, input.organizationId);
       const service = GatewayBudgetService.create(
         ctx.prisma,
-        chRepoOrUndefined(),
+        getApp().gateway.budgets,
       );
       const detail = await service.getDetail(input.id, input.organizationId);
       if (!detail) {
@@ -235,7 +235,7 @@ export const gatewayBudgetsRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const service = GatewayBudgetService.create(
         ctx.prisma,
-        chRepoOrUndefined(),
+        getApp().gateway.budgets,
       );
       const row = await service.create({
         organizationId: input.organizationId,
@@ -270,7 +270,7 @@ export const gatewayBudgetsRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const service = GatewayBudgetService.create(
         ctx.prisma,
-        chRepoOrUndefined(),
+        getApp().gateway.budgets,
       );
       const row = await service.update({
         ...input,
@@ -285,7 +285,7 @@ export const gatewayBudgetsRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const service = GatewayBudgetService.create(
         ctx.prisma,
-        chRepoOrUndefined(),
+        getApp().gateway.budgets,
       );
       const row = await service.archive({
         ...input,
@@ -307,7 +307,7 @@ export const gatewayBudgetsRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const service = GatewayBudgetService.create(
         ctx.prisma,
-        chRepoOrUndefined(),
+        getApp().gateway.budgets,
       );
       const row = await service.reset({
         id: input.id,

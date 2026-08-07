@@ -26,6 +26,7 @@ import {
   getTestClickHouseClient,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
+import { PersonalUsageClickHouseRepository } from "../personalUsage.clickhouse.repository";
 import { PersonalUsageService } from "../personalUsage.service";
 
 async function insertTrace(
@@ -90,6 +91,7 @@ describe("PersonalUsageService spend rollups", () => {
     end: new Date(Date.UTC(2026, 0, 31)),
   };
   let ch: ClickHouseClient | null = null;
+  let service: PersonalUsageService;
   let orgId = "";
   // The CH client resolves a project's cluster off its org in Postgres and
   // refuses unknown ids, so the tenant must be a real project row.
@@ -99,6 +101,9 @@ describe("PersonalUsageService spend rollups", () => {
     const maybe = getTestClickHouseClient();
     if (!maybe) return;
     ch = maybe;
+    service = PersonalUsageService.create(
+      new PersonalUsageClickHouseRepository(async () => ch!),
+    );
 
     const org = await prisma.organization.create({
       data: { name: ns, slug: `org-${ns}` },
@@ -151,7 +156,7 @@ describe("PersonalUsageService spend rollups", () => {
   describe("given a bundled trace and a billed trace", () => {
     it("totals theoretical spend across both in the summary", async () => {
       if (!ch) return;
-      const summary = await new PersonalUsageService().summary({
+      const summary = await service.summary({
         personalProjectId: tenantId,
         window,
       });
@@ -164,7 +169,7 @@ describe("PersonalUsageService spend rollups", () => {
 
     it("executes dailyBuckets and splits billed from theoretical", async () => {
       if (!ch) return;
-      const buckets = await new PersonalUsageService().dailyBuckets({
+      const buckets = await service.dailyBuckets({
         personalProjectId: tenantId,
         window,
       });
@@ -177,7 +182,7 @@ describe("PersonalUsageService spend rollups", () => {
 
     it("executes breakdownByModel and splits billed per model", async () => {
       if (!ch) return;
-      const breakdown = await new PersonalUsageService().breakdownByModel({
+      const breakdown = await service.breakdownByModel({
         personalProjectId: tenantId,
         window,
       });

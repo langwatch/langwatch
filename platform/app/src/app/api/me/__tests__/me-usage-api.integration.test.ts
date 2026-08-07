@@ -15,6 +15,10 @@ import {
   cleanupTestData,
   getTestClickHouseClient,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
+import {
+  clearClickHouseTestApp,
+  installClickHouseTestApp,
+} from "~/test-utils/clickhouseTestApp";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { app } from "../[[...route]]/app";
 
@@ -205,6 +209,12 @@ describe("Feature: Personal usage REST API", () => {
   beforeAll(async () => {
     ch = getTestClickHouseClient();
 
+    // The routes and workers under test take their ClickHouse repositories
+    // from the App rather than resolving a client, so the fixture has to
+    // provide one or they fail with "App not initialized".
+    installClickHouseTestApp({
+      resolveClient: async () => getTestClickHouseClient(),
+    });
     testOrganization = await prisma.organization.create({
       data: { name: "Me Usage Test Org", slug: `--test-org-${ns}` },
     });
@@ -414,6 +424,7 @@ describe("Feature: Personal usage REST API", () => {
   });
 
   afterAll(async () => {
+    await clearClickHouseTestApp();
     if (ch) {
       await cleanupTestData(seededProject.id).catch(() => {});
       // gateway_budget_ledger_events isn't covered by cleanupTestData.

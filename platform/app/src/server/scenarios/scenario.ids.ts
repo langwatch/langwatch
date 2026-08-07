@@ -1,7 +1,7 @@
 /**
  * ID generators for scenario execution.
  *
- * Extracted from scenario.queue.ts so they're available without BullMQ.
+ * Kept in their own module so callers can mint IDs without importing the queue.
  */
 
 import { generate } from "@langwatch/ksuid";

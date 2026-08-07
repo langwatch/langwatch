@@ -18,6 +18,7 @@
  */
 
 import type { ClickHouseClient } from "@clickhouse/client";
+import { WebhookEventsClickHouseRepository } from "@ee/webhooks/webhookEvents.clickhouse.repository";
 import { generate } from "@langwatch/ksuid";
 import {
   OrganizationUserRole,
@@ -26,13 +27,29 @@ import {
 } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
+import { GatewaySpendEventsRepository } from "~/server/gateway/spendEvents.clickhouse.repository";
+import { GatewayVirtualKeySpendRepository } from "~/server/gateway/virtualKeySpend.clickhouse.repository";
 
 // Same environment shims the app-direct suite uses: the billing plan gate
 // and the ClickHouse resolution, both pointed at the test substrate.
 vi.mock("~/server/app-layer/app", () => ({
+  // Built per call rather than once: the routes now take their ClickHouse
+  // repositories from the App, and `chClient` is only assigned once the test
+  // containers are up - after this factory runs.
   getApp: () => ({
     planProvider: {
       getActivePlan: async () => ({ webhookEndpointsEnabled: true }),
+    },
+    gateway: {
+      budgets: new GatewayBudgetClickHouseRepository(async () => chClient),
+      virtualKeySpend: new GatewayVirtualKeySpendRepository(
+        async () => chClient,
+      ),
+      spendEvents: new GatewaySpendEventsRepository(async () => chClient),
+      webhookEvents: new WebhookEventsClickHouseRepository(
+        async () => chClient,
+      ),
     },
   }),
 }));

@@ -109,7 +109,7 @@ export interface EventSourcingServiceOptions<
   globalRegistry?: ProjectionRegistry<Event>;
   /**
    * Process role — controls whether queue consumers are started.
-   * "web": skip BullMQ workers (only dispatch to queues)
+   * "web": skip queue consumers (only dispatch to queues)
    * "worker" | undefined: start all consumers
    */
   processRole?: ProcessRole;

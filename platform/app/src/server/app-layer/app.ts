@@ -20,6 +20,8 @@ export class App {
     AppCommands["evaluations"];
   readonly experimentRuns: AppCommands["experimentRuns"];
   readonly dspySteps: AppDependencies["dspySteps"];
+  /** The ADR-034 analytics read API. */
+  readonly analytics: AppDependencies["analytics"];
   readonly simulations: AppDependencies["simulations"] &
     AppCommands["simulations"];
   readonly suiteRuns: AppDependencies["suiteRuns"] & AppCommands["suiteRuns"];
@@ -27,8 +29,17 @@ export class App {
     AppCommands["topicClustering"];
   readonly codingAgents: AppDependencies["codingAgents"] &
     AppCommands["codingAgents"];
+  readonly gateway: AppDependencies["gateway"];
   readonly filters: AppDependencies["filters"];
+  readonly clickhouse: AppDependencies["clickhouse"];
+  readonly billing: AppDependencies["billing"];
+  readonly usageStats: AppDependencies["usageStats"];
+  readonly scenarios: AppDependencies["scenarios"];
+  readonly governance: AppDependencies["governance"];
+  readonly billableEvents: AppDependencies["billableEvents"];
   readonly commands: AppCommands;
+  readonly storedObjects: AppDependencies["storedObjects"];
+  readonly opsExplain: AppDependencies["opsExplain"];
   readonly langy: AppDependencies["langy"];
   readonly experiments: AppDependencies["experiments"];
   readonly triggers: AppDependencies["triggers"];
@@ -85,6 +96,7 @@ export class App {
     this.evaluations = { ...deps.evaluations, ...deps.commands.evaluations };
     this.experimentRuns = deps.commands.experimentRuns;
     this.dspySteps = deps.dspySteps;
+    this.analytics = deps.analytics;
     this.simulations = { ...deps.simulations, ...deps.commands.simulations };
     this.suiteRuns = { ...deps.suiteRuns, ...deps.commands.suiteRuns };
     this.topicClustering = {
@@ -95,8 +107,17 @@ export class App {
       ...deps.codingAgents,
       ...deps.commands.codingAgents,
     };
+    this.gateway = deps.gateway;
     this.filters = deps.filters;
+    this.clickhouse = deps.clickhouse;
+    this.billing = deps.billing;
+    this.usageStats = deps.usageStats;
+    this.scenarios = deps.scenarios;
+    this.governance = deps.governance;
+    this.billableEvents = deps.billableEvents;
     this.commands = deps.commands;
+    this.storedObjects = deps.storedObjects;
+    this.opsExplain = deps.opsExplain;
     this.langy = deps.langy;
     this.ops = deps.ops;
     this.retentionPolicyCache = deps.retentionPolicyCache;
@@ -153,7 +174,7 @@ export function getApp(): App {
 
 export async function resetApp(): Promise<void> {
   // Close the previous App before dropping the singleton so its EventSourcing
-  // and graceful-closeable handles (Redis, BullMQ workers, etc.) don't leak
+  // and graceful-closeable handles (Redis, queue workers, etc.) don't leak
   // into the next test. Without this the prior App is orphaned and its open
   // handles keep vitest's single fork worker from exiting between files.
   const existing = globalForApp.__langwatch_app;

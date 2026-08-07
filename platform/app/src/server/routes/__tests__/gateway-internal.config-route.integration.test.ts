@@ -4,25 +4,45 @@
  * Integration coverage for GET /api/internal/gateway/config/:vk_id, the
  * route the Go gateway calls on every bundle cache miss.
  *
- * Hits the real Hono app and real PG, no mocks. The materialiser reads
+ * Hits the real Hono app and real PG. The materialiser reads
  * `vk.routingPolicy` off whatever the caller included, so a materialiser
  * test that does its own include cannot catch the route forgetting one:
  * the bundle just comes back with an empty alias map and empty deny
  * lists, and the gateway silently stops resolving aliases and enforcing
  * model policy. This exercises the route's own query.
  *
+ * The route takes its budget repository from `getApp()`; standing in for
+ * the store means standing in for `getApp()`, wired to the same
+ * `getClickHouseClientForProject` resolver the route used to build inline
+ * — this test asserts on aliases/policy rules, not spend, so it does not
+ * need to control which ClickHouse client that resolves to.
+ *
  * Spec: specs/ai-gateway/provider-routing.feature
  *       specs/ai-gateway/governance/routing-policy-aliases-and-rules.feature
  */
 import { createHash, createHmac } from "crypto";
 import { nanoid } from "nanoid";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
-
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
 import { prisma } from "~/server/db";
 import {
   startTestContainers,
   stopTestContainers,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
+import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
+
+vi.mock("~/server/app-layer/app", () => ({
+  getApp: () => ({
+    gateway: {
+      budgets: new GatewayBudgetClickHouseRepository(async (projectId) => {
+        const client = await getClickHouseClientForProject(projectId);
+        if (!client) throw new Error("ClickHouse is not configured");
+        return client;
+      }),
+    },
+  }),
+}));
+
 import { app } from "../gateway-internal";
 
 const suffix = nanoid(8);
