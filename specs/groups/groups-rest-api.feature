@@ -180,3 +180,44 @@ Feature: Groups REST API
   Scenario: DELETE /api/groups/:id/bindings/:bindingId returns 404 for nonexistent binding
     When I send DELETE /api/groups/:id/bindings/nonexistent
     Then the response status is 404
+
+  # ── Trust boundaries and reachability ───────────────────────────────────────
+  #
+  # A group binding is a grant, so every id in it has to belong to the caller's
+  # organization and to a role people are allowed to hold. Two references were
+  # taken on trust: a custom role from another organization, and the internal
+  # role a service API key carries. Both were bindable, and the resolver then
+  # honored them, so the validation and the resolution are pinned separately.
+  #
+  # The family also has to be reachable at all. Its routes were documented and
+  # implemented while nothing mounted them, so every documented call answered
+  # 404 in production.
+
+  @integration
+  Scenario: A custom role from another organization cannot be bound to a group
+    Given group "Engineering" exists
+    And a custom role belongs to a different organization
+    When I send POST /api/groups/:id/bindings with that role
+    Then the request is refused with code custom_role_not_assignable and status 422
+    And the group gains no binding
+
+  @integration
+  Scenario: An API key's system role cannot be bound to a group
+    Given group "Engineering" exists
+    And a role reserved for service API keys exists in the organization
+    When I send POST /api/groups/:id/bindings with that role
+    Then the request is refused with code custom_role_not_assignable and status 422
+    And the group gains no binding
+
+  @unit
+  Scenario: A poisoned cross-organization binding does not grant access
+    Given a group binding that names a role from another organization
+    When a member's permissions are resolved through that group
+    Then the foreign role contributes no permissions
+    And the member's access is what their own organization granted them
+
+  @integration
+  Scenario: The groups API is reachable through the composed router
+    When a request for /api/groups reaches the composed API router
+    Then it is handled by the groups endpoints
+    And it is not answered with 404

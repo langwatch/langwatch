@@ -71,3 +71,46 @@ Feature: Every public REST route reaches the OpenAPI document
     Given a route whose parameter carries a Hono regex constraint
     When the route table is read
     Then the constraint is dropped and the parameter templates on its own
+
+  # Newer families do not construct their own Hono app: they declare a service,
+  # and one declaration fans out into several mounts: a dated version, a
+  # `latest` alias, the bare path every reader gets pointed at, and a 410 for
+  # anything withdrawn. Each of those shapes is a way for a family to fall out
+  # of the route table, and a family the gate cannot see is a family whose next
+  # missing route nobody notices. The same applies to the generator's own side:
+  # an app it merges whose prefix nobody declared public is checked by nothing.
+
+  Scenario: A service declaring only its name is counted under its derived prefix
+    Given a family declared as a service with a name and no explicit base path
+    When the route table is read
+    Then its routes are counted under the prefix derived from that name
+
+  Scenario: A versioned registration is counted once at its bare alias path
+    Given an endpoint served at a dated version, at latest, and at its bare path
+    When the route table is read
+    Then the endpoint is counted once, at the bare path
+    And the dated and latest mounts are not reported as routes of their own
+
+  Scenario: An SSE endpoint is counted as a GET route
+    Given an endpoint that streams server-sent events
+    When the route table is read
+    Then it is counted as a GET route
+    And it must be documented or excluded like any other route
+
+  Scenario: A test helper named createService declares no service
+    Given a test file with a local helper of its own named createService
+    And the file does not declare a service
+    When the route table is read
+    Then no base path is derived from that helper
+
+  Scenario: A withdrawn endpoint is accounted for without an exclusion entry
+    Given an endpoint withdrawn from a family, answering callers still on it
+    When the route-coverage check runs
+    Then the endpoint is reported as withdrawn
+    And it needs no exclusion entry, because a withdrawn route cannot be published
+
+  Scenario: Every app the generator merges is covered by an app-derived prefix
+    Given the set of apps the spec generator merges into the document
+    When the public prefixes are checked
+    Then every one of those apps sits under a declared prefix
+    And an app whose prefix is missing fails the check
