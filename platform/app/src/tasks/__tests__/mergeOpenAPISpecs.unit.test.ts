@@ -176,7 +176,9 @@ describe("mergeOpenAPISpecs()", () => {
           baseSpec: buildSpec({}),
         });
 
-        expect(withTeamsApp.paths).not.toHaveProperty("/api/teams/{id}/retired");
+        expect(withTeamsApp.paths).not.toHaveProperty(
+          "/api/teams/{id}/retired",
+        );
         expect(withoutTeamsApp.paths).toHaveProperty("/api/teams/{id}/retired");
       });
     });
