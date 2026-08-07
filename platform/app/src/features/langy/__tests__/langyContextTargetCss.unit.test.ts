@@ -18,10 +18,13 @@ const css = readFileSync(
   "utf8",
 );
 
-/** The body of the first rule whose selector line contains `selector`. */
+/**
+ * The body of the first rule whose selector line contains `selector`.
+ * Lookup helper: throws when the sheet has no such rule.
+ */
 const ruleBody = (selector: string) => {
   const start = css.indexOf(selector);
-  expect(start).toBeGreaterThan(-1);
+  if (start === -1) throw new Error(`selector not found: ${selector}`);
   return css.slice(start, css.indexOf("}", start));
 };
 

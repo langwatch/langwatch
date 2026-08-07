@@ -200,31 +200,36 @@ describe("experiment run fold — event ordering invariants", () => {
   const store = createReplacingMergeTreeStore();
   const projection = new ExperimentRunStateFoldProjection({ store });
 
-  function assertCorrectFinalState(
-    state: ExperimentRunStateData,
-    label: string,
-  ) {
-    expect(state.FinishedAt, `${label}: FinishedAt must be set`).not.toBeNull();
-    expect(state.RunId, `${label}: RunId must be set`).toBe("run-1");
-    expect(state.ExperimentId, `${label}: ExperimentId must be set`).toBe(
-      "experiment-1",
-    );
-    expect(state.CompletedCount, `${label}: CompletedCount must be 3`).toBe(3);
-    expect(state.Progress, `${label}: Progress must be 3`).toBe(3);
-    expect(
-      state.TotalCost,
-      `${label}: TotalCost must be computed`,
-    ).toBeGreaterThan(0);
-    expect(state.ScoreCount, `${label}: ScoreCount must be 3`).toBe(3);
-    expect(
-      state.AvgScoreBps,
-      `${label}: AvgScoreBps must be computed`,
-    ).not.toBeNull();
-    expect(
-      state.PassRateBps,
-      `${label}: PassRateBps must be computed`,
-    ).not.toBeNull();
+  /**
+   * Normalized view of the final-state invariants, so each ordering asserts
+   * them with one `toEqual` (the label rides on the assertion message and
+   * the failing field shows up in the diff).
+   */
+  function finalStateView(state: ExperimentRunStateData) {
+    return {
+      finishedAtSet: state.FinishedAt !== null,
+      runId: state.RunId,
+      experimentId: state.ExperimentId,
+      completedCount: state.CompletedCount,
+      progress: state.Progress,
+      totalCostComputed: state.TotalCost > 0,
+      scoreCount: state.ScoreCount,
+      avgScoreBpsComputed: state.AvgScoreBps !== null,
+      passRateBpsComputed: state.PassRateBps !== null,
+    };
   }
+
+  const correctFinalState = {
+    finishedAtSet: true,
+    runId: "run-1",
+    experimentId: "experiment-1",
+    completedCount: 3,
+    progress: 3,
+    totalCostComputed: true,
+    scoreCount: 3,
+    avgScoreBpsComputed: true,
+    passRateBpsComputed: true,
+  };
 
   // Production pattern: all events bulk-inserted with same timestamp.
   // completed can have LOWER occurredAt than started/target_result.
@@ -254,7 +259,7 @@ describe("experiment run fold — event ordering invariants", () => {
         })),
       )("$name → final state is correct", async ({ name, perm }) => {
         const state = await processFold(perm, store, projection);
-        assertCorrectFinalState(state, name);
+        expect(finalStateView(state), name).toEqual(correctFinalState);
       });
     });
   });
@@ -276,7 +281,9 @@ describe("experiment run fold — event ordering invariants", () => {
         store,
         projection,
       );
-      assertCorrectFinalState(state, "completed lower occurredAt");
+      expect(finalStateView(state), "completed lower occurredAt").toEqual(
+        correctFinalState,
+      );
     });
 
     it("started → completed → targets → evals (completed before results)", async () => {
@@ -294,7 +301,9 @@ describe("experiment run fold — event ordering invariants", () => {
         store,
         projection,
       );
-      assertCorrectFinalState(state, "completed before results");
+      expect(finalStateView(state), "completed before results").toEqual(
+        correctFinalState,
+      );
     });
   });
 });

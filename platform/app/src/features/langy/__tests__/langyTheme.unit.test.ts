@@ -107,9 +107,10 @@ describe("langyTheme token emission", () => {
     );
     // One rule per selector in the sheet, so anchoring on the selector and
     // reading to the closing brace captures that rule's whole body.
+    // Lookup helper: throws when the sheet has no such rule.
     const ruleBody = (selector: string) => {
       const start = css.indexOf(selector);
-      expect(start).toBeGreaterThan(-1);
+      if (start === -1) throw new Error(`selector not found: ${selector}`);
       return css.slice(start, css.indexOf("}", start));
     };
 

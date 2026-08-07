@@ -110,10 +110,8 @@ afterAll(async () => {
   }
 });
 
-const liveOpenAI = process.env.OPENAI_API_KEY ? it : it.skip;
-
 describe("playground proxy /go/proxy/v1/chat/completions", () => {
-  liveOpenAI(
+  it.runIf(process.env.OPENAI_API_KEY)(
     "non-streaming OpenAI chat completion routes through nlpgo and returns assistant content",
     async () => {
       const url = `http://127.0.0.1:${NLPGO_PORT}/go/proxy/v1/chat/completions`;
@@ -159,7 +157,7 @@ describe("playground proxy /go/proxy/v1/chat/completions", () => {
     30_000,
   );
 
-  liveOpenAI(
+  it.runIf(process.env.OPENAI_API_KEY)(
     "streaming OpenAI chat completion delivers SSE deltas terminated by [DONE]",
     async () => {
       const url = `http://127.0.0.1:${NLPGO_PORT}/go/proxy/v1/chat/completions`;
@@ -223,7 +221,7 @@ describe("playground proxy /go/proxy/v1/chat/completions", () => {
     30_000,
   );
 
-  liveOpenAI(
+  it.runIf(process.env.OPENAI_API_KEY)(
     "missing provider header returns 400 without touching upstream",
     async () => {
       const url = `http://127.0.0.1:${NLPGO_PORT}/go/proxy/v1/chat/completions`;

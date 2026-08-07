@@ -312,13 +312,17 @@
 						//                              skip was implemented, repaired
 						//                              or removed. Conditional
 						//                              skipIf(env) remains allowed.
-						//   noMisplacedAssertion 172  — mostly custom assertion
-						//                              helpers; verify before promoting
+						//   noMisplacedAssertion  0  — burned down from 172: aliased
+						//                              its became it.runIf, assertion
+						//                              helpers became projections
+						//                              asserted inside the it(), and
+						//                              lookup helpers throw like
+						//                              testing-library get* queries
 						"noFocusedTests": "error",
 						"noDuplicateTestHooks": "error",
 						"noExportsInTest": "warn",
 						"noSkippedTests": "error",
-						"noMisplacedAssertion": "warn"
+						"noMisplacedAssertion": "error"
 					},
 					"nursery": {
 						"useTestHooksOnTop": "error"

@@ -1954,17 +1954,16 @@ describe("GroupStagingScripts", () => {
   describe("complete", () => {
     async function stageAndDispatch(
       overrides: Partial<Parameters<typeof scripts.stage>[0]> = {},
-    ): Promise<DispatchResult> {
+    ): Promise<DispatchResult | null> {
       const job = makeJob({ dispatchAfterMs: 100, ...overrides });
       await scripts.stage(job);
-      const result = await scripts.dispatch({ nowMs: 200, activeTtlSec: 60 });
-      expect(result).not.toBeNull();
-      return result!;
+      return await scripts.dispatch({ nowMs: 200, activeTtlSec: 60 });
     }
 
     describe("when active key matches", () => {
       it("deletes active key, pushes signal, returns true", async () => {
-        const dispatched = await stageAndDispatch({ stagedJobId: "j1" });
+        const dispatched = (await stageAndDispatch({ stagedJobId: "j1" }))!;
+        expect(dispatched).not.toBeNull();
 
         const ok = await scripts.complete({
           groupId: dispatched.groupId,
@@ -2001,7 +2000,8 @@ describe("GroupStagingScripts", () => {
       });
 
       it("removes group from ready set if no jobs remain", async () => {
-        const dispatched = await stageAndDispatch({ stagedJobId: "j1" });
+        const dispatched = (await stageAndDispatch({ stagedJobId: "j1" }))!;
+        expect(dispatched).not.toBeNull();
 
         await scripts.complete({
           groupId: dispatched.groupId,
@@ -2015,7 +2015,8 @@ describe("GroupStagingScripts", () => {
 
     describe("when active key stale", () => {
       it("returns false, does not delete", async () => {
-        const dispatched = await stageAndDispatch({ stagedJobId: "j1" });
+        const dispatched = (await stageAndDispatch({ stagedJobId: "j1" }))!;
+        expect(dispatched).not.toBeNull();
 
         // Overwrite the active key with a different job ID
         await redis.set(
@@ -5424,20 +5425,28 @@ describe("group-key TTL safety net", () => {
     return redis.pttl(`${keyPrefix()}group:${groupId}:data`);
   }
 
-  function expectFreshTtl(pttl: number) {
-    // PTTL set and ~the configured window. The upper bound allows a small
-    // delay-derived extension (a job staged a few seconds out pushes expiry to
-    // dispatch + window), without admitting the multi-hour long-delay case.
-    expect(pttl).toBeGreaterThan(GROUP_KEY_TTL_MS - 60_000);
-    expect(pttl).toBeLessThanOrEqual(GROUP_KEY_TTL_MS + 60_000);
+  /**
+   * PTTL projected against the configured window. The upper bound allows a
+   * small delay-derived extension (a job staged a few seconds out pushes
+   * expiry to dispatch + window), without admitting the multi-hour
+   * long-delay case. Tests assert this equals `freshTtl`.
+   */
+  function ttlWindow(pttl: number) {
+    return {
+      pttl,
+      withinFreshWindow:
+        pttl > GROUP_KEY_TTL_MS - 60_000 && pttl <= GROUP_KEY_TTL_MS + 60_000,
+    };
   }
+
+  const freshTtl = { withinFreshWindow: true };
 
   describe("when a job is staged", () => {
     it("sets a bounded TTL on the jobs and data keys", async () => {
       await scripts.stage(makeJob({ stagedJobId: "j1" }));
 
-      expectFreshTtl(await jobsTtl("group-a"));
-      expectFreshTtl(await dataTtl("group-a"));
+      expect(ttlWindow(await jobsTtl("group-a"))).toMatchObject(freshTtl);
+      expect(ttlWindow(await dataTtl("group-a"))).toMatchObject(freshTtl);
     });
   });
 
@@ -5465,8 +5474,8 @@ describe("group-key TTL safety net", () => {
 
       expect(await inspectReadySet()).toEqual([]);
       expect(await inspectGroupJobs("group-a")).toEqual(["j1", "1000"]);
-      expectFreshTtl(await jobsTtl("group-a"));
-      expectFreshTtl(await dataTtl("group-a"));
+      expect(ttlWindow(await jobsTtl("group-a"))).toMatchObject(freshTtl);
+      expect(ttlWindow(await dataTtl("group-a"))).toMatchObject(freshTtl);
     });
   });
 
@@ -5477,8 +5486,8 @@ describe("group-key TTL safety net", () => {
         makeJob({ stagedJobId: "j2", groupId: "group-b" }),
       ]);
 
-      expectFreshTtl(await jobsTtl("group-a"));
-      expectFreshTtl(await jobsTtl("group-b"));
+      expect(ttlWindow(await jobsTtl("group-a"))).toMatchObject(freshTtl);
+      expect(ttlWindow(await jobsTtl("group-b"))).toMatchObject(freshTtl);
     });
   });
 
@@ -5498,8 +5507,8 @@ describe("group-key TTL safety net", () => {
         attemptTtlSec: 1800,
       });
 
-      expectFreshTtl(await jobsTtl("group-a"));
-      expectFreshTtl(await dataTtl("group-a"));
+      expect(ttlWindow(await jobsTtl("group-a"))).toMatchObject(freshTtl);
+      expect(ttlWindow(await dataTtl("group-a"))).toMatchObject(freshTtl);
     });
   });
 
@@ -5541,8 +5550,8 @@ describe("group-key TTL safety net", () => {
         activeTtlSec: 60,
       });
 
-      expectFreshTtl(await jobsTtl("group-a"));
-      expectFreshTtl(await dataTtl("group-a"));
+      expect(ttlWindow(await jobsTtl("group-a"))).toMatchObject(freshTtl);
+      expect(ttlWindow(await dataTtl("group-a"))).toMatchObject(freshTtl);
     });
   });
 
@@ -5561,8 +5570,8 @@ describe("group-key TTL safety net", () => {
 
       await repo.unblockGroup({ queueName: QUEUE_NAME, groupId: "group-a" });
 
-      expectFreshTtl(await jobsTtl("group-a"));
-      expectFreshTtl(await dataTtl("group-a"));
+      expect(ttlWindow(await jobsTtl("group-a"))).toMatchObject(freshTtl);
+      expect(ttlWindow(await dataTtl("group-a"))).toMatchObject(freshTtl);
     });
   });
 
@@ -5573,8 +5582,8 @@ describe("group-key TTL safety net", () => {
       await repo.moveToDlq({ queueName: QUEUE_NAME, groupId: "group-a" });
       await repo.replayFromDlq({ queueName: QUEUE_NAME, groupId: "group-a" });
 
-      expectFreshTtl(await jobsTtl("group-a"));
-      expectFreshTtl(await dataTtl("group-a"));
+      expect(ttlWindow(await jobsTtl("group-a"))).toMatchObject(freshTtl);
+      expect(ttlWindow(await dataTtl("group-a"))).toMatchObject(freshTtl);
     });
   });
 });

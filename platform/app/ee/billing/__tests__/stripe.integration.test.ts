@@ -22,9 +22,7 @@ if (STRIPE_SECRET_KEY && !STRIPE_SECRET_KEY.startsWith("sk_test_")) {
   );
 }
 
-const describeIfStripeKey = STRIPE_SECRET_KEY ? describe : describe.skip;
-
-describeIfStripeKey("Stripe billing integration", () => {
+describe.runIf(STRIPE_SECRET_KEY)("Stripe billing integration", () => {
   const stripe = new Stripe(STRIPE_SECRET_KEY!, { apiVersion: "2024-04-10" });
 
   const createdCustomerIds: string[] = [];

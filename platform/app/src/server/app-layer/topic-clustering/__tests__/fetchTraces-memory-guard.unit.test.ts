@@ -34,9 +34,11 @@ describe("topicClustering page fetch memory guard", () => {
 
       await fetchTracesFromClickHouse(clickhouse, "project-1", false, [], []);
 
+      // Lookup: throws when no captured query selects ComputedInput.
       const pageFetch = captured.find((c) => c.query.includes("ComputedInput"));
-      expect(pageFetch).toBeDefined();
-      return pageFetch!;
+      if (!pageFetch)
+        throw new Error("no captured query selects ComputedInput");
+      return pageFetch;
     }
 
     it("caps the ComputedInput read to a small max_threads", async () => {

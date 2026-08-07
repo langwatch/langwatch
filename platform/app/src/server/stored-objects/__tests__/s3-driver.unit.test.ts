@@ -32,16 +32,18 @@ const TEST_URI = `s3://${TEST_BUCKET}/proj-123/deadbeef1234`;
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** Asserts the `send` call carried the expected command class and input. */
-function assertSentCommand(
-  sendMock: ReturnType<typeof vi.fn>,
-  commandName: string,
-  expectedInput: Record<string, unknown>,
-) {
-  expect(sendMock).toHaveBeenCalledOnce();
-  const [command] = sendMock.mock.calls[0]!;
-  expect(command.constructor.name).toBe(commandName);
-  expect(command.input).toMatchObject(expectedInput);
+/**
+ * The single `send` call projected to its call count, command class and
+ * input, so each test asserts it with one `toMatchObject` (including
+ * `calls: 1` — exactly one command must have been sent).
+ */
+function sentCommand(sendMock: ReturnType<typeof vi.fn>) {
+  const [command] = sendMock.mock.calls[0] ?? [];
+  return {
+    calls: sendMock.mock.calls.length,
+    commandName: command?.constructor.name,
+    input: command?.input,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -74,9 +76,10 @@ describe("S3Driver", () => {
         const result = await driver.get(TEST_URI);
 
         expect(result).toBe(fakeStream);
-        assertSentCommand(s3Client.send, "GetObjectCommand", {
-          Bucket: TEST_BUCKET,
-          Key: "proj-123/deadbeef1234",
+        expect(sentCommand(s3Client.send)).toMatchObject({
+          calls: 1,
+          commandName: "GetObjectCommand",
+          input: { Bucket: TEST_BUCKET, Key: "proj-123/deadbeef1234" },
         });
       });
     });
@@ -108,11 +111,15 @@ describe("S3Driver", () => {
 
       await driver.put(TEST_URI, bytes, mediaType);
 
-      assertSentCommand(s3Client.send, "PutObjectCommand", {
-        Bucket: TEST_BUCKET,
-        Key: "proj-123/deadbeef1234",
-        Body: bytes,
-        ContentType: mediaType,
+      expect(sentCommand(s3Client.send)).toMatchObject({
+        calls: 1,
+        commandName: "PutObjectCommand",
+        input: {
+          Bucket: TEST_BUCKET,
+          Key: "proj-123/deadbeef1234",
+          Body: bytes,
+          ContentType: mediaType,
+        },
       });
     });
   });
@@ -127,9 +134,10 @@ describe("S3Driver", () => {
 
       await driver.delete(TEST_URI);
 
-      assertSentCommand(s3Client.send, "DeleteObjectCommand", {
-        Bucket: TEST_BUCKET,
-        Key: "proj-123/deadbeef1234",
+      expect(sentCommand(s3Client.send)).toMatchObject({
+        calls: 1,
+        commandName: "DeleteObjectCommand",
+        input: { Bucket: TEST_BUCKET, Key: "proj-123/deadbeef1234" },
       });
     });
   });
@@ -146,9 +154,10 @@ describe("S3Driver", () => {
         const result = await driver.exists(TEST_URI);
 
         expect(result).toBe(true);
-        assertSentCommand(s3Client.send, "HeadObjectCommand", {
-          Bucket: TEST_BUCKET,
-          Key: "proj-123/deadbeef1234",
+        expect(sentCommand(s3Client.send)).toMatchObject({
+          calls: 1,
+          commandName: "HeadObjectCommand",
+          input: { Bucket: TEST_BUCKET, Key: "proj-123/deadbeef1234" },
         });
       });
     });

@@ -179,9 +179,12 @@ afterAll(async () => {
   await stopTestContainers();
 });
 
+/** Lookup helper: throws when the trace carries no RAG span. */
 function findRagSpan(spans: readonly Span[] | undefined): RAGSpan {
   const ragSpan = spans?.find((s) => s.type === "rag");
-  expect(ragSpan).toBeDefined();
+  if (!ragSpan) {
+    throw new Error("no rag-type span on the trace");
+  }
   return ragSpan as RAGSpan;
 }
 

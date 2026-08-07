@@ -155,11 +155,6 @@ beforeEach(() => {
   caller = tracesRouter.createCaller(ctx);
 });
 
-/** Asserts the most recent TraceService.create call carried the blob deps. */
-function expectConstructedWithBlobDeps() {
-  expect(mockCreate).toHaveBeenCalledWith(expect.anything(), BLOB_DEPS);
-}
-
 // ---------------------------------------------------------------------------
 // AC2 — thread reads
 // ---------------------------------------------------------------------------
@@ -171,7 +166,7 @@ describe("traces router — #4991 AC2 thread reads", () => {
         projectId: "project_123",
         threadId: "thread-1",
       });
-      expectConstructedWithBlobDeps();
+      expect(mockCreate).toHaveBeenCalledWith(expect.anything(), BLOB_DEPS);
     });
 
     it("requests full resolution (full:true)", async () => {
@@ -194,7 +189,7 @@ describe("traces router — #4991 AC2 thread reads", () => {
         projectId: "project_123",
         threadIds: ["thread-1"],
       });
-      expectConstructedWithBlobDeps();
+      expect(mockCreate).toHaveBeenCalledWith(expect.anything(), BLOB_DEPS);
       expect(mockGetTracesWithSpansByThreadIds).toHaveBeenCalledWith(
         "project_123",
         ["thread-1"],
@@ -223,7 +218,7 @@ describe("traces router — #4991 AC4 dataset/sample builders", () => {
   describe("when getSampleTracesDataset is called", () => {
     it("constructs with deps and resolves spans full", async () => {
       await caller.getSampleTracesDataset(baseFilters);
-      expectConstructedWithBlobDeps();
+      expect(mockCreate).toHaveBeenCalledWith(expect.anything(), BLOB_DEPS);
       expect(mockGetTracesWithSpans).toHaveBeenCalledWith(
         "project_123",
         ["t1"],
@@ -242,7 +237,7 @@ describe("traces router — #4991 AC4 dataset/sample builders", () => {
         preconditions: [],
         expectedResults: 10,
       });
-      expectConstructedWithBlobDeps();
+      expect(mockCreate).toHaveBeenCalledWith(expect.anything(), BLOB_DEPS);
       expect(mockGetTracesWithSpans).toHaveBeenCalledWith(
         "project_123",
         ["t1"],
@@ -262,7 +257,7 @@ describe("traces router — #4991 AC1 download", () => {
   describe("when getAllForDownload is called with includeSpans", () => {
     it("constructs with deps and opts resolveBlobs into the options", async () => {
       await caller.getAllForDownload({ ...baseFilters, includeSpans: true });
-      expectConstructedWithBlobDeps();
+      expect(mockCreate).toHaveBeenCalledWith(expect.anything(), BLOB_DEPS);
       expect(mockGetAllTracesForProject).toHaveBeenCalledWith(
         expect.any(Object),
         expect.any(Object),

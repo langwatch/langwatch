@@ -187,10 +187,8 @@ afterAll(async () => {
   }
 });
 
-const liveOpenAI = process.env.OPENAI_API_KEY ? it : it.skip;
-
 describe("Studio post_event SSE: signature → evaluator e2e (real OpenAI + fake LangWatch)", () => {
-  liveOpenAI(
+  it.runIf(process.env.OPENAI_API_KEY)(
     "evaluator's score / passed / details / cost propagate through the SSE stream end-to-end",
     async () => {
       capturedEvalCalls.length = 0;

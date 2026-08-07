@@ -275,37 +275,37 @@ describe("simulation run fold — event ordering invariants", () => {
   const store = createReplacingMergeTreeStore();
   const projection = new SimulationRunStateFoldProjection({ store });
 
-  function assertCorrectFinalState(
-    state: SimulationRunStateData,
-    label: string,
-  ) {
-    expect(state.Status, `${label}: Status must be SUCCESS`).toBe("SUCCESS");
-    expect(state.FinishedAt, `${label}: FinishedAt must be set`).not.toBeNull();
-    expect(
-      state.ScenarioSetId,
-      `${label}: ScenarioSetId must be preserved`,
-    ).toBe("python-examples");
-    expect(state.BatchRunId, `${label}: BatchRunId must be preserved`).toBe(
-      "batch-1",
-    );
-    expect(state.ScenarioId, `${label}: ScenarioId must be preserved`).toBe(
-      "scenario-1",
-    );
-    expect(state.Verdict, `${label}: Verdict must be set`).toBe("success");
-    // Metrics must always be preserved regardless of ordering
-    expect(
-      state.TotalCost,
-      `${label}: TotalCost must be computed`,
-    ).toBeGreaterThan(0);
-    expect(
-      Object.keys(state.RoleCosts).length,
-      `${label}: RoleCosts must have entries`,
-    ).toBeGreaterThan(0);
-    expect(
-      Object.keys(state.RoleLatencies).length,
-      `${label}: RoleLatencies must have entries`,
-    ).toBeGreaterThan(0);
+  /**
+   * Normalized view of the final-state invariants, so each ordering asserts
+   * them with one `toEqual` (the label rides on the assertion message and
+   * the failing field shows up in the diff). Metrics must always be
+   * preserved regardless of ordering.
+   */
+  function finalStateView(state: SimulationRunStateData) {
+    return {
+      status: state.Status,
+      finishedAtSet: state.FinishedAt !== null,
+      scenarioSetId: state.ScenarioSetId,
+      batchRunId: state.BatchRunId,
+      scenarioId: state.ScenarioId,
+      verdict: state.Verdict,
+      totalCostComputed: state.TotalCost > 0,
+      roleCostsPopulated: Object.keys(state.RoleCosts).length > 0,
+      roleLatenciesPopulated: Object.keys(state.RoleLatencies).length > 0,
+    };
   }
+
+  const correctFinalState = {
+    status: "SUCCESS",
+    finishedAtSet: true,
+    scenarioSetId: "python-examples",
+    batchRunId: "batch-1",
+    scenarioId: "scenario-1",
+    verdict: "success",
+    totalCostComputed: true,
+    roleCostsPopulated: true,
+    roleLatenciesPopulated: true,
+  };
 
   // --- Distinct timestamps (finished > snapshot) ---
   describe("when snapshot and finished have distinct timestamps", () => {
@@ -330,7 +330,7 @@ describe("simulation run fold — event ordering invariants", () => {
         })),
       )("$name → final state is correct", async ({ name, perm }) => {
         const state = await processFold(perm, store, projection);
-        assertCorrectFinalState(state, name);
+        expect(finalStateView(state), name).toEqual(correctFinalState);
       });
     });
   });
@@ -360,7 +360,7 @@ describe("simulation run fold — event ordering invariants", () => {
         })),
       )("$name → final state is correct", async ({ name, perm }) => {
         const state = await processFold(perm, store, projection);
-        assertCorrectFinalState(state, name);
+        expect(finalStateView(state), name).toEqual(correctFinalState);
       });
     });
   });
@@ -379,7 +379,7 @@ describe("simulation run fold — event ordering invariants", () => {
         store,
         projection,
       );
-      assertCorrectFinalState(state, "happy path");
+      expect(finalStateView(state), "happy path").toEqual(correctFinalState);
     });
 
     it("started → finished → snapshot → metrics × 2 (finished before snapshot)", async () => {
@@ -394,7 +394,9 @@ describe("simulation run fold — event ordering invariants", () => {
         store,
         projection,
       );
-      assertCorrectFinalState(state, "finished before snapshot");
+      expect(finalStateView(state), "finished before snapshot").toEqual(
+        correctFinalState,
+      );
     });
 
     it("started → metrics → snapshot → finished → metrics (metrics interleaved)", async () => {
@@ -409,7 +411,9 @@ describe("simulation run fold — event ordering invariants", () => {
         store,
         projection,
       );
-      assertCorrectFinalState(state, "metrics interleaved");
+      expect(finalStateView(state), "metrics interleaved").toEqual(
+        correctFinalState,
+      );
     });
   });
 
@@ -430,7 +434,9 @@ describe("simulation run fold — event ordering invariants", () => {
         store,
         projection,
       );
-      assertCorrectFinalState(state, "duplicate delayed metrics");
+      expect(finalStateView(state), "duplicate delayed metrics").toEqual(
+        correctFinalState,
+      );
     });
   });
 

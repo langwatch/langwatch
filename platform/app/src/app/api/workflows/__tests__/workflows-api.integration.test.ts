@@ -370,22 +370,37 @@ describe("Workflows REST API", () => {
       await prisma.user.delete({ where: { id: author.id } });
     });
 
-    const expectRunResponse = async (
+    /**
+     * The evaluate response projected to a comparable shape view, so each
+     * test asserts `view` against `okRun` with one expect and still gets the
+     * body for its own follow-up assertions.
+     */
+    const runResponse = async (
       res: Response,
     ): Promise<{
-      run_id: string;
-      run_url: string;
-      workflow_version_id: string;
-      version: string;
+      body: {
+        run_id: string;
+        run_url: string;
+        workflow_version_id: string;
+        version: string;
+      };
+      view: { status: number; runIdNonEmpty: boolean; urlPointsAtRun: boolean };
     }> => {
-      expect(res.status).toBe(200);
       const body = await res.json();
-      expect(typeof body.run_id).toBe("string");
-      expect(body.run_id.length).toBeGreaterThan(0);
-      expect(body.run_url).toContain("/experiments/");
-      expect(body.run_url).toContain(`?runId=${body.run_id}`);
-      return body;
+      return {
+        body,
+        view: {
+          status: res.status,
+          runIdNonEmpty:
+            typeof body.run_id === "string" && body.run_id.length > 0,
+          urlPointsAtRun:
+            typeof body.run_url === "string" &&
+            body.run_url.includes("/experiments/") &&
+            body.run_url.includes(`?runId=${body.run_id}`),
+        },
+      };
     };
+    const okRun = { status: 200, runIdNonEmpty: true, urlPointsAtRun: true };
 
     describe("when the workflow has a committed version", () => {
       /** @scenario "Triggering an evaluation returns a run id and a results url" */
@@ -396,7 +411,8 @@ describe("Workflows REST API", () => {
           `/api/workflows/${workflow.id}/evaluate`,
         );
 
-        const body = await expectRunResponse(res);
+        const { body, view } = await runResponse(res);
+        expect(view).toEqual(okRun);
 
         const experiment = await prisma.experiment.findFirst({
           where: {
@@ -415,12 +431,15 @@ describe("Workflows REST API", () => {
         const first = await postEvaluate(
           `/api/workflows/${workflow.id}/evaluate`,
         );
-        const firstBody = await expectRunResponse(first);
+        const { body: firstBody, view: firstView } = await runResponse(first);
+        expect(firstView).toEqual(okRun);
 
         const second = await postEvaluate(
           `/api/workflows/${workflow.id}/evaluate`,
         );
-        const secondBody = await expectRunResponse(second);
+        const { body: secondBody, view: secondView } =
+          await runResponse(second);
+        expect(secondView).toEqual(okRun);
 
         expect(secondBody.run_id).not.toBe(firstBody.run_id);
         const experiments = await prisma.experiment.findMany({
@@ -441,7 +460,8 @@ describe("Workflows REST API", () => {
           `/api/workflows/${workflow.id}/evaluate`,
         );
 
-        const body = await expectRunResponse(res);
+        const { body, view } = await runResponse(res);
+        expect(view).toEqual(okRun);
         expect(body.workflow_version_id).toBe(version.id);
         expect(body.version).toBe("1");
       });
@@ -455,7 +475,8 @@ describe("Workflows REST API", () => {
           `/api/workflows/${workflow.id}/evaluate`,
         );
 
-        const body = await expectRunResponse(res);
+        const { body, view } = await runResponse(res);
+        expect(view).toEqual(okRun);
         expect(body.workflow_version_id).toBe(v2.id);
       });
 
@@ -469,7 +490,8 @@ describe("Workflows REST API", () => {
           { version_id: v1.id },
         );
 
-        const body = await expectRunResponse(res);
+        const { body, view } = await runResponse(res);
+        expect(view).toEqual(okRun);
         expect(body.workflow_version_id).toBe(v1.id);
       });
 
@@ -482,7 +504,7 @@ describe("Workflows REST API", () => {
           { parameters: { feature_flag: "variant-b" } },
         );
 
-        await expectRunResponse(res);
+        expect((await runResponse(res)).view).toEqual(okRun);
 
         // The entry only declares `question`. A parameter the workflow does not
         // declare still has to reach the nodes: it rides as a dataset column
@@ -519,7 +541,7 @@ describe("Workflows REST API", () => {
           { data: [{ question: "x" }, { question: "y" }] },
         );
 
-        await expectRunResponse(res);
+        expect((await runResponse(res)).view).toEqual(okRun);
       });
 
       /** @scenario "The endpoint rejects inline data and a dataset id together" */

@@ -27,10 +27,24 @@ const paidPlan = { free: false, type: "GROWTH_SEAT_EUR_MONTHLY" } as PlanInfo;
 const enterprisePlan = { free: false, type: "ENTERPRISE" } as PlanInfo;
 const freePlan = { free: true, type: "FREE" } as PlanInfo;
 
-const expectForbidden = (fn: () => void) => {
-  expect(fn).toThrow(TRPCError);
-  expect(fn).toThrow(expect.objectContaining({ code: "FORBIDDEN" }));
+/**
+ * The thrown outcome projected for assertion inside each test: compares as
+ * `forbidden` when `fn` threw a TRPCError with code FORBIDDEN.
+ */
+const thrownOutcome = (fn: () => void) => {
+  let captured: unknown;
+  try {
+    fn();
+  } catch (e) {
+    captured = e;
+  }
+  return {
+    threwTRPCError: captured instanceof TRPCError,
+    code: captured instanceof TRPCError ? captured.code : undefined,
+  };
 };
+
+const forbidden = { threwTRPCError: true, code: "FORBIDDEN" };
 
 describe("assertPlanAllowsRetentionValue", () => {
   beforeEach(() => {
@@ -45,11 +59,15 @@ describe("assertPlanAllowsRetentionValue", () => {
     });
 
     it("rejects an arbitrary off-menu value (e.g. 364d)", () => {
-      expectForbidden(() => assertPlanAllowsRetentionValue(paidPlan, 364));
+      expect(
+        thrownOutcome(() => assertPlanAllowsRetentionValue(paidPlan, 364)),
+      ).toEqual(forbidden);
     });
 
     it("rejects an enterprise preset like 1 year (371d)", () => {
-      expectForbidden(() => assertPlanAllowsRetentionValue(paidPlan, 371));
+      expect(
+        thrownOutcome(() => assertPlanAllowsRetentionValue(paidPlan, 371)),
+      ).toEqual(forbidden);
     });
 
     it("no-ops on the indefinite sentinel so the admin gate runs downstream", () => {
@@ -74,7 +92,9 @@ describe("assertPlanAllowsRetentionValue", () => {
 
     it("rejects a custom value below the 49d floor that isn't a paid preset", () => {
       // 42d is 7-aligned but below the enterprise floor and not 35/63.
-      expectForbidden(() => assertPlanAllowsRetentionValue(enterprisePlan, 42));
+      expect(
+        thrownOutcome(() => assertPlanAllowsRetentionValue(enterprisePlan, 42)),
+      ).toEqual(forbidden);
     });
   });
 
@@ -88,7 +108,9 @@ describe("assertPlanAllowsRetentionValue", () => {
     });
 
     it("still enforces the 49d floor for sub-floor non-preset values", () => {
-      expectForbidden(() => assertPlanAllowsRetentionValue(paidPlan, 42));
+      expect(
+        thrownOutcome(() => assertPlanAllowsRetentionValue(paidPlan, 42)),
+      ).toEqual(forbidden);
     });
   });
 

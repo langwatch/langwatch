@@ -34,11 +34,16 @@ const createCaller = () => {
   return workflowRouter.createCaller(ctx);
 };
 
+// Every permission the mock was asked about; the tests assert only
+// workflows:view is ever checked.
+let askedPermissions: unknown[] = [];
+
 beforeEach(() => {
   vi.clearAllMocks();
+  askedPermissions = [];
   hasProjectPermission.mockImplementation(
     async (_ctx, projectId, permission) => {
-      expect(permission).toBe("workflows:view");
+      askedPermissions.push(permission);
       return projectId === "project_visible";
     },
   );
@@ -81,5 +86,12 @@ describe("workflow list tenant metadata", () => {
     const [workflow] = await createCaller().getAll({ projectId: "project_1" });
 
     expect(workflow?._count.copiedWorkflows).toBe(1);
+  });
+
+  it("resolves visibility with workflows:view and nothing else", async () => {
+    await createCaller().getAll({ projectId: "project_1" });
+
+    expect(askedPermissions.length).toBeGreaterThan(0);
+    expect(new Set(askedPermissions)).toEqual(new Set(["workflows:view"]));
   });
 });

@@ -247,17 +247,12 @@ describe("PromptStudioAdapter", () => {
       } as RequestForProcess;
     }
 
+    // The component_state_change consumer is async; we only need the envelope
+    // shape that was passed in. Undefined when the backend was never called —
+    // each test asserts the envelope it reads.
     function lastPostedEvent(): any {
-      const mocked = vi.mocked(studioBackendPostEvent);
-      expect(
-        mocked,
-        "studioBackendPostEvent must have been called",
-      ).toHaveBeenCalled();
-      // The component_state_change consumer is async; we only need the
-      // envelope shape that was passed in. The `!` propagates the
-      // toHaveBeenCalled guarantee past TS's noUncheckedIndexedAccess.
-      const firstCall = mocked.mock.calls[0]!;
-      return (firstCall[0] as any).message;
+      const firstCall = vi.mocked(studioBackendPostEvent).mock.calls[0];
+      return firstCall ? (firstCall[0] as any).message : undefined;
     }
 
     beforeEach(() => {
@@ -284,6 +279,10 @@ describe("PromptStudioAdapter", () => {
       );
 
       const envelope = lastPostedEvent();
+      expect(
+        envelope,
+        "studioBackendPostEvent must have been called",
+      ).toBeDefined();
       expect(envelope.payload.inputs.input).toBe("test7");
     });
 
@@ -304,6 +303,10 @@ describe("PromptStudioAdapter", () => {
       );
 
       const envelope = lastPostedEvent();
+      expect(
+        envelope,
+        "studioBackendPostEvent must have been called",
+      ).toBeDefined();
       const sent: { role: string; content: string }[] =
         envelope.payload.inputs.messages;
       // Exactly one user turn — the template's `{{input}}` slot, NOT a
@@ -335,6 +338,10 @@ describe("PromptStudioAdapter", () => {
       );
 
       const envelope = lastPostedEvent();
+      expect(
+        envelope,
+        "studioBackendPostEvent must have been called",
+      ).toBeDefined();
       const sent: { role: string; content: string }[] =
         envelope.payload.inputs.messages;
       // Prior live history (older question + older reply) FIRST, then
@@ -383,6 +390,10 @@ describe("PromptStudioAdapter", () => {
       );
 
       const envelope = lastPostedEvent();
+      expect(
+        envelope,
+        "studioBackendPostEvent must have been called",
+      ).toBeDefined();
       const sent: { role: string; content: string }[] =
         envelope.payload.inputs.messages;
       // Chronological history (everything BEFORE the latest user turn)
@@ -422,6 +433,10 @@ describe("PromptStudioAdapter", () => {
       );
 
       const envelope = lastPostedEvent();
+      expect(
+        envelope,
+        "studioBackendPostEvent must have been called",
+      ).toBeDefined();
       const sent: { role: string; content: string }[] =
         envelope.payload.inputs.messages;
       // ONE user turn — the template's explicit "answer it". The
@@ -455,6 +470,10 @@ describe("PromptStudioAdapter", () => {
       );
 
       const envelope = lastPostedEvent();
+      expect(
+        envelope,
+        "studioBackendPostEvent must have been called",
+      ).toBeDefined();
       const sent: { role: string; content: string }[] =
         envelope.payload.inputs.messages;
       expect(sent).toEqual([
@@ -485,6 +504,10 @@ describe("PromptStudioAdapter", () => {
       );
 
       const envelope = lastPostedEvent();
+      expect(
+        envelope,
+        "studioBackendPostEvent must have been called",
+      ).toBeDefined();
       expect(envelope.payload.inputs.input).toBe("explicit-value");
     });
 
@@ -528,6 +551,10 @@ describe("PromptStudioAdapter", () => {
       );
 
       const envelope = lastPostedEvent();
+      expect(
+        envelope,
+        "studioBackendPostEvent must have been called",
+      ).toBeDefined();
       // CORE ASSERTION — bind happened despite the declared-but-empty
       // panel row. This is the field nlpgo reads to interpolate the
       // template's `{{input}}` placeholders against, both in the

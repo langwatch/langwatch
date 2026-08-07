@@ -21,15 +21,18 @@ describe("StorageMeterService memory guard", () => {
     return { service, query };
   }
 
-  function assertGuarded(call: {
+  function guardSettings(call: {
     clickhouse_settings?: Record<string, unknown>;
   }) {
-    expect(call.clickhouse_settings).toBeDefined();
-    expect(call.clickhouse_settings!.max_threads).toBe(2);
-    // A coarse guardrail so a runaway byteSize recompute can't grind for a
-    // minute; a materialized read finishes in seconds, well under this.
-    expect(call.clickhouse_settings!.max_execution_time).toBe(45);
+    return {
+      max_threads: call.clickhouse_settings?.max_threads,
+      max_execution_time: call.clickhouse_settings?.max_execution_time,
+    };
   }
+
+  // A coarse guardrail so a runaway byteSize recompute can't grind for a
+  // minute; a materialized read finishes in seconds, well under this.
+  const expectedGuardSettings = { max_threads: 2, max_execution_time: 45 };
 
   describe("when computing the per-category storage breakdown", () => {
     it("passes the bounded-memory settings on every per-table query", async () => {
@@ -39,7 +42,7 @@ describe("StorageMeterService memory guard", () => {
 
       expect(query.mock.calls.length).toBeGreaterThan(0);
       for (const [arg] of query.mock.calls) {
-        assertGuarded(arg);
+        expect(guardSettings(arg)).toEqual(expectedGuardSettings);
       }
     });
 
@@ -74,7 +77,9 @@ describe("StorageMeterService memory guard", () => {
       await service.getTotalStorageBytes({ tenantId: "project-total" });
 
       expect(query).toHaveBeenCalledTimes(1);
-      assertGuarded(query.mock.calls[0]![0]);
+      expect(guardSettings(query.mock.calls[0]![0])).toEqual(
+        expectedGuardSettings,
+      );
     });
   });
 

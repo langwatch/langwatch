@@ -9,10 +9,12 @@ const TRACE_ID = "0af7651916cd43dd8448eb211c80319c";
 
 // Parse the `panes` query param back into the object Grafana Explore reads, so
 // the assertions are about the actual decoded structure, not string fragments.
-// url is non-null for the valid-base cases; assert before decoding.
+// url is non-null for the valid-base cases; throws on null before decoding.
 const panesOf = (url: string | null) => {
-  expect(url).not.toBeNull();
-  const parsed = new URL(url!);
+  if (url === null) {
+    throw new Error("expected a grafana URL, got null");
+  }
+  const parsed = new URL(url);
   const panes = parsed.searchParams.get("panes");
   return { parsed, panes: JSON.parse(panes ?? "{}") };
 };

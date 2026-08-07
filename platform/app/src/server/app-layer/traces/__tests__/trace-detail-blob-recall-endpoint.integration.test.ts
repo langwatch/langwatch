@@ -26,10 +26,10 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { resetApp } from "~/server/app-layer/app";
 import {
   AGGREGATE_TYPE,
-  assertOverThreshold,
   extractSpanAttrs,
   insertEventLogRow,
   LARGE_VALUE,
+  payloadBytes,
   UNIQUE_TAIL,
 } from "~/server/app-layer/traces/__tests__/blob-offload-test-helpers";
 import {
@@ -283,18 +283,16 @@ async function insertTraceSummary({
  * `{ type: "text", value }`). Returns the string value for whichever field the
  * matrix is exercising.
  */
-function spanIoValue(span: Span, ioField: IoField): string {
+function spanIoValue(span: Span, ioField: IoField): unknown {
   const io = (ioField === "langwatch.input" ? span.input : span.output) as
     | { type: string; value: unknown }
     | null
     | undefined;
-  expect(io).toBeTruthy();
   if (!io)
     throw new Error(
       `span.${ioField === "langwatch.input" ? "input" : "output"} is null/undefined`,
     );
-  expect(typeof io.value).toBe("string");
-  return io.value as string;
+  return io.value;
 }
 
 /**
@@ -374,6 +372,12 @@ describe.skipIf(!hasTestcontainers)(
      * `shouldSeedEventLog: false` skips the event_log insert to model AC5 (resolution
      * failure: the ref points at a row that does not exist).
      */
+    const stagedOk = {
+      payloadOverThreshold: true,
+      previewTruncated: true,
+      eventrefPresent: true,
+    };
+
     async function seedOffloadedTrace({
       ioField,
       shouldSeedEventLog = true,
@@ -387,9 +391,12 @@ describe.skipIf(!hasTestcontainers)(
       eventId: string;
       preview: string;
       now: number;
+      staging: {
+        payloadOverThreshold: boolean;
+        previewTruncated: boolean;
+        eventrefPresent: boolean;
+      };
     }> {
-      assertOverThreshold(LARGE_VALUE);
-
       const tenantId = generateTestTenantId();
       ownedTenantIds.push(tenantId);
       const slug = ioField === "langwatch.input" ? "in" : "out";
@@ -423,15 +430,19 @@ describe.skipIf(!hasTestcontainers)(
       // the projection fold wrote to stored_spans.
       const leanAttrs = extractSpanAttrs(leanForProjection(fullEvent));
       const preview = leanAttrs[ioField];
-
-      // Staging guard: preview is truncated and the eventref key IS present.
-      expect(preview).toBeDefined();
       if (!preview)
         throw new Error(
           `leanAttrs missing "${ioField}" after leanForProjection`,
         );
-      expect(preview).not.toContain(UNIQUE_TAIL);
-      expect(leanAttrs[`${EVENTREF_ATTR_PREFIX}${ioField}`]).toBeDefined();
+
+      // Staging view: each test asserts this equals `stagedOk` — the payload
+      // is over threshold, the preview is truncated, the eventref is present.
+      const staging = {
+        payloadOverThreshold: payloadBytes(LARGE_VALUE) > IO_PREVIEW_BYTES,
+        previewTruncated: !preview.includes(UNIQUE_TAIL),
+        eventrefPresent:
+          leanAttrs[`${EVENTREF_ATTR_PREFIX}${ioField}`] !== undefined,
+      };
 
       await insertStoredSpan({
         client,
@@ -454,16 +465,16 @@ describe.skipIf(!hasTestcontainers)(
         computedOutput: ioField === "langwatch.output" ? previewWrapper : null,
       });
 
-      return { tenantId, traceId, spanId, eventId, preview, now };
+      return { tenantId, traceId, spanId, eventId, preview, now, staging };
     }
 
     describe("given an over-threshold offloaded IO field stored full in event_log and leaned into stored_spans", () => {
       describe("when read via TraceService constructed WITHOUT blob-resolution deps (the legacy/no-deps endpoint construction)", () => {
         for (const ioField of IO_FIELDS) {
           it(`returns the 64 KB preview for ${ioField}, not the full value (reproduces the #4888 read-path gap)`, async () => {
-            const { tenantId, traceId, preview } = await seedOffloadedTrace({
-              ioField,
-            });
+            const { tenantId, traceId, preview, staging } =
+              await seedOffloadedTrace({ ioField });
+            expect(staging).toEqual(stagedOk);
 
             // Real TraceService, NO blob-resolution deps (top-level imports, not mocked).
             const service = TraceService.create(prisma);
@@ -484,7 +495,9 @@ describe.skipIf(!hasTestcontainers)(
             if (!span) throw new Error("trace.spans[0] is undefined");
 
             // BUG: the span IO value is the truncated preview, never the full value.
-            const value = spanIoValue(span, ioField);
+            const rawValue = spanIoValue(span, ioField);
+            expect(typeof rawValue).toBe("string");
+            const value = rawValue as string;
             expect(value).not.toContain(UNIQUE_TAIL);
             expect(value).toBe(preview);
             // Preview is ≤ 64 KB + the 1-codepoint ellipsis ("…" = 3 UTF-8 bytes).
@@ -505,7 +518,10 @@ describe.skipIf(!hasTestcontainers)(
       describe("when read via TraceService constructed WITH buildTraceBlobResolutionDeps() and full:true (mirrors app.v1.ts:368 + tRPC getById)", () => {
         for (const ioField of IO_FIELDS) {
           it(`returns the FULL ${ioField} value byte-identically from event_log (AC1)`, async () => {
-            const { tenantId, traceId } = await seedOffloadedTrace({ ioField });
+            const { tenantId, traceId, staging } = await seedOffloadedTrace({
+              ioField,
+            });
+            expect(staging).toEqual(stagedOk);
 
             const service = TraceService.create(
               prisma,
@@ -526,7 +542,9 @@ describe.skipIf(!hasTestcontainers)(
             if (!span) throw new Error("trace.spans[0] is undefined");
 
             // FIX: the full value comes back from event_log, byte-identical.
-            const value = spanIoValue(span, ioField);
+            const rawValue = spanIoValue(span, ioField);
+            expect(typeof rawValue).toBe("string");
+            const value = rawValue as string;
             expect(value).toBe(LARGE_VALUE);
             expect(value).toContain(UNIQUE_TAIL);
             expect(value.length).toBe(LARGE_VALUE.length);
@@ -536,7 +554,10 @@ describe.skipIf(!hasTestcontainers)(
           });
 
           it(`strips the reserved eventref namespace from the returned ${ioField} span attributes (AC3)`, async () => {
-            const { tenantId, traceId } = await seedOffloadedTrace({ ioField });
+            const { tenantId, traceId, staging } = await seedOffloadedTrace({
+              ioField,
+            });
+            expect(staging).toEqual(stagedOk);
 
             const service = TraceService.create(
               prisma,
@@ -566,9 +587,9 @@ describe.skipIf(!hasTestcontainers)(
           it(`patches trace.${
             ioField === "langwatch.input" ? "input" : "output"
           } with the full resolved content (AC1 trace-level)`, async () => {
-            const { tenantId, traceId, preview } = await seedOffloadedTrace({
-              ioField,
-            });
+            const { tenantId, traceId, preview, staging } =
+              await seedOffloadedTrace({ ioField });
+            expect(staging).toEqual(stagedOk);
 
             const service = TraceService.create(
               prisma,
@@ -602,10 +623,12 @@ describe.skipIf(!hasTestcontainers)(
           it(`degrades to the ${ioField} preview, still strips the reserved key, and does not throw`, async () => {
             // Seed stored_spans + trace_summaries with the eventref, but NO
             // event_log row — getFromEventLog finds nothing (BlobNotFoundError).
-            const { tenantId, traceId, preview } = await seedOffloadedTrace({
-              ioField,
-              shouldSeedEventLog: false,
-            });
+            const { tenantId, traceId, preview, staging } =
+              await seedOffloadedTrace({
+                ioField,
+                shouldSeedEventLog: false,
+              });
+            expect(staging).toEqual(stagedOk);
 
             const service = TraceService.create(
               prisma,
@@ -627,7 +650,9 @@ describe.skipIf(!hasTestcontainers)(
             if (!span) throw new Error("trace.spans[0] is undefined");
 
             // Degrades to the preview (no full value recoverable).
-            const value = spanIoValue(span, ioField);
+            const rawValue = spanIoValue(span, ioField);
+            expect(typeof rawValue).toBe("string");
+            const value = rawValue as string;
             expect(value).not.toContain(UNIQUE_TAIL);
             expect(value).toBe(preview);
 

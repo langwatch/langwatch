@@ -150,8 +150,10 @@ async function fetchUpdatedAxisPage(
     openProtections,
     { downloadMode: true, dateField: "updated", scrollId },
   );
-  expect(results).not.toBeNull();
-  return results as TracesForProjectResult;
+  if (!results) {
+    throw new Error("getAllTracesForProject returned null");
+  }
+  return results;
 }
 
 function traceIdsOf(result: TracesForProjectResult): string[] {

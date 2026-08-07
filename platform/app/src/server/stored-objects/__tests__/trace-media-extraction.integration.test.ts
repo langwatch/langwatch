@@ -200,10 +200,14 @@ function enabledDeps(service?: StoredObjectsService) {
   };
 }
 
+/** Lookup helper: throws when the span has no string attribute at `key`. */
 function parseAttr(data: RecordSpanCommandData, key: string): unknown {
   const attr = data.span.attributes.find((a) => a.key === key);
-  expect(attr?.value?.stringValue).toBeTypeOf("string");
-  return JSON.parse(attr!.value!.stringValue!);
+  const stringValue = attr?.value?.stringValue;
+  if (typeof stringValue !== "string") {
+    throw new Error(`span attribute "${key}" is not a string value`);
+  }
+  return JSON.parse(stringValue);
 }
 
 async function readStoredBytes(uri: string): Promise<Buffer> {

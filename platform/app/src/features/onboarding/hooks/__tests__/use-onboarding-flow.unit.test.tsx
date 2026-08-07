@@ -74,11 +74,15 @@ describe("useOnboardingFlow", () => {
       act(() => {
         rendered.result.current.navigation.nextScreen();
       });
+      return rendered;
+    }
+
+    it("reaches the intent screen after org name and agreement", () => {
+      const rendered = advanceToIntentScreen();
       expect(rendered.result.current.currentScreenIndex).toBe(
         OnboardingScreenIndex.INTENT,
       );
-      return rendered;
-    }
+    });
 
     /** @scenario "Intent screen is required" */
     it("blocks proceeding until an intent is selected", () => {

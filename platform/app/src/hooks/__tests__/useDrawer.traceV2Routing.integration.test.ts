@@ -30,9 +30,10 @@ vi.mock("~/utils/compat/next-router", () => {
 
 import { useDrawer } from "../useDrawer";
 
-function lastOpenedUrl(): string {
-  expect(push).toHaveBeenCalled();
-  return String(push.mock.calls[push.mock.calls.length - 1]?.[0]);
+/** Undefined when router.push was never called — the tests' URL assertions fail loudly on it. */
+function lastOpenedUrl(): string | undefined {
+  const lastCall = push.mock.calls[push.mock.calls.length - 1];
+  return lastCall ? String(lastCall[0]) : undefined;
 }
 
 describe("openDrawer Trace Explorer default routing", () => {
