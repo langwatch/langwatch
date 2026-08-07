@@ -61,12 +61,14 @@ const DEFAULT_LOCAL_FS_ROOT = "/var/lib/langwatch/objects";
  * caller.
  */
 function resolveAzureDestination(): ProjectStorageDestination {
-  const credentials = resolveAzureCredentials();
-  // resolveAzureCredentials() already validated AZURE_BLOB_CONTAINER is
-  // present (it's part of "is Azure usable at all", even though the
-  // container isn't part of AzureCredentials itself — a credential
-  // describes how to authenticate to the account, not which container a
-  // caller addresses within it).
+  // The default `purpose: "write"` is what makes the assertion below sound:
+  // only the write arm requires AZURE_BLOB_CONTAINER, because only a write
+  // needs to be told where to go. Resolving with `purpose: "read"` here would
+  // leave the container unvalidated and this `!` unfounded.
+  const credentials = resolveAzureCredentials({ purpose: "write" });
+  // Validated above, though never carried on the credential itself — that
+  // describes how to authenticate to the account, not which container a caller
+  // addresses within it.
   const container = env.AZURE_BLOB_CONTAINER!.trim();
 
   return {

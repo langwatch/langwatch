@@ -175,21 +175,6 @@ function assertWorkloadIdentityInjectedValues(): void {
 }
 
 /**
- * Resolves Azure Blob credentials for whichever auth mode is configured, or
- * throws `AzureBackendMisconfiguredError` naming exactly what's wrong.
- *
- * Callers that also need the destination container (e.g.
- * `resolveProjectStorageDestination`) read AZURE_BLOB_CONTAINER themselves
- * once this function confirms it is present — it isn't part of
- * `AzureCredentials` because a credential describes how to authenticate to
- * a storage ACCOUNT, not which container within it a caller addresses.
- */
-/**
- * `purpose` distinguishes "which destination do new writes go to" from "can
- * we still read what was written before". They are not symmetric: a
- * deployment can legitimately need the second without the first.
- */
-/**
  * Dead-config guard, for WRITE resolution only. Reads are deliberately
  * exempt (`purpose: "read"`): an operator migrating OFF Azure flips the
  * backend toggle to s3 and leaves the AZURE_BLOB_* values in place so the
@@ -280,6 +265,21 @@ function assertRequiredVariablesPresent({
   }
 }
 
+/**
+ * Resolves Azure Blob credentials for whichever auth mode is configured, or
+ * throws `AzureBackendMisconfiguredError` naming exactly what's wrong.
+ *
+ * `purpose` distinguishes "which destination do new writes go to" from "can we
+ * still read what was written before". They are not symmetric: a deployment can
+ * legitimately need the second without the first, so the read arm skips both
+ * the dead-config guard and the container requirement.
+ *
+ * The container is never part of `AzureCredentials` — a credential describes
+ * how to authenticate to a storage ACCOUNT, not which container within it a
+ * caller addresses. A caller that needs one (`resolveProjectStorageDestination`)
+ * reads AZURE_BLOB_CONTAINER itself, and may only assume it is present when it
+ * resolved with the default `purpose: "write"`, which is what validates it.
+ */
 export function resolveAzureCredentials({
   purpose = "write",
 }: {
