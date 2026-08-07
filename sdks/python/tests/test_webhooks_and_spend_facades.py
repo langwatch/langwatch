@@ -10,6 +10,7 @@ Spec: specs/webhooks/webhook-endpoints.feature
 """
 
 import json
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 import httpx
@@ -17,7 +18,7 @@ import pytest
 
 from langwatch.api_errors import LangWatchApiError, LangWatchApiPlanLimitError
 
-from langwatch.spend_events import SpendEventsFacade
+from langwatch.spend_events import _FILTER_PARAMS, SpendEventsFacade
 from langwatch.webhooks import WebhooksFacade
 
 
@@ -354,6 +355,29 @@ def test_iter_summaries_keeps_the_grouping_and_filters_on_every_page():
         assert params.get("metadata") == "tier:gold"
         assert params.get("allow_unstable") == "true"
     assert seen[1].get("cursor") == "c1"
+
+
+def test_the_facade_offers_every_filter_the_published_contract_publishes():
+    """The SDK lagged the REST surface by seven filters once, and nothing
+    failed: a reconciler simply could not narrow a walk to what its checksum
+    had covered. Read against the published document rather than the server
+    source, because the document is what a caller reads."""
+    spec_path = (
+        Path(__file__).parents[3] / "platform/app/src/app/api/openapiLangWatch.json"
+    )
+    assert spec_path.exists(), (
+        f"{spec_path} is missing, so this check would pass without checking "
+        "anything. Point it at the published spec rather than skipping."
+    )
+    spec = json.loads(spec_path.read_text())
+
+    operation = spec["paths"]["/api/gateway/v1/spend-events"]["get"]
+    published = {p["name"] for p in operation["parameters"] if p["in"] == "query"}
+    # Paging and windowing are not filters.
+    published -= {"from", "to", "cursor", "limit"}
+
+    offered = set(_FILTER_PARAMS) | {"metadata", "status"}
+    assert offered == published
 
 
 def test_a_movable_grouping_surfaces_the_refusal_code():
