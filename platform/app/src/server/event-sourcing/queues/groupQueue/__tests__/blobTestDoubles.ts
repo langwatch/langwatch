@@ -84,8 +84,31 @@ export class FlakyObjectStore extends InMemoryObjectStore {
 }
 
 /**
+ * Serves objects, but fails the first N gets for each URI listed in
+ * `failures`. Unlike {@link FlakyObjectStore} (which fails the first N gets
+ * across all URIs), this lets a test inject a transient failure on one
+ * specific sibling while leaving the dispatched job and other siblings
+ * intact -- needed to exercise the mixed transient-plus-corrupt-sibling
+ * race in `restageDrainedSiblings` (#5883 P1).
+ *
+ * `tieredBlobStore` wraps any non-missing error thrown by `get` as
+ * `TransientBlobStoreError`, so a plain `Error` here is sufficient.
+ */
+export class PerUriTransientFailureStore extends InMemoryObjectStore {
+  readonly failureCounts = new Map<string, number>();
+  async get(uri: string): Promise<Readable> {
+    const left = this.failureCounts.get(uri) ?? 0;
+    if (left > 0) {
+      this.failureCounts.set(uri, left - 1);
+      throw new Error("transient ECONNRESET");
+    }
+    return super.get(uri);
+  }
+}
+
+/**
  * Genuinely incompressible text (base64 of random bytes) so the gzipped body
- * stays above the s3 threshold — a compressible payload would collapse below it
+ * stays above the s3 threshold -- a compressible payload would collapse below it
  * and silently never exercise the s3 tier.
  */
 export function incompressible(byteLength: number): string {

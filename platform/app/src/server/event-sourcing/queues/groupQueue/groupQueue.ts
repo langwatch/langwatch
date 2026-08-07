@@ -1081,10 +1081,41 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       }
       if (drainedSiblings.length > 0) {
         try {
-          const parsedSiblings = await Promise.all(
+          // Use Promise.allSettled (not Promise.all) so every sibling's
+          // parseDrainedPayload runs to terminal state — including its
+          // recordDrop call that marks the sibling as dropped — before
+          // we decide whether to restage. Promise.all short-circuits on
+          // the first rejection, so a TransientBlobStoreError or
+          // PayloadTooLargeError thrown by one sibling can fire the
+          // catch block — and trigger restageDrainedSiblings — before
+          // another sibling's parseDrainedPayload has run recordDrop.
+          // The dropped flag would then be unset when
+          // restageDrainedSiblings checks it, and the dropped sibling
+          // would be resurrected on the next drain: the exact loop
+          // #5857 set out to fix (#5883 P1 regression).
+          //
+          // Prioritize PayloadTooLargeError over transient rejections: an
+          // oversized sibling must park the group immediately (replaying it
+          // would re-materialize the over-cap value and seize the event loop).
+          // Otherwise propagate the first transient rejection so the existing
+          // Transient/PayloadTooLarge error routing in the catch block fires.
+          const settled = await Promise.allSettled(
             drainedSiblings.map((sibling) =>
               this.parseDrainedPayload({ sibling, groupId }),
             ),
+          );
+          const rejections = settled.filter(
+            (r): r is PromiseRejectedResult => r.status === "rejected",
+          );
+          const firstRejection =
+            rejections.find(
+              ({ reason }) => reason instanceof PayloadTooLargeError,
+            ) ?? rejections[0];
+          if (firstRejection) {
+            throw firstRejection.reason;
+          }
+          const parsedSiblings = settled.map((r) =>
+            r.status === "fulfilled" ? r.value : null,
           );
           const liveSiblings = drainedSiblings.filter(
             (_, index) => parsedSiblings[index] !== null,
@@ -1714,9 +1745,12 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       // A transient blob-store error on a sibling MUST NOT drop it to replay —
       // the dispatched job's decode routes transient errors through
       // `handleTransientDecode` so the whole batch can retry (ADR-030 §2).
-      // Rethrow so the caller (Promise.all in the batch drain) can bubble it up
-      // and re-stage every sibling together, rather than silently dropping
-      // hundreds of siblings on a brief S3 blip (2026-06-24 review).
+      // Rethrow so the caller (the Promise.allSettled batch drain above)
+      // can bubble it up and re-stage every sibling together, rather than
+      // silently dropping hundreds of siblings on a brief S3 blip
+      // (2026-06-24 review). Promise.allSettled ensures recordDrop has run
+      // on every sibling before the catch re-stages, so already-dropped
+      // siblings are skipped (#5857, #5883).
       if (err instanceof TransientBlobStoreError) {
         throw err;
       }
@@ -1742,6 +1776,14 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
           ? err.reason === "missing_blob"
           : false),
       });
+      // Tag the sibling so `restageDrainedSiblings` skips it if the batch later
+      // throws (e.g. the dispatched job itself fails). Without this, a sibling
+      // already moved to the drop path gets re-staged → re-dispatched →
+      // re-decoded → re-dropped, resurrecting a job the system judged terminal
+      // and inflating the drop counter (#5857). Set BEFORE the lease release:
+      // a failing releaseLease must not cost the marker for a drop already
+      // counted (#5883 CodeRabbit follow-up).
+      sibling.dropped = true;
       await this.blobLifecycle.releaseLease({
         values: [sibling.jobDataJson],
         groupId,
@@ -2055,6 +2097,14 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     siblings: DrainedJob[],
   ): Promise<void> {
     for (const sibling of siblings) {
+      // Skip siblings that `parseDrainedPayload` already routed to the drop
+      // path: recordDrop already counted them, their body was already
+      // dispositioned, and re-staging would resurrect a job the system judged
+      // terminal — re-dispatch → re-decode → re-drop, an idempotency hole
+      // that both re-runs side effects and double-counts the drop (#5857).
+      if (sibling.dropped) {
+        continue;
+      }
       try {
         await this.scripts.stage({
           stagedJobId: sibling.stagedJobId,
