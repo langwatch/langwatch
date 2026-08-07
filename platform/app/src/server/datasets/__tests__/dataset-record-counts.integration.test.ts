@@ -3,6 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { projectFactory } from "~/factories/project.factory";
 import { PrismaClient } from "~/generated/prisma/client";
 import { prisma } from "~/server/db";
+import { createPrismaPgAdapter } from "~/server/prismaPgAdapter";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { attachDatasetRecordCounts } from "../dataset-record-counts";
 import { datasetDisplayRecordCount } from "../record-count";
@@ -122,6 +123,7 @@ describe("dataset entry counts (integration)", () => {
     });
 
     queryLoggingPrisma = new PrismaClient({
+      adapter: createPrismaPgAdapter(process.env.DATABASE_URL ?? ""),
       log: [{ emit: "event", level: "query" }],
     });
     queryLoggingPrisma.$on("query" as never, (event: { query: string }) => {

@@ -210,7 +210,6 @@ vi.mock("~/utils/api", async () => {
     return {
       data,
       isLoading: false,
-      isLoading: false,
       isFetching: false,
       isPlaceholderData: false,
       isFetched: true,

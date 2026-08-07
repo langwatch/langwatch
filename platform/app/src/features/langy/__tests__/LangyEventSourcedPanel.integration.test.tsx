@@ -219,7 +219,6 @@ vi.mock("~/utils/api", async () => {
     return {
       data: state.data,
       isLoading: enabled && state.status === "loading",
-      isLoading: enabled && state.status === "loading",
       isFetching: enabled && state.status === "loading",
       isPlaceholderData: false,
       isFetched: state.status === "success",

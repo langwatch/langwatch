@@ -267,7 +267,6 @@ vi.mock("~/utils/api", async () => {
       // the list while closed — so the production hook reads isLoading.
       // Mirror that: only a query that is BOTH enabled AND still loading counts.
       isLoading: enabled && state.status === "loading",
-      isLoading: enabled && state.status === "loading",
       isFetching: enabled && state.status === "loading",
       isPlaceholderData: false,
       isFetched: state.fetched,

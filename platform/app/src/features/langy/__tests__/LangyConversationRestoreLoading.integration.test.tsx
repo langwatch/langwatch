@@ -158,7 +158,6 @@ vi.mock("~/utils/api", async () => {
           }
         : undefined,
       isLoading: enabled && !settled,
-      isLoading: enabled && !settled,
       isFetching: enabled && !settled,
       isPlaceholderData: false,
       isFetched: settled,
