@@ -120,18 +120,22 @@ beforeEach(() => {
   caller = annotationRouter.createCaller(ctx);
 });
 
+function expectFullResolution() {
+  expect(mockCreate).toHaveBeenCalledWith(expect.anything(), BLOB_DEPS);
+  expect(mockGetTracesWithSpans).toHaveBeenCalledWith(
+    "project_123",
+    ["t1"],
+    expect.any(Object),
+    undefined,
+    { full: true },
+  );
+}
+
 describe("annotation router — #4991 AC3 annotation-queue reads", () => {
   describe("when getQueueItems is called", () => {
     it("constructs with deps and resolves trace IO full", async () => {
       await caller.getQueueItems({ projectId: "project_123" });
-      expect(mockCreate).toHaveBeenCalledWith(expect.anything(), BLOB_DEPS);
-      expect(mockGetTracesWithSpans).toHaveBeenCalledWith(
-        "project_123",
-        ["t1"],
-        expect.any(Object),
-        undefined,
-        { full: true },
-      );
+      expectFullResolution();
       expect(mockQueueItemFindMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({
@@ -170,14 +174,7 @@ describe("annotation router — #4991 AC3 annotation-queue reads", () => {
         pageSize: 10,
         pageOffset: 0,
       });
-      expect(mockCreate).toHaveBeenCalledWith(expect.anything(), BLOB_DEPS);
-      expect(mockGetTracesWithSpans).toHaveBeenCalledWith(
-        "project_123",
-        ["t1"],
-        expect.any(Object),
-        undefined,
-        { full: true },
-      );
+      expectFullResolution();
     });
 
     it("scopes an explicit queue to the project", async () => {

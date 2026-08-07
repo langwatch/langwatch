@@ -96,15 +96,12 @@ describe("LangyConversationProcess", () => {
     ];
   }
 
-  /** Lookup helper: throws when the process instance does not exist yet. */
   async function state(): Promise<LangyConversationProcessState> {
     const instance = await store.findByRef<LangyConversationProcessState>({
       ref,
     });
-    if (!instance) {
-      throw new Error("no process instance found for the conversation ref");
-    }
-    return instance.state;
+    expect(instance).not.toBeNull();
+    return instance!.state;
   }
 
   describe("given an ordered conversation event stream", () => {

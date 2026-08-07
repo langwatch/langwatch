@@ -26,16 +26,12 @@ function result(current: TimeseriesResult["currentPeriod"]): TimeseriesResult {
   return { currentPeriod: current, previousPeriod: [] };
 }
 
-/**
- * The structured payload passed to `logger.warn`, or undefined when warn was
- * never called — each test asserts the payload it reads.
- */
-function lastWarnPayload():
-  | {
-      divergenceCount: number;
-      divergences: Array<{ kind: string; metric: string }>;
-    }
-  | undefined {
+/** The structured payload passed to `logger.warn`. */
+function lastWarnPayload(): {
+  divergenceCount: number;
+  divergences: Array<{ kind: string; metric: string }>;
+} {
+  expect(warn).toHaveBeenCalled();
   return warn.mock.calls.at(-1)?.[0] as never;
 }
 
@@ -64,9 +60,8 @@ describe("compareForTripwire", () => {
         legacy: result([{ date: "2026-07-01", "0/cost/sum": 20 }]),
       });
       const payload = lastWarnPayload();
-      expect(payload).toBeDefined();
-      expect(payload!.divergenceCount).toBe(1);
-      expect(payload!.divergences[0]?.kind).toBe("value");
+      expect(payload.divergenceCount).toBe(1);
+      expect(payload.divergences[0]?.kind).toBe("value");
     });
   });
 
@@ -98,9 +93,8 @@ describe("compareForTripwire", () => {
         ]),
       });
       const payload = lastWarnPayload();
-      expect(payload).toBeDefined();
-      expect(payload!.divergenceCount).toBe(1);
-      expect(payload!.divergences[0]).toMatchObject({
+      expect(payload.divergenceCount).toBe(1);
+      expect(payload.divergences[0]).toMatchObject({
         kind: "value",
         metric: "metadata.model.gpt-4.0/cost/sum",
       });
@@ -143,9 +137,8 @@ describe("compareForTripwire", () => {
         ]),
       });
       const payload = lastWarnPayload();
-      expect(payload).toBeDefined();
-      expect(payload!.divergenceCount).toBe(2);
-      expect(payload!.divergences.map((d) => d.kind)).toEqual([
+      expect(payload.divergenceCount).toBe(2);
+      expect(payload.divergences.map((d) => d.kind)).toEqual([
         "missing-metric",
         "missing-metric",
       ]);
@@ -164,9 +157,8 @@ describe("compareForTripwire", () => {
         ]),
       });
       const payload = lastWarnPayload();
-      expect(payload).toBeDefined();
-      expect(payload!.divergenceCount).toBe(1);
-      expect(payload!.divergences[0]).toMatchObject({
+      expect(payload.divergenceCount).toBe(1);
+      expect(payload.divergences[0]).toMatchObject({
         kind: "missing-bucket",
         date: "2026-07-02",
       });

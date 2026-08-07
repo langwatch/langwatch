@@ -218,14 +218,13 @@ describe("PromptPlaygroundChat ref methods", () => {
       isGenerating?: boolean;
     }) => {
       store.getState().addTab({ data: createTabData() });
-      // Lookup guard for the render below: addTab must have created the tab.
       const tabId = store.getState().windows[0]?.tabs[0]?.id;
-      if (!tabId) throw new Error("addTab did not create a tab");
+      expect(tabId).toBeDefined();
 
       captured.chatProps = null;
       render(
         <ChakraProvider value={defaultSystem}>
-          <TabIdProvider tabId={tabId}>
+          <TabIdProvider tabId={tabId!}>
             <PromptPlaygroundChat formValues={{} as never} />
           </TabIdProvider>
         </ChakraProvider>,
@@ -238,9 +237,7 @@ describe("PromptPlaygroundChat ref methods", () => {
         chatProps?.AssistantMessage as unknown as React.ComponentType<
           Record<string, unknown>
         >;
-      // Lookup guard for the render below.
-      if (!AssistantMessageProp)
-        throw new Error("chatProps did not carry AssistantMessage");
+      expect(AssistantMessageProp).toBeDefined();
 
       render(
         <ChakraProvider value={defaultSystem}>

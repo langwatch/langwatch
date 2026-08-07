@@ -66,157 +66,156 @@ interface Harness {
 
 let harness: Harness | undefined;
 
-describe.runIf(E2E_ENABLED)(
-  "stagedLangevalsFetch e2e (real S3 + real langevals)",
-  () => {
-    beforeAll(async () => {
-      harness = await spawnLangevals();
-    }, 120_000);
+const describeFn = E2E_ENABLED ? describe : describe.skip;
 
-    afterAll(async () => {
-      if (!harness) return;
-      await deleteStagingObjects(harness);
-      harness.proc.kill("SIGTERM");
-      await sleep(500);
-      if (!harness.proc.killed) harness.proc.kill("SIGKILL");
-      try {
-        rmSync(harness.tempDir, { recursive: true, force: true });
-      } catch {
-        /* best-effort */
-      }
+describeFn("stagedLangevalsFetch e2e (real S3 + real langevals)", () => {
+  beforeAll(async () => {
+    harness = await spawnLangevals();
+  }, 120_000);
+
+  afterAll(async () => {
+    if (!harness) return;
+    await deleteStagingObjects(harness);
+    harness.proc.kill("SIGTERM");
+    await sleep(500);
+    if (!harness.proc.killed) harness.proc.kill("SIGKILL");
+    try {
+      rmSync(harness.tempDir, { recursive: true, force: true });
+    } catch {
+      /* best-effort */
+    }
+  });
+
+  it("stages a large llm_boolean payload, real OpenAI runs after the S3 hop", async () => {
+    const h = harness!;
+
+    const padding = "x".repeat(2000);
+    const response = await stagedLangevalsFetch({
+      url: `${h.baseUrl}/langevals/llm_boolean/evaluate`,
+      projectId: "project_e2e_eval",
+      kind: "evaluation",
+      body: {
+        data: [
+          {
+            input: "What is the capital of France?",
+            output: `The capital of France is Paris. ${padding}`,
+            contexts: [`London is the capital of France. ${padding}`],
+          },
+        ],
+        settings: {
+          model: "openai/gpt-5-mini",
+          prompt:
+            "You are an LLM evaluator. Evaluate as False if the output does not match what the provided context says, regardless of factual accuracy.",
+        },
+        env: { OPENAI_API_KEY: requireOpenAIKey() },
+      },
     });
 
-    it("stages a large llm_boolean payload, real OpenAI runs after the S3 hop", async () => {
-      const h = harness!;
+    expect(response.status).toBe(200);
+    const json = (await response.json()) as Array<EvalResult>;
+    const verdict = json[0];
+    // eslint-disable-next-line no-console
+    console.log("[e2e proof] llm_boolean verdict:", JSON.stringify(verdict));
+    expect(verdict?.status).toBe("processed");
+    expect(typeof verdict?.passed).toBe("boolean");
+    expect((verdict?.cost?.amount ?? 0) > 0).toBe(true);
 
-      const padding = "x".repeat(2000);
-      const response = await stagedLangevalsFetch({
-        url: `${h.baseUrl}/langevals/llm_boolean/evaluate`,
-        projectId: "project_e2e_eval",
-        kind: "evaluation",
-        body: {
-          data: [
-            {
-              input: "What is the capital of France?",
-              output: `The capital of France is Paris. ${padding}`,
-              contexts: [`London is the capital of France. ${padding}`],
-            },
-          ],
-          settings: {
-            model: "openai/gpt-5-mini",
-            prompt:
-              "You are an LLM evaluator. Evaluate as False if the output does not match what the provided context says, regardless of factual accuracy.",
-          },
-          env: { OPENAI_API_KEY: requireOpenAIKey() },
+    // langevals emitting "fetched staged payload" proves the body did
+    // round-trip through S3 (the middleware pulled the presigned URL).
+    await waitForLog(h, "fetched staged payload", 5_000);
+
+    // ...and after the call returns, the in-app finally must have
+    // deleted the staged object, so nothing lingers in the bucket.
+    const staged = await listStagingObjects(h);
+    const matching = staged.filter((k) =>
+      k.includes("project_e2e_eval/evaluation/"),
+    );
+    expect(matching).toEqual([]);
+  }, 120_000);
+
+  it("stages a topic_clustering_batch payload and returns real named topics", async () => {
+    const h = harness!;
+    const apiKey = requireOpenAIKey();
+
+    // Two semantically distinct clusters, both above the
+    // MINIMUM_TRACES_PER_TOPIC=5 threshold so the hierarchy actually
+    // returns at least one topic. Real embeddings differentiate them.
+    const weather = [
+      "Why is the sky blue during the day?",
+      "What causes blue color in the sky?",
+      "Why does the daytime sky look blue from earth?",
+      "Explain blue sky scattering of sunlight.",
+      "Rayleigh scattering and the blue color of the sky",
+      "Why is the sky not green or red but blue?",
+    ];
+    const python = [
+      "How do I open a file in Python and read its contents?",
+      "Python file reading best practices with context managers",
+      "How can I parse JSON files in Python?",
+      "Reading large CSV files efficiently in Python",
+      "How do I write bytes to a file in Python?",
+      "Python pathlib vs os.path for reading files",
+    ];
+
+    const traces = [...weather, ...python].map((input, i) => ({
+      trace_id: `trace_e2e_${i}`,
+      input,
+      topic_id: null,
+      subtopic_id: null,
+    }));
+
+    const response = await stagedLangevalsFetch({
+      url: `${h.baseUrl}/topics/batch_clustering`,
+      projectId: "project_e2e_topics",
+      kind: "topic_clustering_batch",
+      body: {
+        project_id: "project_e2e_topics",
+        litellm_params: {
+          model: "openai/gpt-5-mini",
+          api_key: apiKey,
         },
-      });
-
-      expect(response.status).toBe(200);
-      const json = (await response.json()) as Array<EvalResult>;
-      const verdict = json[0];
-      // eslint-disable-next-line no-console
-      console.log("[e2e proof] llm_boolean verdict:", JSON.stringify(verdict));
-      expect(verdict?.status).toBe("processed");
-      expect(typeof verdict?.passed).toBe("boolean");
-      expect((verdict?.cost?.amount ?? 0) > 0).toBe(true);
-
-      // langevals emitting "fetched staged payload" proves the body did
-      // round-trip through S3 (the middleware pulled the presigned URL).
-      await waitForLog(h, "fetched staged payload", 5_000);
-
-      // ...and after the call returns, the in-app finally must have
-      // deleted the staged object, so nothing lingers in the bucket.
-      const staged = await listStagingObjects(h);
-      const matching = staged.filter((k) =>
-        k.includes("project_e2e_eval/evaluation/"),
-      );
-      expect(matching).toEqual([]);
-    }, 120_000);
-
-    it("stages a topic_clustering_batch payload and returns real named topics", async () => {
-      const h = harness!;
-      const apiKey = requireOpenAIKey();
-
-      // Two semantically distinct clusters, both above the
-      // MINIMUM_TRACES_PER_TOPIC=5 threshold so the hierarchy actually
-      // returns at least one topic. Real embeddings differentiate them.
-      const weather = [
-        "Why is the sky blue during the day?",
-        "What causes blue color in the sky?",
-        "Why does the daytime sky look blue from earth?",
-        "Explain blue sky scattering of sunlight.",
-        "Rayleigh scattering and the blue color of the sky",
-        "Why is the sky not green or red but blue?",
-      ];
-      const python = [
-        "How do I open a file in Python and read its contents?",
-        "Python file reading best practices with context managers",
-        "How can I parse JSON files in Python?",
-        "Reading large CSV files efficiently in Python",
-        "How do I write bytes to a file in Python?",
-        "Python pathlib vs os.path for reading files",
-      ];
-
-      const traces = [...weather, ...python].map((input, i) => ({
-        trace_id: `trace_e2e_${i}`,
-        input,
-        topic_id: null,
-        subtopic_id: null,
-      }));
-
-      const response = await stagedLangevalsFetch({
-        url: `${h.baseUrl}/topics/batch_clustering`,
-        projectId: "project_e2e_topics",
-        kind: "topic_clustering_batch",
-        body: {
-          project_id: "project_e2e_topics",
-          litellm_params: {
-            model: "openai/gpt-5-mini",
-            api_key: apiKey,
-          },
-          embeddings_litellm_params: {
-            model: "openai/text-embedding-3-small",
-            api_key: apiKey,
-          },
-          traces,
+        embeddings_litellm_params: {
+          model: "openai/text-embedding-3-small",
+          api_key: apiKey,
         },
-      });
+        traces,
+      },
+    });
 
-      expect(response.status).toBe(200);
-      const json = (await response.json()) as TopicClusteringResponse;
-      // eslint-disable-next-line no-console
-      console.log(
-        "[e2e proof] topics:",
-        JSON.stringify(json.topics),
-        "subtopics:",
-        JSON.stringify(json.subtopics),
-        "trace_assignments:",
-        JSON.stringify(json.traces),
-      );
+    expect(response.status).toBe(200);
+    const json = (await response.json()) as TopicClusteringResponse;
+    // eslint-disable-next-line no-console
+    console.log(
+      "[e2e proof] topics:",
+      JSON.stringify(json.topics),
+      "subtopics:",
+      JSON.stringify(json.subtopics),
+      "trace_assignments:",
+      JSON.stringify(json.traces),
+    );
 
-      expect(Array.isArray(json.topics)).toBe(true);
-      expect(json.topics.length).toBeGreaterThan(0);
-      expect(json.topics[0]?.name).toBeTruthy();
+    expect(Array.isArray(json.topics)).toBe(true);
+    expect(json.topics.length).toBeGreaterThan(0);
+    expect(json.topics[0]?.name).toBeTruthy();
 
-      expect(Array.isArray(json.traces)).toBe(true);
-      expect(json.traces.length).toBeGreaterThan(0);
-      for (const t of json.traces) {
-        expect(typeof t.trace_id).toBe("string");
-        expect(typeof t.topic_id).toBe("string");
-      }
+    expect(Array.isArray(json.traces)).toBe(true);
+    expect(json.traces.length).toBeGreaterThan(0);
+    for (const t of json.traces) {
+      expect(typeof t.trace_id).toBe("string");
+      expect(typeof t.topic_id).toBe("string");
+    }
 
-      // Round-trip proof: langevals fetched the staged body from S3.
-      await waitForLog(h, "fetched staged payload", 10_000);
+    // Round-trip proof: langevals fetched the staged body from S3.
+    await waitForLog(h, "fetched staged payload", 10_000);
 
-      // Cleanup proof: the staged object is deleted after the call returns.
-      const staged = await listStagingObjects(h);
-      const matching = staged.filter((k) =>
-        k.includes("project_e2e_topics/topic_clustering_batch/"),
-      );
-      expect(matching).toEqual([]);
-    }, 180_000);
-  },
-);
+    // Cleanup proof: the staged object is deleted after the call returns.
+    const staged = await listStagingObjects(h);
+    const matching = staged.filter((k) =>
+      k.includes("project_e2e_topics/topic_clustering_batch/"),
+    );
+    expect(matching).toEqual([]);
+  }, 180_000);
+});
 
 interface EvalResult {
   status?: string;

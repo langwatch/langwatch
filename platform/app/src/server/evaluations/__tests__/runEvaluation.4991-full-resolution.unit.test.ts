@@ -116,6 +116,10 @@ beforeEach(() => {
   });
 });
 
+function expectConstructedWithDeps() {
+  expect(mockCreate).toHaveBeenCalledWith(undefined, BLOB_DEPS);
+}
+
 describe("runEvaluation — #4991 full blob resolution on evaluator reads", () => {
   describe("given a trace-level evaluation", () => {
     beforeEach(() => {
@@ -140,7 +144,7 @@ describe("runEvaluation — #4991 full blob resolution on evaluator reads", () =
           protections,
         });
 
-        expect(mockCreate).toHaveBeenCalledWith(undefined, BLOB_DEPS);
+        expectConstructedWithDeps();
         expect(getByIdMock).toHaveBeenCalledWith(
           "project-1",
           "trace-1",
@@ -174,7 +178,7 @@ describe("runEvaluation — #4991 full blob resolution on evaluator reads", () =
           protections,
         });
 
-        expect(mockCreate).toHaveBeenCalledWith(undefined, BLOB_DEPS);
+        expectConstructedWithDeps();
         expect(getTracesByThreadIdMock).toHaveBeenCalledWith(
           "project-1",
           "thread-1",

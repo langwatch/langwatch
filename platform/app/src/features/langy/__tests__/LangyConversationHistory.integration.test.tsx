@@ -674,16 +674,13 @@ async function findRecentOption(pattern: RegExp): Promise<HTMLElement> {
 async function openRecentOption(pattern: RegExp): Promise<void> {
   const row = await findRecentOption(pattern);
   // The title button is the row's other control — everything except the ⋯.
-  // Testing-library-style lookup: throws when the row has no title button.
   const titleButton = within(row)
     .getAllByRole("button")
     .find(
       (button) => button.getAttribute("aria-label") !== "Conversation actions",
     );
-  if (!titleButton) {
-    throw new Error("the recent-conversation row has no title button");
-  }
-  await userEvent.click(titleButton);
+  expect(titleButton).toBeDefined();
+  await userEvent.click(titleButton!);
 }
 
 async function deleteRecentOption(option: HTMLElement): Promise<void> {

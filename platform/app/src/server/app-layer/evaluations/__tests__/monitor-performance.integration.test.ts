@@ -77,16 +77,7 @@ const readTablePerformance = async () => {
   });
 };
 
-/**
- * Both sides projected to 10-decimal-rounded views so one `toEqual` compares
- * them (matching the old toBeCloseTo(…, 10) tolerance). The analytics side
- * maps null to a sentinel so a data-less analytics page still fails loudly
- * instead of matching a null table value.
- */
-const round10 = (value: number | null) =>
-  value === null ? null : Number(value.toFixed(10));
-
-const sameNumbersViews = ({
+const expectSameNumbers = ({
   table,
   analyticsPage,
 }: {
@@ -96,24 +87,16 @@ const sameNumbersViews = ({
     previous: number | null;
     dailyValues: number[];
   };
-}) => ({
-  table: {
-    current: round10(table.current),
-    previous: round10(table.previous),
-    values: table.points.map(round10),
-  },
-  analytics: {
-    current:
-      analyticsPage.current === null
-        ? "<missing>"
-        : round10(analyticsPage.current),
-    previous:
-      analyticsPage.previous === null
-        ? "<missing>"
-        : round10(analyticsPage.previous),
-    values: analyticsPage.dailyValues.map(round10),
-  },
-});
+}) => {
+  expect(analyticsPage.current).not.toBeNull();
+  expect(analyticsPage.previous).not.toBeNull();
+  expect(table.current).toBeCloseTo(analyticsPage.current!, 10);
+  expect(table.previous).toBeCloseTo(analyticsPage.previous!, 10);
+  expect(table.points).toHaveLength(analyticsPage.dailyValues.length);
+  table.points.forEach((point, index) => {
+    expect(point).toBeCloseTo(analyticsPage.dailyValues[index]!, 10);
+  });
+};
 
 beforeAll(async () => {
   const containers = await startTestContainers();
@@ -219,11 +202,7 @@ describe("online evaluation monitor performance", () => {
         endMs,
       });
 
-      const views = sameNumbersViews({
-        table: scorePerformance!,
-        analyticsPage,
-      });
-      expect(views.table).toEqual(views.analytics);
+      expectSameNumbers({ table: scorePerformance!, analyticsPage });
     });
 
     /** @scenario The configuration table matches the analytics page numbers */
@@ -238,11 +217,7 @@ describe("online evaluation monitor performance", () => {
         endMs,
       });
 
-      const views = sameNumbersViews({
-        table: guardrailPerformance!,
-        analyticsPage,
-      });
-      expect(views.table).toEqual(views.analytics);
+      expectSameNumbers({ table: guardrailPerformance!, analyticsPage });
     });
   });
 });

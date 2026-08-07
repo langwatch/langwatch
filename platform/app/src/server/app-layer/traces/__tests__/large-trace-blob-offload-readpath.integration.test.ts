@@ -49,16 +49,15 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   AGGREGATE_TYPE,
+  assertOverThreshold,
   extractSpanAttrs,
   insertEventLogRow,
   LARGE_VALUE,
-  payloadBytes,
   UNIQUE_TAIL,
 } from "~/server/app-layer/traces/__tests__/blob-offload-test-helpers";
 import { BlobStore } from "~/server/app-layer/traces/blob-store.service";
 import {
   EVENTREF_ATTR_PREFIX,
-  IO_PREVIEW_BYTES,
   leanForProjection,
 } from "~/server/app-layer/traces/lean-for-projection";
 import { NullSpanStorageRepository } from "~/server/app-layer/traces/repositories/span-storage.repository";
@@ -293,7 +292,7 @@ describe.skipIf(!hasTestcontainers)(
     // -----------------------------------------------------------------------
     describe("given a SpanReceived event whose langwatch.input exceeds 64 KB is stored full in event_log and leaned for projection", () => {
       it("the v2 read path (SpanStorageService.getSpansByTraceId, real BlobStore) returns the FULL input from event_log, not the 64 KB preview", async () => {
-        expect(payloadBytes(LARGE_VALUE)).toBeGreaterThan(IO_PREVIEW_BYTES);
+        assertOverThreshold(LARGE_VALUE);
 
         const tenantId = generateTestTenantId();
         ownedTenantIds.push(tenantId);
@@ -357,7 +356,7 @@ describe.skipIf(!hasTestcontainers)(
       });
 
       it("resolveOffloadedTraces (real BlobStore) restores the full value into spanAttributes and strips the reserved eventref key", async () => {
-        expect(payloadBytes(LARGE_VALUE)).toBeGreaterThan(IO_PREVIEW_BYTES);
+        assertOverThreshold(LARGE_VALUE);
 
         const tenantId = generateTestTenantId();
         ownedTenantIds.push(tenantId);
@@ -425,7 +424,7 @@ describe.skipIf(!hasTestcontainers)(
     // -----------------------------------------------------------------------
     describe("given a LogRecordReceived event whose body exceeds 64 KB is stored full in event_log and leaned for projection", () => {
       it("resolveOffloadedTraces (real BlobStore) restores the FULL body via the field=='body' branch, not the preview", async () => {
-        expect(payloadBytes(LARGE_VALUE)).toBeGreaterThan(IO_PREVIEW_BYTES);
+        assertOverThreshold(LARGE_VALUE);
 
         const tenantId = generateTestTenantId();
         ownedTenantIds.push(tenantId);

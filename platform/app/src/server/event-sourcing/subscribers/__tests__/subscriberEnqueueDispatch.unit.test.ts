@@ -95,46 +95,26 @@ const raises = () => {
 
 /**
  * `dispatch` reports failures as an AggregateError, so the specific cause sits
- * in `.errors` — a bare `rejects.toThrow()` would pass on any dispatch fault
- * at all. The rejection is projected for assertion inside each test: every
- * test asserts `view` equals `dispatchFailed` — the promise rejected with an
- * AggregateError, the errors array is non-empty (else the message check
- * passes vacuously), and no cause message misses the expected pattern.
+ * in `.errors`. Asserting there proves *which* failure surfaced — a bare
+ * `rejects.toThrow()` would pass on any dispatch fault at all.
  */
-async function dispatchFailureView(
+async function expectDispatchFailure(
   dispatching: Promise<void>,
   expected: RegExp,
-): Promise<{
-  causes: Error[];
-  view: {
-    rejectedWithAggregateError: boolean;
-    causesNonEmpty: boolean;
-    offendingMessages: string[];
-  };
-}> {
+): Promise<Error[]> {
   const caught: unknown = await dispatching.then(
     () => null,
     (error: unknown) => error,
   );
-  const causes =
-    caught instanceof AggregateError ? (caught.errors as Error[]) : [];
-  return {
-    causes,
-    view: {
-      rejectedWithAggregateError: caught instanceof AggregateError,
-      causesNonEmpty: causes.length > 0,
-      offendingMessages: causes
-        .map((cause) => cause.message)
-        .filter((message) => !expected.test(message)),
-    },
-  };
+  expect(caught).toBeInstanceOf(AggregateError);
+  const causes = (caught as AggregateError).errors as Error[];
+  // Without this the loop below vacuously passes on an empty errors array.
+  expect(causes.length).toBeGreaterThan(0);
+  for (const cause of causes) {
+    expect(cause.message).toMatch(expected);
+  }
+  return causes;
 }
-
-const dispatchFailed = {
-  rejectedWithAggregateError: true,
-  causesNonEmpty: true,
-  offendingMessages: [],
-};
 
 describe("subscriber enqueue-time contract", () => {
   describe("given a subscriber whose kill switch is flipped for one tenant", () => {
@@ -288,11 +268,10 @@ describe("subscriber enqueue-time contract", () => {
           options: { enqueue: { filter: raises } },
         });
 
-        const { causes, view } = await dispatchFailureView(
+        const causes = await expectDispatchFailure(
           router.dispatch([makeEvent("evt-throw")], readContext),
           /filter blew up/,
         );
-        expect(view).toEqual(dispatchFailed);
 
         expect(causes).toHaveLength(1);
         expect(received).toHaveLength(0);
@@ -323,14 +302,13 @@ describe("subscriber enqueue-time contract", () => {
           },
         );
 
-        const { causes, view } = await dispatchFailureView(
+        const causes = await expectDispatchFailure(
           router.dispatch(
             [makeEvent("evt-a"), makeEvent("evt-b")],
             readContext,
           ),
           /filter blew up/,
         );
-        expect(view).toEqual(dispatchFailed);
 
         // Blast radius is one (subscriber, event) pair, not the batch: exactly
         // the raising subscriber's two pairs fail, and the healthy subscriber
@@ -475,14 +453,10 @@ describe("subscriber enqueue-time contract", () => {
           handle: async () => undefined,
         });
 
-        expect(
-          (
-            await dispatchFailureView(
-              router.dispatch([makeEvent("evt-send-fails")], readContext),
-              /queue unavailable/,
-            )
-          ).view,
-        ).toEqual(dispatchFailed);
+        await expectDispatchFailure(
+          router.dispatch([makeEvent("evt-send-fails")], readContext),
+          /queue unavailable/,
+        );
 
         expect(await enqueueOutcomeCount("staged")).toBe(before);
       });
@@ -576,14 +550,10 @@ describe("subscriber enqueue-time contract", () => {
           },
         });
 
-        expect(
-          (
-            await dispatchFailureView(
-              router.dispatch([makeEvent("evt-stage-throw")], readContext),
-              /stage blew up/,
-            )
-          ).view,
-        ).toEqual(dispatchFailed);
+        await expectDispatchFailure(
+          router.dispatch([makeEvent("evt-stage-throw")], readContext),
+          /stage blew up/,
+        );
         expect(handlerRan).toBe(false);
       });
     });

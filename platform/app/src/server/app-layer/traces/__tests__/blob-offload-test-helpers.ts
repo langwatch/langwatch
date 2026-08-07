@@ -6,6 +6,8 @@
  */
 
 import type { ClickHouseClient } from "@clickhouse/client";
+import { expect } from "vitest";
+import { IO_PREVIEW_BYTES } from "~/server/app-layer/traces/lean-for-projection";
 import type { Event } from "~/server/event-sourcing";
 
 export const AGGREGATE_TYPE = "trace";
@@ -18,12 +20,9 @@ export const AGGREGATE_TYPE = "trace";
 export const UNIQUE_TAIL = "__OFFLOAD_FULL_VALUE_TAIL_MARKER__";
 export const LARGE_VALUE = "x".repeat(200_000) + UNIQUE_TAIL;
 
-/**
- * Sanity input for the tests' own over-threshold assertion: the payload must
- * genuinely exceed the offload threshold for the offload path to engage.
- */
-export function payloadBytes(value: string): number {
-  return Buffer.byteLength(value, "utf-8");
+/** Sanity: the payload genuinely exceeds the offload threshold. */
+export function assertOverThreshold(value: string): void {
+  expect(Buffer.byteLength(value, "utf-8")).toBeGreaterThan(IO_PREVIEW_BYTES);
 }
 
 /**

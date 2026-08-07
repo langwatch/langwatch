@@ -48,22 +48,15 @@ import { buildRawMimeMessage, rfc2047EncodeHeader } from "../providers/mime";
 
 // ── helper ────────────────────────────────────────────────────────────────────
 
-/**
- * Decode the raw MIME bytes that were passed to SendRawEmailCommand.
- * Lookup helper: throws when no SendRawEmailCommand was sent.
- */
+/** Decode the raw MIME bytes that were passed to SendRawEmailCommand */
 function capturedRawMessage(): string {
   const call = sesClientSendMock.mock.calls[0];
-  if (!call) {
-    throw new Error("ses send was never called");
-  }
-  const cmd = call[0] as {
+  expect(call).toBeDefined();
+  const cmd = call![0] as {
     type: string;
     input: { RawMessage: { Data: Uint8Array } };
   };
-  if (cmd.type !== "SendRawEmailCommand") {
-    throw new Error(`expected a SendRawEmailCommand, got ${cmd.type}`);
-  }
+  expect(cmd.type).toBe("SendRawEmailCommand");
   return new TextDecoder().decode(cmd.input.RawMessage.Data);
 }
 

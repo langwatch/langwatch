@@ -228,12 +228,10 @@ async function projectedSearch({
       dateField,
     },
   );
-  if (!results) {
-    throw new Error("getAllTracesForProject returned null");
-  }
+  expect(results).not.toBeNull();
   const enriched = enrichTracesWithEvaluations({
-    traces: results.groups.flat(),
-    traceChecks: results.traceChecks,
+    traces: results!.groups.flat(),
+    traceChecks: results!.traceChecks,
   });
   return enriched.map((t) => compiled.project(t as ProjectableTrace));
 }

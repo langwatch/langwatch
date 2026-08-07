@@ -80,18 +80,13 @@ function buildCommand(): Command<ExecuteEvaluationCommandData> {
   } as unknown as Command<ExecuteEvaluationCommandData>;
 }
 
-/** Lookup helper: throws unless exactly one evaluation execution ran. */
 async function executeWith(monitor: MonitorFixture) {
   const deps = buildDeps(monitor);
   const command = new ExecuteEvaluationCommand(deps);
   await command.handle(buildCommand());
   const executeForTrace = deps.evaluationExecution
     .executeForTrace as ReturnType<typeof vi.fn>;
-  if (executeForTrace.mock.calls.length !== 1) {
-    throw new Error(
-      `expected exactly one executeForTrace call, got ${executeForTrace.mock.calls.length}`,
-    );
-  }
+  expect(executeForTrace).toHaveBeenCalledTimes(1);
   return executeForTrace.mock.calls[0]?.[0] as Record<string, unknown>;
 }
 

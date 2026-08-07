@@ -45,19 +45,13 @@ function renderTable({
   );
 }
 
-/**
- * Testing-library-style lookup: like the get* queries, throws with a
- * descriptive message when no preview-table cell contains `text`.
- */
 function getCellContaining(text: string): HTMLElement {
   const table = screen.getByTestId("dataset-preview-table");
   const cell = within(table)
     .getAllByRole("cell")
     .find((el) => (el.textContent ?? "").includes(text));
-  if (!cell) {
-    throw new Error(`no dataset-preview-table cell contains "${text}"`);
-  }
-  return cell;
+  expect(cell).toBeDefined();
+  return cell!;
 }
 
 describe("DatasetPreviewTable (integration)", () => {

@@ -68,60 +68,77 @@ function applyToBoth(
 }
 
 /**
- * Projection of the shared fields both folds carry, so each test asserts
- * parity with a single `toEqual` over both projections (full diff on
- * failure). The slim row's projected typed columns come from this list; if
- * they match trace_summaries here, they match in the projected slim row too.
+ * Field-by-field parity assertions over the shared fields both folds carry.
+ * The slim row's projected typed columns come from this list; if they match
+ * trace_summaries here, they match in the projected slim row too.
  */
-function sharedFields(state: TraceSummaryData | TraceAnalyticsData) {
-  return {
-    // Identity
-    traceId: state.traceId,
+function assertSharedFieldsParity({
+  summary,
+  slim,
+}: {
+  summary: TraceSummaryData;
+  slim: TraceAnalyticsData;
+}): void {
+  // Identity / counters
+  expect(slim.traceId).toBe(summary.traceId);
 
-    // Trace-name + topic
-    traceName: state.traceName,
-    topicId: state.topicId,
-    subTopicId: state.subTopicId,
+  // Trace-name + topic
+  expect(slim.traceName).toBe(summary.traceName);
+  expect(slim.topicId).toBe(summary.topicId);
+  expect(slim.subTopicId).toBe(summary.subTopicId);
 
-    // Models — order-sensitive: mergeModelsMostRecentFirst is shared.
-    models: state.models,
+  // Models — order-sensitive: mergeModelsMostRecentFirst is shared.
+  expect(slim.models).toEqual(summary.models);
 
-    // Timing
-    occurredAt: state.occurredAt,
-    totalDurationMs: state.totalDurationMs,
-    timeToFirstTokenMs: state.timeToFirstTokenMs,
-    tokensPerSecond: state.tokensPerSecond,
+  // Timing
+  expect(slim.occurredAt).toBe(summary.occurredAt);
+  expect(slim.totalDurationMs).toBe(summary.totalDurationMs);
+  expect(slim.timeToFirstTokenMs).toBe(summary.timeToFirstTokenMs);
+  expect(slim.tokensPerSecond).toBe(summary.tokensPerSecond);
 
-    // Cost / tokens
-    totalCost: state.totalCost,
-    nonBilledCost: state.nonBilledCost,
-    totalPromptTokenCount: state.totalPromptTokenCount,
-    totalCompletionTokenCount: state.totalCompletionTokenCount,
+  // Cost / tokens
+  expect(slim.totalCost).toBe(summary.totalCost);
+  expect(slim.nonBilledCost).toBe(summary.nonBilledCost);
+  expect(slim.totalPromptTokenCount).toBe(summary.totalPromptTokenCount);
+  expect(slim.totalCompletionTokenCount).toBe(
+    summary.totalCompletionTokenCount,
+  );
 
-    // Status
-    containsErrorStatus: state.containsErrorStatus,
+  // Status
+  expect(slim.containsErrorStatus).toBe(summary.containsErrorStatus);
 
-    // HasAnnotation source
-    hasAnnotation: state.annotationIds.length > 0,
+  // HasAnnotation source
+  expect(slim.annotationIds.length > 0).toBe(summary.annotationIds.length > 0);
 
-    // Hoisted dim values (read off attribute map) — these become the typed
-    // columns on the slim row, so parity on the attribute strings means
-    // parity on the projected typed values. The reserved-key token sums are
-    // what slim's cache*/reasoningTokens columns read from.
-    attributes: {
-      "langwatch.user_id": state.attributes["langwatch.user_id"],
-      "gen_ai.conversation.id": state.attributes["gen_ai.conversation.id"],
-      "langwatch.customer_id": state.attributes["langwatch.customer_id"],
-      "langwatch.origin": state.attributes["langwatch.origin"],
-      "langwatch.labels": state.attributes["langwatch.labels"],
-      "langwatch.reserved.cache_read_tokens":
-        state.attributes["langwatch.reserved.cache_read_tokens"],
-      "langwatch.reserved.cache_creation_tokens":
-        state.attributes["langwatch.reserved.cache_creation_tokens"],
-      "langwatch.reserved.reasoning_tokens":
-        state.attributes["langwatch.reserved.reasoning_tokens"],
-    },
-  };
+  // Hoisted dim values (read off attribute map) — these become the typed
+  // columns on the slim row, so parity on the attribute strings means
+  // parity on the projected typed values.
+  expect(slim.attributes["langwatch.user_id"]).toBe(
+    summary.attributes["langwatch.user_id"],
+  );
+  expect(slim.attributes["gen_ai.conversation.id"]).toBe(
+    summary.attributes["gen_ai.conversation.id"],
+  );
+  expect(slim.attributes["langwatch.customer_id"]).toBe(
+    summary.attributes["langwatch.customer_id"],
+  );
+  expect(slim.attributes["langwatch.origin"]).toBe(
+    summary.attributes["langwatch.origin"],
+  );
+  expect(slim.attributes["langwatch.labels"]).toBe(
+    summary.attributes["langwatch.labels"],
+  );
+
+  // Reserved-key token sums slim's cache*/reasoningTokens columns read from.
+  expect(slim.attributes["langwatch.reserved.cache_read_tokens"]).toBe(
+    summary.attributes["langwatch.reserved.cache_read_tokens"],
+  );
+  expect(slim.attributes["langwatch.reserved.cache_creation_tokens"]).toBe(
+    summary.attributes["langwatch.reserved.cache_creation_tokens"],
+  );
+  expect(slim.attributes["langwatch.reserved.reasoning_tokens"]).toBe(
+    summary.attributes["langwatch.reserved.reasoning_tokens"],
+  );
 }
 
 describe("traceAnalytics fold projection — parity vs trace-summary fold", () => {
@@ -148,7 +165,7 @@ describe("traceAnalytics fold projection — parity vs trace-summary fold", () =
         },
       });
       const out = applyToBoth(span, summary, slim);
-      expect(sharedFields(out.slim)).toEqual(sharedFields(out.summary));
+      assertSharedFieldsParity(out);
     });
   });
 
@@ -177,7 +194,7 @@ describe("traceAnalytics fold projection — parity vs trace-summary fold", () =
       });
       summary = applySpanToSummary({ state: summary, span: spanA });
       slim = applySpanToAnalytics({ state: slim, span: spanA });
-      expect(sharedFields(slim)).toEqual(sharedFields(summary));
+      assertSharedFieldsParity({ summary, slim });
 
       const spanRoot = createTestSpan({
         spanId: "root-x",
@@ -200,7 +217,7 @@ describe("traceAnalytics fold projection — parity vs trace-summary fold", () =
       summary = applySpanToSummary({ state: summary, span: spanRoot });
       slim = applySpanToAnalytics({ state: slim, span: spanRoot });
 
-      expect(sharedFields(slim)).toEqual(sharedFields(summary));
+      assertSharedFieldsParity({ summary, slim });
     });
   });
 
@@ -223,7 +240,7 @@ describe("traceAnalytics fold projection — parity vs trace-summary fold", () =
       summary = { ...summary, annotationIds: [...summary.annotationIds, "a1"] };
       slim = { ...slim, annotationIds: [...slim.annotationIds, "a1"] };
 
-      expect(sharedFields(slim)).toEqual(sharedFields(summary));
+      assertSharedFieldsParity({ summary, slim });
     });
   });
 
@@ -246,7 +263,7 @@ describe("traceAnalytics fold projection — parity vs trace-summary fold", () =
         state: createInitSlimState(),
         span,
       });
-      expect(sharedFields(slim)).toEqual(sharedFields(summary));
+      assertSharedFieldsParity({ summary, slim });
       expect(slim.containsErrorStatus).toBe(true);
     });
   });
@@ -282,7 +299,7 @@ describe("traceAnalytics fold projection — parity vs trace-summary fold", () =
         state: createInitSlimState(),
         span,
       });
-      expect(sharedFields(slim)).toEqual(sharedFields(summary));
+      assertSharedFieldsParity({ summary, slim });
     });
   });
 
@@ -311,7 +328,7 @@ describe("traceAnalytics fold projection — parity vs trace-summary fold", () =
 
       expect(slim.topicId).toBe("topic-billing");
       expect(slim.subTopicId).toBe("sub-x");
-      expect(sharedFields(slim)).toEqual(sharedFields(summary));
+      assertSharedFieldsParity({ summary, slim });
     });
 
     it("preserves prior topic ids when the event carries nulls, on both folds", () => {
@@ -332,7 +349,7 @@ describe("traceAnalytics fold projection — parity vs trace-summary fold", () =
 
       expect(slim.topicId).toBe("topic-billing");
       expect(slim.subTopicId).toBe("sub-x");
-      expect(sharedFields(slim)).toEqual(sharedFields(summary));
+      assertSharedFieldsParity({ summary, slim });
     });
   });
 });

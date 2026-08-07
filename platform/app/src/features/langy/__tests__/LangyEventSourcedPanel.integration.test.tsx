@@ -343,13 +343,10 @@ function renderReloadedPanel() {
   return render(<LangySidecar />, { wrapper: Wrapper });
 }
 
-// Testing-library-style lookup: throws when the composer is not rendered.
 const composerField = (): HTMLTextAreaElement => {
   const field = document.querySelector("textarea");
-  if (!field) {
-    throw new Error("the composer's message field is not rendered");
-  }
-  return field;
+  expect(field, "the composer's message field").toBeTruthy();
+  return field as HTMLTextAreaElement;
 };
 
 /** A recorded step, in the wire shape the tail read serves. */

@@ -136,7 +136,9 @@ function renderDrawer(props: { id?: string; cloneModel?: string } = {}) {
 async function submitStoredModelCost() {
   fireEvent.click(screen.getByRole("button", { name: /save/i }));
 
-  await vi.waitUntil(() => mockCreateOrUpdateMutate.mock.calls.length === 1);
+  await vi.waitFor(() => {
+    expect(mockCreateOrUpdateMutate).toHaveBeenCalledTimes(1);
+  });
 }
 
 describe("Feature: LLM model cost drawer save errors", () => {

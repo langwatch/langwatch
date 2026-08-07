@@ -240,20 +240,17 @@ describe("Prompts API", () => {
       describe("when the prompt is scoped to project (default)", () => {
         // First, update the config to have a handle
         const handle = createHandle("ref");
-        let createRes: Response;
-        let createBody: { handle?: string };
 
         beforeEach(async () => {
           // Create a new prompt with the handle
-          createRes = await helpers.api.post(`/api/prompts`, {
+          const createRes = await helpers.api.post(`/api/prompts`, {
             handle,
             prompt: "test",
           });
-          createBody = await createRes.json();
-        });
 
-        it("creates the prompt with the handle", () => {
+          // Verify the prompt was created with the handle
           expect(createRes.status).toBe(200);
+          const createBody = await createRes.json();
           expect(createBody.handle).toBe(handle);
         });
 
@@ -272,19 +269,16 @@ describe("Prompts API", () => {
       describe("when the prompt is scoped to organization", () => {
         // Create a new prompt with organization scope and handle
         const handle = createHandle("org_ref");
-        let createRes: Response;
-        let createBody: { handle?: string; scope?: string };
 
         beforeEach(async () => {
-          createRes = await helpers.api.post(`/api/prompts`, {
+          const createRes = await helpers.api.post(`/api/prompts`, {
             handle,
             scope: "ORGANIZATION",
             prompt: "test",
           });
-          createBody = await createRes.json();
-        });
 
-        it("creates the prompt with the organization-scoped handle", () => {
+          // Verify the prompt was created with the organization-scoped handle
+          const createBody = await createRes.json();
           expect(createRes.status).toBe(200);
           expect(createBody.handle).toBe(handle);
           expect(createBody.scope).toBe("ORGANIZATION");
@@ -758,19 +752,15 @@ describe("Prompts API", () => {
   // DELETE endpoints tests
   describe("DELETE endpoints", () => {
     let promptToDelete: LlmPromptConfig;
-    let createRes: Response;
 
     beforeEach(async () => {
       // Create a prompt first
-      createRes = await helpers.api.post("/api/prompts", {
+      const createRes = await helpers.api.post("/api/prompts", {
         handle: "delete-by-id-test",
         prompt: "Test prompt",
       });
 
       promptToDelete = await createRes.json();
-    });
-
-    it("creates the prompt to delete", () => {
       expect(createRes.status).toBe(200);
     });
 

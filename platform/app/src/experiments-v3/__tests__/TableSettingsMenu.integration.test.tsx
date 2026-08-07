@@ -157,12 +157,9 @@ describe("TableSettingsMenu", () => {
         await user.click(button);
 
         const cicdText = await screen.findByText("Run in CI/CD");
-        // Testing-library-style lookup: throws when the text is not a button.
         const cicdButton = cicdText.closest("button");
-        if (!cicdButton) {
-          throw new Error("'Run in CI/CD' text is not inside a button");
-        }
-        await user.click(cicdButton);
+        expect(cicdButton).not.toBeNull();
+        await user.click(cicdButton!);
 
         return screen.findByRole("dialog");
       };

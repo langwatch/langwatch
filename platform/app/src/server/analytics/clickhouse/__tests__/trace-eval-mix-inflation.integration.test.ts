@@ -118,10 +118,7 @@ describe("trace-eval-mix-inflation (#3088)", () => {
     alias: string,
   ): number {
     const currentRows = rows.filter((r) => r.period === "current");
-    // Lookup guard: without current-period rows there is nothing to extract.
-    if (currentRows.length === 0) {
-      throw new Error(`no current-period rows to extract "${alias}" from`);
-    }
+    expect(currentRows.length).toBeGreaterThan(0);
     // Sum across all current buckets (some paths return one row, others
     // return one row per date bucket).
     let total = 0;

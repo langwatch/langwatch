@@ -46,6 +46,8 @@ const CONTAINER = process.env.LANGWATCH_TEST_AZURE_CONTAINER;
 const ENDPOINT = process.env.LANGWATCH_TEST_AZURE_ENDPOINT;
 
 const hasRealAzure = Boolean(ACCOUNT_NAME && ACCOUNT_KEY && CONTAINER);
+const describeRealAzure = hasRealAzure ? describe : describe.skip;
+
 /** Unique per run so parallel runs and leftovers never collide. */
 const RUN_ID = crypto.randomBytes(6).toString("hex");
 const PROJECT = `test-realazure-${RUN_ID}`;
@@ -80,7 +82,7 @@ afterAll(async () => {
   await Promise.allSettled(writtenUris.map((uri) => driver.delete(uri)));
 });
 
-describe.runIf(hasRealAzure)(
+describeRealAzure(
   "AzureBlobDriver against real Azure Blob Storage (host-style addressing)",
   () => {
     describe("given a host-style production endpoint", () => {

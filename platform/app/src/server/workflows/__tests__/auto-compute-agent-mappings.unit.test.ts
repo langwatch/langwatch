@@ -65,10 +65,7 @@ function buildPrismaMock({
             where: { id: string; projectId?: string };
             data: { config: Record<string, unknown> };
           }) => {
-            // The multitenancy middleware rejects updates without projectId.
-            if (where.projectId === undefined) {
-              throw new Error("update called without projectId in where");
-            }
+            expect(where.projectId).toBeDefined();
             updatedConfigs[where.id] = data.config as Record<string, unknown>;
             return { id: where.id, config: data.config };
           },

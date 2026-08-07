@@ -143,8 +143,10 @@ afterAll(async () => {
   }
 });
 
+const liveOpenAI = process.env.OPENAI_API_KEY ? it : it.skip;
+
 describe("studioBackendPostEvent FF-gated SSE routing to nlpgo", () => {
-  it.runIf(process.env.OPENAI_API_KEY)(
+  liveOpenAI(
     "execute_flow with FF on streams a real Studio workflow through /go/studio/execute and returns success",
     async () => {
       const { studioBackendPostEvent } = await import("../post-event");

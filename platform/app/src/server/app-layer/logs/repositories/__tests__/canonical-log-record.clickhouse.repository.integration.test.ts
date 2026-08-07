@@ -80,11 +80,7 @@ function otlpLogRecord({
  * All three share the trace's CorrelationTraceId, so the by-trace read
  * returns them together in time order.
  */
-async function buildRecords(baseMs: number): Promise<{
-  records: CanonicalLogRecord[];
-  errors: unknown[];
-  rejectedLogRecords: number;
-}> {
+async function buildRecords(baseMs: number): Promise<CanonicalLogRecord[]> {
   const result = await prepareCanonicalLogRecords({
     tenantId,
     organizationId,
@@ -132,11 +128,9 @@ async function buildRecords(baseMs: number): Promise<{
       ],
     },
   });
-  return {
-    records: result.accepted.map((prepared) => prepared.record),
-    errors: result.errors,
-    rejectedLogRecords: result.rejectedLogRecords,
-  };
+  expect(result.errors).toEqual([]);
+  expect(result.rejectedLogRecords).toBe(0);
+  return result.accepted.map((prepared) => prepared.record);
 }
 
 beforeAll(async () => {
@@ -161,20 +155,13 @@ afterAll(async () => {
 
 describe("given canonical log records ensured for one trace", () => {
   const baseMs = Date.now();
-  let prepared: Awaited<ReturnType<typeof buildRecords>>;
   let records: CanonicalLogRecord[];
 
   beforeAll(async () => {
-    prepared = await buildRecords(baseMs);
-    records = prepared.records;
+    records = await buildRecords(baseMs);
+    expect(records).toHaveLength(3);
     await repo.ensureLogRecords(records);
   }, 30_000);
-
-  it("prepares all three records without errors or rejections", () => {
-    expect(prepared.errors).toEqual([]);
-    expect(prepared.rejectedLogRecords).toBe(0);
-    expect(records).toHaveLength(3);
-  });
 
   describe("when reading the trace's logs by trace id", () => {
     it("returns every record on the trace in time order", async () => {

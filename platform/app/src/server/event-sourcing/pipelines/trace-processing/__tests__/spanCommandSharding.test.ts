@@ -54,20 +54,19 @@ function payload(traceId: string, spanId: string): RecordSpanCommandData {
   return { span: { traceId, spanId } } as unknown as RecordSpanCommandData;
 }
 
-/** Lookup helper: throws when the pipeline has no recordSpan command. */
 function recordSpanCommand(deps: Partial<TraceProcessingPipelineDeps> = {}) {
   const cmd = createTraceProcessingPipeline(buildTraceDeps(deps)).commands.find(
     (c) => c.name === "recordSpan",
   );
-  if (!cmd) throw new Error("pipeline has no recordSpan command");
-  return cmd;
+  expect(cmd).toBeDefined();
+  return cmd!;
 }
 
-/** Group-key fn of an enabled (sharded) pipeline; throws when not installed. */
+/** Group-key fn of an enabled (sharded) pipeline. Asserts it was installed. */
 function shardedGroupKey(deps: Partial<TraceProcessingPipelineDeps>) {
   const getGroupKey = recordSpanCommand(deps).options?.getGroupKey;
-  if (!getGroupKey) throw new Error("recordSpan has no group-key installed");
-  return getGroupKey;
+  expect(getGroupKey).toBeDefined();
+  return getGroupKey!;
 }
 
 /** Shard suffix from the LAST colon — robust to colon-bearing trace ids. */

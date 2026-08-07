@@ -314,45 +314,46 @@ describe("memory-safety integration", () => {
     });
 
     for (const { label, series } of REPRESENTATIVE_METRICS) {
-      // events.event_details (cardinality) needs a bigger live ClickHouse
-      // than the test containers provide.
+      // Skipped: requires live ClickHouse. Run with testcontainers or make dev-full to enable.
       const skip = label === "events.event_details (cardinality)";
-      /** @scenario Analytics queries complete within a tight memory budget */
-      it.skipIf(skip)(
-        `completes ${label} within 50MB memory budget`,
-        async () => {
-          resetParamCounter();
-          const { sql, params } = buildTimeseriesQuery({
-            ...baseInput,
-            projectId: WIDE_TENANT_ID,
-            series,
-          });
+      const body = async () => {
+        resetParamCounter();
+        const { sql, params } = buildTimeseriesQuery({
+          ...baseInput,
+          projectId: WIDE_TENANT_ID,
+          series,
+        });
 
-          // Execute with strict memory budget.
-          // ClickHouse throws MEMORY_LIMIT_EXCEEDED if the query uses > 50MB.
-          try {
-            const result = await ch.query({
-              query: sql,
-              query_params: params,
-              format: "JSONEachRow",
-              clickhouse_settings: {
-                max_memory_usage: "50000000",
-              },
-            });
-            await result.json();
-          } catch (error: unknown) {
-            const message =
-              error instanceof Error ? error.message : String(error);
-            if (message.includes("MEMORY_LIMIT_EXCEEDED")) {
-              expect.fail(
-                `Query "${label}" exceeded 50MB memory budget: ${message}`,
-              );
-            }
-            // Re-throw non-memory errors (these are real bugs)
-            throw error;
+        // Execute with strict memory budget.
+        // ClickHouse throws MEMORY_LIMIT_EXCEEDED if the query uses > 50MB.
+        try {
+          const result = await ch.query({
+            query: sql,
+            query_params: params,
+            format: "JSONEachRow",
+            clickhouse_settings: {
+              max_memory_usage: "50000000",
+            },
+          });
+          await result.json();
+        } catch (error: unknown) {
+          const message =
+            error instanceof Error ? error.message : String(error);
+          if (message.includes("MEMORY_LIMIT_EXCEEDED")) {
+            expect.fail(
+              `Query "${label}" exceeded 50MB memory budget: ${message}`,
+            );
           }
-        },
-      );
+          // Re-throw non-memory errors (these are real bugs)
+          throw error;
+        }
+      };
+      if (skip) {
+        it.skip(`completes ${label} within 50MB memory budget`, body);
+      } else {
+        /** @scenario Analytics queries complete within a tight memory budget */
+        it(`completes ${label} within 50MB memory budget`, body);
+      }
     }
   });
 
@@ -360,27 +361,28 @@ describe("memory-safety integration", () => {
     const TIME_BUDGET_MS = 5_000;
 
     for (const { label, series } of REPRESENTATIVE_METRICS) {
-      // events.event_details (cardinality) needs a bigger live ClickHouse
-      // than the test containers provide.
+      // Skipped: requires live ClickHouse. Run with testcontainers or make dev-full to enable.
       const skip = label === "events.event_details (cardinality)";
-      /** @scenario Analytics queries complete within time budget on seeded data */
-      it.skipIf(skip)(
-        `completes ${label} within ${TIME_BUDGET_MS}ms`,
-        async () => {
-          const { sql, params } = buildQuery(series);
+      const body = async () => {
+        const { sql, params } = buildQuery(series);
 
-          const start = performance.now();
-          const result = await ch.query({
-            query: sql,
-            query_params: params,
-            format: "JSONEachRow",
-          });
-          await result.json();
-          const elapsed = performance.now() - start;
+        const start = performance.now();
+        const result = await ch.query({
+          query: sql,
+          query_params: params,
+          format: "JSONEachRow",
+        });
+        await result.json();
+        const elapsed = performance.now() - start;
 
-          expect(elapsed).toBeLessThan(TIME_BUDGET_MS);
-        },
-      );
+        expect(elapsed).toBeLessThan(TIME_BUDGET_MS);
+      };
+      if (skip) {
+        it.skip(`completes ${label} within ${TIME_BUDGET_MS}ms`, body);
+      } else {
+        /** @scenario Analytics queries complete within time budget on seeded data */
+        it(`completes ${label} within ${TIME_BUDGET_MS}ms`, body);
+      }
     }
   });
 

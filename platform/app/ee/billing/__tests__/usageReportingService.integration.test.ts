@@ -18,7 +18,9 @@ if (STRIPE_SECRET_KEY && !STRIPE_SECRET_KEY.startsWith("sk_test_")) {
   );
 }
 
-describe.runIf(STRIPE_SECRET_KEY)("Usage reporting integration", () => {
+const describeIfStripeKey = STRIPE_SECRET_KEY ? describe : describe.skip;
+
+describeIfStripeKey("Usage reporting integration", () => {
   const stripe = new Stripe(STRIPE_SECRET_KEY!, { apiVersion: "2024-04-10" });
   const service = new StripeUsageReportingService({
     stripe,

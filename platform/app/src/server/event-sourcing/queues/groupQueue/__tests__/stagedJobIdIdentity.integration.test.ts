@@ -652,10 +652,11 @@ describe.skipIf(!hasTestcontainers)(
           __jobName: "pm:langyConversation",
         };
         await queue.send(payload);
-        await vi.waitUntil(
-          async () =>
-            (await stagedIds(name, groupId)).length === 1 &&
-            (await groupAttempt(name, groupId)) === String(chainAt + 1),
+        await vi.waitFor(
+          async () => {
+            expect(await stagedIds(name, groupId)).toHaveLength(1);
+            expect(await groupAttempt(name, groupId)).toBe(String(chainAt + 1));
+          },
           { timeout: 20000, interval: 25 },
         );
         return { queue, payload };
@@ -1156,8 +1157,10 @@ describe.skipIf(!hasTestcontainers)(
           objectStore,
         });
         await queue.waitUntilReady();
-        await vi.waitUntil(
-          async () => (await groupAttempt(name, groupId)) === expectChain,
+        await vi.waitFor(
+          async () => {
+            expect(await groupAttempt(name, groupId)).toBe(expectChain);
+          },
           { timeout: 20000, interval: 25 },
         );
       }

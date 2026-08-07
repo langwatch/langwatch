@@ -30,22 +30,18 @@ vi.mock("../../../license-enforcement", async (importOriginal) => {
 
 const PROJECT_ID = "test-project-id";
 
-/**
- * The rejection projected for assertion inside each test: `view` compares as
- * `{ rejectedWithTRPCError: true, code }` when the promise rejected with a
- * TRPCError carrying that code.
- */
-async function trpcErrorView(promise: Promise<unknown>) {
+async function expectTRPCError(
+  promise: Promise<unknown>,
+  code: TRPCError["code"],
+) {
   let captured: unknown;
   try {
     await promise;
   } catch (e) {
     captured = e;
   }
-  return {
-    rejectedWithTRPCError: captured instanceof TRPCError,
-    code: captured instanceof TRPCError ? captured.code : undefined,
-  };
+  expect(captured, "expected the promise to reject").toBeInstanceOf(TRPCError);
+  expect((captured as TRPCError).code).toBe(code);
 }
 
 describe("experiments.deleteExperiment", () => {
@@ -335,14 +331,13 @@ describe("experiments.deleteExperiment", () => {
           experimentId: id,
         });
 
-        expect(
-          await trpcErrorView(
-            caller.experiments.getExperimentBySlugOrId({
-              projectId: PROJECT_ID,
-              experimentSlug: slug,
-            }),
-          ),
-        ).toEqual({ rejectedWithTRPCError: true, code: "NOT_FOUND" });
+        await expectTRPCError(
+          caller.experiments.getExperimentBySlugOrId({
+            projectId: PROJECT_ID,
+            experimentSlug: slug,
+          }),
+          "NOT_FOUND",
+        );
       });
     });
   });
@@ -428,14 +423,13 @@ describe("experiments.deleteExperiment", () => {
 
       /** @scenario An experiment from another project cannot be archived */
       it("rejects with NOT_FOUND", async () => {
-        expect(
-          await trpcErrorView(
-            caller.experiments.deleteExperiment({
-              projectId: PROJECT_ID,
-              experimentId: foreignExperimentId,
-            }),
-          ),
-        ).toEqual({ rejectedWithTRPCError: true, code: "NOT_FOUND" });
+        await expectTRPCError(
+          caller.experiments.deleteExperiment({
+            projectId: PROJECT_ID,
+            experimentId: foreignExperimentId,
+          }),
+          "NOT_FOUND",
+        );
       });
 
       it("leaves archivedAt null on the row in the other project", async () => {
@@ -473,21 +467,20 @@ describe("experiments.deleteExperiment", () => {
           where: { id, projectId: PROJECT_ID },
         });
 
-        expect(
-          await trpcErrorView(
-            caller.experiments.saveEvaluationsV3({
-              projectId: PROJECT_ID,
-              experimentId: id,
-              state: {
-                name: "Stale autosave",
-                datasets: [],
-                activeDatasetId: "dataset-1",
-                evaluators: [],
-                targets: [],
-              } as any,
-            }),
-          ),
-        ).toEqual({ rejectedWithTRPCError: true, code: "NOT_FOUND" });
+        await expectTRPCError(
+          caller.experiments.saveEvaluationsV3({
+            projectId: PROJECT_ID,
+            experimentId: id,
+            state: {
+              name: "Stale autosave",
+              datasets: [],
+              activeDatasetId: "dataset-1",
+              evaluators: [],
+              targets: [],
+            } as any,
+          }),
+          "NOT_FOUND",
+        );
 
         const after = await prisma.experiment.findFirstOrThrow({
           where: { id, projectId: PROJECT_ID },

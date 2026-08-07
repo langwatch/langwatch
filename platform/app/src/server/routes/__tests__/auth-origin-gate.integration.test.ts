@@ -67,12 +67,7 @@ const bootWithStaleEnvFile = () => {
   );
   dotenv.config({ path: file, override: true, quiet: true });
 
-  // Setup guard: the pinned .env value must have won the override.
-  if (process.env.NEXTAUTH_URL !== COMMITTED_URL) {
-    throw new Error(
-      `setup: NEXTAUTH_URL override failed (got ${process.env.NEXTAUTH_URL})`,
-    );
-  }
+  expect(process.env.NEXTAUTH_URL).toBe(COMMITTED_URL);
 };
 
 const EMAIL = `origin-gate-${Date.now()}@example.com`;
