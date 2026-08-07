@@ -18,7 +18,11 @@ import {
   collectRouteRegistrations,
   honoPathToTemplate,
   joinRoutePath,
+  serviceBasePathsOf,
 } from "../lib/hono-route-table";
+
+/** The import that tells the parse a framework shape is the framework's. */
+const FRAMEWORK_IMPORT = 'import { createService } from "@langwatch/api";';
 
 describe("honoPathToTemplate", () => {
   it("rewrites Hono parameters into OpenAPI templates", () => {
@@ -139,6 +143,201 @@ describe("collectRouteRegistrations", () => {
           described: false,
         },
       ]);
+    });
+  });
+
+  describe("when the file declares its service through @langwatch/api", () => {
+    /** @scenario "An SSE endpoint is counted as a GET route" */
+    it("reads an sse endpoint as the GET it is mounted as", () => {
+      // The framework mounts `sse` with `app.get`, so a stream is one more
+      // route on the surface: it is either documented or excluded like any
+      // other GET. Read as a method of its own it would be neither, and a
+      // whole endpoint would sit outside the gate.
+      const registrations = collectRouteRegistrations(
+        [
+          FRAMEWORK_IMPORT,
+          'v.sse("/runs/:id/events", { events: { token: Token } }, stream);',
+        ].join("\n"),
+      );
+
+      expect(registrations).toEqual([
+        {
+          method: "get",
+          path: "/runs/:id/events",
+          readsQuery: false,
+          described: false,
+          sse: true,
+        },
+      ]);
+    });
+
+    it("marks a withdrawn endpoint, keeping the path it tombstones", () => {
+      const registrations = collectRouteRegistrations(
+        [
+          FRAMEWORK_IMPORT,
+          'v.withdraw("get", "/roles/:id/legacy");',
+          'v.get("/roles/:id", { output: Role }, read);',
+        ].join("\n"),
+      );
+
+      expect(registrations).toEqual([
+        {
+          method: "get",
+          path: "/roles/:id/legacy",
+          readsQuery: false,
+          described: false,
+          withdrawn: true,
+        },
+        {
+          method: "get",
+          path: "/roles/:id",
+          readsQuery: false,
+          described: true,
+        },
+      ]);
+    });
+
+    it("keeps spans in source order when a withdrawal precedes a read", () => {
+      // The two shapes are matched by separate patterns. Merged by index they
+      // span correctly; appended one list after the other, the withdrawal would
+      // own the source from its own line to the end of the file and take the
+      // query read below it with it.
+      const registrations = collectRouteRegistrations(
+        [
+          FRAMEWORK_IMPORT,
+          'v.withdraw("delete", "/roles/:id");',
+          'v.get("/roles", { query: Filters }, async (c) => {',
+          '  const scope = c.req.query("scope");',
+          "  return list(scope);",
+          "});",
+        ].join("\n"),
+      );
+
+      expect(registrations).toEqual([
+        {
+          method: "delete",
+          path: "/roles/:id",
+          readsQuery: false,
+          described: false,
+          withdrawn: true,
+        },
+        {
+          method: "get",
+          path: "/roles",
+          readsQuery: true,
+          described: false,
+        },
+      ]);
+    });
+
+    it("counts an output schema as describing the endpoint", () => {
+      const registrations = collectRouteRegistrations(
+        [
+          FRAMEWORK_IMPORT,
+          'v.get("/roles", { output: RoleList }, list);',
+          'v.post("/roles", { input: NewRole }, create);',
+        ].join("\n"),
+      );
+
+      expect(registrations.map((r) => r.described)).toEqual([true, false]);
+    });
+  });
+
+  describe("when the file has nothing to do with @langwatch/api", () => {
+    it("does not read an output key as a described endpoint", () => {
+      // `output:` is an ordinary word. Only the framework turns it into a
+      // describeRoute, so only a file importing the framework may be read
+      // that way.
+      const registrations = collectRouteRegistrations(
+        'secured.get("/things", async (c) => c.json({ output: result }));',
+      );
+
+      expect(registrations).toEqual([
+        { method: "get", path: "/things", readsQuery: false, described: false },
+      ]);
+    });
+  });
+});
+
+describe("serviceBasePathsOf", () => {
+  it("derives /api/<name> from a service that only names itself", () => {
+    const source = [
+      FRAMEWORK_IMPORT,
+      'export const app = createService({ name: "roles" }).build();',
+    ].join("\n");
+
+    expect(serviceBasePathsOf(source)).toEqual(["/api/roles"]);
+  });
+
+  it("reads a service that names its project type", () => {
+    const source = [
+      FRAMEWORK_IMPORT,
+      'const app = createService<Project>({ name: "role-bindings" });',
+    ].join("\n");
+
+    expect(serviceBasePathsOf(source)).toEqual(["/api/role-bindings"]);
+  });
+
+  describe("when the config spells its basePath out", () => {
+    it("derives nothing, because the explicit value is the served one", () => {
+      const source = [
+        FRAMEWORK_IMPORT,
+        'createService({ name: "organization", basePath: "/api/organization" });',
+      ].join("\n");
+
+      // `apiBasePathsOf` reads that form already, and it is the form the
+      // framework itself prefers. Deriving here too would only make it
+      // possible to disagree.
+      expect(serviceBasePathsOf(source)).toEqual([]);
+      expect(apiBasePathsOf(source)).toEqual(["/api/organization"]);
+    });
+  });
+
+  describe("when a name sits inside a nested option", () => {
+    it("reads only the service's own name", () => {
+      const source = [
+        FRAMEWORK_IMPORT,
+        "createService({",
+        '  _legacy: { organizationMiddleware, name: "legacy" },',
+        '  name: "roles",',
+        "});",
+      ].join("\n");
+
+      expect(serviceBasePathsOf(source)).toEqual(["/api/roles"]);
+    });
+  });
+
+  describe("when a file declares two services", () => {
+    it("returns both, and repeats neither", () => {
+      const source = [
+        FRAMEWORK_IMPORT,
+        'createService({ name: "roles" });',
+        'createService({ name: "role-bindings" });',
+        'createService({ name: "roles" });',
+      ].join("\n");
+
+      expect(serviceBasePathsOf(source)).toEqual([
+        "/api/roles",
+        "/api/role-bindings",
+      ]);
+    });
+  });
+
+  describe("when a test defines its own helper called createService", () => {
+    /** @scenario "A test helper named createService declares no service" */
+    it("declares no service, because the framework is not in the file", () => {
+      // A billing unit test builds its subject with a local factory of that
+      // name. Reading the call as a service declaration would invent an
+      // `/api/eu` surface out of a fixture argument, and every route the gate
+      // then thought lived there would be reported missing from the document.
+      const source = [
+        'function createService({ region = "us" } = {}) {',
+        "  return { service: new NurturingService({ region }), fetchFn };",
+        "}",
+        'const { service } = createService({ name: "eu" });',
+      ].join("\n");
+
+      expect(serviceBasePathsOf(source)).toEqual([]);
     });
   });
 });
