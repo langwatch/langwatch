@@ -15,8 +15,8 @@ import type { TopicClusteringRunIntent } from "./topicClusteringProcess.types";
 const logger = createLogger("langwatch:topic-clustering:process-effects");
 
 /**
- * Delivery attempts before the run is recorded as failed — parity with the
- * BullMQ worker this replaces (3 attempts, exponential backoff).
+ * Delivery attempts before the run is recorded as failed: 3 attempts, with
+ * exponential backoff between them.
  */
 export const TOPIC_CLUSTERING_MAX_ATTEMPTS = 3;
 
