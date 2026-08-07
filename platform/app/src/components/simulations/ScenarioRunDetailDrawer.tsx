@@ -511,7 +511,7 @@ export function ScenarioRunDetailDrawer({
                             label="Results"
                             size="2xs"
                             color="fg.subtle"
-                            _hover={{ color: "gray.200", bg: "gray.800" }}
+                            _hover={{ color: "fg", bg: "bg.muted" }}
                           />
                         ) : undefined
                       }

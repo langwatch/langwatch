@@ -26,19 +26,19 @@ export const SCENARIO_RUN_STATUS_CONFIG: Record<
     colorPalette: "green",
     label: "completed",
     isComplete: true,
-    fgColor: "green.500",
+    fgColor: "green.solid",
   },
   [ScenarioRunStatus.FAILED]: {
     colorPalette: "red",
     label: "failed",
     isComplete: true,
-    fgColor: "red.500",
+    fgColor: "red.solid",
   },
   [ScenarioRunStatus.ERROR]: {
     colorPalette: "red",
     label: "failed",
     isComplete: true,
-    fgColor: "red.500",
+    fgColor: "red.solid",
   },
   [ScenarioRunStatus.CANCELLED]: {
     colorPalette: "gray",
@@ -50,7 +50,7 @@ export const SCENARIO_RUN_STATUS_CONFIG: Record<
     colorPalette: "yellow",
     label: "stalled",
     isComplete: true,
-    fgColor: "yellow.500",
+    fgColor: "yellow.solid",
   },
   [ScenarioRunStatus.IN_PROGRESS]: {
     colorPalette: "orange",

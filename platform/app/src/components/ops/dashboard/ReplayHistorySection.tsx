@@ -20,7 +20,7 @@ export function ReplayHistorySection() {
           paddingTop={3}
           paddingBottom={2}
           cursor="pointer"
-          _hover={{ color: "orange.500" }}
+          _hover={{ color: "orange.solid" }}
           transition="color 0.1s"
         >
           <Text textStyle="xs" fontWeight="medium" color="fg.muted">

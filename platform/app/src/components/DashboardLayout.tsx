@@ -683,7 +683,7 @@ export const DashboardLayout = ({
             right="-100px"
             bottom={0}
             w="400px"
-            background={user?.impersonator ? "blue.300" : "orange.300"}
+            background={user?.impersonator ? "blue.muted" : "orange.muted"}
             filter="blur(40px)"
             pointerEvents="none"
           ></Box>
@@ -963,7 +963,7 @@ export const DashboardLayout = ({
                     status="warning"
                     width="full"
                     borderBottom="1px solid"
-                    borderBottomColor="yellow.300"
+                    borderBottomColor="yellow.emphasized"
                     borderTopLeftRadius="2xl"
                   >
                     <Alert.Indicator />
@@ -994,8 +994,8 @@ export const DashboardLayout = ({
                     borderBottom="1px solid"
                     borderBottomColor={
                       usage.data.messageLimitInfo.status === "exceeded"
-                        ? "red.300"
-                        : "yellow.300"
+                        ? "red.emphasized"
+                        : "yellow.emphasized"
                     }
                   >
                     <Alert.Indicator />
@@ -1033,7 +1033,7 @@ export const DashboardLayout = ({
                     status="warning"
                     width="full"
                     borderBottom="1px solid"
-                    borderBottomColor="yellow.300"
+                    borderBottomColor="yellow.emphasized"
                   >
                     <Alert.Indicator />
                     <Alert.Content>

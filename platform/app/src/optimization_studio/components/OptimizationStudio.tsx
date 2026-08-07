@@ -469,10 +469,10 @@ function StatusCircle({
           maxHeight="12px"
           background={
             status === "connected"
-              ? "green.500"
+              ? "green.solid"
               : status === "disconnected"
-                ? "red.300"
-                : "yellow.500"
+                ? "red.muted"
+                : "yellow.solid"
           }
           borderRadius="full"
         />

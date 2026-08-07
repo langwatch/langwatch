@@ -1113,7 +1113,7 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
                           color="blue.solid"
                           cursor="pointer"
                           textDecoration="underline"
-                          _hover={{ color: "blue.600" }}
+                          _hover={{ color: "blue.fg" }}
                           onClick={() => {
                             setSelectedEvaluator(null);
                             form.setValue("name", "");
@@ -1216,7 +1216,7 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
                           <Box
                             key={index}
                             borderLeft="4px solid"
-                            borderLeftColor="blue.400"
+                            borderLeftColor="blue.emphasized"
                             width="full"
                           >
                             <VStack

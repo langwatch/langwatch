@@ -131,9 +131,9 @@ export function LiquidConditionEditor({
   }, [applyMarkers]);
 
   const borderColor = validation.error
-    ? "red.400"
+    ? "red.solid"
     : validation.missingVariables.length > 0
-      ? "orange.400"
+      ? "orange.solid"
       : "border";
 
   return (

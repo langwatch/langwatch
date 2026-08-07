@@ -11,7 +11,6 @@ export const NoDataInfoBlock = ({
   description: string;
   icon: React.ReactNode;
   docsInfo?: React.ReactNode;
-  color?: string;
   children?: React.ReactNode;
 }) => {
   return (

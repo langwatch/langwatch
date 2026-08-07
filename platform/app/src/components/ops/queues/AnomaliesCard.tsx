@@ -37,7 +37,7 @@ export function AnomaliesCard() {
   );
 
   return (
-    <Card.Root borderColor={hardCount > 0 ? "red.300" : undefined}>
+    <Card.Root borderColor={hardCount > 0 ? "red.emphasized" : undefined}>
       <Card.Body padding={0}>
         <HStack paddingX={4} paddingY={2.5}>
           <Text textStyle="sm" fontWeight="medium">

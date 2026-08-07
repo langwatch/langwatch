@@ -480,7 +480,7 @@ export function GroupsCard({ queueNames }: { queueNames: string[] }) {
                           <Table.Cell>
                             <Text
                               textStyle="xs"
-                              color={overdue ? "orange.500" : "fg.muted"}
+                              color={overdue ? "orange.solid" : "fg.muted"}
                               fontWeight={overdue ? "medium" : undefined}
                             >
                               {formatTimeAgo(group.oldestJobMs)}

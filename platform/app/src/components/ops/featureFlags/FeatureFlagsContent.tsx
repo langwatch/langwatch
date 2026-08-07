@@ -361,7 +361,7 @@ function FlagRowView({
                 partialEnabled
                   ? {
                       "& [data-part='control'][data-state='checked']": {
-                        background: "green.500",
+                        background: "green.solid",
                       },
                     }
                   : undefined

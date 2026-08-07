@@ -109,21 +109,16 @@ export function BudgetExceededBanner({
       backgroundColor="red.subtle"
       borderRadius="md"
       padding={4}
-      _dark={{ borderColor: "red.700", backgroundColor: "red.900" }}
     >
       <HStack gap={3} alignItems="start">
-        <Box color="red.fg" paddingTop="2px" _dark={{ color: "red.300" }}>
+        <Box color="red.fg" paddingTop="2px">
           <AlertTriangle size={20} aria-hidden="true" />
         </Box>
         <VStack align="start" gap={2} flex={1}>
-          <Text
-            fontWeight="semibold"
-            color="red.fg"
-            _dark={{ color: "red.200" }}
-          >
+          <Text fontWeight="semibold" color="red.fg">
             Budget limit reached
           </Text>
-          <Text fontSize="sm" color="red.fg" _dark={{ color: "red.200" }}>
+          <Text fontSize="sm" color="red.fg">
             You&rsquo;ve used <strong>{fmtUsd(spentUsd)}</strong> of your{" "}
             <strong>{fmtUsd(limitUsd)}</strong> {periodLabel} {scopeLabel}{" "}
             budget. New requests are being blocked until the limit resets or
@@ -136,7 +131,6 @@ export function BudgetExceededBanner({
                   href={requestIncreaseUrl}
                   color="red.fg"
                   fontWeight="medium"
-                  _dark={{ color: "red.200" }}
                 >
                   <HStack gap={1}>
                     <TrendingUp size={14} aria-hidden="true" />
@@ -146,13 +140,12 @@ export function BudgetExceededBanner({
                 </Link>
               )}
               {adminEmail && (
-                <Text color="red.fg" _dark={{ color: "red.200" }}>
+                <Text color="red.fg">
                   Admin:{" "}
                   {isUrlContact(adminEmail) || isEmailContact(adminEmail) ? (
                     <Link
                       href={contactHref(adminEmail)}
                       color="red.fg"
-                      _dark={{ color: "red.200" }}
                       {...(isUrlContact(adminEmail) && {
                         target: "_blank",
                         rel: "noreferrer",

@@ -235,9 +235,9 @@ function Row({ user }: { user: SpendByUser }) {
   const trendColor = !user.hasPriorBaseline
     ? "fg.muted"
     : user.trendVsPreviousPct > 25
-      ? "orange.500"
+      ? "orange.solid"
       : user.trendVsPreviousPct < -25
-        ? "blue.500"
+        ? "blue.solid"
         : "fg.muted";
   return (
     <Link

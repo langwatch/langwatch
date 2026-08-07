@@ -67,7 +67,7 @@ export function ConnectionSettings({ compact = false }: { compact?: boolean }) {
             w={2}
             h={2}
             rounded="full"
-            bg={selectedProject ? "green.400" : "gray.500"}
+            bg={selectedProject ? "green.solid" : "gray.emphasized"}
             flexShrink={0}
           />
           <VStack align="start" gap={0} flex={1} minW={0}>

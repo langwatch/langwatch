@@ -196,7 +196,7 @@ export function CriteriaInput({
               flex={1}
               onKeyDown={handleAddKeyDown}
               onBlur={handleSaveNew}
-              _placeholder={{ color: "gray.400", fontStyle: "italic" }}
+              _placeholder={{ color: "fg.subtle", fontStyle: "italic" }}
               autoresize
               rows={2}
             />

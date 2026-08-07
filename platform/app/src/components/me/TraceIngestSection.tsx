@@ -297,7 +297,7 @@ function InstallTile({
       {...({ type: "button" } as { type: "button" })}
       onClick={onClick}
       borderWidth="1px"
-      borderColor={installed ? "green.300" : "border.muted"}
+      borderColor={installed ? "green.emphasized" : "border.muted"}
       borderRadius="md"
       padding={3}
       textAlign="left"

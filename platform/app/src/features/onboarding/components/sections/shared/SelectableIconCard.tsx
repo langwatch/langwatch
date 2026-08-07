@@ -110,7 +110,7 @@ export function SelectableIconCard(
               ? "orange.emphasized"
               : selectedBorderColor
             : "border.emphasized",
-          bg: selected ? selectedBg : isDark ? "bg.muted" : "gray.50",
+          bg: selected ? selectedBg : "bg.subtle",
           boxShadow: selected
             ? isDark
               ? "0 6px 28px rgba(237,137,38,0.06)"

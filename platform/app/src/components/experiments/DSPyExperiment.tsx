@@ -413,12 +413,12 @@ export function DSPyExperimentRunList({
                 !selectedRuns || selectedRuns.includes(run.runId) ? 1 : 0.5
               }
               background={
-                selectedRuns?.includes(run.runId) ? "gray.200" : "none"
+                selectedRuns?.includes(run.runId) ? "bg.emphasized" : "none"
               }
               _hover={{
                 background: selectedRuns?.includes(run.runId)
-                  ? "gray.200"
-                  : "gray.100",
+                  ? "bg.emphasized"
+                  : "bg.muted",
               }}
               onClick={(e) => {
                 e.stopPropagation();
@@ -447,7 +447,7 @@ export function DSPyExperimentRunList({
                     <HStack width="100%">
                       <Skeleton
                         height="12px"
-                        background="gray.400"
+                        background="bg.emphasized"
                         flexGrow={1}
                       />
                       <Spinner size="xs" flexShrink={0} />
@@ -455,7 +455,7 @@ export function DSPyExperimentRunList({
                     <Skeleton
                       width="100%"
                       height="12px"
-                      background="gray.400"
+                      background="bg.emphasized"
                     />
                   </VStack>
                 </>
@@ -1189,7 +1189,7 @@ export function DSPyRunsScoresChart({
   const getColor = (runId: string) => {
     const [name, number] = getColorForString("colors", runId).color.split(".");
     if (!name || !number) {
-      return getRawColorValue("gray.300");
+      return getRawColorValue("bg.emphasized");
     }
 
     return getRawColorValue(`${name}.${number}`);

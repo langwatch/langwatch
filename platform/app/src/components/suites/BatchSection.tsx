@@ -76,19 +76,19 @@ function BatchStatusCounts({ summary }: { summary: BatchRunSummary }) {
   if (summary.passedCount > 0)
     items.push({
       count: summary.passedCount,
-      color: "green.500",
+      color: "green.solid",
       label: "passed",
     });
   if (summary.failedCount > 0)
     items.push({
       count: summary.failedCount,
-      color: "red.500",
+      color: "red.solid",
       label: "failed",
     });
   if (summary.stalledCount > 0)
     items.push({
       count: summary.stalledCount,
-      color: "yellow.500",
+      color: "yellow.solid",
       label: "stalled",
     });
   if (summary.cancelledCount > 0)
@@ -100,13 +100,13 @@ function BatchStatusCounts({ summary }: { summary: BatchRunSummary }) {
   if (summary.inProgressCount > 0)
     items.push({
       count: summary.inProgressCount,
-      color: "orange.500",
+      color: "orange.solid",
       label: "running",
     });
   if (summary.queuedCount > 0)
     items.push({
       count: summary.queuedCount,
-      color: "blue.500",
+      color: "blue.solid",
       label: "queued",
     });
 

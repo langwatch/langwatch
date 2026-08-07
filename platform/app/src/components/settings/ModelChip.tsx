@@ -76,7 +76,7 @@ export function ModelChip({
         <Text
           fontSize={size === "sm" ? "xs" : "sm"}
           lineClamp={1}
-          color={invalid ? "red.600" : undefined}
+          color={invalid ? "red.fg" : undefined}
           textDecoration={invalid ? "line-through" : undefined}
         >
           <Text as="span" fontWeight="medium">
@@ -99,7 +99,7 @@ export function ModelChip({
           fontSize={size === "sm" ? "xs" : "sm"}
           lineClamp={1}
           wordBreak="break-all"
-          color={invalid ? "red.600" : undefined}
+          color={invalid ? "red.fg" : undefined}
           textDecoration={invalid ? "line-through" : undefined}
         >
           {family || model}

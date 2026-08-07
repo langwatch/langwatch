@@ -102,7 +102,7 @@ export function PromptSpanEditor({ span }: { span: SpanConfig }) {
               size="xs"
               variant="ghost"
               color="fg.muted"
-              _hover={{ color: "red.400" }}
+              _hover={{ color: "red.solid" }}
               onClick={() => {
                 const next = { ...variables };
                 delete next[key];

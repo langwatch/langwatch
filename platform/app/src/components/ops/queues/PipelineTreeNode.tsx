@@ -62,7 +62,7 @@ export function PipelineTreeNode({
           fontWeight={depth === 0 ? "semibold" : "medium"}
           fontFamily={isLeaf ? "mono" : undefined}
           flex={1}
-          color={paused ? "orange.500" : undefined}
+          color={paused ? "orange.solid" : undefined}
         >
           {node.name}
         </Text>

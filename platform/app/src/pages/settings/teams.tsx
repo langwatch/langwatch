@@ -473,7 +473,7 @@ function ProjectSection({
           py={2}
           cursor="pointer"
           onClick={() => setExpanded((v) => !v)}
-          _hover={{ bg: "gray.50", _dark: { bg: "gray.800" } }}
+          _hover={{ bg: "bg.subtle" }}
         >
           {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
           <Text fontSize="sm" fontWeight="medium">
@@ -603,7 +603,7 @@ function ProjectSection({
                         size="xs"
                         variant="ghost"
                         color={
-                          m.source === "override" ? "orange.400" : "gray.400"
+                          m.source === "override" ? "orange.solid" : "fg.subtle"
                         }
                         title={
                           m.source === "override"
@@ -761,7 +761,7 @@ function TeamCard({
           py={3}
           cursor="pointer"
           onClick={() => setExpanded((v) => !v)}
-          _hover={{ bg: "gray.50", _dark: { bg: "gray.800" } }}
+          _hover={{ bg: "bg.subtle" }}
         >
           {expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
           <Text fontWeight="semibold">{team.name}</Text>

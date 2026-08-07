@@ -70,19 +70,19 @@ export function OpsDashboardContent({ data }: { data: DashboardData }) {
               ? `${formatCount(data.totalFailed)} total`
               : undefined
           }
-          color={data.failedPerSec > 0 ? "red.500" : undefined}
+          color={data.failedPerSec > 0 ? "red.solid" : undefined}
         />
         <LinkedStat
           label="Blocked"
           value={totalBlocked.toString()}
           sublabel={`${data.totalGroups} groups`}
-          color={totalBlocked > 0 ? "red.500" : undefined}
+          color={totalBlocked > 0 ? "red.solid" : undefined}
         />
         <LinkedStat
           label="Parked"
           value={totalParked.toString()}
           sublabel="over cap"
-          color={totalParked > 0 ? "orange.500" : undefined}
+          color={totalParked > 0 ? "orange.solid" : undefined}
         />
         <LinkedStat
           label="P50"
@@ -97,7 +97,7 @@ export function OpsDashboardContent({ data }: { data: DashboardData }) {
         <LinkedStat
           label="DLQ"
           value={totalDlq.toString()}
-          color={totalDlq > 0 ? "orange.500" : undefined}
+          color={totalDlq > 0 ? "orange.solid" : undefined}
         />
         <RedisStatTiles data={data} />
       </SimpleGrid>

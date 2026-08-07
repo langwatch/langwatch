@@ -573,8 +573,8 @@ function RadioCard({
   return (
     <Box
       borderWidth="1px"
-      borderColor={checked ? "blue.500" : "border.muted"}
-      backgroundColor={checked ? "blue.50" : "transparent"}
+      borderColor={checked ? "blue.emphasized" : "border.muted"}
+      backgroundColor={checked ? "blue.subtle" : "transparent"}
       borderRadius="sm"
       paddingX={3}
       paddingY={2}
@@ -1020,8 +1020,8 @@ function ExternalToolFields({
                   type="button"
                   variant="outline"
                   onClick={() => onIconAssetChange(value)}
-                  borderColor={selected ? "blue.500" : "border.muted"}
-                  backgroundColor={selected ? "blue.50" : "transparent"}
+                  borderColor={selected ? "blue.emphasized" : "border.muted"}
+                  backgroundColor={selected ? "blue.subtle" : "transparent"}
                   borderRadius="sm"
                   paddingX={3}
                   paddingY={2}

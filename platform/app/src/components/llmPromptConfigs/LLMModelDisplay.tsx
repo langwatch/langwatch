@@ -73,7 +73,7 @@ export function LLMModelDisplay({
           lineClamp={1}
           wordBreak="break-all"
           color={
-            isProviderMissing ? "red.600" : isDisabled ? "fg.muted" : undefined
+            isProviderMissing ? "red.fg" : isDisabled ? "fg.muted" : undefined
           }
           textDecoration={
             isProviderMissing || isDisabled ? "line-through" : undefined

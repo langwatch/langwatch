@@ -151,7 +151,7 @@ export const TraceMessages = React.forwardRef(function TraceMessages(
               ? "1px solid"
               : "none"
           }
-          borderColor={highlighted ? "blue.200" : "border"}
+          borderColor={highlighted ? "blue.muted" : "border"}
           onMouseEnter={() => setShowTools(true)}
           onMouseMove={() => setShowTools(true)}
           onMouseLeave={() => setShowTools(false)}

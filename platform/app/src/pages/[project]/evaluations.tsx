@@ -153,7 +153,6 @@ export function ExperimentsPage() {
               title="No experiments yet"
               description="Test prompts, models, and agents against a dataset before shipping changes."
               icon={<LuSquareCheckBig size={24} />}
-              color="green.500"
               docsInfo={
                 <Text>
                   To learn more about experiments, visit the{" "}

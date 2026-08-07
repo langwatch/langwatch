@@ -110,12 +110,7 @@ export const IconRadioCardGroup = <T extends string = string>({
               </Icon>
             )}
 
-            <Text
-              textStyle="sm"
-              fontWeight="medium"
-              color={{ base: "black", _dark: "white" }}
-              truncate
-            >
+            <Text textStyle="sm" fontWeight="medium" color="fg" truncate>
               {item.title}
             </Text>
           </HStack>
@@ -128,6 +123,7 @@ export const IconRadioCardGroup = <T extends string = string>({
             transition="all 0.15s ease"
             flexShrink={0}
           >
+            {/* On the orange.solid fill, so it must stay white in both modes. */}
             {isSelected && <Circle size="1.5" bg="white" />}
           </Circle>
         </HStack>

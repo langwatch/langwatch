@@ -153,7 +153,6 @@ function SsoConfiguredButUnlicensedNotice() {
       padding={4}
       width="full"
       data-testid="sso-unlicensed-notice"
-      _dark={{ backgroundColor: "orange.950", borderColor: "orange.700" }}
     >
       <HStack align="start" gap={3}>
         <Box color="orange.fg" paddingTop={0.5}>

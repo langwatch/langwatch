@@ -43,7 +43,7 @@ export function CopyableInputWithPrefix({
       overflow="hidden"
       transition="all 0.2s ease"
       _hover={{
-        borderColor: "gray.300",
+        borderColor: "border.emphasized",
         boxShadow: "0 8px 40px rgba(0,0,0,0.08)",
       }}
     >

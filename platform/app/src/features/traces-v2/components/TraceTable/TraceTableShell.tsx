@@ -473,9 +473,9 @@ function HeaderCell<T>({
       // cell below — the previous step looked too heavy once the
       // collapse merging stopped.
       borderRightWidth="1px"
-      borderRightColor={{ base: "gray.200", _dark: "gray.800" }}
+      borderRightColor={{ base: "border", _dark: "border.emphasized" }}
       borderBottomWidth="1px"
-      borderBottomColor={{ base: "gray.200", _dark: "gray.800" }}
+      borderBottomColor={{ base: "border", _dark: "border.emphasized" }}
       // Unified padding for every header — sortable + non-sortable share the
       // same Th paddings so the column titles line up across the row. The
       // sortable button below is `width: full` and only adds its own

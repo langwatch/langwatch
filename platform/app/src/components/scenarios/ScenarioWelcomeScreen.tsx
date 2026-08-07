@@ -51,7 +51,6 @@ function ScenarioWelcomeContent({ onProceed }: { onProceed: () => void }) {
               borderRadius="md"
               bg="blue.subtle"
               color="blue.fg"
-              _dark={{ bg: "blue.900", color: "blue.200" }}
               flexShrink={0}
             >
               <Icon size={20} />

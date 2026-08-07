@@ -196,7 +196,7 @@ function CustomReportsSection({ slug }: { slug: string }) {
                 width="full"
                 cursor="pointer"
                 borderColor="border"
-                _hover={{ borderColor: "orange.400", shadow: "sm" }}
+                _hover={{ borderColor: "orange.emphasized", shadow: "sm" }}
                 transition="all 0.15s ease"
               >
                 <Card.Body paddingX={4} paddingY={3}>

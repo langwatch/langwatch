@@ -238,7 +238,7 @@ export function TracesOverview({
             href={`/${project.slug}/analytics`}
             fontSize="xs"
             color="fg.muted"
-            _hover={{ color: "orange.500" }}
+            _hover={{ color: "orange.solid" }}
           >
             View dashboards <LuArrowRight size={12} />
           </Link>

@@ -249,9 +249,9 @@ function Row({ team }: { team: SpendByTeam }) {
   const trendColor = !team.hasPriorBaseline
     ? "fg.muted"
     : team.deltaPctVsPriorWindow > 25
-      ? "orange.500"
+      ? "orange.solid"
       : team.deltaPctVsPriorWindow < -25
-        ? "blue.500"
+        ? "blue.solid"
         : "fg.muted";
   const inner = (
     <HStack

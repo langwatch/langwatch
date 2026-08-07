@@ -81,7 +81,7 @@ function SliderControl({
         step={config.step}
         borderColor="blue.muted"
         _focus={{
-          borderColor: "blue.400",
+          borderColor: "blue.emphasized",
           boxShadow: "0 0 0 1px var(--chakra-colors-blue-400)",
         }}
       />

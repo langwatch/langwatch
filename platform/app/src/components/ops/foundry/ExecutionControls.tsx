@@ -192,7 +192,7 @@ function LogEntry({
       {canCopy && (
         <Text
           fontSize="10px"
-          color={copied ? "green.400" : "fg.muted"}
+          color={copied ? "green.solid" : "fg.muted"}
           flexShrink={0}
         >
           {copied ? "Copied!" : "Copy ID"}

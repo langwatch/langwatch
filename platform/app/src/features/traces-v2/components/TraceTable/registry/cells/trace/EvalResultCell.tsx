@@ -37,7 +37,7 @@ const EvalResultCellView: React.FC<{
     if (ev.passed == null) return dash;
     return (
       <ValueWithDot
-        dotColor={ev.passed ? "green.500" : "red.500"}
+        dotColor={ev.passed ? "green.solid" : "red.solid"}
         text={ev.passed ? "Pass" : "Fail"}
         textColor={ev.passed ? "green.fg" : "red.fg"}
         textStyle={textStyle}

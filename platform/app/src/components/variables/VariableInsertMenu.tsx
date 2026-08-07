@@ -374,7 +374,7 @@ export const VariableInsertMenu = ({
                         gap={2}
                         cursor="pointer"
                         borderRadius="4px"
-                        background={isHighlighted ? "blue.50" : undefined}
+                        background={isHighlighted ? "blue.subtle" : undefined}
                         onMouseMove={() => {
                           if (
                             isKeyboardNav ||
@@ -407,7 +407,7 @@ export const VariableInsertMenu = ({
                   borderRadius="4px"
                   background={
                     highlightedIndex === createOptionIndex
-                      ? "blue.50"
+                      ? "blue.subtle"
                       : undefined
                   }
                   onMouseMove={() => {

@@ -331,7 +331,7 @@ export function DeployPromptDialog({
                           width="10px"
                           height="10px"
                           borderRadius="full"
-                          bg={isAssigned ? "green.400" : "gray.300"}
+                          bg={isAssigned ? "green.solid" : "bg.emphasized"}
                           flexShrink={0}
                         />
                         <Text fontWeight="medium" fontSize="sm">

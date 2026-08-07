@@ -258,7 +258,7 @@ export function TryItOut({
             name="query"
             type="search"
             placeholder="Search"
-            _placeholder={{ color: "gray.800" }}
+            _placeholder={{ color: "fg" }}
             fontSize="14px"
             paddingY={1.5}
             height="auto"
@@ -437,10 +437,10 @@ export function TryItOut({
                           role="button"
                           cursor="pointer"
                           background={
-                            livePassesPreconditions ? undefined : "gray.100"
+                            livePassesPreconditions ? undefined : "bg.muted"
                           }
                           color={
-                            livePassesPreconditions ? undefined : "gray.400"
+                            livePassesPreconditions ? undefined : "fg.subtle"
                           }
                         >
                           <Table.Cell

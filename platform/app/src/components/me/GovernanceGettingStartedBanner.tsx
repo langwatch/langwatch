@@ -118,6 +118,8 @@ export function GovernanceGettingStartedBanner() {
             <Button
               asChild
               size="sm"
+              // The mesh gradient behind this hero is fixed in both colour
+              // modes, so the CTA's white fill and dark orange text must be too.
               bg="white"
               color="orange.700"
               fontWeight="600"

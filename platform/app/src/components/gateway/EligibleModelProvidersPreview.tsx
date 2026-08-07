@@ -154,16 +154,16 @@ export function EligibleModelProvidersPreview({
           <HStack
             key={mp.id}
             borderWidth="1px"
-            borderColor={isSelected ? "blue.400" : "border.subtle"}
+            borderColor={isSelected ? "blue.emphasized" : "border.subtle"}
             borderRadius="md"
             paddingX={2}
             paddingY={1.5}
             gap={2}
             cursor={interactive ? "pointer" : "default"}
-            background={isSelected ? "blue.50" : undefined}
+            background={isSelected ? "blue.subtle" : undefined}
             _hover={
               interactive
-                ? { background: isSelected ? "blue.50" : "bg.subtle" }
+                ? { background: isSelected ? "blue.subtle" : "bg.subtle" }
                 : undefined
             }
             onClick={

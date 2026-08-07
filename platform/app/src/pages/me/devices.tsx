@@ -247,7 +247,7 @@ function DeviceRow({
       align="stretch"
       gap={2}
       borderWidth="1px"
-      borderColor={isPendingRevoke ? "red.300" : "border.muted"}
+      borderColor={isPendingRevoke ? "red.emphasized" : "border.muted"}
       borderRadius="sm"
       padding={3}
     >

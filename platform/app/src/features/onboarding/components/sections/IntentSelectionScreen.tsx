@@ -72,7 +72,7 @@ export const IntentSelectionScreen: React.FC = () => {
             py={4}
             cursor="pointer"
             transition="all 0.2s ease"
-            _hover={{ borderColor: "orange.300" }}
+            _hover={{ borderColor: "orange.emphasized" }}
             onClick={() => {
               setIntent(opt.value);
               emit("selected", "intent", { value: opt.value });

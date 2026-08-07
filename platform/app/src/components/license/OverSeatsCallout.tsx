@@ -34,7 +34,6 @@ export function OverSeatsCallout({
       width="full"
       marginBottom={4}
       data-testid="over-seats-callout"
-      _dark={{ backgroundColor: "orange.950", borderColor: "orange.700" }}
     >
       <HStack align="start" gap={4}>
         <Box color="orange.fg" paddingTop={1}>

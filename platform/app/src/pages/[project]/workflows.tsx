@@ -47,7 +47,6 @@ function Workflows() {
               title="No workflows yet"
               description="Create reusable workflows with the Optimization Studio."
               icon={<Workflow size={24} />}
-              color="blue.500"
             >
               <PageLayout.HeaderButton onClick={onOpen} marginTop={4}>
                 <Plus size={16} /> Create your first workflow

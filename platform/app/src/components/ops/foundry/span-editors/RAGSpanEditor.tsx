@@ -43,7 +43,7 @@ export function RAGSpanEditor({ span }: { span: SpanConfig }) {
                 size="xs"
                 variant="ghost"
                 color="fg.muted"
-                _hover={{ color: "red.400" }}
+                _hover={{ color: "red.solid" }}
                 onClick={() =>
                   updateSpan(span.id, {
                     rag: { contexts: contexts.filter((_, j) => j !== i) },

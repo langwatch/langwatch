@@ -173,7 +173,7 @@ export function ModelProviderTile({
           </Text>
           <Text
             fontSize="xs"
-            color={providerConfigured ? "fg.muted" : "orange.700"}
+            color={providerConfigured ? "fg.muted" : "orange.fg"}
           >
             {providerConfigured
               ? "Issue your own virtual key"

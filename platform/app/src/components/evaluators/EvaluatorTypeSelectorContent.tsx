@@ -250,8 +250,8 @@ function EvaluatorCard({
       borderRadius="lg"
       border="1px solid"
       borderColor="border"
-      bg={disabled ? "gray.50" : "bg.panel"}
-      color={disabled ? "gray.400" : undefined}
+      bg={disabled ? "bg.subtle" : "bg.panel"}
+      color={disabled ? "fg.subtle" : undefined}
       cursor={disabled ? "default" : "pointer"}
       textAlign="left"
       width="full"
@@ -270,7 +270,7 @@ function EvaluatorCard({
         </Text>
         <Text
           fontSize="xs"
-          color={disabled ? "gray.400" : "fg.muted"}
+          color={disabled ? "fg.subtle" : "fg.muted"}
           lineClamp={2}
         >
           {description}

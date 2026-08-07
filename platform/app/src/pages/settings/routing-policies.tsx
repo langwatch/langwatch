@@ -578,7 +578,7 @@ function PolicyRow({
   return (
     <HStack
       borderWidth="1px"
-      borderColor={policy.isDefault ? "blue.300" : "border.muted"}
+      borderColor={policy.isDefault ? "blue.emphasized" : "border.muted"}
       borderRadius="sm"
       padding={3}
       gap={3}
@@ -1042,12 +1042,12 @@ function ProviderCredentialPicker({
               <HStack
                 key={`${id}-${i}`}
                 borderWidth="1px"
-                borderColor={option ? "border.muted" : "red.300"}
+                borderColor={option ? "border.muted" : "red.emphasized"}
                 borderRadius="sm"
                 paddingX={2}
                 paddingY={1}
                 gap={2}
-                backgroundColor={option ? "bg.subtle" : "red.50"}
+                backgroundColor={option ? "bg.subtle" : "red.subtle"}
               >
                 <Text fontSize="xs" color="fg.muted" minWidth="20px">
                   {i + 1}.

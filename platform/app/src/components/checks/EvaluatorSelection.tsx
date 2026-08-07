@@ -188,7 +188,7 @@ export function EvaluatorSelection({
                       isDisabled
                         ? undefined
                         : {
-                            background: "gray.200",
+                            background: "bg.emphasized",
                           }
                     }
                     onClick={() => {
@@ -199,8 +199,8 @@ export function EvaluatorSelection({
                         query: router.query,
                       });
                     }}
-                    color={isDisabled ? "gray.400" : undefined}
-                    background={isDisabled ? "gray.50" : "white"}
+                    color={isDisabled ? "fg.subtle" : undefined}
+                    background={isDisabled ? "bg.subtle" : "white"}
                   >
                     <VStack align="start" gap={4} position="relative">
                       {evaluator.isGuardrail && (
@@ -372,7 +372,7 @@ export function EvaluatorSelection({
                   justifyContent="center"
                   minHeight="200px"
                   _hover={{
-                    background: "gray.50",
+                    background: "bg.subtle",
                     textDecoration: "none",
                   }}
                 >

@@ -244,12 +244,12 @@ const renderExecutionOutputs = (
         nodeType === "evaluator" && identifier === "passed" && value === true;
 
       const textColor = isSkipped
-        ? "yellow.600"
+        ? "yellow.fg"
         : isFail
-          ? "red.600"
+          ? "red.fg"
           : isSuccess
-            ? "green.600"
-            : "gray.600";
+            ? "green.fg"
+            : "fg.muted";
 
       return (
         <VStack
@@ -259,11 +259,11 @@ const renderExecutionOutputs = (
           gap={3}
           color={
             isSkipped
-              ? "yellow.600"
+              ? "yellow.fg"
               : isFail
-                ? "red.600"
+                ? "red.fg"
                 : isSuccess
-                  ? "green.600"
+                  ? "green.fg"
                   : undefined
           }
         >

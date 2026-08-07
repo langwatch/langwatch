@@ -553,8 +553,8 @@ export function ComponentExecutionButton({
               color={
                 checkIsEvaluator(node) &&
                 node?.data.execution_state?.outputs?.status === "skipped"
-                  ? "yellow.500"
-                  : "green.500"
+                  ? "yellow.solid"
+                  : "green.solid"
               }
             >
               <Check size={iconSize} />

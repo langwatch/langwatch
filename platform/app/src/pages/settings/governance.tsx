@@ -513,7 +513,7 @@ function SessionPolicySection({ organizationId }: { organizationId: string }) {
               onChange={(e) => setValue(e.target.value)}
               width="120px"
               size="sm"
-              borderColor={isInvalid ? "red.300" : undefined}
+              borderColor={isInvalid ? "red.emphasized" : undefined}
             />
           </VStack>
           <Button
@@ -567,14 +567,14 @@ function SetupItem({
   return (
     <HStack
       borderWidth="1px"
-      borderColor={done ? "green.200" : "border.muted"}
+      borderColor={done ? "green.muted" : "border.muted"}
       borderRadius="sm"
       padding={3}
       gap={3}
       alignItems="start"
       opacity={upcoming ? 0.7 : 1}
     >
-      <Box color={done ? "green.500" : "fg.muted"} paddingTop="2px">
+      <Box color={done ? "green.solid" : "fg.muted"} paddingTop="2px">
         {done ? <CheckCircle2 size={18} /> : <Circle size={18} />}
       </Box>
       <VStack align="start" gap={0} flex={1} minWidth={0}>
@@ -612,7 +612,7 @@ function SummaryCard({
   subline: string;
   tone?: SummaryCardTone;
 }) {
-  const accent = tone === "amber" ? "orange.500" : "fg";
+  const accent = tone === "amber" ? "orange.solid" : "fg";
   return (
     <Box
       borderWidth="1px"
@@ -723,8 +723,8 @@ const SOURCE_STATUS_ICON = {
 } as const;
 
 const SOURCE_STATUS_COLOR = {
-  active: "green.600",
-  awaiting_first_event: "orange.500",
+  active: "green.fg",
+  awaiting_first_event: "orange.solid",
   disabled: "fg.muted",
 } as const;
 
@@ -752,7 +752,7 @@ function SourceChip({ source }: { source: SourceHealth }) {
         paddingX={3}
         paddingY={2}
         gap={2}
-        _hover={{ borderColor: "orange.300" }}
+        _hover={{ borderColor: "orange.emphasized" }}
       >
         <Box color={color}>
           <Icon size={14} />
@@ -775,9 +775,9 @@ function SourceChip({ source }: { source: SourceHealth }) {
 type AnomalySeverity = "critical" | "warning" | "info";
 
 const SEVERITY_COLOR: Record<AnomalySeverity, string> = {
-  critical: "red.600",
-  warning: "orange.500",
-  info: "blue.600",
+  critical: "red.fg",
+  warning: "orange.solid",
+  info: "blue.fg",
 };
 
 function AnomalyRow({
@@ -970,7 +970,8 @@ function TrendCell({
     );
   }
   const arrow = pct > 0 ? "↑" : pct < 0 ? "↓" : "·";
-  const color = pct > 25 ? "orange.500" : pct < -25 ? "blue.500" : "fg.muted";
+  const color =
+    pct > 25 ? "orange.solid" : pct < -25 ? "blue.solid" : "fg.muted";
   return (
     <Box flex={2} color={color}>
       {arrow} {fmtTrendPct(pct)}

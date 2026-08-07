@@ -293,7 +293,7 @@ export const VersionBox = ({
 } & BoxProps) => {
   return (
     <Box
-      backgroundColor={version?.autoSaved ? "orange.50" : "orange.100"}
+      backgroundColor={version?.autoSaved ? "orange.subtle" : "orange.muted"}
       paddingY={3}
       paddingX={2}
       borderRadius={4}

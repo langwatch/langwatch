@@ -303,7 +303,7 @@ export const ModelSelector = React.memo(function ModelSelector({
         lineClamp={1}
         wordBreak="break-all"
         color={
-          isProviderMissing ? "red.600" : isUnknown ? "gray.500" : undefined
+          isProviderMissing ? "red.fg" : isUnknown ? "fg.subtle" : undefined
         }
         textDecoration={isProviderMissing ? "line-through" : undefined}
       >

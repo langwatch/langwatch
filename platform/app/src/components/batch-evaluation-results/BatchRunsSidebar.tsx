@@ -315,9 +315,9 @@ export function BatchRunsSidebar({
             // Use stable color from parent (based on position in full runs list)
             // Override with red for stopped runs, orange for interrupted
             const runColor = run.timestamps.stoppedAt
-              ? "red.400"
+              ? "red.solid"
               : interrupted
-                ? "orange.400"
+                ? "orange.solid"
                 : (runColors[run.runId] ??
                   getColorForString("colors", run.runId).color);
 

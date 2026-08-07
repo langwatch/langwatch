@@ -61,9 +61,8 @@ function LapsedLicenseNotice({ maxMembers }: { maxMembers: number }) {
       padding={3}
       borderRadius="md"
       width="full"
-      _dark={{ backgroundColor: "orange.950" }}
     >
-      <Text fontSize="sm" color="orange.fg" _dark={{ color: "orange.200" }}>
+      <Text fontSize="sm" color="orange.fg">
         Your license reached its end date. Nothing was switched off: everyone
         keeps their access and your {maxMembers}{" "}
         {maxMembers === 1 ? "seat" : "seats"} and enterprise capabilities stay
@@ -193,7 +192,7 @@ export function LicenseDetailsCard({
             <Text
               fontSize="sm"
               fontWeight="medium"
-              color={isExpired ? "orange.600" : undefined}
+              color={isExpired ? "orange.fg" : undefined}
             >
               {formatLicenseDate(status.expiresAt)}
             </Text>

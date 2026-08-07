@@ -312,13 +312,13 @@ export function PlansComparisonPage({
               borderRadius="full"
               fontSize="sm"
               fontWeight={billingPeriod === opt.value ? "semibold" : "normal"}
-              color={billingPeriod === opt.value ? "orange.500" : "fg.muted"}
+              color={billingPeriod === opt.value ? "orange.solid" : "fg.muted"}
               bg={billingPeriod === opt.value ? "bg.panel" : "transparent"}
               boxShadow={billingPeriod === opt.value ? "xs" : "none"}
               transition="all 0.15s ease-in-out"
               cursor="pointer"
               _hover={{
-                color: billingPeriod === opt.value ? "orange.500" : "fg",
+                color: billingPeriod === opt.value ? "orange.solid" : "fg",
               }}
             >
               {opt.label}
@@ -331,7 +331,7 @@ export function PlansComparisonPage({
             variant="subtle"
             size="sm"
             _hover={{
-              bgColor: "orange.400",
+              bgColor: "orange.solid",
               color: "bg.muted",
             }}
             onClick={() =>
@@ -369,7 +369,7 @@ export function PlansComparisonPage({
                 href="/settings/subscription"
                 fontWeight="semibold"
                 color="orange.fg"
-                _hover={{ color: "orange.900" }}
+                _hover={{ color: "orange.fg" }}
               >
                 Update your plan
               </Link>{" "}

@@ -18,11 +18,11 @@ export const durationColor = (
   duration: number | null | undefined,
 ) => {
   if (duration == null || duration === undefined) {
-    return "gray.500";
+    return "fg.subtle";
   }
   return duration > thresholds[metric].red
     ? "red"
     : duration > thresholds[metric].yellow
-      ? "yellow.600"
+      ? "yellow.fg"
       : "green";
 };

@@ -93,7 +93,9 @@ export const IntegrationChecks = () => {
             <List.Indicator
               asChild
               color={
-                integrationChecks.data?.firstMessage ? "green.500" : "gray.500"
+                integrationChecks.data?.firstMessage
+                  ? "green.solid"
+                  : "fg.subtle"
               }
             >
               {integrationChecks.data?.firstMessage ? (
@@ -118,7 +120,7 @@ export const IntegrationChecks = () => {
             <List.Indicator
               asChild
               color={
-                integrationChecks.data?.workflows ? "green.500" : "gray.500"
+                integrationChecks.data?.workflows ? "green.solid" : "fg.subtle"
               }
             >
               {integrationChecks.data?.workflows ? <CheckCircle /> : <Circle />}
@@ -140,8 +142,8 @@ export const IntegrationChecks = () => {
               asChild
               color={
                 integrationChecks.data?.onlineEvaluations
-                  ? "green.500"
-                  : "gray.500"
+                  ? "green.solid"
+                  : "fg.subtle"
               }
             >
               {integrationChecks.data?.onlineEvaluations ? (
@@ -169,7 +171,7 @@ export const IntegrationChecks = () => {
             <List.Indicator
               asChild
               color={
-                integrationChecks.data?.triggers ? "green.500" : "gray.500"
+                integrationChecks.data?.triggers ? "green.solid" : "fg.subtle"
               }
             >
               {integrationChecks.data?.triggers ? <CheckCircle /> : <Circle />}
@@ -190,7 +192,7 @@ export const IntegrationChecks = () => {
             <List.Indicator
               asChild
               color={
-                integrationChecks.data?.datasets ? "green.500" : "gray.500"
+                integrationChecks.data?.datasets ? "green.solid" : "fg.subtle"
               }
             >
               {integrationChecks.data?.datasets ? <CheckCircle /> : <Circle />}
@@ -211,7 +213,9 @@ export const IntegrationChecks = () => {
             <List.Indicator
               asChild
               color={
-                integrationChecks.data?.customGraphs ? "green.500" : "gray.500"
+                integrationChecks.data?.customGraphs
+                  ? "green.solid"
+                  : "fg.subtle"
               }
             >
               {integrationChecks.data?.customGraphs ? (

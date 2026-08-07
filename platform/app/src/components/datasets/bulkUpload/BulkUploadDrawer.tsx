@@ -257,8 +257,10 @@ function SortableColumnRow({
           value={col.name}
           aria-label={`Column ${index + 1} name`}
           aria-invalid={invalid || undefined}
-          borderColor={invalid ? "red.400" : undefined}
-          _focusVisible={invalid ? { borderColor: "red.400" } : undefined}
+          borderColor={invalid ? "red.emphasized" : undefined}
+          _focusVisible={
+            invalid ? { borderColor: "red.emphasized" } : undefined
+          }
           onChange={(e) => onName(e.target.value)}
         />
         <ColumnTypeSelect
@@ -277,7 +279,7 @@ function SortableColumnRow({
           flexShrink={0}
           cursor={onRemove ? "pointer" : "not-allowed"}
           opacity={onRemove ? 1 : 0.3}
-          _hover={onRemove ? { color: "red.500" } : undefined}
+          _hover={onRemove ? { color: "red.solid" } : undefined}
           onClick={onRemove}
         >
           <Trash2 size={16} />
@@ -576,7 +578,7 @@ function BulkFileRow({
       borderRadius="lg"
       borderColor={
         file.status === "failed" || file.status === "rejected"
-          ? "red.300"
+          ? "red.emphasized"
           : "border"
       }
       bg="bg"
@@ -609,7 +611,7 @@ function BulkFileRow({
             aria-label="Cancel upload"
             color="fg.muted"
             display="flex"
-            _hover={{ color: "red.500" }}
+            _hover={{ color: "red.solid" }}
             onClick={onCancel}
           >
             <X size={16} />
@@ -620,7 +622,7 @@ function BulkFileRow({
             aria-label="Remove file"
             color="fg.muted"
             display="flex"
-            _hover={{ color: "red.500" }}
+            _hover={{ color: "red.solid" }}
             onClick={onRemove}
           >
             <X size={16} />

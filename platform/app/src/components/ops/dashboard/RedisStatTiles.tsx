@@ -47,7 +47,7 @@ export function RedisStatTiles({
         label="Redis mem"
         value={formatBytes(data.redisMemoryUsedBytes)}
         sublabel={memorySublabel}
-        color={memoryWarning ? "red.500" : undefined}
+        color={memoryWarning ? "red.solid" : undefined}
         testId="redis-memory-stat"
         warning={memoryWarning}
       />
@@ -61,7 +61,7 @@ export function RedisStatTiles({
         sublabel={
           data.redisEngineCpuPercent === null ? "sampling…" : "main-thread"
         }
-        color={cpuWarning ? "red.500" : undefined}
+        color={cpuWarning ? "red.solid" : undefined}
         testId="redis-engine-cpu-stat"
         warning={cpuWarning}
       />

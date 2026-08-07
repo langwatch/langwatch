@@ -418,10 +418,10 @@ export const LicenseGeneratorForm = forwardRef<
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
                 onDrop={handleDrop}
-                borderColor={isDragging ? "blue.500" : "border"}
-                backgroundColor={isDragging ? "blue.50" : "transparent"}
+                borderColor={isDragging ? "blue.emphasized" : "border"}
+                backgroundColor={isDragging ? "blue.subtle" : "transparent"}
                 transition="all 0.2s"
-                _hover={{ borderColor: "blue.300" }}
+                _hover={{ borderColor: "blue.emphasized" }}
               >
                 <VStack gap={2}>
                   <Upload size={24} color="#666" />

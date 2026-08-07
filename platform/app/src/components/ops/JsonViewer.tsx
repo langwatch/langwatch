@@ -293,7 +293,7 @@ function DiffLine({
       as="div"
       bg={highlight ? "orange.500/10" : "transparent"}
       borderLeft={highlight ? "2px solid" : "2px solid transparent"}
-      borderLeftColor={highlight ? "orange.400" : "transparent"}
+      borderLeftColor={highlight ? "orange.emphasized" : "transparent"}
       paddingLeft={highlight ? "2px" : "2px"}
       whiteSpace="pre"
     >

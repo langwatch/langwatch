@@ -806,7 +806,7 @@ function VkStat({
       <Text
         fontSize="xl"
         fontWeight="semibold"
-        color={tone === "red" ? "red.600" : undefined}
+        color={tone === "red" ? "red.fg" : undefined}
       >
         {value}
       </Text>

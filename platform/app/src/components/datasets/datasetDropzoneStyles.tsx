@@ -23,7 +23,7 @@ export const dropzoneSurfaceProps = (isActive: boolean) => ({
   borderRadius: "xl",
   borderWidth: "2px",
   borderStyle: "dashed" as const,
-  borderColor: isActive ? "blue.400" : "border",
+  borderColor: isActive ? "blue.emphasized" : "border",
   bg: isActive ? "blue.500/10" : "transparent",
   padding: 10,
   textAlign: "center" as const,
@@ -34,7 +34,7 @@ export const dropzoneSurfaceProps = (isActive: boolean) => ({
   // transition animates the grow/shrink smoothly.
   "& .lw-dropzone-icon": isActive ? { transform: "scale(1.12)" } : {},
   _hover: {
-    borderColor: "blue.300",
+    borderColor: "blue.emphasized",
     bg: "blue.500/5",
     "& .lw-dropzone-icon": { transform: "scale(1.12)" },
   },

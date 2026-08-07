@@ -246,10 +246,10 @@ function ResponseDisplay({ result }: { result: HttpTestResult }) {
         <HStack
           justify="space-between"
           padding={3}
-          bg={result.success ? "green.50" : "red.50"}
+          bg={result.success ? "green.subtle" : "red.subtle"}
           borderRadius="md"
           borderWidth="1px"
-          borderColor={result.success ? "green.200" : "red.200"}
+          borderColor={result.success ? "green.muted" : "red.muted"}
         >
           <HStack gap={3}>
             {result.status !== undefined && (

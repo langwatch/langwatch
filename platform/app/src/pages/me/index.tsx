@@ -294,7 +294,7 @@ function MyUsagePage() {
                             top={0}
                             height="full"
                             width={`${Math.max(tool.usd > 0 ? 2 : 0, theoreticalPct)}%`}
-                            backgroundColor="blue.200"
+                            backgroundColor="blue.muted"
                           />
                         )}
                         {showBilled && (
@@ -304,7 +304,7 @@ function MyUsagePage() {
                             top={0}
                             height="full"
                             width={`${Math.max(tool.billedUsd > 0 ? 2 : 0, billedPct)}%`}
-                            backgroundColor="blue.400"
+                            backgroundColor="blue.solid"
                           />
                         )}
                       </Box>
@@ -448,12 +448,17 @@ function BudgetBanner({
 }) {
   const colors =
     tone === "red"
-      ? { bg: "red.50", border: "red.200", title: "red.700", text: "red.700" }
+      ? {
+          bg: "red.subtle",
+          border: "red.muted",
+          title: "red.fg",
+          text: "red.fg",
+        }
       : {
-          bg: "yellow.50",
-          border: "yellow.200",
-          title: "yellow.800",
-          text: "yellow.800",
+          bg: "yellow.subtle",
+          border: "yellow.muted",
+          title: "yellow.fg",
+          text: "yellow.fg",
         };
 
   return (
@@ -506,7 +511,7 @@ function CostSeriesLegend({
     <HStack gap={4} fontSize="xs">
       <LegendChip
         label="Theoretical"
-        color="blue.200"
+        color="blue.muted"
         active={showTheoretical}
         onClick={onToggleTheoretical}
       />

@@ -229,7 +229,7 @@ export function TargetSelector({
                     cursor="pointer"
                     bg={
                       isAgentTarget(value) && value.id === agent.id
-                        ? "blue.50"
+                        ? "blue.subtle"
                         : "transparent"
                     }
                     _hover={{ bg: "bg.subtle" }}
@@ -301,7 +301,7 @@ export function TargetSelector({
                     cursor="pointer"
                     bg={
                       value?.type === "prompt" && value.id === prompt.id
-                        ? "blue.50"
+                        ? "blue.subtle"
                         : "transparent"
                     }
                     _hover={{ bg: "bg.subtle" }}

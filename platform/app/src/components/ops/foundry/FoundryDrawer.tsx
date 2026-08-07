@@ -292,7 +292,7 @@ export function FoundryDrawer() {
                     >
                       <Text
                         fontSize="xs"
-                        color={copied ? "green.400" : "fg.default"}
+                        color={copied ? "green.solid" : "fg.default"}
                         fontWeight="medium"
                         mb={0.5}
                       >
@@ -352,7 +352,7 @@ function CompactSpanNode({
         cursor="pointer"
         fontSize="xs"
         bg={isSelected ? "orange.500/10" : "transparent"}
-        color={isSelected ? "orange.400" : "fg.default"}
+        color={isSelected ? "orange.solid" : "fg.default"}
         _hover={{ bg: isSelected ? "orange.500/10" : "bg.subtle" }}
         onClick={() => onSelect(span.id)}
       >
