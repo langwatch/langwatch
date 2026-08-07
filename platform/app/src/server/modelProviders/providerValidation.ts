@@ -10,7 +10,7 @@ import {
 } from "../../features/onboarding/regions/model-providers/registry";
 import { MASKED_KEY_PLACEHOLDER } from "../../utils/constants";
 import {
-  REDIRECT_REFUSED_MESSAGE,
+  RedirectRefusedError,
   ssrfSafeFetch,
 } from "../../utils/ssrfProtection";
 import { ModelProviderRepository } from "./modelProvider.repository";
@@ -879,13 +879,14 @@ function unreachableFailure(context: ProbeContext): RankedFailure {
  * when what they need to change is a URL — the misdiagnosis this module
  * exists to remove, and one three previous fixes were about.
  *
- * Detected by message because the helper raises a plain `Error`. The message
- * is imported from the helper rather than copied, so a reword moves both sides
- * together — a local copy would have left this matching nothing and every
- * redirect quietly degrading back to "could not be reached".
+ * Matched by type, not by message. The helper's own catch rewrites a plain
+ * `Error` into "Connection failed to host:port: …" on its way out, so any
+ * string comparison here would be testing text this module never receives —
+ * and would report every refused redirect as a connection failure while
+ * looking entirely correct.
  */
 function isRefusedRedirect(err: unknown): boolean {
-  return err instanceof Error && err.message === REDIRECT_REFUSED_MESSAGE;
+  return err instanceof RedirectRefusedError;
 }
 
 function redirectedFailure(context: ProbeContext): RankedFailure {

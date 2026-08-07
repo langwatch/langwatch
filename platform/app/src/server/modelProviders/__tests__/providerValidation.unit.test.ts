@@ -1,11 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // The probe goes out through the SSRF-validated fetch, not `global.fetch`, so
-// that is what these tests stand in for. Mocking the global would leave the
+// that is what these tests stand in for; mocking the global would leave the
 // real validator in the path and every assertion here would be about DNS.
-// Only the fetch is stood in for. Everything else — notably the message the
-// helper raises on a refused redirect — comes from the real module, so a
-// reword there breaks this test instead of quietly passing it.
+// Only the fetch is replaced — the rest of the module stays real, so the
+// error types these tests reject with are the ones production actually sees.
 const mockFetch = vi.fn();
 vi.mock("../../../utils/ssrfProtection", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../../utils/ssrfProtection")>()),
@@ -13,7 +12,7 @@ vi.mock("../../../utils/ssrfProtection", async (importOriginal) => ({
 }));
 
 import { MASKED_KEY_PLACEHOLDER } from "../../../utils/constants";
-import { REDIRECT_REFUSED_MESSAGE } from "../../../utils/ssrfProtection";
+import { RedirectRefusedError } from "../../../utils/ssrfProtection";
 import {
   ProviderUnreachableError,
   type ValidationResult,
@@ -1093,11 +1092,13 @@ describe("given a check that never reached the provider", () => {
 
     /** @scenario "A redirect is reported as a redirect, not as unreachable" */
     it("says the endpoint redirected rather than that it could not be reached", async () => {
-      // The helper's own message, imported rather than retyped. A copy here
-      // would have pinned nothing: reword the helper and both the production
-      // matcher and this test would keep agreeing with each other while every
-      // real redirect degraded back to "check your network connection".
-      mockFetch.mockRejectedValueOnce(new Error(REDIRECT_REFUSED_MESSAGE));
+      // The helper's own error type. An earlier version of this test rejected
+      // with a bare Error carrying the same text, which passed while the real
+      // thing did not work at all: the helper's catch rewrites a plain Error
+      // into "Connection failed to host:port: …", so the production matcher was
+      // comparing against a string it never receives. The type survives that
+      // catch, and asserting on it is what makes this test about the real path.
+      mockFetch.mockRejectedValueOnce(new RedirectRefusedError());
 
       const result = await validateProviderApiKey("custom", {
         CUSTOM_API_KEY: "sk-test",
