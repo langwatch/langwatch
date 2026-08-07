@@ -36,9 +36,23 @@ export type ThresholdResult =
  * (`anchor_pinned`).
  *
  * This cannot happen at checkout — Stripe Checkout rejects
- * `subscription_data[billing_thresholds]` — so callers apply it right
- * after the subscription exists (checkout-completed webhook) or via the
- * backfill script for pre-existing subscriptions.
+ * `subscription_data[billing_thresholds]` — so it is applied right after
+ * the subscription exists, from the checkout-completed webhook. That is
+ * the only caller in this repo, and it covers new subscriptions only.
+ *
+ * `isDryRun` therefore has no caller here on purpose: the one-time
+ * backfill over pre-existing subscriptions walks live Stripe billing
+ * data for current customers, so it is SaaS-only operational work and
+ * lives in the langwatch-saas task runner, which imports this function.
+ * Its safety story is a dry-run preview of the blast radius, so the flag
+ * stays part of this contract — it is a seam for that caller, not dead
+ * code to delete.
+ *
+ * Note on `items`: Stripe returns it as a paginated list (default 10).
+ * A Growth subscription carries exactly two items (seat + events, see
+ * `createCheckoutLineItems`), so the first page always holds them. If a
+ * plan ever grows past ten line items this needs to page, or it will
+ * silently read as `not_annual_events` and skip the threshold.
  */
 export const applyAnnualEventsBillingThreshold = async ({
   stripe,
