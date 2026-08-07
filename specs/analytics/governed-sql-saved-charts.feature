@@ -161,6 +161,73 @@ Feature: Saved governed SQL workbench charts — the persistence model and its w
     Then the attempt is refused as not found
     And the chart is left exactly as it was
 
+  # ---------------------------------------------------------------------------
+  # Slice 2 — the application's own surface: tRPC procedures and Save/Open
+  # ---------------------------------------------------------------------------
+
+  @integration
+  Scenario: Saved charts stay unreachable while the workbench switch is off
+    Given the governed SQL feature switch is off for the project
+    When the member lists, opens, saves, edits or deletes a saved chart
+    Then every one of them refuses with error code governed_sql_not_enabled
+    And nothing in the browser can force the surface on
+
+  @integration
+  Scenario: The switch is decided for the project's organization, not for the project alone
+    Given the feature switch is granted to the organization that owns the project
+    When the member lists their saved charts
+    Then the surface answers, because the organization the project belongs to was resolved and offered to the switch
+    And a project in an organization without the grant is still refused
+
+  @integration
+  Scenario: Reading saved charts requires the analytics permission
+    Given a signed-in member whose role lacks the analytics view permission
+    When they list or open a saved chart
+    Then the request is refused before any chart is read
+
+  @integration
+  Scenario: Being allowed to read a chart is not being allowed to change one
+    Given a member who may view analytics but not create, update or delete them
+    When they list saved charts and then try to save, edit or delete one
+    Then the listing succeeds
+    And each write is refused for want of its own permission
+
+  @integration
+  Scenario: A refusal from the write gate reaches the member with its code intact
+    Given SQL or a specification the governors refuse
+    When the member saves it through the application
+    Then the failure arrives carrying the same code the service raised
+    And the member reads the registry copy for that code, not a raw wire message
+
+  @integration
+  Scenario: Every procedure answers only for the project in the request
+    Given a chart saved in another project
+    When the member opens, edits or deletes it by its id
+    Then it is not found
+    And the answer is indistinguishable from an id that never existed
+
+  @integration
+  Scenario: Save stores what is on screen, and saves again into the same chart
+    Given a member who has written governed SQL, its parameters and a specification
+    When they save it and then save a second time after an edit
+    Then the first save creates one chart
+    And the second updates that same chart rather than creating another
+
+  @integration
+  Scenario: Open restores a saved chart's query, parameters and specification
+    Given the project has a saved chart
+    When the member opens it from the list of saved charts
+    Then the editor holds the saved SQL
+    And the parameter editor holds the saved values
+    And the specification editor holds the saved specification
+
+  @integration
+  Scenario: A saved chart can be renamed or deleted from the list
+    Given the project has saved charts
+    When the member renames one and deletes another
+    Then the renamed chart keeps its query and specification
+    And the deleted one is gone from the list
+
 # --- AC Coverage Map ---
 # Issue #6582, slice 1 ("Schema + repository + service — model decision,
 # validation choke point, unit/integration tests").
@@ -203,8 +270,34 @@ Feature: Saved governed SQL workbench charts — the persistence model and its w
 # AC "repositories findAll/findById, services getAll/getById" → process AC,
 #    verified in the PR diff.
 #
-# Deliberately NOT in this feature file, because they are not in this slice:
-# tRPC and REST CRUD, the workbench Save/Open UI, dashboard placement and
-# rendering (with #6631's time-window contract), per-viewer re-execution and its
-# degraded cards, and the MCP/langy authoring tools. Each lands with its own
-# scenarios in slices 2 to 5.
+# Issue #6582, slice 2 ("tRPC + workbench Save/Open UI").
+#
+# AC "tRPC router — save, list, open, update, delete"
+#   → Scenario: Save stores what is on screen, and saves again into the same chart
+#   → Scenario: Open restores a saved chart's query, parameters and specification
+#   → Scenario: A saved chart can be renamed or deleted from the list
+#   → Scenario: Every procedure answers only for the project in the request
+# AC "the surface stays behind the experimental switch, evaluated server-side"
+#   → Scenario: Saved charts stay unreachable while the workbench switch is off
+#   → Scenario: The switch is decided for the project's organization, not for the project alone
+# AC "reads and writes are permissioned"
+#   → Scenario: Reading saved charts requires the analytics permission
+#   → Scenario: Being allowed to read a chart is not being allowed to change one
+# AC "each failure with a stable code and presentation-registry entry"
+#   → Scenario: A refusal from the write gate reaches the member with its code intact
+#   → Scenario: A refused save says what to repair, and leaves the work on screen
+# AC "saving never re-runs the query" → carried for now by the workbench's own
+#   guard, `Scenario: The workbench ships no polling, browser-side persistence,
+#   export, or agent surface`, which slice 2 amended rather than deleted. The
+#   stronger claim — that *opening* a saved chart issues no request — needs the
+#   whole workbench driven end to end, so it lands with the browser test rather
+#   than being written here unbound. Two scenarios were drafted for this slice
+#   and removed for exactly that reason ("Opening a saved chart runs nothing
+#   until the member asks", "A refused save says what to repair, and leaves the
+#   work on screen"): a scenario the parity check reports as bound-to-nothing
+#   reads as coverage and is worse than one not yet written.
+#
+# Deliberately NOT in this feature file, because they are not in these slices:
+# the REST surface, dashboard placement and rendering (with #6631's time-window
+# contract), per-viewer re-execution and its degraded cards, and the MCP/langy
+# authoring tools. Each lands with its own scenarios in slices 3 to 5.

@@ -52,13 +52,19 @@ Feature: Governed SQL query workbench — native tables and governed Vega-Lite c
     Then the navigation entry is not offered to them
     And opening the route directly renders the permission-denied guard, not the workbench
 
+  # Amended by #6582 slice 2, which added saving a chart to the member's own
+  # project. That is server-side, explicitly invoked, and governed by the same
+  # validators a run passes — so it is not the thing this scenario forbids. What
+  # it forbids is unchanged: work the member did not ask for, state the browser
+  # keeps behind their back, and a surface an agent can reach.
   @unit
-  Scenario: The workbench ships no polling, persistence, export, or agent surface
+  Scenario: The workbench ships no polling, browser-side persistence, export, or agent surface
     Given the workbench feature's source
-    When it is inspected for schedules, refresh intervals, saved queries, saved
-      specs, dashboards, sharing links, export, source display, Langy, MCP, or
-      external connectors
+    When it is inspected for schedules, refresh intervals, browser storage,
+      sharing links, export, source display, Langy, MCP, or external connectors
     Then none is present
+    And the specification the member is editing is never written anywhere by the
+      chart surface itself
 
   @unit
   Scenario: The frontend does not implement a second SQL validator
@@ -578,7 +584,9 @@ Feature: Governed SQL query workbench — native tables and governed Vega-Lite c
 #    PR diff leaving Recharts components untouched.
 # AC "polling, schedules, dashboards, persistence, sharing, export, Langy, MCP,
 #    coding-agent tools, external connectors not added"
-#   → Scenario: The workbench ships no polling, persistence, export, or agent surface
+#   → Scenario: The workbench ships no polling, browser-side persistence, export, or agent surface
+#     (the persistence half of this AC was superseded by #6582 slice 2, which
+#     added saving deliberately; the scenario now guards the rest)
 #   → Scenario: Reload is manual only
 #
 # Workbench:
