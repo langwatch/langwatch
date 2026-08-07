@@ -25,6 +25,8 @@ export const ScenarioInfraErrorCode = {
   PlatformUnreachable: "scenario_platform_unreachable",
   /** The model provider rejected the request (bad key, unknown model, …). */
   ModelProviderError: "scenario_model_provider_error",
+  /** The judge combined a forced function tool with incompatible reasoning. */
+  ModelToolReasoningConflict: "scenario_model_tool_reasoning_conflict",
   /** The run exceeded its time budget. */
   ExecutionTimeout: "scenario_execution_timeout",
   /** Anything else that failed at the infrastructure level. */
@@ -120,6 +122,19 @@ const CLASSIFICATION_RULES: ClassificationRule[] = [
       message:
         "Couldn't establish a secure connection while running the simulation — the certificate presented by the server isn't trusted.",
       hint: "This is common in local development with self-signed certificates. Trust your local certificate authority (run `haven up`, which installs and trusts it), or point NODE_EXTRA_CA_CERTS at your CA bundle so the simulation runner trusts it.",
+    }),
+  },
+  {
+    // OpenAI Chat Completions rejects the exact combination Scenario's judge
+    // uses when a model enables reasoning by default. Keep this before the
+    // generic provider rule so the user gets an actionable, prose-free
+    // handled error even if an unrecognised model reaches the provider.
+    needles: ["Function tools with reasoning_effort are not supported"],
+    build: () => ({
+      code: ScenarioInfraErrorCode.ModelToolReasoningConflict,
+      message:
+        "The selected judge model cannot use its current reasoning mode with the judge's function tool.",
+      hint: "Choose a different judge model. If you manage this model request directly, use the Responses API or disable reasoning for Chat Completions.",
     }),
   },
   {
@@ -293,6 +308,8 @@ export function scenarioErrorTitle(code: ScenarioInfraErrorCode): string {
       return "Couldn't reach the endpoint";
     case ScenarioInfraErrorCode.ModelProviderError:
       return "Model provider error";
+    case ScenarioInfraErrorCode.ModelToolReasoningConflict:
+      return "Judge model configuration conflict";
     case ScenarioInfraErrorCode.ExecutionTimeout:
       return "Simulation timed out";
     case ScenarioInfraErrorCode.Infra:

@@ -148,7 +148,13 @@ describe("GatewayBudgetService.check", () => {
       });
       const chRepoStub = {
         getSpendForBudgetsAcrossTenants: async () => [
-          { budgetId: "b_ch_sourced", spentUsd: "95.00" },
+          // Both units, as a real read returns them. The cast below means the
+          // compiler would not notice this drifting from the shape.
+          {
+            budgetId: "b_ch_sourced",
+            spentNanoUsd: 95_000_000_000,
+            spentUsd: "95",
+          },
         ],
       } as unknown as Parameters<typeof GatewayBudgetService.create>[1];
 

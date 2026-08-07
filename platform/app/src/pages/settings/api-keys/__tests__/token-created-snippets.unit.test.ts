@@ -9,6 +9,7 @@
 import fs from "fs";
 import path from "path";
 import { describe, expect, it } from "vitest";
+import { CODE_ASSISTANTS, type CodeAssistant } from "../TokenCreatedDialog";
 
 const LANGWATCH_ROOT = path.resolve(__dirname, "../../../../../");
 
@@ -103,6 +104,144 @@ describe("given the token-created-snippets feature is implemented", () => {
         "src/pages/settings/api-keys/TokenCreatedDialog.tsx",
       );
       expect(dialog).toContain("JsonHighlight");
+    });
+  });
+
+  describe("when checking that one list drives the assistant tabs and config paths", () => {
+    /** @scenario One list of coding assistants drives both the tabs and the config paths */
+    it("TokenCreatedDialog no longer keeps a separate EDITOR_PATHS list", () => {
+      const dialog = readFile(
+        "src/pages/settings/api-keys/TokenCreatedDialog.tsx",
+      );
+      expect(dialog).not.toContain("EDITOR_PATHS");
+      expect(dialog).toContain("CODE_ASSISTANTS");
+    });
+
+    /** @scenario One list of coding assistants drives both the tabs and the config paths */
+    it("renders both the tabs and the config-path chips from CODE_ASSISTANTS", () => {
+      const dialog = readFile(
+        "src/pages/settings/api-keys/TokenCreatedDialog.tsx",
+      );
+      // Two map() call sites, both over the same list: the tab strip and the
+      // config-path chip row.
+      const renders =
+        dialog.match(/CODE_ASSISTANTS[\s\S]{0,40}?\.map\(/g) ?? [];
+      expect(renders.length).toBeGreaterThanOrEqual(2);
+    });
+  });
+
+  describe("when checking what each assistant entry builds", () => {
+    // Full expected strings, not substrings. The assistants deliberately
+    // differ in where each flag goes — Claude Code puts the project id before
+    // the `--` and its key after, Codex puts everything before — and a
+    // substring check passes happily while those are wrong. A Gemini entry
+    // whose flags sat on the wrong side of the server name shipped and was
+    // pulled for exactly that reason (#6654).
+    const API_KEY = "sk-lw-real";
+    const PROJECT_ID = "project-abc";
+    const CLOUD = "https://app.langwatch.ai";
+    const SELF_HOSTED = "https://self.host";
+
+    // Both optional flags, independently: a project id and a self-hosted
+    // endpoint are unrelated choices, and the case where BOTH are present is
+    // the densest line either builder emits — the one where an ordering
+    // mistake is most likely and least visible.
+    const COMBOS = [
+      {
+        label: "with a project id, cloud",
+        projectId: PROJECT_ID,
+        endpoint: CLOUD,
+        isSelfHosted: false,
+      },
+      {
+        label: "with a project id, self-hosted",
+        projectId: PROJECT_ID,
+        endpoint: SELF_HOSTED,
+        isSelfHosted: true,
+      },
+      {
+        label: "without a project id, cloud",
+        projectId: undefined,
+        endpoint: CLOUD,
+        isSelfHosted: false,
+      },
+      {
+        label: "without a project id, self-hosted",
+        projectId: undefined,
+        endpoint: SELF_HOSTED,
+        isSelfHosted: true,
+      },
+    ] as const;
+
+    const EXPECTED = {
+      "claude-code": {
+        "with a project id, cloud":
+          "claude mcp add langwatch --env LANGWATCH_PROJECT_ID=project-abc -- npx -y @langwatch/mcp-server --api-key sk-lw-real",
+        "with a project id, self-hosted":
+          "claude mcp add langwatch --env LANGWATCH_PROJECT_ID=project-abc -- npx -y @langwatch/mcp-server --api-key sk-lw-real --endpoint https://self.host",
+        "without a project id, cloud":
+          "claude mcp add langwatch -- npx -y @langwatch/mcp-server --api-key sk-lw-real",
+        "without a project id, self-hosted":
+          "claude mcp add langwatch -- npx -y @langwatch/mcp-server --api-key sk-lw-real --endpoint https://self.host",
+      },
+      codex: {
+        "with a project id, cloud":
+          "codex mcp add langwatch --env LANGWATCH_API_KEY=sk-lw-real --env LANGWATCH_PROJECT_ID=project-abc -- npx -y @langwatch/mcp-server",
+        "with a project id, self-hosted":
+          "codex mcp add langwatch --env LANGWATCH_API_KEY=sk-lw-real --env LANGWATCH_PROJECT_ID=project-abc --env LANGWATCH_ENDPOINT=https://self.host -- npx -y @langwatch/mcp-server",
+        "without a project id, cloud":
+          "codex mcp add langwatch --env LANGWATCH_API_KEY=sk-lw-real -- npx -y @langwatch/mcp-server",
+        "without a project id, self-hosted":
+          "codex mcp add langwatch --env LANGWATCH_API_KEY=sk-lw-real --env LANGWATCH_ENDPOINT=https://self.host -- npx -y @langwatch/mcp-server",
+      },
+    } as const satisfies Record<
+      string,
+      Record<(typeof COMBOS)[number]["label"], string>
+    >;
+
+    for (const key of Object.keys(EXPECTED) as Array<keyof typeof EXPECTED>) {
+      for (const combo of COMBOS) {
+        /** @scenario An assistant with an install command shows a terminal snippet */
+        it(`builds ${key}'s command exactly, ${combo.label}`, () => {
+          const assistant = CODE_ASSISTANTS.find((a) => a.key === key);
+          expect(assistant?.buildCommand).toBeDefined();
+
+          const context: Parameters<
+            NonNullable<CodeAssistant["buildCommand"]>
+          >[0] = {
+            apiKey: API_KEY,
+            projectId: combo.projectId,
+            endpoint: combo.endpoint,
+            isSelfHosted: combo.isSelfHosted,
+          };
+
+          expect(assistant!.buildCommand!(context)).toBe(
+            EXPECTED[key][combo.label],
+          );
+        });
+      }
+    }
+
+    /** @scenario An assistant with an install command shows a terminal snippet */
+    it("covers every installer in the registry", () => {
+      const withCommand = CODE_ASSISTANTS.filter((a) => a.buildCommand).map(
+        (a) => a.key,
+      );
+      // If someone adds an installer, this fails until its exact commands are
+      // pinned above — which is the whole point.
+      expect(Object.keys(EXPECTED).sort()).toEqual(withCommand.sort());
+    });
+
+    /** @scenario An assistant without an install command points at its config file */
+    it("gives every installer-less assistant a config path", () => {
+      const configOnly = CODE_ASSISTANTS.filter(
+        (assistant) => !assistant.buildCommand,
+      );
+      expect(configOnly.length).toBeGreaterThan(0);
+
+      for (const assistant of configOnly) {
+        expect(assistant.configPath).toBeTruthy();
+      }
     });
   });
 

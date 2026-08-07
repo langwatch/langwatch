@@ -5,6 +5,7 @@
  * telemetry-refresh.ts) can share it without import cycles.
  */
 
+import { normalizeEndpoint } from "../../../internal/endpoint";
 import type { GovernanceConfig } from "./config";
 
 export interface ToolEnv {
@@ -42,7 +43,7 @@ export interface ToolEnv {
  * Path B).
  */
 export function envForTool(cfg: GovernanceConfig, tool: string): ToolEnv {
-	const gw = cfg.gateway_url.replace(/\/+$/, "");
+	const gw = normalizeEndpoint(cfg.gateway_url);
 	const auth = cfg.default_personal_vk?.secret;
 	if (!auth) return { vars: {} };
 	switch (tool) {

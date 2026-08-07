@@ -114,6 +114,7 @@ func (o *Orchestrator) provision(ctx context.Context, p UpParams, opts PlanOptio
 		HasStandaloneWorkers: opts.Selection.Workers,
 		LangyTier:            opts.LangyTier,
 		LangyImage:           opts.langyImageTag,
+		DisableGoogleDLP:     o.cfg.ShouldDisableGoogleDLP,
 	}
 	for i, r := range domain.PerWorktreeServices {
 		svc := domain.Service{

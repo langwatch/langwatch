@@ -21,6 +21,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import chalk from "chalk";
+import { normalizeEndpoint } from "../../../internal/endpoint";
 import { createSpinner } from "../spinner";
 import {
 	type CliBootstrapResponse,
@@ -78,7 +79,7 @@ export async function runUnifiedLoginFlow(
 	const dc = await startDeviceCode({ baseUrl }, { credentialType: kind });
 	const verifyURL =
 		dc.verification_uri_complete ??
-		`${dc.verification_uri.replace(/\/+$/, "")}?user_code=${encodeURIComponent(dc.user_code)}`;
+		`${normalizeEndpoint(dc.verification_uri)}?user_code=${encodeURIComponent(dc.user_code)}`;
 
 	console.log();
 	console.log(chalk.cyan(`Opening: ${verifyURL}`));
@@ -322,7 +323,7 @@ function persistDeviceSession(
 		};
 	}
 	if (result.endpoint) {
-		cfg.control_plane_url = result.endpoint.replace(/\/+$/, "");
+		cfg.control_plane_url = normalizeEndpoint(result.endpoint);
 	}
 }
 

@@ -261,8 +261,8 @@ type Options struct {
 	// transport-class refresh failure. Default 5m.
 	SoftBump time.Duration
 	// HardGrace is the absolute cap on extending a stale entry beyond its
-	// natural JWT exp. Default 6h. Setting 0 disables stale-while-error
-	// entirely (legacy behavior: hard-fail at JWT exp).
+	// natural JWT exp. 0 takes the 6h default; a negative value disables
+	// stale-while-error entirely, hard-failing at JWT exp.
 	HardGrace     time.Duration
 	Logger        *zap.Logger
 	L2            L2Store // optional, nil = skip L2
@@ -300,8 +300,10 @@ func New(opts Options) (*Service, error) {
 	if opts.SoftBump == 0 {
 		opts.SoftBump = 5 * time.Minute
 	}
-	// HardGrace == 0 is a documented opt-out (disables stale-while-error).
-	// Only fill in the default when the field was unset entirely.
+	// A negative HardGrace is the opt-out: it puts the hard cap before the
+	// JWT exp, so an entry is hard-expired by the time it could ever be
+	// served stale. Zero means "unset" and takes the default, matching every
+	// other field here.
 	if opts.HardGrace == 0 {
 		opts.HardGrace = 6 * time.Hour
 	}

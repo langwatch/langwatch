@@ -50,10 +50,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/EvaluationResult"
-                  }
+                  "$ref": "#/components/schemas/EvaluationResult"
                 }
               }
             }
@@ -146,10 +143,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/EvaluationResult"
-                  }
+                  "$ref": "#/components/schemas/EvaluationResult"
                 }
               }
             }
@@ -242,10 +236,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/EvaluationResult"
-                  }
+                  "$ref": "#/components/schemas/EvaluationResult"
                 }
               }
             }
@@ -338,10 +329,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/EvaluationResult"
-                  }
+                  "$ref": "#/components/schemas/EvaluationResult"
                 }
               }
             }
@@ -434,10 +422,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/EvaluationResult"
-                  }
+                  "$ref": "#/components/schemas/EvaluationResult"
                 }
               }
             }
@@ -530,10 +515,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/EvaluationResult"
-                  }
+                  "$ref": "#/components/schemas/EvaluationResult"
                 }
               }
             }
@@ -626,10 +608,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/EvaluationResult"
-                  }
+                  "$ref": "#/components/schemas/EvaluationResult"
                 }
               }
             }
@@ -722,10 +701,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/EvaluationResult"
-                  }
+                  "$ref": "#/components/schemas/EvaluationResult"
                 }
               }
             }
@@ -818,10 +794,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/EvaluationResult"
-                  }
+                  "$ref": "#/components/schemas/EvaluationResult"
                 }
               }
             }
@@ -914,10 +887,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/EvaluationResult"
-                  }
+                  "$ref": "#/components/schemas/EvaluationResult"
                 }
               }
             }
@@ -1010,10 +980,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/EvaluationResult"
-                  }
+                  "$ref": "#/components/schemas/EvaluationResult"
                 }
               }
             }
@@ -1106,10 +1073,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/EvaluationResult"
-                  }
+                  "$ref": "#/components/schemas/EvaluationResult"
                 }
               }
             }
@@ -1202,10 +1166,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/EvaluationResult"
-                  }
+                  "$ref": "#/components/schemas/EvaluationResult"
                 }
               }
             }
@@ -1298,10 +1259,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/EvaluationResult"
-                  }
+                  "$ref": "#/components/schemas/EvaluationResult"
                 }
               }
             }
@@ -1394,10 +1352,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/EvaluationResult"
-                  }
+                  "$ref": "#/components/schemas/EvaluationResult"
                 }
               }
             }
@@ -1490,10 +1445,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/EvaluationResult"
-                  }
+                  "$ref": "#/components/schemas/EvaluationResult"
                 }
               }
             }
@@ -1586,10 +1538,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/EvaluationResult"
-                  }
+                  "$ref": "#/components/schemas/EvaluationResult"
                 }
               }
             }
@@ -1682,10 +1631,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/EvaluationResult"
-                  }
+                  "$ref": "#/components/schemas/EvaluationResult"
                 }
               }
             }
@@ -1778,10 +1724,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/EvaluationResult"
-                  }
+                  "$ref": "#/components/schemas/EvaluationResult"
                 }
               }
             }
@@ -1874,10 +1817,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/EvaluationResult"
-                  }
+                  "$ref": "#/components/schemas/EvaluationResult"
                 }
               }
             }
@@ -1970,10 +1910,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/EvaluationResult"
-                  }
+                  "$ref": "#/components/schemas/EvaluationResult"
                 }
               }
             }
@@ -2066,10 +2003,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/EvaluationResult"
-                  }
+                  "$ref": "#/components/schemas/EvaluationResult"
                 }
               }
             }
@@ -2162,10 +2096,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/EvaluationResult"
-                  }
+                  "$ref": "#/components/schemas/EvaluationResult"
                 }
               }
             }
@@ -2258,10 +2189,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/EvaluationResult"
-                  }
+                  "$ref": "#/components/schemas/EvaluationResult"
                 }
               }
             }
@@ -2354,10 +2282,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/EvaluationResult"
-                  }
+                  "$ref": "#/components/schemas/EvaluationResult"
                 }
               }
             }
@@ -2450,10 +2375,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/EvaluationResult"
-                  }
+                  "$ref": "#/components/schemas/EvaluationResult"
                 }
               }
             }
@@ -2546,10 +2468,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/EvaluationResult"
-                  }
+                  "$ref": "#/components/schemas/EvaluationResult"
                 }
               }
             }
@@ -2642,10 +2561,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/EvaluationResult"
-                  }
+                  "$ref": "#/components/schemas/EvaluationResult"
                 }
               }
             }
@@ -2738,10 +2654,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/EvaluationResult"
-                  }
+                  "$ref": "#/components/schemas/EvaluationResult"
                 }
               }
             }
@@ -2834,10 +2747,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/EvaluationResult"
-                  }
+                  "$ref": "#/components/schemas/EvaluationResult"
                 }
               }
             }
@@ -2930,10 +2840,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/EvaluationResult"
-                  }
+                  "$ref": "#/components/schemas/EvaluationResult"
                 }
               }
             }
@@ -3026,10 +2933,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/EvaluationResult"
-                  }
+                  "$ref": "#/components/schemas/EvaluationResult"
                 }
               }
             }
@@ -3122,10 +3026,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/EvaluationResult"
-                  }
+                  "$ref": "#/components/schemas/EvaluationResult"
                 }
               }
             }
@@ -3218,10 +3119,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/EvaluationResult"
-                  }
+                  "$ref": "#/components/schemas/EvaluationResult"
                 }
               }
             }
@@ -3314,10 +3212,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/EvaluationResult"
-                  }
+                  "$ref": "#/components/schemas/EvaluationResult"
                 }
               }
             }
@@ -3410,10 +3305,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/EvaluationResult"
-                  }
+                  "$ref": "#/components/schemas/EvaluationResult"
                 }
               }
             }
@@ -3506,10 +3398,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/EvaluationResult"
-                  }
+                  "$ref": "#/components/schemas/EvaluationResult"
                 }
               }
             }
@@ -3602,10 +3491,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/EvaluationResult"
-                  }
+                  "$ref": "#/components/schemas/EvaluationResult"
                 }
               }
             }
@@ -3698,10 +3584,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/EvaluationResult"
-                  }
+                  "$ref": "#/components/schemas/EvaluationResult"
                 }
               }
             }

@@ -163,7 +163,7 @@ jobs:
       - name: Build @langwatch/server CLI
         run: pnpm --filter @langwatch/server-cli build
 
-      # Pre-build the langwatch app (vite client + scenario-child-process +
+      # Pre-build the langwatch app (vite client + the dist/server bundles +
       # mcp-server) so the published tarball ships dist/ artifacts. Without
       # this, end users see vite chunder past at startup on first run —
       # exactly the bureaucracy we're trying to eliminate.
@@ -213,7 +213,18 @@ jobs:
             "package/app/package.json"
             "package/app/platform/app/package.json"
             "package/app/platform/app/dist/client/index.html"
-            "package/app/platform/app/dist/scenario-child-process.js"
+            # The server bundles. `start:app` and `start:workers` execute these
+            # directly on plain node, and the published tree has no tsx to fall
+            # back to, so a tarball missing any of them is a server that cannot
+            # boot. `task.cjs` runs the migrations, and the scenario bundle is
+            # what keeps simulation cold-starts to seconds.
+            "package/app/platform/app/dist/server/server.cjs"
+            "package/app/platform/app/dist/server/workers.cjs"
+            "package/app/platform/app/dist/server/task.cjs"
+            "package/app/platform/app/dist/server/scenario-child-process.cjs"
+            # goose reads the ClickHouse migrations from ${__dirname}/migrations,
+            # which in the bundle is dist/server/migrations.
+            "package/app/platform/app/dist/server/migrations"
             "package/app/services/langevals/pyproject.toml"
             # langevals resolves the python SDK as a local path dependency,
             # so the tarball must ship sdks/python/pyproject.toml + src/.

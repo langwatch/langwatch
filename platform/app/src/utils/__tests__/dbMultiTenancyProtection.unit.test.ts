@@ -208,27 +208,93 @@ describe("guardProjectId — projectId_traceId compound key (PinnedTrace)", () =
   });
 });
 
-describe("guardProjectId — WebhookDelivery cleanup", () => {
-  describe("when deleteMany omits projectId", () => {
-    it("rejects the cross-tenant prune", async () => {
+// The shared webhook delivery log holds both channels, so it has two tenancy
+// anchors: organizationId + endpointId for the endpoints platform, projectId +
+// triggerId for automations. A query must name one; a create must carry a
+// complete pair, so a row can never land without a tenant.
+describe("guardProjectId — shared WebhookEndpointDelivery log", () => {
+  describe("when a query names no tenancy at all", () => {
+    it("rejects it", async () => {
       await expect(
         runGuard({
-          model: "WebhookDelivery",
-          action: "deleteMany",
+          model: "WebhookEndpointDelivery",
+          action: "findMany",
           args: { where: { firedAt: { lt: new Date() } } },
         }),
-      ).rejects.toThrow(/requires a 'projectId'/);
+      ).rejects.toThrow(/organizationId, endpointId, or projectId/);
     });
   });
 
-  describe("when deleteMany includes projectId", () => {
-    it("permits the tenant-scoped prune", async () => {
+  describe("when a query names either channel's anchor", () => {
+    it("permits the organization-scoped read", async () => {
       await expect(
         runGuard({
-          model: "WebhookDelivery",
-          action: "deleteMany",
+          model: "WebhookEndpointDelivery",
+          action: "findMany",
+          args: { where: { organizationId: "org-1" } },
+        }),
+      ).resolves.toBe("ok");
+    });
+
+    it("permits the project-scoped read the automations drawer makes", async () => {
+      await expect(
+        runGuard({
+          model: "WebhookEndpointDelivery",
+          action: "findMany",
           args: {
-            where: { projectId: "project-1", firedAt: { lt: new Date() } },
+            where: {
+              channel: "automations",
+              projectId: "project-1",
+              triggerId: "trigger-1",
+            },
+          },
+        }),
+      ).resolves.toBe("ok");
+    });
+  });
+
+  describe("when a create carries only half a pair", () => {
+    it("rejects it", async () => {
+      await expect(
+        runGuard({
+          model: "WebhookEndpointDelivery",
+          action: "create",
+          args: { data: { projectId: "project-1", dispatchId: "evt_1" } },
+        }),
+      ).rejects.toThrow(/projectId and triggerId/);
+    });
+  });
+
+  describe("when a create carries one complete pair", () => {
+    it("permits the automations row", async () => {
+      await expect(
+        runGuard({
+          model: "WebhookEndpointDelivery",
+          action: "create",
+          args: {
+            data: {
+              channel: "automations",
+              projectId: "project-1",
+              triggerId: "trigger-1",
+              dispatchId: "evt_1",
+            },
+          },
+        }),
+      ).resolves.toBe("ok");
+    });
+
+    it("permits the platform row", async () => {
+      await expect(
+        runGuard({
+          model: "WebhookEndpointDelivery",
+          action: "create",
+          args: {
+            data: {
+              channel: "platform",
+              organizationId: "org-1",
+              endpointId: "endpoint-1",
+              dispatchId: "btch_1",
+            },
           },
         }),
       ).resolves.toBe("ok");

@@ -48,17 +48,88 @@ const ShikiCommandBox = dynamic(
   { ssr: false },
 ) as React.ComponentType<ShikiCommandBoxProps>;
 
-type AssistantTab = "claude-code" | "codex";
 type CodeTab = "env" | "bearer" | "basic";
 
-const EDITOR_PATHS = [
-  { editor: "Claude Code", path: ".claude/settings.json" },
-  { editor: "Cursor", path: ".cursor/mcp.json" },
-  { editor: "Copilot", path: ".vscode/mcp.json" },
-  { editor: "Windsurf", path: "~/.codeium/windsurf/mcp_config.json" },
+/** What a snippet needs to name this project and this freshly minted token. */
+interface CommandContext {
+  apiKey: string;
+  projectId: string | undefined;
+  endpoint: string;
+  isSelfHosted: boolean;
+}
+
+export interface CodeAssistant {
+  key: string;
+  label: string;
+  /**
+   * Present only where the assistant ships a one-line installer. Cursor,
+   * Copilot, Windsurf and Claude Desktop are configured by editing a file, so
+   * inventing a `cursor mcp add` for symmetry would hand out a command that
+   * does not exist.
+   */
+  buildCommand?: (context: CommandContext) => string;
+  /** The file this assistant reads its MCP servers from. */
+  configPath?: string;
+}
+
+/**
+ * The coding assistants this dialog knows how to set up, and the ONE place
+ * that decides so.
+ *
+ * This list previously lived twice and disagreed with itself: two hardcoded
+ * tabs (Claude Code, Codex) alongside five config-path chips naming a
+ * different set of editors, which is how a customer came to notice that the
+ * assistants they used were missing. Both surfaces below now read from here.
+ *
+ * Commands are the ones the docs publish — `claude mcp add` / `codex mcp add`
+ * (docs/integration/mcp.mdx). An assistant with no published installer gets a
+ * config path instead; inventing a command for symmetry hands the user a line
+ * that fails at the one moment they can still read their token.
+ */
+export const CODE_ASSISTANTS: CodeAssistant[] = [
   {
-    editor: "Claude Desktop",
-    path: "~/Library/Application Support/Claude/claude_desktop_config.json",
+    key: "claude-code",
+    label: "Claude Code",
+    configPath: ".claude/settings.json",
+    buildCommand: ({ apiKey, projectId, endpoint, isSelfHosted }) =>
+      [
+        "claude mcp add langwatch",
+        projectId ? ` --env LANGWATCH_PROJECT_ID=${projectId}` : "",
+        " -- npx -y @langwatch/mcp-server",
+        ` --api-key ${apiKey}`,
+        isSelfHosted ? ` --endpoint ${endpoint}` : "",
+      ].join(""),
+  },
+  {
+    key: "codex",
+    label: "Codex",
+    // Deliberately no configPath: Codex reads TOML, and the chip row sits
+    // under a block rendering JSON. Needs a format marker before it can
+    // appear there — see #6654.
+    buildCommand: ({ apiKey, projectId, endpoint, isSelfHosted }) =>
+      [
+        `codex mcp add langwatch --env LANGWATCH_API_KEY=${apiKey}`,
+        projectId ? ` --env LANGWATCH_PROJECT_ID=${projectId}` : "",
+        isSelfHosted ? ` --env LANGWATCH_ENDPOINT=${endpoint}` : "",
+        " -- npx -y @langwatch/mcp-server",
+      ].join(""),
+  },
+  // Gemini is deliberately absent until its command is verified against a
+  // real `gemini` CLI — its `mcp add` takes options BEFORE the server name
+  // and does not use `--` to introduce the command, unlike Codex above.
+  // Tracked in #6654.
+  { key: "cursor", label: "Cursor", configPath: ".cursor/mcp.json" },
+  { key: "copilot", label: "Copilot", configPath: ".vscode/mcp.json" },
+  {
+    key: "windsurf",
+    label: "Windsurf",
+    configPath: "~/.codeium/windsurf/mcp_config.json",
+  },
+  {
+    key: "claude-desktop",
+    label: "Claude Desktop",
+    configPath:
+      "~/Library/Application Support/Claude/claude_desktop_config.json",
   },
 ];
 
@@ -75,7 +146,9 @@ export function TokenCreatedDialog({
   orgProjects: Array<{ id: string; name: string }>;
   onClose: () => void;
 }) {
-  const [assistantTab, setAssistantTab] = useState<AssistantTab>("claude-code");
+  const [assistantKey, setAssistantKey] = useState<string>(
+    CODE_ASSISTANTS[0]!.key,
+  );
   const [codeTab, setCodeTab] = useState<CodeTab>("env");
   const [selectedProjectId, setSelectedProjectId] = useState<string>(
     projectId ?? "",
@@ -92,14 +165,9 @@ export function TokenCreatedDialog({
     [orgProjects],
   );
 
+  // Each assistant's builder decides where its own flags go, so the flag
+  // fragments that used to be assembled here now live in CODE_ASSISTANTS.
   const isSelfHosted = endpoint && endpoint !== CLOUD_ENDPOINT;
-  const endpointFlag = isSelfHosted ? ` --endpoint ${endpoint}` : "";
-  const projectIdEnvBefore = activeProjectId
-    ? ` --env LANGWATCH_PROJECT_ID=${activeProjectId}`
-    : "";
-  const projectIdEnvAfter = activeProjectId
-    ? ` --env LANGWATCH_PROJECT_ID=${activeProjectId}`
-    : "";
 
   const mcpJson = useMemo(
     () =>
@@ -160,13 +228,28 @@ export function TokenCreatedDialog({
       : "";
   const basicMasked = `Authorization: Basic base64(${activeProjectId ?? "<your-project-id>"}:pat-lw-...)`;
 
-  // ── Claude Code command ────────────────────────────────────────────────
-  const claudeCommand = `claude mcp add langwatch${projectIdEnvBefore} -- npx -y @langwatch/mcp-server --api-key ${newToken ?? ""}${endpointFlag}`;
-  const claudeMasked = `claude mcp add langwatch${projectIdEnvBefore} -- npx -y @langwatch/mcp-server --api-key ${maskedKey}${endpointFlag}`;
+  // ── Per-assistant terminal command ─────────────────────────────────────
+  // Both forms come from the same builder, so the value the user copies and
+  // the value they read can never drift apart.
+  // Only the tab buttons set this key, and they map over the list itself, so
+  // the lookup cannot miss; the fallback only satisfies the compiler.
+  const activeAssistant =
+    CODE_ASSISTANTS.find((assistant) => assistant.key === assistantKey) ??
+    CODE_ASSISTANTS[0]!;
 
-  // ── Codex command ──────────────────────────────────────────────────────
-  const codexCommand = `codex mcp add langwatch --env LANGWATCH_API_KEY=${newToken ?? ""}${projectIdEnvAfter}${isSelfHosted ? ` --env LANGWATCH_ENDPOINT=${endpoint}` : ""} -- npx -y @langwatch/mcp-server`;
-  const codexMasked = `codex mcp add langwatch --env LANGWATCH_API_KEY=${maskedKey}${projectIdEnvAfter}${isSelfHosted ? ` --env LANGWATCH_ENDPOINT=${endpoint}` : ""} -- npx -y @langwatch/mcp-server`;
+  const commandContext = {
+    projectId: activeProjectId,
+    endpoint,
+    isSelfHosted: !!isSelfHosted,
+  };
+  const assistantCommand = activeAssistant.buildCommand?.({
+    ...commandContext,
+    apiKey: newToken ?? "",
+  });
+  const assistantMasked = activeAssistant.buildCommand?.({
+    ...commandContext,
+    apiKey: maskedKey,
+  });
 
   return (
     <Dialog.Root
@@ -314,49 +397,46 @@ export function TokenCreatedDialog({
                 bg="bg.panel/70"
                 boxShadow="sm"
                 width="fit-content"
+                flexWrap="wrap"
               >
-                <TabButton
-                  label="Claude Code"
-                  active={assistantTab === "claude-code"}
-                  onClick={() => setAssistantTab("claude-code")}
-                />
-                <TabButton
-                  label="Codex"
-                  active={assistantTab === "codex"}
-                  onClick={() => setAssistantTab("codex")}
-                />
+                {CODE_ASSISTANTS.map((assistant) => (
+                  <TabButton
+                    key={assistant.key}
+                    label={assistant.label}
+                    active={assistantKey === assistant.key}
+                    onClick={() => setAssistantKey(assistant.key)}
+                  />
+                ))}
               </HStack>
 
-              {/* Claude Code terminal command — bash-highlighted with >_ prompt */}
-              {assistantTab === "claude-code" && newToken && (
+              {/* Terminal command — bash-highlighted with >_ prompt. Only the
+                  assistants that actually ship an installer get one. */}
+              {assistantCommand && assistantMasked && newToken && (
                 <VStack align="stretch" gap={3}>
                   <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
                     Run in your terminal
                   </Text>
                   <ShikiCommandBox
-                    command={claudeCommand}
-                    maskedCommand={claudeMasked}
+                    command={assistantCommand}
+                    maskedCommand={assistantMasked}
                     lang="bash"
                     showPrompt
-                    copyLabel="Claude Code command"
+                    copyLabel={`${activeAssistant.label} command`}
                   />
                 </VStack>
               )}
 
-              {/* Codex terminal command — bash-highlighted with >_ prompt */}
-              {assistantTab === "codex" && newToken && (
-                <VStack align="stretch" gap={3}>
-                  <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
-                    Run in your terminal
+              {/* Config-file-only assistants: say so, rather than leaving the
+                  tab looking broken next to one that offers a command. */}
+              {!assistantCommand && newToken && (
+                <Text fontSize="xs" color="fg.muted">
+                  {activeAssistant.label} has no install command — paste the
+                  config below into{" "}
+                  <Text as="span" fontWeight="semibold" color="fg">
+                    {activeAssistant.configPath}
                   </Text>
-                  <ShikiCommandBox
-                    command={codexCommand}
-                    maskedCommand={codexMasked}
-                    lang="bash"
-                    showPrompt
-                    copyLabel="Codex command"
-                  />
-                </VStack>
+                  .
+                </Text>
               )}
 
               {/* JSON config — existing JsonHighlight wiring unchanged */}
@@ -392,9 +472,9 @@ export function TokenCreatedDialog({
                     <Text fontSize="xs" color="fg.muted" flexShrink={0}>
                       Config path:
                     </Text>
-                    {EDITOR_PATHS.map((ep) => (
+                    {CODE_ASSISTANTS.filter((a) => a.configPath).map((ep) => (
                       <HStack
-                        key={ep.editor}
+                        key={ep.key}
                         asChild
                         gap={1}
                         px={2}
@@ -411,17 +491,17 @@ export function TokenCreatedDialog({
                         }}
                         onClick={() => {
                           void copyToClipboard({
-                            text: ep.path,
-                            successMessage: `${ep.editor} config path copied`,
+                            text: ep.configPath!,
+                            successMessage: `${ep.label} config path copied`,
                           });
                         }}
                       >
                         <button
                           type="button"
-                          aria-label={`Copy ${ep.editor} config path`}
+                          aria-label={`Copy ${ep.label} config path`}
                         >
                           <Text fontSize="2xs" fontWeight="medium" color="fg">
-                            {ep.editor}
+                            {ep.label}
                           </Text>
                         </button>
                       </HStack>

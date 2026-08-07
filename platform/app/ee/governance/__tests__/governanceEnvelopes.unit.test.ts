@@ -6,6 +6,10 @@ import {
   RecordVkLifecycleCommand,
 } from "~/server/event-sourcing/pipelines/governance-events/commands/governanceCommands";
 import {
+  anchoredPeriodStart,
+  nextAnchoredResetAt,
+} from "~/server/gateway/budgetWindow";
+import {
   budgetCrossingToEnvelope,
   vkLifecycleToEnvelope,
 } from "../webhooks/governanceEnvelopes";
@@ -146,5 +150,67 @@ describe("governance envelopes", () => {
       data: lifecycle("disabled"),
     } as never);
     expect(disabledOnce[0]!.idempotencyKey).toContain("vk:vk_1:disabled");
+  });
+
+  /** @scenario "A breach fires once per anchored period" */
+  it("keys an anchored budget's crossings on its own period, not the calendar month", async () => {
+    const anchor = new Date("2026-06-17T09:00:00.000Z");
+    const insidePeriod = new Date("2026-07-01T00:00:00.000Z");
+    const periodStart = anchoredPeriodStart({
+      window: "MONTH",
+      anchorAt: anchor,
+      now: insidePeriod,
+    });
+    const nextPeriodStart = nextAnchoredResetAt({
+      window: "MONTH",
+      anchorAt: anchor,
+      now: insidePeriod,
+    });
+
+    // The anchored period spans the calendar boundary, so its start is the
+    // 17th of June, not the 1st of July that the calendar would give.
+    expect(periodStart.toISOString()).toBe("2026-06-17T09:00:00.000Z");
+    expect(nextPeriodStart.toISOString()).toBe("2026-07-17T09:00:00.000Z");
+
+    const anchored = (at: Date) => ({
+      ...crossing("breached"),
+      period_started_at_ms: at.getTime(),
+    });
+
+    const handler = new RecordBudgetCrossingCommand();
+    const first = await handler.handle({
+      tenantId: "proj_1",
+      data: anchored(periodStart),
+    } as never);
+    // Crossing again later in the same anchored period is the same event,
+    // whatever the spend has climbed to since.
+    const again = await handler.handle({
+      tenantId: "proj_1",
+      data: { ...anchored(periodStart), spent_usd: "500.000000" },
+    } as never);
+    expect(again[0]!.idempotencyKey).toBe(first[0]!.idempotencyKey);
+
+    // The first crossing after the anchored rollover is a new one, so the
+    // customer is told once per period they are actually billed on.
+    const afterRollover = await handler.handle({
+      tenantId: "proj_1",
+      data: anchored(nextPeriodStart),
+    } as never);
+    expect(afterRollover[0]!.idempotencyKey).not.toBe(first[0]!.idempotencyKey);
+
+    // The envelope id carries the same period, so a webhook consumer
+    // deduplicates on exactly the same boundary the command store does.
+    expect(budgetCrossingToEnvelope(anchored(periodStart)).id).toBe(
+      budgetCrossingToEnvelope({
+        ...anchored(periodStart),
+        spent_usd: "500.000000",
+      }).id,
+    );
+    expect(budgetCrossingToEnvelope(anchored(nextPeriodStart)).id).not.toBe(
+      budgetCrossingToEnvelope(anchored(periodStart)).id,
+    );
+    expect(
+      budgetCrossingToEnvelope(anchored(periodStart)).data.period_started_at,
+    ).toBe("2026-06-17T09:00:00.000Z");
   });
 });

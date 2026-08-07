@@ -50,8 +50,8 @@ function parseClusterEndpoints(endpointsStr: string) {
 export let connection: IORedis | Cluster | undefined;
 
 // Dev-only isolation: `pnpm dev` at PORT=5570 lands on DB 1, PORT=5580 on DB 2,
-// etc. Prevents multiple worktrees from contending on the same BullMQ queues
-// and GroupQueue streams. Cluster mode ignores this (cluster supports only
+// etc. Prevents multiple worktrees from contending on the same GroupQueue
+// streams. Cluster mode ignores this (cluster supports only
 // DB 0) — we warn below if it's set in that combination.
 
 if (!isBuildOrNoRedis) {

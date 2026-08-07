@@ -221,7 +221,7 @@ const traceColumnDefs = {
     maxSize: 640,
     enableSorting: false,
   }),
-  events: traceCol.accessor((row) => row.events.length, {
+  events: traceCol.accessor((row) => row.events.totalCount, {
     id: "events",
     header: "Events",
     size: 250,

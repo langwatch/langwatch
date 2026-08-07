@@ -13,7 +13,6 @@ import {
   WebhookEndpointService,
   type WebhookEndpointView,
 } from "@ee/webhooks/webhookEndpoint.service";
-import { WebhookEventsClickHouseRepository } from "@ee/webhooks/webhookEvents.clickhouse.repository";
 import { WebhookEventsService } from "@ee/webhooks/webhookEvents.service";
 import type { Organization } from "@prisma/client";
 import type { Context, Next } from "hono";
@@ -24,27 +23,16 @@ import { z } from "zod";
 import { createOrgApp, requires } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
 import { getApp } from "~/server/app-layer/app";
-import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
+import { ClickHouseUnavailableError } from "~/server/app-layer/traces/errors";
 import { prisma } from "~/server/db";
 import { PrismaProcessStore } from "~/server/event-sourcing/process-manager/stores/prismaProcessStore";
-import {
-  bucketPeriodFloorMs,
-  GatewayBudgetClickHouseRepository,
-} from "~/server/gateway/budget.clickhouse.repository";
-import {
-  attributedUserBucketScopeId,
-  bucketScopeIdFor,
-} from "~/server/gateway/budgetResolution.service";
+import { applicableEndUserCaps } from "~/server/gateway/endUserCaps.service";
 import {
   decodeSpendEventsCursor,
   decodeSpendSummariesCursor,
-  GatewaySpendEventsRepository,
 } from "~/server/gateway/spendEvents.clickhouse.repository";
-import { toWireEnum } from "~/server/gateway/wireEnums";
-import {
-  USD_DISPLAY_STRING_FORMAT,
-  usdDisplayString,
-} from "~/server/gateway/wireMoney";
+import { GatewaySpendEventsService } from "~/server/gateway/spendEvents.service";
+import { USD_DISPLAY_STRING_FORMAT } from "~/server/gateway/wireMoney";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { canonicalBaseResponses } from "../../shared/base-responses";
 import { BadRequestError, ForbiddenError } from "../../shared/errors";
@@ -56,11 +44,18 @@ import { handleGatewaySpendApiError } from "./error-handler";
 
 patchZodOpenapi();
 
-const spendEvents = new GatewaySpendEventsRepository(async (tenantId) => {
-  const client = await getClickHouseClientForProject(tenantId);
-  if (!client) throw new Error("ClickHouse is not configured");
-  return client;
-});
+/**
+ * The App's spend-events repository, undefined on a deployment without
+ * ClickHouse — the ledger is the only store spend accrues in, so a route
+ * that reaches this surface with no repository has no figures to report.
+ * Resolved per call, not at module scope, so every route shares the one
+ * instance `getApp()` hands out instead of each minting its own (#6248).
+ */
+function requireSpendEventsService(): GatewaySpendEventsService {
+  const repository = getApp().gateway.spendEvents;
+  if (!repository) throw new ClickHouseUnavailableError();
+  return new GatewaySpendEventsService(repository);
+}
 
 /**
  * The billing reconciliation surface rides the webhook platform's plan flag
@@ -131,84 +126,6 @@ async function orgTenantIds(
     return ids.includes(projectId) ? [projectId] : [];
   }
   return ids;
-}
-
-/**
- * The applicable caps for one end user: every attributed-user template in
- * the org (optionally narrowed by anchor key), each with its CURRENT
- * PERIOD spend from the budget ledger, boundary-aware. This is the pair a
- * rebilling platform polls at period close; the usage rollup served
- * beside it is the billing-events view of the same user over the asked
- * window, so the two figures deliberately cover different periods.
- */
-async function applicableEndUserCaps(params: {
-  organizationId: string;
-  endUserId: string;
-  tenantIds: string[];
-  virtualKeyId?: string;
-}): Promise<Array<Record<string, unknown>>> {
-  const { organizationId, endUserId, tenantIds, virtualKeyId } = params;
-  const templates = await prisma.gatewayBudget.findMany({
-    where: {
-      organizationId,
-      scopeType: "ATTRIBUTED_USER",
-      archivedAt: null,
-      ...(virtualKeyId ? { scopeId: virtualKeyId } : {}),
-    },
-  });
-  if (templates.length === 0 || tenantIds.length === 0) return [];
-
-  const boundaries = await prisma.gatewayBudgetBucketBoundary.findMany({
-    where: {
-      organizationId,
-      budgetId: { in: templates.map((t) => t.id) },
-    },
-  });
-  const boundaryByKey = new Map(
-    boundaries.map((b) => [`${b.budgetId}:${b.bucketScopeId}`, b]),
-  );
-  const bucketFor = (t: (typeof templates)[number]) =>
-    bucketScopeIdFor(t, attributedUserBucketScopeId(t.scopeId, endUserId));
-
-  const budgetCH = new GatewayBudgetClickHouseRepository(async (projectId) => {
-    const client = await getClickHouseClientForProject(projectId);
-    if (!client) throw new Error("clickhouse unavailable");
-    return client;
-  });
-  const targets = templates.map((t) => {
-    const bucketScopeId = bucketFor(t);
-    const bucketBoundary = boundaryByKey.get(`${t.id}:${bucketScopeId}`);
-    return {
-      budgetId: t.id,
-      scope: t.scopeType,
-      scopeId: bucketScopeId,
-      window: t.window,
-      match: "exact" as const,
-      periodFloorMs: bucketPeriodFloorMs(t, bucketBoundary?.periodStartedAt),
-    };
-  });
-  const spends = await budgetCH.getSpendForTargetsAcrossTenants(
-    tenantIds,
-    targets,
-  );
-  const spentByBudget = new Map(spends.map((sp) => [sp.budgetId, sp.spentUsd]));
-  return templates.map((t) => {
-    const bucketBoundary = boundaryByKey.get(`${t.id}:${bucketFor(t)}`);
-    return {
-      budget_id: t.id,
-      anchor_id: t.scopeId,
-      // Lowercase like every other enum under /api/gateway/v1. These two were
-      // passing Prisma's casing straight through, so the same prefix served
-      // `"MONTH"` here and `"month"` from the platform routes.
-      window: toWireEnum(t.window),
-      on_breach: toWireEnum(t.onBreach),
-      limit_usd: usdDisplayString(t.limitUsd),
-      spent_usd: usdDisplayString(spentByBudget.get(t.id) ?? "0"),
-      period_started_at: (
-        bucketBoundary?.periodStartedAt ?? t.currentPeriodStartedAt
-      ).toISOString(),
-    };
-  });
 }
 
 // ── Response DTO schemas (used by describeRoute for OpenAPI gen) ────────
@@ -357,6 +274,8 @@ secured.access(requires("gatewaySpend:view")).get(
         next_cursor: nextCursorSchema,
       }),
     ),
+    tags: ["Gateway Spend"],
+    summary: "List spend summaries",
     description:
       "Reconciliation checksum fast path: per-key spend rollups grouped by virtual key or end user, with token classes and integer nano-USD cost. Settled (unpriced) requests are counted separately as settled_count and never included in cost sums. Diff individual items via /spend-events only when a checksum diverges. Paged by group key ascending: follow next_cursor until it comes back null, because a page that is full does not mean the window held nothing more.",
   }),
@@ -373,7 +292,7 @@ secured.access(requires("gatewaySpend:view")).get(
       throw new BadRequestError("Invalid cursor.");
     }
     const tenantIds = await orgTenantIds(organization.id, query.project_id);
-    const page = await spendEvents.readSpendSummaries({
+    const page = await requireSpendEventsService().getSpendSummaries({
       tenantIds,
       groupBy: query.group_by,
       fromMs: query.from,
@@ -405,6 +324,8 @@ secured.access(requires("gatewaySpend:view")).get(
   "/spend-events",
   requireBillingPlan,
   describeRoute({
+    tags: ["Gateway Spend"],
+    summary: "List spend events",
     description: SPEND_EVENTS_PULL_DESCRIPTION,
     responses: okResponse(
       "One page of billing envelopes",
@@ -424,7 +345,7 @@ secured.access(requires("gatewaySpend:view")).get(
       throw new BadRequestError("Invalid cursor.");
     }
     const tenantIds = await orgTenantIds(organization.id, query.project_id);
-    const page = await spendEvents.walkSpendEvents({
+    const page = await requireSpendEventsService().walkSpendEvents({
       tenantIds,
       fromMs: query.from,
       toMs: query.to,
@@ -446,6 +367,8 @@ secured.access(requires("gatewaySpend:view")).get(
   "/end-users/:id/spend",
   requireBillingPlan,
   describeRoute({
+    tags: ["Gateway Spend"],
+    summary: "Read one end user's spend",
     description: END_USER_SPEND_DESCRIPTION,
     responses: okResponse(
       "Spend and standing for one end user",
@@ -461,14 +384,22 @@ secured.access(requires("gatewaySpend:view")).get(
     const fromMs = query.from ?? now - END_USER_WINDOWS[query.window];
     const toMs = query.to ?? now;
     const tenantIds = await orgTenantIds(organization.id);
-    const rollup = await spendEvents.readEndUserSpend({
+    const rollup = await requireSpendEventsService().getEndUserSpend({
       tenantIds,
       endUserId,
       fromMs,
       toMs,
       virtualKeyId: query.virtual_key_id,
     });
+    const budgetRepository = getApp().gateway.budgets;
+    if (!budgetRepository) {
+      // The ledger is the only store spend accrues in, so without ClickHouse
+      // there are no figures to report against these caps.
+      throw new ClickHouseUnavailableError();
+    }
     const caps = await applicableEndUserCaps({
+      prisma,
+      budgetRepository,
       organizationId: organization.id,
       endUserId,
       tenantIds,
@@ -626,6 +557,8 @@ secured.access(requires("gatewaySpend:manage")).post(
   "/spend-events/replay",
   requireBillingPlan,
   describeRoute({
+    tags: ["Gateway Spend"],
+    summary: "Replay spend events to an endpoint",
     description: REPLAY_DESCRIPTION,
     responses: okResponse(
       "Replay accepted",
@@ -648,17 +581,18 @@ secured.access(requires("gatewaySpend:manage")).post(
       );
     }
 
+    const webhookEventsRepository = getApp().gateway.webhookEvents;
+    if (!webhookEventsRepository) {
+      throw new ClickHouseUnavailableError();
+    }
     const events = new WebhookEventsService({
       prisma,
-      repository: new WebhookEventsClickHouseRepository(async (tenantId) => {
-        const client = await getClickHouseClientForProject(tenantId);
-        if (!client) throw new Error("ClickHouse is not configured");
-        return client;
-      }),
+      repository: webhookEventsRepository,
     });
     const deliveryDeps: WebhookDeliveryProcessDeps = {
       processStore: new PrismaProcessStore(prisma),
       endpoints,
+      prisma,
       getPlan: (organizationId) =>
         getApp().planProvider.getActivePlan({ organizationId }),
     };

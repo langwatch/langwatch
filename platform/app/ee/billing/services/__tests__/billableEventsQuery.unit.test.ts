@@ -4,13 +4,19 @@ import {
   queryTraceSummariesTotalUniq,
 } from "../billableEventsQuery";
 
-const { mockGetClickHouseClientForProject } = vi.hoisted(() => ({
-  mockGetClickHouseClientForProject: vi.fn(),
+const { findTraceSummariesTotalUniq } = vi.hoisted(() => ({
+  findTraceSummariesTotalUniq: vi.fn(),
 }));
 
-vi.mock("../../../../src/server/clickhouse/clickhouseClient", () => ({
-  getClickHouseClientForProject: mockGetClickHouseClientForProject,
-  getClickHouseClientForOrganization: vi.fn(),
+// The query functions take the repository from the App, so standing in for
+// the store means standing in for `getApp()`.
+let billableEvents:
+  | { findTraceSummariesTotalUniq: typeof findTraceSummariesTotalUniq }
+  | undefined;
+vi.mock("~/server/app-layer/app", () => ({
+  getApp: () => ({
+    billableEvents,
+  }),
 }));
 
 describe("billingMonthDateRange", () => {
@@ -46,16 +52,12 @@ describe("billingMonthDateRange", () => {
 describe("queryTraceSummariesTotalUniq", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    billableEvents = { findTraceSummariesTotalUniq };
   });
 
-  describe("when a ClickHouse client is available", () => {
-    it("queries with tenant-scoped and month-bounded params and parses the total", async () => {
-      const mockQuery = vi
-        .fn()
-        .mockResolvedValue({ json: () => Promise.resolve([{ total: "42" }]) });
-      mockGetClickHouseClientForProject.mockResolvedValue({
-        query: mockQuery,
-      });
+  describe("when a ClickHouse repository is available", () => {
+    it("queries with tenant-scoped and month-bounded params and returns the total", async () => {
+      findTraceSummariesTotalUniq.mockResolvedValue(42);
 
       const result = await queryTraceSummariesTotalUniq({
         projectIds: ["proj-1", "proj-2"],
@@ -63,25 +65,17 @@ describe("queryTraceSummariesTotalUniq", () => {
       });
 
       expect(result).toBe(42);
-      expect(mockGetClickHouseClientForProject).toHaveBeenCalledWith("proj-1");
-      expect(mockQuery).toHaveBeenCalledWith(
-        expect.objectContaining({
-          query_params: {
-            tenantIds: ["proj-1", "proj-2"],
-            startDate: "2026-02-01 00:00:00.000",
-            endDate: "2026-03-01 00:00:00.000",
-          },
-        }),
-      );
-      const queryString = (mockQuery.mock.calls[0]?.[0] as { query: string })
-        .query;
-      expect(queryString).toContain("TenantId IN {tenantIds:Array(String)}");
+      expect(findTraceSummariesTotalUniq).toHaveBeenCalledWith({
+        tenantIds: ["proj-1", "proj-2"],
+        startDate: "2026-02-01 00:00:00.000",
+        endDate: "2026-03-01 00:00:00.000",
+      });
     });
   });
 
-  describe("when no ClickHouse client is available", () => {
+  describe("when no ClickHouse repository is available", () => {
     it("returns null so callers can distinguish outage from zero usage", async () => {
-      mockGetClickHouseClientForProject.mockResolvedValue(null);
+      billableEvents = undefined;
 
       const result = await queryTraceSummariesTotalUniq({
         projectIds: ["proj-1"],
@@ -93,14 +87,14 @@ describe("queryTraceSummariesTotalUniq", () => {
   });
 
   describe("when projectIds is empty", () => {
-    it("returns 0 without resolving a client", async () => {
+    it("returns 0 without resolving a repository", async () => {
       const result = await queryTraceSummariesTotalUniq({
         projectIds: [],
         billingMonth: "2026-02",
       });
 
       expect(result).toBe(0);
-      expect(mockGetClickHouseClientForProject).not.toHaveBeenCalled();
+      expect(findTraceSummariesTotalUniq).not.toHaveBeenCalled();
     });
   });
 });

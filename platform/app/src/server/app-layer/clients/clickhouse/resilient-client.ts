@@ -1,4 +1,5 @@
 import type { ClickHouseClient } from "@clickhouse/client";
+import { RETRY_CAUSE_FIELD, runWithRetry } from "@langwatch/clickhouse-client";
 import { createLogger } from "@langwatch/observability";
 import {
   incrementClickHouseQueryCount,
@@ -6,10 +7,7 @@ import {
 } from "~/server/clickhouse/metrics";
 import { CLICKHOUSE_TRANSIENT_MESSAGE_FRAGMENTS } from "~/server/event-sourcing/services/errorHandling";
 import { detectColdScan } from "./cold-scan-detector";
-import {
-  TRANSIENT_NETWORK_CODES,
-  translateClickHouseQueryError,
-} from "./translate-query-error";
+import { translateClickHouseQueryError } from "./translate-query-error";
 import { queryWindowed } from "./windowed-read";
 
 /**
@@ -26,55 +24,14 @@ const logger = createLogger("langwatch:clickhouse:resilient");
 const queryLogger = createLogger("langwatch:clickhouse:query");
 
 /**
- * Reuses the canonical transient-message list from
- * event-sourcing/services/errorHandling.ts so the inline insert retry
- * loop catches the exact same set of cluster-recovery cases (ZK
- * reconnect, replica shutdown, KILL during graceful shutdown, overload)
- * as the outer group-queue retry classifier. Importing instead of
- * duplicating keeps the two layers in lock-step forever.
- */
-function isTransientError(error: unknown): boolean {
-  if (!(error instanceof Error)) return false;
-
-  const message = error.message;
-  if (/timeout/i.test(message)) return true;
-  for (const fragment of CLICKHOUSE_TRANSIENT_MESSAGE_FRAGMENTS) {
-    if (message.includes(fragment)) return true;
-  }
-
-  const code = (error as NodeJS.ErrnoException).code;
-  if (code && TRANSIENT_NETWORK_CODES.has(code)) return true;
-
-  const status =
-    (error as { statusCode?: number }).statusCode ??
-    (error as { status?: number }).status;
-  if (status === 429 || status === 502 || status === 503) return true;
-
-  return false;
-}
-
-function jitteredBackoff({
-  attempt,
-  baseDelayMs,
-  maxDelayMs,
-}: {
-  attempt: number;
-  baseDelayMs: number;
-  maxDelayMs: number;
-}): number {
-  const exponential = baseDelayMs * 2 ** attempt;
-  const jitter = Math.random() * baseDelayMs;
-  return Math.min(exponential + jitter, maxDelayMs);
-}
-
-/**
- * Runs an operation against ClickHouse, retrying transient failures with
- * jittered backoff. Both reads and writes use this: a read rejected with
- * "Too many simultaneous queries" (or any other transient overload /
- * cluster-recovery condition) frees up within moments, and reads are
- * idempotent, so retrying rides through the spike instead of surfacing a
- * 500 to the user. Non-transient errors (e.g. a query syntax error) fail
- * fast on the first attempt.
+ * The whole retry policy - classification, backoff, how loudly to report an
+ * attempt - lives in @langwatch/clickhouse-client, so every ClickHouse caller
+ * in the repo answers to one implementation rather than a copy per layer.
+ *
+ * The transient-message list is still passed in from
+ * event-sourcing/services/errorHandling.ts rather than owned by the package,
+ * which keeps this layer and the outer group-queue classifier reading the same
+ * list forever.
  */
 async function withTransientRetry<T>(
   fn: () => Promise<T>,
@@ -90,29 +47,22 @@ async function withTransientRetry<T>(
     maxDelayMs: number;
   },
 ): Promise<T> {
-  let lastError: unknown;
-
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    try {
-      return await fn();
-    } catch (error) {
-      lastError = error;
-
-      if (!isTransientError(error) || attempt === maxRetries) {
-        throw error;
-      }
-
-      const delay = jitteredBackoff({ attempt, baseDelayMs, maxDelayMs });
-
+  return runWithRetry(fn, {
+    // maxRetries counts retries after the first try; runWithRetry counts tries.
+    maxAttempts: maxRetries + 1,
+    baseDelayMs,
+    maxDelayMs,
+    transientMessageFragments: CLICKHOUSE_TRANSIENT_MESSAGE_FRAGMENTS,
+    onRetry: ({ attempt, maxAttempts, delayMs, error, level }) => {
       try {
-        logger.warn(
+        logger[level](
           {
             source: "clickhouse",
             operation,
             attempt: attempt + 1,
-            maxRetries,
-            delayMs: Math.round(delay),
-            error,
+            maxRetries: maxAttempts - 1,
+            delayMs: Math.round(delayMs),
+            [RETRY_CAUSE_FIELD]: error,
           },
           `Transient ClickHouse ${operation} error, retrying`,
         );
@@ -122,12 +72,8 @@ async function withTransientRetry<T>(
           `Failed to log transient ${operation} retry`,
         );
       }
-
-      await new Promise((resolve) => setTimeout(resolve, delay));
-    }
-  }
-
-  throw lastError;
+    },
+  });
 }
 
 function safeQueryMeta(params: unknown): {
@@ -375,7 +321,32 @@ function guardInbandException<
 }
 
 /**
- * Wraps a ClickHouseClient with structured logging and insert retry.
+ * Wraps a ClickHouseClient with structured logging, error translation, and
+ * retry on reads only.
+ *
+ * Reads retry here because they are idempotent and nothing above them will do
+ * it: a transient overload would otherwise surface as a failed page.
+ *
+ * Writes deliberately do not. Every insert in this system is issued from a job
+ * on the group queue, which retries the whole job on its own backoff, so a
+ * client-side retry does not add resilience - it multiplies attempts. The two
+ * layers compounded: 4 attempts here inside up to 25 there, so one insert could
+ * be tried ~100 times against a server that was rejecting precisely because it
+ * was overloaded.
+ *
+ * It was also the unsafe half. These are async inserts
+ * (`async_insert` + `wait_for_async_insert`, see ~/server/clickhouse/queryDefaults)
+ * and `async_insert_deduplicate` is not set anywhere, so it takes ClickHouse's
+ * default of off. A failure raised after the server has accepted the batch into
+ * its buffer - `Query was cancelled`, or the memory limit hit while executing
+ * `WaitForAsyncInsert`, which between them were most of the insert retries in
+ * production - can still flush. Retrying then writes the rows twice.
+ * ReplacingMergeTree collapses that for the tables keyed to collapse it; the
+ * rollup and analytics tables just double-count.
+ *
+ * If insert retries are ever wanted back, make them idempotent first: set
+ * `async_insert_deduplicate`, or pass a deterministic `insert_deduplication_token`
+ * per batch.
  */
 export function createResilientClickHouseClient({
   client,
@@ -424,12 +395,8 @@ export function createResilientClickHouseClient({
       "unknown";
     const start = performance.now();
     try {
-      const result = await withTransientRetry(() => client.insert(params), {
-        operation: "insert",
-        maxRetries,
-        baseDelayMs,
-        maxDelayMs,
-      });
+      // Deliberately NOT retried here. See the note on this function.
+      const result = await client.insert(params);
       const durationMs = performance.now() - start;
       logSuccess({ operation: "insert", durationMs, params });
       observeClickHouseQueryDuration("INSERT", insertTable, durationMs / 1000);

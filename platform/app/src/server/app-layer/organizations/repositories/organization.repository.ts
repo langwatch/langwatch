@@ -13,6 +13,7 @@ import type {
   TeamUserRole,
   User,
 } from "@prisma/client";
+import type { TeamRoleUpdateOrigin } from "../compute-effective-team-role-updates";
 
 export type TeamWithProjects = Team & {
   projects: Project[];
@@ -215,8 +216,19 @@ export interface UpdateMemberRoleInput {
     teamId: string;
     role: string;
     customRoleId?: string;
+    origin: TeamRoleUpdateOrigin;
   }>;
   currentUserId: string;
+}
+
+/**
+ * What the seat change did that the admin who made it would not otherwise see.
+ *
+ * A correction to Viewer can take away a shared team's only team-scoped admin.
+ * The change is allowed, so this is the only place it is visible.
+ */
+export interface UpdateMemberRoleResult {
+  teamsLeftWithoutAdmin: Array<{ id: string; name: string }>;
 }
 
 /**
@@ -302,7 +314,9 @@ export interface OrganizationRepository {
 
   setMemberDisabled(input: SetMemberDisabledInput): Promise<void>;
 
-  updateMemberRole(input: UpdateMemberRoleInput): Promise<void>;
+  updateMemberRole(
+    input: UpdateMemberRoleInput,
+  ): Promise<UpdateMemberRoleResult>;
 
   updateTeamMemberRole(input: UpdateTeamMemberRoleInput): Promise<void>;
 
@@ -436,7 +450,11 @@ export class NullOrganizationRepository implements OrganizationRepository {
 
   async setMemberDisabled(_input: SetMemberDisabledInput): Promise<void> {}
 
-  async updateMemberRole(_input: UpdateMemberRoleInput): Promise<void> {}
+  async updateMemberRole(
+    _input: UpdateMemberRoleInput,
+  ): Promise<UpdateMemberRoleResult> {
+    return { teamsLeftWithoutAdmin: [] };
+  }
 
   async updateTeamMemberRole(
     _input: UpdateTeamMemberRoleInput,

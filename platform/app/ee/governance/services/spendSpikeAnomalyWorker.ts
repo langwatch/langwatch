@@ -15,6 +15,7 @@ import { createLogger } from "@langwatch/observability";
  * Spec: specs/ai-gateway/governance/anomaly-detection.feature +
  *       specs/ai-gateway/governance/anomaly-rules.feature
  */
+import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
 import {
   captureException,
@@ -48,7 +49,10 @@ export function startSpendSpikeAnomalyWorker(): SpendSpikeAnomalyWorkerHandle {
   const tick = async () => {
     if (stopped) return;
     try {
-      const evaluator = SpendSpikeAnomalyEvaluator.create(prisma);
+      const evaluator = SpendSpikeAnomalyEvaluator.create({
+        prisma,
+        kpisRepository: getApp().governance.kpis,
+      });
       const result = await evaluator.evaluateAll({ now: new Date() });
       logger.info(
         {

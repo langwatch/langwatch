@@ -8,12 +8,12 @@
  */
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-
+import { getApp } from "~/server/app-layer/app";
 import {
   GatewayBudgetService,
   type GatewayBudgetWithSeats,
 } from "~/server/gateway/budget.service";
-import { chRepoOrUndefined } from "~/server/gateway/clickhouseRepos";
+import { effectiveBudgetPeriod } from "~/server/gateway/budgetPeriod";
 import {
   providerLabelFor,
   resolveProviderLabels,
@@ -59,7 +59,7 @@ export const gatewayBudgetsRouter = createTRPCRouter({
       await requireOrgAccess(ctx, input.organizationId);
       const service = GatewayBudgetService.create(
         ctx.prisma,
-        chRepoOrUndefined(),
+        getApp().gateway.budgets,
       );
       const { budgets, spendAvailable, scopeReach } =
         await service.listWithHealth(input.organizationId);
@@ -90,7 +90,7 @@ export const gatewayBudgetsRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       const service = GatewayBudgetService.create(
         ctx.prisma,
-        chRepoOrUndefined(),
+        getApp().gateway.budgets,
       );
       const { budgets, spendAvailable, scopeReach } =
         await service.listForProjectWithHealth(input.projectId);
@@ -126,7 +126,7 @@ export const gatewayBudgetsRouter = createTRPCRouter({
       await requireOrgAccess(ctx, input.organizationId);
       const service = GatewayBudgetService.create(
         ctx.prisma,
-        chRepoOrUndefined(),
+        getApp().gateway.budgets,
       );
       const detail = await service.getDetail(input.id, input.organizationId);
       if (!detail) {
@@ -191,20 +191,47 @@ export const gatewayBudgetsRouter = createTRPCRouter({
         scope: scopeSchema,
         name: z.string().min(1).max(128),
         description: z.string().optional(),
-        window: z.enum(["MINUTE", "HOUR", "DAY", "WEEK", "MONTH", "TOTAL"]),
+        window: z.enum([
+          "MINUTE",
+          "HOUR",
+          "DAY",
+          "WEEK",
+          "MONTH",
+          "TOTAL",
+          "MANUAL",
+        ]),
         limitUsd: z.number().positive().or(z.string()),
         onBreach: z.enum(["BLOCK", "WARN"]).optional(),
         timezone: z.string().nullable().optional(),
         // ModelProvider row id. Null / absent = the budget counts every
         // provider; set = it counts and constrains only that provider.
         providerKey: z.string().nullable().optional(),
+        // Phases a cyclic window off this instant instead of the calendar.
+        // Absent keeps the calendar alignment. Rejected on TOTAL and
+        // MANUAL, which do not cycle.
+        //
+        // A Date, or an ISO string carrying its offset, and nothing looser:
+        // the same instant the REST surface demands. An offsetless string
+        // would be read in whichever zone the server process happens to run
+        // in, so the anchor a customer set would land on a different instant
+        // per deployment.
+        cycleAnchorAt: z
+          .union([
+            z.date(),
+            z
+              .string()
+              .datetime({ offset: true })
+              .transform((iso) => new Date(iso)),
+          ])
+          .nullable()
+          .optional(),
       }),
     )
     .use(checkOrganizationPermission("gatewayBudgets:create"))
     .mutation(async ({ ctx, input }) => {
       const service = GatewayBudgetService.create(
         ctx.prisma,
-        chRepoOrUndefined(),
+        getApp().gateway.budgets,
       );
       const row = await service.create({
         organizationId: input.organizationId,
@@ -216,6 +243,7 @@ export const gatewayBudgetsRouter = createTRPCRouter({
         onBreach: input.onBreach,
         timezone: input.timezone ?? null,
         providerKey: input.providerKey ?? null,
+        cycleAnchorAt: input.cycleAnchorAt ?? null,
         actorUserId: ctx.session.user.id,
       });
       return toDto(row);
@@ -237,7 +265,7 @@ export const gatewayBudgetsRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const service = GatewayBudgetService.create(
         ctx.prisma,
-        chRepoOrUndefined(),
+        getApp().gateway.budgets,
       );
       const row = await service.update({
         ...input,
@@ -252,7 +280,7 @@ export const gatewayBudgetsRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const service = GatewayBudgetService.create(
         ctx.prisma,
-        chRepoOrUndefined(),
+        getApp().gateway.budgets,
       );
       const row = await service.archive({
         ...input,
@@ -274,7 +302,7 @@ export const gatewayBudgetsRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const service = GatewayBudgetService.create(
         ctx.prisma,
-        chRepoOrUndefined(),
+        getApp().gateway.budgets,
       );
       const row = await service.reset({
         id: input.id,
@@ -478,6 +506,11 @@ async function resolveScopeTargetsBatch(
 }
 
 function toDto(b: GatewayBudgetWithSeats) {
+  // Computed, not read off the row: the stored columns only move at create
+  // and at an explicit reset, so a budget past its first boundary would
+  // otherwise report a period that closed months ago next to this period's
+  // spend. See effectiveBudgetPeriod.
+  const period = effectiveBudgetPeriod(b);
   return {
     id: b.id,
     organizationId: b.organizationId,
@@ -491,8 +524,10 @@ function toDto(b: GatewayBudgetWithSeats) {
     spentUsd: b.spentUsd.toString(),
     timezone: b.timezone,
     providerKey: b.providerKey,
-    currentPeriodStartedAt: b.currentPeriodStartedAt.toISOString(),
-    resetsAt: b.resetsAt.toISOString(),
+    currentPeriodStartedAt: period.currentPeriodStartedAt.toISOString(),
+    resetsAt: period.resetsAt.toISOString(),
+    /** Null is calendar alignment; set, it is the phase the window cycles on. */
+    cycleAnchorAt: b.cycleAnchorAt?.toISOString() ?? null,
     lastResetAt: b.lastResetAt?.toISOString() ?? null,
     archivedAt: b.archivedAt?.toISOString() ?? null,
     createdAt: b.createdAt.toISOString(),

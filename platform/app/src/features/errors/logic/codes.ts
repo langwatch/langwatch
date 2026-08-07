@@ -45,6 +45,8 @@ export const APP_ERROR_CODES = [
   "cache_rule_not_found",
   "cannot_impersonate_admin",
   "cannot_impersonate_deactivated_user",
+  "cannot_remove_self_as_last_admin",
+  "clickhouse_overloaded",
   "clickhouse_unavailable",
   "codex_auth_failed",
   "custom_role_not_found",
@@ -53,6 +55,7 @@ export const APP_ERROR_CODES = [
   "dataset_not_ready",
   "dataset_stale_columns",
   "dspy_step_not_found",
+  "email_already_registered",
   "evaluation_not_found",
   "evaluator_config_error",
   "evaluator_execution_error",
@@ -64,6 +67,7 @@ export const APP_ERROR_CODES = [
   "external_id_conflict",
   "filter_field_unknown",
   "filter_parse_error",
+  "gateway_budget_cycle_anchor_invalid",
   "gateway_budget_not_found",
   "gateway_group_budget_unsupported",
   "gateway_guardrail_project_mismatch",
@@ -75,6 +79,7 @@ export const APP_ERROR_CODES = [
   "governed_sql_unavailable",
   "governed_sql_unparseable",
   "guardrail_attach_forbidden",
+  "idempotency_error",
   "ingestion_source_cap_reached",
   "ingestion_source_not_found",
   // Also a Go code, with copy already written under the shared/transport
@@ -117,6 +122,7 @@ export const APP_ERROR_CODES = [
   "license_signing_key_encrypted",
   "license_signing_key_not_pem",
   "lite_member_restricted",
+  "lite_member_viewer_only",
   "malformed_custom_role_permissions",
   "malformed_request",
   "missing_annotator",
@@ -143,6 +149,7 @@ export const APP_ERROR_CODES = [
   "notification_delivery_error",
   "organization_not_found",
   "organization_not_found_for_team",
+  "personal_workspace_not_managed_here",
   "project_not_found",
   "project_permission_denied",
   "prompt_not_found",
@@ -182,6 +189,7 @@ export const APP_ERROR_CODES = [
   "suite_not_found",
   "system_prompt_conflict",
   "system_prompt_required",
+  "team_last_admin_required",
   "team_membership_not_found",
   "team_not_found",
   "template_immutable",
@@ -203,6 +211,12 @@ export const APP_ERROR_CODES = [
   // boundary uses to promote input ZodErrors onto the handled channel).
   "validation_error",
   "virtual_key_not_found",
+  // The webhook platform names its two endpoint failures itself, in
+  // `~/app/api/webhooks/[[...route]]/error-handler`, rather than deriving
+  // them from the status: `not_found` alone would not say WHICH lookup
+  // missed, and an endpoint id is the only one those routes take.
+  "webhook_endpoint_invalid",
+  "webhook_endpoint_not_found",
   "webhook_event_not_found",
   "workflow_execution_failed",
   "workflow_not_found",

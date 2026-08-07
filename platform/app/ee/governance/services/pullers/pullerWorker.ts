@@ -22,7 +22,7 @@
  * Spec: specs/ai-governance/puller-framework/puller-adapter-contract.feature
  */
 import { createLogger } from "@langwatch/observability";
-import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
+import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
 import {
   captureException,
@@ -33,7 +33,6 @@ import { decryptCredentials } from "../activity-monitor/ingestionCredentials";
 
 import {
   type GovernanceOcsfEventInput,
-  GovernanceOcsfEventsClickHouseRepository,
   OCSF_ACTIVITY,
   OCSF_SEVERITY,
 } from "../governanceOcsfEvents.clickhouse.repository";
@@ -213,15 +212,12 @@ export async function runIngestionPull(params: {
       prisma,
       source.organizationId,
     );
-    const ocsfRepo = new GovernanceOcsfEventsClickHouseRepository(
-      async (tenantId) => {
-        const client = await getClickHouseClientForProject(tenantId);
-        if (!client) {
-          throw new Error(`ClickHouse not available for tenant ${tenantId}`);
-        }
-        return client;
-      },
-    );
+    const ocsfRepo = getApp().governance.ocsfEvents;
+    if (!ocsfRepo) {
+      throw new Error(
+        "ClickHouse client is not available — check ClickHouse connection configuration",
+      );
+    }
     for (const evt of result.events) {
       await ocsfRepo.insertEvent(
         mapToOcsfRow({
