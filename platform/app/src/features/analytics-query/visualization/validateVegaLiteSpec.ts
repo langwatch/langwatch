@@ -39,6 +39,44 @@ import type {
   VegaValidationWarning,
 } from "./visualization.types";
 
+export interface ValidateVegaLiteSpecStructureInput {
+  /** The already-parsed candidate specification. Never a URL, never text. */
+  readonly spec: unknown;
+  /** Every dataset name the spec may read. This list is the whole registry. */
+  readonly registeredDatasets: readonly string[];
+}
+
+/**
+ * Stages 2 to 6 — everything decidable from the specification alone.
+ *
+ * Split out because the two callers hold different amounts of the picture. The
+ * renderer has rows and columns and asks {@link validateVegaLiteSpec} for all
+ * seven stages. The save path holds a *query*, not its result, so the dataset
+ * row ceilings and the field references are not yet facts about anything; it
+ * asks for exactly this much on the way in, and the renderer asks for the rest
+ * once rows exist. Neither re-implements a rule the other applies.
+ */
+export function validateVegaLiteSpecStructure({
+  spec,
+  registeredDatasets,
+}: ValidateVegaLiteSpecStructureInput): VegaLiteValidationResult {
+  if (!isPlainObject(spec)) return refused([notAnObjectError(spec)]);
+
+  const version = checkSchemaDeclaration(spec);
+  if (version.length > 0) return refused(version);
+
+  const envelope = checkSpecEnvelopeLimits(spec);
+  if (envelope.length > 0) return refused(envelope);
+
+  const schema = validateAgainstVegaLiteSchema(spec);
+  if (schema.length > 0) return refused(schema);
+
+  const policy = applyGovernedVegaPolicy({ spec, registeredDatasets });
+  if (policy.errors.length > 0) return refused(policy.errors, policy.warnings);
+
+  return { ok: true, normalized: spec, warnings: policy.warnings };
+}
+
 export interface ValidateVegaLiteSpecInput {
   /** The already-parsed candidate specification. Never a URL, never text. */
   readonly spec: unknown;
@@ -56,25 +94,14 @@ export function validateVegaLiteSpec({
   const rowLimits = checkDatasetRowLimits(rowCountsByDataset);
   if (rowLimits.length > 0) return refused(rowLimits);
 
-  if (!isPlainObject(spec)) return refused([notAnObjectError(spec)]);
-
-  const version = checkSchemaDeclaration(spec);
-  if (version.length > 0) return refused(version);
-
-  const envelope = checkSpecEnvelopeLimits(spec);
-  if (envelope.length > 0) return refused(envelope);
-
-  const schema = validateAgainstVegaLiteSchema(spec);
-  if (schema.length > 0) return refused(schema);
-
-  const policy = applyGovernedVegaPolicy({
+  const structure = validateVegaLiteSpecStructure({
     spec,
     registeredDatasets: Object.keys(columnsByDataset),
   });
-  if (policy.errors.length > 0) return refused(policy.errors, policy.warnings);
+  if (!structure.ok) return structure;
 
   const fields = validateFieldReferences({ spec, columnsByDataset });
-  const warnings = [...policy.warnings, ...fields.warnings];
+  const warnings = [...structure.warnings, ...fields.warnings];
   if (fields.errors.length > 0) return refused(fields.errors, warnings);
 
   return { ok: true, normalized: spec, warnings };

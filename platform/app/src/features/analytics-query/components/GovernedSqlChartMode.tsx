@@ -29,6 +29,7 @@ import {
 } from "@chakra-ui/react";
 import { useMemo, useState } from "react";
 
+import { GOVERNED_QUERY_RESULT_DATASET } from "../visualization/governedDatasetNames";
 import { starterVegaLiteSpecText } from "../visualization/starterVegaLiteSpec";
 import {
   parseVegaLiteSpecText,
@@ -42,9 +43,6 @@ import type {
 import { GovernedChartFailure } from "./GovernedChartFailure";
 import { GovernedVegaLiteChart } from "./GovernedVegaLiteChart";
 import { VegaLiteSpecEditor } from "./VegaLiteSpecEditor";
-
-/** The dataset name the workbench registers its result under. */
-export const GOVERNED_QUERY_RESULT_DATASET = "query_result";
 
 /** The shape of a governed SQL result, narrowed to what a chart reads. */
 export interface GovernedSqlChartResult {
