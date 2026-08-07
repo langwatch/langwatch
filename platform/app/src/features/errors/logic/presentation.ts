@@ -159,6 +159,19 @@ const PROVIDER_OUTAGE_REASONS: ReadonlySet<string> = new Set([
 ]);
 
 /**
+ * The provider a retired one was folded into, written the way the product
+ * writes it. Keyed by the registry slug that rides in `meta.replacement`.
+ *
+ * A table rather than a title-cased slug, because provider names are brand
+ * names ("OpenAI", "vLLM") that no casing rule gets right, and because an
+ * unmapped slug should fall back to a sentence that omits the name rather
+ * than print a raw identifier at a customer.
+ */
+const DEPRECATED_PROVIDER_REPLACEMENTS: Record<string, string> = {
+  gemini: "Gemini",
+};
+
+/**
  * Looks a label up in one of the tables below, without trusting the key.
  *
  * Every key passed here comes from `meta` — a field name, a `fieldErrors`
@@ -454,6 +467,23 @@ const presentations = {
         ? "Removing a provider by name needs a project. Pick one and try again."
         : "Choose a project or an organization, then try again.",
   },
+  model_provider_deprecated: {
+    // Reader tried to ADD a provider that has been absorbed into another
+    // one — from the API, an SDK, or a page open since before the change,
+    // since the Add menu no longer offers it. Their stored rows are fine
+    // and the copy says so, because "no longer available" otherwise reads
+    // as "the one I already have just broke".
+    title: "This provider has moved",
+    describe: (error) => {
+      const replacement = label(
+        DEPRECATED_PROVIDER_REPLACEMENTS,
+        str(error, "replacement", ""),
+      );
+      return replacement
+        ? `Add ${replacement} instead — it now covers this. Providers you already set up keep working.`
+        : "It has been merged into another provider. Providers you already set up keep working.";
+    },
+  },
   model_provider_scopes_required: {
     title: "Choose where this provider applies",
     describe: () =>
@@ -514,6 +544,25 @@ const presentations = {
     describe: () =>
       "It may have been removed, or it isn't available here. Reload to see the current list.",
   },
+  model_provider_test_rate_limited: {
+    // Nothing is wrong with the credential — we simply stopped asking. Saying
+    // "wait" without saying how long invites the customer to keep clicking,
+    // which is the behaviour the limit exists to stop, so the number rides in
+    // `meta` and gets read back here.
+    title: "Too many connection tests",
+    describe: (error) => {
+      // Rounded up here rather than trusted from the wire. The server sends a
+      // whole number today, but this is a client contract read by whatever
+      // sends the code, and a fraction would print "about 30.427 seconds" and
+      // slip past the `=== 1` singular check. Up, not down: rounding down
+      // invites a retry the limiter is still going to refuse.
+      const raw = Number(error.meta.retryAfterSeconds);
+      const seconds = Number.isFinite(raw) ? Math.ceil(raw) : 0;
+      return seconds > 0
+        ? `Wait about ${seconds} second${seconds === 1 ? "" : "s"} and try again.`
+        : "Wait a moment and try again.";
+    },
+  },
   provider_key_invalid: {
     // The provider positively identified the credential as wrong, which is the
     // one refusal a new key actually fixes. Deliberately says nothing about
@@ -522,6 +571,14 @@ const presentations = {
     title: "That API key was refused",
     describe: () =>
       "The provider didn't recognise it. Check you copied the whole key, and that it belongs to the right account.",
+  },
+  provider_endpoint_redirected: {
+    // Not "we couldn't reach it" — something answered, and it wants us
+    // somewhere else. Saying so is the difference between the customer
+    // checking their network and the customer fixing a URL.
+    title: "That endpoint redirects somewhere else",
+    describe: () =>
+      "We don't follow redirects when sending a credential. Point the base URL at the address the provider actually serves — an http:// URL redirecting to https:// is the usual cause.",
   },
   provider_key_missing: {
     title: "No API key to check",
@@ -533,10 +590,20 @@ const presentations = {
     // what "invalid" would send them off to do. The reason is a discriminant
     // from a set Google enumerates, so branching copy on it is safe.
     title: "This key's restrictions block the request",
-    describe: (error) =>
-      error.meta.reason === "API_KEY_SERVICE_BLOCKED"
-        ? "Its API restrictions exclude the Generative Language API. Allow that API in the Google Cloud console, or set up a Vertex AI provider instead."
-        : "Its application restrictions don't allow a call from our servers. Adjust them in the Google Cloud console, then try again.",
+    // The same refusal reason means opposite remediations on Google's two
+    // doors, so the sentence follows `meta.googleDoor` (set by the
+    // validation walk): a key blocked on the Gemini API likely belongs on
+    // the Agent Platform door and needs the pair filled in, while a key
+    // blocked on Agent Platform likely belongs on the Gemini API and
+    // needs the pair cleared.
+    describe: (error) => {
+      if (error.meta.reason !== "API_KEY_SERVICE_BLOCKED") {
+        return "Its application restrictions don't allow a call from our servers. Adjust them in the Google Cloud console, then try again.";
+      }
+      return error.meta.googleDoor === "agent-platform"
+        ? "This key can't call the Agent Platform service. If it is an AI Studio key, clear the Google Cloud Project and Location fields and save again; otherwise allow the Agent Platform API in the Google Cloud console."
+        : "This key belongs to a different Google service. If it is a Gemini Enterprise Agent Platform key, fill in the Google Cloud Project and Location fields and save again; otherwise allow the Generative Language API in the Google Cloud console.";
+    },
   },
   provider_refused: {
     // fault: provider. It answered and said no, but not in terms we can map —

@@ -15,6 +15,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"sync"
@@ -1015,14 +1016,15 @@ const ProviderRequestTimeoutSeconds = 14 * 60
 
 func (a *account) GetConfigForProvider(provider bfschemas.ModelProvider) (*bfschemas.ProviderConfig, error) {
 	cfg := &bfschemas.ProviderConfig{}
-	if strings.HasPrefix(string(provider), anthropicCompatPrefix) {
+	if strings.HasPrefix(string(provider), anthropicCompatPrefix) ||
+		strings.HasPrefix(string(provider), geminiCompatPrefix) {
 		endpoint, ok := a.anthropicCompat.lookup(string(provider))
 		if !ok {
-			return nil, fmt.Errorf("no endpoint registered for anthropic-compatible provider %q", provider)
+			return nil, fmt.Errorf("no endpoint registered for URL-derived provider %q", provider)
 		}
 		cfg.NetworkConfig.BaseURL = endpoint.baseURL
 		cfg.CustomProviderConfig = &bfschemas.CustomProviderConfig{
-			BaseProviderType: bfschemas.Anthropic,
+			BaseProviderType: endpoint.baseType,
 			IsKeyLess:        endpoint.keyless,
 		}
 		// Every compat endpoint gets its own bifrost worker pool, unlike the
@@ -1160,7 +1162,8 @@ func envVar(v string) bfschemas.EnvVar {
 // never the ones evicted.
 func (r *BifrostRouter) mapProviderForDispatch(cred domain.Credential) bfschemas.ModelProvider {
 	provider := mapProvider(cred)
-	if strings.HasPrefix(string(provider), anthropicCompatPrefix) {
+	if strings.HasPrefix(string(provider), anthropicCompatPrefix) ||
+		strings.HasPrefix(string(provider), geminiCompatPrefix) {
 		return r.anthropicCompat.register(cred)
 	}
 	return provider
@@ -1175,6 +1178,15 @@ func mapProvider(cred domain.Credential) bfschemas.ModelProvider {
 	case domain.ProviderVertex:
 		return bfschemas.Vertex
 	case domain.ProviderGemini:
+		// A credential carrying a project and region is an Agent Platform
+		// key — Gemini's second door. It dispatches through a derived
+		// custom provider (base type Gemini) whose base URL names the
+		// project and location, because the stock Gemini provider is
+		// pinned to generativelanguage.googleapis.com, where such a key
+		// is refused by its own restrictions.
+		if credentialIsAgentPlatform(cred) {
+			return geminiCompatProviderKey(cred)
+		}
 		return bfschemas.Gemini
 	case domain.ProviderAnthropic:
 		// Anthropic with a base-URL override (self-hosted server speaking
@@ -1241,6 +1253,13 @@ type anthropicCompatEndpoint struct {
 	// empty-value keys for base provider Anthropic and fails the
 	// dispatch; CustomProviderConfig.IsKeyLess skips selection entirely.
 	keyless bool
+	// baseType is the bifrost provider whose wire format the endpoint
+	// speaks: Anthropic for self-hosted Anthropic-compatible servers,
+	// Gemini for the Agent Platform door (a Gemini credential carrying a
+	// project and location — see geminiAgentPlatformEndpointForCred). The
+	// registry that holds these entries is shared by both; only the
+	// derivation and the prefix differ.
+	baseType bfschemas.ModelProvider
 }
 
 // anthropicCompatMaxEndpoints bounds the endpoint registry. Every distinct
@@ -1300,7 +1319,7 @@ func newAnthropicCompatRegistry(capacity int) *anthropicCompatRegistry {
 // register records the credential's endpoint under its derived provider key,
 // refreshes LRU recency, and returns the key. Evicts beyond capacity.
 func (reg *anthropicCompatRegistry) register(cred domain.Credential) bfschemas.ModelProvider {
-	endpoint, key := anthropicCompatEndpointForCred(cred)
+	endpoint, key := compatEndpointForCred(cred)
 
 	reg.mu.Lock()
 	if el, ok := reg.entries[string(key)]; ok {
@@ -1371,8 +1390,9 @@ func anthropicCompatEndpointForCred(cred domain.Credential) (anthropicCompatEndp
 	endpoint := anthropicCompatEndpoint{
 		// Same "/v1"-stripping as the OpenAI-compat path: Bifrost's
 		// Anthropic provider appends the full "/v1/messages" path itself.
-		baseURL: normalizeOpenAICompatBaseURL(credBaseURL(cred)),
-		keyless: strings.TrimSpace(cred.APIKey) == "",
+		baseURL:  normalizeOpenAICompatBaseURL(credBaseURL(cred)),
+		keyless:  strings.TrimSpace(cred.APIKey) == "",
+		baseType: bfschemas.Anthropic,
 	}
 	sum := sha256.Sum256([]byte(fmt.Sprintf("%s|keyless=%t", endpoint.baseURL, endpoint.keyless)))
 	return endpoint, bfschemas.ModelProvider(anthropicCompatPrefix + hex.EncodeToString(sum[:8]))
@@ -1383,6 +1403,58 @@ func anthropicCompatEndpointForCred(cred domain.Credential) (anthropicCompatEndp
 func anthropicCompatProviderKey(cred domain.Credential) bfschemas.ModelProvider {
 	_, key := anthropicCompatEndpointForCred(cred)
 	return key
+}
+
+// geminiCompatPrefix namespaces derived provider keys for Gemini credentials
+// served through the Agent Platform door, the way anthropicCompatPrefix does
+// for self-hosted Anthropic endpoints. A distinct prefix keeps the two
+// derivations from ever colliding in the shared registry.
+const geminiCompatPrefix = "gemini-url-"
+
+// geminiAgentPlatformEndpointForCred derives the endpoint identity and
+// provider key for a Gemini credential carrying a project and location — an
+// Agent Platform key, Gemini's second door. Bifrost's Gemini provider
+// appends "/models/{model}:generateContent" to its base URL and sends the
+// key as `x-goog-api-key`, both verified to be exactly what Agent Platform
+// serves, so the whole door is a base-URL prefix naming the project and
+// location. See specs/model-providers/google-agent-platform.feature.
+func geminiAgentPlatformEndpointForCred(cred domain.Credential) (anthropicCompatEndpoint, bfschemas.ModelProvider) {
+	endpoint := anthropicCompatEndpoint{
+		baseURL: fmt.Sprintf(
+			"https://aiplatform.googleapis.com/v1/projects/%s/locations/%s/publishers/google",
+			url.PathEscape(cred.Extra["project_id"]),
+			url.PathEscape(cred.Extra["region"]),
+		),
+		keyless:  false,
+		baseType: bfschemas.Gemini,
+	}
+	sum := sha256.Sum256([]byte(fmt.Sprintf("%s|keyless=%t", endpoint.baseURL, endpoint.keyless)))
+	return endpoint, bfschemas.ModelProvider(geminiCompatPrefix + hex.EncodeToString(sum[:8]))
+}
+
+// geminiCompatProviderKey derives the provider key for a Gemini credential
+// with Agent Platform routing fields.
+func geminiCompatProviderKey(cred domain.Credential) bfschemas.ModelProvider {
+	_, key := geminiAgentPlatformEndpointForCred(cred)
+	return key
+}
+
+// credentialIsAgentPlatform reports whether a Gemini credential names the
+// Agent Platform door: both routing fields present, per the materialiser's
+// contract (config.materialiser.ts emits project_id and region together or
+// not at all).
+func credentialIsAgentPlatform(cred domain.Credential) bool {
+	return cred.Extra["project_id"] != "" && cred.Extra["region"] != ""
+}
+
+// compatEndpointForCred picks the derivation matching the credential — the
+// registry stores both kinds of derived endpoint, and the credential's
+// provider says which one this is.
+func compatEndpointForCred(cred domain.Credential) (anthropicCompatEndpoint, bfschemas.ModelProvider) {
+	if cred.ProviderID == domain.ProviderGemini {
+		return geminiAgentPlatformEndpointForCred(cred)
+	}
+	return anthropicCompatEndpointForCred(cred)
 }
 
 // normalizeOpenAICompatBaseURL strips a trailing "/v1" (and trailing

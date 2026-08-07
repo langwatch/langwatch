@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.2.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v1.1.0...typescript-sdk@v1.2.0) (2026-08-07)
+
+
+### Features
+
+* **api-docs:** publish the REST API the SDKs actually call, and gate route coverage ([#6605](https://github.com/langwatch/langwatch/issues/6605)) ([25884bf](https://github.com/langwatch/langwatch/commit/25884bf3992eb99c00c3c7bafb09b979b02f0013))
+* gateway billing follow-ups: anchored cycles, idempotency keys, one webhook pipeline, CodeQL, docs sweep ([#6511](https://github.com/langwatch/langwatch/issues/6511)) ([359f985](https://github.com/langwatch/langwatch/commit/359f985700bc7178ff4725108810b917c626af84))
+
+
+### Bug Fixes
+
+* **sdk:** @opentelemetry/api is a runtime import, so declare it as a dependency ([#6552](https://github.com/langwatch/langwatch/issues/6552)) ([35effd6](https://github.com/langwatch/langwatch/commit/35effd6ae669e5e2799297048c0f87253a0a42d6))
+* **sdk:** declare the otel packages the SDK imports at runtime as dependencies ([35effd6](https://github.com/langwatch/langwatch/commit/35effd6ae669e5e2799297048c0f87253a0a42d6))
+
 ## [1.1.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v1.0.0...typescript-sdk@v1.1.0) (2026-07-31)
 
 
