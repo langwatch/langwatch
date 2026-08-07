@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"runtime"
+	"strings"
 	"time"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
@@ -22,6 +23,7 @@ import (
 // names verified against a live session rather than docs.
 type hookPayload struct {
 	SessionID      string         `json:"session_id"`
+	TranscriptPath string         `json:"transcript_path"`
 	AgentID        string         `json:"agent_id"`
 	PermissionMode string         `json:"permission_mode"`
 	ToolName       string         `json:"tool_name"`
@@ -78,6 +80,13 @@ func (o *Orchestrator) Gate(stdin io.Reader, stdout io.Writer) {
 
 	var p hookPayload
 	if json.NewDecoder(stdin).Decode(&p) != nil {
+		return
+	}
+	if warning := o.cacheCostWarning(p); warning != "" {
+		reply = hookReply{SystemMessage: warning, Specific: hookSpecificOutput{
+			HookEventName:      "PreToolUse",
+			PermissionDecision: "defer",
+		}}
 		return
 	}
 	if p.ToolName != "Bash" {
@@ -184,6 +193,59 @@ func (o *Orchestrator) havenPath() string {
 func (o *Orchestrator) readPressureRecord() (domain.PressureRecord, bool, time.Time) {
 	rec, ok := o.store.ReadPressure()
 	return rec, ok, o.sys.Now()
+}
+
+// instructionFiles are the paths whose edit MAY invalidate the cached prefix.
+//
+// May, not does: where the harness places instructions in the prefix is not
+// verified, which is why the warning hedges and why this only notifies.
+var instructionFiles = []string{"CLAUDE.md", ".claude/rules/", ".claude/settings"}
+
+// cacheCostWarning prices an edit that could bust a large cached prefix, and
+// returns "" when there is nothing worth saying.
+//
+// It is a warning and never a block: a cache-busting edit is almost always
+// deliberate, and the job is to make the price visible at the moment of the
+// action rather than to prevent it. The channel is a system message, which the
+// developer sees and the model does not — there is no primitive that shows the
+// model a price and still lets the action through.
+func (o *Orchestrator) cacheCostWarning(p hookPayload) string {
+	if p.ToolName != "Edit" && p.ToolName != "Write" {
+		return ""
+	}
+	path, _ := p.ToolInput["file_path"].(string)
+	if path == "" || !containsAnyPath(path) {
+		return ""
+	}
+	prefixTokens := domain.EstimateTokensFromBytes(transcriptSize(p.TranscriptPath))
+	if domain.ChannelFor(domain.InstructionsEdit, prefixTokens) == domain.Silent {
+		return ""
+	}
+	caller := domain.CallerFromAgentID(p.AgentID, false)
+	return "haven: " + domain.InvalidationWarning(domain.InstructionsEdit, prefixTokens, caller)
+}
+
+func containsAnyPath(path string) bool {
+	for _, marker := range instructionFiles {
+		if strings.Contains(path, marker) {
+			return true
+		}
+	}
+	return false
+}
+
+// transcriptSize stats the session's transcript. Stat, not parse: the fast path
+// budget forbids reading a file that reaches hundreds of MB, and the figure is
+// an order-of-magnitude aid rather than an invoice.
+func transcriptSize(path string) int64 {
+	if path == "" {
+		return 0
+	}
+	fi, err := os.Stat(path)
+	if err != nil {
+		return 0
+	}
+	return fi.Size()
 }
 
 // queueState reports how many heavy runs are live and whether a slot is free.
