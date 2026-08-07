@@ -1124,11 +1124,12 @@ describe.skipIf(!hasTestcontainers)(
           const processedInOrder: number[] = [];
           const attemptedSizes: number[] = [];
 
-          const queue = createQueue(
-            async (p) => {
+          const sendOrder = [5, 2, 7, 0, 4, 1, 6, 3];
+          await stageThenConsume({
+            processFn: async (p) => {
               processedInOrder.push(Number(p.id.slice(1)));
             },
-            {
+            overrides: {
               processBatch: async (ps) => {
                 attemptedSizes.push(ps.length);
                 if (ps.length > MAX_WORKABLE) {
@@ -1141,18 +1142,16 @@ describe.skipIf(!hasTestcontainers)(
               coalesceMaxBatch: () => 50,
               score: (p) => Number(p.value),
             },
-          );
-          await queue.waitUntilReady();
-
-          const dueAt = Date.now() + 2500;
-          const sendOrder = [5, 2, 7, 0, 4, 1, 6, 3];
-          await queue.sendBatch(
-            sendOrder.map((i) => ({
+            // One shared score, unlike the ordered batches elsewhere: the tie
+            // is the point, because it hands the ordering job entirely to
+            // `sendBatch`'s positional tiebreak and so lets the send order
+            // differ from the id order.
+            payloads: sendOrder.map((i) => ({
               id: `j${i}`,
               groupId: "group-a",
-              value: String(dueAt),
+              value: String(orderedScore(0)),
             })),
-          );
+          });
 
           // At-LEAST-8, not exactly 8: an over-delivery would never satisfy an
           // exact-length wait, so the bug would surface as an opaque 30s
