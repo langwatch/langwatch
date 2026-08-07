@@ -75,6 +75,31 @@ const registry = {
   time_range_too_wide: {
     tips: ["Query in smaller windows and paginate through the results"],
   },
+  governed_sql_unparseable: {
+    tips: [
+      "Read `meta.violations` — each entry carries the line and column the parser stopped at",
+      "The endpoint accepts native ClickHouse SQL; check for an unclosed quote, bracket, or parenthesis first",
+    ],
+  },
+  governed_sql_not_permitted: {
+    tips: [
+      "Read `meta.violations` — each entry names the rule (`code`) and the clause (`clause`) that was refused",
+      "Submit one read-only SELECT; writes, DDL, SETTINGS, FORMAT, INTO OUTFILE and table functions are all refused",
+      "Read only the datasets the schema endpoint lists for this key, and select fields by name rather than with `*`",
+    ],
+  },
+  governed_sql_parameter_missing: {
+    tips: [
+      "Read `meta.parameters` — it lists every parameter the SQL declares that the request left unset",
+      "Send a value for each under `parameters`, keyed by the name inside the braces: `{since:DateTime}` reads `parameters.since`",
+    ],
+  },
+  governed_sql_unavailable: {
+    tips: [
+      "The governed analytics SQL API is not provisioned on this deployment — retrying will not help",
+      "Contact support to have it enabled for this workspace",
+    ],
+  },
   clickhouse_unavailable: {
     tips: [
       "This is a temporary platform issue — retry in a few seconds",
