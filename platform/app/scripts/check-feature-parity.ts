@@ -517,7 +517,6 @@ const LEGACY_INERT: string[] = [
   "specs/npx-installer/04-validation.feature",
   "specs/npx-installer/05-publish.feature",
   "specs/npx-installer/06-langy.feature",
-  "specs/npx-installer/07-lean-install.feature",
   "specs/observability/browser-rum-trace-correlation.feature",
   "specs/observability/process-substrate-alerting.feature",
   "specs/ops/clickhouse-backup-metrics.feature",

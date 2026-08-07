@@ -81,3 +81,29 @@ Feature: A laptop install only pays for what it uses
     Then the rest of the install keeps working
     And the product goes back to saying the evaluator is not installed here
 
+  # ===========================================================================
+  # An evaluator this install cannot run is named, never shrugged at
+  # ===========================================================================
+
+  # An evaluator can be absent for two reasons: this install skipped it, or it
+  # was retired from the product entirely. Either way a saved evaluation can
+  # still name it, and the question is the same one: what does the person who
+  # opens that evaluation see. A blank page, an "internal error" or a silent
+  # pass all mean the same thing to them, which is that the product will not
+  # tell them what is wrong or what to do about it.
+
+  @integration
+  Scenario: An old evaluation that still names a retired evaluator offers a replacement
+    Given an evaluation saved long ago that names an evaluator this install no longer has
+    When they open its configuration page
+    Then the page loads rather than failing
+    And it names the evaluator that is no longer available
+    And it offers the evaluators they can pick instead
+
+  @unit
+  Scenario: Running one fails naming the evaluator, not with an unknown error
+    Given an evaluation saved long ago that names an evaluator this install no longer has
+    When it runs
+    Then the failure names the evaluator that could not be found
+    And it is reported as a known failure rather than an unknown one
+

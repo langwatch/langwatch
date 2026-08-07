@@ -346,7 +346,7 @@ export type SimpleMappingValidationResult = {
 
 /**
  * Core validation logic for evaluator mappings.
- * Used by both validateEvaluatorMappings and validateEvaluatorMappingsWithFields.
+ * Used by validateEvaluatorMappingsWithFields.
  */
 const validateMappingsCore = (
   requiredFields: string[],
@@ -387,32 +387,6 @@ const validateMappingsCore = (
     hasAnyMapping,
     missingRequiredFields,
   };
-};
-
-/**
- * Check if mappings are valid for an evaluator type.
- * This is a simpler version that works with just mappings and evaluator type,
- * without needing the full EvaluatorConfig.
- *
- * Validation rules:
- * 1. ALL required fields MUST have mappings
- * 2. Optional fields MAY have mappings
- * 3. BUT if ALL fields (required + optional) are empty, that's also invalid
- *    (at least one field must be mapped)
- *
- * @param evaluatorType - The evaluator type (e.g., "langevals/exact_match")
- * @param mappings - The current mappings (field -> mapping)
- * @returns Validation result
- */
-export const validateEvaluatorMappings = (
-  evaluatorType: string,
-  mappings: Record<string, { type: string; path?: string[] } | undefined>,
-): SimpleMappingValidationResult => {
-  const evaluatorDef = AVAILABLE_EVALUATORS[evaluatorType as EvaluatorTypes];
-  const requiredFields = evaluatorDef?.requiredFields ?? [];
-  const optionalFields = evaluatorDef?.optionalFields ?? [];
-
-  return validateMappingsCore(requiredFields, optionalFields, mappings);
 };
 
 /**
@@ -491,6 +465,24 @@ export const getEvaluatorMissingMappings = (
   // Get the evaluator definition to know which fields are required vs optional
   const evaluatorDef =
     AVAILABLE_EVALUATORS[evaluator.evaluatorType as EvaluatorTypes];
+
+  // A built-in evaluator with no catalog entry cannot run, whatever the
+  // mappings say. Reporting the mappings as complete would let the row be
+  // queued for an evaluator that is not there, so the evaluator itself is the
+  // finding.
+  if (!evaluatorDef && !evaluator.evaluatorType.startsWith("custom/")) {
+    return {
+      isValid: false,
+      missingMappings: [
+        {
+          fieldId: "evaluatorType",
+          fieldName: `${evaluator.evaluatorType} is not available`,
+          isRequired: true,
+        },
+      ],
+    };
+  }
+
   const requiredFieldsArr = evaluatorDef?.requiredFields ?? [];
   const optionalFieldsArr = evaluatorDef?.optionalFields ?? [];
 
