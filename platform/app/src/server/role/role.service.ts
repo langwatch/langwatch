@@ -106,8 +106,16 @@ export class RoleService {
       throw new RoleNotFoundError();
     }
 
-    if (role.assignedUsers.length > 0) {
-      throw new RoleInUseError(role.assignedUsers.length);
+    // In-use means referenced anywhere: the legacy TeamUser.assignedRoleId
+    // rows AND RoleBinding rows. Counting only the legacy side let a bound
+    // role reach the storage layer, where the delete died as an unnamed
+    // constraint failure instead of this refusal.
+    const bindingCount = await this.repository.countRoleBindings({
+      roleId,
+      organizationId: role.organizationId,
+    });
+    if (role.assignedUsers.length > 0 || bindingCount > 0) {
+      throw new RoleInUseError(role.assignedUsers.length, bindingCount);
     }
 
     await this.repository.delete(roleId);

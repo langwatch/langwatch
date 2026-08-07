@@ -215,7 +215,7 @@ secured.access(SCIM_POLICY).get("/Schemas", (c) => {
         schemas: ["urn:ietf:params:scim:schemas:core:2.0:Schema"],
         id: "urn:ietf:params:scim:schemas:core:2.0:Group",
         name: "Group",
-        description: "Group (maps to LangWatch Team)",
+        description: "Group (maps to a LangWatch access group)",
         attributes: [
           {
             name: "displayName",

@@ -362,6 +362,24 @@ export class ApiKeyRepository {
     });
   }
 
+  async findOrgAdminApiKeyBinding({
+    apiKeyId,
+    organizationId,
+  }: {
+    apiKeyId: string;
+    organizationId: string;
+  }): Promise<{ apiKeyId: string | null } | null> {
+    return this.prisma.roleBinding.findFirst({
+      where: {
+        apiKeyId,
+        organizationId,
+        scopeType: RoleBindingScopeType.ORGANIZATION,
+        role: TeamUserRole.ADMIN,
+      },
+      select: { apiKeyId: true },
+    });
+  }
+
   async findUserBindings({
     userId,
     organizationId,

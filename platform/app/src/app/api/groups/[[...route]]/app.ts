@@ -9,6 +9,7 @@ import { createOrgApp, requires } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
 import {
   BindingNotFoundError,
+  CustomRoleRequiredError,
   DuplicateMemberError,
   GroupNotFoundError,
   type GroupRestService,
@@ -16,10 +17,15 @@ import {
   ScopeNotInOrganizationError,
   UserNotInOrganizationError,
 } from "~/server/app-layer/groups/group.service";
+import { RoleNotAssignableError } from "~/server/role/errors";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import type { GroupServiceMiddlewareVariables } from "../../middleware/group-service";
 import { groupServiceMiddleware } from "../../middleware/group-service";
-import { BadRequestError, NotFoundError } from "../../shared/errors";
+import {
+  BadRequestError,
+  NotFoundError,
+  UnprocessableEntityError,
+} from "../../shared/errors";
 import { handleGroupError } from "./error-handler";
 
 patchZodOpenapi();
@@ -122,23 +128,33 @@ secured
       const body = c.req.valid("json");
       const service = c.get("groupService") as GroupRestService;
 
-      const group = await service.create({
-        organizationId: organization.id,
-        name: body.name,
-        bindings: body.bindings,
-        memberIds: body.memberIds,
-      });
+      try {
+        const group = await service.create({
+          organizationId: organization.id,
+          name: body.name,
+          bindings: body.bindings,
+          memberIds: body.memberIds,
+        });
 
-      return c.json(
-        {
-          id: group.id,
-          name: group.name,
-          slug: group.slug,
-          organizationId: group.organizationId,
-          createdAt: group.createdAt,
-        },
-        201,
-      );
+        return c.json(
+          {
+            id: group.id,
+            name: group.name,
+            slug: group.slug,
+            organizationId: group.organizationId,
+            createdAt: group.createdAt,
+          },
+          201,
+        );
+      } catch (error) {
+        if (
+          error instanceof RoleNotAssignableError ||
+          error instanceof CustomRoleRequiredError
+        ) {
+          throw new UnprocessableEntityError(error.message);
+        }
+        throw error;
+      }
     },
   );
 
@@ -416,6 +432,12 @@ secured
         }
         if (error instanceof ScopeNotInOrganizationError) {
           throw new BadRequestError(error.message);
+        }
+        if (
+          error instanceof RoleNotAssignableError ||
+          error instanceof CustomRoleRequiredError
+        ) {
+          throw new UnprocessableEntityError(error.message);
         }
         throw error;
       }

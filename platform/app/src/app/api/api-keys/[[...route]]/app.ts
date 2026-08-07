@@ -1,4 +1,5 @@
 import type { Organization } from "@prisma/client";
+import type { Context } from "hono";
 import { describeRoute } from "hono-openapi";
 import { z } from "zod";
 import { createOrgApp, requires } from "~/server/api/security";
@@ -79,6 +80,66 @@ const secured = createOrgApp<ApiKeyServiceMiddlewareVariables>({
 
 secured.hono.onError(handleApiKeyError);
 
+/**
+ * Real adminness for the presented credential: an org-scope ADMIN role
+ * binding on the calling user, or on the service key itself. Deliberately
+ * stricter than holding organization:manage, which a custom role can carry.
+ */
+const resolveCallerIsAdmin = async ({
+  service,
+  organizationId,
+  callerUserId,
+  apiKeyId,
+}: {
+  service: ApiKeyService;
+  organizationId: string;
+  callerUserId: string | null;
+  apiKeyId: string;
+}): Promise<boolean> =>
+  callerUserId
+    ? service.isOrgAdmin({ userId: callerUserId, organizationId })
+    : service.isOrgAdminApiKey({ apiKeyId, organizationId });
+
+/**
+ * Service keys have no user ceiling, and an unbound one defaults to org-wide
+ * ADMIN, so minting one takes a real organization admin, the same bar the
+ * tRPC path sets. Returns the 403 to send, or null when the mint may proceed
+ * (personal keys always may, since their owner's ceiling caps them).
+ */
+const refuseNonAdminServiceKeyMint = async ({
+  c,
+  service,
+  organizationId,
+  callerUserId,
+  isService,
+}: {
+  c: Context;
+  service: ApiKeyService;
+  organizationId: string;
+  callerUserId: string | null;
+  isService: boolean;
+}): Promise<Response | null> => {
+  if (!isService) return null;
+  const callerIsAdmin = await resolveCallerIsAdmin({
+    service,
+    organizationId,
+    callerUserId,
+    apiKeyId: c.get("apiKeyId") as string,
+  });
+  if (callerIsAdmin) return null;
+  return c.json(
+    {
+      error: "Forbidden",
+      message: "Only organization admins can create service API keys",
+    },
+    403,
+  );
+};
+
+// The route policy is organization:view for the caller's OWN keys. The
+// org-wide listing a service credential receives is a different disclosure
+// (every key in the organization), so that branch additionally requires
+// organization:manage in the handler.
 secured
   .access(requires("organization:view"))
   .get(
@@ -89,6 +150,25 @@ secured
       const organization = c.get("organization") as Organization;
       const userId = c.get("apiKeyUserId") as string | null;
       const service = c.get("apiKeyService") as ApiKeyService;
+
+      if (!userId) {
+        const canManage = await service.hasOrgScopedPermission({
+          apiKeyId: c.get("apiKeyId") as string,
+          userId: null,
+          organizationId: organization.id,
+          permission: "organization:manage",
+        });
+        if (!canManage) {
+          return c.json(
+            {
+              error: "Forbidden",
+              message:
+                "Listing every API key in the organization requires the organization:manage permission",
+            },
+            403,
+          );
+        }
+      }
 
       const keys = userId
         ? await service.list({ userId, organizationId: organization.id })
@@ -128,6 +208,16 @@ secured
       const service = c.get("apiKeyService") as ApiKeyService;
 
       const isService = body.keyType === "service";
+
+      const mintRefusal = await refuseNonAdminServiceKeyMint({
+        c,
+        service,
+        organizationId: organization.id,
+        callerUserId,
+        isService,
+      });
+      if (mintRefusal) return mintRefusal;
+
       const projectBindings = isService
         ? (body.projectIds ?? []).map((projectId: string) => ({
             role: "ADMIN" as const,
@@ -187,11 +277,20 @@ secured
       const userId = c.get("apiKeyUserId") as string | null;
       const service = c.get("apiKeyService") as ApiKeyService;
 
+      // Real adminness, so revoke() can enforce its owner-only path: without
+      // this, any organization:manage holder could revoke anyone's key.
+      const callerIsAdmin = await resolveCallerIsAdmin({
+        service,
+        organizationId: organization.id,
+        callerUserId: userId,
+        apiKeyId: c.get("apiKeyId") as string,
+      });
+
       try {
         await service.revoke({
           id,
           callerUserId: userId ?? "",
-          callerIsAdmin: true,
+          callerIsAdmin,
           organizationId: organization.id,
         });
       } catch (error) {

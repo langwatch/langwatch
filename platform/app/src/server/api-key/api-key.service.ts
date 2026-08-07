@@ -10,12 +10,14 @@ import {
 } from "~/server/rbac/custom-role-permissions";
 import {
   checkRoleBindingPermission,
+  resolveApiKeyPermission,
   resolveLegacyCeiling,
 } from "~/server/rbac/role-binding-resolver";
 import {
   CUSTOM_ROLE_KIND,
   RoleRepository,
 } from "~/server/role/repositories/role.repository";
+import { assertPersonalTeamScopesOwnedBy } from "~/server/role-bindings/personal-team-scope";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import {
   ApiKeyRepository,
@@ -252,6 +254,15 @@ export class ApiKeyService {
       }
 
       if (effectiveBindings.length > 0) {
+        // A key may reach a personal workspace only as its owner's own
+        // credential, whose ceiling already caps it. A service key or a key
+        // owned by anyone else binding in would hand the private workspace to
+        // a second principal.
+        await assertPersonalTeamScopesOwnedBy({
+          client: tx,
+          scopes: effectiveBindings,
+          ownerUserId: userId ?? null,
+        });
         await txRepo.createRoleBindings({
           apiKeyId: created.id,
           organizationId,
@@ -420,6 +431,13 @@ export class ApiKeyService {
       });
 
       if (effectiveBindings) {
+        // Same personal-workspace line as create(): replacement bindings may
+        // reach a personal workspace only when this key acts as its owner.
+        await assertPersonalTeamScopesOwnedBy({
+          client: tx,
+          scopes: effectiveBindings,
+          ownerUserId: existing.userId,
+        });
         await txRepo.replaceRoleBindings({
           apiKeyId: id,
           organizationId,
@@ -907,6 +925,55 @@ export class ApiKeyService {
       organizationId,
     });
     return !!binding;
+  }
+
+  /**
+   * The service-credential counterpart of {@link isOrgAdmin}: whether the API
+   * key itself holds an ADMIN role binding at the organization scope. A
+   * credential can carry `organization:manage` through a custom role without
+   * being an organization admin, and admin-only decisions (minting unbound
+   * service keys, revoking someone else's key) must not accept that as
+   * adminness.
+   */
+  async isOrgAdminApiKey({
+    apiKeyId,
+    organizationId,
+  }: {
+    apiKeyId: string;
+    organizationId: string;
+  }): Promise<boolean> {
+    const binding = await this.repo.findOrgAdminApiKeyBinding({
+      apiKeyId,
+      organizationId,
+    });
+    return !!binding;
+  }
+
+  /**
+   * Whether the presented credential resolves the given permission at
+   * organization scope: the same primitive the route-level
+   * `requireOrgPermission` middleware applies, exposed for handlers that need
+   * a second, stricter permission on one branch of a route.
+   */
+  async hasOrgScopedPermission({
+    apiKeyId,
+    userId,
+    organizationId,
+    permission,
+  }: {
+    apiKeyId: string;
+    userId: string | null;
+    organizationId: string;
+    permission: Permission;
+  }): Promise<boolean> {
+    return resolveApiKeyPermission({
+      prisma: this.prisma,
+      apiKeyId,
+      userId,
+      organizationId,
+      scope: { type: "org", id: organizationId },
+      permission,
+    });
   }
 
   /**

@@ -85,6 +85,18 @@ export class RoleRepository {
     });
   }
 
+  async countRoleBindings({
+    roleId,
+    organizationId,
+  }: {
+    roleId: string;
+    organizationId: string;
+  }): Promise<number> {
+    return this.prisma.roleBinding.count({
+      where: { customRoleId: roleId, organizationId },
+    });
+  }
+
   async findByNameAndOrganization(name: string, organizationId: string) {
     return this.prisma.customRole.findUnique({
       where: {
