@@ -1,7 +1,7 @@
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
-import { Prisma, type PrismaClient } from "~/generated/prisma/client";
 import { z } from "zod";
+import { Prisma, type PrismaClient } from "~/generated/prisma/client";
 import { getApp } from "~/server/app-layer";
 import type { Session } from "~/server/auth";
 import { parseVirtualKeyConfig } from "~/server/gateway/virtualKey.config";

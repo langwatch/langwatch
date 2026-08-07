@@ -1,5 +1,5 @@
-import type { PrismaClient } from "~/generated/prisma/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { PrismaClient } from "~/generated/prisma/client";
 import {
   type AuditLogFn,
   CannotImpersonateAdminError,

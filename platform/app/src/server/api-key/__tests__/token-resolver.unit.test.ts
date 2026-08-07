@@ -1,5 +1,5 @@
-import type { PrismaClient } from "~/generated/prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { PrismaClient } from "~/generated/prisma/client";
 import { generateApiKeyToken } from "../api-key-token.utils";
 import { TokenResolver } from "../token-resolver";
 

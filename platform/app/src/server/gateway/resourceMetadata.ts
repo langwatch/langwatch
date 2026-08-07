@@ -12,8 +12,9 @@
  * `metadata` has handed us a secret we will echo back to anyone who can read
  * the row, which is why the docs say bookkeeping and nothing else.
  */
-import type { Prisma } from "~/generated/prisma/client";
+
 import { z } from "zod";
+import type { Prisma } from "~/generated/prisma/client";
 
 /**
  * Caps, chosen to be generous for bookkeeping and hostile to using the map as

@@ -19,14 +19,15 @@
  *   specs/ai-governance/personal-portal/tool-catalog-scoping.feature
  *   specs/ai-governance/personal-portal/tool-catalog-vk-bridge.feature
  */
+
+import { nanoid } from "nanoid";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   OrganizationUserRole,
   type Prisma,
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
-import { nanoid } from "nanoid";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { appRouter } from "~/server/api/root";
 import { createInnerTRPCContext } from "~/server/api/trpc";
 import { globalForApp, resetApp } from "~/server/app-layer/app";

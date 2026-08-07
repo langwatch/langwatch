@@ -1,6 +1,6 @@
-import type { Project } from "~/generated/prisma/client";
 import { Factory } from "fishery";
 import { nanoid } from "nanoid";
+import type { Project } from "~/generated/prisma/client";
 
 // Omit the Json fields - Prisma's output type (JsonValue | null) is structurally
 // incompatible with its input type (InputJsonValue | NullableJsonNullValueInput).

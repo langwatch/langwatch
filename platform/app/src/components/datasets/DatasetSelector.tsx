@@ -6,7 +6,6 @@ import {
   Spinner,
   Text,
 } from "@chakra-ui/react";
-import type { Dataset } from "~/generated/prisma/client";
 import { type ReactNode, useEffect, useState } from "react";
 import type {
   FieldErrors,
@@ -14,6 +13,7 @@ import type {
   PathValue,
   UseFormSetValue,
 } from "react-hook-form";
+import type { Dataset } from "~/generated/prisma/client";
 import { HorizontalFormControl } from "../HorizontalFormControl";
 import { Select } from "../ui/select";
 

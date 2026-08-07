@@ -13,13 +13,14 @@
  *
  * Spec: specs/model-providers/model-cost-scoping.feature
  */
+
+import { nanoid } from "nanoid";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   OrganizationUserRole,
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
-import { nanoid } from "nanoid";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { prisma } from "../../../db";
 import {

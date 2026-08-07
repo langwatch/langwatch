@@ -1,6 +1,6 @@
 import { auditLog } from "@ee/audit-log/auditLog";
-import { Prisma, type PrismaClient } from "~/generated/prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { Prisma, type PrismaClient } from "~/generated/prisma/client";
 import { createInnerTRPCContext } from "../../trpc";
 import { projectRouter } from "../project";
 

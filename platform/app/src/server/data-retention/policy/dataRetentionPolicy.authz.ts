@@ -1,8 +1,8 @@
 import { isAdmin } from "@ee/admin/isAdmin";
 import type { PlanInfo } from "@ee/licensing/planInfo";
-import type { PrismaClient } from "~/generated/prisma/client";
 import { TRPCError } from "@trpc/server";
 import { env } from "~/env.mjs";
+import type { PrismaClient } from "~/generated/prisma/client";
 import { isEnterpriseTier } from "~/server/api/enterprise";
 import {
   hasOrganizationPermission,

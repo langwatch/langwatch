@@ -8,8 +8,8 @@
  * @see specs/suites/suite-archiving.feature
  */
 
-import type { PrismaClient, SimulationSuite } from "~/generated/prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { PrismaClient, SimulationSuite } from "~/generated/prisma/client";
 import { SuiteRepository } from "../suite.repository";
 
 function makeSuiteRow(

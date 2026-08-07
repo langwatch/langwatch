@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import type { User } from "~/generated/prisma/client";
+
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { User } from "~/generated/prisma/client";
 import { ScimService } from "../scim.service";
 
 // Mock the redis connection so the revoke helper used by deactivate()

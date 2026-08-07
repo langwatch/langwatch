@@ -1,6 +1,6 @@
-import { OrganizationUserRole, TeamUserRole } from "~/generated/prisma/client";
 import { TRPCError } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { OrganizationUserRole, TeamUserRole } from "~/generated/prisma/client";
 import type { PromptTagRepository } from "~/server/prompt-config/repositories/prompt-tag.repository";
 import { OrganizationService } from "../organization.service";
 import type { OrganizationRepository } from "../repositories/organization.repository";

@@ -1,5 +1,7 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { generate } from "@langwatch/ksuid";
+import { nanoid } from "nanoid";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   type Organization,
   OrganizationUserRole,
@@ -7,8 +9,6 @@ import {
   type Team,
   TeamUserRole,
 } from "~/generated/prisma/client";
-import { nanoid } from "nanoid";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { ApiKeyService } from "~/server/api-key/api-key.service";
 import { prisma } from "~/server/db";
 import {

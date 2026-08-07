@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import { nanoid } from "nanoid";
 /**
  * Hidden Governance Project — internal routing/tenancy artifact.
  *
@@ -28,8 +29,11 @@
  *   - specs/ai-gateway/governance/ui-contract.feature
  *   - specs/ai-gateway/governance/receiver-shapes.feature
  */
-import { Prisma, type PrismaClient, type Project } from "~/generated/prisma/client";
-import { nanoid } from "nanoid";
+import {
+  Prisma,
+  type PrismaClient,
+  type Project,
+} from "~/generated/prisma/client";
 
 import { generateApiKey } from "~/server/utils/apiKeyGenerator";
 

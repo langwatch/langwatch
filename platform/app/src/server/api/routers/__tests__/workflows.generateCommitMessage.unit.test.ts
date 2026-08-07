@@ -1,5 +1,5 @@
-import type { PrismaClient } from "~/generated/prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { PrismaClient } from "~/generated/prisma/client";
 
 import { blankTemplate } from "../../../../optimization_studio/templates/blank";
 import { createInnerTRPCContext } from "../../trpc";

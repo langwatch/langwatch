@@ -21,7 +21,6 @@
 
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
-import type { GatewayCacheRule, Project } from "~/generated/prisma/client";
 import { TRPCError } from "@trpc/server";
 import type { Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
@@ -29,6 +28,7 @@ import { describeRoute } from "hono-openapi";
 import { resolver } from "hono-openapi/zod";
 import { z } from "zod";
 import type { AuthMiddlewareVariables } from "~/app/api/middleware/auth";
+import type { GatewayCacheRule, Project } from "~/generated/prisma/client";
 import {
   IDEMPOTENCY_KEY_HEADER,
   readIdempotencyKey,

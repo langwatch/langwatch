@@ -8,8 +8,13 @@
  * wrong by one boundary is invisible on screen and wrong in exactly the
  * case that matters, someone sitting exactly on their limit.
  */
-import { type GatewayBudget, Prisma, type PrismaClient } from "~/generated/prisma/client";
+
 import { describe, expect, it, vi } from "vitest";
+import {
+  type GatewayBudget,
+  Prisma,
+  type PrismaClient,
+} from "~/generated/prisma/client";
 
 import type {
   BucketSpend,

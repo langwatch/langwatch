@@ -1,6 +1,6 @@
-import type { Organization } from "~/generated/prisma/client";
 import { describeRoute } from "hono-openapi";
 import { z } from "zod";
+import type { Organization } from "~/generated/prisma/client";
 import { createOrgApp, requires } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
 import type { ApiKeyService } from "~/server/api-key/api-key.service";

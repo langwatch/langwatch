@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import { TRPCError } from "@trpc/server";
 /**
  * RoutingPolicyService — admin-defined routing templates that VirtualKeys
  * reference instead of embedding their own fallback chain.
@@ -36,7 +37,6 @@ import {
   type RoutingPolicyScope as RoutingPolicyScopeRow,
   RoutingPolicyScopeType,
 } from "~/generated/prisma/client";
-import { TRPCError } from "@trpc/server";
 
 export type RoutingPolicyScope = "organization" | "team" | "project";
 

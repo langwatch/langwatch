@@ -4,9 +4,10 @@
  * Department entity + assignment against a real Postgres test container,
  * no mocks. Binds the entity scenarios of departments.feature.
  */
-import { OrganizationUserRole } from "~/generated/prisma/client";
+
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { OrganizationUserRole } from "~/generated/prisma/client";
 import { prisma } from "../../../../../src/server/db";
 import {
   startTestContainers,

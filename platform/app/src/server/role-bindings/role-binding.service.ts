@@ -1,11 +1,11 @@
 import { generate } from "@langwatch/ksuid";
+import { TRPCError } from "@trpc/server";
 import {
   OrganizationUserRole,
   type PrismaClient,
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
-import { TRPCError } from "@trpc/server";
 import {
   getOrganizationRolePermissions,
   getTeamRolePermissions,

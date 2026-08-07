@@ -1,8 +1,8 @@
 import { Box, Field, HStack, RadioGroup, VStack } from "@chakra-ui/react";
-import type { Project } from "~/generated/prisma/client";
 import type { PropsWithChildren } from "react";
 import { Code } from "react-feather";
 import { Controller, type UseFormReturn } from "react-hook-form";
+import type { Project } from "~/generated/prisma/client";
 import { RadioCard } from "~/pages/onboarding/[team]/project";
 import { Azure } from "./icons/Azure";
 import { DSPy } from "./icons/DSPy";

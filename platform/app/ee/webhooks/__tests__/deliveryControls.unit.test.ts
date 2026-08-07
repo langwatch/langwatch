@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import type { PrismaClient } from "~/generated/prisma/client";
 import { describe, expect, it } from "vitest";
+import type { PrismaClient } from "~/generated/prisma/client";
 import {
   assertValidDeliveryControls,
   WEBHOOK_BATCH_DELAY_BOUNDS_MS,

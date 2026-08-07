@@ -12,7 +12,6 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { EvaluationExecutionMode } from "~/generated/prisma/client";
 import { useEffect, useMemo, useState } from "react";
 import { ChevronDown, Edit2, HelpCircle } from "react-feather";
 import {
@@ -23,6 +22,7 @@ import {
   useForm,
 } from "react-hook-form";
 import { z } from "zod";
+import { EvaluationExecutionMode } from "~/generated/prisma/client";
 import { useRouter } from "~/utils/compat/next-router";
 import { slugify } from "~/utils/slugify";
 import { useAvailableEvaluators } from "../../hooks/useAvailableEvaluators";

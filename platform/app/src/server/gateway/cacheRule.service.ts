@@ -32,13 +32,14 @@
  * `modeEnum` is redundantly captured so we can index and aggregate by mode
  * without parsing the JSON in hot queries (e.g. Prometheus rule-hit export).
  */
+
+import { TRPCError } from "@trpc/server";
 import type {
   GatewayCacheRule,
   GatewayCacheRuleMode,
   Prisma,
   PrismaClient,
 } from "~/generated/prisma/client";
-import { TRPCError } from "@trpc/server";
 
 import { GatewayAuditAdapter } from "./auditLog.repository";
 import { serializeRowForAudit } from "./auditSerializer";

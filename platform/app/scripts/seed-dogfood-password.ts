@@ -13,8 +13,12 @@
  *   DOGFOOD_PASSWORD    — login password (default: DogfoodPassword!2026)
  *   DOGFOOD_USER_NAME   — display name (default: Dogfood)
  */
-import { RoleBindingScopeType, TeamUserRole } from "../src/generated/prisma/client";
+
 import { hash } from "bcrypt";
+import {
+  RoleBindingScopeType,
+  TeamUserRole,
+} from "../src/generated/prisma/client";
 import { prisma } from "../src/server/db";
 
 async function main() {

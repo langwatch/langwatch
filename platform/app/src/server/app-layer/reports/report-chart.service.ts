@@ -1,6 +1,6 @@
 import type { ReportChart } from "@langwatch/automations/templating/templateContext";
-import type { CustomGraph } from "~/generated/prisma/client";
 import type { CustomGraphInput } from "~/components/analytics/CustomGraph";
+import type { CustomGraph } from "~/generated/prisma/client";
 import type {
   SeriesInputType,
   TimeseriesInputType,

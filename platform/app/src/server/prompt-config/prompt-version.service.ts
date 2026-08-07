@@ -1,9 +1,9 @@
+import type { z } from "zod";
 import type {
   LlmPromptConfigVersion,
   Prisma,
   PrismaClient,
 } from "~/generated/prisma/client";
-import type { z } from "zod";
 import type { messageSchema } from "~/prompts/schemas/field-schemas";
 import type { SchemaVersion } from "./enums";
 import { SystemPromptConflictError } from "./errors";

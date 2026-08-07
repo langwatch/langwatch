@@ -1,7 +1,7 @@
-import { PrismaClient } from "~/generated/prisma/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { projectFactory } from "~/factories/project.factory";
+import { PrismaClient } from "~/generated/prisma/client";
 import { prisma } from "~/server/db";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { attachDatasetRecordCounts } from "../dataset-record-counts";

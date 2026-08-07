@@ -1,9 +1,9 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
-import type { PrismaClient } from "~/generated/prisma/client";
 import { getLangWatchTracer } from "langwatch";
 import type { TraceWithGuardrail } from "~/components/messages/MessageCard";
+import type { PrismaClient } from "~/generated/prisma/client";
 import { LLM_PARAMETER_MAP } from "~/prompts/prompt-playground/llmParameterMap";
 import {
   DEFAULT_PARTITION_WINDOW_MS,

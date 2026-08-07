@@ -1,5 +1,4 @@
 import { Box, VStack } from "@chakra-ui/react";
-import type { Project } from "~/generated/prisma/client";
 import {
   Activity,
   Anvil,
@@ -11,6 +10,7 @@ import {
   Shield,
 } from "lucide-react";
 import React, { useState } from "react";
+import type { Project } from "~/generated/prisma/client";
 import { useRouter } from "~/utils/compat/next-router";
 import { useFeatureFlag } from "../hooks/useFeatureFlag";
 import { useOpsPermission } from "../hooks/useOpsPermission";

@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import { DepartmentService } from "@ee/governance/services/department/department.service";
 import { generate } from "@langwatch/ksuid";
+import { PrismaClientKnownRequestError } from "@prisma/client/runtime/client";
 import {
   type PrismaClient,
   RoleBindingScopeType,
   TeamUserRole,
   type User,
 } from "~/generated/prisma/client";
-import { PrismaClientKnownRequestError } from "@prisma/client/runtime/client";
 import { UserService } from "~/server/users/user.service";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import {

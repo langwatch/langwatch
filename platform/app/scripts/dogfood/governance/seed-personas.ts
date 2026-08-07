@@ -44,10 +44,13 @@
 
 import { PersonalVirtualKeyService } from "@ee/governance/services/personalVirtualKey.service";
 import { PersonalWorkspaceService } from "@ee/governance/services/personalWorkspace.service";
-import { RoleBindingScopeType, TeamUserRole } from "../../../src/generated/prisma/client";
 import { randomBytes } from "crypto";
 import { prisma } from "~/server/db";
 import { encrypt } from "~/utils/encryption";
+import {
+  RoleBindingScopeType,
+  TeamUserRole,
+} from "../../../src/generated/prisma/client";
 
 export interface SeedPersonasArgs {
   email: string;

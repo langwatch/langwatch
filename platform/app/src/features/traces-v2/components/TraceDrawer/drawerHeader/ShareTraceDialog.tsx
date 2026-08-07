@@ -10,7 +10,6 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import type { ShareLink, ShareVisibility } from "~/generated/prisma/client";
 import { useRef, useState } from "react";
 import type { IconType } from "react-icons";
 import {
@@ -25,6 +24,7 @@ import { Dialog } from "~/components/ui/dialog";
 import { Select } from "~/components/ui/select";
 import { toaster } from "~/components/ui/toaster";
 import { Tooltip } from "~/components/ui/tooltip";
+import type { ShareLink, ShareVisibility } from "~/generated/prisma/client";
 import {
   type ShareExpiryOption,
   type ShareVisibilityOption,

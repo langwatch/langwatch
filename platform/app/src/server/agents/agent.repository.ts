@@ -1,6 +1,6 @@
+import { z } from "zod";
 import type { Agent, PrismaClient } from "~/generated/prisma/client";
 import { Prisma } from "~/generated/prisma/client";
-import { z } from "zod";
 import {
   type CodeComponentConfig,
   type CustomComponentConfig,

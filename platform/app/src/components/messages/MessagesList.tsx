@@ -11,10 +11,10 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import type { Project } from "~/generated/prisma/client";
 import React, { createRef, useEffect, useRef, useState } from "react";
 import { ChevronDown, ChevronUp, Maximize2 } from "react-feather";
 import { LuLayers, LuRefreshCw } from "react-icons/lu";
+import type { Project } from "~/generated/prisma/client";
 import { useRouter } from "~/utils/compat/next-router";
 import { formatMilliseconds } from "~/utils/formatMilliseconds";
 import { Menu } from "../../components/ui/menu";

@@ -1,8 +1,8 @@
+import { describe, expect, it } from "vitest";
 import {
   PlanTypes as PrismaPlanTypes,
   SubscriptionStatus as PrismaSubscriptionStatus,
 } from "~/generated/prisma/client";
-import { describe, expect, it } from "vitest";
 import {
   PlanTypes,
   SUBSCRIBABLE_PLANS,

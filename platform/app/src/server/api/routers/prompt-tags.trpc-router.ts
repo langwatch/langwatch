@@ -1,6 +1,6 @@
-import type { PrismaClient } from "~/generated/prisma/client";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
+import type { PrismaClient } from "~/generated/prisma/client";
 import {
   PromptTagConflictError,
   PromptTagNotFoundError,

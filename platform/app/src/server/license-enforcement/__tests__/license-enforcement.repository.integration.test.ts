@@ -1,3 +1,5 @@
+import { nanoid } from "nanoid";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   type Organization,
   OrganizationUserRole,
@@ -5,8 +7,6 @@ import {
   type Team,
   type User,
 } from "~/generated/prisma/client";
-import { nanoid } from "nanoid";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { prisma } from "~/server/db";
 import { LicenseEnforcementRepository } from "../license-enforcement.repository";
 

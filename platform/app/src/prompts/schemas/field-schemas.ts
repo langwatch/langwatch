@@ -1,5 +1,5 @@
-import { PromptScope } from "~/generated/prisma/client";
 import { z } from "zod";
+import { PromptScope } from "~/generated/prisma/client";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 
 patchZodOpenapi();

@@ -1,5 +1,5 @@
-import type { PrismaClient } from "~/generated/prisma/client";
 import { describe, expect, it } from "vitest";
+import type { PrismaClient } from "~/generated/prisma/client";
 import {
   eventMatches,
   isValidEventSelector,

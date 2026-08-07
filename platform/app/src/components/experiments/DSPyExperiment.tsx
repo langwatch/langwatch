@@ -16,7 +16,6 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import type { Experiment, Project, WorkflowVersion } from "~/generated/prisma/client";
 import type { TRPCClientErrorLike } from "@trpc/client";
 import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
 import type { inferRouterOutputs } from "@trpc/server";
@@ -34,6 +33,11 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import type {
+  Experiment,
+  Project,
+  WorkflowVersion,
+} from "~/generated/prisma/client";
 import { useRouter } from "~/utils/compat/next-router";
 import { FormatMoney } from "../../optimization_studio/components/FormatMoney";
 import { VersionBox } from "../../optimization_studio/components/History";

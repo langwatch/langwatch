@@ -1,4 +1,8 @@
-import type { Experiment, Prisma, PrismaClient } from "~/generated/prisma/client";
+import type {
+  Experiment,
+  Prisma,
+  PrismaClient,
+} from "~/generated/prisma/client";
 
 /**
  * Repository layer for experiment data access.

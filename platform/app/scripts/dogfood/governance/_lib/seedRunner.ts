@@ -18,7 +18,10 @@
  *     end if any action failed
  */
 
-import type { Organization, PrismaClient } from "../../../../src/generated/prisma/client";
+import type {
+  Organization,
+  PrismaClient,
+} from "../../../../src/generated/prisma/client";
 import type { DemoOrgScope } from "./scopeGuard";
 
 export type SeedActionOutcome =

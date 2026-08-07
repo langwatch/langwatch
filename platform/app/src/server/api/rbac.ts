@@ -1,11 +1,11 @@
+import { TRPCError } from "@trpc/server";
+import { env } from "~/env.mjs";
 import {
   OrganizationUserRole,
   type PrismaClient,
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
-import { TRPCError } from "@trpc/server";
-import { env } from "~/env.mjs";
 import {
   LiteMemberRestrictedError,
   ProjectPermissionDeniedError,

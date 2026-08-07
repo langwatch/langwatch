@@ -15,13 +15,14 @@
  *
  * Spec: specs/ai-gateway/governance/vk-scope-rbac.feature
  */
+
+import { nanoid } from "nanoid";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   OrganizationUserRole,
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
-import { nanoid } from "nanoid";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { prisma } from "../../../db";
 import {

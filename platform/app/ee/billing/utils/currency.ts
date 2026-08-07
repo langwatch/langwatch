@@ -1,6 +1,6 @@
-import { Currency } from "~/generated/prisma/client";
 // @ts-ignore — no type definitions for geoip-country
 import geoip from "geoip-country";
+import { Currency } from "~/generated/prisma/client";
 import type { NextApiRequest } from "~/types/next-stubs";
 
 const DEFAULT_CURRENCY = Currency.EUR;

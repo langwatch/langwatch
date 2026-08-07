@@ -1,4 +1,9 @@
-import type { ApiKey, Prisma, PrismaClient, RoleBinding } from "~/generated/prisma/client";
+import type {
+  ApiKey,
+  Prisma,
+  PrismaClient,
+  RoleBinding,
+} from "~/generated/prisma/client";
 import { RoleBindingScopeType, TeamUserRole } from "~/generated/prisma/client";
 import { HIDDEN_SYSTEM_KEY_NAMES } from "./reserved-names";
 

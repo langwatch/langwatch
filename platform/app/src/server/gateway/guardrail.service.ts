@@ -9,13 +9,14 @@
  *
  * Spec: specs/ai-gateway/governance/guardrails-project-scope.feature
  */
+
+import { TRPCError } from "@trpc/server";
 import type {
   GatewayGuardrail,
   GatewayGuardrailDirection,
   GatewayGuardrailFailureMode,
   PrismaClient,
 } from "~/generated/prisma/client";
-import { TRPCError } from "@trpc/server";
 
 import { GatewayAuditAdapter } from "./auditLog.repository";
 import { serializeRowForAudit } from "./auditSerializer";

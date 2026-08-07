@@ -1,5 +1,5 @@
-import { OrganizationUserRole, TeamUserRole } from "~/generated/prisma/client";
 import { describe, expect, it } from "vitest";
+import { OrganizationUserRole, TeamUserRole } from "~/generated/prisma/client";
 import { computeEffectiveTeamRoleUpdates } from "~/server/app-layer/organizations/compute-effective-team-role-updates";
 
 describe("computeEffectiveTeamRoleUpdates()", () => {

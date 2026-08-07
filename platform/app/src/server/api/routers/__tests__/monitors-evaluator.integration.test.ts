@@ -6,8 +6,9 @@
  *
  * Requires: PostgreSQL database (Prisma)
  */
-import { EvaluationExecutionMode } from "~/generated/prisma/client";
+
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { EvaluationExecutionMode } from "~/generated/prisma/client";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
 import { PlanProviderService } from "~/server/app-layer/subscription/plan-provider";

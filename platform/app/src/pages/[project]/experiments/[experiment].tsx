@@ -1,7 +1,6 @@
 import { Alert, Box } from "@chakra-ui/react";
-import { ExperimentType } from "~/generated/prisma/client";
-
 import { HandledErrorAlert } from "~/features/errors";
+import { ExperimentType } from "~/generated/prisma/client";
 import { useRouter } from "~/utils/compat/next-router";
 import { BatchEvaluationResults } from "../../../components/batch-evaluation-results";
 import { DashboardLayout } from "../../../components/DashboardLayout";

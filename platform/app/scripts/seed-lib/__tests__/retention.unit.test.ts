@@ -1,5 +1,5 @@
-import type { PrismaClient } from "../../../src/generated/prisma/client";
 import { describe, expect, it } from "vitest";
+import type { PrismaClient } from "../../../src/generated/prisma/client";
 import {
   applySeedRetention,
   RETENTION_CATEGORIES,

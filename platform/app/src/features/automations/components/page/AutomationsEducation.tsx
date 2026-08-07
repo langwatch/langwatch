@@ -1,5 +1,4 @@
 import { SimpleGrid, Text, VStack } from "@chakra-ui/react";
-import type { TriggerAction } from "~/generated/prisma/client";
 import {
   AlertTriangle,
   Database,
@@ -8,6 +7,7 @@ import {
   Flag,
   TrendingDown,
 } from "react-feather";
+import type { TriggerAction } from "~/generated/prisma/client";
 
 export type AutomationKind = "alert" | "automation";
 

@@ -14,11 +14,11 @@
  * - Cancel batch archive dismisses modal and preserves selection
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import type { Scenario } from "~/generated/prisma/client";
 import type { RowSelectionState } from "@tanstack/react-table";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { Scenario } from "~/generated/prisma/client";
 import { BatchActionBar } from "../BatchActionBar";
 import { ScenarioArchiveDialog } from "../ScenarioArchiveDialog";
 import { ScenarioTable } from "../ScenarioTable";

@@ -1,9 +1,9 @@
+import { describe, expect, it, vi } from "vitest";
 import {
   type PrismaClient,
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
-import { describe, expect, it, vi } from "vitest";
 import { PrismaRoleBindingRepository } from "../repositories/role-binding.prisma.repository";
 
 describe("PrismaRoleBindingRepository tenant references", () => {

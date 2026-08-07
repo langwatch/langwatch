@@ -8,8 +8,8 @@ import {
   type TemplateMatchInput,
 } from "@langwatch/automations/templating/templateContext";
 import { createLogger } from "@langwatch/observability";
-import { TriggerAction } from "~/generated/prisma/client";
 import { createHash } from "crypto";
+import { TriggerAction } from "~/generated/prisma/client";
 import {
   deliverWebhook,
   type WebhookDeliveryRecorder,

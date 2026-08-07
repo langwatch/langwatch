@@ -7,7 +7,7 @@
  *
  * Requires: PostgreSQL database (Prisma)
  */
-import { OrganizationUserRole, TeamUserRole } from "~/generated/prisma/client";
+
 import { nanoid } from "nanoid";
 import {
   afterAll,
@@ -19,6 +19,7 @@ import {
   it,
   vi,
 } from "vitest";
+import { OrganizationUserRole, TeamUserRole } from "~/generated/prisma/client";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
 import {

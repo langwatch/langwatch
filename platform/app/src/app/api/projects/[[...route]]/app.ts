@@ -1,6 +1,6 @@
-import type { Organization } from "~/generated/prisma/client";
 import { describeRoute } from "hono-openapi";
 import { z } from "zod";
+import type { Organization } from "~/generated/prisma/client";
 import {
   createOrgApp,
   requires,

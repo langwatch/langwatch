@@ -1,4 +1,3 @@
-import type { PrismaClient } from "~/generated/prisma/client";
 import {
   createInitialUIState,
   type DatasetColumn,
@@ -7,6 +6,7 @@ import {
   type TargetConfig,
 } from "~/experiments-v3/types";
 import { extractPersistedState } from "~/experiments-v3/types/persistence";
+import type { PrismaClient } from "~/generated/prisma/client";
 import type {
   Entry,
   Field,

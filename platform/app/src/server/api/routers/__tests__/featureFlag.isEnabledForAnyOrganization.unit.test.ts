@@ -16,8 +16,8 @@
  * `{ enabled: false }` when the filtered set is empty.
  */
 
-import type { PrismaClient } from "~/generated/prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { PrismaClient } from "~/generated/prisma/client";
 import { createInnerTRPCContext } from "../../trpc";
 import { featureFlagRouter } from "../featureFlag";
 

@@ -1,4 +1,8 @@
-import { type PinnedTrace, PinSource, type PrismaClient } from "~/generated/prisma/client";
+import {
+  type PinnedTrace,
+  PinSource,
+  type PrismaClient,
+} from "~/generated/prisma/client";
 
 interface CreatePinnedTraceParams {
   projectId: string;

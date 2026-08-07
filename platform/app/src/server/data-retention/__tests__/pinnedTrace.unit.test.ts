@@ -1,5 +1,5 @@
-import type { PinnedTrace } from "~/generated/prisma/client";
 import { describe, expect, it, vi } from "vitest";
+import type { PinnedTrace } from "~/generated/prisma/client";
 import { PinnedTraceRepository } from "../pinning/pinnedTrace.repository";
 import {
   PinnedToActiveShareError,

@@ -17,10 +17,14 @@
  * a confident $0.00 spent. Any future drift fails here instead of in a
  * customer's gateway.
  */
-import type { GatewayBudget, GatewayBudgetWindow } from "~/generated/prisma/client";
-import { Prisma } from "~/generated/prisma/client";
+
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import type {
+  GatewayBudget,
+  GatewayBudgetWindow,
+} from "~/generated/prisma/client";
+import { Prisma } from "~/generated/prisma/client";
 import {
   replayGooseMigrationUp,
   replayRollupRebuild,

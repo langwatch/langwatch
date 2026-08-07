@@ -1,5 +1,5 @@
-import { PromptScope } from "~/generated/prisma/client";
 import { merge } from "lodash-es";
+import { PromptScope } from "~/generated/prisma/client";
 
 import { DEFAULT_MODEL, FALLBACK_MAX_TOKENS } from "~/utils/constants";
 import type { DeepPartial } from "~/utils/types";

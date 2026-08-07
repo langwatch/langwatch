@@ -11,9 +11,12 @@
  * seat that still works).
  */
 
-import { OrganizationUserRole, RoleBindingScopeType } from "~/generated/prisma/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import {
+  OrganizationUserRole,
+  RoleBindingScopeType,
+} from "~/generated/prisma/client";
 import { UNLIMITED_PLAN } from "../../../../../ee/licensing/constants";
 import { cleanupTestRows } from "../../../../test-utils/cleanupTestRows";
 import { globalForApp, resetApp } from "../../../app-layer/app";

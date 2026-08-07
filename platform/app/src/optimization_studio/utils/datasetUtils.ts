@@ -1,6 +1,6 @@
-import type { Dataset, DatasetRecord } from "~/generated/prisma/client";
 import { nanoid } from "nanoid";
 import type { InMemoryDataset } from "~/components/datasets/editor/DatasetEditorTable";
+import type { Dataset, DatasetRecord } from "~/generated/prisma/client";
 import type {
   DatasetColumns,
   DatasetColumnType,

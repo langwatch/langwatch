@@ -1,6 +1,6 @@
-import { OrganizationUserRole, type Project } from "~/generated/prisma/client";
 import { useEffect, useMemo } from "react";
 import { useLocalStorage } from "usehooks-ts";
+import { OrganizationUserRole, type Project } from "~/generated/prisma/client";
 import { useRouter } from "~/utils/compat/next-router";
 import {
   EXTERNAL_MEMBER_PERMISSIONS,

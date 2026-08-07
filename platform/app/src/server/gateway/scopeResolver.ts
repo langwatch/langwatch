@@ -24,7 +24,12 @@
  * Used by the gateway-config materialiser to assemble the flat
  * `providers[]` array the Go dispatcher reads on every request.
  */
-import type { ModelProvider, Prisma, PrismaClient, Team } from "~/generated/prisma/client";
+import type {
+  ModelProvider,
+  Prisma,
+  PrismaClient,
+  Team,
+} from "~/generated/prisma/client";
 
 import type { ScopeInput, VirtualKeyWithScopes } from "./virtualKey.repository";
 

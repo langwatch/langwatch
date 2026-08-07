@@ -6,8 +6,8 @@
  * - Workflow evaluators (from workflow DSL)
  */
 
-import type { Evaluator, PrismaClient } from "~/generated/prisma/client";
 import { describe, expect, it, vi } from "vitest";
+import type { Evaluator, PrismaClient } from "~/generated/prisma/client";
 import type { EvaluatorRepository } from "../evaluator.repository";
 import {
   EvaluatorService,

@@ -1,6 +1,10 @@
-import type { Experiment, Prisma, PrismaClient } from "~/generated/prisma/client";
-import { ExperimentType } from "~/generated/prisma/client";
 import { nanoid } from "nanoid";
+import type {
+  Experiment,
+  Prisma,
+  PrismaClient,
+} from "~/generated/prisma/client";
+import { ExperimentType } from "~/generated/prisma/client";
 import { slugify } from "../../utils/slugify";
 import { isUniqueConstraintError } from "../utils/prismaErrors";
 import { ExperimentNotFoundError } from "./errors";

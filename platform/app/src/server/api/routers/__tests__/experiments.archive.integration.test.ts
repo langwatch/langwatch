@@ -8,10 +8,11 @@
  * only the licence-enforcement boundary is stubbed so the test does not
  * require a licensed organisation row to be seeded.
  */
-import { ExperimentType } from "~/generated/prisma/client";
+
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { ExperimentType } from "~/generated/prisma/client";
 import { getTestUser } from "../../../../utils/testUtils";
 import { globalForApp } from "../../../app-layer/app";
 import { createTestApp } from "../../../app-layer/presets";

@@ -11,9 +11,10 @@
  *
  * Requires: PostgreSQL database (Prisma)
  */
-import { OrganizationUserRole, TeamUserRole } from "~/generated/prisma/client";
+
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { OrganizationUserRole, TeamUserRole } from "~/generated/prisma/client";
 
 // License limits need the app layer, which is not initialized under
 // vitest — same workaround as the other router integration tests.

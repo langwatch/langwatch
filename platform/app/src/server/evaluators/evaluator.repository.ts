@@ -1,4 +1,8 @@
-import type { Evaluator, Prisma, PrismaClient } from "~/generated/prisma/client";
+import type {
+  Evaluator,
+  Prisma,
+  PrismaClient,
+} from "~/generated/prisma/client";
 import { generateEvaluatorSlug } from "../../utils/evaluatorSlug";
 
 /**

@@ -1,5 +1,8 @@
-import { type PrismaClient, RoleBindingScopeType } from "~/generated/prisma/client";
 import { TRPCError } from "@trpc/server";
+import {
+  type PrismaClient,
+  RoleBindingScopeType,
+} from "~/generated/prisma/client";
 import type {
   RoleBindingForSynthesis,
   RoleBindingRepository,

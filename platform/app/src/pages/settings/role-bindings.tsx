@@ -12,10 +12,10 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { RoleBindingScopeType } from "~/generated/prisma/client";
 import { Users } from "lucide-react";
 import { useState } from "react";
 import { RandomColorAvatar } from "~/components/RandomColorAvatar";
+import { RoleBindingScopeType } from "~/generated/prisma/client";
 import SettingsLayout from "../../components/SettingsLayout";
 import { ContactSalesBlock } from "../../components/subscription/ContactSalesBlock";
 import { withPermissionGuard } from "../../components/WithPermissionGuard";

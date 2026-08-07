@@ -1,5 +1,5 @@
-import { PricingModel } from "~/generated/prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { PricingModel } from "~/generated/prisma/client";
 import { TtlCache } from "~/server/utils/ttlCache";
 import { UNLIMITED_MESSAGES } from "../../../../../ee/billing/planLimits";
 import { FREE_PLAN } from "../../../../../ee/licensing/constants";

@@ -8,12 +8,12 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { PromptScope } from "~/generated/prisma/client";
 import { Building, Check, ChevronDown, Users } from "lucide-react";
 import { useCallback, useEffect } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { Dialog } from "~/components/ui/dialog";
 import { Menu } from "~/components/ui/menu";
+import { PromptScope } from "~/generated/prisma/client";
 import { usePromptHandleCheck } from "../../hooks/prompts/usePromptHandleCheck";
 import {
   type ChangeHandleFormValues,

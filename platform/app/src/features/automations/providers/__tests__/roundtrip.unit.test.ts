@@ -3,8 +3,8 @@ import { datasetActionParamsSchema } from "@langwatch/automations/providers/data
 import { emailActionParamsSchema } from "@langwatch/automations/providers/email";
 import { slackActionParamsSchema } from "@langwatch/automations/providers/slack";
 import type { SavedTriggerRow } from "@langwatch/automations/providers/types";
-import { TriggerAction } from "~/generated/prisma/client";
 import { describe, expect, it } from "vitest";
+import { TriggerAction } from "~/generated/prisma/client";
 import type { AnnotationQueueSlice } from "../annotationQueue/client";
 import { type DatasetSlice, deriveMappingFromColumns } from "../dataset/client";
 import type { EmailSlice } from "../email/client";

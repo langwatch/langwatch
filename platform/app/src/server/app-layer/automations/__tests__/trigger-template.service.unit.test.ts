@@ -3,9 +3,9 @@ import {
   TEST_FIRE_NOTICE,
 } from "@langwatch/automations/templating/banner";
 import { DEFAULT_ALERT_SLACK_BLOCK_KIT_TEMPLATE } from "@langwatch/automations/templating/defaults";
-import { AlertType } from "~/generated/prisma/client";
 import { describe, expect, it } from "vitest";
 import graphAlertDetailedSource from "~/features/automations/providers/slack/templates/graph_alert_detailed.liquid?raw";
+import { AlertType } from "~/generated/prisma/client";
 import { TemplateValidationError, TestFireUnavailableError } from "../errors";
 import {
   type DraftIdentity,

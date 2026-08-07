@@ -1,5 +1,5 @@
-import type { Annotation, PrismaClient } from "~/generated/prisma/client";
 import { TRPCError } from "@trpc/server";
+import type { Annotation, PrismaClient } from "~/generated/prisma/client";
 import {
   AnnotationRepository,
   type CreateAnnotationInput,

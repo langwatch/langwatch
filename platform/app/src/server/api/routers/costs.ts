@@ -1,5 +1,5 @@
-import type { Project } from "~/generated/prisma/client";
 import { z } from "zod";
+import type { Project } from "~/generated/prisma/client";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { checkOrganizationPermission } from "../rbac";
 

@@ -1,9 +1,9 @@
+import { describe, expect, it, vi } from "vitest";
 import {
   OrganizationUserRole,
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
-import { describe, expect, it, vi } from "vitest";
 
 import type { Session } from "~/server/auth";
 

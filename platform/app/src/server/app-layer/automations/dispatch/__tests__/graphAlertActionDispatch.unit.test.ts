@@ -1,6 +1,6 @@
+import { describe, expect, it, vi } from "vitest";
 import type { Project, Trigger } from "~/generated/prisma/client";
 import { TriggerAction } from "~/generated/prisma/client";
-import { describe, expect, it, vi } from "vitest";
 
 // Fake cipher so the webhook-headers tests exercise the decrypt-at-dispatch
 // seam (ADR-040 §3) without real AES/env plumbing.

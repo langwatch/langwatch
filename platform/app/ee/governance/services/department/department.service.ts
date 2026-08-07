@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import { PrismaClientKnownRequestError } from "@prisma/client/runtime/client";
 /**
  * DepartmentService - org-scoped CRUD for departments plus assignment of
  * users, teams, and projects to a department. Pure accounting: nothing
@@ -12,7 +13,6 @@
  * Spec: specs/ai-gateway/governance/departments.feature
  */
 import type { PrismaClient } from "~/generated/prisma/client";
-import { PrismaClientKnownRequestError } from "@prisma/client/runtime/client";
 
 import { DepartmentRepository } from "../../repositories/department.repository";
 

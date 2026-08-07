@@ -14,11 +14,7 @@
  * lookup, RoleBinding permission check, email-template rendering,
  * tRPC error mapping) runs against a real Postgres test container.
  */
-import {
-  OrganizationUserRole,
-  RoleBindingScopeType,
-  TeamUserRole,
-} from "~/generated/prisma/client";
+
 import { nanoid } from "nanoid";
 import {
   afterAll,
@@ -29,6 +25,11 @@ import {
   it,
   vi,
 } from "vitest";
+import {
+  OrganizationUserRole,
+  RoleBindingScopeType,
+  TeamUserRole,
+} from "~/generated/prisma/client";
 
 import { prisma } from "../../../db";
 import {

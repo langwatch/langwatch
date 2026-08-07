@@ -1,6 +1,6 @@
-import type { Team } from "~/generated/prisma/client";
 import { Factory } from "fishery";
 import { nanoid } from "nanoid";
+import type { Team } from "~/generated/prisma/client";
 
 export const teamFactory = Factory.define<Team>(({ sequence }) => ({
   id: nanoid(),

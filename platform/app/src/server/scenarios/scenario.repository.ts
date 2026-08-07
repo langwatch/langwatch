@@ -1,8 +1,8 @@
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import { SpanKind } from "@opentelemetry/api";
-import type { Prisma, PrismaClient, Scenario } from "~/generated/prisma/client";
 import { getLangWatchTracer } from "langwatch";
+import type { Prisma, PrismaClient, Scenario } from "~/generated/prisma/client";
 import { KSUID_RESOURCES } from "~/utils/constants";
 
 const tracer = getLangWatchTracer("langwatch.scenarios.repository");

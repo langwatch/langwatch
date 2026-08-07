@@ -1,6 +1,6 @@
 import { createLogger } from "@langwatch/observability";
-import type { PrismaClient } from "~/generated/prisma/client";
 import type { Cluster, Redis } from "ioredis";
+import type { PrismaClient } from "~/generated/prisma/client";
 
 import type { TopicModelEntry } from "~/server/event-sourcing/pipelines/topic-clustering-processing/schemas/events";
 

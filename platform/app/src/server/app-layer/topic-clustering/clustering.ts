@@ -1,7 +1,11 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { createLogger } from "@langwatch/observability";
-import { CostReferenceType, CostType, type Project } from "~/generated/prisma/client";
 import { nanoid } from "nanoid";
+import {
+  CostReferenceType,
+  CostType,
+  type Project,
+} from "~/generated/prisma/client";
 import { TOPIC_CLUSTERING_OUTBOX_LEASE_DURATION_MS } from "~/server/event-sourcing/pipelines/topic-clustering-processing/process-manager/topicClusteringIntentHandlers";
 import { env } from "../../../env.mjs";
 import { OPENAI_EMBEDDING_DIMENSION } from "../../../utils/constants";

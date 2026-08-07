@@ -2,9 +2,9 @@ import type {
   ReportChart,
   ReportTraceRow,
 } from "@langwatch/automations/templating/templateContext";
+import { describe, expect, it, vi } from "vitest";
 import type { Project, Trigger } from "~/generated/prisma/client";
 import { TriggerAction, TriggerKind } from "~/generated/prisma/client";
-import { describe, expect, it, vi } from "vitest";
 import type { ScheduledJobFire } from "~/server/app-layer/scheduler/scheduler.types";
 import {
   dispatchScheduledReport,

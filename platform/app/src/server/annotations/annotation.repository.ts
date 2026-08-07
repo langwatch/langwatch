@@ -1,5 +1,5 @@
-import type { Annotation, PrismaClient } from "~/generated/prisma/client";
 import type { JsonValue } from "@prisma/client/runtime/client";
+import type { Annotation, PrismaClient } from "~/generated/prisma/client";
 
 export type CreateAnnotationInput = {
   id: string;

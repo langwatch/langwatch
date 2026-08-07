@@ -1,6 +1,5 @@
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
-import type { Organization, PrismaClient, Project } from "~/generated/prisma/client";
 import type { MiddlewareHandler } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { handledErrorResponseBody } from "~/app/api/middleware/error-handler";
@@ -10,6 +9,11 @@ import {
   canonicalErrorFor,
   requestTraceIds,
 } from "~/app/api/shared/canonical-error";
+import type {
+  Organization,
+  PrismaClient,
+  Project,
+} from "~/generated/prisma/client";
 import type { Permission } from "~/server/api/rbac";
 import { resolveApiKeyPermission } from "~/server/rbac/role-binding-resolver";
 import { getTokenType } from "./api-key-token.utils";

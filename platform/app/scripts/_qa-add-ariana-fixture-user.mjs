@@ -17,10 +17,13 @@
  * Run:
  *   node scripts/_qa-add-ariana-fixture-user.mjs
  */
-import { createPrismaPgAdapter } from "../src/server/prismaPgAdapter";
-import { PrismaClient } from "../src/generated/prisma/client";
 
-const prisma = new PrismaClient({ adapter: createPrismaPgAdapter(process.env.DATABASE_URL ?? "") });
+import { PrismaClient } from "../src/generated/prisma/client";
+import { createPrismaPgAdapter } from "../src/server/prismaPgAdapter";
+
+const prisma = new PrismaClient({
+  adapter: createPrismaPgAdapter(process.env.DATABASE_URL ?? ""),
+});
 
 const ORG_ID = "organization_0000HrVrdhNtZNrM5ysajP4tyK9Cq";
 const TEAM_NAME = "Ariana Zone Co";

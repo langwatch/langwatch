@@ -27,7 +27,11 @@
  * Spec: specs/ai-gateway/gateway-budget-targeting.feature
  *       specs/ai-gateway/budgets-principal-cascade.feature
  */
-import type { GatewayBudget, Prisma, PrismaClient } from "~/generated/prisma/client";
+import type {
+  GatewayBudget,
+  Prisma,
+  PrismaClient,
+} from "~/generated/prisma/client";
 
 export type BudgetResolutionTarget = {
   organizationId: string;

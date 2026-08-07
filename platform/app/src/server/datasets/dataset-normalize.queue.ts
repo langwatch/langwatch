@@ -22,8 +22,8 @@
  */
 
 import { createLogger } from "@langwatch/observability";
-import type { PrismaClient } from "~/generated/prisma/client";
 import { env } from "~/env.mjs";
+import type { PrismaClient } from "~/generated/prisma/client";
 import { DatasetRepository } from "./dataset.repository";
 import {
   createDatasetNormalizeHandler,

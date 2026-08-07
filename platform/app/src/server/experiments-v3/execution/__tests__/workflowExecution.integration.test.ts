@@ -1,4 +1,3 @@
-import type { Project } from "~/generated/prisma/client";
 import { nanoid } from "nanoid";
 import { beforeAll, describe, expect, it } from "vitest";
 import { studioBackendPostEvent } from "~/app/api/workflows/post_event/post-event";
@@ -7,6 +6,7 @@ import type {
   LocalPromptConfig,
   TargetConfig,
 } from "~/experiments-v3/types";
+import type { Project } from "~/generated/prisma/client";
 import { addEnvs } from "~/optimization_studio/server/addEnvs";
 import { loadDatasets } from "~/optimization_studio/server/loadDatasets";
 import type { StudioServerEvent } from "~/optimization_studio/types/events";

@@ -1,5 +1,5 @@
-import type { SimulationSuite } from "~/generated/prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { SimulationSuite } from "~/generated/prisma/client";
 import type { AgentRepository } from "../../agents/agent.repository";
 import type { SuiteRunService } from "../../app-layer/suites/suite-run.service";
 import type { LlmConfigRepository } from "../../prompt-config/repositories/llm-config.repository";

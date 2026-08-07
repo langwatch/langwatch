@@ -1,4 +1,8 @@
-import type { DatasetRecord, Prisma, PrismaClient } from "~/generated/prisma/client";
+import type {
+  DatasetRecord,
+  Prisma,
+  PrismaClient,
+} from "~/generated/prisma/client";
 
 /**
  * Repository layer for dataset record data access.

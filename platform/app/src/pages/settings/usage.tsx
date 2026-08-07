@@ -9,8 +9,8 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { PricingModel } from "~/generated/prisma/client";
 import { ArrowRight } from "lucide-react";
+import { PricingModel } from "~/generated/prisma/client";
 import {
   getPlanActionLabel,
   shouldShowPlanLimits,

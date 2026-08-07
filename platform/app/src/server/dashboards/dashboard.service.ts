@@ -1,5 +1,5 @@
-import type { PrismaClient } from "~/generated/prisma/client";
 import { nanoid } from "nanoid";
+import type { PrismaClient } from "~/generated/prisma/client";
 import { DashboardRepository } from "./dashboard.repository";
 import { DashboardNotFoundError, DashboardReorderError } from "./errors";
 

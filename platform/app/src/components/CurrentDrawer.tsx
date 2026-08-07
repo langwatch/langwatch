@@ -1,8 +1,8 @@
 import { Center, Spinner } from "@chakra-ui/react";
-import { OrganizationUserRole } from "~/generated/prisma/client";
 import qs from "qs";
 import { Suspense, useEffect, useMemo, useSyncExternalStore } from "react";
 import { ErrorBoundary } from "react-error-boundary";
+import { OrganizationUserRole } from "~/generated/prisma/client";
 import { useRouter } from "~/utils/compat/next-router";
 import {
   type DrawerType,

@@ -29,9 +29,9 @@
  *   - eventLogDurability.integration.test.ts (write path durability)
  */
 import type { ClickHouseClient } from "@clickhouse/client";
-import type { Organization, Project } from "~/generated/prisma/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import type { Organization, Project } from "~/generated/prisma/client";
 
 import { prisma } from "~/server/db";
 import {

@@ -1,9 +1,9 @@
 import type { LangyConversationStateData } from "@langwatch/langy";
+import { describe, expect, it, vi } from "vitest";
 import {
   type LangyConversationProjection,
   LangyProjectionTitleSource,
 } from "~/generated/prisma/client";
-import { describe, expect, it, vi } from "vitest";
 import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
 import type { Event } from "~/server/event-sourcing/domain/types";
 import type { ProjectionStoreContext } from "~/server/event-sourcing/projections/projectionStoreContext";

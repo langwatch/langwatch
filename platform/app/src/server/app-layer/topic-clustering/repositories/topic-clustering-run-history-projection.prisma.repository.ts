@@ -1,6 +1,6 @@
 import { generate } from "@langwatch/ksuid";
-import type { Prisma } from "~/generated/prisma/client";
 import { z } from "zod";
+import type { Prisma } from "~/generated/prisma/client";
 
 import {
   type TopicClusteringRunHistoryData,

@@ -13,7 +13,11 @@
  */
 import { NotFoundError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
-import type { AnomalyRule, Prisma, PrismaClient } from "~/generated/prisma/client";
+import type {
+  AnomalyRule,
+  Prisma,
+  PrismaClient,
+} from "~/generated/prisma/client";
 
 import { validateDestinationConfig } from "./destinationConfig.schema";
 import { validateThresholdConfig } from "./thresholdConfig.schema";

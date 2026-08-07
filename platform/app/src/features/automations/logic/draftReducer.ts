@@ -2,7 +2,6 @@ import {
   DEFAULT_TRACE_DEBOUNCE_MS,
   type NotificationCadence,
 } from "@langwatch/automations/cadences";
-import type { AlertType, TriggerAction } from "~/generated/prisma/client";
 import {
   type AllSlices,
   CLIENT_PROVIDERS,
@@ -10,6 +9,7 @@ import {
   type SliceFor,
 } from "~/features/automations/providers/registry";
 import { isNotifyEntry } from "~/features/automations/providers/types";
+import type { AlertType, TriggerAction } from "~/generated/prisma/client";
 import type { FilterParam } from "~/hooks/useFilterParams";
 import {
   type GraphAlertOperator,

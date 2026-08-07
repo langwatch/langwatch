@@ -18,7 +18,6 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import type { SimulationSuite } from "~/generated/prisma/client";
 import {
   FlaskConical,
   List,
@@ -35,6 +34,7 @@ import {
   PassRateCircle,
 } from "~/components/shared/PassRateIndicator";
 import { Tooltip } from "~/components/ui/tooltip";
+import type { SimulationSuite } from "~/generated/prisma/client";
 import { useNow } from "~/hooks/useNow";
 import type {
   ExternalSetSummary,

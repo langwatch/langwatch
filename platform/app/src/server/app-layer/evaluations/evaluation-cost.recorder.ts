@@ -1,5 +1,9 @@
 import { generate } from "@langwatch/ksuid";
-import { CostReferenceType, CostType, type PrismaClient } from "~/generated/prisma/client";
+import {
+  CostReferenceType,
+  CostType,
+  type PrismaClient,
+} from "~/generated/prisma/client";
 import { KSUID_RESOURCES } from "../../../utils/constants";
 
 /**

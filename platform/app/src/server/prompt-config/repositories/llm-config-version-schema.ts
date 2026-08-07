@@ -1,6 +1,6 @@
-import type { LlmPromptConfigVersion } from "~/generated/prisma/client";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
+import type { LlmPromptConfigVersion } from "~/generated/prisma/client";
 import {
   inputsSchema,
   messageSchema,

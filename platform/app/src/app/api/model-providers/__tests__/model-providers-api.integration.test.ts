@@ -1,7 +1,7 @@
-import type { Organization, Project, Team } from "~/generated/prisma/client";
 import { nanoid } from "nanoid";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { projectFactory } from "~/factories/project.factory";
+import type { Organization, Project, Team } from "~/generated/prisma/client";
 import { prisma } from "~/server/db";
 import { ModelProviderRepository } from "~/server/modelProviders/modelProvider.repository";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";

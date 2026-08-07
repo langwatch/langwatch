@@ -10,7 +10,6 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { TriggerKind } from "~/generated/prisma/client";
 import { differenceInMinutes, differenceInSeconds } from "date-fns";
 import { useState } from "react";
 import { Calendar, TrendingUp } from "react-feather";
@@ -24,6 +23,7 @@ import {
 import { resolveSeriesLabel } from "~/features/automations/logic/seriesOptions";
 import type { TriggerActionParams } from "~/features/automations/logic/triggerActionParams";
 import { CLIENT_PROVIDERS } from "~/features/automations/providers/registry";
+import { TriggerKind } from "~/generated/prisma/client";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api, type RouterOutputs } from "~/utils/api";

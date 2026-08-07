@@ -1,5 +1,5 @@
-import type { PrismaClient } from "~/generated/prisma/client";
 import { describe, expect, it, vi } from "vitest";
+import type { PrismaClient } from "~/generated/prisma/client";
 import { PrismaScheduledJobRepository } from "../scheduled-job.repository";
 
 // Mirror the repository's naive-UTC timestamp rendering so we can assert the

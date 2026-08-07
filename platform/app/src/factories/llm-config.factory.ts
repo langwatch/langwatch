@@ -1,12 +1,12 @@
+import { Factory } from "fishery";
+import { nanoid } from "nanoid";
+import type { z } from "zod";
 import {
   type LlmPromptConfig,
   type LlmPromptConfigVersion,
   type Prisma,
   PromptScope,
 } from "~/generated/prisma/client";
-import { Factory } from "fishery";
-import { nanoid } from "nanoid";
-import type { z } from "zod";
 
 import {
   LATEST_SCHEMA_VERSION,

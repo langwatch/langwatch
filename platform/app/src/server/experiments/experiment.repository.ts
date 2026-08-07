@@ -1,5 +1,9 @@
-import type { Experiment, Prisma, PrismaClient } from "~/generated/prisma/client";
 import { nanoid } from "nanoid";
+import type {
+  Experiment,
+  Prisma,
+  PrismaClient,
+} from "~/generated/prisma/client";
 
 /**
  * Repository layer for experiment data access.

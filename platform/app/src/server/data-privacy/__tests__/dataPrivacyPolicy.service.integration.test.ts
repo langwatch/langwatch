@@ -5,9 +5,10 @@
  * end-to-end cascade resolution, single-organization anchoring, cache
  * invalidation on writes, and custom-pattern vetting.
  */
-import type { Project } from "~/generated/prisma/client";
+
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import type { Project } from "~/generated/prisma/client";
 import { cleanupTestRows } from "../../../test-utils/cleanupTestRows";
 import { getTestProject } from "../../../utils/testUtils";
 import { prisma } from "../../db";

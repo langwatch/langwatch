@@ -1,10 +1,10 @@
 import { createLogger } from "@langwatch/observability";
+import type Stripe from "stripe";
 import {
   Currency,
   type OrganizationUserRole,
   type PrismaClient,
 } from "~/generated/prisma/client";
-import type Stripe from "stripe";
 import { getApp } from "../../../src/server/app-layer/app";
 import { PrismaOrganizationRepository } from "../../../src/server/app-layer/organizations/repositories/organization.prisma.repository";
 import type { OrganizationRepository } from "../../../src/server/app-layer/organizations/repositories/organization.repository";

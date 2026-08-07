@@ -1,5 +1,5 @@
-import { Prisma } from "~/generated/prisma/client";
 import { describe, expect, it } from "vitest";
+import { Prisma } from "~/generated/prisma/client";
 
 import { serializeRowForAudit } from "../auditSerializer";
 

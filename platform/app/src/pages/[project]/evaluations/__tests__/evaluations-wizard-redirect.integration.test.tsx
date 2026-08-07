@@ -13,9 +13,10 @@
  * workbench routes to the workflow it was run from instead.
  * See specs/experiments-v3/evaluation-creation-entrypoints.feature.
  */
-import { ExperimentType } from "~/generated/prisma/client";
+
 import { cleanup, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { ExperimentType } from "~/generated/prisma/client";
 
 const { replaceMock, routerState, experimentState } = vi.hoisted(() => ({
   replaceMock: vi.fn(),

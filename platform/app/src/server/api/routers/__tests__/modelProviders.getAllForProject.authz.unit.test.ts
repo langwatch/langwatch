@@ -1,6 +1,6 @@
-import type { PrismaClient } from "~/generated/prisma/client";
 import { TRPCError } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { PrismaClient } from "~/generated/prisma/client";
 
 import { MASKED_KEY_PLACEHOLDER } from "../../../../utils/constants";
 import { createInnerTRPCContext } from "../../trpc";

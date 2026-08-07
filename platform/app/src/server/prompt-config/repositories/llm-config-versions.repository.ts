@@ -1,3 +1,5 @@
+import { TRPCError } from "@trpc/server";
+import { nanoid } from "nanoid";
 import type {
   LlmPromptConfig,
   LlmPromptConfigVersion,
@@ -5,8 +7,6 @@ import type {
   PrismaClient,
   User,
 } from "~/generated/prisma/client";
-import { TRPCError } from "@trpc/server";
-import { nanoid } from "nanoid";
 
 import type { SchemaVersion } from "../enums";
 import { LlmConfigRepository } from "./llm-config.repository";

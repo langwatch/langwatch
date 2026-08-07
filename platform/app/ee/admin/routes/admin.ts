@@ -12,7 +12,6 @@
 
 import { auditLog } from "@ee/audit-log/auditLog";
 import { HandledError, ValidationError } from "@langwatch/handled-error";
-import { PlanTypes, type Prisma, SubscriptionStatus } from "~/generated/prisma/client";
 import {
   defaultHandler,
   type GetListRequest,
@@ -20,6 +19,11 @@ import {
   getListHandler,
   getOneHandler,
 } from "ra-data-simple-prisma";
+import {
+  PlanTypes,
+  type Prisma,
+  SubscriptionStatus,
+} from "~/generated/prisma/client";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import { getServerAuthSession } from "~/server/auth";
 import { auth as betterAuth } from "~/server/better-auth";

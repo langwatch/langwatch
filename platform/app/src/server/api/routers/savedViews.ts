@@ -1,5 +1,5 @@
-import type { Prisma } from "~/generated/prisma/client";
 import { z } from "zod";
+import type { Prisma } from "~/generated/prisma/client";
 import { savedViewErrorHandler } from "../../saved-views/middleware";
 import { SavedViewService } from "../../saved-views/saved-view.service";
 import { checkProjectPermission } from "../rbac";

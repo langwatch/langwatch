@@ -24,13 +24,13 @@
  */
 
 import { generate } from "@langwatch/ksuid";
+import { nanoid } from "nanoid";
 import {
   Prisma,
   type PrismaClient,
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
-import { nanoid } from "nanoid";
 import { KSUID_RESOURCES } from "~/utils/constants";
 
 type TxClient = Prisma.TransactionClient;

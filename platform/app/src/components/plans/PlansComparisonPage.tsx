@@ -11,10 +11,10 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { Currency as PrismaCurrency } from "~/generated/prisma/client";
 import { ArrowLeft, Check, DollarSign, Euro, Info } from "lucide-react";
 import { useState } from "react";
 import { Link } from "~/components/ui/link";
+import { Currency as PrismaCurrency } from "~/generated/prisma/client";
 import { api } from "~/utils/api";
 import { CONTACT_SALES_URL } from "../../../ee/licensing/constants";
 import {

@@ -1,5 +1,5 @@
-import type { OrganizationIntent } from "~/generated/prisma/client";
 import { useMemo, useState } from "react";
+import type { OrganizationIntent } from "~/generated/prisma/client";
 import { useFeatureFlag } from "~/hooks/useFeatureFlag";
 import { usePublicEnv } from "~/hooks/usePublicEnv";
 import { readAttribution } from "~/utils/attribution";

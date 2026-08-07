@@ -2,8 +2,8 @@ import {
   CADENCE_WINDOW_MS,
   NOTIFICATION_CADENCES,
 } from "@langwatch/automations/cadences";
-import { TriggerAction } from "~/generated/prisma/client";
 import { describe, expect, it } from "vitest";
+import { TriggerAction } from "~/generated/prisma/client";
 import {
   computeScheduledFor,
   NOTIFY_TRIGGER_ACTIONS,
