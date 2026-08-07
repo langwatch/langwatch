@@ -1,10 +1,15 @@
 import type { ClickHouseClient } from "@clickhouse/client";
+import { BillableEventsClickHouseRepository } from "@ee/billing/services/billableEvents.clickhouse.repository";
 import { createNoopEnterprisePipelineCommands } from "@ee/event-sourcing/pipelineSet";
 import { GovernanceKpisClickHouseRepository } from "@ee/governance/services/governanceKpis.clickhouse.repository";
 import { GovernanceOcsfEventsClickHouseRepository } from "@ee/governance/services/governanceOcsfEvents.clickhouse.repository";
+import { GovernanceTraceActivityClickHouseRepository } from "@ee/governance/services/governanceTraceActivity.clickhouse.repository";
+import { PersonalUsageClickHouseRepository } from "@ee/governance/services/personalUsage.clickhouse.repository";
 import { WebhookEndpointService } from "@ee/webhooks/webhookEndpoint.service";
+import { WebhookEventsClickHouseRepository } from "@ee/webhooks/webhookEvents.clickhouse.repository";
 import { createLogger } from "@langwatch/observability";
 import { env } from "~/env.mjs";
+import { ClickHouseAnalyticsService } from "~/server/analytics/clickhouse/clickhouse-analytics.service";
 import { sendRenderedSlackMessage } from "~/server/app-layer/automations/delivery/sendSlackWebhook";
 import { postSlackChatMessage } from "~/server/app-layer/automations/delivery/slackWebApi";
 import { liveTriggerNotifier } from "~/server/app-layer/automations/delivery/triggerNotifier";
@@ -18,9 +23,12 @@ import { createLangyWorkerPort } from "~/server/app-layer/langy/langyWorker";
 import { createLangyTokenBuffer } from "~/server/app-layer/langy/streaming/langyTokenBuffer";
 import { createLangyTurnAccessStore } from "~/server/app-layer/langy/streaming/langyTurnAccess";
 import { createLangyTurnHandoffStore } from "~/server/app-layer/langy/streaming/langyTurnHandoff";
+import { OpsExplainClickHouseRepository } from "~/server/app-layer/ops/repositories/ops-explain.clickhouse.repository";
+import { InstanceUsageStatsClickHouseRepository } from "~/server/app-layer/usage-stats/repositories/instance-usage.clickhouse.repository";
 import {
   type ClickHouseClientResolver,
   clearCustomClientCache,
+  getAllClickHouseInstances,
   getClickHouseClientForOrganization,
   getClickHouseClientForProject,
   getSharedClickHouseClient,
@@ -29,10 +37,13 @@ import {
 import { closeClickHouseClient } from "~/server/clickhouse/client";
 import { prisma as globalPrisma } from "~/server/db";
 import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
+import { BillableEventsMeterClickHouseRepository } from "~/server/event-sourcing/projections/global/repositories/billable-events.clickhouse.repository";
 import { getFeatureFlagStore } from "~/server/featureFlag/featureFlagStore.postgres";
+import { FilterService } from "~/server/filters/filter.service";
 import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
 import { createBudgetChangeEventDedupeService } from "~/server/gateway/budgetChangeEventDedupe.service";
 import { GatewaySpendEventsRepository } from "~/server/gateway/spendEvents.clickhouse.repository";
+import { GatewayVirtualKeySpendRepository } from "~/server/gateway/virtualKeySpend.clickhouse.repository";
 import { sendRenderedTriggerEmail } from "~/server/mailer/triggerEmail";
 import { getEdgeSpoolFailOpenCounter } from "~/server/metrics";
 import {
@@ -42,9 +53,12 @@ import {
 } from "~/server/middleware/rate-limit-langy-github-prs";
 import { LANGY_CHAT_FEATURE_KEY } from "~/server/modelProviders/codexRestrictions";
 import { getVercelAIModel } from "~/server/modelProviders/utils";
+import { OpsExplainService } from "~/server/ops/opsExplain.service";
 import { getPostHogInstance } from "~/server/posthog";
 import { PromptService } from "~/server/prompt-config/prompt.service";
 import { PromptTagRepository } from "~/server/prompt-config/repositories/prompt-tag.repository";
+import { ClickHouseOrphanedRunFinder } from "~/server/scenarios/orphaned-run-reconciliation.clickhouse";
+import { StoredObjectOwnerClickHouseRepository } from "~/server/stored-objects/repositories/stored-object-owner.clickhouse.repository";
 import { buildTraceBlobResolutionDeps } from "~/server/traces/trace-blob-resolution.deps";
 import { getSaaSPlanProvider } from "../../../ee/billing";
 import { NotificationService } from "../../../ee/billing/notifications/notification.service";
@@ -79,8 +93,10 @@ import {
 import { buildAutomationDispatchPorts } from "../event-sourcing/pipelines/automations/automationDispatch.wiring";
 import { createExperimentRunItemAppendStore } from "../event-sourcing/pipelines/experiment-run-processing/projections/experimentRunResultStorage.store";
 import {
+  ExperimentIdLookupClickHouseRepository,
   ExperimentRunStateRepositoryClickHouse,
   ExperimentRunStateRepositoryMemory,
+  NullExperimentIdLookupRepository,
 } from "../event-sourcing/pipelines/experiment-run-processing/repositories";
 import { LangyAnalyticsEventAppendStore } from "../event-sourcing/pipelines/langy-conversation-processing/projections/langyAnalyticsEvent.store";
 import type { ScenarioExecutionReactorHandle } from "../event-sourcing/pipelines/simulation-processing/reactors/scenarioExecution.reactor";
@@ -105,7 +121,8 @@ import { EventUsageService } from "../traces/event-usage.service";
 import { TraceService } from "../traces/trace.service";
 import { TraceUsageService } from "../traces/trace-usage.service";
 import { runEvaluationWorkflow } from "../workflows/runWorkflow";
-import { getAnalyticsService } from "./analytics";
+import { createAnalyticsService } from "./analytics";
+import { LegacyAnalyticsBackendClickHouseRepository } from "./analytics/repositories/legacy-analytics-backend.clickhouse.repository";
 import { App, getApp, globalForApp, initializeApp } from "./app";
 import { EmailSuppressionService } from "./automations/emailSuppression.service";
 import { REPORT_SCHEDULER_TARGET_TYPE } from "./automations/report.builder";
@@ -165,6 +182,8 @@ import { EvaluationRunClickHouseRepository } from "./evaluations/repositories/ev
 import { NullEvaluationRunRepository } from "./evaluations/repositories/evaluation-run.repository";
 import { MonitorPerformanceClickHouseRepository } from "./evaluations/repositories/monitor-performance.clickhouse.repository";
 import { NullMonitorPerformanceRepository } from "./evaluations/repositories/monitor-performance.repository";
+import { TraceEvaluationsClickHouseRepository } from "./evaluations/repositories/trace-evaluations.clickhouse.repository";
+import { FilterOptionsClickHouseRepository } from "./filters/repositories/filter-options.clickhouse.repository";
 import { LangyConversationService } from "./langy/langy-conversation.service";
 import { LangyGithubInstallationsService } from "./langy/langy-github-installations.service";
 import {
@@ -326,6 +345,13 @@ export function initializeDefaultApp(options?: {
     return client;
   };
 
+  // Clustering reads ClickHouse directly (its query has no repository yet), so
+  // it takes the resolver as a parameter. Bound once here, then handed to both
+  // the event-sourcing run port and the App, so no caller re-derives one.
+  const runClusteringPage: AppDependencies["topicClustering"]["runPage"] = (
+    params,
+  ) => clusterTopicsForProject({ ...params, resolveClickHouseClient });
+
   const redis = config.skipRedis
     ? null
     : createRedisConnectionFromConfig({
@@ -479,6 +505,18 @@ export function initializeDefaultApp(options?: {
     ),
     "DspyStepService",
   );
+  // The ADR-034 analytics read API, built once here (same
+  // shape `createAnalyticsService` always used — unconditional on
+  // `clickhouseEnabled`, since the resolver itself already throws at query
+  // time when ClickHouse isn't configured) and handed out as
+  // `getApp().analytics.service` instead of each of its ~6 callers
+  // constructing — and each resolving a ClickHouse client — its own.
+  const analyticsService = createAnalyticsService({
+    resolveClient: resolveClickHouseClient,
+    legacyBackend: new ClickHouseAnalyticsService(
+      new LegacyAnalyticsBackendClickHouseRepository(resolveClickHouseClient),
+    ),
+  });
   const simulationReads = SimulationRunService.create(
     clickhouseEnabled ? resolveClickHouseClient : null,
   );
@@ -499,6 +537,12 @@ export function initializeDefaultApp(options?: {
           : new NullMonitorPerformanceRepository(),
       ),
       "MonitorPerformanceService",
+    ),
+    // Unconditional on `clickhouseEnabled` for the same reason the analytics
+    // service is: the resolver throws at query time when ClickHouse isn't
+    // configured, and this repository already degrades that to an empty read.
+    traceEvaluations: new TraceEvaluationsClickHouseRepository(
+      resolveClickHouseClient,
     ),
   };
 
@@ -689,6 +733,9 @@ export function initializeDefaultApp(options?: {
     experimentRunState: clickhouseEnabled
       ? new ExperimentRunStateRepositoryClickHouse(resolveClickHouseClient)
       : new ExperimentRunStateRepositoryMemory(),
+    experimentIdLookup: clickhouseEnabled
+      ? new ExperimentIdLookupClickHouseRepository(resolveClickHouseClient)
+      : new NullExperimentIdLookupRepository(),
     traceSummaryFold: clickhouseEnabled
       ? new TraceSummaryClickHouseRepository(resolveClickHouseClient)
       : traceSummary.repository,
@@ -765,36 +812,80 @@ export function initializeDefaultApp(options?: {
     ? {
         processStore: repositories.processStore,
         endpoints: webhookEndpointService,
+        prisma,
         getPlan: (organizationId: string) =>
           planProvider.getActivePlan({ organizationId }),
       }
     : undefined;
 
+  // The gateway's ClickHouse-backed repositories, built once and handed out
+  // on the App. Every surface - tRPC routers, the REST apps, the CLI auth
+  // route - takes these instead of minting its own, which is how REST came to
+  // serve stale PG spend for the same budgets the UI showed live (#6248), and
+  // how the CLI route ended up with a second copy of the same constructor.
+  const gatewayBudgetRepository = clickhouseEnabled
+    ? new GatewayBudgetClickHouseRepository(resolveClickHouseClient)
+    : undefined;
+  const gatewayVirtualKeySpendRepository = clickhouseEnabled
+    ? new GatewayVirtualKeySpendRepository(resolveClickHouseClient)
+    : undefined;
+  const gatewayWebhookEventsRepository = clickhouseEnabled
+    ? new WebhookEventsClickHouseRepository(resolveClickHouseClient)
+    : undefined;
+
   // Gateway budget debits ride the spend pipeline and share its ClickHouse
   // gate: the ledger is the only store spend accrues in.
-  const gatewayDebits = clickhouseEnabled
-    ? {
-        prisma,
-        budgetCHRepository: new GatewayBudgetClickHouseRepository(
-          resolveClickHouseClient,
-        ),
-        changeEventDedupe: createBudgetChangeEventDedupeService(redis),
-      }
+  const gatewayDebits =
+    clickhouseEnabled && gatewayBudgetRepository
+      ? {
+          prisma,
+          budgetCHRepository: gatewayBudgetRepository,
+          changeEventDedupe: createBudgetChangeEventDedupeService(redis),
+        }
+      : undefined;
+
+  // Governance's KPI rollup. One instance for the whole App: the reactor
+  // sync writes through it, the spend-spike anomaly evaluator reads through
+  // it — the same repository reference the process manager below takes and
+  // `app.governance.kpis` hands out.
+  const governanceKpisRepository = clickhouseEnabled
+    ? new GovernanceKpisClickHouseRepository(resolveClickHouseClient)
+    : undefined;
+  const governanceKpisSync = governanceKpisRepository
+    ? { governanceKpisRepository }
     : undefined;
 
-  const governanceKpisSync = clickhouseEnabled
-    ? {
-        governanceKpisRepository: new GovernanceKpisClickHouseRepository(
-          resolveClickHouseClient,
-        ),
-      }
+  // Governance's OCSF SIEM-export sink. One instance for the whole App: the
+  // reactor sync writes through it, the puller worker and the workspace-view
+  // audit trail write through it, and the SIEM export procedure reads
+  // through it — the same repository reference the process manager below
+  // takes and `app.governance.ocsfEvents` hands out.
+  const governanceOcsfEventsRepository = clickhouseEnabled
+    ? new GovernanceOcsfEventsClickHouseRepository(resolveClickHouseClient)
+    : undefined;
+  const governanceOcsfEventsSync = governanceOcsfEventsRepository
+    ? { governanceOcsfEventsRepository }
     : undefined;
 
-  const governanceOcsfEventsSync = clickhouseEnabled
-    ? {
-        governanceOcsfEventsRepository:
-          new GovernanceOcsfEventsClickHouseRepository(resolveClickHouseClient),
-      }
+  // Governance-domain reads over the shared `trace_summaries` table (the
+  // persona-detection activity probe, the quarantine-fill breakdown).
+  const governanceTraceActivityRepository = clickhouseEnabled
+    ? new GovernanceTraceActivityClickHouseRepository(resolveClickHouseClient)
+    : undefined;
+
+  // The /me dashboard's spend/token/model rollups, over trace_summaries
+  // and the gateway ledger's PRINCIPAL rows.
+  const personalUsageRepository = clickhouseEnabled
+    ? new PersonalUsageClickHouseRepository(resolveClickHouseClient)
+    : undefined;
+
+  // Billing-month usage rollups (billable_events + trace_summaries),
+  // read by the billing pipeline and the usage-limit services.
+  const billableEventsRepository = clickhouseEnabled
+    ? new BillableEventsClickHouseRepository(
+        resolveClickHouseClient,
+        getClickHouseClientForOrganization,
+      )
     : undefined;
 
   const es = new EventSourcing({
@@ -822,6 +913,7 @@ export function initializeDefaultApp(options?: {
     evaluations: { runs: evaluations.runs },
     traces: { spans: spanStorage },
     traceSummaryRepository: repositories.traceSummaryFold,
+    resolveClickHouseClient,
   });
 
   // ADR-044 Phase 1: the generic calendar scheduler. No cron infra. A
@@ -932,7 +1024,7 @@ export function initializeDefaultApp(options?: {
                       orderBy: [{ gridRow: "asc" }, { gridColumn: "asc" }],
                     }),
                   getTimeseries: (input) =>
-                    getAnalyticsService().getTimeseries(input),
+                    analyticsService.getTimeseries(input),
                 },
                 source,
                 projectId,
@@ -986,9 +1078,10 @@ export function initializeDefaultApp(options?: {
     topicClustering: {
       runPort: {
         runClusteringPage: ({ projectId, searchAfter, runId, page }) =>
-          clusterTopicsForProject(projectId, searchAfter ?? undefined, {
-            runId,
-            page,
+          runClusteringPage({
+            projectId,
+            searchAfter: searchAfter ?? undefined,
+            runContext: { runId, page },
           }),
       },
     },
@@ -1301,6 +1394,7 @@ export function initializeDefaultApp(options?: {
     triggerTemplates,
     emailSuppressions,
     dspySteps: { steps: dspySteps },
+    analytics: { service: analyticsService },
     simulations: { runs: simulationReads, export: scenarioRunExport },
     suiteRuns: { runs: suiteRunService },
     topicClustering: {
@@ -1308,7 +1402,53 @@ export function initializeDefaultApp(options?: {
         new PrismaTopicClusteringStatusRepository(prisma),
       ),
       topics,
+      runPage: runClusteringPage,
     },
+    gateway: {
+      budgets: gatewayBudgetRepository,
+      virtualKeySpend: gatewayVirtualKeySpendRepository,
+      spendEvents: gatewaySpend?.repository,
+      webhookEvents: gatewayWebhookEventsRepository,
+    },
+    filters: {
+      options: new FilterService(
+        clickhouseEnabled
+          ? new FilterOptionsClickHouseRepository(resolveClickHouseClient)
+          : null,
+      ),
+    },
+    clickhouse: {
+      enabled: clickhouseEnabled,
+      resolveClient: resolveClickHouseClient,
+    },
+    billing: {
+      events: new BillableEventsMeterClickHouseRepository(
+        getClickHouseClientForOrganization,
+      ),
+    },
+    usageStats: {
+      instance: new InstanceUsageStatsClickHouseRepository(
+        getClickHouseClientForOrganization,
+      ),
+    },
+    scenarios: {
+      // Boot-sweep-only: the two orphaned-run reconciliation sweeps read the
+      // shared (cross-tenant) client directly rather than a per-tenant
+      // repository — see clickhouse-queries.md's "boot-time system sweeps"
+      // carve-out. `sharedCh` is the same client `ops.eventExplorer` above
+      // was built from.
+      orphanReconciliation: {
+        client: sharedCh,
+        finder: sharedCh ? new ClickHouseOrphanedRunFinder(sharedCh) : null,
+      },
+    },
+    governance: {
+      ocsfEvents: governanceOcsfEventsRepository,
+      traceActivity: governanceTraceActivityRepository,
+      kpis: governanceKpisRepository,
+      personalUsage: personalUsageRepository,
+    },
+    billableEvents: billableEventsRepository,
     codingAgents: {
       sessions: traced(
         new CodingAgentSessionService(
@@ -1318,6 +1458,14 @@ export function initializeDefaultApp(options?: {
         ),
         "CodingAgentSessionService",
       ),
+    },
+    storedObjects: {
+      crossTenantOwnerLookup: new StoredObjectOwnerClickHouseRepository(
+        getAllClickHouseInstances,
+      ),
+    },
+    opsExplain: {
+      service: new OpsExplainService(new OpsExplainClickHouseRepository()),
     },
     // traced() gives every service call a `ClassName.method` span, same as
     // the rest of the app bag. Per-method, not per-frame: the streaming hot
@@ -1479,8 +1627,19 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       performance: new MonitorPerformanceService(
         new NullMonitorPerformanceRepository(),
       ),
+      traceEvaluations: new TraceEvaluationsClickHouseRepository(async () => {
+        throw new Error("ClickHouse is not available in the test app");
+      }),
     },
     dspySteps: { steps: new DspyStepService(new NullDspyStepRepository()) },
+    analytics: {
+      service: createAnalyticsService({
+        resolveClient: async () => {
+          throw new Error("ClickHouse not available in test app");
+        },
+        legacyBackend: new ClickHouseAnalyticsService(null),
+      }),
+    },
     experiments: ExperimentService.create(testPrisma),
     triggers: new TriggerService(new NullTriggerRepository()),
     emailSuppressions: new EmailSuppressionService(
@@ -1524,13 +1683,55 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
         new PrismaTopicClusteringStatusRepository(testPrisma),
       ),
       topics: new TopicService(new PrismaTopicRepository(testPrisma)),
+      runPage: () => {
+        throw new Error("Topic clustering is not available in the test app");
+      },
     },
+    gateway: {
+      budgets: undefined,
+      virtualKeySpend: undefined,
+      spendEvents: undefined,
+      webhookEvents: undefined,
+    },
+    filters: { options: new FilterService(null) },
+    clickhouse: {
+      enabled: false,
+      resolveClient: async () => {
+        throw new Error("ClickHouse is not available in the test app");
+      },
+    },
+    billing: {
+      events: new BillableEventsMeterClickHouseRepository(async () => null),
+    },
+    usageStats: {
+      instance: new InstanceUsageStatsClickHouseRepository(async () => {
+        throw new Error("ClickHouse is not available in the test app");
+      }),
+    },
+    scenarios: {
+      orphanReconciliation: { client: null, finder: null },
+    },
+    governance: {
+      ocsfEvents: undefined,
+      traceActivity: undefined,
+      kpis: undefined,
+      personalUsage: undefined,
+    },
+    billableEvents: undefined,
     codingAgents: {
       sessions: new CodingAgentSessionService(
         new NullCodingAgentSessionRepository(),
         new NullCodingAgentTraceSessionRepository(),
         new NullSessionMetricSeriesRepository(),
       ),
+    },
+    storedObjects: {
+      crossTenantOwnerLookup: new StoredObjectOwnerClickHouseRepository(
+        async () => [],
+      ),
+    },
+    opsExplain: {
+      service: new OpsExplainService(new OpsExplainClickHouseRepository()),
     },
     langy: {
       conversations: LangyConversationService.create(

@@ -36,6 +36,12 @@ jobs:
       heavy: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          # The gate reads no working-tree content: on pull_request events
+          # dorny/paths-filter takes the changed-file list from the API, and
+          # every file this job needs on disk lives under .github/. Checking
+          # out the rest of the tree is pure runner time.
+          sparse-checkout: .github
       # Only `pull_request` has a base to diff against. Every other event
       # (push, merge_group, workflow_dispatch) forces the filter true, so the
       # aggregator below always has a concrete result to require. See

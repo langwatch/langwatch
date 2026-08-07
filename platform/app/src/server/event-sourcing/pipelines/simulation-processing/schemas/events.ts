@@ -20,7 +20,7 @@ export const simulationRunQueuedEventDataSchema = z.object({
   name: z.string().optional(),
   description: z.string().optional(),
   metadata: z.record(z.unknown()).optional(),
-  /** Target for execution. Added for event-driven execution (replaces BullMQ job data). */
+  /** Target the event-driven execution runs against. */
   target: z
     .object({
       type: z.enum(["prompt", "http", "code", "workflow"]),

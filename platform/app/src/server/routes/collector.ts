@@ -17,6 +17,8 @@ import {
 import { TokenResolver } from "../api-key/token-resolver";
 import { getApp } from "../app-layer/app";
 import { SPAN_MAX_PAST_MS } from "../app-layer/traces/trace-request-collection.service";
+import { PlanLimitExceededError } from "../app-layer/usage/errors";
+import type { UsageLimitResult } from "../app-layer/usage/usage.service";
 import { prisma } from "../db";
 import { evaluationNameAutoslug } from "../tracer/collector/evaluationNameAutoslug";
 import { maybeAddIdsToContextList } from "../tracer/collector/rag";
@@ -73,9 +75,13 @@ secured
         );
       }
 
+      // warn, not error: a malformed body is the caller's mistake and we answer
+      // it with a 400. These three sites return rather than throw, so they never
+      // reach the boundary that would classify them as customer fault, and at
+      // error level they were about a fifth of this service's error stream.
       const contentType = c.req.header("content-type");
       if (!contentType?.includes("application/json")) {
-        logger.error("collector request body is not json");
+        logger.warn("collector request body is not json");
 
         return c.json({ message: "Invalid body, expecting json" }, 400);
       }
@@ -84,12 +90,16 @@ secured
       try {
         body = await c.req.json();
       } catch {
-        logger.error("collector request body is not valid json");
+        logger.warn("collector request body is not valid json");
         return c.json({ message: "Invalid body, expecting json" }, 400);
       }
 
-      if (typeof body !== "object") {
-        logger.error("collector request body is not json");
+      // `typeof null` is "object" and an array is one too, so both walk past a
+      // bare typeof check and reach `"metadata" in body` below — which throws on
+      // null. That is the same customer mistake as the two guards above, so it
+      // belongs on the same 400 rather than in the error stream as a 500.
+      if (body === null || Array.isArray(body) || typeof body !== "object") {
+        logger.warn("collector request body is not a json object");
         return c.json({ message: "Invalid body, expecting json" }, 400);
       }
 
@@ -139,43 +149,15 @@ secured
         "collector request being processed",
       );
 
+      // The lookup is wrapped in try/catch on its own — on failure we log and
+      // let the request through (same behaviour as before). The thrown limit
+      // error below lives outside that try block so it is never mistaken for
+      // a lookup failure.
+      let limitResult: UsageLimitResult;
       try {
-        const limitResult = await getApp().usage.checkLimit({
+        limitResult = await getApp().usage.checkLimit({
           teamId: project.teamId,
         });
-
-        if (limitResult.exceeded) {
-          try {
-            const activePlan = await getApp().planProvider.getActivePlan({
-              organizationId: project.team.organizationId,
-            });
-            await getApp().usageLimits.notifyPlanLimitReached({
-              organizationId: project.team.organizationId,
-              planName: activePlan.name ?? "free",
-            });
-          } catch (error) {
-            logger.error(
-              { error, projectId: project.id },
-              "Error sending plan limit notification",
-            );
-          }
-          logger.info(
-            {
-              projectId: project.id,
-              currentMonthMessagesCount: limitResult.count,
-              activePlanName: limitResult.planName,
-              maxMessagesPerMonth: limitResult.maxMessagesPerMonth,
-            },
-            "Project has reached plan limit",
-          );
-
-          return c.json(
-            {
-              message: `ERR_PLAN_LIMIT: ${limitResult.message}`,
-            },
-            429,
-          );
-        }
       } catch (error) {
         logger.error(
           { error, projectId: project.id },
@@ -183,6 +165,42 @@ secured
         );
         captureException(new Error("Error checking trace limit"), {
           extra: { projectId: project.id, error },
+        });
+        limitResult = { exceeded: false };
+      }
+
+      if (limitResult.exceeded) {
+        try {
+          const activePlan = await getApp().planProvider.getActivePlan({
+            organizationId: project.team.organizationId,
+          });
+          await getApp().usageLimits.notifyPlanLimitReached({
+            organizationId: project.team.organizationId,
+            planName: activePlan.name ?? "free",
+          });
+        } catch (error) {
+          logger.error(
+            { error, projectId: project.id },
+            "Error sending plan limit notification",
+          );
+        }
+        logger.info(
+          {
+            projectId: project.id,
+            currentMonthMessagesCount: limitResult.count,
+            activePlanName: limitResult.planName,
+            maxMessagesPerMonth: limitResult.maxMessagesPerMonth,
+          },
+          "Project has reached plan limit",
+        );
+
+        // 402, not 429: OTel SDKs and most HTTP clients retry a 429, and a
+        // plan limit is terminal for that payload, so a retryable status
+        // turns one rejection into an unbounded loop.
+        throw new PlanLimitExceededError(limitResult.message, {
+          currentMonthMessagesCount: limitResult.count,
+          maxMessagesPerMonth: limitResult.maxMessagesPerMonth,
+          activePlanName: limitResult.planName,
         });
       }
 
@@ -642,7 +660,7 @@ secured
       }
 
       // Total ingestion failure: every dispatched span failed (e.g. Redis /
-      // group-queue outage). With the BullMQ fallback stack gone, a 200 here
+      // group-queue outage). There is no fallback stack, so a 200 here
       // would tell the SDK the trace landed and it would never retry —
       // permanent trace loss. Return 500 so clients retry; the dedup gate
       // releases failed spans via tryReleaseOnFailure, so a retry is safe.

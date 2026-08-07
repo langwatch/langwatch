@@ -34,7 +34,7 @@ type ScopeKind =
   | "PROJECT"
   | "PRINCIPAL"
   | "VIRTUAL_KEY";
-type Window = "MINUTE" | "HOUR" | "DAY" | "WEEK" | "MONTH" | "TOTAL";
+type Window = "MINUTE" | "HOUR" | "DAY" | "WEEK" | "MONTH" | "TOTAL" | "MANUAL";
 
 const KIND_OPTIONS: Array<{
   kind: ScopeKind;
@@ -71,7 +71,13 @@ export function BudgetCreateDrawer({
   const [window, setWindow] = useState<Window>("MONTH");
   const [limitUsd, setLimitUsd] = useState("");
   const [onBreach, setOnBreach] = useState<"BLOCK" | "WARN">("BLOCK");
+  const [cycleAnchorAt, setCycleAnchorAt] = useState("");
   const [submitError, setSubmitError] = useState<string | null>(null);
+
+  // Only a window that rolls on its own can be phased. Total never rolls
+  // and manual rolls only when someone asks it to, so neither offers the
+  // field, and the server refuses an anchor on either.
+  const isScheduledWindow = window !== "TOTAL" && window !== "MANUAL";
 
   const orgId = organization?.id ?? "";
 
@@ -157,6 +163,7 @@ export function BudgetCreateDrawer({
     setWindow("MONTH");
     setLimitUsd("");
     setOnBreach("BLOCK");
+    setCycleAnchorAt("");
     setSubmitError(null);
   };
 
@@ -243,6 +250,11 @@ export function BudgetCreateDrawer({
         limitUsd,
         onBreach,
         providerKey: providerKey || null,
+        // The picker gives a local wall-clock string with no zone; the
+        // Date constructor reads it in the browser's zone, which is the
+        // one the admin typed it in.
+        cycleAnchorAt:
+          isScheduledWindow && cycleAnchorAt ? new Date(cycleAnchorAt) : null,
       });
       onCreated();
       reset();
@@ -403,7 +415,7 @@ export function BudgetCreateDrawer({
                 <Field.Label>
                   Window
                   <FieldInfoTooltip
-                    description="Time window the limit applies to. Minute / hour / day / week / month reset on a rolling schedule in UTC. 'total' never resets, which suits burn-down budgets on a fixed-fund project."
+                    description="Time window the limit applies to. Minute / hour / day / week / month reset on a rolling schedule, calendar aligned in UTC unless you set a cycle start below. 'total' never resets, which suits burn-down budgets on a fixed-fund project. 'manual' accrues until someone resets it."
                     docHref="/ai-gateway/budgets#windows"
                   />
                 </Field.Label>
@@ -420,6 +432,7 @@ export function BudgetCreateDrawer({
                     <option value="WEEK">Per week</option>
                     <option value="MONTH">Per calendar month</option>
                     <option value="TOTAL">Total (no reset)</option>
+                    <option value="MANUAL">Manual (reset on request)</option>
                   </NativeSelect.Field>
                 </NativeSelect.Root>
               </Field.Root>
@@ -427,7 +440,7 @@ export function BudgetCreateDrawer({
                 <Field.Label>
                   Limit (USD)
                   <FieldInfoTooltip
-                    description="Spend ceiling per window in USD. Tracked against provider-computed token costs (summed post-response). Near-limit requests (≥90% of cap) trigger a live reconciliation on the gateway with a 200ms fail-open."
+                    description="Spend ceiling per window in USD, tracked against the cost each provider reports for the request. Responses carry a warning from 80% of the cap, and past it the on-breach action applies."
                     docHref="/ai-gateway/budgets#creating-a-budget"
                   />
                 </Field.Label>
@@ -439,6 +452,24 @@ export function BudgetCreateDrawer({
                 />
               </Field.Root>
             </HStack>
+            {isScheduledWindow && (
+              <Field.Root>
+                <Field.Label>
+                  Start cycle on
+                  <FieldInfoTooltip
+                    description="Optional. Leave empty and the window is calendar aligned, so a monthly budget rolls on the 1st. Set it and the window rolls from this moment instead, which is how you line a budget up with a billing date: anchored on the 17th at 09:00, every period starts on the 17th at 09:00. A monthly cycle anchored past the 28th clamps into shorter months and springs back, so the 31st gives Feb 28 and then Mar 31. This cannot be changed later."
+                    docHref="/ai-gateway/budgets#windows"
+                    testId="budget-cycle-anchor-info"
+                  />
+                </Field.Label>
+                <Input
+                  type="datetime-local"
+                  value={cycleAnchorAt}
+                  onChange={(e) => setCycleAnchorAt(e.target.value)}
+                  data-testid="budget-cycle-anchor"
+                />
+              </Field.Root>
+            )}
             <Field.Root required>
               <Field.Label>
                 On breach

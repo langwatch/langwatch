@@ -67,7 +67,7 @@ export function groupTracesByConversation(
     for (const t of sorted) {
       totalSpans += t.spanCount;
       if (t.status === "error") errorCount++;
-      totalEvents += t.events.length;
+      totalEvents += t.events.totalCount;
       totalEvals += t.evaluations.length;
       for (const ev of t.evaluations) {
         if (ev.passed === true) evalsPassedCount++;

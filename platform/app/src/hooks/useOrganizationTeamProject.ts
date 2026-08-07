@@ -493,18 +493,32 @@ export const useOrganizationTeamProject = (
       org.teams.filter((team) => team.projects.length > 0),
     );
 
+    // Onboarding is for people who belong to no organization. It is the page
+    // that creates one, so offering it to a member only ever produces a second
+    // organization nobody asked for, and `pages/index.tsx` already draws the
+    // line here.
+    if (organizations.data.length === 0) {
+      void router.push(`/onboarding/welcome${returnTo}`);
+      return;
+    }
+
     // ADR-038 v6: an intent-set org is onboarded, period. Governance orgs
     // deliberately have no project (users live on /me, data flows through
     // personal workspaces); an LLMOps org that postponed project creation
-    // recovers via /settings. Never bounce either into onboarding — the
-    // welcome screen would offer to create a duplicate org — or to another
-    // org's project.
+    // recovers via /settings. Never redirect either to another org's project.
     if (organization?.primaryIntent) {
       return;
     }
 
+    // A member with nothing to be redirected *to* stays put, and the home
+    // resolver in `pages/index.tsx` picks their destination. This used to bounce
+    // to onboarding, which is how a member invited into an organization with no
+    // shared project ended up at "let's kick off by creating your organization".
+    // Note `teamsWithProjectsOnAnyOrg` counts personal workspaces, so a member
+    // who has only their own workspace reaches here rather than the branch
+    // below, which is deliberate: a personal workspace is never a project-home
+    // target (ADR-038 v6).
     if (!organization || !teamsWithProjectsOnAnyOrg.length) {
-      void router.push(`/onboarding/welcome${returnTo}`);
       return;
     }
 

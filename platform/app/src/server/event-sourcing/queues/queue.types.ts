@@ -156,6 +156,10 @@ export interface EventSourcedQueueDefinition<
    * own later dispatch. Returns undefined to fall back to the GroupQueue default
    * ({@link DEFAULT_COALESCE_MAX_BYTES}). Only consulted when `coalesceMaxBatch`
    * enables coalescing.
+   *
+   * The budget is spent in payload bytes — the size a worker's batch actually
+   * holds — not in the bytes the job occupies in Redis, which for a compressed
+   * or blob-offloaded body is a small fraction of it.
    */
   coalesceMaxBytes?: (payload: Payload) => number | undefined;
 
@@ -299,7 +303,7 @@ export interface EventSourcedQueueProcessor<
   close(): Promise<void>;
   /**
    * Waits until the queue processor is ready to accept jobs.
-   * For BullMQ, this waits for the worker to connect to Redis.
+   * For groupQueue, this waits for the worker to connect to Redis.
    * For memory queues, this resolves immediately.
    */
   waitUntilReady(): Promise<void>;

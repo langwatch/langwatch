@@ -32,16 +32,10 @@
  * Spec: specs/ai-gateway/governance/ingestion-attribution.feature
  *       §"Admin warning fires when quarantine fill rate exceeds threshold"
  */
-import type { ClickHouseClient } from "@clickhouse/client";
 import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "@prisma/client";
-import { getClickHouseClientForOrganization } from "~/server/clickhouse/clickhouseClient";
-
-import {
-  GOVERNANCE_ATTR,
-  GOVERNANCE_ORIGIN_KIND_VALUE,
-} from "./governanceAttributeKeys";
 import { ensureHiddenGovernanceProject } from "./governanceProject.service";
+import type { GovernanceTraceActivityClickHouseRepository } from "./governanceTraceActivity.clickhouse.repository";
 
 const logger = createLogger("langwatch:governance:quarantine-fill-evaluator");
 
@@ -87,7 +81,15 @@ export interface QuarantineFillStats {
 
 export interface QuarantineFillEvaluatorDeps {
   prisma: PrismaClient;
-  clickHouseClient?: ClickHouseClient;
+  /**
+   * The governance trace-activity reader, from the App. `undefined` on a
+   * deployment without ClickHouse — {@link QuarantineFillEvaluator.evaluate}
+   * throws in that case, same as the pre-repository client lookup did.
+   * Once a repository is present, a query-time failure still fail-safes to
+   * zero stats — the admin dashboard shouldn't break on a transient
+   * ClickHouse error.
+   */
+  traceActivity?: GovernanceTraceActivityClickHouseRepository;
 }
 
 export class QuarantineFillEvaluator {
@@ -122,44 +124,26 @@ export class QuarantineFillEvaluator {
     );
     const tenantId = govProject.id;
 
-    const ch =
-      this.deps.clickHouseClient ??
-      (await getClickHouseClientForOrganization(organizationId));
+    if (!this.deps.traceActivity) {
+      throw new Error(
+        "ClickHouse client is not available — check ClickHouse connection configuration",
+      );
+    }
+    const traceActivity = this.deps.traceActivity;
 
     const since = Date.now() - windowSeconds * 1000;
 
     try {
-      const result = await ch.query({
-        query: `
-          SELECT
-            ts.Attributes[{sourceIdKey:String}] AS sourceId,
-            count() AS spanCount
-          FROM trace_summaries ts
-          WHERE ts.TenantId = {tenantId:String}
-            AND ts.OccurredAt >= fromUnixTimestamp64Milli({since:UInt64})
-            AND ts.Attributes[{originKey:String}] = {originValue:String}
-          GROUP BY sourceId
-          ORDER BY spanCount DESC
-        `,
-        query_params: {
-          tenantId,
-          since,
-          originKey: GOVERNANCE_ATTR.ORIGIN_KIND,
-          originValue: GOVERNANCE_ORIGIN_KIND_VALUE,
-          sourceIdKey: GOVERNANCE_ATTR.INGESTION_SOURCE_ID,
-        },
-        format: "JSONEachRow",
+      const rows = await traceActivity.findSpanCountsBySource({
+        tenantId,
+        sinceMs: since,
       });
-      const rows = (await result.json()) as Array<{
-        sourceId: string;
-        spanCount: number | string;
-      }>;
 
       const perSource = rows
         .filter((r) => r.sourceId)
         .map((r) => ({
           ingestionSourceId: r.sourceId,
-          spanCount: Number(r.spanCount ?? 0),
+          spanCount: r.spanCount,
         }));
 
       const spanCount = perSource.reduce((sum, r) => sum + r.spanCount, 0);

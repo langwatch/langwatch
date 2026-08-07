@@ -67,9 +67,9 @@ const availability = protectedProcedure
   .query(async ({ ctx, input }) => ({
     available:
       (await workbenchEnabled({
+        prisma: ctx.prisma,
         userId: ctx.session.user.id,
         projectId: input.projectId,
-        prisma: ctx.prisma,
       })) && getGovernedSqlService().available,
   }));
 
@@ -80,9 +80,9 @@ const schema = protectedProcedure
   .query(async ({ ctx, input }) => {
     if (
       !(await workbenchEnabled({
+        prisma: ctx.prisma,
         userId: ctx.session.user.id,
         projectId: input.projectId,
-        prisma: ctx.prisma,
       }))
     ) {
       throw new GovernedSqlNotEnabledError();
@@ -116,9 +116,9 @@ const query = protectedProcedure
   .mutation(async ({ ctx, input }) => {
     if (
       !(await workbenchEnabled({
+        prisma: ctx.prisma,
         userId: ctx.session.user.id,
         projectId: input.projectId,
-        prisma: ctx.prisma,
       }))
     ) {
       throw new GovernedSqlNotEnabledError();

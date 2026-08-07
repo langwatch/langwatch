@@ -68,6 +68,7 @@ import {
 } from "~/server/app-layer/subscription/plan-provider";
 import { getDataPrivacyPolicyService } from "~/server/data-privacy/dataPrivacyPolicy.service";
 import { prisma } from "~/server/db";
+import { getFeatureFlagStore } from "~/server/featureFlag";
 import { FREE_PLAN } from "../../../../../ee/licensing/constants";
 import { app } from "../[[...route]]/app";
 
@@ -556,6 +557,65 @@ describe("given the governed analytics SQL REST endpoints", () => {
         app.request(schemaPath(openProject), {
           headers: { "X-Auth-Token": openProject.apiKey },
         }),
+      );
+      const body = (await response.json()) as Record<string, any>;
+      expect(response.status).toBe(403);
+      expect(body.error).toBe("governed_sql_not_enabled");
+    });
+  });
+
+  describe("when a stored organization rule is the only thing enabling the switch", () => {
+    /**
+     * No environment override, a row whose default is off, and one rule keyed
+     * to an organization: the surface is on exactly for that organization's
+     * projects. Runs against the real store, so this is the whole chain —
+     * gate resolves the project's organization, rule matches it.
+     */
+    const withOrganizationRule = async <T>(
+      organizationId: string,
+      request: () => Promise<T>,
+    ): Promise<T> => {
+      const store = getFeatureFlagStore();
+      await store.setRules(
+        "release_governed_sql_workbench",
+        [{ match: { organizationId }, enabled: true }],
+        null,
+      );
+      // Both env doors must be shut or the rule is never consulted: the
+      // dev .env force-enables this flag, and force-enable wins before the
+      // store — leaving it in place turns both of these tests vacuous.
+      const forceEnable = process.env.FEATURE_FLAG_FORCE_ENABLE;
+      delete process.env.RELEASE_GOVERNED_SQL_WORKBENCH;
+      delete process.env.FEATURE_FLAG_FORCE_ENABLE;
+      try {
+        return await request();
+      } finally {
+        process.env.RELEASE_GOVERNED_SQL_WORKBENCH = "1";
+        if (forceEnable !== undefined) {
+          process.env.FEATURE_FLAG_FORCE_ENABLE = forceEnable;
+        }
+        await store.clear("release_governed_sql_workbench", null);
+      }
+    };
+
+    /** @scenario "An organization-scoped rule can switch the workbench on" */
+    it("turns the surface on for that organization's projects", async () => {
+      const response = await withOrganizationRule(organization.id, async () =>
+        app.request(schemaPath(openProject), {
+          headers: { "X-Auth-Token": openProject.apiKey },
+        }),
+      );
+      expect(response.status).toBe(200);
+    });
+
+    /** @scenario "An organization-scoped rule can switch the workbench on" */
+    it("leaves the surface off for a project outside the rule's organization", async () => {
+      const response = await withOrganizationRule(
+        "org_someone_else",
+        async () =>
+          app.request(schemaPath(openProject), {
+            headers: { "X-Auth-Token": openProject.apiKey },
+          }),
       );
       const body = (await response.json()) as Record<string, any>;
       expect(response.status).toBe(403);

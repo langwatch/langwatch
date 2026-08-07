@@ -5,6 +5,7 @@
  */
 
 import type { ClickHouseClient } from "@clickhouse/client";
+import { WebhookEventsClickHouseRepository } from "@ee/webhooks/webhookEvents.clickhouse.repository";
 import { generate } from "@langwatch/ksuid";
 import {
   type Organization,
@@ -30,8 +31,16 @@ import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { expectCanonicalError } from "~/test-utils/expectCanonicalError";
 import { KSUID_RESOURCES } from "~/utils/constants";
 
+// Both apps' ClickHouse resolution routes at the test cluster; the repos
+// below are real instances (not fakes) so a `vi.spyOn` against their
+// prototypes still intercepts calls the route makes through `getApp()`.
+let chClient: ClickHouseClient;
+const resolveTestClickHouseClient = async () => chClient;
+
 // The enterprise gate reads the org's active plan through the app layer;
-// tests flip this flag per scenario instead of booting the whole app.
+// tests flip this flag per scenario instead of booting the whole app. The
+// route takes its ClickHouse-backed repositories from `getApp().gateway`
+// too, so standing in for the store means standing in for all of it.
 let planHasWebhookEndpoints = true;
 vi.mock("~/server/app-layer/app", () => ({
   getApp: () => ({
@@ -40,11 +49,21 @@ vi.mock("~/server/app-layer/app", () => ({
         webhookEndpointsEnabled: planHasWebhookEndpoints,
       }),
     },
+    gateway: {
+      budgets: new GatewayBudgetClickHouseRepository(
+        resolveTestClickHouseClient,
+      ),
+      virtualKeySpend: undefined,
+      spendEvents: new GatewaySpendEventsRepository(
+        resolveTestClickHouseClient,
+      ),
+      webhookEvents: new WebhookEventsClickHouseRepository(
+        resolveTestClickHouseClient,
+      ),
+    },
   }),
 }));
 
-// Route both apps' ClickHouse resolution at the test cluster.
-let chClient: ClickHouseClient;
 vi.mock("~/server/clickhouse/clickhouseClient", async (importOriginal) => {
   const original =
     await importOriginal<
@@ -52,7 +71,7 @@ vi.mock("~/server/clickhouse/clickhouseClient", async (importOriginal) => {
     >();
   return {
     ...original,
-    getClickHouseClientForProject: async () => chClient,
+    getClickHouseClientForProject: resolveTestClickHouseClient,
   };
 });
 
@@ -905,7 +924,7 @@ describe("Feature: Gateway spend reconciliation REST surface", () => {
         virtualKeyId: templateAnchor,
         providerKey: null,
         gatewayRequestId: `${ns}-caps-req`,
-        amountUsd: "12.500000",
+        amountNanoUsd: 12_500_000_000,
         tokensInput: 10,
         tokensOutput: 5,
         tokensCacheRead: 0,

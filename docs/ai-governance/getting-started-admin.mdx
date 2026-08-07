@@ -46,7 +46,7 @@ The same chain controls cost, latency, fallback, and prompt caching across every
 For a brand-new org, the cheapest first source is `otel_generic`, it's available on the **Apache 2.0** open-core floor (no Enterprise license required) and accepts any OTLP/HTTP push:
 
 1. Navigate to **Settings → AI Governance → Ingestion Sources** (`/settings/governance/ingestion-sources`).
-2. Click **+ New source**, pick **Generic OTLP (`otel_generic`)**, fill the form, choose `thirty_days` retention.
+2. Click **+ New source**, pick **Generic OTLP (`otel_generic`)**, and fill the form.
 3. The backend mints a `lw_is_<base64url>` ingest secret and shows it **once** in a one-time-reveal modal, copy it now. The list endpoint never returns it again.
 4. Paste the secret into the upstream platform's OTLP exporter as `Authorization: Bearer lw_is_<secret>`. The receiver endpoint is on the same host as the rest of LangWatch.
 

@@ -24,10 +24,6 @@ import { z } from "zod";
 import { env } from "~/env.mjs";
 import { createServiceApp, internalSecret } from "~/server/api/security";
 import { getApp } from "~/server/app-layer/app";
-import {
-  getClickHouseClientForProject,
-  isClickHouseEnabled,
-} from "~/server/clickhouse/clickhouseClient";
 import { prisma } from "~/server/db";
 import {
   admitSpendWireSchema,
@@ -37,10 +33,8 @@ import {
 } from "~/server/event-sourcing/pipelines/gateway-spend-processing/schemas/commands";
 import { GATEWAY_SPEND_PIPELINE_NAME } from "~/server/event-sourcing/pipelines/gateway-spend-processing/schemas/constants";
 import { rateSpendNanoUsd } from "~/server/event-sourcing/pipelines/gateway-spend-processing/services/spend-rating.service";
-import {
-  bucketPeriodFloorMs,
-  GatewayBudgetClickHouseRepository,
-} from "~/server/gateway/budget.clickhouse.repository";
+import type { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
+import { bucketPeriodFloorMs } from "~/server/gateway/budgetPeriod";
 import {
   attributedUserBucketScopeId,
   bucketScopeIdFor,
@@ -557,26 +551,15 @@ secured.access(gatewayPolicy()).get("/config/:vk_id", async (c) => {
     });
   }
 
-  // EC4 — wire the CH repo so the materialiser stamps current-period
-  // spend (sumMerge from the rollup) onto each applicable budget. The
-  // gateway's existing Bundle.Config.Budget.Scopes.SpentMicroUSD ->
-  // Precheck path then sees fresh state on every re-materialise after
-  // a BUDGET_UPDATED eviction. Without this the wire output reads the
-  // stale `GatewayBudget.spentUsd` PG column that no writer updates.
-  const chRepo = isClickHouseEnabled()
-    ? new GatewayBudgetClickHouseRepository(async (projectId) => {
-        const client = await getClickHouseClientForProject(projectId);
-        if (!client) {
-          throw new Error(
-            `ClickHouse enabled but no client for project ${projectId}`,
-          );
-        }
-        return client;
-      })
-    : null;
+  // EC4 — the CH repo lets the materialiser stamp current-period spend
+  // (sumMerge from the rollup) onto each applicable budget. The gateway's
+  // existing Bundle.Config.Budget.Scopes.SpentMicroUSD -> Precheck path
+  // then sees fresh state on every re-materialise after a BUDGET_UPDATED
+  // eviction. Without this the wire output reads the stale
+  // `GatewayBudget.spentUsd` PG column that no writer updates.
   const payload = await new GatewayConfigMaterialiser(
     prisma,
-    chRepo,
+    getApp().gateway.budgets ?? null,
   ).materialise(vk);
   return c.json(payload, 200, {
     ETag: currentRevision,
@@ -753,22 +736,10 @@ secured.access(gatewayPolicy()).post("/guardrail/check", async (c) => {
  * period boundary and any single-bucket boundary from a per-user reset:
  * whichever is later bounds the sum.
  */
-/** The budget ledger's ClickHouse reader, resolving one client per project. */
-function budgetClickHouseRepository(): GatewayBudgetClickHouseRepository {
-  return new GatewayBudgetClickHouseRepository(async (projectId) => {
-    const client = await getClickHouseClientForProject(projectId);
-    if (!client) {
-      throw new Error(
-        `ClickHouse enabled but no client for project ${projectId}`,
-      );
-    }
-    return client;
-  });
-}
-
 /** Spend in one budget bucket, in micro USD. An organization with no
  *  projects has nothing to read, so it reports zero. */
 async function bucketSpentMicroUsd(params: {
+  budgetRepository: GatewayBudgetClickHouseRepository;
   budget: GatewayBudget;
   bucketScopeId: string;
   periodFloorMs: number | undefined;
@@ -778,20 +749,19 @@ async function bucketSpentMicroUsd(params: {
     select: { id: true },
   });
   if (projects.length === 0) return 0;
-  const spends =
-    await budgetClickHouseRepository().getSpendForTargetsAcrossTenants(
-      projects.map((p) => p.id),
-      [
-        {
-          budgetId: params.budget.id,
-          scope: params.budget.scopeType,
-          scopeId: params.bucketScopeId,
-          window: params.budget.window,
-          match: "exact",
-          periodFloorMs: params.periodFloorMs,
-        },
-      ],
-    );
+  const spends = await params.budgetRepository.getSpendForTargetsAcrossTenants(
+    projects.map((p) => p.id),
+    [
+      {
+        budgetId: params.budget.id,
+        scope: params.budget.scopeType,
+        scopeId: params.bucketScopeId,
+        window: params.budget.window,
+        match: "exact",
+        periodFloorMs: params.periodFloorMs,
+      },
+    ],
+  );
   const spentUsd = Number.parseFloat(spends[0]?.spentUsd ?? "0") || 0;
   return Math.round(spentUsd * 1_000_000);
 }
@@ -826,7 +796,8 @@ secured.access(gatewayPolicy()).get("/budget-bucket-spend", async (c) => {
       404,
     );
   }
-  if (!isClickHouseEnabled()) {
+  const budgetRepository = getApp().gateway.budgets;
+  if (!budgetRepository) {
     // Without the ledger there is no bucket figure; report zero spend so
     // enforcement stays permissive rather than inventing a number.
     return c.json({ spent_micro_usd: 0, bucket: null });
@@ -840,6 +811,7 @@ secured.access(gatewayPolicy()).get("/budget-bucket-spend", async (c) => {
     select: { periodStartedAt: true },
   });
   const spentMicroUsd = await bucketSpentMicroUsd({
+    budgetRepository,
     budget,
     bucketScopeId,
     periodFloorMs: bucketPeriodFloorMs(budget, boundary?.periodStartedAt),

@@ -316,8 +316,12 @@ describe("SimulationClickHouseRepository", () => {
     }
 
     describe("when the page carries a StartedAt range", () => {
-      it("bounds step 2 with the byte-identical window and records a hit", async () => {
-        const before = await simulationOutcomeCount("hit");
+      it("bounds step 2 with the byte-identical window and meters it as windowed", async () => {
+        // The step-2 fake returns no preview rows, and this read declares its
+        // window authoritative (`fallback: "none"`) — so an empty result is
+        // metered as `windowed_empty`, not `hit`. Either way it proves the
+        // point this test exists for: the read ran windowed, not unwindowed.
+        const before = await simulationOutcomeCount("windowed_empty");
         const { repo, step2Query } = makeRepoCapturing("1000", "9000");
 
         await repo.getBatchHistoryForScenarioSet({
@@ -334,7 +338,7 @@ describe("SimulationClickHouseRepository", () => {
         );
         expect(step2?.params.minStartedAtMs).toBe("1000");
         expect(step2?.params.maxStartedAtMs).toBe("9000");
-        expect(await simulationOutcomeCount("hit")).toBe(before + 1);
+        expect(await simulationOutcomeCount("windowed_empty")).toBe(before + 1);
       });
     });
 

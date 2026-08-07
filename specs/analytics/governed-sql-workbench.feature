@@ -39,6 +39,13 @@ Feature: Governed SQL query workbench — native tables and governed Vega-Lite c
     And the switch is evaluated on the server, so nothing in the browser can force the surface on
 
   @integration
+  Scenario: An organization-scoped rule can switch the workbench on
+    Given no environment override for the feature switch
+    And a stored rule enabling the switch for the project's organization
+    When the switch is evaluated for any of the surface's endpoints
+    Then it is evaluated with the project's organization, so the rule matches and the surface is on
+
+  @integration
   Scenario: An authorized member opens Custom query and sees only their live governed schema
     When the member opens the Custom query page
     Then the page identifies the surface as governed and project-scoped

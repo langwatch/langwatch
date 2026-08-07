@@ -1,29 +1,12 @@
-import type { ClickHouseClient } from "@clickhouse/client";
+import { getApp } from "~/server/app-layer/app";
 import { BlobStore } from "~/server/app-layer/traces/blob-store.service";
 import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
 import {
   type ClickHouseClientResolver,
-  getClickHouseClientForProject,
   isClickHouseEnabled,
 } from "~/server/clickhouse/clickhouseClient";
 import { createS3Client } from "~/server/storage";
 import type { BlobResolutionDeps } from "./trace.service";
-
-/**
- * Default ClickHouse client resolver: given a tenantId (projectId), returns the
- * right ClickHouse client. Identical to the closure `presets.ts` builds at the
- * composition root — kept here so both the request layer and the app layer
- * construct {@link BlobResolutionDeps} from one definition.
- */
-const defaultResolveClickHouseClient: ClickHouseClientResolver = async (
-  tenantId: string,
-): Promise<ClickHouseClient> => {
-  const client = await getClickHouseClientForProject(tenantId);
-  if (!client) {
-    throw new Error("ClickHouse not available for this tenant");
-  }
-  return client;
-};
 
 /**
  * Builds the ADR-022 blob-resolution dependencies ({@link BlobResolutionDeps})
@@ -51,16 +34,26 @@ const defaultResolveClickHouseClient: ClickHouseClientResolver = async (
  * @param overrides - Optional composition-root values. `presets.ts` passes its
  *   own `clickhouseEnabled` (which also honors `config.clickhouseUrl`) and
  *   `resolveClickHouseClient` so the eval-path deps stay byte-identical to the
- *   pre-#4888 wiring. Routers call with no arguments.
+ *   pre-#4888 wiring. Routers call with no arguments, in which case the
+ *   resolver comes from `getApp().clickhouse` — the same one every other
+ *   repository is built from, rather than a second closure re-deriving it.
  */
 export function buildTraceBlobResolutionDeps(overrides?: {
   clickhouseEnabled?: boolean;
   resolveClickHouseClient?: ClickHouseClientResolver;
 }): BlobResolutionDeps {
+  // Deferred to the first actual resolution, not read while the deps are being
+  // built. Routers construct these per request, including on paths that never
+  // resolve a blob, so reading the App here made merely *assembling* the deps
+  // require an initialised App - which turned every such route into a 500
+  // wherever one is not (unit tests, and any caller that builds deps before
+  // boot completes). The App is still the single source of the resolver; it is
+  // just consulted when the resolver is used.
+  const resolveClickHouseClient: ClickHouseClientResolver =
+    overrides?.resolveClickHouseClient ??
+    ((tenantId) => getApp().clickhouse.resolveClient(tenantId));
   const clickhouseEnabled =
-    overrides?.clickhouseEnabled ?? isClickHouseEnabled();
-  const resolveClickHouseClient =
-    overrides?.resolveClickHouseClient ?? defaultResolveClickHouseClient;
+    overrides?.clickhouseEnabled ?? defaultClickHouseEnabled();
 
   return {
     blobStore: new BlobStore(
@@ -69,4 +62,24 @@ export function buildTraceBlobResolutionDeps(overrides?: {
     ),
     ioExtractionService: new TraceIOExtractionService(),
   };
+}
+
+/**
+ * Whether the resolver above can reach anything, answered by the App when
+ * there is one.
+ *
+ * `isClickHouseEnabled()` alone reads the shared client, while the App gates
+ * on `!!config.clickhouseUrl || isClickHouseEnabled()`. On a deployment
+ * configured only by `CLICKHOUSE_URL`, the two disagree until the shared
+ * client exists, and `BlobStore` built with `undefined` refuses the read
+ * before it ever calls the resolver - so an ADR-022 full read degraded to a
+ * preview on a deployment that has ClickHouse. The fallback keeps building
+ * deps free of an initialised App, which is why the App is not read directly.
+ */
+function defaultClickHouseEnabled(): boolean {
+  try {
+    return getApp().clickhouse.enabled;
+  } catch {
+    return isClickHouseEnabled();
+  }
 }

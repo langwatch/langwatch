@@ -163,10 +163,21 @@ function callerProject({
  * tRPC router. Checked per request and server-side only; an API key has no
  * member behind it, so the project is the distinct identity.
  */
-async function requireGovernedSqlEnabled(projectId: string): Promise<void> {
+async function requireGovernedSqlEnabled(project: Project): Promise<void> {
+  // The flag store's organization-scoped rules fail closed when the calling
+  // context has no organization, so the gate resolves the project's — without
+  // this, a rule enabling the surface for an organization could never match.
+  const team = await prisma.team.findUnique({
+    where: { id: project.teamId },
+    select: { organizationId: true },
+  });
   const enabled = await featureFlagService.isEnabled(
     "release_governed_sql_workbench",
-    { distinctId: projectId, projectId },
+    {
+      distinctId: project.id,
+      projectId: project.id,
+      organizationId: team?.organizationId,
+    },
   );
   if (!enabled) throw new GovernedSqlNotEnabledError();
 }
@@ -199,7 +210,7 @@ export function registerGovernedSqlRoutes(
         project: c.get("project"),
         requestedProjectId: c.req.param("projectId"),
       });
-      await requireGovernedSqlEnabled(project.id);
+      await requireGovernedSqlEnabled(project);
       const { sql, parameters } = c.req.valid("json");
 
       logger.info(
@@ -242,7 +253,7 @@ export function registerGovernedSqlRoutes(
         project: c.get("project"),
         requestedProjectId: c.req.param("projectId"),
       });
-      await requireGovernedSqlEnabled(project.id);
+      await requireGovernedSqlEnabled(project);
 
       return c.json(
         getGovernedSqlService().describeSchema({

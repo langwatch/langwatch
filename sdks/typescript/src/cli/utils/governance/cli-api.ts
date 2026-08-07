@@ -13,6 +13,7 @@
  *      rows land with `metadata.surface = 'cli'` per @audit-uniform.
  */
 
+import { normalizeEndpoint } from "../../../internal/endpoint";
 import { type GovernanceConfig } from "./config";
 import type { PlatformToolPolicyMap } from "./platform-tool-policy";
 import {
@@ -137,7 +138,7 @@ async function getJSON<T>(
       "Not logged in. Run `langwatch login --device` first.",
     );
   }
-  const url = cfg.control_plane_url.replace(/\/+$/, "") + path;
+  const url = normalizeEndpoint(cfg.control_plane_url) + path;
   const res = await authorizedFetch(
     cfg,
     url,
@@ -383,7 +384,7 @@ async function requestREST<T>(
       "Not logged in. Run `langwatch login --device` first.",
     );
   }
-  const url = cfg.control_plane_url.replace(/\/+$/, "") + path;
+  const url = normalizeEndpoint(cfg.control_plane_url) + path;
   const buildInit = (token: string): RequestInit => {
     const headers: Record<string, string> = {
       Authorization: `Bearer ${token}`,
@@ -589,7 +590,7 @@ export async function cloneIngestionTemplateFromPlatform(
   const body = await requestREST<{ ingestion_template: IngestionTemplateRow }>(
     cfg,
     "POST",
-    "/api/governance/ingestion-templates/clone-from-platform",
+    "/api/governance/ingestion-templates/clone",
     {
       ...options,
       body: { source_template_id: sourceTemplateId },

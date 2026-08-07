@@ -48,16 +48,17 @@ describe("createResilientClickHouseClient()", () => {
     mockLogger.fatal.mockReset();
   });
 
-  describe("when insert fails with transient error then succeeds", () => {
-    /** @scenario Transient insert errors are retried with exponential backoff */
-    it("retries and returns the result", async () => {
+  describe("when insert fails with transient error", () => {
+    /** @scenario Insert failures are not retried by the client */
+    it("attempts it exactly once and raises for the queue to retry", async () => {
+      // Every insert comes from a queued job that retries the whole job, so a
+      // retry here multiplies attempts rather than adding resilience. These
+      // are also async inserts with deduplication off, so a failure raised
+      // after the server buffered the batch can still flush - retrying then
+      // writes the rows twice.
       const transientError = new Error("MEMORY_LIMIT_EXCEEDED");
-      const result = { executed: true };
       const mock = makeMockClient({
-        insert: vi
-          .fn()
-          .mockRejectedValueOnce(transientError)
-          .mockResolvedValueOnce(result),
+        insert: vi.fn().mockRejectedValue(transientError),
       });
       const client = createResilientClickHouseClient({
         client: mock,
@@ -65,24 +66,15 @@ describe("createResilientClickHouseClient()", () => {
         baseDelayMs: 1,
       });
 
-      const actual = await client.insert({
-        table: "test",
-        values: [],
-        format: "JSONEachRow",
-      });
-
-      expect(actual).toBe(result);
-      expect(mock.insert).toHaveBeenCalledTimes(2);
+      await expect(
+        client.insert({ table: "test", values: [], format: "JSONEachRow" }),
+      ).rejects.toThrow("MEMORY_LIMIT_EXCEEDED");
+      expect(mock.insert).toHaveBeenCalledTimes(1);
     });
 
-    it("logs a retry warning with structured metadata", async () => {
-      const transientError = new Error("MEMORY_LIMIT_EXCEEDED");
-      const result = { executed: true };
+    it("emits no retry warning, because there is no retry", async () => {
       const mock = makeMockClient({
-        insert: vi
-          .fn()
-          .mockRejectedValueOnce(transientError)
-          .mockResolvedValueOnce(result),
+        insert: vi.fn().mockRejectedValue(new Error("MEMORY_LIMIT_EXCEEDED")),
       });
       const client = createResilientClickHouseClient({
         client: mock,
@@ -90,18 +82,12 @@ describe("createResilientClickHouseClient()", () => {
         baseDelayMs: 1,
       });
 
-      await client.insert({
-        table: "test",
-        values: [],
-        format: "JSONEachRow",
-      });
+      await expect(
+        client.insert({ table: "test", values: [], format: "JSONEachRow" }),
+      ).rejects.toThrow();
 
-      expect(mockLogger.warn).toHaveBeenCalledWith(
-        expect.objectContaining({
-          source: "clickhouse",
-          operation: "insert",
-          attempt: 1,
-        }),
+      expect(mockLogger.warn).not.toHaveBeenCalledWith(
+        expect.objectContaining({ operation: "insert" }),
         expect.any(String),
       );
     });
@@ -127,11 +113,11 @@ describe("createResilientClickHouseClient()", () => {
     });
   });
 
-  describe("when all retries are exhausted", () => {
+  describe("when a read exhausts its retries", () => {
     it("calls maxRetries+1 times then throws the final error", async () => {
       const transientError = new Error("MEMORY_LIMIT_EXCEEDED");
       const mock = makeMockClient({
-        insert: vi.fn().mockRejectedValue(transientError),
+        query: vi.fn().mockRejectedValue(transientError),
       });
       const client = createResilientClickHouseClient({
         client: mock,
@@ -140,9 +126,9 @@ describe("createResilientClickHouseClient()", () => {
       });
 
       await expect(
-        client.insert({ table: "test", values: [], format: "JSONEachRow" }),
-      ).rejects.toThrow("MEMORY_LIMIT_EXCEEDED");
-      expect(mock.insert).toHaveBeenCalledTimes(3);
+        client.query({ query: "SELECT 1" } as any),
+      ).rejects.toThrow();
+      expect(mock.query).toHaveBeenCalledTimes(3);
     });
   });
 
@@ -339,15 +325,15 @@ describe("createResilientClickHouseClient()", () => {
     });
   });
 
-  describe("when logging throws during insert retry", () => {
+  describe("when logging throws during a read retry", () => {
     it("still retries and succeeds", async () => {
       const transientError = new Error("MEMORY_LIMIT_EXCEEDED");
-      const result = { executed: true };
+      const queryResult = { data: [] };
       const mock = makeMockClient({
-        insert: vi
+        query: vi
           .fn()
           .mockRejectedValueOnce(transientError)
-          .mockResolvedValueOnce(result),
+          .mockResolvedValueOnce(queryResult),
       });
       mockLogger.warn.mockImplementation(() => {
         throw new Error("pino transport crashed");
@@ -359,14 +345,9 @@ describe("createResilientClickHouseClient()", () => {
         baseDelayMs: 1,
       });
 
-      const actual = await client.insert({
-        table: "test",
-        values: [],
-        format: "JSONEachRow",
-      });
+      await client.query({ query: "SELECT 1" } as any);
 
-      expect(actual).toBe(result);
-      expect(mock.insert).toHaveBeenCalledTimes(2);
+      expect(mock.query).toHaveBeenCalledTimes(2);
     });
   });
 

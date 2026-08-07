@@ -14,7 +14,7 @@ Goal: catch misconfigurations in the gateway BEFORE they surface during an on-ca
 - A ModelProvider scoped at ORG/TEAM/PROJECT is healthy (reaches actual upstream) via its Advanced (Gateway) tab settings.
 - VK creation + secret reveal flow works at the requested scope.
 - VK resolves end-to-end against the gateway data plane.
-- Response carries `X-LangWatch-Trace-Id`, `X-LangWatch-Span-Id`, `X-LangWatch-Request-Id`, and `traceparent`.
+- Response carries `X-LangWatch-Trace-Id`, `X-LangWatch-Span-Id`, `X-LangWatch-Gateway-Request-Id`, and `traceparent`.
 - VK revocation propagates (best-effort, cache TTL applies).
 
 ## Prerequisites
@@ -77,7 +77,7 @@ RESP_TRACE_ID=$(grep -i '^x-langwatch-trace-id:' "$HEADERS_FILE" | awk '{print $
 RESP_SPAN_ID=$(grep -i '^x-langwatch-span-id:' "$HEADERS_FILE" | awk '{print $2}' | tr -d '\r')
 RESP_TRACEPARENT=$(grep -i '^traceparent:' "$HEADERS_FILE" | awk '{print $2}' | tr -d '\r')
 
-[ -z "$REQUEST_ID" ] && { echo "FAIL: missing X-LangWatch-Request-Id"; exit 1; }
+[ -z "$REQUEST_ID" ] && { echo "FAIL: missing X-LangWatch-Gateway-Request-Id"; exit 1; }
 [ ${#RESP_TRACE_ID} -ne 32 ] && { echo "FAIL: trace-id not 32 hex ($RESP_TRACE_ID)"; exit 1; }
 [ ${#RESP_SPAN_ID} -ne 16 ] && { echo "FAIL: span-id not 16 hex ($RESP_SPAN_ID)"; exit 1; }
 

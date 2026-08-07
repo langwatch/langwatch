@@ -67,7 +67,10 @@ export class SerializedPromptConfigAdapter extends AgentAdapter {
       ...(templateUsesMessages ? [] : input.messages),
     ];
 
-    const model = createModelFromParams(this.litellmParams, this.nlpServiceUrl);
+    const model = createModelFromParams({
+      litellmParams: this.litellmParams,
+      nlpServiceUrl: this.nlpServiceUrl,
+    });
 
     const result = await generateText({
       model,

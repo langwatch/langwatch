@@ -31,15 +31,16 @@ beforeEach(() => {
       ingestionSource: { findUnique: sourceFindUnique, update: sourceUpdate },
     },
   }));
-  vi.doMock("~/server/clickhouse/clickhouseClient", () => ({
-    getClickHouseClientForProject: async () => ({}),
+  // The worker takes the OCSF sink from the App, so standing in for the
+  // store means standing in for `getApp()`.
+  vi.doMock("~/server/app-layer/app", () => ({
+    getApp: () => ({
+      governance: {
+        ocsfEvents: { insertEvent: async (row: unknown) => ocsfInsert(row) },
+      },
+    }),
   }));
   vi.doMock("../../governanceOcsfEvents.clickhouse.repository", () => ({
-    GovernanceOcsfEventsClickHouseRepository: class {
-      async insertEvent(row: unknown) {
-        return ocsfInsert(row);
-      }
-    },
     OCSF_ACTIVITY: { CREATE: 1, READ: 2, UPDATE: 3, DELETE: 4, INVOKE: 6 },
     OCSF_SEVERITY: { INFO: 1, LOW: 3, MEDIUM: 4, HIGH: 5, CRITICAL: 6 },
   }));

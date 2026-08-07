@@ -6,8 +6,8 @@ import {
   LOG_RECORD_RECEIVED_EVENT_TYPE,
   TOPIC_ASSIGNED_EVENT_TYPE,
 } from "../../schemas/constants";
+import { anchorStorageTime } from "../services/storage-anchor";
 import {
-  anchorStorageTime,
   projectAnalyticsStateToRow,
   TRACE_ANALYTICS_PROJECTION_VERSION_LATEST,
   type TraceAnalyticsData,

@@ -177,7 +177,7 @@ describe("POST /api/otel/v1/logs", () => {
 
       const response = await postLogs();
 
-      expect(response.status).toBe(429);
+      expect(response.status).toBe(402);
       expect(mockHandleLogs).not.toHaveBeenCalled();
     });
   });
