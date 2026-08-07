@@ -28,6 +28,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       relevant: ${{ steps.detect.outputs.relevant }}
+      ingest: ${{ steps.detect.outputs.ingest }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
         with:
@@ -56,6 +57,35 @@ jobs:
               - 'package.json'
               - '.npmrc'
               - '.github/workflows/sdk-javascript-ci.yml'
+            # Gates `e2e` only, never `ci`. The e2e job boots a real server
+            # and posts real SDK telemetry at it, so it is the only check in
+            # the repo that watches the ingest routes answer over a socket,
+            # and app-only changes are exactly what `relevant` misses. It
+            # cannot be folded into `relevant`: `ci` shares that filter and
+            # `ci` spends LLM budget on every match.
+            #
+            # Scoped to the HTTP transport spine the SDK traffic crosses
+            # before any of it becomes business logic. Everything those
+            # handlers go on to call has unit and integration coverage of its
+            # own; what has none is the seam between a socket and a handler,
+            # which only a live request can exercise.
+            ingest:
+              # The Hono route modules the SDK posts to, and the shared
+              # middleware under `_lib/` that the capped ones mount:
+              # /api/otel/v1/{traces,logs,metrics} and /api/collector.
+              - 'platform/app/src/server/routes/**'
+              # Mounts those modules and fixes their order. A route that
+              # resolves in the router but not on the wire is a mount bug,
+              # and mount order has silently swallowed API surfaces before.
+              - 'platform/app/src/server/api-router.ts'
+              # Reads the OTLP request body for those routes and decodes it,
+              # including the byte ceiling they enforce on it.
+              - 'platform/app/src/server/otel/**'
+              # Wires the Node bridge into Hono and decides whether the
+              # process keeps its own global Request/Response. Behaviour that
+              # depends on that seam is invisible to every test that does not
+              # go over a real socket.
+              - 'platform/app/src/start.ts'
 
   ci:
     needs: changes
@@ -119,7 +149,8 @@ jobs:
   e2e:
     needs: changes
     if: >
-      needs.changes.outputs.relevant == 'true'
+      (needs.changes.outputs.relevant == 'true'
+       || needs.changes.outputs.ingest == 'true')
       && (github.event_name != 'pull_request_target'
           || github.event.label.name == 'approved-ci')
     runs-on: ubuntu-latest

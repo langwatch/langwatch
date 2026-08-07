@@ -62,6 +62,9 @@ outputs:
   lambda-image:
     description: "'true' if Lambda-image-relevant paths changed, or if the event is neither a PR nor a diff-mode push. Used by langwatch-nlp-ci's LWA-readiness job — covers Go-binary source + Dockerfile + entrypoint, which aren't matched by the Python-only `relevant` filter."
     value: ${{ steps.filter.outputs.lambda-image || steps.force.outputs.lambda-image }}
+  ingest:
+    description: "'true' if the app's HTTP ingest spine changed, or if the event is neither a PR nor a diff-mode push. Used by sdk-javascript-ci's e2e job, which drives real SDK telemetry at a running server and is therefore the only check that sees those routes answer over a socket. Separate from `relevant` because the sibling `ci` job shares that filter and spends LLM budget."
+    value: ${{ steps.filter.outputs.ingest || steps.force.outputs.ingest }}
 
 runs:
   using: composite
@@ -87,3 +90,4 @@ runs:
         echo "relevant=true" >> "$GITHUB_OUTPUT"
         echo "feature-parity=true" >> "$GITHUB_OUTPUT"
         echo "lambda-image=true" >> "$GITHUB_OUTPUT"
+        echo "ingest=true" >> "$GITHUB_OUTPUT"
