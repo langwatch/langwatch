@@ -110,6 +110,35 @@ describe("given a token has just been minted", () => {
       expect(await screen.findByText("HTTP headers")).toBeInTheDocument();
     });
 
+    /** @scenario Basic Auth tab without a resolvable project still explains itself */
+    it("keeps the helper text and asks for a project when none is resolvable", async () => {
+      render(
+        <ChakraProvider value={defaultSystem}>
+          <TokenCreatedDialog
+            newToken={TOKEN}
+            projectId={undefined}
+            endpoint="https://app.langwatch.ai"
+            orgProjects={[
+              { id: "project-abc", name: "ACME" },
+              { id: "project-def", name: "ACME Staging" },
+            ]}
+            onClose={() => void 0}
+          />
+        </ChakraProvider>,
+      );
+      fireEvent.click(
+        within(useInCodeSection()).getByRole("button", { name: "Basic Auth" }),
+      );
+
+      expect(
+        await screen.findByText(/Encode the project ID and token as/),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(/Select a project to fill in this header/),
+      ).toBeInTheDocument();
+      expect(screen.queryByText("HTTP headers")).toBeNull();
+    });
+
     /** @scenario Basic Auth masking hides the encoded credential */
     it("masks the base64-encoded credential, not just the raw token", async () => {
       renderDialog();

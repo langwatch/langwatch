@@ -70,6 +70,15 @@ Feature: Token Created modal command snippets
     Then the base64-encoded credential is not readable in the snippet
     And toggling reveal shows the full encoded credential
 
+  @integration
+  Scenario: Basic Auth tab without a resolvable project still explains itself
+    # The encoded header needs a project id, so without one there is no
+    # snippet to show — but a silently blank tab reads as broken.
+    Given no project is resolvable for the freshly minted key
+    When I select the "Basic Auth" tab inside "Use in Code"
+    Then the helper text explaining the base64(projectId:token) format is still shown
+    And instead of a snippet box the tab asks the user to select a project
+
   # ============================================================================
   # "Use with Code Assistants" section — terminal command + JSON config
   # ============================================================================

@@ -333,21 +333,29 @@ export function TokenCreatedDialog({
               )}
 
               {/* Basic Auth — shellscript-highlighted. The sensitive value is
-                  the base64 blob (see basicBlob above). */}
-              {codeTab === "basic" && basicUnmasked && (
+                  the base64 blob (see basicBlob above). The encoded header
+                  needs a project id, so without one the tab explains itself
+                  instead of going silently blank. */}
+              {codeTab === "basic" && (
                 <VStack gap={1} align="stretch">
                   <Text fontSize="xs" color="fg.muted">
                     Encode the project ID and token as{" "}
                     <code>base64(projectId:token)</code>:
                   </Text>
-                  <CodePreview
-                    code={basicUnmasked}
-                    copyText={basicUnmasked}
-                    filename="HTTP headers"
-                    codeLanguage="shellscript"
-                    sensitiveValue={basicBlob}
-                    enableVisibilityToggle
-                  />
+                  {basicUnmasked ? (
+                    <CodePreview
+                      code={basicUnmasked}
+                      copyText={basicUnmasked}
+                      filename="HTTP headers"
+                      codeLanguage="shellscript"
+                      sensitiveValue={basicBlob}
+                      enableVisibilityToggle
+                    />
+                  ) : (
+                    <Text fontSize="xs" color="fg.muted">
+                      Select a project to fill in this header.
+                    </Text>
+                  )}
                 </VStack>
               )}
             </VStack>
