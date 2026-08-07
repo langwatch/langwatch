@@ -29,7 +29,7 @@ const mockGetSuiteRunData = vi.hoisted(() => vi.fn());
 
 vi.mock("~/utils/api", () => ({
   api: {
-    useContext: () => ({
+    useUtils: () => ({
       scenarios: {
         getSuiteRunData: { invalidate: vi.fn() },
         getRunState: { invalidate: vi.fn(), prefetch: vi.fn() },

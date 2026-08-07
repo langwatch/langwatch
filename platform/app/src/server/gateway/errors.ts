@@ -6,7 +6,8 @@
  * prose — `message` is for whoever reads the trace.
  */
 import { HandledError } from "@langwatch/handled-error";
-import { Prisma } from "@prisma/client";
+import { Prisma } from "~/generated/prisma/client";
+import { uniqueConstraintTargets } from "~/server/utils/prismaErrors";
 
 import type { ExternalIdResource } from "./resourceMetadata";
 
@@ -206,7 +207,7 @@ export function translateExternalIdConflict(
     externalId &&
     error instanceof Prisma.PrismaClientKnownRequestError &&
     error.code === "P2002" &&
-    namesExternalIdIndex(error.meta?.target)
+    namesExternalIdIndex(uniqueConstraintTargets(error))
   ) {
     throw new GatewayExternalIdConflictError(resource, externalId);
   }

@@ -1,5 +1,4 @@
 import { Button, Container, Heading, HStack, Spacer } from "@chakra-ui/react";
-import type { Annotation } from "@prisma/client";
 import Parse from "papaparse";
 import { Download } from "react-feather";
 import AnnotationsLayout from "~/components/AnnotationsLayout";
@@ -8,6 +7,7 @@ import {
   type AnnotationWithUser,
 } from "~/components/annotations/AnnotationsTable";
 import { PeriodSelector, usePeriodSelector } from "~/components/PeriodSelector";
+import type { Annotation } from "~/generated/prisma/client";
 import { useAnnotationsByTraceIds } from "~/hooks/useAnnotationsByTraceIds";
 import { useFilterParams } from "~/hooks/useFilterParams";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";

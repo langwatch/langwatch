@@ -2,7 +2,7 @@ import {
   type Prisma,
   type PrismaClient,
   RoleBindingScopeType,
-} from "@prisma/client";
+} from "~/generated/prisma/client";
 import { assertNoPersonalTeamScope } from "~/server/role-bindings/personal-team-scope";
 import {
   RoleDuplicateNameError,

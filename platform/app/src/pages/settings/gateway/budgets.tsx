@@ -67,7 +67,7 @@ function BudgetsPage() {
   const { rows, spendAvailable, isLoading, isError, error, refetch } =
     useBudgetRows(organization?.id);
 
-  const utils = api.useContext();
+  const utils = api.useUtils();
   const archiveMutation = api.gatewayBudgets.archive.useMutation({
     onSuccess: async () => {
       if (organization?.id) {

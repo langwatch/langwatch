@@ -21,11 +21,7 @@
  * migrates the dedicated test database, and setupEnv pins a deterministic
  * CREDENTIALS_SECRET.
  */
-import {
-  OrganizationUserRole,
-  RoleBindingScopeType,
-  TeamUserRole,
-} from "@prisma/client";
+
 import { nanoid } from "nanoid";
 import {
   afterAll,
@@ -36,6 +32,11 @@ import {
   expect,
   it,
 } from "vitest";
+import {
+  OrganizationUserRole,
+  RoleBindingScopeType,
+  TeamUserRole,
+} from "~/generated/prisma/client";
 import { cleanupTestRows } from "../../../test-utils/cleanupTestRows";
 import { appRouter } from "../../api/root";
 import { createInnerTRPCContext } from "../../api/trpc";

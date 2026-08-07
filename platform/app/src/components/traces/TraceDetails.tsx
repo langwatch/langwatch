@@ -52,7 +52,7 @@ export function TraceDetails(props: {
   const { isLiteMember } = useLiteMemberGuard();
   const [threadId, setThreadId] = useState<string | undefined>(undefined);
   const router = useRouter();
-  const queryClient = api.useContext();
+  const queryClient = api.useUtils();
 
   const canViewMessages = true;
 
@@ -296,7 +296,7 @@ export function TraceDetails(props: {
                             setAnnotators={setAnnotators}
                             queueDrawerOpen={queueDrawerOpen}
                             sendToQueue={sendToQueue}
-                            isLoading={queueItem.isLoading}
+                            isLoading={queueItem.isPending}
                           />
                         )}
                       </Popover.Body>

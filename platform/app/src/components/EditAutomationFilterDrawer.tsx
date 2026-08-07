@@ -1,5 +1,5 @@
 import { Box, Button, Heading, HStack, Text, VStack } from "@chakra-ui/react";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useColorMode } from "~/components/ui/color-mode";
 import { useDrawer } from "~/hooks/useDrawer";
 import type { FilterParam } from "~/hooks/useFilterParams";
@@ -84,7 +84,7 @@ export function EditAutomationFilterDrawer({
   const updateTriggerFilters =
     api.automation.updateTriggerFilters.useMutation();
 
-  const queryClient = api.useContext();
+  const queryClient = api.useUtils();
   const { closeDrawer } = useDrawer();
 
   const [isCodeMode, setIsCodeMode] = useState(false);
@@ -100,48 +100,52 @@ export function EditAutomationFilterDrawer({
     Partial<Record<FilterField, FilterParam>>
   >({});
 
-  // Guard against refetches overwriting unsaved user edits (TanStack Query v4
-  // fires onSuccess on every successful fetch, including background refetches)
+  // Guard against refetches overwriting unsaved user edits (the hydration
+  // effect below re-runs on every successful fetch, including background
+  // refetches)
   const hydratedForRef = useRef<string | undefined>(undefined);
 
-  api.automation.getTriggerById.useQuery(
+  const triggerQuery = api.automation.getTriggerById.useQuery(
     {
       triggerId: automationId ?? "",
       projectId: project?.id ?? "",
     },
     {
       enabled: !!automationId && !!project?.id,
-      onSuccess: (data) => {
-        const drawerKey = `${project?.id}:${automationId}`;
-        if (hydratedForRef.current === drawerKey) return;
-
-        const filters = JSON.parse(data?.filters as string) as Record<
-          string,
-          FilterParam
-        >;
-        const { sanitized } = sanitizeTriggerFilters(
-          filters as Record<string, TriggerFilterValue>,
-        );
-        const filtersToSet = Object.entries(sanitized).reduce(
-          (acc, [key, value]) => {
-            if (Array.isArray(value)) {
-              if (value.length > 0) {
-                acc[key as FilterField] = value;
-              }
-            } else if (typeof value === "object" && value !== null) {
-              acc[key as FilterField] = value;
-            }
-            return acc;
-          },
-          {} as Partial<Record<FilterField, FilterParam>>,
-        );
-
-        setLocalFilters(filtersToSet);
-        setCodeValue(JSON.stringify(filters, null, 2));
-        hydratedForRef.current = drawerKey;
-      },
     },
   );
+
+  const triggerData = triggerQuery.data;
+  useEffect(() => {
+    if (!triggerData) return;
+    const drawerKey = `${project?.id}:${automationId}`;
+    if (hydratedForRef.current === drawerKey) return;
+
+    const filters = JSON.parse(triggerData.filters as string) as Record<
+      string,
+      FilterParam
+    >;
+    const { sanitized } = sanitizeTriggerFilters(
+      filters as Record<string, TriggerFilterValue>,
+    );
+    const filtersToSet = Object.entries(sanitized).reduce(
+      (acc, [key, value]) => {
+        if (Array.isArray(value)) {
+          if (value.length > 0) {
+            acc[key as FilterField] = value;
+          }
+        } else if (typeof value === "object" && value !== null) {
+          acc[key as FilterField] = value;
+        }
+        return acc;
+      },
+      {} as Partial<Record<FilterField, FilterParam>>,
+    );
+
+    setLocalFilters(filtersToSet);
+    setCodeValue(JSON.stringify(filters, null, 2));
+    hydratedForRef.current = drawerKey;
+  }, [triggerData, project?.id, automationId]);
 
   const getNonEmptyFilters = useCallback(() => {
     return Object.fromEntries(
@@ -370,7 +374,7 @@ export function EditAutomationFilterDrawer({
                 colorPalette="blue"
                 type="submit"
                 minWidth="fit-content"
-                loading={updateTriggerFilters.isLoading}
+                loading={updateTriggerFilters.isPending}
                 onClick={onSubmit}
               >
                 Update Filters

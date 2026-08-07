@@ -1,8 +1,8 @@
 import { generate } from "@langwatch/ksuid";
-import { RoleBindingScopeType, TeamUserRole } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { z } from "zod";
+import { RoleBindingScopeType, TeamUserRole } from "~/generated/prisma/client";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import {
   PERSONAL_TEAM_ARCHIVE_REFUSAL,

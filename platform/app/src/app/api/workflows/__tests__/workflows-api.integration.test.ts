@@ -1,13 +1,13 @@
+import { nanoid } from "nanoid";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { projectFactory } from "~/factories/project.factory";
 import type {
   Organization,
   Project,
   Team,
   User,
   Workflow,
-} from "@prisma/client";
-import { nanoid } from "nanoid";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { projectFactory } from "~/factories/project.factory";
+} from "~/generated/prisma/client";
 import { prisma } from "~/server/db";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 

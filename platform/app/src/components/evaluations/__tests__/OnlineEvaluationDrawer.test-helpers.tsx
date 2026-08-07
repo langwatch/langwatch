@@ -363,7 +363,7 @@ export function createApiMock() {
           })),
         },
       },
-      useContext: vi.fn(() => ({
+      useUtils: vi.fn(() => ({
         evaluators: {
           getAll: { invalidate: mockInvalidate },
           getById: { invalidate: mockInvalidate },

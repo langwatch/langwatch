@@ -204,9 +204,9 @@ vi.mock("~/utils/api", () => ({
       list: {
         useInfiniteQuery: () => ({
           data: { pages: [{ items: [], nextCursor: null }] },
-          isInitialLoading: false,
+          isLoading: false,
           isFetching: false,
-          isPreviousData: false,
+          isPlaceholderData: false,
           isFetched: true,
           isError: false,
           error: null,

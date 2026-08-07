@@ -1,13 +1,13 @@
 import { generate } from "@langwatch/ksuid";
-import type { User } from "@prisma/client";
+import { TRPCError } from "@trpc/server";
+import type { User } from "~/generated/prisma/client";
 import {
   type OrganizationIntent,
   type OrganizationUserRole,
   PricingModel,
   RoleBindingScopeType,
   type TeamUserRole,
-} from "@prisma/client";
-import { TRPCError } from "@trpc/server";
+} from "~/generated/prisma/client";
 import type { RoleBindingForSynthesis } from "~/server/app-layer/role-bindings/repositories/role-binding.repository";
 import type { PromptTagRepository } from "~/server/prompt-config/repositories/prompt-tag.repository";
 import { KSUID_RESOURCES } from "~/utils/constants";

@@ -10,7 +10,6 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { OrganizationUserRole, TeamUserRole } from "@prisma/client";
 import { Mail, Plus, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useRef } from "react";
 import {
@@ -23,6 +22,7 @@ import {
   useWatch,
 } from "react-hook-form";
 import { Checkbox } from "~/components/ui/checkbox";
+import { OrganizationUserRole, TeamUserRole } from "~/generated/prisma/client";
 import { api } from "~/utils/api";
 import { InfoWithoutSelecting } from "./settings/InfoWithoutSelecting";
 import {

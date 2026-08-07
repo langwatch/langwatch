@@ -210,9 +210,8 @@ vi.mock("~/utils/api", async () => {
     return {
       data,
       isLoading: false,
-      isInitialLoading: false,
       isFetching: false,
-      isPreviousData: false,
+      isPlaceholderData: false,
       isFetched: true,
       isSuccess: enabled && !historyState.errored && !!data,
       isError: enabled && historyState.errored,

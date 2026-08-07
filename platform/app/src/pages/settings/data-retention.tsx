@@ -497,7 +497,7 @@ function DataRetentionPage({
           onCancel={(mutationId) =>
             killMutation.mutate({ projectId, mutationId })
           }
-          isCancelling={killMutation.isLoading}
+          isCancelling={killMutation.isPending}
         />
 
         {available && (
@@ -511,7 +511,7 @@ function DataRetentionPage({
             currentProjectId={projectId}
             isPlatformAdmin={isPlatformAdmin}
             isEnterprise={isEnterprise}
-            isSaving={setForScope.isLoading || triggerUpdate.isLoading}
+            isSaving={setForScope.isPending || triggerUpdate.isPending}
             onSave={async ({ scopes, retentionDays, applyToExisting }) => {
               const categories: RetentionCategory[] = [...RETENTION_CATEGORIES];
               const saveOverrides = async () => {
@@ -676,7 +676,7 @@ function DataRetentionPage({
         <RemoveScopeConfirmDialog
           group={removeTarget}
           projectId={projectId}
-          isRemoving={removeForScope.isLoading}
+          isRemoving={removeForScope.isPending}
           onCancel={() => setRemoveTarget(null)}
           onConfirm={async () => {
             if (!removeTarget) return;
@@ -687,7 +687,7 @@ function DataRetentionPage({
 
         <ApplyToExistingConfirmDialog
           pending={pendingConfirm}
-          isApplying={triggerUpdate.isLoading || setForScope.isLoading}
+          isApplying={triggerUpdate.isPending || setForScope.isPending}
           onCancel={() => setPendingConfirm(null)}
           onConfirm={async () => {
             if (!pendingConfirm) return;

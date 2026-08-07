@@ -8,8 +8,8 @@
  * Tests the service in isolation with mocked dependencies.
  */
 
-import { OrganizationUserRole } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { OrganizationUserRole } from "~/generated/prisma/client";
 import type { PlanProvider } from "../../app-layer/subscription/plan-provider";
 import { LimitExceededError } from "../../license-enforcement/errors";
 import type { ILicenseEnforcementRepository } from "../../license-enforcement/license-enforcement.repository";

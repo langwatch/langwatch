@@ -56,7 +56,7 @@ vi.mock("~/utils/api", () => ({
         useMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
       },
     },
-    useContext: () => ({
+    useUtils: () => ({
       organization: { getAll: { invalidate: vi.fn() } },
       modelProvider: {
         getAllForProject: { invalidate: vi.fn() },

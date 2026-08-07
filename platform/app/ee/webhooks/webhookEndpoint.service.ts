@@ -9,7 +9,7 @@ import type {
   PrismaClient,
   WebhookDeliveryOutcome,
   WebhookEndpoint,
-} from "@prisma/client";
+} from "~/generated/prisma/client";
 import { pruneWebhookDeliveries } from "~/server/webhooks/deliveryLog";
 import { WEBHOOK_PREVIOUS_SECRET_TTL_MS } from "~/server/webhooks/signature";
 import {

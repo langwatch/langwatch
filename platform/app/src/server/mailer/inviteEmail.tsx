@@ -1,6 +1,6 @@
-import type { Organization } from "@prisma/client";
 import { Button, Container, Heading, Html, Img } from "@react-email/components";
 import { render } from "@react-email/render";
+import type { Organization } from "~/generated/prisma/client";
 import { env } from "../../env.mjs";
 import { sendEmail } from "./emailSender";
 

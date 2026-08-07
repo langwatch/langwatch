@@ -26,9 +26,8 @@
 export const idleQuery = () => ({
   data: undefined,
   isLoading: false,
-  isInitialLoading: false,
   isFetching: false,
-  isPreviousData: false,
+  isPlaceholderData: false,
   isFetched: true,
   isError: false,
   error: null,

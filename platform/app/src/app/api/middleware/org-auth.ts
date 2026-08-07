@@ -1,9 +1,9 @@
-import type { Organization } from "@prisma/client";
 import type { MiddlewareHandler } from "hono";
 import {
   type ApiErrorEnvelope,
   authRefusalBody,
 } from "~/app/api/shared/canonical-error";
+import type { Organization } from "~/generated/prisma/client";
 import type { Permission } from "~/server/api/rbac";
 import { createOrgAuthMiddleware } from "~/server/api-key/auth-middleware";
 import type { OrgResolvedToken } from "~/server/api-key/token-resolver";

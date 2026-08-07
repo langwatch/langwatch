@@ -136,7 +136,7 @@ export function BudgetCreateDrawer({
     [providersQuery.data],
   );
 
-  const utils = api.useContext();
+  const utils = api.useUtils();
   const createMutation = api.gatewayBudgets.create.useMutation({
     onSuccess: async () => {
       await Promise.all([

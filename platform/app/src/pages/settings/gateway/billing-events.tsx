@@ -12,8 +12,9 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { keepPreviousData } from "@tanstack/react-query";
 import { ReceiptText, X } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import AiGatewayLayout from "~/components/gateway/AiGatewayLayout";
 import { Link } from "~/components/ui/link";
 import { Select } from "~/components/ui/select";
@@ -123,10 +124,19 @@ function useBillingEventsLedger(projectId: string) {
     },
     {
       enabled: !!projectId,
-      keepPreviousData: true,
-      onSuccess: paging.append,
+      placeholderData: keepPreviousData,
     },
   );
+
+  // Append per fetch, keyed on `dataUpdatedAt` so a cursor page that happens
+  // to equal the previous one (identity held by structural sharing) still
+  // lands exactly once per response.
+  const { data: pageData, dataUpdatedAt } = query;
+  useEffect(() => {
+    if (dataUpdatedAt === 0 || !pageData) return;
+    paging.append(pageData);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dataUpdatedAt]);
 
   const rows = useMemo(() => {
     if (paging.pages.length === 0) return query.data?.rows ?? [];

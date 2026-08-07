@@ -201,7 +201,7 @@ export function TraceOverflowMenu({
             value="pin"
             onClick={handleTogglePin}
             disabled={
-              pinMutation.isLoading || unpinMutation.isLoading || isSharePin
+              pinMutation.isPending || unpinMutation.isPending || isSharePin
             }
           >
             <HStack gap={2}>

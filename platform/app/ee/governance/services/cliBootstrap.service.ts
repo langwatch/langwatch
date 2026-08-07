@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import { env } from "~/env.mjs";
 /**
  * CliBootstrapService - shared logic for the login-completion ceremony.
  * Returns the member's available AI tools (coding assistants they can run),
@@ -20,9 +21,7 @@
  * catalog, and budget collapses to {null, 0, MONTHLY} when the user has no
  * personal workspace yet (fresh login flow, no VK provisioning yet).
  */
-import type { PrismaClient } from "@prisma/client";
-
-import { env } from "~/env.mjs";
+import type { PrismaClient } from "~/generated/prisma/client";
 import type { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
 import { GatewayBudgetService } from "~/server/gateway/budget.service";
 import { AiToolEntryService } from "./aiToolEntry.service";

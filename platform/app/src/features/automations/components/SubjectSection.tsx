@@ -13,6 +13,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import type { NotificationCadence } from "@langwatch/automations/cadences";
+import { keepPreviousData } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { FieldsFilters } from "~/components/filters/FieldsFilters";
 import { Tooltip } from "~/components/ui/tooltip";
@@ -450,7 +451,7 @@ function TraceQuerySubject({
       // instead of blanking to a spinner. Focus changes never refetch — the
       // matched set doesn't move fast enough to justify the flicker.
       staleTime: 5 * 60_000,
-      keepPreviousData: true,
+      placeholderData: keepPreviousData,
       refetchOnWindowFocus: false,
     },
   );

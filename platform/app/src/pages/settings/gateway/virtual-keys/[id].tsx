@@ -112,7 +112,7 @@ function VirtualKeyDetailPage() {
     },
     { enabled: !!orgId && !!vkId },
   );
-  const utils = api.useContext();
+  const utils = api.useUtils();
   const rotateMutation = api.virtualKeys.rotate.useMutation({
     onSuccess: () =>
       utils.virtualKeys.get.invalidate({ organizationId: orgId, id: vkId }),

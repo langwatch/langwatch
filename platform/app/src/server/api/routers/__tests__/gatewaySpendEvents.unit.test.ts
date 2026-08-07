@@ -3,8 +3,9 @@
  * passthrough to the repository, virtual-key display-name resolution, the
  * ClickHouse-disabled degrade, and RBAC denial.
  */
-import type { PrismaClient } from "@prisma/client";
+
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { PrismaClient } from "~/generated/prisma/client";
 import type { SpendEventRow } from "~/server/gateway/spendEvents.clickhouse.repository";
 import { createInnerTRPCContext } from "../../trpc";
 import { gatewaySpendEventsRouter } from "../gatewaySpendEvents";

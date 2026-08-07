@@ -5,7 +5,7 @@ import type {
   ModelDefaultScopeType,
   Prisma,
   PrismaClient,
-} from "@prisma/client";
+} from "~/generated/prisma/client";
 import { KSUID_RESOURCES } from "../../utils/constants";
 import { resolveSingleOrganizationForScopes } from "../scopes/resolveOrganizationForScope";
 

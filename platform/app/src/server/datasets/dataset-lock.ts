@@ -12,7 +12,7 @@
  * lock is held for the duration of the `$transaction`, so the chunk I/O AND the
  * `Dataset` counter update commit (or roll back) as one unit.
  */
-import type { Prisma, PrismaClient } from "@prisma/client";
+import type { Prisma, PrismaClient } from "~/generated/prisma/client";
 
 /**
  * Max wall-clock a dataset-mutation transaction may run before Prisma aborts it
@@ -68,7 +68,8 @@ export const withDatasetLock = async <T>(
       // `$executeRaw` (not `$queryRaw`): pg_advisory_xact_lock returns `void`,
       // which $queryRaw can't deserialize. $executeRaw runs the statement and
       // ignores the result, acquiring the lock as a side effect.
-      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`dataset:${datasetId}`}, 0))`;
+      await tx.$executeRaw`-- @tenancy: advisory-lock helper, key is dataset-bounded
+SELECT pg_advisory_xact_lock(hashtextextended(${`dataset:${datasetId}`}, 0))`;
       return fn(tx);
     },
     {

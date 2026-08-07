@@ -1,6 +1,6 @@
 import { HandledError } from "@langwatch/handled-error";
-import type { Team } from "@prisma/client";
 import { nanoid } from "nanoid";
+import type { Team } from "~/generated/prisma/client";
 import { slugify } from "~/utils/slugify";
 import type {
   PaginatedResult,

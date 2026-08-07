@@ -97,7 +97,7 @@ vi.mock("~/experiments-v3/components/SavedDatasetLoaders", () => ({
 // experiments-v3 workbench tests (see ExecutionControls.integration.test.tsx).
 vi.mock("~/utils/api", () => ({
   api: {
-    useContext: () => ({}),
+    useUtils: () => ({}),
     evaluators: {
       create: { useMutation: () => ({ mutate: vi.fn() }) },
       update: { useMutation: () => ({ mutate: vi.fn() }) },

@@ -44,7 +44,7 @@ interface AddDatasetDrawerProps {
  * @param props - Component props
  */
 export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
-  const trpc = api.useContext();
+  const trpc = api.useUtils();
   const { project } = useOrganizationTeamProject();
   const createDatasetRecord = api.datasetRecord.create.useMutation();
   const editDataset = useDisclosure();
@@ -331,7 +331,7 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
                 colorPalette="blue"
                 marginTop={6}
                 marginBottom={4}
-                loading={createDatasetRecord.isLoading}
+                loading={createDatasetRecord.isPending}
                 disabled={
                   !selectedDataset ||
                   !tracesWithSpans.data ||

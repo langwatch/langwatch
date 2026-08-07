@@ -14,13 +14,14 @@
  * Covers @integration scenarios from
  * specs/model-providers/provider-configuration.feature.
  */
+
+import { nanoid } from "nanoid";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   OrganizationUserRole,
   RoleBindingScopeType,
   TeamUserRole,
-} from "@prisma/client";
-import { nanoid } from "nanoid";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+} from "~/generated/prisma/client";
 
 import { cleanupTestRows } from "../../../test-utils/cleanupTestRows";
 import { MASKED_KEY_PLACEHOLDER } from "../../../utils/constants";

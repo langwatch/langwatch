@@ -7,13 +7,13 @@ import {
   Input,
   Text,
 } from "@chakra-ui/react";
-import { RoleBindingScopeType } from "@prisma/client";
 import { Search } from "lucide-react";
 import { forwardRef, useImperativeHandle, useMemo, useState } from "react";
 import { InputGroup } from "~/components/ui/input-group";
 import { Select } from "~/components/ui/select";
 import { toaster } from "~/components/ui/toaster";
 import { showErrorToast } from "~/features/errors";
+import { RoleBindingScopeType } from "~/generated/prisma/client";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 

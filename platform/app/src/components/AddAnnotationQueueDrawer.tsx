@@ -63,7 +63,7 @@ export const AddAnnotationQueueDrawer = ({
     }
   };
 
-  const queryClient = api.useContext();
+  const queryClient = api.useUtils();
 
   const annotationScores = api.annotationScore.getAllActive.useQuery(
     {
@@ -445,7 +445,7 @@ export const AddAnnotationQueueDrawer = ({
                     colorPalette="orange"
                     type="submit"
                     minWidth="fit-content"
-                    loading={createOrUpdateQueue.isLoading}
+                    loading={createOrUpdateQueue.isPending}
                   >
                     Save
                   </Button>

@@ -3,8 +3,9 @@
  *
  * Router-level tests for automation filter validation and update sanitization.
  */
-import { TriggerAction } from "@prisma/client";
+
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { TriggerAction } from "~/generated/prisma/client";
 import { globalForApp } from "../../../app-layer/app";
 import { createTestApp } from "../../../app-layer/presets";
 

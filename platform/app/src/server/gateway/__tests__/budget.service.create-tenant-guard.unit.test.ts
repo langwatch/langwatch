@@ -7,8 +7,9 @@
  * caller could otherwise create a budget targeting another tenant's team or
  * project (the Team/Project FK is org-agnostic).
  */
-import type { PrismaClient } from "@prisma/client";
+
 import { describe, expect, it, vi } from "vitest";
+import type { PrismaClient } from "~/generated/prisma/client";
 
 import { GatewayBudgetService } from "../budget.service";
 

@@ -128,7 +128,7 @@ export function DefaultModelsSection({
   const setFilter = onFilterChange ?? setLocalFilter;
   const { openDrawer } = useDrawer();
 
-  const utils = api.useContext();
+  const utils = api.useUtils();
   const deleteMutation =
     api.modelProvider.deleteDefaultModelsConfig.useMutation();
   const handleDelete = async (c: ConfigRow) => {

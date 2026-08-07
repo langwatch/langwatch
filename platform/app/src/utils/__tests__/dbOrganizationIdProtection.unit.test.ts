@@ -1,8 +1,9 @@
-import type { PrismaClient } from "@prisma/client";
-import { Prisma } from "@prisma/client";
 import { describe, expect, it, vi } from "vitest";
+import type { PrismaClient } from "~/generated/prisma/client";
 
 import { reapExpiredLangySessionApiKeys } from "~/server/app-layer/langy/langyApiKey";
+import { parsePrismaDatamodel } from "~/test-utils/prismaDatamodel";
+import type { GuardParams } from "../dbGuardMiddleware";
 import {
   guardOrganizationId,
   ORG_SCOPED_MODEL_NAMES,
@@ -16,22 +17,9 @@ import {
  * partition test keeps the regime classification honest as the schema grows.
  */
 
-async function runGuard(
-  params: Partial<Prisma.MiddlewareParams> & {
-    model: string;
-    action: Prisma.MiddlewareParams["action"];
-    args: Prisma.MiddlewareParams["args"];
-  },
-): Promise<unknown> {
+async function runGuard(params: GuardParams): Promise<unknown> {
   const next = vi.fn(async () => "ok");
-  return guardOrganizationId(
-    {
-      dataPath: [],
-      runInTransaction: false,
-      ...params,
-    } as Prisma.MiddlewareParams,
-    next,
-  );
+  return guardOrganizationId(params, next);
 }
 
 describe("guardOrganizationId — original three models preserved", () => {
@@ -323,10 +311,8 @@ describe("guardOrganizationId — unguarded models are ignored", () => {
  * tenancy decision instead of a silent leak.
  */
 describe("organization-tenancy regime partition", () => {
-  const orgBearingModels = Prisma.dmmf.datamodel.models
-    .filter((model) =>
-      model.fields.some((field) => field.name === "organizationId"),
-    )
+  const orgBearingModels = parsePrismaDatamodel()
+    .filter((model) => model.fields.includes("organizationId"))
     .map((model) => model.name);
 
   it("covers every org-bearing model with exactly one regime", () => {
@@ -383,13 +369,7 @@ describe("guardOrganizationId — platform-owned API-key sweeps", () => {
         updateMany: async (args: unknown) => {
           calls.push(args);
           return guardOrganizationId(
-            {
-              model: "ApiKey",
-              action: "updateMany",
-              args,
-              dataPath: [],
-              runInTransaction: false,
-            } as Prisma.MiddlewareParams,
+            { model: "ApiKey", action: "updateMany", args },
             async () => ({ count: rowsAffected }),
           );
         },

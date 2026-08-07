@@ -10,12 +10,12 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import type { Annotation } from "@prisma/client";
 import { useMemo, useState } from "react";
 import { ChevronDown, Edit, MessageCircle, MoreVertical } from "react-feather";
 import { LangyContextTarget } from "~/features/langy/components/LangyContextTarget";
 import { traceContextChip } from "~/features/langy/logic/langyContextChips";
 import { TraceIdPeek } from "~/features/traces-v2/components/TraceIdPeek";
+import type { Annotation } from "~/generated/prisma/client";
 import { useAnnotationQueues } from "~/hooks/useAnnotationQueues";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";

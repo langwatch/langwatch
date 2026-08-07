@@ -1,6 +1,6 @@
-import type { PrismaClient, Project } from "@prisma/client";
 import { z } from "zod";
 import { env } from "~/env.mjs";
+import type { PrismaClient, Project } from "~/generated/prisma/client";
 import type { Session } from "~/server/auth";
 import { isManagedProvider } from "../../../ee/managed-providers/managedBedrockConfig";
 import { KEY_CHECK, MASKED_KEY_PLACEHOLDER } from "../../utils/constants";

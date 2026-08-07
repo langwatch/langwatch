@@ -1,9 +1,9 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   type PrismaClient,
   RoleBindingScopeType,
   TeamUserRole,
-} from "@prisma/client";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+} from "~/generated/prisma/client";
 import type { RoleBindingRepository } from "~/server/app-layer/role-bindings/repositories/role-binding.repository";
 import type { RoleService } from "~/server/role/role.service";
 import { RoleBindingService } from "../role-binding.service";

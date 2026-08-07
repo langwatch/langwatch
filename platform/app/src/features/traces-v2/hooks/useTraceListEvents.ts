@@ -1,3 +1,4 @@
+import { keepPreviousData } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
@@ -59,7 +60,7 @@ export function useTraceListEvents({
       enabled,
       staleTime: 60_000,
       refetchOnWindowFocus: false,
-      keepPreviousData: true,
+      placeholderData: keepPreviousData,
       trpc: { context: { skipBatch: true } },
     },
   );
@@ -69,7 +70,7 @@ export function useTraceListEvents({
   // already false, so a row on the new page would find no entry of its own and
   // read as eventless. It is still waiting, and says so until its own answer
   // arrives.
-  const isLoading = enabled && (query.isLoading || query.isPreviousData);
+  const isLoading = enabled && (query.isLoading || query.isPlaceholderData);
   const isUnavailable = enabled && query.isError;
 
   return useMemo(() => {

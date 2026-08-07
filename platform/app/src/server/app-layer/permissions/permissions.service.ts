@@ -1,5 +1,5 @@
-import type { PrismaClient } from "@prisma/client";
-import { OrganizationUserRole } from "@prisma/client";
+import type { PrismaClient } from "~/generated/prisma/client";
+import { OrganizationUserRole } from "~/generated/prisma/client";
 import type { Permission } from "~/server/api/rbac";
 import { resolveProjectPermission } from "~/server/api/rbac";
 import type { Session } from "~/server/auth";

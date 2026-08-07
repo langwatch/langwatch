@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import type { PrismaClient } from "@prisma/client";
+
 import crypto from "crypto";
+import type { PrismaClient } from "~/generated/prisma/client";
 
 /**
  * Manages SCIM bearer tokens: generation, hashing, and verification.

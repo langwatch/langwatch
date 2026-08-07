@@ -1,3 +1,4 @@
+import { keepPreviousData } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { api } from "~/utils/api";
 import { LIVE_REFETCH_MS } from "../constants/freshness";
@@ -44,10 +45,11 @@ export function useTraceHeader() {
     {
       enabled: isReady && !shared,
       staleTime: 300_000,
-      cacheTime: 1_800_000,
-      keepPreviousData: true,
+      gcTime: 1_800_000,
+      placeholderData: keepPreviousData,
       refetchOnWindowFocus: true,
-      refetchInterval: (data) => {
+      refetchInterval: (query) => {
+        const data = query.state.data;
         if (isLive && !sseConnected) return LIVE_REFETCH_MS;
         // The trace knows it used a prompt but the rollup hasn't
         // populated the IDs yet — keep polling on a slower cadence so

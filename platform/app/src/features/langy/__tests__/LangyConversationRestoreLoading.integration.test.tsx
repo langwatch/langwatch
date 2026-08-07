@@ -158,9 +158,8 @@ vi.mock("~/utils/api", async () => {
           }
         : undefined,
       isLoading: enabled && !settled,
-      isInitialLoading: enabled && !settled,
       isFetching: enabled && !settled,
-      isPreviousData: false,
+      isPlaceholderData: false,
       isFetched: settled,
       isSuccess: settled,
       isError: false,
