@@ -113,6 +113,16 @@ const WATERMARK_LAG_MS = 5 * 60 * 1000;
 const cursorSchema = z.object({
   sinceMs: z.number().int().nonnegative(),
   spaceId: z.string().nullable().default(null),
+  /**
+   * When the sweep currently IN FLIGHT began, or null when none is.
+   *
+   * A sweep is not a run. The budget can cut one short and `spaceId` carries
+   * it into the next run, so a large workspace is swept across several runs
+   * over several scheduled ticks. The watermark has to anchor to when that
+   * whole sweep started, which means the instant has to outlive the run that
+   * stamped it — hence the cursor rather than a local.
+   */
+  sweepStartedAtMs: z.number().int().positive().nullable().default(null),
 });
 type GenieCursor = z.infer<typeof cursorSchema>;
 
@@ -128,6 +138,13 @@ type GenieCursor = z.infer<typeof cursorSchema>;
  * would filter it out — a message lost with nothing anywhere reporting a
  * failure. Anchored to the sweep's start, that question is still in the next
  * run's window.
+ *
+ * `sweepStartedAtMs` is the start of the SWEEP, which on a large workspace is
+ * several runs back — not the start of the run calling this. Anchoring to the
+ * current run would reintroduce the same loss on exactly the workspaces the
+ * resume mechanism exists for: the gap between the first run and the last is
+ * scheduling interval times the number of runs, and everything asked in an
+ * already-swept space during that gap would be filtered out for good.
  *
  * `Math.max` against the previous value keeps it monotonic, so a clock that
  * steps backwards cannot rewind the window to the beginning of history.
@@ -165,6 +182,7 @@ function parseCursor(
   return {
     sinceMs: Number.isFinite(sinceMs) ? sinceMs : defaultSinceMs(),
     spaceId: null,
+    sweepStartedAtMs: null,
   };
 }
 
@@ -369,12 +387,19 @@ export class DatabricksGeniePuller
 
     const cursor = parseCursor(options.cursor, config);
     const budget = new RunBudget(options.deadlineMs);
-    // Taken BEFORE the first request, and it has to be. The next watermark is
+    // Stamped BEFORE the first request when a FRESH sweep begins, and carried
+    // unchanged through every run that resumes it. The next watermark is
     // derived from this instant, so anything created while the sweep is
-    // running lands after it and is caught next run. Reading the clock at the
-    // END would place the watermark past activity the sweep had already walked
-    // past — the exact loss this replaced.
-    const sweepStartedAtMs = Date.now();
+    // running lands after it and is caught next time.
+    //
+    // Resuming is the case that matters: `spaceId` means a sweep is already in
+    // flight, and re-stamping here would anchor the finished sweep to its LAST
+    // run instead of its first, silently dropping everything asked in an
+    // already-swept space in between. Reading the clock at the end of the run
+    // would be the same bug, one step worse.
+    const resuming =
+      cursor.spaceId !== null && cursor.sweepStartedAtMs !== null;
+    const sweepStartedAtMs = resuming ? cursor.sweepStartedAtMs! : Date.now();
 
     let sweep: SweepResult;
     try {
@@ -403,6 +428,11 @@ export class DatabricksGeniePuller
           complete: sweep.complete,
         }),
         spaceId: sweep.resumeSpaceId,
+        // Held only while the sweep is still in flight. Cleared the moment it
+        // stops resuming, so the next run stamps a fresh anchor rather than
+        // inheriting a stale one and re-reading from it forever.
+        sweepStartedAtMs:
+          sweep.resumeSpaceId === null ? null : sweepStartedAtMs,
       }),
       errorCount: 0,
     };
@@ -692,12 +722,15 @@ export class DatabricksGeniePuller
    * items already read are returned — the caller's job is to make sure the
    * watermark does not step over what is missing.
    *
-   * A `next_page_token` identical to the one just sent is refused rather than
-   * followed. Databricks pages by opaque token, so a token that does not
-   * advance is a contract violation, and following it would spend the run's
-   * whole request budget re-reading one page and then report "out of budget" —
-   * indistinguishable, from the outside, from a workspace that is merely large.
-   * Same shape as `has_more` with no token, and it gets the same answer.
+   * A `next_page_token` that has already been seen in this walk is refused
+   * rather than followed. Databricks pages by opaque token, so a token that
+   * revisits a page is a contract violation, and following it would spend the
+   * run's whole request budget re-reading the same pages and then report "out
+   * of budget" — indistinguishable, from the outside, from a workspace that is
+   * merely large. Same shape as `has_more` with no token, same answer.
+   *
+   * The whole set is tracked, not just the previous token: A → B → A is a
+   * cycle too, and a check against only the last one walks it forever.
    */
   private async paginate<T>({
     config,
@@ -718,6 +751,7 @@ export class DatabricksGeniePuller
   }): Promise<PagedRead<T>> {
     const items: T[] = [];
     let page: string | null = null;
+    const seen = new Set<string>();
 
     for (;;) {
       if (budget.exhausted()) return { items, complete: false };
@@ -739,11 +773,12 @@ export class DatabricksGeniePuller
       items.push(...parsed.items);
 
       if (parsed.next === null) return { items, complete: true };
-      if (parsed.next === page) {
+      if (seen.has(parsed.next)) {
         throw new Error(
-          `databricks genie ${path} returned a page_token that does not advance; refusing to re-read the same page`,
+          `databricks genie ${path} returned a page_token it had already served; refusing to re-read pages in a cycle`,
         );
       }
+      seen.add(parsed.next);
       page = parsed.next;
     }
   }

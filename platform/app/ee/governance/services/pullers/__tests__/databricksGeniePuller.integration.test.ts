@@ -65,7 +65,10 @@ import {
   installClickHouseTestApp,
 } from "~/test-utils/clickhouseTestApp";
 import { ensureHiddenGovernanceProject } from "../../governanceProject.service";
-import { DATABRICKS_GENIE_ADAPTER_ID } from "../databricksGenie.puller";
+import {
+  DATABRICKS_GENIE_ADAPTER_ID,
+  DatabricksGeniePuller,
+} from "../databricksGenie.puller";
 import { type PulledUsageDispatcher, runIngestionPull } from "../pullerWorker";
 
 const ns = `genie-${nanoid(8)}`;
@@ -126,9 +129,14 @@ async function pullThroughTheRealPipeline(params: {
 function decodeCursor(cursor: string | null): {
   sinceMs: number;
   spaceId: string | null;
+  sweepStartedAtMs: number | null;
 } {
   if (!cursor) throw new Error("expected a cursor");
-  return JSON.parse(cursor) as { sinceMs: number; spaceId: string | null };
+  return JSON.parse(cursor) as {
+    sinceMs: number;
+    spaceId: string | null;
+    sweepStartedAtMs: number | null;
+  };
 }
 
 /** What the dedicated pulled read reports for a scope. */
@@ -323,12 +331,19 @@ function message(params: {
  * mutate it mid-sweep and one of them 403s — state leaking between them would
  * make the failures mean the wrong thing.
  */
-function createFixtureWorkspace() {
+function createFixtureWorkspace(options: { betaAgeMs?: number } = {}) {
   const now = Date.now();
   /** Older activity, in the space the sweep visits first. */
   const alphaMs = now - 60 * 60 * 1000;
-  /** Newer activity, in a space the sweep only reaches later. */
-  const betaMs = now - 30 * 60 * 1000;
+  /**
+   * Newer activity, in a space the sweep only reaches later.
+   *
+   * The race scenario shortens this deliberately. It needs the LATER space's
+   * message to be the newest thing the sweep sees while still sitting inside
+   * the watermark's lag window — that combination is what separates a
+   * start-anchored watermark from a max-seen one.
+   */
+  const betaMs = now - (options.betaAgeMs ?? 30 * 60 * 1000);
 
   const conversations: Record<
     string,
@@ -423,10 +438,13 @@ async function startFixtureServer(params: {
 }): Promise<{
   baseUrl: string;
   conversationRequests: string[];
+  /** Requests per path prefix, for asserting a walk did not spin. */
+  requestCounts: Map<string, number>;
   close: () => Promise<void>;
 }> {
   const { workspace } = params;
   const conversationRequests: string[] = [];
+  const requestCounts = new Map<string, number>();
   /** One conversation per page, so paging is exercised with tiny fixtures. */
   const CONVERSATION_PAGE = 1;
   const MESSAGE_PAGE = 1;
@@ -434,6 +452,7 @@ async function startFixtureServer(params: {
   const server = http.createServer((req, res) => {
     const url = new URL(req.url ?? "/", "http://localhost");
     const token = url.searchParams.get("page_token");
+    requestCounts.set(url.pathname, (requestCounts.get(url.pathname) ?? 0) + 1);
     res.setHeader("content-type", "application/json");
     res.statusCode = 200;
     const send = (body: unknown) => res.end(JSON.stringify(body));
@@ -525,6 +544,7 @@ async function startFixtureServer(params: {
   return {
     baseUrl: `http://127.0.0.1:${(server.address() as AddressInfo).port}`,
     conversationRequests,
+    requestCounts,
     close: () => new Promise<void>((resolve) => server.close(() => resolve())),
   };
 }
@@ -677,7 +697,13 @@ describe("given someone asks a question while a sweep is running", () => {
   let seeded: Awaited<ReturnType<typeof seedSource>>;
 
   beforeAll(async () => {
-    workspace = createFixtureWorkspace();
+    // The later space's activity is recent, which is what makes this bite. The
+    // injected message must be OLDER than the newest thing the sweep goes on
+    // to see (so a max-seen watermark buries it) while still being newer than
+    // the sweep's start minus the lag window (so a start-anchored watermark
+    // catches it). With a 30-minute-old beta message neither holds and the
+    // scenario proves nothing.
+    workspace = createFixtureWorkspace({ betaAgeMs: 10_000 });
     let injected = false;
     fixture = await startFixtureServer({
       workspace,
@@ -694,9 +720,10 @@ describe("given someone asks a question while a sweep is running", () => {
             spaceId: "space-alpha",
             userId: 700_000_000_000_001,
             content: "Asked while the sweep was already past this space",
-            // NOW — later than everything the sweep will go on to see in beta,
-            // but in a space it has already walked past.
-            createdMs: Date.now(),
+            // Two seconds BEFORE beta's message, in a space the sweep has
+            // already walked past. A watermark set to the newest message seen
+            // lands on beta's timestamp and filters this one out for good.
+            createdMs: workspace.betaMs - 2_000,
             sql: "SELECT 1",
           }),
         );
@@ -730,6 +757,22 @@ describe("given someone asks a question while a sweep is running", () => {
       expect(firstRows.map((r) => r.EventId)).not.toContain(
         `databricks_genie:${seeded.sourceId}:msg-alpha-late`,
       );
+
+      // The property that gives this scenario its teeth, asserted rather than
+      // assumed: the injected message must be OLDER than the newest message
+      // the first sweep saw, or a max-seen watermark would have caught it too
+      // and the scenario would prove nothing. A later edit to the fixture ages
+      // fails here instead of quietly going decorative.
+      const injected = workspace.messages["conv-alpha-1"]!.find(
+        (m) => m.message_id === "msg-alpha-late",
+      )!;
+      const newestSeen = Math.max(
+        ...Object.values(workspace.messages)
+          .flat()
+          .filter((m) => m.message_id !== "msg-alpha-late")
+          .map((m) => m.created_timestamp),
+      );
+      expect(injected.created_timestamp).toBeLessThan(newestSeen);
 
       await pullThroughTheRealPipeline({
         sourceId: seeded.sourceId,
@@ -828,12 +871,104 @@ describe("given a list endpoint whose page token never advances", () => {
         sourceId: seeded.sourceId,
         cursor: null,
       });
+
+      // The refusal itself, not just its consequence. The old behaviour also
+      // produced no events and held the watermark — it just burned all 400
+      // requests getting there, which is what makes a broken workspace look
+      // like a merely large one.
+      const requests =
+        fixture.requestCounts.get(
+          "/api/2.0/genie/spaces/space-loop/conversations",
+        ) ?? 0;
+      expect(requests).toBeGreaterThan(0);
+      expect(requests).toBeLessThan(5);
+
       // The space is isolated, so the run itself survives — but it is
       // incomplete, and the watermark says so.
       expect(outcome.eventCount).toBe(0);
       expect(decodeCursor(outcome.nextCursor).sinceMs).toBe(
         Date.parse("2020-01-01T00:00:00.000Z"),
       );
+    }, 60_000);
+  });
+});
+
+describe("given a sweep too large for one run's budget", () => {
+  let workspace: FixtureWorkspace;
+  let fixture: Awaited<ReturnType<typeof startFixtureServer>>;
+
+  beforeAll(async () => {
+    workspace = createFixtureWorkspace();
+    fixture = await startFixtureServer({ workspace });
+  });
+
+  afterAll(async () => {
+    await fixture.close();
+  });
+
+  describe("when it finishes on a later run", () => {
+    /**
+     * Driven through `runOnce` rather than the pipeline, because the deadline
+     * is the only lever that truncates a sweep and `runIngestionPull` pins it
+     * at five minutes. Everything under test here — the anchor, the resume,
+     * the watermark — lives in the adapter, and the pipeline tiers above
+     * already cover the path from an event to a row.
+     */
+    it("anchors the watermark to the FIRST run's start, not the last one's", async () => {
+      const adapter = new DatabricksGeniePuller();
+      const config = adapter.validateConfig({
+        adapter: DATABRICKS_GENIE_ADAPTER_ID,
+        workspaceUrl: fixture.baseUrl,
+        spaceIds: ["space-alpha", "space-beta"],
+        startingAt: "2020-01-01T00:00:00.000Z",
+        schedule: "*/15 * * * *",
+      });
+      const credentials = { token: "fixture-token" };
+
+      // Run one, with a deadline already behind it: the sweep starts, gets no
+      // further than its first space, and hands the rest to the next run.
+      const beforeFirstRun = Date.now();
+      const first = await adapter.runOnce(
+        { cursor: null, credentials, deadlineMs: Date.now() - 1 },
+        config,
+      );
+      const afterFirstRun = Date.now();
+
+      const truncated = decodeCursor(first.cursor);
+      expect(truncated.spaceId).toBe("space-alpha");
+      expect(truncated.sweepStartedAtMs).not.toBeNull();
+      // Nothing was read, so the window must not have moved.
+      expect(truncated.sinceMs).toBe(Date.parse("2020-01-01T00:00:00.000Z"));
+
+      // A real gap between runs — the scheduler's interval, compressed. This
+      // is the whole distance the bug hid in.
+      await new Promise((resolve) => setTimeout(resolve, 1_500));
+
+      const beforeSecondRun = Date.now();
+      const second = await adapter.runOnce(
+        { cursor: first.cursor, credentials },
+        config,
+      );
+
+      const done = decodeCursor(second.cursor);
+
+      // The assertion that bites, and it comes first so that it — rather than
+      // the cursor's shape — is what fails if the anchor regresses. Anchored
+      // to run ONE, the watermark cannot be later than when run one ended.
+      // Anchored to run two, it lands at least the 1.5s gap beyond that, and
+      // everything asked in space-alpha during the gap is filtered out for
+      // good.
+      expect(done.sinceMs).toBeGreaterThanOrEqual(
+        beforeFirstRun - WATERMARK_LAG_MS,
+      );
+      expect(done.sinceMs).toBeLessThanOrEqual(
+        afterFirstRun - WATERMARK_LAG_MS,
+      );
+      expect(done.sinceMs).toBeLessThan(beforeSecondRun - WATERMARK_LAG_MS);
+
+      // The sweep drained, so the in-flight anchor is released.
+      expect(done.spaceId).toBeNull();
+      expect(done.sweepStartedAtMs).toBeNull();
     }, 60_000);
   });
 });
