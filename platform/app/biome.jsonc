@@ -308,13 +308,16 @@
 						//                              disables the rest of its file
 						//   noDuplicateTestHooks  0
 						//   noExportsInTest       1
-						//   noSkippedTests      110  — that much coverage is off
+						//   noSkippedTests        0  — burned down from 110; every
+						//                              skip was implemented, repaired
+						//                              or removed. Conditional
+						//                              skipIf(env) remains allowed.
 						//   noMisplacedAssertion 172  — mostly custom assertion
 						//                              helpers; verify before promoting
 						"noFocusedTests": "error",
 						"noDuplicateTestHooks": "error",
 						"noExportsInTest": "warn",
-						"noSkippedTests": "warn",
+						"noSkippedTests": "error",
 						"noMisplacedAssertion": "warn"
 					},
 					"nursery": {

@@ -50,9 +50,7 @@ describe("ModelProviderRepository Integration", () => {
 
   describe("given a model provider with customKeys", () => {
     describe("when saved and read back through the repository", () => {
-      // Skipped: env.mjs requires DATABASE_URL, BASE_HOST, NEXTAUTH_SECRET etc. which are not available in this test environment.
-      // CREDENTIALS_SECRET is set in beforeAll but the env validation fails at module load time before tests run.
-      it.skip("encrypts on save and decrypts on read preserving original values", async () => {
+      it("encrypts on save and decrypts on read preserving original values", async () => {
         const created = await repository.create({
           name: "OpenAI",
           provider: "openai",
@@ -140,9 +138,7 @@ describe("ModelProviderRepository Integration", () => {
     const migrationIds: string[] = [];
 
     describe("when the migration task runs", () => {
-      // Skipped: env.mjs requires DATABASE_URL, BASE_HOST, NEXTAUTH_SECRET etc. which are not available in this test environment.
-      // CREDENTIALS_SECRET is set in beforeAll but the env validation fails at module load time before tests run.
-      it.skip("encrypts only the plaintext rows", async () => {
+      it("encrypts only the plaintext rows", async () => {
         // 1. Insert plaintext row directly via prisma
         const plaintextId = generate(KSUID_RESOURCES.MODEL_PROVIDER).toString();
         migrationIds.push(plaintextId);
@@ -238,9 +234,7 @@ describe("ModelProviderRepository Integration", () => {
 
     describe("given already-migrated providers", () => {
       describe("when migration runs again", () => {
-        // Skipped: env.mjs requires DATABASE_URL, BASE_HOST, NEXTAUTH_SECRET etc. which are not available in this test environment.
-        // CREDENTIALS_SECRET is set in beforeAll but the env validation fails at module load time before tests run.
-        it.skip("is idempotent -- skips encrypted rows and data remains valid", async () => {
+        it("is idempotent -- skips encrypted rows and data remains valid", async () => {
           // Run migration again (same data from previous test)
           await main();
 

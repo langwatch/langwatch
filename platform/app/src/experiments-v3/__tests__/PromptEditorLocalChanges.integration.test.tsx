@@ -84,6 +84,7 @@ vi.mock("~/utils/compat/next-router", () => ({
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "test-project", slug: "test-project" },
+    hasPermission: () => true,
   }),
 }));
 
@@ -561,24 +562,23 @@ describe("Prompt Editor Local Changes", () => {
   });
 
   describe("saving prompt preserves newly added fields", () => {
-    // Skipped: After save, the PromptEditorDrawer resets form to initialLocalConfig
-    // instead of showing the server-saved data. The drawer needs to clear initialLocalConfig
-    // from its internal state when onSave fires so the form shows the new server response.
-    it.skip("form does not reset to initialLocalConfig after clicking save", async () => {
+    it("form does not reset to initialLocalConfig after clicking save", async () => {
       // BUG: After clicking save, the form resets to initialLocalConfig
       // instead of keeping the user's changes or showing the saved data.
 
       const user = userEvent.setup({ delay: null });
 
       // initialLocalConfig has DIFFERENT content than mockPromptData (server data)
-      // This simulates: user had unsaved local changes, then we open the drawer
+      // This simulates: user had unsaved local changes, then we open the drawer.
+      // The message must be a system message — the save button requires a
+      // non-empty system message to be valid (hasNonEmptySystemMessage).
       const localConfig: LocalPromptConfig = {
         llm: {
           model: "openai/gpt-4",
           temperature: 0.7,
           maxTokens: 4096,
         },
-        messages: [{ role: "user", content: "LOCAL UNSAVED CONTENT" }],
+        messages: [{ role: "system", content: "LOCAL UNSAVED CONTENT" }],
         inputs: [{ identifier: "input", type: "str" }],
         outputs: [{ identifier: "output", type: "str" }],
       };

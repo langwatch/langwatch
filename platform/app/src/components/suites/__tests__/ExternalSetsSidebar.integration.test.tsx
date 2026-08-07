@@ -313,11 +313,7 @@ describe("<SuiteSidebar/> External Sets", () => {
   });
 
   describe("given an external set with no runs", () => {
-    // Skipped: Code bug in SuiteSidebar.tsx — ExternalSetListItem always renders
-    // <RunSummaryLine> unconditionally, even when totalCount=0. This means "0 passed"
-    // and a pass-rate indicator are shown for sets with no runs. Fix: conditionally
-    // render <RunSummaryLine> only when totalCount > 0 (or lastRunTimestamp > 0).
-    it.skip("displays only the name with no summary line", () => {
+    it("displays only the name with no summary line", () => {
       render(
         <SuiteSidebar
           {...defaultProps}

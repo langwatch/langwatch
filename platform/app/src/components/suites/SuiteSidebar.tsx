@@ -643,7 +643,7 @@ function ExternalSetListItem({
             {externalSet.scenarioSetId || "<empty>"}
           </Text>
           <Spacer />
-          {externalSet.lastRunTimestamp && (
+          {externalSet.lastRunTimestamp > 0 && (
             <Text
               fontSize="11px"
               color="fg.subtle"
@@ -654,11 +654,13 @@ function ExternalSetListItem({
             </Text>
           )}
         </HStack>
-        <RunSummaryLine
-          passedCount={externalSet.passedCount}
-          failedCount={externalSet.failedCount}
-          totalCount={externalSet.totalCount}
-        />
+        {(externalSet.totalCount > 0 || externalSet.lastRunTimestamp > 0) && (
+          <RunSummaryLine
+            passedCount={externalSet.passedCount}
+            failedCount={externalSet.failedCount}
+            totalCount={externalSet.totalCount}
+          />
+        )}
       </VStack>
     </SidebarListItemWrapper>
   );

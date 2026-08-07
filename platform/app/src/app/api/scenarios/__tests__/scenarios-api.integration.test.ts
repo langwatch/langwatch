@@ -208,8 +208,7 @@ describe("Scenarios API", () => {
 
   describe("POST /api/scenarios", () => {
     describe("when given valid data", () => {
-      // Skipped: route exists but App singleton (resourceLimitMiddleware, planProvider) not initialized in test env.
-      it.skip("creates a scenario and returns it with an ID", async () => {
+      it("creates a scenario and returns it with an ID", async () => {
         const res = await helpers.api.post("/api/scenarios", {
           name: "Login Flow Happy Path",
           situation: "User attempts to log in with valid creds",
@@ -236,8 +235,7 @@ describe("Scenarios API", () => {
     });
 
     describe("when name is empty", () => {
-      // Skipped: route exists but App singleton (resourceLimitMiddleware, planProvider) not initialized in test env.
-      it.skip("returns a validation error", async () => {
+      it("returns a validation error", async () => {
         const res = await helpers.api.post("/api/scenarios", {
           name: "",
           situation: "Some situation",
@@ -245,22 +243,21 @@ describe("Scenarios API", () => {
           labels: [],
         });
 
-        expect(res.status).toBe(400);
+        expect(res.status).toBe(422);
         const body = await res.json();
         expect(body).toHaveProperty("error");
       });
     });
 
     describe("when situation is missing", () => {
-      // Skipped: route exists but App singleton (resourceLimitMiddleware, planProvider) not initialized in test env.
-      it.skip("returns a validation error", async () => {
+      it("returns a validation error", async () => {
         const res = await helpers.api.post("/api/scenarios", {
           name: "A valid name",
           criteria: ["A criterion"],
           labels: [],
         });
 
-        expect(res.status).toBe(400);
+        expect(res.status).toBe(422);
         const body = await res.json();
         expect(body).toHaveProperty("error");
       });

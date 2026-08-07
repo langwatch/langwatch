@@ -301,8 +301,7 @@ describe("SimulationClickHouseRepository (integration)", () => {
 
   describe("getRunDataForScenarioSet() (paginated)", () => {
     describe("when runs have metadata", () => {
-      // Skipped: requires live ClickHouse. Run with testcontainers or make dev-full to enable.
-      it.skip("returns runs with metadata through pagination", async () => {
+      it("returns runs with metadata through pagination", async () => {
         const scenarioSetId = `set-paged-${nanoid()}`;
         const batchRunId = `batch-paged-${nanoid()}`;
         const metadata = { page_test: true };
@@ -457,8 +456,7 @@ describe("SimulationClickHouseRepository (integration)", () => {
     const batch2 = `batch-ext2-${nanoid()}`;
 
     describe("when an external set has multiple batches with mixed results", () => {
-      // Skipped: requires live ClickHouse. Run with testcontainers or make dev-full to enable.
-      it.skip("aggregates pass/total across all batches", async () => {
+      it("aggregates pass/total across all batches", async () => {
         // Batch 1: 2 passed, 1 failed → 3 total
         await insertRow(
           ch,
@@ -467,6 +465,7 @@ describe("SimulationClickHouseRepository (integration)", () => {
             BatchRunId: batch1,
             ScenarioSetId: extSetId,
             Status: "SUCCESS",
+            StartedAt: new Date(now - 10000),
             CreatedAt: new Date(now - 10000),
             UpdatedAt: new Date(now - 10000),
           }),
@@ -478,6 +477,7 @@ describe("SimulationClickHouseRepository (integration)", () => {
             BatchRunId: batch1,
             ScenarioSetId: extSetId,
             Status: "SUCCESS",
+            StartedAt: new Date(now - 9000),
             CreatedAt: new Date(now - 9000),
             UpdatedAt: new Date(now - 9000),
           }),
@@ -489,6 +489,7 @@ describe("SimulationClickHouseRepository (integration)", () => {
             BatchRunId: batch1,
             ScenarioSetId: extSetId,
             Status: "FAILED",
+            StartedAt: new Date(now - 8000),
             CreatedAt: new Date(now - 8000),
             UpdatedAt: new Date(now - 8000),
           }),
@@ -502,6 +503,7 @@ describe("SimulationClickHouseRepository (integration)", () => {
             BatchRunId: batch2,
             ScenarioSetId: extSetId,
             Status: "SUCCESS",
+            StartedAt: new Date(now - 3000),
             CreatedAt: new Date(now - 3000),
             UpdatedAt: new Date(now - 3000),
           }),
@@ -513,6 +515,7 @@ describe("SimulationClickHouseRepository (integration)", () => {
             BatchRunId: batch2,
             ScenarioSetId: extSetId,
             Status: "STALLED",
+            StartedAt: new Date(now - 2000),
             CreatedAt: new Date(now - 2000),
             UpdatedAt: new Date(now - 2000),
           }),
@@ -567,8 +570,7 @@ describe("SimulationClickHouseRepository (integration)", () => {
     });
 
     describe("when date range filters out older batches", () => {
-      // Skipped: requires live ClickHouse. Run with testcontainers or make dev-full to enable.
-      it.skip("only counts runs within the date range", async () => {
+      it("only counts runs within the date range", async () => {
         const setId = `ext-datefilter-${nanoid()}`;
         const oldBatch = `batch-old-${nanoid()}`;
         const recentBatch = `batch-recent-${nanoid()}`;
@@ -582,6 +584,7 @@ describe("SimulationClickHouseRepository (integration)", () => {
             BatchRunId: oldBatch,
             ScenarioSetId: setId,
             Status: "SUCCESS",
+            StartedAt: new Date(now - 40 * 24 * 60 * 60 * 1000),
             CreatedAt: new Date(now - 40 * 24 * 60 * 60 * 1000),
             UpdatedAt: new Date(now - 40 * 24 * 60 * 60 * 1000),
           }),
@@ -595,6 +598,7 @@ describe("SimulationClickHouseRepository (integration)", () => {
             BatchRunId: recentBatch,
             ScenarioSetId: setId,
             Status: "SUCCESS",
+            StartedAt: new Date(now - 1 * 24 * 60 * 60 * 1000),
             CreatedAt: new Date(now - 1 * 24 * 60 * 60 * 1000),
             UpdatedAt: new Date(now - 1 * 24 * 60 * 60 * 1000),
           }),
@@ -606,6 +610,7 @@ describe("SimulationClickHouseRepository (integration)", () => {
             BatchRunId: recentBatch,
             ScenarioSetId: setId,
             Status: "FAILED",
+            StartedAt: new Date(now - 1 * 24 * 60 * 60 * 1000),
             CreatedAt: new Date(now - 1 * 24 * 60 * 60 * 1000),
             UpdatedAt: new Date(now - 1 * 24 * 60 * 60 * 1000),
           }),

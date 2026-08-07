@@ -82,10 +82,15 @@ describe("RBAC Integration Tests", () => {
       expect(result).toBe(false);
     });
 
-    it.skip("should return true for demo project with view permissions", async () => {
-      // Skipped due to environment mocking complexity
-      // The hasProjectPermission function uses env.DEMO_PROJECT_ID from ~/env.mjs
-      // which requires more complex mocking setup
+    it("returns true for demo project with view permissions", async () => {
+      process.env.DEMO_PROJECT_ID = "demo-project-123";
+
+      const result = await hasProjectPermission(
+        { prisma: mockPrisma, session: mockSession },
+        "demo-project-123",
+        "workflows:view" as Permission,
+      );
+      expect(result).toBe(true);
     });
 
     it("returns false for demo project with manage permissions", async () => {
