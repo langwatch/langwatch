@@ -578,8 +578,12 @@ jobs:
             file="$1"; want="$2"
             probe="src/_plugin_fixture_probe.tsx"
             cp "$file" "$probe"
-            got=$(pnpm exec biome lint --only=plugin --max-diagnostics=none \
-              --reporter=json "$probe" 2>/dev/null \
+            # `|| true` is load-bearing: biome exits non-zero BECAUSE it found
+            # the violations, which is the success case here. Under `set -e` a
+            # failing command substitution aborts the whole step.
+            raw=$(pnpm exec biome lint --only=plugin --max-diagnostics=none \
+              --reporter=json "$probe" 2>/dev/null || true)
+            got=$(printf '%s' "$raw" \
               | jq '[.diagnostics[] | select(.category == "plugin")] | length')
             rm -f "$probe"
             echo "$(basename "$file"): $got violations (floor $want)"
