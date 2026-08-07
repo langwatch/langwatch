@@ -730,6 +730,13 @@ const presentations = {
     title: "You can't disable your own membership",
     describe: () => "Ask another organization admin to make this change.",
   },
+  cannot_demote_last_admin: {
+    // Same lockout wall as disabling the last admin: with no admin remaining,
+    // nobody can sign in and undo the change.
+    title: "That would leave the organization without an admin",
+    describe: () =>
+      "This member is the only organization admin. Make somebody else an admin first, then change this member's role.",
+  },
   cannot_disable_last_admin: {
     // Same lockout wall seen from the other side: this member is the only
     // administrator left, so the remedy is to appoint another one first.

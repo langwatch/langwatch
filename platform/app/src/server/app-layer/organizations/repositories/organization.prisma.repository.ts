@@ -28,6 +28,7 @@ import {
   TeamLastAdminRequiredError,
 } from "../../teams/team.service";
 import {
+  CannotDemoteLastAdminError,
   CannotDisableLastAdminError,
   OrganizationSlugTakenError,
 } from "../errors";
@@ -885,10 +886,10 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
         });
 
         if (adminCount <= 1) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: "Cannot remove the last admin from an organization",
-          });
+          // Handled for the same reason as the disable guard: the tRPC
+          // boundary still maps the 400 to BAD_REQUEST, and the REST surface
+          // answers the stable code instead of an unknown 500.
+          throw new CannotDemoteLastAdminError();
         }
       }
 
