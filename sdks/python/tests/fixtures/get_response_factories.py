@@ -25,6 +25,9 @@ from langwatch.generated.langwatch_rest_api_client.models.get_api_prompts_by_id_
 from langwatch.generated.langwatch_rest_api_client.models.get_api_prompts_by_id_response_200_messages_item import (
     GetApiPromptsByIdResponse200MessagesItem,
 )
+from langwatch.generated.langwatch_rest_api_client.models.get_api_prompts_by_id_response_200_parameters import (
+    GetApiPromptsByIdResponse200Parameters,
+)
 from langwatch.generated.langwatch_rest_api_client.models.post_api_prompts_response_200_scope import (
     PostApiPromptsResponse200Scope,
 )
@@ -56,6 +59,8 @@ class GetPromptResponseFactory(Factory[GetApiPromptsByIdResponse200]):
     created_at = LazyFunction(lambda: datetime.now().isoformat() + "Z")
     inputs = []
     outputs = []
+    tags = []
+    parameters = LazyFunction(GetApiPromptsByIdResponse200Parameters)
 
     # Provide default messages as a factory attribute instead of post_generation
     messages = [

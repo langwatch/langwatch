@@ -82,10 +82,6 @@ vi.mock("../EvaluatorApiUsageDialog", () => ({
   EvaluatorApiUsageDialog: () => null,
 }));
 
-vi.mock("../../checks/EvaluatorSelection", () => ({
-  evaluatorTempNameMap: {},
-}));
-
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
 );

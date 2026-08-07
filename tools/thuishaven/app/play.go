@@ -978,6 +978,9 @@ func (o *Orchestrator) PlayLaunch(ctx context.Context, number int, checkout, lwD
 		ClickHouseHTTPPort: chPort, ClickHouseDatabase: database,
 		PostgresPort: pgPort, PostgresDatabase: database,
 		RedisPort: redisPort,
+		// Sandboxes run unreviewed branches, so this is the last place that
+		// should be shipping trace text to Google on someone's real credentials.
+		DisableGoogleDLP: o.cfg.ShouldDisableGoogleDLP,
 	}
 	for i, r := range domain.PerWorktreeServices {
 		svc := domain.Service{

@@ -142,18 +142,20 @@ export class RoleService {
       throw new UserNotTeamMemberError();
     }
 
-    await assertNoPersonalTeamScope(this.prisma, [
-      { scopeType: RoleBindingScopeType.TEAM, scopeId: teamId },
-    ]);
+    await assertNoPersonalTeamScope({
+      client: this.prisma,
+      scopes: [{ scopeType: RoleBindingScopeType.TEAM, scopeId: teamId }],
+    });
     await this.repository.assignToUser(userId, teamId, customRoleId);
 
     return { success: true };
   }
 
   async removeRoleFromUser(userId: string, teamId: string) {
-    await assertNoPersonalTeamScope(this.prisma, [
-      { scopeType: RoleBindingScopeType.TEAM, scopeId: teamId },
-    ]);
+    await assertNoPersonalTeamScope({
+      client: this.prisma,
+      scopes: [{ scopeType: RoleBindingScopeType.TEAM, scopeId: teamId }],
+    });
     await this.repository.removeFromUser(userId, teamId);
     return { success: true };
   }

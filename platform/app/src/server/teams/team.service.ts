@@ -1,4 +1,4 @@
-import { NotFoundError, ValidationError } from "@langwatch/handled-error";
+import { NotFoundError } from "@langwatch/handled-error";
 import {
   Prisma,
   type PrismaClient,
@@ -10,7 +10,11 @@ import type {
   RoleBindingRepository,
   TeamScopedMemberBinding,
 } from "~/server/app-layer/role-bindings/repositories/role-binding.repository";
-import { PERSONAL_TEAM_MEMBERSHIP_REFUSAL } from "~/server/app-layer/teams/team.service";
+import {
+  CannotRemoveSelfAsLastAdminError,
+  PersonalWorkspaceNotManagedHereError,
+  TeamLastAdminRequiredError,
+} from "~/server/app-layer/teams/team.service";
 
 // When a user holds multiple bindings on one team, the most privileged is the
 // one the settings page displays (and the binding team.update edits).
@@ -623,7 +627,7 @@ export class TeamService {
         // projection below stops protecting them the moment a group binding
         // exists on the team, so the invariant is stated here directly.
         if (team.isPersonal) {
-          throw new ValidationError(PERSONAL_TEAM_MEMBERSHIP_REFUSAL);
+          throw new PersonalWorkspaceNotManagedHereError(team.name);
         }
 
         // Compute the effective set of admin userIds — direct user ADMIN
@@ -638,7 +642,7 @@ export class TeamService {
         );
 
         if (effectiveAdminUserIds.size === 0) {
-          throw new ValidationError("No admin found for this team");
+          throw new TeamLastAdminRequiredError(team.name);
         }
 
         // Check if the target user is currently a direct member of the team
@@ -676,14 +680,10 @@ export class TeamService {
 
         if (projectedAdminUserIds.size === 0) {
           if (userId === currentUserId) {
-            throw new ValidationError(
-              "You cannot remove yourself from the last admin position in this team",
-            );
+            throw new CannotRemoveSelfAsLastAdminError(team.name);
           }
 
-          throw new ValidationError(
-            "Cannot remove the last admin from this team",
-          );
+          throw new TeamLastAdminRequiredError(team.name);
         }
 
         // Remove RoleBinding and legacy TeamUser row (if any) atomically
@@ -710,9 +710,7 @@ export class TeamService {
         );
 
         if (finalAdminUserIds.size === 0) {
-          throw new ValidationError(
-            "Operation would result in no admins for this team",
-          );
+          throw new TeamLastAdminRequiredError(team.name);
         }
 
         return {

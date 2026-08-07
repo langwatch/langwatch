@@ -118,6 +118,59 @@ Shared by cold storage and backups. Required when either `cold.enabled` or `back
 | `backup.full.schedule` | Cron schedule for full backups | `0 */12 * * *` |
 | `backup.incremental.schedule` | Cron schedule for incremental backups | `0 * * * *` |
 
+### Backup alerting
+
+Off by default. When enabled, the chart renders Prometheus alerting rules that
+watch the backup CronJobs through kube-state-metrics, so a Prometheus that
+scrapes kube-state-metrics is the only prerequisite.
+
+The alert to care about is `ClickHouseBackupStale`, which fires when a backup
+has no successful run inside its window. That is a different condition from "a
+job failed", and a stricter one: a CronJob that is suspended, deleted, or
+silently rescheduled never fails, it just stops producing backups. It also
+covers the case of a backup that has never succeeded even once, which has no
+`kube_cronjob_status_last_successful_time` series at all and so is invisible to
+the obvious form of the query.
+
+Each target additionally gets `ClickHouseBackupJobFailed` (faster, fires on a
+bad run rather than waiting out the window), `ClickHouseBackupCronJobSuspended`,
+and `ClickHouseBackupCronJobMissing` (the CronJob or kube-state-metrics itself
+has gone away, which would otherwise resolve every other rule into silence).
+
+Runbook: [`dev/docs/runbooks/clickhouse-backup-alerts.md`](../../dev/docs/runbooks/clickhouse-backup-alerts.md).
+
+| Name | Description | Default |
+|------|-------------|---------|
+| `backup.monitoring.enabled` | Render the backup alerting rules (also requires `backup.enabled`) | `false` |
+| `backup.monitoring.runbookUrl` | Value for the `runbook_url` annotation on every alert | `""` |
+| `backup.monitoring.additionalLabels` | Labels merged into every alert, for Alertmanager or Grafana routing | `{}` |
+| `backup.monitoring.for` | How long a backup may look broken before the alert fires | `15m` |
+| `backup.monitoring.absentFor` | How long the CronJob's metrics may be missing before alerting | `30m` |
+| `backup.monitoring.prometheusRule.enabled` | Emit a `PrometheusRule` instead of a ConfigMap (needs prometheus-operator CRDs) | `false` |
+| `backup.monitoring.prometheusRule.labels` | Extra labels on the `PrometheusRule`, for the operator's `ruleSelector` | `{}` |
+| `backup.monitoring.configMapLabels` | Labels on the rules ConfigMap, for a rules sidecar to discover it | `{langwatch.ai/prometheus-rules: "true"}` |
+| `backup.monitoring.targets` | Backups to watch: `name`, `cronjob` or `cronjobName`, `staleAfterHours` | full at 26h, incremental at 3h |
+
+Add an entry to `backup.monitoring.targets` for any other backup CronJob in the
+same namespace, including ones this chart does not create. Name it either way:
+
+```yaml
+targets:
+  # CronJob created by this chart: give the suffix, the release fullname is
+  # prepended, so this matches <release>-clickhouse-backup-full.
+  - name: full
+    cronjob: backup-full
+    staleAfterHours: 26
+  # CronJob managed outside this chart: give the exact name, no prefix is added.
+  - name: ebs-snapshot
+    cronjobName: acme-ebs-snapshotter
+    staleAfterHours: 26
+```
+
+`cronjob` and `cronjobName` are mutually exclusive, and the render fails if a
+target sets both or neither. A backup mechanism that is not a Kubernetes CronJob
+has no kube-state-metrics series and cannot be watched from here.
+
 ### Authentication
 
 | Name | Description | Default |

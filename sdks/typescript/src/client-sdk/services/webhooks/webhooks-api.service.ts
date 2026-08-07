@@ -1,3 +1,15 @@
+import { scopedApiKey } from "@/internal/credentialContext";
+import {
+  CURSOR_WALK_PAGE_SIZE,
+  walkCursorPages,
+} from "@/client-sdk/services/_shared/collect-cursor-pages";
+import {
+  idempotentCreateInit,
+  mutationInit,
+  type IdempotentCreateOptions,
+  type MutationOptions,
+  type ObservedRequestInit,
+} from "@/client-sdk/services/_shared/mutation-options";
 import { formatApiErrorForOperation } from "@/client-sdk/services/_shared/format-api-error";
 import { throwIfHandledError } from "@/client-sdk/services/_shared/throw-handled-error";
 import { resolveEndpoint } from "@/internal/endpoint";
@@ -22,6 +34,28 @@ export interface WebhookEndpointSummary {
 export interface WebhookEndpointWithSecret extends WebhookEndpointSummary {
   /** Present only on create and roll-secret responses; never again. */
   secret: string;
+}
+
+/** The POST body, exactly as the wire takes it. */
+export interface CreateWebhookEndpointInput {
+  url: string;
+  enabled_events: string[];
+  /** Envelopes per delivery. The receiver always gets an array. */
+  max_batch_size?: number;
+  /** How long a partial batch waits for company before it is sent. */
+  max_batch_delay_ms?: number;
+  /** Concurrent in-flight deliveries to this endpoint. */
+  max_in_flight?: number;
+}
+
+/** The PATCH body, exactly as the wire takes it. Omitted fields are left alone. */
+export interface UpdateWebhookEndpointInput {
+  url?: string;
+  enabled_events?: string[];
+  status?: "active" | "disabled";
+  max_batch_size?: number;
+  max_batch_delay_ms?: number;
+  max_in_flight?: number;
 }
 
 export interface WebhookDeliveryRecord {
@@ -74,6 +108,20 @@ export interface EmittedEvent {
   data: Record<string, unknown>;
 }
 
+/** One page of the organization's emitted-events log. */
+export interface EmittedEventsPage {
+  data: EmittedEvent[];
+  /** Pass back as `cursor` for the next page; null ends the walk. */
+  next_cursor: string | null;
+}
+
+/** One page of an endpoint's delivery log, newest first. */
+export interface WebhookDeliveryPage {
+  data: WebhookDeliveryRecord[];
+  /** Pass back as `cursor` for the next page; null ends the walk. */
+  next_cursor: string | null;
+}
+
 export class WebhooksApiError extends Error {
   constructor(
     message: string,
@@ -88,7 +136,15 @@ export class WebhooksApiError extends Error {
 /**
  * Client for the org-anchored webhook platform surface (/api/webhooks/v1).
  * Authenticates with an ORGANIZATION API key (sk-lw-*); project keys are
- * rejected by the server.
+ * rejected by the server. The surface is anchored on the organization alone,
+ * so there is no project id to give this client.
+ *
+ * The endpoint entity and the create/update bodies mirror the wire verbatim,
+ * so their fields are lowercase snake_case: virtual keys and gateway budgets
+ * already take the wire body as it is, and translating field by field here
+ * only made the request bodies of the four billing surfaces disagree. Call
+ * options this SDK invents (query filters, per-call behaviour, action
+ * arguments) stay camelCase like the rest of the SDK.
  */
 export class WebhooksApiService {
   private readonly endpoint: string;
@@ -96,13 +152,13 @@ export class WebhooksApiService {
 
   constructor(config?: { endpoint?: string; apiKey?: string }) {
     this.endpoint = resolveEndpoint(config?.endpoint);
-    this.apiKey = config?.apiKey ?? process.env.LANGWATCH_API_KEY ?? "";
+    this.apiKey = config?.apiKey ?? scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
   }
 
   private async request<T>(
     operation: string,
     path: string,
-    init?: RequestInit,
+    init?: ObservedRequestInit,
   ): Promise<T> {
     const response = await fetch(`${this.endpoint}${path}`, {
       ...init,
@@ -134,6 +190,7 @@ export class WebhooksApiService {
       });
       throw new WebhooksApiError(message, operation, parsedBody);
     }
+    init?.onResponse?.(response);
     return (await response.json()) as T;
   }
 
@@ -153,19 +210,22 @@ export class WebhooksApiService {
     return res.data;
   }
 
-  async create(input: {
-    url: string;
-    enabledEvents: string[];
-  }): Promise<WebhookEndpointWithSecret> {
+  /**
+   * The signing secret comes back on this response and never again, so a
+   * create that times out is recovered with `idempotencyKey`: the replay
+   * carries the same secret, and nothing else ever will.
+   */
+  async create(
+    input: CreateWebhookEndpointInput,
+    options?: IdempotentCreateOptions,
+  ): Promise<WebhookEndpointWithSecret> {
     const res = await this.request<{ data: WebhookEndpointWithSecret }>(
       "create webhook endpoint",
       "/api/webhooks/v1/endpoints",
       {
         method: "POST",
-        body: JSON.stringify({
-          url: input.url,
-          enabled_events: input.enabledEvents,
-        }),
+        body: JSON.stringify(input),
+        ...idempotentCreateInit(options),
       },
     );
     return res.data;
@@ -173,79 +233,110 @@ export class WebhooksApiService {
 
   async update(
     id: string,
-    input: {
-      url?: string;
-      enabledEvents?: string[];
-      status?: "active" | "disabled";
-      maxBatchSize?: number;
-      maxBatchDelayMs?: number;
-      maxInFlight?: number;
-    },
+    input: UpdateWebhookEndpointInput,
+    options?: MutationOptions,
   ): Promise<WebhookEndpointSummary> {
     const res = await this.request<{ data: WebhookEndpointSummary }>(
       "update webhook endpoint",
       `/api/webhooks/v1/endpoints/${encodeURIComponent(id)}`,
-      {
-        method: "PATCH",
-        body: JSON.stringify({
-          ...(input.url !== undefined ? { url: input.url } : {}),
-          ...(input.enabledEvents !== undefined
-            ? { enabled_events: input.enabledEvents }
-            : {}),
-          ...(input.status !== undefined ? { status: input.status } : {}),
-          ...(input.maxBatchSize !== undefined
-            ? { max_batch_size: input.maxBatchSize }
-            : {}),
-          ...(input.maxBatchDelayMs !== undefined
-            ? { max_batch_delay_ms: input.maxBatchDelayMs }
-            : {}),
-          ...(input.maxInFlight !== undefined
-            ? { max_in_flight: input.maxInFlight }
-            : {}),
-        }),
-      },
+      { method: "PATCH", body: JSON.stringify(input), ...mutationInit(options) },
     );
     return res.data;
   }
 
-  async delete(id: string): Promise<void> {
+  /**
+   * Retire an endpoint: the server soft-archives the row, stamping
+   * `archived_at` and dropping the status to disabled, so the delivery
+   * history stays readable for audit while nothing more is ever sent. The
+   * row is archived, not removed, and `gatewayBudgets.archive()` already
+   * names that operation, so the billing surfaces agree on the verb.
+   *
+   * Nothing comes back: the response body carries only an `archived: true`
+   * acknowledgement, and a non-2xx already raises.
+   */
+  async archive(id: string, options?: MutationOptions): Promise<void> {
     await this.request<unknown>(
-      "delete webhook endpoint",
+      "archive webhook endpoint",
       `/api/webhooks/v1/endpoints/${encodeURIComponent(id)}`,
-      { method: "DELETE" },
+      { method: "DELETE", ...mutationInit(options) },
     );
   }
 
-  async rollSecret(id: string): Promise<WebhookEndpointWithSecret> {
+  async rollSecret(
+    id: string,
+    options?: MutationOptions,
+  ): Promise<WebhookEndpointWithSecret> {
     const res = await this.request<{ data: WebhookEndpointWithSecret }>(
       "roll webhook endpoint secret",
       `/api/webhooks/v1/endpoints/${encodeURIComponent(id)}/roll-secret`,
-      { method: "POST" },
+      { method: "POST", ...mutationInit(options) },
     );
     return res.data;
   }
 
-  async test(id: string): Promise<WebhookTestResult> {
+  async test(
+    id: string,
+    options?: MutationOptions,
+  ): Promise<WebhookTestResult> {
     const res = await this.request<{ data: WebhookTestResult }>(
       "test webhook endpoint",
       `/api/webhooks/v1/endpoints/${encodeURIComponent(id)}/test`,
-      { method: "POST" },
+      { method: "POST", ...mutationInit(options) },
     );
     return res.data;
   }
 
-  async deliveries(
+  /**
+   * ONE page of the endpoint's delivery attempts, newest first.
+   *
+   * The cursor is why this is a page: the route has always served one, and
+   * dropping it truncated the delivery log at whatever the first page held,
+   * with nothing in the result to say the rest existed. Pass `next_cursor`
+   * back as `cursor`, or walk the whole log with `iterDeliveries()`.
+   */
+  async deliveriesPage(
     id: string,
-    options?: { limit?: number },
-  ): Promise<WebhookDeliveryRecord[]> {
+    options?: { cursor?: string; limit?: number },
+  ): Promise<WebhookDeliveryPage> {
     const params = new URLSearchParams();
+    if (options?.cursor) params.set("cursor", options.cursor);
     if (options?.limit !== undefined) params.set("limit", String(options.limit));
     const qs = params.toString() !== "" ? `?${params.toString()}` : "";
-    const res = await this.request<{ data: WebhookDeliveryRecord[] }>(
+    const { data, next_cursor } = await this.request<{
+      data: WebhookDeliveryRecord[];
+      next_cursor?: string | null;
+    }>(
       "list webhook deliveries",
       `/api/webhooks/v1/endpoints/${encodeURIComponent(id)}/deliveries${qs}`,
     );
-    return res.data;
+    return { data, next_cursor: next_cursor ?? null };
+  }
+
+  /**
+   * Every recorded delivery attempt for the endpoint, one at a time,
+   * fetching each page only when the consumer reaches it.
+   */
+  async *iterDeliveries(
+    id: string,
+    options?: { cursor?: string; limit?: number },
+  ): AsyncGenerator<WebhookDeliveryRecord> {
+    const pages = walkCursorPages<WebhookDeliveryPage>({
+      startCursor: options?.cursor,
+      nextCursorOf: (page) => page.next_cursor,
+      onEndlessWalk: (reason) =>
+        new WebhooksApiError(
+          `Failed to list webhook deliveries: ${reason}.`,
+          "list webhook deliveries",
+        ),
+      fetchPage: (cursor) =>
+        this.deliveriesPage(id, {
+          cursor,
+          limit: options?.limit ?? CURSOR_WALK_PAGE_SIZE,
+        }),
+    });
+    for await (const page of pages) {
+      yield* page.data;
+    }
   }
 
   async health(id: string): Promise<WebhookEndpointHealth> {
@@ -264,13 +355,20 @@ export class WebhooksApiService {
     return res.data;
   }
 
-  async events(options?: {
+  /**
+   * ONE page of the organization's emitted-events log, newest first.
+   *
+   * Webhooks are a push over this log, never the only copy of it: a consumer
+   * that missed a delivery reads the window back from here. Walk the whole
+   * window with `iterEvents()`.
+   */
+  async eventsPage(options?: {
     type?: string;
     from?: number;
     to?: number;
     cursor?: string;
     limit?: number;
-  }): Promise<{ data: EmittedEvent[]; next_cursor: string | null }> {
+  }): Promise<EmittedEventsPage> {
     const params = new URLSearchParams();
     if (options?.type) params.set("type", options.type);
     if (options?.from !== undefined) params.set("from", String(options.from));
@@ -278,9 +376,55 @@ export class WebhooksApiService {
     if (options?.cursor) params.set("cursor", options.cursor);
     if (options?.limit !== undefined) params.set("limit", String(options.limit));
     const qs = params.toString() !== "" ? `?${params.toString()}` : "";
-    return await this.request<{
+    const { data, next_cursor } = await this.request<{
       data: EmittedEvent[];
-      next_cursor: string | null;
+      next_cursor?: string | null;
     }>("list emitted events", `/api/webhooks/v1/events${qs}`);
+    return { data, next_cursor: next_cursor ?? null };
+  }
+
+  /**
+   * Every emitted event matching the filter, one at a time, fetching each
+   * page only when the consumer reaches it.
+   */
+  async *iterEvents(options?: {
+    type?: string;
+    from?: number;
+    to?: number;
+    cursor?: string;
+    limit?: number;
+  }): AsyncGenerator<EmittedEvent> {
+    const pages = walkCursorPages<EmittedEventsPage>({
+      startCursor: options?.cursor,
+      nextCursorOf: (page) => page.next_cursor,
+      onEndlessWalk: (reason) =>
+        new WebhooksApiError(
+          `Failed to list emitted events: ${reason}.`,
+          "list emitted events",
+        ),
+      fetchPage: (cursor) =>
+        this.eventsPage({
+          ...options,
+          cursor,
+          limit: options?.limit ?? CURSOR_WALK_PAGE_SIZE,
+        }),
+    });
+    for await (const page of pages) {
+      yield* page.data;
+    }
+  }
+
+  /**
+   * One emitted event by id, the envelope exactly as it was delivered.
+   *
+   * A 404 covers every reason the log cannot answer: never emitted, past the
+   * retention horizon, or belonging to another organization.
+   */
+  async getEvent(id: string): Promise<EmittedEvent> {
+    const res = await this.request<{ data: EmittedEvent }>(
+      "get emitted event",
+      `/api/webhooks/v1/events/${encodeURIComponent(id)}`,
+    );
+    return res.data;
   }
 }

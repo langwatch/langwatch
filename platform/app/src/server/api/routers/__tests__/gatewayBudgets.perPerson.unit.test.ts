@@ -10,6 +10,10 @@
 import type { PrismaClient } from "@prisma/client";
 import { Prisma } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  nanoUsdToDecimalString,
+  usdToNanoUsd,
+} from "~/server/gateway/wireMoney";
 import { createInnerTRPCContext } from "../../trpc";
 import { gatewayBudgetsRouter } from "../gatewayBudgets";
 
@@ -32,10 +36,17 @@ vi.mock("../../rbac", async (importOriginal) => {
 
 const breakdown = vi.hoisted(() => vi.fn());
 
-vi.mock("~/server/gateway/clickhouseRepos", () => ({
-  chRepoOrUndefined: () => ({
-    getSpendForBudgetsAcrossTenants: async () => [],
-    getBucketSpendBreakdownForBudget: breakdown,
+// The router takes the budget ledger from the App, so standing in for the
+// store means standing in for `getApp()`.
+vi.mock("~/server/app-layer/app", () => ({
+  getApp: () => ({
+    gateway: {
+      budgets: {
+        getSpendForBudgetsAcrossTenants: async () => [],
+        getBucketSpendBreakdownForBudget: breakdown,
+      },
+      virtualKeySpend: undefined,
+    },
   }),
 }));
 
@@ -113,11 +124,17 @@ function callerFor(budgets: Array<Record<string, unknown>>) {
   } as any);
 }
 
+/** A bucket's spend, as both wire units, derived from one USD amount. */
+function bucketSpend(usd: string) {
+  const spentNanoUsd = Number(usdToNanoUsd(usd));
+  return { spentNanoUsd, spentUsd: nanoUsdToDecimalString(spentNanoUsd) };
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   breakdown.mockResolvedValue([
-    { scopeId: `${ANCHOR_VK_ID}:a`, spentUsd: "1.500000" },
-    { scopeId: `${ANCHOR_VK_ID}:b`, spentUsd: "0.200000" },
+    { scopeId: `${ANCHOR_VK_ID}:a`, ...bucketSpend("1.500000") },
+    { scopeId: `${ANCHOR_VK_ID}:b`, ...bucketSpend("0.200000") },
   ]);
 });
 

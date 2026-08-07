@@ -17,7 +17,7 @@ These are the only events that increment your count. Everything else the platfor
 
 | What you did | Billable event | Counted |
 |---|---|---|
-| Your app sent a span (an LLM call, tool call, retrieval step, or any other step in a trace) | `lw.obs.trace.span_received` | One per span |
+| Your app, or a coding assistant you track, sent a span (an LLM call, tool call, retrieval step, or any other step in a trace) | `lw.obs.trace.span_received` | One per span |
 | An evaluation produced a result | `lw.evaluation.reported` | One per evaluation result |
 | An experiment run started | `lw.experiment_run.started` | One per run |
 | An experiment recorded a target's output | `lw.experiment_run.target_result` | One per target result |

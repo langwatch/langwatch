@@ -31,17 +31,21 @@ vi.mock("../../rbac", async (importOriginal) => {
   };
 });
 
-const clickHouseEnabled = vi.hoisted(() => ({ current: true }));
-vi.mock("~/server/clickhouse/clickhouseClient", () => ({
-  isClickHouseEnabled: () => clickHouseEnabled.current,
-  getClickHouseClientForProject: vi.fn().mockResolvedValue({}),
-}));
-
 const readSpendEventsPage = vi.hoisted(() => vi.fn());
-vi.mock("~/server/gateway/spendEvents.clickhouse.repository", () => ({
-  GatewaySpendEventsRepository: class {
-    readSpendEventsPage = readSpendEventsPage;
-  },
+
+// The router takes the spend-events repository from the App, so standing
+// in for the store means standing in for `getApp()`. `current` toggles
+// between the repository and undefined to stand in for a deployment
+// without ClickHouse.
+const spendEventsRepository = vi.hoisted(() => ({
+  current: undefined as
+    | { readSpendEventsPage: typeof readSpendEventsPage }
+    | undefined,
+}));
+vi.mock("~/server/app-layer/app", () => ({
+  getApp: () => ({
+    gateway: { spendEvents: spendEventsRepository.current },
+  }),
 }));
 
 const SPEND_ROW: SpendEventRow = {
@@ -109,7 +113,7 @@ describe("gatewaySpendEventsRouter", () => {
     vi.clearAllMocks();
     seenPermissions.length = 0;
     denied.clear();
-    clickHouseEnabled.current = true;
+    spendEventsRepository.current = { readSpendEventsPage };
     readSpendEventsPage.mockResolvedValue({
       rows: [SPEND_ROW],
       nextCursor: null,
@@ -155,7 +159,7 @@ describe("gatewaySpendEventsRouter", () => {
 
   /** @scenario The ledger degrades to an empty page without ClickHouse */
   it("degrades to an empty page when ClickHouse is disabled", async () => {
-    clickHouseEnabled.current = false;
+    spendEventsRepository.current = undefined;
     const caller = buildCaller();
     const result = await caller.list(BASE_INPUT);
     expect(result).toMatchObject({

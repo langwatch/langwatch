@@ -164,8 +164,14 @@ jobs:
             # Never sign something that cannot install. Without this, a template
             # error merged to main still produces a cryptographically valid
             # signature over a broken chart.
+            #
+            # autogen.enabled=true matches every entry of the chart CI matrix
+            # in langwatch-chart.yml: clickhouse-serverless and the langwatch
+            # umbrella refuse to render at all without credentials config, and
+            # autogen is how a throwaway render satisfies that gate. Charts
+            # without an autogen gate ignore the value.
             helm lint "$chart_dir" >/dev/null
-            helm template smoke "$chart_dir" >/dev/null
+            helm template smoke "$chart_dir" --set autogen.enabled=true >/dev/null
             # --app-version deliberately NOT set: clickhouse-serverless declares
             # appVersion "25.10.2.65" (the actual ClickHouse release), and
             # overwriting it with a git sha both destroys that and claims a

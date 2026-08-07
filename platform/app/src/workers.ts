@@ -1,23 +1,16 @@
-import "dotenv/config";
-// Portless (haven) overlay, loaded last with override exactly like
-// server.mts: a standalone workers lane must resolve the same hostnames,
-// ports and connection URLs as the app it serves, or the two halves of one
-// stack quietly talk to different infrastructure.
-import dotenv from "dotenv";
-import { existsSync } from "fs";
-
-dotenv.config({
-  path: ".env.portless",
-  override: true,
-  quiet: process.env.NODE_ENV !== "development" || !existsSync(".env.portless"),
-});
+// Env files (.env + the .env.portless haven overlay) load as this import's
+// side effect, BEFORE instrumentation and the app graph below evaluate — a
+// standalone workers lane must resolve the same hostnames, ports and
+// connection URLs as the app it serves, or the two halves of one stack
+// quietly talk to different infrastructure. Must stay the first import: see
+// src/env-load.ts for why inline dotenv.config() calls cannot do this.
+import "./env-load";
 
 // OTel instrumentation MUST load before any module that creates spans —
 // without it the worker process has no registered tracer provider and every
-// BullMQOtel adapter / getLangWatchTracer span becomes a non-recording no-op.
-// dotenv stays first so instrumentation.node sees .env-provided config
-// (LANGWATCH_API_KEY, OTEL_EXPORTER_OTLP_ENDPOINT). Kept as the first import
-// so its side effects run before the worker modules below evaluate.
+// getLangWatchTracer span becomes a non-recording no-op.
+// env-load stays first so instrumentation.node sees .env-provided config
+// (LANGWATCH_API_KEY, OTEL_EXPORTER_OTLP_ENDPOINT).
 import "./instrumentation.node";
 // Registers the Grafana trace-link builder with @langwatch/handled-error.
 import "./server/handled-error-wiring";

@@ -9,7 +9,7 @@ import {
   assertWebhookDelivered,
   sendWebhook,
   type WebhookSendResult,
-} from "./sendWebhook";
+} from "~/server/webhooks/sendWebhook";
 
 const logger = createLogger("langwatch:webhook-delivery");
 
@@ -61,6 +61,7 @@ export async function deliverWebhook({
   url,
   method,
   headers,
+  signingSecrets,
   body,
   triggerName,
 }: {
@@ -77,6 +78,10 @@ export async function deliverWebhook({
   method?: WebhookMethod;
   /** Decrypted headers; sent on the wire, never stored anywhere. */
   headers?: Record<string, string>;
+  /** Decrypted signing secrets, newest first. Empty or absent sends the
+   *  delivery unsigned, which is what a trigger with no configured secret
+   *  does and what every webhook automation did before the field existed. */
+  signingSecrets?: readonly string[];
   body: string;
   triggerName: string;
 }): Promise<WebhookSendResult> {
@@ -100,6 +105,7 @@ export async function deliverWebhook({
       url,
       method,
       headers,
+      signingSecrets,
       body,
       triggerName,
       projectId,

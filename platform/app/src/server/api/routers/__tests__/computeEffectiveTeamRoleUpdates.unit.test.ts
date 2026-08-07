@@ -20,7 +20,9 @@ describe("computeEffectiveTeamRoleUpdates()", () => {
           newOrganizationRole: OrganizationUserRole.ADMIN,
         });
 
-        expect(result).toEqual(requested);
+        expect(result).toEqual(
+          requested.map((update) => ({ ...update, origin: "requested" })),
+        );
       });
 
       it("returns requested updates for MEMBER org role", () => {
@@ -32,7 +34,9 @@ describe("computeEffectiveTeamRoleUpdates()", () => {
           newOrganizationRole: OrganizationUserRole.MEMBER,
         });
 
-        expect(result).toEqual(requested);
+        expect(result).toEqual(
+          requested.map((update) => ({ ...update, origin: "requested" })),
+        );
       });
     });
 
@@ -51,16 +55,18 @@ describe("computeEffectiveTeamRoleUpdates()", () => {
         });
 
         expect(result).toEqual([
-          { teamId: "team-1", role: TeamUserRole.VIEWER },
+          { teamId: "team-1", role: TeamUserRole.VIEWER, origin: "requested" },
           {
             teamId: "team-2",
             role: TeamUserRole.VIEWER,
             customRoleId: undefined,
+            origin: "seat-correction",
           },
           {
             teamId: "team-3",
             role: TeamUserRole.VIEWER,
             customRoleId: undefined,
+            origin: "seat-correction",
           },
         ]);
       });
@@ -80,7 +86,9 @@ describe("computeEffectiveTeamRoleUpdates()", () => {
           newOrganizationRole: OrganizationUserRole.EXTERNAL,
         });
 
-        expect(result).toEqual(requested);
+        expect(result).toEqual(
+          requested.map((update) => ({ ...update, origin: "requested" })),
+        );
       });
     });
   });
@@ -105,11 +113,13 @@ describe("computeEffectiveTeamRoleUpdates()", () => {
             teamId: "team-1",
             role: TeamUserRole.VIEWER,
             customRoleId: undefined,
+            origin: "seat-correction",
           },
           {
             teamId: "team-2",
             role: TeamUserRole.VIEWER,
             customRoleId: undefined,
+            origin: "seat-correction",
           },
         ]);
       });
@@ -142,11 +152,13 @@ describe("computeEffectiveTeamRoleUpdates()", () => {
             teamId: "team-1",
             role: TeamUserRole.MEMBER,
             customRoleId: undefined,
+            origin: "seat-correction",
           },
           {
             teamId: "team-3",
             role: TeamUserRole.MEMBER,
             customRoleId: undefined,
+            origin: "seat-correction",
           },
         ]);
       });
@@ -177,6 +189,44 @@ describe("computeEffectiveTeamRoleUpdates()", () => {
         });
 
         expect(result).toEqual([]);
+      });
+    });
+
+    describe("when a correction would take away a team's only admin", () => {
+      /** @scenario Moving the only admin of a shared team to a Lite Member seat goes through */
+      it("marks the correction as coming from the seat change, not the caller", () => {
+        const result = computeEffectiveTeamRoleUpdates({
+          requestedTeamRoleUpdates: [],
+          currentMemberships: [{ teamId: "team-1", role: TeamUserRole.ADMIN }],
+          newOrganizationRole: OrganizationUserRole.EXTERNAL,
+        });
+
+        // The origin is what lets the last-admin guard tell a team-local
+        // decision from an organization-level one, so it is the whole contract
+        // between this function and that guard.
+        expect(result).toEqual([
+          {
+            teamId: "team-1",
+            role: TeamUserRole.VIEWER,
+            customRoleId: undefined,
+            origin: "seat-correction",
+          },
+        ]);
+      });
+
+      /** @scenario A seat change that names team roles outright still keeps the guard */
+      it("keeps a team the caller named outright attributed to the caller", () => {
+        const result = computeEffectiveTeamRoleUpdates({
+          requestedTeamRoleUpdates: [
+            { teamId: "team-1", role: TeamUserRole.VIEWER },
+          ],
+          currentMemberships: [{ teamId: "team-1", role: TeamUserRole.ADMIN }],
+          newOrganizationRole: OrganizationUserRole.EXTERNAL,
+        });
+
+        expect(result).toEqual([
+          { teamId: "team-1", role: TeamUserRole.VIEWER, origin: "requested" },
+        ]);
       });
     });
 

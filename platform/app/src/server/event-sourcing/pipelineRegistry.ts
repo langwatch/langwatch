@@ -75,7 +75,6 @@ import type { SpanStorageService } from "../app-layer/traces/span-storage.servic
 import { TraceReadDerivationService } from "../app-layer/traces/trace-read-derivation.service";
 import type { TraceSummaryService } from "../app-layer/traces/trace-summary.service";
 import type { TraceSummaryData } from "../app-layer/traces/types";
-import { getClickHouseClientForProject } from "../clickhouse/clickhouseClient";
 import type { RetentionPolicyResolver } from "../data-retention/retentionPolicyResolver";
 import type { AutomationDispatchPorts } from "../event-sourcing/pipelines/automations/automationDispatch.wiring";
 import { createEvaluationAlertTriggerMatchHandler } from "../event-sourcing/pipelines/automations/subscribers/evaluationAlertTriggerMatch.subscriber";
@@ -120,6 +119,7 @@ import { createExperimentRunProcessingPipeline } from "./pipelines/experiment-ru
 import type { ClickHouseExperimentRunResultRecord } from "./pipelines/experiment-run-processing/projections/experimentRunResultStorage.mapProjection";
 import type { ExperimentRunStateData } from "./pipelines/experiment-run-processing/projections/experimentRunState.foldProjection";
 import { createExperimentRunStateFoldStore } from "./pipelines/experiment-run-processing/projections/experimentRunState.store";
+import type { ExperimentIdLookup } from "./pipelines/experiment-run-processing/repositories/experimentIdLookup.clickhouse.repository";
 import type { ExperimentRunStateRepository } from "./pipelines/experiment-run-processing/repositories/experimentRunState.repository";
 import type { ComputeExperimentRunMetricsCommandData } from "./pipelines/experiment-run-processing/schemas/commands";
 import { createGatewaySpendProcessingPipeline } from "./pipelines/gateway-spend-processing/pipeline";
@@ -274,6 +274,8 @@ export interface PipelineRepositories {
   /** ADR-034 Phase 6: slim per-evaluation analytics repository. */
   evaluationAnalytics: EvaluationAnalyticsRepository;
   experimentRunItemStorage: AppendStore<ClickHouseExperimentRunResultRecord>;
+  /** experimentMetricsSync's late-bound runId -> experimentId lookup. */
+  experimentIdLookup: ExperimentIdLookup;
   /** Direct Postgres operational projection; deliberately bypasses Redis. */
   langyConversationState: StateProjectionStore<LangyConversationStateData>;
   /** Direct Postgres per-turn operational projection. */
@@ -1068,7 +1070,7 @@ export class PipelineRegistry {
     const traceCommands = mapCommands(tracePipeline.commands);
     resolveOrigin.resolve(traceCommands.resolveOrigin);
 
-    // Wire the deferred origin resolution queue (BullMQ-backed, survives process restart).
+    // Wire the deferred origin resolution queue (GroupQueue-backed, survives process restart).
     // After 5 min, dispatches resolveOrigin command → OriginResolvedEvent → fold → reactor.
     const deferredOriginHandler = createDeferredOriginHandler(resolveOrigin.fn);
     const deferredOriginQueue =
@@ -1340,30 +1342,17 @@ export class PipelineRegistry {
     // Wire the trace-side experimentMetricsSync reactor's late-bound deps
     const expCommands = mapCommands(experimentRunPipeline.commands);
 
-    // Create the experimentId lookup function using the experiment run ClickHouse repository
+    // The experimentId lookup, pre-built at the composition root (presets.ts)
+    // over the App's ClickHouse resolver — the registry consumes it directly,
+    // it does not resolve a client itself (see PipelineRepositories above).
     const lookupExperimentId = async (
       tenantId: string,
       runId: string,
     ): Promise<string | null> => {
       try {
-        const client = await getClickHouseClientForProject(tenantId);
-        if (!client) return null;
-
-        const result = await client.query({
-          query: `
-            SELECT ExperimentId
-            FROM experiment_runs
-            WHERE TenantId = {tenantId:String}
-              AND RunId = {runId:String}
-            ORDER BY UpdatedAt DESC
-            LIMIT 1
-          `,
-          query_params: { tenantId, runId },
-          format: "JSONEachRow",
-        });
-
-        const rows = await result.json<{ ExperimentId: string }>();
-        return rows[0]?.ExperimentId ?? null;
+        return await this.deps.repositories.experimentIdLookup.findExperimentId(
+          { tenantId, runId },
+        );
       } catch (error) {
         logger.warn(
           { tenantId, runId, error },

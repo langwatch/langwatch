@@ -29,7 +29,7 @@ describe("Feature: CLI families for webhooks and spend events", () => {
         "update",
         "enable",
         "disable",
-        "delete",
+        "archive",
         "roll-secret",
         "test",
         "deliveries",

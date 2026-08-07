@@ -35,6 +35,7 @@ import type {
   IExportTraceServiceRequest,
 } from "@opentelemetry/otlp-transformer";
 import * as root from "@opentelemetry/otlp-transformer/build/src/generated/root";
+import { OtlpBodyTooLargeError } from "./errors";
 
 const gunzipAsync = promisify(gunzip);
 const inflateAsync = promisify(inflate);
@@ -52,24 +53,134 @@ function toArrayBuffer(buf: Buffer): ArrayBuffer {
 }
 
 /**
+ * The most we will read off the wire, and the most we will hold after
+ * decompressing.
+ *
+ * One number covers both because they bound the same thing — the bytes this
+ * process ends up holding for one request — and neither stage can express the
+ * other. `bodyLimit` weighs the bytes on the wire, and the ratio between those
+ * and the bytes in memory is chosen by the sender: a 10 MiB gzip of repetitive
+ * protobuf expands by orders of magnitude. An uncompressed body has no such
+ * ratio, but it is read whole before any of that, so a route with no wire limit
+ * is exposed to the plain version of the same attack.
+ *
+ * Both caps live here rather than at each route because the routes do not agree
+ * on middleware: the OTLP handler routes carry `bodyLimit`, and the governance
+ * ingest routes carry none at all, which made them the more exposed of the two
+ * receivers. Applying the bound in the one function both receivers share means
+ * neither can be left out, and each still answers in its own contract — the
+ * OTLP routes with a 413, the ingest routes with their existing ack-and-hint.
+ */
+export const OTLP_MAX_BODY_BYTES = 10 * 1024 * 1024;
+
+/**
+ * Node reports the cap as a RangeError with this code rather than anything
+ * zlib-specific, and it is the only signal distinguishing "too big" from a
+ * genuinely corrupt stream.
+ */
+function isOutputLimitExceeded(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    (error as { code?: unknown }).code === "ERR_BUFFER_TOO_LARGE"
+  );
+}
+
+type Decompressor = (
+  buf: Buffer,
+  opts: { maxOutputLength: number },
+) => Promise<Buffer>;
+
+const DECOMPRESSORS = {
+  gzip: gunzipAsync,
+  deflate: inflateAsync,
+  br: brotliDecompressAsync,
+} as const satisfies Record<string, Decompressor>;
+
+type SupportedEncoding = keyof typeof DECOMPRESSORS;
+
+function isSupportedEncoding(encoding: string): encoding is SupportedEncoding {
+  return encoding in DECOMPRESSORS;
+}
+
+/**
+ * Read the wire body, refusing it the moment it passes
+ * {@link OTLP_MAX_BODY_BYTES}.
+ *
+ * Consuming the stream by hand rather than calling `req.arrayBuffer()` is the
+ * point: `arrayBuffer()` buffers the whole body and only then hands it over, so
+ * measuring afterwards would concede exactly the memory being defended.
+ */
+async function readWireBody(req: Request): Promise<Buffer> {
+  const stream = req.body;
+  if (!stream) return Buffer.alloc(0);
+
+  const reader = stream.getReader();
+  const chunks: Uint8Array[] = [];
+  let held = 0;
+
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      held += value.byteLength;
+      if (held > OTLP_MAX_BODY_BYTES) {
+        await reader.cancel();
+        throw new OtlpBodyTooLargeError({
+          maxBytes: OTLP_MAX_BODY_BYTES,
+          encoding: null,
+        });
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+
+  return Buffer.concat(chunks);
+}
+
+/**
  * Read the request body, decompressing per `Content-Encoding`.
- * Throws on unsupported encodings — the caller decides how to respond.
+ *
+ * Throws on unsupported encodings, and on a body that passes
+ * {@link OTLP_MAX_BODY_BYTES} either on the wire or on expanding — the caller
+ * decides how to respond. Decompression is bounded by zlib itself, so an
+ * oversized body stops being written the moment it crosses the line.
  */
 export async function readOtlpBody(req: Request): Promise<ArrayBuffer> {
-  const raw = await req.arrayBuffer();
   const encoding = req.headers.get("content-encoding");
 
-  if (!encoding || encoding === "identity") return raw;
-  if (encoding === "gzip") {
-    return toArrayBuffer(await gunzipAsync(Buffer.from(raw)));
+  if (!encoding || encoding === "identity") {
+    return toArrayBuffer(await readWireBody(req));
   }
-  if (encoding === "deflate") {
-    return toArrayBuffer(await inflateAsync(Buffer.from(raw)));
+
+  // Settled before the body is read, so a request we are going to refuse
+  // outright does not get to spend the read budget first.
+  if (!isSupportedEncoding(encoding)) {
+    throw new Error(`Unsupported Content-Encoding: ${encoding}`);
   }
-  if (encoding === "br") {
-    return toArrayBuffer(await brotliDecompressAsync(Buffer.from(raw)));
+
+  // Widened to the shared signature deliberately: the three entries differ in
+  // their options type (ZlibOptions vs BrotliOptions), so calling the indexed
+  // union directly is not something TypeScript will resolve.
+  const decompress: Decompressor = DECOMPRESSORS[encoding];
+  const raw = await readWireBody(req);
+
+  try {
+    return toArrayBuffer(
+      await decompress(raw, { maxOutputLength: OTLP_MAX_BODY_BYTES }),
+    );
+  } catch (error) {
+    if (isOutputLimitExceeded(error)) {
+      throw new OtlpBodyTooLargeError({
+        maxBytes: OTLP_MAX_BODY_BYTES,
+        encoding,
+      });
+    }
+    throw error;
   }
-  throw new Error(`Unsupported Content-Encoding: ${encoding}`);
 }
 
 export type OtlpParseResult<T> =

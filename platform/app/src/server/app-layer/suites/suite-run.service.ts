@@ -73,7 +73,7 @@ export class SuiteRunService {
   }
 
   /**
-   * Start a suite run: dispatch the startSuiteRun command and schedule BullMQ jobs.
+   * Start a suite run: dispatch the startSuiteRun command and schedule queue jobs.
    *
    * Generates the batchRunId upfront and returns it synchronously (before jobs
    * finish scheduling), so the frontend can navigate to the run page immediately.

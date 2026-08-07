@@ -36,8 +36,10 @@ A spending limit attached to a scope. Scopes:
 - `project` (all traffic in a project)
 - `virtual_key` (this specific VK)
 - `principal` (one user or service account)
+- `group` (each member of a group, individually)
+- `attributed_user` (each end user seen on a key or project, individually)
 
-Windows: `minute`, `hour`, `day`, `week`, `month`, `total`.
+Windows: `minute`, `hour`, `day`, `week`, `month`, `total`, `manual`. The cycling windows align to the calendar unless you anchor them to your own start instant. See [Budgets](/ai-gateway/budgets#windows).
 
 `on_breach`:
 
@@ -136,7 +138,7 @@ Per-VK regex allow/deny lists for:
 - **MCP servers**: matched against declared `mcp_servers[].name` and `.url`. Denied servers → 403 `tool_not_allowed`.
 - **Outbound URLs**: heuristically matched against every `http(s)://` URL in the request body. Denied URLs → 403 `url_not_allowed`.
 
-Each block emits an `AuditLog` row (gateway shape) + the `X-LangWatch-Request-Id` response header → trace correlation.
+Each block emits an `AuditLog` row (gateway shape) + the `X-LangWatch-Gateway-Request-Id` response header → trace correlation.
 
 ## Traces (per-tenant observability)
 
@@ -151,11 +153,11 @@ Attributes always present (source of truth: `services/aigateway/adapters/gateway
 
 When a bundle-baked cache rule matches: `langwatch.cache.rule_id`, `.rule_priority`, `.mode_applied`.
 
-<Info>Previously-documented per-feature attrs (`langwatch.fallback.attempt`, `.reason`, `langwatch.policy.blocked`, `langwatch.budget.breached_scope`, `langwatch.guardrail.post_flag`, `.verdict`) are **not emitted in v1**. For per-feature signals today, use the Prometheus counters + correlate via `X-LangWatch-Request-Id`. See [Observability → Per-feature attributes](/ai-gateway/observability#per-feature-attributes-when-applicable) for the v1 ↔ v1.1 breakdown.</Info>
+<Info>Previously-documented per-feature attrs (`langwatch.fallback.attempt`, `.reason`, `langwatch.policy.blocked`, `langwatch.budget.breached_scope`, `langwatch.guardrail.post_flag`, `.verdict`) are **not emitted in v1**. For per-feature signals today, use the Prometheus counters + correlate via `X-LangWatch-Gateway-Request-Id`. See [Observability → Per-feature attributes](/ai-gateway/observability#per-feature-attributes-when-applicable) for the v1 ↔ v1.1 breakdown.</Info>
 
 ## Request id
 
-Every response carries `X-LangWatch-Request-Id: grq_<ULID>`. Use it to:
+Once a request is authenticated, its response carries `X-LangWatch-Gateway-Request-Id: req_<30 hex characters>`. Use it to:
 
 - Deep-link into the LangWatch trace from logs.
 - File a support ticket, the first thing we ask for.
@@ -169,4 +171,6 @@ The id also flows into the CH ledger as the idempotency key for debit replays, s
 - **Semantic caching across unrelated requests**: Bifrost ships a semantic-cache plugin; we're not enabling it by default because it changes latency characteristics in ways customers should opt into.
 - **Per-region provider routing for data residency**: tracked as an open question in the contract; not in v1.
 
-Once these concepts are in your head the rest of the docs, [Virtual Keys](/ai-gateway/virtual-keys), [Budgets](/ai-gateway/budgets), [Providers](/ai-gateway/providers/overview), [CLI Integrations](/ai-gateway/cli/overview): are detail views on the same primitives.
+Once these concepts are in your head the rest of the docs are detail views on the same primitives: [Virtual Keys](/ai-gateway/virtual-keys), [Budgets](/ai-gateway/budgets), [Providers](/ai-gateway/providers/overview), and [CLI Integrations](/ai-gateway/cli/overview).
+
+If you rebill this traffic to your own customers, two more read next: [Billing and spend events](/ai-gateway/billing-events) for the per-request record you reconcile against, and [Webhooks](/features/webhooks) for having it pushed to you instead of polling.

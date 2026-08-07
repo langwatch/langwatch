@@ -15,7 +15,13 @@ import { AZURE_SAFETY_NOT_CONFIGURED_MESSAGE } from "~/server/app-layer/evaluati
 import { formatCost, formatDuration } from "../../../utils/formatters";
 import { RunHistorySparkline } from "./RunHistorySparkline";
 import { useEvalInputs } from "./useEvalInputs";
-import { type EvalEntry, formatInputValue, isNoVerdict, STATUS } from "./utils";
+import {
+  type EvalEntry,
+  formatInputValue,
+  isCategoryOnly,
+  isNoVerdict,
+  STATUS,
+} from "./utils";
 
 export function EvalCard({
   eval_,
@@ -27,12 +33,18 @@ export function EvalCard({
   const { name, score, scoreType, status } = eval_;
   const tone = STATUS[status] ?? STATUS.warning;
   const noVerdict = isNoVerdict(status);
+  // A categorising evaluator answers with a category and nothing else — no
+  // score to show and no pass/fail to badge. Its category leads the header
+  // instead: a PASS badge over a run that never judged anything, next to the
+  // zero that stands in for the score it never produced, is two fabrications
+  // burying the one thing the evaluator did say.
+  const categoryOnly = isCategoryOnly(eval_);
 
   let scoreLabel = "";
   let scoreSubLabel = "";
   let barFill = 0;
 
-  if (!noVerdict) {
+  if (!noVerdict && !categoryOnly) {
     if (scoreType === "boolean") {
       scoreLabel = score === true ? "PASS" : "FAIL";
       barFill = score === true ? 100 : 0;
@@ -67,8 +79,13 @@ export function EvalCard({
   const mightHaveInputs = hasListInputs || canLazyLoadInputs;
   const hasRetries = (eval_.retries ?? 0) > 0;
   // The labeled categorical/boolean verdict is sometimes more informative
-  // than the numeric score (e.g. score=1 with label="safe").
-  const hasLabel = !!eval_.label && eval_.label !== String(eval_.score);
+  // than the numeric score (e.g. score=1 with label="safe"), so the header
+  // carries it alongside the badge. Only a category-only run needs no detail
+  // row for it — there the label IS the header, which is also why it shows
+  // even when it reads the same as the placeholder score it stands in for.
+  const hasLabel =
+    !!eval_.label && (categoryOnly || eval_.label !== String(eval_.score));
+  const showLabelDetailRow = hasLabel && !categoryOnly;
 
   const meta: string[] = [];
   if (eval_.executionTime !== undefined && eval_.executionTime > 0)
@@ -102,7 +119,7 @@ export function EvalCard({
   const hasExpandableDetails =
     mightHaveInputs ||
     hasStacktrace ||
-    hasLabel ||
+    showLabelDetailRow ||
     showErrorPanel ||
     showErrorIds;
   const hasFooterRow =
@@ -127,29 +144,32 @@ export function EvalCard({
         borderColor="border.muted"
         align="center"
       >
-        <HStack
-          paddingX={2}
-          paddingY={0.5}
-          borderRadius="sm"
-          bg={tone.bg}
-          flexShrink={0}
-          gap={1}
-        >
-          {status === "skipped" && (
-            <Icon as={LuCircleSlash} boxSize={2.5} color={tone.fg} />
-          )}
-          {status === "error" && (
-            <Icon as={LuCircleAlert} boxSize={2.5} color={tone.fg} />
-          )}
-          <Text
-            textStyle="2xs"
-            fontWeight="bold"
-            color={tone.fg}
-            letterSpacing="0.06em"
+        {!categoryOnly && (
+          <HStack
+            paddingX={2}
+            paddingY={0.5}
+            borderRadius="sm"
+            bg={tone.bg}
+            flexShrink={0}
+            gap={1}
           >
-            {tone.label}
-          </Text>
-        </HStack>
+            {status === "skipped" && (
+              <Icon as={LuCircleSlash} boxSize={2.5} color={tone.fg} />
+            )}
+            {status === "error" && (
+              <Icon as={LuCircleAlert} boxSize={2.5} color={tone.fg} />
+            )}
+            <Text
+              textStyle="2xs"
+              fontWeight="bold"
+              color={tone.fg}
+              letterSpacing="0.06em"
+            >
+              {tone.label}
+            </Text>
+          </HStack>
+        )}
+        {hasLabel && <CategoryChip label={eval_.label!} />}
         <Text
           textStyle="sm"
           fontWeight="semibold"
@@ -163,7 +183,7 @@ export function EvalCard({
         {eval_.runHistory && eval_.runHistory.length > 1 && (
           <RunHistorySparkline runs={eval_.runHistory} />
         )}
-        {!noVerdict && (
+        {!noVerdict && !categoryOnly && (
           <HStack gap={0.5} align="baseline" flexShrink={0}>
             <Text
               textStyle="lg"
@@ -183,7 +203,7 @@ export function EvalCard({
       </HStack>
 
       {/* Score bar (numeric, only when the eval actually produced a score) */}
-      {!noVerdict && scoreType === "numeric" && (
+      {!noVerdict && !categoryOnly && scoreType === "numeric" && (
         <Box
           height="3px"
           bg="bg.subtle"
@@ -269,13 +289,38 @@ export function EvalCard({
           tone={tone}
           mightHaveInputs={mightHaveInputs}
           hasStacktrace={hasStacktrace}
-          hasLabel={hasLabel}
+          hasLabel={showLabelDetailRow}
           showErrorPanel={showErrorPanel}
           showErrorIds={showErrorIds}
           hasExpandableDetails={hasExpandableDetails}
         />
       )}
     </Box>
+  );
+}
+
+/**
+ * The evaluator's own word for the verdict. Blue rather than a verdict tone:
+ * a category is not a pass or a fail, and colouring it like one would put a
+ * judgement on it that the evaluator never made.
+ */
+function CategoryChip({ label }: { label: string }) {
+  return (
+    <Text
+      textStyle="2xs"
+      fontWeight="bold"
+      color="blue.fg"
+      bg="blue.subtle"
+      paddingX={2}
+      paddingY={0.5}
+      borderRadius="sm"
+      flexShrink={0}
+      maxWidth="180px"
+      truncate
+      title={label}
+    >
+      {label}
+    </Text>
   );
 }
 

@@ -6,7 +6,9 @@ from typing import TYPE_CHECKING, Any, TypeVar, cast
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
+from ..models.post_api_traces_search_body_date_field import PostApiTracesSearchBodyDateField
 from ..models.post_api_traces_search_body_format import PostApiTracesSearchBodyFormat
+from ..models.post_api_traces_search_body_from import PostApiTracesSearchBodyFrom
 from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
@@ -38,6 +40,18 @@ class PostApiTracesSearchBody:
         include_spans (bool | Unset): When true, fetches full span data for each trace. Useful for bulk export. Default
             false.
         llm_mode (bool | Unset):
+        date_field (PostApiTracesSearchBodyDateField | Unset): Which timestamp the startDate/endDate window filters on.
+            'occurred' (default) selects traces by when they happened. 'updated' selects traces by when they were last
+            modified — use this for incremental ETL ('give me everything changed since my last pull'), since a trace can
+            occur long before it gains a later evaluation or annotation. Default: PostApiTracesSearchBodyDateField.OCCURRED.
+        from_ (PostApiTracesSearchBodyFrom | Unset): Entity root to read from. Only 'traces' is supported today;
+            defaults to 'traces' when omitted. Default: PostApiTracesSearchBodyFrom.TRACES.
+        select (list[str] | Unset): Flat list of dotted-path columns to project, e.g.
+            ['trace_id','metadata.user_id','events.type','evaluations.score']. Paths group by root in the response: scalar
+            fields stay top-level, 'metadata.*' nests under a metadata object, and
+            'events.*'/'annotations.*'/'evaluations.*' return as nested arrays (one row per trace). When present, the
+            response gains a top-level 'schema' field describing the resolved columns. When omitted, the response is
+            unchanged from the legacy shape.
     """
 
     start_date: float | str
@@ -56,6 +70,9 @@ class PostApiTracesSearchBody:
     format_: PostApiTracesSearchBodyFormat | Unset = UNSET
     include_spans: bool | Unset = UNSET
     llm_mode: bool | Unset = UNSET
+    date_field: PostApiTracesSearchBodyDateField | Unset = PostApiTracesSearchBodyDateField.OCCURRED
+    from_: PostApiTracesSearchBodyFrom | Unset = PostApiTracesSearchBodyFrom.TRACES
+    select: list[str] | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -103,6 +120,18 @@ class PostApiTracesSearchBody:
 
         llm_mode = self.llm_mode
 
+        date_field: str | Unset = UNSET
+        if not isinstance(self.date_field, Unset):
+            date_field = self.date_field.value
+
+        from_: str | Unset = UNSET
+        if not isinstance(self.from_, Unset):
+            from_ = self.from_.value
+
+        select: list[str] | Unset = UNSET
+        if not isinstance(self.select, Unset):
+            select = self.select
+
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
@@ -139,6 +168,12 @@ class PostApiTracesSearchBody:
             field_dict["includeSpans"] = include_spans
         if llm_mode is not UNSET:
             field_dict["llmMode"] = llm_mode
+        if date_field is not UNSET:
+            field_dict["dateField"] = date_field
+        if from_ is not UNSET:
+            field_dict["from"] = from_
+        if select is not UNSET:
+            field_dict["select"] = select
 
         return field_dict
 
@@ -203,6 +238,22 @@ class PostApiTracesSearchBody:
 
         llm_mode = d.pop("llmMode", UNSET)
 
+        _date_field = d.pop("dateField", UNSET)
+        date_field: PostApiTracesSearchBodyDateField | Unset
+        if isinstance(_date_field, Unset):
+            date_field = UNSET
+        else:
+            date_field = PostApiTracesSearchBodyDateField(_date_field)
+
+        _from_ = d.pop("from", UNSET)
+        from_: PostApiTracesSearchBodyFrom | Unset
+        if isinstance(_from_, Unset):
+            from_ = UNSET
+        else:
+            from_ = PostApiTracesSearchBodyFrom(_from_)
+
+        select = cast(list[str], d.pop("select", UNSET))
+
         post_api_traces_search_body = cls(
             start_date=start_date,
             end_date=end_date,
@@ -220,6 +271,9 @@ class PostApiTracesSearchBody:
             format_=format_,
             include_spans=include_spans,
             llm_mode=llm_mode,
+            date_field=date_field,
+            from_=from_,
+            select=select,
         )
 
         post_api_traces_search_body.additional_properties = d

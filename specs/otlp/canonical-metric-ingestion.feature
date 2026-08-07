@@ -49,7 +49,7 @@ Feature: Canonical OTLP metric ingestion
 
   Rule: The server never tells a client to discard data the server is holding
 
-    Scenario: Storage trouble asks the client to retry
+    Scenario: Storage trouble asks the client to retry the metric batch
       Given the platform cannot durably store incoming points
       When the project sends a valid batch
       Then the response tells the client the request is retryable
@@ -82,3 +82,77 @@ Feature: Canonical OTLP metric ingestion
       Given a data point has already been processed
       When the same point is processed again
       Then the stored point and its summaries are unchanged
+
+  # A batch of points once produced a storage request that grew with the batch:
+  # a parameter set and a whole query branch per point. Storage rejected one
+  # such request outright, having read the request's own encoding as part of
+  # the query. It stopped happening when an unrelated change made the requests
+  # smaller, which is not the same as bounding them - a larger batch would have
+  # crossed the same line again. These scenarios bound it.
+  #
+  # Bounded, not constant: the summary-window read still costs a seek per
+  # window by design, because folding it would trade a single-row index seek
+  # for a scan of the whole retention window. What every scenario here holds to
+  # is a stated ceiling the batch cannot push a request past.
+  Rule: Rebuilding summaries sends a request bounded independently of the batch
+
+    @unit
+    Scenario: A folded rollup read sends a fixed-size request
+      Given a batch of points for one series
+      When the platform looks up what follows each of them
+      Then the request it sends is the same whether the batch holds one point
+        or hundreds
+
+    @unit
+    Scenario: A folded rollup read binds a fixed number of parameters
+      Given a batch of points
+      When the platform looks up what follows each of them
+      Then the number of values bound into the request does not grow with the
+        batch
+      And a batch too large for one request is split rather than sent whole
+
+    @unit
+    Scenario: A folded rollup read keeps its encoded request inside a budget
+      Given a batch of points touching any number of series
+      When the platform looks up what follows each of them
+      Then every request it sends stays under a stated size, however many
+        series the batch touches
+
+    @unit
+    Scenario: A folded rollup read leaves the stored payload behind
+      Given a batch of points
+      When the platform looks up what follows each of them
+      Then it does not ask for the stored payload it never reads
+
+    @unit
+    Scenario: A folded rollup read resolves the successors a per-point read did
+      Given a batch of points whose series already holds points between them
+      When the platform looks up what follows each of them in one request
+      Then it resolves the same following point for each as it would asking
+        one at a time
+      And it recomputes exactly the same summary windows
+
+    @unit
+    Scenario: A rollup bucket read sends the window size and retention span once
+      Given a summary window has to be recomputed
+      When the platform reads the points that window covers
+      Then the request carries the window size and the retention span once,
+        not once per window
+      And a full request of window seeks still fits the size a request may be
+
+    @integration
+    Scenario: A batch folds to the summaries a point-at-a-time rebuild produces
+      Given a series already holds points between the points of a batch
+      When the batch is folded in one pass
+      Then its summaries match those of an identical series rebuilt one point
+        at a time
+      And every sample is counted exactly once across the windows
+
+    @integration
+    Scenario: A batch carrying several series folds each of them correctly
+      Given a batch carries points for several series recorded at different
+        times
+      When the batch is folded in one pass
+      Then each series' summaries match those of the same series rebuilt one
+        point at a time
+      And every sample of every series is counted exactly once

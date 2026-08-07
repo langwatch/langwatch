@@ -144,6 +144,19 @@ func wire(logger *zap.Logger, isAgent bool) deps {
 		obsConsoleLevel = ""
 	}
 
+	// Resolved through the operator's own .env, not the full dotenv layering: the
+	// overlay haven writes is loaded last with override:true, so a knob read only
+	// from the shell would let haven's default beat a platform/app/.env line that
+	// says otherwise — and the opt-in would silently not work.
+	//
+	// It must exclude .env.portless specifically, because this is the one knob
+	// haven itself writes there (domain.Stack.OverlayEnv). Reading the merged
+	// layers means that from the second `haven up` onward haven is reading back
+	// its own output: it sees the "true" it wrote last time, concludes the
+	// operator asked for it, and rewrites it — so a `.env` opt-in can never win
+	// no matter how many times you set it. An overlay is output, not input.
+	disableDLP, disableDLPSet := operatorEnvLookup("LANGWATCH_DISABLE_GOOGLE_DLP")
+
 	cfg := app.Config{
 		Naming:                   naming,
 		Home:                     havenHome(),
@@ -162,6 +175,7 @@ func wire(logger *zap.Logger, isAgent bool) deps {
 		LocalAPIKey:               envOr("LANGWATCH_LOCAL_API_KEY", domain.DefaultLocalAPIKey),
 		RepoRoot:                  worktree,
 		ObservabilityConsoleLevel: obsConsoleLevel,
+		ShouldDisableGoogleDLP:    shouldDisableGoogleDLP(disableDLP, disableDLPSet),
 	}
 
 	return deps{
@@ -703,6 +717,21 @@ func dotenvLookup(key string) (string, bool) {
 	return resolveKnob(key, os.LookupEnv, dotenvKnobs)
 }
 
+// shouldDisableGoogleDLP decides whether haven forces
+// LANGWATCH_DISABLE_GOOGLE_DLP=true into every stack's overlay.
+//
+// Google DLP is off by default locally: no local workflow should ship trace text
+// to Google, and the app then skips loading the @google-cloud/dlp SDK entirely.
+// A value the operator did set is read exactly the way the app reads it — the
+// repo's boolean rule is a case-insensitive "true", everything else false (see
+// env-create.mjs) — so "false", "FALSE" and "0" mean the same thing on both
+// sides of the boundary. Only an absent or "true" value makes haven force the
+// override; anything else leaves .env to govern, which is how you opt back in to
+// exercising DLP locally against real credentials.
+func shouldDisableGoogleDLP(value string, isSet bool) bool {
+	return !isSet || strings.EqualFold(value, "true")
+}
+
 // resolveKnob is the precedence itself, kept pure so it can be tested without a
 // checkout on disk. dotenv is a thunk so the file is never read when the
 // process environment already answers.
@@ -728,9 +757,38 @@ func dotenvKnobs() map[string]string {
 	return dotenvVars
 }
 
+// operatorEnvLookup is dotenvLookup restricted to files a human wrote: the
+// process environment and platform/app/.env, never the .env.portless overlay haven
+// generates. Use it for any knob haven also *writes*, so that reading a
+// preference cannot pick up haven's own last answer instead of the operator's.
+func operatorEnvLookup(key string) (string, bool) {
+	return resolveKnob(key, os.LookupEnv, operatorEnvKnobs)
+}
+
+// operatorEnvKnobs loads only platform/app/.env — deliberately not the overlay.
+func operatorEnvKnobs() map[string]string {
+	operatorEnvOnce.Do(func() {
+		cwd, _ := os.Getwd()
+		operatorEnvVars = operatorEnvIn(filepath.Join(gitTopLevel(cwd), "platform", "app"))
+	})
+	return operatorEnvVars
+}
+
+// operatorEnvIn reads the operator-authored .env in lwDir and nothing else.
+// Split out from operatorEnvKnobs so the "and nothing else" half is reachable
+// from a test: pointed at a directory holding both files, it must still not see
+// .env.portless.
+func operatorEnvIn(lwDir string) map[string]string {
+	env := map[string]string{}
+	domain.ReadEnvFile(filepath.Join(lwDir, ".env"), env)
+	return env
+}
+
 var (
-	dotenvOnce sync.Once
-	dotenvVars map[string]string
+	dotenvOnce      sync.Once
+	dotenvVars      map[string]string
+	operatorEnvOnce sync.Once
+	operatorEnvVars map[string]string
 )
 
 // envTruthy reports whether an env var is set to a common "on" value. Accepts the
