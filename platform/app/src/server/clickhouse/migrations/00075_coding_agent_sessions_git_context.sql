@@ -29,7 +29,7 @@
 --
 -- Every DEFAULT '' is load-bearing rather than cosmetic. A variable-size column
 -- added by ALTER is unmaterialised in every part written before it, so a read
--- decodes a size header that was never written; 00014, 00057 and 00071 all
+-- decodes a size header that was never written; 00014, 00057 and 00074 all
 -- fixed exactly that, and every session row that exists today is such a part.
 --
 -- Each ALTER is its own statement block, because ClickHouse does not support
@@ -54,7 +54,7 @@ ALTER TABLE ${CLICKHOUSE_DATABASE}.coding_agent_sessions
 -- +goose StatementBegin
 -- Plain String, never LowCardinality: branch names are high-cardinality (one
 -- per task, often per agent run), the same reasoning ParentSessionId carries
--- in 00071.
+-- in 00074.
 ALTER TABLE ${CLICKHOUSE_DATABASE}.coding_agent_sessions
   ADD COLUMN IF NOT EXISTS GitBranch String DEFAULT '' CODEC(ZSTD(1));
 -- +goose StatementEnd

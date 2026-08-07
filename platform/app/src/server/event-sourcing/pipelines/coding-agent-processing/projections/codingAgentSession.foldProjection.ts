@@ -57,14 +57,14 @@ const codingAgentSessionEvents = [
 
 /** Schema-snapshot version (calendar date). Bump when the derivation changes.
  *
- *  2026-08-02: the context-economics columns of migration 00071 joined the
+ *  2026-08-02: the context-economics columns of migration 00074 joined the
  *  projected row shape: `RateLimitEvents` (reported rate-limit events, apart
  *  from the 429-inferred `RateLimited`), `CompactionTriggers` (compactions by
  *  trigger kind), and the spawn lineage `ParentSessionId` / `IsFork`. Rows
  *  stamped earlier decode without them, so the bump refolds each session once
  *  to backfill the counters from its stored contributions.
  *
- *  The same stamp also covers the git-context columns of migration 00072
+ *  The same stamp also covers the git-context columns of migration 00075
  *  (`RepositoryHost` / `RepositoryOwner` / `RepositoryName`, `GitBranch`,
  *  `GitWorktree`, `Title`), deliberately rather than by omission: it has not
  *  been released, so no row in the wild carries it without them, and every
@@ -109,7 +109,7 @@ export const CODING_AGENT_SESSION_PROJECTION_VERSION_LATEST = "2026-08-02";
  * these rows predate
  * the logs-only fold entirely, so no agent folded a turn from both a log and a
  * span into them. They are stale in shape, never double-counted, and the
- * discriminator already covers the shape. (The same trade holds for the 00071
+ * discriminator already covers the shape. (The same trade holds for the 00074
  * context-economics columns: a pre-stamp row decodes them as zeros, which is
  * honest for sessions that old, and a replay can backfill them if they ever
  * matter.)
@@ -392,7 +392,7 @@ export interface CodingAgentSessionRow {
   entrypoint: string;
   parentSessionId: string;
   isFork: boolean;
-  /** Git identity from the companion event, and the generated title (00072). */
+  /** Git identity from the companion event, and the generated title (00075). */
   repositoryHost: string;
   repositoryOwner: string;
   repositoryName: string;
@@ -622,7 +622,7 @@ export function projectCodingAgentSessionToRow({
 }
 
 /**
- * The git identity and title columns (migration 00072). The empty string is
+ * The git identity and title columns (migration 00075). The empty string is
  * the honest unset for all six: an agent with no companion emitter reports
  * none of them, and `nullIfEmpty` maps them straight back on read.
  */

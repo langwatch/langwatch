@@ -2,7 +2,7 @@
  * @vitest-environment node
  * @integration
  *
- * Round-trips the three coding-agent tables (migrations 00051-00054, 00071)
+ * Round-trips the three coding-agent tables (migrations 00051-00054, 00074)
  * through their real INSERT/SELECT SQL against ClickHouse. The unit tests cover
  * the query shape and record mapping with a mocked client; this proves the
  * DDL↔repository column contract — a mismatched column name or type fails a
@@ -13,8 +13,8 @@
  * store.get() reconstruct working state without touching event_log, the
  * 00054 AppliedEventIds watermark that survives cache loss (including the
  * mixed-deploy read of a pre-00054 row whose body omits the column entirely),
- * the 00071 context-economics columns (reported rate-limit events,
- * compactions by trigger, spawn lineage), and the 00072 git-context columns
+ * the 00074 context-economics columns (reported rate-limit events,
+ * compactions by trigger, spawn lineage), and the 00075 git-context columns
  * (repository, branch, worktree, title).
  *
  * @see specs/coding-agent/session-git-context.feature
@@ -214,7 +214,7 @@ describe("coding_agent_sessions round-trip (migrations 00051-00054)", () => {
     expect(read!.costUsd).toBeCloseTo(1.25);
     expect(read!.commits).toBe(2);
 
-    // Context-economics columns (migration 00071): the trigger map, the
+    // Context-economics columns (migration 00074): the trigger map, the
     // reported rate-limit counter and the spawn lineage all survive the trip.
     expect(read!.compactionTriggers).toEqual({ auto: 2, manual: 1 });
     expect(read!.rateLimitEvents).toBe(2);
@@ -272,7 +272,7 @@ describe("coding_agent_sessions round-trip (migrations 00051-00054)", () => {
   /** @scenario A session row from before the git context columns decodes with empty context */
   it("decodes a row written before the git context columns with empty context", async () => {
     const sessionId = `${tag}-pre-git`;
-    // The genuine mixed-deploy read: a writer from before migration 00072
+    // The genuine mixed-deploy read: a writer from before migration 00075
     // emits a JSONEachRow body with none of the six fields, so ClickHouse
     // supplies each column's DEFAULT ''. Inserted through the same client the
     // repository resolves.

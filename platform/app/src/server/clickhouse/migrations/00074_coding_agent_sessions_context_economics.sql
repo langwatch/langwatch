@@ -42,7 +42,7 @@ ALTER TABLE ${CLICKHOUSE_DATABASE}.coding_agent_sessions
 -- unmaterialised in every part written before it, so a read decodes a size
 -- header that was never written; 00014 and 00057 both fixed that, and 00057
 -- records that the same header applies to Map. A read of this column on a
--- pre-00071 session row is exactly that case, and the default makes it
+-- pre-00074 session row is exactly that case, and the default makes it
 -- synthesise an empty map instead.
 ALTER TABLE ${CLICKHOUSE_DATABASE}.coding_agent_sessions
   ADD COLUMN IF NOT EXISTS CompactionTriggers Map(LowCardinality(String), UInt32) DEFAULT map() CODEC(ZSTD(1));

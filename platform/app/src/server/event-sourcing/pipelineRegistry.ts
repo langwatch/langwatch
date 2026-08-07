@@ -271,7 +271,7 @@ export interface PipelineRepositories {
   codingAgentTraceSession: CodingAgentTraceSessionRepository;
   /** ADR-056 §5: converged per-series metric totals per session. */
   sessionMetricSeries: SessionMetricSeriesRepository;
-  /** The per-call fact table: one row per session event (migration 00070). */
+  /** The per-call fact table: one row per session event (migration 00073). */
   codingAgentSessionEvents: CodingAgentSessionEventsRepository;
   metricDataPointStorage: MetricDataPointRepository;
   /** ADR-034 Phase 1: per-span rollup repository (app-side, replaces the MV). */
