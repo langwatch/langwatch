@@ -219,7 +219,7 @@ const renderExecutionOutputs = (
           fontSize="13px"
           fontWeight="bold"
           textTransform="uppercase"
-          color="gray.600"
+          color="fg.muted"
         >
           Condition
         </Text>

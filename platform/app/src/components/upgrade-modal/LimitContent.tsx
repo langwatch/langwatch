@@ -32,7 +32,7 @@ function LimitContentBody({
               You've reached the limit of {variant.max}{" "}
               {LIMIT_TYPE_LABELS[variant.limitType]} on your current plan.
             </Text>
-            <Text color="gray.500">
+            <Text color="fg.subtle">
               Current usage: {variant.current} / {variant.max}
             </Text>
           </>
@@ -43,7 +43,7 @@ function LimitContentBody({
           </Text>
         )}
         {SEAT_LIMIT_TYPES.has(variant.limitType) && (
-          <Text color="gray.500">
+          <Text color="fg.subtle">
             To free a seat instead, disable a membership from the members page.
             That is reversible, and it keeps their role and everything they did.
           </Text>

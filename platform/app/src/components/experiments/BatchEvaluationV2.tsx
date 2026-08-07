@@ -375,7 +375,7 @@ export function BatchEvaluationV2RunList({
               width="100%"
               cursor="pointer"
               role="button"
-              background="gray.200"
+              background="bg.emphasized"
               _hover={{
                 background: "gray.100",
               }}

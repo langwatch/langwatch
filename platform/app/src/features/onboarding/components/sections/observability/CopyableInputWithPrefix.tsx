@@ -36,7 +36,7 @@ export function CopyableInputWithPrefix({
       position="relative"
       borderRadius="xl"
       border="1px solid"
-      borderColor="gray.200"
+      borderColor="border"
       bg="bg.panel/70"
       backdropFilter="blur(24px) saturate(1.4)"
       boxShadow="0 4px 30px rgba(0,0,0,0.06)"

@@ -75,7 +75,7 @@ const SidebarSectionToggle = ({
         gap={showExpanded ? 1 : 0}
         justifyContent={showExpanded ? "flex-start" : "center"}
         borderRadius="md"
-        color="gray.500"
+        color="fg.subtle"
         _hover={{ color: "nav.fg" }}
       >
         {showExpanded && (

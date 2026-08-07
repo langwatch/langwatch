@@ -224,7 +224,7 @@ export default function BatchEvaluation({
         align="center"
         alignItems="stretch"
         justify="center"
-        background="gray.50"
+        background="bg.subtle"
         padding={6}
         gap={6}
       >

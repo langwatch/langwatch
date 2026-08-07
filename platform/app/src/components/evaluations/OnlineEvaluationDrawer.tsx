@@ -1195,7 +1195,7 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
                   {isDefaultOnlyPrecondition(preconditions) &&
                   !preconditionsExpanded ? (
                     <>
-                      <Text color="gray.500" fontStyle="italic">
+                      <Text color="fg.subtle" fontStyle="italic">
                         This evaluation will run on every application trace
                       </Text>
                       <Button variant="outline" onClick={addPrecondition}>
@@ -1234,7 +1234,7 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
                                 size="sm"
                                 variant="ghost"
                                 onClick={() => removePrecondition(index)}
-                                color="gray.400"
+                                color="fg.subtle"
                               >
                                 <X size={16} />
                               </Button>
@@ -1353,7 +1353,7 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
                           </Box>
                         );
                       })}
-                      <Text color="gray.500" fontStyle="italic">
+                      <Text color="fg.subtle" fontStyle="italic">
                         This evaluation will run on {runOnText}
                         {preconditions.length > 0 &&
                           " matching the preconditions"}
@@ -1394,7 +1394,7 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
                       }
                     />
                   </HStack>
-                  <Text color="gray.500" fontStyle="italic">
+                  <Text color="fg.subtle" fontStyle="italic">
                     This evaluation will run on {runOnText}
                     {preconditions.length > 0 && " matching the preconditions"}
                   </Text>

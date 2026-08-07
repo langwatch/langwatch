@@ -254,7 +254,7 @@ export function PlansComparisonPage({
       <Flex justifyContent="space-between" alignItems="flex-start">
         <Box flex={1}>
           <Link href="/settings/subscription">
-            <Button variant="ghost" size="sm" color="gray.600">
+            <Button variant="ghost" size="sm" color="fg.muted">
               <ArrowLeft size={14} /> Subscription
             </Button>
           </Link>

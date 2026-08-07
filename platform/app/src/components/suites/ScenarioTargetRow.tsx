@@ -246,7 +246,7 @@ export function ScenarioTargetRow({
               paddingY={0.5}
               borderRadius="md"
               border="1px solid"
-              borderColor="gray.300"
+              borderColor="border.emphasized"
               fontSize="xs"
               color="fg.default"
               cursor={isCancelling ? "default" : "pointer"}
@@ -292,7 +292,7 @@ export function ScenarioTargetRow({
                 )}
                 {scenarioRun.totalCost != null && (
                   <>
-                    <Text color="gray.300">{"⋅"}</Text>
+                    <Text color="fg.subtle">{"⋅"}</Text>
                     <Text fontSize="xs">
                       {formatCost(scenarioRun.totalCost)}
                     </Text>

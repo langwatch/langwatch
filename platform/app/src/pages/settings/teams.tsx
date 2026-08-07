@@ -250,7 +250,7 @@ function AddToTeamDialog({
               </Select.Root>
             </Field.Root>
 
-            <Text fontSize="sm" color="gray.500">
+            <Text fontSize="sm" color="fg.subtle">
               This gives them access to all projects in the team at this role
               level.
             </Text>
@@ -399,7 +399,7 @@ function AddToProjectDialog({
               </Select.Root>
             </Field.Root>
 
-            <Text fontSize="sm" color="gray.500">
+            <Text fontSize="sm" color="fg.subtle">
               If they&apos;re already on the team, this overrides their team
               role for this project only.
             </Text>
@@ -485,14 +485,14 @@ function ProjectSection({
             </Badge>
           )}
           <Spacer />
-          <Text fontSize="xs" color="gray.500">
+          <Text fontSize="xs" color="fg.subtle">
             {access.length} with access
           </Text>
           {canManage && (
             <Button
               size="xs"
               variant="ghost"
-              color="gray.400"
+              color="fg.subtle"
               onClick={(e) => {
                 e.stopPropagation();
                 openDrawer("editProject", {
@@ -526,7 +526,7 @@ function ProjectSection({
                 <Text
                   fontSize="xs"
                   fontWeight="semibold"
-                  color="gray.500"
+                  color="fg.subtle"
                   textTransform="uppercase"
                   letterSpacing="wider"
                   mb={2}
@@ -548,12 +548,12 @@ function ProjectSection({
                       <Link
                         href="/settings/groups"
                         fontSize="xs"
-                        color="purple.400"
+                        color="purple.solid"
                       >
                         via {m.viaGroupName}
                       </Link>
                     ) : (
-                      <Text fontSize="xs" color="gray.400">
+                      <Text fontSize="xs" color="fg.subtle">
                         from team
                       </Text>
                     )}
@@ -568,7 +568,7 @@ function ProjectSection({
                 <Text
                   fontSize="xs"
                   fontWeight="semibold"
-                  color="gray.500"
+                  color="fg.subtle"
                   textTransform="uppercase"
                   letterSpacing="wider"
                   mb={2}
@@ -585,7 +585,7 @@ function ProjectSection({
                     <Box flex={1}>
                       <Text display="inline">{m.name}</Text>
                       {m.source === "override" && m.teamRole && (
-                        <Text as="span" fontSize="xs" color="gray.400" ml={2}>
+                        <Text as="span" fontSize="xs" color="fg.subtle" ml={2}>
                           team role: {m.teamRole}
                         </Text>
                       )}
@@ -635,7 +635,7 @@ function ProjectSection({
 
             {/* Empty state */}
             {projectLevel.length === 0 && inherited.length > 0 && (
-              <Text fontSize="xs" color="gray.400" fontStyle="italic" mt={2}>
+              <Text fontSize="xs" color="fg.subtle" fontStyle="italic" mt={2}>
                 No project-level overrides. Everyone uses their team role.
               </Text>
             )}
@@ -694,7 +694,7 @@ function InlineDepartment({
     <HStack
       gap={2}
       pl={2}
-      color="gray.500"
+      color="fg.subtle"
       fontSize="sm"
       onClick={(e) => e.stopPropagation()}
     >
@@ -766,7 +766,7 @@ function TeamCard({
           {expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
           <Text fontWeight="semibold">{team.name}</Text>
           <Spacer />
-          <Text fontSize="sm" color="gray.500">
+          <Text fontSize="sm" color="fg.subtle">
             {team.projects.length}{" "}
             {team.projects.length === 1 ? "project" : "projects"}
             {" · "}
@@ -790,7 +790,7 @@ function TeamCard({
               href={`/settings/teams/${team.slug}`}
               onClick={(e) => e.stopPropagation()}
             >
-              <Button size="xs" variant="ghost" color="gray.400">
+              <Button size="xs" variant="ghost" color="fg.subtle">
                 <Pencil size={13} />
                 Edit
               </Button>
@@ -806,7 +806,7 @@ function TeamCard({
                 <Text
                   fontSize="xs"
                   fontWeight="semibold"
-                  color="gray.500"
+                  color="fg.subtle"
                   textTransform="uppercase"
                   letterSpacing="wider"
                 >
@@ -829,7 +829,7 @@ function TeamCard({
               </HStack>
 
               {team.directMembers.length === 0 ? (
-                <Text fontSize="sm" color="gray.400" fontStyle="italic">
+                <Text fontSize="sm" color="fg.subtle" fontStyle="italic">
                   No members yet.
                 </Text>
               ) : (
@@ -838,8 +838,7 @@ function TeamCard({
                     key={i}
                     py={2}
                     borderBottomWidth={i < arr.length - 1 ? "1px" : "0"}
-                    borderColor="gray.100"
-                    _dark={{ borderColor: "gray.700" }}
+                    borderColor="border.muted"
                     opacity={m.viaGroupId ? 0.7 : 1}
                   >
                     <RandomColorAvatar
@@ -858,7 +857,7 @@ function TeamCard({
                         <Link
                           href="/settings/groups"
                           fontSize="xs"
-                          color="purple.400"
+                          color="purple.solid"
                         >
                           via {m.viaGroupName}
                         </Link>
@@ -881,7 +880,7 @@ function TeamCard({
                         <Button
                           size="xs"
                           variant="ghost"
-                          color="gray.400"
+                          color="fg.subtle"
                           loading={deleteBinding.isPending}
                           onClick={() =>
                             deleteBinding.mutate({
@@ -901,7 +900,7 @@ function TeamCard({
                   </HStack>
                 ))
               )}
-              <Text fontSize="xs" color="gray.400" mt={2}>
+              <Text fontSize="xs" color="fg.subtle" mt={2}>
                 Editing a role here changes their team-level access, inherited
                 by all projects below.
               </Text>
@@ -913,7 +912,7 @@ function TeamCard({
                 <Text
                   fontSize="xs"
                   fontWeight="semibold"
-                  color="gray.500"
+                  color="fg.subtle"
                   textTransform="uppercase"
                   letterSpacing="wider"
                   mb={3}
@@ -928,8 +927,7 @@ function TeamCard({
                     borderBottomWidth={
                       i < team.projectOnlyAccess.length - 1 ? "1px" : "0"
                     }
-                    borderColor="gray.100"
-                    _dark={{ borderColor: "gray.700" }}
+                    borderColor="border.muted"
                   >
                     <RandomColorAvatar
                       name={m.name}
@@ -940,7 +938,7 @@ function TeamCard({
                     <Badge colorPalette={roleBadgeColor(m.role)} size="sm">
                       {m.role}
                     </Badge>
-                    <Text fontSize="xs" color="gray.400">
+                    <Text fontSize="xs" color="fg.subtle">
                       on
                     </Text>
                     <Badge colorPalette="green" size="sm">
@@ -948,7 +946,7 @@ function TeamCard({
                     </Badge>
                     <Link
                       fontSize="xs"
-                      color="purple.400"
+                      color="purple.solid"
                       href="#"
                       onClick={(e) => {
                         e.preventDefault();
@@ -968,7 +966,7 @@ function TeamCard({
                 <Text
                   fontSize="xs"
                   fontWeight="semibold"
-                  color="gray.500"
+                  color="fg.subtle"
                   textTransform="uppercase"
                   letterSpacing="wider"
                 >
@@ -992,7 +990,7 @@ function TeamCard({
                 )}
               </HStack>
               {team.projects.length === 0 ? (
-                <Text fontSize="sm" color="gray.400" fontStyle="italic">
+                <Text fontSize="sm" color="fg.subtle" fontStyle="italic">
                   No projects yet.
                 </Text>
               ) : (
@@ -1048,7 +1046,7 @@ function TeamsAndProjects() {
         <HStack width="full">
           <Box>
             <Heading size="md">Teams &amp; Projects</Heading>
-            <Text fontSize="sm" color="gray.500" mt={1}>
+            <Text fontSize="sm" color="fg.subtle" mt={1}>
               People on a team inherit access to all its projects. Expand a
               project to add overrides or direct access.
             </Text>
@@ -1073,7 +1071,7 @@ function TeamsAndProjects() {
         {teams.isLoading && <Spinner />}
 
         {teams.data?.length === 0 && (
-          <Text color="gray.500">No teams yet.</Text>
+          <Text color="fg.subtle">No teams yet.</Text>
         )}
 
         <VStack gap={3} width="full" align="stretch">

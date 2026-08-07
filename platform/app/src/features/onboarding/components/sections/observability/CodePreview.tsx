@@ -137,7 +137,7 @@ export function CodePreview({
             <CodeBlock.Header
               display="flex"
               justifyContent="space-between"
-              borderColor="gray.200"
+              borderColor="border"
             >
               <CodeBlock.Title fontSize="xs" pt={2}>
                 {languageIconUrl ? (

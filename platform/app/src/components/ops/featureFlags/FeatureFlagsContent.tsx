@@ -380,7 +380,7 @@ function FlagRowView({
                   size="xs"
                   variant="ghost"
                   onClick={() => setRulesDialogOpen(true)}
-                  color="gray.500"
+                  color="fg.subtle"
                 >
                   <Settings2 size={14} />
                 </IconButton>

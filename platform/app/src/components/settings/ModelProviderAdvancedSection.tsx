@@ -181,7 +181,7 @@ export function ModelProviderAdvancedSection({
         <Accordion.ItemContent>
           {!modelProviderId ? (
             <Box width="full" paddingY={2}>
-              <Text fontSize="xs" color="gray.500">
+              <Text fontSize="xs" color="fg.subtle">
                 Save the provider first to configure rate limits and routing
                 hints.
               </Text>

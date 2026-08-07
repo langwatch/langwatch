@@ -61,7 +61,7 @@ export function AnomaliesCard() {
           </Text>
         )}
         {!hasAny && !query.isLoading && !hasError && (
-          <Text paddingX={4} paddingBottom={3} color="gray.500" textStyle="xs">
+          <Text paddingX={4} paddingBottom={3} color="fg.subtle" textStyle="xs">
             No active anomalies in the last 60 minutes.
           </Text>
         )}
@@ -102,7 +102,7 @@ export function AnomaliesCard() {
                     <Text textStyle="xs">{formatAge(a.triggeredAt)}</Text>
                   </Table.Cell>
                   <Table.Cell maxW="320px">
-                    <Text textStyle="xs" color="gray.600" lineClamp={2}>
+                    <Text textStyle="xs" color="fg.muted" lineClamp={2}>
                       {a.reason}
                     </Text>
                   </Table.Cell>

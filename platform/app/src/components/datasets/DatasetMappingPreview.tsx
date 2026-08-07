@@ -180,7 +180,7 @@ export function DatasetMappingPreview({
             <Field.Label margin={0}>Mapping</Field.Label>
           </HStack>
           <HStack
-            bg="gray.100"
+            bg="bg.muted"
             _dark={{ bg: "gray.800" }}
             borderRadius="md"
             padding="3px"
