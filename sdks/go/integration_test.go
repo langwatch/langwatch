@@ -22,8 +22,7 @@ func TestEndToEndPipeline(t *testing.T) {
 		// The LangWatch filtering exporter sits between the span processor and the
 		// in-memory sink: it drops HTTP spans and, via the predicate, captures
 		// nothing (DataCaptureNone) for every LangWatch span.
-		fe := NewFilteringExporter(mem, ExcludeHTTPRequests())
-		fe.dataCapture = dataCaptureConfig{
+		fe := newFilteringExporter(mem, dataCaptureConfig{
 			enabled: true,
 			predicate: func(c DataCaptureContext) DataCaptureMode {
 				// Assert the predicate sees a fully populated context.
@@ -33,7 +32,7 @@ func TestEndToEndPipeline(t *testing.T) {
 				}
 				return DataCaptureAll
 			},
-		}
+		}, ExcludeHTTPRequests())
 
 		provider := sdktrace.NewTracerProvider(
 			sdktrace.WithSpanProcessor(sdktrace.NewSimpleSpanProcessor(fe)),
@@ -66,9 +65,11 @@ func TestEndToEndPipeline(t *testing.T) {
 
 		keys := keySet(span.Attributes)
 
-		// Content attributes are stripped by the none-mode predicate.
+		// Content attributes are stripped by the none-mode predicate. RAG contexts
+		// carry the retrieved document text, so they go with the input.
 		assert.NotContains(t, keys, AttributeLangWatchInput, "input content must be stripped")
 		assert.NotContains(t, keys, AttributeLangWatchOutput, "output content must be stripped")
+		assert.NotContains(t, keys, AttributeLangWatchRAGContexts, "retrieved document text must be stripped")
 
 		// Structure, models, metrics, token usage, metadata and identity all survive.
 		assert.Contains(t, keys, AttributeLangWatchSpanType)
@@ -76,7 +77,6 @@ func TestEndToEndPipeline(t *testing.T) {
 		assert.Contains(t, keys, attribute.Key("gen_ai.usage.input_tokens"))
 		assert.Contains(t, keys, attribute.Key("metadata.feature"))
 		assert.Contains(t, keys, attribute.Key("gen_ai.conversation.id"))
-		assert.Contains(t, keys, AttributeLangWatchRAGContexts)
 		assert.Contains(t, keys, attribute.Key("gen_ai.request.model"))
 		assert.Contains(t, keys, attribute.Key("gen_ai.response.model"))
 		assert.Contains(t, keys, attribute.Key("gen_ai.provider.name"))

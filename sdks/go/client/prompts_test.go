@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"sync"
+	"sync/atomic"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -68,10 +70,48 @@ func TestPromptsGet(t *testing.T) {
 			assert.Equal(t, "production", p.Tags[0].Name)
 		})
 
-		t.Run("when fetched with version and tag options", func(t *testing.T) {
+		t.Run("when fetched with a version option", func(t *testing.T) {
+			var mu sync.Mutex
 			var gotQuery string
 			c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+				mu.Lock()
 				gotQuery = r.URL.Query().Encode()
+				mu.Unlock()
+				_, _ = w.Write([]byte(samplePromptJSON))
+			})
+
+			_, err := c.Prompts.Get(context.Background(), "support-greeting", &GetPromptOptions{Version: 4})
+			require.NoError(t, err)
+			mu.Lock()
+			defer mu.Unlock()
+			assert.Contains(t, gotQuery, "version=4")
+			assert.NotContains(t, gotQuery, "tag=")
+		})
+
+		t.Run("when fetched with a tag option", func(t *testing.T) {
+			var mu sync.Mutex
+			var gotQuery string
+			c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+				mu.Lock()
+				gotQuery = r.URL.Query().Encode()
+				mu.Unlock()
+				_, _ = w.Write([]byte(samplePromptJSON))
+			})
+
+			_, err := c.Prompts.Get(context.Background(), "support-greeting", &GetPromptOptions{Tag: "production"})
+			require.NoError(t, err)
+			mu.Lock()
+			defer mu.Unlock()
+			assert.Contains(t, gotQuery, "tag=production")
+			assert.NotContains(t, gotQuery, "version=")
+		})
+
+		t.Run("when fetched with both version and tag options", func(t *testing.T) {
+			// A tag already resolves to a version, so the two are mutually
+			// exclusive and the request is refused before it is sent.
+			var requested atomic.Bool
+			c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+				requested.Store(true)
 				_, _ = w.Write([]byte(samplePromptJSON))
 			})
 
@@ -79,9 +119,8 @@ func TestPromptsGet(t *testing.T) {
 				Version: 4,
 				Tag:     "production",
 			})
-			require.NoError(t, err)
-			assert.Contains(t, gotQuery, "version=4")
-			assert.Contains(t, gotQuery, "tag=production")
+			require.Error(t, err)
+			assert.False(t, requested.Load(), "no request is sent for conflicting options")
 		})
 	})
 

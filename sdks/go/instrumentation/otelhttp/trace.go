@@ -181,7 +181,15 @@ func (t *Tracer) Handle(req *http.Request, next func(*http.Request) (*http.Respo
 		span.SetStatus(codes.Error, http.StatusText(resp.StatusCode))
 		return resp, nil
 	}
-	span.SetStatus(codes.Ok, "")
+	// Deliberately NOT set for a streamed body — see the streaming branch below.
+	// OTel treats Ok as final and refuses to downgrade it to Error, so marking
+	// the span Ok here would swallow a failure the stream reports later.
+	setOKUnlessStreamed := func() {
+		if !streamingResp {
+			span.SetStatus(codes.Ok, "")
+		}
+	}
+	defer setOKUnlessStreamed()
 
 	if resp.Body == nil || resp.Body == http.NoBody {
 		recordRequest()
@@ -212,7 +220,7 @@ func (t *Tracer) Handle(req *http.Request, next func(*http.Request) (*http.Respo
 	resp.Body = newCapturingBody(resp.Body, func(captured []byte, truncated bool) {
 		recordRequest()
 		if !truncated {
-			if e := selectResponseExtractor(t.cfg.Extractors, PeekObjectField(captured), contentType); e != nil {
+			if e := SelectResponseExtractor(t.cfg.Extractors, PeekObjectField(captured), contentType); e != nil {
 				e.ExtractNonStreaming(span, captured, t.capture)
 			}
 		}
@@ -224,18 +232,43 @@ func (t *Tracer) Handle(req *http.Request, next func(*http.Request) (*http.Respo
 
 // readRequest reads and restores the request body and selects its extractor,
 // WITHOUT extracting attributes (that is deferred to span completion).
+//
+// The read is capped at maxCaptureBytes, matching the response side. A chat
+// request carrying base64 images, audio or a long document context can reach
+// tens of megabytes, and buffering all of it on the request path would let a
+// single caller grow the tracer's memory without limit. Past the cap the body is
+// still forwarded byte-for-byte — the bytes already read are re-attached ahead
+// of the untouched remainder — but no attributes are extracted from it, because
+// a partial JSON body cannot be parsed.
 func (t *Tracer) readRequest(req *http.Request) ([]byte, Extractor) {
 	if req.Body == nil || req.Body == http.NoBody {
 		return nil, nil
 	}
-	raw, err := io.ReadAll(req.Body)
+	// One byte past the cap, so a body sitting exactly on it is still parsed.
+	raw, err := io.ReadAll(io.LimitReader(req.Body, maxCaptureBytes+1))
 	if err != nil {
 		logf("failed to read request body: %v", err)
 		return nil, nil
 	}
+	if len(raw) > maxCaptureBytes {
+		logf("request body exceeds %d bytes; passing it through without extraction", maxCaptureBytes)
+		req.Body = &readerCloser{
+			Reader: io.MultiReader(bytes.NewReader(raw), req.Body),
+			Closer: req.Body,
+		}
+		return nil, nil
+	}
 	req.Body = io.NopCloser(bytes.NewReader(raw))
 	body, _ := ParseBody(raw)
-	return raw, selectRequestExtractor(t.cfg.Extractors, body, req.URL.Path)
+	return raw, SelectRequestExtractor(t.cfg.Extractors, body, req.URL.Path)
+}
+
+// readerCloser pairs a rebuilt read stream with the original body's Closer, so
+// an over-cap request still releases the underlying body when the transport
+// closes it.
+type readerCloser struct {
+	io.Reader
+	io.Closer
 }
 
 func (t *Tracer) streamAccumulatorFor(reqExtractor Extractor) StreamAccumulator {

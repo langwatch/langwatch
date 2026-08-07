@@ -195,7 +195,10 @@ func metricsFromMap(body otelhttp.JSONObject) metricsPayload {
 }
 
 // mergeFromMap folds any present token / duration fields from an untyped body
-// into m, overwriting only when a non-zero value is found.
+// into m, overwriting only when a non-zero value is found. The durations are
+// nanoseconds on the Ollama wire — a one-second call is already 1e9 and a
+// multi-second call exceeds the int32 range — so they are read through GetInt64,
+// which does not truncate on 32-bit builds (GOARCH=386, 32-bit ARM).
 func (m *metricsPayload) mergeFromMap(body otelhttp.JSONObject) {
 	if v, ok := otelhttp.GetInt(body, "prompt_eval_count"); ok && v > 0 {
 		m.PromptEvalCount = v
@@ -203,16 +206,16 @@ func (m *metricsPayload) mergeFromMap(body otelhttp.JSONObject) {
 	if v, ok := otelhttp.GetInt(body, "eval_count"); ok && v > 0 {
 		m.EvalCount = v
 	}
-	if v, ok := otelhttp.GetInt(body, "total_duration"); ok && v > 0 {
-		m.TotalDuration = int64(v)
+	if v, ok := otelhttp.GetInt64(body, "total_duration"); ok && v > 0 {
+		m.TotalDuration = v
 	}
-	if v, ok := otelhttp.GetInt(body, "load_duration"); ok && v > 0 {
-		m.LoadDuration = int64(v)
+	if v, ok := otelhttp.GetInt64(body, "load_duration"); ok && v > 0 {
+		m.LoadDuration = v
 	}
-	if v, ok := otelhttp.GetInt(body, "prompt_eval_duration"); ok && v > 0 {
-		m.PromptEvalDuration = int64(v)
+	if v, ok := otelhttp.GetInt64(body, "prompt_eval_duration"); ok && v > 0 {
+		m.PromptEvalDuration = v
 	}
-	if v, ok := otelhttp.GetInt(body, "eval_duration"); ok && v > 0 {
-		m.EvalDuration = int64(v)
+	if v, ok := otelhttp.GetInt64(body, "eval_duration"); ok && v > 0 {
+		m.EvalDuration = v
 	}
 }

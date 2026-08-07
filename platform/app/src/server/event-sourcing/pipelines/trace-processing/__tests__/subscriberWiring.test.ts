@@ -34,6 +34,7 @@ function buildTraceDeps(
     originGateReactor: reactorStub("originGate"),
     evaluationTriggerReactor: reactorStub("evaluationTrigger"),
     customEvaluationSyncReactor: reactorStub("customEvaluationSync"),
+    trackedEventSyncReactor: reactorStub("trackedEventSync"),
     traceUpdateBroadcastReactor: reactorStub("traceUpdateBroadcast"),
     projectMetadataReactor: reactorStub("projectMetadata"),
     simulationMetricsSyncReactor: reactorStub("simulationMetricsSync"),

@@ -2,6 +2,7 @@ package langwatch
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -161,11 +162,114 @@ func TestApplyDataCapture(t *testing.T) {
 	}
 }
 
+func TestDataCaptureStripsRAGContexts(t *testing.T) {
+	t.Run("disabling input capture strips the retrieved document text", func(t *testing.T) {
+		stub := tracetest.SpanStub{
+			Name: "op",
+			Attributes: []attribute.KeyValue{
+				AttributeLangWatchRAGContexts.String(`[{"document_id":"doc-1","content":"secret passage"}]`),
+				AttributeLangWatchSpanType.String("rag"),
+			},
+		}
+		out := applyDataCapture(stub.Snapshot(), DataCaptureNone)
+		keys := keySet(out.Attributes())
+		assert.NotContains(t, keys, AttributeLangWatchRAGContexts, "retrieved document text must be stripped")
+		assert.Contains(t, keys, AttributeLangWatchSpanType, "structure is preserved")
+	})
+
+	t.Run("capturing input keeps them", func(t *testing.T) {
+		stub := tracetest.SpanStub{
+			Name:       "op",
+			Attributes: []attribute.KeyValue{AttributeLangWatchRAGContexts.String("[]")},
+		}
+		out := applyDataCapture(stub.Snapshot(), DataCaptureInput)
+		assert.Contains(t, keySet(out.Attributes()), AttributeLangWatchRAGContexts)
+	})
+}
+
+func TestDataCaptureStripsEventContent(t *testing.T) {
+	eventStub := func() tracetest.SpanStub {
+		return tracetest.SpanStub{
+			Name: "op",
+			Events: []sdktrace.Event{
+				{
+					Name: string(AttributeLangWatchEvent),
+					Attributes: []attribute.KeyValue{
+						AttributeEventType.String("thumbs_up_down"),
+						attribute.Float64(EventMetricsPrefix+"vote", 1),
+						attribute.String(EventDetailsPrefix+"feedback", "my card ending 4242 was declined"),
+					},
+				},
+				{
+					Name: string(AttributeLangWatchEvaluationCustom),
+					Attributes: []attribute.KeyValue{
+						AttributeEvaluationPayload.String(
+							`{"name":"answer relevancy","status":"processed","passed":true,"score":0.92,"details":"the answer quotes the user's address"}`),
+					},
+				},
+			},
+		}
+	}
+
+	eventAttrs := func(event sdktrace.Event) map[attribute.Key]attribute.Value {
+		m := make(map[attribute.Key]attribute.Value, len(event.Attributes))
+		for _, kv := range event.Attributes {
+			m[kv.Key] = kv.Value
+		}
+		return m
+	}
+
+	t.Run("capturing nothing drops the free-text annotation but keeps the signal", func(t *testing.T) {
+		out := applyDataCapture(eventStub().Snapshot(), DataCaptureNone)
+		events := out.Events()
+		require.Len(t, events, 2)
+
+		tracked := eventAttrs(events[0])
+		assert.Equal(t, "thumbs_up_down", tracked[AttributeEventType].AsString())
+		assert.InDelta(t, 1, tracked[EventMetricsPrefix+"vote"].AsFloat64(), 1e-9)
+		assert.NotContains(t, tracked, attribute.Key(EventDetailsPrefix+"feedback"),
+			"free-text feedback must not leave the process")
+	})
+
+	t.Run("capturing nothing redacts the evaluation details but keeps its score", func(t *testing.T) {
+		out := applyDataCapture(eventStub().Snapshot(), DataCaptureNone)
+		events := out.Events()
+		require.Len(t, events, 2)
+
+		payload := eventAttrs(events[1])[AttributeEvaluationPayload].AsString()
+		var eval map[string]any
+		require.NoError(t, json.Unmarshal([]byte(payload), &eval))
+		assert.NotContains(t, eval, "details", "the evaluation's free text must be redacted")
+		assert.Equal(t, "answer relevancy", eval["name"])
+		assert.Equal(t, true, eval["passed"])
+		assert.InDelta(t, 0.92, eval["score"], 1e-9)
+	})
+
+	t.Run("an undecodable evaluation payload is dropped rather than forwarded", func(t *testing.T) {
+		stub := tracetest.SpanStub{
+			Name: "op",
+			Events: []sdktrace.Event{{
+				Name:       string(AttributeLangWatchEvaluationCustom),
+				Attributes: []attribute.KeyValue{AttributeEvaluationPayload.String("not json")},
+			}},
+		}
+		out := applyDataCapture(stub.Snapshot(), DataCaptureNone)
+		require.Len(t, out.Events(), 1)
+		assert.Empty(t, out.Events()[0].Attributes)
+	})
+
+	t.Run("a partial mode leaves events untouched", func(t *testing.T) {
+		out := applyDataCapture(eventStub().Snapshot(), DataCaptureInput)
+		tracked := eventAttrs(out.Events()[0])
+		assert.Contains(t, tracked, attribute.Key(EventDetailsPrefix+"feedback"))
+	})
+}
+
+// @scenario "Capturing nothing strips input and output"
 func TestFilteringExporterStripsContent(t *testing.T) {
 	t.Run("a none-mode exporter drops input/output before the wrapped exporter", func(t *testing.T) {
 		mem := tracetest.NewInMemoryExporter()
-		fe := NewFilteringExporter(mem)
-		fe.dataCapture = dataCaptureConfig{enabled: true, mode: DataCaptureNone}
+		fe := newFilteringExporter(mem, dataCaptureConfig{enabled: true, mode: DataCaptureNone})
 
 		require.NoError(t, fe.ExportSpans(context.Background(),
 			[]sdktrace.ReadOnlySpan{captureStub("llm").Snapshot()}))
@@ -179,11 +283,11 @@ func TestFilteringExporterStripsContent(t *testing.T) {
 	})
 }
 
+// @scenario "A predicate decides capture per span"
 func TestDataCapturePredicate(t *testing.T) {
 	t.Run("the predicate decides capture per span by type", func(t *testing.T) {
 		mem := tracetest.NewInMemoryExporter()
-		fe := NewFilteringExporter(mem)
-		fe.dataCapture = dataCaptureConfig{
+		fe := newFilteringExporter(mem, dataCaptureConfig{
 			enabled: true,
 			predicate: func(c DataCaptureContext) DataCaptureMode {
 				if c.SpanType == "tool" {
@@ -191,7 +295,7 @@ func TestDataCapturePredicate(t *testing.T) {
 				}
 				return DataCaptureAll
 			},
-		}
+		})
 
 		require.NoError(t, fe.ExportSpans(context.Background(), []sdktrace.ReadOnlySpan{
 			captureStub("tool").Snapshot(),

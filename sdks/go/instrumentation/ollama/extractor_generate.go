@@ -40,8 +40,6 @@ func (generateExtractor) MatchesResponse(objectField, contentType string) bool {
 type generateRequest struct {
 	Model   string          `json:"model"`
 	Prompt  string          `json:"prompt"`
-	System  string          `json:"system"`
-	Suffix  string          `json:"suffix"`
 	Format  json.RawMessage `json:"format"`
 	Options optionsParams   `json:"options"`
 	Stream  *bool           `json:"stream"`
@@ -95,7 +93,11 @@ func (generateExtractor) ExtractNonStreaming(span *langwatch.Span, raw []byte, c
 	recordUsage(span, resp.metricsPayload)
 
 	if capture.CaptureOutput() {
-		recordGenerateOutput(span, resp.Response, resp.ToolCalls)
+		recordGenerateOutput(span, generateOutput{
+			response:  resp.Response,
+			thinking:  resp.Thinking,
+			toolCalls: resp.ToolCalls,
+		})
 	}
 }
 
@@ -103,21 +105,31 @@ func (generateExtractor) NewStreamAccumulator() otelhttp.StreamAccumulator {
 	return &generateStreamAccumulator{}
 }
 
-// recordGenerateOutput records the generate response output: the text response,
-// or — when the model emitted tool calls — an assistant chat message carrying
-// them structurally alongside any text.
-func recordGenerateOutput(span *langwatch.Span, response string, toolCalls []json.RawMessage) {
-	if calls := decodeToolCalls(toolCalls); len(calls) > 0 {
-		msg := langwatch.ChatMessage{Role: langwatch.ChatRoleAssistant, ToolCalls: calls}
-		if response != "" {
-			msg.Content = response
-		}
-		span.SetGenAIOutputMessages([]langwatch.ChatMessage{msg})
+// generateOutput is the assistant output of one /api/generate call, assembled
+// either from the single response body or from the accumulated stream.
+type generateOutput struct {
+	response  string
+	thinking  string
+	toolCalls []json.RawMessage
+}
+
+// recordGenerateOutput records the generate response output as a single
+// assistant message: the text response, the reasoning text a thinking model
+// returns under "thinking", and any tool calls, kept structurally. Mirrors the
+// chat path, which carries thinking as ReasoningContent.
+func recordGenerateOutput(span *langwatch.Span, out generateOutput) {
+	calls := decodeToolCalls(out.toolCalls)
+	if out.response == "" && out.thinking == "" && len(calls) == 0 {
 		return
 	}
-	if response != "" {
-		span.SetGenAIOutputMessages([]langwatch.ChatMessage{langwatch.TextMessage(langwatch.ChatRoleAssistant, response)})
+	msg := langwatch.ChatMessage{Role: langwatch.ChatRoleAssistant, ToolCalls: calls}
+	if out.response != "" {
+		msg.Content = out.response
 	}
+	if out.thinking != "" {
+		msg.ReasoningContent = out.thinking
+	}
+	span.SetGenAIOutputMessages([]langwatch.ChatMessage{msg})
 }
 
 // generateStreamAccumulator reconstructs an Ollama /api/generate NDJSON stream.
@@ -127,6 +139,7 @@ type generateStreamAccumulator struct {
 	model        string
 	doneReason   string
 	response     strings.Builder
+	thinking     strings.Builder
 	toolCalls    []json.RawMessage
 	metrics      metricsPayload
 	sawAnyOutput bool
@@ -138,6 +151,7 @@ func (a *generateStreamAccumulator) Consume(line string) {
 	var chunk struct {
 		Model      string            `json:"model"`
 		Response   string            `json:"response"`
+		Thinking   string            `json:"thinking"`
 		DoneReason string            `json:"done_reason"`
 		ToolCalls  []json.RawMessage `json:"tool_calls"`
 		metricsPayload
@@ -154,6 +168,12 @@ func (a *generateStreamAccumulator) Consume(line string) {
 	}
 	if chunk.Response != "" {
 		a.response.WriteString(chunk.Response)
+		a.sawAnyOutput = true
+	}
+	if chunk.Thinking != "" {
+		// Reasoning counts as output: a thinking model can stream only thinking
+		// chunks before the final line, and Finish would otherwise discard them.
+		a.thinking.WriteString(chunk.Thinking)
 		a.sawAnyOutput = true
 	}
 	if len(chunk.ToolCalls) > 0 {
@@ -190,6 +210,10 @@ func (a *generateStreamAccumulator) Finish(span *langwatch.Span, capture langwat
 	recordUsage(span, a.metrics)
 
 	if capture.CaptureOutput() && a.sawAnyOutput {
-		recordGenerateOutput(span, a.response.String(), a.toolCalls)
+		recordGenerateOutput(span, generateOutput{
+			response:  a.response.String(),
+			thinking:  a.thinking.String(),
+			toolCalls: a.toolCalls,
+		})
 	}
 }

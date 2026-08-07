@@ -72,6 +72,34 @@ func TestToGenAIUsage_ExclusiveCachedSplit(t *testing.T) {
 	}
 }
 
+// TestToGenAIUsage_NilPayload pins the nil guard. A chat response that omits
+// `usage` decodes to a nil *usagePayload and is passed straight to recordUsage,
+// so this is the live path, not a defensive one.
+func TestToGenAIUsage_NilPayload(t *testing.T) {
+	var u *usagePayload
+
+	usage := u.toGenAIUsage()
+
+	assert.Nil(t, usage.InputTokens)
+	assert.Nil(t, usage.OutputTokens)
+	assert.Nil(t, usage.TotalTokens)
+	assert.Nil(t, usage.CachedInputTokens)
+	assert.Nil(t, usage.ReasoningTokens)
+}
+
+// TestMergeUsage_NilPayload confirms the streamed path survives a chunk with no
+// usage block and leaves the accumulated usage untouched.
+func TestMergeUsage_NilPayload(t *testing.T) {
+	dst := langwatch.GenAIUsage{InputTokens: langwatch.Int(7)}
+
+	mergeUsage(&dst, nil)
+
+	require.NotNil(t, dst.InputTokens)
+	assert.Equal(t, 7, *dst.InputTokens)
+	assert.Nil(t, dst.OutputTokens)
+	assert.Nil(t, dst.TotalTokens)
+}
+
 // TestToGenAIUsage_TotalTokensUnchanged confirms the normalisation touches only
 // the input split: TotalTokens stays the provider's reported total, which
 // already accounts for the cached tokens.

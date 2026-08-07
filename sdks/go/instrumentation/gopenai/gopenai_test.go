@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -358,6 +359,58 @@ func TestNewTransport_DirectWiring(t *testing.T) {
 	span := requireSingleSpan(t, provider, exporter)
 	assert.Equal(t, codes.Ok, span.Status().Code)
 	assert.Equal(t, attribute.IntValue(2), spanAttrs(span)[semconv.GenAIUsageInputTokensKey])
+}
+
+// TestWrapConfig_PreservesClientTimeout pins that wrapping keeps the caller's
+// http.Client configuration. Timeout lives on the Client, not on its Transport,
+// so rebuilding a bare client would silently drop it and let a request that used
+// to abort hang instead.
+func TestWrapConfig_PreservesClientTimeout(t *testing.T) {
+	rt := &mockRoundTripper{statusCode: http.StatusOK, respBody: `{"object":"chat.completion"}`}
+	config := openai.DefaultConfig("token")
+	config.HTTPClient = &http.Client{Transport: rt, Timeout: 30 * time.Second}
+
+	WrapConfig(&config)
+
+	wrapped, ok := config.HTTPClient.(*http.Client)
+	require.True(t, ok, "WrapConfig must install an *http.Client")
+	assert.Equal(t, 30*time.Second, wrapped.Timeout, "the caller's timeout must survive wrapping")
+	_, isBareTransport := wrapped.Transport.(*mockRoundTripper)
+	assert.False(t, isBareTransport, "the caller's transport must sit underneath the tracing chain, not replace it")
+}
+
+// recordingDoer is an HTTPDoer that is NOT an *http.Client, standing in for a
+// caller's custom retry / auth / circuit-breaker doer.
+type recordingDoer struct {
+	rt     *mockRoundTripper
+	called bool
+}
+
+func (d *recordingDoer) Do(req *http.Request) (*http.Response, error) {
+	d.called = true
+	return d.rt.RoundTrip(req)
+}
+
+// TestWrapConfig_KeepsCustomDoer pins that a caller-supplied HTTPDoer which is
+// not an *http.Client stays in the chain rather than being silently replaced by
+// http.DefaultTransport.
+func TestWrapConfig_KeepsCustomDoer(t *testing.T) {
+	doer := &recordingDoer{rt: &mockRoundTripper{
+		statusCode: http.StatusOK,
+		respBody:   `{"id":"cmpl-doer","object":"chat.completion","model":"gpt-test","choices":[{"index":0,"message":{"role":"assistant","content":"pong"},"finish_reason":"stop"}]}`,
+	}}
+	provider, _ := newTestProvider(t)
+
+	config := openai.DefaultConfig("token")
+	config.HTTPClient = doer
+	WrapConfig(&config, WithTracerProvider(provider))
+
+	_, err := openai.NewClientWithConfig(config).CreateChatCompletion(context.Background(), openai.ChatCompletionRequest{
+		Model:    openai.GPT4oMini,
+		Messages: []openai.ChatCompletionMessage{{Role: openai.ChatMessageRoleUser, Content: "ping"}},
+	})
+	require.NoError(t, err)
+	assert.True(t, doer.called, "the custom doer must still perform the request")
 }
 
 func TestAPIError(t *testing.T) {

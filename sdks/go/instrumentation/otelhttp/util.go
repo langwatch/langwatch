@@ -37,6 +37,12 @@ func ParseBody(raw []byte) (JSONObject, bool) {
 	if err := json.Unmarshal(raw, &data); err != nil {
 		return nil, false
 	}
+	// A literal `null` unmarshals without error and leaves the map nil. It is not
+	// a JSON object, and reporting success would let the shape sniffers read zero
+	// values out of a nil map and pick the wrong extractor.
+	if data == nil {
+		return nil, false
+	}
 	return data, true
 }
 
@@ -79,6 +85,21 @@ func GetInt(data JSONObject, key string) (int, bool) {
 	return v, ok
 }
 
+// GetInt64 safely extracts a 64-bit integer field. Use this rather than GetInt
+// for wire values that can exceed the int32 range — nanosecond durations, byte
+// counts — because Go's int is 32-bit on GOARCH=386 and 32-bit ARM, where GetInt
+// would silently truncate.
+func GetInt64(data JSONObject, key string) (int64, bool) {
+	if v, ok := data[key].(float64); ok {
+		return int64(v), true
+	}
+	if v, ok := data[key].(int64); ok {
+		return v, true
+	}
+	v, ok := data[key].(int)
+	return int64(v), ok
+}
+
 // GetFloat64 safely extracts a float field.
 func GetFloat64(data JSONObject, key string) (float64, bool) {
 	v, ok := data[key].(float64)
@@ -86,14 +107,17 @@ func GetFloat64(data JSONObject, key string) (float64, bool) {
 }
 
 // RequestStreams reports whether a request body asked for a streamed response
-// (a top-level "stream": true).
+// (a top-level "stream": true). This runs on every traced request, so it probes
+// the one field rather than decoding a whole multi-message chat payload into a
+// map, the same way PeekObjectField does.
 func RequestStreams(raw []byte) bool {
-	body, ok := ParseBody(raw)
-	if !ok {
+	var probe struct {
+		Stream bool `json:"stream"`
+	}
+	if err := json.Unmarshal(raw, &probe); err != nil {
 		return false
 	}
-	v, ok := GetBool(body, "stream")
-	return ok && v
+	return probe.Stream
 }
 
 // SetJSONAttribute marshals data to JSON and records it as a string attribute,

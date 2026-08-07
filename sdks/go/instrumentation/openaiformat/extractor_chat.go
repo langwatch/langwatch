@@ -75,6 +75,23 @@ func (ChatExtractor) ExtractRequest(span *langwatch.Span, raw []byte, capture la
 		span.SetName("chat." + req.Model)
 	}
 
+	span.SetGenAIRequestParams(chatRequestParams(req))
+
+	if len(req.Tools) > 0 {
+		otelhttp.SetJSONAttribute(span, string(langwatch.AttributeGenAIRequestTools), json.RawMessage(req.Tools))
+	}
+
+	if capture.CaptureInput() {
+		recordChatInput(span, req)
+	}
+
+	return req.Stream
+}
+
+// chatRequestParams maps the sampling/decoding fields of a chat or legacy
+// completions request onto the LangWatch request params. Absent wire fields stay
+// unset so they are not recorded.
+func chatRequestParams(req chatRequest) langwatch.GenAIRequestParams {
 	reqParams := langwatch.GenAIRequestParams{}
 	if req.Temperature != nil {
 		reqParams.Temperature = req.Temperature
@@ -106,17 +123,7 @@ func (ChatExtractor) ExtractRequest(span *langwatch.Span, raw []byte, capture la
 	if stop := stopSequences(req.Stop); len(stop) > 0 {
 		reqParams.StopSequences = stop
 	}
-	span.SetGenAIRequestParams(reqParams)
-
-	if len(req.Tools) > 0 {
-		otelhttp.SetJSONAttribute(span, string(langwatch.AttributeGenAIRequestTools), json.RawMessage(req.Tools))
-	}
-
-	if capture.CaptureInput() {
-		recordChatInput(span, req)
-	}
-
-	return req.Stream
+	return reqParams
 }
 
 // recordChatInput records the request input as chat messages (chat completions)
@@ -140,19 +147,45 @@ func recordChatInput(span *langwatch.Span, req chatRequest) {
 
 // chatResponse is the subset of an OpenAI chat/legacy-completions response we read.
 type chatResponse struct {
-	ID                string `json:"id"`
-	Model             string `json:"model"`
-	SystemFingerprint string `json:"system_fingerprint"`
-	Choices           []struct {
-		FinishReason string `json:"finish_reason"`
-		Message      struct {
-			Content   string             `json:"content"`
-			ToolCalls []chatRespToolCall `json:"tool_calls"`
-		} `json:"message"`
-		// Legacy text completions carry the text directly on the choice.
-		Text string `json:"text"`
-	} `json:"choices"`
-	Usage *usagePayload `json:"usage"`
+	ID                string        `json:"id"`
+	Model             string        `json:"model"`
+	SystemFingerprint string        `json:"system_fingerprint"`
+	Choices           []chatChoice  `json:"choices"`
+	Usage             *usagePayload `json:"usage"`
+}
+
+// chatChoice is a single candidate of a chat/legacy-completions response. With
+// n > 1 the response carries several, each an independent candidate.
+type chatChoice struct {
+	FinishReason string `json:"finish_reason"`
+	Message      struct {
+		Content   string             `json:"content"`
+		ToolCalls []chatRespToolCall `json:"tool_calls"`
+	} `json:"message"`
+	// Legacy text completions carry the text directly on the choice.
+	Text string `json:"text"`
+}
+
+// toChatMessage maps a chat choice onto its assistant message, keeping the
+// choice's tool calls attached to it. ok is false when the choice carries no
+// chat content at all — a legacy /completions choice (whose answer is on Text)
+// or an empty candidate — so the caller records nothing for it.
+func (c chatChoice) toChatMessage() (langwatch.ChatMessage, bool) {
+	if len(c.Message.ToolCalls) == 0 {
+		if c.Message.Content == "" {
+			return langwatch.ChatMessage{}, false
+		}
+		return langwatch.TextMessage(langwatch.ChatRoleAssistant, c.Message.Content), true
+	}
+	toolCalls := make([]langwatch.ToolCall, 0, len(c.Message.ToolCalls))
+	for _, tc := range c.Message.ToolCalls {
+		toolCalls = append(toolCalls, tc.toLangwatch())
+	}
+	return langwatch.ChatMessage{
+		Role:      langwatch.ChatRoleAssistant,
+		Content:   c.Message.Content,
+		ToolCalls: toolCalls,
+	}, true
 }
 
 // chatRespToolCall is a single tool call in an OpenAI chat response message.
@@ -197,37 +230,26 @@ func (ChatExtractor) ExtractNonStreaming(span *langwatch.Span, raw []byte, captu
 	recordUsage(span, resp.Usage)
 
 	var finishReasons []string
-	// chatOutput accumulates chat-completion assistant message content; legacyText
-	// accumulates the legacy /completions answer carried directly on the choice.
-	// They route to different sinks: chat content is gen_ai-native chat output,
-	// while the legacy completions answer is arbitrary (non-chat) output text.
-	var chatOutput strings.Builder
+	// chatMessages holds one assistant message per choice, so an n > 1 response
+	// keeps its candidates distinct and each candidate keeps its own tool calls.
+	// legacyText accumulates the legacy /completions answer carried directly on
+	// the choice: that is arbitrary (non-chat) output text, a different sink.
+	var chatMessages []langwatch.ChatMessage
 	var legacyText strings.Builder
-	var toolCalls []langwatch.ToolCall
 	for _, choice := range resp.Choices {
 		if choice.FinishReason != "" {
 			finishReasons = append(finishReasons, choice.FinishReason)
 		}
-		chatOutput.WriteString(choice.Message.Content)
-		legacyText.WriteString(choice.Text)
-		for _, tc := range choice.Message.ToolCalls {
-			toolCalls = append(toolCalls, tc.toLangwatch())
+		if msg, ok := choice.toChatMessage(); ok {
+			chatMessages = append(chatMessages, msg)
 		}
+		legacyText.WriteString(choice.Text)
 	}
 	span.SetGenAIResponseFinishReasons(finishReasons...)
 
 	if capture.CaptureOutput() {
-		// Record the chat-completion assistant response as gen_ai-native chat
-		// messages: structured when it carries tool calls (the common agent case),
-		// otherwise a single text assistant message.
-		if len(toolCalls) > 0 {
-			span.SetGenAIOutputMessages([]langwatch.ChatMessage{{
-				Role:      langwatch.ChatRoleAssistant,
-				Content:   chatOutput.String(),
-				ToolCalls: toolCalls,
-			}})
-		} else if chatOutput.Len() > 0 {
-			span.SetGenAIOutputMessages([]langwatch.ChatMessage{langwatch.TextMessage(langwatch.ChatRoleAssistant, chatOutput.String())})
+		if len(chatMessages) > 0 {
+			span.SetGenAIOutputMessages(chatMessages)
 		}
 		// The legacy /completions answer is not a chat message; record it as
 		// arbitrary output text.
@@ -241,169 +263,5 @@ func (ChatExtractor) NewStreamAccumulator() otelhttp.StreamAccumulator {
 	return &chatStreamAccumulator{}
 }
 
-// chatStreamAccumulator reconstructs a Chat Completions stream. Each chunk is a
-// "chat.completion.chunk" carrying choices[].delta.content; the stream is
-// terminated by a "[DONE]" sentinel and usage (when requested via
-// stream_options.include_usage) arrives in the final chunk.
-type chatStreamAccumulator struct {
-	id                string
-	model             string
-	systemFingerprint string
-	finishReasons     []string
-	// output accumulates chat-completion delta content (gen_ai-native chat output);
-	// legacyText accumulates the legacy /completions streamed answer (non-chat).
-	output     strings.Builder
-	legacyText strings.Builder
-	usage      langwatch.GenAIUsage
-	// toolCalls accumulates streamed tool-call fragments keyed by their delta
-	// index; toolCallOrder preserves first-seen order for deterministic output.
-	toolCalls     map[int]*streamToolCall
-	toolCallOrder []int
-}
-
-// streamToolCall accumulates the fragments of a single streamed tool call. The
-// id/type/name arrive once; the function arguments are streamed incrementally.
-type streamToolCall struct {
-	id   string
-	typ  string
-	name string
-	args strings.Builder
-}
-
-func (a *chatStreamAccumulator) IsTerminal(dataLine string) bool {
-	return dataLine == "[DONE]"
-}
-
-func (a *chatStreamAccumulator) Consume(dataLine string) {
-	var chunk struct {
-		ID                string `json:"id"`
-		Model             string `json:"model"`
-		SystemFingerprint string `json:"system_fingerprint"`
-		Choices           []struct {
-			Delta struct {
-				Content   string `json:"content"`
-				ToolCalls []struct {
-					Index    int    `json:"index"`
-					ID       string `json:"id"`
-					Type     string `json:"type"`
-					Function struct {
-						Name      string `json:"name"`
-						Arguments string `json:"arguments"`
-					} `json:"function"`
-				} `json:"tool_calls"`
-			} `json:"delta"`
-			// Legacy streamed text completions carry text on the choice.
-			Text         string `json:"text"`
-			FinishReason string `json:"finish_reason"`
-		} `json:"choices"`
-		Usage *usagePayload `json:"usage"`
-	}
-	if err := json.Unmarshal([]byte(dataLine), &chunk); err != nil {
-		return
-	}
-
-	if a.id == "" && chunk.ID != "" {
-		a.id = chunk.ID
-	}
-	if a.model == "" && chunk.Model != "" {
-		a.model = chunk.Model
-	}
-	if a.systemFingerprint == "" && chunk.SystemFingerprint != "" {
-		a.systemFingerprint = chunk.SystemFingerprint
-	}
-
-	for _, choice := range chunk.Choices {
-		a.output.WriteString(choice.Delta.Content)
-		a.legacyText.WriteString(choice.Text)
-		if choice.FinishReason != "" {
-			a.finishReasons = append(a.finishReasons, choice.FinishReason)
-		}
-		for _, tc := range choice.Delta.ToolCalls {
-			acc := a.toolCallAt(tc.Index)
-			if tc.ID != "" {
-				acc.id = tc.ID
-			}
-			if tc.Type != "" {
-				acc.typ = tc.Type
-			}
-			if tc.Function.Name != "" {
-				acc.name = tc.Function.Name
-			}
-			acc.args.WriteString(tc.Function.Arguments)
-		}
-	}
-
-	if chunk.Usage != nil {
-		mergeUsage(&a.usage, chunk.Usage)
-	}
-}
-
-// toolCallAt returns the accumulator for the streamed tool call at index,
-// creating it (and remembering its order) on first sight.
-func (a *chatStreamAccumulator) toolCallAt(index int) *streamToolCall {
-	if a.toolCalls == nil {
-		a.toolCalls = make(map[int]*streamToolCall)
-	}
-	acc, ok := a.toolCalls[index]
-	if !ok {
-		acc = &streamToolCall{}
-		a.toolCalls[index] = acc
-		a.toolCallOrder = append(a.toolCallOrder, index)
-	}
-	return acc
-}
-
-// assembledToolCalls renders the accumulated streamed tool calls into LangWatch
-// ToolCalls, in first-seen order.
-func (a *chatStreamAccumulator) assembledToolCalls() []langwatch.ToolCall {
-	if len(a.toolCallOrder) == 0 {
-		return nil
-	}
-	out := make([]langwatch.ToolCall, 0, len(a.toolCallOrder))
-	for _, index := range a.toolCallOrder {
-		tc := a.toolCalls[index]
-		out = append(out, langwatch.ToolCall{
-			ID:   tc.id,
-			Type: tc.typ,
-			Function: langwatch.FunctionCall{
-				Name:      tc.name,
-				Arguments: tc.args.String(),
-			},
-		})
-	}
-	return out
-}
-
-func (a *chatStreamAccumulator) Finish(span *langwatch.Span, capture langwatch.DataCaptureMode) {
-	if a.id != "" {
-		span.SetAttributes(semconv.GenAIResponseID(a.id))
-	}
-	if a.model != "" {
-		span.SetResponseModel(a.model)
-	}
-	if a.systemFingerprint != "" {
-		span.SetAttributes(semconv.OpenAIResponseSystemFingerprint(a.systemFingerprint))
-	}
-	span.SetGenAIResponseFinishReasons(dedupe(a.finishReasons)...)
-	span.SetGenAIUsage(a.usage)
-
-	if capture.CaptureOutput() {
-		// Record the chat-completion response as gen_ai-native chat messages:
-		// structured when tool calls were streamed (the common agent case),
-		// otherwise a single text assistant message.
-		if toolCalls := a.assembledToolCalls(); len(toolCalls) > 0 {
-			span.SetGenAIOutputMessages([]langwatch.ChatMessage{{
-				Role:      langwatch.ChatRoleAssistant,
-				Content:   a.output.String(),
-				ToolCalls: toolCalls,
-			}})
-		} else if a.output.Len() > 0 {
-			span.SetGenAIOutputMessages([]langwatch.ChatMessage{langwatch.TextMessage(langwatch.ChatRoleAssistant, a.output.String())})
-		}
-		// The legacy /completions streamed answer is not a chat message; record it
-		// as arbitrary output text.
-		if a.legacyText.Len() > 0 {
-			span.SetOutputText(a.legacyText.String())
-		}
-	}
-}
+// The streamed counterpart (chatStreamAccumulator and its helpers) lives in
+// extractor_chat_stream.go.

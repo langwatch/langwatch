@@ -59,9 +59,11 @@ func Middleware(opts ...Option) option.Middleware {
 	}
 }
 
-// operationAttrs derives gen_ai.operation.name from the Anthropic endpoint. The
-// Messages API is a chat operation; everything else is named after its path
-// segment so unknown endpoints still carry a useful operation attribute.
+// operationAttrs derives gen_ai.operation.name from the Anthropic endpoint. Only
+// the Messages API is mapped, to the semconv "chat" operation. Every other
+// endpoint is left without the attribute rather than deriving a value from its
+// path segment: gen_ai.operation.name is a closed semconv enum, and an invented
+// member would be worse than its absence.
 func operationAttrs(req *http.Request) []attribute.KeyValue {
 	if isMessagesPath(req.URL.Path) {
 		return []attribute.KeyValue{semconv.GenAIOperationNameChat}

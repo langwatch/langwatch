@@ -27,8 +27,8 @@ type responseCandidate struct {
 
 // recordResponse records the shared response attributes for both the
 // non-streaming body and the final streamed chunk: response id, model version,
-// usage (gen_ai.usage.* + langwatch.metrics), finish reasons and — gated by
-// capture — the output text.
+// usage (gen_ai.usage.*), finish reasons and — gated by capture — the output
+// text.
 func recordResponse(span *langwatch.Span, resp *generateContentResponse, capture langwatch.DataCaptureMode) {
 	if resp.ResponseID != "" {
 		span.SetAttributes(semconv.GenAIResponseID(resp.ResponseID))
@@ -194,7 +194,12 @@ func (a *generateContentStreamAccumulator) Finish(span *langwatch.Span, capture 
 		span.SetResponseModel(a.modelVersion)
 	}
 	recordUsage(span, a.usage)
-	span.SetGenAIResponseFinishReasons(dedupe(a.finishReasons)...)
+	// Guarded exactly as recordResponse guards it: a stream that ends without a
+	// finishReason (cancellation, truncation) must omit the attribute rather than
+	// record an empty slice, so both paths produce the same span shape.
+	if reasons := dedupe(a.finishReasons); len(reasons) > 0 {
+		span.SetGenAIResponseFinishReasons(reasons...)
+	}
 
 	if capture.CaptureOutput() {
 		// Record structured chat messages when functionCall parts were streamed

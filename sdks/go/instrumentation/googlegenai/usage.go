@@ -18,11 +18,11 @@ type usageMetadata struct {
 // toGenAIUsage maps a Gemini usageMetadata block onto the LangWatch GenAIUsage
 // helper, leaving fields nil (unrecorded) when the wire value is absent / zero.
 //
-//	promptTokenCount - cachedContentTokenCount -> InputTokens
-//	candidatesTokenCount                       -> OutputTokens
-//	totalTokenCount                            -> TotalTokens
-//	cachedContentTokenCount                    -> CachedInputTokens
-//	thoughtsTokenCount                         -> ReasoningTokens
+//	promptTokenCount - cachedContentTokenCount  -> InputTokens
+//	candidatesTokenCount + thoughtsTokenCount   -> OutputTokens
+//	totalTokenCount                             -> TotalTokens
+//	cachedContentTokenCount                     -> CachedInputTokens
+//	thoughtsTokenCount                          -> ReasoningTokens
 //
 // InputTokens carries the NON-CACHED input only. Gemini reports
 // cachedContentTokenCount as a subset of promptTokenCount, whereas LangWatch
@@ -32,6 +32,16 @@ type usageMetadata struct {
 // convention uniform across instrumentations. Reporting promptTokenCount as-is
 // would bill the cached tokens twice. TotalTokens is left as the provider's
 // reported total.
+//
+// OutputTokens carries the BILLABLE output, which on Gemini is the visible
+// candidates plus the reasoning ("thoughts") tokens. Gemini splits the two
+// (totalTokenCount = promptTokenCount + candidatesTokenCount +
+// thoughtsTokenCount), unlike OpenAI, whose completion_tokens already includes
+// reasoning_tokens as a nested detail. Google bills thoughts at the output
+// rate and LangWatch prices output from gen_ai.usage.output_tokens, so
+// candidatesTokenCount alone would under-report the cost of every thinking
+// call. ReasoningTokens still carries thoughtsTokenCount on its own, as the
+// informational subset — matching what the OpenAI mapping emits.
 func (u *usageMetadata) toGenAIUsage() langwatch.GenAIUsage {
 	usage := langwatch.GenAIUsage{}
 	if u == nil {
@@ -42,8 +52,8 @@ func (u *usageMetadata) toGenAIUsage() langwatch.GenAIUsage {
 	if nonCached := u.PromptTokenCount - u.CachedContentTokenCount; nonCached > 0 {
 		usage.InputTokens = langwatch.Int(nonCached)
 	}
-	if u.CandidatesTokenCount > 0 {
-		usage.OutputTokens = langwatch.Int(u.CandidatesTokenCount)
+	if billableOutput := u.CandidatesTokenCount + u.ThoughtsTokenCount; billableOutput > 0 {
+		usage.OutputTokens = langwatch.Int(billableOutput)
 	}
 	if u.TotalTokenCount > 0 {
 		usage.TotalTokens = langwatch.Int(u.TotalTokenCount)

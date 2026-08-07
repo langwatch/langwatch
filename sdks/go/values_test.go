@@ -178,6 +178,7 @@ func TestBinaryPart(t *testing.T) {
 		assert.Empty(t, part.ID)
 	})
 
+	// @scenario "A developer references an already-stored object"
 	t.Run("when built from a stored object id it references that id", func(t *testing.T) {
 		part := BinaryRefPart("application/pdf", "file-123")
 		assert.Equal(t, ChatContentTypeBinary, part.Type)
@@ -187,6 +188,7 @@ func TestBinaryPart(t *testing.T) {
 	})
 }
 
+// @scenario "A developer attaches an image to a message"
 func TestBinaryPartSerialization(t *testing.T) {
 	t.Run("a multimodal message marshals binary parts with the canonical shape", func(t *testing.T) {
 		msg := MultiContentMessage(ChatRoleUser,

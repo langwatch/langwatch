@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 
@@ -107,15 +108,20 @@ func TestDatasetsAllRecords(t *testing.T) {
 
 	t.Run("given the page size is left unset", func(t *testing.T) {
 		t.Run("when iterating", func(t *testing.T) {
+			var mu sync.Mutex
 			var gotLimit string
 			c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+				mu.Lock()
 				gotLimit = r.URL.Query().Get("limit")
+				mu.Unlock()
 				_, _ = w.Write([]byte(`{"data":[],"pagination":{"page":1,"limit":1000,"total":0}}`))
 			})
 
 			for range c.Datasets.AllRecords(context.Background(), "ds", ListDatasetsParams{}) {
 			}
 
+			mu.Lock()
+			defer mu.Unlock()
 			assert.Equal(t, "1000", gotLimit, "defaults the page size to the server maximum")
 		})
 	})
@@ -232,6 +238,7 @@ func TestProjectsAll(t *testing.T) {
 func TestTracesAll(t *testing.T) {
 	t.Run("given trace search results spanning three pages", func(t *testing.T) {
 		t.Run("when iterating by pageOffset", func(t *testing.T) {
+			var mu sync.Mutex
 			var offsets []int
 			c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 				assert.Equal(t, "/api/traces/search", r.URL.Path)
@@ -239,7 +246,9 @@ func TestTracesAll(t *testing.T) {
 				raw, _ := io.ReadAll(r.Body)
 				_ = json.Unmarshal(raw, &body)
 				off := int(body["pageOffset"].(float64))
+				mu.Lock()
 				offsets = append(offsets, off)
+				mu.Unlock()
 				assert.Equal(t, float64(2), body["pageSize"], "page size is carried on every request")
 
 				switch off {
@@ -260,7 +269,29 @@ func TestTracesAll(t *testing.T) {
 			}
 
 			assert.Equal(t, []string{"t0", "t1", "t2", "t3", "t4"}, ids, "yields every trace in order")
+			mu.Lock()
+			defer mu.Unlock()
 			assert.Equal(t, []int{0, 2, 4}, offsets, "advances pageOffset until a short page")
+		})
+	})
+
+	t.Run("given a scroll cursor is supplied", func(t *testing.T) {
+		t.Run("when auto-paginating", func(t *testing.T) {
+			var requests atomic.Int32
+			c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+				requests.Add(1)
+				_, _ = w.Write([]byte(`{"traces":[],"pagination":{"totalHits":0}}`))
+			})
+
+			var errs []error
+			for _, err := range c.Traces.All(context.Background(), TraceSearchParams{ScrollID: "cursor-1"}) {
+				errs = append(errs, err)
+			}
+
+			require.Len(t, errs, 1, "one (zero, err) pair, then it stops")
+			require.Error(t, errs[0])
+			assert.Equal(t, int32(0), requests.Load(),
+				"a scroll cursor is rejected before any request is sent")
 		})
 	})
 
@@ -290,10 +321,13 @@ func TestTracesAll(t *testing.T) {
 func TestScenariosAllRuns(t *testing.T) {
 	t.Run("given cursor-paginated runs across three pages", func(t *testing.T) {
 		t.Run("when iterating", func(t *testing.T) {
+			var mu sync.Mutex
 			var cursors []string
 			c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 				cur := r.URL.Query().Get("cursor")
+				mu.Lock()
 				cursors = append(cursors, cur)
+				mu.Unlock()
 				switch cur {
 				case "":
 					_, _ = w.Write([]byte(`{"runs":[{"id":"r0"}],"hasMore":true,"nextCursor":"c1"}`))
@@ -311,6 +345,8 @@ func TestScenariosAllRuns(t *testing.T) {
 			}
 
 			assert.Equal(t, []string{"r0", "r1", "r2"}, ids, "yields every run in order")
+			mu.Lock()
+			defer mu.Unlock()
 			assert.Equal(t, []string{"", "c1", "c2"}, cursors, "advances by NextCursor then stops")
 		})
 	})

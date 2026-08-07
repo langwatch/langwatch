@@ -2,6 +2,7 @@ package googlegenai
 
 import (
 	"strings"
+	"unicode"
 
 	"go.opentelemetry.io/otel/attribute"
 	semconv "go.opentelemetry.io/otel/semconv/v1.41.0"
@@ -79,6 +80,9 @@ func operationAttrs(urlPath string) []attribute.KeyValue {
 // operationName maps a Gemini action verb to a gen_ai.operation.name value. Both
 // generateContent and streamGenerateContent map to "generate_content", the
 // OTel-semconv operation for Gemini's multimodal content generation.
+//
+// semconv v1.41.0 has no constant for token counting, so "count_tokens" is
+// spelled out; every other mapped value comes from a typed constant.
 func operationName(action string) string {
 	switch action {
 	case "generateContent", "streamGenerateContent":
@@ -90,6 +94,34 @@ func operationName(action string) string {
 	case "":
 		return ""
 	default:
-		return action
+		// gen_ai.operation.name values are snake_case in semconv, while Gemini's
+		// URL verbs are camelCase. An unmapped verb (predict, streamRawPredict, …)
+		// is normalised so it still groups with the Python and TypeScript spans
+		// for the same operation instead of landing verbatim.
+		return snakeCase(action)
 	}
+}
+
+// snakeCase converts a camelCase Gemini action verb to the snake_case form
+// gen_ai.operation.name uses ("streamRawPredict" -> "stream_raw_predict"). Runs
+// of capitals are kept together ("countTokensV2" -> "count_tokens_v2").
+func snakeCase(s string) string {
+	var b strings.Builder
+	b.Grow(len(s) + 4)
+	runes := []rune(s)
+	for i, r := range runes {
+		if !unicode.IsUpper(r) {
+			b.WriteRune(r)
+			continue
+		}
+		// A boundary is a lower/digit -> upper transition, or the last upper of a
+		// run followed by a lower ("RawPredict" -> "raw_predict", not "r_a_w…").
+		prevIsLower := i > 0 && !unicode.IsUpper(runes[i-1])
+		nextIsLower := i+1 < len(runes) && unicode.IsLower(runes[i+1])
+		if i > 0 && (prevIsLower || nextIsLower) {
+			b.WriteByte('_')
+		}
+		b.WriteRune(unicode.ToLower(r))
+	}
+	return b.String()
 }

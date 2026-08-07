@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -14,15 +15,22 @@ import (
 func TestDatasets(t *testing.T) {
 	t.Run("given a paginated dataset list", func(t *testing.T) {
 		t.Run("when listing", func(t *testing.T) {
+			// httptest runs the handler on its own goroutine, so anything it
+			// captures is written and read back under mu.
+			var mu sync.Mutex
 			var gotQuery string
 			c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 				assert.Equal(t, "/api/dataset", r.URL.Path)
+				mu.Lock()
 				gotQuery = r.URL.Query().Encode()
+				mu.Unlock()
 				_, _ = w.Write([]byte(`{"data":[{"id":"ds_1","slug":"golden","name":"Golden"}],"pagination":{"page":1,"limit":50,"total":1}}`))
 			})
 
 			items, pg, err := c.Datasets.List(context.Background(), ListDatasetsParams{Page: 1, Limit: 50})
 			require.NoError(t, err)
+			mu.Lock()
+			defer mu.Unlock()
 			assert.Contains(t, gotQuery, "page=1")
 			assert.Contains(t, gotQuery, "limit=50")
 			require.Len(t, items, 1)
@@ -36,18 +44,23 @@ func TestDatasets(t *testing.T) {
 
 	t.Run("given a dataset", func(t *testing.T) {
 		t.Run("when creating records", func(t *testing.T) {
+			var mu sync.Mutex
 			var gotBody map[string]any
 			c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 				assert.Equal(t, http.MethodPost, r.Method)
 				assert.Equal(t, "/api/dataset/golden/records", r.URL.Path)
 				raw, _ := io.ReadAll(r.Body)
+				mu.Lock()
 				_ = json.Unmarshal(raw, &gotBody)
+				mu.Unlock()
 				_, _ = w.Write([]byte(`{"success":true}`))
 			})
 			_, err := c.Datasets.CreateRecords(context.Background(), "golden", []map[string]any{
 				{"input": "hi"},
 			})
 			require.NoError(t, err)
+			mu.Lock()
+			defer mu.Unlock()
 			assert.Contains(t, gotBody, "entries")
 		})
 	})
@@ -56,12 +69,15 @@ func TestDatasets(t *testing.T) {
 func TestTraces(t *testing.T) {
 	t.Run("given a trace search", func(t *testing.T) {
 		t.Run("when searching", func(t *testing.T) {
+			var mu sync.Mutex
 			var gotBody map[string]any
 			c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 				assert.Equal(t, http.MethodPost, r.Method)
 				assert.Equal(t, "/api/traces/search", r.URL.Path)
 				raw, _ := io.ReadAll(r.Body)
+				mu.Lock()
 				_ = json.Unmarshal(raw, &gotBody)
+				mu.Unlock()
 				_, _ = w.Write([]byte(`{"traces":[{"trace_id":"trace_1"}],"pagination":{"page":1,"limit":10,"total":1}}`))
 			})
 
@@ -70,6 +86,8 @@ func TestTraces(t *testing.T) {
 				Filters: map[string][]string{"metadata.user_id": {"u_1"}},
 			})
 			require.NoError(t, err)
+			mu.Lock()
+			defer mu.Unlock()
 			assert.Equal(t, "timeout", gotBody["query"])
 			require.NotNil(t, res.Traces)
 			require.Len(t, *res.Traces, 1)
@@ -79,14 +97,19 @@ func TestTraces(t *testing.T) {
 
 	t.Run("given a trace get", func(t *testing.T) {
 		t.Run("when fetching by id", func(t *testing.T) {
+			var mu sync.Mutex
 			var gotQuery string
 			c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 				assert.Equal(t, "/api/traces/trace_1", r.URL.Path)
+				mu.Lock()
 				gotQuery = r.URL.Query().Encode()
+				mu.Unlock()
 				_, _ = w.Write([]byte(`{"trace_id":"trace_1","project_id":"p1"}`))
 			})
 			tr, err := c.Traces.Get(context.Background(), "trace_1")
 			require.NoError(t, err)
+			mu.Lock()
+			defer mu.Unlock()
 			assert.Contains(t, gotQuery, "format=json")
 			require.NotNil(t, tr.TraceId)
 			assert.Equal(t, "trace_1", *tr.TraceId)
@@ -97,12 +120,15 @@ func TestTraces(t *testing.T) {
 func TestAnnotations(t *testing.T) {
 	t.Run("given a trace", func(t *testing.T) {
 		t.Run("when creating an annotation", func(t *testing.T) {
+			var mu sync.Mutex
 			var gotBody map[string]any
 			c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 				assert.Equal(t, http.MethodPost, r.Method)
 				assert.Equal(t, "/api/annotations/trace/trace_1", r.URL.Path)
 				raw, _ := io.ReadAll(r.Body)
+				mu.Lock()
 				_ = json.Unmarshal(raw, &gotBody)
+				mu.Unlock()
 				_, _ = w.Write([]byte(`{"id":"ann_1","traceId":"trace_1","comment":"Great","isThumbsUp":true}`))
 			})
 
@@ -112,6 +138,8 @@ func TestAnnotations(t *testing.T) {
 				IsThumbsUp: &up,
 			})
 			require.NoError(t, err)
+			mu.Lock()
+			defer mu.Unlock()
 			assert.Equal(t, "Great", gotBody["comment"])
 			assert.Equal(t, true, gotBody["isThumbsUp"])
 			require.NotNil(t, a.Id)
@@ -150,16 +178,21 @@ func TestTriggersService(t *testing.T) {
 func TestMonitorsService(t *testing.T) {
 	t.Run("given a monitor", func(t *testing.T) {
 		t.Run("when toggling", func(t *testing.T) {
+			var mu sync.Mutex
 			var gotBody map[string]any
 			c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 				assert.Equal(t, http.MethodPost, r.Method)
 				assert.Equal(t, "/api/monitors/mon_1/toggle", r.URL.Path)
 				raw, _ := io.ReadAll(r.Body)
+				mu.Lock()
 				_ = json.Unmarshal(raw, &gotBody)
+				mu.Unlock()
 				_, _ = w.Write([]byte(`{"success":true}`))
 			})
 			_, err := c.Monitors.Toggle(context.Background(), "mon_1", false)
 			require.NoError(t, err)
+			mu.Lock()
+			defer mu.Unlock()
 			assert.Equal(t, false, gotBody["enabled"])
 		})
 
@@ -178,15 +211,20 @@ func TestMonitorsService(t *testing.T) {
 func TestScenariosService(t *testing.T) {
 	t.Run("given cursor-paginated simulation runs", func(t *testing.T) {
 		t.Run("when listing runs", func(t *testing.T) {
+			var mu sync.Mutex
 			var gotQuery string
 			c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 				assert.Equal(t, "/api/simulation-runs", r.URL.Path)
+				mu.Lock()
 				gotQuery = r.URL.Query().Encode()
+				mu.Unlock()
 				_, _ = w.Write([]byte(`{"runs":[{"scenarioRunId":"sr_1"}],"hasMore":true,"nextCursor":"cur_2"}`))
 			})
 
 			page, err := c.Scenarios.ListRuns(context.Background(), SimulationRunsParams{Limit: 25, Cursor: "cur_1"})
 			require.NoError(t, err)
+			mu.Lock()
+			defer mu.Unlock()
 			assert.Contains(t, gotQuery, "limit=25")
 			assert.Contains(t, gotQuery, "cursor=cur_1")
 			require.Len(t, page.Runs, 1)

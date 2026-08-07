@@ -21,7 +21,7 @@ adds negligible latency and memory.
 Unlike OpenAI and Anthropic, the Gemini REST API encodes the **model** and the
 **action** in the URL path rather than the request body:
 
-```
+```text
 POST /v1beta/models/gemini-2.5-flash:generateContent
 POST /v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse
 POST /v1beta1/projects/{p}/locations/{l}/publishers/google/models/gemini-2.5-flash:generateContent   (Vertex)

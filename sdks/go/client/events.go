@@ -67,10 +67,19 @@ func (s *EventsService) Track(ctx context.Context, traceID string, event Event) 
 		return fmt.Errorf("langwatch: Events.Track: event Type is required")
 	}
 
+	// The server schema types metrics as a required record of numbers, so a nil
+	// map — which marshals to "metrics": null — is rejected. An event with no
+	// metrics is legitimate, so normalise nil to an empty object here rather
+	// than making the caller remember.
+	metrics := event.Metrics
+	if metrics == nil {
+		metrics = map[string]float64{}
+	}
+
 	body := trackEventRequest{
 		TraceID:      traceID,
 		EventType:    event.Type,
-		Metrics:      event.Metrics,
+		Metrics:      metrics,
 		EventDetails: event.Details,
 	}
 

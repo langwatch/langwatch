@@ -2,7 +2,12 @@ package client
 
 import (
 	"context"
+	"io"
+	"math/rand"
 	"net/http"
+	"net/http/httptest"
+	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -107,15 +112,23 @@ func TestRetry(t *testing.T) {
 		})
 	})
 
-	t.Run("given a retried request with a body", func(t *testing.T) {
+	t.Run("given a retried idempotent request with a body", func(t *testing.T) {
 		t.Run("when the first attempt fails", func(t *testing.T) {
+			// PUT is idempotent, so it is retried — and its body must be replayed
+			// byte-for-byte.
 			var calls int32
+			var mu sync.Mutex
 			var bodies []string
 			c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 				n := atomic.AddInt32(&calls, 1)
-				buf := make([]byte, r.ContentLength)
-				_, _ = r.Body.Read(buf)
-				bodies = append(bodies, string(buf))
+				// Read the body to completion: io.Reader.Read returns at most
+				// len(p) bytes, so a single Read can record a prefix and make two
+				// different bodies compare equal.
+				raw, readErr := io.ReadAll(r.Body)
+				assert.NoError(t, readErr)
+				mu.Lock()
+				bodies = append(bodies, string(raw))
+				mu.Unlock()
 				if n == 1 {
 					w.WriteHeader(http.StatusServiceUnavailable)
 					return
@@ -126,11 +139,100 @@ func TestRetry(t *testing.T) {
 				WithRetryWaitMax(5*time.Millisecond),
 			)
 
-			_, err := c.Prompts.Create(context.Background(), CreatePromptParams{Handle: "h"})
+			_, err := c.Prompts.Update(context.Background(), "h", UpdatePromptParams{CommitMessage: "msg"})
 			require.NoError(t, err)
+			mu.Lock()
+			defer mu.Unlock()
 			require.Len(t, bodies, 2)
 			assert.Equal(t, bodies[0], bodies[1], "request body is replayed identically on retry")
 		})
+	})
+
+	t.Run("given a POST without an idempotency key", func(t *testing.T) {
+		t.Run("when the first attempt fails with 503", func(t *testing.T) {
+			// A server can complete a create and still fail to deliver the
+			// response. Replaying it would mint a second prompt version, so an
+			// unprotected POST is attempted exactly once.
+			var calls int32
+			c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+				atomic.AddInt32(&calls, 1)
+				w.WriteHeader(http.StatusServiceUnavailable)
+			},
+				WithMaxRetries(3),
+				WithRetryWaitMax(5*time.Millisecond),
+			)
+
+			_, err := c.Prompts.Create(context.Background(), CreatePromptParams{Handle: "h"})
+			require.Error(t, err)
+			assert.Equal(t, int32(1), atomic.LoadInt32(&calls),
+				"a non-idempotent write is not replayed")
+			assert.True(t, hasStatus(err, http.StatusServiceUnavailable))
+		})
+	})
+
+	t.Run("given a POST carrying an idempotency key", func(t *testing.T) {
+		t.Run("when the first attempt fails with 503", func(t *testing.T) {
+			// The key lets the server collapse the replay onto the original write,
+			// so retrying is safe. Exercised at the transport directly because no
+			// generated operation sets the header for us.
+			var calls int32
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if atomic.AddInt32(&calls, 1) == 1 {
+					w.WriteHeader(http.StatusServiceUnavailable)
+					return
+				}
+				_, _ = w.Write([]byte(`{}`))
+			}))
+			defer srv.Close()
+
+			d := &retryingDoer{
+				inner:        srv.Client(),
+				maxRetries:   2,
+				retryWaitMin: time.Millisecond,
+				retryWaitMax: 5 * time.Millisecond,
+				rand:         rand.New(rand.NewSource(1)),
+			}
+			req, err := http.NewRequestWithContext(context.Background(),
+				http.MethodPost, srv.URL, strings.NewReader(`{"handle":"h"}`))
+			require.NoError(t, err)
+			req.Header.Set(idempotencyKeyHeader, "key-123")
+
+			resp, err := d.Do(req)
+			require.NoError(t, err)
+			defer func() { _ = resp.Body.Close() }()
+
+			assert.Equal(t, http.StatusOK, resp.StatusCode)
+			assert.Equal(t, int32(2), atomic.LoadInt32(&calls),
+				"an idempotency-keyed write is retried")
+		})
+	})
+}
+
+func TestIsRetryableRequest(t *testing.T) {
+	t.Run("given an idempotent method", func(t *testing.T) {
+		for _, method := range []string{
+			http.MethodGet, http.MethodHead, http.MethodOptions,
+			http.MethodTrace, http.MethodPut, http.MethodDelete,
+		} {
+			req, err := http.NewRequest(method, "https://example.test/x", nil)
+			require.NoError(t, err)
+			assert.True(t, isRetryableRequest(req), method)
+		}
+	})
+
+	t.Run("given a non-idempotent method without a key", func(t *testing.T) {
+		for _, method := range []string{http.MethodPost, http.MethodPatch} {
+			req, err := http.NewRequest(method, "https://example.test/x", nil)
+			require.NoError(t, err)
+			assert.False(t, isRetryableRequest(req), method)
+		}
+	})
+
+	t.Run("given a non-idempotent method with a key", func(t *testing.T) {
+		req, err := http.NewRequest(http.MethodPost, "https://example.test/x", nil)
+		require.NoError(t, err)
+		req.Header.Set(idempotencyKeyHeader, "key-123")
+		assert.True(t, isRetryableRequest(req))
 	})
 }
 

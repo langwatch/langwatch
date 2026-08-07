@@ -2,6 +2,7 @@ package client
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/langwatch/langwatch/sdks/go/client/internal/openapi"
 )
@@ -52,11 +53,17 @@ func (s *PromptsService) List(ctx context.Context) ([]Prompt, error) {
 //	// Resolve a tag:
 //	p, err := lw.Prompts.Get(ctx, "support-greeting", &client.GetPromptOptions{Tag: "production"})
 //
+// Version and Tag are mutually exclusive — a tag already resolves to a version —
+// so setting both returns an error without sending a request.
+//
 // A missing prompt yields an [*APIError] with status 404; use [IsNotFound] to
 // detect it, or [PromptsService.Exists] for a boolean check.
 func (s *PromptsService) Get(ctx context.Context, handleOrID string, opts *GetPromptOptions) (*Prompt, error) {
 	params := &openapi.GetApiPromptsByIdParams{}
 	if opts != nil {
+		if opts.Version > 0 && opts.Tag != "" {
+			return nil, fmt.Errorf("langwatch: Prompts.Get: Version and Tag are mutually exclusive")
+		}
 		if opts.Version > 0 {
 			v := opts.Version
 			params.Version = &v

@@ -8,16 +8,18 @@
 # go.mod and exercises it independently.
 #
 # Usage: ./test-all.sh [extra go test flags...]   e.g. ./test-all.sh -race
+# No `-e`: a failing module must not abort the run, the loop aggregates into
+# $fail and reports every module. The one thing that must abort is failing to
+# reach the SDK root, or the find below walks the wrong tree.
 set -uo pipefail
-cd "$(dirname "$0")"
+cd "$(dirname "$0")" || { echo "✗ cannot enter $(dirname "$0")"; exit 1; }
 
-extra_flags="$*"
 fail=0
 
-# Core first, then instrumentation modules, then examples/e2e.
-modules=$(find . -name go.mod -not -path '*/vendor/*' | sed 's#/go.mod$##' | sort)
-
-for dir in $modules; do
+# Core first — "." sorts ahead of every "./…" subdirectory — then the remaining
+# modules in path order. Read line by line so a path containing a space is one
+# module, not two; the loop body must stay in this shell so $fail survives it.
+while IFS= read -r dir; do
   echo "──────────────────────────────────────────────────────────"
   echo "▶ $dir"
   echo "──────────────────────────────────────────────────────────"
@@ -26,11 +28,14 @@ for dir in $modules; do
     # `go vet` compiles every package (incl. main) so it doubles as the build
     # check, without `go build ./...` writing stray binaries for single-main
     # modules (e.g. examples/filtering).
+    #
+    # "$@" forwards this script's own arguments, so a flag carrying a space
+    # stays one argument.
     go vet ./... &&
-      go test -count=1 $extra_flags ./... &&
-      { test -z "$(gofmt -l . | grep -v 'prompts/prompts.go')" || { echo "gofmt issues:"; gofmt -l .; exit 1; }; }
+      go test -count=1 "$@" ./... &&
+      { test -z "$(gofmt -l .)" || { echo "gofmt issues:"; gofmt -l .; exit 1; }; }
   ) || { echo "✗ FAILED: $dir"; fail=1; }
-done
+done < <(find . -name go.mod -not -path '*/vendor/*' | sed 's#/go.mod$##' | sort)
 
 echo "──────────────────────────────────────────────────────────"
 if [ "$fail" -eq 0 ]; then

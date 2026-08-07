@@ -2,6 +2,7 @@ package genkit
 
 import (
 	"context"
+	"runtime/debug"
 	"testing"
 
 	"github.com/firebase/genkit/go/core/tracing"
@@ -88,18 +89,50 @@ func TestRegisterLangWatch(t *testing.T) {
 				"the registered processor received the Genkit span, proving it is wired to Genkit's tracer provider")
 		})
 	})
+
+	t.Run("when called twice", func(t *testing.T) {
+		t.Run("each Genkit span is exported to LangWatch exactly once", func(t *testing.T) {
+			g := newGenkit(t)
+
+			// Two registrations of processors feeding the SAME exporter. OTel
+			// dispatches an ended span to every registered processor, so if the
+			// second call stacked a processor onto the first, the exporter would
+			// see the span twice.
+			exp := tracetest.NewInMemoryExporter()
+			require.NoError(t, RegisterLangWatch(g, WithSpanProcessor(sdktrace.NewSimpleSpanProcessor(exp))))
+			require.NoError(t, RegisterLangWatch(g, WithSpanProcessor(sdktrace.NewSimpleSpanProcessor(exp))))
+
+			_, err := tracing.RunInNewSpan(
+				context.Background(),
+				&tracing.SpanMetadata{Name: "lw-double-registration-probe", Type: "flowStep"},
+				nil,
+				func(context.Context, any) (any, error) { return nil, nil },
+			)
+			require.NoError(t, err)
+
+			exports := 0
+			for _, s := range exp.GetSpans() {
+				if s.Name == "lw-double-registration-probe" {
+					exports++
+				}
+			}
+			assert.Equal(t, 1, exports, "a second RegisterLangWatch must replace the first, not double-export")
+		})
+	})
 }
 
 // newGenkit initializes a real *genkit.Genkit offline. genkit.Init only starts
 // the reflection server when GENKIT_ENV=dev; the default (prod) environment
-// needs no network or plugins. If a future Genkit version makes Init require
-// connectivity, this skips rather than failing the suite.
+// needs no network or plugins, so a panic here is a genuine regression — a
+// Genkit upgrade that made Init require connectivity would change what this
+// package can promise. Fail loudly rather than skipping, which would let that
+// regression pass as a green run.
 func newGenkit(t *testing.T) *genkit.Genkit {
 	t.Helper()
 	t.Setenv("GENKIT_ENV", "")
 	defer func() {
 		if r := recover(); r != nil {
-			t.Skipf("genkit.Init could not initialize offline: %v", r)
+			t.Fatalf("genkit.Init panicked initializing offline: %v\n%s", r, debug.Stack())
 		}
 	}()
 	g := genkit.Init(context.Background())

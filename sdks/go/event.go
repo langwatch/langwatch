@@ -1,6 +1,8 @@
 package langwatch
 
 import (
+	"log"
+
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -23,16 +25,24 @@ type Event struct {
 // RecordEvent attaches a LangWatch tracked event to the span as a langwatch.event
 // span event, carrying event.type / event.metrics.* / event.details.* — the same
 // shape the server records for tracked events.
+//
+// Type is what the server classifies the event by, so an Event with an empty
+// Type is dropped (logged, not recorded) rather than emitted unclassifiable.
 func (s *Span) RecordEvent(event Event) *Span {
+	if event.Type == "" {
+		log.Default().Printf("langwatch: dropping tracked event with an empty Type")
+		return s
+	}
+
 	attrs := make([]attribute.KeyValue, 0, 1+len(event.Metrics)+len(event.Details))
-	attrs = append(attrs, attribute.String("event.type", event.Type))
+	attrs = append(attrs, AttributeEventType.String(event.Type))
 	for k, v := range event.Metrics {
-		attrs = append(attrs, attribute.Float64("event.metrics."+k, v))
+		attrs = append(attrs, attribute.Float64(EventMetricsPrefix+k, v))
 	}
 	for k, v := range event.Details {
-		attrs = append(attrs, attribute.String("event.details."+k, v))
+		attrs = append(attrs, attribute.String(EventDetailsPrefix+k, v))
 	}
-	s.AddEvent("langwatch.event", trace.WithAttributes(attrs...))
+	s.AddEvent(string(AttributeLangWatchEvent), trace.WithAttributes(attrs...))
 	return s
 }
 

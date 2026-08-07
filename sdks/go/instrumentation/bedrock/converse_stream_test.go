@@ -3,6 +3,7 @@ package bedrock
 import (
 	"context"
 	"reflect"
+	"sync"
 	"testing"
 	"time"
 	"unsafe"
@@ -33,11 +34,19 @@ func setStreamOnOutput(t *testing.T, out *bedrockruntime.ConverseStreamOutput, s
 }
 
 // fakeStreamReader is a ConverseStreamOutputReader backed by a fixed event
-// slice, mirroring how the SDK feeds events from the wire.
+// slice, mirroring how the SDK feeds events from the wire. Close signals the
+// producer goroutine to stop, so a test that abandons the stream early does not
+// leave it parked on a send nobody will ever receive.
 type fakeStreamReader struct {
-	events []types.ConverseStreamOutput
-	err    error
-	closed bool
+	events    []types.ConverseStreamOutput
+	err       error
+	closed    bool
+	done      chan struct{}
+	closeOnce sync.Once
+}
+
+func newFakeStreamReader(events []types.ConverseStreamOutput) *fakeStreamReader {
+	return &fakeStreamReader{events: events, done: make(chan struct{})}
 }
 
 func (f *fakeStreamReader) Events() <-chan types.ConverseStreamOutput {
@@ -45,7 +54,11 @@ func (f *fakeStreamReader) Events() <-chan types.ConverseStreamOutput {
 	go func() {
 		defer close(ch)
 		for _, e := range f.events {
-			ch <- e
+			select {
+			case ch <- e:
+			case <-f.done:
+				return
+			}
 		}
 	}()
 	return ch
@@ -53,6 +66,7 @@ func (f *fakeStreamReader) Events() <-chan types.ConverseStreamOutput {
 
 func (f *fakeStreamReader) Close() error {
 	f.closed = true
+	f.closeOnce.Do(func() { close(f.done) })
 	return nil
 }
 
@@ -98,7 +112,7 @@ func TestConverseStream_RecordsRequestThenEndsAfterDrain(t *testing.T) {
 
 	// Build a ConverseStreamOutput carrying a wired event-stream reader.
 	stream := bedrockruntime.NewConverseStreamEventStream()
-	stream.Reader = &fakeStreamReader{events: converseStreamEvents()}
+	stream.Reader = newFakeStreamReader(converseStreamEvents())
 	output := &bedrockruntime.ConverseStreamOutput{}
 	setStreamOnOutput(t, output, stream)
 
@@ -164,7 +178,7 @@ func TestConverseStream_RecordsRequestThenEndsAfterDrain(t *testing.T) {
 func TestConverseStream_EarlyClose_FinalisesSpan(t *testing.T) {
 	provider, exporter := newTestProvider(t)
 
-	reader := &fakeStreamReader{events: converseStreamEvents()}
+	reader := newFakeStreamReader(converseStreamEvents())
 	tracer := langwatch.TracerFromProvider(provider, tracerName)
 	_, span := tracer.Start(context.Background(), "init")
 
@@ -213,7 +227,7 @@ func converseStreamToolUseEvents() []types.ConverseStreamOutput {
 func TestConverseStream_ToolUse_RecordsToolCallOutput(t *testing.T) {
 	provider, exporter := newTestProvider(t)
 
-	reader := &fakeStreamReader{events: converseStreamToolUseEvents()}
+	reader := newFakeStreamReader(converseStreamToolUseEvents())
 	tracer := langwatch.TracerFromProvider(provider, tracerName)
 	_, span := tracer.Start(context.Background(), "init")
 
@@ -252,11 +266,11 @@ func TestConverseStream_ToolUse_RecordsToolCallOutput(t *testing.T) {
 func TestConverseStream_CtxCancel_FinalisesSpan(t *testing.T) {
 	provider, exporter := newTestProvider(t)
 
-	// A reader that emits one event then blocks forever, simulating an in-flight
+	// A reader that emits one event then goes idle, simulating an in-flight
 	// stream the consumer walks away from.
-	reader := &blockingStreamReader{first: &types.ConverseStreamOutputMemberContentBlockDelta{
+	reader := newBlockingStreamReader(t, &types.ConverseStreamOutputMemberContentBlockDelta{
 		Value: types.ContentBlockDeltaEvent{Delta: &types.ContentBlockDeltaMemberText{Value: "partial"}},
-	}}
+	})
 	tracer := langwatch.TracerFromProvider(provider, tracerName)
 	_, span := tracer.Start(context.Background(), "init")
 
@@ -285,24 +299,116 @@ func TestConverseStream_CtxCancel_FinalisesSpan(t *testing.T) {
 }
 
 // blockingStreamReader emits a single event then leaves the channel open and
-// idle forever, modelling a long-lived stream abandoned mid-flight.
+// idle, modelling a long-lived stream abandoned mid-flight. It stays idle until
+// Close (or the end of the test) releases the producer goroutine, so the
+// goroutine is not leaked for the rest of the run.
 type blockingStreamReader struct {
-	first  types.ConverseStreamOutput
-	closed bool
+	first     types.ConverseStreamOutput
+	closed    bool
+	done      chan struct{}
+	closeOnce sync.Once
+}
+
+func newBlockingStreamReader(t *testing.T, first types.ConverseStreamOutput) *blockingStreamReader {
+	t.Helper()
+	b := &blockingStreamReader{first: first, done: make(chan struct{})}
+	t.Cleanup(func() { _ = b.Close() })
+	return b
 }
 
 func (b *blockingStreamReader) Events() <-chan types.ConverseStreamOutput {
 	ch := make(chan types.ConverseStreamOutput)
 	go func() {
-		ch <- b.first
-		// Never close: model an in-flight upstream the consumer abandons.
-		select {}
+		select {
+		case ch <- b.first:
+		case <-b.done:
+			return
+		}
+		// Never close the channel: model an in-flight upstream the consumer
+		// abandons. Wait for completion rather than blocking forever.
+		<-b.done
 	}()
 	return ch
 }
 
-func (b *blockingStreamReader) Close() error { b.closed = true; return nil }
-func (b *blockingStreamReader) Err() error   { return nil }
+func (b *blockingStreamReader) Close() error {
+	b.closed = true
+	b.closeOnce.Do(func() { close(b.done) })
+	return nil
+}
+func (b *blockingStreamReader) Err() error { return nil }
+
+// endlessStreamReader emits text deltas continuously until Close is called, so a
+// consumer can close the reader while the pump goroutine is still accumulating.
+type endlessStreamReader struct {
+	done      chan struct{}
+	closeOnce sync.Once
+}
+
+func newEndlessStreamReader() *endlessStreamReader {
+	return &endlessStreamReader{done: make(chan struct{})}
+}
+
+func (e *endlessStreamReader) Events() <-chan types.ConverseStreamOutput {
+	ch := make(chan types.ConverseStreamOutput)
+	go func() {
+		defer close(ch)
+		for {
+			event := &types.ConverseStreamOutputMemberContentBlockDelta{Value: types.ContentBlockDeltaEvent{
+				Delta: &types.ContentBlockDeltaMemberText{Value: "x"},
+			}}
+			select {
+			case ch <- event:
+			case <-e.done:
+				return
+			}
+		}
+	}()
+	return ch
+}
+
+func (e *endlessStreamReader) Close() error {
+	e.closeOnce.Do(func() { close(e.done) })
+	return nil
+}
+
+func (e *endlessStreamReader) Err() error { return nil }
+
+// TestConverseStream_CloseDuringPump_NoDataRace closes the reader from the
+// consumer goroutine while the pump goroutine is still observing events, so
+// finish() reads the accumulator concurrently with observe() writing it. Run
+// under `go test -race`, this fails if finish() reads the accumulator outside
+// accLock. The window is scheduler-dependent (the pump exits on whichever
+// select case wins), so the scenario is repeated to make the detection reliable
+// in a single run.
+func TestConverseStream_CloseDuringPump_NoDataRace(t *testing.T) {
+	provider, _ := newTestProvider(t)
+	tracer := langwatch.TracerFromProvider(provider, tracerName)
+
+	for range 200 {
+		reader := newEndlessStreamReader()
+		_, span := tracer.Start(context.Background(), "init")
+		wrapped := newObservingReader(context.Background(), reader, span, langwatch.DataCaptureAll, time.Now())
+
+		streaming := make(chan struct{})
+		drained := make(chan struct{})
+		go func() {
+			defer close(drained)
+			seen := 0
+			for range wrapped.Events() {
+				seen++
+				if seen == 1 {
+					close(streaming)
+				}
+			}
+		}()
+
+		// Close while events are still flowing, so Close()'s finish() races the pump.
+		<-streaming
+		require.NoError(t, wrapped.Close())
+		<-drained
+	}
+}
 
 func TestConverseStream_DataCaptureOutputOnly_KeepsOutputDropsInput(t *testing.T) {
 	provider, exporter := newTestProvider(t)
@@ -311,7 +417,7 @@ func TestConverseStream_DataCaptureOutputOnly_KeepsOutputDropsInput(t *testing.T
 		ModelId:  aws.String("anthropic.claude-3-haiku-20240307-v1:0"),
 		Messages: []types.Message{{Role: types.ConversationRoleUser, Content: []types.ContentBlock{&types.ContentBlockMemberText{Value: "in"}}}},
 	}
-	reader := &fakeStreamReader{events: converseStreamEvents()}
+	reader := newFakeStreamReader(converseStreamEvents())
 
 	tracer := langwatch.TracerFromProvider(provider, tracerName)
 	_, span := tracer.Start(context.Background(), "init")

@@ -114,6 +114,18 @@ func main() {
 
 ## Data capture
 
+> **Upgrading — the default flipped.** Content capture used to be **opt-in**: no
+> prompts or completions left your process unless you passed `WithCaptureInput()`
+> / `WithCaptureOutput()`. It is now **on by default** (`langwatch.DataCaptureAll`),
+> so a client that passes no capture option starts exporting full prompt and
+> completion content — which routinely contains end-user PII. The removed
+> `WithCaptureInput()` / `WithCaptureOutput()` options fail at compile time, but
+> the changed default does not. To keep the old behaviour, opt out explicitly:
+>
+> ```go
+> otelopenai.Middleware("my-app", otelopenai.WithDataCapture(langwatch.DataCaptureNone))
+> ```
+
 The middleware records request (input) and response (output) **content** by
 default — `langwatch.DataCaptureAll`. This is a deliberate change from the
 previous opt-in `WithCaptureInput()` / `WithCaptureOutput()` options (now

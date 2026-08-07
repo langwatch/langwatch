@@ -58,9 +58,11 @@ func WithAPIKey(key string) Option {
 
 // WithProjectID sets the LangWatch project identifier (project_...).
 //
-// It is required when the API key is a Personal Access Token (pat-lw-*) and is
-// ignored for legacy sk-lw-* keys. When omitted, the client reads the
-// LANGWATCH_PROJECT_ID environment variable.
+// It is required when the API key is a Personal Access Token (pat-lw-*), which
+// carries no project identity of its own, and optional for legacy sk-lw-* keys,
+// which do. A project ID set here is sent as X-Project-Id whatever the key kind;
+// with an sk-lw-* key that pins the request to a specific project. When omitted,
+// the client reads the LANGWATCH_PROJECT_ID environment variable.
 func WithProjectID(projectID string) Option {
 	return func(c *config) { c.projectID = projectID }
 }

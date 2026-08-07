@@ -21,6 +21,7 @@ package genkit
 
 import (
 	"context"
+	"sync"
 
 	"github.com/firebase/genkit/go/core/tracing"
 	"github.com/firebase/genkit/go/genkit"
@@ -122,6 +123,15 @@ func SpanProcessor(opts ...Option) (sdktrace.SpanProcessor, error) {
 // Genkit uses (the global OpenTelemetry provider), which is shared by every
 // *genkit.Genkit. Call this once after genkit.Init.
 //
+// Calling it more than once is safe. OpenTelemetry dispatches every ended span
+// to every registered processor, so a second registration would export each
+// Genkit span twice. Instead, a repeat call REPLACES this package's previous
+// registration: the earlier processor is unregistered (which shuts it down,
+// flushing whatever it still holds) before the new one is registered, leaving
+// exactly one LangWatch processor on the provider whatever the call count. A
+// processor supplied via WithSpanProcessor is shut down by that replacement too,
+// so do not reuse one across calls.
+//
 // By default the exporter is configured from the environment
 // (LANGWATCH_API_KEY, LANGWATCH_ENDPOINT). Use WithExporterOptions to configure
 // it in code, WithContext to control the exporter's setup context, or
@@ -131,6 +141,26 @@ func RegisterLangWatch(g *genkit.Genkit, opts ...Option) error {
 	if err != nil {
 		return err
 	}
-	tracing.TracerProvider().RegisterSpanProcessor(sp)
+
+	registrationMu.Lock()
+	defer registrationMu.Unlock()
+
+	provider := tracing.TracerProvider()
+	if registeredProvider != nil && registeredProcessor != nil {
+		registeredProvider.UnregisterSpanProcessor(registeredProcessor)
+	}
+	provider.RegisterSpanProcessor(sp)
+	registeredProvider, registeredProcessor = provider, sp
 	return nil
 }
+
+// registeredProvider / registeredProcessor record the registration this package
+// last made, so RegisterLangWatch can replace it rather than stack a second
+// processor onto the same provider. The provider is recorded alongside the
+// processor because Genkit's tracer provider is the global one and a host
+// application may swap it between calls.
+var (
+	registrationMu      sync.Mutex
+	registeredProvider  *sdktrace.TracerProvider
+	registeredProcessor sdktrace.SpanProcessor
+)

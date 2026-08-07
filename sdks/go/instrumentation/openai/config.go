@@ -2,6 +2,7 @@ package openai
 
 import (
 	"go.opentelemetry.io/otel/attribute"
+	semconv "go.opentelemetry.io/otel/semconv/v1.41.0"
 	oteltrace "go.opentelemetry.io/otel/trace"
 
 	langwatch "github.com/langwatch/langwatch/sdks/go"
@@ -65,11 +66,14 @@ func WithGenAIProvider(provider attribute.KeyValue) Option {
 	})
 }
 
-// WithGenAISystem sets the GenAI provider on the span.
+// WithGenAISystem sets the GenAI provider on the span. Only the value of the
+// argument is used: it is re-keyed onto gen_ai.provider.name, so passing the old
+// semconv.GenAISystemKey.String("openai") still records the current attribute
+// rather than emitting the removed gen_ai.system key.
 //
 // Deprecated: gen_ai.system was removed from the GenAI semantic conventions in
 // favour of gen_ai.provider.name. Use WithGenAIProvider; this alias forwards to
 // it for backwards compatibility.
 func WithGenAISystem(system attribute.KeyValue) Option {
-	return WithGenAIProvider(system)
+	return WithGenAIProvider(semconv.GenAIProviderNameKey.String(system.Value.Emit()))
 }

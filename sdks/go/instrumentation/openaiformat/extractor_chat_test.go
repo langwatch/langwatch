@@ -63,6 +63,60 @@ func TestChatExtractor_Response(t *testing.T) {
 	assert.NotContains(t, attrs, outputKey)
 }
 
+// TestChatExtractor_MultipleChoices pins the n > 1 contract: each candidate is
+// its own assistant message, rather than every candidate's text concatenated
+// into one message with no boundary between them.
+func TestChatExtractor_MultipleChoices(t *testing.T) {
+	raw := []byte(`{"id":"cmpl-n","object":"chat.completion","model":"gpt-4o-mini","choices":[{"index":0,"message":{"role":"assistant","content":"first"},"finish_reason":"stop"},{"index":1,"message":{"role":"assistant","content":"second"},"finish_reason":"stop"}],"usage":{"prompt_tokens":2,"completion_tokens":4,"total_tokens":6}}`)
+	attrs := recordExtractor(t, func(span *langwatch.Span) {
+		ChatExtractor{}.ExtractNonStreaming(span, raw, langwatch.DataCaptureAll)
+	})
+
+	outMsgs := genAIMessages(t, attrs[genAIOutputKey].AsString())
+	require.Len(t, outMsgs, 2, "each choice must stay a distinct assistant message")
+	assert.Equal(t, langwatch.ChatRoleAssistant, outMsgs[0].Role)
+	assert.Equal(t, "first", outMsgs[0].Content)
+	assert.Equal(t, "second", outMsgs[1].Content)
+}
+
+// TestChatExtractor_MultipleChoicesToolCalls pins that a candidate's tool calls
+// stay attached to the candidate that produced them.
+func TestChatExtractor_MultipleChoicesToolCalls(t *testing.T) {
+	raw := []byte(`{"id":"cmpl-n-tool","object":"chat.completion","model":"gpt-4o-mini","choices":[{"index":0,"message":{"role":"assistant","content":null,"tool_calls":[{"id":"call_a","type":"function","function":{"name":"first_tool","arguments":"{}"}}]},"finish_reason":"tool_calls"},{"index":1,"message":{"role":"assistant","content":null,"tool_calls":[{"id":"call_b","type":"function","function":{"name":"second_tool","arguments":"{}"}}]},"finish_reason":"tool_calls"}],"usage":{"prompt_tokens":2,"completion_tokens":4,"total_tokens":6}}`)
+	attrs := recordExtractor(t, func(span *langwatch.Span) {
+		ChatExtractor{}.ExtractNonStreaming(span, raw, langwatch.DataCaptureAll)
+	})
+
+	outMsgs := genAIMessages(t, attrs[genAIOutputKey].AsString())
+	require.Len(t, outMsgs, 2)
+	require.Len(t, outMsgs[0].ToolCalls, 1, "choice 0 keeps only its own tool call")
+	assert.Equal(t, "call_a", outMsgs[0].ToolCalls[0].ID)
+	require.Len(t, outMsgs[1].ToolCalls, 1, "choice 1 keeps only its own tool call")
+	assert.Equal(t, "call_b", outMsgs[1].ToolCalls[0].ID)
+}
+
+// TestChatStreamAccumulator_MultipleChoices pins the same contract on the
+// streamed path, where the candidates' deltas interleave and each candidate's
+// tool-call indices restart at 0.
+func TestChatStreamAccumulator_MultipleChoices(t *testing.T) {
+	span, exporter := newSpan(t)
+	acc := ChatExtractor{}.NewStreamAccumulator()
+	acc.Consume(`{"id":"cmpl-n-str","object":"chat.completion.chunk","model":"gpt-4o-mini","choices":[{"index":0,"delta":{"role":"assistant","content":"first"},"finish_reason":null},{"index":1,"delta":{"role":"assistant","content":"second"},"finish_reason":null}]}`)
+	acc.Consume(`{"id":"cmpl-n-str","object":"chat.completion.chunk","model":"gpt-4o-mini","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"id":"call_a","type":"function","function":{"name":"first_tool","arguments":"{}"}}]},"finish_reason":"tool_calls"},{"index":1,"delta":{"tool_calls":[{"index":0,"id":"call_b","type":"function","function":{"name":"second_tool","arguments":"{}"}}]},"finish_reason":"tool_calls"}]}`)
+	acc.Finish(span, langwatch.DataCaptureAll)
+	span.End()
+
+	attrs := requireSingleSpanAttrs(t, exporter)
+	msgs := genAIMessages(t, attrs[genAIOutputKey].AsString())
+	require.Len(t, msgs, 2, "each streamed choice must stay a distinct assistant message")
+	assert.Equal(t, "first", msgs[0].Content)
+	assert.Equal(t, "second", msgs[1].Content)
+	require.Len(t, msgs[0].ToolCalls, 1, "tool-call index 0 of choice 0 is not overwritten by choice 1")
+	assert.Equal(t, "call_a", msgs[0].ToolCalls[0].ID)
+	require.Len(t, msgs[1].ToolCalls, 1)
+	assert.Equal(t, "call_b", msgs[1].ToolCalls[0].ID)
+}
+
 // TestChatExtractor_ToolCalls records a tool-calling response as a structured
 // assistant message carrying the tool call.
 func TestChatExtractor_ToolCalls(t *testing.T) {

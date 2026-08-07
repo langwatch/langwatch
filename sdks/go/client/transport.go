@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/langwatch/langwatch/sdks/go/client/internal/openapi"
@@ -80,23 +81,46 @@ func (c *Client) requestEditor() openapi.RequestEditorFn {
 	}
 }
 
+// idempotencyKeyHeader is the header LangWatch reads to make a replay of a
+// write safe: a repeat of the same key returns the original response instead of
+// performing the write again. A POST or PATCH carrying it is therefore safe for
+// the transport to retry; one without it is not.
+const idempotencyKeyHeader = "Idempotency-Key"
+
 // retryingDoer wraps an inner [openapi.HttpRequestDoer] (an *http.Client) with
 // bounded exponential-backoff retries on HTTP 429 and 5xx responses, honouring
 // any Retry-After header and the request context. It is the single transport
 // every generated operation flows through, so retry policy is uniform across the
 // whole SDK.
+//
+// Retries are restricted to requests that are safe to replay — see
+// [isRetryableRequest]. A retryingDoer is safe for concurrent use: the jitter
+// source is guarded by mu.
 type retryingDoer struct {
 	inner        openapi.HttpRequestDoer
 	maxRetries   int
 	retryWaitMin time.Duration
 	retryWaitMax time.Duration
-	rand         *rand.Rand
+
+	// mu guards rand. *rand.Rand is not safe for concurrent use, and a single
+	// retryingDoer is shared by every goroutine using the [Client].
+	mu   sync.Mutex
+	rand *rand.Rand
 }
 
 // Do executes req, retrying retryable failures up to maxRetries additional
 // times. The request body is buffered up front via GetBody so it can be replayed
 // on each attempt; requests without a replayable body are attempted once.
+//
+// Requests that are not safe to replay ([isRetryableRequest]) are attempted
+// exactly once, whatever the response: replaying an unprotected POST risks a
+// duplicate write when the server completed the first attempt but the response
+// never reached us.
 func (d *retryingDoer) Do(req *http.Request) (*http.Response, error) {
+	if !isRetryableRequest(req) {
+		return d.inner.Do(req)
+	}
+
 	var lastResp *http.Response
 	var lastErr error
 
@@ -172,6 +196,8 @@ func (d *retryingDoer) backoff(attempt int, resp *http.Response) time.Duration {
 		backoff = float64(d.retryWaitMax)
 	}
 	// Full jitter: sleep a random duration in [0, backoff].
+	d.mu.Lock()
+	defer d.mu.Unlock()
 	return time.Duration(d.rand.Int63n(int64(backoff) + 1))
 }
 
@@ -180,6 +206,33 @@ func (d *retryingDoer) backoff(attempt int, resp *http.Response) time.Duration {
 // surfaced immediately.
 func isRetryableStatus(code int) bool {
 	return code == http.StatusTooManyRequests || (code >= 500 && code <= 599)
+}
+
+// isIdempotentMethod reports whether an HTTP method is idempotent per RFC 9110,
+// i.e. repeating the request has the same effect on server state as making it
+// once. GET/HEAD/OPTIONS/TRACE are safe and PUT/DELETE are idempotent; POST and
+// PATCH are neither. An empty Method means GET, matching net/http.
+func isIdempotentMethod(method string) bool {
+	switch method {
+	case "", http.MethodGet, http.MethodHead, http.MethodOptions, http.MethodTrace,
+		http.MethodPut, http.MethodDelete:
+		return true
+	default:
+		return false
+	}
+}
+
+// isRetryableRequest reports whether a request may be replayed after a transport
+// error or a retryable status. Idempotent methods always may. A non-idempotent
+// write (POST, PATCH) may only when it carries an [idempotencyKeyHeader], which
+// is what lets the server collapse the replay onto the original write instead of
+// performing it twice — without one, a retry can duplicate a prompt version, an
+// evaluation or a tracked event.
+func isRetryableRequest(req *http.Request) bool {
+	if isIdempotentMethod(req.Method) {
+		return true
+	}
+	return req.Header.Get(idempotencyKeyHeader) != ""
 }
 
 // parseRetryAfter interprets a Retry-After header value, which may be either an
