@@ -36,6 +36,16 @@ function listTeamNames(names: string[]): string {
   return `${quoted.slice(0, -1).join(", ")} and ${quoted[quoted.length - 1]}`;
 }
 
+/** What makes two access rows the same grant, regardless of which row it is. */
+function bindingKey(binding: {
+  role: string;
+  customRoleId?: string | null;
+  scopeType: RoleBindingScopeType;
+  scopeId: string;
+}): string {
+  return `${binding.role}:${binding.customRoleId ?? ""}:${binding.scopeType}:${binding.scopeId}`;
+}
+
 type MemberSummary = {
   userId: string;
   role: OrganizationUserRole;
@@ -100,12 +110,52 @@ export function MemberDetailDialog({
   const roleChanged = pendingRole !== member.role;
   const hasChanges = hasBindingChanges || roleChanged;
 
+  const stageAddition = (binding: PendingBinding) => {
+    const alreadyHeld = (directBindings.data ?? []).some(
+      (row) =>
+        !pendingBindingRemovals.has(row.id) &&
+        bindingKey(row) === bindingKey(binding),
+    );
+    if (alreadyHeld) return;
+    setPendingBindingAdditions((prev) =>
+      prev.some((staged) => bindingKey(staged) === bindingKey(binding))
+        ? prev
+        : [...prev, binding],
+    );
+  };
+
+  const refreshAccessQueries = () =>
+    Promise.all([
+      queryClient.roleBinding.listForUser.invalidate(),
+      queryClient.roleBinding.listForOrg.invalidate(),
+      queryClient.organization.getOrganizationWithMembersAndTheirTeams.invalidate(),
+      queryClient.organization.getAll.invalidate(),
+      // An org role change moves the member between full and Lite Member
+      // seats, so the seat counts an admin is reconciling against changed
+      // with this save.
+      queryClient.limits.getUsage.invalidate(),
+    ]);
+
   const handleSave = async () => {
     // Auto-stage any uncommitted binding row (user selected fields but didn't click Add)
     const uncommitted = bindingInputRef.current?.flush() ?? null;
-    const allBindingAdditions = uncommitted
+    const stagedAdditions = uncommitted
       ? [...pendingBindingAdditions, uncommitted]
       : pendingBindingAdditions;
+    // The batch describes the access the admin wants the member to hold, so
+    // a staged row the member already holds (or the same row staged twice)
+    // adds nothing to it.
+    const heldKeys = new Set(
+      (directBindings.data ?? [])
+        .filter((row) => !pendingBindingRemovals.has(row.id))
+        .map(bindingKey),
+    );
+    const allBindingAdditions = stagedAdditions.filter((binding) => {
+      const key = bindingKey(binding);
+      if (heldKeys.has(key)) return false;
+      heldKeys.add(key);
+      return true;
+    });
     const hasBindingChangesNow =
       pendingBindingRemovals.size > 0 || allBindingAdditions.length > 0;
 
@@ -143,16 +193,7 @@ export function MemberDetailDialog({
         });
       }
 
-      await Promise.all([
-        queryClient.roleBinding.listForUser.invalidate(),
-        queryClient.roleBinding.listForOrg.invalidate(),
-        queryClient.organization.getOrganizationWithMembersAndTheirTeams.invalidate(),
-        queryClient.organization.getAll.invalidate(),
-        // An org role change moves the member between full and Lite Member
-        // seats, so the seat counts an admin is reconciling against changed
-        // with this save.
-        queryClient.limits.getUsage.invalidate(),
-      ]);
+      await refreshAccessQueries();
       toaster.create({
         title: "Member updated",
         // A seat correction is allowed to take away a team's only team-scoped
@@ -169,6 +210,11 @@ export function MemberDetailDialog({
       });
       onClose();
     } catch (e) {
+      // The role change lands before the binding batch, so a failure here can
+      // sit on top of a half-applied save. Re-read rather than keep showing
+      // rows the server already rewrote — reloading the page to find out what
+      // actually happened is the customer experience this replaces.
+      void refreshAccessQueries();
       showErrorToast({
         error: e,
         fallbackTitle: "Couldn't update this member",
@@ -333,9 +379,7 @@ export function MemberDetailDialog({
                 <BindingInputRow
                   ref={bindingInputRef}
                   organizationId={organizationId}
-                  onAdd={(b) =>
-                    setPendingBindingAdditions((prev) => [...prev, b])
-                  }
+                  onAdd={stageAddition}
                 />
               </Box>
             )}

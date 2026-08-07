@@ -43,6 +43,7 @@ const {
     current: [] as Array<{
       id: string;
       role: string;
+      customRoleId: string | null;
       customRoleName: string | null;
       scopeType: RoleBindingScopeType;
       scopeId: string;
@@ -314,6 +315,7 @@ describe("<MemberDetailDialog/>", () => {
         {
           id: "binding-1",
           role: "MEMBER",
+          customRoleId: null,
           customRoleName: null,
           scopeType: RoleBindingScopeType.TEAM,
           scopeId: "team-1",
@@ -381,6 +383,91 @@ describe("<MemberDetailDialog/>", () => {
         );
       });
       expect(mockApplyMemberBindings).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given the member already holds the staged access row", () => {
+    beforeEach(() => {
+      mockListForUserData.current = [
+        {
+          id: "binding-1",
+          role: "MEMBER",
+          customRoleId: null,
+          customRoleName: null,
+          scopeType: RoleBindingScopeType.TEAM,
+          scopeId: "team-1",
+          scopeName: "Team One",
+        },
+      ];
+    });
+
+    describe("when the admin stages it again", () => {
+      /** @scenario An access row the member already holds is not staged twice */
+      it("keeps a single row for that access", () => {
+        renderDialog();
+
+        fireEvent.click(screen.getByTestId("stub-add-binding"));
+
+        // A staged row would carry an "Undo add" action; the existing row is
+        // the only one there.
+        expect(screen.queryByRole("button", { name: /undo add/i })).toBeNull();
+      });
+
+      /** @scenario An access row the member already holds is not staged twice */
+      it("leaves nothing to save", () => {
+        renderDialog();
+
+        fireEvent.click(screen.getByTestId("stub-add-binding"));
+
+        const save = screen.getByRole("button", { name: /^save$/i });
+        expect(save.hasAttribute("disabled")).toBe(true);
+      });
+    });
+  });
+
+  describe("when the same access row is staged twice", () => {
+    /** @scenario An access row the member already holds is not staged twice */
+    it("keeps a single staged row", () => {
+      renderDialog();
+
+      fireEvent.click(screen.getByTestId("stub-add-binding"));
+      fireEvent.click(screen.getByTestId("stub-add-binding"));
+
+      expect(screen.getAllByRole("button", { name: /undo add/i })).toHaveLength(
+        1,
+      );
+    });
+  });
+
+  describe("given the access batch fails after the seat change landed", () => {
+    beforeEach(() => {
+      mockApplyMemberBindings.mockRejectedValue(new Error("boom"));
+    });
+
+    describe("when the admin saves both changes", () => {
+      /** @scenario A failed save re-reads the member's access */
+      it("re-reads the member's access instead of trusting the staged view", async () => {
+        renderDialog();
+
+        fireEvent.click(screen.getByTestId("org-role-field"));
+        fireEvent.click(screen.getByTestId("stub-add-binding"));
+        fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
+
+        await vi.waitFor(() => {
+          expect(mockToasterCreate).toHaveBeenCalledWith(
+            expect.objectContaining({
+              title: "Couldn't update this member",
+              type: "error",
+            }),
+          );
+        });
+        // The seat change landed before the failure, so what the dialog shows
+        // must come from the server, not from the staged rows.
+        expect(mockUpdateMemberRole).toHaveBeenCalledTimes(1);
+        expect(mockInvalidateListForUser).toHaveBeenCalled();
+        expect(mockInvalidateOrgWithMembers).toHaveBeenCalled();
+        expect(mockInvalidateGetUsage).toHaveBeenCalled();
+      });
     });
   });
 

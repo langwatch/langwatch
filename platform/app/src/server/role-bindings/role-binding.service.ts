@@ -606,20 +606,28 @@ export class RoleBindingService {
 
     return this.prisma.$transaction(async (tx) => {
       if (bindingIdsToDelete.length > 0) {
+        // The batch describes the state the admin wants this member's access
+        // to be in, so an id that no longer exists is already in that state:
+        // a seat change applied just before this batch rewrites the member's
+        // team rows (delete + recreate, new ids), and a row another admin
+        // removed concurrently is equally gone. Only the member's own direct
+        // rows are deletable through their edit — an id resolving to another
+        // principal is skipped, never deleted.
         const existing = await tx.roleBinding.findMany({
-          where: { id: { in: bindingIdsToDelete }, organizationId },
+          where: {
+            id: { in: bindingIdsToDelete },
+            organizationId,
+            userId,
+            groupId: null,
+          },
           select: { id: true, scopeType: true, scopeId: true },
         });
-        if (existing.length !== bindingIdsToDelete.length) {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "One or more bindings not found",
+        if (existing.length > 0) {
+          await assertNoPersonalTeamScope({ client: tx, scopes: existing });
+          await tx.roleBinding.deleteMany({
+            where: { id: { in: existing.map((b) => b.id) } },
           });
         }
-        await assertNoPersonalTeamScope({ client: tx, scopes: existing });
-        await tx.roleBinding.deleteMany({
-          where: { id: { in: bindingIdsToDelete }, organizationId },
-        });
       }
 
       if (bindingsToCreate.length > 0) {
@@ -635,6 +643,10 @@ export class RoleBindingService {
             scopeType: b.scopeType,
             scopeId: b.scopeId,
           })),
+          // Re-asserting a row the member already holds (or staging the same
+          // row twice) lands on the partial unique indexes; skipping the
+          // conflict leaves exactly the state the admin asked for.
+          skipDuplicates: true,
         });
       }
 
@@ -708,6 +720,10 @@ export class RoleBindingService {
       }
 
       if (bindingIdsToDelete.length > 0) {
+        // Same desired-state rule as applyMemberBindings: an id another
+        // admin already removed is already in the state this edit asks for,
+        // and an id resolving to a different group's row is skipped, never
+        // deleted.
         const existing = await tx.roleBinding.findMany({
           where: {
             id: { in: bindingIdsToDelete },
@@ -716,16 +732,12 @@ export class RoleBindingService {
           },
           select: { id: true, scopeType: true, scopeId: true },
         });
-        if (existing.length !== bindingIdsToDelete.length) {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "One or more bindings not found",
+        if (existing.length > 0) {
+          await assertNoPersonalTeamScope({ client: tx, scopes: existing });
+          await tx.roleBinding.deleteMany({
+            where: { id: { in: existing.map((b) => b.id) } },
           });
         }
-        await assertNoPersonalTeamScope({ client: tx, scopes: existing });
-        await tx.roleBinding.deleteMany({
-          where: { id: { in: bindingIdsToDelete }, organizationId, groupId },
-        });
       }
 
       if (bindingsToCreate.length > 0) {
@@ -741,6 +753,7 @@ export class RoleBindingService {
             scopeType: b.scopeType,
             scopeId: b.scopeId,
           })),
+          skipDuplicates: true,
         });
       }
 
