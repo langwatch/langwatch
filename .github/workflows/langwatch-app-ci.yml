@@ -232,6 +232,14 @@ jobs:
         # from a leaked key, to a scanner and to a reader.
         run: echo "CREDENTIALS_SECRET=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
 
+      # @langwatch/api ships raw TypeScript the app inlines, so its own suite
+      # runs here rather than in a workflow of its own. Shard 1 only: the
+      # package suite is not sharded, and shard 1 exists in every matrix shape
+      # (drafts run [1]).
+      - name: Run @langwatch/api unit tests
+        if: matrix.shard == 1
+        run: pnpm --filter @langwatch/api run test:unit
+
       - name: Run unit tests (shard ${{ matrix.shard }}/4)
         id: unit-tests
         working-directory: platform/app

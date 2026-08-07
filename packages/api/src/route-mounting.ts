@@ -1,4 +1,5 @@
 import type { Hono, MiddlewareHandler } from "hono";
+import { mergePath } from "hono/utils/url";
 
 import {
   buildEndpointMiddlewareStack,
@@ -25,12 +26,14 @@ type ErrorHandler = NonNullable<ServiceConfig["onError"]>;
 /** Mounts all resolved versions, namespace guards, and the bare latest alias. */
 export function mountResolvedRoutes<TProject>({
   app,
+  basePath,
   onError,
   providers,
   serviceConfig,
   versionMap,
 }: {
   app: Hono;
+  basePath: string;
   onError: ErrorHandler;
   providers: ProviderMap<TProject>;
   serviceConfig: ServiceConfig;
@@ -39,6 +42,7 @@ export function mountResolvedRoutes<TProject>({
   for (const [version, endpoints] of versionMap) {
     mountVersion({
       app,
+      basePath,
       endpoints,
       onError,
       providers,
@@ -50,13 +54,24 @@ export function mountResolvedRoutes<TProject>({
 
   const versionNamespace =
     "/:apiVersion{latest|preview|20\\d{2}-\\d{2}-\\d{2}}";
-  app.all(versionNamespace, (c) => c.notFound());
-  app.all(`${versionNamespace}/*`, (c) => c.notFound());
+  for (const guardPath of [versionNamespace, `${versionNamespace}/*`]) {
+    app.all(guardPath, (c) => c.notFound());
+    serviceConfig.onRouteMounted?.({
+      method: "all",
+      path: mergePath(basePath, guardPath),
+      version: null,
+      status: "unversioned",
+      withdrawn: false,
+      namespaceGuard: true,
+      config: null,
+    });
+  }
 
   const latestEndpoints = versionMap.get(VERSION_LATEST);
   if (latestEndpoints) {
     mountVersion({
       app,
+      basePath,
       endpoints: latestEndpoints,
       onError,
       providers,
@@ -69,6 +84,7 @@ export function mountResolvedRoutes<TProject>({
 
 function mountVersion<TProject>({
   app,
+  basePath,
   endpoints,
   onError,
   providers,
@@ -77,6 +93,7 @@ function mountVersion<TProject>({
   version,
 }: {
   app: Hono;
+  basePath: string;
   endpoints: ResolvedEndpoint[];
   onError: ErrorHandler;
   providers: ProviderMap<TProject>;
@@ -108,6 +125,16 @@ function mountVersion<TProject>({
           version,
         });
     mountRoute({ app, method, path, stack });
+    serviceConfig.onRouteMounted?.({
+      method,
+      // mergePath is what Hono itself applies a basePath with, so the
+      // reported string is byte-identical to app.routes[i].path.
+      path: mergePath(basePath, path),
+      version,
+      status,
+      withdrawn: ep.withdrawn === true,
+      config: ep.config,
+    });
   }
 }
 
