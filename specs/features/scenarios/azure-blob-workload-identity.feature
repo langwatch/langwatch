@@ -284,11 +284,25 @@ Feature: Azure Blob stored-objects authenticate without a shared account key
   # container it was written to, so a read never consults the variable — and an
   # operator who stops writing to Azure has every reason to drop it.
   @unit
-  Scenario: Reads survive an operator dropping the now-unused container variable
-    Given the Azure account settings remain but no container is configured
-    When the Azure read driver is registered
-    Then the driver is available and historical azure-blob URIs still resolve
-    But resolving a write destination refuses, naming the missing container
+  Scenario: A historical Azure object resolves without the write-only container
+    Given Azure account credentials are configured but no container is
+    When a stored azure-blob URI is dispatched through the storage registry
+    Then it reaches the Azure driver instead of failing as an unconfigured scheme
+
+  @unit
+  Scenario: Writes still refuse without a container, naming it
+    Given Azure is selected for writes but no container is configured
+    When a write destination is resolved
+    Then it refuses, naming the missing container
+
+  # The app-level half of "historical Azure objects stay readable after moving
+  # writes to S3" — that one describes what the chart renders, this one what
+  # the running app then does with it.
+  @unit
+  Scenario: Choosing S3 for writes does not unregister the Azure driver
+    Given the Azure settings are configured but S3 is selected for writes
+    When the write destination and the driver registration are both resolved
+    Then the write destination is S3 while the Azure driver stays registered
 
   @integration @unimplemented
   Scenario: Dataset uploads work in a token-based mode

@@ -61,7 +61,10 @@ vi.mock("~/server/dataplane-s3", () => ({
 
 import { resolveAzureCredentials } from "../azure-credentials";
 import { resolveProjectStorageDestination } from "../project-storage-destination";
-import { maybeAzureDriver } from "../stored-objects-factory";
+import {
+  createStorageRegistry,
+  maybeAzureDriver,
+} from "../stored-objects-factory";
 
 const INJECTED_WORKLOAD_IDENTITY_VARS = [
   "AZURE_CLIENT_ID",
@@ -201,23 +204,46 @@ describe("maybeAzureDriver / resolveProjectStorageDestination parity", () => {
     });
   });
 
-  describe("given azure backend in a token mode with no container configured", () => {
-    /** @scenario "Reads survive an operator dropping the now-unused container variable" */
-    it("refuses to resolve a write destination while still registering the read driver", async () => {
-      // Asymmetric on purpose, which is why it cannot ride the table above.
-      // A container is what a WRITE needs; a read carries its own inside the
-      // stored URI. So this install cannot write — loudly, naming the variable
-      // — and can still serve every object written before the container was
-      // dropped.
+  describe("given azure credentials but no container configured", () => {
+    /** @scenario "A historical Azure object resolves without the write-only container" */
+    it("dispatches a stored azure-blob URI to the driver rather than rejecting the scheme", async () => {
+      // Dispatch, not registration. `maybeAzureDriver() !== undefined` is one
+      // step short of the claim: the observable behaviour is StorageRegistry
+      // routing the URI, and an unregistered scheme throws there — before any
+      // request is made. Asserting the driver exists would let that throw
+      // survive the test.
+      mockEnv.STORED_OBJECTS_BACKEND = "s3";
+      mockEnv.AZURE_BLOB_ACCOUNT_NAME = "lwacct";
+      mockEnv.AZURE_BLOB_ACCOUNT_KEY = "a2V5";
+
+      // Only the outermost boundary is stubbed; everything from the registry
+      // down to the signed request is the real code path.
+      const fetchSpy = vi
+        .spyOn(globalThis, "fetch")
+        .mockResolvedValue(new Response(null, { status: 404 }));
+      try {
+        const registry = createStorageRegistry({ projectId: "proj-1" });
+
+        await expect(
+          registry.exists("azure-blob://lwacct/written-long-ago/objects/abc"),
+        ).resolves.toBe(false);
+        // A 404 answered by the driver, so the URI genuinely reached Azure
+        // rather than short-circuiting somewhere earlier.
+        expect(fetchSpy).toHaveBeenCalledTimes(1);
+      } finally {
+        fetchSpy.mockRestore();
+      }
+    });
+
+    /** @scenario "Writes still refuse without a container, naming it" */
+    it("refuses to resolve a write destination, naming the container", async () => {
       mockEnv.STORED_OBJECTS_BACKEND = "azure";
       mockEnv.AZURE_BLOB_AUTH_MODE = "managedIdentity";
       mockEnv.AZURE_BLOB_ACCOUNT_NAME = "lwacct";
 
-      const { isDestinationAzure, isDriverRegistered } =
-        await evaluateAzureUsability();
+      const { isDestinationAzure } = await evaluateAzureUsability();
 
       expect(isDestinationAzure).toBe(false);
-      expect(isDriverRegistered).toBe(true);
       expect(() => resolveAzureCredentials({ purpose: "write" })).toThrow(
         /AZURE_BLOB_CONTAINER/,
       );
@@ -225,7 +251,7 @@ describe("maybeAzureDriver / resolveProjectStorageDestination parity", () => {
   });
 
   describe("given writes moved to S3 while the Azure settings stay for legacy reads", () => {
-    /** @scenario "Historical Azure objects stay readable after moving writes to S3" */
+    /** @scenario "Choosing S3 for writes does not unregister the Azure driver" */
     it("registers the read driver even though no write resolves to azure", async () => {
       // The row the table above cannot hold, because the two answers
       // legitimately differ here. Registration is deliberately NOT gated on the
@@ -284,20 +310,6 @@ describe("maybeAzureDriver / resolveProjectStorageDestination parity", () => {
 
       expect(isDestinationAzure).toBe(false);
       expect(isDriverRegistered).toBe(false);
-    });
-  });
-
-  describe("given writes moved back to S3 and the now-unused container dropped", () => {
-    /** @scenario "Reads survive an operator dropping the now-unused container variable" */
-    it("still registers the read driver so historical URIs resolve", async () => {
-      // The migration case in full: nothing is written to Azure any more, so
-      // the operator drops the variable that named where writes went. Every
-      // object already in Azure must stay readable.
-      mockEnv.STORED_OBJECTS_BACKEND = "s3";
-      mockEnv.AZURE_BLOB_ACCOUNT_NAME = "lwacct";
-      mockEnv.AZURE_BLOB_ACCOUNT_KEY = "a2V5";
-
-      expect(maybeAzureDriver()).toBeDefined();
     });
   });
 });
