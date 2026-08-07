@@ -1,5 +1,4 @@
 import { ValidationError } from "@langwatch/handled-error";
-import { HTTPException } from "hono/http-exception";
 import { describeRoute } from "hono-openapi";
 import { resolver } from "hono-openapi/zod";
 import { z } from "zod";
@@ -15,6 +14,7 @@ import { resolveOrganizationId } from "~/server/organizations/resolveOrganizatio
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 
 import { baseResponses } from "../../shared/base-responses";
+import { resolvePersonalCaller } from "../../shared/personal-project-caller";
 
 patchZodOpenapi();
 
@@ -360,6 +360,8 @@ secured.access(requires("traces:view")).get(
   }),
   async (c) => {
     const project = c.get("project");
+    // The rollup answers with whatever the CALLER may read across the whole
+    // organization, so it needs a person rather than just a project.
     const callerUserId = resolvePersonalCaller({
       project,
       apiKeyUserId: c.get("apiKeyUserId"),
@@ -396,37 +398,6 @@ secured.access(requires("traces:view")).get(
     );
   },
 );
-
-/**
- * The user behind a personal-project key.
- *
- * The rollup answers with whatever the CALLER may read across the whole
- * organization, so it needs a person, not just a project. A shared/team key
- * names no single person, and a user-bound key pointed at somebody else's
- * personal workspace would otherwise borrow their identity. Those are the two
- * guards `/api/me/usage` applies, for the same reason.
- */
-function resolvePersonalCaller({
-  project,
-  apiKeyUserId,
-}: {
-  project: { isPersonal: boolean | null; ownerUserId: string | null };
-  apiKeyUserId: string | undefined;
-}): string {
-  if (!project.isPersonal || !project.ownerUserId) {
-    throw new HTTPException(400, {
-      message:
-        "GET /api/coding-agent/pull-request-usage requires a personal-project API key. Use the API key from your personal workspace.",
-    });
-  }
-  if (apiKeyUserId && apiKeyUserId !== project.ownerUserId) {
-    throw new HTTPException(403, {
-      message:
-        "This API key cannot read another user's pull request usage. Use a key scoped to your own personal workspace.",
-    });
-  }
-  return project.ownerUserId;
-}
 
 /**
  * The organization's projects split by what this caller may do with each: read

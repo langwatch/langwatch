@@ -150,6 +150,8 @@ export const APP_ERROR_CODES = [
   "notification_delivery_error",
   "organization_not_found",
   "organization_not_found_for_team",
+  "personal_project_key_required",
+  "personal_usage_key_mismatch",
   "personal_workspace_not_managed_here",
   "project_not_found",
   "project_permission_denied",
