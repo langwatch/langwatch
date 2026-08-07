@@ -120,7 +120,16 @@ function parseMetadataFlags(
       );
       process.exit(1);
     }
-    (parsed[key] ??= []).push(pair.slice(separator + 1));
+    const value = pair.slice(separator + 1);
+    if (value === "") {
+      console.error(
+        chalk.red(
+          `Invalid --metadata value: ${pair} (an empty value would match every request that lacks the key)`,
+        ),
+      );
+      process.exit(1);
+    }
+    (parsed[key] ??= []).push(value);
   }
   return parsed;
 }

@@ -8,6 +8,7 @@ import {
   intersectIds,
   parseMetadataFilters,
   spendFilterQueryShape,
+  spendFiltersSchema,
 } from "../spendFilters";
 
 describe("the shared spend filter vocabulary", () => {
@@ -62,6 +63,35 @@ describe("the shared spend filter vocabulary", () => {
 
     it("refuses a pair with no colon at all", () => {
       expect(() => spendFilterQueryShape.metadata.parse("tier")).toThrow();
+    });
+  });
+
+  describe("when the structured spelling is parsed", () => {
+    it("accepts what the query spelling accepts", () => {
+      const parsed = spendFiltersSchema.parse({
+        models: ["gpt-5-mini"],
+        metadata: [{ key: "customer_tier", values: ["gold", "silver"] }],
+      });
+      expect(parsed.metadata).toEqual([
+        { key: "customer_tier", values: ["gold", "silver"] },
+      ]);
+    });
+
+    it("refuses a metadata key the query spelling could not express", () => {
+      // A key with a colon is unaddressable in `key:value`, so accepting it
+      // here would let the screen set a filter no reconciliation script can
+      // reproduce, which is the drift this module exists to prevent.
+      expect(() =>
+        spendFiltersSchema.parse({
+          metadata: [{ key: "region:env", values: ["eu"] }],
+        }),
+      ).toThrow();
+    });
+
+    it("refuses an empty metadata value", () => {
+      expect(() =>
+        spendFiltersSchema.parse({ metadata: [{ key: "tier", values: [""] }] }),
+      ).toThrow();
     });
   });
 

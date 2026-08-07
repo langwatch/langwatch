@@ -219,7 +219,16 @@ export const spendFiltersSchema = z.object({
   metadata: z
     .array(
       z.object({
-        key: z.string().min(1).max(128),
+        // No colon, so this spelling cannot express a key the query spelling
+        // cannot. A filter the screen can set and a reconciliation script
+        // cannot reproduce is the drift this whole module exists to prevent.
+        key: z
+          .string()
+          .min(1)
+          .max(128)
+          .refine((raw) => !raw.includes(":"), {
+            message: "a metadata key cannot contain a colon",
+          }),
         // Non-empty for the same reason the query spelling is: ClickHouse
         // answers a missing Map key with the type default, so an empty value
         // matches every row that lacks the key.
