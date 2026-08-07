@@ -54,8 +54,12 @@ Feature: GroupQueue batch bisection
   # point of the budget is to stop walking and let backoff take over — but it
   # means "everything before the offender commits" and "an oversized batch
   # converges" hold only while the budget lasts, which is why both scenarios say
-  # so. Sizing the budget below log2(coalesceMaxBatch) makes isolation
-  # unreachable for a full batch.
+  # so. Isolating one offender costs a split per level of the path down to it,
+  # which for a full batch is floor(log2(coalesceMaxBatch)) when it falls left
+  # of every halving and one more when it does not; halves that succeed cost
+  # nothing, so where the offender sits barely matters, but a second offender
+  # in the same batch costs its own descent. A budget under that narrows the
+  # batch without ever isolating anything.
 
   @integration @coalescing @bisection
   Scenario: Payloads ahead of an unprocessable one still commit
