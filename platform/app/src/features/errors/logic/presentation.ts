@@ -730,6 +730,13 @@ const presentations = {
     title: "You can't disable your own membership",
     describe: () => "Ask another organization admin to make this change.",
   },
+  cannot_disable_last_admin: {
+    // Same lockout wall seen from the other side: this member is the only
+    // administrator left, so the remedy is to appoint another one first.
+    title: "That would leave the organization without an admin",
+    describe: () =>
+      "This member is the only active organization admin. Make somebody else an admin first, then disable them.",
+  },
   cannot_remove_self: {
     title: "You can't remove yourself from the organization",
     describe: () => "Ask another organization admin to make this change.",

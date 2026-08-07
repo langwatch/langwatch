@@ -111,6 +111,34 @@ export interface CreateAndAssignResult {
 }
 
 /**
+ * Input for creating an organization with no user attached: the instance
+ * provisioning path. Unlike {@link CreateAndAssignInput} there is no member to
+ * assign: the caller mints an organization-scoped admin API key afterwards,
+ * and that credential is how anything reaches the new organization.
+ */
+export interface CreateForProvisioningInput {
+  orgId: string;
+  orgName: string;
+  orgSlug: string;
+  teamId: string;
+  teamSlug: string;
+  pricingModel: PricingModel;
+}
+
+/**
+ * One organization as the instance provisioning surface reads it back: the
+ * natural key (`slug`) plus enough to tell entries apart. Deliberately not the
+ * settings shape: an instance administrator lists organizations to find one,
+ * not to manage it.
+ */
+export interface OrganizationProvisioningSummary {
+  id: string;
+  name: string;
+  slug: string;
+  createdAt: Date;
+}
+
+/**
  * Filter parameters for fetching audit logs.
  */
 export interface AuditLogFilters {
@@ -338,6 +366,23 @@ export interface OrganizationRepository {
 
   createAndAssign(input: CreateAndAssignInput): Promise<CreateAndAssignResult>;
 
+  /**
+   * Creates an organization and its default team with no user attached (the
+   * instance provisioning path). Throws `OrganizationSlugTakenError` when the
+   * slug is already claimed, so provisioning tools get a deterministic 409 on
+   * the natural key.
+   */
+  createForProvisioning(
+    input: CreateForProvisioningInput,
+  ): Promise<CreateAndAssignResult>;
+
+  /** Every organization on the instance, newest first. Instance-admin only. */
+  listProvisioningSummaries(): Promise<OrganizationProvisioningSummary[]>;
+
+  findProvisioningSummaryById(
+    organizationId: string,
+  ): Promise<OrganizationProvisioningSummary | null>;
+
   getAllForUser(params: {
     userId: string;
     isDemo: boolean;
@@ -510,6 +555,27 @@ export class NullOrganizationRepository implements OrganizationRepository {
       organization: { id: "", name: "" },
       team: { id: "", slug: "", name: "" },
     };
+  }
+
+  async createForProvisioning(
+    _input: CreateForProvisioningInput,
+  ): Promise<CreateAndAssignResult> {
+    return {
+      organization: { id: "", name: "" },
+      team: { id: "", slug: "", name: "" },
+    };
+  }
+
+  async listProvisioningSummaries(): Promise<
+    OrganizationProvisioningSummary[]
+  > {
+    return [];
+  }
+
+  async findProvisioningSummaryById(
+    _organizationId: string,
+  ): Promise<OrganizationProvisioningSummary | null> {
+    return null;
   }
 
   async getAllForUser(_params: {

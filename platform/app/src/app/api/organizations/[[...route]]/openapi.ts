@@ -1,0 +1,155 @@
+/**
+ * The published operations for the self-hosted organization provisioning
+ * family (the api-keys `openapi.ts` pattern: typed DescribeRouteOptions
+ * constants, request bodies left to the zod validators so the generator
+ * cannot drift from them).
+ *
+ * `security` names the instance credential rather than an organization key:
+ * this family exists before any organization does. On SaaS, and on
+ * deployments that have not configured `LANGWATCH_INSTANCE_ADMIN_API_KEY`,
+ * every path answers 404 — the reference documents the self-hosted
+ * capability.
+ */
+import type { DescribeRouteOptions } from "hono-openapi";
+
+type ResponseSpec = NonNullable<DescribeRouteOptions["responses"]>[string];
+
+const INSTANCE_KEY_SECURITY: DescribeRouteOptions["security"] = [
+  { instance_admin_key: [] },
+];
+
+const ORGANIZATION_SUMMARY_SCHEMA = {
+  type: "object" as const,
+  properties: {
+    id: { type: "string" as const },
+    name: { type: "string" as const },
+    slug: { type: "string" as const },
+    createdAt: { type: "string" as const, format: "date-time" },
+  },
+};
+
+const NOT_AVAILABLE_404: ResponseSpec = {
+  description:
+    "Organization provisioning is not available: the instance administrator key is not configured, this is a cloud deployment, or (on GET /{id}) the organization does not exist",
+};
+
+export const CREATE_ORGANIZATION: DescribeRouteOptions = {
+  operationId: "provisionOrganization",
+  summary: "Create an organization",
+  description:
+    "Self-hosted only. Creates an organization with a default team and returns an organization-scoped admin API key, so provisioning can continue through the management APIs without a browser step: the instance key creates the organization, the returned key does everything else. The slug is the natural key; a taken slug answers 409 organization_slug_taken.",
+  tags: ["Organizations (Self-Hosted)"],
+  security: INSTANCE_KEY_SECURITY,
+  responses: {
+    "201": {
+      description:
+        "Organization created. adminApiKey.token is the bootstrap credential and is only shown once.",
+      content: {
+        "application/json": {
+          schema: {
+            type: "object",
+            properties: {
+              organization: {
+                type: "object",
+                properties: {
+                  id: { type: "string" },
+                  name: { type: "string" },
+                  slug: { type: "string" },
+                },
+              },
+              team: {
+                type: "object",
+                properties: {
+                  id: { type: "string" },
+                  name: { type: "string" },
+                  slug: { type: "string" },
+                },
+              },
+              adminApiKey: {
+                type: "object",
+                properties: {
+                  id: { type: "string" },
+                  token: {
+                    type: "string",
+                    description:
+                      "Plaintext organization admin API key (sk-lw-...). Store securely: shown only once.",
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    "401": { description: "Invalid instance administrator credential" },
+    "404": NOT_AVAILABLE_404,
+    "409": {
+      description:
+        "An organization with this slug already exists (organization_slug_taken)",
+    },
+    "422": { description: "Validation error" },
+  },
+};
+
+export const LIST_ORGANIZATIONS: DescribeRouteOptions = {
+  operationId: "listOrganizations",
+  summary: "List organizations",
+  description:
+    "Self-hosted only. Lists every organization on this instance, newest first.",
+  tags: ["Organizations (Self-Hosted)"],
+  security: INSTANCE_KEY_SECURITY,
+  responses: {
+    "200": {
+      description: "Organizations on this instance",
+      content: {
+        "application/json": {
+          schema: {
+            type: "object",
+            properties: {
+              organizations: {
+                type: "array",
+                items: ORGANIZATION_SUMMARY_SCHEMA,
+              },
+            },
+          },
+        },
+      },
+    },
+    "401": { description: "Invalid instance administrator credential" },
+    "404": NOT_AVAILABLE_404,
+  },
+};
+
+export const GET_ORGANIZATION: DescribeRouteOptions = {
+  operationId: "getOrganizationById",
+  summary: "Get an organization",
+  description: "Self-hosted only. Reads one organization's summary by id.",
+  tags: ["Organizations (Self-Hosted)"],
+  security: INSTANCE_KEY_SECURITY,
+  parameters: [
+    {
+      name: "id",
+      in: "path",
+      required: true,
+      schema: { type: "string" },
+      description: "Organization ID",
+    },
+  ],
+  responses: {
+    "200": {
+      description: "The organization",
+      content: {
+        "application/json": {
+          schema: {
+            type: "object",
+            properties: {
+              organization: ORGANIZATION_SUMMARY_SCHEMA,
+            },
+          },
+        },
+      },
+    },
+    "401": { description: "Invalid instance administrator credential" },
+    "404": NOT_AVAILABLE_404,
+  },
+};

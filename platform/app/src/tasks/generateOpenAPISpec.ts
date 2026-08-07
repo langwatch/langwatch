@@ -21,7 +21,12 @@ import { app as modelDefaultsApp } from "../app/api/model-defaults/[[...route]]/
 import { app as modelProvidersApp } from "../app/api/model-providers/[[...route]]/app";
 import { app as monitorsApp } from "../app/api/monitors/[[...route]]/app";
 import rawCurrentSpec from "../app/api/openapiLangWatch.json";
+import { app as organizationApp } from "../app/api/organization/[[...route]]/app";
+import { app as organizationsApp } from "../app/api/organizations/[[...route]]/app";
 import { app as projectsApp } from "../app/api/projects/[[...route]]/app";
+import { app as roleBindingsApp } from "../app/api/role-bindings/[[...route]]/app";
+import { app as rolesApp } from "../app/api/roles/[[...route]]/app";
+import { app as scimTokensApp } from "../app/api/scim-tokens/[[...route]]/app";
 // The two legacy route files below are wired in for the routes they describe
 // and nothing else: `generateSpecs` skips any handler without `describeRoute`,
 // so the unannotated siblings sharing these files (the stripe webhook, the demo
@@ -60,8 +65,13 @@ const APP_DERIVED_PREFIXES = [
   "/api/graphs",
   "/api/groups",
   "/api/me",
+  "/api/organization",
+  "/api/organizations",
   "/api/projects",
   "/api/prompts",
+  "/api/role-bindings",
+  "/api/roles",
+  "/api/scim-tokens",
   "/api/dataset",
   "/api/model-defaults",
   "/api/model-providers",
@@ -175,8 +185,18 @@ export default async function execute() {
   const modelDefaultsSpec = await generateSpecs(modelDefaultsApp);
   console.log("Building model providers spec...");
   const modelProvidersSpec = await generateSpecs(modelProvidersApp);
+  console.log("Building organization spec...");
+  const organizationSpec = await generateSpecs(organizationApp);
+  console.log("Building organizations (instance provisioning) spec...");
+  const organizationsSpec = await generateSpecs(organizationsApp);
   console.log("Building projects spec...");
   const projectsSpec = await generateSpecs(projectsApp);
+  console.log("Building roles spec...");
+  const rolesSpec = await generateSpecs(rolesApp);
+  console.log("Building role bindings spec...");
+  const roleBindingsSpec = await generateSpecs(roleBindingsApp);
+  console.log("Building scim tokens spec...");
+  const scimTokensSpec = await generateSpecs(scimTokensApp);
   console.log("Building secrets spec...");
   const secretsSpec = await generateSpecs(secretsApp);
   console.log("Building scenarios spec...");
@@ -221,6 +241,11 @@ export default async function execute() {
       modelDefaultsSpec,
       modelProvidersSpec,
       monitorsSpec,
+      organizationSpec,
+      organizationsSpec,
+      roleBindingsSpec,
+      rolesSpec,
+      scimTokensSpec,
       scenarioEventsSpec,
       scenariosSpec,
       projectsSpec,

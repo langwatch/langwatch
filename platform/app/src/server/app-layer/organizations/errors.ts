@@ -70,6 +70,25 @@ export class CannotDisableSelfError extends HandledError {
   }
 }
 
+/**
+ * Disabling this membership would leave the organization without an active
+ * administrator, so nobody could sign in and undo it. Raised by the storage
+ * guard itself so every path that disables a member trips it, and handled so
+ * the REST surface answers a stable 400 instead of an unknown 500.
+ */
+export class CannotDisableLastAdminError extends HandledError {
+  declare readonly code: "cannot_disable_last_admin";
+
+  constructor() {
+    super(
+      "cannot_disable_last_admin",
+      "Cannot disable the last active administrator of an organization",
+      { httpStatus: 400 },
+    );
+    this.name = "CannotDisableLastAdminError";
+  }
+}
+
 /** The removal named the caller's own membership. Same guard as disabling. */
 export class CannotRemoveSelfError extends HandledError {
   declare readonly code: "cannot_remove_self";

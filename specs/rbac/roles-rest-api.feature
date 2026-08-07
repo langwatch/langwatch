@@ -28,7 +28,7 @@ Feature: Custom roles REST API
 
   @integration
   Scenario: Creating a role from permission keys succeeds
-    When I create a role named "Release Manager" with permissions "project:view" and "prompt:manage"
+    When I create a role named "Release Manager" with permissions "project:view" and "prompts:manage"
     Then the response status is 201
     And the response carries the role id, name, description and both permissions
 

@@ -43,6 +43,7 @@ export const APP_ERROR_CODES = [
   "broadcaster_not_active",
   "budget_not_found",
   "cache_rule_not_found",
+  "cannot_disable_last_admin",
   "cannot_disable_self",
   "cannot_impersonate_admin",
   "cannot_impersonate_deactivated_user",

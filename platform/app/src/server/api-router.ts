@@ -30,10 +30,15 @@ import { app as meApp } from "../app/api/me/[[...route]]/app";
 import { app as modelDefaultsApp } from "../app/api/model-defaults/[[...route]]/app";
 import { app as modelProvidersApp } from "../app/api/model-providers/[[...route]]/app";
 import { app as monitorsApp } from "../app/api/monitors/[[...route]]/app";
+import { app as organizationApp } from "../app/api/organization/[[...route]]/app";
+import { app as organizationsApp } from "../app/api/organizations/[[...route]]/app";
 import { app as projectsApp } from "../app/api/projects/[[...route]]/app";
 import { app as promptsApp } from "../app/api/prompts/[[...route]]/app";
+import { app as roleBindingsApp } from "../app/api/role-bindings/[[...route]]/app";
+import { app as rolesApp } from "../app/api/roles/[[...route]]/app";
 import { app as scenarioEventsApp } from "../app/api/scenario-events/[[...route]]/app";
 import { app as scenariosApp } from "../app/api/scenarios/[[...route]]/app";
+import { app as scimTokensApp } from "../app/api/scim-tokens/[[...route]]/app";
 import { app as secretsApp } from "../app/api/secrets/[[...route]]/app";
 import { app as simulationRunsApp } from "../app/api/simulation-runs/[[...route]]/app";
 import { app as suitesApp } from "../app/api/suites/[[...route]]/app";
@@ -146,7 +151,16 @@ export function createApiRouter() {
   api.route("/", modelProvidersApp);
   api.route("/", monitorsApp);
   api.route("/", apiKeysApp);
+  // Singular and plural are two disjoint surfaces: /api/organization is the
+  // credential-implied management family; /api/organizations is the
+  // self-hosted instance-admin provisioning family (absent, 404, unless the
+  // instance key is configured on a non-SaaS deployment).
+  api.route("/", organizationApp);
+  api.route("/", organizationsApp);
   api.route("/", projectsApp);
+  api.route("/", roleBindingsApp);
+  api.route("/", rolesApp);
+  api.route("/", scimTokensApp);
   api.route("/", promptsApp);
   api.route("/", scenarioEventsApp);
   api.route("/", scenariosApp);

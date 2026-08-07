@@ -6,7 +6,7 @@ import {
   type OrganizationIntent,
   OrganizationUserRole,
   PricingModel,
-  type Prisma,
+  Prisma,
   type PrismaClient,
   RoleBindingScopeType,
   TeamUserRole,
@@ -27,10 +27,15 @@ import {
   LiteMemberViewerOnlyError,
   TeamLastAdminRequiredError,
 } from "../../teams/team.service";
+import {
+  CannotDisableLastAdminError,
+  OrganizationSlugTakenError,
+} from "../errors";
 import type {
   AuditLogFilters,
   CreateAndAssignInput,
   CreateAndAssignResult,
+  CreateForProvisioningInput,
   DeleteMemberInput,
   EnrichedAuditLog,
   FullyLoadedOrganization,
@@ -38,6 +43,7 @@ import type {
   OrganizationForBilling,
   OrganizationMemberSummary,
   OrganizationMemberWithUser,
+  OrganizationProvisioningSummary,
   OrganizationRepository,
   OrganizationSettings,
   OrganizationWithAdmins,
@@ -317,6 +323,73 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
         organization: { id: organization.id, name: organization.name },
         team: { id: team.id, slug: team.slug, name: team.name },
       };
+    });
+  }
+
+  async createForProvisioning(
+    input: CreateForProvisioningInput,
+  ): Promise<CreateAndAssignResult> {
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        // Deterministic answer for the common case; the P2002 catch below
+        // still covers the race where two provisioning runs claim one slug.
+        const taken = await tx.organization.findUnique({
+          where: { slug: input.orgSlug },
+          select: { id: true },
+        });
+        if (taken) {
+          throw new OrganizationSlugTakenError(input.orgSlug);
+        }
+
+        const organization = await tx.organization.create({
+          data: {
+            id: input.orgId,
+            name: input.orgName,
+            slug: input.orgSlug,
+            pricingModel: input.pricingModel,
+          },
+        });
+
+        const team = await tx.team.create({
+          data: {
+            id: input.teamId,
+            name: input.orgName,
+            slug: input.teamSlug,
+            organizationId: organization.id,
+          },
+        });
+
+        return {
+          organization: { id: organization.id, name: organization.name },
+          team: { id: team.id, slug: team.slug, name: team.name },
+        };
+      });
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2002"
+      ) {
+        throw new OrganizationSlugTakenError(input.orgSlug);
+      }
+      throw error;
+    }
+  }
+
+  async listProvisioningSummaries(): Promise<
+    OrganizationProvisioningSummary[]
+  > {
+    return this.prisma.organization.findMany({
+      select: { id: true, name: true, slug: true, createdAt: true },
+      orderBy: { createdAt: "desc" },
+    });
+  }
+
+  async findProvisioningSummaryById(
+    organizationId: string,
+  ): Promise<OrganizationProvisioningSummary | null> {
+    return this.prisma.organization.findUnique({
+      where: { id: organizationId },
+      select: { id: true, name: true, slug: true, createdAt: true },
     });
   }
 
@@ -752,10 +825,11 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
         });
 
         if (activeAdmins <= 1) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: "Cannot disable the last admin of an organization",
-          });
+          // Handled rather than a TRPCError: the tRPC boundary maps a 400
+          // HandledError to BAD_REQUEST anyway, and the REST surface answers
+          // the stable code instead of flattening this refusal to an unknown
+          // 500.
+          throw new CannotDisableLastAdminError();
         }
       }
 

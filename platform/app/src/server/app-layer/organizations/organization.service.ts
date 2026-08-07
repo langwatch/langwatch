@@ -46,6 +46,7 @@ import type {
   OrganizationForBilling,
   OrganizationMemberSummary,
   OrganizationMemberWithUser,
+  OrganizationProvisioningSummary,
   OrganizationRepository,
   OrganizationSettings,
   OrganizationWithAdmins,
@@ -258,6 +259,63 @@ export class OrganizationService {
     });
 
     return result;
+  }
+
+  /**
+   * Creates an organization with a default team and NO user attached: the
+   * self-hosted instance provisioning path ({@link createAndAssign} requires a
+   * member to assign, and this path runs before any user exists).
+   *
+   * An explicit slug is taken verbatim, so infrastructure-as-code can address
+   * the organization by a natural key it chose; a missing slug is derived from
+   * the name with an id suffix, exactly like sign-up. A taken slug raises
+   * `organization_slug_taken` (409) from the repository.
+   */
+  async createForProvisioning(params: {
+    name: string;
+    slug?: string;
+  }): Promise<CreateAndAssignResult> {
+    const orgId = generate(KSUID_RESOURCES.ORGANIZATION).toString();
+    const orgSlug =
+      params.slug ??
+      slugify(params.name, { lower: true, strict: true }) +
+        "-" +
+        orgId.substring(orgId.length - 6);
+
+    const teamId = generate(KSUID_RESOURCES.TEAM).toString();
+    const teamSlug =
+      slugify(params.name, { lower: true, strict: true }) +
+      "-" +
+      teamId.substring(teamId.length - 6);
+
+    const result = await this.repo.createForProvisioning({
+      orgId,
+      orgName: params.name,
+      orgSlug,
+      teamId,
+      teamSlug,
+      pricingModel: PricingModel.SEAT_EVENT,
+    });
+
+    await this.promptTagRepo.seedForOrg({
+      organizationId: result.organization.id,
+    });
+
+    return result;
+  }
+
+  /** Every organization on the instance, for the instance-admin surface. */
+  async listProvisioningSummaries(): Promise<
+    OrganizationProvisioningSummary[]
+  > {
+    return this.repo.listProvisioningSummaries();
+  }
+
+  /** One organization's provisioning summary, or null when the id is unknown. */
+  async getProvisioningSummary(
+    organizationId: string,
+  ): Promise<OrganizationProvisioningSummary | null> {
+    return this.repo.findProvisioningSummaryById(organizationId);
   }
 
   /**
