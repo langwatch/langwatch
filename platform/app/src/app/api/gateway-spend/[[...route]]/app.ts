@@ -51,6 +51,7 @@ import { BadRequestError, ForbiddenError } from "../../shared/errors";
 import {
   END_USER_SPEND_DESCRIPTION,
   SPEND_EVENTS_PULL_DESCRIPTION,
+  SPEND_SUMMARIES_DESCRIPTION,
 } from "./contract";
 import { handleGatewaySpendApiError } from "./error-handler";
 
@@ -294,8 +295,7 @@ secured.access(requires("gatewaySpend:view")).get(
     ),
     tags: ["Gateway Spend"],
     summary: "List spend summaries",
-    description:
-      "Reconciliation checksum fast path: per-key spend rollups grouped by virtual key or end user, with token classes and integer nano-USD cost. Settled (unpriced) requests are counted separately as settled_count and never included in cost sums. Diff individual items via /spend-events only when a checksum diverges. Paged by group key ascending: follow next_cursor until it comes back null, because a page that is full does not mean the window held nothing more.",
+    description: SPEND_SUMMARIES_DESCRIPTION,
   }),
   zValidator("query", spendSummariesQuerySchema),
   async (c) => {

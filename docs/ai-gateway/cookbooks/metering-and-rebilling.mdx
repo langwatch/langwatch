@@ -154,7 +154,31 @@ curl -sS "$LW/api/gateway/v1/spend-summaries?group_by=virtual_key&from=$FROM_MS&
 # compare event_count and cost.nano_usd per key against your ledger
 ```
 
-Matching checksums end it. On divergence, walk `spend-events` for that key and window by cursor and diff by `gateway_request_id`; the missing or duplicated ids are your fix list. For a delivery gap (receiver outage, endpoint auto-disabled), [replay](/ai-gateway/billing-events#replay) the gap window to your endpoint, honoring your downstream biller's dedup window.
+Matching checksums end it. On divergence, walk `spend-events` for that key and window by cursor and diff by `gateway_request_id`; the missing or duplicated ids are your fix list. Both reads take the same filters, so you can narrow the walk to exactly what the checksum covered. For a delivery gap (receiver outage, endpoint auto-disabled), [replay](/ai-gateway/billing-events#replay) the gap window to your endpoint, honoring your downstream biller's dedup window.
+
+### Narrowing and grouping
+
+Repeat a filter to widen it and name two filters to narrow. Both reads accept `project_id`, `team_id`, `external_id`, `virtual_key_id`, `end_user_id`, `principal_user_id`, `model`, `provider_key`, `request_type`, `label`, `metadata` and `status`.
+
+```bash
+# Two models, one customer tier, one team, in one call
+curl -sS "$LW/api/gateway/v1/spend-summaries?group_by=model,end_user\
+&from=$FROM_MS&to=$TO_MS\
+&model=gpt-5-mini&model=claude-opus-5\
+&metadata=customer_tier:gold\
+&team_id=$TEAM_ID" \
+  -H "Authorization: Bearer $LANGWATCH_ORG_API_KEY"
+```
+
+`metadata` is written `key:value` and splits on the first colon, so a value may contain one. Repeating a key widens that key: `metadata=tier:gold&metadata=tier:silver` matches either.
+
+`group_by` takes one or two dimensions and `bucket=hour|day` adds a time column in the `timezone` you name. `key` stays the first dimension's value, so an integration written against the single-dimension response keeps working; read `group` to tell two dimensions apart.
+
+<Warning>
+Grouping by `model` or `provider`, or into time buckets, is refused with `gateway_spend_group_by_unstable` on a window recent enough that outcomes can still arrive. Until a request settles, the model and provider recorded against it are the ones that were **asked for**, and they are replaced by the ones that actually served it. A page walk over a group that can move counts some requests twice and misses others, which is the one failure a reconciliation cannot detect on its own.
+
+Reconcile closed periods and this never fires. For a live dashboard where an approximate shape is enough, send `allow_unstable=true`. The refusal carries `meta.settles_at`, so a scheduler can wait rather than guess.
+</Warning>
 
 ## 6. Breach handling and period close
 
