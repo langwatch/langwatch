@@ -104,7 +104,7 @@ export class EventSourcedQueueProcessorMemory<
     options?: QueueSendOptions<Payload>,
   ): Promise<void> {
     // Memory implementation allows sends after close since it has no persistent state
-    // This is different from BullMQ which should reject sends after shutdown
+    // This is different from groupQueue, which rejects sends after shutdown
 
     const dedup = options?.deduplication ?? this.deduplication;
     const effectiveDelay = options?.delay ?? this.delay;

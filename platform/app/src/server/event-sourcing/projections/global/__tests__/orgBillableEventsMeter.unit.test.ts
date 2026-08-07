@@ -215,7 +215,7 @@ describe("orgBillableEventsMeterStore", () => {
   });
 
   describe("given the App's repository rejects (ClickHouse insert fails)", () => {
-    it("throws for BullMQ retry", async () => {
+    it("throws so the queue retries", async () => {
       const insertError = new Error("ClickHouse connection timeout");
       mockInsert.mockRejectedValue(insertError);
       mockGetApp.mockReturnValue({

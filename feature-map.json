@@ -201,8 +201,11 @@
             "platform": {
               "ui": "/evaluations",
               "mcp": [
-                "platform_run_evaluation",
-                "platform_evaluation_status"
+                "platform_experiment_list",
+                "platform_run_experiment",
+                "platform_experiment_status",
+                "platform_experiment_list_runs",
+                "platform_experiment_results"
               ],
               "skill": null,
               "docs": "https://langwatch.ai/docs/evaluations/experiments/overview.md"

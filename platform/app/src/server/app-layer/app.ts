@@ -176,7 +176,7 @@ export function getApp(): App {
 
 export async function resetApp(): Promise<void> {
   // Close the previous App before dropping the singleton so its EventSourcing
-  // and graceful-closeable handles (Redis, BullMQ workers, etc.) don't leak
+  // and graceful-closeable handles (Redis, queue workers, etc.) don't leak
   // into the next test. Without this the prior App is orphaned and its open
   // handles keep vitest's single fork worker from exiting between files.
   const existing = globalForApp.__langwatch_app;

@@ -660,7 +660,7 @@ secured
       }
 
       // Total ingestion failure: every dispatched span failed (e.g. Redis /
-      // group-queue outage). With the BullMQ fallback stack gone, a 200 here
+      // group-queue outage). There is no fallback stack, so a 200 here
       // would tell the SDK the trace landed and it would never retry —
       // permanent trace loss. Return 500 so clients retry; the dedup gate
       // releases failed spans via tryReleaseOnFailure, so a retry is safe.
