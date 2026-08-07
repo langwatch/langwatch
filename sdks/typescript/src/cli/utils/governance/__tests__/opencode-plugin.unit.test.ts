@@ -144,8 +144,12 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  process.env.HOME = origHome;
-  process.env.USERPROFILE = origUserprofile;
+  // Assigning undefined to process.env stores the string "undefined", which
+  // then leaks into every later test in this worker.
+  if (origHome === undefined) delete process.env.HOME;
+  else process.env.HOME = origHome;
+  if (origUserprofile === undefined) delete process.env.USERPROFILE;
+  else process.env.USERPROFILE = origUserprofile;
   if (origXdg === undefined) delete process.env.XDG_CONFIG_HOME;
   else process.env.XDG_CONFIG_HOME = origXdg;
   fs.rmSync(tmpHome, { recursive: true, force: true });
@@ -262,7 +266,7 @@ describe("the generated plugin module", () => {
   });
 
   describe("when a session is created", () => {
-    /** @scenario "Installing opencode writes the session context plugin" */
+    /** @scenario "The opencode plugin runs the hook for each session event" */
     it("runs the hook command with the session id and the session's directory", () => {
       const invocation = runPluginEvent({
         directory: "/fallback",

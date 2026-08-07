@@ -23,7 +23,13 @@ import {
 } from "@/cli/utils/governance/opencode-plugin";
 import { sessionContextHookCommand } from "@/cli/utils/governance/session-context-hooks";
 
-const mintIngestionKeyMock = vi.fn();
+// Hoisted, because the factory below is: a plain top-level const is still in
+// its temporal dead zone if anything on the static import graph reaches
+// cli-api before this line runs.
+const { mintIngestionKeyMock } = vi.hoisted(() => ({
+  mintIngestionKeyMock: vi.fn(),
+}));
+
 vi.mock("@/cli/utils/governance/cli-api", async () => {
   const actual = await vi.importActual<typeof CliApiModule>(
     "@/cli/utils/governance/cli-api",

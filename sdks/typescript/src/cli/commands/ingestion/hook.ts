@@ -29,20 +29,17 @@
  *     the user's session context, so one stray line would land in the
  *     model's prompt. Diagnostics go to stderr, and only when `DEBUG`
  *     contains "langwatch" (the CLI's existing debug convention).
- *   - ALWAYS EXIT ZERO. Unparseable input, no repository, no telemetry
- *     configured, a collector that refuses the post: every one of them
- *     returns quietly. A hook is never allowed to be why a session broke.
+ *   - ALWAYS EXIT ZERO, AND SOON. Unparseable input, no repository, no
+ *     telemetry configured, a collector that refuses the post: every one of
+ *     them returns quietly. Every wait is bounded, stdin included, so a seam
+ *     that never closes a pipe cannot leave the hook alive for the rest of the
+ *     session. A hook is never allowed to be why a session broke.
  *
  * A failed post deliberately leaves the fingerprint file alone, so the next
  * hook in the same session retries instead of assuming the context landed.
  *
  * Spec: specs/ai-governance/cli-wrappers/session-context-hook.feature
  */
-
-import { spawnSync } from "node:child_process";
-import * as fs from "node:fs";
-import * as os from "node:os";
-import * as path from "node:path";
 
 import { resolveLogsEndpoint } from "@/cli/telemetry/events";
 import {
@@ -52,11 +49,22 @@ import {
 import { LANGWATCH_SDK_VERSION } from "@/internal/constants";
 
 import {
+  type GitRunner,
+  readSessionContext,
+  runGitCommand,
+} from "./git-context";
+import { parseHookInput, readStdin } from "./hook-input";
+import {
+  defaultStateDir,
+  pruneStaleState,
+  readFingerprint,
+  stateFilePath,
+  writeFingerprint,
+} from "./hook-state";
+import {
   buildSessionContextLogPayload,
-  parseGitRemoteUrl,
   parseOtlpHeaders,
   parseTraceparent,
-  type SessionContext,
   sessionContextFingerprint,
 } from "./session-context";
 
@@ -92,15 +100,6 @@ const TOOLS: Record<
 /** How long the collector has to accept the record before we give up on it. */
 const POST_TIMEOUT_MS = 3_000;
 
-/** How long a single git invocation may take. */
-const GIT_TIMEOUT_MS = 2_000;
-
-/** Fingerprints for sessions last seen longer ago than this are pruned. */
-const STATE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1_000;
-
-/** Runs one git command in a directory. Trimmed stdout, or null on any failure. */
-export type GitRunner = (args: { args: string[]; cwd: string }) => string | null;
-
 export interface HookCommandOptions {
   /** The agent the hook is running for: `claude-code`, `codex` or `opencode`. */
   tool: string;
@@ -133,12 +132,6 @@ interface TelemetryTarget {
   headers: Record<string, string>;
 }
 
-interface HookInput {
-  sessionId?: string;
-  cwd?: string;
-  hookEventName?: string;
-}
-
 /**
  * Emit the session's git context, once per distinct context per session.
  * Never writes stdout, never throws, never exits non-zero.
@@ -165,7 +158,7 @@ export async function hookCommand({
       readCliConfig,
     });
   } catch (error) {
-    debug(`hook failed: ${(error as Error).message}`, env);
+    debug({ message: `hook failed: ${(error as Error).message}`, env });
   }
 }
 
@@ -190,7 +183,7 @@ async function runHook({
 }): Promise<void> {
   const spec = TOOLS[tool.trim().toLowerCase().replace(/-/g, "_")];
   if (!spec) {
-    debug(`no hook for tool '${tool}'`, env);
+    debug({ message: `no hook for tool '${tool}'`, env });
     return;
   }
   const agent = spec.agent;
@@ -201,16 +194,22 @@ async function runHook({
     spec.sessionIdVar ? env[spec.sessionIdVar] : undefined,
   );
   if (!sessionId) {
-    debug("no session id in the hook input or the environment", env);
+    debug({ message: "no session id in the hook input or the environment", env });
     return;
   }
-  debug(`${input.hookEventName ?? "hook"} for session ${sessionId}`, env);
+  debug({
+    message: `${input.hookEventName ?? "hook"} for session ${sessionId}`,
+    env,
+  });
 
   // Checked before any git work: an agent with no telemetry configured is
   // the common case, and it must cost nothing but this lookup.
   const target = resolveTarget({ env, agent, readCliConfig });
   if (!target) {
-    debug("no telemetry target in the environment or the CLI config", env);
+    debug({
+      message: "no telemetry target in the environment or the CLI config",
+      env,
+    });
     return;
   }
 
@@ -218,19 +217,19 @@ async function runHook({
   const directory = firstNonEmpty(projectDir, input.cwd) ?? process.cwd();
   const context = readSessionContext({ directory, runGit });
   if (!context) {
-    debug(`no git repository with an origin remote at ${directory}`, env);
+    debug({
+      message: `no git repository with an origin remote at ${directory}`,
+      env,
+    });
     return;
   }
 
   const fingerprint = sessionContextFingerprint(context);
   pruneStaleState({ stateDir, now });
 
-  const stateFile = path.join(
-    stateDir,
-    `${stateFileName(`${agent}-${sessionId}`)}.json`,
-  );
+  const stateFile = stateFilePath({ stateDir, agent, sessionId });
   if (readFingerprint(stateFile) === fingerprint) {
-    debug("context unchanged since the last post", env);
+    debug({ message: "context unchanged since the last post", env });
     return;
   }
 
@@ -252,8 +251,16 @@ async function runHook({
   });
   if (!posted) return;
 
-  writeFingerprint({ stateFile, fingerprint, now, env });
-  debug(`posted ${fingerprint}`, env);
+  try {
+    writeFingerprint({ stateFile, fingerprint, now });
+  } catch (error) {
+    // A fingerprint we cannot record costs one duplicate record next time.
+    debug({
+      message: `could not record the fingerprint: ${(error as Error).message}`,
+      env,
+    });
+  }
+  debug({ message: `posted ${fingerprint}`, env });
 }
 
 /**
@@ -299,57 +306,6 @@ function resolveTarget({
   };
 }
 
-/** The git identity of `directory`, or null when it is not a repository we can name. */
-function readSessionContext({
-  directory,
-  runGit,
-}: {
-  directory: string;
-  runGit: GitRunner;
-}): SessionContext | null {
-  const remote = runGit({ args: ["remote", "get-url", "origin"], cwd: directory });
-  const repository = remote === null ? null : parseGitRemoteUrl(remote);
-  if (!repository) return null;
-
-  // Empty on a detached HEAD, which is a state to omit rather than invent.
-  const branch = runGit({ args: ["branch", "--show-current"], cwd: directory });
-  const worktree = readWorktreeName({ directory, runGit });
-
-  return {
-    repository,
-    ...(branch ? { branch } : {}),
-    ...(worktree ? { worktree } : {}),
-  };
-}
-
-/**
- * The name of the linked worktree `directory` sits in, or undefined in the
- * main checkout. A linked worktree is exactly the case where the per-worktree
- * git dir differs from the common one; its name is the directory it is
- * checked out into, which is what people call it.
- */
-function readWorktreeName({
-  directory,
-  runGit,
-}: {
-  directory: string;
-  runGit: GitRunner;
-}): string | undefined {
-  const gitDir = runGit({ args: ["rev-parse", "--git-dir"], cwd: directory });
-  const commonDir = runGit({
-    args: ["rev-parse", "--git-common-dir"],
-    cwd: directory,
-  });
-  if (!gitDir || !commonDir) return undefined;
-  // Both may come back relative to the directory, so resolve before comparing.
-  if (path.resolve(directory, gitDir) === path.resolve(directory, commonDir)) {
-    return undefined;
-  }
-
-  const topLevel = runGit({ args: ["rev-parse", "--show-toplevel"], cwd: directory });
-  return topLevel ? path.basename(topLevel) : undefined;
-}
-
 async function postSessionContext({
   target,
   env,
@@ -376,40 +332,16 @@ async function postSessionContext({
       signal: controller.signal,
     });
     if (!response.ok) {
-      debug(`collector answered ${response.status}`, env);
+      debug({ message: `collector answered ${response.status}`, env });
       return false;
     }
     return true;
   } catch (error) {
-    debug(`post failed: ${(error as Error).message}`, env);
+    debug({ message: `post failed: ${(error as Error).message}`, env });
     return false;
   } finally {
     clearTimeout(timer);
   }
-}
-
-function parseHookInput(raw: string): HookInput {
-  try {
-    const parsed: unknown = JSON.parse(raw);
-    if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
-      return {};
-    }
-    const record = parsed as Record<string, unknown>;
-    return {
-      sessionId: stringField(record.session_id),
-      cwd: stringField(record.cwd),
-      hookEventName: stringField(record.hook_event_name),
-    };
-  } catch {
-    // Empty stdin, or something that is not JSON. Neither is worth a word.
-    return {};
-  }
-}
-
-function stringField(value: unknown): string | undefined {
-  if (typeof value !== "string") return undefined;
-  const trimmed = value.trim();
-  return trimmed === "" ? undefined : trimmed;
 }
 
 function firstNonEmpty(...values: Array<string | undefined>): string | undefined {
@@ -420,111 +352,13 @@ function firstNonEmpty(...values: Array<string | undefined>): string | undefined
   return undefined;
 }
 
-/** Drain stdin. A terminal is not a hook payload, so it reads as empty. */
-async function readStdin(): Promise<string> {
-  if (process.stdin.isTTY) return "";
-  const chunks: Buffer[] = [];
-  for await (const chunk of process.stdin) chunks.push(chunk as Buffer);
-  return Buffer.concat(chunks).toString("utf8");
-}
-
-function runGitCommand({ args, cwd }: { args: string[]; cwd: string }): string | null {
-  try {
-    const result = spawnSync("git", ["-C", cwd, ...args], {
-      encoding: "utf8",
-      timeout: GIT_TIMEOUT_MS,
-    });
-    if (result.status !== 0 || typeof result.stdout !== "string") return null;
-    const output = result.stdout.trim();
-    return output === "" ? null : output;
-  } catch {
-    return null;
-  }
-}
-
-/** `~/.langwatch/state/session-context`, beside the CLI's own config. */
-function defaultStateDir(): string {
-  return path.join(os.homedir(), ".langwatch", "state", "session-context");
-}
-
-/**
- * One path segment, whatever the agent and session id turn out to contain.
- * The agent is part of the key because session ids are only unique within one
- * agent, and two agents sharing a fingerprint would leave the second silent.
- */
-function stateFileName(key: string): string {
-  return key.replace(/[^A-Za-z0-9._-]/g, "_").slice(0, 128);
-}
-
-function readFingerprint(stateFile: string): string | null {
-  try {
-    const parsed: unknown = JSON.parse(fs.readFileSync(stateFile, "utf8"));
-    if (parsed === null || typeof parsed !== "object") return null;
-    const fingerprint = (parsed as { fingerprint?: unknown }).fingerprint;
-    return typeof fingerprint === "string" ? fingerprint : null;
-  } catch {
-    // Nothing recorded for this session yet, or a file we cannot read: post.
-    return null;
-  }
-}
-
-function writeFingerprint({
-  stateFile,
-  fingerprint,
-  now,
+function debug({
+  message,
   env,
 }: {
-  stateFile: string;
-  fingerprint: string;
-  now: () => number;
+  message: string;
   env: NodeJS.ProcessEnv;
 }): void {
-  try {
-    fs.mkdirSync(path.dirname(stateFile), { recursive: true, mode: 0o700 });
-    fs.writeFileSync(
-      stateFile,
-      JSON.stringify({
-        fingerprint,
-        updated_at: new Date(now()).toISOString(),
-      }),
-      { mode: 0o600 },
-    );
-  } catch (error) {
-    // A fingerprint we cannot record costs one duplicate record next time.
-    debug(`could not record the fingerprint: ${(error as Error).message}`, env);
-  }
-}
-
-/**
- * Drop fingerprints for sessions nobody has touched in a week. Opportunistic:
- * the directory is small, this runs on a hook that is already doing IO, and
- * every failure is beneath mentioning.
- */
-function pruneStaleState({
-  stateDir,
-  now,
-}: {
-  stateDir: string;
-  now: () => number;
-}): void {
-  try {
-    for (const entry of fs.readdirSync(stateDir)) {
-      if (!entry.endsWith(".json")) continue;
-      const file = path.join(stateDir, entry);
-      try {
-        if (now() - fs.statSync(file).mtimeMs > STATE_MAX_AGE_MS) {
-          fs.unlinkSync(file);
-        }
-      } catch {
-        // Raced with another hook, or unreadable. Either way, leave it.
-      }
-    }
-  } catch {
-    // No state directory yet.
-  }
-}
-
-function debug(message: string, env: NodeJS.ProcessEnv): void {
   if (!env.DEBUG?.includes("langwatch")) return;
   process.stderr.write(`langwatch:hook ${message}\n`);
 }

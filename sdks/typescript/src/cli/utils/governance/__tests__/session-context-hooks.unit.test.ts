@@ -40,7 +40,10 @@ const userEntry = {
   hooks: [{ type: "command", command: "./scripts/greet.sh", timeout: 5 }],
 };
 
-const install = (tool: HookedTool = "claude_code", filePath?: string) =>
+const install = ({
+  tool = "claude_code",
+  filePath,
+}: { tool?: HookedTool; filePath?: string } = {}) =>
   installSessionContextHooks({ tool, ...(filePath ? { filePath } : {}) });
 
 const has = (tool: HookedTool = "claude_code") =>
@@ -66,8 +69,12 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  process.env.HOME = origHome;
-  process.env.USERPROFILE = origUserprofile;
+  // Assigning undefined to process.env stores the string "undefined", which
+  // then leaks into every later test in this worker.
+  if (origHome === undefined) delete process.env.HOME;
+  else process.env.HOME = origHome;
+  if (origUserprofile === undefined) delete process.env.USERPROFILE;
+  else process.env.USERPROFILE = origUserprofile;
   if (origCodexHome === undefined) delete process.env.CODEX_HOME;
   else process.env.CODEX_HOME = origCodexHome;
   fs.rmSync(tmpHome, { recursive: true, force: true });
@@ -162,7 +169,7 @@ describe("installSessionContextHooks", () => {
     it("merges into that file instead of the home directory one", () => {
       const custom = path.join(tmpHome, "elsewhere", "settings.json");
 
-      const result = install("claude_code", custom);
+      const result = install({ filePath: custom });
 
       expect(result.action).toBe("created");
       expect(result.path).toBe(custom);
@@ -170,9 +177,20 @@ describe("installSessionContextHooks", () => {
     });
   });
 
+  describe("given a settings file that is not valid json", () => {
+    /** @scenario "A settings file LangWatch cannot parse is never overwritten" */
+    it("refuses to write, leaving the user's file exactly as it was", () => {
+      fs.mkdirSync(path.dirname(settingsPath), { recursive: true });
+      fs.writeFileSync(settingsPath, '{"hooks": {,}');
+
+      expect(() => install()).toThrow(/is not valid JSON/);
+      expect(fs.readFileSync(settingsPath, "utf8")).toBe('{"hooks": {,}');
+    });
+  });
+
   describe("when the tool is codex", () => {
     it("writes the codex hook command into the codex hooks file", () => {
-      const result = install("codex");
+      const result = install({ tool: "codex" });
 
       expect(result.path).toBe(path.join(tmpHome, ".codex", "hooks.json"));
       expect(result.displayPath).toBe("~/.codex/hooks.json");
@@ -190,7 +208,7 @@ describe("installSessionContextHooks", () => {
       expect(sessionContextHooksTarget("codex").path).toBe(
         path.join(tmpHome, "elsewhere", "hooks.json"),
       );
-      expect(install("codex").path).toBe(
+      expect(install({ tool: "codex" }).path).toBe(
         path.join(tmpHome, "elsewhere", "hooks.json"),
       );
     });
@@ -206,7 +224,7 @@ describe("installSessionContextHooks", () => {
         }),
       );
 
-      expect(install("codex").action).toBe("updated");
+      expect(install({ tool: "codex" }).action).toBe("updated");
 
       const document = readSettings(codexHooks);
       expect(document.description).toBe("mine");
@@ -217,7 +235,7 @@ describe("installSessionContextHooks", () => {
     });
 
     it("leaves the claude settings file alone", () => {
-      install("codex");
+      install({ tool: "codex" });
 
       expect(fs.existsSync(settingsPath)).toBe(false);
     });
@@ -277,7 +295,7 @@ describe("removeSessionContextHooks", () => {
 
   describe("when the tool is codex", () => {
     it("takes our entries out of the codex hooks file", () => {
-      install("codex");
+      install({ tool: "codex" });
 
       expect(remove("codex")).toBe(true);
       expect(readSettings(path.join(tmpHome, ".codex", "hooks.json"))).toEqual(

@@ -87,6 +87,9 @@ const SCP_LIKE = /^(?:[^@/]+@)?([^:/]+):(.+)$/;
 
 const TRACEPARENT = /^00-([0-9a-f]{32})-([0-9a-f]{16})-/;
 
+/** An id made entirely of zeroes, which W3C defines as invalid. */
+const ALL_ZERO = /^0+$/;
+
 /**
  * Read `{host, owner, name}` out of an origin remote URL. Null when the URL
  * is empty, unparseable, or carries no owner/name pair, which the caller
@@ -160,10 +163,19 @@ export function parseOtlpHeaders(raw: string | undefined): Record<string, string
  * The trace and span ids out of a W3C `traceparent`. Only version `00` is
  * accepted: a future version may lay its fields out differently, and a
  * misread id would attach the record to a trace that does not exist.
+ *
+ * All-zero ids are rejected for the same reason. They are the W3C spelling of
+ * "there is no valid context here", and OTel SDKs emit that string verbatim
+ * when asked to inject one, so honouring it would point the record at a trace
+ * that was never created.
  */
 export function parseTraceparent(raw: string | undefined): TraceContext | null {
   const match = TRACEPARENT.exec(raw?.trim() ?? "");
-  return match ? { traceId: match[1]!, spanId: match[2]! } : null;
+  if (!match) return null;
+  const traceId = match[1]!;
+  const spanId = match[2]!;
+  if (ALL_ZERO.test(traceId) || ALL_ZERO.test(spanId)) return null;
+  return { traceId, spanId };
 }
 
 /**
@@ -189,24 +201,32 @@ export function buildSessionContextLogPayload({
   trace?: TraceContext | null;
 }): OtlpLogsPayload {
   const attributes: OtlpKeyValue[] = [
-    attribute("event.name", SESSION_CONTEXT_EVENT_NAME),
-    attribute("session.id", sessionId),
-    attribute("coding_agent.name", agent),
-    attribute("vcs.repository.host", context.repository.host),
-    attribute("vcs.repository.owner", context.repository.owner),
-    attribute("vcs.repository.name", context.repository.name),
+    attribute({ key: "event.name", value: SESSION_CONTEXT_EVENT_NAME }),
+    attribute({ key: "session.id", value: sessionId }),
+    attribute({ key: "coding_agent.name", value: agent }),
+    attribute({ key: "vcs.repository.host", value: context.repository.host }),
+    attribute({ key: "vcs.repository.owner", value: context.repository.owner }),
+    attribute({ key: "vcs.repository.name", value: context.repository.name }),
   ];
   if (context.branch) {
-    attributes.push(attribute("vcs.ref.head.name", context.branch));
+    attributes.push(
+      attribute({ key: "vcs.ref.head.name", value: context.branch }),
+    );
   }
   if (context.worktree) {
-    attributes.push(attribute("vcs.worktree.name", context.worktree));
+    attributes.push(
+      attribute({ key: "vcs.worktree.name", value: context.worktree }),
+    );
   }
 
   return {
     resourceLogs: [
       {
-        resource: { attributes: [attribute("service.name", SERVICE_NAME)] },
+        resource: {
+          attributes: [
+            attribute({ key: "service.name", value: SERVICE_NAME }),
+          ],
+        },
         scopeLogs: [
           {
             scope: { name: SESSION_CONTEXT_SCOPE_NAME, version: scopeVersion },
@@ -229,6 +249,12 @@ export function buildSessionContextLogPayload({
   };
 }
 
-function attribute(key: string, value: string): OtlpKeyValue {
+function attribute({
+  key,
+  value,
+}: {
+  key: string;
+  value: string;
+}): OtlpKeyValue {
   return { key, value: { stringValue: value } };
 }

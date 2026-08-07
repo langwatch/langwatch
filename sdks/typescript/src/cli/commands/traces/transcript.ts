@@ -5,6 +5,7 @@ import { createSpinner } from "../../utils/spinner";
 import { resolveCredentials } from "../../utils/apiKey";
 import { formatFetchError } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
+import { clockTime, dayHeading, localDay } from "../../utils/event-clock";
 import {
   printResult,
   type RawOutputFlags,
@@ -115,7 +116,13 @@ const plural = (count: number, singular: string, pluralForm?: string): string =>
 /** Human rendering: one line per entry, economics dimmed, prompts loud. */
 const renderTranscript = (doc: TranscriptDocument): void => {
   console.log();
+  let day = "";
   for (const entry of doc.entries) {
+    const entryDay = localDay(entry.atMs);
+    if (entryDay !== day) {
+      day = entryDay;
+      console.log(chalk.gray(dayHeading(entry.atMs)));
+    }
     console.log(renderEntry(entry));
   }
   console.log();
@@ -128,8 +135,7 @@ const renderTranscript = (doc: TranscriptDocument): void => {
 };
 
 const renderEntry = (entry: TranscriptEntry): string => {
-  const time = new Date(entry.atMs).toISOString().slice(11, 19);
-  const stamp = chalk.gray(time);
+  const stamp = chalk.gray(clockTime(entry.atMs));
 
   switch (entry.kind) {
     case "system_prompt":

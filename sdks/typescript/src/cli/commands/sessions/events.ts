@@ -4,6 +4,7 @@ import { createSpinner } from "../../utils/spinner";
 import { resolveCredentials } from "../../utils/apiKey";
 import { formatFetchError } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
+import { clockTime, dayHeading, localDay } from "../../utils/event-clock";
 import {
   printResult,
   type RawOutputFlags,
@@ -224,7 +225,13 @@ export const sessionEventsCommand = async (
 
 const renderEvents = (rows: SessionEvent[]): void => {
   console.log();
+  let day = "";
   for (const event of rows) {
+    const eventDay = localDay(event.timeUnixMs);
+    if (eventDay !== day) {
+      day = eventDay;
+      console.log(chalk.gray(dayHeading(event.timeUnixMs)));
+    }
     console.log(renderEvent(event));
   }
   if (rows.length === 0) {
@@ -234,8 +241,7 @@ const renderEvents = (rows: SessionEvent[]): void => {
 };
 
 const renderEvent = (event: SessionEvent): string => {
-  const time = new Date(event.timeUnixMs).toISOString().slice(11, 19);
-  const stamp = chalk.gray(time);
+  const stamp = chalk.gray(clockTime(event.timeUnixMs));
 
   switch (event.eventKind) {
     case "model_call": {

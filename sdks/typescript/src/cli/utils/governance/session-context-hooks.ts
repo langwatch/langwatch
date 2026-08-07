@@ -31,7 +31,11 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 
-import { appSettingsTargetFor, readAppSettingsFile } from "./app-settings";
+import {
+	appSettingsTargetFor,
+	readAppSettingsFile,
+	readAppSettingsFileForUpdate,
+} from "./app-settings";
 
 /** The agents whose session context rides on a command hook. */
 export type HookedTool = "claude_code" | "codex";
@@ -109,6 +113,9 @@ export interface SessionContextHooksInstallResult extends HooksTarget {
  * Merge the session-context hooks into the tool's hook file, creating it and
  * its directory when missing. Idempotent: running twice leaves exactly one
  * entry per event, and reports `unchanged` the second time.
+ *
+ * Throws when an existing file cannot be read as a JSON object: the write
+ * replaces it wholesale, and the user's own hooks live in there too.
  */
 export function installSessionContextHooks({
 	tool,
@@ -117,10 +124,10 @@ export function installSessionContextHooks({
 	tool: HookedTool;
 	filePath?: string;
 }): SessionContextHooksInstallResult {
-	const target = resolveTarget(tool, filePath);
+	const target = resolveTarget({ tool, filePath });
 	const existedBefore = fs.existsSync(target.path);
 
-	const document = readAppSettingsFile(target.path);
+	const document = readAppSettingsFileForUpdate(target.path);
 	const before = JSON.stringify(document);
 
 	const hooks = isPlainObject(document.hooks) ? document.hooks : {};
@@ -149,7 +156,7 @@ export function hasSessionContextHooks({
 	tool: HookedTool;
 	filePath?: string;
 }): boolean {
-	const document = readAppSettingsFile(resolveTarget(tool, filePath).path);
+	const document = readAppSettingsFile(resolveTarget({ tool, filePath }).path);
 	if (!isPlainObject(document.hooks)) return false;
 	return Object.values(document.hooks).some(
 		(entries) => Array.isArray(entries) && entries.some(isLangwatchHookEntry),
@@ -172,7 +179,7 @@ export function removeSessionContextHooks({
 	tool: HookedTool;
 	filePath?: string;
 }): boolean {
-	const target = resolveTarget(tool, filePath);
+	const target = resolveTarget({ tool, filePath });
 
 	let raw: string;
 	try {
@@ -250,10 +257,13 @@ function isLangwatchHookEntry(entry: unknown): boolean {
 	});
 }
 
-function resolveTarget(
-	tool: HookedTool,
-	filePath: string | undefined,
-): HooksTarget {
+function resolveTarget({
+	tool,
+	filePath,
+}: {
+	tool: HookedTool;
+	filePath: string | undefined;
+}): HooksTarget {
 	if (filePath) return { path: filePath, displayPath: filePath };
 	return TARGETS[tool].resolveTarget();
 }

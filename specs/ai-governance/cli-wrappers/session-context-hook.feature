@@ -2,6 +2,9 @@
 #
 # Implementation:
 #   sdks/typescript/src/cli/commands/ingestion/hook.ts                 (the hook command, shared by every agent)
+#   sdks/typescript/src/cli/commands/ingestion/hook-input.ts           (the payload the agent writes to its stdin)
+#   sdks/typescript/src/cli/commands/ingestion/git-context.ts          (what git says about the session's directory)
+#   sdks/typescript/src/cli/commands/ingestion/hook-state.ts           (the per-session fingerprint store)
 #   sdks/typescript/src/cli/commands/ingestion/install.ts              (each tool's seam wired at install)
 #   sdks/typescript/src/cli/utils/governance/session-context-hooks.ts  (the Claude Code and Codex hook files)
 #   sdks/typescript/src/cli/utils/governance/opencode-plugin.ts        (the opencode plugin file)
@@ -71,6 +74,19 @@ Rule: Installing wires each tool's seam without touching the user's own
     And it runs the hook command for opencode
 
   @unit
+  Scenario: A device whose exports are already current still gets the hooks
+    Given telemetry exports persisted before the session hooks existed
+    When the wrapper re-asserts that device's telemetry wiring
+    Then the session hooks are installed and the exports are left as they were
+
+  @unit
+  Scenario: A settings file LangWatch cannot parse is never overwritten
+    Given a settings file that is not valid JSON
+    When the session hooks are installed into it
+    Then the file is left exactly as it was
+    And the install reports that it could not merge into it
+
+  @unit
   Scenario: Logout removes exactly the LangWatch hook entries
     Given a settings file with LangWatch hooks and a user-authored hook
     When logout removes the telemetry targets
@@ -106,10 +122,22 @@ Rule: The hook reports the git identity of the session
     Then each record declares its own agent
 
   @unit
+  Scenario: The opencode plugin runs the hook for each session event
+    Given an opencode session that has just been created
+    When the plugin receives the event
+    Then it runs the hook command with the session id and the session's directory
+
+  @unit
   Scenario: The Stop hook attaches the live trace context when present
     Given a Stop invocation whose environment carries a traceparent
     When the hook runs
     Then the posted record carries that trace and span id
+
+  @unit
+  Scenario: A traceparent that names no live context leaves the record unlinked
+    Given a Stop invocation whose traceparent carries the all-zero ids
+    When the hook runs
+    Then the posted record carries no trace id
 
   @unit
   Scenario: An unchanged context does not re-post
@@ -170,6 +198,12 @@ Rule: The hook never disturbs the session
     Given a hook invocation whose telemetry endpoint is unreachable
     When the hook runs
     Then stdout stays empty and the exit code is zero
+
+  @unit
+  Scenario: A payload that never arrives does not outlive the session
+    Given a seam that spawns the hook with a pipe it never closes
+    When the hook reads its payload
+    Then it stops waiting at the deadline and releases the pipe
 
   @unit
   Scenario: The opencode plugin never fails the session it runs in

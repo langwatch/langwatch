@@ -215,9 +215,12 @@ export async function resolveLiveIngestionKey({
  * on some earlier run) and its values differ. Returns the refreshed
  * target's label, or null when nothing was touched.
  *
- * A refresh also re-asserts the session context hooks in the same file:
- * they are part of the wiring the persisted block stands for, and a login
- * against a different instance is exactly when they can be missing.
+ * Every run also re-asserts the session context hooks in the same file, not
+ * only the runs that rewrite the env. They are part of the wiring the persisted
+ * block stands for, and the block outlived the CLI version that started writing
+ * them, so a device that persisted earlier has the env and none of the hooks.
+ * The hooks name no endpoint, so asserting them refreshes nothing to point at
+ * this login and the label stays null when they were the only change.
  */
 export function refreshClaudeUserTelemetryEnv({
 	vars,
@@ -229,13 +232,13 @@ export function refreshClaudeUserTelemetryEnv({
 	if (!appEnvHasAnyVar(target, Object.keys(vars))) return null;
 	const current = appEnvValues(target);
 	if (!otelWiringLooksLangwatchAuthored(current)) return null;
-	if (appEnvHasAllVars(target, vars)) return null;
-	installAppEnv(target, vars);
 	try {
 		installSessionContextHooks({ tool: "claude_code" });
 	} catch {
 		// The env is the refresh that matters; the hooks are best-effort.
 	}
+	if (appEnvHasAllVars(target, vars)) return null;
+	installAppEnv(target, vars);
 	return `claude telemetry env (${target.displayPath})`;
 }
 

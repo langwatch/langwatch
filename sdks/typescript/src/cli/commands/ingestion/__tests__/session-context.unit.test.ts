@@ -143,6 +143,27 @@ describe("parseTraceparent", () => {
     });
   });
 
+  describe("given the all-zero ids that mean there is no context", () => {
+    it("returns null rather than naming a trace that never existed", () => {
+      // What an OTel SDK injects when the current context is invalid.
+      expect(
+        parseTraceparent(
+          "00-00000000000000000000000000000000-0000000000000000-00",
+        ),
+      ).toBeNull();
+      expect(
+        parseTraceparent(
+          "00-00000000000000000000000000000000-be7ce7c6bf1173f5-01",
+        ),
+      ).toBeNull();
+      expect(
+        parseTraceparent(
+          "00-16872e6253edb3e8748023ff172703c4-0000000000000000-01",
+        ),
+      ).toBeNull();
+    });
+  });
+
   describe("given anything else", () => {
     it("returns null rather than guessing at the layout", () => {
       expect(parseTraceparent(undefined)).toBeNull();
