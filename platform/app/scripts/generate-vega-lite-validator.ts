@@ -188,7 +188,9 @@ function main(): void {
     "utf8",
   );
 
-  const megabytes = (Buffer.byteLength(source, "utf8") / 1024 / 1024).toFixed(2);
+  const megabytes = (Buffer.byteLength(source, "utf8") / 1024 / 1024).toFixed(
+    2,
+  );
   console.log(
     `Wrote ${GENERATED_VALIDATOR_PATH} (${megabytes} MB) and its declaration.`,
   );
@@ -197,6 +199,9 @@ function main(): void {
 // `tsx scripts/generate-vega-lite-validator.ts` writes the files; the drift
 // guard imports the exports above and writes nothing.
 const entryPoint = process.argv[1];
-if (entryPoint !== undefined && fileURLToPath(import.meta.url) === resolve(entryPoint)) {
+if (
+  entryPoint !== undefined &&
+  fileURLToPath(import.meta.url) === resolve(entryPoint)
+) {
   main();
 }
