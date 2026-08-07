@@ -60,7 +60,7 @@ function fakePrisma(configJson: Record<string, string>): PrismaClient {
 }
 
 describe("resolveModelForFeature — unresolvable latest-alias exhaustion (unit)", () => {
-  /** @scenario "Exhaustion caused by an unresolvable latest-alias still reports "nothing configured"" */
+  /** @scenario 'Exhaustion caused by an unresolvable latest-alias still reports "nothing configured"' */
   it("throws plain ModelNotConfiguredError, not a restriction error", async () => {
     const prisma = fakePrisma({ DEFAULT: UNRESOLVABLE_ALIAS });
 

@@ -297,10 +297,8 @@ describe.skipIf(!hasCredentialsSecret)(
       ];
 
       describe.each(cases)("when the run is against a $label target", ({ label, referenceId }) => {
-        /**
-         * @scenario A project whose FAST/coding default is codex still runs workflow, code, and http simulations
-         * @scenario Coding defaults never break a simulation run
-         */
+        /** @scenario "A project whose FAST/coding default is codex still runs workflow, code, and http simulations" */
+        /** @scenario "Coding defaults never break a simulation run" */
         it("prefetches successfully instead of hitting the codex coding-assistant backstop", async () => {
           const deps = createDataPrefetcherDependencies();
           const target: TargetConfig = { type: label, referenceId: referenceId() };

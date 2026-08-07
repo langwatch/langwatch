@@ -202,10 +202,8 @@ describe("prefetchScenarioData", () => {
       };
 
       describe("when prefetching scenario data", () => {
-        /**
-         * @scenario "A prompt without a model resolves the agent-under-test default"
-         * @scenario "A FAST-only-codex project still resolves the DEFAULT-role agent-under-test key for prompts"
-         */
+        /** @scenario "A prompt without a model resolves the agent-under-test default" */
+        /** @scenario "A FAST-only-codex project still resolves the DEFAULT-role agent-under-test key for prompts" */
         it("resolves the agent-under-test model, not the scenario-generator model", async () => {
           const mockModelParamsProvider: ModelParamsProvider = {
             prepare: vi.fn().mockResolvedValue(defaultModelParamsResult),
@@ -1381,6 +1379,7 @@ describe("prefetchScenarioData", () => {
         edges: [],
       };
 
+      /** @scenario "A workflow node still pinned to a restricted model correctly fails" */
       it("returns a structured failure naming the codex model, not a silent pass", async () => {
         const deps = createMockDeps({
           agentFetcher: {

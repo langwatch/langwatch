@@ -155,7 +155,7 @@ Feature: Simulation run model resolution per target type
   # ============================================================================
 
   # Schema-level contract is bound in childProcessJobData.schema.unit.test.ts; the
-  # real-spawn proof runs as post-fix verification. Tracked in #6634.
+  # real-spawn proof runs as post-fix verification. Tracked in #6673.
   @integration @unimplemented
   Scenario: A workflow run with no adapter-role model params still builds real simulator and judge models
     Given a workflow target whose job payload carries no adapter-role model params

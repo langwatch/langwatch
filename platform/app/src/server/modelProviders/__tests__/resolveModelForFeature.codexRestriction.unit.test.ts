@@ -101,7 +101,7 @@ function cfg(overrides: Partial<FakeConfigRow>): FakeConfigRow {
 }
 
 describe("resolveModelForFeature — restricted-model exhaustion (unit)", () => {
-  /** @scenario "Exhaustion caused entirely by a restricted model reports the refusal, not "nothing configured"" */
+  /** @scenario 'Exhaustion caused entirely by a restricted model reports the refusal, not "nothing configured"' */
   it("throws ModelRestrictedForFeatureError, not ModelNotConfiguredError, when only a restricted value exists", async () => {
     const prisma = fakePrisma({
       project: PROJECT,
