@@ -1134,6 +1134,35 @@ export async function validateKeyWithCustomUrl({
  * did not check", and a branch that quietly returned a pass instead is the
  * failure the third verdict exists to prevent.
  */
+/**
+ * The project and location that name Gemini's Agent Platform door, if the
+ * credential carries them.
+ *
+ * Two field-name pairs reach the same door. A row created since the fold uses
+ * `GEMINI_*`; a legacy row created while Agent Platform was its own provider
+ * still wears the retired names, and goes on working until those rows are
+ * converted. Both are read here so no caller has to know which era a
+ * credential came from.
+ */
+function agentPlatformPair({
+  provider,
+  customKeys,
+}: {
+  provider: string;
+  customKeys: Record<string, string>;
+}): { project: string; location: string } {
+  if (provider === "google_agent_platform") {
+    return {
+      project: customKeys.GOOGLE_AGENT_PLATFORM_PROJECT?.trim() ?? "",
+      location: customKeys.GOOGLE_AGENT_PLATFORM_LOCATION?.trim() ?? "",
+    };
+  }
+  return {
+    project: customKeys.GEMINI_PROJECT?.trim() ?? "",
+    location: customKeys.GEMINI_LOCATION?.trim() ?? "",
+  };
+}
+
 function whyNotCheckable({
   provider,
   apiKey,
@@ -1212,20 +1241,7 @@ export async function validateProviderApiKey(
     VALIDATION_ONLY_BASE_URLS[provider] ??
     "";
 
-  // Legacy rows from the fold window read their pair from the retired
-  // field names; new gemini rows carry the GEMINI_* pair. Both validate
-  // through the same Agent Platform door. The legacy branch goes with the
-  // deprecated `google_agent_platform` registry entry.
-  const agentPlatform =
-    provider === "google_agent_platform"
-      ? {
-          project: customKeys.GOOGLE_AGENT_PLATFORM_PROJECT?.trim() ?? "",
-          location: customKeys.GOOGLE_AGENT_PLATFORM_LOCATION?.trim() ?? "",
-        }
-      : {
-          project: customKeys.GEMINI_PROJECT?.trim() ?? "",
-          location: customKeys.GEMINI_LOCATION?.trim() ?? "",
-        };
+  const agentPlatform = agentPlatformPair({ provider, customKeys });
 
   const cannotCheck = whyNotCheckable({
     provider,
@@ -1251,14 +1267,34 @@ export async function validateProviderApiKey(
       provider,
       apiKey,
       hasConfigurableEndpoint: !!endpointField,
-      ...(provider === "gemini" || provider === "google_agent_platform"
-        ? {
-            googleDoor:
-              agentPlatform.project && agentPlatform.location
-                ? ("agent-platform" as const)
-                : ("gemini-api" as const),
-          }
-        : {}),
+      ...googleDoorFor({ provider, agentPlatform }),
     },
   });
+}
+
+/**
+ * Which of Google's two doors a credential is being checked against, for the
+ * providers that have two.
+ *
+ * Carried on the probe context so a refusal can say which door refused —
+ * "fill in the project and location" and "clear them" are opposite
+ * instructions, and giving the wrong one sends the customer the wrong way.
+ * Absent entirely for every other provider, which has only one door.
+ */
+function googleDoorFor({
+  provider,
+  agentPlatform,
+}: {
+  provider: string;
+  agentPlatform: { project: string; location: string };
+}): { googleDoor?: "agent-platform" | "gemini-api" } {
+  if (provider !== "gemini" && provider !== "google_agent_platform") {
+    return {};
+  }
+  return {
+    googleDoor:
+      agentPlatform.project && agentPlatform.location
+        ? "agent-platform"
+        : "gemini-api",
+  };
 }

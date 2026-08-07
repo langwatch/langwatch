@@ -306,7 +306,11 @@ describe("validateProviderApiKey for gemini's two Google doors", () => {
       expect(sentRequest().url).toContain(
         "/projects/acme-123/locations/global/",
       );
-      expect(result).toEqual({ valid: true });
+      // `verified`, not merely `valid` — which is the whole point of this
+      // test. The defect it guards is a row reported as fine after no
+      // request at all, and `unchecked` also carries `valid: true`, so
+      // asserting on `valid` alone could not tell the two apart.
+      expect(result.outcome).toBe("verified");
     });
 
     /** @scenario A legacy row still validates through the Agent Platform door during the fold window */
