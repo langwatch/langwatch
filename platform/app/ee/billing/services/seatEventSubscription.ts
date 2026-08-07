@@ -38,6 +38,47 @@ export type SeatEventSubscriptionFns = ReturnType<
   typeof createSeatEventSubscriptionFns
 >;
 
+/**
+ * The two money figures a seat quote reports, read off a previewed invoice.
+ *
+ * For an `always_invoice` preview the invoice IS the immediate one: it carries
+ * only the proration lines, not next cycle's recurring and metered usage.
+ *
+ * **`total`, never a sum over `lines.data`.** Line amounts are pre-tax, so a
+ * customer billed in a tax-exclusive currency was quoted a fifth under what
+ * their card is debited; and `lines` is a paginated sublist, so a subscription
+ * carrying enough pending prorations silently drops the ones past page one.
+ *
+ * **The charge is `amount_due`, not `total`.** `amount_due` is the total after
+ * any credit the account already holds is spent against it, and it is the
+ * figure the charge is raised for. Measured on one purchase, two accounts:
+ *
+ *     clean      total 293.70   amount_due 293.70   charged 293.70
+ *     credited   total 293.70   amount_due  93.70   charged  93.70
+ *
+ * Quoting the total there tells a customer with a balance they are about to
+ * pay 293.70 while their card takes 93.70. Both are true; only one of them is
+ * what "Due today" means.
+ *
+ * **But `amount_due` is not simply the better field.** It clamps a negative
+ * invoice to zero, so a seat REDUCTION previewing a total of -587.39 reports 0
+ * and the dialog would say nothing happens over a 587.39 credit. Hence the
+ * branch: a credit is described by the signed total, a charge by the amount
+ * actually due.
+ */
+const quotedAmounts = (preview: Stripe.Invoice) => {
+  const invoiceTotalCents = preview.total;
+  const isCredit = invoiceTotalCents < 0;
+
+  return {
+    prorationCents: isCredit ? invoiceTotalCents : preview.amount_due,
+    // Credit spent on this invoice, so the dialog can explain a "Due today"
+    // smaller than the change itself. Zero on a clean account, and never
+    // reported for a credit — nothing is drawn down by one.
+    creditAppliedCents: isCredit ? 0 : invoiceTotalCents - preview.amount_due,
+  };
+};
+
 export const createSeatEventSubscriptionFns = ({
   stripe,
   db,
@@ -403,7 +444,8 @@ export const createSeatEventSubscriptionFns = ({
       // Every failure below throws rather than returning `{ success: false }`:
       // a silent false used to resolve the mutation as a success, so the UI
       // toasted "Seats updated successfully" over a seat count that never moved.
-      // Before the provider is touched, so an expired quote costs nothing.
+
+      // First, so an expired quote is refused before the provider is touched.
       const prorationDate = resolveProrationDate(quotedAt);
 
       const { subscription, stripeSubscription, seatItem } =
@@ -466,46 +508,7 @@ export const createSeatEventSubscriptionFns = ({
         Currency.USD) as Currency;
       const billingInterval = seatItem.price.recurring?.interval ?? "month";
 
-      // The invoice total, which for an `always_invoice` preview IS the
-      // immediate invoice: it carries only the proration lines, not next
-      // cycle's recurring and metered usage.
-      //
-      // Deliberately the total rather than a sum over `lines.data`. Summing
-      // line amounts is wrong twice: those amounts are pre-tax, so a customer
-      // billed in a tax-exclusive currency was quoted a fifth under what their
-      // card is debited; and `lines` is a paginated sublist, so a subscription
-      // carrying enough pending prorations silently drops the ones past the
-      // first page.
-      //
-      // Signed, so a seat reduction previews as a credit rather than as zero.
-      const invoiceTotalCents = preview.total;
-
-      // What the card is debited, which is not the invoice total. `amount_due`
-      // is the total after any credit the account is already holding is spent
-      // against it, and it is the figure the charge is raised for. Measured on
-      // the same purchase, one account clean and one holding 200.00 of credit:
-      //
-      //   clean     total 293.70   amount_due 293.70   charged 293.70
-      //   credited  total 293.70   amount_due  93.70   charged  93.70
-      //
-      // So quoting the total tells a customer with a balance they are about to
-      // pay 293.70 while their card is charged 93.70. Both numbers are true;
-      // only one of them is what "Due today" means.
-      //
-      // `amount_due` is not simply the better field, though — it clamps a
-      // negative invoice to zero, so a seat REDUCTION previewing a total of
-      // -587.39 reports 0 and the dialog would say nothing happens over a
-      // 587.39 credit. Hence the branch: a credit is described by the signed
-      // total, a charge by the amount actually due.
-      const isCredit = invoiceTotalCents < 0;
-      const prorationCents = isCredit ? invoiceTotalCents : preview.amount_due;
-
-      // Credit spent on this invoice, so the dialog can explain a "Due today"
-      // that is smaller than the change itself. Zero on a clean account, and
-      // never reported for a credit (nothing is drawn down by one).
-      const creditAppliedCents = isCredit
-        ? 0
-        : invoiceTotalCents - preview.amount_due;
+      const { prorationCents, creditAppliedCents } = quotedAmounts(preview);
 
       // Recurring total: new seat count × per-seat price.
       //
