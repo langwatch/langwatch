@@ -54,6 +54,15 @@ const REQUEST_TIMEOUT_MS = 30_000;
  */
 const MAX_PAGES_PER_RUN = 20;
 
+/**
+ * The cost report is daily-only, so its width is a constant rather than a
+ * setting. It is BOTH the request parameter and the restatement-key dimension,
+ * and the two must be the same value: a width that varied with config would
+ * re-key every unchanged cost bucket the moment an operator edited it, and the
+ * same spend would be recorded a second time under the new key.
+ */
+const COST_REPORT_BUCKET_WIDTH = "1d" as const;
+
 export const ANTHROPIC_ADMIN_ADAPTER_ID = "anthropic_admin" as const;
 
 export const anthropicAdminPullConfigSchema = z.object({
@@ -161,6 +170,24 @@ function dimension(value: string | null): string {
   return value ?? "";
 }
 
+/**
+ * The dimension values as one `:`-delimited string, each value encoded first.
+ *
+ * `description` is free text Anthropic writes, and it can contain the
+ * delimiter. Joined raw, `{description: "Claude: usage", costType: ""}` and
+ * `{description: "Claude", costType: " usage"}` produce the identical string —
+ * two distinct provider rows collapsing onto one `source_event_id`, which is
+ * the OCSF sink's dedup key and the record's `itemKey`. Encoding each value
+ * first makes the separator unambiguous.
+ *
+ * The restatement key is not affected: it hashes the dimensions map through
+ * `JSON.stringify`, which escapes rather than concatenates. This is about the
+ * human-readable identity that rides beside it.
+ */
+function dimensionPath(dimensions: Record<string, string>): string {
+  return Object.values(dimensions).map(encodeURIComponent).join(":");
+}
+
 export class AnthropicAdminPuller
   implements PullerAdapter<AnthropicAdminPullConfig>
 {
@@ -182,7 +209,7 @@ export class AnthropicAdminPuller
     const startingAt = cursor.startingAt;
     let page = cursor.page;
 
-    for (let attempt = 0; attempt < MAX_PAGES_PER_RUN; attempt += 1) {
+    for (let pageCount = 0; pageCount < MAX_PAGES_PER_RUN; pageCount += 1) {
       if (options.deadlineMs !== undefined && Date.now() > options.deadlineMs) {
         // Everything read so far is kept and the cursor says where to resume,
         // so a deadline costs latency rather than a window.
@@ -263,13 +290,24 @@ export class AnthropicAdminPuller
     }
 
     const parsed = pageSchema.parse(body);
+    // `has_more` with no token to follow it is a contract violation, and the
+    // one shape that must NOT be treated as drained. Reading it as drained
+    // would advance the watermark past pages that were never fetched, and the
+    // next run would start after them — silent loss of a window's spend, with
+    // nothing anywhere reporting a failure. Same class as a malformed body,
+    // so it gets the same answer: refuse rather than swallow.
+    if (parsed.has_more && parsed.next_page === null) {
+      throw new Error(
+        `anthropic ${config.report}_report reported has_more with no next_page; advancing the watermark here would drop the rest of the window`,
+      );
+    }
     const events = parsed.data.flatMap((bucket) =>
       this.bucketEvents({ bucket, config }),
     );
     return {
       ok: true,
       events,
-      nextPage: parsed.has_more ? parsed.next_page : null,
+      nextPage: parsed.next_page,
       watermark: parsed.data.at(-1)?.starting_at ?? null,
     };
   }
@@ -304,6 +342,12 @@ export class AnthropicAdminPuller
         url.searchParams.append("group_by[]", dim);
       }
     } else {
+      // The cost report is daily-only, so the width is pinned here rather than
+      // taken from config. It has to match `COST_REPORT_BUCKET_WIDTH`, which
+      // rides the restatement key: a width that could vary with config would
+      // re-key unchanged cost buckets the moment an operator edited it, and
+      // the same spend would be recorded twice.
+      url.searchParams.set("bucket_width", COST_REPORT_BUCKET_WIDTH);
       url.searchParams.append("group_by[]", "workspace_id");
       url.searchParams.append("group_by[]", "description");
     }
@@ -333,7 +377,13 @@ export class AnthropicAdminPuller
     return await response.json();
   }
 
-  /** One bucket's group-by rows, each as its own priced usage event. */
+  /**
+   * One bucket's group-by rows, each as its own priced usage event.
+   *
+   * `flatMap` over a nullable result rather than `map`: a cost row in a
+   * currency the ledger cannot hold is dropped (see `costEvent`) instead of
+   * unwinding the run, so the rest of the bucket still lands.
+   */
   private bucketEvents({
     bucket,
     config,
@@ -341,19 +391,20 @@ export class AnthropicAdminPuller
     bucket: z.infer<typeof bucketSchema>;
     config: AnthropicAdminPullConfig;
   }): NormalizedPullEvent[] {
-    return bucket.results.map((result) =>
-      config.report === "usage"
-        ? this.usageEvent({
-            result: usageResultSchema.parse(result),
-            startingAt: bucket.starting_at,
-            config,
-          })
-        : this.costEvent({
-            result: costResultSchema.parse(result),
-            startingAt: bucket.starting_at,
-            config,
-          }),
-    );
+    return bucket.results.flatMap((result) => {
+      const event =
+        config.report === "usage"
+          ? this.usageEvent({
+              result: usageResultSchema.parse(result),
+              startingAt: bucket.starting_at,
+              config,
+            })
+          : this.costEvent({
+              result: costResultSchema.parse(result),
+              startingAt: bucket.starting_at,
+            });
+      return event ? [event] : [];
+    });
   }
 
   private usageEvent({
@@ -374,7 +425,7 @@ export class AnthropicAdminPuller
       serviceTier: dimension(result.service_tier),
     };
     return {
-      source_event_id: `usage:${startingAt}:${Object.values(dimensions).join(":")}`,
+      source_event_id: `usage:${startingAt}:${dimensionPath(dimensions)}`,
       event_timestamp: startingAt,
       actor: "",
       action: "usage_report",
@@ -399,29 +450,40 @@ export class AnthropicAdminPuller
   private costEvent({
     result,
     startingAt,
-    config,
   }: {
     result: z.infer<typeof costResultSchema>;
     startingAt: string;
-    config: AnthropicAdminPullConfig;
-  }): NormalizedPullEvent {
+  }): NormalizedPullEvent | null {
     const dimensions = {
       report: "cost",
-      bucketWidth: config.bucketWidth,
+      // Pinned, NOT `config.bucketWidth`. This value rides the restatement
+      // key, and the cost report is daily-only, so taking it from config would
+      // let an operator's edit re-key every unchanged cost bucket and record
+      // the same spend a second time.
+      bucketWidth: COST_REPORT_BUCKET_WIDTH,
       workspaceId: dimension(result.workspace_id),
       description: dimension(result.description),
       costType: dimension(result.cost_type),
     };
-    const amount = String(result.amount);
     if (result.currency !== "USD") {
       // The ledger is nano-USD. Converting here would need a rate and a date,
       // and inventing either is how a wrong number becomes a confident one.
-      throw new Error(
-        `anthropic cost report returned ${result.currency}; only USD can be recorded`,
+      //
+      // Dropping the row rather than throwing is the blast-radius call: a
+      // throw here unwinds the whole run, discarding every event already read
+      // from earlier pages and returning no `PullResult` at all, so the cursor
+      // this adapter is otherwise careful about is never reported. And the row
+      // would be non-USD on every retry, so the run could never succeed —
+      // one unsupported currency would wedge the source permanently.
+      logger.error(
+        { adapter: this.id, currency: result.currency, startingAt },
+        "anthropic cost report row is not USD; skipping the row",
       );
+      return null;
     }
+    const amount = String(result.amount);
     return {
-      source_event_id: `cost:${startingAt}:${Object.values(dimensions).join(":")}`,
+      source_event_id: `cost:${startingAt}:${dimensionPath(dimensions)}`,
       event_timestamp: startingAt,
       actor: "",
       action: "cost_report",
