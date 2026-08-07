@@ -361,6 +361,55 @@ describe("given the Model Providers settings page", () => {
         ).toBeNull();
       });
 
+      // The row action and the verdict beneath it, driven from the page rather
+      // than from the hook. Everything under this heading was previously
+      // covered only at the hook, which left the wiring itself unbound: the
+      // menu item could stop calling the hook, or the verdict stop rendering,
+      // and nothing would have failed.
+
+      /** @scenario "Testing a saved provider uses the credential already stored" */
+      it("sends the row id when the connection test is picked", async () => {
+        mockTestConnection.mockResolvedValueOnce({ outcome: "verified" });
+        renderPage();
+
+        fireEvent.click(document.querySelector('[data-menu-item="test"]')!);
+
+        expect(mockTestConnection).toHaveBeenCalledWith(
+          expect.objectContaining({ modelProviderId: "mp-1" }),
+        );
+        // No endpoint travels with it — see the service for why the absence is
+        // the point.
+        expect(
+          Object.keys(mockTestConnection.mock.calls[0]![0] as object),
+        ).not.toContain("customBaseUrl");
+      });
+
+      /** @scenario "A working credential says so" */
+      it("shows the verdict on the row it belongs to", async () => {
+        mockTestConnection.mockResolvedValueOnce({ outcome: "verified" });
+        renderPage();
+
+        fireEvent.click(document.querySelector('[data-menu-item="test"]')!);
+
+        expect(await screen.findByText("Connection works")).toBeTruthy();
+      });
+
+      /** @scenario "A provider we cannot check says so instead of reporting success" */
+      it("never renders a provider it could not check as working", async () => {
+        mockTestConnection.mockResolvedValueOnce({
+          outcome: "unchecked",
+          reason: "provider_not_probeable",
+        });
+        renderPage();
+
+        fireEvent.click(document.querySelector('[data-menu-item="test"]')!);
+
+        expect(
+          await screen.findByText(/can't be tested automatically/),
+        ).toBeTruthy();
+        expect(screen.queryByText("Connection works")).toBeNull();
+      });
+
       /** @scenario "Editing it" */
       it("opens the setup for the row being edited, carrying the organization", () => {
         renderPage();
