@@ -280,6 +280,16 @@ Feature: Azure Blob stored-objects authenticate without a shared account key
     When they are read after the deployment moves to a token-based mode
     Then they resolve through the registered Azure driver
 
+  # The container names where NEW objects go. A stored URI already carries the
+  # container it was written to, so a read never consults the variable — and an
+  # operator who stops writing to Azure has every reason to drop it.
+  @unit
+  Scenario: Reads survive an operator dropping the now-unused container variable
+    Given the Azure account settings remain but no container is configured
+    When the Azure read driver is registered
+    Then the driver is available and historical azure-blob URIs still resolve
+    But resolving a write destination refuses, naming the missing container
+
   @integration @unimplemented
   Scenario: Dataset uploads work in a token-based mode
     Given STORED_OBJECTS_BACKEND is azure in a token-based auth mode
