@@ -214,13 +214,44 @@ export interface GovernedSqlParametersEditorProps {
   ) => void;
   /** Names the last submission declared and did not supply. */
   missingParameters: readonly string[];
+  /**
+   * Values to start from — a saved chart's, when one has been opened.
+   *
+   * Read once, at mount. The workbench remounts this form (by key) when it
+   * opens a chart, which is what makes "opening restores the values" true
+   * without this form having to arbitrate between a saved value and one the
+   * member is halfway through typing.
+   */
+  initialParameters?: Readonly<Record<string, GovernedSqlParameterValue>>;
+}
+
+/** Turns saved values back into rows, recovering the kind from each value. */
+function rowsOf(
+  parameters: Readonly<Record<string, GovernedSqlParameterValue>>,
+): readonly ParameterRow[] {
+  return Object.entries(parameters).map(([name, value]) => ({
+    id: `param-${nextRowId++}`,
+    name,
+    kind:
+      value === null
+        ? "null"
+        : typeof value === "number"
+          ? "number"
+          : typeof value === "boolean"
+            ? "boolean"
+            : "text",
+    text: value === null ? "" : String(value),
+  }));
 }
 
 export function GovernedSqlParametersEditor({
   onChange,
   missingParameters,
+  initialParameters,
 }: GovernedSqlParametersEditorProps) {
-  const [rows, setRows] = useState<readonly ParameterRow[]>([]);
+  const [rows, setRows] = useState<readonly ParameterRow[]>(() =>
+    initialParameters ? rowsOf(initialParameters) : [],
+  );
   const [expanded, setExpanded] = useState(false);
 
   // A refusal that names parameters is answered in this form, so the form has

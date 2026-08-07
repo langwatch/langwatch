@@ -18,8 +18,11 @@ import { Box, Button, HStack, Kbd, Spinner, Text } from "@chakra-ui/react";
 import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { type ReactNode, useCallback, useMemo, useRef, useState } from "react";
 
+import { showErrorToast } from "~/features/errors";
+
 import { useGovernedSqlQuery } from "../hooks/useGovernedSqlQuery";
 import { useGovernedSqlSchema } from "../hooks/useGovernedSqlSchema";
+import { useSavedWorkbenchCharts } from "../hooks/useSavedWorkbenchCharts";
 import {
   GOVERNED_SQL_PARAMETER_MISSING_CODE,
   type GovernedSqlEditorMarker,
@@ -27,6 +30,7 @@ import {
   readGovernedSqlFailure,
 } from "../logic/governedSqlFailure";
 import {
+  type GovernedSqlParameterValue,
   type GovernedSqlRequestState,
   isGovernedSqlResultStale,
 } from "../logic/governedSqlRequestState";
@@ -39,6 +43,7 @@ import {
   type GovernedSqlResultView,
 } from "./GovernedSqlResultPane";
 import { LazyGovernedSqlChartMode } from "./LazyGovernedSqlChartMode";
+import { SavedChartsToolbar } from "./SavedChartsToolbar";
 
 /** What a refusal gives the editor and the parameters form to work with. */
 interface FailureView {
@@ -105,6 +110,7 @@ function QueryCardHeader({
   inFlight,
   onRun,
   onCancel,
+  savedCharts,
 }: {
   schemaVisible: boolean;
   onToggleSchema: () => void;
@@ -113,6 +119,8 @@ function QueryCardHeader({
   inFlight: boolean;
   onRun: () => void;
   onCancel: () => void;
+  /** Save and Open. Supplied by the workbench, which owns the saved chart. */
+  savedCharts: ReactNode;
 }) {
   return (
     <HStack
@@ -140,6 +148,7 @@ function QueryCardHeader({
         Query
       </Text>
       <Box flex="1" />
+      {savedCharts}
       <Kbd size="sm" aria-hidden="true">
         ⌘⏎
       </Kbd>
@@ -172,6 +181,31 @@ export function GovernedSqlWorkbench({ projectId }: GovernedSqlWorkbenchProps) {
 
   const [schemaVisible, setSchemaVisible] = useState(true);
 
+  // Bumped whenever a saved chart is opened. Used as a React key so the
+  // parameters form and the chart remount and read their saved starting values
+  // — which is what makes "opening restores them" true without either of them
+  // having to arbitrate against what the member is halfway through typing.
+  const [openedRevision, setOpenedRevision] = useState(0);
+  const [openedSpecText, setOpenedSpecText] = useState<string | undefined>(
+    undefined,
+  );
+  const [openedParameters, setOpenedParameters] = useState<
+    Readonly<Record<string, GovernedSqlParameterValue>> | undefined
+  >(undefined);
+
+  // The chart hands back a reader once it has mounted. Until then — a query
+  // saved before its chart was ever opened — Save stores the query alone,
+  // which is a whole record: the starter specification is derived on open.
+  const specReaderRef = useRef<
+    (() => Record<string, unknown> | undefined) | null
+  >(null);
+  const registerSpecReader = useCallback(
+    (read: (() => Record<string, unknown> | undefined) | null) => {
+      specReaderRef.current = read;
+    },
+    [],
+  );
+
   // The editor hands back a writer once Monaco has mounted. Until then, and in
   // any environment without it, an insert appends to the draft instead of
   // silently doing nothing.
@@ -184,7 +218,45 @@ export function GovernedSqlWorkbench({ projectId }: GovernedSqlWorkbenchProps) {
   );
 
   const { draft } = query.state;
-  const { setSql } = query;
+  const { setSql, setParameters } = query;
+
+  const saved = useSavedWorkbenchCharts({
+    projectId,
+    onOpened: useCallback(
+      (opened) => {
+        setSql(opened.sql);
+        setParameters(opened.parameters);
+        setOpenedParameters(opened.parameters);
+        setOpenedSpecText(
+          opened.vegaLiteSpec
+            ? JSON.stringify(opened.vegaLiteSpec, null, 2)
+            : undefined,
+        );
+        setOpenedRevision((revision) => revision + 1);
+      },
+      [setSql, setParameters],
+    ),
+    onError: useCallback(
+      (error: unknown, fallbackTitle: string) =>
+        showErrorToast({ error, fallbackTitle }),
+      [],
+    ),
+  });
+
+  // What Save writes: the draft the member is looking at, plus the
+  // specification if they have opened the chart at all.
+  const currentDraft = useCallback(() => {
+    // `undefined` covers both "the chart was never opened" and "the text on
+    // screen is not valid JSON". Either way the query is saved alone rather
+    // than the whole save being refused, which would cost the member their SQL
+    // over a half-typed specification.
+    const vegaLiteSpec = specReaderRef.current?.();
+    return {
+      sql: draft.sql,
+      parameters: draft.parameters,
+      ...(vegaLiteSpec ? { vegaLiteSpec } : {}),
+    };
+  }, [draft.sql, draft.parameters]);
   const failure = useMemo(() => failureView(query.state), [query.state]);
 
   const handleInsert = useCallback(
@@ -273,6 +345,25 @@ export function GovernedSqlWorkbench({ projectId }: GovernedSqlWorkbenchProps) {
             // at.
             onRun={query.runQuery}
             onCancel={query.cancelQuery}
+            savedCharts={
+              <SavedChartsToolbar
+                charts={saved.charts}
+                openedChartId={saved.openedChartId}
+                openedChartName={saved.openedChartName}
+                isSaving={saved.isSaving}
+                savable={draft.sql.trim().length > 0}
+                onSave={({ name }) =>
+                  void saved.save({
+                    draft: currentDraft(),
+                    ...(name === undefined ? {} : { name }),
+                  })
+                }
+                onOpen={(chartId) => void saved.open(chartId)}
+                onRename={(input) => void saved.rename(input)}
+                onDelete={(chartId) => void saved.remove(chartId)}
+                onSaveAsNew={saved.closeOpened}
+              />
+            }
           />
 
           <GovernedSqlEditor
@@ -292,8 +383,12 @@ export function GovernedSqlWorkbench({ projectId }: GovernedSqlWorkbenchProps) {
             paddingY={2}
           >
             <GovernedSqlParametersEditor
+              key={`parameters-${openedRevision}`}
               onChange={query.setParameters}
               missingParameters={failure.missingParameters}
+              {...(openedParameters
+                ? { initialParameters: openedParameters }
+                : {})}
             />
           </Box>
         </Box>
@@ -314,7 +409,12 @@ export function GovernedSqlWorkbench({ projectId }: GovernedSqlWorkbenchProps) {
             state={query.state}
             onRun={query.runQuery}
             {...(insertExample ? { onInsertExample: insertExample } : {})}
-            renderChartArea={chartArea(query.state)}
+            renderChartArea={chartArea({
+              state: query.state,
+              registerSpecReader,
+              openedRevision,
+              openedSpecText,
+            })}
           />
         </Box>
       </Box>
@@ -331,9 +431,20 @@ export function GovernedSqlWorkbench({ projectId }: GovernedSqlWorkbenchProps) {
  * reads. One render function serves both tabs so the specification being
  * edited is a single piece of state however the member looks at it.
  */
-function chartArea(
-  state: GovernedSqlRequestState,
-):
+function chartArea({
+  state,
+  registerSpecReader,
+  openedRevision,
+  openedSpecText,
+}: {
+  state: GovernedSqlRequestState;
+  registerSpecReader: (
+    read: (() => Record<string, unknown> | undefined) | null,
+  ) => void;
+  /** Changes when a saved chart is opened, remounting the chart with its spec. */
+  openedRevision: number;
+  openedSpecText: string | undefined;
+}):
   | ((view: GovernedSqlResultView, openSpecification: () => void) => ReactNode)
   | undefined {
   if (state.outcome?.kind !== "result") return undefined;
@@ -347,10 +458,15 @@ function chartArea(
     // would put the whole Vega runtime in the entry chunk, and nothing
     // would look wrong (vegaLazyBoundary.unit.test.ts is what would).
     <LazyGovernedSqlChartMode
+      key={`chart-${openedRevision}`}
       result={result}
       submittedLabel={chartResultLabel(snapshot.sql)}
       view={view === "specification" ? "specification" : "chart"}
       onOpenSpecification={openSpecification}
+      registerSpecReader={registerSpecReader}
+      {...(openedSpecText === undefined
+        ? {}
+        : { initialSpecText: openedSpecText })}
     />
   );
   return renderArea;
