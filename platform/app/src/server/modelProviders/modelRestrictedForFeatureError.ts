@@ -23,13 +23,25 @@ import type { ModelRole } from "./featureRegistry";
 export class ModelRestrictedForFeatureError extends HandledError {
   declare readonly code: "model_restricted_for_feature";
 
-  constructor(
-    public readonly featureKey: string,
-    public readonly role: ModelRole,
-    public readonly featureDisplayName: string,
-    public readonly projectId: string,
-    public readonly restrictedModels: readonly string[],
-  ) {
+  public readonly featureKey: string;
+  public readonly role: ModelRole;
+  public readonly featureDisplayName: string;
+  public readonly projectId: string;
+  public readonly restrictedModels: readonly string[];
+
+  constructor({
+    featureKey,
+    role,
+    featureDisplayName,
+    projectId,
+    restrictedModels,
+  }: {
+    featureKey: string;
+    role: ModelRole;
+    featureDisplayName: string;
+    projectId: string;
+    restrictedModels: readonly string[];
+  }) {
     const restrictedModel = restrictedModels[0] ?? "restricted model";
     super(
       "model_restricted_for_feature",
@@ -46,5 +58,10 @@ export class ModelRestrictedForFeatureError extends HandledError {
       },
     );
     this.name = "ModelRestrictedForFeatureError";
+    this.featureKey = featureKey;
+    this.role = role;
+    this.featureDisplayName = featureDisplayName;
+    this.projectId = projectId;
+    this.restrictedModels = restrictedModels;
   }
 }

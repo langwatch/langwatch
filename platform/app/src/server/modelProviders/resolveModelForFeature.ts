@@ -296,13 +296,13 @@ export async function resolveModelForFeature(
   // genuinely nothing being set (see ModelRestrictedForFeatureError's doc
   // comment for why this is a sibling error, not a subclass).
   if (restrictedModels.length > 0) {
-    throw new ModelRestrictedForFeatureError(
-      feature.key,
-      feature.role,
-      feature.displayName,
-      ctx.projectId,
+    throw new ModelRestrictedForFeatureError({
+      featureKey: feature.key,
+      role: feature.role,
+      featureDisplayName: feature.displayName,
+      projectId: ctx.projectId,
       restrictedModels,
-    );
+    });
   }
 
   // AI features for this role are disabled until the user configures a

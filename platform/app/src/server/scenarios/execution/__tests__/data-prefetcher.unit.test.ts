@@ -108,14 +108,16 @@ describe("prefetchScenarioData", () => {
       // (the pre-#6634 bug) is observable rather than accidentally
       // matching the agent-under-test value.
       resolve: vi.fn().mockImplementation(async (featureKey: string) => {
-        if (featureKey === "scenarios.user_simulator")
-          return "openai/sim-default";
-        if (featureKey === "scenarios.judge") return "openai/judge-default";
-        if (featureKey === "scenarios.agent_under_test")
-          return "anthropic/claude-3-sonnet";
-        if (featureKey === "scenarios.generator")
-          return "anthropic/wrong-key-generator";
-        throw new Error(`unexpected feature key resolved: "${featureKey}"`);
+        const modelByFeatureKey: Record<string, string> = {
+          "scenarios.user_simulator": "openai/sim-default",
+          "scenarios.judge": "openai/judge-default",
+          "scenarios.agent_under_test": "anthropic/claude-3-sonnet",
+          "scenarios.generator": "anthropic/wrong-key-generator",
+        };
+        const model = modelByFeatureKey[featureKey];
+        if (!model)
+          throw new Error(`unexpected feature key resolved: "${featureKey}"`);
+        return model;
       }),
     };
 
