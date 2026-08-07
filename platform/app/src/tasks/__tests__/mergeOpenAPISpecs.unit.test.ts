@@ -138,6 +138,50 @@ describe("mergeOpenAPISpecs()", () => {
     });
   });
 
+  /**
+   * Pins the prune boundary to `appSpecs` membership alone.
+   *
+   * The prefix list this module replaced did not cover `/api/model-defaults`,
+   * `/api/teams` or `/api/groups`, so those three were merged additively and
+   * never pruned. Deriving ownership from the specs brings them inside the
+   * boundary — intended, and a no-op on today's committed spec, but a real
+   * change worth holding still. Naming one exemplar rather than asserting a
+   * namespace set is deliberate: an enumerated set would be the hand-maintained
+   * list whose drift is the bug (#2987) this module exists to remove.
+   */
+  describe("given a namespace the retired prefix list never owned", () => {
+    describe("when the same committed paths are merged with and without its app spec", () => {
+      it("prunes the orphan only in the run whose appSpecs include that app", () => {
+        const currentSpec = buildSpec({
+          paths: {
+            "/api/teams": { get: { summary: "list teams" } },
+            "/api/teams/{id}/retired": { get: { summary: "removed route" } },
+          },
+        });
+        const teamsAppSpec = buildSpec({
+          paths: { "/api/teams": { get: { summary: "list teams" } } },
+        });
+        const unrelatedAppSpec = buildSpec({
+          paths: { "/api/prompts/{id}": { get: { summary: "unrelated" } } },
+        });
+
+        const withTeamsApp = mergeOpenAPISpecs({
+          currentSpec,
+          appSpecs: [teamsAppSpec],
+          baseSpec: buildSpec({}),
+        });
+        const withoutTeamsApp = mergeOpenAPISpecs({
+          currentSpec,
+          appSpecs: [unrelatedAppSpec],
+          baseSpec: buildSpec({}),
+        });
+
+        expect(withTeamsApp.paths).not.toHaveProperty("/api/teams/{id}/retired");
+        expect(withoutTeamsApp.paths).toHaveProperty("/api/teams/{id}/retired");
+      });
+    });
+  });
+
   describe("given a base spec with top-level metadata", () => {
     describe("when merging app specs onto the current spec", () => {
       it("carries the base spec's top-level fields onto the result", () => {

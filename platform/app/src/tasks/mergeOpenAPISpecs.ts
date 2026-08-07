@@ -51,8 +51,12 @@ function apiNamespace(path: string): string {
  * deep-merge).
  *
  * Paths in namespaces that NO app generates are hand-maintained (e.g.
- * `/api/annotations`, `/api/projects`, the singular `/api/trace`, the root
- * `/`) and are always preserved untouched.
+ * `/api/annotations`, the singular `/api/trace`, the root `/`) and are always
+ * preserved untouched. Whether a namespace is hand-maintained is decided by
+ * the `appSpecs` array in `generateOpenAPISpec.ts`, not by intuition: a plural
+ * sibling can be app-owned while the singular is not (`/api/traces` is owned,
+ * `/api/trace` is not), so check that array before hand-editing the committed
+ * JSON — an edit inside an owned namespace is silently overwritten next run.
  *
  * Ownership is keyed on what the apps EMIT this run, so the prune targets
  * removed/renamed routes within a namespace an app still serves. A namespace an
