@@ -7,6 +7,7 @@ import {
   getProviderFromModel,
   getSchemaShape,
   hasUserEnteredNewApiKey,
+  headerSignature,
   shouldAutoEnableAsDefault,
 } from "../modelProviderHelpers";
 
@@ -292,6 +293,53 @@ describe("modelProviderHelpers", () => {
         expect(shouldAutoEnableAsDefault({ enabledProvidersCount: 2 })).toBe(
           false,
         );
+      });
+    });
+  });
+
+  describe("headerSignature()", () => {
+    describe("given a form header list and the stored list it came from", () => {
+      it("reads them as equal even though only the form list is concealed", () => {
+        const stored = [{ key: "api-key", value: MASKED_KEY_PLACEHOLDER }];
+        const asShownInTheForm = [
+          { key: "api-key", value: MASKED_KEY_PLACEHOLDER, concealed: true },
+        ];
+
+        expect(headerSignature(asShownInTheForm)).toBe(headerSignature(stored));
+      });
+    });
+
+    describe("given a header the customer actually changed", () => {
+      it("reads a renamed key as different", () => {
+        expect(headerSignature([{ key: "api-key", value: "v" }])).not.toBe(
+          headerSignature([{ key: "x-api-key", value: "v" }]),
+        );
+      });
+
+      it("reads a new value as different", () => {
+        expect(headerSignature([{ key: "api-key", value: "v" }])).not.toBe(
+          headerSignature([{ key: "api-key", value: "w" }]),
+        );
+      });
+
+      it("reads a reorder as different, because dragging is a real edit", () => {
+        const a = [
+          { key: "one", value: "1" },
+          { key: "two", value: "2" },
+        ];
+        const b = [
+          { key: "two", value: "2" },
+          { key: "one", value: "1" },
+        ];
+
+        expect(headerSignature(a)).not.toBe(headerSignature(b));
+      });
+    });
+
+    describe("given no headers at all", () => {
+      it("treats null, undefined and the empty list the same", () => {
+        expect(headerSignature(null)).toBe(headerSignature([]));
+        expect(headerSignature(undefined)).toBe(headerSignature([]));
       });
     });
   });

@@ -4,11 +4,13 @@ import { env } from "~/env.mjs";
 import type { Session } from "~/server/auth";
 import { isManagedProvider } from "../../../ee/managed-providers/managedBedrockConfig";
 import { KEY_CHECK, MASKED_KEY_PLACEHOLDER } from "../../utils/constants";
+import { getSchemaShape } from "../../utils/modelProviderHelpers";
 import { rateLimit } from "../rateLimit";
 import type { CustomModelsInput } from "./customModel.schema";
 import { toLegacyCompatibleCustomModels } from "./customModel.schema";
 import {
   ModelProviderAnchorRequiredError,
+  ModelProviderCredentialsWouldBeDroppedError,
   ModelProviderDeprecatedError,
   ModelProviderNotFoundError,
   ModelProviderScopesRequiredError,
@@ -1479,10 +1481,16 @@ export class ModelProviderService {
     let customKeysToSave: Record<string, unknown> | undefined;
 
     if (customKeysProvided) {
-      customKeysToSave = this.mergeCustomKeys(
+      const existingKeys = existingProvider.customKeys as Record<
+        string,
+        unknown
+      > | null;
+      this.assertKeepsStoredCredentials({
+        provider: data.provider,
         validatedKeys,
-        existingProvider.customKeys as Record<string, unknown> | null,
-      );
+        existingKeys,
+      });
+      customKeysToSave = this.mergeCustomKeys(validatedKeys, existingKeys);
     }
 
     return await this.repository.update(
@@ -1540,6 +1548,58 @@ export class ModelProviderService {
       },
       tx,
     );
+  }
+
+  /**
+   * Refuses a write whose credential payload would leave the provider with no
+   * credential at all.
+   *
+   * `mergeCustomKeys` restores a stored value only where the payload sends the
+   * masked placeholder for that key. A key the payload omits is dropped, so a
+   * payload that names none of the provider's credential fields silently
+   * deletes every one of them. Providers whose schema is loose (Azure is
+   * `.passthrough()` with every field optional) accept such a payload without
+   * a murmur, which is what turned a UI slip into lost credentials.
+   *
+   * Omission is the signal this reads, not emptiness: clearing a credential on
+   * purpose sends the field with an empty value, and that still goes through.
+   * `MANAGED` rows carry their own single key rather than the schema's, so they
+   * are recognised too.
+   */
+  private assertKeepsStoredCredentials({
+    provider,
+    validatedKeys,
+    existingKeys,
+  }: {
+    provider: string;
+    validatedKeys: Record<string, unknown> | null;
+    existingKeys: Record<string, unknown> | null;
+  }): void {
+    if (!existingKeys) return;
+
+    const definition =
+      modelProviders[provider as keyof typeof modelProviders] ?? undefined;
+    const schemaKeys = new Set([
+      ...Object.keys(getSchemaShape(definition?.keysSchema)),
+      "MANAGED",
+    ]);
+    if (schemaKeys.size === 1) return; // unknown provider: nothing to judge against
+
+    // Only a credential that actually holds something is worth protecting. A
+    // field already sitting empty has nothing to lose, and counting it would
+    // block the save right after a customer cleared one on purpose.
+    const storedCredentials = Object.entries(existingKeys).filter(
+      ([key, value]) =>
+        schemaKeys.has(key) && typeof value === "string" && value !== "",
+    );
+    if (storedCredentials.length === 0) return;
+
+    const incomingCredentials = Object.keys(validatedKeys ?? {}).filter((key) =>
+      schemaKeys.has(key),
+    );
+    if (incomingCredentials.length > 0) return;
+
+    throw new ModelProviderCredentialsWouldBeDroppedError({ provider });
   }
 
   /**
