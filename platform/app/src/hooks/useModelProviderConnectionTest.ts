@@ -60,6 +60,46 @@ const uncheckedMessage = (reason: UncheckedReason): string => {
   return "This provider can't be tested automatically — its settings are checked when you first use it.";
 };
 
+/**
+ * A verdict, turned into what the row should say.
+ *
+ * A pure function rather than three branches inside the hook: the mapping is
+ * the part worth reading on its own, and keeping it out here is what lets the
+ * exhaustiveness check below be the only place a new outcome has to be
+ * handled.
+ */
+function toState(result: ConnectionTestResult): ConnectionTestState {
+  if (result.outcome === "verified") {
+    return { status: "works" };
+  }
+
+  if (result.outcome === "refused") {
+    // The refusal is a serialized handled error riding on the payload, so it
+    // is read with `explainSerializedError` rather than `describeError`. Both
+    // land in the same code-keyed registry; only the transport differs. The
+    // provider's own sentence never appears in either — a rejected-credential
+    // body is where the credential itself tends to turn up.
+    const { title, description } = explainSerializedError(result.domainError);
+    return {
+      status: "refused",
+      message: description ? `${title}. ${description}` : title,
+    };
+  }
+
+  if (result.outcome === "unchecked") {
+    return { status: "unchecked", message: uncheckedMessage(result.reason) };
+  }
+
+  // A fourth outcome would otherwise fall into the branch above and be
+  // described as "can't be tested automatically" — a confident sentence about
+  // a verdict nobody has classified. This turns that into a compile error at
+  // the moment the server grows one.
+  const unhandled: never = result;
+  throw new Error(
+    `Unhandled connection test outcome: ${JSON.stringify(unhandled)}`,
+  );
+}
+
 export function useModelProviderConnectionTest({
   projectId,
   organizationId,
@@ -127,7 +167,7 @@ export function useModelProviderConnectionTest({
       try {
         // No cast. Asserting the shape here would give back exactly what
         // importing the server's type was meant to prevent: a renamed field or
-        // a new outcome would compile, and the `never` check below would stop
+        // a new outcome would compile, and `toState`'s `never` check would stop
         // catching it.
         const result: ConnectionTestResult = await testConnection({
           modelProviderId,
@@ -135,49 +175,7 @@ export function useModelProviderConnectionTest({
           organizationId,
         });
 
-        if (result.outcome === "verified") {
-          setResult(modelProviderId, { status: "works" }, asked);
-          return;
-        }
-
-        if (result.outcome === "refused") {
-          // The refusal is a serialized handled error riding on the payload,
-          // so it is read with `explainSerializedError` rather than
-          // `describeError`. Both land in the same code-keyed registry; only
-          // the transport differs. The provider's own sentence never appears
-          // in either — a rejected-credential body is where the credential
-          // itself tends to turn up.
-          const { title, description } = explainSerializedError(
-            result.domainError,
-          );
-          setResult(
-            modelProviderId,
-            {
-              status: "refused",
-              message: description ? `${title}. ${description}` : title,
-            },
-            asked,
-          );
-          return;
-        }
-
-        if (result.outcome === "unchecked") {
-          setResult(
-            modelProviderId,
-            { status: "unchecked", message: uncheckedMessage(result.reason) },
-            asked,
-          );
-          return;
-        }
-
-        // A fourth outcome would otherwise fall into the branch above and be
-        // described as "can't be tested automatically" — a confident sentence
-        // about a verdict nobody has classified. This turns that into a
-        // compile error at the moment the server grows one.
-        const unhandled: never = result;
-        throw new Error(
-          `Unhandled connection test outcome: ${JSON.stringify(unhandled)}`,
-        );
+        setResult(modelProviderId, toState(result), asked);
       } catch (error) {
         // Not `error.message`: a handled error's message is replaced by its
         // stable code on the wire, so reading it renders a slug like

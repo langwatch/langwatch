@@ -1118,6 +1118,62 @@ export async function validateKeyWithCustomUrl({
  * });
  * ```
  */
+/**
+ * Every reason we would decline to ask, gathered in one place.
+ *
+ * `null` means the probe can go ahead. Kept separate from the probe itself
+ * because these are the answers a customer reads as "we did not check", and
+ * having them in one list is what stops a future branch quietly returning a
+ * pass instead — the failure this whole third verdict exists to prevent.
+ */
+function whyNotCheckable({
+  provider,
+  apiKey,
+  baseUrl,
+  defaultBaseUrl,
+  hasAgentPlatformDoor,
+}: {
+  provider: string;
+  apiKey: string;
+  baseUrl: string;
+  defaultBaseUrl: string;
+  /**
+   * Whether the credential names the Agent Platform door (a project and a
+   * location). That probe builds its URL from the API root and needs no base
+   * URL, so "nowhere to ask" is false for it however empty the endpoint
+   * fields are.
+   */
+  hasAgentPlatformDoor: boolean;
+}): UncheckedReason | null {
+  // The stored value came back as the mask, not a credential — the customer is
+  // editing a provider without touching its key.
+  if (apiKey === MASKED_KEY_PLACEHOLDER) {
+    return "credential_masked";
+  }
+
+  // No key at all. `custom` is the exception: an endpoint on its own is worth
+  // probing, since that is the part most likely to be wrong.
+  if (!apiKey && (provider !== "custom" || !baseUrl)) {
+    return "no_credential";
+  }
+
+  // Nowhere to ask (e.g. voyage, which has no models listing). Probing anyway
+  // would fetch a relative URL, throw, and surface as a misleading "check your
+  // network connection". The key is exercised on the first real call instead.
+  //
+  // The Agent Platform door is exempt, and that exemption is load-bearing: a
+  // legacy row reaching it has no onboarding tile left to supply a default
+  // base URL, so without this it would be declined without a request and — on
+  // the old two-state result — reported as a pass. A key that was never probed
+  // coming back green is the failure both this exemption and the third verdict
+  // exist to prevent, from either end.
+  if (!baseUrl && !defaultBaseUrl && !hasAgentPlatformDoor) {
+    return "no_endpoint";
+  }
+
+  return null;
+}
+
 export async function validateProviderApiKey(
   provider: string,
   customKeys: Record<string, string>,
@@ -1141,19 +1197,6 @@ export async function validateProviderApiKey(
     ? (customKeys[endpointField]?.trim() ?? "")
     : "";
 
-  // Skip validation if API key is masked (user editing existing provider without changing key)
-  if (apiKey === MASKED_KEY_PLACEHOLDER) {
-    return unchecked("credential_masked");
-  }
-
-  // Skip validation if no API key provided (schema validation handles required fields)
-  // For custom provider, only skip if no base URL either
-  if (!apiKey) {
-    if (provider !== "custom" || !baseUrl) {
-      return unchecked("no_credential");
-    }
-  }
-
   // Get auth strategy (default to bearer) and base URL
   const authStrategy = PROVIDER_AUTH_OVERRIDES[provider] ?? "bearer";
   const defaultBaseUrl =
@@ -1176,26 +1219,15 @@ export async function validateProviderApiKey(
           location: customKeys.GEMINI_LOCATION?.trim() ?? "",
         };
 
-  // No endpoint to probe (e.g. voyage, which has no models listing): skip
-  // rather than fetch a relative URL, which would always throw and surface
-  // as a misleading "check your network connection" error. The key is
-  // exercised on the first real call instead.
-  //
-  // A credential naming the Agent Platform door is exempt: that probe
-  // builds its URL from AGENT_PLATFORM_API_ROOT and never needs a base
-  // URL. Without the exemption, a legacy `google_agent_platform` row —
-  // whose onboarding tile (the source of providerDefaultBaseUrls) is gone
-  // — returned a pass after ZERO requests: a green check on a key that was
-  // never probed.
-  //
-  // Both halves of that fix are here. The exemption decides WHEN we
-  // decline to ask; `unchecked` decides what we SAY when we do. A skip that
-  // reports itself as a pass is the same defect one step later, which is
-  // why the return is not `valid: true`.
-  const hasAgentPlatformDoor =
-    !!agentPlatform.project && !!agentPlatform.location;
-  if (!baseUrl && !defaultBaseUrl && !hasAgentPlatformDoor) {
-    return unchecked("no_endpoint");
+  const cannotCheck = whyNotCheckable({
+    provider,
+    apiKey,
+    baseUrl,
+    defaultBaseUrl,
+    hasAgentPlatformDoor: !!agentPlatform.project && !!agentPlatform.location,
+  });
+  if (cannotCheck) {
+    return unchecked(cannotCheck);
   }
 
   return runProbeChain({
