@@ -53,8 +53,19 @@ describe("given a token has just been minted", () => {
 
       const labels = CODE_ASSISTANTS.map((assistant) => assistant.label);
       expect(labels).toEqual(
-        expect.arrayContaining(["Claude Code", "Codex", "Cursor", "Gemini"]),
+        expect.arrayContaining(["Claude Code", "Codex", "Cursor", "Copilot"]),
       );
+    });
+
+    /** @scenario An assistant without an install command points at its config file */
+    it("ships no assistant whose command has not been verified", () => {
+      // Gemini's `mcp add` takes its options before the server name and does
+      // not use `--` to introduce the command, so the Codex-shaped builder
+      // written for it emitted a line that does not run. It stays out until
+      // that is verified against a real CLI — #6654.
+      expect(
+        CODE_ASSISTANTS.some((assistant) => assistant.key === "gemini"),
+      ).toBe(false);
     });
   });
 

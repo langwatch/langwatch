@@ -81,9 +81,10 @@ interface CodeAssistant {
  * different set of editors, which is how a customer came to notice that the
  * assistants they used were missing. Both surfaces below now read from here.
  *
- * Commands are the ones the docs publish — `claude`/`codex`/`gemini mcp add`
- * (docs/integration/mcp.mdx and the onboarding MCP-client screen). An
- * assistant with no published installer gets a config path instead.
+ * Commands are the ones the docs publish — `claude mcp add` / `codex mcp add`
+ * (docs/integration/mcp.mdx). An assistant with no published installer gets a
+ * config path instead; inventing a command for symmetry hands the user a line
+ * that fails at the one moment they can still read their token.
  */
 export const CODE_ASSISTANTS: CodeAssistant[] = [
   {
@@ -102,7 +103,9 @@ export const CODE_ASSISTANTS: CodeAssistant[] = [
   {
     key: "codex",
     label: "Codex",
-    configPath: "~/.codex/config.toml",
+    // Deliberately no configPath: Codex reads TOML, and the chip row sits
+    // under a block rendering JSON. Needs a format marker before it can
+    // appear there — see #6654.
     buildCommand: ({ apiKey, projectId, endpoint, isSelfHosted }) =>
       [
         `codex mcp add langwatch --env LANGWATCH_API_KEY=${apiKey}`,
@@ -111,18 +114,10 @@ export const CODE_ASSISTANTS: CodeAssistant[] = [
         " -- npx -y @langwatch/mcp-server",
       ].join(""),
   },
-  {
-    key: "gemini",
-    label: "Gemini",
-    configPath: "~/.gemini/settings.json",
-    buildCommand: ({ apiKey, projectId, endpoint, isSelfHosted }) =>
-      [
-        `gemini mcp add langwatch --env LANGWATCH_API_KEY=${apiKey}`,
-        projectId ? ` --env LANGWATCH_PROJECT_ID=${projectId}` : "",
-        isSelfHosted ? ` --env LANGWATCH_ENDPOINT=${endpoint}` : "",
-        " -- npx -y @langwatch/mcp-server",
-      ].join(""),
-  },
+  // Gemini is deliberately absent until its command is verified against a
+  // real `gemini` CLI — its `mcp add` takes options BEFORE the server name
+  // and does not use `--` to introduce the command, unlike Codex above.
+  // Tracked in #6654.
   { key: "cursor", label: "Cursor", configPath: ".cursor/mcp.json" },
   { key: "copilot", label: "Copilot", configPath: ".vscode/mcp.json" },
   {
