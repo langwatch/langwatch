@@ -567,7 +567,7 @@ secured.access(legacyEvaluationAuth).post(
   describeRoute({
     summary: "Evaluate a dataset",
     description:
-      "Run one evaluator across a saved dataset and record the result against an experiment. Name the dataset by slug and the evaluator the same way the evaluate endpoints do; results are grouped under `experimentSlug`, or under a generated batch id when you omit it.",
+      "Run one evaluator across a saved dataset and record the result against an experiment. Name the dataset by slug and the evaluator the same way the evaluate endpoints do; results are grouped under `experimentSlug`, or under a generated batch id when you omit it. Bodies up to 30MB are accepted.",
     tags: ["Datasets"],
     requestBody: {
       required: true,
@@ -607,6 +607,13 @@ secured.access(legacyEvaluationAuth).post(
         description: "No dataset with that slug",
         content: {
           "application/json": { schema: resolver(evaluateErrorSchema) },
+        },
+      },
+      413: {
+        description:
+          "The body is larger than 30MB. Refused before it is read, so the response is the plain sentence `Payload Too Large` rather than a JSON error",
+        content: {
+          "text/plain": { schema: { type: "string" } },
         },
       },
     },

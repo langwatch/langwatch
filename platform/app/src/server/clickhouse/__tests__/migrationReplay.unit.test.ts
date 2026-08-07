@@ -28,6 +28,19 @@ const { retakeAfterNextRename, THIRD_OWNER } = vi.hoisted(() => ({
   THIRD_OWNER: "third-owner",
 }));
 
+/**
+ * The other way a restore can fail: the path is still free, but the filesystem
+ * refuses the link outright. Set `error` and the next restore rejects with it
+ * rather than linking; `from` records where the stranger's copy was left, so
+ * the test can clean it up.
+ */
+const { deniedRestore } = vi.hoisted(() => ({
+  deniedRestore: {
+    error: null as NodeJS.ErrnoException | null,
+    from: null as string | null,
+  },
+}));
+
 vi.mock("node:fs/promises", async () => {
   const actual =
     await vi.importActual<typeof import("node:fs/promises")>(
@@ -42,6 +55,15 @@ vi.mock("node:fs/promises", async () => {
         retakeAfterNextRename.path = null;
         await actual.writeFile(retaken, THIRD_OWNER);
       }
+    },
+    link: async (from: string, to: string) => {
+      const denial = deniedRestore.error;
+      if (denial !== null) {
+        deniedRestore.error = null;
+        deniedRestore.from = from;
+        throw denial;
+      }
+      await actual.link(from, to);
     },
   };
 });
@@ -205,6 +227,38 @@ describe("given a holder whose lock was broken and taken by somebody else", () =
       // theirs.
       await expect(readFile(lockPath, "utf-8")).resolves.toBe(THIRD_OWNER);
       await rm(lockPath, { force: true });
+    });
+  });
+
+  describe("when the restore fails for a reason other than the path being taken", () => {
+    // EEXIST is the restore doing its job, and the only failure it may absorb.
+    // Every other code means the stranger's lock was moved away and never put
+    // back, so answering "restored" to it loses a live holder's lock without
+    // anything, anywhere, saying so.
+    it("surfaces the failure rather than reporting a restore that did not happen", async () => {
+      const key = freshKey();
+      const lockPath = lockPathFor(key);
+      deniedRestore.from = null;
+
+      await expect(
+        withReplayLock({
+          database: key,
+          run: async () => {
+            await rm(lockPath, { force: true });
+            await writeFile(lockPath, "replacement-owner");
+            deniedRestore.error = Object.assign(
+              new Error("EACCES: permission denied, link"),
+              { code: "EACCES" },
+            );
+          },
+        }),
+      ).rejects.toMatchObject({ code: "EACCES" });
+
+      deniedRestore.error = null;
+      await rm(lockPath, { force: true });
+      if (deniedRestore.from !== null) {
+        await rm(deniedRestore.from, { force: true });
+      }
     });
   });
 });

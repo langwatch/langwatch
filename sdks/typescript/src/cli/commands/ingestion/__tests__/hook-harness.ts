@@ -89,6 +89,11 @@ export const recordOf = (request: PostedRequest) =>
 
 export interface RunHookOptions {
   input?: Record<string, unknown> | string;
+  /**
+   * Hands the command its own payload reader, for the runs where how the
+   * payload arrives is the point. Defaults to serving `input` straight back.
+   */
+  readInput?: () => Promise<string>;
   env?: NodeJS.ProcessEnv;
   git?: Record<string, string>;
   fetchImpl?: typeof fetch;
@@ -170,6 +175,7 @@ export const installHookHarness = (): HookHarness => {
     collector,
     runHook: ({
       input = { session_id: SESSION_ID, cwd: "/repo/worktrees/review" },
+      readInput,
       env = {},
       git = WORKTREE_GIT,
       fetchImpl = collector(),
@@ -183,10 +189,12 @@ export const installHookHarness = (): HookHarness => {
         env: shouldOmitExporterEnv
           ? env
           : { OTEL_EXPORTER_OTLP_ENDPOINT: ENDPOINT, ...env },
-        readInput: () =>
-          Promise.resolve(
-            typeof input === "string" ? input : JSON.stringify(input),
-          ),
+        readInput:
+          readInput ??
+          (() =>
+            Promise.resolve(
+              typeof input === "string" ? input : JSON.stringify(input),
+            )),
         runGit: gitRunner(git),
         fetchImpl,
         now: () => now,

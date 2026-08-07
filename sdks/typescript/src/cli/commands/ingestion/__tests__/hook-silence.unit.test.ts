@@ -21,6 +21,13 @@ import { installHookHarness, unreachableCollector } from "./hook-harness";
 const hook = installHookHarness();
 const { posted } = hook;
 
+/** Far more than a session payload holds, on a pipe the seam keeps open. */
+const oversizedWrite = () => {
+  const stream = new PassThrough();
+  stream.write(`{"session_id":"${"x".repeat(128 * 1024)}"}`);
+  return stream;
+};
+
 describe("the session context hook's silence", () => {
   describe("given a directory that is not a git repository", () => {
     /** @scenario "Outside a git repository the hook sends nothing and exits zero" */
@@ -112,10 +119,20 @@ describe("the session context hook's silence", () => {
   });
 
   describe("given a seam writing far more than a payload holds", () => {
-    /** @scenario "A write too large to be a payload is not buffered" */
-    it("stops at the cap, releases the pipe and reads as empty", async () => {
-      const stream = new PassThrough();
-      stream.write(`{"session_id":"${"x".repeat(128 * 1024)}"}`);
+    /** @scenario "An oversized payload sends no session context and leaves the session undisturbed" */
+    it("posts nothing, writes nothing and exits zero", async () => {
+      await hook.runHook({
+        readInput: () =>
+          readStdin({ stream: oversizedWrite(), timeoutMs: 5_000 }),
+      });
+
+      expect(posted).toEqual([]);
+      expect(hook.stdout).toEqual([]);
+      expect(hook.exits).toEqual([]);
+    });
+
+    it("stops at the cap and releases the pipe rather than buffering the write", async () => {
+      const stream = oversizedWrite();
 
       await expect(readStdin({ stream, timeoutMs: 5_000 })).resolves.toBe("");
       expect(stream.destroyed).toBe(true);

@@ -206,10 +206,10 @@ Rule: The hook never disturbs the session
     Then it stops waiting at the deadline and releases the pipe
 
   @unit
-  Scenario: A write too large to be a payload is not buffered
-    Given a seam that writes far more to the hook's stdin than a payload holds
-    When the hook reads its payload
-    Then it stops at the cap, releases the pipe and reads the input as empty
+  Scenario: An oversized payload sends no session context and leaves the session undisturbed
+    Given a seam that hands the hook far more than a session payload holds
+    When the hook runs
+    Then nothing is posted and the exit code is zero
 
   @unit
   Scenario: The opencode plugin never fails the session it runs in

@@ -18755,7 +18755,7 @@ Commit `.claude/settings.json` with the exporter wiring, and keep the bearer tok
 
 The committed file decides the shape of the export. What that export carries is decided by four flags, and they stay out of the repository so each person turns them on for themselves: `OTEL_LOG_USER_PROMPTS` puts prompt text on the wire, `OTEL_LOG_TOOL_DETAILS` and `OTEL_LOG_TOOL_CONTENT` put the input and output of every tool call on it, and `OTEL_LOG_RAW_API_BODIES` puts the Messages API request and response JSON on it. Inline bodies are truncated at 60 KB (`CLAUDE_CODE_OTEL_CONTENT_MAX_LENGTH` raises the limit, `file:<dir>` writes untruncated bodies to disk instead) and extended thinking is redacted.
 
-<Warning>Those four flags are what put your session content in LangWatch: prompt text, the input and output of every tool call, including file contents, and the model request and response bodies of every turn. Committing any of them turns it on for everyone who clones the repo, which is why the recipe keeps all four in each person's own gitignored file. The enable flag can arrive from any settings scope Claude Code reads, not only from that file: a managed settings file, a shell export, or a contributor's own `~/.claude/settings.json` can each turn telemetry on, and a content flag sitting in the committed file rides along with it.</Warning>
+<Warning>Those four flags are what put your session content in LangWatch: prompt text, the input and output of every tool call, including file contents, and the model request and response bodies of every turn. A committed content flag does not switch telemetry on by itself, because Claude Code exports nothing until `CLAUDE_CODE_ENABLE_TELEMETRY` is set. It does not have to be set in the repository for that to happen, though: a managed settings file, a shell export, or a contributor's own `~/.claude/settings.json` can each turn telemetry on, and from that moment a content flag sitting in the committed file applies to everyone who cloned the repo. That is why the recipe keeps all four in each person's own gitignored file.</Warning>
 
 `settings.local.json`'s `env` merges per-key with `settings.json`'s `env`, so the local flags combine with the committed ones rather than replacing them.
 
@@ -31035,7 +31035,7 @@ echo $OTEL_EXPORTER_OTLP_HEADERS
   </Accordion>
 
   <Accordion title="Large payloads or truncated content">
-    The content flags ship the Messages API request and response JSON on every turn, so `api_request_body` / `api_response_body` events can reach tens of KB each. Claude Code truncates each inline body at 60 KB (raise the limit with `CLAUDE_CODE_OTEL_CONTENT_MAX_LENGTH`) and redacts extended thinking. LangWatch caps oversized log records on ingestion to protect the pipeline, keeping the lifted input and output text while trimming the rest. If you only need cost and token data, drop all four content flags. The other two (`OTEL_LOG_USER_PROMPTS`, `OTEL_LOG_TOOL_CONTENT`) send smaller records than the raw bodies do, but they are content too: a whole prompt, and the input and output of every tool call, including the contents of files a tool read or wrote.
+    `OTEL_LOG_RAW_API_BODIES` is the flag that carries the large payload: it ships the Messages API request and response JSON on every turn, so `api_request_body` / `api_response_body` events can reach tens of KB each. Claude Code truncates each inline body at 60 KB (raise the limit with `CLAUDE_CODE_OTEL_CONTENT_MAX_LENGTH`) and redacts extended thinking. LangWatch caps oversized log records on ingestion to protect the pipeline, keeping the lifted input and output text while trimming the rest. If you only need cost and token data, drop all four content flags. The other three send smaller records than the raw bodies do, but they are content too: `OTEL_LOG_USER_PROMPTS` sends the whole prompt, `OTEL_LOG_TOOL_DETAILS` sends what each tool call was asked to do (the Bash command text, the Edit diff, the path a Read opened), and `OTEL_LOG_TOOL_CONTENT` sends what the tool gave back, including the contents of files a tool read or wrote.
   </Accordion>
 
   <Accordion title="Configuration not taking effect">
@@ -31069,6 +31069,10 @@ export OTEL_RESOURCE_ATTRIBUTES="environment=production,region=us-west-2,team=pl
 ## Usage Insights
 
 With LangWatch integration, you can gain insights into Claude Code usage:
+
+<Note>
+  Which of these you get depends on which flags are set, and nothing is exported at all without `CLAUDE_CODE_ENABLE_TELEMETRY=1`. With that alone you get the usage fields: token counts, cost, model and latency. The tool call tree, per-tool timings, session structure and subagent attribution need `CLAUDE_CODE_ENHANCED_TELEMETRY_BETA=1`, which is what turns spans on. Prompt text, tool input and output, and the model request and response bodies each need their own content flag (`OTEL_LOG_USER_PROMPTS`, `OTEL_LOG_TOOL_DETAILS`, `OTEL_LOG_TOOL_CONTENT`, `OTEL_LOG_RAW_API_BODIES`).
+</Note>
 
 ### **Productivity Tracking**
 - Monitor code generation patterns

@@ -218,6 +218,24 @@ async function tryTakeLock(lockPath: string, owner: string): Promise<boolean> {
   return true;
 }
 
+/**
+ * Whether `error` is the refusal `link` gives when the destination already
+ * exists. Anything that does not say so for itself, a value that is not an
+ * object or one carrying a different code or none, is a real failure.
+ *
+ * Matched on shape rather than with `instanceof Error`, because the rejection
+ * comes from a node builtin: under the vmThreads pool the suites run in, those
+ * are constructed in the host realm and are not instances of this module's
+ * `Error`.
+ */
+function isPathAlreadyTaken(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    (error as NodeJS.ErrnoException).code === "EEXIST"
+  );
+}
+
 /** The token in the lock file, or null once it has gone. */
 async function lockOwner(lockPath: string): Promise<string | null> {
   return readFile(lockPath, "utf-8").catch(() => null);
@@ -280,9 +298,16 @@ async function removeLockOwnedBy({
   // goes back through `link`, which fails with EEXIST once somebody else has
   // taken the freed path, leaving that holder's lock where it is; `rename`
   // would replace it silently and put two replays inside the critical section
-  // believing they each hold it. The claim copy goes either way: `link` leaves
-  // its source in place.
-  await link(claimPath, lockPath).catch(() => undefined);
+  // believing they each hold it. That EEXIST is the restore working, so it is
+  // the only failure absorbed here: under any other one the lock was moved
+  // away and never put back, and returning as if it had been lets a live
+  // holder lose its lock silently. The claim copy goes either way: `link`
+  // leaves its source in place.
+  try {
+    await link(claimPath, lockPath);
+  } catch (error) {
+    if (!isPathAlreadyTaken(error)) throw error;
+  }
   await rm(claimPath, { force: true });
   return false;
 }
