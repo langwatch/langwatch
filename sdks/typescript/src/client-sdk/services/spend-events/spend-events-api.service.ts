@@ -155,10 +155,13 @@ const FILTER_PARAMS: ReadonlyArray<[keyof SpendFilterOptions, string]> = [
 ];
 
 /** Repeat the parameter once per value: that is how the API widens a filter. */
-function appendSpendFilters(
-  params: URLSearchParams,
-  filters: SpendFilterOptions,
-): void {
+function appendSpendFilters({
+  params,
+  filters,
+}: {
+  params: URLSearchParams;
+  filters: SpendFilterOptions;
+}): void {
   for (const [field, name] of FILTER_PARAMS) {
     const value = filters[field] as string | string[] | undefined;
     if (value === undefined) continue;
@@ -167,6 +170,15 @@ function appendSpendFilters(
     }
   }
   for (const [key, value] of Object.entries(filters.metadata ?? {})) {
+    // The API splits a pair on its FIRST colon, so a key carrying one would
+    // silently address a different key and report spend for a filter nobody
+    // wrote. Refused here rather than sent and misread.
+    if (key.includes(":")) {
+      throw new SpendEventsApiError(
+        `A metadata key cannot contain a colon: ${key}`,
+        "build spend filters",
+      );
+    }
     for (const one of Array.isArray(value) ? value : [value]) {
       params.append("metadata", `${key}:${one}`);
     }
@@ -360,7 +372,7 @@ export class SpendEventsApiService {
     params.set("to", String(options.to));
     if (options.cursor) params.set("cursor", options.cursor);
     if (options.limit !== undefined) params.set("limit", String(options.limit));
-    appendSpendFilters(params, options);
+    appendSpendFilters({ params, filters: options });
     const qs = params.toString() !== "" ? `?${params.toString()}` : "";
     return await this.request<SpendEventsPage>(
       "list spend events",
@@ -428,7 +440,7 @@ export class SpendEventsApiService {
     if (options.bucket) params.set("bucket", options.bucket);
     if (options.timezone) params.set("timezone", options.timezone);
     if (options.allowUnstable) params.set("allow_unstable", "true");
-    appendSpendFilters(params, options);
+    appendSpendFilters({ params, filters: options });
     if (options.cursor) params.set("cursor", options.cursor);
     if (options.limit !== undefined) params.set("limit", String(options.limit));
     return await this.request<SpendSummariesPage>(

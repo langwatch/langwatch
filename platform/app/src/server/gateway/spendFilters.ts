@@ -60,6 +60,15 @@ export interface SpendFilters {
 }
 
 /**
+ * How many values one filter may name. Each becomes an element of a bound
+ * ClickHouse array and each metadata entry becomes a predicate of its own, so
+ * an unbounded repeat is an unbounded query on a billing read. A caller who
+ * genuinely needs more is naming a team or an organization, and both of those
+ * are filters in their own right.
+ */
+export const MAX_FILTER_VALUES = 100;
+
+/**
  * A filter the caller may repeat. Hono hands a query parameter back as a
  * string when it appears once and an array when it appears more than once,
  * so a schema that accepted only one of those shapes would reject the
@@ -69,7 +78,7 @@ function repeatable(
   inner: z.ZodType<string, z.ZodTypeDef, string>,
 ): z.ZodType<string[], z.ZodTypeDef, string | string[]> {
   return z
-    .union([inner, z.array(inner)])
+    .union([inner, z.array(inner).max(MAX_FILTER_VALUES)])
     .transform((value): string[] => (Array.isArray(value) ? value : [value]));
 }
 
@@ -80,14 +89,25 @@ const longId = z.string().min(1).max(256);
  * `key:value`, split on the FIRST colon so a value may contain one. The key
  * cannot: a metadata key with a colon in it is unaddressable here, which is
  * a limit worth naming rather than a shape worth guessing at.
+ *
+ * Both halves have to be non-empty. ClickHouse answers a missing Map key with
+ * the value type's default, so `tier:` would read as `'' IN ('')` and match
+ * every row that has no `tier` at all, which is the exact opposite of the
+ * narrowing the caller asked for. Refusing beats returning wrong spend.
  */
 const metadataPair = z
   .string()
   .min(3)
   .max(640)
-  .refine((raw) => raw.includes(":") && !raw.startsWith(":"), {
-    message: "metadata must be written key:value",
-  });
+  .refine(
+    (raw) => {
+      const separator = raw.indexOf(":");
+      return separator > 0 && separator < raw.length - 1;
+    },
+    {
+      message: "metadata must be written key:value, with both sides non-empty",
+    },
+  );
 
 /**
  * The query-parameter shape both spend reads mount. Spread into each route's
@@ -157,10 +177,13 @@ export function intersectIds(
  * Postgres-resolved filters (project, team, external id) are applied by the
  * caller before this runs.
  */
-export function spendFiltersFromQuery(
-  query: SpendFilterQuery,
-  overrides?: { virtualKeyIds?: string[] },
-): SpendFilters {
+export function spendFiltersFromQuery({
+  query,
+  overrides,
+}: {
+  query: SpendFilterQuery;
+  overrides?: { virtualKeyIds?: string[] };
+}): SpendFilters {
   return {
     virtualKeyIds: intersectIds(query.virtual_key_id, overrides?.virtualKeyIds),
     endUserIds: query.end_user_id,
@@ -183,20 +206,30 @@ export function spendFiltersFromQuery(
  * screen narrows exactly the way the REST reads do.
  */
 export const spendFiltersSchema = z.object({
-  virtualKeyIds: z.array(id).optional(),
-  endUserIds: z.array(longId).optional(),
-  principalUserIds: z.array(id).optional(),
-  models: z.array(z.string().min(1).max(200)).optional(),
-  providerKeys: z.array(id).optional(),
-  requestTypes: z.array(z.string().min(1).max(50)).optional(),
-  labels: z.array(z.string().min(1).max(200)).optional(),
+  virtualKeyIds: z.array(id).max(MAX_FILTER_VALUES).optional(),
+  endUserIds: z.array(longId).max(MAX_FILTER_VALUES).optional(),
+  principalUserIds: z.array(id).max(MAX_FILTER_VALUES).optional(),
+  models: z.array(z.string().min(1).max(200)).max(MAX_FILTER_VALUES).optional(),
+  providerKeys: z.array(id).max(MAX_FILTER_VALUES).optional(),
+  requestTypes: z
+    .array(z.string().min(1).max(50))
+    .max(MAX_FILTER_VALUES)
+    .optional(),
+  labels: z.array(z.string().min(1).max(200)).max(MAX_FILTER_VALUES).optional(),
   metadata: z
     .array(
       z.object({
         key: z.string().min(1).max(128),
-        values: z.array(z.string().max(512)).min(1),
+        // Non-empty for the same reason the query spelling is: ClickHouse
+        // answers a missing Map key with the type default, so an empty value
+        // matches every row that lacks the key.
+        values: z
+          .array(z.string().min(1).max(512))
+          .min(1)
+          .max(MAX_FILTER_VALUES),
       }),
     )
+    .max(MAX_FILTER_VALUES)
     .optional(),
   status: z
     .enum(["success", "error", "admitted", "confirmed", "failed", "settled"])

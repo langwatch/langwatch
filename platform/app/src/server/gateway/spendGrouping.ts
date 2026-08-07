@@ -63,6 +63,24 @@ export const SPEND_BUCKETS = ["none", "hour", "day"] as const;
 export type SpendBucket = (typeof SPEND_BUCKETS)[number];
 
 /**
+ * Whether the runtime knows this zone.
+ *
+ * Asked before the query is built so an unknown zone is a 400 naming
+ * `timezone`. ClickHouse would otherwise refuse it in `formatDateTime` and the
+ * caller would read an unknown error about a value they chose. The check is a
+ * construction attempt rather than a list, because the zone database ships
+ * with the runtime and any list here would go stale against it.
+ */
+export function isIanaTimeZone(zone: string): boolean {
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: zone });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * A time bucket rendered as a sortable string, so every grouping dimension is
  * a String and one cursor comparison covers them all. The offset is applied
  * inside ClickHouse rather than after the fact: a day boundary is the

@@ -41586,7 +41586,9 @@
             "in": "query",
             "name": "group_by",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "description": "One or two dimensions, comma separated: virtual_key, end_user, project, model, provider, principal, request_type. A dimension may not repeat. Each row's `key` is the first dimension's value and `group` names them all, so two rows may share a key.",
+              "example": "model,end_user"
             },
             "required": true
           },
@@ -41619,8 +41621,17 @@
             "in": "query",
             "name": "allow_unstable",
             "schema": {
-              "type": "boolean",
-              "default": false
+              "type": "string",
+              "enum": [
+                "",
+                "true",
+                "false",
+                "1",
+                "0",
+                "yes",
+                "no"
+              ],
+              "default": "false"
             },
             "required": false
           },
@@ -41629,7 +41640,8 @@
             "name": "from",
             "schema": {
               "type": "integer",
-              "exclusiveMinimum": 0
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
             },
             "required": true
           },
@@ -41638,7 +41650,8 @@
             "name": "to",
             "schema": {
               "type": "integer",
-              "exclusiveMinimum": 0
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
             },
             "required": true
           },
@@ -41678,7 +41691,8 @@
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 100
-                  }
+                  },
+                  "maxItems": 100
                 }
               ]
             },
@@ -41700,7 +41714,8 @@
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 100
-                  }
+                  },
+                  "maxItems": 100
                 }
               ]
             },
@@ -41722,7 +41737,8 @@
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 200
-                  }
+                  },
+                  "maxItems": 100
                 }
               ]
             },
@@ -41744,7 +41760,8 @@
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 100
-                  }
+                  },
+                  "maxItems": 100
                 }
               ]
             },
@@ -41766,7 +41783,8 @@
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 256
-                  }
+                  },
+                  "maxItems": 100
                 }
               ]
             },
@@ -41788,7 +41806,8 @@
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 100
-                  }
+                  },
+                  "maxItems": 100
                 }
               ]
             },
@@ -41810,7 +41829,8 @@
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 200
-                  }
+                  },
+                  "maxItems": 100
                 }
               ]
             },
@@ -41832,7 +41852,8 @@
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 100
-                  }
+                  },
+                  "maxItems": 100
                 }
               ]
             },
@@ -41854,7 +41875,8 @@
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 50
-                  }
+                  },
+                  "maxItems": 100
                 }
               ]
             },
@@ -41876,7 +41898,8 @@
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 200
-                  }
+                  },
+                  "maxItems": 100
                 }
               ]
             },
@@ -41898,7 +41921,8 @@
                     "type": "string",
                     "minLength": 3,
                     "maxLength": 640
-                  }
+                  },
+                  "maxItems": 100
                 }
               ]
             },
@@ -42355,7 +42379,8 @@
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 100
-                  }
+                  },
+                  "maxItems": 100
                 }
               ]
             },
@@ -42377,7 +42402,8 @@
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 100
-                  }
+                  },
+                  "maxItems": 100
                 }
               ]
             },
@@ -42399,7 +42425,8 @@
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 200
-                  }
+                  },
+                  "maxItems": 100
                 }
               ]
             },
@@ -42421,7 +42448,8 @@
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 100
-                  }
+                  },
+                  "maxItems": 100
                 }
               ]
             },
@@ -42443,7 +42471,8 @@
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 256
-                  }
+                  },
+                  "maxItems": 100
                 }
               ]
             },
@@ -42465,7 +42494,8 @@
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 100
-                  }
+                  },
+                  "maxItems": 100
                 }
               ]
             },
@@ -42487,7 +42517,8 @@
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 200
-                  }
+                  },
+                  "maxItems": 100
                 }
               ]
             },
@@ -42509,7 +42540,8 @@
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 100
-                  }
+                  },
+                  "maxItems": 100
                 }
               ]
             },
@@ -42531,7 +42563,8 @@
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 50
-                  }
+                  },
+                  "maxItems": 100
                 }
               ]
             },
@@ -42553,7 +42586,8 @@
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 200
-                  }
+                  },
+                  "maxItems": 100
                 }
               ]
             },
@@ -42575,7 +42609,8 @@
                     "type": "string",
                     "minLength": 3,
                     "maxLength": 640
-                  }
+                  },
+                  "maxItems": 100
                 }
               ]
             },

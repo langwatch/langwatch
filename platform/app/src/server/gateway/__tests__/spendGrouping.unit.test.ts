@@ -3,7 +3,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { SETTLEMENT_GRACE_MS_DEFAULT } from "~/server/event-sourcing/pipelines/gateway-spend-processing/process-manager/spendSettlement.process";
+import { settlementGraceMs } from "~/server/event-sourcing/pipelines/gateway-spend-processing/process-manager/spendSettlement.process";
 
 import {
   assertGroupingIsWalkable,
@@ -12,10 +12,17 @@ import {
 } from "../spendGrouping";
 
 const NOW = 1_800_000_000_000;
+/**
+ * Read rather than assumed: the grace is overridable through
+ * LW_SPEND_SETTLEMENT_GRACE_MS, so pinning the default here would make these
+ * windows mean something else on a runner that sets it. Asserted positive so
+ * a zero grace cannot make both windows the same window.
+ */
+const GRACE_MS = settlementGraceMs();
 /** Inside the grace: outcomes for this window can still land. */
-const LIVE_WINDOW_END = NOW - 60_000;
+const LIVE_WINDOW_END = NOW - Math.floor(GRACE_MS / 2);
 /** Past the grace: every admission has resolved or been settled. */
-const SETTLED_WINDOW_END = NOW - SETTLEMENT_GRACE_MS_DEFAULT - 1;
+const SETTLED_WINDOW_END = NOW - GRACE_MS - 1;
 
 /** The thrown error, so a test can assert on its code rather than its prose. */
 function refusalFrom(run: () => void): { code?: string; meta?: unknown } {
@@ -28,6 +35,10 @@ function refusalFrom(run: () => void): { code?: string; meta?: unknown } {
 }
 
 describe("given a spend rollup grouping", () => {
+  it("runs against a grace that can actually separate the two windows", () => {
+    expect(GRACE_MS).toBeGreaterThan(0);
+  });
+
   describe("when the dimension is one the fold can rewrite", () => {
     it("names model and provider as movable", () => {
       // The fold replaces the REQUESTED model and provider with the ones that
@@ -140,7 +151,7 @@ describe("given a spend rollup grouping", () => {
       const meta = (refusal.meta ?? {}) as Record<string, unknown>;
       expect(meta.group_by).toEqual(["model", "bucket:hour"]);
       expect(meta.settles_at).toBe(
-        new Date(LIVE_WINDOW_END + SETTLEMENT_GRACE_MS_DEFAULT).toISOString(),
+        new Date(LIVE_WINDOW_END + GRACE_MS).toISOString(),
       );
     });
   });

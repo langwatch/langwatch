@@ -38,6 +38,22 @@ const GROUP_BY_VALUES: readonly SpendGroupBy[] = [
   "request_type",
 ];
 
+const BUCKET_VALUES = ["none", "hour", "day"] as const;
+
+/**
+ * Everything that tells one row from another. A rollup can be grouped two
+ * ways and bucketed by time, so `key` alone is now ambiguous: two rows sharing
+ * a model but not an end user, or a day, would print under the same label and
+ * read as duplicates of each other.
+ */
+function rowLabel(row: SpendSummaryRow): string {
+  const dimensions = Object.values(row.group)
+    .map((value) => value || "(unattributed)")
+    .join(" / ");
+  const label = dimensions || row.key || "(unattributed)";
+  return row.bucket_start === null ? label : `${row.bucket_start}  ${label}`;
+}
+
 /** What a row of each grouping is, for the one-line count after the walk. */
 const GROUP_LABELS: Record<string, string> = {
   virtual_key: "keys",
@@ -50,8 +66,37 @@ const GROUP_LABELS: Record<string, string> = {
 };
 
 /**
+ * Refuse a value the API does not accept, naming what it does. A typo must
+ * not silently become a different report on a billing reconciliation surface,
+ * and finding that out from a server 400 is finding it out too late.
+ */
+function oneOf<T extends string>({
+  value,
+  allowed,
+  flag,
+}: {
+  value: string;
+  allowed: readonly T[];
+  flag: string;
+}): T {
+  if (!allowed.includes(value as T)) {
+    console.error(
+      chalk.red(
+        `Invalid ${flag} value: ${value} (expected one of ${allowed.join(", ")})`,
+      ),
+    );
+    process.exit(1);
+  }
+  return value as T;
+}
+
+/**
  * `--metadata tier=gold`, repeated. Equals rather than a colon, because the
  * value may itself contain a colon and a shell user expects `key=value`.
+ *
+ * A key may not contain a colon: the server splits a pair on its FIRST colon,
+ * so a key carrying one would silently address a different key. Refusing beats
+ * reporting spend for a filter the caller did not write.
  */
 function parseMetadataFlags(
   pairs: string[] | undefined,
@@ -67,6 +112,14 @@ function parseMetadataFlags(
       process.exit(1);
     }
     const key = pair.slice(0, separator);
+    if (key.includes(":")) {
+      console.error(
+        chalk.red(
+          `Invalid --metadata key: ${key} (a metadata key cannot contain a colon)`,
+        ),
+      );
+      process.exit(1);
+    }
     (parsed[key] ??= []).push(pair.slice(separator + 1));
   }
   return parsed;
@@ -88,22 +141,21 @@ export const spendSummaryCommand = async (options: {
   limit?: string;
 }): Promise<CommandResult | void> => {
   const apiKey = checkOrgApiKey();
-  // A typo must not silently become a virtual-key report on a billing
-  // reconciliation surface.
   const groupBy = (options.groupBy ?? "virtual_key")
     .split(",")
-    .map((part) => part.trim());
-  const unknown = groupBy.filter(
-    (key) => !GROUP_BY_VALUES.includes(key as SpendGroupBy),
-  );
-  if (unknown.length > 0 || groupBy.length > 2) {
-    console.error(
-      chalk.red(
-        `Invalid --group-by value: ${options.groupBy} (expected one or two of ${GROUP_BY_VALUES.join(", ")})`,
-      ),
-    );
+    .map((part) => oneOf({ value: part.trim(), allowed: GROUP_BY_VALUES, flag: "--group-by" }));
+  if (groupBy.length > 2) {
+    console.error(chalk.red("--group-by takes at most two dimensions"));
     process.exit(1);
   }
+  const bucket =
+    options.bucket === undefined
+      ? undefined
+      : oneOf({
+          value: options.bucket,
+          allowed: BUCKET_VALUES,
+          flag: "--bucket",
+        });
   const now = Date.now();
   const fromMs =
     options.from !== undefined
@@ -120,8 +172,8 @@ export const spendSummaryCommand = async (options: {
     // is the page size; the walk is always the whole window.
     const data: SpendSummaryRow[] = [];
     for await (const row of service.iterSummaries({
-      groupBy: groupBy as SpendGroupBy[],
-      bucket: options.bucket as "none" | "hour" | "day" | undefined,
+      groupBy,
+      bucket,
       timezone: options.timezone,
       allowUnstable: options.allowUnstable,
       from: fromMs,
@@ -153,7 +205,7 @@ export const spendSummaryCommand = async (options: {
               ? chalk.yellow(` (+${row.settled_count} settled, unpriced)`)
               : "";
           console.log(
-            `${chalk.cyan(row.key || "(unattributed)")}  $${Number(row.cost.total_usd).toFixed(6)}  ${row.event_count} events${settledNote}  in ${row.usage.input_tokens} / out ${row.usage.output_tokens}`,
+            `${chalk.cyan(rowLabel(row))}  $${Number(row.cost.total_usd).toFixed(6)}  ${row.event_count} events${settledNote}  in ${row.usage.input_tokens} / out ${row.usage.output_tokens}`,
           );
         }
         console.log();

@@ -117,10 +117,27 @@ ALTER TABLE ${CLICKHOUSE_DATABASE}.gateway_spend
     TYPE set(16) GRANULARITY 4;
 -- +goose StatementEnd
 
+-- The write path is not free either. Every part write now builds nine index
+-- granules and evaluates JSONExtract over Metadata. Watch part-write and merge
+-- duration on gateway_spend after this lands: if the fold's insert rate
+-- degrades, idx_gateway_spend_metadata_value is the first to drop, since a
+-- bloom over every metadata value has the widest cardinality here and the
+-- narrowest benefit.
+--
 -- +goose Down
--- To roll back, uncomment and run manually. Down migrations are
--- intentionally commented out per LangWatch CLAUDE.md "ClickHouse
--- migration" guidance.
+-- IRREVERSIBLE: this down step is deliberately a no-op.
+--
+-- Every statement below is a DROP against the billing spend ledger, and goose
+-- runs a down step unattended, on whichever environment asked for it. Dropping
+-- an index costs a rebuild; dropping MetadataMap takes the metadata filters
+-- offline for every caller until it is added back. Neither is a decision worth
+-- making by rollback, so it is made by hand.
+--
+-- Leaving the up step in place is safe: an index and a MATERIALIZED column are
+-- both read-path shape, so an older build reading this table simply does not
+-- use them.
+--
+-- To roll back, uncomment and run these manually.
 
 -- ALTER TABLE ${CLICKHOUSE_DATABASE}.gateway_spend DROP INDEX IF EXISTS idx_gateway_spend_request_type;
 -- ALTER TABLE ${CLICKHOUSE_DATABASE}.gateway_spend DROP INDEX IF EXISTS idx_gateway_spend_labels;

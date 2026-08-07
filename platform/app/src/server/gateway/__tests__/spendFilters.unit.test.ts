@@ -52,6 +52,17 @@ describe("the shared spend filter vocabulary", () => {
     it("refuses a pair with no key", () => {
       expect(() => spendFilterQueryShape.metadata.parse(":gold")).toThrow();
     });
+
+    it("refuses a pair with no value", () => {
+      // ClickHouse answers a missing Map key with the value type's default,
+      // so `tier:` would read as '' IN ('') and match every row that has no
+      // `tier` at all: the exact opposite of the narrowing asked for.
+      expect(() => spendFilterQueryShape.metadata.parse("tier:")).toThrow();
+    });
+
+    it("refuses a pair with no colon at all", () => {
+      expect(() => spendFilterQueryShape.metadata.parse("tier")).toThrow();
+    });
   });
 
   describe("when filters are rendered to SQL", () => {

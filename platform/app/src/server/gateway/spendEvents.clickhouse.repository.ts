@@ -254,7 +254,11 @@ export interface SpendSummaryRow {
   costUsd: string;
 }
 
-/** An aggregate that matched no rows comes back absent, never as a zero. */
+/**
+ * Zero is the honest answer for an absent aggregate here: a group only exists
+ * in the result because at least one row produced it, so a missing column is
+ * a sum over rows that all carried nothing, not an unknown quantity.
+ */
 function summed(raw: Record<string, unknown>, column: string): number {
   return Number(raw[column] ?? 0);
 }
@@ -827,22 +831,36 @@ export function encodeSpendSummariesCursor(groupKey: string[]): string {
  * The group-key parts a summaries cursor names, or null when it is not a
  * cursor this service minted.
  *
- * A bare string decodes to a single part: cursors minted before a rollup
- * could group by two dimensions are plain base64url text, and a caller can be
- * mid-walk across the deploy that changed this.
+ * Anything that is not a JSON array of strings is one part: cursors minted
+ * before a rollup could group by two dimensions are plain base64url text, and
+ * a caller can be mid-walk across the deploy that changed this.
+ *
+ * The decision is made by parsing, never by looking at the first character.
+ * Group keys are caller data, so a model or end-user id may legitimately open
+ * with `[`, and sniffing would refuse that caller's perfectly good cursor and
+ * restart their walk from the first page.
  */
 export function decodeSpendSummariesCursor(encoded: string): string[] | null {
   try {
     const raw = Buffer.from(encoded, "base64url").toString("utf8");
     if (raw.length === 0) return null;
-    if (!raw.startsWith("[")) return [raw];
-    const parsed: unknown = JSON.parse(raw);
-    if (!Array.isArray(parsed) || parsed.length === 0) return null;
-    if (!parsed.every((part) => typeof part === "string")) return null;
-    return parsed as string[];
+    return asGroupKeyParts(raw) ?? [raw];
   } catch {
     return null;
   }
+}
+
+/** The parts a payload names, or null when it is not the multi-part form. */
+function asGroupKeyParts(raw: string): string[] | null {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  if (!Array.isArray(parsed) || parsed.length === 0) return null;
+  if (!parsed.every((part) => typeof part === "string")) return null;
+  return parsed as string[];
 }
 
 export function decodeSpendEventsCursor(

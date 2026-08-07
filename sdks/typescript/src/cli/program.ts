@@ -2139,7 +2139,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .option("--provider <id...>", "Narrow to these model providers")
       .option("--end-user <id...>", "Narrow to these end users")
       .option("--metadata <pair...>", "Narrow by your own request metadata, written key=value")
-      .option("--limit <n>", "Max rows, default 500")
+      .option("--limit <n>", "Rows fetched per page, default 500. The walk always covers the whole window")
       .option("-f, --format <format>", "Output format: text (default) or json", "text"),
     async (options: {
       groupBy?: string;

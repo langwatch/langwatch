@@ -34,9 +34,20 @@ const USER_ID = `usr-filt-${suffix}`;
 const VK_A_ID = `vk_filt_a_${suffix}`;
 const VK_B_ID = `vk_filt_b_${suffix}`;
 
-const WINDOW_FROM = Date.parse("2026-03-01T00:00:00Z");
-const WINDOW_TO = Date.parse("2026-04-01T00:00:00Z");
-const OCCURRED_AT = new Date("2026-03-11T10:00:00Z");
+/** A second organization, so the tenant fence has something to keep out. */
+const ORG_B_ID = `org-filt-other-${suffix}`;
+const TEAM_C_ID = `team-filt-c-${suffix}`;
+const PROJECT_C_ID = `proj-filt-c-${suffix}`;
+const VK_C_ID = `vk_filt_c_${suffix}`;
+
+/**
+ * Anchored to the run, not to a date on the calendar. The ledger keeps 13
+ * months, so a fixed instant silently ages out of every window and the
+ * failure would read as a filter bug years after anyone could place it.
+ */
+const OCCURRED_AT = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+const WINDOW_FROM = OCCURRED_AT.getTime() - 24 * 60 * 60 * 1000;
+const WINDOW_TO = OCCURRED_AT.getTime() + 24 * 60 * 60 * 1000;
 
 function ch(): ClickHouseClient {
   const client = getTestClickHouseClient();
@@ -209,30 +220,80 @@ describe("gateway spend filtering (real PG + real CH)", () => {
       virtualKeyId: VK_B_ID,
       model: "gemini-3-pro",
       providerKey: "pk-google",
+      endUserId: "enduser-b",
+    });
+
+    // A second organization with real spend of its own. Without it, "a key
+    // from another organization" and "a key nobody minted" are the same test.
+    await prisma.organization.create({
+      data: {
+        id: ORG_B_ID,
+        name: `Filt Other Org ${suffix}`,
+        slug: `filt-other-${suffix}`,
+      },
+    });
+    await prisma.team.create({
+      data: {
+        id: TEAM_C_ID,
+        name: `Filt Team c ${suffix}`,
+        slug: `filt-team-c-${suffix}`,
+        organizationId: ORG_B_ID,
+      },
+    });
+    await prisma.project.create({
+      data: {
+        id: PROJECT_C_ID,
+        name: `Filt Project c ${suffix}`,
+        slug: `filt-proj-c-${suffix}`,
+        teamId: TEAM_C_ID,
+        language: "en",
+        framework: "openai",
+        apiKey: `filt-key-c-${suffix}`,
+      },
+    });
+    await prisma.virtualKey.create({
+      data: {
+        id: VK_C_ID,
+        organizationId: ORG_B_ID,
+        name: "filt-key-c",
+        hashedSecret: `hash-${VK_C_ID}`,
+        displayPrefix: "vk-lw-flt",
+        createdById: USER_ID,
+        scopes: { create: [{ scopeType: "PROJECT", scopeId: PROJECT_C_ID }] },
+      },
+    });
+    await insertSpend({
+      tenantId: PROJECT_C_ID,
+      virtualKeyId: VK_C_ID,
+      model: "gpt-5-mini",
     });
   });
 
   afterAll(async () => {
     const client = getTestClickHouseClient();
     if (client) {
-      for (const tenantId of [PROJECT_A_ID, PROJECT_B_ID]) {
+      for (const tenantId of [PROJECT_A_ID, PROJECT_B_ID, PROJECT_C_ID]) {
         await client.command({
           query: `ALTER TABLE gateway_spend DELETE WHERE TenantId = '${tenantId}'`,
         });
       }
     }
     await prisma.virtualKeyScope.deleteMany({
-      where: { virtualKeyId: { in: [VK_A_ID, VK_B_ID] } },
+      where: { virtualKeyId: { in: [VK_A_ID, VK_B_ID, VK_C_ID] } },
     });
-    await prisma.virtualKey.deleteMany({ where: { organizationId: ORG_ID } });
+    await prisma.virtualKey.deleteMany({
+      where: { organizationId: { in: [ORG_ID, ORG_B_ID] } },
+    });
     await prisma.project.deleteMany({
-      where: { id: { in: [PROJECT_A_ID, PROJECT_B_ID] } },
+      where: { id: { in: [PROJECT_A_ID, PROJECT_B_ID, PROJECT_C_ID] } },
     });
     await prisma.team.deleteMany({
-      where: { id: { in: [TEAM_A_ID, TEAM_B_ID] } },
+      where: { id: { in: [TEAM_A_ID, TEAM_B_ID, TEAM_C_ID] } },
     });
     await prisma.user.deleteMany({ where: { id: USER_ID } });
-    await prisma.organization.deleteMany({ where: { id: ORG_ID } });
+    await prisma.organization.deleteMany({
+      where: { id: { in: [ORG_ID, ORG_B_ID] } },
+    });
     clearSpendScopeCache();
     await stopTestContainers();
   });
@@ -297,6 +358,47 @@ describe("gateway spend filtering (real PG + real CH)", () => {
         externalIds: ["no-such-external-id"],
       });
       expect(scope.virtualKeyIds).toEqual([]);
+    });
+
+    /** @scenario "A filter that matches nothing answers empty rather than everything" */
+    it("keeps another organization's key out even though its spend is real", async () => {
+      // A key nobody minted resolves to nothing and would read as empty even
+      // with no fence at all. This one exists, carries spend, and is simply
+      // not ours, so only the tenant fence can keep it out.
+      expect(
+        await summariseBy(["model"], { filters: { virtualKeyIds: [VK_C_ID] } }),
+      ).toEqual([]);
+
+      // The row really is there, so the empty answer above is the fence and
+      // not a fixture that never wrote anything.
+      const theirs = await repository().readSpendSummaries({
+        tenantIds: [PROJECT_C_ID],
+        groupBy: ["model"],
+        fromMs: WINDOW_FROM,
+        toMs: WINDOW_TO,
+        filters: { virtualKeyIds: [VK_C_ID] },
+      });
+      expect(theirs.rows.map((r) => r.key)).toEqual(["gpt-5-mini"]);
+    });
+  });
+
+  describe("when the caller filters on a provider, an end user or a label", () => {
+    it("narrows on each of them", async () => {
+      // The seed carries these three dimensions, and a dimension nothing
+      // asserts is a dimension the SQL could be building wrong.
+      expect(
+        await summariseBy(["model"], {
+          filters: { providerKeys: ["pk-google"] },
+        }),
+      ).toEqual(["gemini-3-pro"]);
+      expect(
+        await summariseBy(["model"], {
+          filters: { endUserIds: ["enduser-b"] },
+        }),
+      ).toEqual(["gemini-3-pro"]);
+      expect(
+        await summariseBy(["model"], { filters: { labels: ["billable"] } }),
+      ).toEqual(["gpt-5-mini"]);
     });
   });
 

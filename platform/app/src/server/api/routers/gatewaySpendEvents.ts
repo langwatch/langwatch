@@ -34,8 +34,10 @@ export const gatewaySpendEventsRouter = createTRPCRouter({
         projectId: z.string(),
         fromMs: z.number().int(),
         toMs: z.number().int(),
-        // The same vocabulary the REST reads accept, so the Billing events
-        // screen and a reconciliation script can ask the same question.
+        // The same filter set the REST reads narrow on, in the structured
+        // spelling rather than the query-string one, so the screen and a
+        // reconciliation script cannot come to mean different things by the
+        // same narrowing.
         filters: spendFiltersSchema.optional(),
         cursor: z
           .object({

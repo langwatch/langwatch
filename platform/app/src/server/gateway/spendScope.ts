@@ -33,10 +33,13 @@ interface CachedProjects {
 
 const projectCache = new Map<string, CachedProjects>();
 
-async function organizationProjects(
-  organizationId: string,
-  nowMs: number,
-): Promise<Array<{ id: string; teamId: string }>> {
+async function organizationProjects({
+  organizationId,
+  nowMs,
+}: {
+  organizationId: string;
+  nowMs: number;
+}): Promise<Array<{ id: string; teamId: string }>> {
   const cached = projectCache.get(organizationId);
   if (cached && cached.expiresAtMs > nowMs) return cached.projects;
   const projects = await prisma.project.findMany({
@@ -77,7 +80,7 @@ export async function resolveSpendScope({
   externalIds?: string[];
   nowMs?: number;
 }): Promise<{ tenantIds: string[]; virtualKeyIds?: string[] }> {
-  const projects = await organizationProjects(organizationId, nowMs);
+  const projects = await organizationProjects({ organizationId, nowMs });
 
   let tenantIds = projects;
   if (teamIds !== undefined) {

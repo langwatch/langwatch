@@ -39,6 +39,7 @@ import {
 } from "~/server/gateway/spendFilters";
 import {
   assertGroupingIsWalkable,
+  isIanaTimeZone,
   MAX_GROUP_BY_KEYS,
   SPEND_BUCKETS,
   SPEND_GROUP_BY_KEYS,
@@ -256,28 +257,48 @@ secured.hono.onError(handleGatewaySpendApiError);
  * an index they never wrote maps onto nothing a client can point at, and
  * `meta.fields` exists precisely so a client can point at something.
  */
-const groupBySchema = z.string().transform((raw, ctx): SpendGroupByKey[] => {
-  const keys = raw.split(",").map((part) => part.trim());
-  const refuse = (message: string): typeof z.NEVER => {
-    ctx.addIssue({ code: z.ZodIssueCode.custom, message });
-    return z.NEVER;
-  };
-  const unknown = keys.filter(
-    (key) => !SPEND_GROUP_BY_KEYS.includes(key as SpendGroupByKey),
-  );
-  if (unknown.length > 0) {
-    return refuse(
-      `group_by must name one or two of ${SPEND_GROUP_BY_KEYS.join(", ")}`,
+const groupBySchema = z
+  .string()
+  .transform((raw, ctx): SpendGroupByKey[] => {
+    const keys = raw.split(",").map((part) => part.trim());
+    const refuse = (message: string): typeof z.NEVER => {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message });
+      return z.NEVER;
+    };
+    const unknown = keys.filter(
+      (key) => !SPEND_GROUP_BY_KEYS.includes(key as SpendGroupByKey),
     );
-  }
-  if (keys.length > MAX_GROUP_BY_KEYS) {
-    return refuse(`group_by takes at most ${MAX_GROUP_BY_KEYS} dimensions`);
-  }
-  if (new Set(keys).size !== keys.length) {
-    return refuse("group_by cannot repeat a dimension");
-  }
-  return keys as SpendGroupByKey[];
-});
+    if (unknown.length > 0) {
+      return refuse(
+        `group_by must name one or two of ${SPEND_GROUP_BY_KEYS.join(", ")}`,
+      );
+    }
+    if (keys.length > MAX_GROUP_BY_KEYS) {
+      return refuse(`group_by takes at most ${MAX_GROUP_BY_KEYS} dimensions`);
+    }
+    if (new Set(keys).size !== keys.length) {
+      return refuse("group_by cannot repeat a dimension");
+    }
+    return keys as SpendGroupByKey[];
+  })
+  .openapi({
+    description: `One or two dimensions, comma separated: ${SPEND_GROUP_BY_KEYS.join(", ")}. A dimension may not repeat. Each row's \`key\` is the first dimension's value and \`group\` names them all, so two rows may share a key.`,
+    example: "model,end_user",
+  });
+
+/**
+ * A boolean spelled in a query string.
+ *
+ * `z.coerce.boolean()` is JavaScript `Boolean()`, so every non-empty string is
+ * true and `allow_unstable=false` would turn the guard OFF. The most obvious
+ * way to spell "off" must not mean "on", and a spelling this does not know is
+ * refused by name rather than guessed at.
+ */
+const queryBoolean = z
+  .enum(["", "true", "false", "1", "0", "yes", "no"])
+  .optional()
+  .default("false")
+  .transform((raw) => raw === "true" || raw === "1" || raw === "yes");
 
 const spendSummariesQuerySchema = z
   .object({
@@ -285,11 +306,21 @@ const spendSummariesQuerySchema = z
     bucket: z.enum(SPEND_BUCKETS).optional().default("none"),
     // An IANA zone, because a day boundary is the caller's local midnight and
     // re-bucketing UTC days afterwards cannot recover the requests that fell
-    // on the other side of it.
-    timezone: z.string().min(1).max(64).optional().default("UTC"),
-    allow_unstable: z.coerce.boolean().optional().default(false),
-    from: z.coerce.number().int().positive(),
-    to: z.coerce.number().int().positive(),
+    // on the other side of it. Checked here so an unknown zone is a 400 that
+    // names the parameter rather than a ClickHouse error the caller cannot act
+    // on.
+    timezone: z
+      .string()
+      .min(1)
+      .max(64)
+      .refine(isIanaTimeZone, {
+        message: "timezone must be an IANA zone name, e.g. Europe/Amsterdam",
+      })
+      .optional()
+      .default("UTC"),
+    allow_unstable: queryBoolean,
+    from: z.coerce.number().int().positive().safe(),
+    to: z.coerce.number().int().positive().safe(),
     cursor: z.string().max(500).optional(),
     limit: z.coerce.number().int().positive().max(1000).optional().default(500),
     ...spendFilterQueryShape,
@@ -350,8 +381,9 @@ secured.access(requires("gatewaySpend:view")).get(
       toMs: query.to,
       cursor: query.cursor ?? null,
       limit: query.limit,
-      filters: spendFiltersFromQuery(query, {
-        virtualKeyIds: scope.virtualKeyIds,
+      filters: spendFiltersFromQuery({
+        query,
+        overrides: { virtualKeyIds: scope.virtualKeyIds },
       }),
     });
     return c.json({
@@ -411,8 +443,9 @@ secured.access(requires("gatewaySpend:view")).get(
       toMs: query.to,
       cursor: query.cursor ?? null,
       limit: query.limit,
-      filters: spendFiltersFromQuery(query, {
-        virtualKeyIds: scope.virtualKeyIds,
+      filters: spendFiltersFromQuery({
+        query,
+        overrides: { virtualKeyIds: scope.virtualKeyIds },
       }),
     });
     return c.json({

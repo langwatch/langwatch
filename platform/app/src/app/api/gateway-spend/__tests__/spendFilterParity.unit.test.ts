@@ -20,14 +20,34 @@ const ROLLUP_ONLY = new Set([
 /** Paging and windowing, shared by both but not filters. */
 const NOT_A_FILTER = new Set(["from", "to", "cursor", "limit"]);
 
-function queryParameterNames(path: string): string[] {
+interface QueryParameter {
+  name: string;
+  in: string;
+  schema?: unknown;
+}
+
+/**
+ * The query parameters the published document gives this operation.
+ *
+ * Throws when the path is absent rather than answering with nothing: every
+ * assertion below compares two of these, and two empty lists are equal, so a
+ * renamed route would turn this whole file green while checking nothing.
+ */
+function queryParameters(path: string): QueryParameter[] {
   const paths = (openapi as { paths: Record<string, unknown> }).paths;
   const operation = (paths[path] as { get?: { parameters?: unknown[] } })?.get;
-  const parameters = (operation?.parameters ?? []) as Array<{
-    name: string;
-    in: string;
-  }>;
-  return parameters.filter((p) => p.in === "query").map((p) => p.name);
+  if (operation === undefined) {
+    throw new Error(
+      `${path} has no documented GET. If the route moved, point this check at it; do not let it pass by finding nothing.`,
+    );
+  }
+  return ((operation.parameters ?? []) as QueryParameter[]).filter(
+    (p) => p.in === "query",
+  );
+}
+
+function queryParameterNames(path: string): string[] {
+  return queryParameters(path).map((p) => p.name);
 }
 
 function filterNames(path: string): Set<string> {
@@ -35,6 +55,16 @@ function filterNames(path: string): Set<string> {
     queryParameterNames(path).filter(
       (name) => !ROLLUP_ONLY.has(name) && !NOT_A_FILTER.has(name),
     ),
+  );
+}
+
+/** Each shared filter's published schema, keyed by name. */
+function filterSchemas(path: string): Record<string, string> {
+  const wanted = filterNames(path);
+  return Object.fromEntries(
+    queryParameters(path)
+      .filter((p) => wanted.has(p.name))
+      .map((p) => [p.name, JSON.stringify(p.schema)]),
   );
 }
 
@@ -48,7 +78,17 @@ describe("given the two gateway spend reads", () => {
       // for the job they exist to do.
       const events = filterNames(EVENTS);
       const summaries = filterNames(SUMMARIES);
+      expect(events.size).toBeGreaterThan(0);
       expect([...events].sort()).toEqual([...summaries].sort());
+    });
+
+    /** @scenario "A filter offered on one read is offered on the other" */
+    it("gives each shared filter the same schema on both", () => {
+      // Matching names are not a matching question. `status` published with a
+      // different enum on each read, or `metadata` as a string on one and an
+      // array on the other, lets a caller write one narrowing that means two
+      // different things, which is the divergence this pair exists to detect.
+      expect(filterSchemas(EVENTS)).toEqual(filterSchemas(SUMMARIES));
     });
 
     it("publishes every filter the shared vocabulary declares", () => {
