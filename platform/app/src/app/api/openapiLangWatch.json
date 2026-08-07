@@ -4975,6 +4975,645 @@
         }
       }
     },
+    "/api/coding-agent/sessions/{sessionId}/events": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "One page of session events plus the cursor for the next page",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "events": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "sessionId": {
+                            "type": "string"
+                          },
+                          "timeUnixMs": {
+                            "type": "number"
+                          },
+                          "recordId": {
+                            "type": "string"
+                          },
+                          "eventKind": {
+                            "type": "string"
+                          },
+                          "agent": {
+                            "type": "string"
+                          },
+                          "sessionKeySource": {
+                            "type": "string"
+                          },
+                          "traceId": {
+                            "type": "string"
+                          },
+                          "spanId": {
+                            "type": "string"
+                          },
+                          "promptId": {
+                            "type": "string"
+                          },
+                          "querySource": {
+                            "type": "string"
+                          },
+                          "agentType": {
+                            "type": "string"
+                          },
+                          "eventSequence": {
+                            "type": "number"
+                          },
+                          "requestId": {
+                            "type": "string"
+                          },
+                          "model": {
+                            "type": "string"
+                          },
+                          "inputTokens": {
+                            "type": "number"
+                          },
+                          "outputTokens": {
+                            "type": "number"
+                          },
+                          "cacheReadTokens": {
+                            "type": "number"
+                          },
+                          "cacheCreationTokens": {
+                            "type": "number"
+                          },
+                          "costUsd": {
+                            "type": "number"
+                          },
+                          "durationMs": {
+                            "type": "number"
+                          },
+                          "ttftMs": {
+                            "type": "number"
+                          },
+                          "attempt": {
+                            "type": "number"
+                          },
+                          "speed": {
+                            "type": "string"
+                          },
+                          "stopReason": {
+                            "type": "string"
+                          },
+                          "preTokens": {
+                            "type": "number"
+                          },
+                          "postTokens": {
+                            "type": "number"
+                          },
+                          "compactionTrigger": {
+                            "type": "string"
+                          },
+                          "precomputeReuse": {
+                            "type": "string"
+                          },
+                          "statusCode": {
+                            "type": "string"
+                          },
+                          "errorType": {
+                            "type": "string"
+                          },
+                          "rateLimitCarrier": {
+                            "type": "string"
+                          },
+                          "retryDurationMs": {
+                            "type": "number"
+                          },
+                          "toolName": {
+                            "type": "string"
+                          },
+                          "success": {
+                            "type": "string"
+                          },
+                          "decision": {
+                            "type": "string"
+                          },
+                          "decisionSource": {
+                            "type": "string"
+                          },
+                          "toolInputBytes": {
+                            "type": "number"
+                          },
+                          "toolResultBytes": {
+                            "type": "number"
+                          },
+                          "promptChars": {
+                            "type": "number"
+                          },
+                          "totalTokens": {
+                            "type": "number"
+                          }
+                        },
+                        "required": [
+                          "sessionId",
+                          "timeUnixMs",
+                          "recordId",
+                          "eventKind",
+                          "agent",
+                          "sessionKeySource",
+                          "traceId",
+                          "spanId",
+                          "promptId",
+                          "querySource",
+                          "agentType",
+                          "eventSequence",
+                          "requestId",
+                          "model",
+                          "inputTokens",
+                          "outputTokens",
+                          "cacheReadTokens",
+                          "cacheCreationTokens",
+                          "costUsd",
+                          "durationMs",
+                          "ttftMs",
+                          "attempt",
+                          "speed",
+                          "stopReason",
+                          "preTokens",
+                          "postTokens",
+                          "compactionTrigger",
+                          "precomputeReuse",
+                          "statusCode",
+                          "errorType",
+                          "rateLimitCarrier",
+                          "retryDurationMs",
+                          "toolName",
+                          "success",
+                          "decision",
+                          "decisionSource",
+                          "toolInputBytes",
+                          "toolResultBytes",
+                          "promptChars",
+                          "totalTokens"
+                        ]
+                      }
+                    },
+                    "nextCursor": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "events",
+                    "nextCursor"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "operationId": "getApiCoding-agentSessionsBySessionIdEvents",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The agent's own session id (session.id / conversation id)."
+          },
+          {
+            "name": "kinds",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Comma-separated event kinds to include. Known kinds: model_call, compaction, rate_limit, api_error, retries_exhausted, tool_result, tool_decision, user_prompt, subagent_completed."
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Opaque keyset cursor from the previous response's nextCursor."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 1000,
+              "default": 500
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Epoch ms lower bound on event time; with `to`, prunes storage partitions for faster reads."
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Epoch ms upper bound on event time."
+          }
+        ],
+        "summary": "List coding agent session events",
+        "description": "List a coding-agent session's events (model calls, compactions, rate limits, tool runs, prompts) in time order, keyset-paginated. Pass the previous response's nextCursor to continue; filter with kinds (comma-separated)."
+      }
+    },
+    "/api/coding-agent/pull-request-usage": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "The pull request's usage rollup",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "pullRequest": {
+                      "type": "object",
+                      "properties": {
+                        "repositoryHost": {
+                          "type": "string"
+                        },
+                        "repositoryFullName": {
+                          "type": "string"
+                        },
+                        "prNumber": {
+                          "type": "number"
+                        },
+                        "headBranch": {
+                          "type": "string"
+                        },
+                        "htmlUrl": {
+                          "type": "string"
+                        },
+                        "state": {
+                          "type": "string"
+                        },
+                        "isDraft": {
+                          "type": "boolean"
+                        },
+                        "authorLogin": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "prCreatedAtMs": {
+                          "type": "number"
+                        },
+                        "prClosedAtMs": {
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        },
+                        "prMergedAtMs": {
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "repositoryHost",
+                        "repositoryFullName",
+                        "prNumber",
+                        "headBranch",
+                        "htmlUrl",
+                        "state",
+                        "isDraft",
+                        "authorLogin",
+                        "prCreatedAtMs",
+                        "prClosedAtMs",
+                        "prMergedAtMs"
+                      ]
+                    },
+                    "rows": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "projectId": {
+                            "type": "string"
+                          },
+                          "userLabel": {
+                            "type": "string"
+                          },
+                          "agent": {
+                            "type": "string"
+                          },
+                          "models": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "sessionsCount": {
+                            "type": "number"
+                          },
+                          "inputTokens": {
+                            "type": "number"
+                          },
+                          "outputTokens": {
+                            "type": "number"
+                          },
+                          "cacheReadTokens": {
+                            "type": "number"
+                          },
+                          "cacheCreationTokens": {
+                            "type": "number"
+                          },
+                          "totalTokens": {
+                            "type": "number"
+                          },
+                          "costUsd": {
+                            "type": [
+                              "number",
+                              "null"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "projectId",
+                          "userLabel",
+                          "agent",
+                          "models",
+                          "sessionsCount",
+                          "inputTokens",
+                          "outputTokens",
+                          "cacheReadTokens",
+                          "cacheCreationTokens",
+                          "totalTokens",
+                          "costUsd"
+                        ]
+                      }
+                    },
+                    "totals": {
+                      "type": "object",
+                      "properties": {
+                        "sessionsCount": {
+                          "type": "number"
+                        },
+                        "inputTokens": {
+                          "type": "number"
+                        },
+                        "outputTokens": {
+                          "type": "number"
+                        },
+                        "cacheReadTokens": {
+                          "type": "number"
+                        },
+                        "cacheCreationTokens": {
+                          "type": "number"
+                        },
+                        "totalTokens": {
+                          "type": "number"
+                        },
+                        "costUsd": {
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "sessionsCount",
+                        "inputTokens",
+                        "outputTokens",
+                        "cacheReadTokens",
+                        "cacheCreationTokens",
+                        "totalTokens",
+                        "costUsd"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "pullRequest",
+                    "rows",
+                    "totals"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "operationId": "getApiCoding-agentPull-request-usage",
+        "parameters": [
+          {
+            "name": "repository",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The repository as \"owner/name\"."
+          },
+          {
+            "name": "pullRequest",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "The pull request number."
+          },
+          {
+            "name": "host",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "github.com"
+            }
+          }
+        ],
+        "summary": "Get pull request coding agent usage",
+        "description": "Assistant usage for one pull request: sessions, tokens and cost, grouped by project, reported user and agent, over the pull request's whole lifetime rather than a time window. Requires a personal-project API key; rows appear only for projects the calling user may view, and cost only for those they may price."
+      }
+    },
     "/api/dashboards": {
       "get": {
         "responses": {},

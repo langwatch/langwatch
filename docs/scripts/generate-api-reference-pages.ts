@@ -197,6 +197,13 @@ const ENDPOINT_GROUPS: EndpointGroup[] = [
       "Manage AI agent configurations. Create, update, and organize agents that are tracked and evaluated in LangWatch.",
   },
   {
+    name: "Coding Agents",
+    dirName: "coding-agents",
+    pathPrefixes: ["/api/coding-agent"],
+    overviewDescription:
+      "Read what a coding agent session did and what it cost. Walk one session's events call by call, with the tokens, cost and compactions of each, or roll a whole pull request up into sessions, tokens and cost per project, user and agent.",
+  },
+  {
     name: "Triggers",
     dirName: "triggers",
     pathPrefixes: ["/api/triggers", "/api/trigger"],

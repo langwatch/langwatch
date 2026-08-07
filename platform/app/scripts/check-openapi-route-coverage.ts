@@ -172,9 +172,9 @@ export const UNPUBLISHED = [
     why: "inbound Auth0 provisioning webhook, addressed by Auth0 and no one else",
   },
   {
-    match: "/api/github-langy",
+    match: "/api/github",
     category: "internal",
-    why: "GitHub App install callbacks and webhook, addressed by GitHub",
+    why: "the GitHub App install redirect, setup callback and webhook. The redirect runs on a browser session from our own settings page, and the other two are addressed by GitHub, so an API-key caller can reach none of them",
   },
   {
     match: "/api/track_usage",
@@ -258,6 +258,11 @@ export const UNPUBLISHED = [
     why: "the dashboard's download button for scenario runs, session-authenticated in the same way as the trace export",
   },
   // ── Aliases: older paths kept working ──────────────────────────────────
+  {
+    match: "/api/github-langy",
+    category: "alias",
+    why: "the older spelling of the setup callback and webhook, mounted on the same handlers because the GitHub App's configuration still delivers to it",
+  },
   {
     match: "/api/evaluations/v3",
     category: "alias",

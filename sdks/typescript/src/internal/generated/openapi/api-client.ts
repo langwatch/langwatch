@@ -974,6 +974,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/coding-agent/sessions/{sessionId}/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List coding agent session events
+         * @description List a coding-agent session's events (model calls, compactions, rate limits, tool runs, prompts) in time order, keyset-paginated. Pass the previous response's nextCursor to continue; filter with kinds (comma-separated).
+         */
+        get: operations["getApiCoding-agentSessionsBySessionIdEvents"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/coding-agent/pull-request-usage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get pull request coding agent usage
+         * @description Assistant usage for one pull request: sessions, tokens and cost, grouped by project, reported user and agent, over the pull request's whole lifetime rather than a time window. Requires a personal-project API key; rows appear only for projects the calling user may view, and cost only for those they may price.
+         */
+        get: operations["getApiCoding-agentPull-request-usage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/dashboards": {
         parameters: {
             query?: never;
@@ -4862,6 +4902,241 @@ export interface operations {
                         previousPeriod: {
                             [key: string]: unknown;
                         }[];
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    "getApiCoding-agentSessionsBySessionIdEvents": {
+        parameters: {
+            query?: {
+                /** @description Comma-separated event kinds to include. Known kinds: model_call, compaction, rate_limit, api_error, retries_exhausted, tool_result, tool_decision, user_prompt, subagent_completed. */
+                kinds?: string;
+                /** @description Opaque keyset cursor from the previous response's nextCursor. */
+                cursor?: string;
+                limit?: number;
+                /** @description Epoch ms lower bound on event time; with `to`, prunes storage partitions for faster reads. */
+                from?: number;
+                /** @description Epoch ms upper bound on event time. */
+                to?: number;
+            };
+            header?: never;
+            path: {
+                /** @description The agent's own session id (session.id / conversation id). */
+                sessionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description One page of session events plus the cursor for the next page */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        events: {
+                            sessionId: string;
+                            timeUnixMs: number;
+                            recordId: string;
+                            eventKind: string;
+                            agent: string;
+                            sessionKeySource: string;
+                            traceId: string;
+                            spanId: string;
+                            promptId: string;
+                            querySource: string;
+                            agentType: string;
+                            eventSequence: number;
+                            requestId: string;
+                            model: string;
+                            inputTokens: number;
+                            outputTokens: number;
+                            cacheReadTokens: number;
+                            cacheCreationTokens: number;
+                            costUsd: number;
+                            durationMs: number;
+                            ttftMs: number;
+                            attempt: number;
+                            speed: string;
+                            stopReason: string;
+                            preTokens: number;
+                            postTokens: number;
+                            compactionTrigger: string;
+                            precomputeReuse: string;
+                            statusCode: string;
+                            errorType: string;
+                            rateLimitCarrier: string;
+                            retryDurationMs: number;
+                            toolName: string;
+                            success: string;
+                            decision: string;
+                            decisionSource: string;
+                            toolInputBytes: number;
+                            toolResultBytes: number;
+                            promptChars: number;
+                            totalTokens: number;
+                        }[];
+                        nextCursor: string | null;
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    "getApiCoding-agentPull-request-usage": {
+        parameters: {
+            query: {
+                /** @description The repository as "owner/name". */
+                repository: string;
+                /** @description The pull request number. */
+                pullRequest: number;
+                host?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The pull request's usage rollup */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        pullRequest: {
+                            repositoryHost: string;
+                            repositoryFullName: string;
+                            prNumber: number;
+                            headBranch: string;
+                            htmlUrl: string;
+                            state: string;
+                            isDraft: boolean;
+                            authorLogin: string | null;
+                            prCreatedAtMs: number;
+                            prClosedAtMs: number | null;
+                            prMergedAtMs: number | null;
+                        };
+                        rows: {
+                            projectId: string;
+                            userLabel: string;
+                            agent: string;
+                            models: string[];
+                            sessionsCount: number;
+                            inputTokens: number;
+                            outputTokens: number;
+                            cacheReadTokens: number;
+                            cacheCreationTokens: number;
+                            totalTokens: number;
+                            costUsd: number | null;
+                        }[];
+                        totals: {
+                            sessionsCount: number;
+                            inputTokens: number;
+                            outputTokens: number;
+                            cacheReadTokens: number;
+                            cacheCreationTokens: number;
+                            totalTokens: number;
+                            costUsd: number | null;
+                        };
                     };
                 };
             };

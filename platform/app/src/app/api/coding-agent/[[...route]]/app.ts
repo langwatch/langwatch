@@ -94,6 +94,7 @@ const secured = createProjectApp({ basePath: "/api/coding-agent" });
 secured.access(requires("traces:view")).get(
   "/sessions/:sessionId/events",
   describeRoute({
+    summary: "List coding agent session events",
     description:
       "List a coding-agent session's events (model calls, compactions, rate limits, " +
       "tool runs, prompts) in time order, keyset-paginated. Pass the previous " +
@@ -318,6 +319,7 @@ const usageQuerySchema = z.object({
 secured.access(requires("traces:view")).get(
   "/pull-request-usage",
   describeRoute({
+    summary: "Get pull request coding agent usage",
     description:
       "Assistant usage for one pull request: sessions, tokens and cost, " +
       "grouped by project, reported user and agent, over the pull request's " +

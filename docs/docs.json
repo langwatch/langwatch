@@ -1122,6 +1122,14 @@
             ]
           },
           {
+            "group": "Coding Agents",
+            "pages": [
+              "api-reference/coding-agents/overview",
+              "api-reference/coding-agents/get-pull-request-coding-agent-usage",
+              "api-reference/coding-agents/list-coding-agent-session-events"
+            ]
+          },
+          {
             "group": "Triggers",
             "pages": [
               "api-reference/triggers/overview",
