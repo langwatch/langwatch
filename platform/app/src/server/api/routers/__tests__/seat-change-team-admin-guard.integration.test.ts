@@ -162,8 +162,8 @@ describe("given a member who is the only admin of a shared team", () => {
     });
   });
 
-  describe("when a seat correction left the team with no admin at all", () => {
-    const orphanTheTeam = () =>
+  describe("given a seat correction left the team with no admin at all", () => {
+    beforeEach(() =>
       prisma.roleBinding.updateMany({
         where: {
           organizationId: fixture.organizationId,
@@ -172,39 +172,47 @@ describe("given a member who is the only admin of a shared team", () => {
           scopeId: fixture.onlyAdminTeamId,
         },
         data: { role: TeamUserRole.VIEWER },
+      }),
+    );
+
+    describe("when a member's role on the team is edited", () => {
+      /** @scenario A team already without a team admin stays editable */
+      it("saves the change", async () => {
+        await expect(
+          fixture.callerAsAdmin().organization.updateTeamMemberRole({
+            teamId: fixture.onlyAdminTeamId,
+            userId: fixture.soloUserId,
+            role: TeamUserRole.MEMBER,
+          }),
+        ).resolves.toMatchObject({ success: true });
+
+        await expect(
+          fixture.teamRoleOf({
+            userId: fixture.soloUserId,
+            teamId: fixture.onlyAdminTeamId,
+          }),
+        ).resolves.toBe(TeamUserRole.MEMBER);
       });
-
-    /** @scenario A team already without a team admin stays editable */
-    it("still accepts a member edit", async () => {
-      await orphanTheTeam();
-
-      await expect(
-        fixture.callerAsAdmin().organization.updateTeamMemberRole({
-          teamId: fixture.onlyAdminTeamId,
-          userId: fixture.soloUserId,
-          role: TeamUserRole.MEMBER,
-        }),
-      ).resolves.toMatchObject({ success: true });
     });
 
-    /** @scenario A team already without a team admin stays editable */
-    it("lets a member be promoted back to Admin", async () => {
-      await orphanTheTeam();
+    describe("when a member is promoted back to Admin", () => {
+      /** @scenario A team already without a team admin stays editable */
+      it("repairs the team", async () => {
+        await expect(
+          fixture.callerAsAdmin().organization.updateTeamMemberRole({
+            teamId: fixture.onlyAdminTeamId,
+            userId: fixture.soloUserId,
+            role: TeamUserRole.ADMIN,
+          }),
+        ).resolves.toMatchObject({ success: true });
 
-      await expect(
-        fixture.callerAsAdmin().organization.updateTeamMemberRole({
-          teamId: fixture.onlyAdminTeamId,
-          userId: fixture.soloUserId,
-          role: TeamUserRole.ADMIN,
-        }),
-      ).resolves.toMatchObject({ success: true });
-
-      await expect(
-        fixture.teamRoleOf({
-          userId: fixture.soloUserId,
-          teamId: fixture.onlyAdminTeamId,
-        }),
-      ).resolves.toBe(TeamUserRole.ADMIN);
+        await expect(
+          fixture.teamRoleOf({
+            userId: fixture.soloUserId,
+            teamId: fixture.onlyAdminTeamId,
+          }),
+        ).resolves.toBe(TeamUserRole.ADMIN);
+      });
     });
   });
 
