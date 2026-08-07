@@ -22,6 +22,7 @@ Configure Claude Code to send telemetry to LangWatch using environment variables
 
 ```bash
 export CLAUDE_CODE_ENABLE_TELEMETRY=1
+export CLAUDE_CODE_ENHANCED_TELEMETRY_BETA=1
 export OTEL_TRACES_EXPORTER=otlp
 export OTEL_LOGS_EXPORTER=otlp
 export OTEL_METRICS_EXPORTER=otlp
@@ -34,6 +35,10 @@ export OTEL_EXPORTER_OTLP_ENDPOINT=https://app.langwatch.ai/api/otel
 export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer your-langwatch-api-key"
 claude
 ```
+
+<Note>
+  `CLAUDE_CODE_ENHANCED_TELEMETRY_BETA` is an experimental Claude Code flag, and it is the one that turns spans on. Without it `OTEL_TRACES_EXPORTER` does nothing and `OTEL_LOG_TOOL_CONTENT` has no span events to write to, so you get flat log records instead of a trace: no tool call tree, no latencies, and every subagent folded into the main session rather than branching off it.
+</Note>
 
 ## Administrator Configuration
 
@@ -51,6 +56,7 @@ Example managed settings configuration for LangWatch:
 {
   "env": {
     "CLAUDE_CODE_ENABLE_TELEMETRY": "1",
+    "CLAUDE_CODE_ENHANCED_TELEMETRY_BETA": "1",
     "OTEL_TRACES_EXPORTER": "otlp",
     "OTEL_LOGS_EXPORTER": "otlp",
     "OTEL_METRICS_EXPORTER": "otlp",
@@ -140,6 +146,7 @@ Claude Code traces include:
 ```bash
 # Enable telemetry and send to LangWatch
 export CLAUDE_CODE_ENABLE_TELEMETRY=1
+export CLAUDE_CODE_ENHANCED_TELEMETRY_BETA=1
 export OTEL_TRACES_EXPORTER=otlp
 export OTEL_LOGS_EXPORTER=otlp
 export OTEL_METRICS_EXPORTER=otlp
@@ -157,6 +164,7 @@ export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer your-api-key"
 ```bash
 # Basic telemetry setup
 export CLAUDE_CODE_ENABLE_TELEMETRY=1
+export CLAUDE_CODE_ENHANCED_TELEMETRY_BETA=1
 export OTEL_TRACES_EXPORTER=otlp
 export OTEL_LOGS_EXPORTER=otlp
 export OTEL_METRICS_EXPORTER=otlp
@@ -179,6 +187,7 @@ export OTEL_RESOURCE_ATTRIBUTES="department=engineering,team.id=platform"
 ```bash
 # Debug configuration with console output and LangWatch
 export CLAUDE_CODE_ENABLE_TELEMETRY=1
+export CLAUDE_CODE_ENHANCED_TELEMETRY_BETA=1
 export OTEL_TRACES_EXPORTER=console,otlp
 export OTEL_LOGS_EXPORTER=console,otlp
 export OTEL_METRICS_EXPORTER=console,otlp
@@ -269,6 +278,9 @@ After setting up your configuration, verify that Claude Code is sending data to 
 # Check if telemetry is enabled
 echo $CLAUDE_CODE_ENABLE_TELEMETRY
 
+# Check if span tracing is enabled
+echo $CLAUDE_CODE_ENHANCED_TELEMETRY_BETA
+
 # Verify endpoint configuration
 echo $OTEL_EXPORTER_OTLP_ENDPOINT
 
@@ -293,6 +305,10 @@ echo $OTEL_EXPORTER_OTLP_HEADERS
     - Ensure your API key is valid and has proper permissions
     - Check network connectivity to the LangWatch endpoint
     - Verify the OTLP protocol is supported (http/json or grpc)
+  </Accordion>
+
+  <Accordion title="Trace lands but has no tool call tree, latencies, or subagents">
+    Set `CLAUDE_CODE_ENHANCED_TELEMETRY_BETA=1`. It is the experimental flag that turns span tracing on, and `OTEL_TRACES_EXPORTER` is a no-op without it. Cost and token events still arrive over the logs exporter, so the session shows up, but with no spans LangWatch has no structure to hang them on: every subagent folds into the main session instead of branching off it. `OTEL_LOG_TOOL_CONTENT` also depends on this flag, because the tool input and output it unlocks are written as span events.
   </Accordion>
 
   <Accordion title="Trace shows but input/prompt is empty">
