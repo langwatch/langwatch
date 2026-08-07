@@ -79,6 +79,28 @@ matchCondition = "AND"
 paths = ['''\.github/workflows/langwatch-app-ci\.yml''']
 regexes = ['''(0123456789abcdef){4}''']
 
+# The two AWS-shaped literals the secrets-gate tests plant into throwaway
+# repositories. The tests exist to prove the gate fails on a credential a pull
+# request adds and passes on one it did not (#6681), and a fixture that no
+# scanner recognises would prove neither half. No such AWS account exists, and
+# the tests run the scanners in offline mode precisely because these values
+# cannot verify against a provider.
+#
+# Scoped by VALUE and by nothing else, so any OTHER credential — in this file
+# or any other — is still caught by every rule. Deliberately NOT scoped by path
+# with `matchCondition = "AND"`, the shape the CREDENTIALS_SECRET entry above
+# uses: gitleaks 8.30 does not narrow that way. A `paths` entry allowlists the
+# whole file, AND or no AND, and the accompanying `regexes` change nothing —
+# verified by planting a second, unrelated AWS key in this file and watching it
+# go unreported. Fixing that entry (and its comment, which claims a narrowing it
+# does not get) is #6681's deferred half.
+[[allowlists]]
+description = "AWS-shaped fixture credentials planted by the secrets-gate scoping tests"
+regexes = [
+  '''AKIAQYLPMN5HHHFPZAM2''',
+  '''A1B2C3D4E5F6G7H8I9J0K1L2M3N4O5P6Q7R8S9T0''',
+]
+
 # `Idempotency-Key: signup-acme-4171` and its SDK equivalents in the billing
 # docs. An idempotency key is a value the CALLER invents to make a retry safe,
 # and it is meaningless to anyone who is not already authenticated: it names a
