@@ -13,29 +13,24 @@ import { fieldMappings, TRACE_IDENTITY_COLUMNS } from "../field-mappings";
 import { resetParamCounter } from "../filter-translator";
 
 /**
- * Splits a SELECT list on the commas that separate its items, ignoring commas
- * nested inside call parentheses or string literals. A plain `split(",")` would
- * tear `map('k', SpanAttributes['k']) AS SpanAttributes` in half and make the
- * whole-map assertion below meaningless.
+ * Splits a SELECT list into its items. Commas inside a call cannot split an
+ * item, so parenthesised groups are emptied first, innermost outwards, until
+ * none are left: a plain `split(",")` would otherwise tear
+ * `map('k', SpanAttributes['k']) AS SpanAttributes` in half at its inner comma
+ * and make the whole-map assertion below meaningless.
+ *
+ * Emptying rather than removing keeps each item's shape, so
+ * `map(...) AS SpanAttributes` stays distinguishable from a bare
+ * `SpanAttributes`, which is the whole point of the assertion.
  */
-function splitTopLevel(selectList: string): string[] {
-  const items: string[] = [];
-  let depth = 0;
-  let quoted = false;
-  let current = "";
-  for (const char of selectList) {
-    if (char === "'") quoted = !quoted;
-    if (!quoted && char === "(") depth++;
-    if (!quoted && char === ")") depth--;
-    if (char === "," && depth === 0 && !quoted) {
-      items.push(current.trim());
-      current = "";
-      continue;
-    }
-    current += char;
+function selectListItems(selectList: string): string[] {
+  let flattened = selectList;
+  let previous = "";
+  while (flattened !== previous) {
+    previous = flattened;
+    flattened = flattened.replace(/\([^()]*\)/g, "()");
   }
-  if (current.trim() !== "") items.push(current.trim());
-  return items;
+  return flattened.split(",").map((item) => item.trim());
 }
 
 describe("column-pruning", () => {
@@ -327,7 +322,7 @@ describe("column-pruning", () => {
           /SELECT\s+(?<list>[\s\S]*?)\s+FROM stored_spans/.exec(result.sql)
             ?.groups?.list;
         expect(storedSpansSelect).toBeDefined();
-        const selectedItems = splitTopLevel(storedSpansSelect!);
+        const selectedItems = selectListItems(storedSpansSelect!);
         expect(selectedItems).not.toContain("SpanAttributes");
         // Outer accesses still resolve against the reconstructed map.
         expect(result.sql).toContain(
