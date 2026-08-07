@@ -329,9 +329,11 @@ function IngestionSourcesPage() {
     const pullConfig =
       composer.sourceType === "http_custom"
         ? buildHttpCustomPullConfig(composer)
-        : pullAdapter
-          ? { adapter: pullAdapter }
-          : null;
+        : composer.sourceType === "databricks_genie"
+          ? buildDatabricksGeniePullConfig(composer)
+          : pullAdapter
+            ? { adapter: pullAdapter }
+            : null;
     if (composer.sourceType === "http_custom" && !pullConfig) {
       // buildHttpCustomPullConfig returns null when required fields are
       // empty - keep the drawer open so the user can fix the form.
@@ -339,6 +341,14 @@ function IngestionSourcesPage() {
         title: "Missing required HTTP source fields",
         description:
           "URL, auth header value, token, events JSONPath, cursor JSONPath, and event mapping are all required.",
+        type: "error",
+      });
+      return;
+    }
+    if (composer.sourceType === "databricks_genie" && !pullConfig) {
+      toaster.create({
+        title: "Missing required Databricks fields",
+        description: "Workspace URL and workspace token are both required.",
         type: "error",
       });
       return;
@@ -1056,7 +1066,11 @@ const PARSER_FIELDS: Record<SourceType, FieldDef[]> = {
       required: true,
     },
     {
-      key: "token",
+      // Named `credentialsToken` on purpose: `buildParserConfig` routes every
+      // `credentials*` field into the `credentials` subtree, which is the ONLY
+      // part of parserConfig the server encrypts before it reaches the
+      // database. A field named `token` would sit in the JSONB in plaintext.
+      key: "credentialsToken",
       label: "Workspace token",
       placeholder: "dapi...",
       hint: "A personal access token or OAuth token for a service principal that can read every Genie space you want covered. We encrypt this server-side.",
@@ -1225,6 +1239,40 @@ function buildHttpCustomPullConfig(
   };
 }
 
+/**
+ * The Databricks Genie adapter config, or null when a required field is empty.
+ *
+ * Genie needs a real builder rather than the bare `{ adapter }` the other
+ * reference pullers get, for two reasons the form cannot express on its own:
+ * the token has to land under `credentials` so the server encrypts it, and
+ * `spaceIds` is a comma-separated string in the form but an array in the
+ * adapter's schema.
+ */
+function buildDatabricksGeniePullConfig(
+  c: ComposerState,
+): Record<string, unknown> | null {
+  const p = c.parserConfig;
+  const workspaceUrl = (p.workspaceUrl ?? "").trim().replace(/\/+$/, "");
+  const token = (p.credentialsToken ?? "").trim();
+  if (!workspaceUrl || !token) return null;
+
+  return {
+    adapter: "databricks_genie",
+    workspaceUrl,
+    // Empty means "every space the token can see", which is the setting most
+    // workspaces want and the one that covers a new space automatically.
+    spaceIds: (p.spaceIds ?? "")
+      .split(",")
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0),
+    schedule:
+      c.pullSchedule.trim() ||
+      PULL_SCHEDULE_DEFAULTS.databricks_genie ||
+      "*/15 * * * *",
+    credentials: { token },
+  };
+}
+
 function ParserConfigFields({
   sourceType,
   values,
@@ -1322,10 +1370,33 @@ function PullScheduleField({
   );
 }
 
+/**
+ * Form fields owned by a source type's ADAPTER config rather than by
+ * parserConfig.
+ *
+ * The server merges pullConfig into parserConfig and lets parserConfig WIN on a
+ * key clash, so a raw form value copied through here would silently override
+ * the typed one its builder produced. For Genie that is not cosmetic:
+ * `spaceIds` is a comma string in the form and an array in the adapter's
+ * schema, so the string would win and the source would fail validation at pull
+ * time — a broken source that looked fine when it was saved.
+ */
+const PULL_CONFIG_OWNED_FIELDS: Partial<Record<SourceType, readonly string[]>> =
+  {
+    databricks_genie: ["workspaceUrl", "spaceIds"],
+  };
+
 function buildParserConfig(c: ComposerState): Record<string, unknown> {
   const out: Record<string, unknown> = {};
+  const adapterOwned = new Set(PULL_CONFIG_OWNED_FIELDS[c.sourceType] ?? []);
   for (const [k, v] of Object.entries(c.parserConfig)) {
     if (v == null || v === "") continue;
+    if (adapterOwned.has(k)) continue;
+    // Secrets travel in exactly one place: `pullConfig.credentials`, which is
+    // the only subtree `encryptParserConfigCredentials` wraps before the row
+    // reaches Postgres. A `credentials*` field copied to the top level of
+    // parserConfig would be persisted as plaintext JSONB — so it never is.
+    if (k.startsWith("credentials")) continue;
     if (k === "pollEverySec") {
       const n = Number(v);
       if (!Number.isNaN(n)) out[k] = n;

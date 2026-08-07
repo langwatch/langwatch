@@ -90,25 +90,60 @@ export type DatabricksGeniePullConfig = z.infer<
 >;
 
 /**
+ * How far back a completed sweep sets its watermark from the instant it began.
+ *
+ * The window is re-read on the next run, and that is the point. Genie's list
+ * endpoints take no server-side time filter, so "new" is decided here against
+ * `created_timestamp` — a value Databricks stamps on its own clock, not ours.
+ * A watermark placed exactly at our sweep's start would drop any message whose
+ * server timestamp landed a few seconds behind our clock. Re-reading five
+ * minutes costs a handful of requests and dedups on the message id at both
+ * sinks; the alternative silently loses messages at the boundary.
+ */
+const WATERMARK_LAG_MS = 5 * 60 * 1000;
+
+/**
  * The durable cursor.
  *
  * `sinceMs` is the watermark: a message is new when it was created after it.
- * It only moves once a full sweep has drained, because the sweep visits spaces
- * in whatever order the API lists them and advancing mid-sweep would move the
- * watermark past a space that had not been read yet.
- *
- * `spaceId` / `conversationPage` are where an interrupted sweep resumes, so a
- * run cut off at its deadline picks up where it stopped rather than restarting
- * the crawl. `maxSeenMs` accumulates the newest message the in-flight sweep has
- * seen, and becomes the next `sinceMs` when the sweep completes.
+ * `spaceId` is where a budget-truncated sweep resumes, so a large workspace
+ * makes forward progress across runs instead of re-crawling from the top and
+ * running out at the same place every time.
  */
 const cursorSchema = z.object({
   sinceMs: z.number().int().nonnegative(),
   spaceId: z.string().nullable().default(null),
-  conversationPage: z.string().nullable().default(null),
-  maxSeenMs: z.number().int().nonnegative().default(0),
 });
 type GenieCursor = z.infer<typeof cursorSchema>;
+
+/**
+ * Where the watermark lands after a sweep.
+ *
+ * It moves ONLY on a complete sweep, and it is derived from when the sweep
+ * BEGAN rather than from the newest message it saw. The difference is the
+ * whole correctness argument: a sweep walks six spaces over some seconds or
+ * minutes, and someone asking a question in space one while the sweep is
+ * already reading space four is invisible to it. A watermark at the newest
+ * message seen would sit AFTER that question's timestamp, and the next run
+ * would filter it out — a message lost with nothing anywhere reporting a
+ * failure. Anchored to the sweep's start, that question is still in the next
+ * run's window.
+ *
+ * `Math.max` against the previous value keeps it monotonic, so a clock that
+ * steps backwards cannot rewind the window to the beginning of history.
+ */
+function nextWatermark({
+  previousMs,
+  sweepStartedAtMs,
+  complete,
+}: {
+  previousMs: number;
+  sweepStartedAtMs: number;
+  complete: boolean;
+}): number {
+  if (!complete) return previousMs;
+  return Math.max(previousMs, sweepStartedAtMs - WATERMARK_LAG_MS);
+}
 
 function parseCursor(
   cursor: string | null,
@@ -130,8 +165,6 @@ function parseCursor(
   return {
     sinceMs: Number.isFinite(sinceMs) ? sinceMs : defaultSinceMs(),
     spaceId: null,
-    conversationPage: null,
-    maxSeenMs: 0,
   };
 }
 
@@ -267,15 +300,51 @@ class RunBudget {
 }
 
 /**
- * What one sweep read, and where it stopped.
+ * What one sweep read, and whether it read all of it.
  *
- * `stoppedAt` null means drained — the only state in which the watermark is
- * allowed to move.
+ * `complete` is the only thing the watermark is allowed to depend on, and it
+ * is false for every reason a sweep might have left something behind: the
+ * request budget ran out, the deadline hit, a space returned 403, one
+ * conversation 429'd. They differ in cause and not in consequence — data we did
+ * not fetch — so they collapse to one flag rather than a taxonomy the caller
+ * would have to re-derive the same answer from.
  */
 interface SweepResult {
   events: NormalizedPullEvent[];
-  maxSeenMs: number;
-  stoppedAt: { spaceId: string; conversationPage: string | null } | null;
+  complete: boolean;
+  /** Which space to start at next run, when the budget cut this one short. */
+  resumeSpaceId: string | null;
+}
+
+/** One page of a Databricks list endpoint, and whether more were left unread. */
+interface PagedRead<T> {
+  items: T[];
+  complete: boolean;
+}
+
+/**
+ * A non-2xx from the workspace, carrying the status.
+ *
+ * The status is on the error rather than only in its message because one
+ * caller has to branch on it: a 404 from SCIM is a permanent answer worth
+ * caching, and every other code is a transient one that must not be.
+ */
+class GenieHttpError extends Error {
+  readonly status: number;
+
+  constructor({
+    status,
+    statusText,
+    path,
+  }: {
+    status: number;
+    statusText: string;
+    path: string;
+  }) {
+    super(`HTTP ${status} ${statusText} (databricks genie ${path})`);
+    this.name = "GenieHttpError";
+    this.status = status;
+  }
 }
 
 export class DatabricksGeniePuller
@@ -300,58 +369,59 @@ export class DatabricksGeniePuller
 
     const cursor = parseCursor(options.cursor, config);
     const budget = new RunBudget(options.deadlineMs);
+    // Taken BEFORE the first request, and it has to be. The next watermark is
+    // derived from this instant, so anything created while the sweep is
+    // running lands after it and is caught next run. Reading the clock at the
+    // END would place the watermark past activity the sweep had already walked
+    // past — the exact loss this replaced.
+    const sweepStartedAtMs = Date.now();
 
     let sweep: SweepResult;
     try {
       sweep = await this.sweep({ config, token, options, budget, cursor });
     } catch (error) {
-      // A failed sweep leaves the cursor exactly where it was, so the window is
-      // retried rather than skipped. Returning the events already read would
-      // be worse than dropping them: the OCSF sink dedups on the message id, so
-      // the retry re-lands them anyway, and reporting a partial sweep as a
-      // successful one is how a watermark advances past unread history.
+      // Only a failure to enumerate spaces reaches here — everything below it
+      // is isolated. With no space list there is nothing to have read, so the
+      // cursor stays put and the run is reported as failed.
       logger.error(
         {
           adapter: this.id,
           workspaceUrl: config.workspaceUrl,
           error: error instanceof Error ? error.message : String(error),
         },
-        "databricks genie sweep failed; leaving the cursor where it was",
+        "databricks genie could not enumerate spaces; leaving the cursor where it was",
       );
       return { events: [], cursor: options.cursor, errorCount: 1 };
     }
 
-    // An interrupted sweep keeps `sinceMs` where it was and records where to
-    // resume; only a COMPLETE one moves the watermark, and only forward — a
-    // sweep that saw nothing new must not drag it back to zero.
     return {
       events: sweep.events,
-      cursor: encode(
-        sweep.stoppedAt
-          ? {
-              sinceMs: cursor.sinceMs,
-              spaceId: sweep.stoppedAt.spaceId,
-              conversationPage: sweep.stoppedAt.conversationPage,
-              maxSeenMs: sweep.maxSeenMs,
-            }
-          : {
-              sinceMs: Math.max(cursor.sinceMs, sweep.maxSeenMs),
-              spaceId: null,
-              conversationPage: null,
-              maxSeenMs: 0,
-            },
-      ),
+      cursor: encode({
+        sinceMs: nextWatermark({
+          previousMs: cursor.sinceMs,
+          sweepStartedAtMs,
+          complete: sweep.complete,
+        }),
+        spaceId: sweep.resumeSpaceId,
+      }),
       errorCount: 0,
     };
   }
 
   /**
-   * Walks spaces → conversations → messages until drained or out of budget.
+   * Walks spaces → conversations → messages, keeping everything it manages to
+   * read and reporting whether it read all of it.
    *
-   * Returns where it stopped rather than deciding what that means for the
-   * cursor. The watermark rule is one decision and it lives in `runOnce`; a
-   * sweep that also encoded cursors would let "we ran out of budget" and "we
-   * finished" be answered in two places.
+   * Each space, and each conversation within it, is isolated. One space the
+   * credential cannot see must not cost the workspace the other five: this API
+   * has no partial-failure response, so a 403 on space four would otherwise
+   * unwind the run and discard three spaces' worth of already-read messages,
+   * forever, because the next run would hit the same 403 at the same point.
+   *
+   * A failure does still suppress the watermark, so nothing behind the broken
+   * space is skipped — the cost of a permanently unreadable space is a sweep
+   * that keeps re-reading the rest, which is loud and lossless rather than
+   * quiet and lossy.
    */
   private async sweep({
     config,
@@ -371,63 +441,112 @@ export class DatabricksGeniePuller
     // provider the same question dozens of times inside one sweep.
     const identities = new Map<number, GenieIdentity>();
     const events: NormalizedPullEvent[] = [];
-    let maxSeenMs = cursor.maxSeenMs;
 
     const spaces = await this.resolveSpaces({ config, token, options, budget });
-    // Resume where the last sweep stopped. An unknown id means the space was
-    // deleted mid-sweep, and starting over is the safe answer: the watermark
-    // has not moved, so nothing is skipped.
+    let complete = spaces.complete;
+
+    // Resume where the budget cut the last sweep short. An unknown id means the
+    // space was deleted since, and starting over is the safe answer: the
+    // watermark did not move either, so nothing is skipped.
     const resumeAt = cursor.spaceId
-      ? spaces.findIndex((s) => s.space_id === cursor.spaceId)
+      ? spaces.items.findIndex((s) => s.space_id === cursor.spaceId)
       : 0;
-    const startIndex = resumeAt >= 0 ? resumeAt : 0;
-    let page = resumeAt >= 0 ? cursor.conversationPage : null;
 
-    for (let i = startIndex; i < spaces.length; i += 1) {
-      const space = spaces[i]!;
-      do {
-        if (budget.exhausted()) {
-          return {
-            events,
-            maxSeenMs,
-            stoppedAt: { spaceId: space.space_id, conversationPage: page },
-          };
-        }
+    for (let i = Math.max(resumeAt, 0); i < spaces.items.length; i += 1) {
+      const space = spaces.items[i]!;
+      if (budget.exhausted()) {
+        // Everything read so far is kept, the watermark is held, and the next
+        // run starts at this space rather than crawling from the top.
+        return { events, complete: false, resumeSpaceId: space.space_id };
+      }
 
-        const conversations = conversationsPageSchema.parse(
-          await this.get({
-            config,
-            token,
-            options,
-            budget,
-            path: `/api/2.0/genie/spaces/${encodeURIComponent(space.space_id)}/conversations`,
-            // Without this the endpoint answers with the CALLER'S OWN
-            // conversations only, and a governance sweep would quietly report
-            // one service account's activity as the workspace's.
-            query: { include_all: "true", page_size: String(PAGE_SIZE) },
-          }),
-        );
+      const read = await this.spaceMessages({
+        config,
+        token,
+        options,
+        budget,
+        space,
+        sinceMs: cursor.sinceMs,
+        identities,
+      });
+      events.push(...read.items);
+      if (!read.complete) complete = false;
+    }
 
-        for (const conversation of conversations.conversations) {
-          const read = await this.conversationMessages({
+    return { events, complete, resumeSpaceId: null };
+  }
+
+  /** Every new message across one space's conversations. */
+  private async spaceMessages({
+    config,
+    token,
+    options,
+    budget,
+    space,
+    sinceMs,
+    identities,
+  }: {
+    config: DatabricksGeniePullConfig;
+    token: string;
+    options: PullRunOptions;
+    budget: RunBudget;
+    space: z.infer<typeof spaceSchema>;
+    sinceMs: number;
+    identities: Map<number, GenieIdentity>;
+  }): Promise<PagedRead<NormalizedPullEvent>> {
+    const conversations = await this.isolate({
+      what: "conversations",
+      context: { spaceId: space.space_id },
+      run: () =>
+        this.paginate({
+          config,
+          token,
+          options,
+          budget,
+          path: `/api/2.0/genie/spaces/${encodeURIComponent(space.space_id)}/conversations`,
+          // Without this the endpoint answers with the CALLER'S OWN
+          // conversations only, and a governance sweep would quietly report one
+          // service account's activity as the workspace's.
+          query: { include_all: "true" },
+          parse: (body) => {
+            const page = conversationsPageSchema.parse(body);
+            return { items: page.conversations, next: page.next_page_token };
+          },
+        }),
+    });
+    if (!conversations) return { items: [], complete: false };
+
+    const events: NormalizedPullEvent[] = [];
+    let complete = conversations.complete;
+
+    for (const conversation of conversations.items) {
+      const read = await this.isolate({
+        what: "messages",
+        context: {
+          spaceId: space.space_id,
+          conversationId: conversation.conversation_id,
+        },
+        run: () =>
+          this.conversationMessages({
             config,
             token,
             options,
             budget,
             space,
             conversation,
-            sinceMs: cursor.sinceMs,
+            sinceMs,
             identities,
-          });
-          events.push(...read.events);
-          maxSeenMs = Math.max(maxSeenMs, read.maxSeenMs);
-        }
-
-        page = conversations.next_page_token;
-      } while (page);
+          }),
+      });
+      if (!read) {
+        complete = false;
+        continue;
+      }
+      events.push(...read.items);
+      if (!read.complete) complete = false;
     }
 
-    return { events, maxSeenMs, stoppedAt: null };
+    return { items: events, complete };
   }
 
   /** The configured spaces, or every space the credential can see. */
@@ -441,33 +560,61 @@ export class DatabricksGeniePuller
     token: string;
     options: PullRunOptions;
     budget: RunBudget;
-  }): Promise<Array<z.infer<typeof spaceSchema>>> {
+  }): Promise<PagedRead<z.infer<typeof spaceSchema>>> {
     if (config.spaceIds.length > 0) {
-      // Titles are only a label, so a configured list does not pay for a
-      // discovery call to fetch them.
-      return config.spaceIds.map((space_id) => ({ space_id, title: null }));
+      // A pinned list still gets titles where they can be had. The title is
+      // what a human reads on the governance screen — "ACME Revenue Analyst"
+      // rather than `01f190cfd5c1…` — and a source that pinned its spaces
+      // should not be the one that reads worse.
+      //
+      // Best-effort, and deliberately so: a credential permitted to read a
+      // space's conversations but not to enumerate the workspace is a real
+      // configuration, and it must keep working. A failed lookup costs the
+      // label, never the records, so it neither fails the run nor marks the
+      // sweep incomplete.
+      const discovered = await this.isolate({
+        what: "space titles",
+        context: {},
+        run: () => this.discoverSpaces({ config, token, options, budget }),
+      });
+      const titles = new Map(
+        (discovered?.items ?? []).map((s) => [s.space_id, s.title]),
+      );
+      return {
+        items: config.spaceIds.map((space_id) => ({
+          space_id,
+          title: titles.get(space_id) ?? null,
+        })),
+        complete: true,
+      };
     }
 
-    const spaces: Array<z.infer<typeof spaceSchema>> = [];
-    let page: string | null = null;
-    do {
-      const parsed: z.infer<typeof spacesPageSchema> = spacesPageSchema.parse(
-        await this.get({
-          config,
-          token,
-          options,
-          budget,
-          path: "/api/2.0/genie/spaces",
-          query: {
-            page_size: String(PAGE_SIZE),
-            ...(page ? { page_token: page } : {}),
-          },
-        }),
-      );
-      spaces.push(...parsed.spaces);
-      page = parsed.next_page_token;
-    } while (page && !budget.exhausted());
-    return spaces;
+    return await this.discoverSpaces({ config, token, options, budget });
+  }
+
+  /** Every Genie space the credential can enumerate. */
+  private async discoverSpaces({
+    config,
+    token,
+    options,
+    budget,
+  }: {
+    config: DatabricksGeniePullConfig;
+    token: string;
+    options: PullRunOptions;
+    budget: RunBudget;
+  }): Promise<PagedRead<z.infer<typeof spaceSchema>>> {
+    return await this.paginate({
+      config,
+      token,
+      options,
+      budget,
+      path: "/api/2.0/genie/spaces",
+      parse: (body) => {
+        const page = spacesPageSchema.parse(body);
+        return { items: page.spaces, next: page.next_page_token };
+      },
+    });
   }
 
   /** Every new message in one conversation, mapped to events. */
@@ -489,74 +636,161 @@ export class DatabricksGeniePuller
     conversation: z.infer<typeof conversationSchema>;
     sinceMs: number;
     identities: Map<number, GenieIdentity>;
-  }): Promise<{ events: NormalizedPullEvent[]; maxSeenMs: number }> {
-    const events: NormalizedPullEvent[] = [];
-    let maxSeenMs = 0;
-    let page: string | null = null;
+  }): Promise<PagedRead<NormalizedPullEvent>> {
+    const messages = await this.paginate({
+      config,
+      token,
+      options,
+      budget,
+      path: `/api/2.0/genie/spaces/${encodeURIComponent(space.space_id)}/conversations/${encodeURIComponent(conversation.conversation_id)}/messages`,
+      parse: (body) => {
+        const page = messagesPageSchema.parse(body);
+        return { items: page.messages, next: page.next_page_token };
+      },
+    });
 
-    do {
-      const parsed: z.infer<typeof messagesPageSchema> =
-        messagesPageSchema.parse(
-          await this.get({
+    const events: NormalizedPullEvent[] = [];
+    for (const message of messages.items) {
+      const createdMs = message.created_timestamp;
+      // A message with no timestamp cannot be placed against the watermark, and
+      // emitting it would either re-emit it on every future sweep or file it
+      // under `now`. Skipping it loses one row; the alternatives corrupt the
+      // window for every row after it.
+      if (createdMs === null || !Number.isFinite(createdMs)) {
+        logger.warn(
+          { adapter: this.id, messageId: message.message_id },
+          "genie message has no created_timestamp; skipping",
+        );
+        continue;
+      }
+      if (createdMs <= sinceMs) continue;
+
+      events.push(
+        this.messageEvent({
+          message,
+          space,
+          conversation,
+          createdMs,
+          identity: await this.identityFor({
             config,
             token,
             options,
             budget,
-            path: `/api/2.0/genie/spaces/${encodeURIComponent(space.space_id)}/conversations/${encodeURIComponent(conversation.conversation_id)}/messages`,
-            query: {
-              page_size: String(PAGE_SIZE),
-              ...(page ? { page_token: page } : {}),
-            },
+            userId: message.user_id,
+            identities,
           }),
-        );
+        }),
+      );
+    }
+    return { items: events, complete: messages.complete };
+  }
 
-      for (const message of parsed.messages) {
-        const createdMs = message.created_timestamp;
-        // A message with no timestamp cannot be placed on the watermark, and
-        // emitting it would either re-emit it on every future sweep or file it
-        // under `now`. Skipping it loses one row; the alternatives corrupt the
-        // cursor for every row after it.
-        if (createdMs === null || !Number.isFinite(createdMs)) {
-          logger.warn(
-            { adapter: this.id, messageId: message.message_id },
-            "genie message has no created_timestamp; skipping",
-          );
-          continue;
-        }
-        maxSeenMs = Math.max(maxSeenMs, createdMs);
-        if (createdMs <= sinceMs) continue;
+  /**
+   * Walks one paginated Databricks list endpoint to the end, or to the budget.
+   *
+   * `complete: false` says pages were left unread. It is NOT an error and the
+   * items already read are returned — the caller's job is to make sure the
+   * watermark does not step over what is missing.
+   *
+   * A `next_page_token` identical to the one just sent is refused rather than
+   * followed. Databricks pages by opaque token, so a token that does not
+   * advance is a contract violation, and following it would spend the run's
+   * whole request budget re-reading one page and then report "out of budget" —
+   * indistinguishable, from the outside, from a workspace that is merely large.
+   * Same shape as `has_more` with no token, and it gets the same answer.
+   */
+  private async paginate<T>({
+    config,
+    token,
+    options,
+    budget,
+    path,
+    query,
+    parse,
+  }: {
+    config: DatabricksGeniePullConfig;
+    token: string;
+    options: PullRunOptions;
+    budget: RunBudget;
+    path: string;
+    query?: Record<string, string>;
+    parse: (body: unknown) => { items: T[]; next: string | null };
+  }): Promise<PagedRead<T>> {
+    const items: T[] = [];
+    let page: string | null = null;
 
-        events.push(
-          this.messageEvent({
-            message,
-            space,
-            conversation,
-            createdMs,
-            identity: await this.identityFor({
-              config,
-              token,
-              options,
-              budget,
-              userId: message.user_id,
-              identities,
-            }),
-          }),
+    for (;;) {
+      if (budget.exhausted()) return { items, complete: false };
+
+      const parsed = parse(
+        await this.get({
+          config,
+          token,
+          options,
+          budget,
+          path,
+          query: {
+            ...(query ?? {}),
+            page_size: String(PAGE_SIZE),
+            ...(page ? { page_token: page } : {}),
+          },
+        }),
+      );
+      items.push(...parsed.items);
+
+      if (parsed.next === null) return { items, complete: true };
+      if (parsed.next === page) {
+        throw new Error(
+          `databricks genie ${path} returned a page_token that does not advance; refusing to re-read the same page`,
         );
       }
-      page = parsed.next_page_token;
-    } while (page && !budget.exhausted());
+      page = parsed.next;
+    }
+  }
 
-    return { events, maxSeenMs };
+  /**
+   * Runs one unit of the walk, answering null instead of throwing.
+   *
+   * This is where "keep what we read" is actually implemented. The caller turns
+   * a null into `complete: false`, which holds the watermark, so a failure
+   * costs freshness rather than data.
+   */
+  private async isolate<T>({
+    what,
+    context,
+    run,
+  }: {
+    what: string;
+    context: Record<string, string>;
+    run: () => Promise<T>;
+  }): Promise<T | null> {
+    try {
+      return await run();
+    } catch (error) {
+      logger.error(
+        {
+          adapter: this.id,
+          ...context,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        `databricks genie could not read ${what}; keeping the rest of the sweep and holding the watermark`,
+      );
+      return null;
+    }
   }
 
   /**
    * The person behind a numeric author id, cached for the run.
    *
-   * A SCIM lookup that fails is cached as unknown rather than retried per
-   * message: a deactivated account 404s every time, and re-asking once per
-   * message would turn one deleted user into hundreds of wasted calls. The
-   * event still lands — an unattributed question is worth recording, and a
-   * missing author must not cost the workspace its visibility.
+   * Only a 404 is remembered. A missing user is a permanent answer — the
+   * account is gone, and asking again once per message would turn one deleted
+   * user into hundreds of wasted calls. Anything else (a 429, a 503, a socket
+   * reset) is transient, and caching THAT would take one unlucky moment and
+   * silently strip the author off every remaining message in the run.
+   *
+   * Either way the event still lands. An unattributed question is worth
+   * recording, and a directory hiccup must not cost the workspace its
+   * visibility.
    */
   private async identityFor({
     config,
@@ -577,7 +811,6 @@ export class DatabricksGeniePuller
     const cached = identities.get(userId);
     if (cached) return cached;
 
-    let identity = UNKNOWN_IDENTITY;
     try {
       const user = scimUserSchema.parse(
         await this.get({
@@ -590,24 +823,30 @@ export class DatabricksGeniePuller
       );
       const email = user.userName ?? "";
       const externalId = user.externalId ?? "";
-      identity = {
+      const identity: GenieIdentity = {
         key: externalId || email || String(userId),
         email,
         externalId,
         displayName: user.displayName ?? "",
       };
+      identities.set(userId, identity);
+      return identity;
     } catch (error) {
+      const gone = error instanceof GenieHttpError && error.status === 404;
       logger.warn(
         {
           adapter: this.id,
           userId,
+          permanent: gone,
           error: error instanceof Error ? error.message : String(error),
         },
         "could not resolve a genie author through SCIM; recording the message unattributed",
       );
+      // Only the permanent answer is remembered. A transient failure is left
+      // uncached so the next message gets a fresh attempt.
+      if (gone) identities.set(userId, UNKNOWN_IDENTITY);
+      return UNKNOWN_IDENTITY;
     }
-    identities.set(userId, identity);
-    return identity;
   }
 
   /**
@@ -642,7 +881,11 @@ export class DatabricksGeniePuller
     return {
       source_event_id: message.message_id,
       event_timestamp: new Date(createdMs).toISOString(),
-      actor: identity.email,
+      // The login when the directory has one, the identity key otherwise. An
+      // account with no `userName` still has an object id or a numeric id, and
+      // an empty `actor` would drop it out of every actor-filtered SIEM view —
+      // present-but-not-an-email beats absent.
+      actor: identity.email || identity.key,
       action: "genie_query",
       target: space.title ?? space.space_id,
       // Genie bills nothing per message. See the file header: the warehouse
@@ -721,9 +964,11 @@ export class DatabricksGeniePuller
       signal,
     });
     if (!response.ok) {
-      throw new Error(
-        `HTTP ${response.status} ${response.statusText} (databricks genie ${path})`,
-      );
+      throw new GenieHttpError({
+        status: response.status,
+        statusText: response.statusText,
+        path,
+      });
     }
     return await response.json();
   }

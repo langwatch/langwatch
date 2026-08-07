@@ -19,6 +19,12 @@
  * mapping, it is the command boundary rejecting a record it cannot key, and a
  * test that calls the ledger writer directly would sail straight past it.
  *
+ * Most of what is asserted below is about NOT LOSING DATA — pagination that
+ * stops early, a watermark that steps over unread history, one forbidden space
+ * discarding five good ones. Those failures are silent by construction: the
+ * run reports success and the missing records are simply never mentioned
+ * again. They only exist as tests.
+ *
  * The live tier runs only when `DATABRICKS_GENIE_TOKEN` is set. It is the
  * evidence tier — read-only, against a real workspace — and CI never has the
  * credential, so it skips there rather than failing.
@@ -26,6 +32,18 @@
  * Fixture identities are placeholders. Real workspace identities exist only in
  * a live run's own output, never in this file.
  */
+
+import { vi } from "vitest";
+
+// The dev `.env` sets IS_SAAS + BLOCK_LOCAL_HTTP_CALLS, and `ssrfProtection`
+// reads both ONCE at module load to build its validator. The fixture server is
+// on loopback, so without this the whole tier fails with an SSRF rejection on a
+// developer machine while passing in CI, where the vars are unset. Hoisted
+// because a `beforeAll` would run long after that module was evaluated.
+vi.hoisted(() => {
+  process.env.IS_SAAS = "false";
+  process.env.BLOCK_LOCAL_HTTP_CALLS = "false";
+});
 
 import type { ClickHouseClient } from "@clickhouse/client";
 import { createPulledUsageProcessingPipeline } from "@ee/event-sourcing/pipelines/pulled-usage-processing";
@@ -55,6 +73,9 @@ const ns = `genie-${nanoid(8)}`;
 /** The window the pulled read is bounded by. Wide enough for a live pull. */
 const WINDOW_FROM = new Date("2020-01-01T00:00:00.000Z");
 const WINDOW_TO = new Date("2100-01-01T00:00:00.000Z");
+
+/** Mirrors the adapter's own constant; asserted against, not imported by it. */
+const WATERMARK_LAG_MS = 5 * 60 * 1000;
 
 let ch: ClickHouseClient;
 let chRepo: GatewayBudgetClickHouseRepository;
@@ -101,6 +122,15 @@ async function pullThroughTheRealPipeline(params: {
   }
 }
 
+/** The adapter's durable cursor, decoded. */
+function decodeCursor(cursor: string | null): {
+  sinceMs: number;
+  spaceId: string | null;
+} {
+  if (!cursor) throw new Error("expected a cursor");
+  return JSON.parse(cursor) as { sinceMs: number; spaceId: string | null };
+}
+
 /** What the dedicated pulled read reports for a scope. */
 function pulledTotalsFor(params: { tenantId: string; scopeIds: string[] }) {
   return chRepo.readPulledUsageTotals({
@@ -111,7 +141,7 @@ function pulledTotalsFor(params: { tenantId: string; scopeIds: string[] }) {
   });
 }
 
-/** The OCSF audit rows one pull landed, newest last. */
+/** The OCSF audit rows one pull landed, oldest first. */
 async function ocsfRowsFor(tenantId: string) {
   const result = await ch.query({
     query: `
@@ -197,6 +227,15 @@ async function dropTenant(tenantId: string): Promise<void> {
   }
 }
 
+async function cleanupOrg(organizationId: string): Promise<void> {
+  await cleanupTestRows(prisma, [
+    ["ingestionSource", { organizationId }],
+    ["project", { team: { organizationId } }],
+    ["team", { organizationId }],
+    ["organization", { id: organizationId }],
+  ]);
+}
+
 beforeAll(() => {
   const client = getTestClickHouseClient();
   if (!client) throw new Error("Test ClickHouse client not initialised");
@@ -213,279 +252,589 @@ afterAll(async () => {
   await clearClickHouseTestApp();
 });
 
-describe("given a Databricks workspace with Genie activity", () => {
-  /** Two users: one carrying an IdP object id, one provisioned without. */
-  const USERS: Record<string, Record<string, string | null>> = {
-    "700000000000001": {
-      id: "700000000000001",
-      userName: "dana.hoffman@acme.test",
-      externalId: "11111111-2222-3333-4444-555555555555",
-      displayName: "Dana Hoffman",
-    },
-    "700000000000002": {
-      id: "700000000000002",
-      userName: "priya.nair@acme.test",
-      // Absent, exactly as it is for accounts created before SCIM was wired.
-      externalId: null,
-      displayName: "Priya Nair",
+// ---------------------------------------------------------------------------
+// The fixture workspace
+// ---------------------------------------------------------------------------
+
+/** Two users: one carrying an IdP object id, one provisioned without. */
+const USERS: Record<string, Record<string, string | null>> = {
+  "700000000000001": {
+    id: "700000000000001",
+    userName: "dana.hoffman@acme.test",
+    externalId: "11111111-2222-3333-4444-555555555555",
+    displayName: "Dana Hoffman",
+  },
+  "700000000000002": {
+    id: "700000000000002",
+    userName: "priya.nair@acme.test",
+    // Absent, exactly as it is for accounts created before SCIM was wired.
+    externalId: null,
+    displayName: "Priya Nair",
+  },
+};
+
+const SPACE_TITLES: Record<string, string> = {
+  "space-alpha": "ACME Revenue Analyst",
+  "space-beta": "ACME Trip Analytics",
+  "space-forbidden": "ACME Restricted",
+  "space-loop": "ACME Broken Pagination",
+};
+
+function sqlAttachment(id: string, query: string, rowCount: number) {
+  return {
+    attachment_id: id,
+    query: {
+      query,
+      description: "generated by genie",
+      statement_id: `stmt-${id}`,
+      query_result_metadata: { row_count: rowCount },
     },
   };
+}
 
-  const SPACES = [
-    { space_id: "space-alpha", title: "ACME Revenue Analyst" },
-    { space_id: "space-beta", title: "ACME Trip Analytics" },
-  ];
+function message(params: {
+  id: string;
+  conversationId: string;
+  spaceId: string;
+  userId: number;
+  content: string;
+  createdMs: number;
+  sql: string;
+}) {
+  return {
+    message_id: params.id,
+    conversation_id: params.conversationId,
+    space_id: params.spaceId,
+    user_id: params.userId,
+    content: params.content,
+    status: "COMPLETED",
+    created_timestamp: params.createdMs,
+    attachments: [
+      { attachment_id: `txt-${params.id}`, text: { content: "Here you go." } },
+      sqlAttachment(params.id, params.sql, 5),
+    ],
+  };
+}
 
-  /** Conversations keyed by space, as the API returns them under include_all. */
-  const CONVERSATIONS: Record<string, Array<Record<string, unknown>>> = {
+/**
+ * A fixture Genie workspace.
+ *
+ * Built per suite rather than shared, because two of the scenarios below
+ * mutate it mid-sweep and one of them 403s — state leaking between them would
+ * make the failures mean the wrong thing.
+ */
+function createFixtureWorkspace() {
+  const now = Date.now();
+  /** Older activity, in the space the sweep visits first. */
+  const alphaMs = now - 60 * 60 * 1000;
+  /** Newer activity, in a space the sweep only reaches later. */
+  const betaMs = now - 30 * 60 * 1000;
+
+  const conversations: Record<
+    string,
+    Array<{ conversation_id: string; title: string; created_timestamp: number }>
+  > = {
+    // Two conversations across TWO pages, so a puller that ignores the
+    // conversation page token sees only the first.
     "space-alpha": [
       {
         conversation_id: "conv-alpha-1",
-        title: "What are the top 5 products by quantity sold?",
-        created_timestamp: 1_785_935_897_370,
-        agent_type: "GENIE_CONVERSATION_TYPE_CHAT",
+        title: "Top products",
+        created_timestamp: alphaMs,
+      },
+      {
+        conversation_id: "conv-alpha-2",
+        title: "Revenue by region",
+        created_timestamp: alphaMs,
       },
     ],
     "space-beta": [
       {
         conversation_id: "conv-beta-1",
-        title: "Average trip distance by pickup zip",
-        created_timestamp: 1_785_481_037_529,
-        agent_type: "GENIE_CONVERSATION_TYPE_CHAT",
+        title: "Trip distance",
+        created_timestamp: betaMs,
       },
     ],
+    "space-forbidden": [],
+    "space-loop": [],
   };
 
-  const MESSAGES: Record<string, Array<Record<string, unknown>>> = {
+  const messages: Record<string, Array<ReturnType<typeof message>>> = {
     "conv-alpha-1": [
-      {
-        message_id: "msg-alpha-1",
-        conversation_id: "conv-alpha-1",
-        space_id: "space-alpha",
-        user_id: 700_000_000_000_001,
+      message({
+        id: "msg-alpha-1",
+        conversationId: "conv-alpha-1",
+        spaceId: "space-alpha",
+        userId: 700_000_000_000_001,
         content: "What are the top 5 products by quantity sold?",
-        status: "COMPLETED",
-        created_timestamp: 1_785_935_897_400,
-        attachments: [
-          { attachment_id: "att-1", text: { content: "Here are the top 5." } },
-          {
-            attachment_id: "att-2",
-            query: {
-              query:
-                "SELECT `product`, SUM(`quantity`) AS qty\nFROM `acme`.`sales`.`orders`\nGROUP BY `product`\nORDER BY qty DESC\nLIMIT 5",
-              description: "Top products by quantity",
-              statement_id: "stmt-alpha-1",
-              query_result_metadata: { row_count: 5 },
-            },
-          },
-        ],
-      },
+        createdMs: alphaMs,
+        sql: "SELECT `product`, SUM(`quantity`) AS qty\nFROM `acme`.`sales`.`orders`\nGROUP BY `product`\nORDER BY qty DESC\nLIMIT 5",
+      }),
+    ],
+    // On page TWO of this conversation's messages.
+    "conv-alpha-2": [
+      message({
+        id: "msg-alpha-2",
+        conversationId: "conv-alpha-2",
+        spaceId: "space-alpha",
+        userId: 700_000_000_000_001,
+        content: "Revenue by region last quarter?",
+        createdMs: alphaMs,
+        sql: "SELECT `region`, SUM(`revenue`) FROM `acme`.`sales`.`orders` GROUP BY `region`",
+      }),
+      message({
+        id: "msg-alpha-3",
+        conversationId: "conv-alpha-2",
+        spaceId: "space-alpha",
+        userId: 700_000_000_000_002,
+        content: "And the quarter before that?",
+        createdMs: alphaMs + 1_000,
+        sql: "SELECT `region`, SUM(`revenue`) FROM `acme`.`sales`.`orders` WHERE `quarter` = 'Q3' GROUP BY `region`",
+      }),
     ],
     "conv-beta-1": [
-      {
-        message_id: "msg-beta-1",
-        conversation_id: "conv-beta-1",
-        space_id: "space-beta",
-        user_id: 700_000_000_000_002,
+      message({
+        id: "msg-beta-1",
+        conversationId: "conv-beta-1",
+        spaceId: "space-beta",
+        userId: 700_000_000_000_002,
         content: "What was the average trip distance by pickup zip code?",
-        status: "COMPLETED",
-        created_timestamp: 1_785_481_037_729,
-        attachments: [
-          {
-            attachment_id: "att-3",
-            query: {
-              query:
-                "SELECT `pickup_zip`, AVG(`trip_distance`) AS avg_distance\nFROM `samples`.`nyctaxi`.`trips`\nGROUP BY `pickup_zip`",
-              description: "Average distance by zip",
-              statement_id: "stmt-beta-1",
-              query_result_metadata: { row_count: 25 },
-            },
-          },
-        ],
-      },
+        createdMs: betaMs,
+        sql: "SELECT `pickup_zip`, AVG(`trip_distance`) AS avg_distance\nFROM `samples`.`nyctaxi`.`trips`\nGROUP BY `pickup_zip`",
+      }),
     ],
   };
 
-  let server: http.Server;
-  let baseUrl: string;
-  let seeded: Awaited<ReturnType<typeof seedSource>>;
-  /** Every conversations request the adapter made, for the include_all guard. */
+  return { conversations, messages, alphaMs, betaMs };
+}
+
+type FixtureWorkspace = ReturnType<typeof createFixtureWorkspace>;
+
+/**
+ * Serves the fixture workspace over real HTTP, with the pagination, the 403 and
+ * the broken page token the adapter has to survive.
+ *
+ * `onBeforeSpace` is the hook the concurrency scenario uses to inject activity
+ * into an already-swept space while the sweep is still running.
+ */
+async function startFixtureServer(params: {
+  workspace: FixtureWorkspace;
+  onBeforeSpace?: (spaceId: string) => void;
+}): Promise<{
+  baseUrl: string;
+  conversationRequests: string[];
+  close: () => Promise<void>;
+}> {
+  const { workspace } = params;
   const conversationRequests: string[] = [];
+  /** One conversation per page, so paging is exercised with tiny fixtures. */
+  const CONVERSATION_PAGE = 1;
+  const MESSAGE_PAGE = 1;
 
-  beforeAll(async () => {
-    server = http.createServer((req, res) => {
-      const url = new URL(req.url ?? "/", "http://localhost");
-      res.setHeader("content-type", "application/json");
-      res.statusCode = 200;
+  const server = http.createServer((req, res) => {
+    const url = new URL(req.url ?? "/", "http://localhost");
+    const token = url.searchParams.get("page_token");
+    res.setHeader("content-type", "application/json");
+    res.statusCode = 200;
+    const send = (body: unknown) => res.end(JSON.stringify(body));
 
-      const spaces = /^\/api\/2\.0\/genie\/spaces$/.exec(url.pathname);
-      if (spaces) {
-        res.end(JSON.stringify({ spaces: SPACES }));
+    if (url.pathname === "/api/2.0/genie/spaces") {
+      send({
+        spaces: Object.entries(SPACE_TITLES).map(([space_id, title]) => ({
+          space_id,
+          title,
+        })),
+        next_page_token: null,
+      });
+      return;
+    }
+
+    const conversations =
+      /^\/api\/2\.0\/genie\/spaces\/([^/]+)\/conversations$/.exec(url.pathname);
+    if (conversations) {
+      const spaceId = conversations[1]!;
+      params.onBeforeSpace?.(spaceId);
+      conversationRequests.push(url.search);
+
+      if (spaceId === "space-forbidden") {
+        res.statusCode = 403;
+        send({ error_code: "PERMISSION_DENIED", message: "no access" });
+        return;
+      }
+      if (spaceId === "space-loop") {
+        // Hands back the very token it was given. A puller that follows it
+        // burns the whole run re-reading one page.
+        send({ conversations: [], next_page_token: token ?? "stuck" });
+        return;
+      }
+      // The real endpoint answers with the caller's own conversations when
+      // include_all is absent. Mirroring that is the point of the fixture: an
+      // adapter that dropped the flag must fail here, loudly, rather than
+      // silently reporting one service account as the whole workspace.
+      if (url.searchParams.get("include_all") !== "true") {
+        send({ conversations: [], next_page_token: null });
         return;
       }
 
-      const conversations =
-        /^\/api\/2\.0\/genie\/spaces\/([^/]+)\/conversations$/.exec(
-          url.pathname,
-        );
-      if (conversations) {
-        conversationRequests.push(url.search);
-        // The real endpoint answers with the caller's own conversations when
-        // include_all is absent. Mirroring that is the whole point of the
-        // fixture: an adapter that dropped the flag must fail here, loudly,
-        // rather than silently reporting one service account's activity.
-        const all = url.searchParams.get("include_all") === "true";
-        res.end(
-          JSON.stringify({
-            conversations: all ? (CONVERSATIONS[conversations[1]!] ?? []) : [],
-          }),
-        );
-        return;
-      }
+      const all = workspace.conversations[spaceId] ?? [];
+      const offset = token ? Number(token) : 0;
+      const slice = all.slice(offset, offset + CONVERSATION_PAGE);
+      const next = offset + CONVERSATION_PAGE;
+      send({
+        conversations: slice,
+        next_page_token: next < all.length ? String(next) : null,
+      });
+      return;
+    }
 
-      const messages =
-        /^\/api\/2\.0\/genie\/spaces\/[^/]+\/conversations\/([^/]+)\/messages$/.exec(
-          url.pathname,
-        );
-      if (messages) {
-        res.end(JSON.stringify({ messages: MESSAGES[messages[1]!] ?? [] }));
-        return;
-      }
-
-      const scim = /^\/api\/2\.0\/preview\/scim\/v2\/Users\/([^/]+)$/.exec(
+    const messages =
+      /^\/api\/2\.0\/genie\/spaces\/[^/]+\/conversations\/([^/]+)\/messages$/.exec(
         url.pathname,
       );
-      if (scim) {
-        const user = USERS[scim[1]!];
-        if (!user) {
-          res.statusCode = 404;
-          res.end(JSON.stringify({ error: "not found" }));
-          return;
-        }
-        res.end(JSON.stringify(user));
+    if (messages) {
+      const all = workspace.messages[messages[1]!] ?? [];
+      const offset = token ? Number(token) : 0;
+      const slice = all.slice(offset, offset + MESSAGE_PAGE);
+      const next = offset + MESSAGE_PAGE;
+      send({
+        messages: slice,
+        next_page_token: next < all.length ? String(next) : null,
+      });
+      return;
+    }
+
+    const scim = /^\/api\/2\.0\/preview\/scim\/v2\/Users\/([^/]+)$/.exec(
+      url.pathname,
+    );
+    if (scim) {
+      const user = USERS[scim[1]!];
+      if (!user) {
+        res.statusCode = 404;
+        send({ error: "not found" });
         return;
       }
+      send(user);
+      return;
+    }
 
-      res.statusCode = 404;
-      res.end(JSON.stringify({ error: `unrouted ${url.pathname}` }));
-    });
-    await new Promise<void>((resolve) =>
-      server.listen(0, "127.0.0.1", resolve),
-    );
-    baseUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+    res.statusCode = 404;
+    send({ error: `unrouted ${url.pathname}` });
+  });
 
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  return {
+    baseUrl: `http://127.0.0.1:${(server.address() as AddressInfo).port}`,
+    conversationRequests,
+    close: () => new Promise<void>((resolve) => server.close(() => resolve())),
+  };
+}
+
+function genieConfig(params: {
+  baseUrl: string;
+  spaceIds: string[];
+  startingAt: string;
+}): Prisma.InputJsonObject {
+  return {
+    adapter: DATABRICKS_GENIE_ADAPTER_ID,
+    workspaceUrl: params.baseUrl,
+    spaceIds: params.spaceIds,
+    startingAt: params.startingAt,
+    schedule: "*/15 * * * *",
+    credentials: { token: "fixture-token" },
+  };
+}
+
+// ---------------------------------------------------------------------------
+
+describe("given a Genie workspace the credential can fully read", () => {
+  let workspace: FixtureWorkspace;
+  let fixture: Awaited<ReturnType<typeof startFixtureServer>>;
+  let seeded: Awaited<ReturnType<typeof seedSource>>;
+  let firstCursor: string | null;
+
+  beforeAll(async () => {
+    workspace = createFixtureWorkspace();
+    fixture = await startFixtureServer({ workspace });
     seeded = await seedSource({
-      slug: ns,
-      pullConfig: {
-        adapter: DATABRICKS_GENIE_ADAPTER_ID,
-        workspaceUrl: baseUrl,
-        spaceIds: [],
+      slug: `ok-${ns}`,
+      pullConfig: genieConfig({
+        baseUrl: fixture.baseUrl,
+        spaceIds: ["space-alpha", "space-beta"],
         startingAt: "2020-01-01T00:00:00.000Z",
-        schedule: "*/15 * * * *",
-        credentials: { token: "fixture-token" },
-      },
+      }),
     });
-  });
-
-  afterAll(async () => {
-    await new Promise<void>((resolve) => server.close(() => resolve()));
-    await dropTenant(seeded.govProjectId);
-    await cleanupTestRows(prisma, [
-      ["ingestionSource", { organizationId: seeded.organizationId }],
-      ["project", { team: { organizationId: seeded.organizationId } }],
-      ["team", { organizationId: seeded.organizationId }],
-      ["organization", { id: seeded.organizationId }],
-    ]);
-  });
-
-  describe("when the puller sweeps every space", () => {
-    it("lands one audit row and one zero-cost visibility record per message", async () => {
-      const outcome = await pullThroughTheRealPipeline({
+    firstCursor = (
+      await pullThroughTheRealPipeline({
         sourceId: seeded.sourceId,
         cursor: null,
-      });
+      })
+    ).nextCursor;
+  }, 120_000);
 
-      expect(outcome.eventCount).toBe(2);
+  afterAll(async () => {
+    await fixture.close();
+    await dropTenant(seeded.govProjectId);
+    await cleanupOrg(seeded.organizationId);
+  });
 
+  describe("when the puller sweeps it", () => {
+    it("reads every page of every list, not just the first", async () => {
       const rows = await ocsfRowsFor(seeded.govProjectId);
-      expect(rows).toHaveLength(2);
-      expect(rows.map((r) => r.EventId).sort()).toEqual([
-        `databricks_genie:${seeded.sourceId}:msg-alpha-1`,
-        `databricks_genie:${seeded.sourceId}:msg-beta-1`,
-      ]);
-
-      // The two artefacts this adapter exists to surface.
-      const alpha = rows.find((r) => r.EventId.endsWith("msg-alpha-1"))!;
-      const alphaExtra = extensionOf(alpha);
-      expect(alpha.ActorEmail).toBe("dana.hoffman@acme.test");
-      expect(alpha.TargetName).toBe("ACME Revenue Analyst");
-      expect(alpha.ActionName).toBe("genie_query");
-      expect(alphaExtra.question).toBe(
-        "What are the top 5 products by quantity sold?",
+      // One message sits on conversation page 2 and another on message page 2.
+      // A puller that stops at the first page of either lands 1 or 2 rows.
+      expect(rows.map((r) => r.EventId).sort()).toEqual(
+        [
+          `databricks_genie:${seeded.sourceId}:msg-alpha-1`,
+          `databricks_genie:${seeded.sourceId}:msg-alpha-2`,
+          `databricks_genie:${seeded.sourceId}:msg-alpha-3`,
+          `databricks_genie:${seeded.sourceId}:msg-beta-1`,
+        ].sort(),
       );
-      expect(alphaExtra.generatedSql).toContain("`acme`.`sales`.`orders`");
-      expect(alphaExtra.statementId).toBe("stmt-alpha-1");
-      expect(alphaExtra.rowCount).toBe(5);
-
-      // The money side: the record exists, and it carries nothing.
-      const totals = await pulledTotalsFor({
-        tenantId: seeded.govProjectId,
-        scopeIds: [seeded.teamId, seeded.organizationId],
-      });
-      expect(totals.items).toBe(2);
-      expect(totals.spentNanoUsd).toBe(0);
-      expect(totals.spentUsd).toBe("0");
     });
 
-    it("asks for every user's conversations, not just the caller's", async () => {
+    it("carries the question and the SQL it generated", async () => {
+      const rows = await ocsfRowsFor(seeded.govProjectId);
+      const alpha = rows.find((r) => r.EventId.endsWith("msg-alpha-1"))!;
+      const extra = extensionOf(alpha);
+
+      expect(alpha.ActionName).toBe("genie_query");
+      expect(alpha.TargetName).toBe("ACME Revenue Analyst");
+      expect(extra.question).toBe(
+        "What are the top 5 products by quantity sold?",
+      );
+      expect(extra.generatedSql).toContain("`acme`.`sales`.`orders`");
+      expect(extra.statementId).toBe("stmt-msg-alpha-1");
+      expect(extra.rowCount).toBe(5);
+    });
+
+    it("asks for every user's conversations, not just the caller's", () => {
       // The failure this guards is silent: without include_all the sweep
       // returns the service account's own conversations, reports success, and
       // under-reports the workspace forever with nothing looking wrong.
-      expect(conversationRequests.length).toBeGreaterThan(0);
-      for (const search of conversationRequests) {
+      expect(fixture.conversationRequests.length).toBeGreaterThan(0);
+      for (const search of fixture.conversationRequests) {
         expect(search).toContain("include_all=true");
       }
     });
 
-    it("keys identity on the IdP object id, and falls back to the login without one", async () => {
+    it("keys identity on the IdP object id, and falls back to the login", async () => {
       const rows = await ocsfRowsFor(seeded.govProjectId);
-      const withExternalId = extensionOf(
+      const withObjectId = extensionOf(
         rows.find((r) => r.EventId.endsWith("msg-alpha-1"))!,
       );
-      const withoutExternalId = extensionOf(
+      const withoutObjectId = extensionOf(
         rows.find((r) => r.EventId.endsWith("msg-beta-1"))!,
       );
 
-      expect(withExternalId.actorKey).toBe(
+      expect(withObjectId.actorKey).toBe(
         "11111111-2222-3333-4444-555555555555",
       );
-      expect(withExternalId.actorEmail).toBe("dana.hoffman@acme.test");
+      expect(withObjectId.actorEmail).toBe("dana.hoffman@acme.test");
 
-      // No object id in the directory, so the login carries the identity.
-      expect(withoutExternalId.actorExternalId).toBe("");
-      expect(withoutExternalId.actorKey).toBe("priya.nair@acme.test");
+      // No object id in the directory, so the login carries the identity — and
+      // the record is still attributed rather than anonymous.
+      expect(withoutObjectId.actorExternalId).toBe("");
+      expect(withoutObjectId.actorKey).toBe("priya.nair@acme.test");
+      expect(
+        rows.find((r) => r.EventId.endsWith("msg-beta-1"))!.ActorEmail,
+      ).toBe("priya.nair@acme.test");
     });
 
-    it("advances its watermark so a second sweep re-reads nothing", async () => {
-      const first = JSON.parse(
-        (
-          await pullThroughTheRealPipeline({
-            sourceId: seeded.sourceId,
-            cursor: null,
-          })
-        ).nextCursor!,
-      ) as { sinceMs: number; spaceId: string | null };
-      // The newest fixture message. A complete sweep moves the watermark to it
-      // and leaves no resume position behind.
-      expect(first.sinceMs).toBe(1_785_935_897_400);
-      expect(first.spaceId).toBeNull();
+    it("records the questions with no cost attached", async () => {
+      const totals = await pulledTotalsFor({
+        tenantId: seeded.govProjectId,
+        scopeIds: [seeded.teamId, seeded.organizationId],
+      });
+      expect(totals.items).toBe(4);
+      expect(totals.spentNanoUsd).toBe(0);
+      expect(totals.spentUsd).toBe("0");
+    });
 
+    it("anchors the watermark to when the sweep began, not to the newest message", () => {
+      const cursor = decodeCursor(firstCursor);
+      // The bug this pins: a watermark set to the newest message seen sits
+      // AFTER anything posted mid-sweep into an already-read space, and the
+      // next run filters that activity out permanently.
+      expect(cursor.sinceMs).toBeGreaterThan(workspace.betaMs);
+      // Anchored near the sweep's start, minus the lag window it re-reads.
+      expect(cursor.sinceMs).toBeLessThanOrEqual(Date.now() - WATERMARK_LAG_MS);
+      expect(cursor.spaceId).toBeNull();
+    });
+
+    it("re-reads nothing when the workspace has not changed", async () => {
       const second = await pullThroughTheRealPipeline({
         sourceId: seeded.sourceId,
-        cursor: JSON.stringify(first),
+        cursor: firstCursor,
       });
       expect(second.eventCount).toBe(0);
+    }, 60_000);
+  });
+});
+
+describe("given someone asks a question while a sweep is running", () => {
+  let workspace: FixtureWorkspace;
+  let fixture: Awaited<ReturnType<typeof startFixtureServer>>;
+  let seeded: Awaited<ReturnType<typeof seedSource>>;
+
+  beforeAll(async () => {
+    workspace = createFixtureWorkspace();
+    let injected = false;
+    fixture = await startFixtureServer({
+      workspace,
+      // Fires when the sweep moves on to the SECOND space, i.e. once the first
+      // is already behind it. That is precisely the window in which a real
+      // question can be missed.
+      onBeforeSpace: (spaceId) => {
+        if (spaceId !== "space-beta" || injected) return;
+        injected = true;
+        workspace.messages["conv-alpha-1"]!.push(
+          message({
+            id: "msg-alpha-late",
+            conversationId: "conv-alpha-1",
+            spaceId: "space-alpha",
+            userId: 700_000_000_000_001,
+            content: "Asked while the sweep was already past this space",
+            // NOW — later than everything the sweep will go on to see in beta,
+            // but in a space it has already walked past.
+            createdMs: Date.now(),
+            sql: "SELECT 1",
+          }),
+        );
+      },
     });
+    seeded = await seedSource({
+      slug: `race-${ns}`,
+      pullConfig: genieConfig({
+        baseUrl: fixture.baseUrl,
+        spaceIds: ["space-alpha", "space-beta"],
+        startingAt: "2020-01-01T00:00:00.000Z",
+      }),
+    });
+  }, 120_000);
+
+  afterAll(async () => {
+    await fixture.close();
+    await dropTenant(seeded.govProjectId);
+    await cleanupOrg(seeded.organizationId);
+  });
+
+  describe("when the next sweep runs", () => {
+    it("records the question the first sweep raced past", async () => {
+      const first = await pullThroughTheRealPipeline({
+        sourceId: seeded.sourceId,
+        cursor: null,
+      });
+      // The injected message was created after the sweep read that space, so
+      // the first run cannot have it.
+      const firstRows = await ocsfRowsFor(seeded.govProjectId);
+      expect(firstRows.map((r) => r.EventId)).not.toContain(
+        `databricks_genie:${seeded.sourceId}:msg-alpha-late`,
+      );
+
+      await pullThroughTheRealPipeline({
+        sourceId: seeded.sourceId,
+        cursor: first.nextCursor,
+      });
+
+      const rows = await ocsfRowsFor(seeded.govProjectId);
+      expect(rows.map((r) => r.EventId)).toContain(
+        `databricks_genie:${seeded.sourceId}:msg-alpha-late`,
+      );
+    }, 120_000);
+  });
+});
+
+describe("given one space the credential cannot read", () => {
+  let workspace: FixtureWorkspace;
+  let fixture: Awaited<ReturnType<typeof startFixtureServer>>;
+  let seeded: Awaited<ReturnType<typeof seedSource>>;
+  let outcome: { nextCursor: string | null; eventCount: number };
+
+  beforeAll(async () => {
+    workspace = createFixtureWorkspace();
+    fixture = await startFixtureServer({ workspace });
+    seeded = await seedSource({
+      slug: `denied-${ns}`,
+      pullConfig: genieConfig({
+        baseUrl: fixture.baseUrl,
+        // The unreadable space sits BETWEEN two readable ones, so a puller
+        // that unwinds on the 403 loses the third as well as the first.
+        spaceIds: ["space-alpha", "space-forbidden", "space-beta"],
+        startingAt: "2020-01-01T00:00:00.000Z",
+      }),
+    });
+    outcome = await pullThroughTheRealPipeline({
+      sourceId: seeded.sourceId,
+      cursor: null,
+    });
+  }, 120_000);
+
+  afterAll(async () => {
+    await fixture.close();
+    await dropTenant(seeded.govProjectId);
+    await cleanupOrg(seeded.organizationId);
+  });
+
+  describe("when the sweep hits it", () => {
+    it("still records everything the readable spaces held", async () => {
+      const rows = await ocsfRowsFor(seeded.govProjectId);
+      expect(rows.map((r) => r.EventId).sort()).toEqual(
+        [
+          `databricks_genie:${seeded.sourceId}:msg-alpha-1`,
+          `databricks_genie:${seeded.sourceId}:msg-alpha-2`,
+          `databricks_genie:${seeded.sourceId}:msg-alpha-3`,
+          `databricks_genie:${seeded.sourceId}:msg-beta-1`,
+        ].sort(),
+      );
+    });
+
+    it("holds the watermark, so nothing behind the failure is skipped", () => {
+      // The sweep was incomplete, so the window must not advance — the next
+      // run reads the same history again rather than stepping over whatever
+      // the forbidden space was hiding.
+      const cursor = decodeCursor(outcome.nextCursor);
+      expect(cursor.sinceMs).toBe(Date.parse("2020-01-01T00:00:00.000Z"));
+    });
+  });
+});
+
+describe("given a list endpoint whose page token never advances", () => {
+  let workspace: FixtureWorkspace;
+  let fixture: Awaited<ReturnType<typeof startFixtureServer>>;
+  let seeded: Awaited<ReturnType<typeof seedSource>>;
+
+  beforeAll(async () => {
+    workspace = createFixtureWorkspace();
+    fixture = await startFixtureServer({ workspace });
+    seeded = await seedSource({
+      slug: `loop-${ns}`,
+      pullConfig: genieConfig({
+        baseUrl: fixture.baseUrl,
+        spaceIds: ["space-loop"],
+        startingAt: "2020-01-01T00:00:00.000Z",
+      }),
+    });
+  }, 120_000);
+
+  afterAll(async () => {
+    await fixture.close();
+    await dropTenant(seeded.govProjectId);
+    await cleanupOrg(seeded.organizationId);
+  });
+
+  describe("when the puller reads it", () => {
+    it("refuses rather than re-reading the same page until the budget dies", async () => {
+      const outcome = await pullThroughTheRealPipeline({
+        sourceId: seeded.sourceId,
+        cursor: null,
+      });
+      // The space is isolated, so the run itself survives — but it is
+      // incomplete, and the watermark says so.
+      expect(outcome.eventCount).toBe(0);
+      expect(decodeCursor(outcome.nextCursor).sinceMs).toBe(
+        Date.parse("2020-01-01T00:00:00.000Z"),
+      );
+    }, 60_000);
   });
 });
 
@@ -513,6 +862,8 @@ describe.skipIf(!liveToken || !liveUrl)(
         pullConfig: {
           adapter: DATABRICKS_GENIE_ADAPTER_ID,
           workspaceUrl: liveUrl,
+          // Empty: discover every space the credential can see, which is the
+          // configuration a customer would actually run.
           spaceIds: [],
           // Wide enough to sweep the whole recorded history in one run.
           startingAt: "2020-01-01T00:00:00.000Z",
@@ -531,12 +882,7 @@ describe.skipIf(!liveToken || !liveUrl)(
         return;
       }
       await dropTenant(seeded.govProjectId);
-      await cleanupTestRows(prisma, [
-        ["ingestionSource", { organizationId: seeded.organizationId }],
-        ["project", { team: { organizationId: seeded.organizationId } }],
-        ["team", { organizationId: seeded.organizationId }],
-        ["organization", { id: seeded.organizationId }],
-      ]);
+      await cleanupOrg(seeded.organizationId);
     });
 
     describe("when the puller sweeps every space it can see", () => {
@@ -566,15 +912,25 @@ describe.skipIf(!liveToken || !liveUrl)(
           expect(extra.actorKey).not.toBe("");
         }
 
+        // A complete sweep of a healthy workspace must drain, not stop early.
+        const cursor = decodeCursor(outcome.nextCursor);
+        expect(cursor.spaceId).toBeNull();
+        expect(cursor.sinceMs).toBeGreaterThan(0);
+
         const perSpace = new Map<string, number>();
+        const identityShapes = { objectId: 0, loginFallback: 0 };
         for (const row of rows) {
-          const title = String(extensionOf(row).spaceTitle);
+          const extra = extensionOf(row);
+          const title = String(extra.spaceTitle || extra.spaceId);
           perSpace.set(title, (perSpace.get(title) ?? 0) + 1);
+          if (extra.actorExternalId) identityShapes.objectId += 1;
+          else identityShapes.loginFallback += 1;
         }
         console.log(
           `[genie-live] ${rows.length} records across ${perSpace.size} spaces:`,
           Object.fromEntries(perSpace),
         );
+        console.log("[genie-live] identity resolution:", identityShapes);
         const sample = extensionOf(rows[0]!);
         console.log("[genie-live] sample record:", {
           actorKey: sample.actorKey,
@@ -584,7 +940,7 @@ describe.skipIf(!liveToken || !liveUrl)(
           sql: String(sample.generatedSql).slice(0, 160),
           costNanoUsd: 0,
         });
-      });
+      }, 180_000);
     });
   },
 );
