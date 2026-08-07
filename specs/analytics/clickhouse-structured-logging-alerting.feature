@@ -41,7 +41,7 @@ Feature: Structured Logging for ClickHouse Queries
   Scenario: The cause never rides on a field named error
     When a ClickHouse attempt fails
     Then the cause is attached under a field that is not named "error"
-    And the record's level is not promoted by the log pipeline
+    And the record does not claim a failure the level did not
 
   @unit @regression
   Scenario: Query successes are logged at debug level
