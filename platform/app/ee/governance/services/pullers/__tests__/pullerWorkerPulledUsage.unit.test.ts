@@ -238,7 +238,9 @@ describe("the pull effect's pulled-usage emit seam", () => {
       await runIngestionPull({
         sourceId: "src_1",
         cursor: null,
-        pulledUsage: { recordPulledUsage: vi.fn().mockResolvedValue(undefined) },
+        pulledUsage: {
+          recordPulledUsage: vi.fn().mockResolvedValue(undefined),
+        },
       });
 
       // The answer cannot change mid-batch, so a lookup per row would put
