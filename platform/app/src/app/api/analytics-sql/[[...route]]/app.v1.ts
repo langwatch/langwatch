@@ -26,9 +26,7 @@
  * @see specs/analytics/governed-sql-api.feature
  */
 
-import { NotFoundError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
-import type { Project } from "@prisma/client";
 import { describeRoute } from "hono-openapi";
 import { resolver } from "hono-openapi/zod";
 import { z } from "zod";
@@ -38,13 +36,12 @@ import {
   GOVERNED_SQL_DIAGNOSTIC_CODES,
   getGovernedSqlService,
 } from "~/server/analytics/governed-sql";
-import { GovernedSqlNotEnabledError } from "~/server/analytics/governed-sql/errors";
 import { type createProjectApp, requires } from "~/server/api/security";
 import { getProtectionsForProject } from "~/server/api/utils";
 import { validator as zValidator } from "~/server/api/validation";
 import { prisma } from "~/server/db";
-import { featureFlagService } from "~/server/featureFlag";
 import { baseResponses } from "../../shared/base-responses";
+import { callerProject, requireGovernedSqlEnabled } from "./routeGuards";
 
 const logger = createLogger("langwatch:api:analytics-sql");
 
@@ -132,55 +129,6 @@ const governedSchemaSchema = z.object({
     }),
   ),
 });
-
-/**
- * The project this request runs for, having checked the URL agrees with the
- * credential.
- *
- * Returns the credential's project, never the one the path named — so even a
- * future refactor that forgot the check could not widen scope, because the id
- * from the URL is never what anything downstream reads.
- */
-function callerProject({
-  project,
-  requestedProjectId,
-}: {
-  project: Project;
-  requestedProjectId: string | undefined;
-}): Project {
-  if (requestedProjectId !== project.id) {
-    throw new NotFoundError(
-      "project_not_found",
-      "Project",
-      requestedProjectId ?? "",
-    );
-  }
-  return project;
-}
-
-/**
- * The experimental gate over the whole surface, same flag as the workbench's
- * tRPC router. Checked per request and server-side only; an API key has no
- * member behind it, so the project is the distinct identity.
- */
-async function requireGovernedSqlEnabled(project: Project): Promise<void> {
-  // The flag store's organization-scoped rules fail closed when the calling
-  // context has no organization, so the gate resolves the project's — without
-  // this, a rule enabling the surface for an organization could never match.
-  const team = await prisma.team.findUnique({
-    where: { id: project.teamId },
-    select: { organizationId: true },
-  });
-  const enabled = await featureFlagService.isEnabled(
-    "release_governed_sql_workbench",
-    {
-      distinctId: project.id,
-      projectId: project.id,
-      organizationId: team?.organizationId,
-    },
-  );
-  if (!enabled) throw new GovernedSqlNotEnabledError();
-}
 
 export function registerGovernedSqlRoutes(
   secured: ReturnType<typeof createProjectApp>,
