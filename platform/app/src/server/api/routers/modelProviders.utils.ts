@@ -3,6 +3,7 @@ import { getSchemaShape } from "../../../utils/modelProviderHelpers";
 import { prisma } from "../../db";
 import { CODING_ASSISTANT_SURFACES_ONLY_NEEDLE } from "../../modelProviders/codexRefusalMessage";
 import { isCodexModel } from "../../modelProviders/codexRestrictions";
+import { geminiAgentPlatformPair } from "../../modelProviders/geminiDoor";
 import type {
   LLMModelEntry,
   ReasoningConfig,
@@ -395,6 +396,19 @@ export const prepareLitellmParams = async ({
       getModelOrDefaultEnvKey(modelProvider, "VERTEXAI_PROJECT") ?? "invalid";
     params.vertex_location =
       getModelOrDefaultEnvKey(modelProvider, "VERTEXAI_LOCATION") ?? "invalid";
+  }
+
+  // Gemini's second door: a credential carrying a project and location is
+  // an Agent Platform key, and the two fields ride with it so nlpgo and the
+  // Go gateway route to aiplatform.googleapis.com instead of the Gemini
+  // API. Emitted together or not at all — one without the other names no
+  // door. See specs/model-providers/google-agent-platform.feature.
+  if (modelProvider.provider === "gemini") {
+    const pair = geminiAgentPlatformPair(modelProvider.customKeys);
+    if (pair) {
+      params.project_id = pair.project;
+      params.region = pair.location;
+    }
   }
 
   if (modelProvider.provider === "bedrock") {

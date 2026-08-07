@@ -29,9 +29,8 @@ export const modelProviderIcons: Record<
   groq: <Groq />,
   vertex_ai: <GoogleCloud />,
   gemini: <Gemini />,
-  // The Cloud mark rather than the Gemini one: the models are Gemini, but the
-  // credential and console are Google Cloud's, and that is the distinction a
-  // customer is picking between in this list.
+  // Deprecated fold-window provider (see registry.ts): stored rows still
+  // render in the providers table until the migration folds them.
   google_agent_platform: <GoogleCloud />,
   bedrock: <AWS />,
   deepseek: <DeepSeek />,
