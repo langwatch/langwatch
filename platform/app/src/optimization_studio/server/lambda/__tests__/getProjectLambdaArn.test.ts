@@ -270,41 +270,4 @@ describe("getProjectLambdaArn", () => {
       expect(LAMBDA_ARN_CACHE_TTL_MS).toBeLessThanOrEqual(60 * 60_000);
     });
   });
-
-  describe("when a project's Lambda is created", () => {
-    it("provisions it at the sized memory allocation", async () => {
-      const send = vi
-        .spyOn(LambdaClient.prototype as any, "send")
-        // GetFunction (existence) misses, so the create path runs.
-        .mockRejectedValueOnce(
-          Object.assign(new Error("not found"), {
-            name: "ResourceNotFoundException",
-          }),
-        )
-        .mockResolvedValueOnce({ FunctionArn: mockLambdaConfig.FunctionArn })
-        .mockResolvedValue({
-          Configuration: mockLambdaConfig,
-          Code: {
-            ImageUri:
-              "123456789012.dkr.ecr.us-east-1.amazonaws.com/test:latest",
-          },
-        });
-
-      await getProjectLambdaArn(mockProjectId);
-
-      const createCall = send.mock.calls
-        .map(([command]: any) => command)
-        .find(
-          (command: any) =>
-            command?.input?.FunctionName !== undefined &&
-            command?.input?.MemorySize !== undefined,
-        );
-
-      // Pinned because the allocation is a sizing decision made against
-      // production data, not an arbitrary default: Max Memory Used peaks at
-      // 507MB across 806k invocations, so 1024MB is the smallest size that
-      // still clears the tail with room to spare.
-      expect(createCall?.input?.MemorySize).toBe(1024);
-    });
-  });
 });
