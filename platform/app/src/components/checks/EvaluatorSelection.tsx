@@ -156,7 +156,7 @@ export function EvaluatorSelection({
           <Box flex="1">
             <Alert.Title>This evaluator is no longer available</Alert.Title>
             <Alert.Description>
-              {`This evaluation was set up with ${retiredEvaluatorType}, which this server no longer runs. Pick a replacement below to keep the evaluation running.`}
+              {`This evaluation was set up with ${retiredEvaluatorType}. Pick a replacement below to start getting results again.`}
             </Alert.Description>
           </Box>
         </Alert.Root>
@@ -194,6 +194,15 @@ export function EvaluatorSelection({
                     (evaluator.missingEnvVars &&
                       evaluator.missingEnvVars.length > 0);
 
+                  const choose = () => {
+                    if (isDisabled) return;
+                    form.setValue("checkType", key as EvaluatorTypes);
+                    void router.push({
+                      pathname: router.pathname.replace("/choose", ""),
+                      query: router.query,
+                    });
+                  };
+
                   return (
                     <GridItem
                       key={key}
@@ -203,6 +212,18 @@ export function EvaluatorSelection({
                       boxShadow="0px 4px 10px 0px rgba(0, 0, 0, 0.06)"
                       cursor={isDisabled ? "default" : "pointer"}
                       role="button"
+                      // A card is the only way to pick an evaluator, including
+                      // for someone recovering an evaluation whose evaluator is
+                      // gone, so it takes focus and answers the keys a button
+                      // answers. A disabled card stays in the tab order and says
+                      // so, rather than silently doing nothing when activated.
+                      tabIndex={0}
+                      aria-disabled={isDisabled ? true : undefined}
+                      onKeyDown={(event) => {
+                        if (event.key !== "Enter" && event.key !== " ") return;
+                        event.preventDefault();
+                        choose();
+                      }}
                       _hover={
                         isDisabled
                           ? undefined
@@ -210,14 +231,7 @@ export function EvaluatorSelection({
                               background: "gray.200",
                             }
                       }
-                      onClick={() => {
-                        if (isDisabled) return;
-                        form.setValue("checkType", key as EvaluatorTypes);
-                        void router.push({
-                          pathname: router.pathname.replace("/choose", ""),
-                          query: router.query,
-                        });
-                      }}
+                      onClick={choose}
                       color={isDisabled ? "gray.400" : undefined}
                       background={isDisabled ? "gray.50" : "white"}
                     >
@@ -266,9 +280,7 @@ export function EvaluatorSelection({
                               padding="4px 8px"
                               lineHeight="1.5em"
                             >
-                              <Tag.Label>
-                                Not installed on this server
-                              </Tag.Label>
+                              <Tag.Label>Not available here</Tag.Label>
                             </Tag.Root>
                           </Tooltip>
                         )}
@@ -276,7 +288,9 @@ export function EvaluatorSelection({
                           evaluator.missingEnvVars &&
                           evaluator.missingEnvVars.length > 0 && (
                             <Tooltip
-                              content={evaluator.missingEnvVars.join(", ")}
+                              // The names are the actionable part for whoever
+                              // runs the install, so the tooltip keeps them.
+                              content={`Set these environment variables to enable it: ${evaluator.missingEnvVars.join(", ")}`}
                               positioning={{ placement: "top" }}
                             >
                               <Tag.Root
@@ -285,9 +299,7 @@ export function EvaluatorSelection({
                                 padding="4px 8px"
                                 lineHeight="1.5em"
                               >
-                                <Tag.Label>
-                                  Evaluator disabled, missing env vars
-                                </Tag.Label>
+                                <Tag.Label>Needs configuration</Tag.Label>
                               </Tag.Root>
                             </Tooltip>
                           )}

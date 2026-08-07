@@ -34,6 +34,28 @@
 -- `embeddings_model` is dropped from the settings of the evaluators that do not
 -- accept it, so a migrated row holds the same settings a newly created one
 -- would. `ragas/response_relevancy` takes all three legacy settings unchanged.
+--
+-- IRREVERSIBLE: there is no down step, because the information a down step
+-- would need is gone once this runs.
+--
+-- Two legacy slugs collapse onto one target. `legacy/ragas_context_precision`
+-- and `legacy/ragas_context_utilization` both become
+-- `ragas/response_context_precision`, which is correct going forward, since
+-- that one evaluator implements both of the metrics they named. It is not
+-- invertible: afterwards a row on `ragas/response_context_precision` carries no
+-- record of which of the two it came from.
+--
+-- Nor is a migrated row distinguishable from one that already held the target
+-- slug before this ran. `ragas/faithfulness`, `ragas/response_relevancy` and
+-- `ragas/response_context_precision` are all evaluators customers could and did
+-- pick directly, so after this there is nothing separating those rows from the
+-- ones this statement moved.
+--
+-- The dropped `embeddings_model` setting is the smaller loss and the same shape:
+-- the value is deleted rather than parked anywhere, so nothing could put it
+-- back.
+--
+-- A database restore from before this ran is the only route back.
 
 UPDATE "Monitor"
 SET "checkType" = 'ragas/faithfulness',
