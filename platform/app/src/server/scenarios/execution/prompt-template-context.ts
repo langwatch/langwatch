@@ -126,6 +126,12 @@ export function buildPromptTemplateContext({
   const context: Record<string, string> = {
     input: lastUserMessageText(sanitized.messages),
     messages: transcript,
+    // The structured escape hatch for templates that parsed the pre-#6590
+    // `{{messages}}` JSON: the same array shape, minus the internal `id` /
+    // `traceId` fields that made the old value unsafe to consume. `{{messages}}`
+    // itself stays prose because a model shown a JSON transcript answers with
+    // one, and that reply re-escapes one level deeper every turn (#6590).
+    messagesJson: JSON.stringify(sanitized.messages),
     threadId: input.threadId ?? DEFAULT_SCENARIO_THREAD_ID,
   };
 

@@ -109,6 +109,13 @@ Feature: Prompt agent input binding under simulation
     Then "messages" holds one "role: content" line per turn
     And "messages" is not a JSON array
 
+  @unit
+  Scenario: A JSON-consuming template keeps a structured conversation via messagesJson
+    Given a template that parses the conversation as JSON
+    When the template context is built for a turn
+    Then "messagesJson" parses to the role and content of every turn
+    And "messagesJson" carries neither "id" nor "traceId"
+
   # --- Compounding ---
 
   # The payload is the serialised conversation. A model that reproduces what it

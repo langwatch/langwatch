@@ -191,6 +191,23 @@ describe("buildPromptTemplateContext", () => {
       expect(context.messages).not.toMatch(/"role"\s*:/);
     });
 
+    /** @scenario "A JSON-consuming template keeps a structured conversation via messagesJson" */
+    it("keeps a sanitised structured conversation available as messagesJson", () => {
+      const { context } = buildPromptTemplateContext({
+        input: turn([
+          { role: "user", content: "I need a refund" },
+          { role: "assistant", content: "Sure, let me help" },
+        ]),
+      });
+
+      expect(JSON.parse(context.messagesJson!)).toEqual([
+        { role: "user", content: "I need a refund" },
+        { role: "assistant", content: "Sure, let me help" },
+      ]);
+      expect(context.messagesJson).not.toContain("traceId");
+      expect(context.messagesJson).not.toContain("scnmsg_");
+    });
+
     /** @scenario "A mapping that resolves to the conversation is sanitised too" */
     it("sanitises a declared input that resolves to the conversation", () => {
       const { context } = buildPromptTemplateContext({
