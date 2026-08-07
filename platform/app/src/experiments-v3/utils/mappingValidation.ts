@@ -469,8 +469,14 @@ export const getEvaluatorMissingMappings = (
   // A built-in evaluator with no catalog entry cannot run, whatever the
   // mappings say. Reporting the mappings as complete would let the row be
   // queued for an evaluator that is not there, so the evaluator itself is the
-  // finding.
-  if (!evaluatorDef && !evaluator.evaluatorType.startsWith("custom/")) {
+  // finding. Custom, code and workflow evaluators are defined elsewhere and are
+  // never expected in the catalog.
+  const isDefinedOutsideTheCatalog =
+    evaluator.evaluatorType.startsWith("custom/") ||
+    evaluator.evaluatorType.startsWith("code/") ||
+    evaluator.evaluatorType === "workflow";
+
+  if (!evaluatorDef && !isDefinedOutsideTheCatalog) {
     return {
       isValid: false,
       missingMappings: [
