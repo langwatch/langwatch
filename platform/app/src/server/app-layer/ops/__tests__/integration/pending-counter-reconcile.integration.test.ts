@@ -4,7 +4,10 @@ import {
   startTestContainers,
   stopTestContainers,
 } from "../../../../event-sourcing/__tests__/integration/testContainers";
-import { QueueRedisRepository } from "../../repositories/queue.redis.repository";
+import {
+  QueueRedisRepository,
+  RECONCILE_WRITE_LUA,
+} from "../../repositories/queue.redis.repository";
 
 let redis: Redis;
 beforeAll(async () => {
@@ -424,6 +427,186 @@ describe("QueueRedisRepository.reconcileTotalPending", () => {
         expect(result).toBeNull();
         expect(await redis.get(markerKey)).toBe("other-instance-token");
         expect(await redis.pttl(markerKey)).toBeGreaterThan(0);
+      });
+    });
+  });
+
+  /**
+   * Seed a queue so a reconcile measures exactly `drift`, then run one.
+   *
+   * `counter - groundTruth` is the drift, so the counter is seeded at
+   * `jobs + drift` against `jobs` real jobs.
+   */
+  const reconcileWithDrift = async (params: {
+    queue: string;
+    jobs: number;
+    drift: number;
+    by?: QueueRedisRepository;
+  }) => {
+    const { queue, jobs, drift, by } = params;
+    const prefix = `${queue}:gq:`;
+    // The counter is read as `Math.max(0, ...)`, so a seeded counter below zero
+    // silently becomes zero and the measured drift is not the requested one.
+    const counter = jobs + drift;
+    if (counter < 0) {
+      throw new Error(
+        `fixture asks for counter ${counter}; raise jobs above ${-drift}`,
+      );
+    }
+    // The test containers are reused between runs and the queue names come from
+    // a per-process counter, so the same names recur. Clear everything this
+    // fixture asserts on, or a previous run's published drift is still readable
+    // and the assertions pass without this run having written anything.
+    await redis.del(
+      `${prefix}stats:pending-recon-ts`,
+      `${prefix}stats:pending-drift`,
+      `${prefix}stats:total-pending`,
+      `${prefix}group:g:jobs`,
+      `${prefix}ready`,
+      `${prefix}pending-groups`,
+    );
+    for (let i = 0; i < jobs; i++) {
+      await redis.zadd(`${prefix}group:g:jobs`, 1000 + i, `job-${i}`);
+    }
+    if (jobs > 0) await redis.zadd(`${prefix}ready`, 1, "g");
+    await redis.set(`${prefix}stats:total-pending`, String(counter));
+    return await (by ?? repo).reconcileTotalPending(queue);
+  };
+
+  describe("given one instance reconciled a queue and measured a drift", () => {
+    describe("when a second instance that won no marker reports drift", () => {
+      /** @scenario An instance that measured nothing reports the drift another instance measured */
+      it("reports the same drift as the instance that measured it", async () => {
+        const measured = await reconcileWithDrift({
+          queue: queueName,
+          jobs: 5,
+          drift: 95,
+        });
+        expect(measured!.drift).toBe(95);
+
+        // A second repository standing in for a second process. It wins no
+        // marker (the first pass holds it for the rest of the window), so it
+        // measures nothing of its own.
+        const otherInstance = new QueueRedisRepository(redis);
+        expect(await otherInstance.reconcileTotalPending(queueName)).toBeNull();
+
+        expect(await otherInstance.readPublishedPendingDrift([queueName])).toBe(
+          95,
+        );
+      });
+    });
+  });
+
+  // Runs the real script against real Redis. The reconcile unit suite drives a
+  // fake that models these semantics, so reordering the script cannot fail it:
+  // the fake would keep modelling the old order. This is the binding to the
+  // script itself.
+  describe("given the marker is held by somebody else", () => {
+    describe("when the fenced write script runs", () => {
+      /** @scenario A pass that loses the marker publishes neither the count nor the drift */
+      it("writes neither the counter nor the drift", async () => {
+        const prefix = `${queueName}:gq:`;
+        const counterKey = `${prefix}stats:total-pending`;
+        const driftKey = `${prefix}stats:pending-drift`;
+        await redis.del(counterKey, driftKey);
+        await redis.set(markerKey, "another-instances-token");
+
+        const wrote = await redis.eval(
+          RECONCILE_WRITE_LUA,
+          3,
+          markerKey,
+          counterKey,
+          driftKey,
+          "our-token",
+          "17",
+          "35",
+          "180000",
+        );
+
+        expect(Number(wrote)).toBe(0);
+        expect(await redis.get(counterKey)).toBeNull();
+        expect(await redis.get(driftKey)).toBeNull();
+      });
+
+      it("writes both once the marker is ours", async () => {
+        const prefix = `${queueName}:gq:`;
+        const counterKey = `${prefix}stats:total-pending`;
+        const driftKey = `${prefix}stats:pending-drift`;
+        await redis.del(counterKey, driftKey);
+        await redis.set(markerKey, "our-token");
+
+        const wrote = await redis.eval(
+          RECONCILE_WRITE_LUA,
+          3,
+          markerKey,
+          counterKey,
+          driftKey,
+          "our-token",
+          "17",
+          "35",
+          "180000",
+        );
+
+        expect(Number(wrote)).toBe(1);
+        expect(await redis.get(counterKey)).toBe("17");
+        expect(await redis.get(driftKey)).toBe("35");
+        expect(await redis.pttl(driftKey)).toBeGreaterThan(0);
+      });
+    });
+  });
+
+  describe("given one queue has published a drift and another never reconciled", () => {
+    describe("when drift is reported", () => {
+      /** @scenario A queue with no published drift does not suppress the queues that have one */
+      it("still reports the drift of the queue that published one", async () => {
+        const neverReconciled = `${queueName}-silent`;
+        await redis.del(`${neverReconciled}:gq:stats:pending-drift`);
+        await reconcileWithDrift({ queue: queueName, jobs: 2, drift: 7 });
+
+        expect(
+          await repo.readPublishedPendingDrift([neverReconciled, queueName]),
+        ).toBe(7);
+      });
+
+      it("survives a figure that is not a number at all", async () => {
+        // The script only ever writes an integer, so this is reachable through
+        // a hand-edited key rather than through the code. Worth a case anyway:
+        // a total that gives up on one bad value reports the fleet as clean.
+        const poked = `${queueName}-poked`;
+        await redis.set(`${poked}:gq:stats:pending-drift`, "not-a-number");
+        await reconcileWithDrift({ queue: queueName, jobs: 2, drift: 7 });
+
+        expect(await repo.readPublishedPendingDrift([poked, queueName])).toBe(
+          7,
+        );
+      });
+    });
+  });
+
+  describe("given two queues whose drifts were measured by different instances", () => {
+    describe("when either instance reports drift", () => {
+      /** @scenario Drift is summed across queues whichever instance measured each one */
+      it("reports the total across both queues", async () => {
+        const second = `${queueName}-b`;
+        // Opposing directions, measured by two different repository instances
+        // standing in for two processes. A sum that let them cancel would
+        // report 20; the tile is meant to show total magnitude.
+        const a = await reconcileWithDrift({
+          queue: queueName,
+          jobs: 4,
+          drift: 30,
+        });
+        const b = await reconcileWithDrift({
+          queue: second,
+          jobs: 14,
+          drift: -10,
+          by: new QueueRedisRepository(redis),
+        });
+        expect([a!.drift, b!.drift]).toEqual([30, -10]);
+
+        expect(await repo.readPublishedPendingDrift([queueName, second])).toBe(
+          40,
+        );
       });
     });
   });

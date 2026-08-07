@@ -2454,3 +2454,15 @@ export class GroupStagingScripts {
 export function pendingGroupsKey(keyPrefix: string): string {
   return `${keyPrefix}pending-groups`;
 }
+
+/**
+ * Key holding the drift the last reconcile pass measured for this queue, from
+ * its key prefix (`<name>:gq:`).
+ *
+ * Shared rather than per-process because the reconcile is single-flighted: only
+ * the instance that wins the marker computes a drift, so any other instance
+ * reporting its own local figure reports zero for a queue it never recomputed.
+ */
+export function pendingDriftKey(keyPrefix: string): string {
+  return `${keyPrefix}stats:pending-drift`;
+}
