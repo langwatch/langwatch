@@ -156,16 +156,16 @@ describe("NotificationService", () => {
           expected:
             "Plan limit reached: Acme, jane@acme.com, Plan: Free, Monthly Events: 12000/10000",
         },
-      ])(
-        "names the $limitType cap and the numbers behind it",
-        async ({ limitType, expected }) => {
-          config.slackPlanLimitChannel = "https://hooks.slack.com/test";
+      ])("names the $limitType cap and the numbers behind it", async ({
+        limitType,
+        expected,
+      }) => {
+        config.slackPlanLimitChannel = "https://hooks.slack.com/test";
 
-          await service.sendSlackPlanLimitAlert({ ...context, limitType });
+        await service.sendSlackPlanLimitAlert({ ...context, limitType });
 
-          expect(mockSlackSend).toHaveBeenCalledWith({ text: expected });
-        },
-      );
+        expect(mockSlackSend).toHaveBeenCalledWith({ text: expected });
+      });
 
       /** @scenario "Plan limit alert still sends when the organization has no admin email" */
       it("falls back to unknown when the org has no admin email", async () => {
