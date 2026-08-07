@@ -9,18 +9,30 @@ const CHAIN = resolveScopeChain({
   projectId: "proj-1",
 });
 
-const row = (
-  scopeType: RetentionRow["scopeType"],
-  scopeId: string,
-  category: string,
-  retentionDays: number,
-): RetentionRow => ({ scopeType, scopeId, category, retentionDays });
+const row = ({
+  scopeType,
+  scopeId,
+  category,
+  retentionDays,
+}: {
+  scopeType: RetentionRow["scopeType"];
+  scopeId: string;
+  category: string;
+  retentionDays: number;
+}): RetentionRow => ({ scopeType, scopeId, category, retentionDays });
 
 describe("resolveRetention", () => {
   describe("given a project-level override", () => {
     it("returns the project value for that category", () => {
       const resolved = resolveRetention({
-        rows: [row("PROJECT", "proj-1", "traces", 90)],
+        rows: [
+          row({
+            scopeType: "PROJECT",
+            scopeId: "proj-1",
+            category: "traces",
+            retentionDays: 90,
+          }),
+        ],
         chain: CHAIN,
       });
       expect(resolved.traces).toBe(90);
@@ -31,9 +43,24 @@ describe("resolveRetention", () => {
     it("the project tier wins (most specific)", () => {
       const resolved = resolveRetention({
         rows: [
-          row("ORGANIZATION", "org-1", "traces", 30),
-          row("TEAM", "team-1", "traces", 60),
-          row("PROJECT", "proj-1", "traces", 90),
+          row({
+            scopeType: "ORGANIZATION",
+            scopeId: "org-1",
+            category: "traces",
+            retentionDays: 30,
+          }),
+          row({
+            scopeType: "TEAM",
+            scopeId: "team-1",
+            category: "traces",
+            retentionDays: 60,
+          }),
+          row({
+            scopeType: "PROJECT",
+            scopeId: "proj-1",
+            category: "traces",
+            retentionDays: 90,
+          }),
         ],
         chain: CHAIN,
       });
@@ -45,8 +72,18 @@ describe("resolveRetention", () => {
     it("the team tier sits between org and project", () => {
       const resolved = resolveRetention({
         rows: [
-          row("ORGANIZATION", "org-1", "traces", 30),
-          row("TEAM", "team-1", "traces", 60),
+          row({
+            scopeType: "ORGANIZATION",
+            scopeId: "org-1",
+            category: "traces",
+            retentionDays: 30,
+          }),
+          row({
+            scopeType: "TEAM",
+            scopeId: "team-1",
+            category: "traces",
+            retentionDays: 60,
+          }),
         ],
         chain: CHAIN,
       });
@@ -57,7 +94,14 @@ describe("resolveRetention", () => {
   describe("given only an organization override", () => {
     it("the org value applies when no closer override exists", () => {
       const resolved = resolveRetention({
-        rows: [row("ORGANIZATION", "org-1", "scenarios", 45)],
+        rows: [
+          row({
+            scopeType: "ORGANIZATION",
+            scopeId: "org-1",
+            category: "scenarios",
+            retentionDays: 45,
+          }),
+        ],
         chain: CHAIN,
       });
       expect(resolved.scenarios).toBe(45);
@@ -68,9 +112,24 @@ describe("resolveRetention", () => {
     it("resolves each category independently", () => {
       const resolved = resolveRetention({
         rows: [
-          row("PROJECT", "proj-1", "traces", 90),
-          row("TEAM", "team-1", "scenarios", 60),
-          row("ORGANIZATION", "org-1", "experiments", 30),
+          row({
+            scopeType: "PROJECT",
+            scopeId: "proj-1",
+            category: "traces",
+            retentionDays: 90,
+          }),
+          row({
+            scopeType: "TEAM",
+            scopeId: "team-1",
+            category: "scenarios",
+            retentionDays: 60,
+          }),
+          row({
+            scopeType: "ORGANIZATION",
+            scopeId: "org-1",
+            category: "experiments",
+            retentionDays: 30,
+          }),
         ],
         chain: CHAIN,
       });
@@ -81,7 +140,14 @@ describe("resolveRetention", () => {
   describe("given no row for a category", () => {
     it("falls back to the platform default", () => {
       const resolved = resolveRetention({
-        rows: [row("PROJECT", "proj-1", "traces", 91)],
+        rows: [
+          row({
+            scopeType: "PROJECT",
+            scopeId: "proj-1",
+            category: "traces",
+            retentionDays: 91,
+          }),
+        ],
         chain: CHAIN,
       });
       expect(resolved.scenarios).toBe(PLATFORM_DEFAULT_RETENTION_DAYS);
@@ -92,7 +158,14 @@ describe("resolveRetention", () => {
   describe("given a row from a sibling scope not in the chain", () => {
     it("is ignored", () => {
       const resolved = resolveRetention({
-        rows: [row("PROJECT", "other-project", "traces", 91)],
+        rows: [
+          row({
+            scopeType: "PROJECT",
+            scopeId: "other-project",
+            category: "traces",
+            retentionDays: 91,
+          }),
+        ],
         chain: CHAIN,
       });
       expect(resolved.traces).toBe(PLATFORM_DEFAULT_RETENTION_DAYS);

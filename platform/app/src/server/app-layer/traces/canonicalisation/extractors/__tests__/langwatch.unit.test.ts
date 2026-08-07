@@ -11,7 +11,9 @@ describe("LangWatchExtractor", () => {
     describe("when metadata JSON contains user_id", () => {
       it("promotes to langwatch.user.id via setAttrIfAbsent", () => {
         const ctx = createExtractorContext({
-          metadata: JSON.stringify({ user_id: "meta-user-1" }),
+          attrs: {
+            metadata: JSON.stringify({ user_id: "meta-user-1" }),
+          },
         });
 
         extractor.apply(ctx);
@@ -27,7 +29,9 @@ describe("LangWatchExtractor", () => {
     describe("when metadata JSON contains userId (camelCase)", () => {
       it("promotes to langwatch.user.id via setAttrIfAbsent", () => {
         const ctx = createExtractorContext({
-          metadata: JSON.stringify({ userId: "meta-user-camel" }),
+          attrs: {
+            metadata: JSON.stringify({ userId: "meta-user-camel" }),
+          },
         });
 
         extractor.apply(ctx);
@@ -43,7 +47,9 @@ describe("LangWatchExtractor", () => {
     describe("when langwatch.user.id is already set in out", () => {
       it("does not overwrite the existing value", () => {
         const ctx = createExtractorContext({
-          metadata: JSON.stringify({ user_id: "meta-user" }),
+          attrs: {
+            metadata: JSON.stringify({ user_id: "meta-user" }),
+          },
         });
         // Pre-set via explicit attribute processing (simulated)
         ctx.out[ATTR_KEYS.LANGWATCH_USER_ID] = "explicit-user";
@@ -57,7 +63,9 @@ describe("LangWatchExtractor", () => {
     describe("when metadata contains thread_id", () => {
       it("promotes to gen_ai.conversation.id", () => {
         const ctx = createExtractorContext({
-          metadata: JSON.stringify({ thread_id: "thread-abc" }),
+          attrs: {
+            metadata: JSON.stringify({ thread_id: "thread-abc" }),
+          },
         });
 
         extractor.apply(ctx);
@@ -73,7 +81,9 @@ describe("LangWatchExtractor", () => {
     describe("when metadata contains customer_id", () => {
       it("promotes to langwatch.customer.id", () => {
         const ctx = createExtractorContext({
-          metadata: JSON.stringify({ customer_id: "cust-xyz" }),
+          attrs: {
+            metadata: JSON.stringify({ customer_id: "cust-xyz" }),
+          },
         });
 
         extractor.apply(ctx);
@@ -89,7 +99,9 @@ describe("LangWatchExtractor", () => {
     describe("when metadata is invalid JSON", () => {
       it("does not throw", () => {
         const ctx = createExtractorContext({
-          metadata: "{not valid json",
+          attrs: {
+            metadata: "{not valid json",
+          },
         });
 
         expect(() => extractor.apply(ctx)).not.toThrow();
@@ -97,7 +109,9 @@ describe("LangWatchExtractor", () => {
 
       it("does not set any promoted attributes", () => {
         const ctx = createExtractorContext({
-          metadata: "{not valid json",
+          attrs: {
+            metadata: "{not valid json",
+          },
         });
 
         extractor.apply(ctx);
@@ -112,19 +126,22 @@ describe("LangWatchExtractor", () => {
   describe("evaluation events (langwatch.evaluation.custom)", () => {
     describe("when span has a langwatch.evaluation.custom event", () => {
       it("maps first evaluation to GenAI semconv attributes", () => {
-        const ctx = createExtractorContext({}, undefined, [
-          {
-            name: "langwatch.evaluation.custom",
-            timeUnixMs: Date.now(),
-            attributes: {
-              json_encoded_event: JSON.stringify({
-                name: "toxicity",
-                score: 0.95,
-                label: "safe",
-              }),
+        const ctx = createExtractorContext({
+          attrs: {},
+          events: [
+            {
+              name: "langwatch.evaluation.custom",
+              timeUnixMs: Date.now(),
+              attributes: {
+                json_encoded_event: JSON.stringify({
+                  name: "toxicity",
+                  score: 0.95,
+                  label: "safe",
+                }),
+              },
             },
-          },
-        ]);
+          ],
+        });
 
         extractor.apply(ctx);
 
@@ -143,16 +160,19 @@ describe("LangWatchExtractor", () => {
       });
 
       it("handles already-parsed json_encoded_event (from parseJsonStringValues)", () => {
-        const ctx = createExtractorContext({}, undefined, [
-          {
-            name: "langwatch.evaluation.custom",
-            timeUnixMs: Date.now(),
-            attributes: {
-              // After parseJsonStringValues, JSON strings become objects
-              json_encoded_event: { name: "toxicity", score: 0.8 },
+        const ctx = createExtractorContext({
+          attrs: {},
+          events: [
+            {
+              name: "langwatch.evaluation.custom",
+              timeUnixMs: Date.now(),
+              attributes: {
+                // After parseJsonStringValues, JSON strings become objects
+                json_encoded_event: { name: "toxicity", score: 0.8 },
+              },
             },
-          },
-        ]);
+          ],
+        });
 
         extractor.apply(ctx);
 
@@ -165,7 +185,7 @@ describe("LangWatchExtractor", () => {
 
     describe("when span has no evaluation events", () => {
       it("does not set GenAI evaluation attributes", () => {
-        const ctx = createExtractorContext({});
+        const ctx = createExtractorContext({ attrs: {} });
 
         extractor.apply(ctx);
 
@@ -175,15 +195,18 @@ describe("LangWatchExtractor", () => {
 
     describe("when span has no langwatch.reserved.evaluations attribute", () => {
       it("does not leak reserved attributes to metadata", () => {
-        const ctx = createExtractorContext({}, undefined, [
-          {
-            name: "langwatch.evaluation.custom",
-            timeUnixMs: Date.now(),
-            attributes: {
-              json_encoded_event: JSON.stringify({ name: "test", score: 1 }),
+        const ctx = createExtractorContext({
+          attrs: {},
+          events: [
+            {
+              name: "langwatch.evaluation.custom",
+              timeUnixMs: Date.now(),
+              attributes: {
+                json_encoded_event: JSON.stringify({ name: "test", score: 1 }),
+              },
             },
-          },
-        ]);
+          ],
+        });
 
         extractor.apply(ctx);
 
@@ -201,7 +224,9 @@ describe("LangWatchExtractor", () => {
           { document_id: "doc-1", chunk_id: "chunk-1", content: "hello world" },
         ];
         const ctx = createExtractorContext({
-          [ATTR_KEYS.LANGWATCH_RAG_CONTEXTS]: contexts,
+          attrs: {
+            [ATTR_KEYS.LANGWATCH_RAG_CONTEXTS]: contexts,
+          },
         });
 
         extractor.apply(ctx);
@@ -220,7 +245,9 @@ describe("LangWatchExtractor", () => {
           { document_id: "doc-2", chunk_id: "chunk-2", content: "legacy data" },
         ];
         const ctx = createExtractorContext({
-          [ATTR_KEYS.LANGWATCH_RAG_CONTEXTS_LEGACY]: contexts,
+          attrs: {
+            [ATTR_KEYS.LANGWATCH_RAG_CONTEXTS_LEGACY]: contexts,
+          },
         });
 
         extractor.apply(ctx);
@@ -240,10 +267,12 @@ describe("LangWatchExtractor", () => {
         ];
         // Old TS SDK (<=0.26.0) sent "langwatch.contexts" which is not recognized
         const ctx = createExtractorContext({
-          "langwatch.contexts": JSON.stringify({
-            type: "json",
-            value: contexts,
-          }),
+          attrs: {
+            "langwatch.contexts": JSON.stringify({
+              type: "json",
+              value: contexts,
+            }),
+          },
         });
 
         extractor.apply(ctx);

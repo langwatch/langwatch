@@ -64,32 +64,32 @@ function validateHandlerEvents(
   commandType: CommandType,
 ): void {
   if (!events) {
-    throw new ValidationError(
-      `Command handler for "${commandType}" returned undefined. Handler must return an array of events.`,
-      "events",
-      void 0,
-      { commandType },
-    );
+    throw new ValidationError({
+      reason: `Command handler for "${commandType}" returned undefined. Handler must return an array of events.`,
+      field: "events",
+      value: void 0,
+      context: { commandType },
+    });
   }
 
   if (!Array.isArray(events)) {
-    throw new ValidationError(
-      `Command handler for "${commandType}" returned a non-array value. Handler must return an array of events, but got: ${typeof events}`,
-      "events",
-      undefined,
-      { commandType },
-    );
+    throw new ValidationError({
+      reason: `Command handler for "${commandType}" returned a non-array value. Handler must return an array of events, but got: ${typeof events}`,
+      field: "events",
+      value: undefined,
+      context: { commandType },
+    });
   }
 
   for (let i = 0; i < events.length; i++) {
     const event = events[i];
     if (!event) {
-      throw new ValidationError(
-        `Command handler for "${commandType}" returned an array with undefined at index ${i}. All events must be defined.`,
-        "events",
-        undefined,
-        { commandType, index: i },
-      );
+      throw new ValidationError({
+        reason: `Command handler for "${commandType}" returned an array with undefined at index ${i}. All events must be defined.`,
+        field: "events",
+        value: undefined,
+        context: { commandType, index: i },
+      });
     }
 
     if (!EventUtils.isValidEvent(event)) {
@@ -101,11 +101,11 @@ function validateHandlerEvents(
               .join(", ")}`
           : "Unknown validation error";
 
-      throw new ValidationError(
-        `Command handler for "${commandType}" returned an invalid event at index ${i}. Event must have id, aggregateId, timestamp, type, and data. ${validationError}.`,
-        "events",
-        undefined,
-        {
+      throw new ValidationError({
+        reason: `Command handler for "${commandType}" returned an invalid event at index ${i}. Event must have id, aggregateId, timestamp, type, and data. ${validationError}.`,
+        field: "events",
+        value: undefined,
+        context: {
           commandType,
           index: i,
           zodIssues:
@@ -113,9 +113,36 @@ function validateHandlerEvents(
               ? mapZodIssuesToLogContext(parseResult.error.issues)
               : void 0,
         },
-      );
+      });
     }
   }
+}
+
+/**
+ * Schema-validate a single command payload, throwing the same ValidationError
+ * shape the dispatcher has always raised on malformed input.
+ */
+function validateCommandPayload<EventType extends Event>({
+  commandSchema,
+  payload,
+  commandType,
+}: Pick<
+  ProcessCommandParams<EventType>,
+  "commandSchema" | "payload" | "commandType"
+>) {
+  const validation = commandSchema.validate(payload);
+  if (!validation.success) {
+    throw new ValidationError({
+      reason: `Invalid payload for command type "${commandType}". Validation failed.`,
+      field: "payload",
+      value: undefined,
+      context: {
+        commandType,
+        zodIssues: mapZodIssuesToLogContext(validation.error.issues),
+      },
+    });
+  }
+  return validation.data;
 }
 
 /**
@@ -142,20 +169,11 @@ export async function processCommand<EventType extends Event>(
     logger: log,
   } = params;
 
-  const validation = commandSchema.validate(payload);
-  if (!validation.success) {
-    throw new ValidationError(
-      `Invalid payload for command type "${commandType}". Validation failed.`,
-      "payload",
-      undefined,
-      {
-        commandType,
-        zodIssues: mapZodIssuesToLogContext(validation.error.issues),
-      },
-    );
-  }
-
-  const validated = validation.data;
+  const validated = validateCommandPayload<EventType>({
+    commandSchema,
+    payload,
+    commandType,
+  });
   const tenantId = createTenantId(String(validated.tenantId));
   const aggregateId = getAggregateId(validated);
 
@@ -172,7 +190,12 @@ export async function processCommand<EventType extends Event>(
     return;
   }
 
-  const command = createCommand(tenantId, aggregateId, commandType, validated);
+  const command = createCommand({
+    tenantId,
+    aggregateId,
+    type: commandType,
+    data: validated,
+  });
 
   const commandStartTime = performance.now();
   try {
@@ -245,15 +268,15 @@ function validateBatchPayloads<EventType extends Event>(
   return payloads.map((payload) => {
     const validation = commandSchema.validate(payload);
     if (!validation.success) {
-      throw new ValidationError(
-        `Invalid payload for command type "${commandType}". Validation failed.`,
-        "payload",
-        undefined,
-        {
+      throw new ValidationError({
+        reason: `Invalid payload for command type "${commandType}". Validation failed.`,
+        field: "payload",
+        value: undefined,
+        context: {
           commandType,
           zodIssues: mapZodIssuesToLogContext(validation.error.issues),
         },
-      );
+      });
     }
     return validation.data;
   });
@@ -273,12 +296,12 @@ function resolveBatchTenantId(args: {
   const tenantId = createTenantId(String(validatedPayloads[0]!.tenantId));
   for (const validated of validatedPayloads) {
     if (createTenantId(String(validated.tenantId)) !== tenantId) {
-      throw new ValidationError(
-        `Coalesced batch for command type "${commandType}" mixes tenants. All payloads in one group share a tenant.`,
-        "tenantId",
-        undefined,
-        { commandType },
-      );
+      throw new ValidationError({
+        reason: `Coalesced batch for command type "${commandType}" mixes tenants. All payloads in one group share a tenant.`,
+        field: "tenantId",
+        value: undefined,
+        context: { commandType },
+      });
     }
   }
   return tenantId;
@@ -328,12 +351,12 @@ async function handleBatchCommands<EventType extends Event>(args: {
     }
 
     progress.attempted++;
-    const command = createCommand(
-      payloadTenantId,
+    const command = createCommand({
+      tenantId: payloadTenantId,
       aggregateId,
-      commandType,
-      validated,
-    );
+      type: commandType,
+      data: validated,
+    });
     const events = await handler.handle(command);
     validateHandlerEvents(events, commandType);
     handledCommands.push(command);

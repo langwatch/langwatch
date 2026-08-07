@@ -407,11 +407,11 @@ export async function enrichCodingAgentSpansFromLogs({
   if (!hasCodingAgentJoinableSpans(spans)) return spans;
 
   try {
-    const logRows = await logRecords.getLogsByTraceId(
+    const logRows = await logRecords.getLogsByTraceId({
       tenantId,
       traceId,
       occurredAtMs,
-    );
+    });
     return enrichSpansWithClaudeLogContent({ spans, logRows });
   } catch (error) {
     logger?.warn(

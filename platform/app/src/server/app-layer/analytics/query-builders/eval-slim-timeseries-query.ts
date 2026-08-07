@@ -273,7 +273,13 @@ export function buildEvalSlimTimeseriesQuery(
         `Eval slim builder cannot filter by evaluator key "${String(s.key)}" — evaluation_analytics has no EvaluatorId column. The router should have routed this to evaluation_runs.`,
       );
     }
-    const alias = buildMetricAlias(i, s.metric, s.aggregation, s.key, s.subkey);
+    const alias = buildMetricAlias({
+      index: i,
+      metric: s.metric,
+      aggregation: s.aggregation,
+      key: s.key,
+      subkey: s.subkey,
+    });
     const expr = evalSlimAggExpression(
       s.aggregation,
       evalSlimColumnFor(s.metric),

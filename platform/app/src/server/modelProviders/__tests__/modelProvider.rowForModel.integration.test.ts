@@ -543,17 +543,21 @@ describe("Runtime provider-row selection follows the model (real DB)", () => {
 
     /** @scenario Evaluations accept a model served only by a wider-scope row */
     it("builds the evaluator env with the serving row's credentials instead of rejecting", async () => {
-      const env = await setupModelEnv(
-        `gemini/eval-custom-${ns}`,
-        false,
+      const env = await setupModelEnv({
+        model: `gemini/eval-custom-${ns}`,
+        embeddings: false,
         projectId,
-      );
+      });
       expect(env.X_LITELLM_api_key).toBe(`sk-gemini-org-${ns}`);
     });
 
     it("still rejects a model no accessible row serves", async () => {
       await expect(
-        setupModelEnv(`gemini/nonexistent-${ns}`, false, projectId),
+        setupModelEnv({
+          model: `gemini/nonexistent-${ns}`,
+          embeddings: false,
+          projectId,
+        }),
       ).rejects.toThrow(/not in the models list/);
     });
   });

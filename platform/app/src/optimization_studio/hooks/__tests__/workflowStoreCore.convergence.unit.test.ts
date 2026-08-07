@@ -21,13 +21,19 @@ const node = (id: string, type: string): Node => ({
   data: { name: id },
 });
 
-const edge = (
-  id: string,
-  source: string,
-  sourceHandle: string,
-  target: string,
-  targetHandle: string,
-): Edge => ({
+const edge = ({
+  id,
+  source,
+  sourceHandle,
+  target,
+  targetHandle,
+}: {
+  id: string;
+  source: string;
+  sourceHandle: string;
+  target: string;
+  targetHandle: string;
+}): Edge => ({
   id,
   source,
   target,
@@ -46,9 +52,27 @@ const forkNodes = [
   node("end", "end"),
 ];
 const forkEdges = [
-  edge("e1", "entry", "q", "gate", "context"),
-  edge("e2", "gate", "true", "codeA", "gate"),
-  edge("e3", "gate", "false", "codeB", "gate"),
+  edge({
+    id: "e1",
+    source: "entry",
+    sourceHandle: "q",
+    target: "gate",
+    targetHandle: "context",
+  }),
+  edge({
+    id: "e2",
+    source: "gate",
+    sourceHandle: "true",
+    target: "codeA",
+    targetHandle: "gate",
+  }),
+  edge({
+    id: "e3",
+    source: "gate",
+    sourceHandle: "false",
+    target: "codeB",
+    targetHandle: "gate",
+  }),
 ];
 
 const edgesIntoAnswer = (edges: Edge[]) =>
@@ -66,7 +90,16 @@ describe("workflowStoreCore - branch convergence on connect", () => {
     it("accepts the second, converging connection", () => {
       store.setState({
         nodes: forkNodes as unknown as Node[],
-        edges: [...forkEdges, edge("c1", "codeA", "out", "end", "answer")],
+        edges: [
+          ...forkEdges,
+          edge({
+            id: "c1",
+            source: "codeA",
+            sourceHandle: "out",
+            target: "end",
+            targetHandle: "answer",
+          }),
+        ],
       });
 
       const result = store.getState().onConnect({
@@ -92,9 +125,27 @@ describe("workflowStoreCore - branch convergence on connect", () => {
           node("end", "end"),
         ] as unknown as Node[],
         edges: [
-          edge("e1", "entry", "q", "x", "in"),
-          edge("e2", "entry", "q", "y", "in"),
-          edge("c1", "x", "out", "end", "answer"),
+          edge({
+            id: "e1",
+            source: "entry",
+            sourceHandle: "q",
+            target: "x",
+            targetHandle: "in",
+          }),
+          edge({
+            id: "e2",
+            source: "entry",
+            sourceHandle: "q",
+            target: "y",
+            targetHandle: "in",
+          }),
+          edge({
+            id: "c1",
+            source: "x",
+            sourceHandle: "out",
+            target: "end",
+            targetHandle: "answer",
+          }),
         ],
       });
 

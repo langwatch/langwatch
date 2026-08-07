@@ -992,12 +992,12 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     const tenantId = spans[0]!.tenantId;
     for (const span of spans) {
       if (span.tenantId !== tenantId) {
-        throw new SecurityError(
-          "SpanStorageClickHouseRepository.insertSpans",
-          "all spans in a single batch must share the same tenantId",
+        throw new SecurityError({
+          operation: "SpanStorageClickHouseRepository.insertSpans",
+          message: "all spans in a single batch must share the same tenantId",
           tenantId,
-          { mismatchedTenantId: span.tenantId },
-        );
+          context: { mismatchedTenantId: span.tenantId },
+        });
       }
     }
 

@@ -38,20 +38,20 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
         mapProjections: [mapDef],
       });
 
-      const event1 = createTestEvent(
-        TEST_CONSTANTS.AGGREGATE_ID,
-        TEST_CONSTANTS.AGGREGATE_TYPE,
+      const event1 = createTestEvent({
+        aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+        aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
         tenantId,
-        EVENT_TYPES[0],
-        TEST_CONSTANTS.BASE_TIMESTAMP,
-      );
-      const event2 = createTestEvent(
-        TEST_CONSTANTS.AGGREGATE_ID,
-        TEST_CONSTANTS.AGGREGATE_TYPE,
+        type: EVENT_TYPES[0],
+        createdAt: TEST_CONSTANTS.BASE_TIMESTAMP,
+      });
+      const event2 = createTestEvent({
+        aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+        aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
         tenantId,
-        EVENT_TYPES[0],
-        TEST_CONSTANTS.BASE_TIMESTAMP + 1000,
-      );
+        type: EVENT_TYPES[0],
+        createdAt: TEST_CONSTANTS.BASE_TIMESTAMP + 1000,
+      });
 
       // Store event1 first (but don't process it via service yet)
       await eventStore.storeEvents([event1], context, aggregateType);
@@ -82,27 +82,27 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
         mapProjections: [mapDef],
       });
 
-      const event1 = createTestEvent(
-        TEST_CONSTANTS.AGGREGATE_ID,
-        TEST_CONSTANTS.AGGREGATE_TYPE,
+      const event1 = createTestEvent({
+        aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+        aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
         tenantId,
-        EVENT_TYPES[0],
-        TEST_CONSTANTS.BASE_TIMESTAMP,
-      );
-      const event2 = createTestEvent(
-        TEST_CONSTANTS.AGGREGATE_ID,
-        TEST_CONSTANTS.AGGREGATE_TYPE,
+        type: EVENT_TYPES[0],
+        createdAt: TEST_CONSTANTS.BASE_TIMESTAMP,
+      });
+      const event2 = createTestEvent({
+        aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+        aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
         tenantId,
-        EVENT_TYPES[0],
-        TEST_CONSTANTS.BASE_TIMESTAMP + 1000,
-      );
-      const event3 = createTestEvent(
-        TEST_CONSTANTS.AGGREGATE_ID,
-        TEST_CONSTANTS.AGGREGATE_TYPE,
+        type: EVENT_TYPES[0],
+        createdAt: TEST_CONSTANTS.BASE_TIMESTAMP + 1000,
+      });
+      const event3 = createTestEvent({
+        aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+        aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
         tenantId,
-        EVENT_TYPES[0],
-        TEST_CONSTANTS.BASE_TIMESTAMP + 2000,
-      );
+        type: EVENT_TYPES[0],
+        createdAt: TEST_CONSTANTS.BASE_TIMESTAMP + 2000,
+      });
 
       // Store all events
       await eventStore.storeEvents(
@@ -137,13 +137,13 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
         mapProjections: [mapDef],
       });
 
-      const event1 = createTestEvent(
-        TEST_CONSTANTS.AGGREGATE_ID,
-        TEST_CONSTANTS.AGGREGATE_TYPE,
+      const event1 = createTestEvent({
+        aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+        aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
         tenantId,
-        EVENT_TYPES[0],
-        TEST_CONSTANTS.BASE_TIMESTAMP,
-      );
+        type: EVENT_TYPES[0],
+        createdAt: TEST_CONSTANTS.BASE_TIMESTAMP,
+      });
 
       // Store event
       await eventStore.storeEvents([event1], context, aggregateType);
@@ -170,36 +170,36 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
 
       // Create events with same timestamp but different IDs
       const sameTimestamp = TEST_CONSTANTS.BASE_TIMESTAMP;
-      const event1 = createTestEvent(
-        TEST_CONSTANTS.AGGREGATE_ID,
-        TEST_CONSTANTS.AGGREGATE_TYPE,
+      const event1 = createTestEvent({
+        aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+        aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
         tenantId,
-        EVENT_TYPES[0],
-        sameTimestamp,
-        eventVersion,
-        {},
-        `${sameTimestamp}:${tenantId}:${TEST_CONSTANTS.AGGREGATE_ID}:${aggregateType}:a`,
-      );
-      const event2 = createTestEvent(
-        TEST_CONSTANTS.AGGREGATE_ID,
-        TEST_CONSTANTS.AGGREGATE_TYPE,
+        type: EVENT_TYPES[0],
+        createdAt: sameTimestamp,
+        version: eventVersion,
+        data: {},
+        id: `${sameTimestamp}:${tenantId}:${TEST_CONSTANTS.AGGREGATE_ID}:${aggregateType}:a`,
+      });
+      const event2 = createTestEvent({
+        aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+        aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
         tenantId,
-        EVENT_TYPES[0],
-        sameTimestamp,
-        eventVersion,
-        {},
-        `${sameTimestamp}:${tenantId}:${TEST_CONSTANTS.AGGREGATE_ID}:${aggregateType}:b`,
-      );
-      const event3 = createTestEvent(
-        TEST_CONSTANTS.AGGREGATE_ID,
-        TEST_CONSTANTS.AGGREGATE_TYPE,
+        type: EVENT_TYPES[0],
+        createdAt: sameTimestamp,
+        version: eventVersion,
+        data: {},
+        id: `${sameTimestamp}:${tenantId}:${TEST_CONSTANTS.AGGREGATE_ID}:${aggregateType}:b`,
+      });
+      const event3 = createTestEvent({
+        aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+        aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
         tenantId,
-        EVENT_TYPES[0],
-        sameTimestamp,
-        eventVersion,
-        {},
-        `${sameTimestamp}:${tenantId}:${TEST_CONSTANTS.AGGREGATE_ID}:${aggregateType}:c`,
-      );
+        type: EVENT_TYPES[0],
+        createdAt: sameTimestamp,
+        version: eventVersion,
+        data: {},
+        id: `${sameTimestamp}:${tenantId}:${TEST_CONSTANTS.AGGREGATE_ID}:${aggregateType}:c`,
+      });
 
       // Store all events
       await eventStore.storeEvents(
@@ -233,13 +233,13 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
         mapProjections: [mapDef],
       });
 
-      const event1 = createTestEvent(
-        TEST_CONSTANTS.AGGREGATE_ID,
-        TEST_CONSTANTS.AGGREGATE_TYPE,
+      const event1 = createTestEvent({
+        aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+        aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
         tenantId,
-        EVENT_TYPES[0],
-        TEST_CONSTANTS.BASE_TIMESTAMP,
-      );
+        type: EVENT_TYPES[0],
+        createdAt: TEST_CONSTANTS.BASE_TIMESTAMP,
+      });
 
       // Store event1 via service (stores and processes)
       await service.storeEvents([event1], context);
@@ -248,11 +248,11 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
       await service.storeEvents([event1], context);
 
       // Verify event is only stored once in the repository
-      const allEvents = await eventStore.getEvents(
-        TEST_CONSTANTS.AGGREGATE_ID,
+      const allEvents = await eventStore.getEvents({
+        aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
         context,
         aggregateType,
-      );
+      });
       const event1Count = allEvents.filter((e) => e.id === event1.id).length;
       expect(event1Count).toBe(1);
 
@@ -273,13 +273,13 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
         mapProjections: [mapDef],
       });
 
-      const event1 = createTestEvent(
-        TEST_CONSTANTS.AGGREGATE_ID,
-        TEST_CONSTANTS.AGGREGATE_TYPE,
+      const event1 = createTestEvent({
+        aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+        aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
         tenantId,
-        EVENT_TYPES[0],
-        TEST_CONSTANTS.BASE_TIMESTAMP,
-      );
+        type: EVENT_TYPES[0],
+        createdAt: TEST_CONSTANTS.BASE_TIMESTAMP,
+      });
 
       // Store event1 directly in event store
       await eventStore.storeEvents([event1], context, aggregateType);
@@ -288,11 +288,11 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
       await service.storeEvents([event1], context);
 
       // Verify event is only stored once
-      const allEvents = await eventStore.getEvents(
-        TEST_CONSTANTS.AGGREGATE_ID,
+      const allEvents = await eventStore.getEvents({
+        aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
         context,
         aggregateType,
-      );
+      });
       const event1Count = allEvents.filter((e) => e.id === event1.id).length;
       expect(event1Count).toBe(1);
 
@@ -313,30 +313,30 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
         mapProjections: [mapDef],
       });
 
-      const event1 = createTestEvent(
-        TEST_CONSTANTS.AGGREGATE_ID,
-        TEST_CONSTANTS.AGGREGATE_TYPE,
+      const event1 = createTestEvent({
+        aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+        aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
         tenantId,
-        EVENT_TYPES[0],
-        TEST_CONSTANTS.BASE_TIMESTAMP,
-      );
-      const event2 = createTestEvent(
-        TEST_CONSTANTS.AGGREGATE_ID,
-        TEST_CONSTANTS.AGGREGATE_TYPE,
+        type: EVENT_TYPES[0],
+        createdAt: TEST_CONSTANTS.BASE_TIMESTAMP,
+      });
+      const event2 = createTestEvent({
+        aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+        aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
         tenantId,
-        EVENT_TYPES[0],
-        TEST_CONSTANTS.BASE_TIMESTAMP + 1000,
-      );
+        type: EVENT_TYPES[0],
+        createdAt: TEST_CONSTANTS.BASE_TIMESTAMP + 1000,
+      });
 
       // Store batch with duplicate event1
       await service.storeEvents([event1, event2, event1], context);
 
       // Verify each event is only stored once
-      const allEvents = await eventStore.getEvents(
-        TEST_CONSTANTS.AGGREGATE_ID,
+      const allEvents = await eventStore.getEvents({
+        aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
         context,
         aggregateType,
-      );
+      });
       expect(allEvents).toHaveLength(2);
       expect(allEvents.find((e) => e.id === event1.id)).toBeDefined();
       expect(allEvents.find((e) => e.id === event2.id)).toBeDefined();
@@ -360,13 +360,13 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
         mapProjections: [mapDef1, mapDef2],
       });
 
-      const event1 = createTestEvent(
-        TEST_CONSTANTS.AGGREGATE_ID,
-        TEST_CONSTANTS.AGGREGATE_TYPE,
+      const event1 = createTestEvent({
+        aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+        aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
         tenantId,
-        EVENT_TYPES[0],
-        TEST_CONSTANTS.BASE_TIMESTAMP,
-      );
+        type: EVENT_TYPES[0],
+        createdAt: TEST_CONSTANTS.BASE_TIMESTAMP,
+      });
 
       // Store event1 via service (both handlers should process)
       await service.storeEvents([event1], context);
@@ -375,11 +375,11 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
       await service.storeEvents([event1], context);
 
       // Verify event is only stored once in the repository
-      const allEvents = await eventStore.getEvents(
-        TEST_CONSTANTS.AGGREGATE_ID,
+      const allEvents = await eventStore.getEvents({
+        aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
         context,
         aggregateType,
-      );
+      });
       const event1Count = allEvents.filter((e) => e.id === event1.id).length;
       expect(event1Count).toBe(1);
 
@@ -408,20 +408,20 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
       const sameTimestamp = TEST_CONSTANTS.BASE_TIMESTAMP;
 
       // Create events for different aggregates (will have different IDs due to different aggregate IDs)
-      const event1_agg1 = createTestEvent(
-        aggregateId1,
-        TEST_CONSTANTS.AGGREGATE_TYPE,
+      const event1_agg1 = createTestEvent({
+        aggregateId: aggregateId1,
+        aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
         tenantId,
-        EVENT_TYPES[0],
-        sameTimestamp,
-      );
-      const event1_agg2 = createTestEvent(
-        aggregateId2,
-        TEST_CONSTANTS.AGGREGATE_TYPE,
+        type: EVENT_TYPES[0],
+        createdAt: sameTimestamp,
+      });
+      const event1_agg2 = createTestEvent({
+        aggregateId: aggregateId2,
+        aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
         tenantId,
-        EVENT_TYPES[0],
-        sameTimestamp,
-      );
+        type: EVENT_TYPES[0],
+        createdAt: sameTimestamp,
+      });
 
       // Verify they have different IDs (due to different aggregate IDs in ID generation)
       expect(event1_agg1.id).not.toBe(event1_agg2.id);
@@ -433,16 +433,16 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
       await service.storeEvents([event1_agg2], context);
 
       // Verify both events are stored (they're in different partitions)
-      const events_agg1 = await eventStore.getEvents(
-        aggregateId1,
+      const events_agg1 = await eventStore.getEvents({
+        aggregateId: aggregateId1,
         context,
         aggregateType,
-      );
-      const events_agg2 = await eventStore.getEvents(
-        aggregateId2,
+      });
+      const events_agg2 = await eventStore.getEvents({
+        aggregateId: aggregateId2,
         context,
         aggregateType,
-      );
+      });
       expect(events_agg1).toHaveLength(1);
       expect(events_agg2).toHaveLength(1);
       expect(events_agg1[0]?.id).toBe(event1_agg1.id);
@@ -466,27 +466,27 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
         mapProjections: [mapDef],
       });
 
-      const event1 = createTestEvent(
-        TEST_CONSTANTS.AGGREGATE_ID,
-        TEST_CONSTANTS.AGGREGATE_TYPE,
+      const event1 = createTestEvent({
+        aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+        aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
         tenantId,
-        EVENT_TYPES[0],
-        TEST_CONSTANTS.BASE_TIMESTAMP,
-      );
-      const event2 = createTestEvent(
-        TEST_CONSTANTS.AGGREGATE_ID,
-        TEST_CONSTANTS.AGGREGATE_TYPE,
+        type: EVENT_TYPES[0],
+        createdAt: TEST_CONSTANTS.BASE_TIMESTAMP,
+      });
+      const event2 = createTestEvent({
+        aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+        aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
         tenantId,
-        EVENT_TYPES[0],
-        TEST_CONSTANTS.BASE_TIMESTAMP + 1000,
-      );
-      const event3 = createTestEvent(
-        TEST_CONSTANTS.AGGREGATE_ID,
-        TEST_CONSTANTS.AGGREGATE_TYPE,
+        type: EVENT_TYPES[0],
+        createdAt: TEST_CONSTANTS.BASE_TIMESTAMP + 1000,
+      });
+      const event3 = createTestEvent({
+        aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+        aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
         tenantId,
-        EVENT_TYPES[0],
-        TEST_CONSTANTS.BASE_TIMESTAMP + 2000,
-      );
+        type: EVENT_TYPES[0],
+        createdAt: TEST_CONSTANTS.BASE_TIMESTAMP + 2000,
+      });
 
       // Store event1 first
       await service.storeEvents([event1], context);
@@ -496,11 +496,11 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
       await service.storeEvents([event1, event2, event3], context);
 
       // Verify all events are stored (event1 once, event2 once, event3 once)
-      const allEvents = await eventStore.getEvents(
-        TEST_CONSTANTS.AGGREGATE_ID,
+      const allEvents = await eventStore.getEvents({
+        aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
         context,
         aggregateType,
-      );
+      });
       expect(allEvents).toHaveLength(3);
       expect(allEvents.find((e) => e.id === event1.id)).toBeDefined();
       expect(allEvents.find((e) => e.id === event2.id)).toBeDefined();

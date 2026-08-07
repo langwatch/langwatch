@@ -220,7 +220,7 @@ describe("runWorkflow with a pre-1.5 published version", () => {
       json: async () => ({ result: {}, status: "success" }),
     });
 
-    await runWorkflow(workflowId, projectId, { input: "hello" });
+    await runWorkflow({ workflowId, projectId, inputs: { input: "hello" } });
 
     expect(nlpgoFetchMock).toHaveBeenCalledTimes(1);
     const dispatched = nlpgoFetchMock.mock.calls[0]![0] as {

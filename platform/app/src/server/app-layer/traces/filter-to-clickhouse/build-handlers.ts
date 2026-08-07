@@ -75,14 +75,14 @@ function crossCategoricalFacet(
   if (def.kind !== "categorical") {
     throw new Error(`facet '${key}' is not a categorical facet`);
   }
-  return crossTableCategorical(
-    def.table,
-    TABLE_TIME_COLUMNS[def.table],
-    def.expression,
+  return crossTableCategorical({
+    table: def.table,
+    timeColumn: TABLE_TIME_COLUMNS[def.table],
+    expression: def.expression,
     read,
     needs,
-    def.key,
-  );
+    name: def.key,
+  });
 }
 
 function crossRangeFacet(
@@ -94,14 +94,14 @@ function crossRangeFacet(
   if (def.kind !== "range") {
     throw new Error(`facet '${key}' is not a range facet`);
   }
-  return crossTableRange(
-    def.table,
-    TABLE_TIME_COLUMNS[def.table],
-    def.expression,
+  return crossTableRange({
+    table: def.table,
+    timeColumn: TABLE_TIME_COLUMNS[def.table],
+    expression: def.expression,
     read,
     needs,
-    def.key,
-  );
+    name: def.key,
+  });
 }
 
 // ---------------------------------------------------------------------------

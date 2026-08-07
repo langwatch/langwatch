@@ -63,12 +63,17 @@ async function insertTraceSummary(
   });
 }
 
-async function insertStoredSpan(
-  ch: ClickHouseClient,
-  traceId: string,
-  spanType: string,
-  startTimeMs: number = now,
-) {
+async function insertStoredSpan({
+  ch,
+  traceId,
+  spanType,
+  startTimeMs = now,
+}: {
+  ch: ClickHouseClient;
+  traceId: string;
+  spanType: string;
+  startTimeMs?: number;
+}) {
   await ch.insert({
     table: "stored_spans",
     values: [
@@ -152,8 +157,8 @@ describe("filter-conditions ClickHouse integration", () => {
       "langwatch.user_id": "user-3",
     });
 
-    await insertStoredSpan(ch, traceCanonical, "llm");
-    await insertStoredSpan(ch, traceLwPrefix, "tool");
+    await insertStoredSpan({ ch, traceId: traceCanonical, spanType: "llm" });
+    await insertStoredSpan({ ch, traceId: traceLwPrefix, spanType: "tool" });
   });
 
   afterAll(async () => {
@@ -253,7 +258,12 @@ describe("filter-conditions ClickHouse integration", () => {
       await insertTraceSummary(ch, oldTraceId, {
         "langwatch.user_id": "user-old",
       });
-      await insertStoredSpan(ch, oldTraceId, "llm", now - 60 * DAY);
+      await insertStoredSpan({
+        ch,
+        traceId: oldTraceId,
+        spanType: "llm",
+        startTimeMs: now - 60 * DAY,
+      });
     });
 
     it("still returns in-window matches when bounded", async () => {

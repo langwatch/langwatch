@@ -127,7 +127,7 @@ export function DatasetPreviewTable({
       expandedCells,
       editingCell,
       selectedCell,
-      setCellValue: (_datasetId, rowIndex, columnId, value) => {
+      setCellValue: ({ row: rowIndex, columnId, value }) => {
         const column = visibleColumns.find((col) => col.id === columnId);
         if (!column) return;
         let parsed: unknown = value;

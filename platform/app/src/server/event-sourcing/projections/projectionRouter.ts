@@ -147,15 +147,39 @@ export class ProjectionRouter<
     EventSubscriberDefinition<EventType>
   >();
 
-  constructor(
-    private readonly aggregateType: AggregateType,
-    private readonly pipelineName: string,
-    private readonly queueManager: QueueManager<EventType>,
-    private readonly featureFlagService?: FeatureFlagServiceInterface,
-    private readonly processRole?: ProcessRole,
-    private readonly replayMarkerChecker?: ReplayMarkerChecker,
-    private readonly retentionPolicyResolver?: RetentionPolicyResolver,
-  ) {}
+  private readonly aggregateType: AggregateType;
+  private readonly pipelineName: string;
+  private readonly queueManager: QueueManager<EventType>;
+  private readonly featureFlagService?: FeatureFlagServiceInterface;
+  private readonly processRole?: ProcessRole;
+  private readonly replayMarkerChecker?: ReplayMarkerChecker;
+  private readonly retentionPolicyResolver?: RetentionPolicyResolver;
+
+  constructor({
+    aggregateType,
+    pipelineName,
+    queueManager,
+    featureFlagService,
+    processRole,
+    replayMarkerChecker,
+    retentionPolicyResolver,
+  }: {
+    aggregateType: AggregateType;
+    pipelineName: string;
+    queueManager: QueueManager<EventType>;
+    featureFlagService?: FeatureFlagServiceInterface;
+    processRole?: ProcessRole;
+    replayMarkerChecker?: ReplayMarkerChecker;
+    retentionPolicyResolver?: RetentionPolicyResolver;
+  }) {
+    this.aggregateType = aggregateType;
+    this.pipelineName = pipelineName;
+    this.queueManager = queueManager;
+    this.featureFlagService = featureFlagService;
+    this.processRole = processRole;
+    this.replayMarkerChecker = replayMarkerChecker;
+    this.retentionPolicyResolver = retentionPolicyResolver;
+  }
 
   registerFoldProjection(
     projection: FoldProjectionDefinition<any, EventType>,
@@ -554,12 +578,12 @@ export class ProjectionRouter<
             { projectionName },
           );
         }
-        await this.processStateProjectionEvents(
+        await this.processStateProjectionEvents({
           projectionName,
           projection,
-          [event],
+          events: [event],
           context,
-        );
+        });
       },
       async (projectionName, events, context) => {
         const projection = this.stateProjections.get(projectionName);
@@ -570,12 +594,12 @@ export class ProjectionRouter<
             { projectionName },
           );
         }
-        await this.processStateProjectionEvents(
+        await this.processStateProjectionEvents({
           projectionName,
           projection,
           events,
           context,
-        );
+        });
       },
     );
   }
@@ -625,9 +649,9 @@ export class ProjectionRouter<
       };
     }
 
-    this.queueManager.initializeProjectionQueues(
-      projectionDefs,
-      async (projectionName, triggerEvent, context) => {
+    this.queueManager.initializeProjectionQueues({
+      projections: projectionDefs,
+      onEvent: async (projectionName, triggerEvent, context) => {
         const fold = this.foldProjections.get(projectionName);
         if (!fold) {
           throw new ConfigurationError(
@@ -637,19 +661,19 @@ export class ProjectionRouter<
           );
         }
 
-        await this.processFoldProjectionEvent(
+        await this.processFoldProjectionEvent({
           projectionName,
           fold,
-          triggerEvent,
-          {
+          event: triggerEvent,
+          context: {
             tenantId: triggerEvent.tenantId,
             ...(context.deliveryAttempt !== undefined
               ? { deliveryAttempt: context.deliveryAttempt }
               : {}),
           },
-        );
+        });
       },
-      async (projectionName, events, context) => {
+      onEventBatch: async (projectionName, events, context) => {
         const fold = this.foldProjections.get(projectionName);
         if (!fold) {
           throw new ConfigurationError(
@@ -659,14 +683,19 @@ export class ProjectionRouter<
           );
         }
 
-        await this.processFoldProjectionBatch(projectionName, fold, events, {
-          tenantId: events[0]!.tenantId,
-          ...(context.deliveryAttempt !== undefined
-            ? { deliveryAttempt: context.deliveryAttempt }
-            : {}),
+        await this.processFoldProjectionBatch({
+          projectionName,
+          fold,
+          events,
+          context: {
+            tenantId: events[0]!.tenantId,
+            ...(context.deliveryAttempt !== undefined
+              ? { deliveryAttempt: context.deliveryAttempt }
+              : {}),
+          },
         });
       },
-    );
+    });
   }
 
   /**
@@ -997,18 +1026,23 @@ export class ProjectionRouter<
             continue;
           }
           try {
-            await this.processFoldProjectionEvent(
+            await this.processFoldProjectionEvent({
               projectionName,
               fold,
               event,
               context,
-            );
+            });
           } catch (error) {
             const category = categorizeError(error);
-            handleError(error, category, this.logger, {
-              projectionName,
-              aggregateId: String(event.aggregateId),
-              tenantId: context.tenantId,
+            handleError({
+              error,
+              category,
+              logger: this.logger,
+              context: {
+                projectionName,
+                aggregateId: String(event.aggregateId),
+                tenantId: context.tenantId,
+              },
             });
             errors.push(toError(error));
           }
@@ -1050,12 +1084,12 @@ export class ProjectionRouter<
         }
 
         for (const event of matching) {
-          await this.processStateProjectionEvents(
-            name,
+          await this.processStateProjectionEvents({
+            projectionName: name,
             projection,
-            [event],
+            events: [event],
             context,
-          );
+          });
         }
       } catch (error) {
         this.logger.error(
@@ -1207,11 +1241,16 @@ export class ProjectionRouter<
               });
             }
           } catch (error) {
-            handleError(error, categorizeError(error), this.logger, {
-              handlerName: name,
-              eventType: event.type,
-              aggregateId: String(event.aggregateId),
-              tenantId: event.tenantId,
+            handleError({
+              error,
+              category: categorizeError(error),
+              logger: this.logger,
+              context: {
+                handlerName: name,
+                eventType: event.type,
+                aggregateId: String(event.aggregateId),
+                tenantId: event.tenantId,
+              },
             });
             errors.push(toError(error));
           }
@@ -1444,12 +1483,17 @@ export class ProjectionRouter<
     );
   }
 
-  private async processStateProjectionEvents(
-    projectionName: string,
-    projection: StateProjectionDefinition<any, EventType>,
-    events: EventType[],
-    context: EventStoreReadContext<EventType>,
-  ): Promise<void> {
+  private async processStateProjectionEvents({
+    projectionName,
+    projection,
+    events,
+    context,
+  }: {
+    projectionName: string;
+    projection: StateProjectionDefinition<any, EventType>;
+    events: EventType[];
+    context: EventStoreReadContext<EventType>;
+  }): Promise<void> {
     if (events.length === 0) return;
     const first = events[0]!;
 
@@ -1577,12 +1621,17 @@ export class ProjectionRouter<
    * Processes a single event for a fold projection (incremental).
    * The fold state in the store serves as the checkpoint — no separate checkpoint tracking needed.
    */
-  private async processFoldProjectionEvent(
-    projectionName: string,
-    fold: FoldProjectionDefinition<any, EventType>,
-    event: EventType,
-    context: EventStoreReadContext<EventType>,
-  ): Promise<void> {
+  private async processFoldProjectionEvent({
+    projectionName,
+    fold,
+    event,
+    context,
+  }: {
+    projectionName: string;
+    fold: FoldProjectionDefinition<any, EventType>;
+    event: EventType;
+    context: EventStoreReadContext<EventType>;
+  }): Promise<void> {
     await this.tracer.withActiveSpan(
       "ProjectionRouter.processFoldProjectionEvent",
       {
@@ -1750,12 +1799,17 @@ export class ProjectionRouter<
    * Reactors fire once with the final folded state (using the last event), which
    * is the correct coalesced behavior for the trace's debounced reactors.
    */
-  private async processFoldProjectionBatch(
-    projectionName: string,
-    fold: FoldProjectionDefinition<any, EventType>,
-    events: EventType[],
-    context: EventStoreReadContext<EventType>,
-  ): Promise<void> {
+  private async processFoldProjectionBatch({
+    projectionName,
+    fold,
+    events,
+    context,
+  }: {
+    projectionName: string;
+    fold: FoldProjectionDefinition<any, EventType>;
+    events: EventType[];
+    context: EventStoreReadContext<EventType>;
+  }): Promise<void> {
     if (events.length === 0) return;
 
     await this.tracer.withActiveSpan(
@@ -2176,12 +2230,17 @@ export class ProjectionRouter<
    */
   async getProjectionByName<
     ProjectionName extends keyof ProjectionTypes & string,
-  >(
-    projectionName: ProjectionName,
-    aggregateId: string,
-    context: EventStoreReadContext<EventType>,
-    options?: { key?: string },
-  ): Promise<ProjectionTypes[ProjectionName] | null> {
+  >({
+    projectionName,
+    aggregateId,
+    context,
+    options,
+  }: {
+    projectionName: ProjectionName;
+    aggregateId: string;
+    context: EventStoreReadContext<EventType>;
+    options?: { key?: string };
+  }): Promise<ProjectionTypes[ProjectionName] | null> {
     EventUtils.validateTenantId(context, "getProjectionByName");
 
     const fold = this.foldProjections.get(projectionName);
@@ -2217,18 +2276,23 @@ export class ProjectionRouter<
    */
   async hasProjectionByName<
     ProjectionName extends keyof ProjectionTypes & string,
-  >(
-    projectionName: ProjectionName,
-    aggregateId: string,
-    context: EventStoreReadContext<EventType>,
-    options?: { key?: string },
-  ): Promise<boolean> {
-    const projection = await this.getProjectionByName(
+  >({
+    projectionName,
+    aggregateId,
+    context,
+    options,
+  }: {
+    projectionName: ProjectionName;
+    aggregateId: string;
+    context: EventStoreReadContext<EventType>;
+    options?: { key?: string };
+  }): Promise<boolean> {
+    const projection = await this.getProjectionByName({
       projectionName,
       aggregateId,
       context,
       options,
-    );
+    });
     return projection !== null;
   }
 

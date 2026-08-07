@@ -459,24 +459,34 @@ export class OtlpSpanPiiRedactionService {
    * batch for those. Without a tenant (or with the kill switch set) the
    * analysis-service batch path runs unchanged.
    */
-  async redactSpan(
-    span: OtlpSpan,
-    resource: OtlpResource | null,
-    piiRedactionLevel: PIIRedactionLevel,
-    tenantId?: TenantId,
-  ): Promise<void> {
+  async redactSpan({
+    span,
+    resource,
+    piiRedactionLevel,
+    tenantId,
+  }: {
+    span: OtlpSpan;
+    resource: OtlpResource | null;
+    piiRedactionLevel: PIIRedactionLevel;
+    tenantId?: TenantId;
+  }): Promise<void> {
     const native = await this.resolveNativeContext(tenantId, piiRedactionLevel);
     if (!native) {
-      await this.lambdaRedactSpan(span, resource, piiRedactionLevel);
+      await this.lambdaRedactSpan({ span, resource, piiRedactionLevel });
       return;
     }
     this.applyNativeSpanPass(span, resource, native.policy);
     const lambda = this.lambdaAfterNative(native.policy);
     if (lambda) {
       try {
-        const ran = await this.lambdaRedactSpan(span, resource, "STRICT", {
-          entities: lambda.entities,
-          exceptPatterns: lambda.exceptPatterns,
+        const ran = await this.lambdaRedactSpan({
+          span,
+          resource,
+          piiRedactionLevel: "STRICT",
+          lambda: {
+            entities: lambda.entities,
+            exceptPatterns: lambda.exceptPatterns,
+          },
         });
         // Mark the span only when strict could not run because the analysis
         // service is genuinely unavailable (not configured in dev): the native
@@ -525,15 +535,20 @@ export class OtlpSpanPiiRedactionService {
    * then sends them in a single batch to the PII detection service. Used for the
    * strict level and the legacy (no-policy) fallback. Mutates in place.
    */
-  private async lambdaRedactSpan(
-    span: OtlpSpan,
-    resource: OtlpResource | null,
-    piiRedactionLevel: PIIRedactionLevel,
+  private async lambdaRedactSpan({
+    span,
+    resource,
+    piiRedactionLevel,
+    lambda,
+  }: {
+    span: OtlpSpan;
+    resource: OtlpResource | null;
+    piiRedactionLevel: PIIRedactionLevel;
     lambda?: {
       entities?: readonly string[];
       exceptPatterns?: readonly string[];
-    },
-  ): Promise<boolean> {
+    };
+  }): Promise<boolean> {
     const options = await this.buildOptions(
       piiRedactionLevel,
       lambda?.entities,

@@ -68,12 +68,17 @@ export type EvaluationResultWithThreadId = SingleEvaluationResult & {
   inputs?: Record<string, any>;
 };
 
-const buildThreadData = async (
-  projectId: string,
-  trace: Trace,
-  mappingState: MappingState | null,
-  protections: Protections,
-): Promise<Record<string, any>> => {
+const buildThreadData = async ({
+  projectId,
+  trace,
+  mappingState,
+  protections,
+}: {
+  projectId: string;
+  trace: Trace;
+  mappingState: MappingState | null;
+  protections: Protections;
+}): Promise<Record<string, any>> => {
   if (!mappingState) {
     throw new Error("Mapping state is required for thread-based evaluation");
   }
@@ -90,12 +95,12 @@ const buildThreadData = async (
     undefined,
     buildTraceBlobResolutionDeps(),
   );
-  const threadTraces = await traceService.getTracesByThreadId(
+  const threadTraces = await traceService.getTracesByThreadId({
     projectId,
     threadId,
     protections,
-    { full: true },
-  );
+    opts: { full: true },
+  });
 
   const result: Record<string, any> = {};
 
@@ -148,13 +153,11 @@ const buildThreadData = async (
           key: mappingConfig.key,
           subkey: mappingConfig.subkey,
         };
-        const mapped = mapTraceToDatasetEntry(
+        const mapped = mapTraceToDatasetEntry({
           trace,
-          { [targetField]: traceMappingConfig as any },
-          new Set(),
-          undefined,
-          undefined,
-        )[0];
+          mapping: { [targetField]: traceMappingConfig as any },
+          expansions: new Set(),
+        })[0];
         result[targetField] = mapped?.[targetField];
       }
     }
@@ -173,9 +176,9 @@ const switchMapping = (
       ? mapping_
       : migrateLegacyMappings(mapping_ as any);
 
-  return mapTraceToDatasetEntry(
+  return mapTraceToDatasetEntry({
     trace,
-    mapping.mapping as Record<
+    mapping: mapping.mapping as Record<
       string,
       {
         source: keyof typeof TRACE_MAPPINGS | "";
@@ -183,24 +186,34 @@ const switchMapping = (
         subkey?: string;
       }
     >,
-    new Set(),
-    undefined,
-    undefined,
-  )[0];
+    expansions: new Set(),
+  })[0];
 };
 
-const buildDataForEvaluation = async (
-  evaluatorType: EvaluatorTypes | "workflow",
-  trace: Trace,
-  mappings: MappingState | null,
-  isThreadLevel: boolean,
-  projectId: string,
-  protections: Protections,
-): Promise<DataForEvaluation> => {
+const buildDataForEvaluation = async ({
+  evaluatorType,
+  trace,
+  mappings,
+  isThreadLevel,
+  projectId,
+  protections,
+}: {
+  evaluatorType: EvaluatorTypes | "workflow";
+  trace: Trace;
+  mappings: MappingState | null;
+  isThreadLevel: boolean;
+  projectId: string;
+  protections: Protections;
+}): Promise<DataForEvaluation> => {
   let data: Record<string, any>;
 
   if (isThreadLevel) {
-    data = await buildThreadData(projectId, trace, mappings, protections);
+    data = await buildThreadData({
+      projectId,
+      trace,
+      mappingState: mappings,
+      protections,
+    });
   } else {
     const mappedData = switchMapping(trace, mappings ?? DEFAULT_MAPPINGS);
     if (!mappedData) {
@@ -234,8 +247,11 @@ const buildDataForEvaluation = async (
         trace,
         mappings,
         getThreadTraces: (threadId) =>
-          traceService.getTracesByThreadId(projectId, threadId, protections, {
-            full: true,
+          traceService.getTracesByThreadId({
+            projectId,
+            threadId,
+            protections,
+            opts: { full: true },
           }),
       });
     }
@@ -279,8 +295,11 @@ export const runEvaluationForTrace = async ({
     undefined,
     buildTraceBlobResolutionDeps(),
   );
-  const trace = await traceService.getById(projectId, traceId, protections, {
-    full: true,
+  const trace = await traceService.getById({
+    projectId,
+    traceId,
+    protections,
+    opts: { full: true },
   });
   if (!trace) {
     throw new Error("trace not found");
@@ -317,14 +336,14 @@ export const runEvaluationForTrace = async ({
     trace.evaluations = evaluationsByTrace[traceId] ?? [];
   }
 
-  const data = await buildDataForEvaluation(
+  const data = await buildDataForEvaluation({
     evaluatorType,
     trace,
     mappings,
     isThreadLevel,
     projectId,
     protections,
-  );
+  });
 
   const result = await runEvaluation({
     projectId,
@@ -382,14 +401,14 @@ export const runEvaluation = async ({
         parentTrace: extractParentTraceForNlpgo(trace),
       });
     }
-    return customEvaluation(
+    return customEvaluation({
       projectId,
       evaluatorType,
-      data.data,
+      data: data.data,
       trace,
       workflowId,
       parentCausalityDepth,
-    );
+    });
   }
 
   const builtInEvaluatorType = (
@@ -447,12 +466,12 @@ export const runEvaluation = async ({
     builtInEvaluatorType !== "openai/moderation"
   ) {
     try {
-      const modelEnv = await setupModelEnv(
-        settings.model,
-        false,
+      const modelEnv = await setupModelEnv({
+        model: settings.model,
+        embeddings: false,
         projectId,
         settings,
-      );
+      });
       evaluatorEnv = { ...evaluatorEnv, ...modelEnv };
     } catch (error) {
       if (error instanceof EvaluatorConfigError) {
@@ -475,12 +494,12 @@ export const runEvaluation = async ({
     typeof settings.embeddings_model === "string"
   ) {
     try {
-      const embeddingsEnv = await setupModelEnv(
-        settings.embeddings_model,
-        true,
+      const embeddingsEnv = await setupModelEnv({
+        model: settings.embeddings_model,
+        embeddings: true,
         projectId,
         settings,
-      );
+      });
       evaluatorEnv = { ...evaluatorEnv, ...embeddingsEnv };
     } catch (error) {
       if (error instanceof EvaluatorConfigError) {
@@ -616,14 +635,21 @@ export const runEvaluation = async ({
   });
 };
 
-const customEvaluation = async (
-  projectId: string,
-  evaluatorType: EvaluatorTypes | "workflow",
-  data: Record<string, any>,
-  trace?: Trace,
-  workflowId?: string | null,
-  parentCausalityDepth?: number,
-): Promise<SingleEvaluationResult> => {
+const customEvaluation = async ({
+  projectId,
+  evaluatorType,
+  data,
+  trace,
+  workflowId,
+  parentCausalityDepth,
+}: {
+  projectId: string;
+  evaluatorType: EvaluatorTypes | "workflow";
+  data: Record<string, any>;
+  trace?: Trace;
+  workflowId?: string | null;
+  parentCausalityDepth?: number;
+}): Promise<SingleEvaluationResult> => {
   const resolvedWorkflowId = workflowId ?? evaluatorType.split("/")[1];
 
   const requestBody: Record<string, any> = {
@@ -638,14 +664,13 @@ const customEvaluation = async (
 
   const parentTrace = extractParentTraceForNlpgo(trace);
 
-  const response = await runEvaluationWorkflow(
-    resolvedWorkflowId,
+  const response = await runEvaluationWorkflow({
+    workflowId: resolvedWorkflowId,
     projectId,
-    requestBody,
-    undefined,
-    parentCausalityDepth,
+    inputs: requestBody,
     parentTrace,
-  );
+    causalityDepth: parentCausalityDepth,
+  });
 
   const { result, status } = response;
 

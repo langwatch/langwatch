@@ -85,11 +85,11 @@ export const ModelSelectFieldMini = React.memo(function ModelSelectFieldMini({
   // form value lives in form state; reading it here for the empty-state
   // check is cheap and the picker re-renders on form changes anyway.
   const watchedLlm = useWatch({ control, name: "version.configData.llm" });
-  const { isEmpty, isLoading } = useModelSelectionOptions(
-    allModelOptions,
-    watchedLlm?.model ?? "",
-    "chat",
-  );
+  const { isEmpty, isLoading } = useModelSelectionOptions({
+    options: allModelOptions,
+    model: watchedLlm?.model ?? "",
+    mode: "chat",
+  });
 
   if (isLoading) {
     // While the providers query is in flight, render a chip-shaped

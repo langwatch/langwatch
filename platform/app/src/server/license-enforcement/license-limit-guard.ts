@@ -39,12 +39,17 @@ export interface MemberTypeLimits {
  *
  * @throws LimitExceededError if the limit would be exceeded
  */
-export async function assertMemberTypeLimitNotExceeded(
-  changeType: RoleChangeType,
-  organizationId: string,
-  licenseRepo: ILicenseEnforcementRepository,
-  limits: MemberTypeLimits,
-): Promise<void> {
+export async function assertMemberTypeLimitNotExceeded({
+  changeType,
+  organizationId,
+  licenseRepo,
+  limits,
+}: {
+  changeType: RoleChangeType;
+  organizationId: string;
+  licenseRepo: ILicenseEnforcementRepository;
+  limits: MemberTypeLimits;
+}): Promise<void> {
   // No limit check needed if type unchanged or limits overridden
   if (changeType === "no-change" || limits.overrideAddingLimitations) {
     return;

@@ -46,12 +46,22 @@ export class ModelNotConfiguredError extends HandledError {
    */
   public readonly cause = MODEL_NOT_CONFIGURED_CAUSE;
 
-  constructor(
-    public readonly featureKey: string,
-    public readonly role: ModelRole,
-    public readonly featureDisplayName: string,
-    public readonly projectId: string,
-  ) {
+  public readonly featureKey: string;
+  public readonly role: ModelRole;
+  public readonly featureDisplayName: string;
+  public readonly projectId: string;
+
+  constructor({
+    featureKey,
+    role,
+    featureDisplayName,
+    projectId,
+  }: {
+    featureKey: string;
+    role: ModelRole;
+    featureDisplayName: string;
+    projectId: string;
+  }) {
     super(
       "model_not_configured",
       `No model configured for "${featureKey}" (role: ${role}, project: ${projectId}).`,
@@ -61,5 +71,9 @@ export class ModelNotConfiguredError extends HandledError {
       },
     );
     this.name = "ModelNotConfiguredError";
+    this.featureKey = featureKey;
+    this.role = role;
+    this.featureDisplayName = featureDisplayName;
+    this.projectId = projectId;
   }
 }

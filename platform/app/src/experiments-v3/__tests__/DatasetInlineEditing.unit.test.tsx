@@ -26,12 +26,17 @@ const Wrapper = ({ children }: { children: React.ReactNode }) => (
 );
 
 // Helper to render with store reset and Chakra provider
-const renderCell = (
-  value: string,
-  row: number,
-  columnId: string,
-  datasetId: string = DEFAULT_TEST_DATA_ID,
-) => {
+const renderCell = ({
+  value,
+  row,
+  columnId,
+  datasetId = DEFAULT_TEST_DATA_ID,
+}: {
+  value: string;
+  row: number;
+  columnId: string;
+  datasetId?: string;
+}) => {
   return render(
     <EditableCell
       value={value}
@@ -75,7 +80,7 @@ describe("Dataset inline editing", () => {
 
   describe("Edit a cell by setting editingCell in store", () => {
     it("enters edit mode and shows textarea", async () => {
-      renderCell("original", 0, "input");
+      renderCell({ value: "original", row: 0, columnId: "input" });
 
       // Set editing cell directly (in real app, this is done by DatasetCellTd on double-click)
       useEvaluationsV3Store
@@ -96,7 +101,7 @@ describe("Dataset inline editing", () => {
       // Get the initial store value before any edits
       const initialValue = getActiveDatasetRecords()?.input?.[0];
 
-      renderCell("original", 0, "input");
+      renderCell({ value: "original", row: 0, columnId: "input" });
 
       // Enter edit mode
       useEvaluationsV3Store
@@ -120,7 +125,7 @@ describe("Dataset inline editing", () => {
   describe("Confirm cell edit with Enter", () => {
     it("saves value on Enter", async () => {
       const user = userEvent.setup();
-      renderCell("", 0, "input");
+      renderCell({ value: "", row: 0, columnId: "input" });
 
       // Enter edit mode
       useEvaluationsV3Store
@@ -145,7 +150,7 @@ describe("Dataset inline editing", () => {
   describe("Commit cell edit by clicking outside", () => {
     it("saves the value on blur instead of discarding it", async () => {
       const user = userEvent.setup();
-      renderCell("", 0, "input");
+      renderCell({ value: "", row: 0, columnId: "input" });
 
       useEvaluationsV3Store
         .getState()
@@ -168,7 +173,7 @@ describe("Dataset inline editing", () => {
       const user = userEvent.setup();
       const initialValue = getActiveDatasetRecords()?.input?.[0];
 
-      renderCell("original", 0, "input");
+      renderCell({ value: "original", row: 0, columnId: "input" });
 
       useEvaluationsV3Store
         .getState()
@@ -194,7 +199,7 @@ describe("Dataset inline editing", () => {
 
   describe("Cell editor positioning", () => {
     it("shows editor with help text", async () => {
-      renderCell("original", 0, "input");
+      renderCell({ value: "original", row: 0, columnId: "input" });
 
       // Enter edit mode
       useEvaluationsV3Store
@@ -214,7 +219,7 @@ describe("Dataset inline editing", () => {
       // Get the initial store value before any edits
       const initialValue = getActiveDatasetRecords()?.input?.[0];
 
-      renderCell("", 0, "input");
+      renderCell({ value: "", row: 0, columnId: "input" });
 
       // Make an edit
       useEvaluationsV3Store
@@ -251,7 +256,7 @@ describe("Dataset inline editing", () => {
       // Get the initial store value before any edits
       const initialValue = getActiveDatasetRecords()?.input?.[0];
 
-      renderCell("", 0, "input");
+      renderCell({ value: "", row: 0, columnId: "input" });
 
       // Make an edit
       useEvaluationsV3Store

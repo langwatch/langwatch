@@ -229,13 +229,12 @@ describe("ClickHouseTraceService — eventref resolution seam (ADR-022)", () => 
           );
 
           // Per-call gate (#4888): resolution fires only when resolveBlobs:true.
-          const traces = await service.getTracesWithSpans(
-            "proj-1",
-            ["trace-1"],
+          const traces = await service.getTracesWithSpans({
+            projectId: "proj-1",
+            traceIds: ["trace-1"],
             protections,
-            undefined,
-            { resolveBlobs: true },
-          );
+            opts: { resolveBlobs: true },
+          });
 
           const span = traces![0]!.spans[0];
           // The span's params should not contain any eventref key

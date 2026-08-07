@@ -184,12 +184,17 @@ const registered = new Map<string, RegisteredEntry>();
  * stable editors). Callers with dynamic shadow URIs (e.g. the Liquid
  * substitution shadow) pass a basename pattern like `["**\/<basename>"]`.
  */
-export function registerJsonSchema(
-  monaco: Monaco,
-  modelUri: string,
-  schema: object,
-  fileMatch: string[] = [modelUri],
-): void {
+export function registerJsonSchema({
+  monaco,
+  modelUri,
+  schema,
+  fileMatch = [modelUri],
+}: {
+  monaco: Monaco;
+  modelUri: string;
+  schema: object;
+  fileMatch?: string[];
+}): void {
   registered.set(modelUri, { schema, fileMatch });
   monaco.languages.json.jsonDefaults.setDiagnosticsOptions({
     validate: true,

@@ -162,32 +162,32 @@ describe("TraceService.getTracesWithSpans() — ADR-022 blob resolution pipeline
       });
 
       it("returns the trace from ClickHouseTraceService", async () => {
-        const traces = await service.getTracesWithSpans(
-          "proj-1",
-          ["trace-1"],
+        const traces = await service.getTracesWithSpans({
+          projectId: "proj-1",
+          traceIds: ["trace-1"],
           protections,
-        );
+        });
 
         expect(traces).toHaveLength(1);
         expect(traces[0]!.trace_id).toBe("trace-1");
       });
 
       it("delegates trace fetching to ClickHouseTraceService", async () => {
-        const traces = await service.getTracesWithSpans(
-          "proj-1",
-          ["trace-1"],
+        const traces = await service.getTracesWithSpans({
+          projectId: "proj-1",
+          traceIds: ["trace-1"],
           protections,
-        );
+        });
 
         // #4888: TraceService forwards the per-call blob-resolution gate to CH.
         // No `full` was passed, so resolveBlobs is undefined (preview).
-        expect(mockGetTracesWithSpansCH).toHaveBeenCalledWith(
-          "proj-1",
-          ["trace-1"],
+        expect(mockGetTracesWithSpansCH).toHaveBeenCalledWith({
+          projectId: "proj-1",
+          traceIds: ["trace-1"],
           protections,
-          undefined,
-          { resolveBlobs: undefined },
-        );
+          occurredAt: undefined,
+          opts: { resolveBlobs: undefined },
+        });
         expect(traces[0]!.trace_id).toBe("trace-1");
       });
 
@@ -206,11 +206,11 @@ describe("TraceService.getTracesWithSpans() — ADR-022 blob resolution pipeline
       it("returns an empty array without errors", async () => {
         mockGetTracesWithSpansCH.mockResolvedValue([]);
 
-        const traces = await service.getTracesWithSpans(
-          "proj-1",
-          [],
+        const traces = await service.getTracesWithSpans({
+          projectId: "proj-1",
+          traceIds: [],
           protections,
-        );
+        });
 
         expect(traces).toEqual([]);
       });

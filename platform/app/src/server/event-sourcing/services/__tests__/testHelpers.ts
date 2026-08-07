@@ -60,13 +60,23 @@ export function createMockEventStore<T extends Event>(): EventStore<T> {
     getEventsUpTo: vi
       .fn()
       .mockImplementation(
-        async (aggregateId, context, aggregateType, upToEvent) => {
+        async ({
+          aggregateId,
+          context,
+          aggregateType,
+          upToEvent,
+        }: {
+          aggregateId: string;
+          context: EventStoreReadContext<T>;
+          aggregateType: AggregateType;
+          upToEvent: T;
+        }) => {
           // Default implementation: get all events and filter
-          const allEvents = await mockStore.getEvents(
+          const allEvents = await mockStore.getEvents({
             aggregateId,
             context,
             aggregateType,
-          );
+          });
           const upToIndex = allEvents.findIndex(
             (e: T) => e.id === upToEvent.id,
           );
@@ -186,16 +196,25 @@ let testEventIdCounter = 0;
  * Creates a test event with predictable values.
  * IDs are auto-generated to be unique even for events with the same timestamp.
  */
-export function createTestEvent(
-  aggregateId: string,
-  aggregateType: AggregateType,
-  tenantId: TenantId,
-  type: EventType = EVENT_TYPES[0],
+export function createTestEvent({
+  aggregateId,
+  aggregateType,
+  tenantId,
+  type = EVENT_TYPES[0],
   createdAt = 1000000,
   version = "2025-12-17",
-  data: unknown = {},
-  id?: string,
-): Event {
+  data = {},
+  id,
+}: {
+  aggregateId: string;
+  aggregateType: AggregateType;
+  tenantId: TenantId;
+  type?: EventType;
+  createdAt?: number;
+  version?: string;
+  data?: unknown;
+  id?: string;
+}): Event {
   const uniqueId =
     id ??
     `${createdAt}:${tenantId}:${aggregateId}:${aggregateType}:${testEventIdCounter++}`;
@@ -215,13 +234,19 @@ export function createTestEvent(
 /**
  * Creates a test projection with predictable values.
  */
-export function createTestProjection<Data = unknown>(
-  aggregateId: string,
-  tenantId: TenantId,
-  data: Data = {} as Data,
+export function createTestProjection<Data = unknown>({
+  aggregateId,
+  tenantId,
+  data = {} as Data,
   version = "2025-12-17",
-  id?: string,
-): Projection<Data> {
+  id,
+}: {
+  aggregateId: string;
+  tenantId: TenantId;
+  data?: Data;
+  version?: string;
+  id?: string;
+}): Projection<Data> {
   return {
     id: id ?? `projection-${aggregateId}`,
     aggregateId,

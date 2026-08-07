@@ -58,7 +58,11 @@ describe("useModelSelectionOptions()", () => {
     describe("when the caller passes no featureKey", () => {
       it("excludes codex models from the options", () => {
         const { result } = renderHook(() =>
-          useModelSelectionOptions(OPTIONS, "openai/gpt-5-mini", "chat"),
+          useModelSelectionOptions({
+            options: OPTIONS,
+            model: "openai/gpt-5-mini",
+            mode: "chat",
+          }),
         );
 
         const values = result.current.selectOptions.map((o) => o.value);
@@ -70,12 +74,12 @@ describe("useModelSelectionOptions()", () => {
     describe("when the caller declares the langy.chat featureKey", () => {
       it("includes codex models alongside the unrestricted ones", () => {
         const { result } = renderHook(() =>
-          useModelSelectionOptions(
-            OPTIONS,
-            "openai_codex/gpt-5.6-terra",
-            "chat",
-            { featureKey: "langy.chat" },
-          ),
+          useModelSelectionOptions({
+            options: OPTIONS,
+            model: "openai_codex/gpt-5.6-terra",
+            mode: "chat",
+            featureKey: "langy.chat",
+          }),
         );
 
         const values = result.current.selectOptions.map((o) => o.value);
@@ -87,7 +91,10 @@ describe("useModelSelectionOptions()", () => {
     describe("when the caller declares a featureKey codex is not licensed for", () => {
       it("excludes codex models from the options", () => {
         const { result } = renderHook(() =>
-          useModelSelectionOptions(OPTIONS, "openai/gpt-5-mini", "chat", {
+          useModelSelectionOptions({
+            options: OPTIONS,
+            model: "openai/gpt-5-mini",
+            mode: "chat",
             featureKey: "prompt.create_default",
           }),
         );

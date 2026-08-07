@@ -581,13 +581,19 @@ function renderUnicodeFlame(spans: SpanTreeNode[], width: number): string[] {
   return lines;
 }
 
-export function buildTraceMarkdown(
-  trace: TraceHeader,
-  spans: SpanTreeNode[],
-  opts: MarkdownConfig,
-  fullSpans?: FullSpan[],
-  events: DerivedTraceEvent[] = [],
-): string {
+export function buildTraceMarkdown({
+  trace,
+  spans,
+  opts,
+  fullSpans,
+  events = [],
+}: {
+  trace: TraceHeader;
+  spans: SpanTreeNode[];
+  opts: MarkdownConfig;
+  fullSpans?: FullSpan[];
+  events?: DerivedTraceEvent[];
+}): string {
   const lines: string[] = [];
 
   // Header — real markdown so the rendered view has hierarchy: an h1

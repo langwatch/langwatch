@@ -121,7 +121,12 @@ describe("OtlpSpanPiiRedactionService scoped-policy native redaction", () => {
       const key = "sk-proj-aB3dEf_gHi-jKlMnOpQrStUvWx0123456789xYaB-cD_eF";
       const span = spanWith({ input: `my key is ${key} thanks` });
 
-      await service.redactSpan(span, null, "ESSENTIAL", TENANT);
+      await service.redactSpan({
+        span,
+        resource: null,
+        piiRedactionLevel: "ESSENTIAL",
+        tenantId: TENANT,
+      });
 
       expect(attr(span, "input")).not.toContain(key);
       expect(attr(span, "input")).not.toContain("sk-proj-");
@@ -136,7 +141,12 @@ describe("OtlpSpanPiiRedactionService scoped-policy native redaction", () => {
         input: "db is postgres://app:s3cr3tpw@db.acme.internal:5432/main",
       });
 
-      await service.redactSpan(span, null, "ESSENTIAL", TENANT);
+      await service.redactSpan({
+        span,
+        resource: null,
+        piiRedactionLevel: "ESSENTIAL",
+        tenantId: TENANT,
+      });
 
       const value = attr(span, "input")!;
       expect(value).not.toContain("s3cr3tpw");
@@ -150,7 +160,12 @@ describe("OtlpSpanPiiRedactionService scoped-policy native redaction", () => {
       const { service, batchSpy } = makeService(mkPolicy({}));
       const span = spanWith({ authorization: "Bearer abc123def456ghi789" });
 
-      await service.redactSpan(span, null, "ESSENTIAL", TENANT);
+      await service.redactSpan({
+        span,
+        resource: null,
+        piiRedactionLevel: "ESSENTIAL",
+        tenantId: TENANT,
+      });
 
       expect(attr(span, "authorization")).toBe("[SECRET]");
       expect(batchSpy).not.toHaveBeenCalled();
@@ -162,7 +177,12 @@ describe("OtlpSpanPiiRedactionService scoped-policy native redaction", () => {
       const text = "The quick brown fox jumps over the lazy dog.";
       const span = spanWith({ input: text });
 
-      await service.redactSpan(span, null, "ESSENTIAL", TENANT);
+      await service.redactSpan({
+        span,
+        resource: null,
+        piiRedactionLevel: "ESSENTIAL",
+        tenantId: TENANT,
+      });
 
       expect(attr(span, "input")).toBe(text);
       expect(batchSpy).not.toHaveBeenCalled();
@@ -176,7 +196,12 @@ describe("OtlpSpanPiiRedactionService scoped-policy native redaction", () => {
       const { service, batchSpy } = makeService(policy);
       const span = spanWith({ input: "token acme_live_abcd1234 end" });
 
-      await service.redactSpan(span, null, "ESSENTIAL", TENANT);
+      await service.redactSpan({
+        span,
+        resource: null,
+        piiRedactionLevel: "ESSENTIAL",
+        tenantId: TENANT,
+      });
 
       expect(attr(span, "input")).toBe("token [SECRET] end");
       expect(batchSpy).not.toHaveBeenCalled();
@@ -191,7 +216,12 @@ describe("OtlpSpanPiiRedactionService scoped-policy native redaction", () => {
       const key = "sk-" + "B".repeat(40);
       const span = spanWith({ input: `key ${key}` });
 
-      await service.redactSpan(span, null, "ESSENTIAL", TENANT);
+      await service.redactSpan({
+        span,
+        resource: null,
+        piiRedactionLevel: "ESSENTIAL",
+        tenantId: TENANT,
+      });
 
       expect(attr(span, "input")).toContain(key);
       expect(batchSpy).not.toHaveBeenCalled();
@@ -206,7 +236,12 @@ describe("OtlpSpanPiiRedactionService scoped-policy native redaction", () => {
         input: "reach me at jane@example.com or +14155552671 anytime",
       });
 
-      await service.redactSpan(span, null, "ESSENTIAL", TENANT);
+      await service.redactSpan({
+        span,
+        resource: null,
+        piiRedactionLevel: "ESSENTIAL",
+        tenantId: TENANT,
+      });
 
       const value = attr(span, "input")!;
       expect(value).not.toContain("jane@example.com");
@@ -221,7 +256,12 @@ describe("OtlpSpanPiiRedactionService scoped-policy native redaction", () => {
       const { service, batchSpy } = makeService(mkPolicy({}));
       const span = spanWith({ input: "My name is Alexander Hamilton." });
 
-      await service.redactSpan(span, null, "ESSENTIAL", TENANT);
+      await service.redactSpan({
+        span,
+        resource: null,
+        piiRedactionLevel: "ESSENTIAL",
+        tenantId: TENANT,
+      });
 
       expect(attr(span, "input")).toContain("Alexander Hamilton");
       expect(batchSpy).not.toHaveBeenCalled();
@@ -234,7 +274,12 @@ describe("OtlpSpanPiiRedactionService scoped-policy native redaction", () => {
         input: "card 4242424242424242 order 1234567890123456",
       });
 
-      await service.redactSpan(span, null, "ESSENTIAL", TENANT);
+      await service.redactSpan({
+        span,
+        resource: null,
+        piiRedactionLevel: "ESSENTIAL",
+        tenantId: TENANT,
+      });
 
       const value = attr(span, "input")!;
       expect(value).not.toContain("4242424242424242");
@@ -251,7 +296,12 @@ describe("OtlpSpanPiiRedactionService scoped-policy native redaction", () => {
       );
       const span = spanWith({ input: "My name is Alexander Hamilton." });
 
-      await service.redactSpan(span, null, "ESSENTIAL", TENANT);
+      await service.redactSpan({
+        span,
+        resource: null,
+        piiRedactionLevel: "ESSENTIAL",
+        tenantId: TENANT,
+      });
 
       expect(batchSpy).toHaveBeenCalledTimes(1);
       expect(attr(span, "input")).toBe("[REDACTED]");
@@ -276,7 +326,12 @@ describe("OtlpSpanPiiRedactionService scoped-policy native redaction", () => {
           "email jane@example.com card 4242424242424242 name Alexander Hamilton",
       });
 
-      await service.redactSpan(span, null, "ESSENTIAL", TENANT);
+      await service.redactSpan({
+        span,
+        resource: null,
+        piiRedactionLevel: "ESSENTIAL",
+        tenantId: TENANT,
+      });
 
       const value = attr(span, "input")!;
       expect(value).not.toContain("jane@example.com");
@@ -296,7 +351,12 @@ describe("OtlpSpanPiiRedactionService scoped-policy native redaction", () => {
       );
       const span = spanWith({ input: "contact jane@example.com please" });
 
-      await service.redactSpan(span, null, "ESSENTIAL", TENANT);
+      await service.redactSpan({
+        span,
+        resource: null,
+        piiRedactionLevel: "ESSENTIAL",
+        tenantId: TENANT,
+      });
 
       expect(attr(span, "input")).toContain("jane@example.com");
       expect(batchSpy).not.toHaveBeenCalled();
@@ -309,7 +369,12 @@ describe("OtlpSpanPiiRedactionService scoped-policy native redaction", () => {
       const { service, batchSpy } = makeService(mkPolicy({}));
       const span = spanWith({ input: "cpf 529.982.247-25 done" });
 
-      await service.redactSpan(span, null, "ESSENTIAL", TENANT);
+      await service.redactSpan({
+        span,
+        resource: null,
+        piiRedactionLevel: "ESSENTIAL",
+        tenantId: TENANT,
+      });
 
       expect(attr(span, "input")).toBe("cpf [BR_CPF] done");
       expect(batchSpy).not.toHaveBeenCalled();
@@ -329,7 +394,12 @@ describe("OtlpSpanPiiRedactionService scoped-policy native redaction", () => {
         input: "mail jane@example.com cpf 529.982.247-25 card 4111111111111111",
       });
 
-      await service.redactSpan(span, null, "ESSENTIAL", TENANT);
+      await service.redactSpan({
+        span,
+        resource: null,
+        piiRedactionLevel: "ESSENTIAL",
+        tenantId: TENANT,
+      });
 
       const value = attr(span, "input")!;
       expect(value).toContain("[EMAIL_ADDRESS]");
@@ -346,7 +416,12 @@ describe("OtlpSpanPiiRedactionService scoped-policy native redaction", () => {
       );
       const span = spanWith({ input: "My name is Alexander Hamilton." });
 
-      await service.redactSpan(span, null, "ESSENTIAL", TENANT);
+      await service.redactSpan({
+        span,
+        resource: null,
+        piiRedactionLevel: "ESSENTIAL",
+        tenantId: TENANT,
+      });
 
       expect(batchSpy).toHaveBeenCalledTimes(1);
       expect(batchSpy.mock.calls[0]![1].entities).toEqual(["PERSON"]);
@@ -358,7 +433,12 @@ describe("OtlpSpanPiiRedactionService scoped-policy native redaction", () => {
       );
       const span = spanWith({ input: "mail jane@example.com" });
 
-      await service.redactSpan(span, null, "ESSENTIAL", TENANT);
+      await service.redactSpan({
+        span,
+        resource: null,
+        piiRedactionLevel: "ESSENTIAL",
+        tenantId: TENANT,
+      });
 
       expect(attr(span, "input")).toContain("[EMAIL_ADDRESS]");
       expect(batchSpy).not.toHaveBeenCalled();
@@ -397,7 +477,12 @@ describe("OtlpSpanPiiRedactionService scoped-policy native redaction", () => {
       });
       const span = spanWith({ input: "mail a@b.com, I am John from New York" });
 
-      await service.redactSpan(span, null, "STRICT", TENANT);
+      await service.redactSpan({
+        span,
+        resource: null,
+        piiRedactionLevel: "STRICT",
+        tenantId: TENANT,
+      });
 
       // The native floor still scrubbed the email, but names/locations slip
       // through, so the span is marked rather than presented as fully scrubbed.
@@ -417,7 +502,12 @@ describe("OtlpSpanPiiRedactionService scoped-policy native redaction", () => {
       });
       const span = spanWith({ input: "mail a@b.com" });
 
-      await service.redactSpan(span, null, "STRICT", TENANT);
+      await service.redactSpan({
+        span,
+        resource: null,
+        piiRedactionLevel: "STRICT",
+        tenantId: TENANT,
+      });
 
       expect(attr(span, "input")).not.toContain("a@b.com");
       expect(attr(span, PII_INCOMPLETE)).toBe("strict");
@@ -439,7 +529,12 @@ describe("OtlpSpanPiiRedactionService scoped-policy native redaction", () => {
       });
       const span = spanWith({ input: "mail a@b.com, I am John from New York" });
 
-      await service.redactSpan(span, null, "STRICT", TENANT);
+      await service.redactSpan({
+        span,
+        resource: null,
+        piiRedactionLevel: "STRICT",
+        tenantId: TENANT,
+      });
 
       expect(attr(span, PII_INCOMPLETE)).toBeUndefined();
       expect(batchSpy).not.toHaveBeenCalled();
@@ -457,7 +552,12 @@ describe("OtlpSpanPiiRedactionService scoped-policy native redaction", () => {
       const span = spanWith({ input: "mail a@b.com" });
 
       await expect(
-        service.redactSpan(span, null, "STRICT", TENANT),
+        service.redactSpan({
+          span,
+          resource: null,
+          piiRedactionLevel: "STRICT",
+          tenantId: TENANT,
+        }),
       ).rejects.toThrow();
       expect(attr(span, PII_INCOMPLETE)).toBeUndefined();
     });
@@ -474,7 +574,12 @@ describe("OtlpSpanPiiRedactionService PII exception patterns", () => {
       const span = spanWith({
         "gen_ai.prompt": "reservation 00528000043000 for test@example.com",
       });
-      await service.redactSpan(span, null, "ESSENTIAL", TENANT);
+      await service.redactSpan({
+        span,
+        resource: null,
+        piiRedactionLevel: "ESSENTIAL",
+        tenantId: TENANT,
+      });
       expect(attr(span, "gen_ai.prompt")).toBe(
         "reservation 00528000043000 for [EMAIL_ADDRESS]",
       );
@@ -490,7 +595,12 @@ describe("OtlpSpanPiiRedactionService PII exception patterns", () => {
       const span = spanWith({
         "gen_ai.prompt": "reservation 00528000043000 here",
       });
-      await service.redactSpan(span, null, "STRICT", TENANT);
+      await service.redactSpan({
+        span,
+        resource: null,
+        piiRedactionLevel: "STRICT",
+        tenantId: TENANT,
+      });
 
       expect(batchSpy).toHaveBeenCalledTimes(1);
       const options = batchSpy.mock.calls[0]![1];
@@ -507,7 +617,12 @@ describe("OtlpSpanPiiRedactionService PII exception patterns", () => {
         mkPolicy({ piiLevel: "strict" }),
       );
       const span = spanWith({ "gen_ai.prompt": "hello there" });
-      await service.redactSpan(span, null, "STRICT", TENANT);
+      await service.redactSpan({
+        span,
+        resource: null,
+        piiRedactionLevel: "STRICT",
+        tenantId: TENANT,
+      });
 
       expect(batchSpy).toHaveBeenCalledTimes(1);
       const options = batchSpy.mock.calls[0]![1];
@@ -524,7 +639,12 @@ describe("OtlpSpanPiiRedactionService api key id attribute", () => {
     const span = spanWith({
       "langwatch.api_key.id": "key_abc123def456",
     });
-    await service.redactSpan(span, null, "ESSENTIAL", TENANT);
+    await service.redactSpan({
+      span,
+      resource: null,
+      piiRedactionLevel: "ESSENTIAL",
+      tenantId: TENANT,
+    });
     expect(attr(span, "langwatch.api_key.id")).toBe("key_abc123def456");
   });
 
@@ -534,7 +654,12 @@ describe("OtlpSpanPiiRedactionService api key id attribute", () => {
     const span = spanWith({
       "langwatch.api_key.id": "sk-lw-" + "a".repeat(40),
     });
-    await service.redactSpan(span, null, "ESSENTIAL", TENANT);
+    await service.redactSpan({
+      span,
+      resource: null,
+      piiRedactionLevel: "ESSENTIAL",
+      tenantId: TENANT,
+    });
     expect(attr(span, "langwatch.api_key.id")).toContain("[SECRET]");
     expect(attr(span, "langwatch.api_key.id")).not.toContain("sk-lw-");
   });
@@ -545,14 +670,24 @@ describe("OtlpSpanPiiRedactionService api key id attribute", () => {
   it("still nukes other api_key-named attributes by name", async () => {
     const { service } = makeService(mkPolicy({}));
     const span = spanWith({ "user.api_key": "plain text value" });
-    await service.redactSpan(span, null, "ESSENTIAL", TENANT);
+    await service.redactSpan({
+      span,
+      resource: null,
+      piiRedactionLevel: "ESSENTIAL",
+      tenantId: TENANT,
+    });
     expect(attr(span, "user.api_key")).toBe("[SECRET]");
   });
 
   it("nukes a near-miss name that only looks like the exempt one", async () => {
     const { service } = makeService(mkPolicy({}));
     const span = spanWith({ "langwatch.api_key.id.extra": "plain text value" });
-    await service.redactSpan(span, null, "ESSENTIAL", TENANT);
+    await service.redactSpan({
+      span,
+      resource: null,
+      piiRedactionLevel: "ESSENTIAL",
+      tenantId: TENANT,
+    });
     expect(attr(span, "langwatch.api_key.id.extra")).toBe("[SECRET]");
   });
 });
@@ -592,7 +727,12 @@ describe("OtlpSpanPiiRedactionService strict-only exception scoping", () => {
       }),
     );
     const span = spanWith({ "conversation.text": "Acme Support Bot" });
-    await service.redactSpan(span, null, "STRICT", TENANT);
+    await service.redactSpan({
+      span,
+      resource: null,
+      piiRedactionLevel: "STRICT",
+      tenantId: TENANT,
+    });
 
     // The mock stands in for the real Presidio call: it always anonymizes,
     // exactly like the production endpoint, because exceptPatterns never
@@ -614,7 +754,12 @@ describe("OtlpSpanPiiRedactionService strict-only exception scoping", () => {
     const span = spanWith({
       "conversation.text": "reservation 00528000043000 confirmed",
     });
-    await service.redactSpan(span, null, "STRICT", TENANT);
+    await service.redactSpan({
+      span,
+      resource: null,
+      piiRedactionLevel: "STRICT",
+      tenantId: TENANT,
+    });
 
     expect(attr(span, "conversation.text")).toBe(
       "reservation 00528000043000 confirmed",

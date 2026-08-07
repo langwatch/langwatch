@@ -151,12 +151,17 @@ export function computeGatewaySignature(
  * logger. Includes the gateway node ID when present so multi-node
  * deployments can correlate which gateway sent the bad request.
  */
-function logAuthDecision(
-  c: Context,
-  code: string,
-  status: number,
-  detail?: Record<string, unknown>,
-): void {
+function logAuthDecision({
+  c,
+  code,
+  status,
+  detail,
+}: {
+  c: Context;
+  code: string;
+  status: number;
+  detail?: Record<string, unknown>;
+}): void {
   logger.warn(
     {
       code,
@@ -173,7 +178,11 @@ async function verifyGatewaySignature(c: Context, next: Next) {
   const secret =
     process.env.LW_GATEWAY_INTERNAL_SECRET ?? env.LW_GATEWAY_INTERNAL_SECRET;
   if (!secret) {
-    logAuthDecision(c, "gateway_internal_secret_missing", 500);
+    logAuthDecision({
+      c,
+      code: "gateway_internal_secret_missing",
+      status: 500,
+    });
     return c.json(
       {
         error: {
@@ -189,9 +198,14 @@ async function verifyGatewaySignature(c: Context, next: Next) {
   const presentedSig = c.req.header("X-LangWatch-Gateway-Signature");
   const presentedTs = c.req.header("X-LangWatch-Gateway-Timestamp");
   if (!presentedSig || !presentedTs) {
-    logAuthDecision(c, "missing_signature", 401, {
-      hasSignature: Boolean(presentedSig),
-      hasTimestamp: Boolean(presentedTs),
+    logAuthDecision({
+      c,
+      code: "missing_signature",
+      status: 401,
+      detail: {
+        hasSignature: Boolean(presentedSig),
+        hasTimestamp: Boolean(presentedTs),
+      },
     });
     return c.json(
       {
@@ -219,7 +233,7 @@ async function verifyGatewaySignature(c: Context, next: Next) {
   const a = Buffer.from(expected);
   const b = Buffer.from(presentedSig);
   if (a.length !== b.length || !timingSafeEqual(a, b)) {
-    logAuthDecision(c, "invalid_signature", 401);
+    logAuthDecision({ c, code: "invalid_signature", status: 401 });
     return c.json(
       {
         error: {
@@ -234,7 +248,12 @@ async function verifyGatewaySignature(c: Context, next: Next) {
 
   const ts = Number.parseInt(presentedTs, 10);
   if (!Number.isFinite(ts)) {
-    logAuthDecision(c, "invalid_timestamp", 401, { presentedTs });
+    logAuthDecision({
+      c,
+      code: "invalid_timestamp",
+      status: 401,
+      detail: { presentedTs },
+    });
     return c.json(
       {
         error: {
@@ -248,8 +267,11 @@ async function verifyGatewaySignature(c: Context, next: Next) {
   }
   const now = Math.floor(Date.now() / 1000);
   if (Math.abs(now - ts) > GATEWAY_SIGNATURE_WINDOW_SECONDS) {
-    logAuthDecision(c, "timestamp_out_of_window", 401, {
-      driftSeconds: now - ts,
+    logAuthDecision({
+      c,
+      code: "timestamp_out_of_window",
+      status: 401,
+      detail: { driftSeconds: now - ts },
     });
     return c.json(
       {
@@ -387,7 +409,11 @@ secured.access(gatewayPolicy()).post("/resolve-key", async (c) => {
 
   const parseRejection = virtualKeyParseRejection(presented);
   if (parseRejection) {
-    logAuthDecision(c, parseRejection.code, parseRejection.status);
+    logAuthDecision({
+      c,
+      code: parseRejection.code,
+      status: parseRejection.status,
+    });
     return c.json(rejectionBody(parseRejection), parseRejection.status);
   }
 
@@ -396,7 +422,7 @@ secured.access(gatewayPolicy()).post("/resolve-key", async (c) => {
     hashVirtualKeySecret(presented),
   );
   if (!vk) {
-    logAuthDecision(c, "virtual_key_not_found", 401);
+    logAuthDecision({ c, code: "virtual_key_not_found", status: 401 });
     return c.json(
       {
         error: {
@@ -410,8 +436,11 @@ secured.access(gatewayPolicy()).post("/resolve-key", async (c) => {
   }
   const statusRejection = virtualKeyStatusRejection(vk.status);
   if (statusRejection) {
-    logAuthDecision(c, statusRejection.code, statusRejection.status, {
-      vkId: vk.id,
+    logAuthDecision({
+      c,
+      code: statusRejection.code,
+      status: statusRejection.status,
+      detail: { vkId: vk.id },
     });
     return c.json(rejectionBody(statusRejection), statusRejection.status);
   }

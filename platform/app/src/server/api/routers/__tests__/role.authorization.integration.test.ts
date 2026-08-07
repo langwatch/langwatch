@@ -44,12 +44,17 @@ describe("Feature: role router caller authorization", () => {
   let memberCaller: ReturnType<typeof callerFor>;
   let outsiderAdminCaller: ReturnType<typeof callerFor>;
 
-  const makeUser = async (
-    label: string,
-    orgId: string,
-    role: OrganizationUserRole,
-    bindingRole: TeamUserRole,
-  ) => {
+  const makeUser = async ({
+    label,
+    orgId,
+    role,
+    bindingRole,
+  }: {
+    label: string;
+    orgId: string;
+    role: OrganizationUserRole;
+    bindingRole: TeamUserRole;
+  }) => {
     const user = await prisma.user.create({
       data: { name: `${label} ${ns}`, email: `${label}-${ns}@example.com` },
     });
@@ -89,24 +94,24 @@ describe("Feature: role router caller authorization", () => {
     });
     otherOrganizationId = other.id;
 
-    const adminUserId = await makeUser(
-      "admin",
-      organizationId,
-      OrganizationUserRole.ADMIN,
-      TeamUserRole.ADMIN,
-    );
-    memberUserId = await makeUser(
-      "member",
-      organizationId,
-      OrganizationUserRole.MEMBER,
-      TeamUserRole.MEMBER,
-    );
-    const outsiderAdminUserId = await makeUser(
-      "outsider",
-      otherOrganizationId,
-      OrganizationUserRole.ADMIN,
-      TeamUserRole.ADMIN,
-    );
+    const adminUserId = await makeUser({
+      label: "admin",
+      orgId: organizationId,
+      role: OrganizationUserRole.ADMIN,
+      bindingRole: TeamUserRole.ADMIN,
+    });
+    memberUserId = await makeUser({
+      label: "member",
+      orgId: organizationId,
+      role: OrganizationUserRole.MEMBER,
+      bindingRole: TeamUserRole.MEMBER,
+    });
+    const outsiderAdminUserId = await makeUser({
+      label: "outsider",
+      orgId: otherOrganizationId,
+      role: OrganizationUserRole.ADMIN,
+      bindingRole: TeamUserRole.ADMIN,
+    });
 
     const customRole = await prisma.customRole.create({
       data: {

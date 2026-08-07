@@ -633,18 +633,23 @@ function SortableHeaderButton({
   );
 }
 
-export function cellPropsFor(
+export function cellPropsFor({
+  cell,
+  leftBorderColor,
+  index,
+  rightBorderColor,
+}: {
   cell: {
     column: {
       id: string;
       getSize: () => number;
       columnDef: { size?: number; minSize?: number; meta?: unknown };
     };
-  },
-  leftBorderColor?: Color,
-  index?: number,
-  rightBorderColor?: Color,
-): {
+  };
+  leftBorderColor?: Color;
+  index?: number;
+  rightBorderColor?: Color;
+}): {
   textAlign: "left" | "right";
   width: string | undefined;
   minWidth: string;

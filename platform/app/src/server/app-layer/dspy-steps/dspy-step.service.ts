@@ -30,12 +30,12 @@ export class DspyStepService {
     runId: string;
     stepIndex: string;
   }): Promise<DspyStepData> {
-    const result = await this.repository.getStep(
+    const result = await this.repository.getStep({
       tenantId,
       experimentId,
       runId,
       stepIndex,
-    );
+    });
     if (!result) {
       throw new DspyStepNotFoundError(
         `${tenantId}/${experimentId}/${runId}/${stepIndex}`,

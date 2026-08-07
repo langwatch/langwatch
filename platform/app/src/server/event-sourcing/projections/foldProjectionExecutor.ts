@@ -796,12 +796,12 @@ export class FoldProjectionExecutor {
       projection.eventLoaderUpToPaged &&
       projection.options?.refoldOnOutOfOrder === false
     ) {
-      return this.streamRefoldUpToDelivered(
+      return this.streamRefoldUpToDelivered({
         projection,
         delivered,
         context,
         upToEvent,
-      );
+      });
     }
 
     const history = await projection.eventLoaderUpTo!({
@@ -856,12 +856,17 @@ export class FoldProjectionExecutor {
    * - Missing delivered: any delivered event the history read did not return
    *   (event-log read lag) is applied on top, as the array path does.
    */
-  private async streamRefoldUpToDelivered<State, E extends Event>(
-    projection: FoldProjectionDefinition<State, E>,
-    delivered: E[],
-    context: ProjectionStoreContext,
-    upToEvent: E,
-  ): Promise<State | null> {
+  private async streamRefoldUpToDelivered<State, E extends Event>({
+    projection,
+    delivered,
+    context,
+    upToEvent,
+  }: {
+    projection: FoldProjectionDefinition<State, E>;
+    delivered: E[];
+    context: ProjectionStoreContext;
+    upToEvent: E;
+  }): Promise<State | null> {
     const PAGE_SIZE = this.refoldPageSize;
     // Safety net only: the paged loader's cursor is expected to strictly
     // advance every call. If that contract is ever violated (e.g. a

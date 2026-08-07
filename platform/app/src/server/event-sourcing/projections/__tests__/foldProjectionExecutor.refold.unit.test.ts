@@ -78,13 +78,12 @@ describe("FoldProjectionExecutor out-of-order re-fold", () => {
   let executor: FoldProjectionExecutor;
 
   const eventAt = (occurredAt: number) =>
-    createTestEvent(
-      TEST_CONSTANTS.AGGREGATE_ID,
-      TEST_CONSTANTS.AGGREGATE_TYPE,
+    createTestEvent({
+      aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+      aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
       tenantId,
-      undefined,
-      occurredAt,
-    );
+      createdAt: occurredAt,
+    });
 
   beforeEach(() => {
     vi.useFakeTimers();

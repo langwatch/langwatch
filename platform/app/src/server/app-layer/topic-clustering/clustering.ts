@@ -208,14 +208,14 @@ export const clusterTopicsForProject = async ({
     "Starting trace search for topic clustering",
   );
 
-  const { traces, lastSort, returnedCount } = await fetchTracesFromClickHouse(
+  const { traces, lastSort, returnedCount } = await fetchTracesFromClickHouse({
     clickhouse,
     projectId,
     isIncrementalProcessing,
     topicIds,
     subtopicIds,
     searchAfter,
-  );
+  });
 
   const minimumTraces = isIncrementalProcessing ? 1 : 10;
 
@@ -358,14 +358,21 @@ export async function fetchCountsFromClickHouse({
   };
 }
 
-export async function fetchTracesFromClickHouse(
-  clickhouse: ClickHouseClient,
-  projectId: string,
-  isIncrementalProcessing: boolean,
-  topicIds: string[],
-  subtopicIds: string[],
-  searchAfter?: [number, string],
-): Promise<TraceSearchResult> {
+export async function fetchTracesFromClickHouse({
+  clickhouse,
+  projectId,
+  isIncrementalProcessing,
+  topicIds,
+  subtopicIds,
+  searchAfter,
+}: {
+  clickhouse: ClickHouseClient;
+  projectId: string;
+  isIncrementalProcessing: boolean;
+  topicIds: string[];
+  subtopicIds: string[];
+  searchAfter?: [number, string];
+}): Promise<TraceSearchResult> {
   // Narrow FETCH window (49d, hot-tier only): bounds how far cursor-paging
   // reads the heavy ComputedInput column, keeping it off S3 cold storage.
   const fetchWindowStartMs = Date.now() - CLUSTERING_FETCH_WINDOW_DAYS * DAY_MS;
@@ -651,7 +658,12 @@ export const batchClusterTraces = async (
     traces,
   });
 
-  return await storeResults(project.id, clusteringResult, false, runContext);
+  return await storeResults({
+    projectId: project.id,
+    clusteringResult,
+    isIncremental: false,
+    runContext,
+  });
 };
 
 export const incrementalClustering = async (
@@ -720,15 +732,25 @@ export const incrementalClustering = async (
     subtopics,
   });
 
-  return await storeResults(project.id, clusteringResult, true, runContext);
+  return await storeResults({
+    projectId: project.id,
+    clusteringResult,
+    isIncremental: true,
+    runContext,
+  });
 };
 
-export const storeResults = async (
-  projectId: string,
-  clusteringResult: TopicClusteringResponse | undefined,
-  isIncremental: boolean,
-  runContext?: ClusteringRunContext,
-): Promise<ClusteringStoreSummary | null> => {
+export const storeResults = async ({
+  projectId,
+  clusteringResult,
+  isIncremental,
+  runContext,
+}: {
+  projectId: string;
+  clusteringResult: TopicClusteringResponse | undefined;
+  isIncremental: boolean;
+  runContext?: ClusteringRunContext;
+}): Promise<ClusteringStoreSummary | null> => {
   // NO RESULT IS A SKIP, NOT AN EMPTY CLUSTERING.
   //
   // This used to default an absent result to empty arrays and fall through.

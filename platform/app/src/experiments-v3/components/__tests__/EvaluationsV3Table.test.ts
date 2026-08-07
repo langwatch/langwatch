@@ -232,12 +232,12 @@ describe("buildTargetEvaluatorsForRow", () => {
         [comparisonTarget.id]: [{ status: "processed", label: "target-a" }],
       };
 
-      const evaluators = buildTargetEvaluatorsForRow(
-        comparisonTarget,
-        [],
+      const evaluators = buildTargetEvaluatorsForRow({
+        target: comparisonTarget,
+        evaluators: [],
         results,
-        0,
-      );
+        rowIndex: 0,
+      });
 
       expect(evaluators[comparisonTarget.id]).toEqual({
         status: "processed",
@@ -249,12 +249,12 @@ describe("buildTargetEvaluatorsForRow", () => {
       it("resolves to null rather than being dropped", () => {
         const results = createInitialResults();
 
-        const evaluators = buildTargetEvaluatorsForRow(
-          comparisonTarget,
-          [],
+        const evaluators = buildTargetEvaluatorsForRow({
+          target: comparisonTarget,
+          evaluators: [],
           results,
-          0,
-        );
+          rowIndex: 0,
+        });
 
         expect(evaluators[comparisonTarget.id]).toBeNull();
       });
@@ -268,12 +268,12 @@ describe("buildTargetEvaluatorsForRow", () => {
         [gradingEvaluator.id]: [{ status: "processed", passed: true }],
       };
 
-      const evaluators = buildTargetEvaluatorsForRow(
-        plainTarget,
-        [gradingEvaluator],
+      const evaluators = buildTargetEvaluatorsForRow({
+        target: plainTarget,
+        evaluators: [gradingEvaluator],
         results,
-        0,
-      );
+        rowIndex: 0,
+      });
 
       expect(evaluators[gradingEvaluator.id]).toEqual({
         status: "processed",

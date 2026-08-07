@@ -34,7 +34,12 @@ describe("given InMemoryDspyStepRepository", () => {
       const step = makeStep();
       await repo.upsertStep(step);
 
-      const result = await repo.getStep("tenant-1", "exp-1", "run-1", "0");
+      const result = await repo.getStep({
+        tenantId: "tenant-1",
+        experimentId: "exp-1",
+        runId: "run-1",
+        stepIndex: "0",
+      });
       expect(result).toEqual(step);
     });
   });
@@ -59,7 +64,12 @@ describe("given InMemoryDspyStepRepository", () => {
         }),
       );
 
-      const result = await repo.getStep("tenant-1", "exp-1", "run-1", "0");
+      const result = await repo.getStep({
+        tenantId: "tenant-1",
+        experimentId: "exp-1",
+        runId: "run-1",
+        stepIndex: "0",
+      });
       expect(result!.examples).toHaveLength(2);
       expect(result!.examples.map((e) => e.hash)).toEqual(["aaa", "bbb"]);
     });
@@ -83,7 +93,12 @@ describe("given InMemoryDspyStepRepository", () => {
         }),
       );
 
-      const result = await repo.getStep("tenant-1", "exp-1", "run-1", "0");
+      const result = await repo.getStep({
+        tenantId: "tenant-1",
+        experimentId: "exp-1",
+        runId: "run-1",
+        stepIndex: "0",
+      });
       expect(result!.llmCalls).toHaveLength(2);
       expect(result!.llmCalls.map((c) => c.hash)).toEqual(["c1", "c2"]);
     });
@@ -101,7 +116,12 @@ describe("given InMemoryDspyStepRepository", () => {
         }),
       );
 
-      const result = await repo.getStep("tenant-1", "exp-1", "run-1", "0");
+      const result = await repo.getStep({
+        tenantId: "tenant-1",
+        experimentId: "exp-1",
+        runId: "run-1",
+        stepIndex: "0",
+      });
       expect(result!.score).toBe(0.8);
       expect(result!.createdAt).toBe(1000);
       expect(result!.insertedAt).toBe(1000);
@@ -168,8 +188,22 @@ describe("given InMemoryDspyStepRepository", () => {
 
       await repo.deleteByExperiment("t1", "e1");
 
-      expect(await repo.getStep("t1", "e1", "r1", "0")).toBeNull();
-      expect(await repo.getStep("t1", "e2", "r2", "0")).not.toBeNull();
+      expect(
+        await repo.getStep({
+          tenantId: "t1",
+          experimentId: "e1",
+          runId: "r1",
+          stepIndex: "0",
+        }),
+      ).toBeNull();
+      expect(
+        await repo.getStep({
+          tenantId: "t1",
+          experimentId: "e2",
+          runId: "r2",
+          stepIndex: "0",
+        }),
+      ).not.toBeNull();
     });
   });
 

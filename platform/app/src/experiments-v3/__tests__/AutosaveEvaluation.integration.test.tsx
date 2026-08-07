@@ -142,9 +142,12 @@ describe("Autosave evaluation state", () => {
 
     // Make a change to the store
     act(() => {
-      useEvaluationsV3Store
-        .getState()
-        .setCellValue("test-data", 0, "input", "test value");
+      useEvaluationsV3Store.getState().setCellValue({
+        datasetId: "test-data",
+        row: 0,
+        columnId: "input",
+        value: "test value",
+      });
     });
 
     // Force re-render to pick up store changes
@@ -168,9 +171,12 @@ describe("Autosave evaluation state", () => {
 
     // Make a change
     act(() => {
-      useEvaluationsV3Store
-        .getState()
-        .setCellValue("test-data", 0, "input", "trigger save");
+      useEvaluationsV3Store.getState().setCellValue({
+        datasetId: "test-data",
+        row: 0,
+        columnId: "input",
+        value: "trigger save",
+      });
     });
 
     // Advance past debounce - should trigger save and go to "saving" then "saved"
@@ -206,9 +212,12 @@ describe("Autosave evaluation state", () => {
 
     // Make a change - this should trigger the rejected mock
     act(() => {
-      useEvaluationsV3Store
-        .getState()
-        .setCellValue("test-data", 0, "input", "will fail");
+      useEvaluationsV3Store.getState().setCellValue({
+        datasetId: "test-data",
+        row: 0,
+        columnId: "input",
+        value: "will fail",
+      });
     });
 
     // Advance past debounce to trigger save

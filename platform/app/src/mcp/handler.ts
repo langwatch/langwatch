@@ -492,12 +492,17 @@ export function createMcpHandler(): McpHandler {
     return createHash("sha256").update(randomUUID()).digest("hex");
   }
 
-  async function storeOAuthToken(
-    accessToken: string,
-    apiKey: string,
-    expiresIn: number,
-    userId?: string,
-  ): Promise<void> {
+  async function storeOAuthToken({
+    accessToken,
+    apiKey,
+    expiresIn,
+    userId,
+  }: {
+    accessToken: string;
+    apiKey: string;
+    expiresIn: number;
+    userId?: string;
+  }): Promise<void> {
     const entry: OAuthTokenEntry = {
       apiKey,
       userId,
@@ -946,7 +951,12 @@ export function createMcpHandler(): McpHandler {
     const expiresIn = TOKEN_TTL_SECONDS;
     const accessToken = generateAccessToken();
 
-    await storeOAuthToken(accessToken, apiKey, expiresIn, stored.userId);
+    await storeOAuthToken({
+      accessToken,
+      apiKey,
+      expiresIn,
+      userId: stored.userId,
+    });
 
     sendJson(res, 200, {
       access_token: accessToken,

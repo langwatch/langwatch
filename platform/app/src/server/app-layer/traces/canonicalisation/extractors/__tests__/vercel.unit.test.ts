@@ -9,13 +9,13 @@ describe("VercelExtractor", () => {
 
   describe("when instrumentationScope.name is 'ai'", () => {
     it("processes the span and sets span type from span name", () => {
-      const ctx = createExtractorContext(
-        {},
-        {
+      const ctx = createExtractorContext({
+        attrs: {},
+        spanOverrides: {
           name: "ai.generateText",
           instrumentationScope: { name: "ai", version: null },
         },
-      );
+      });
 
       extractor.apply(ctx);
 
@@ -24,13 +24,13 @@ describe("VercelExtractor", () => {
     });
 
     it("records a rule for span type mapping", () => {
-      const ctx = createExtractorContext(
-        {},
-        {
+      const ctx = createExtractorContext({
+        attrs: {},
+        spanOverrides: {
           name: "ai.generateText",
           instrumentationScope: { name: "ai", version: null },
         },
-      );
+      });
 
       extractor.apply(ctx);
 
@@ -40,18 +40,18 @@ describe("VercelExtractor", () => {
     });
 
     it("sets model attributes when ai.model is provided", () => {
-      const ctx = createExtractorContext(
-        {
+      const ctx = createExtractorContext({
+        attrs: {
           [ATTR_KEYS.AI_MODEL]: JSON.stringify({
             id: "gpt-4",
             provider: "openai.chat",
           }),
         },
-        {
+        spanOverrides: {
           name: "ai.generateText",
           instrumentationScope: { name: "ai", version: null },
         },
-      );
+      });
 
       extractor.apply(ctx);
 
@@ -68,14 +68,14 @@ describe("VercelExtractor", () => {
 
     it("extracts ai.response.object as output messages", () => {
       const objectPayload = { name: "Alice", age: 30 };
-      const ctx = createExtractorContext(
-        {
+      const ctx = createExtractorContext({
+        attrs: {
           [ATTR_KEYS.AI_RESPONSE]: JSON.stringify({
             object: JSON.stringify(objectPayload),
           }),
         },
-        aiSpan,
-      );
+        spanOverrides: aiSpan,
+      });
 
       extractor.apply(ctx);
 
@@ -86,12 +86,12 @@ describe("VercelExtractor", () => {
 
     it("extracts ai.response.object as flat attribute fallback", () => {
       const objectPayload = { name: "Bob", score: 42 };
-      const ctx = createExtractorContext(
-        {
+      const ctx = createExtractorContext({
+        attrs: {
           [ATTR_KEYS.AI_RESPONSE_OBJECT]: JSON.stringify(objectPayload),
         },
-        aiSpan,
-      );
+        spanOverrides: aiSpan,
+      });
 
       extractor.apply(ctx);
 
@@ -101,15 +101,15 @@ describe("VercelExtractor", () => {
     });
 
     it("prefers .text over .object when both are present", () => {
-      const ctx = createExtractorContext(
-        {
+      const ctx = createExtractorContext({
+        attrs: {
           [ATTR_KEYS.AI_RESPONSE]: JSON.stringify({
             text: "hello",
             object: JSON.stringify({ key: "val" }),
           }),
         },
-        aiSpan,
-      );
+        spanOverrides: aiSpan,
+      });
 
       extractor.apply(ctx);
 
@@ -121,18 +121,18 @@ describe("VercelExtractor", () => {
 
   describe("when instrumentationScope.name is not 'ai' but ai.* attrs are present", () => {
     it("still lifts (covers opencode/embedded-Vercel-SDK case)", () => {
-      const ctx = createExtractorContext(
-        {
+      const ctx = createExtractorContext({
+        attrs: {
           [ATTR_KEYS.AI_MODEL]: JSON.stringify({
             id: "gpt-4",
             provider: "openai.chat",
           }),
         },
-        {
+        spanOverrides: {
           name: "ai.generateText",
           instrumentationScope: { name: "opencode", version: null },
         },
-      );
+      });
 
       extractor.apply(ctx);
 
@@ -143,15 +143,15 @@ describe("VercelExtractor", () => {
 
     it("lifts flat structured output from a non-ai instrumentation scope", () => {
       const objectPayload = { greeting: "Hallo" };
-      const ctx = createExtractorContext(
-        {
+      const ctx = createExtractorContext({
+        attrs: {
           [ATTR_KEYS.AI_RESPONSE_OBJECT]: objectPayload,
         },
-        {
+        spanOverrides: {
           name: "ai.generateText",
           instrumentationScope: { name: "opencode", version: null },
         },
-      );
+      });
 
       extractor.apply(ctx);
 
@@ -163,16 +163,16 @@ describe("VercelExtractor", () => {
 
     it("uses structured output when the text attribute is empty", () => {
       const objectPayload = { greeting: "Hallo" };
-      const ctx = createExtractorContext(
-        {
+      const ctx = createExtractorContext({
+        attrs: {
           [ATTR_KEYS.AI_RESPONSE_TEXT]: "",
           [ATTR_KEYS.AI_RESPONSE_OBJECT]: objectPayload,
         },
-        {
+        spanOverrides: {
           name: "ai.generateText",
           instrumentationScope: { name: "opencode", version: null },
         },
-      );
+      });
 
       extractor.apply(ctx);
 
@@ -183,16 +183,16 @@ describe("VercelExtractor", () => {
 
     it("falls back to response text when the response attribute is empty", () => {
       const objectPayload = { greeting: "Hallo" };
-      const ctx = createExtractorContext(
-        {
+      const ctx = createExtractorContext({
+        attrs: {
           [ATTR_KEYS.AI_RESPONSE]: "",
           [ATTR_KEYS.AI_RESPONSE_TEXT]: JSON.stringify(objectPayload),
         },
-        {
+        spanOverrides: {
           name: "ai.generateText",
           instrumentationScope: { name: "opencode", version: null },
         },
-      );
+      });
 
       extractor.apply(ctx);
 
@@ -203,15 +203,15 @@ describe("VercelExtractor", () => {
 
     it("handles a parsed JSON response text value", () => {
       const objectPayload = { text: "structured field" };
-      const ctx = createExtractorContext(
-        {
+      const ctx = createExtractorContext({
+        attrs: {
           [ATTR_KEYS.AI_RESPONSE_TEXT]: objectPayload,
         },
-        {
+        spanOverrides: {
           name: "ai.generateText",
           instrumentationScope: { name: "opencode", version: null },
         },
-      );
+      });
 
       extractor.apply(ctx);
 
@@ -223,15 +223,15 @@ describe("VercelExtractor", () => {
 
   describe("when scope is unrelated AND no ai.* attrs are present", () => {
     it("returns early with nothing in out", () => {
-      const ctx = createExtractorContext(
-        {
+      const ctx = createExtractorContext({
+        attrs: {
           [ATTR_KEYS.GEN_AI_REQUEST_MODEL]: "claude-haiku-4-5",
         },
-        {
+        spanOverrides: {
           name: "spanWithoutAiAttrs",
           instrumentationScope: { name: "opentelemetry", version: null },
         },
-      );
+      });
 
       extractor.apply(ctx);
 
@@ -243,21 +243,21 @@ describe("VercelExtractor", () => {
 
   describe("when instrumentationScope.name is undefined but ai.* attrs are present", () => {
     it("still lifts via attrs-presence fallback", () => {
-      const ctx = createExtractorContext(
-        {
+      const ctx = createExtractorContext({
+        attrs: {
           [ATTR_KEYS.AI_MODEL]: JSON.stringify({
             id: "gpt-4",
             provider: "openai.chat",
           }),
         },
-        {
+        spanOverrides: {
           name: "ai.generateText",
           instrumentationScope: {
             name: undefined as unknown as string,
             version: null,
           },
         },
-      );
+      });
 
       extractor.apply(ctx);
 
@@ -268,8 +268,8 @@ describe("VercelExtractor", () => {
   describe("when the AI SDK reports cache token details", () => {
     /** @scenario "A cached turn's input is split into fresh and cached buckets" */
     it("maps inputTokenDetails.cacheWriteTokens to gen_ai cache_creation (opencode Path B)", () => {
-      const ctx = createExtractorContext(
-        {
+      const ctx = createExtractorContext({
+        attrs: {
           [ATTR_KEYS.AI_MODEL]: JSON.stringify({
             id: "claude-haiku-4-5",
             provider: "anthropic",
@@ -278,11 +278,11 @@ describe("VercelExtractor", () => {
           [ATTR_KEYS.AI_USAGE_CACHE_WRITE_TOKENS]: 12629,
           [ATTR_KEYS.AI_USAGE_CACHE_READ_TOKENS]: 0,
         },
-        {
+        spanOverrides: {
           name: "ai.streamText.doStream",
           instrumentationScope: { name: "opencode", version: null },
         },
-      );
+      });
 
       extractor.apply(ctx);
 
@@ -299,8 +299,8 @@ describe("VercelExtractor", () => {
     });
 
     it("maps inputTokenDetails.cacheReadTokens to gen_ai cache_read on a cached turn", () => {
-      const ctx = createExtractorContext(
-        {
+      const ctx = createExtractorContext({
+        attrs: {
           [ATTR_KEYS.AI_MODEL]: JSON.stringify({
             id: "claude-haiku-4-5",
             provider: "anthropic",
@@ -308,11 +308,11 @@ describe("VercelExtractor", () => {
           "gen_ai.usage.input_tokens": 13000,
           [ATTR_KEYS.AI_USAGE_CACHE_READ_TOKENS]: 12629,
         },
-        {
+        spanOverrides: {
           name: "ai.streamText.doStream",
           instrumentationScope: { name: "opencode", version: null },
         },
-      );
+      });
 
       extractor.apply(ctx);
 
@@ -323,8 +323,8 @@ describe("VercelExtractor", () => {
     });
 
     it("falls back to the cachedInputTokens alias for the read count", () => {
-      const ctx = createExtractorContext(
-        {
+      const ctx = createExtractorContext({
+        attrs: {
           [ATTR_KEYS.AI_MODEL]: JSON.stringify({
             id: "claude-haiku-4-5",
             provider: "anthropic",
@@ -332,11 +332,11 @@ describe("VercelExtractor", () => {
           "gen_ai.usage.input_tokens": 9000,
           [ATTR_KEYS.AI_USAGE_CACHED_INPUT_TOKENS]: 8745,
         },
-        {
+        spanOverrides: {
           name: "ai.streamText.doStream",
           instrumentationScope: { name: "opencode", version: null },
         },
-      );
+      });
 
       extractor.apply(ctx);
 
@@ -348,17 +348,17 @@ describe("VercelExtractor", () => {
 
     /** @scenario "The SDK's own fresh-input count is trusted when reported" */
     it("prefers the SDK's own noCacheTokens for the fresh input remainder", () => {
-      const ctx = createExtractorContext(
-        {
+      const ctx = createExtractorContext({
+        attrs: {
           "gen_ai.usage.input_tokens": 25449,
           [ATTR_KEYS.AI_USAGE_CACHED_INPUT_TOKENS]: 20000,
           [ATTR_KEYS.AI_USAGE_NO_CACHE_TOKENS]: 5449,
         },
-        {
+        spanOverrides: {
           name: "ai.streamText.doStream",
           instrumentationScope: { name: "opencode", version: null },
         },
-      );
+      });
 
       extractor.apply(ctx);
 
@@ -374,17 +374,17 @@ describe("VercelExtractor", () => {
       // the provider-call child but carries no gen_ai.usage.input_tokens;
       // mapping cache onto it would count the cached share twice in the
       // trace fold.
-      const ctx = createExtractorContext(
-        {
+      const ctx = createExtractorContext({
+        attrs: {
           [ATTR_KEYS.AI_USAGE_INPUT_TOKENS]: 25449,
           [ATTR_KEYS.AI_USAGE_CACHED_INPUT_TOKENS]: 20000,
           [ATTR_KEYS.AI_USAGE_NO_CACHE_TOKENS]: 5449,
         },
-        {
+        spanOverrides: {
           name: "ai.streamText",
           instrumentationScope: { name: "opencode", version: null },
         },
-      );
+      });
 
       extractor.apply(ctx);
 
@@ -396,17 +396,17 @@ describe("VercelExtractor", () => {
 
     /** @scenario "Reasoning tokens reported by the SDK reach the trace" */
     it("maps the flat reasoningTokens count to gen_ai reasoning_tokens", () => {
-      const ctx = createExtractorContext(
-        {
+      const ctx = createExtractorContext({
+        attrs: {
           "gen_ai.usage.input_tokens": 9000,
           [ATTR_KEYS.AI_USAGE_INPUT_TOKENS]: 9000,
           [ATTR_KEYS.AI_USAGE_REASONING_TOKENS]: 384,
         },
-        {
+        spanOverrides: {
           name: "ai.streamText.doStream",
           instrumentationScope: { name: "opencode", version: null },
         },
-      );
+      });
 
       extractor.apply(ctx);
 
@@ -417,17 +417,17 @@ describe("VercelExtractor", () => {
   describe("when the span is an ai.toolCall tool span under the opencode scope", () => {
     /** @scenario "Opencode tool-call spans capture the tool name, arguments, and result" */
     it("lifts ai.toolCall.{name,args,result} to the tool name + input/output", () => {
-      const ctx = createExtractorContext(
-        {
+      const ctx = createExtractorContext({
+        attrs: {
           [ATTR_KEYS.AI_TOOL_CALL_NAME]: "bash",
           [ATTR_KEYS.AI_TOOL_CALL_ARGS]: '{"command":"ls -la"}',
           [ATTR_KEYS.AI_TOOL_CALL_RESULT]: "total 4\ndrwxr-xr-x",
         },
-        {
+        spanOverrides: {
           name: "ai.toolCall",
           instrumentationScope: { name: "opencode", version: null },
         },
-      );
+      });
 
       extractor.apply(ctx);
 
@@ -444,13 +444,13 @@ describe("VercelExtractor", () => {
     });
 
     it("detects the tool span even though the scope is not 'ai'", () => {
-      const ctx = createExtractorContext(
-        { [ATTR_KEYS.AI_TOOL_CALL_NAME]: "read_file" },
-        {
+      const ctx = createExtractorContext({
+        attrs: { [ATTR_KEYS.AI_TOOL_CALL_NAME]: "read_file" },
+        spanOverrides: {
           name: "ai.toolCall",
           instrumentationScope: { name: "opencode", version: null },
         },
-      );
+      });
 
       extractor.apply(ctx);
 

@@ -153,26 +153,27 @@ async function resolveModel({
     );
     const feature = featureByKey(featureKey);
     const alternateProviderKey = alternate?.model.split("/")[0] ?? null;
-    throw new ModelProviderDisabledError(
+    throw new ModelProviderDisabledError({
       featureKey,
-      feature?.displayName ?? featureKey,
-      resolved.feature.role,
+      featureDisplayName: feature?.displayName ?? featureKey,
+      role: resolved.feature.role,
       projectId,
-      resolved.scope,
-      resolved.model,
+      resolvedScope: resolved.scope,
+      resolvedModel: resolved.model,
       providerKey,
-      alternate && alternate.scope !== null && alternate.scope !== "project"
-        ? {
-            scope: alternate.scope,
-            model: alternate.model,
-            providerKey: alternateProviderKey ?? "",
-            providerEnabled: Boolean(
-              alternateProviderKey &&
-                modelProviders[alternateProviderKey]?.enabled,
-            ),
-          }
-        : null,
-    );
+      alternate:
+        alternate && alternate.scope !== null && alternate.scope !== "project"
+          ? {
+              scope: alternate.scope,
+              model: alternate.model,
+              providerKey: alternateProviderKey ?? "",
+              providerEnabled: Boolean(
+                alternateProviderKey &&
+                  modelProviders[alternateProviderKey]?.enabled,
+              ),
+            }
+          : null,
+    });
   } catch (err) {
     if (err instanceof ModelNotConfiguredError) throw err;
     if (err instanceof ModelProviderDisabledError) throw err;

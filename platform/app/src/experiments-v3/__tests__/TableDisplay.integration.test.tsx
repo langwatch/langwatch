@@ -387,7 +387,12 @@ describe("Value truncation", () => {
 
     // Create a very long string (over 5000 chars)
     const longValue = "a".repeat(6000);
-    store.setCellValue("test-data", 0, "input", longValue);
+    store.setCellValue({
+      datasetId: "test-data",
+      row: 0,
+      columnId: "input",
+      value: longValue,
+    });
 
     render(<EvaluationsV3Table disableVirtualization />, { wrapper: Wrapper });
 

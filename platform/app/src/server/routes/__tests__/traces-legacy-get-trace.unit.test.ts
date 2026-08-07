@@ -209,12 +209,12 @@ describe("legacy GET /api/trace/:id (singular)", () => {
       // with THREE args; it must pass { full: true } as the fourth arg.
       await makeRequest({ traceId: "trace-abc", query: { format: "json" } });
 
-      expect(mockGetById).toHaveBeenCalledWith(
-        "project-123",
-        "trace-abc",
-        expect.any(Object),
-        { full: true },
-      );
+      expect(mockGetById).toHaveBeenCalledWith({
+        projectId: "project-123",
+        traceId: "trace-abc",
+        protections: expect.any(Object),
+        opts: { full: true },
+      });
     });
 
     it("returns 200 with the trace json", async () => {

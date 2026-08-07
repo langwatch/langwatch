@@ -181,11 +181,11 @@ export interface FeedbacksResult {
  * semantics to drift.
  */
 export interface AnalyticsBackend {
-  getDataForFilter(
-    projectId: string,
-    field: FilterField,
-    startDate: number,
-    endDate: number,
+  getDataForFilter(params: {
+    projectId: string;
+    field: FilterField;
+    startDate: number;
+    endDate: number;
     filters: Partial<
       Record<
         FilterField,
@@ -193,15 +193,15 @@ export interface AnalyticsBackend {
         | Record<string, string[]>
         | Record<string, Record<string, string[]>>
       >
-    >,
-    key?: string,
-    subkey?: string,
-    searchQuery?: string,
-  ): Promise<FilterDataResult>;
-  getTopUsedDocuments(
-    projectId: string,
-    startDate: number,
-    endDate: number,
+    >;
+    key?: string;
+    subkey?: string;
+    searchQuery?: string;
+  }): Promise<FilterDataResult>;
+  getTopUsedDocuments(params: {
+    projectId: string;
+    startDate: number;
+    endDate: number;
     filters?: Partial<
       Record<
         FilterField,
@@ -209,12 +209,12 @@ export interface AnalyticsBackend {
         | Record<string, string[]>
         | Record<string, Record<string, string[]>>
       >
-    >,
-  ): Promise<TopDocumentsResult>;
-  getFeedbacks(
-    projectId: string,
-    startDate: number,
-    endDate: number,
+    >;
+  }): Promise<TopDocumentsResult>;
+  getFeedbacks(params: {
+    projectId: string;
+    startDate: number;
+    endDate: number;
     filters?: Partial<
       Record<
         FilterField,
@@ -222,7 +222,7 @@ export interface AnalyticsBackend {
         | Record<string, string[]>
         | Record<string, Record<string, string[]>>
       >
-    >,
-  ): Promise<FeedbacksResult>;
+    >;
+  }): Promise<FeedbacksResult>;
   isAvailable(): boolean;
 }

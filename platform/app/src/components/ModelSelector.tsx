@@ -91,12 +91,17 @@ export const filterRestrictedModels = ({
       : isModelAllowedForFeature({ modelId: model, featureKey }),
   );
 
-export const useModelSelectionOptions = (
-  options: string[],
-  model: string,
-  mode: "chat" | "embedding" = "chat",
-  opts?: { featureKey?: string | undefined },
-) => {
+export const useModelSelectionOptions = ({
+  options,
+  model,
+  mode = "chat",
+  featureKey,
+}: {
+  options: string[];
+  model: string;
+  mode?: "chat" | "embedding";
+  featureKey?: string | undefined;
+}) => {
   const { project } = useOrganizationTeamProject();
   // `listAllForProjectForFrontend` returns the providers actually
   // stored against any scope reachable from this project. The legacy
@@ -138,7 +143,7 @@ export const useModelSelectionOptions = (
 
   const allModels = filterRestrictedModels({
     models: getCustomModels(providersByKey, options, mode),
-    featureKey: opts?.featureKey,
+    featureKey,
   });
 
   // Build a set of custom model IDs for quick lookup
@@ -248,7 +253,7 @@ export const ModelSelector = React.memo(function ModelSelector({
   onOpenChange?: (open: boolean) => void;
 }) {
   const { selectOptions, groupedByProvider, isEmpty, isLoading } =
-    useModelSelectionOptions(options, model, mode);
+    useModelSelectionOptions({ options, model, mode });
 
   // ALL hooks must run unconditionally — keep the empty-state early
   // return *after* every hook below so we don't violate React's rules

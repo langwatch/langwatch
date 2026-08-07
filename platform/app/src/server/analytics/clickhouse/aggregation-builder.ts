@@ -747,23 +747,23 @@ export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
     let translation: MetricTranslation;
 
     if (series.pipeline) {
-      translation = translatePipelineAggregation(
-        series.metric,
-        series.aggregation,
-        series.pipeline.field,
-        series.pipeline.aggregation,
-        i,
-        series.key,
-        series.subkey,
-      );
+      translation = translatePipelineAggregation({
+        metric: series.metric,
+        aggregation: series.aggregation,
+        pipelineField: series.pipeline.field,
+        pipelineAggregation: series.pipeline.aggregation,
+        index: i,
+        key: series.key,
+        subkey: series.subkey,
+      });
     } else {
-      translation = translateMetric(
-        series.metric,
-        series.aggregation,
-        i,
-        series.key,
-        series.subkey,
-      );
+      translation = translateMetric({
+        metric: series.metric,
+        aggregation: series.aggregation,
+        index: i,
+        key: series.key,
+        subkey: series.subkey,
+      });
     }
 
     metricTranslations.push(translation);
@@ -930,17 +930,17 @@ export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
   // When groupBy is present, fall through to the standard query path which correctly
   // handles GROUP BY group_key — the CTE path doesn't support grouped results.
   if (input.timeScale === "full" && !groupByColumn) {
-    return buildSubqueryTimeseriesQuery(
+    return buildSubqueryTimeseriesQuery({
       input,
       simpleMetrics,
       subqueryMetrics,
       joinClauses,
       baseWhere,
       filterWhere,
-      allTranslationParams,
+      filterParams: allTranslationParams,
       groupByColumn,
       groupByHandlesUnknown,
-    );
+    });
   }
 
   // Pipeline metrics with numeric timeScale: use date-bucketed two-level aggregation
@@ -1472,13 +1472,13 @@ function buildArrayJoinTimeseriesQuery({
       series.pipeline.field === "trace_id" &&
       TRACE_ID_PIPELINE_SAFE_AGGS.has(series.pipeline.aggregation)
     ) {
-      const innerTranslation = translateMetric(
-        series.metric,
-        series.aggregation,
-        i,
-        series.key,
-        series.subkey,
-      );
+      const innerTranslation = translateMetric({
+        metric: series.metric,
+        aggregation: series.aggregation,
+        index: i,
+        key: series.key,
+        subkey: series.subkey,
+      });
       // Swap alias to match the pipeline translation's alias (they're identical
       // for trace_id pipelines, but be explicit for clarity)
       const escapedAlias = innerTranslation.alias.replace(
@@ -1910,17 +1910,27 @@ function buildGroupByUnionAllQuery({
  * Build a timeseries query using CTEs for subquery (pipeline) metrics.
  * This handles metrics that require two-level aggregation (e.g., avg threads per user).
  */
-function buildSubqueryTimeseriesQuery(
-  input: TimeseriesQueryInput,
-  simpleMetrics: MetricTranslation[],
-  subqueryMetrics: MetricTranslation[],
-  joinClauses: string,
-  baseWhere: string,
-  filterWhere: string,
-  filterParams: Record<string, unknown>,
-  groupByColumn: string | null = null,
+function buildSubqueryTimeseriesQuery({
+  input,
+  simpleMetrics,
+  subqueryMetrics,
+  joinClauses,
+  baseWhere,
+  filterWhere,
+  filterParams,
+  groupByColumn = null,
   groupByHandlesUnknown = false,
-): BuiltQuery {
+}: {
+  input: TimeseriesQueryInput;
+  simpleMetrics: MetricTranslation[];
+  subqueryMetrics: MetricTranslation[];
+  joinClauses: string;
+  baseWhere: string;
+  filterWhere: string;
+  filterParams: Record<string, unknown>;
+  groupByColumn?: string | null;
+  groupByHandlesUnknown?: boolean;
+}): BuiltQuery {
   const ts = tableAliases.trace_summaries;
   const traceColumns = referencedTraceColumns(
     [...simpleMetrics, ...subqueryMetrics],
@@ -2106,13 +2116,13 @@ function buildSubqueryTimeseriesQuery(
       .map((series, index) => ({ series, index }))
       .filter(({ series }) => isZeroWhenAbsentSeries(series))
       .map(({ series, index }) =>
-        buildMetricAlias(
+        buildMetricAlias({
           index,
-          series.metric,
-          series.aggregation,
-          series.key,
-          series.subkey,
-        ),
+          metric: series.metric,
+          aggregation: series.aggregation,
+          key: series.key,
+          subkey: series.subkey,
+        }),
       ),
   );
   const scalarExpr = (
@@ -2733,14 +2743,23 @@ function transformMetricForDedup(
 /**
  * Build a query for dataForFilter (dropdown data)
  */
-export function buildDataForFilterQuery(
-  projectId: string,
-  field: FilterField,
-  startDate: Date,
-  endDate: Date,
-  key?: string,
-  subkey?: string,
-  searchQuery?: string,
+export function buildDataForFilterQuery({
+  projectId,
+  field,
+  startDate,
+  endDate,
+  key,
+  subkey,
+  searchQuery,
+  filters,
+}: {
+  projectId: string;
+  field: FilterField;
+  startDate: Date;
+  endDate: Date;
+  key?: string;
+  subkey?: string;
+  searchQuery?: string;
   filters?: Partial<
     Record<
       FilterField,
@@ -2748,8 +2767,8 @@ export function buildDataForFilterQuery(
       | Record<string, string[]>
       | Record<string, Record<string, string[]>>
     >
-  >,
-): BuiltQuery {
+  >;
+}): BuiltQuery {
   const ts = tableAliases.trace_summaries;
   const ss = tableAliases.stored_spans;
   const es = tableAliases.evaluation_runs;
@@ -2980,10 +2999,15 @@ export function buildDataForFilterQuery(
 /**
  * Build a query for top used documents (RAG analytics)
  */
-export function buildTopDocumentsQuery(
-  projectId: string,
-  startDate: Date,
-  endDate: Date,
+export function buildTopDocumentsQuery({
+  projectId,
+  startDate,
+  endDate,
+  filters,
+}: {
+  projectId: string;
+  startDate: Date;
+  endDate: Date;
   filters?: Partial<
     Record<
       FilterField,
@@ -2991,8 +3015,8 @@ export function buildTopDocumentsQuery(
       | Record<string, string[]>
       | Record<string, Record<string, string[]>>
     >
-  >,
-): BuiltQuery {
+  >;
+}): BuiltQuery {
   const ts = tableAliases.trace_summaries;
   const ss = tableAliases.stored_spans;
 
@@ -3078,10 +3102,15 @@ export function buildTopDocumentsQuery(
 /**
  * Build a query for feedbacks
  */
-export function buildFeedbacksQuery(
-  projectId: string,
-  startDate: Date,
-  endDate: Date,
+export function buildFeedbacksQuery({
+  projectId,
+  startDate,
+  endDate,
+  filters,
+}: {
+  projectId: string;
+  startDate: Date;
+  endDate: Date;
   filters?: Partial<
     Record<
       FilterField,
@@ -3089,8 +3118,8 @@ export function buildFeedbacksQuery(
       | Record<string, string[]>
       | Record<string, Record<string, string[]>>
     >
-  >,
-): BuiltQuery {
+  >;
+}): BuiltQuery {
   const ts = tableAliases.trace_summaries;
   const ss = tableAliases.stored_spans;
 

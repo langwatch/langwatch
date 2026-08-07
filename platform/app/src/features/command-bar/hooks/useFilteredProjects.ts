@@ -28,12 +28,17 @@ interface Organization {
  * Filters by project name, organization name, or team name.
  * Only includes projects from teams where the current user is a member.
  */
-export function useFilteredProjects(
-  query: string,
-  organizations: Organization[] | undefined,
-  currentProjectSlug: string | undefined,
-  currentUserId: string | undefined,
-): FilteredProject[] {
+export function useFilteredProjects({
+  query,
+  organizations,
+  currentProjectSlug,
+  currentUserId,
+}: {
+  query: string;
+  organizations: Organization[] | undefined;
+  currentProjectSlug: string | undefined;
+  currentUserId: string | undefined;
+}): FilteredProject[] {
   return useMemo(() => {
     if (!organizations || !query.trim()) return [];
 

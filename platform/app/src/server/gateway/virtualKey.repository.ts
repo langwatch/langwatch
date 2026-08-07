@@ -287,12 +287,17 @@ export class VirtualKeyRepository {
     });
   }
 
-  async updateConfig(
-    id: string,
-    organizationId: string,
-    config: Prisma.InputJsonValue,
-    tx?: Prisma.TransactionClient,
-  ): Promise<VirtualKeyWithScopes> {
+  async updateConfig({
+    id,
+    organizationId,
+    config,
+    tx,
+  }: {
+    id: string;
+    organizationId: string;
+    config: Prisma.InputJsonValue;
+    tx?: Prisma.TransactionClient;
+  }): Promise<VirtualKeyWithScopes> {
     const client = tx ?? this.prisma;
     return client.virtualKey.update({
       where: { id, organizationId },
@@ -329,12 +334,17 @@ export class VirtualKeyRepository {
     });
   }
 
-  async setRoutingPolicy(
-    id: string,
-    organizationId: string,
-    routingPolicyId: string | null,
-    tx?: Prisma.TransactionClient,
-  ): Promise<VirtualKeyWithScopes> {
+  async setRoutingPolicy({
+    id,
+    organizationId,
+    routingPolicyId,
+    tx,
+  }: {
+    id: string;
+    organizationId: string;
+    routingPolicyId: string | null;
+    tx?: Prisma.TransactionClient;
+  }): Promise<VirtualKeyWithScopes> {
     const client = tx ?? this.prisma;
     return client.virtualKey.update({
       where: { id, organizationId },
@@ -349,15 +359,23 @@ export class VirtualKeyRepository {
     });
   }
 
-  async rotateSecret(
-    id: string,
-    organizationId: string,
-    newHashedSecret: string,
-    newDisplayPrefix: string,
-    previousHashedSecret: string,
-    previousSecretValidUntil: Date,
-    tx?: Prisma.TransactionClient,
-  ): Promise<VirtualKeyWithScopes> {
+  async rotateSecret({
+    id,
+    organizationId,
+    newHashedSecret,
+    newDisplayPrefix,
+    previousHashedSecret,
+    previousSecretValidUntil,
+    tx,
+  }: {
+    id: string;
+    organizationId: string;
+    newHashedSecret: string;
+    newDisplayPrefix: string;
+    previousHashedSecret: string;
+    previousSecretValidUntil: Date;
+    tx?: Prisma.TransactionClient;
+  }): Promise<VirtualKeyWithScopes> {
     const client = tx ?? this.prisma;
     return client.virtualKey.update({
       where: { id, organizationId },
@@ -378,12 +396,17 @@ export class VirtualKeyRepository {
     });
   }
 
-  async revoke(
-    id: string,
-    organizationId: string,
-    revokedById: string,
-    tx?: Prisma.TransactionClient,
-  ): Promise<VirtualKeyWithScopes> {
+  async revoke({
+    id,
+    organizationId,
+    revokedById,
+    tx,
+  }: {
+    id: string;
+    organizationId: string;
+    revokedById: string;
+    tx?: Prisma.TransactionClient;
+  }): Promise<VirtualKeyWithScopes> {
     const client = tx ?? this.prisma;
     return client.virtualKey.update({
       where: { id, organizationId },

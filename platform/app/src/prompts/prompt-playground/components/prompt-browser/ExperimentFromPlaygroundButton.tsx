@@ -125,12 +125,17 @@ const hasUnsavedChanges = (
  * @param datasets - Datasets for auto-mapping
  * @param savedPrompt - The saved prompt from database (for comparison)
  */
-const convertTabToTarget = (
-  tabData: TabData,
-  index: number,
-  datasets: DatasetReference[],
-  savedPrompt: VersionedPrompt | null | undefined,
-): TargetConfig => {
+const convertTabToTarget = ({
+  tabData,
+  index,
+  datasets,
+  savedPrompt,
+}: {
+  tabData: TabData;
+  index: number;
+  datasets: DatasetReference[];
+  savedPrompt: VersionedPrompt | null | undefined;
+}): TargetConfig => {
   const configId = tabData.form.currentValues.configId;
   const versionId = tabData.form.currentValues.versionMetadata?.versionId;
 
@@ -292,12 +297,12 @@ export function ExperimentFromPlaygroundButton({
       (tab, index) => {
         const configId = tab.data.form.currentValues.configId;
         const savedPrompt = configId ? savedPromptsMap.get(configId) : null;
-        return convertTabToTarget(
-          tab.data,
+        return convertTabToTarget({
+          tabData: tab.data,
           index,
-          initialState.datasets,
+          datasets: initialState.datasets,
           savedPrompt,
-        );
+        });
       },
     );
     initialState.targets = targets;

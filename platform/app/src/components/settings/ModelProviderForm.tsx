@@ -313,13 +313,13 @@ export const EditModelProviderForm = ({
     isValidating: isValidatingApiKey,
     validationError: apiKeyValidationError,
     clearError: clearApiKeyError,
-  } = useModelProviderApiKeyValidation(
-    provider.provider,
-    state.customKeys,
+  } = useModelProviderApiKeyValidation({
+    provider: provider.provider,
+    customKeys: state.customKeys,
     projectId,
-    organization?.id,
-    state.scopes,
-  );
+    organizationId: organization?.id,
+    scopes: state.scopes,
+  });
 
   // Shared with onboarding and the Langy model gate, so a refusal is not the
   // end of the road on one surface and a hard block on the next.

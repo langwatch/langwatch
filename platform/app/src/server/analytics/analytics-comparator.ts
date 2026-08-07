@@ -35,12 +35,17 @@ export class AnalyticsComparator {
   /**
    * Compare results from two backends and log discrepancies
    */
-  compare<T>(
-    operation: string,
-    input: unknown,
-    esResult: T,
-    chResult: T,
-  ): void {
+  compare<T>({
+    operation,
+    input,
+    esResult,
+    chResult,
+  }: {
+    operation: string;
+    input: unknown;
+    esResult: T;
+    chResult: T;
+  }): void {
     const discrepancies = this.findDiscrepancies(esResult, chResult);
 
     if (discrepancies.length > 0) {

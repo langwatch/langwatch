@@ -148,12 +148,27 @@ interface ApproveInviteInput {
  * Dependencies are injected to follow DIP and enable testability.
  */
 export class InviteService {
-  constructor(
-    private readonly prisma: PrismaClient | Prisma.TransactionClient,
-    private readonly licenseRepo: ILicenseEnforcementRepository,
-    private readonly planProvider: PlanProvider,
-    private readonly roleService?: RoleService,
-  ) {}
+  private readonly prisma: PrismaClient | Prisma.TransactionClient;
+  private readonly licenseRepo: ILicenseEnforcementRepository;
+  private readonly planProvider: PlanProvider;
+  private readonly roleService?: RoleService;
+
+  constructor({
+    prisma,
+    licenseRepo,
+    planProvider,
+    roleService,
+  }: {
+    prisma: PrismaClient | Prisma.TransactionClient;
+    licenseRepo: ILicenseEnforcementRepository;
+    planProvider: PlanProvider;
+    roleService?: RoleService;
+  }) {
+    this.prisma = prisma;
+    this.licenseRepo = licenseRepo;
+    this.planProvider = planProvider;
+    this.roleService = roleService;
+  }
 
   /**
    * Factory method for creating InviteService with default dependencies.
@@ -175,7 +190,12 @@ export class InviteService {
       getActivePlan: (params) => getApp().planProvider.getActivePlan(params),
     };
     const roleService = new RoleService(prisma);
-    return new InviteService(prisma, licenseRepo, provider, roleService);
+    return new InviteService({
+      prisma,
+      licenseRepo,
+      planProvider: provider,
+      roleService,
+    });
   }
 
   /**

@@ -112,14 +112,14 @@ function createFoundryExecutor(opts: ExecutorOpts): FoundryExecutor {
     const now = Date.now();
     let traceId = "";
     for (const spanConfig of traceConfig.spans) {
-      const id = buildSpan(
+      const id = buildSpan({
         tracer,
-        spanConfig,
-        ROOT_CONTEXT,
-        now,
+        config: spanConfig,
+        parentContext: ROOT_CONTEXT,
+        baseTime: now,
         traceConfig,
-        otelDeps,
-      );
+        otel: otelDeps,
+      });
       if (!traceId) traceId = id;
     }
     return traceId;
@@ -159,18 +159,25 @@ function createFoundryExecutor(opts: ExecutorOpts): FoundryExecutor {
   };
 }
 
-function buildSpan(
-  tracer: Tracer,
-  config: SpanConfig,
-  parentContext: Context,
-  baseTime: number,
-  traceConfig: TraceConfig,
+function buildSpan({
+  tracer,
+  config,
+  parentContext,
+  baseTime,
+  traceConfig,
+  otel,
+}: {
+  tracer: Tracer;
+  config: SpanConfig;
+  parentContext: Context;
+  baseTime: number;
+  traceConfig: TraceConfig;
   otel: {
     context: typeof import("@opentelemetry/api").context;
     trace: typeof import("@opentelemetry/api").trace;
     SpanStatusCode: typeof import("@opentelemetry/api").SpanStatusCode;
-  },
-): string {
+  };
+}): string {
   const startTimeMs = baseTime + config.offsetMs;
   const endTimeMs = startTimeMs + config.durationMs;
 
@@ -385,7 +392,14 @@ function buildSpan(
 
   const childContext = otel.trace.setSpan(parentContext, span);
   for (const child of config.children) {
-    buildSpan(tracer, child, childContext, startTimeMs, traceConfig, otel);
+    buildSpan({
+      tracer,
+      config: child,
+      parentContext: childContext,
+      baseTime: startTimeMs,
+      traceConfig,
+      otel,
+    });
   }
 
   span.end(new Date(endTimeMs));

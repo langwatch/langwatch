@@ -129,12 +129,27 @@ export type ValidateDatasetNameResult = {
  * Throws domain-specific errors that can be mapped by the router layer.
  */
 export class DatasetService {
-  constructor(
-    private readonly prisma: PrismaClient,
-    private readonly repository: DatasetRepository,
-    private readonly recordRepository: DatasetRecordRepository,
-    private readonly experimentRepository: ExperimentRepository,
-  ) {}
+  private readonly prisma: PrismaClient;
+  private readonly repository: DatasetRepository;
+  private readonly recordRepository: DatasetRecordRepository;
+  private readonly experimentRepository: ExperimentRepository;
+
+  constructor({
+    prisma,
+    repository,
+    recordRepository,
+    experimentRepository,
+  }: {
+    prisma: PrismaClient;
+    repository: DatasetRepository;
+    recordRepository: DatasetRecordRepository;
+    experimentRepository: ExperimentRepository;
+  }) {
+    this.prisma = prisma;
+    this.repository = repository;
+    this.recordRepository = recordRepository;
+    this.experimentRepository = experimentRepository;
+  }
 
   /**
    * Static factory method for creating a DatasetService with proper DI.
@@ -143,12 +158,12 @@ export class DatasetService {
     const repository = new DatasetRepository(prisma);
     const recordRepository = new DatasetRecordRepository(prisma);
     const experimentRepository = new ExperimentRepository(prisma);
-    return new DatasetService(
+    return new DatasetService({
       prisma,
       repository,
       recordRepository,
       experimentRepository,
-    );
+    });
   }
 
   /**

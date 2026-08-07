@@ -128,12 +128,27 @@ export interface UsageStats {
  * manually wiring dependencies.
  */
 export class UsageStatsService {
-  constructor(
-    private readonly repository: ILicenseEnforcementRepository,
-    private readonly traceUsageService: ITraceUsageService,
-    private readonly planProvider: PlanProvider,
-    private readonly usageUnitResolver: IUsageUnitResolver,
-  ) {}
+  private readonly repository: ILicenseEnforcementRepository;
+  private readonly traceUsageService: ITraceUsageService;
+  private readonly planProvider: PlanProvider;
+  private readonly usageUnitResolver: IUsageUnitResolver;
+
+  constructor({
+    repository,
+    traceUsageService,
+    planProvider,
+    usageUnitResolver,
+  }: {
+    repository: ILicenseEnforcementRepository;
+    traceUsageService: ITraceUsageService;
+    planProvider: PlanProvider;
+    usageUnitResolver: IUsageUnitResolver;
+  }) {
+    this.repository = repository;
+    this.traceUsageService = traceUsageService;
+    this.planProvider = planProvider;
+    this.usageUnitResolver = usageUnitResolver;
+  }
 
   /**
    * Static factory method for creating UsageStatsService with proper DI.
@@ -141,12 +156,12 @@ export class UsageStatsService {
    */
   static create(prisma: PrismaClient): UsageStatsService {
     const repository = new LicenseEnforcementRepository(prisma);
-    return new UsageStatsService(
+    return new UsageStatsService({
       repository,
-      getApp().usage,
-      getApp().planProvider,
-      getApp().usage,
-    );
+      traceUsageService: getApp().usage,
+      planProvider: getApp().planProvider,
+      usageUnitResolver: getApp().usage,
+    });
   }
 
   /**

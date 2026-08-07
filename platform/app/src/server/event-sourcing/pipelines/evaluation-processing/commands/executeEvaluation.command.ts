@@ -187,9 +187,13 @@ export class ExecuteEvaluationCommand
         { tenantId: tenantId, evaluatorId: data.evaluatorId },
         "Monitor not found — skipping evaluation",
       );
-      return emitReported(data, tenantId, {
-        status: "skipped",
-        details: "Monitor not found",
+      return emitReported({
+        data,
+        tenantId,
+        result: {
+          status: "skipped",
+          details: "Monitor not found",
+        },
       });
     }
 
@@ -210,9 +214,13 @@ export class ExecuteEvaluationCommand
           },
           "Azure Safety provider not configured — skipping evaluation",
         );
-        return emitReported(data, tenantId, {
-          status: "skipped",
-          details: AZURE_SAFETY_NOT_CONFIGURED_MESSAGE,
+        return emitReported({
+          data,
+          tenantId,
+          result: {
+            status: "skipped",
+            details: AZURE_SAFETY_NOT_CONFIGURED_MESSAGE,
+          },
         });
       }
     }
@@ -363,10 +371,10 @@ export class ExecuteEvaluationCommand
         ? (result.error ?? result.details ?? "Evaluator failed")
         : result.error;
 
-      return await emitReported(
+      return await emitReported({
         data,
         tenantId,
-        {
+        result: {
           status: result.status,
           score: result.score,
           passed: result.passed,
@@ -377,8 +385,8 @@ export class ExecuteEvaluationCommand
           inputs: result.inputs ?? null,
           costId,
         },
-        this.deps.offloadInputs,
-      );
+        offloadInputs: this.deps.offloadInputs,
+      });
     } catch (error) {
       // Customer-fixable errors (see isCustomerFixable above) are skipped,
       // not errored — mirrors the pre-execution config gates above.
@@ -401,9 +409,13 @@ export class ExecuteEvaluationCommand
           "Customer-fixable evaluator failure — skipping evaluation",
         );
 
-        return emitReported(data, tenantId, {
-          status: "skipped",
-          details: error.message,
+        return emitReported({
+          data,
+          tenantId,
+          result: {
+            status: "skipped",
+            details: error.message,
+          },
         });
       }
 
@@ -418,18 +430,27 @@ export class ExecuteEvaluationCommand
         "Evaluation execution failed",
       );
 
-      return emitReported(data, tenantId, {
-        status: "error",
-        error: extractErrorMessage(error),
-        errorDetails: error instanceof Error ? (error.stack ?? null) : null,
+      return emitReported({
+        data,
+        tenantId,
+        result: {
+          status: "error",
+          error: extractErrorMessage(error),
+          errorDetails: error instanceof Error ? (error.stack ?? null) : null,
+        },
       });
     }
   }
 }
 
-async function emitReported(
-  data: ExecuteEvaluationCommandData,
-  tenantId: ReturnType<typeof createTenantId>,
+async function emitReported({
+  data,
+  tenantId,
+  result,
+  offloadInputs,
+}: {
+  data: ExecuteEvaluationCommandData;
+  tenantId: ReturnType<typeof createTenantId>;
   result: {
     status: "processed" | "error" | "skipped";
     score?: number;
@@ -440,9 +461,9 @@ async function emitReported(
     error?: string;
     errorDetails?: string | null;
     costId?: string | null;
-  },
-  offloadInputs?: ExecuteEvaluationCommandDeps["offloadInputs"],
-): Promise<EvaluationProcessingEvent[]> {
+  };
+  offloadInputs?: ExecuteEvaluationCommandDeps["offloadInputs"];
+}): Promise<EvaluationProcessingEvent[]> {
   // ADR-040: offload oversized inputs to durable object storage BEFORE the
   // event is created, so the S3 PUT precedes the event_log append (matching
   // the PUT-then-row ordering used by stored-objects) and the event carries

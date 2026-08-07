@@ -50,26 +50,41 @@ export interface IssuedPersonalVk {
 }
 
 export class PersonalVirtualKeyService {
-  constructor(
-    private readonly prisma: PrismaClient,
-    private readonly personalWorkspace: PersonalWorkspaceService,
-    private readonly routingPolicy: RoutingPolicyService,
-    private readonly gatewayBaseUrl: string,
-  ) {}
+  private readonly prisma: PrismaClient;
+  private readonly personalWorkspace: PersonalWorkspaceService;
+  private readonly routingPolicy: RoutingPolicyService;
+  private readonly gatewayBaseUrl: string;
+
+  constructor({
+    prisma,
+    personalWorkspace,
+    routingPolicy,
+    gatewayBaseUrl,
+  }: {
+    prisma: PrismaClient;
+    personalWorkspace: PersonalWorkspaceService;
+    routingPolicy: RoutingPolicyService;
+    gatewayBaseUrl: string;
+  }) {
+    this.prisma = prisma;
+    this.personalWorkspace = personalWorkspace;
+    this.routingPolicy = routingPolicy;
+    this.gatewayBaseUrl = gatewayBaseUrl;
+  }
 
   static create(
     prisma: PrismaClient,
     options?: { gatewayBaseUrl?: string; isSaas?: boolean },
   ): PersonalVirtualKeyService {
-    return new PersonalVirtualKeyService(
+    return new PersonalVirtualKeyService({
       prisma,
-      new PersonalWorkspaceService(prisma),
-      new RoutingPolicyService(prisma),
-      resolveGatewayBaseUrl({
+      personalWorkspace: new PersonalWorkspaceService(prisma),
+      routingPolicy: new RoutingPolicyService(prisma),
+      gatewayBaseUrl: resolveGatewayBaseUrl({
         publicUrl: options?.gatewayBaseUrl,
         isSaas: options?.isSaas,
       }),
-    );
+    });
   }
 
   /**

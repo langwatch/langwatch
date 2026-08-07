@@ -130,7 +130,7 @@ describe("VertexAdkExtractor", () => {
   describe("given a generate_content span", () => {
     describe("when the span is canonicalised", () => {
       it("extracts the conversation as gen_ai.input.messages", () => {
-        const ctx = createExtractorContext(llmSpanAttrs());
+        const ctx = createExtractorContext({ attrs: llmSpanAttrs() });
 
         extractor.apply(ctx);
 
@@ -165,7 +165,7 @@ describe("VertexAdkExtractor", () => {
       });
 
       it("extracts the model reply as gen_ai.output.messages", () => {
-        const ctx = createExtractorContext(llmSpanAttrs());
+        const ctx = createExtractorContext({ attrs: llmSpanAttrs() });
 
         extractor.apply(ctx);
 
@@ -188,7 +188,7 @@ describe("VertexAdkExtractor", () => {
       });
 
       it("surfaces the system instruction separately from the chat messages", () => {
-        const ctx = createExtractorContext(llmSpanAttrs());
+        const ctx = createExtractorContext({ attrs: llmSpanAttrs() });
 
         extractor.apply(ctx);
 
@@ -202,7 +202,7 @@ describe("VertexAdkExtractor", () => {
       });
 
       it("annotates input and output messages as chat_messages", () => {
-        const ctx = createExtractorContext(llmSpanAttrs());
+        const ctx = createExtractorContext({ attrs: llmSpanAttrs() });
 
         extractor.apply(ctx);
 
@@ -213,7 +213,7 @@ describe("VertexAdkExtractor", () => {
       });
 
       it("lifts tool declarations to gen_ai.tool.definitions", () => {
-        const ctx = createExtractorContext(llmSpanAttrs());
+        const ctx = createExtractorContext({ attrs: llmSpanAttrs() });
 
         extractor.apply(ctx);
 
@@ -223,7 +223,7 @@ describe("VertexAdkExtractor", () => {
       });
 
       it("types the span as llm", () => {
-        const ctx = createExtractorContext(llmSpanAttrs());
+        const ctx = createExtractorContext({ attrs: llmSpanAttrs() });
 
         extractor.apply(ctx);
 
@@ -231,7 +231,7 @@ describe("VertexAdkExtractor", () => {
       });
 
       it("consumes the vendor request/response payload attributes", () => {
-        const ctx = createExtractorContext(llmSpanAttrs());
+        const ctx = createExtractorContext({ attrs: llmSpanAttrs() });
 
         extractor.apply(ctx);
 
@@ -240,7 +240,7 @@ describe("VertexAdkExtractor", () => {
       });
 
       it("keeps the vendor session/invocation ids as passthrough attributes", () => {
-        const ctx = createExtractorContext(llmSpanAttrs());
+        const ctx = createExtractorContext({ attrs: llmSpanAttrs() });
 
         extractor.apply(ctx);
 
@@ -251,7 +251,7 @@ describe("VertexAdkExtractor", () => {
 
     describe("when the span already reports standard token usage", () => {
       it("keeps the explicitly reported token counts", () => {
-        const ctx = createExtractorContext(llmSpanAttrs());
+        const ctx = createExtractorContext({ attrs: llmSpanAttrs() });
 
         extractor.apply(ctx);
 
@@ -263,7 +263,7 @@ describe("VertexAdkExtractor", () => {
       });
 
       it("still lifts cached prompt tokens as cache-read tokens", () => {
-        const ctx = createExtractorContext(llmSpanAttrs());
+        const ctx = createExtractorContext({ attrs: llmSpanAttrs() });
 
         extractor.apply(ctx);
 
@@ -278,7 +278,7 @@ describe("VertexAdkExtractor", () => {
         const attrs = llmSpanAttrs();
         delete attrs["gen_ai.usage.input_tokens"];
         delete attrs["gen_ai.usage.output_tokens"];
-        const ctx = createExtractorContext(attrs);
+        const ctx = createExtractorContext({ attrs });
 
         extractor.apply(ctx);
 
@@ -291,8 +291,10 @@ describe("VertexAdkExtractor", () => {
       it("does not overwrite the existing messages", () => {
         const existing = [{ role: "user", content: "already extracted" }];
         const ctx = createExtractorContext({
-          ...llmSpanAttrs(),
-          [ATTR_KEYS.GEN_AI_INPUT_MESSAGES]: existing,
+          attrs: {
+            ...llmSpanAttrs(),
+            [ATTR_KEYS.GEN_AI_INPUT_MESSAGES]: existing,
+          },
         });
 
         extractor.apply(ctx);
@@ -311,7 +313,7 @@ describe("VertexAdkExtractor", () => {
           content: { parts: [{ text: "Done." }], role: "model" },
           finish_reason: "STOP",
         });
-        const ctx = createExtractorContext(attrs);
+        const ctx = createExtractorContext({ attrs });
 
         extractor.apply(ctx);
 
@@ -334,7 +336,7 @@ describe("VertexAdkExtractor", () => {
             },
           ],
         });
-        const ctx = createExtractorContext(attrs);
+        const ctx = createExtractorContext({ attrs });
 
         extractor.apply(ctx);
 
@@ -356,7 +358,7 @@ describe("VertexAdkExtractor", () => {
           },
           contents: [{ parts: [{ text: "hi" }], role: "user" }],
         });
-        const ctx = createExtractorContext(attrs);
+        const ctx = createExtractorContext({ attrs });
 
         extractor.apply(ctx);
 
@@ -379,7 +381,7 @@ describe("VertexAdkExtractor", () => {
           },
           contents: [{ parts: [{ text: "hi" }], role: "user" }],
         });
-        const ctx = createExtractorContext(attrs);
+        const ctx = createExtractorContext({ attrs });
 
         extractor.apply(ctx);
 
@@ -394,7 +396,7 @@ describe("VertexAdkExtractor", () => {
   describe("given an execute_tool span", () => {
     describe("when the span is canonicalised", () => {
       it("types the span as tool", () => {
-        const ctx = createExtractorContext(toolSpanAttrs());
+        const ctx = createExtractorContext({ attrs: toolSpanAttrs() });
 
         extractor.apply(ctx);
 
@@ -402,7 +404,7 @@ describe("VertexAdkExtractor", () => {
       });
 
       it("lifts the call arguments to langwatch.input and gen_ai.tool.call.arguments", () => {
-        const ctx = createExtractorContext(toolSpanAttrs());
+        const ctx = createExtractorContext({ attrs: toolSpanAttrs() });
 
         extractor.apply(ctx);
 
@@ -412,7 +414,7 @@ describe("VertexAdkExtractor", () => {
       });
 
       it("lifts the tool response to langwatch.output and gen_ai.tool.call.result", () => {
-        const ctx = createExtractorContext(toolSpanAttrs());
+        const ctx = createExtractorContext({ attrs: toolSpanAttrs() });
 
         extractor.apply(ctx);
 
@@ -425,7 +427,7 @@ describe("VertexAdkExtractor", () => {
       });
 
       it("does not produce chat messages from the empty request/response payloads", () => {
-        const ctx = createExtractorContext(toolSpanAttrs());
+        const ctx = createExtractorContext({ attrs: toolSpanAttrs() });
 
         extractor.apply(ctx);
 
@@ -434,7 +436,7 @@ describe("VertexAdkExtractor", () => {
       });
 
       it("consumes the vendor tool payload attributes", () => {
-        const ctx = createExtractorContext(toolSpanAttrs());
+        const ctx = createExtractorContext({ attrs: toolSpanAttrs() });
 
         extractor.apply(ctx);
 
@@ -450,11 +452,13 @@ describe("VertexAdkExtractor", () => {
     describe("when the tool input/output were already set by an earlier source", () => {
       it("does not record the tool lift rules", () => {
         const ctx = createExtractorContext({
-          ...toolSpanAttrs(),
-          [ATTR_KEYS.LANGWATCH_INPUT]: "already set",
-          [ATTR_KEYS.GEN_AI_TOOL_CALL_ARGUMENTS]: "already set",
-          [ATTR_KEYS.LANGWATCH_OUTPUT]: "already set",
-          [ATTR_KEYS.GEN_AI_TOOL_CALL_RESULT]: "already set",
+          attrs: {
+            ...toolSpanAttrs(),
+            [ATTR_KEYS.LANGWATCH_INPUT]: "already set",
+            [ATTR_KEYS.GEN_AI_TOOL_CALL_ARGUMENTS]: "already set",
+            [ATTR_KEYS.LANGWATCH_OUTPUT]: "already set",
+            [ATTR_KEYS.GEN_AI_TOOL_CALL_RESULT]: "already set",
+          },
         });
 
         extractor.apply(ctx);
@@ -472,8 +476,10 @@ describe("VertexAdkExtractor", () => {
     describe("when the span type is explicitly set", () => {
       it("respects the explicit type", () => {
         const ctx = createExtractorContext({
-          ...toolSpanAttrs(),
-          [ATTR_KEYS.SPAN_TYPE]: "component",
+          attrs: {
+            ...toolSpanAttrs(),
+            [ATTR_KEYS.SPAN_TYPE]: "component",
+          },
         });
 
         extractor.apply(ctx);
@@ -487,9 +493,11 @@ describe("VertexAdkExtractor", () => {
     describe("when the span is canonicalised", () => {
       it("types the span as agent", () => {
         const ctx = createExtractorContext({
-          "gen_ai.operation.name": "invoke_agent",
-          "gen_ai.provider.name": "gcp.vertex.agent",
-          "gen_ai.agent.name": "TravelPlanner",
+          attrs: {
+            "gen_ai.operation.name": "invoke_agent",
+            "gen_ai.provider.name": "gcp.vertex.agent",
+            "gen_ai.agent.name": "TravelPlanner",
+          },
         });
 
         extractor.apply(ctx);
@@ -504,7 +512,7 @@ describe("VertexAdkExtractor", () => {
       it("falls back to gcp.vertex.agent.session_id", () => {
         const attrs = llmSpanAttrs();
         delete attrs["gen_ai.conversation.id"];
-        const ctx = createExtractorContext(attrs);
+        const ctx = createExtractorContext({ attrs });
 
         extractor.apply(ctx);
 
@@ -517,18 +525,16 @@ describe("VertexAdkExtractor", () => {
 
   describe("given the payload arrives as a JSON string that bypassed pre-parsing", () => {
     it("parses the request payload itself", () => {
-      const ctx = createExtractorContext(
-        {
+      const ctx = createExtractorContext({
+        attrs: {
           "gen_ai.provider.name": "gcp.vertex.agent",
           "gcp.vertex.agent.llm_request": JSON.stringify({
             model: "gemini-2.5-pro",
             contents: [{ parts: [{ text: "hello" }], role: "user" }],
           }),
         },
-        undefined,
-        undefined,
-        { skipJsonParsing: true },
-      );
+        options: { skipJsonParsing: true },
+      });
 
       extractor.apply(ctx);
 
@@ -542,9 +548,11 @@ describe("VertexAdkExtractor", () => {
     describe("when the span is canonicalised", () => {
       it("does nothing", () => {
         const ctx = createExtractorContext({
-          "gen_ai.operation.name": "chat",
-          "gen_ai.provider.name": "openai",
-          "gen_ai.request.model": "gpt-5-mini",
+          attrs: {
+            "gen_ai.operation.name": "chat",
+            "gen_ai.provider.name": "openai",
+            "gen_ai.request.model": "gpt-5-mini",
+          },
         });
 
         extractor.apply(ctx);

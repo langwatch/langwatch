@@ -104,17 +104,24 @@ function todayYYYYMMDD(): string {
   return `${y}${m}${day}`;
 }
 
-async function backfillAliasesAndRules(
-  vkId: string,
-  vkName: string,
-  orgId: string,
+async function backfillAliasesAndRules({
+  vkId,
+  vkName,
+  orgId,
+  scopes,
+  modelAliases,
+  policyRules,
+}: {
+  vkId: string;
+  vkName: string;
+  orgId: string;
   scopes: Array<{
     scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
     scopeId: string;
-  }>,
-  modelAliases: Record<string, string> | undefined,
-  policyRules: LegacyConfig["policyRules"],
-): Promise<string> {
+  }>;
+  modelAliases: Record<string, string> | undefined;
+  policyRules: LegacyConfig["policyRules"];
+}): Promise<string> {
   const rpId = `rp_migr_${nanoid()}`;
   const rpName = `${vkName}-migrated-aliases-${todayYYYYMMDD()}`;
   const primary = scopes[0]!;
@@ -249,14 +256,14 @@ async function main() {
 
     let routingPolicyId: string | null = vk.routingPolicyId;
     if ((hasAliases || hasRules) && !routingPolicyId) {
-      routingPolicyId = await backfillAliasesAndRules(
-        vk.id,
-        vk.name,
-        vk.organizationId,
+      routingPolicyId = await backfillAliasesAndRules({
+        vkId: vk.id,
+        vkName: vk.name,
+        orgId: vk.organizationId,
         scopes,
-        config.modelAliases,
-        config.policyRules,
-      );
+        modelAliases: config.modelAliases,
+        policyRules: config.policyRules,
+      });
     }
 
     let attachments: GuardrailAttachment[] = [];

@@ -91,7 +91,7 @@ export async function resolveApplicableBudgetsForDraftKey(
 
   // Independent lookups on an interactive path: run them together.
   const [spentByBudgetId, labels, providerLabels] = await Promise.all([
-    loadSpend(prisma, draft, resolved, chRepo),
+    loadSpend({ prisma, draft, resolved, chRepo }),
     loadScopeLabels(prisma, resolved),
     resolveProviderLabels({
       prisma,
@@ -122,12 +122,17 @@ export async function resolveApplicableBudgetsForDraftKey(
   }));
 }
 
-async function loadSpend(
-  prisma: PrismaClient,
-  draft: DraftVirtualKey,
-  resolved: Awaited<ReturnType<typeof resolveApplicableBudgets>>,
-  chRepo?: GatewayBudgetClickHouseRepository,
-): Promise<Map<string, string>> {
+async function loadSpend({
+  prisma,
+  draft,
+  resolved,
+  chRepo,
+}: {
+  prisma: PrismaClient;
+  draft: DraftVirtualKey;
+  resolved: Awaited<ReturnType<typeof resolveApplicableBudgets>>;
+  chRepo?: GatewayBudgetClickHouseRepository;
+}): Promise<Map<string, string>> {
   if (!chRepo) return new Map();
   const projects = await prisma.project.findMany({
     where: { team: { organizationId: draft.organizationId } },

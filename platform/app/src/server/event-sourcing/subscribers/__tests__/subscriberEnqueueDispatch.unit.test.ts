@@ -50,11 +50,11 @@ function makeQueueManager() {
 }
 
 function makeRouter(...subscribers: EventSubscriberDefinition<Event>[]) {
-  const router = new ProjectionRouter<Event>(
+  const router = new ProjectionRouter<Event>({
     aggregateType,
-    TEST_CONSTANTS.PIPELINE_NAME,
-    makeQueueManager(),
-  );
+    pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
+    queueManager: makeQueueManager(),
+  });
   for (const subscriber of subscribers) {
     router.registerEventSubscriber(subscriber);
   }
@@ -62,16 +62,16 @@ function makeRouter(...subscribers: EventSubscriberDefinition<Event>[]) {
 }
 
 function makeEvent(id: string): Event {
-  return createTestEvent(
-    TEST_CONSTANTS.AGGREGATE_ID,
+  return createTestEvent({
+    aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
     aggregateType,
     tenantId,
-    TEST_CONSTANTS.EVENT_TYPE_1,
-    1000,
-    "2025-12-17",
-    { marker: id },
+    type: TEST_CONSTANTS.EVENT_TYPE_1,
+    createdAt: 1000,
+    version: "2025-12-17",
+    data: { marker: id },
     id,
-  );
+  });
 }
 
 async function enqueueOutcomeCount(outcome: string): Promise<number> {
@@ -135,13 +135,13 @@ describe("subscriber enqueue-time contract", () => {
         // this switch's entire distinguishing claim.
         const asked: Array<{ key: string; projectId?: string }> = [];
         const killedTenant = createTestTenantId(`${tenantId}-killed`);
-        const router = new ProjectionRouter<Event>(
+        const router = new ProjectionRouter<Event>({
           aggregateType,
-          TEST_CONSTANTS.PIPELINE_NAME,
-          makeQueueManager(),
+          pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
+          queueManager: makeQueueManager(),
           // The seam drops events irreversibly, so "off" has to be reachable at
           // runtime; every other dispatch path already resolves this flag.
-          {
+          featureFlagService: {
             isEnabled: async (
               key: string,
               options: { projectId?: string },
@@ -150,7 +150,7 @@ describe("subscriber enqueue-time contract", () => {
               return options.projectId === killedTenant;
             },
           } as never,
-        );
+        });
         router.registerEventSubscriber({
           name: "seamSubscriber",
           eventTypes: [],
@@ -202,17 +202,17 @@ describe("subscriber enqueue-time contract", () => {
         // cache read and a span on the busiest path in the product to answer a
         // question that cannot change within one batch.
         let lookups = 0;
-        const router = new ProjectionRouter<Event>(
+        const router = new ProjectionRouter<Event>({
           aggregateType,
-          TEST_CONSTANTS.PIPELINE_NAME,
-          makeQueueManager(),
-          {
+          pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
+          queueManager: makeQueueManager(),
+          featureFlagService: {
             isEnabled: async (): Promise<boolean> => {
               lookups += 1;
               return false;
             },
           } as never,
-        );
+        });
         router.registerEventSubscriber({
           name: "seamSubscriber",
           eventTypes: [],
@@ -442,11 +442,11 @@ describe("subscriber enqueue-time contract", () => {
           send: vi.fn().mockRejectedValue(new Error("queue unavailable")),
         } as never);
 
-        const router = new ProjectionRouter<Event>(
+        const router = new ProjectionRouter<Event>({
           aggregateType,
-          TEST_CONSTANTS.PIPELINE_NAME,
+          pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
           queueManager,
-        );
+        });
         router.registerEventSubscriber({
           name: "seamSubscriber",
           eventTypes: [],

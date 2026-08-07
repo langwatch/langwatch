@@ -52,11 +52,11 @@ const ModelSelectorWithWarning = ({
   fieldName: string;
   variant: string;
 }) => {
-  const { modelOption } = useModelSelectionOptions(
-    selectorOptions,
-    field.value,
-    fieldName === "model" ? "chat" : "embedding",
-  );
+  const { modelOption } = useModelSelectionOptions({
+    options: selectorOptions,
+    model: field.value,
+    mode: fieldName === "model" ? "chat" : "embedding",
+  });
   const isModelDisabled = modelOption?.isDisabled ?? false;
 
   return (
@@ -212,11 +212,12 @@ const ArrayField = <T extends EvaluatorTypes>({
   prefix: string;
   evaluator: EvaluatorDefinition<T> | undefined;
   variant?: "default" | "studio";
-  renderField: <T extends EvaluatorTypes>(
-    fieldSchema: ZodType,
-    fieldName: string,
-    evaluator: EvaluatorDefinition<T> | undefined,
-  ) => React.JSX.Element | null;
+  renderField: <T extends EvaluatorTypes>(args: {
+    fieldSchema: ZodType;
+    fieldName: string;
+    evaluator: EvaluatorDefinition<T> | undefined;
+    isTopLevel?: boolean;
+  }) => React.JSX.Element | null;
 }) => {
   const { control } = useFormContext();
   const fullPath = prefix ? `${prefix}.${fieldName}` : fieldName;
@@ -289,11 +290,11 @@ const ArrayField = <T extends EvaluatorTypes>({
               {variant === "studio" ? <Trash2 size={14} /> : <X size={18} />}
             </Button>
             <Box width={variant === "studio" ? "100%" : "95%"}>
-              {renderField(
-                arraySchema.element,
-                `${fieldName}.${index}`,
+              {renderField({
+                fieldSchema: arraySchema.element,
+                fieldName: `${fieldName}.${index}`,
                 evaluator,
-              )}
+              })}
             </Box>
           </HStack>
         </Box>
@@ -339,17 +340,22 @@ const DynamicZodForm = ({
       { enabled: !!project?.id },
     );
 
-  const renderField = <T extends EvaluatorTypes>(
-    fieldSchema: ZodType,
-    fieldName: string,
-    evaluator: EvaluatorDefinition<T> | undefined,
+  const renderField = <T extends EvaluatorTypes>({
+    fieldSchema,
+    fieldName,
+    evaluator,
     // True when the caller (HorizontalFormControl / PropertySectionTitle)
     // already renders this field's title above/beside it — suppresses the
     // boolean branch's own inline label so it isn't shown twice at two
     // different sizes. Nested ZodObject fields render with no outer label
     // for booleans, so they keep passing false (the default) here.
     isTopLevel = false,
-  ): React.JSX.Element | null => {
+  }: {
+    fieldSchema: ZodType;
+    fieldName: string;
+    evaluator: EvaluatorDefinition<T> | undefined;
+    isTopLevel?: boolean;
+  }): React.JSX.Element | null => {
     const fullPath = prefix ? `${prefix}.${fieldName}` : fieldName;
     let defaultValue =
       evaluator?.settings?.[fieldName as keyof Evaluators[T]["settings"]]
@@ -368,12 +374,12 @@ const DynamicZodForm = ({
     const fieldKey = fieldName.split(".").toReversed()[0] ?? "";
 
     if (fieldSchema_ instanceof z.ZodDefault) {
-      return renderField(
-        fieldSchema_._def.innerType,
+      return renderField({
+        fieldSchema: fieldSchema_._def.innerType,
         fieldName,
         evaluator,
         isTopLevel,
-      );
+      });
     } else if (fieldSchema_ instanceof z.ZodNumber) {
       return (
         <Input
@@ -562,11 +568,11 @@ const DynamicZodForm = ({
                     : titleCase(key)}
                 </SmallLabel>
               )}
-              {renderField(
-                fieldSchema_.shape[key],
-                `${fieldName}.${key}`,
+              {renderField({
+                fieldSchema: fieldSchema_.shape[key],
+                fieldName: `${fieldName}.${key}`,
                 evaluator,
-              )}
+              })}
             </VStack>
           ))}
         </VStack>
@@ -657,12 +663,12 @@ const DynamicZodForm = ({
                   )}
                 </HStack>
                 <Field.Root invalid={isInvalid}>
-                  {renderField(
-                    field,
-                    basePath ? `${basePath}.${key}` : key,
-                    evaluatorDefinition,
-                    true,
-                  )}
+                  {renderField({
+                    fieldSchema: field,
+                    fieldName: basePath ? `${basePath}.${key}` : key,
+                    evaluator: evaluatorDefinition,
+                    isTopLevel: true,
+                  })}
                 </Field.Root>
               </VStack>
             );
@@ -678,12 +684,12 @@ const DynamicZodForm = ({
                 tooltip={helperOverride?.tooltip ?? helperText}
                 invalid={isInvalid}
               >
-                {renderField(
-                  field,
-                  basePath ? `${basePath}.${key}` : key,
-                  evaluatorDefinition,
-                  true,
-                )}
+                {renderField({
+                  fieldSchema: field,
+                  fieldName: basePath ? `${basePath}.${key}` : key,
+                  evaluator: evaluatorDefinition,
+                  isTopLevel: true,
+                })}
               </HorizontalFormControl>
             </React.Fragment>
           );

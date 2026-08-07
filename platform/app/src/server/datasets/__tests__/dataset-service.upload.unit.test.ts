@@ -19,7 +19,12 @@ import {
 import { UPLOAD_MAX_BYTES } from "../presigned-upload";
 
 const makeService = (repo: Record<string, unknown>) =>
-  new DatasetService({} as any, repo as any, {} as any, {} as any);
+  new DatasetService({
+    prisma: {} as any,
+    repository: repo as any,
+    recordRepository: {} as any,
+    experimentRepository: {} as any,
+  });
 
 describe("DatasetService", () => {
   beforeEach(() => vi.clearAllMocks());

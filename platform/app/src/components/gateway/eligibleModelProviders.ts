@@ -69,12 +69,17 @@ export type ScopeHierarchy = {
  * last resort so the gateway surfaces a readable 404 instead of an empty
  * model field.
  */
-export function resolveProviderDefaultModel(
-  providerKey: string,
-  providerLabel: string,
-  providerModels: string[],
-  customModels?: Array<{ modelId: string }> | null,
-): string {
+export function resolveProviderDefaultModel({
+  providerKey,
+  providerLabel,
+  providerModels,
+  customModels,
+}: {
+  providerKey: string;
+  providerLabel: string;
+  providerModels: string[];
+  customModels?: Array<{ modelId: string }> | null;
+}): string {
   const registry = modelProviderRegistry.find(
     (entry) => entry.backendModelProviderKey === providerKey,
   );
@@ -180,12 +185,12 @@ export function resolveEligible(
       label,
       modelCount: chatModels.length + customCount,
       definedAt,
-      defaultModel: resolveProviderDefaultModel(
-        provider.provider,
-        label,
-        chatModels,
-        provider.customModels,
-      ),
+      defaultModel: resolveProviderDefaultModel({
+        providerKey: provider.provider,
+        providerLabel: label,
+        providerModels: chatModels,
+        customModels: provider.customModels,
+      }),
     });
   }
   return Array.from(result.values()).sort((a, b) =>

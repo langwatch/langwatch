@@ -384,7 +384,11 @@ export function registerTracesRoutes(
 
       let trace;
       try {
-        trace = await traceService.getById(project.id, traceId, protections);
+        trace = await traceService.getById({
+          projectId: project.id,
+          traceId,
+          protections,
+        });
       } catch (err) {
         if (err instanceof AmbiguousTraceIdPrefixError) {
           return c.json(
@@ -500,8 +504,11 @@ export function registerTracesRoutes(
 
       let trace;
       try {
-        trace = await traceService.getById(project.id, traceId, protections, {
-          full: true,
+        trace = await traceService.getById({
+          projectId: project.id,
+          traceId,
+          protections,
+          opts: { full: true },
         });
       } catch (err) {
         if (err instanceof AmbiguousTraceIdPrefixError) {

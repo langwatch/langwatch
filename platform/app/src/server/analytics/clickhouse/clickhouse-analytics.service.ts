@@ -73,11 +73,20 @@ export class ClickHouseAnalyticsService {
   /**
    * Get data for filter dropdown
    */
-  async getDataForFilter(
-    projectId: string,
-    field: FilterField,
-    startDate: number,
-    endDate: number,
+  async getDataForFilter({
+    projectId,
+    field,
+    startDate,
+    endDate,
+    filters,
+    key,
+    subkey,
+    searchQuery,
+  }: {
+    projectId: string;
+    field: FilterField;
+    startDate: number;
+    endDate: number;
     filters?: Partial<
       Record<
         FilterField,
@@ -85,11 +94,11 @@ export class ClickHouseAnalyticsService {
         | Record<string, string[]>
         | Record<string, Record<string, string[]>>
       >
-    >,
-    key?: string,
-    subkey?: string,
-    searchQuery?: string,
-  ): Promise<FilterDataResult> {
+    >;
+    key?: string;
+    subkey?: string;
+    searchQuery?: string;
+  }): Promise<FilterDataResult> {
     return this.tracer.withActiveSpan(
       "ClickHouseAnalyticsService.getDataForFilter",
       { attributes: { "tenant.id": projectId, "filter.field": field } },
@@ -116,10 +125,15 @@ export class ClickHouseAnalyticsService {
   /**
    * Get top used documents (RAG analytics)
    */
-  async getTopUsedDocuments(
-    projectId: string,
-    startDate: number,
-    endDate: number,
+  async getTopUsedDocuments({
+    projectId,
+    startDate,
+    endDate,
+    filters,
+  }: {
+    projectId: string;
+    startDate: number;
+    endDate: number;
     filters?: Partial<
       Record<
         FilterField,
@@ -127,8 +141,8 @@ export class ClickHouseAnalyticsService {
         | Record<string, string[]>
         | Record<string, Record<string, string[]>>
       >
-    >,
-  ): Promise<TopDocumentsResult> {
+    >;
+  }): Promise<TopDocumentsResult> {
     return this.tracer.withActiveSpan(
       "ClickHouseAnalyticsService.getTopUsedDocuments",
       { attributes: { "tenant.id": projectId } },
@@ -151,10 +165,15 @@ export class ClickHouseAnalyticsService {
   /**
    * Get feedbacks (thumbs up/down events with feedback text)
    */
-  async getFeedbacks(
-    projectId: string,
-    startDate: number,
-    endDate: number,
+  async getFeedbacks({
+    projectId,
+    startDate,
+    endDate,
+    filters,
+  }: {
+    projectId: string;
+    startDate: number;
+    endDate: number;
     filters?: Partial<
       Record<
         FilterField,
@@ -162,8 +181,8 @@ export class ClickHouseAnalyticsService {
         | Record<string, string[]>
         | Record<string, Record<string, string[]>>
       >
-    >,
-  ): Promise<FeedbacksResult> {
+    >;
+  }): Promise<FeedbacksResult> {
     return this.tracer.withActiveSpan(
       "ClickHouseAnalyticsService.getFeedbacks",
       { attributes: { "tenant.id": projectId } },

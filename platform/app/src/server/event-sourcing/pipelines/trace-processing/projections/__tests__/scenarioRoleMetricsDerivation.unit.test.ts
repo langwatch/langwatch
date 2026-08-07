@@ -36,12 +36,17 @@ function llmSpan(spanId: string, parentSpanId: string | null): NormalizedSpan {
   });
 }
 
-function agentSpan(
-  spanId: string,
-  parentSpanId: string | null,
-  role: string,
+function agentSpan({
+  spanId,
+  parentSpanId,
+  role,
   durationMs = 3000,
-): NormalizedSpan {
+}: {
+  spanId: string;
+  parentSpanId: string | null;
+  role: string;
+  durationMs?: number;
+}): NormalizedSpan {
   return createTestSpan({
     id: spanId,
     spanId,
@@ -225,9 +230,19 @@ describe("aggregateScenarioRoleMetrics", () => {
 });
 
 describe("deriveScenarioRoleMetricsFromSpans", () => {
-  const userAgent = agentSpan("user-agent", null, "user", 1500);
+  const userAgent = agentSpan({
+    spanId: "user-agent",
+    parentSpanId: null,
+    role: "user",
+    durationMs: 1500,
+  });
   const userLlm = llmSpan("user-llm", "user-agent");
-  const asstAgent = agentSpan("asst-agent", null, "assistant", 2500);
+  const asstAgent = agentSpan({
+    spanId: "asst-agent",
+    parentSpanId: null,
+    role: "assistant",
+    durationMs: 2500,
+  });
   const asstLlm = llmSpan("asst-llm", "asst-agent");
   const asstNestedLlm = llmSpan("asst-nested", "asst-llm");
 

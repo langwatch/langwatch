@@ -656,11 +656,11 @@ export class CodingAgentSessionClickHouseRepository
     // written into this tenant's ClickHouse. Refuse rather than cross the line.
     for (const { row } of entries) {
       if (row.tenantId !== tenantId) {
-        throw new SecurityError(
-          "CodingAgentSessionClickHouseRepository.upsertBatch",
-          "coding agent session batch spans multiple tenants",
+        throw new SecurityError({
+          operation: "CodingAgentSessionClickHouseRepository.upsertBatch",
+          message: "coding agent session batch spans multiple tenants",
           tenantId,
-        );
+        });
       }
     }
 

@@ -135,12 +135,12 @@ describe("handleError()", () => {
 
   describe("when error is a ModelNotConfiguredError", () => {
     it("returns 400 with the missing-model cause instead of a generic 500", async () => {
-      const error = new ModelNotConfiguredError(
-        "evaluator.create_default",
-        "DEFAULT",
-        "Evaluator default model",
-        "project_123",
-      );
+      const error = new ModelNotConfiguredError({
+        featureKey: "evaluator.create_default",
+        role: "DEFAULT",
+        featureDisplayName: "Evaluator default model",
+        projectId: "project_123",
+      });
       const app = createTestApp(error);
 
       const res = await app.request("/");

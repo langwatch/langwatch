@@ -19,12 +19,12 @@ import { errorFormatter } from "../trpc";
 describe("tRPC wire mapping for ModelNotConfiguredError", () => {
   /** @scenario A tRPC procedure forwards ModelNotConfiguredError as a typed TRPCError */
   it("serialises the typed error into data.cause for the frontend interceptor", () => {
-    const cause = new ModelNotConfiguredError(
-      "traces.ai_search",
-      "FAST",
-      "AI search",
-      "proj_abc",
-    );
+    const cause = new ModelNotConfiguredError({
+      featureKey: "traces.ai_search",
+      role: "FAST",
+      featureDisplayName: "AI search",
+      projectId: "proj_abc",
+    });
     const trpcError = new TRPCError({
       code: "BAD_REQUEST",
       message: cause.message,

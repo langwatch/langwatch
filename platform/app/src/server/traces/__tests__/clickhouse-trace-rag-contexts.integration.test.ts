@@ -205,11 +205,11 @@ describe("RAG contexts read path (integration)", () => {
     });
 
     it("returns the stored contexts on the RAG span", async () => {
-      const traces = await service.getTracesWithSpans(
-        tenantId,
-        [traceId],
-        openProtections,
-      );
+      const traces = await service.getTracesWithSpans({
+        projectId: tenantId,
+        traceIds: [traceId],
+        protections: openProtections,
+      });
 
       expect(traces).toHaveLength(1);
       const ragSpan = findRagSpan(traces?.[0]?.spans);
@@ -217,11 +217,11 @@ describe("RAG contexts read path (integration)", () => {
     });
 
     it("returns JSON-typed attributes as structured params, not strings", async () => {
-      const traces = await service.getTracesWithSpans(
-        tenantId,
-        [traceId],
-        openProtections,
-      );
+      const traces = await service.getTracesWithSpans({
+        projectId: tenantId,
+        traceIds: [traceId],
+        protections: openProtections,
+      });
 
       expect(traces).toHaveLength(1);
       const ragSpan = findRagSpan(traces?.[0]?.spans);

@@ -110,15 +110,15 @@ export class EventSourcingService<
     });
 
     // Create ProjectionRouter (no event store needed — incremental only)
-    this.router = new ProjectionRouter<EventType, ProjectionTypes>(
+    this.router = new ProjectionRouter<EventType, ProjectionTypes>({
       aggregateType,
       pipelineName,
-      this.queueManager,
+      queueManager: this.queueManager,
       featureFlagService,
       processRole,
       replayMarkerChecker,
       retentionPolicyResolver,
-    );
+    });
 
     // Register fold projections and auto-wire event loaders for out-of-order re-fold
     if (foldProjections) {
@@ -133,12 +133,12 @@ export class EventSourcingService<
             aggregateId: string;
             occurredAtMs?: number;
           }) => {
-            const events = await capturedEventStore.getEvents(
-              ctx.aggregateId,
-              { tenantId: createTenantId(ctx.tenantId) },
-              capturedAggregateType,
-              ctx.occurredAtMs,
-            );
+            const events = await capturedEventStore.getEvents({
+              aggregateId: ctx.aggregateId,
+              context: { tenantId: createTenantId(ctx.tenantId) },
+              aggregateType: capturedAggregateType,
+              anchorOccurredAtMs: ctx.occurredAtMs,
+            });
             return [...events].sort(
               (a, b) => (a.occurredAt ?? 0) - (b.occurredAt ?? 0),
             );
@@ -156,12 +156,12 @@ export class EventSourcingService<
             aggregateId: string;
             upToEvent: Event;
           }) => {
-            const events = await capturedEventStore.getEventsUpTo(
-              ctx.aggregateId,
-              { tenantId: createTenantId(ctx.tenantId) },
-              capturedAggregateType,
-              ctx.upToEvent as EventType,
-            );
+            const events = await capturedEventStore.getEventsUpTo({
+              aggregateId: ctx.aggregateId,
+              context: { tenantId: createTenantId(ctx.tenantId) },
+              aggregateType: capturedAggregateType,
+              upToEvent: ctx.upToEvent as EventType,
+            });
             return [...events].sort(
               (a, b) => (a.occurredAt ?? 0) - (b.occurredAt ?? 0),
             );
@@ -223,12 +223,12 @@ export class EventSourcingService<
             aggregateId: string;
             upToEvent: Event;
           }) => {
-            const events = await capturedEventStore.getEventsUpTo(
-              ctx.aggregateId,
-              { tenantId: createTenantId(ctx.tenantId) },
-              capturedAggregateType,
-              ctx.upToEvent as EventType,
-            );
+            const events = await capturedEventStore.getEventsUpTo({
+              aggregateId: ctx.aggregateId,
+              context: { tenantId: createTenantId(ctx.tenantId) },
+              aggregateType: capturedAggregateType,
+              upToEvent: ctx.upToEvent as EventType,
+            });
             return [...events].sort(
               (a, b) => (a.occurredAt ?? 0) - (b.occurredAt ?? 0),
             );
@@ -445,18 +445,23 @@ export class EventSourcingService<
    */
   async getProjectionByName<
     ProjectionName extends keyof ProjectionTypes & string,
-  >(
-    projectionName: ProjectionName,
-    aggregateId: string,
-    context: EventStoreReadContext<EventType>,
-    options?: { key?: string },
-  ): Promise<ProjectionTypes[ProjectionName] | null> {
-    return this.router.getProjectionByName(
+  >({
+    projectionName,
+    aggregateId,
+    context,
+    options,
+  }: {
+    projectionName: ProjectionName;
+    aggregateId: string;
+    context: EventStoreReadContext<EventType>;
+    options?: { key?: string };
+  }): Promise<ProjectionTypes[ProjectionName] | null> {
+    return this.router.getProjectionByName({
       projectionName,
       aggregateId,
       context,
       options,
-    );
+    });
   }
 
   /**
@@ -464,18 +469,23 @@ export class EventSourcingService<
    */
   async hasProjectionByName<
     ProjectionName extends keyof ProjectionTypes & string,
-  >(
-    projectionName: ProjectionName,
-    aggregateId: string,
-    context: EventStoreReadContext<EventType>,
-    options?: { key?: string },
-  ): Promise<boolean> {
-    return await this.router.hasProjectionByName(
+  >({
+    projectionName,
+    aggregateId,
+    context,
+    options,
+  }: {
+    projectionName: ProjectionName;
+    aggregateId: string;
+    context: EventStoreReadContext<EventType>;
+    options?: { key?: string };
+  }): Promise<boolean> {
+    return await this.router.hasProjectionByName({
       projectionName,
       aggregateId,
       context,
       options,
-    );
+    });
   }
 
   /**

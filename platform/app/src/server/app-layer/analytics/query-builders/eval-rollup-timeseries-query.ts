@@ -212,7 +212,13 @@ export function buildEvalRollupTimeseriesQuery(
         `Eval rollup builder cannot serve series with key="${s.key}" — the router should have routed this to slim or evaluation_runs (no EvaluatorId column on evaluation_analytics_rollup; see migration 00039).`,
       );
     }
-    const alias = buildMetricAlias(i, s.metric, s.aggregation, s.key, s.subkey);
+    const alias = buildMetricAlias({
+      index: i,
+      metric: s.metric,
+      aggregation: s.aggregation,
+      key: s.key,
+      subkey: s.subkey,
+    });
     const expr = evalRollupAggExpression(s.metric, s.aggregation);
     selectExprs.push(`${expr} AS ${alias}`);
   }

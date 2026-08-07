@@ -57,7 +57,12 @@ describe("given a saved-mode dataset editor", () => {
   describe("when deleting a new_ row that still has an unsaved edit queued", () => {
     it("replaces the queued edit with a deletion", () => {
       const store = seedSaved();
-      store.getState().setCellValue("ds-1", 1, "input_0", "edited");
+      store.getState().setCellValue({
+        datasetId: "ds-1",
+        row: 1,
+        columnId: "input_0",
+        value: "edited",
+      });
       store.getState().toggleRowSelection(1);
       store.getState().deleteSelectedRows();
 

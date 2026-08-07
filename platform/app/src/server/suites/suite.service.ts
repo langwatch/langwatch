@@ -58,13 +58,31 @@ type ResolvedTargetReferences = {
 };
 
 export class SuiteService {
-  constructor(
-    private readonly repository: SuiteRepository,
-    private readonly scenarioRepository: ScenarioRepository,
-    private readonly agentRepository: AgentRepository,
-    private readonly llmConfigRepository: LlmConfigRepository,
-    private readonly suiteRunService: SuiteRunService,
-  ) {}
+  private readonly repository: SuiteRepository;
+  private readonly scenarioRepository: ScenarioRepository;
+  private readonly agentRepository: AgentRepository;
+  private readonly llmConfigRepository: LlmConfigRepository;
+  private readonly suiteRunService: SuiteRunService;
+
+  constructor({
+    repository,
+    scenarioRepository,
+    agentRepository,
+    llmConfigRepository,
+    suiteRunService,
+  }: {
+    repository: SuiteRepository;
+    scenarioRepository: ScenarioRepository;
+    agentRepository: AgentRepository;
+    llmConfigRepository: LlmConfigRepository;
+    suiteRunService: SuiteRunService;
+  }) {
+    this.repository = repository;
+    this.scenarioRepository = scenarioRepository;
+    this.agentRepository = agentRepository;
+    this.llmConfigRepository = llmConfigRepository;
+    this.suiteRunService = suiteRunService;
+  }
 
   /**
    * Static factory method for creating a SuiteService with proper DI.
@@ -73,13 +91,13 @@ export class SuiteService {
     prisma: PrismaClient;
     suiteRunService: SuiteRunService;
   }): SuiteService {
-    return new SuiteService(
-      new SuiteRepository(params.prisma),
-      new ScenarioRepository(params.prisma),
-      new AgentRepository(params.prisma),
-      new LlmConfigRepository(params.prisma),
-      params.suiteRunService,
-    );
+    return new SuiteService({
+      repository: new SuiteRepository(params.prisma),
+      scenarioRepository: new ScenarioRepository(params.prisma),
+      agentRepository: new AgentRepository(params.prisma),
+      llmConfigRepository: new LlmConfigRepository(params.prisma),
+      suiteRunService: params.suiteRunService,
+    });
   }
 
   async create(

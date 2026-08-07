@@ -147,20 +147,25 @@ export const resolveScopedRowIndices = ({
 /**
  * Generates all cells to execute based on the scope.
  */
-export const generateCells = (
+export const generateCells = ({
+  state,
+  datasetRows,
+  scope,
+  options = {},
+}: {
   state: Pick<
     EvaluationsV3State,
     "datasets" | "activeDatasetId" | "targets" | "evaluators"
-  >,
-  datasetRows: Array<Record<string, unknown>>,
-  scope: ExecutionScope,
-  options: {
+  >;
+  datasetRows: Array<Record<string, unknown>>;
+  scope: ExecutionScope;
+  options?: {
     seedTargetOutputs?: Record<
       string,
       { output: unknown; cost?: number; duration?: number }
     >;
-  } = {},
-): ExecutionCell[] => {
+  };
+}): ExecutionCell[] => {
   const cells: ExecutionCell[] = [];
   const datasetId =
     state.datasets[0]?.id ?? state.activeDatasetId ?? "dataset-1";
@@ -708,13 +713,18 @@ export const generateComparisonCells = ({
    * the config's variant order — that order is what the judge's deterministic
    * shuffle is seeded against.
    */
-  const buildCandidates = (
-    cfg: ComparisonEvaluatorConfig,
-    resolvedVariants: TargetConfig[],
-    variantIds: string[],
-    variantDisplayNames: string[],
-    rowIndex: number,
-  ):
+  const buildCandidates = ({
+    cfg,
+    variantIds,
+    variantDisplayNames,
+    rowIndex,
+  }: {
+    cfg: ComparisonEvaluatorConfig;
+    resolvedVariants: TargetConfig[];
+    variantIds: string[];
+    variantDisplayNames: string[];
+    rowIndex: number;
+  }):
     | {
         candidates: ExecutionCell["comparison"];
         missing?: never;
@@ -781,13 +791,13 @@ export const generateComparisonCells = ({
       const datasetEntry = datasetRows[rowIndex];
       if (!datasetEntry) continue;
 
-      const built = buildCandidates(
+      const built = buildCandidates({
         cfg,
         resolvedVariants,
         variantIds,
         variantDisplayNames,
         rowIndex,
-      );
+      });
       if (built.missing || built.empty) {
         skipReasons.push({
           rowIndex,
@@ -850,13 +860,13 @@ export const generateComparisonCells = ({
       const datasetEntry = datasetRows[rowIndex];
       if (!datasetEntry) continue;
 
-      const built = buildCandidates(
+      const built = buildCandidates({
         cfg,
         resolvedVariants,
         variantIds,
         variantDisplayNames,
         rowIndex,
-      );
+      });
       if (built.missing || built.empty) {
         skipReasons.push({
           rowIndex,
@@ -1025,18 +1035,25 @@ export const priceMetrics = async (
  * Executes a single cell and yields events.
  * @param isAborted - Optional function to check if execution should be aborted
  */
-export async function* executeCell(
-  cell: ExecutionCell,
-  projectId: string,
-  datasetColumns: Array<{ id: string; name: string; type: string }>,
+export async function* executeCell({
+  cell,
+  projectId,
+  datasetColumns,
+  loadedData,
+  resultMapperConfig,
+  isAborted,
+}: {
+  cell: ExecutionCell;
+  projectId: string;
+  datasetColumns: Array<{ id: string; name: string; type: string }>;
   loadedData: {
     prompt?: VersionedPrompt;
     agent?: TypedAgent;
     evaluators?: Map<string, { id: string; name: string; config: unknown }>;
-  },
-  resultMapperConfig?: ResultMapperConfig,
-  isAborted?: () => Promise<boolean>,
-): AsyncGenerator<EvaluationV3Event> {
+  };
+  resultMapperConfig?: ResultMapperConfig;
+  isAborted?: () => Promise<boolean>;
+}): AsyncGenerator<EvaluationV3Event> {
   // Emit cell_started
   yield {
     type: "cell_started",
@@ -1303,12 +1320,17 @@ export async function* executeCell(
  * evaluator result. This replaces the legacy nlpgo execute_evaluation loop,
  * keeping orchestration (parallelism, abort, storage) in TypeScript.
  */
-export async function* executeWorkflowCell(
-  cell: ExecutionCell,
-  projectId: string,
-  workflowDsl: Workflow,
-  isAborted?: () => Promise<boolean>,
-): AsyncGenerator<EvaluationV3Event> {
+export async function* executeWorkflowCell({
+  cell,
+  projectId,
+  workflowDsl,
+  isAborted,
+}: {
+  cell: ExecutionCell;
+  projectId: string;
+  workflowDsl: Workflow;
+  isAborted?: () => Promise<boolean>;
+}): AsyncGenerator<EvaluationV3Event> {
   yield {
     type: "cell_started",
     rowIndex: cell.rowIndex,
@@ -1429,12 +1451,12 @@ export async function* executeWorkflowCell(
           execution_state.status === "error")
       ) {
         evaluatorEvents.push(
-          mapWorkflowEvaluatorResult(
-            cell.rowIndex,
-            cell.targetId,
-            component_id,
-            evaluatorNodeNames.get(component_id),
-            {
+          mapWorkflowEvaluatorResult({
+            rowIndex: cell.rowIndex,
+            targetId: cell.targetId,
+            evaluatorId: component_id,
+            evaluatorName: evaluatorNodeNames.get(component_id),
+            executionState: {
               status: execution_state.status,
               outputs: execution_state.outputs,
               cost: execution_state.cost,
@@ -1445,7 +1467,7 @@ export async function* executeWorkflowCell(
               upstream_status: execution_state.upstream_status,
               trace_id: execution_state.trace_id ?? finalTraceId,
             },
-          ),
+          }),
         );
       }
     }
@@ -1880,8 +1902,11 @@ export async function* runOrchestrator(
   const runId = providedRunId ?? generateHumanReadableId();
 
   // Generate cells to execute
-  const cells = generateCells(state, datasetRows, scope, {
-    seedTargetOutputs,
+  const cells = generateCells({
+    state,
+    datasetRows,
+    scope,
+    options: { seedTargetOutputs },
   });
   // Phase-1 count only; grows by the Phase-2 (comparison) cell count once
   // those are generated after Phase 1 finishes, so the final summary's
@@ -2257,12 +2282,12 @@ export async function* runOrchestrator(
 
             // Get loaded data for this target
             const loadedData = {
-              ...getLoadedDataForTarget(
-                cell.targetConfig,
+              ...getLoadedDataForTarget({
+                targetConfig: cell.targetConfig,
                 loadedPrompts,
                 loadedAgents,
                 loadedWorkflows,
-              ),
+              }),
               evaluators: loadedEvaluators,
             };
 
@@ -2281,20 +2306,20 @@ export async function* runOrchestrator(
               !!loadedData.workflow;
 
             const cellEvents = runsAsWorkflow
-              ? executeWorkflowCell(
+              ? executeWorkflowCell({
                   cell,
                   projectId,
-                  loadedData.workflow!.dsl,
-                  checkAbort,
-                )
-              : executeCell(
+                  workflowDsl: loadedData.workflow!.dsl,
+                  isAborted: checkAbort,
+                })
+              : executeCell({
                   cell,
                   projectId,
                   datasetColumns,
                   loadedData,
                   resultMapperConfig,
-                  checkAbort,
-                );
+                  isAborted: checkAbort,
+                });
 
             // Execute cell and collect events
             let cellFailed = false;
@@ -2511,25 +2536,25 @@ export async function* runOrchestrator(
                 if (await abortManager.isAborted(runId)) return;
 
                 const loadedData = {
-                  ...getLoadedDataForTarget(
-                    cell.targetConfig,
+                  ...getLoadedDataForTarget({
+                    targetConfig: cell.targetConfig,
                     loadedPrompts,
                     loadedAgents,
-                  ),
+                  }),
                   evaluators: loadedEvaluators,
                 };
 
                 const checkAbort = () => abortManager.isAborted(runId);
 
                 let cellFailed = false;
-                for await (const event of executeCell(
+                for await (const event of executeCell({
                   cell,
                   projectId,
                   datasetColumns,
                   loadedData,
                   resultMapperConfig,
-                  checkAbort,
-                )) {
+                  isAborted: checkAbort,
+                })) {
                   if (await abortManager.isAborted(runId)) break;
                   pushEvent(event);
                   await processEventForStorage(event);
@@ -2662,12 +2687,17 @@ export async function* runOrchestrator(
 /**
  * Gets loaded prompt/agent data for a target.
  */
-const getLoadedDataForTarget = (
-  targetConfig: TargetConfig,
-  loadedPrompts: Map<string, VersionedPrompt>,
-  loadedAgents: Map<string, TypedAgent>,
-  loadedWorkflows?: Map<string, LoadedWorkflow>,
-): {
+const getLoadedDataForTarget = ({
+  targetConfig,
+  loadedPrompts,
+  loadedAgents,
+  loadedWorkflows,
+}: {
+  targetConfig: TargetConfig;
+  loadedPrompts: Map<string, VersionedPrompt>;
+  loadedAgents: Map<string, TypedAgent>;
+  loadedWorkflows?: Map<string, LoadedWorkflow>;
+}): {
   prompt?: VersionedPrompt;
   agent?: TypedAgent;
   workflow?: LoadedWorkflow;

@@ -43,12 +43,12 @@ export function createDefaultModelEnvResolver(): ModelEnvResolver {
         typeof settings.model === "string" &&
         evaluatorType !== "openai/moderation"
       ) {
-        const modelEnv = await setupModelEnv(
-          settings.model,
-          false,
+        const modelEnv = await setupModelEnv({
+          model: settings.model,
+          embeddings: false,
           projectId,
           settings,
-        );
+        });
         evaluatorEnv = { ...evaluatorEnv, ...modelEnv };
       }
 
@@ -57,12 +57,12 @@ export function createDefaultModelEnvResolver(): ModelEnvResolver {
         "embeddings_model" in settings &&
         typeof settings.embeddings_model === "string"
       ) {
-        const embeddingsEnv = await setupModelEnv(
-          settings.embeddings_model,
-          true,
+        const embeddingsEnv = await setupModelEnv({
+          model: settings.embeddings_model,
+          embeddings: true,
           projectId,
           settings,
-        );
+        });
         evaluatorEnv = { ...evaluatorEnv, ...embeddingsEnv };
       }
 
@@ -80,12 +80,17 @@ export function createDefaultModelEnvResolver(): ModelEnvResolver {
  * Throws `EvaluatorConfigError` for misconfigured providers — callers who
  * need a per-worker error class should catch and rewrap.
  */
-export async function setupModelEnv(
-  model: string,
-  embeddings: boolean,
-  projectId: string,
-  settings?: Record<string, unknown>,
-): Promise<Record<string, string>> {
+export async function setupModelEnv({
+  model,
+  embeddings,
+  projectId,
+  settings,
+}: {
+  model: string;
+  embeddings: boolean;
+  projectId: string;
+  settings?: Record<string, unknown>;
+}): Promise<Record<string, string>> {
   const modelProviders = await getProjectModelProviders(projectId);
   const provider = model.split("/")[0]!;
   const modelProvider = modelProviders[provider];

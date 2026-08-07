@@ -230,12 +230,12 @@ export const useOpenTargetEditor = () => {
                 mapping: UIFieldMapping | undefined,
               ) => {
                 if (mapping) {
-                  setTargetMapping(
-                    target.id,
-                    activeDatasetId,
-                    identifier,
-                    convertFromUIMapping(mapping, isDatasetSource),
-                  );
+                  setTargetMapping({
+                    targetId: target.id,
+                    datasetId: activeDatasetId,
+                    inputField: identifier,
+                    mapping: convertFromUIMapping(mapping, isDatasetSource),
+                  });
                 } else {
                   removeTargetMapping(target.id, activeDatasetId, identifier);
                 }
@@ -269,12 +269,12 @@ export const useOpenTargetEditor = () => {
                 mapping: UIFieldMapping | undefined,
               ) => {
                 if (mapping) {
-                  setTargetMapping(
-                    target.id,
-                    activeDatasetId,
-                    identifier,
-                    convertFromUIMapping(mapping, isDatasetSource),
-                  );
+                  setTargetMapping({
+                    targetId: target.id,
+                    datasetId: activeDatasetId,
+                    inputField: identifier,
+                    mapping: convertFromUIMapping(mapping, isDatasetSource),
+                  });
                 } else {
                   removeTargetMapping(target.id, activeDatasetId, identifier);
                 }
@@ -309,12 +309,12 @@ export const useOpenTargetEditor = () => {
                 mapping: UIFieldMapping | undefined,
               ) => {
                 if (mapping) {
-                  setTargetMapping(
-                    target.id,
-                    activeDatasetId,
-                    identifier,
-                    convertFromUIMapping(mapping, isDatasetSource),
-                  );
+                  setTargetMapping({
+                    targetId: target.id,
+                    datasetId: activeDatasetId,
+                    inputField: identifier,
+                    mapping: convertFromUIMapping(mapping, isDatasetSource),
+                  });
                 } else {
                   removeTargetMapping(target.id, activeDatasetId, identifier);
                 }
@@ -404,12 +404,12 @@ export const useOpenTargetEditor = () => {
           mapping: UIFieldMapping | undefined,
         ) => {
           if (mapping) {
-            setTargetMapping(
-              target.id,
-              activeDatasetId,
-              identifier,
-              convertFromUIMapping(mapping, isDatasetSource),
-            );
+            setTargetMapping({
+              targetId: target.id,
+              datasetId: activeDatasetId,
+              inputField: identifier,
+              mapping: convertFromUIMapping(mapping, isDatasetSource),
+            });
           } else {
             removeTargetMapping(target.id, activeDatasetId, identifier);
           }

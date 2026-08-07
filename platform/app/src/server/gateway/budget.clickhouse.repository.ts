@@ -347,12 +347,17 @@ function bucketQueryShape(args: {
  * both of them into each budget, reporting every budget at N times its
  * true spend for N budgets sharing the bucket.
  */
-function bucketMatchSql(
-  target: BudgetSpendTarget,
-  budgetIdParam: string,
-  scopeIdParam: string,
-  suffixParam: string,
-): string {
+function bucketMatchSql({
+  target,
+  budgetIdParam,
+  scopeIdParam,
+  suffixParam,
+}: {
+  target: BudgetSpendTarget;
+  budgetIdParam: string;
+  scopeIdParam: string;
+  suffixParam: string;
+}): string {
   const budget = `BudgetId = {${budgetIdParam}:String}`;
   if (target.match !== "prefix") {
     return `${budget} AND ScopeId = {${scopeIdParam}:String}`;
@@ -385,12 +390,12 @@ function flooredTargetSums(targets: BudgetSpendTarget[]): {
     if (t.match === "prefix" && t.bucketSuffix) {
       params[`fsuffix${i}`] = t.bucketSuffix;
     }
-    const bucket = bucketMatchSql(
-      t,
-      `fbudgetId${i}`,
-      `fscopeId${i}`,
-      `fsuffix${i}`,
-    );
+    const bucket = bucketMatchSql({
+      target: t,
+      budgetIdParam: `fbudgetId${i}`,
+      scopeIdParam: `fscopeId${i}`,
+      suffixParam: `fsuffix${i}`,
+    });
     return `toString(sumIf(AmountNanoUSD, Scope = {fscope${i}:String} AND ${bucket} AND Window = {fwindow${i}:String} AND OccurredAt >= fromUnixTimestamp64Milli({ffloor${i}:Int64}))) AS T${i}`;
   });
   return { sql: sums.join(",\n              "), params };
@@ -413,12 +418,12 @@ function rollupScopeFilter(targets: BudgetSpendTarget[]): {
     params[`scope${i}`] = scopeToClickHouse(t.scope);
     params[`scopeId${i}`] = t.scopeId;
     if (t.bucketSuffix) params[`suffix${i}`] = t.bucketSuffix;
-    const bucket = bucketMatchSql(
-      t,
-      `budgetId${i}`,
-      `scopeId${i}`,
-      `suffix${i}`,
-    );
+    const bucket = bucketMatchSql({
+      target: t,
+      budgetIdParam: `budgetId${i}`,
+      scopeIdParam: `scopeId${i}`,
+      suffixParam: `suffix${i}`,
+    });
     return `(Scope = {scope${i}:String} AND ${bucket})`;
   });
   return { sql: terms.join(" OR "), params };

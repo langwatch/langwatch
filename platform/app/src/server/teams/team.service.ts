@@ -91,12 +91,17 @@ async function computeEffectiveAdminUserIds(
   return userIds;
 }
 
-async function isUserAdminViaGroup(
-  tx: TxClient,
-  organizationId: string,
-  teamId: string,
-  userId: string,
-): Promise<boolean> {
+async function isUserAdminViaGroup({
+  tx,
+  organizationId,
+  teamId,
+  userId,
+}: {
+  tx: TxClient;
+  organizationId: string;
+  teamId: string;
+  userId: string;
+}): Promise<boolean> {
   const adminGroupBindings = await tx.roleBinding.findMany({
     where: {
       organizationId,
@@ -667,12 +672,12 @@ export class TeamService {
         // Project the post-removal admin set. Removing the target's direct
         // binding only changes things if they aren't also an admin via a
         // group membership on this team.
-        const targetStillAdminViaGroup = await isUserAdminViaGroup(
+        const targetStillAdminViaGroup = await isUserAdminViaGroup({
           tx,
-          team.organizationId,
+          organizationId: team.organizationId,
           teamId,
           userId,
-        );
+        });
         const projectedAdminUserIds = new Set(effectiveAdminUserIds);
         if (!targetStillAdminViaGroup) {
           projectedAdminUserIds.delete(userId);

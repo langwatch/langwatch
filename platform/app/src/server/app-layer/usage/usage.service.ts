@@ -47,13 +47,30 @@ export class UsageService {
   private readonly countCache: TtlCache<number>;
   private readonly decisionCache: TtlCache<MeterDecision>;
 
-  constructor(
-    private readonly organizationService: OrganizationService,
-    private readonly traceUsageService: TraceUsageService,
-    private readonly eventUsageService: EventUsageService,
-    private readonly planResolver: PlanResolver,
-    private readonly organizationRepository: OrganizationRepository | null,
-  ) {
+  private readonly organizationService: OrganizationService;
+  private readonly traceUsageService: TraceUsageService;
+  private readonly eventUsageService: EventUsageService;
+  private readonly planResolver: PlanResolver;
+  private readonly organizationRepository: OrganizationRepository | null;
+
+  constructor({
+    organizationService,
+    traceUsageService,
+    eventUsageService,
+    planResolver,
+    organizationRepository,
+  }: {
+    organizationService: OrganizationService;
+    traceUsageService: TraceUsageService;
+    eventUsageService: EventUsageService;
+    planResolver: PlanResolver;
+    organizationRepository: OrganizationRepository | null;
+  }) {
+    this.organizationService = organizationService;
+    this.traceUsageService = traceUsageService;
+    this.eventUsageService = eventUsageService;
+    this.planResolver = planResolver;
+    this.organizationRepository = organizationRepository;
     this.countCache = new TtlCache<number>(
       CACHE_TTL_MS,
       "ttlcache:usage:count:",

@@ -35,13 +35,13 @@ describe("EventStoreMemory - countEventsBefore", () => {
 
       await store.storeEvents([event1], context, aggregateType);
 
-      const count = await store.countEventsBefore(
+      const count = await store.countEventsBefore({
         aggregateId,
         context,
         aggregateType,
-        timestamp,
-        event1.id,
-      );
+        beforeTimestamp: timestamp,
+        beforeEventId: event1.id,
+      });
 
       expect(count).toBe(0);
     });
@@ -80,13 +80,13 @@ describe("EventStoreMemory - countEventsBefore", () => {
       await store.storeEvents([event1, event2, event3], context, aggregateType);
 
       // Count events before event2 (timestamp 2000)
-      const count = await store.countEventsBefore(
+      const count = await store.countEventsBefore({
         aggregateId,
         context,
         aggregateType,
-        2000,
-        event2.id,
-      );
+        beforeTimestamp: 2000,
+        beforeEventId: event2.id,
+      });
 
       // Should count event1 (timestamp 1000 < 2000)
       expect(count).toBe(1);
@@ -139,13 +139,13 @@ describe("EventStoreMemory - countEventsBefore", () => {
       await store.storeEvents([event1, event2, event3], context, aggregateType);
 
       // Count events before event2 (same timestamp, but ID comparison)
-      const count = await store.countEventsBefore(
+      const count = await store.countEventsBefore({
         aggregateId,
         context,
         aggregateType,
-        sameTimestamp,
-        event2.id,
-      );
+        beforeTimestamp: sameTimestamp,
+        beforeEventId: event2.id,
+      });
 
       // Should count event1 (same timestamp but earlier ID)
       expect(count).toBe(1);
@@ -156,13 +156,13 @@ describe("EventStoreMemory - countEventsBefore", () => {
       const timestamp = 1000;
       const eventId = "non-existent-event";
 
-      const count = await store.countEventsBefore(
+      const count = await store.countEventsBefore({
         aggregateId,
         context,
         aggregateType,
-        timestamp,
-        eventId,
-      );
+        beforeTimestamp: timestamp,
+        beforeEventId: eventId,
+      });
 
       expect(count).toBe(0);
     });
@@ -196,13 +196,13 @@ describe("EventStoreMemory - countEventsBefore", () => {
       await store.storeEvents([event2], context2, aggregateType);
 
       // Count events before event2 in tenant2's context
-      const count = await store.countEventsBefore(
+      const count = await store.countEventsBefore({
         aggregateId,
-        context2,
+        context: context2,
         aggregateType,
-        1000,
-        event2.id,
-      );
+        beforeTimestamp: 1000,
+        beforeEventId: event2.id,
+      });
 
       // Should only count events from tenant2 (0, since event2 is the first)
       expect(count).toBe(0);
@@ -212,13 +212,13 @@ describe("EventStoreMemory - countEventsBefore", () => {
       const invalidContext = {} as any;
 
       await expect(
-        store.countEventsBefore(
+        store.countEventsBefore({
           aggregateId,
-          invalidContext,
+          context: invalidContext,
           aggregateType,
-          1000,
-          "event-id",
-        ),
+          beforeTimestamp: 1000,
+          beforeEventId: "event-id",
+        }),
       ).rejects.toThrow("tenantId");
     });
 
@@ -268,13 +268,13 @@ describe("EventStoreMemory - countEventsBefore", () => {
       await store.storeEvents([event1, event2, event3], context, aggregateType);
 
       // Count events before event3
-      const count = await store.countEventsBefore(
+      const count = await store.countEventsBefore({
         aggregateId,
         context,
         aggregateType,
-        sameTimestamp,
-        event3.id,
-      );
+        beforeTimestamp: sameTimestamp,
+        beforeEventId: event3.id,
+      });
 
       // Should count event1 and event2 (both have same timestamp but earlier IDs)
       // Note: All events now have manually set IDs to ensure predictable ordering
@@ -331,13 +331,13 @@ describe("EventStoreMemory - countEventsBefore", () => {
       );
 
       // Count events before event4 (timestamp 3000)
-      const count = await store.countEventsBefore(
+      const count = await store.countEventsBefore({
         aggregateId,
         context,
         aggregateType,
-        3000,
-        event4.id,
-      );
+        beforeTimestamp: 3000,
+        beforeEventId: event4.id,
+      });
 
       // Should count event1, event2, event3 (all have timestamp < 3000)
       expect(count).toBe(3);

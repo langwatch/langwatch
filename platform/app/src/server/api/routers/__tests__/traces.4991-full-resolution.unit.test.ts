@@ -179,12 +179,12 @@ describe("traces router — #4991 AC2 thread reads", () => {
         projectId: "project_123",
         threadId: "thread-1",
       });
-      expect(mockGetTracesByThreadId).toHaveBeenCalledWith(
-        "project_123",
-        "thread-1",
-        expect.any(Object),
-        { full: true },
-      );
+      expect(mockGetTracesByThreadId).toHaveBeenCalledWith({
+        projectId: "project_123",
+        threadId: "thread-1",
+        protections: expect.any(Object),
+        opts: { full: true },
+      });
     });
   });
 
@@ -195,12 +195,12 @@ describe("traces router — #4991 AC2 thread reads", () => {
         threadIds: ["thread-1"],
       });
       expectConstructedWithBlobDeps();
-      expect(mockGetTracesWithSpansByThreadIds).toHaveBeenCalledWith(
-        "project_123",
-        ["thread-1"],
-        expect.any(Object),
-        { full: true },
-      );
+      expect(mockGetTracesWithSpansByThreadIds).toHaveBeenCalledWith({
+        projectId: "project_123",
+        threadIds: ["thread-1"],
+        protections: expect.any(Object),
+        opts: { full: true },
+      });
     });
   });
 });
@@ -224,13 +224,13 @@ describe("traces router — #4991 AC4 dataset/sample builders", () => {
     it("constructs with deps and resolves spans full", async () => {
       await caller.getSampleTracesDataset(baseFilters);
       expectConstructedWithBlobDeps();
-      expect(mockGetTracesWithSpans).toHaveBeenCalledWith(
-        "project_123",
-        ["t1"],
-        expect.any(Object),
-        expect.any(Object),
-        { full: true },
-      );
+      expect(mockGetTracesWithSpans).toHaveBeenCalledWith({
+        projectId: "project_123",
+        traceIds: ["t1"],
+        protections: expect.any(Object),
+        occurredAt: expect.any(Object),
+        opts: { full: true },
+      });
     });
   });
 
@@ -243,13 +243,13 @@ describe("traces router — #4991 AC4 dataset/sample builders", () => {
         expectedResults: 10,
       });
       expectConstructedWithBlobDeps();
-      expect(mockGetTracesWithSpans).toHaveBeenCalledWith(
-        "project_123",
-        ["t1"],
-        expect.any(Object),
-        expect.any(Object),
-        { full: true },
-      );
+      expect(mockGetTracesWithSpans).toHaveBeenCalledWith({
+        projectId: "project_123",
+        traceIds: ["t1"],
+        protections: expect.any(Object),
+        occurredAt: expect.any(Object),
+        opts: { full: true },
+      });
     });
   });
 });
@@ -323,11 +323,11 @@ describe("traces router — #4991 AC5 list grid stays preview", () => {
       });
       expect(mockBuildDeps).not.toHaveBeenCalled();
       // getTracesWithSpans called with NO { full: true } opts (preview only).
-      expect(mockGetTracesWithSpans).toHaveBeenCalledWith(
-        "project_123",
-        ["t1"],
-        expect.any(Object),
-      );
+      expect(mockGetTracesWithSpans).toHaveBeenCalledWith({
+        projectId: "project_123",
+        traceIds: ["t1"],
+        protections: expect.any(Object),
+      });
     });
   });
 });

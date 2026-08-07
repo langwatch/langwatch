@@ -65,13 +65,19 @@ export function calculateSensibleDefaults(
  * @param previousValues - Optional previous config values (for smart max_tokens handling)
  * @param previousModelMetadata - Optional metadata for the previous model
  */
-export function buildModelChangeValues(
-  newModel: string,
-  registry: typeof defaultRegistry = defaultRegistry,
-  newModelMetadata?: ModelMetadataForFrontend,
-  previousValues?: LLMConfigValues,
-  previousModelMetadata?: ModelMetadataForFrontend,
-): LLMConfigValues {
+export function buildModelChangeValues({
+  newModel,
+  registry = defaultRegistry,
+  newModelMetadata,
+  previousValues,
+  previousModelMetadata,
+}: {
+  newModel: string;
+  registry?: typeof defaultRegistry;
+  newModelMetadata?: ModelMetadataForFrontend;
+  previousValues?: LLMConfigValues;
+  previousModelMetadata?: ModelMetadataForFrontend;
+}): LLMConfigValues {
   const result: LLMConfigValues = { model: newModel };
   const resultRecord = result as Record<string, unknown>;
 

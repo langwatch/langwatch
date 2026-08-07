@@ -421,7 +421,12 @@ export class QueueManager<EventType extends Event = Event> {
     }
   }
 
-  initializeProjectionQueues(
+  initializeProjectionQueues({
+    projections,
+    onEvent,
+    onEventBatch,
+    lane = { queueType: "projection", jobPath: "fold" },
+  }: {
     projections: Record<
       string,
       {
@@ -433,22 +438,22 @@ export class QueueManager<EventType extends Event = Event> {
           killSwitch?: KillSwitchOptions;
         };
       }
-    >,
+    >;
     onEvent: (
       projectionName: string,
       event: EventType,
       context: EventStoreReadContext<EventType>,
-    ) => Promise<void>,
+    ) => Promise<void>;
     onEventBatch?: (
       projectionName: string,
       events: EventType[],
       context: EventStoreReadContext<EventType>,
-    ) => Promise<void>,
-    lane: {
+    ) => Promise<void>;
+    lane?: {
       queueType: "projection" | "stateProjection";
       jobPath: "fold" | "state";
-    } = { queueType: "projection", jobPath: "fold" },
-  ): void {
+    };
+  }): void {
     if (!this.globalQueue) {
       return;
     }
@@ -518,17 +523,19 @@ export class QueueManager<EventType extends Event = Event> {
   initializeStateProjectionQueues(
     projections: Parameters<
       QueueManager<EventType>["initializeProjectionQueues"]
-    >[0],
+    >[0]["projections"],
     onEvent: Parameters<
       QueueManager<EventType>["initializeProjectionQueues"]
-    >[1],
+    >[0]["onEvent"],
     onEventBatch?: Parameters<
       QueueManager<EventType>["initializeProjectionQueues"]
-    >[2],
+    >[0]["onEventBatch"],
   ): void {
-    this.initializeProjectionQueues(projections, onEvent, onEventBatch, {
-      queueType: "stateProjection",
-      jobPath: "state",
+    this.initializeProjectionQueues({
+      projections,
+      onEvent,
+      onEventBatch,
+      lane: { queueType: "stateProjection", jobPath: "state" },
     });
   }
 
@@ -717,15 +724,14 @@ export class QueueManager<EventType extends Event = Event> {
         send: async (payload: any, options?: QueueSendOptions<any>) => {
           const validation = cmdEntry.schema.validate(payload);
           if (!validation.success) {
-            throw new ValidationError(
-              `Invalid payload for command type "${cmdEntry.commandType}". Validation failed.`,
-              "payload",
-              undefined,
-              {
+            throw new ValidationError({
+              reason: `Invalid payload for command type "${cmdEntry.commandType}". Validation failed.`,
+              field: "payload",
+              context: {
                 commandType: cmdEntry.commandType,
                 zodIssues: mapZodIssuesToLogContext(validation.error.issues),
               },
-            );
+            });
           }
           return baseFacade.send(payload, options);
         },
@@ -733,15 +739,14 @@ export class QueueManager<EventType extends Event = Event> {
           for (const payload of payloads) {
             const validation = cmdEntry.schema.validate(payload);
             if (!validation.success) {
-              throw new ValidationError(
-                `Invalid payload for command type "${cmdEntry.commandType}". Validation failed.`,
-                "payload",
-                undefined,
-                {
+              throw new ValidationError({
+                reason: `Invalid payload for command type "${cmdEntry.commandType}". Validation failed.`,
+                field: "payload",
+                context: {
                   commandType: cmdEntry.commandType,
                   zodIssues: mapZodIssuesToLogContext(validation.error.issues),
                 },
-              );
+              });
             }
           }
           return baseFacade.sendBatch(payloads, options);

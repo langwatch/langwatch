@@ -127,13 +127,19 @@ export function validateCommand(
 export function createCommand<
   Payload = unknown,
   Metadata = Record<string, unknown>,
->(
-  tenantId: TenantId,
-  aggregateId: string,
-  type: CommandType,
-  data: Payload,
-  metadata?: Metadata,
-): Command<Payload, Metadata> {
+>({
+  tenantId,
+  aggregateId,
+  type,
+  data,
+  metadata,
+}: {
+  tenantId: TenantId;
+  aggregateId: string;
+  type: CommandType;
+  data: Payload;
+  metadata?: Metadata;
+}): Command<Payload, Metadata> {
   return {
     tenantId,
     aggregateId,

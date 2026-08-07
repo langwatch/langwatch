@@ -39,12 +39,12 @@ export interface LogRecordStorageRepository {
    * `occurredAtMs` is an optional partition-pruning hint on the `TimeUnixMs`
    * partition key.
    */
-  getLogsByTraceId(
-    tenantId: string,
-    traceId: string,
-    occurredAtMs?: number,
-    limit?: number,
-  ): Promise<StoredLogRecordRow[]>;
+  getLogsByTraceId(params: {
+    tenantId: string;
+    traceId: string;
+    occurredAtMs?: number;
+    limit?: number;
+  }): Promise<StoredLogRecordRow[]>;
 }
 
 /**
@@ -80,12 +80,12 @@ export function mergeStoredLogRows(
 export class NullLogRecordStorageRepository
   implements LogRecordStorageRepository
 {
-  async getLogsByTraceId(
-    _tenantId: string,
-    _traceId: string,
-    _occurredAtMs?: number,
-    _limit?: number,
-  ): Promise<StoredLogRecordRow[]> {
+  async getLogsByTraceId(_params: {
+    tenantId: string;
+    traceId: string;
+    occurredAtMs?: number;
+    limit?: number;
+  }): Promise<StoredLogRecordRow[]> {
     return [];
   }
 }

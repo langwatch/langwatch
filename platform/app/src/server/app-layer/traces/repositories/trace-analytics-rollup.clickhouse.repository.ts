@@ -123,12 +123,12 @@ export class TraceAnalyticsRollupClickHouseRepository
     const tenantId = rows[0]!.tenantId;
     for (const row of rows) {
       if (row.tenantId !== tenantId) {
-        throw new SecurityError(
-          "TraceAnalyticsRollupClickHouseRepository.insertRows",
-          "all rows in a single batch must share the same tenantId",
+        throw new SecurityError({
+          operation: "TraceAnalyticsRollupClickHouseRepository.insertRows",
+          message: "all rows in a single batch must share the same tenantId",
           tenantId,
-          { mismatchedTenantId: row.tenantId },
-        );
+          context: { mismatchedTenantId: row.tenantId },
+        });
       }
     }
 

@@ -149,10 +149,15 @@ export class AnalyticsService {
     );
   }
 
-  async getFeedbacks(
-    projectId: string,
-    startDate: number,
-    endDate: number,
+  async getFeedbacks({
+    projectId,
+    startDate,
+    endDate,
+    filters,
+  }: {
+    projectId: string;
+    startDate: number;
+    endDate: number;
     filters: Partial<
       Record<
         FilterField,
@@ -160,25 +165,30 @@ export class AnalyticsService {
         | Record<string, string[]>
         | Record<string, Record<string, string[]>>
       >
-    >,
-  ): Promise<FeedbacksResult> {
+    >;
+  }): Promise<FeedbacksResult> {
     return this.tracer.withActiveSpan(
       "AnalyticsService.getFeedbacks",
       { attributes: { "tenant.id": projectId } },
       () =>
-        this.deps.legacyBackend.getFeedbacks(
+        this.deps.legacyBackend.getFeedbacks({
           projectId,
           startDate,
           endDate,
           filters,
-        ),
+        }),
     );
   }
 
-  async getTopUsedDocuments(
-    projectId: string,
-    startDate: number,
-    endDate: number,
+  async getTopUsedDocuments({
+    projectId,
+    startDate,
+    endDate,
+    filters,
+  }: {
+    projectId: string;
+    startDate: number;
+    endDate: number;
     filters: Partial<
       Record<
         FilterField,
@@ -186,18 +196,18 @@ export class AnalyticsService {
         | Record<string, string[]>
         | Record<string, Record<string, string[]>>
       >
-    >,
-  ): Promise<TopDocumentsResult> {
+    >;
+  }): Promise<TopDocumentsResult> {
     return this.tracer.withActiveSpan(
       "AnalyticsService.getTopUsedDocuments",
       { attributes: { "tenant.id": projectId } },
       () =>
-        this.deps.legacyBackend.getTopUsedDocuments(
+        this.deps.legacyBackend.getTopUsedDocuments({
           projectId,
           startDate,
           endDate,
           filters,
-        ),
+        }),
     );
   }
 

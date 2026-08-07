@@ -119,7 +119,11 @@ describe("TraceService", () => {
       it("returns the trace without attempting prefix resolution", async () => {
         mockGetTracesWithSpansCH.mockResolvedValue([sampleTrace]);
 
-        const result = await service.getById(projectId, fullId, protections);
+        const result = await service.getById({
+          projectId,
+          traceId: fullId,
+          protections,
+        });
 
         expect(result).toBe(sampleTrace);
         expect(mockResolveTraceIdByPrefixCH).not.toHaveBeenCalled();
@@ -133,7 +137,11 @@ describe("TraceService", () => {
           .mockResolvedValueOnce([sampleTrace]);
         mockResolveTraceIdByPrefixCH.mockResolvedValue([fullId]);
 
-        const result = await service.getById(projectId, prefix20, protections);
+        const result = await service.getById({
+          projectId,
+          traceId: prefix20,
+          protections,
+        });
 
         expect(result).toBe(sampleTrace);
         expect(mockResolveTraceIdByPrefixCH).toHaveBeenCalledWith(
@@ -148,14 +156,12 @@ describe("TraceService", () => {
           }),
         );
         // Second fetch uses the resolved full ID
-        expect(mockGetTracesWithSpansCH).toHaveBeenNthCalledWith(
-          2,
+        expect(mockGetTracesWithSpansCH).toHaveBeenNthCalledWith(2, {
           projectId,
-          [fullId],
+          traceIds: [fullId],
           protections,
-          undefined,
-          { resolveBlobs: undefined },
-        );
+          opts: { resolveBlobs: undefined },
+        });
       });
 
       it("throws AmbiguousTraceIdPrefixError when the prefix matches multiple traces", async () => {
@@ -166,7 +172,7 @@ describe("TraceService", () => {
         ]);
 
         await expect(
-          service.getById(projectId, prefix20, protections),
+          service.getById({ projectId, traceId: prefix20, protections }),
         ).rejects.toBeInstanceOf(AmbiguousTraceIdPrefixError);
       });
 
@@ -174,7 +180,11 @@ describe("TraceService", () => {
         mockGetTracesWithSpansCH.mockResolvedValue([]);
         mockResolveTraceIdByPrefixCH.mockResolvedValue([]);
 
-        const result = await service.getById(projectId, prefix20, protections);
+        const result = await service.getById({
+          projectId,
+          traceId: prefix20,
+          protections,
+        });
 
         expect(result).toBeUndefined();
       });
@@ -184,7 +194,11 @@ describe("TraceService", () => {
       it("returns undefined without querying by prefix", async () => {
         mockGetTracesWithSpansCH.mockResolvedValue([]);
 
-        const result = await service.getById(projectId, "abc", protections);
+        const result = await service.getById({
+          projectId,
+          traceId: "abc",
+          protections,
+        });
 
         expect(result).toBeUndefined();
         expect(mockResolveTraceIdByPrefixCH).not.toHaveBeenCalled();
@@ -195,11 +209,11 @@ describe("TraceService", () => {
       it("skips prefix resolution and returns undefined", async () => {
         mockGetTracesWithSpansCH.mockResolvedValue([]);
 
-        const result = await service.getById(
+        const result = await service.getById({
           projectId,
-          "not-a-hex-id-zzzzzzzz",
+          traceId: "not-a-hex-id-zzzzzzzz",
           protections,
-        );
+        });
 
         expect(result).toBeUndefined();
         expect(mockResolveTraceIdByPrefixCH).not.toHaveBeenCalled();

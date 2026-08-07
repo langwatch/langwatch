@@ -29,12 +29,17 @@ function createNode(
   };
 }
 
-function createEdge(
-  source: string,
-  target: string,
-  sourceHandle: string,
-  targetHandle: string,
-): Edge {
+function createEdge({
+  source,
+  target,
+  sourceHandle,
+  targetHandle,
+}: {
+  source: string;
+  target: string;
+  sourceHandle: string;
+  targetHandle: string;
+}): Edge {
   return {
     id: `edge-${source}-${target}-${sourceHandle}`,
     source,
@@ -93,7 +98,12 @@ describe("buildAvailableSources", () => {
         createNode("end", "end", {}),
       ];
       const edges: Edge[] = [
-        createEdge("llm1", "llm2", "outputs.result", "inputs.context"),
+        createEdge({
+          source: "llm1",
+          target: "llm2",
+          sourceHandle: "outputs.result",
+          targetHandle: "inputs.context",
+        }),
       ];
 
       const result = buildAvailableSources({
@@ -188,8 +198,18 @@ describe("buildInputMappingsFromEdges", () => {
   describe("when edges connect to the node", () => {
     it("builds mappings from edge handles", () => {
       const edges: Edge[] = [
-        createEdge("entry", "llm1", "outputs.question", "inputs.input"),
-        createEdge("entry", "llm1", "outputs.context", "inputs.context"),
+        createEdge({
+          source: "entry",
+          target: "llm1",
+          sourceHandle: "outputs.question",
+          targetHandle: "inputs.input",
+        }),
+        createEdge({
+          source: "entry",
+          target: "llm1",
+          sourceHandle: "outputs.context",
+          targetHandle: "inputs.context",
+        }),
       ];
 
       const result = buildInputMappingsFromEdges({
@@ -207,7 +227,12 @@ describe("buildInputMappingsFromEdges", () => {
   describe("when no edges target the node", () => {
     it("returns an empty mapping", () => {
       const edges: Edge[] = [
-        createEdge("entry", "other_node", "outputs.data", "inputs.input"),
+        createEdge({
+          source: "entry",
+          target: "other_node",
+          sourceHandle: "outputs.data",
+          targetHandle: "inputs.input",
+        }),
       ];
 
       const result = buildInputMappingsFromEdges({
@@ -271,8 +296,18 @@ describe("applyMappingChangeToEdges", () => {
   describe("when removing a mapping", () => {
     it("removes the existing edge for that input", () => {
       const currentEdges: Edge[] = [
-        createEdge("entry", "llm1", "outputs.input", "inputs.question"),
-        createEdge("entry", "llm1", "outputs.context", "inputs.context"),
+        createEdge({
+          source: "entry",
+          target: "llm1",
+          sourceHandle: "outputs.input",
+          targetHandle: "inputs.question",
+        }),
+        createEdge({
+          source: "entry",
+          target: "llm1",
+          sourceHandle: "outputs.context",
+          targetHandle: "inputs.context",
+        }),
       ];
 
       const result = applyMappingChangeToEdges({
@@ -290,7 +325,12 @@ describe("applyMappingChangeToEdges", () => {
   describe("when replacing a mapping", () => {
     it("removes the old edge and adds a new one", () => {
       const currentEdges: Edge[] = [
-        createEdge("entry", "llm1", "outputs.old_field", "inputs.question"),
+        createEdge({
+          source: "entry",
+          target: "llm1",
+          sourceHandle: "outputs.old_field",
+          targetHandle: "inputs.question",
+        }),
       ];
 
       const result = applyMappingChangeToEdges({
@@ -317,7 +357,12 @@ describe("applyMappingChangeToEdges", () => {
   describe("when mapping is a value type (not source)", () => {
     it("only removes existing edges without adding new ones", () => {
       const currentEdges: Edge[] = [
-        createEdge("entry", "llm1", "outputs.input", "inputs.question"),
+        createEdge({
+          source: "entry",
+          target: "llm1",
+          sourceHandle: "outputs.input",
+          targetHandle: "inputs.question",
+        }),
       ];
 
       const result = applyMappingChangeToEdges({
@@ -334,8 +379,18 @@ describe("applyMappingChangeToEdges", () => {
   describe("when unrelated edges exist", () => {
     it("preserves edges not targeting this node input", () => {
       const currentEdges: Edge[] = [
-        createEdge("entry", "llm1", "outputs.input", "inputs.question"),
-        createEdge("entry", "llm2", "outputs.input", "inputs.context"),
+        createEdge({
+          source: "entry",
+          target: "llm1",
+          sourceHandle: "outputs.input",
+          targetHandle: "inputs.question",
+        }),
+        createEdge({
+          source: "entry",
+          target: "llm2",
+          sourceHandle: "outputs.input",
+          targetHandle: "inputs.context",
+        }),
       ];
 
       const result = applyMappingChangeToEdges({

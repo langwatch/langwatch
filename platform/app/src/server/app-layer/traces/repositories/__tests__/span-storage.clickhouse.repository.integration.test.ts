@@ -984,12 +984,17 @@ describe("SpanStorageClickHouseRepository per-span cost columns (integration)", 
 // are deterministic and the heavy single-trace dataset above is untouched.
 const pageTenantId = `test-span-page-${nanoid()}`;
 
-function makePageSpanRow(
-  pageTraceId: string,
-  spanId: string,
-  startTime: Date,
-  overrides: Record<string, unknown> = {},
-): ReturnType<typeof makeSpanRow> {
+function makePageSpanRow({
+  pageTraceId,
+  spanId,
+  startTime,
+  overrides = {},
+}: {
+  pageTraceId: string;
+  spanId: string;
+  startTime: Date;
+  overrides?: Record<string, unknown>;
+}): ReturnType<typeof makeSpanRow> {
   return {
     ...makeSpanRow(0, {
       TenantId: pageTenantId,
@@ -1039,12 +1044,19 @@ describe("SpanStorageClickHouseRepository cursor-paged span summaries (integrati
     // stale earlier version of one mid-trace span that dedup must not emit.
     await insertRows(
       Array.from({ length: EXACT_SPANS }, (_, i) =>
-        makePageSpanRow(exactTraceId, spanIdFor(i), new Date(base + i * 10)),
+        makePageSpanRow({
+          pageTraceId: exactTraceId,
+          spanId: spanIdFor(i),
+          startTime: new Date(base + i * 10),
+        }),
       ),
     );
     await insertRows([
-      makePageSpanRow(exactTraceId, spanIdFor(25), new Date(base - 5_000), {
-        SpanAttributes: { idx: spanIdFor(25), stale: "yes" },
+      makePageSpanRow({
+        pageTraceId: exactTraceId,
+        spanId: spanIdFor(25),
+        startTime: new Date(base - 5_000),
+        overrides: { SpanAttributes: { idx: spanIdFor(25), stale: "yes" } },
       }),
     ]);
 
@@ -1052,7 +1064,11 @@ describe("SpanStorageClickHouseRepository cursor-paged span summaries (integrati
     // same-millisecond rows and only the SpanId tiebreak separates pages.
     await insertRows(
       ["tie-a", "tie-b", "tie-c", "tie-d"].map((spanId) =>
-        makePageSpanRow(tieTraceId, spanId, new Date(base + 500)),
+        makePageSpanRow({
+          pageTraceId: tieTraceId,
+          spanId,
+          startTime: new Date(base + 500),
+        }),
       ),
     );
 
@@ -1060,14 +1076,18 @@ describe("SpanStorageClickHouseRepository cursor-paged span summaries (integrati
     // three days later — past the hint's +2-day partition window.
     await insertRows([
       ...[0, 1, 2].map((i) =>
-        makePageSpanRow(longTraceId, `early-${i}`, new Date(base + i)),
+        makePageSpanRow({
+          pageTraceId: longTraceId,
+          spanId: `early-${i}`,
+          startTime: new Date(base + i),
+        }),
       ),
       ...[0, 1].map((i) =>
-        makePageSpanRow(
-          longTraceId,
-          `late-${i}`,
-          new Date(base + 3 * 24 * 60 * 60 * 1000 + i),
-        ),
+        makePageSpanRow({
+          pageTraceId: longTraceId,
+          spanId: `late-${i}`,
+          startTime: new Date(base + 3 * 24 * 60 * 60 * 1000 + i),
+        }),
       ),
     ]);
   }, 60_000);
@@ -1126,10 +1146,17 @@ describe("SpanStorageClickHouseRepository langwatch signals read (integration)",
 
   beforeAll(async () => {
     await insertRows([
-      makePageSpanRow(signalsTraceId, "sig-prompt", new Date(base), {
-        SpanAttributes: { "langwatch.prompt.id": "prompt-1" },
+      makePageSpanRow({
+        pageTraceId: signalsTraceId,
+        spanId: "sig-prompt",
+        startTime: new Date(base),
+        overrides: { SpanAttributes: { "langwatch.prompt.id": "prompt-1" } },
       }),
-      makePageSpanRow(signalsTraceId, "sig-none", new Date(base + 1)),
+      makePageSpanRow({
+        pageTraceId: signalsTraceId,
+        spanId: "sig-none",
+        startTime: new Date(base + 1),
+      }),
     ]);
   }, 60_000);
 

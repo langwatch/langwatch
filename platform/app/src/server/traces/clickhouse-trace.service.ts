@@ -422,13 +422,19 @@ export class ClickHouseTraceService {
    * @returns Array of Trace objects with spans
    * @throws ClickHouseClientUnavailableError when no ClickHouse client resolves
    */
-  async getTracesWithSpans(
-    projectId: string,
-    traceIds: string[],
-    protections: Protections,
-    occurredAt?: OccurredAtRange,
-    opts?: { resolveBlobs?: boolean },
-  ): Promise<Trace[]> {
+  async getTracesWithSpans({
+    projectId,
+    traceIds,
+    protections,
+    occurredAt,
+    opts,
+  }: {
+    projectId: string;
+    traceIds: string[];
+    protections: Protections;
+    occurredAt?: OccurredAtRange;
+    opts?: { resolveBlobs?: boolean };
+  }): Promise<Trace[]> {
     return await this.tracer.withActiveSpan(
       "ClickHouseTraceService.getTracesWithSpans",
       {
@@ -590,12 +596,17 @@ export class ClickHouseTraceService {
    *   clickhouse-trace.service-4991-bulk.unit.test.ts.
    * @throws ClickHouseClientUnavailableError when no ClickHouse client resolves
    */
-  async getTracesByThreadId(
-    projectId: string,
-    threadId: string,
-    protections: Protections,
-    opts?: { resolveBlobs?: boolean },
-  ): Promise<Trace[]> {
+  async getTracesByThreadId({
+    projectId,
+    threadId,
+    protections,
+    opts,
+  }: {
+    projectId: string;
+    threadId: string;
+    protections: Protections;
+    opts?: { resolveBlobs?: boolean };
+  }): Promise<Trace[]> {
     return await this.tracer.withActiveSpan(
       "ClickHouseTraceService.getTracesByThreadId",
       {
@@ -638,13 +649,12 @@ export class ClickHouseTraceService {
           // Fetch full traces with spans. Forward resolveBlobs so the
           // thread-detail read can resolve full IO (#4991); customer thread
           // views with no resolver wired stay on the preview.
-          const traces = await this.getTracesWithSpans(
+          const traces = await this.getTracesWithSpans({
             projectId,
             traceIds,
             protections,
-            undefined,
-            { resolveBlobs: opts?.resolveBlobs },
-          );
+            opts: { resolveBlobs: opts?.resolveBlobs },
+          });
 
           // Re-sort by timestamp — getTracesWithSpans returns in TraceId
           // order which doesn't match the chronological order we need.
@@ -687,12 +697,17 @@ export class ClickHouseTraceService {
    * @returns Array of Trace objects with spans
    * @throws ClickHouseClientUnavailableError when no ClickHouse client resolves
    */
-  async getTracesWithSpansByThreadIds(
-    projectId: string,
-    threadIds: string[],
-    protections: Protections,
-    opts?: { resolveBlobs?: boolean },
-  ): Promise<Trace[]> {
+  async getTracesWithSpansByThreadIds({
+    projectId,
+    threadIds,
+    protections,
+    opts,
+  }: {
+    projectId: string;
+    threadIds: string[];
+    protections: Protections;
+    opts?: { resolveBlobs?: boolean };
+  }): Promise<Trace[]> {
     return await this.tracer.withActiveSpan(
       "ClickHouseTraceService.getTracesWithSpansByThreadIds",
       {
@@ -742,13 +757,12 @@ export class ClickHouseTraceService {
           // Fetch full traces with spans. Forward resolveBlobs so the eval
           // path reads full thread IO (#4888); customer thread views pass
           // nothing and have no resolver, so they stay on the preview.
-          const traces = await this.getTracesWithSpans(
+          const traces = await this.getTracesWithSpans({
             projectId,
             traceIds,
             protections,
-            undefined,
-            { resolveBlobs: opts?.resolveBlobs },
-          );
+            opts: { resolveBlobs: opts?.resolveBlobs },
+          });
 
           // Re-sort by timestamp — getTracesWithSpans returns in TraceId
           // order which doesn't match the chronological order we need.
@@ -950,12 +964,12 @@ export class ClickHouseTraceService {
           const wantsFullIo = options.resolveBlobs === true;
 
           if ((wantsSpans || wantsFullIo) && traces.length > 0) {
-            const enriched = await this.enrichTracesWithSpans(
+            const enriched = await this.enrichTracesWithSpans({
               traces,
-              input.projectId,
+              projectId: input.projectId,
               protections,
-              wantsFullIo,
-            );
+              resolveBlobs: wantsFullIo,
+            });
 
             // A summary caller keeps the recomputed trace-level IO but not the
             // spans it never asked for — the payload shape stays exactly as it
@@ -2640,12 +2654,17 @@ export class ClickHouseTraceService {
    *
    * @internal
    */
-  private async enrichTracesWithSpans(
-    traces: Trace[],
-    projectId: string,
-    protections: Protections,
+  private async enrichTracesWithSpans({
+    traces,
+    projectId,
+    protections,
     resolveBlobs = false,
-  ): Promise<Trace[]> {
+  }: {
+    traces: Trace[];
+    projectId: string;
+    protections: Protections;
+    resolveBlobs?: boolean;
+  }): Promise<Trace[]> {
     const traceIds = traces.map((t) => t.trace_id);
     // The traces already carry their own timestamps, so derive the partition
     // window for free: this bounds the trace_summaries summary read to the

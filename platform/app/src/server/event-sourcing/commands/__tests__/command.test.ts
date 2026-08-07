@@ -12,12 +12,12 @@ describe("createCommand", () => {
       const commandType = COMMAND_TYPES[0];
       const payload = { action: "test" };
 
-      const command = createCommand(
+      const command = createCommand({
         tenantId,
         aggregateId,
-        commandType,
-        payload,
-      );
+        type: commandType,
+        data: payload,
+      });
 
       expect(command.tenantId).toBe(tenantId);
     });
@@ -28,12 +28,12 @@ describe("createCommand", () => {
       const commandType = COMMAND_TYPES[0];
       const payload = { action: "test" };
 
-      const command = createCommand(
+      const command = createCommand({
         tenantId,
         aggregateId,
-        commandType,
-        payload,
-      );
+        type: commandType,
+        data: payload,
+      });
 
       expect(command.aggregateId).toBe(aggregateId);
     });
@@ -44,12 +44,12 @@ describe("createCommand", () => {
       const commandType = COMMAND_TYPES[0];
       const payload = { action: "test" };
 
-      const command = createCommand(
+      const command = createCommand({
         tenantId,
         aggregateId,
-        commandType,
-        payload,
-      );
+        type: commandType,
+        data: payload,
+      });
 
       expect(command.type).toBe(commandType);
     });
@@ -60,12 +60,12 @@ describe("createCommand", () => {
       const commandType = COMMAND_TYPES[0];
       const payload = { action: "test", value: 42 };
 
-      const command = createCommand(
+      const command = createCommand({
         tenantId,
         aggregateId,
-        commandType,
-        payload,
-      );
+        type: commandType,
+        data: payload,
+      });
 
       expect(command.data).toEqual(payload);
     });
@@ -78,12 +78,12 @@ describe("createCommand", () => {
       const commandType = COMMAND_TYPES[0];
       const payload = { action: "test" };
 
-      const command = createCommand(
+      const command = createCommand({
         tenantId,
         aggregateId,
-        commandType,
-        payload,
-      );
+        type: commandType,
+        data: payload,
+      });
 
       expect(command.metadata).toBeUndefined();
     });
@@ -97,13 +97,13 @@ describe("createCommand", () => {
       const payload = { action: "test" };
       const metadata = { correlationId: "corr-123", traceId: "trace-456" };
 
-      const command = createCommand(
+      const command = createCommand({
         tenantId,
         aggregateId,
-        commandType,
-        payload,
+        type: commandType,
+        data: payload,
         metadata,
-      );
+      });
 
       expect(command.metadata).toEqual(metadata);
     });
@@ -123,13 +123,13 @@ describe("createCommand", () => {
         array: [1, 2, 3],
       };
 
-      const command = createCommand(
+      const command = createCommand({
         tenantId,
         aggregateId,
-        commandType,
-        payload,
+        type: commandType,
+        data: payload,
         metadata,
-      );
+      });
 
       expect(command.metadata).toEqual(metadata);
     });
@@ -142,12 +142,12 @@ describe("createCommand", () => {
       const commandType = COMMAND_TYPES[0];
       const payload = "string-payload";
 
-      const command = createCommand(
+      const command = createCommand({
         tenantId,
         aggregateId,
-        commandType,
-        payload,
-      );
+        type: commandType,
+        data: payload,
+      });
 
       expect(command.data).toBe(payload);
     });
@@ -158,12 +158,12 @@ describe("createCommand", () => {
       const commandType = COMMAND_TYPES[0];
       const payload = 42;
 
-      const command = createCommand(
+      const command = createCommand({
         tenantId,
         aggregateId,
-        commandType,
-        payload,
-      );
+        type: commandType,
+        data: payload,
+      });
 
       expect(command.data).toBe(payload);
     });
@@ -174,12 +174,12 @@ describe("createCommand", () => {
       const commandType = COMMAND_TYPES[0];
       const payload = { key: "value", number: 123 };
 
-      const command = createCommand(
+      const command = createCommand({
         tenantId,
         aggregateId,
-        commandType,
-        payload,
-      );
+        type: commandType,
+        data: payload,
+      });
 
       expect(command.data).toEqual(payload);
     });
@@ -190,12 +190,12 @@ describe("createCommand", () => {
       const commandType = COMMAND_TYPES[0];
       const payload = [1, 2, 3, "four"];
 
-      const command = createCommand(
+      const command = createCommand({
         tenantId,
         aggregateId,
-        commandType,
-        payload,
-      );
+        type: commandType,
+        data: payload,
+      });
 
       expect(command.data).toEqual(payload);
     });
@@ -206,12 +206,12 @@ describe("createCommand", () => {
       const commandType = COMMAND_TYPES[0];
       const payload = null;
 
-      const command = createCommand(
+      const command = createCommand({
         tenantId,
         aggregateId,
-        commandType,
-        payload,
-      );
+        type: commandType,
+        data: payload,
+      });
 
       expect(command.data).toBeNull();
     });
@@ -225,13 +225,13 @@ describe("createCommand", () => {
       const payload = { action: "test" };
       const metadata = { key: "value" };
 
-      const command = createCommand(
+      const command = createCommand({
         tenantId,
         aggregateId,
-        commandType,
-        payload,
+        type: commandType,
+        data: payload,
         metadata,
-      );
+      });
 
       expect(command.metadata).toEqual(metadata);
     });
@@ -243,13 +243,13 @@ describe("createCommand", () => {
       const payload = { action: "test" };
       const metadata = null;
 
-      const command = createCommand(
+      const command = createCommand({
         tenantId,
         aggregateId,
-        commandType,
-        payload,
+        type: commandType,
+        data: payload,
         metadata,
-      );
+      });
 
       expect(command.metadata).toBeNull();
     });

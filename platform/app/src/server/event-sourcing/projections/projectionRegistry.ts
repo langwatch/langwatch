@@ -150,13 +150,12 @@ export class ProjectionRegistry<EventType extends Event = Event> {
     });
 
     // Create router — all projections are incremental
-    this.router = new ProjectionRouter<EventType>(
+    this.router = new ProjectionRouter<EventType>({
       aggregateType,
-      "global",
-      this.queueManager,
-      undefined, // featureFlagService
+      pipelineName: "global",
+      queueManager: this.queueManager,
       processRole,
-    );
+    });
 
     for (const fold of this.foldProjections.values()) {
       this.router.registerFoldProjection(fold);

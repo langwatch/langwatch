@@ -33,11 +33,11 @@ function createDurableWatermarkStore<State>(): FoldProjectionStore<State> {
 function createRouter(
   aggregateType: AggregateType = TEST_CONSTANTS.AGGREGATE_TYPE,
 ) {
-  return new ProjectionRouter(
+  return new ProjectionRouter({
     aggregateType,
-    TEST_CONSTANTS.PIPELINE_NAME,
-    createMockQueueManager(),
-  );
+    pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
+    queueManager: createMockQueueManager(),
+  });
 }
 
 describe("ProjectionRouter registration guard", () => {

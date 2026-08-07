@@ -172,7 +172,7 @@ class OffloadedSpanResolver {
  * @example
  * ```ts
  * const service = TraceService.create(prisma);
- * const traces = await service.getTracesWithSpans(projectId, traceIds, protections);
+ * const traces = await service.getTracesWithSpans({ projectId, traceIds, protections });
  * ```
  */
 export class TraceService {
@@ -253,23 +253,27 @@ export class TraceService {
    *   preview — identical to pre-#4888 behavior.
    * @returns The trace if found, undefined otherwise
    */
-  async getById(
-    projectId: string,
-    traceId: string,
-    protections: Protections,
-    opts?: { full?: boolean },
-  ): Promise<Trace | undefined> {
+  async getById({
+    projectId,
+    traceId,
+    protections,
+    opts,
+  }: {
+    projectId: string;
+    traceId: string;
+    protections: Protections;
+    opts?: { full?: boolean };
+  }): Promise<Trace | undefined> {
     return this.tracer.withActiveSpan(
       "TraceService.getById",
       { attributes: { "tenant.id": projectId, "trace.id": traceId } },
       async (span) => {
-        const traces = await this.clickHouseService.getTracesWithSpans(
+        const traces = await this.clickHouseService.getTracesWithSpans({
           projectId,
-          [traceId],
+          traceIds: [traceId],
           protections,
-          undefined,
-          { resolveBlobs: opts?.full },
-        );
+          opts: { resolveBlobs: opts?.full },
+        });
         if (traces[0]) {
           return this.enrichCodingAgentTrace(projectId, traces[0]);
         }
@@ -305,13 +309,12 @@ export class TraceService {
           }
 
           span.setAttribute("trace.id.prefix.resolved", candidates[0]!);
-          const resolved = await this.clickHouseService.getTracesWithSpans(
+          const resolved = await this.clickHouseService.getTracesWithSpans({
             projectId,
-            [candidates[0]!],
+            traceIds: [candidates[0]!],
             protections,
-            undefined,
-            { resolveBlobs: opts?.full },
-          );
+            opts: { resolveBlobs: opts?.full },
+          });
           return resolved[0]
             ? this.enrichCodingAgentTrace(projectId, resolved[0])
             : undefined;
@@ -403,26 +406,32 @@ export class TraceService {
    *   read back full (#4888). Default (undefined/false) returns previews.
    * @returns Array of Trace objects with spans
    */
-  async getTracesWithSpans(
-    projectId: string,
-    traceIds: string[],
-    protections: Protections,
-    occurredAt?: { from: number; to: number },
-    opts?: { full?: boolean },
-  ): Promise<Trace[]> {
+  async getTracesWithSpans({
+    projectId,
+    traceIds,
+    protections,
+    occurredAt,
+    opts,
+  }: {
+    projectId: string;
+    traceIds: string[];
+    protections: Protections;
+    occurredAt?: { from: number; to: number };
+    opts?: { full?: boolean };
+  }): Promise<Trace[]> {
     return this.tracer.withActiveSpan(
       "TraceService.getTracesWithSpans",
       {
         attributes: { "tenant.id": projectId, "trace.count": traceIds.length },
       },
       async () => {
-        const traces = await this.clickHouseService.getTracesWithSpans(
+        const traces = await this.clickHouseService.getTracesWithSpans({
           projectId,
           traceIds,
           protections,
           occurredAt,
-          { resolveBlobs: opts?.full },
-        );
+          opts: { resolveBlobs: opts?.full },
+        });
         return this.enrichCodingAgentTraces(projectId, traces);
       },
     );
@@ -439,22 +448,27 @@ export class TraceService {
    *   Default (undefined/false) returns the ≤64 KB preview.
    * @returns Array of traces in the thread
    */
-  async getTracesByThreadId(
-    projectId: string,
-    threadId: string,
-    protections: Protections,
-    opts?: { full?: boolean },
-  ): Promise<Trace[]> {
+  async getTracesByThreadId({
+    projectId,
+    threadId,
+    protections,
+    opts,
+  }: {
+    projectId: string;
+    threadId: string;
+    protections: Protections;
+    opts?: { full?: boolean };
+  }): Promise<Trace[]> {
     return this.tracer.withActiveSpan(
       "TraceService.getTracesByThreadId",
       { attributes: { "tenant.id": projectId, "thread.id": threadId } },
       async () => {
-        const traces = await this.clickHouseService.getTracesByThreadId(
+        const traces = await this.clickHouseService.getTracesByThreadId({
           projectId,
           threadId,
           protections,
-          { resolveBlobs: opts?.full },
-        );
+          opts: { resolveBlobs: opts?.full },
+        });
         return this.enrichCodingAgentTraces(projectId, traces);
       },
     );
@@ -580,12 +594,17 @@ export class TraceService {
    *   preview and issues zero event_log reads (#4888 / ADR-022).
    * @returns Array of traces
    */
-  async getTracesWithSpansByThreadIds(
-    projectId: string,
-    threadIds: string[],
-    protections: Protections,
-    opts?: { full?: boolean },
-  ): Promise<Trace[]> {
+  async getTracesWithSpansByThreadIds({
+    projectId,
+    threadIds,
+    protections,
+    opts,
+  }: {
+    projectId: string;
+    threadIds: string[];
+    protections: Protections;
+    opts?: { full?: boolean };
+  }): Promise<Trace[]> {
     return this.tracer.withActiveSpan(
       "TraceService.getTracesWithSpansByThreadIds",
       {
@@ -596,12 +615,12 @@ export class TraceService {
       },
       async () => {
         const traces =
-          await this.clickHouseService.getTracesWithSpansByThreadIds(
+          await this.clickHouseService.getTracesWithSpansByThreadIds({
             projectId,
             threadIds,
             protections,
-            { resolveBlobs: opts?.full },
-          );
+            opts: { resolveBlobs: opts?.full },
+          });
         return this.enrichCodingAgentTraces(projectId, traces);
       },
     );

@@ -166,12 +166,12 @@ export function createCodingAgentSpanFactsDispatchSubscriber(deps: {
       // unreadable shape — a build that poisons the queue with every ordinary
       // span is worse than the loss this refusal prevents.
       if (!isCodingAgentSpan(event)) return;
-      const span = normalization.normalizeSpanReceived(
-        event.tenantId,
-        event.data.span,
-        event.data.resource,
-        event.data.instrumentationScope,
-      );
+      const span = normalization.normalizeSpanReceived({
+        tenantId: event.tenantId,
+        otlpSpan: event.data.span,
+        otlpResource: event.data.resource,
+        otlpInstrumentationScope: event.data.instrumentationScope,
+      });
       await deps.contributeSpanFacts(
         liftContribution({
           span,

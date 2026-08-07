@@ -66,13 +66,13 @@ const wireErrorFor = (domainError: Error) =>
 
 const renderValidation = () =>
   renderHook(() =>
-    useModelProviderApiKeyValidation(
-      "gemini",
-      { GEMINI_API_KEY: "AIzaSyTheCustomersKey" },
-      undefined,
-      "org-1",
-      [{ scopeType: "ORGANIZATION", scopeId: "org-1" }],
-    ),
+    useModelProviderApiKeyValidation({
+      provider: "gemini",
+      customKeys: { GEMINI_API_KEY: "AIzaSyTheCustomersKey" },
+      projectId: undefined,
+      organizationId: "org-1",
+      scopes: [{ scopeType: "ORGANIZATION", scopeId: "org-1" }],
+    }),
   );
 
 describe("useModelProviderApiKeyValidation", () => {
@@ -193,12 +193,12 @@ describe("useModelProviderApiKeyValidation", () => {
      */
     it("refuses to send the key anywhere", async () => {
       const { result } = renderHook(() =>
-        useModelProviderApiKeyValidation(
-          "gemini",
-          { GEMINI_API_KEY: "AIzaSyTheCustomersKey" },
-          undefined,
-          undefined,
-        ),
+        useModelProviderApiKeyValidation({
+          provider: "gemini",
+          customKeys: { GEMINI_API_KEY: "AIzaSyTheCustomersKey" },
+          projectId: undefined,
+          organizationId: undefined,
+        }),
       );
 
       let valid: boolean | undefined;

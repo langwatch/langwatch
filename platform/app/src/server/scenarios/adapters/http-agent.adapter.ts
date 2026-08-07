@@ -101,12 +101,12 @@ export class HttpAgentAdapter extends AgentAdapter {
         input,
         templateContext,
       );
-      const responseData = await this.executeHttpRequest(
+      const responseData = await this.executeHttpRequest({
         url,
-        config.method,
+        method: config.method,
         headers,
         body,
-      );
+      });
       const result = this.extractResponseContent(
         responseData,
         config.outputPath,
@@ -197,12 +197,17 @@ export class HttpAgentAdapter extends AgentAdapter {
     Object.assign(headers, applyAuthentication(auth));
   }
 
-  private async executeHttpRequest(
-    url: string,
-    method: HttpComponentConfig["method"],
-    headers: Record<string, string>,
-    body: string,
-  ): Promise<unknown> {
+  private async executeHttpRequest({
+    url,
+    method,
+    headers,
+    body,
+  }: {
+    url: string;
+    method: HttpComponentConfig["method"];
+    headers: Record<string, string>;
+    body: string;
+  }): Promise<unknown> {
     logger.debug({ origin: safeOrigin(url), method }, "Making HTTP request");
 
     const response = await ssrfSafeFetch(url, {

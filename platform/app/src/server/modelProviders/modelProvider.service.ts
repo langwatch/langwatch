@@ -560,9 +560,9 @@ export class ModelProviderService {
       let result;
 
       if (existingProvider) {
-        result = await this.updateExisting(
+        result = await this.updateExisting({
           existingProvider,
-          {
+          data: {
             provider,
             enabled,
             name,
@@ -575,10 +575,10 @@ export class ModelProviderService {
           validatedKeys,
           customKeysProvided,
           tx,
-        );
+        });
       } else {
-        result = await this.createNew(
-          {
+        result = await this.createNew({
+          data: {
             provider,
             enabled,
             name: name ?? this.deriveDefaultName(provider),
@@ -591,7 +591,7 @@ export class ModelProviderService {
           validatedKeys,
           customKeysProvided,
           tx,
-        );
+        });
 
         // Onboarding seed: writes one role-level ModelDefault row per
         // role the provider can fulfill (DEFAULT / FAST / EMBEDDINGS),
@@ -1267,12 +1267,18 @@ export class ModelProviderService {
     return organizationId ?? null;
   }
 
-  private async updateExisting(
+  private async updateExisting({
+    existingProvider,
+    data,
+    validatedKeys,
+    customKeysProvided,
+    tx,
+  }: {
     existingProvider: {
       id: string;
       customKeys: unknown;
       extraHeaders: unknown;
-    },
+    };
     data: {
       provider: string;
       enabled: boolean;
@@ -1282,11 +1288,11 @@ export class ModelProviderService {
       customEmbeddingsModels: CustomModelsInput;
       extraHeaders: { key: string; value: string }[];
       advanced: AdvancedGatewayInput;
-    },
-    validatedKeys: Record<string, unknown> | null,
-    customKeysProvided: boolean,
-    tx: Parameters<Parameters<PrismaClient["$transaction"]>[0]>[0],
-  ) {
+    };
+    validatedKeys: Record<string, unknown> | null;
+    customKeysProvided: boolean;
+    tx: Parameters<Parameters<PrismaClient["$transaction"]>[0]>[0];
+  }) {
     let customKeysToSave: Record<string, unknown> | undefined;
 
     if (customKeysProvided) {
@@ -1319,7 +1325,12 @@ export class ModelProviderService {
     );
   }
 
-  private async createNew(
+  private async createNew({
+    data,
+    validatedKeys,
+    customKeysProvided,
+    tx,
+  }: {
     data: {
       name: string;
       provider: string;
@@ -1329,11 +1340,11 @@ export class ModelProviderService {
       extraHeaders: { key: string; value: string }[];
       scopes: ScopeInput[];
       advanced: AdvancedGatewayInput;
-    },
-    validatedKeys: Record<string, unknown> | null,
-    customKeysProvided: boolean,
-    tx: Parameters<Parameters<PrismaClient["$transaction"]>[0]>[0],
-  ) {
+    };
+    validatedKeys: Record<string, unknown> | null;
+    customKeysProvided: boolean;
+    tx: Parameters<Parameters<PrismaClient["$transaction"]>[0]>[0];
+  }) {
     return await this.repository.create(
       {
         name: data.name,

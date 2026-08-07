@@ -321,7 +321,12 @@ async function replayStateBatch({
       const cutoff = cutoffs.get(key);
       if (
         cutoff != null &&
-        isAtOrBeforeCutoff(e.timestamp, e.id, cutoff.timestamp, cutoff.eventId)
+        isAtOrBeforeCutoff({
+          eventTimestamp: e.timestamp,
+          eventId: e.id,
+          cutoffTimestamp: cutoff.timestamp,
+          cutoffEventId: cutoff.eventId,
+        })
       ) {
         accumulator.apply(e);
         eventsApplied++;

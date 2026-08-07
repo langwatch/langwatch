@@ -27,11 +27,11 @@ export function ModelMultiSelect({
   onChange: (next: string[]) => void;
   mode?: "chat" | "embedding";
 }) {
-  const { groupedByProvider, isLoading, isEmpty } = useModelSelectionOptions(
-    allModelOptions,
-    "",
+  const { groupedByProvider, isLoading, isEmpty } = useModelSelectionOptions({
+    options: allModelOptions,
+    model: "",
     mode,
-  );
+  });
   const [search, setSearch] = useState("");
   const selected = useMemo(() => new Set(value), [value]);
 

@@ -149,20 +149,20 @@ export const RunEvaluationButton = ({
           mapping: UIFieldMapping | undefined,
         ) => {
           if (mapping) {
-            setEvaluatorMapping(
-              evaluator.id,
-              activeDatasetId,
+            setEvaluatorMapping({
+              evaluatorId: evaluator.id,
+              datasetId: activeDatasetId,
               targetId,
-              identifier,
-              convertFromUIMapping(mapping, isDatasetSource),
-            );
+              inputField: identifier,
+              mapping: convertFromUIMapping(mapping, isDatasetSource),
+            });
           } else {
-            removeEvaluatorMapping(
-              evaluator.id,
-              activeDatasetId,
+            removeEvaluatorMapping({
+              evaluatorId: evaluator.id,
+              datasetId: activeDatasetId,
               targetId,
-              identifier,
-            );
+              inputField: identifier,
+            });
           }
         };
 

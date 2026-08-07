@@ -23,12 +23,17 @@ type ExtractMessagesConfig = {
   extractSystemInstructions: boolean;
 };
 
-const extractMessages = (
-  ctx: ExtractorContext,
-  sources: MessageSource[],
-  ruleId: string,
-  config: ExtractMessagesConfig,
-): boolean => {
+const extractMessages = ({
+  ctx,
+  sources,
+  ruleId,
+  config,
+}: {
+  ctx: ExtractorContext;
+  sources: MessageSource[];
+  ruleId: string;
+  config: ExtractMessagesConfig;
+}): boolean => {
   if (
     ctx.bag.attrs.has(config.attrKey) ||
     ctx.out[config.attrKey] !== undefined
@@ -99,10 +104,15 @@ export const extractInputMessages = (
   sources: MessageSource[],
   ruleId: string,
 ): boolean =>
-  extractMessages(ctx, sources, ruleId, {
-    attrKey: ATTR_KEYS.GEN_AI_INPUT_MESSAGES,
-    defaultRole: "user",
-    extractSystemInstructions: true,
+  extractMessages({
+    ctx,
+    sources,
+    ruleId,
+    config: {
+      attrKey: ATTR_KEYS.GEN_AI_INPUT_MESSAGES,
+      defaultRole: "user",
+      extractSystemInstructions: true,
+    },
   });
 
 export const extractOutputMessages = (
@@ -110,19 +120,28 @@ export const extractOutputMessages = (
   sources: MessageSource[],
   ruleId: string,
 ): boolean =>
-  extractMessages(ctx, sources, ruleId, {
-    attrKey: ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES,
-    defaultRole: "assistant",
-    extractSystemInstructions: false,
+  extractMessages({
+    ctx,
+    sources,
+    ruleId,
+    config: {
+      attrKey: ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES,
+      defaultRole: "assistant",
+      extractSystemInstructions: false,
+    },
   });
 
-export const extractModelToBoth = (
-  ctx: ExtractorContext,
-  sourceKey: string,
-  transform: (raw: unknown) => string | null = (raw) =>
-    typeof raw === "string" ? raw : null,
-  ruleId: string,
-): boolean => {
+export const extractModelToBoth = ({
+  ctx,
+  sourceKey,
+  transform = (raw) => (typeof raw === "string" ? raw : null),
+  ruleId,
+}: {
+  ctx: ExtractorContext;
+  sourceKey: string;
+  transform?: (raw: unknown) => string | null;
+  ruleId: string;
+}): boolean => {
   if (
     ctx.bag.attrs.has(ATTR_KEYS.GEN_AI_REQUEST_MODEL) ||
     ctx.bag.attrs.has(ATTR_KEYS.GEN_AI_RESPONSE_MODEL)

@@ -158,12 +158,12 @@ describe("GET /:traceId", () => {
       const res = await makeRequest("trace-abc", { format: "json" });
 
       expect(res.status).toBe(200);
-      expect(mockGetById).toHaveBeenCalledWith(
-        "project-123",
-        "trace-abc",
-        expect.any(Object),
-        { full: true },
-      );
+      expect(mockGetById).toHaveBeenCalledWith({
+        projectId: "project-123",
+        traceId: "trace-abc",
+        protections: expect.any(Object),
+        opts: { full: true },
+      });
     });
 
     it("fetches evaluations via TraceService.getEvaluationsMultiple", async () => {

@@ -33,12 +33,12 @@ export type DatasetTableContextValue = {
   expandedCells: Set<string>;
   editingCell: CellPosition | undefined;
   selectedCell: CellPosition | undefined;
-  setCellValue: (
-    datasetId: string,
-    row: number,
-    columnId: string,
-    value: string,
-  ) => void;
+  setCellValue: (params: {
+    datasetId: string;
+    row: number;
+    columnId: string;
+    value: string;
+  }) => void;
   setEditingCell: (cell: CellPosition | undefined) => void;
   setSelectedCell: (cell: CellPosition | undefined) => void;
   toggleCellExpanded: (row: number, columnId: string) => void;

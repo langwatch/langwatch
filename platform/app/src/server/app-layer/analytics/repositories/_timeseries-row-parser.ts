@@ -90,13 +90,13 @@ export function parseTimeseriesRows(
 
       for (let i = 0; i < series.length; i++) {
         const s = series[i]!;
-        const alias = buildMetricAlias(
-          i,
-          s.metric,
-          s.aggregation,
-          s.key,
-          s.subkey,
-        );
+        const alias = buildMetricAlias({
+          index: i,
+          metric: s.metric,
+          aggregation: s.aggregation,
+          key: s.key,
+          subkey: s.subkey,
+        });
         const seriesName = buildSeriesName(s, i);
         const coerced = coerceNumber(row[alias]);
         if (coerced !== null) groupData[groupKey]![seriesName] = coerced;
@@ -104,13 +104,13 @@ export function parseTimeseriesRows(
     } else {
       for (let i = 0; i < series.length; i++) {
         const s = series[i]!;
-        const alias = buildMetricAlias(
-          i,
-          s.metric,
-          s.aggregation,
-          s.key,
-          s.subkey,
-        );
+        const alias = buildMetricAlias({
+          index: i,
+          metric: s.metric,
+          aggregation: s.aggregation,
+          key: s.key,
+          subkey: s.subkey,
+        });
         const seriesName = buildSeriesName(s, i);
         const coerced = coerceNumber(row[alias]);
         if (coerced !== null) bucket[seriesName] = coerced;
@@ -136,7 +136,12 @@ export function parseTimeseriesRows(
     Math.max(0, previousPeriod.length - currentPeriod.length),
   );
 
-  normalizeMetricKeys(correctedPrevious, currentPeriod, series, groupBy);
+  normalizeMetricKeys({
+    previousPeriod: correctedPrevious,
+    currentPeriod,
+    series,
+    groupBy,
+  });
 
   return { previousPeriod: correctedPrevious, currentPeriod };
 }
@@ -177,12 +182,17 @@ export function buildSeriesName(
  * a bucket — do NOT spawn new groups from the other period, that would bleed
  * stale dimension values across periods.
  */
-function normalizeMetricKeys(
-  previousPeriod: TimeseriesBucket[],
-  currentPeriod: TimeseriesBucket[],
-  series: readonly SeriesInputType[],
-  groupBy?: string,
-): void {
+function normalizeMetricKeys({
+  previousPeriod,
+  currentPeriod,
+  series,
+  groupBy,
+}: {
+  previousPeriod: TimeseriesBucket[];
+  currentPeriod: TimeseriesBucket[];
+  series: readonly SeriesInputType[];
+  groupBy?: string;
+}): void {
   const zeroFillableKeys = new Set<string>();
   series.forEach((s, i) => {
     if (isZeroWhenAbsentSeries(s)) zeroFillableKeys.add(buildSeriesName(s, i));

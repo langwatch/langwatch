@@ -857,12 +857,15 @@ async function checkPermissionFromBindings({
     if (!bindingScopeCanGrant(RoleBindingScopeType.TEAM, permission)) {
       return false;
     }
-    return resolveBindingPermission(
-      { role: teamUser.role, customRoleId: teamUser.assignedRoleId ?? null },
+    return resolveBindingPermission({
+      binding: {
+        role: teamUser.role,
+        customRoleId: teamUser.assignedRoleId ?? null,
+      },
       organizationRole,
       permission,
       prisma,
-    );
+    });
   }
 
   // Union permissions across ALL matching bindings — permitted if any grants it
@@ -890,12 +893,12 @@ async function checkPermissionFromBindings({
       continue;
     }
 
-    const permitted = await resolveBindingPermission(
+    const permitted = await resolveBindingPermission({
       binding,
       organizationRole,
       permission,
       prisma,
-    );
+    });
     if (permitted) return true;
   }
 
@@ -910,12 +913,17 @@ async function checkPermissionFromBindings({
  * implements parallel CUSTOM-role logic for API key resolution and must
  * stay in sync with the non-empty/empty fallthrough semantics here.
  */
-async function resolveBindingPermission(
-  binding: { role: TeamUserRole; customRoleId: string | null },
-  organizationRole: OrganizationUserRole | null,
-  permission: Permission,
-  prisma: PrismaClient,
-): Promise<boolean> {
+async function resolveBindingPermission({
+  binding,
+  organizationRole,
+  permission,
+  prisma,
+}: {
+  binding: { role: TeamUserRole; customRoleId: string | null };
+  organizationRole: OrganizationUserRole | null;
+  permission: Permission;
+  prisma: PrismaClient;
+}): Promise<boolean> {
   if (binding.customRoleId) {
     const customRole = await prisma.customRole.findUnique({
       where: { id: binding.customRoleId },
@@ -1206,12 +1214,12 @@ export async function hasOrganizationPermission(
     select: { role: true, assignedRoleId: true },
   });
   for (const tu of teamMemberships) {
-    const permitted = await resolveBindingPermission(
-      { role: tu.role, customRoleId: tu.assignedRoleId ?? null },
-      orgMember.role,
+    const permitted = await resolveBindingPermission({
+      binding: { role: tu.role, customRoleId: tu.assignedRoleId ?? null },
+      organizationRole: orgMember.role,
       permission,
-      ctx.prisma,
-    );
+      prisma: ctx.prisma,
+    });
     if (permitted) return true;
   }
   return false;

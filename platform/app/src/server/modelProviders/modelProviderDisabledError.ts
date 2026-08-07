@@ -61,16 +61,34 @@ export class ModelProviderDisabledError extends HandledError {
    */
   public readonly cause = MODEL_PROVIDER_DISABLED_CAUSE;
 
-  constructor(
-    public readonly featureKey: string,
-    public readonly featureDisplayName: string,
-    public readonly role: ModelRole,
-    public readonly projectId: string,
-    public readonly resolvedScope: Exclude<ResolutionScope, null>,
-    public readonly resolvedModel: string,
-    public readonly providerKey: string,
-    public readonly alternate: ResolvedAlternate | null,
-  ) {
+  public readonly featureKey: string;
+  public readonly featureDisplayName: string;
+  public readonly role: ModelRole;
+  public readonly projectId: string;
+  public readonly resolvedScope: Exclude<ResolutionScope, null>;
+  public readonly resolvedModel: string;
+  public readonly providerKey: string;
+  public readonly alternate: ResolvedAlternate | null;
+
+  constructor({
+    featureKey,
+    featureDisplayName,
+    role,
+    projectId,
+    resolvedScope,
+    resolvedModel,
+    providerKey,
+    alternate,
+  }: {
+    featureKey: string;
+    featureDisplayName: string;
+    role: ModelRole;
+    projectId: string;
+    resolvedScope: Exclude<ResolutionScope, null>;
+    resolvedModel: string;
+    providerKey: string;
+    alternate: ResolvedAlternate | null;
+  }) {
     super(
       "model_provider_disabled",
       `Model "${resolvedModel}" is configured at ${resolvedScope} scope for "${featureKey}", but its provider "${providerKey}" is currently disabled.`,
@@ -89,6 +107,14 @@ export class ModelProviderDisabledError extends HandledError {
       },
     );
     this.name = "ModelProviderDisabledError";
+    this.featureKey = featureKey;
+    this.featureDisplayName = featureDisplayName;
+    this.role = role;
+    this.projectId = projectId;
+    this.resolvedScope = resolvedScope;
+    this.resolvedModel = resolvedModel;
+    this.providerKey = providerKey;
+    this.alternate = alternate;
   }
 
   /**

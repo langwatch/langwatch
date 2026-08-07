@@ -42,16 +42,14 @@ describe("FoldProjectionExecutor streaming store-miss re-fold", () => {
   };
 
   function ev(id: string, createdAt: number, idempotencyKey?: string): Event {
-    const base = createTestEvent(
-      TEST_CONSTANTS.AGGREGATE_ID,
-      TEST_CONSTANTS.AGGREGATE_TYPE,
+    const base = createTestEvent({
+      aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+      aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
       tenantId,
-      undefined,
       createdAt,
-      undefined,
-      {},
+      data: {},
       id,
-    );
+    });
     return idempotencyKey ? { ...base, idempotencyKey } : base;
   }
 

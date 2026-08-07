@@ -404,11 +404,11 @@ describe("ClickHouse trace dedup (integration)", () => {
       });
 
       it("returns only the latest trace summary version", async () => {
-        const traces = await service.getTracesWithSpans(
-          tenantId,
-          [traceId],
-          openProtections,
-        );
+        const traces = await service.getTracesWithSpans({
+          projectId: tenantId,
+          traceIds: [traceId],
+          protections: openProtections,
+        });
 
         expect(traces).not.toBeNull();
         expect(traces).toHaveLength(1);
@@ -419,11 +419,11 @@ describe("ClickHouse trace dedup (integration)", () => {
       });
 
       it("returns only the latest span version", async () => {
-        const traces = await service.getTracesWithSpans(
-          tenantId,
-          [traceId],
-          openProtections,
-        );
+        const traces = await service.getTracesWithSpans({
+          projectId: tenantId,
+          traceIds: [traceId],
+          protections: openProtections,
+        });
 
         const trace = traces![0]!;
         expect(trace.spans).toHaveLength(1);
@@ -434,11 +434,11 @@ describe("ClickHouse trace dedup (integration)", () => {
       });
 
       it("preserves heavy SpanAttributes in the result", async () => {
-        const traces = await service.getTracesWithSpans(
-          tenantId,
-          [traceId],
-          openProtections,
-        );
+        const traces = await service.getTracesWithSpans({
+          projectId: tenantId,
+          traceIds: [traceId],
+          protections: openProtections,
+        });
 
         const span = traces![0]!.spans[0]!;
         // SpanAttributes are mapped to params via unflattenDotNotation
@@ -452,11 +452,11 @@ describe("ClickHouse trace dedup (integration)", () => {
       });
 
       it("preserves heavy ComputedInput/ComputedOutput from the latest trace version", async () => {
-        const traces = await service.getTracesWithSpans(
-          tenantId,
-          [traceId],
-          openProtections,
-        );
+        const traces = await service.getTracesWithSpans({
+          projectId: tenantId,
+          traceIds: [traceId],
+          protections: openProtections,
+        });
 
         const trace = traces![0]!;
 
@@ -477,12 +477,12 @@ describe("ClickHouse trace dedup (integration)", () => {
 
       describe("when an occurredAt window around the trace is supplied", () => {
         it("returns the same latest trace + span (partition hint is correctness-preserving)", async () => {
-          const traces = await service.getTracesWithSpans(
-            tenantId,
-            [traceId],
-            openProtections,
-            { from: now - 20000, to: now },
-          );
+          const traces = await service.getTracesWithSpans({
+            projectId: tenantId,
+            traceIds: [traceId],
+            protections: openProtections,
+            occurredAt: { from: now - 20000, to: now },
+          });
 
           expect(traces).toHaveLength(1);
           const trace = traces![0]!;
@@ -524,11 +524,11 @@ describe("ClickHouse trace dedup (integration)", () => {
           const { client, queries } = recordingClient();
           getClickHouseClientForProject.mockResolvedValue(client);
           try {
-            const traces = await service.getTracesWithSpans(
-              tenantId,
-              [traceId],
-              openProtections,
-            );
+            const traces = await service.getTracesWithSpans({
+              projectId: tenantId,
+              traceIds: [traceId],
+              protections: openProtections,
+            });
             // Correctness is unchanged: still the latest summary + span version.
             expect(traces).toHaveLength(1);
             expect(traces![0]!.trace_id).toBe(traceId);
@@ -555,11 +555,11 @@ describe("ClickHouse trace dedup (integration)", () => {
           const { client, queries } = recordingClient();
           getClickHouseClientForProject.mockResolvedValue(client);
           try {
-            const traces = await service.getTracesWithSpans(
-              tenantId,
-              [`missing-${nanoid()}`],
-              openProtections,
-            );
+            const traces = await service.getTracesWithSpans({
+              projectId: tenantId,
+              traceIds: [`missing-${nanoid()}`],
+              protections: openProtections,
+            });
             expect(traces ?? []).toHaveLength(0);
           } finally {
             getClickHouseClientForProject.mockResolvedValue(ch);
@@ -673,11 +673,11 @@ describe("ClickHouse trace dedup (integration)", () => {
       });
 
       it("deduplicates spans per trace correctly", async () => {
-        const traces = await service.getTracesWithSpans(
-          tenantId,
-          [traceX, traceY],
-          openProtections,
-        );
+        const traces = await service.getTracesWithSpans({
+          projectId: tenantId,
+          traceIds: [traceX, traceY],
+          protections: openProtections,
+        });
 
         expect(traces).not.toBeNull();
         expect(traces).toHaveLength(2);

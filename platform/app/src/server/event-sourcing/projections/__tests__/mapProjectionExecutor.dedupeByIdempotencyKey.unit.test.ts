@@ -28,16 +28,14 @@ describe("MapProjectionExecutor dedupeByIdempotencyKey", () => {
 
   function makeEvent(id: string, idempotencyKey?: string): Event {
     return {
-      ...createTestEvent(
-        TEST_CONSTANTS.AGGREGATE_ID,
-        TEST_CONSTANTS.AGGREGATE_TYPE,
+      ...createTestEvent({
+        aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+        aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
         tenantId,
-        undefined,
-        1000,
-        undefined,
-        {},
+        createdAt: 1000,
+        data: {},
         id,
-      ),
+      }),
       idempotencyKey,
     };
   }

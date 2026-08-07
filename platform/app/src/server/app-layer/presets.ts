@@ -365,13 +365,13 @@ export function initializeDefaultApp(options?: {
     new ProjectService(new PrismaProjectRepository(prisma)),
     "ProjectService",
   );
-  const presence = new PresenceService(
-    redis
+  const presence = new PresenceService({
+    repository: redis
       ? new RedisPresenceRepository(redis)
       : new InMemoryPresenceRepository(),
     broadcast,
     projects,
-  );
+  });
   const spanDedup = createSpanDedupeService(redis);
 
   // ADR-022: construct blob/IO deps before the summary + span services so
@@ -434,11 +434,11 @@ export function initializeDefaultApp(options?: {
       tenantId,
       timestamp: Date.now(),
     });
-    void broadcast.broadcastToTenantRateLimited(
+    void broadcast.broadcastToTenantRateLimited({
       tenantId,
-      payload,
-      "discover_updated",
-    );
+      event: payload,
+      eventType: "discover_updated",
+    });
   });
   const spanStorage = traced(
     new SpanStorageService(spanStorageRepository, {
@@ -551,13 +551,13 @@ export function initializeDefaultApp(options?: {
   const traceUsageService = TraceUsageService.create(prisma);
   const eventUsageService = new EventUsageService();
   const orgRepo = new OrganizationRepository(prisma);
-  const usage = new UsageService(
-    organizations,
+  const usage = new UsageService({
+    organizationService: organizations,
     traceUsageService,
     eventUsageService,
     planResolver,
-    orgRepo,
-  );
+    organizationRepository: orgRepo,
+  });
 
   const planProvider = config.isSaas
     ? PlanProviderService.create(
@@ -1133,12 +1133,12 @@ export function initializeDefaultApp(options?: {
   // commands against the canonical ClickHouse event log. The event READER feeds
   // only the tail read (conversationEventsAfter, ADR-059) — null when event
   // sourcing is disabled, in which case the tail is honestly empty.
-  const langyConversations = LangyConversationService.create(
-    commands.langy,
-    langyConversationRepository,
-    langyMessageRepository,
-    es.getEventStore<LangyConversationProcessingEvent>() ?? null,
-  );
+  const langyConversations = LangyConversationService.create({
+    commands: commands.langy,
+    repository: langyConversationRepository,
+    messages: langyMessageRepository,
+    events: es.getEventStore<LangyConversationProcessingEvent>() ?? null,
+  });
   const langyMessages = new LangyMessageService(
     langyMessageRepository,
     langyConversationRepository,
@@ -1561,11 +1561,11 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
   return new App({
     config,
     broadcast: testBroadcast,
-    presence: new PresenceService(
-      new InMemoryPresenceRepository(),
-      testBroadcast,
-      nullProjects,
-    ),
+    presence: new PresenceService({
+      repository: new InMemoryPresenceRepository(),
+      broadcast: testBroadcast,
+      projects: nullProjects,
+    }),
     traces: (() => {
       const nullEvalRuns = new EvaluationRunService(
         new NullEvaluationRunRepository(),
@@ -1734,8 +1734,8 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       service: new OpsExplainService(new OpsExplainClickHouseRepository()),
     },
     langy: {
-      conversations: LangyConversationService.create(
-        {
+      conversations: LangyConversationService.create({
+        commands: {
           createConversation: noop,
           forkConversation: noop,
           recordMessage: noop,
@@ -1753,8 +1753,8 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
           consumeTurnHandoff: noop,
           generateConversationTitle: noop,
         },
-        new NullLangyConversationRepository(),
-      ),
+        repository: new NullLangyConversationRepository(),
+      }),
       turns: LangyTurnService.create({
         conversations: void 0 as unknown as LangyConversationService,
         credentials: void 0 as unknown as LangyCredentialService,
@@ -1793,13 +1793,13 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
     organizations: nullOrganizations,
     projects: nullProjects,
     tokenizer: new TokenizerService(new NullTokenizerClient()),
-    usage: new UsageService(
-      nullOrganizations,
-      TraceUsageService.create(),
-      new EventUsageService(),
-      async () => FREE_PLAN,
-      null,
-    ),
+    usage: new UsageService({
+      organizationService: nullOrganizations,
+      traceUsageService: TraceUsageService.create(),
+      eventUsageService: new EventUsageService(),
+      planResolver: async () => FREE_PLAN,
+      organizationRepository: null,
+    }),
     planProvider: PlanProviderService.create({
       getActivePlan: async () => FREE_PLAN,
     }),

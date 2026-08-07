@@ -626,9 +626,12 @@ export function setupLiquidJsonSchema(params: {
   // separators while a plain `*` does not, so `**/<basename>` is the right
   // shape. Basenames must be unique per editor — that's the caller's
   // responsibility (different editors must use different shadow URIs).
-  registerJsonSchema(monaco, shadowUri, schema, [
-    `**/${basenameOfUri(shadowUri)}`,
-  ]);
+  registerJsonSchema({
+    monaco,
+    modelUri: shadowUri,
+    schema,
+    fileMatch: [`**/${basenameOfUri(shadowUri)}`],
+  });
   const shadowResource = monaco.Uri.parse(shadowUri);
   // Re-mount safety: another instance with the same shadow URI may have left
   // a model behind if it was disposed mid-update.

@@ -470,12 +470,12 @@ describe.skipIf(!hasTestcontainers)(
 
             // Even full:true cannot resolve without deps: the resolve gate needs
             // `this.resolveTraceSpans`, which is undefined for a no-deps service.
-            const trace = await service.getById(
-              tenantId,
+            const trace = await service.getById({
+              projectId: tenantId,
               traceId,
-              openProtections,
-              { full: true },
-            );
+              protections: openProtections,
+              opts: { full: true },
+            });
 
             expect(trace).toBeDefined();
             if (!trace) throw new Error("trace is null/undefined");
@@ -512,12 +512,12 @@ describe.skipIf(!hasTestcontainers)(
               buildTraceBlobResolutionDeps(),
             );
 
-            const trace = await service.getById(
-              tenantId,
+            const trace = await service.getById({
+              projectId: tenantId,
               traceId,
-              openProtections,
-              { full: true },
-            );
+              protections: openProtections,
+              opts: { full: true },
+            });
 
             expect(trace).toBeDefined();
             if (!trace) throw new Error("trace is null/undefined");
@@ -543,12 +543,12 @@ describe.skipIf(!hasTestcontainers)(
               buildTraceBlobResolutionDeps(),
             );
 
-            const trace = await service.getById(
-              tenantId,
+            const trace = await service.getById({
+              projectId: tenantId,
               traceId,
-              openProtections,
-              { full: true },
-            );
+              protections: openProtections,
+              opts: { full: true },
+            });
 
             expect(trace).toBeDefined();
             if (!trace) throw new Error("trace is null/undefined");
@@ -575,12 +575,12 @@ describe.skipIf(!hasTestcontainers)(
               buildTraceBlobResolutionDeps(),
             );
 
-            const trace = await service.getById(
-              tenantId,
+            const trace = await service.getById({
+              projectId: tenantId,
               traceId,
-              openProtections,
-              { full: true },
-            );
+              protections: openProtections,
+              opts: { full: true },
+            });
 
             expect(trace).toBeDefined();
             if (!trace) throw new Error("trace is null/undefined");
@@ -613,12 +613,12 @@ describe.skipIf(!hasTestcontainers)(
             );
 
             // AC5: the missing row must NOT break the read.
-            const trace = await service.getById(
-              tenantId,
+            const trace = await service.getById({
+              projectId: tenantId,
               traceId,
-              openProtections,
-              { full: true },
-            );
+              protections: openProtections,
+              opts: { full: true },
+            });
 
             expect(trace).toBeDefined();
             if (!trace) throw new Error("trace is null/undefined");

@@ -19,13 +19,12 @@ export const spansRouter = createTRPCRouter({
         ctx.prisma,
         buildTraceBlobResolutionDeps(),
       );
-      const traces = await traceService.getTracesWithSpans(
-        input.projectId,
-        [input.traceId],
+      const traces = await traceService.getTracesWithSpans({
+        projectId: input.projectId,
+        traceIds: [input.traceId],
         protections,
-        undefined,
-        { full: true },
-      );
+        opts: { full: true },
+      });
       if (traces.length === 0) {
         return [];
       }

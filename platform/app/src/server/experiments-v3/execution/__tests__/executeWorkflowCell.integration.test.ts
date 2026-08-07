@@ -57,7 +57,11 @@ const makeCell = (overrides?: Partial<ExecutionCell>): ExecutionCell => ({
 
 const run = async (cell: ExecutionCell): Promise<EvaluationV3Event[]> => {
   const events: EvaluationV3Event[] = [];
-  for await (const event of executeWorkflowCell(cell, "p1", workflowDsl)) {
+  for await (const event of executeWorkflowCell({
+    cell,
+    projectId: "p1",
+    workflowDsl,
+  })) {
     events.push(event);
   }
   return events;

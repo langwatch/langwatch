@@ -251,17 +251,17 @@ secured.access(sessionAuth).post(
       );
     }
 
-    const dataResult = await loadExecutionData(
+    const dataResult = await loadExecutionData({
       projectId,
-      request.dataset,
-      request.targets,
-      request.evaluators,
-      {
+      dataset: request.dataset,
+      targets: request.targets,
+      evaluators: request.evaluators,
+      inputs: {
         data: request.data,
         datasetId: request.dataset_id,
         parameters: request.parameters,
       },
-    );
+    });
 
     if ("error" in dataResult) {
       return c.json(
@@ -588,17 +588,17 @@ secured.access(apiKeyAuthRun).post(
     }
     const runInputs = inputsParse.data;
 
-    const dataResult = await loadExecutionData(
-      project.id,
+    const dataResult = await loadExecutionData({
+      projectId: project.id,
       dataset,
-      workbenchState.targets,
-      workbenchState.evaluators,
-      {
+      targets: workbenchState.targets,
+      evaluators: workbenchState.evaluators,
+      inputs: {
         data: runInputs.data,
         datasetId: runInputs.dataset_id,
         parameters: runInputs.parameters,
       },
-    );
+    });
 
     if ("error" in dataResult) {
       return c.json(

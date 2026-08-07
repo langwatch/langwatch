@@ -76,11 +76,11 @@ function createRouterWithGovernanceReactors(foldState: TraceSummaryData) {
     hasReactorQueues: true,
     getReactorQueue: vi.fn().mockReturnValue({ send }),
   });
-  const router = new ProjectionRouter(
-    TEST_CONSTANTS.AGGREGATE_TYPE,
-    TEST_CONSTANTS.PIPELINE_NAME,
+  const router = new ProjectionRouter({
+    aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
+    pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
     queueManager,
-  );
+  });
 
   const store = createMockFoldProjectionStore<TraceSummaryData>();
   (store.get as ReturnType<typeof vi.fn>).mockResolvedValue(null);
@@ -115,11 +115,11 @@ describe("governance reactors on the trace-processing router", () => {
 
         await router.dispatch(
           [
-            createTestEvent(
-              TEST_CONSTANTS.AGGREGATE_ID,
-              TEST_CONSTANTS.AGGREGATE_TYPE,
+            createTestEvent({
+              aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+              aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
               tenantId,
-            ),
+            }),
           ],
           { tenantId },
         );
@@ -134,11 +134,11 @@ describe("governance reactors on the trace-processing router", () => {
 
         await router.dispatch(
           [
-            createTestEvent(
-              TEST_CONSTANTS.AGGREGATE_ID,
-              TEST_CONSTANTS.AGGREGATE_TYPE,
+            createTestEvent({
+              aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+              aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
               tenantId,
-            ),
+            }),
           ],
           { tenantId },
         );
@@ -174,11 +174,11 @@ describe("governance reactors on the trace-processing router", () => {
 
         await router.dispatch(
           [
-            createTestEvent(
-              TEST_CONSTANTS.AGGREGATE_ID,
-              TEST_CONSTANTS.AGGREGATE_TYPE,
+            createTestEvent({
+              aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+              aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
               tenantId,
-            ),
+            }),
           ],
           { tenantId },
         );
@@ -200,11 +200,11 @@ describe("governance reactors on the trace-processing router", () => {
 
         await router.dispatch(
           [
-            createTestEvent(
-              TEST_CONSTANTS.AGGREGATE_ID,
-              TEST_CONSTANTS.AGGREGATE_TYPE,
+            createTestEvent({
+              aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+              aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
               tenantId,
-            ),
+            }),
           ],
           { tenantId },
         );

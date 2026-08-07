@@ -33,11 +33,13 @@ vi.mock("~/utils/auth-client", () => ({
 // Mock useModelSelectionOptions
 vi.mock("../../ModelSelector", () => ({
   allModelOptions: ["openai/gpt-4.1", "openai/gpt-5"],
-  useModelSelectionOptions: (
-    _options: string[],
-    model: string,
-    _mode: string,
-  ) => {
+  useModelSelectionOptions: ({
+    model,
+  }: {
+    options: string[];
+    model: string;
+    mode: string;
+  }) => {
     const knownModels: Record<
       string,
       { label: string; icon: React.ReactNode; isDisabled: boolean }

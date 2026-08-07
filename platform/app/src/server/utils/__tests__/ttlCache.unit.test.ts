@@ -8,6 +8,7 @@ const { mockRedisStore, mockRedis } = vi.hoisted(() => {
       mockRedisStore.set(key, { value, ttl });
     }),
     set: vi.fn(
+      // biome-ignore lint/complexity/useMaxParams: fake of ioredis's positional set(key, value, "EX", ttl, "NX")
       async (
         key: string,
         value: string,

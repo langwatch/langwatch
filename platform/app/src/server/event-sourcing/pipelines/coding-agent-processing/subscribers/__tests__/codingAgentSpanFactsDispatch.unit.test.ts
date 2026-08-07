@@ -105,12 +105,12 @@ const normalization = new SpanNormalizationPipelineService(
 );
 
 function normalizedFrom(event: SpanReceivedEvent): NormalizedSpan {
-  return normalization.normalizeSpanReceived(
-    event.tenantId,
-    event.data.span,
-    event.data.resource,
-    event.data.instrumentationScope,
-  );
+  return normalization.normalizeSpanReceived({
+    tenantId: event.tenantId,
+    otlpSpan: event.data.span,
+    otlpResource: event.data.resource,
+    otlpInstrumentationScope: event.data.instrumentationScope,
+  });
 }
 
 /**

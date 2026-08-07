@@ -108,14 +108,21 @@ export class ExperimentRunStateRepositoryClickHouse<
     };
   }
 
-  private mapProjectionDataToClickHouseRecord(
-    data: ExperimentRunStateData,
-    tenantId: string,
-    projectionId: string,
-    projectionVersion: string,
-    lastProcessedEventId: string,
-    runId: string,
-  ): ClickHouseExperimentRunWriteRecord {
+  private mapProjectionDataToClickHouseRecord({
+    data,
+    tenantId,
+    projectionId,
+    projectionVersion,
+    lastProcessedEventId,
+    runId,
+  }: {
+    data: ExperimentRunStateData;
+    tenantId: string;
+    projectionId: string;
+    projectionVersion: string;
+    lastProcessedEventId: string;
+    runId: string;
+  }): ClickHouseExperimentRunWriteRecord {
     return {
       ProjectionId: projectionId,
       TenantId: tenantId,
@@ -230,14 +237,14 @@ export class ExperimentRunStateRepositoryClickHouse<
         { runId, tenantId: context.tenantId, error: errorMessage },
         "Failed to get projection from ClickHouse",
       );
-      throw new StoreError(
-        "getProjection",
-        "ExperimentRunStateRepositoryClickHouse",
-        `Failed to get projection for run ${runId}: ${errorMessage}`,
-        classifyClickHouseError(error),
-        { runId },
-        error,
-      );
+      throw new StoreError({
+        operation: "getProjection",
+        store: "ExperimentRunStateRepositoryClickHouse",
+        message: `Failed to get projection for run ${runId}: ${errorMessage}`,
+        category: classifyClickHouseError(error),
+        context: { runId },
+        cause: error,
+      });
     }
   }
 
@@ -251,33 +258,34 @@ export class ExperimentRunStateRepositoryClickHouse<
     );
 
     if (!EventUtils.isValidProjection(projection)) {
-      throw new ValidationError(
-        "Invalid projection: projection must have id, aggregateId, tenantId, version, and data",
-        "projection",
-        projection,
-      );
+      throw new ValidationError({
+        reason:
+          "Invalid projection: projection must have id, aggregateId, tenantId, version, and data",
+        field: "projection",
+        value: projection,
+      });
     }
 
     if (projection.tenantId !== context.tenantId) {
-      throw new SecurityError(
-        "storeProjection",
-        `Projection has tenantId '${projection.tenantId}' that does not match context tenantId '${context.tenantId}'`,
-        projection.tenantId,
-        { contextTenantId: context.tenantId },
-      );
+      throw new SecurityError({
+        operation: "storeProjection",
+        message: `Projection has tenantId '${projection.tenantId}' that does not match context tenantId '${context.tenantId}'`,
+        tenantId: projection.tenantId,
+        context: { contextTenantId: context.tenantId },
+      });
     }
 
     try {
       const client = await this.resolveClient(context.tenantId);
       const { runId } = parseExperimentRunKey(String(projection.aggregateId));
-      const projectionRecord = this.mapProjectionDataToClickHouseRecord(
-        projection.data as ExperimentRunStateData,
-        String(context.tenantId),
-        projection.id,
-        projection.version,
-        projection.id,
+      const projectionRecord = this.mapProjectionDataToClickHouseRecord({
+        data: projection.data as ExperimentRunStateData,
+        tenantId: String(context.tenantId),
+        projectionId: projection.id,
+        projectionVersion: projection.version,
+        lastProcessedEventId: projection.id,
         runId,
-      );
+      });
 
       const retentionPolicy = context.metadata?.retentionPolicy as
         | { experiments?: number | null }
@@ -303,14 +311,17 @@ export class ExperimentRunStateRepositoryClickHouse<
         },
         "Failed to store projection in ClickHouse",
       );
-      throw new StoreError(
-        "storeProjection",
-        "ExperimentRunStateRepositoryClickHouse",
-        `Failed to store projection ${projection.id} for run ${projection.aggregateId}: ${errorMessage}`,
-        classifyClickHouseError(error),
-        { projectionId: projection.id, runId: String(projection.aggregateId) },
-        error,
-      );
+      throw new StoreError({
+        operation: "storeProjection",
+        store: "ExperimentRunStateRepositoryClickHouse",
+        message: `Failed to store projection ${projection.id} for run ${projection.aggregateId}: ${errorMessage}`,
+        category: classifyClickHouseError(error),
+        context: {
+          projectionId: projection.id,
+          runId: String(projection.aggregateId),
+        },
+        cause: error,
+      });
     }
   }
 
@@ -327,12 +338,12 @@ export class ExperimentRunStateRepositoryClickHouse<
 
     for (const projection of projections) {
       if (projection.tenantId !== context.tenantId) {
-        throw new SecurityError(
-          "storeProjectionBatch",
-          `Projection has tenantId '${projection.tenantId}' that does not match context tenantId '${context.tenantId}'`,
-          projection.tenantId,
-          { contextTenantId: context.tenantId },
-        );
+        throw new SecurityError({
+          operation: "storeProjectionBatch",
+          message: `Projection has tenantId '${projection.tenantId}' that does not match context tenantId '${context.tenantId}'`,
+          tenantId: projection.tenantId,
+          context: { contextTenantId: context.tenantId },
+        });
       }
     }
 
@@ -344,14 +355,14 @@ export class ExperimentRunStateRepositoryClickHouse<
         retentionPolicy?.experiments ?? PLATFORM_DEFAULT_RETENTION_DAYS;
       const records = projections.map((projection) => {
         const { runId } = parseExperimentRunKey(String(projection.aggregateId));
-        const record = this.mapProjectionDataToClickHouseRecord(
-          projection.data as ExperimentRunStateData,
-          String(context.tenantId),
-          projection.id,
-          projection.version,
-          projection.id,
+        const record = this.mapProjectionDataToClickHouseRecord({
+          data: projection.data as ExperimentRunStateData,
+          tenantId: String(context.tenantId),
+          projectionId: projection.id,
+          projectionVersion: projection.version,
+          lastProcessedEventId: projection.id,
           runId,
-        );
+        });
         record._retention_days = retentionDays;
         return record;
       });
@@ -374,14 +385,14 @@ export class ExperimentRunStateRepositoryClickHouse<
         },
         "Failed to batch store projections in ClickHouse",
       );
-      throw new StoreError(
-        "storeProjectionBatch",
-        "ExperimentRunStateRepositoryClickHouse",
-        `Failed to batch store ${projections.length} projections: ${errorMessage}`,
-        classifyClickHouseError(error),
-        { count: projections.length },
-        error,
-      );
+      throw new StoreError({
+        operation: "storeProjectionBatch",
+        store: "ExperimentRunStateRepositoryClickHouse",
+        message: `Failed to batch store ${projections.length} projections: ${errorMessage}`,
+        category: classifyClickHouseError(error),
+        context: { count: projections.length },
+        cause: error,
+      });
     }
   }
 }

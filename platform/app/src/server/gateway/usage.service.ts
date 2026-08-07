@@ -178,9 +178,24 @@ export class GatewayUsageService {
       totalUsd = totalUsd.plus(bucket.totalUsd);
       totalRequests += bucket.requests;
       blockedRequests += bucket.blockedRequests;
-      bumpBucket(byVk, bucket.virtualKeyId, bucket.totalUsd, bucket.requests);
-      bumpBucket(byModel, bucket.model, bucket.totalUsd, bucket.requests);
-      bumpBucket(byDay, bucket.day, bucket.totalUsd, bucket.requests);
+      bumpBucket({
+        map: byVk,
+        key: bucket.virtualKeyId,
+        amount: bucket.totalUsd,
+        requests: bucket.requests,
+      });
+      bumpBucket({
+        map: byModel,
+        key: bucket.model,
+        amount: bucket.totalUsd,
+        requests: bucket.requests,
+      });
+      bumpBucket({
+        map: byDay,
+        key: bucket.day,
+        amount: bucket.totalUsd,
+        requests: bucket.requests,
+      });
     }
 
     const vkMeta = await this.loadVirtualKeyMeta([...byVk.keys()]);
@@ -240,25 +255,8 @@ export class GatewayUsageService {
       }),
     ]);
 
-    const byModel = new Map<
-      string,
-      { totalUsd: Prisma.Decimal; requests: number }
-    >();
-    const byDay = new Map<
-      string,
-      { totalUsd: Prisma.Decimal; requests: number }
-    >();
-    let totalUsd = new Prisma.Decimal(0);
-    let totalRequests = 0;
-    let blockedRequests = 0;
-
-    for (const bucket of buckets) {
-      totalUsd = totalUsd.plus(bucket.totalUsd);
-      totalRequests += bucket.requests;
-      blockedRequests += bucket.blockedRequests;
-      bumpBucket(byModel, bucket.model, bucket.totalUsd, bucket.requests);
-      bumpBucket(byDay, bucket.day, bucket.totalUsd, bucket.requests);
-    }
+    const { byModel, byDay, totalUsd, totalRequests, blockedRequests } =
+      accumulateUsageBuckets(buckets);
 
     return {
       totalUsd: totalUsd.toFixed(6),
@@ -340,12 +338,63 @@ function sortedDays(
     }));
 }
 
-function bumpBucket(
-  map: Map<string, { totalUsd: Prisma.Decimal; requests: number }>,
-  key: string,
-  amount: Prisma.Decimal | string,
-  requests: number,
+/**
+ * Fold usage buckets into per-model and per-day maps plus grand totals —
+ * one pass, shared by the virtual-key summary.
+ */
+function accumulateUsageBuckets(
+  buckets: Array<{
+    model: string;
+    day: string;
+    totalUsd: Prisma.Decimal | string;
+    requests: number;
+    blockedRequests: number;
+  }>,
 ) {
+  const byModel = new Map<
+    string,
+    { totalUsd: Prisma.Decimal; requests: number }
+  >();
+  const byDay = new Map<
+    string,
+    { totalUsd: Prisma.Decimal; requests: number }
+  >();
+  let totalUsd = new Prisma.Decimal(0);
+  let totalRequests = 0;
+  let blockedRequests = 0;
+
+  for (const bucket of buckets) {
+    totalUsd = totalUsd.plus(bucket.totalUsd);
+    totalRequests += bucket.requests;
+    blockedRequests += bucket.blockedRequests;
+    bumpBucket({
+      map: byModel,
+      key: bucket.model,
+      amount: bucket.totalUsd,
+      requests: bucket.requests,
+    });
+    bumpBucket({
+      map: byDay,
+      key: bucket.day,
+      amount: bucket.totalUsd,
+      requests: bucket.requests,
+    });
+  }
+
+  return { byModel, byDay, totalUsd, totalRequests, blockedRequests };
+}
+
+function bumpBucket({
+  map,
+  key,
+  amount,
+  requests,
+}: {
+  map: Map<string, { totalUsd: Prisma.Decimal; requests: number }>;
+  key: string;
+  amount: Prisma.Decimal | string;
+  requests: number;
+}) {
   const existing = map.get(key);
   if (existing) {
     existing.totalUsd = existing.totalUsd.plus(amount);

@@ -187,13 +187,13 @@ export class WorkflowEvaluationService {
       }
     }
 
-    const dataResult = await loadExecutionData(
+    const dataResult = await loadExecutionData({
       projectId,
-      datasetRef,
-      [target],
-      [],
-      { data, datasetId: resolvedDatasetId, parameters },
-    );
+      dataset: datasetRef,
+      targets: [target],
+      evaluators: [],
+      inputs: { data, datasetId: resolvedDatasetId, parameters },
+    });
     if ("error" in dataResult) {
       throw new EvaluationInputError(dataResult.error, dataResult.status);
     }

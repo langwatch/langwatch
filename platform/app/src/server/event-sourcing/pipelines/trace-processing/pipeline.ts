@@ -315,12 +315,12 @@ export function createTraceProcessingPipeline(
   // (no spool support) when blobStore is absent. Either way the recordSpan
   // command carries the dedup config and span-command sharding from main.
   const recordSpanBuilder = deps.blobStore
-    ? builder.withCommandInstance(
-        "recordSpan",
-        RecordSpanCommand,
-        new RecordSpanCommand({ blobStore: deps.blobStore }),
-        recordSpanOptions,
-      )
+    ? builder.withCommandInstance({
+        name: "recordSpan",
+        handlerClass: RecordSpanCommand,
+        instance: new RecordSpanCommand({ blobStore: deps.blobStore }),
+        options: recordSpanOptions,
+      })
     : builder.withCommand("recordSpan", RecordSpanCommand, recordSpanOptions);
 
   return recordSpanBuilder

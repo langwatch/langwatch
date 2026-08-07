@@ -41,16 +41,14 @@ describe("FoldProjectionExecutor refoldOnStoreMiss", () => {
   };
 
   function makeEvent(id: string, createdAt: number): Event {
-    return createTestEvent(
-      TEST_CONSTANTS.AGGREGATE_ID,
-      TEST_CONSTANTS.AGGREGATE_TYPE,
+    return createTestEvent({
+      aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+      aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
       tenantId,
-      undefined,
       createdAt,
-      undefined,
-      {},
+      data: {},
       id,
-    );
+    });
   }
 
   beforeEach(() => {
@@ -394,16 +392,14 @@ describe("FoldProjectionExecutor refoldOnStoreMiss instrumentation", () => {
     describe("when the executor re-folds it", () => {
       it("counts the refold as performed", async () => {
         const executor = new FoldProjectionExecutor();
-        const event = createTestEvent(
-          TEST_CONSTANTS.AGGREGATE_ID,
-          TEST_CONSTANTS.AGGREGATE_TYPE,
+        const event = createTestEvent({
+          aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+          aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
           tenantId,
-          undefined,
-          2000,
-          undefined,
-          {},
-          "e2",
-        );
+          createdAt: 2000,
+          data: {},
+          id: "e2",
+        });
         const foldDef = missingStoreFold("counted-performed");
         foldDef.eventLoaderUpTo = vi.fn().mockResolvedValue([event]);
         const before = await refoldCount("counted-performed", "performed");
@@ -421,16 +417,14 @@ describe("FoldProjectionExecutor refoldOnStoreMiss instrumentation", () => {
     describe("when the executor falls through to init", () => {
       it("counts it as absent rather than as transitional debt", async () => {
         const executor = new FoldProjectionExecutor();
-        const event = createTestEvent(
-          TEST_CONSTANTS.AGGREGATE_ID,
-          TEST_CONSTANTS.AGGREGATE_TYPE,
+        const event = createTestEvent({
+          aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+          aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
           tenantId,
-          undefined,
-          2000,
-          undefined,
-          {},
-          "e1",
-        );
+          createdAt: 2000,
+          data: {},
+          id: "e1",
+        });
         const foldDef = missingStoreFold("counted-absent");
         foldDef.eventLoaderUpTo = vi.fn().mockResolvedValue([]);
         const before = await refoldCount("counted-absent", "absent");

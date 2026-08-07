@@ -41,11 +41,11 @@ describe("ProjectionRouter", () => {
     describe("when fold projection has eventTypes filter (inline)", () => {
       it("skips events that do not match the fold's eventTypes", async () => {
         const queueManager = createMockQueueManager();
-        const router = new ProjectionRouter(
-          TEST_CONSTANTS.AGGREGATE_TYPE,
-          TEST_CONSTANTS.PIPELINE_NAME,
+        const router = new ProjectionRouter({
+          aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
+          pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
           queueManager,
-        );
+        });
 
         const store = createMockFoldProjectionStore<{ count: number }>();
         (store.get as ReturnType<typeof vi.fn>).mockResolvedValue(null);
@@ -59,18 +59,18 @@ describe("ProjectionRouter", () => {
 
         router.registerFoldProjection(fold);
 
-        const matchingEvent = createTestEvent(
-          TEST_CONSTANTS.AGGREGATE_ID,
-          TEST_CONSTANTS.AGGREGATE_TYPE,
+        const matchingEvent = createTestEvent({
+          aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+          aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
           tenantId,
-          TEST_CONSTANTS.EVENT_TYPE_1,
-        );
-        const nonMatchingEvent = createTestEvent(
-          "other-agg",
-          TEST_CONSTANTS.AGGREGATE_TYPE,
+          type: TEST_CONSTANTS.EVENT_TYPE_1,
+        });
+        const nonMatchingEvent = createTestEvent({
+          aggregateId: "other-agg",
+          aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
           tenantId,
-          TEST_CONSTANTS.EVENT_TYPE_2,
-        );
+          type: TEST_CONSTANTS.EVENT_TYPE_2,
+        });
 
         await router.dispatch([matchingEvent, nonMatchingEvent], { tenantId });
 
@@ -93,11 +93,11 @@ describe("ProjectionRouter", () => {
           sendBatch: mockSendBatch,
         });
 
-        const router = new ProjectionRouter(
-          TEST_CONSTANTS.AGGREGATE_TYPE,
-          TEST_CONSTANTS.PIPELINE_NAME,
+        const router = new ProjectionRouter({
+          aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
+          pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
           queueManager,
-        );
+        });
 
         const store = createMockFoldProjectionStore<{ count: number }>();
         const fold = createMockFoldProjectionDefinition("filtered-fold", {
@@ -109,18 +109,18 @@ describe("ProjectionRouter", () => {
 
         router.registerFoldProjection(fold);
 
-        const matchingEvent = createTestEvent(
-          TEST_CONSTANTS.AGGREGATE_ID,
-          TEST_CONSTANTS.AGGREGATE_TYPE,
+        const matchingEvent = createTestEvent({
+          aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+          aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
           tenantId,
-          TEST_CONSTANTS.EVENT_TYPE_1,
-        );
-        const nonMatchingEvent = createTestEvent(
-          "other-agg",
-          TEST_CONSTANTS.AGGREGATE_TYPE,
+          type: TEST_CONSTANTS.EVENT_TYPE_1,
+        });
+        const nonMatchingEvent = createTestEvent({
+          aggregateId: "other-agg",
+          aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
           tenantId,
-          TEST_CONSTANTS.EVENT_TYPE_2,
-        );
+          type: TEST_CONSTANTS.EVENT_TYPE_2,
+        });
 
         await router.dispatch([matchingEvent, nonMatchingEvent], { tenantId });
 
@@ -140,11 +140,11 @@ describe("ProjectionRouter", () => {
           sendBatch: mockSendBatch,
         });
 
-        const router = new ProjectionRouter(
-          TEST_CONSTANTS.AGGREGATE_TYPE,
-          TEST_CONSTANTS.PIPELINE_NAME,
+        const router = new ProjectionRouter({
+          aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
+          pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
           queueManager,
-        );
+        });
 
         const store = createMockFoldProjectionStore<{ count: number }>();
         const fold = createMockFoldProjectionDefinition("filtered-fold", {
@@ -156,12 +156,12 @@ describe("ProjectionRouter", () => {
 
         router.registerFoldProjection(fold);
 
-        const nonMatchingEvent = createTestEvent(
-          TEST_CONSTANTS.AGGREGATE_ID,
-          TEST_CONSTANTS.AGGREGATE_TYPE,
+        const nonMatchingEvent = createTestEvent({
+          aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+          aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
           tenantId,
-          TEST_CONSTANTS.EVENT_TYPE_2,
-        );
+          type: TEST_CONSTANTS.EVENT_TYPE_2,
+        });
 
         await router.dispatch([nonMatchingEvent], { tenantId });
 
@@ -172,11 +172,11 @@ describe("ProjectionRouter", () => {
     describe("when a fold projection fails inline", () => {
       it("attempts all projections and throws AggregateError", async () => {
         const queueManager = createMockQueueManager();
-        const router = new ProjectionRouter(
-          TEST_CONSTANTS.AGGREGATE_TYPE,
-          TEST_CONSTANTS.PIPELINE_NAME,
+        const router = new ProjectionRouter({
+          aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
+          pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
           queueManager,
-        );
+        });
 
         const failingStore = createMockFoldProjectionStore<{ count: number }>();
         (failingStore.get as ReturnType<typeof vi.fn>).mockRejectedValue(
@@ -201,11 +201,11 @@ describe("ProjectionRouter", () => {
         router.registerFoldProjection(failingFold);
         router.registerFoldProjection(successFold);
 
-        const event = createTestEvent(
-          TEST_CONSTANTS.AGGREGATE_ID,
-          TEST_CONSTANTS.AGGREGATE_TYPE,
+        const event = createTestEvent({
+          aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+          aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
           tenantId,
-        );
+        });
 
         await expect(router.dispatch([event], { tenantId })).rejects.toThrow(
           AggregateError,
@@ -220,11 +220,11 @@ describe("ProjectionRouter", () => {
     describe("when fold projection fails but map projections exist", () => {
       it("still dispatches to map projections", async () => {
         const queueManager = createMockQueueManager();
-        const router = new ProjectionRouter(
-          TEST_CONSTANTS.AGGREGATE_TYPE,
-          TEST_CONSTANTS.PIPELINE_NAME,
+        const router = new ProjectionRouter({
+          aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
+          pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
           queueManager,
-        );
+        });
 
         const failingStore = createMockFoldProjectionStore<{ count: number }>();
         (failingStore.get as ReturnType<typeof vi.fn>).mockRejectedValue(
@@ -246,11 +246,11 @@ describe("ProjectionRouter", () => {
         router.registerFoldProjection(failingFold);
         router.registerMapProjection(successMap);
 
-        const event = createTestEvent(
-          TEST_CONSTANTS.AGGREGATE_ID,
-          TEST_CONSTANTS.AGGREGATE_TYPE,
+        const event = createTestEvent({
+          aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+          aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
           tenantId,
-        );
+        });
 
         await expect(router.dispatch([event], { tenantId })).rejects.toThrow(
           AggregateError,
@@ -264,11 +264,11 @@ describe("ProjectionRouter", () => {
     describe("when both fold and map projections fail", () => {
       it("throws single AggregateError with all errors", async () => {
         const queueManager = createMockQueueManager();
-        const router = new ProjectionRouter(
-          TEST_CONSTANTS.AGGREGATE_TYPE,
-          TEST_CONSTANTS.PIPELINE_NAME,
+        const router = new ProjectionRouter({
+          aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
+          pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
           queueManager,
-        );
+        });
 
         const foldStore = createMockFoldProjectionStore<{ count: number }>();
         (foldStore.get as ReturnType<typeof vi.fn>).mockRejectedValue(
@@ -294,11 +294,11 @@ describe("ProjectionRouter", () => {
         router.registerFoldProjection(failingFold);
         router.registerMapProjection(failingMap);
 
-        const event = createTestEvent(
-          TEST_CONSTANTS.AGGREGATE_ID,
-          TEST_CONSTANTS.AGGREGATE_TYPE,
+        const event = createTestEvent({
+          aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+          aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
           tenantId,
-        );
+        });
 
         try {
           await router.dispatch([event], { tenantId });
@@ -315,11 +315,11 @@ describe("ProjectionRouter", () => {
     describe("when a fold projection throws", () => {
       it("does not dispatch to reactors registered on that fold", async () => {
         const queueManager = createMockQueueManager();
-        const router = new ProjectionRouter(
-          TEST_CONSTANTS.AGGREGATE_TYPE,
-          TEST_CONSTANTS.PIPELINE_NAME,
+        const router = new ProjectionRouter({
+          aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
+          pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
           queueManager,
-        );
+        });
 
         const failingStore = createMockFoldProjectionStore<{ count: number }>();
         (failingStore.get as ReturnType<typeof vi.fn>).mockRejectedValue(
@@ -341,11 +341,11 @@ describe("ProjectionRouter", () => {
         };
         router.registerReactor("exploding-fold", reactor);
 
-        const event = createTestEvent(
-          TEST_CONSTANTS.AGGREGATE_ID,
-          TEST_CONSTANTS.AGGREGATE_TYPE,
+        const event = createTestEvent({
+          aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+          aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
           tenantId,
-        );
+        });
 
         await expect(router.dispatch([event], { tenantId })).rejects.toThrow(
           AggregateError,
@@ -358,11 +358,11 @@ describe("ProjectionRouter", () => {
     describe("when a map projection fails inline (only map registered)", () => {
       it("attempts all projections and throws AggregateError", async () => {
         const queueManager = createMockQueueManager();
-        const router = new ProjectionRouter(
-          TEST_CONSTANTS.AGGREGATE_TYPE,
-          TEST_CONSTANTS.PIPELINE_NAME,
+        const router = new ProjectionRouter({
+          aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
+          pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
           queueManager,
-        );
+        });
 
         const failingStore = createMockAppendStore<Record<string, unknown>>();
         (failingStore.append as ReturnType<typeof vi.fn>).mockRejectedValue(
@@ -384,11 +384,11 @@ describe("ProjectionRouter", () => {
         router.registerMapProjection(failingMap);
         router.registerMapProjection(successMap);
 
-        const event = createTestEvent(
-          TEST_CONSTANTS.AGGREGATE_ID,
-          TEST_CONSTANTS.AGGREGATE_TYPE,
+        const event = createTestEvent({
+          aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+          aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
           tenantId,
-        );
+        });
 
         await expect(router.dispatch([event], { tenantId })).rejects.toThrow(
           AggregateError,
@@ -402,11 +402,11 @@ describe("ProjectionRouter", () => {
     describe("when a reactor fails inline", () => {
       it("throws AggregateError", async () => {
         const queueManager = createMockQueueManager();
-        const router = new ProjectionRouter(
-          TEST_CONSTANTS.AGGREGATE_TYPE,
-          TEST_CONSTANTS.PIPELINE_NAME,
+        const router = new ProjectionRouter({
+          aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
+          pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
           queueManager,
-        );
+        });
 
         const store = createMockFoldProjectionStore<{ count: number }>();
         (store.get as ReturnType<typeof vi.fn>).mockResolvedValue(null);
@@ -428,11 +428,11 @@ describe("ProjectionRouter", () => {
         };
         router.registerReactor("my-fold", reactor);
 
-        const event = createTestEvent(
-          TEST_CONSTANTS.AGGREGATE_ID,
-          TEST_CONSTANTS.AGGREGATE_TYPE,
+        const event = createTestEvent({
+          aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+          aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
           tenantId,
-        );
+        });
 
         await expect(router.dispatch([event], { tenantId })).rejects.toThrow(
           AggregateError,
@@ -446,11 +446,11 @@ describe("ProjectionRouter", () => {
       const setupRouterWithFold = (
         queueManager: ReturnType<typeof createMockQueueManager>,
       ) => {
-        const router = new ProjectionRouter(
-          TEST_CONSTANTS.AGGREGATE_TYPE,
-          TEST_CONSTANTS.PIPELINE_NAME,
+        const router = new ProjectionRouter({
+          aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
+          pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
           queueManager,
-        );
+        });
 
         const store = createMockFoldProjectionStore<{ count: number }>();
         (store.get as ReturnType<typeof vi.fn>).mockResolvedValue(null);
@@ -482,11 +482,11 @@ describe("ProjectionRouter", () => {
           };
           router.registerReactor("my-fold", reactor);
 
-          const event = createTestEvent(
-            TEST_CONSTANTS.AGGREGATE_ID,
-            TEST_CONSTANTS.AGGREGATE_TYPE,
+          const event = createTestEvent({
+            aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+            aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
             tenantId,
-          );
+          });
 
           await router.dispatch([event], { tenantId });
 
@@ -511,11 +511,11 @@ describe("ProjectionRouter", () => {
           };
           router.registerReactor("my-fold", reactor);
 
-          const event = createTestEvent(
-            TEST_CONSTANTS.AGGREGATE_ID,
-            TEST_CONSTANTS.AGGREGATE_TYPE,
+          const event = createTestEvent({
+            aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+            aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
             tenantId,
-          );
+          });
 
           await router.dispatch([event], { tenantId });
 
@@ -540,11 +540,11 @@ describe("ProjectionRouter", () => {
           };
           router.registerReactor("my-fold", reactor);
 
-          const event = createTestEvent(
-            TEST_CONSTANTS.AGGREGATE_ID,
-            TEST_CONSTANTS.AGGREGATE_TYPE,
+          const event = createTestEvent({
+            aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+            aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
             tenantId,
-          );
+          });
 
           await router.dispatch([event], { tenantId });
 
@@ -581,11 +581,11 @@ describe("ProjectionRouter", () => {
           };
           router.registerReactor("my-fold", reactor);
 
-          const event = createTestEvent(
-            TEST_CONSTANTS.AGGREGATE_ID,
-            TEST_CONSTANTS.AGGREGATE_TYPE,
+          const event = createTestEvent({
+            aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+            aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
             tenantId,
-          );
+          });
 
           await router.dispatch([event], { tenantId });
 
@@ -603,11 +603,11 @@ describe("ProjectionRouter", () => {
           hasReactorQueues: true,
           getReactorQueue: vi.fn().mockReturnValue({ send: mockSend }),
         });
-        const router = new ProjectionRouter(
-          TEST_CONSTANTS.AGGREGATE_TYPE,
-          TEST_CONSTANTS.PIPELINE_NAME,
+        const router = new ProjectionRouter({
+          aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
+          pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
           queueManager,
-        );
+        });
 
         const store = createMockFoldProjectionStore<{ count: number }>();
         (store.get as ReturnType<typeof vi.fn>).mockResolvedValue(null);
@@ -626,11 +626,11 @@ describe("ProjectionRouter", () => {
         };
         router.registerReactor("my-fold", reactor);
 
-        const event = createTestEvent(
-          TEST_CONSTANTS.AGGREGATE_ID,
-          TEST_CONSTANTS.AGGREGATE_TYPE,
+        const event = createTestEvent({
+          aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+          aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
           tenantId,
-        );
+        });
 
         await expect(router.dispatch([event], { tenantId })).rejects.toThrow(
           AggregateError,
@@ -644,11 +644,11 @@ describe("ProjectionRouter", () => {
           hasReactorQueues: true,
           getReactorQueue: vi.fn().mockReturnValue(undefined),
         });
-        const router = new ProjectionRouter(
-          TEST_CONSTANTS.AGGREGATE_TYPE,
-          TEST_CONSTANTS.PIPELINE_NAME,
+        const router = new ProjectionRouter({
+          aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
+          pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
           queueManager,
-        );
+        });
 
         const store = createMockFoldProjectionStore<{ count: number }>();
         (store.get as ReturnType<typeof vi.fn>).mockResolvedValue(null);
@@ -668,11 +668,11 @@ describe("ProjectionRouter", () => {
         };
         router.registerReactor("my-fold", reactor);
 
-        const event = createTestEvent(
-          TEST_CONSTANTS.AGGREGATE_ID,
-          TEST_CONSTANTS.AGGREGATE_TYPE,
+        const event = createTestEvent({
+          aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+          aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
           tenantId,
-        );
+        });
 
         await router.dispatch([event], { tenantId });
 
@@ -686,11 +686,11 @@ describe("ProjectionRouter", () => {
           hasReactorQueues: true,
           getReactorQueue: vi.fn().mockReturnValue(undefined),
         });
-        const router = new ProjectionRouter(
-          TEST_CONSTANTS.AGGREGATE_TYPE,
-          TEST_CONSTANTS.PIPELINE_NAME,
+        const router = new ProjectionRouter({
+          aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
+          pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
           queueManager,
-        );
+        });
 
         const store = createMockFoldProjectionStore<{ count: number }>();
         (store.get as ReturnType<typeof vi.fn>).mockResolvedValue(null);
@@ -712,11 +712,11 @@ describe("ProjectionRouter", () => {
         };
         router.registerReactor("my-fold", reactor);
 
-        const event = createTestEvent(
-          TEST_CONSTANTS.AGGREGATE_ID,
-          TEST_CONSTANTS.AGGREGATE_TYPE,
+        const event = createTestEvent({
+          aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+          aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
           tenantId,
-        );
+        });
 
         await expect(router.dispatch([event], { tenantId })).rejects.toThrow(
           AggregateError,
@@ -731,11 +731,11 @@ describe("ProjectionRouter", () => {
     describe("when a map reactor is registered on a map projection", () => {
       it("fires after map projection succeeds inline", async () => {
         const queueManager = createMockQueueManager();
-        const router = new ProjectionRouter(
-          TEST_CONSTANTS.AGGREGATE_TYPE,
-          TEST_CONSTANTS.PIPELINE_NAME,
+        const router = new ProjectionRouter({
+          aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
+          pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
           queueManager,
-        );
+        });
 
         const mapStore = createMockAppendStore<Record<string, unknown>>();
         const mapProj = createMockMapProjectionDefinition("my-map", {
@@ -752,11 +752,11 @@ describe("ProjectionRouter", () => {
         };
         router.registerMapReactor("my-map", reactor);
 
-        const event = createTestEvent(
-          TEST_CONSTANTS.AGGREGATE_ID,
-          TEST_CONSTANTS.AGGREGATE_TYPE,
+        const event = createTestEvent({
+          aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+          aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
           tenantId,
-        );
+        });
 
         await router.dispatch([event], { tenantId });
 
@@ -768,11 +768,11 @@ describe("ProjectionRouter", () => {
     describe("when a map projection fails", () => {
       it("does not dispatch to map reactors", async () => {
         const queueManager = createMockQueueManager();
-        const router = new ProjectionRouter(
-          TEST_CONSTANTS.AGGREGATE_TYPE,
-          TEST_CONSTANTS.PIPELINE_NAME,
+        const router = new ProjectionRouter({
+          aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
+          pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
           queueManager,
-        );
+        });
 
         const failingStore = createMockAppendStore<Record<string, unknown>>();
         (failingStore.append as ReturnType<typeof vi.fn>).mockRejectedValue(
@@ -793,11 +793,11 @@ describe("ProjectionRouter", () => {
         };
         router.registerMapReactor("failing-map", reactor);
 
-        const event = createTestEvent(
-          TEST_CONSTANTS.AGGREGATE_ID,
-          TEST_CONSTANTS.AGGREGATE_TYPE,
+        const event = createTestEvent({
+          aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+          aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
           tenantId,
-        );
+        });
 
         await expect(router.dispatch([event], { tenantId })).rejects.toThrow(
           AggregateError,
@@ -810,11 +810,11 @@ describe("ProjectionRouter", () => {
     describe("when registering a map reactor on a non-existent map", () => {
       it("throws ConfigurationError", () => {
         const queueManager = createMockQueueManager();
-        const router = new ProjectionRouter(
-          TEST_CONSTANTS.AGGREGATE_TYPE,
-          TEST_CONSTANTS.PIPELINE_NAME,
+        const router = new ProjectionRouter({
+          aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
+          pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
           queueManager,
-        );
+        });
 
         const reactor: ReactorDefinition<Event> = {
           name: "orphan-reactor",
@@ -832,11 +832,11 @@ describe("ProjectionRouter", () => {
     describe("when a custom key is provided", () => {
       it("calls store.get with the custom key", async () => {
         const queueManager = createMockQueueManager();
-        const router = new ProjectionRouter(
-          TEST_CONSTANTS.AGGREGATE_TYPE,
-          TEST_CONSTANTS.PIPELINE_NAME,
+        const router = new ProjectionRouter({
+          aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
+          pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
           queueManager,
-        );
+        });
 
         const store = createMockFoldProjectionStore<{ count: number }>();
         (store.get as ReturnType<typeof vi.fn>).mockResolvedValue({ count: 5 });
@@ -850,12 +850,12 @@ describe("ProjectionRouter", () => {
         router.registerFoldProjection(fold);
 
         const customKey = "tenant-1:2025-01-01";
-        await router.getProjectionByName(
-          "myProjection",
-          TEST_CONSTANTS.AGGREGATE_ID,
-          { tenantId },
-          { key: customKey },
-        );
+        await router.getProjectionByName({
+          projectionName: "myProjection",
+          aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+          context: { tenantId },
+          options: { key: customKey },
+        });
 
         expect(store.get).toHaveBeenCalledWith(
           customKey,
@@ -870,11 +870,11 @@ describe("ProjectionRouter", () => {
     describe("when no custom key is provided", () => {
       it("calls store.get with aggregateId", async () => {
         const queueManager = createMockQueueManager();
-        const router = new ProjectionRouter(
-          TEST_CONSTANTS.AGGREGATE_TYPE,
-          TEST_CONSTANTS.PIPELINE_NAME,
+        const router = new ProjectionRouter({
+          aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
+          pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
           queueManager,
-        );
+        });
 
         const store = createMockFoldProjectionStore<{ count: number }>();
         (store.get as ReturnType<typeof vi.fn>).mockResolvedValue({ count: 5 });
@@ -887,11 +887,11 @@ describe("ProjectionRouter", () => {
 
         router.registerFoldProjection(fold);
 
-        await router.getProjectionByName(
-          "myProjection",
-          TEST_CONSTANTS.AGGREGATE_ID,
-          { tenantId },
-        );
+        await router.getProjectionByName({
+          projectionName: "myProjection",
+          aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+          context: { tenantId },
+        });
 
         expect(store.get).toHaveBeenCalledWith(
           TEST_CONSTANTS.AGGREGATE_ID,
@@ -906,16 +906,15 @@ describe("ProjectionRouter", () => {
 
   describe("processFoldProjectionBatch (coalescing)", () => {
     function makeBatchEvent(id: string, occurredAt: number): Event {
-      return createTestEvent(
-        TEST_CONSTANTS.AGGREGATE_ID,
-        TEST_CONSTANTS.AGGREGATE_TYPE,
+      return createTestEvent({
+        aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+        aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
         tenantId,
-        TEST_CONSTANTS.EVENT_TYPE_1,
-        occurredAt,
-        undefined,
-        {},
+        type: TEST_CONSTANTS.EVENT_TYPE_1,
+        createdAt: occurredAt,
+        data: {},
         id,
-      );
+      });
     }
 
     function batchFold(
@@ -938,11 +937,11 @@ describe("ProjectionRouter", () => {
     describe("when several events for one aggregate are coalesced", () => {
       /** @scenario 'Coalescing still dispatches per-span reactors for every event' */
       it("folds the batch once but fires reactors for every event", async () => {
-        const router = new ProjectionRouter(
-          TEST_CONSTANTS.AGGREGATE_TYPE,
-          TEST_CONSTANTS.PIPELINE_NAME,
-          createMockQueueManager(),
-        );
+        const router = new ProjectionRouter({
+          aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
+          pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
+          queueManager: createMockQueueManager(),
+        });
         const store = createMockFoldProjectionStore();
         (store.get as ReturnType<typeof vi.fn>).mockResolvedValue(null);
         const fold = batchFold(store);
@@ -963,12 +962,12 @@ describe("ProjectionRouter", () => {
           makeBatchEvent("e3", 3000),
         ];
 
-        await (router as any).processFoldProjectionBatch(
-          "my-fold",
+        await (router as any).processFoldProjectionBatch({
+          projectionName: "my-fold",
           fold,
           events,
-          { tenantId },
-        );
+          context: { tenantId },
+        });
 
         // The expensive fold load/store happens once — the O(n) win.
         expect(store.get).toHaveBeenCalledTimes(1);
@@ -979,11 +978,11 @@ describe("ProjectionRouter", () => {
       });
 
       it("evaluates shouldReact per coalesced event, not once per batch", async () => {
-        const router = new ProjectionRouter(
-          TEST_CONSTANTS.AGGREGATE_TYPE,
-          TEST_CONSTANTS.PIPELINE_NAME,
-          createMockQueueManager(),
-        );
+        const router = new ProjectionRouter({
+          aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
+          pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
+          queueManager: createMockQueueManager(),
+        });
         const store = createMockFoldProjectionStore();
         (store.get as ReturnType<typeof vi.fn>).mockResolvedValue(null);
         const fold = batchFold(store);
@@ -1005,22 +1004,22 @@ describe("ProjectionRouter", () => {
           makeBatchEvent("e3", 3000),
         ];
 
-        await (router as any).processFoldProjectionBatch(
-          "my-fold",
+        await (router as any).processFoldProjectionBatch({
+          projectionName: "my-fold",
           fold,
           events,
-          { tenantId },
-        );
+          context: { tenantId },
+        });
 
         expect(seen).toEqual(["e1", "e3"]);
       });
 
       it("dispatches reactors in occurredAt order even when events arrive shuffled", async () => {
-        const router = new ProjectionRouter(
-          TEST_CONSTANTS.AGGREGATE_TYPE,
-          TEST_CONSTANTS.PIPELINE_NAME,
-          createMockQueueManager(),
-        );
+        const router = new ProjectionRouter({
+          aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
+          pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
+          queueManager: createMockQueueManager(),
+        });
         const store = createMockFoldProjectionStore();
         (store.get as ReturnType<typeof vi.fn>).mockResolvedValue(null);
         const fold = batchFold(store);
@@ -1040,12 +1039,12 @@ describe("ProjectionRouter", () => {
           makeBatchEvent("second", 2000),
         ];
 
-        await (router as any).processFoldProjectionBatch(
-          "my-fold",
+        await (router as any).processFoldProjectionBatch({
+          projectionName: "my-fold",
           fold,
           events,
-          { tenantId },
-        );
+          context: { tenantId },
+        });
 
         expect(seen).toEqual(["first", "second", "third"]);
       });
@@ -1053,26 +1052,25 @@ describe("ProjectionRouter", () => {
       /** @scenario Batched fold projections use the tenant retention policy */
       it("stores the folded state with the tenant retention policy", async () => {
         const retentionPolicy = { traces: 30, scenarios: 60, experiments: 90 };
-        const router = new ProjectionRouter(
-          TEST_CONSTANTS.AGGREGATE_TYPE,
-          TEST_CONSTANTS.PIPELINE_NAME,
-          createMockQueueManager(),
-          undefined,
-          undefined,
-          undefined,
-          { resolve: vi.fn().mockResolvedValue(retentionPolicy) },
-        );
+        const router = new ProjectionRouter({
+          aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
+          pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
+          queueManager: createMockQueueManager(),
+          retentionPolicyResolver: {
+            resolve: vi.fn().mockResolvedValue(retentionPolicy),
+          },
+        });
         const store = createMockFoldProjectionStore();
         (store.get as ReturnType<typeof vi.fn>).mockResolvedValue(null);
         const fold = batchFold(store);
         router.registerFoldProjection(fold);
 
-        await (router as any).processFoldProjectionBatch(
-          "my-fold",
+        await (router as any).processFoldProjectionBatch({
+          projectionName: "my-fold",
           fold,
-          [makeBatchEvent("e1", 1000), makeBatchEvent("e2", 2000)],
-          { tenantId },
-        );
+          events: [makeBatchEvent("e1", 1000), makeBatchEvent("e2", 2000)],
+          context: { tenantId },
+        });
 
         expect(store.store).toHaveBeenCalledWith(
           expect.anything(),
@@ -1089,14 +1087,12 @@ describe("ProjectionRouter", () => {
         const markerChecker = {
           check: vi.fn().mockResolvedValue("skip" as const),
         };
-        const router = new ProjectionRouter(
-          TEST_CONSTANTS.AGGREGATE_TYPE,
-          TEST_CONSTANTS.PIPELINE_NAME,
+        const router = new ProjectionRouter({
+          aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
+          pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
           queueManager,
-          undefined,
-          undefined,
-          markerChecker,
-        );
+          replayMarkerChecker: markerChecker,
+        });
 
         const store = createMockAppendStore<Record<string, unknown>>();
         const mapProj = createMockMapProjectionDefinition("skipped-map", {
@@ -1105,11 +1101,11 @@ describe("ProjectionRouter", () => {
         });
         router.registerMapProjection(mapProj);
 
-        const event = createTestEvent(
-          TEST_CONSTANTS.AGGREGATE_ID,
-          TEST_CONSTANTS.AGGREGATE_TYPE,
+        const event = createTestEvent({
+          aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+          aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
           tenantId,
-        );
+        });
 
         await router.dispatch([event], { tenantId });
 
@@ -1124,14 +1120,12 @@ describe("ProjectionRouter", () => {
         const markerChecker = {
           check: vi.fn().mockResolvedValue("process" as const),
         };
-        const router = new ProjectionRouter(
-          TEST_CONSTANTS.AGGREGATE_TYPE,
-          TEST_CONSTANTS.PIPELINE_NAME,
+        const router = new ProjectionRouter({
+          aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
+          pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
           queueManager,
-          undefined,
-          undefined,
-          markerChecker,
-        );
+          replayMarkerChecker: markerChecker,
+        });
 
         const store = createMockAppendStore<Record<string, unknown>>();
         const mapProj = createMockMapProjectionDefinition("allowed-map", {
@@ -1140,11 +1134,11 @@ describe("ProjectionRouter", () => {
         });
         router.registerMapProjection(mapProj);
 
-        const event = createTestEvent(
-          TEST_CONSTANTS.AGGREGATE_ID,
-          TEST_CONSTANTS.AGGREGATE_TYPE,
+        const event = createTestEvent({
+          aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+          aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
           tenantId,
-        );
+        });
 
         await router.dispatch([event], { tenantId });
 
@@ -1164,14 +1158,12 @@ describe("ProjectionRouter", () => {
         const markerChecker = {
           check: vi.fn().mockRejectedValue(deferError),
         };
-        const router = new ProjectionRouter(
-          TEST_CONSTANTS.AGGREGATE_TYPE,
-          TEST_CONSTANTS.PIPELINE_NAME,
+        const router = new ProjectionRouter({
+          aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
+          pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
           queueManager,
-          undefined,
-          undefined,
-          markerChecker,
-        );
+          replayMarkerChecker: markerChecker,
+        });
 
         const store = createMockAppendStore<Record<string, unknown>>();
         const mapProj = createMockMapProjectionDefinition("deferred-map", {
@@ -1180,11 +1172,11 @@ describe("ProjectionRouter", () => {
         });
         router.registerMapProjection(mapProj);
 
-        const event = createTestEvent(
-          TEST_CONSTANTS.AGGREGATE_ID,
-          TEST_CONSTANTS.AGGREGATE_TYPE,
+        const event = createTestEvent({
+          aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+          aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
           tenantId,
-        );
+        });
 
         const rejection = await router.dispatch([event], { tenantId }).then(
           () => {

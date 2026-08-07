@@ -83,12 +83,12 @@ describe("DatasetService", () => {
           findDatasetRecords: vi.fn().mockResolvedValue(records),
           updateDatasetRecordsTransaction: vi.fn().mockResolvedValue(void 0),
         };
-        const service = new DatasetService(
-          prisma as never,
-          repository as never,
-          recordRepository as never,
-          {} as never,
-        );
+        const service = new DatasetService({
+          prisma: prisma as never,
+          repository: repository as never,
+          recordRepository: recordRepository as never,
+          experimentRepository: {} as never,
+        });
         return {
           service,
           prisma,

@@ -12,50 +12,58 @@ describe("resolveProviderDefaultModel", () => {
   describe("when the provider is a self-hosted custom endpoint", () => {
     it("uses the first custom model in resolver-safe vendor/model form", () => {
       expect(
-        resolveProviderDefaultModel(
-          "custom",
-          "Custom",
-          [],
-          [{ modelId: "Qwen2.5-0.5B-Instruct" }],
-        ),
+        resolveProviderDefaultModel({
+          providerKey: "custom",
+          providerLabel: "Custom",
+          providerModels: [],
+          customModels: [{ modelId: "Qwen2.5-0.5B-Instruct" }],
+        }),
       ).toBe("custom/Qwen2.5-0.5B-Instruct");
     });
 
     it("does not fall back to the OpenAI-only gpt-5-mini", () => {
       expect(
-        resolveProviderDefaultModel(
-          "custom",
-          "Custom",
-          [],
-          [{ modelId: "Qwen2.5-0.5B-Instruct" }],
-        ),
+        resolveProviderDefaultModel({
+          providerKey: "custom",
+          providerLabel: "Custom",
+          providerModels: [],
+          customModels: [{ modelId: "Qwen2.5-0.5B-Instruct" }],
+        }),
       ).not.toContain("gpt-5-mini");
     });
 
     it("prefers a registry chat model over a custom model when both exist", () => {
       expect(
-        resolveProviderDefaultModel(
-          "custom",
-          "Custom",
-          ["llama-3"],
-          [{ modelId: "Qwen2.5-0.5B-Instruct" }],
-        ),
+        resolveProviderDefaultModel({
+          providerKey: "custom",
+          providerLabel: "Custom",
+          providerModels: ["llama-3"],
+          customModels: [{ modelId: "Qwen2.5-0.5B-Instruct" }],
+        }),
       ).toBe("custom/llama-3");
     });
   });
 
   describe("when the provider is a first-class registry provider", () => {
     it("prefixes the registry default with the provider key", () => {
-      const result = resolveProviderDefaultModel("openai", "OpenAI", []);
+      const result = resolveProviderDefaultModel({
+        providerKey: "openai",
+        providerLabel: "OpenAI",
+        providerModels: [],
+      });
       expect(result.startsWith("openai/")).toBe(true);
     });
   });
 
   describe("when no model can be resolved", () => {
     it("returns the bare provider label so the gateway surfaces a readable error", () => {
-      expect(resolveProviderDefaultModel("custom", "My vLLM", [])).toBe(
-        "my vllm",
-      );
+      expect(
+        resolveProviderDefaultModel({
+          providerKey: "custom",
+          providerLabel: "My vLLM",
+          providerModels: [],
+        }),
+      ).toBe("my vllm");
     });
   });
 });

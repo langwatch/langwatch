@@ -52,12 +52,17 @@ interface ScenarioShape {
   sessionHref?: string;
 }
 
-const bar = (
-  id: string,
-  label: string,
-  status: ScenarioBar["status"],
-  fillPct: number,
-): ScenarioBar => ({
+const bar = ({
+  id,
+  label,
+  status,
+  fillPct,
+}: {
+  id: string;
+  label: string;
+  status: ScenarioBar["status"];
+  fillPct: number;
+}): ScenarioBar => ({
   id,
   label,
   status,
@@ -104,9 +109,24 @@ const SCENARIOS: Record<ScenarioKey, ScenarioShape> = {
     pills: [{ label: "3 scenario sets" }],
     scenariosLabel: "Last run · 32 concurrent",
     bars: [
-      bar("a", "refund · within policy", "pass", 98),
-      bar("b", "refund · outside policy", "pass", 96),
-      bar("c", "partial refund · negotiation", "pass", 94),
+      bar({
+        id: "a",
+        label: "refund · within policy",
+        status: "pass",
+        fillPct: 98,
+      }),
+      bar({
+        id: "b",
+        label: "refund · outside policy",
+        status: "pass",
+        fillPct: 96,
+      }),
+      bar({
+        id: "c",
+        label: "partial refund · negotiation",
+        status: "pass",
+        fillPct: 94,
+      }),
     ],
     judge: { pass: 32, regressions: 0, note: "rubric audited" },
     sessionHref: "#",
@@ -127,10 +147,30 @@ const SCENARIOS: Record<ScenarioKey, ScenarioShape> = {
     ],
     scenariosLabel: "Last run · 32 concurrent · 6 to 9 turns each",
     bars: [
-      bar("a", "refund · within policy", "pass", 97),
-      bar("b", "refund · outside policy", "pass", 94),
-      bar("c", "angry escalation (DE)", "fail", 100),
-      bar("d", "partial refund · negotiation", "pass", 92),
+      bar({
+        id: "a",
+        label: "refund · within policy",
+        status: "pass",
+        fillPct: 97,
+      }),
+      bar({
+        id: "b",
+        label: "refund · outside policy",
+        status: "pass",
+        fillPct: 94,
+      }),
+      bar({
+        id: "c",
+        label: "angry escalation (DE)",
+        status: "fail",
+        fillPct: 100,
+      }),
+      bar({
+        id: "d",
+        label: "partial refund · negotiation",
+        status: "pass",
+        fillPct: 92,
+      }),
     ],
     judge: { pass: 28, regressions: 4, note: "rubric audited" },
     sessionHref: "#",
@@ -147,10 +187,25 @@ const SCENARIOS: Record<ScenarioKey, ScenarioShape> = {
     pills: [{ label: "2 scenario sets" }],
     scenariosLabel: "Last run · 18 concurrent",
     bars: [
-      bar("a", "checkout · happy path", "pass", 95),
-      bar("b", "checkout · declined card", "fail", 100),
-      bar("c", "address · ambiguous", "fail", 100),
-      bar("d", "refund · partial", "pass", 90),
+      bar({
+        id: "a",
+        label: "checkout · happy path",
+        status: "pass",
+        fillPct: 95,
+      }),
+      bar({
+        id: "b",
+        label: "checkout · declined card",
+        status: "fail",
+        fillPct: 100,
+      }),
+      bar({
+        id: "c",
+        label: "address · ambiguous",
+        status: "fail",
+        fillPct: 100,
+      }),
+      bar({ id: "d", label: "refund · partial", status: "pass", fillPct: 90 }),
     ],
     judge: { pass: 13, regressions: 5, note: "rubric audited" },
     sessionHref: "#",

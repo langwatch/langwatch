@@ -122,12 +122,12 @@ export function LangyModelPill({
 }) {
   // Langy is a licensed codex surface: declaring `langy.chat` re-admits
   // codex models the shared hook fail-closes everywhere else.
-  const { selectOptions, modelOption } = useModelSelectionOptions(
+  const { selectOptions, modelOption } = useModelSelectionOptions({
     options,
     model,
-    "chat",
-    { featureKey: LANGY_CHAT_FEATURE_KEY },
-  );
+    mode: "chat",
+    featureKey: LANGY_CHAT_FEATURE_KEY,
+  });
   const currentProvider = model.split("/")[0] ?? "";
   const hasCurrentProvider = currentProvider in modelProviderIcons;
   const modelsLoading = options.length === 0 && selectOptions.length === 0;

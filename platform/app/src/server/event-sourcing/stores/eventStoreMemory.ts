@@ -61,12 +61,17 @@ export class EventStoreMemory<
    * Seeds the event store with events for a given aggregate.
    * Useful in tests.
    */
-  async seed(
-    _aggregateId: string,
-    events: EventType[],
-    _tenantId: string,
-    _aggregateType: AggregateType,
-  ): Promise<void> {
+  async seed({
+    _aggregateId,
+    events,
+    _tenantId,
+    _aggregateType,
+  }: {
+    _aggregateId: string;
+    events: EventType[];
+    _tenantId: string;
+    _aggregateType: AggregateType;
+  }): Promise<void> {
     const records = events.map((event) => eventToRecord(event));
     await this.repository.insertEventRecords(records);
   }

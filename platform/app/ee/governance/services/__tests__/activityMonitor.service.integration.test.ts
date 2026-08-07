@@ -107,12 +107,17 @@ async function insertGovernanceTraceSummary(
   });
 }
 
-async function insertGovernanceLogRecord(
-  ch: ClickHouseClient,
-  tenantId: string,
-  attrs: Record<string, string>,
-  occurredAt: Date,
-): Promise<void> {
+async function insertGovernanceLogRecord({
+  ch,
+  tenantId,
+  attrs,
+  occurredAt,
+}: {
+  ch: ClickHouseClient;
+  tenantId: string;
+  attrs: Record<string, string>;
+  occurredAt: Date;
+}): Promise<void> {
   await ch.insert({
     table: "stored_log_records",
     values: [
@@ -280,17 +285,17 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
     });
 
     // Webhook log_record path (governance-origin) for ingestionSourcesHealth
-    await insertGovernanceLogRecord(
+    await insertGovernanceLogRecord({
       ch,
-      primaryGovProject.id,
-      {
+      tenantId: primaryGovProject.id,
+      attrs: {
         [ORIGIN_KEY]: ORIGIN_VALUE,
         [SOURCE_ID_KEY]: secondarySourceId,
         [SOURCE_TYPE_KEY]: "claude_cowork",
         [ORG_ID_KEY]: primaryOrg.id,
       },
-      inWindow,
-    );
+      occurredAt: inWindow,
+    });
 
     // Persist the IngestionSource rows so ingestionSourcesHealth has metadata
     // to roll up. The PG side is the source of truth for source identity;

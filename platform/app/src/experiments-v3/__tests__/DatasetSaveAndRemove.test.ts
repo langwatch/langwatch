@@ -151,10 +151,30 @@ describe("Dataset save and remove edge cases", () => {
       const store = useEvaluationsV3Store.getState();
 
       // Set up an inline dataset with data
-      store.setCellValue(DEFAULT_TEST_DATA_ID, 0, "input", "hello");
-      store.setCellValue(DEFAULT_TEST_DATA_ID, 0, "expected_output", "world");
-      store.setCellValue(DEFAULT_TEST_DATA_ID, 1, "input", "foo");
-      store.setCellValue(DEFAULT_TEST_DATA_ID, 1, "expected_output", "bar");
+      store.setCellValue({
+        datasetId: DEFAULT_TEST_DATA_ID,
+        row: 0,
+        columnId: "input",
+        value: "hello",
+      });
+      store.setCellValue({
+        datasetId: DEFAULT_TEST_DATA_ID,
+        row: 0,
+        columnId: "expected_output",
+        value: "world",
+      });
+      store.setCellValue({
+        datasetId: DEFAULT_TEST_DATA_ID,
+        row: 1,
+        columnId: "input",
+        value: "foo",
+      });
+      store.setCellValue({
+        datasetId: DEFAULT_TEST_DATA_ID,
+        row: 1,
+        columnId: "expected_output",
+        value: "bar",
+      });
 
       // Get the inline records
       const state = useEvaluationsV3Store.getState();

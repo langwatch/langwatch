@@ -216,13 +216,18 @@ describe("Column visibility", () => {
     it("hides cell data for hidden columns", () => {
       // Set up some data
       const store = useEvaluationsV3Store.getState();
-      store.setCellValue("test-data", 0, "input", "test input value");
-      store.setCellValue(
-        "test-data",
-        0,
-        "expected_output",
-        "test output value",
-      );
+      store.setCellValue({
+        datasetId: "test-data",
+        row: 0,
+        columnId: "input",
+        value: "test input value",
+      });
+      store.setCellValue({
+        datasetId: "test-data",
+        row: 0,
+        columnId: "expected_output",
+        value: "test output value",
+      });
 
       // Hide the 'input' column
       store.toggleColumnVisibility("input");

@@ -114,7 +114,12 @@ export function DrawerSpotlights({
         next !== null &&
         isAnchorParkedOffscreen(next, window.innerWidth, window.scrollX);
       if (
-        isAnchorSettled(next, previous, window.innerWidth, window.scrollX) ||
+        isAnchorSettled({
+          next,
+          previous,
+          viewportWidth: window.innerWidth,
+          scrollX: window.scrollX,
+        }) ||
         frames >= MAX_FRAMES
       ) {
         setAnchorRect(next);

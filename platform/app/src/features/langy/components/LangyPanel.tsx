@@ -264,6 +264,7 @@ function useViewportWidth(): number {
   return width;
 }
 
+// biome-ignore lint/complexity/useMaxParams: React's <Profiler onRender> callback contract fixes this positional parameter list
 function onLangyProfilerRender(
   id: string,
   phase: "mount" | "update" | "nested-update",

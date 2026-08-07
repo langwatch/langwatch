@@ -2181,18 +2181,20 @@ export class GroupStagingScripts {
     const activeKey = `${this.keyPrefix}group:${groupId}:active`;
     const readyKey = `${this.keyPrefix}ready`;
 
-    const result = await refreshScript.runCancellable(
-      this.redis,
-      isCancelled ?? null,
-      2,
-      activeKey,
-      readyKey,
-      stagedJobId,
-      String(activeTtlSec),
-      groupId,
-      String(Date.now()),
-      `${this.keyPrefix}tenant_active_z:`,
-    );
+    const result = await refreshScript.runCancellable({
+      redis: this.redis,
+      isCancelled: isCancelled ?? null,
+      numKeys: 2,
+      keysAndArgs: [
+        activeKey,
+        readyKey,
+        stagedJobId,
+        String(activeTtlSec),
+        groupId,
+        String(Date.now()),
+        `${this.keyPrefix}tenant_active_z:`,
+      ],
+    });
 
     return result === 1;
   }

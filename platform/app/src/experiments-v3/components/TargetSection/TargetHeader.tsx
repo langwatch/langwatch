@@ -260,12 +260,12 @@ export const TargetHeader = memo(function TargetHeader({
             results,
             effectiveRowCount,
           )
-        : computeTargetAggregates(
-            target.id,
+        : computeTargetAggregates({
+            targetId: target.id,
             results,
             evaluators,
-            effectiveRowCount,
-          ),
+            rowCount: effectiveRowCount,
+          }),
     [target, results, evaluators, effectiveRowCount],
   );
 

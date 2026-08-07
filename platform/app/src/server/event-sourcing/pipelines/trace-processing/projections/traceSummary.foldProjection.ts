@@ -703,12 +703,12 @@ export class TraceSummaryFoldProjection
     }
 
     const normalizedSpan =
-      spanNormalizationPipelineService.normalizeSpanReceived(
-        event.tenantId,
-        event.data.span,
-        event.data.resource,
-        event.data.instrumentationScope,
-      );
+      spanNormalizationPipelineService.normalizeSpanReceived({
+        tenantId: event.tenantId,
+        otlpSpan: event.data.span,
+        otlpResource: event.data.resource,
+        otlpInstrumentationScope: event.data.instrumentationScope,
+      });
     enrichRagContextIds(normalizedSpan);
 
     return {

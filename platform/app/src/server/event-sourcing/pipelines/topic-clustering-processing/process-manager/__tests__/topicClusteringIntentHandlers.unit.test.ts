@@ -254,16 +254,14 @@ describe("createTopicClusteringRunHandler", () => {
       const commands = makeCommands();
       const run = createTopicClusteringRunHandler({
         runPort: {
-          runClusteringPage: vi
-            .fn()
-            .mockRejectedValue(
-              new ModelNotConfiguredError(
-                "analytics.topic_clustering_llm",
-                "FAST",
-                "Topic clustering",
-                "project-1",
-              ),
-            ),
+          runClusteringPage: vi.fn().mockRejectedValue(
+            new ModelNotConfiguredError({
+              featureKey: "analytics.topic_clustering_llm",
+              role: "FAST",
+              featureDisplayName: "Topic clustering",
+              projectId: "project-1",
+            }),
+          ),
         },
         commands: () => commands,
         clock: () => 999,

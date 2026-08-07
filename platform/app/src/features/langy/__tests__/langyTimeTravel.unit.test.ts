@@ -77,12 +77,17 @@ const responded = (atMs: number, turnId: string, eventAt: number) =>
     },
   } as never);
 
-const historyRow = (
-  id: string,
-  role: "user" | "assistant",
-  createdAtMs: number,
-  text: string,
-): LangyMessageDto => ({
+const historyRow = ({
+  id,
+  role,
+  createdAtMs,
+  text,
+}: {
+  id: string;
+  role: "user" | "assistant";
+  createdAtMs: number;
+  text: string;
+}): LangyMessageDto => ({
   id,
   role,
   parts: [{ type: "text", text }],
@@ -158,7 +163,12 @@ describe("buildTimeTravelView", () => {
         records,
         scrubSeq: 1,
         historyMessages: [
-          historyRow("msg-t1", "assistant", 1_999, "the full answer"),
+          historyRow({
+            id: "msg-t1",
+            role: "assistant",
+            createdAtMs: 1_999,
+            text: "the full answer",
+          }),
         ],
       });
       expect(view!.messages.filter((m) => m.id === "msg-t1")).toHaveLength(1);
@@ -177,8 +187,18 @@ describe("buildTimeTravelView", () => {
         records,
         scrubSeq: 1,
         historyMessages: [
-          historyRow("q1", "user", 1_000, "first question"),
-          historyRow("q2", "user", 2_400, "second question"),
+          historyRow({
+            id: "q1",
+            role: "user",
+            createdAtMs: 1_000,
+            text: "first question",
+          }),
+          historyRow({
+            id: "q2",
+            role: "user",
+            createdAtMs: 2_400,
+            text: "second question",
+          }),
         ],
       });
       expect(view!.messages.map((m) => m.id)).toEqual(["q1", "msg-t1", "q2"]);
@@ -196,7 +216,14 @@ describe("buildTimeTravelView", () => {
       const view = buildTimeTravelView({
         records,
         scrubSeq: 3,
-        historyMessages: [historyRow("q1", "user", 1_500, "same question")],
+        historyMessages: [
+          historyRow({
+            id: "q1",
+            role: "user",
+            createdAtMs: 1_500,
+            text: "same question",
+          }),
+        ],
       });
       expect(view!.messages.filter((m) => m.role === "user")).toHaveLength(1);
       expect(view!.messages[0]!.id).toBe("q1");
@@ -223,9 +250,14 @@ describe("buildTimeTravelView", () => {
         records,
         scrubSeq: 5,
         historyMessages: [
-          historyRow("q1", "user", 990, "hey"),
+          historyRow({ id: "q1", role: "user", createdAtMs: 990, text: "hey" }),
           // Server clock: stamped just BEFORE the client saw the last delta.
-          historyRow("a1", "assistant", 1_390, "How can I help?"),
+          historyRow({
+            id: "a1",
+            role: "assistant",
+            createdAtMs: 1_390,
+            text: "How can I help?",
+          }),
         ],
       });
       expect(view!.messages.filter((m) => m.role === "assistant")).toHaveLength(
@@ -249,8 +281,13 @@ describe("buildTimeTravelView", () => {
         // The FIRST delta: the row (1_390) is later than this moment (1_300).
         scrubSeq: 3,
         historyMessages: [
-          historyRow("q1", "user", 990, "hey"),
-          historyRow("a1", "assistant", 1_390, "How can I help?"),
+          historyRow({ id: "q1", role: "user", createdAtMs: 990, text: "hey" }),
+          historyRow({
+            id: "a1",
+            role: "assistant",
+            createdAtMs: 1_390,
+            text: "How can I help?",
+          }),
         ],
       });
       const assistants = view!.messages.filter((m) => m.role === "assistant");
@@ -273,8 +310,13 @@ describe("buildTimeTravelView", () => {
         records,
         scrubSeq: 4,
         historyMessages: [
-          historyRow("q1", "user", 990, "hey"),
-          historyRow("a1", "assistant", 1_390, "How can I help?"),
+          historyRow({ id: "q1", role: "user", createdAtMs: 990, text: "hey" }),
+          historyRow({
+            id: "a1",
+            role: "assistant",
+            createdAtMs: 1_390,
+            text: "How can I help?",
+          }),
         ],
       });
       // The landed answer suppresses ITS partial, not the follow-up question.
@@ -297,8 +339,18 @@ describe("buildTimeTravelView", () => {
         records,
         scrubSeq: 1,
         historyMessages: [
-          historyRow("m-old", "assistant", 500, "before the moment"),
-          historyRow("m-future", "assistant", 5_000, "after the moment"),
+          historyRow({
+            id: "m-old",
+            role: "assistant",
+            createdAtMs: 500,
+            text: "before the moment",
+          }),
+          historyRow({
+            id: "m-future",
+            role: "assistant",
+            createdAtMs: 5_000,
+            text: "after the moment",
+          }),
         ],
       });
       expect(view!.messages.map((m) => m.id)).toContain("m-old");

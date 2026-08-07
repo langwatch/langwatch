@@ -313,8 +313,11 @@ describe("ClickHouseTraceService — batch-resolver contract", () => {
         );
 
         await expect(
-          service.getTracesByThreadId(PROJECT_ID, "thread-1", protections, {
-            resolveBlobs: true,
+          service.getTracesByThreadId({
+            projectId: PROJECT_ID,
+            threadId: "thread-1",
+            protections,
+            opts: { resolveBlobs: true },
           }),
         ).rejects.toThrow(/returned 0 resolution\(s\) for 1 trace\(s\)/);
       });
@@ -359,13 +362,13 @@ describe("ClickHouseTraceService — batch-resolver contract", () => {
         );
 
         await expect(
-          service.getTracesWithSpans(
-            PROJECT_ID,
-            [TRACE_A, TRACE_B],
+          service.getTracesWithSpans({
+            projectId: PROJECT_ID,
+            traceIds: [TRACE_A, TRACE_B],
             protections,
-            { from: 0, to: Date.now() },
-            { resolveBlobs: true },
-          ),
+            occurredAt: { from: 0, to: Date.now() },
+            opts: { resolveBlobs: true },
+          }),
         ).rejects.toThrow(/resolutions must come back in input order/);
       });
 
@@ -406,13 +409,13 @@ describe("ClickHouseTraceService — batch-resolver contract", () => {
         );
 
         await expect(
-          service.getTracesWithSpans(
-            PROJECT_ID,
-            [TRACE_A, TRACE_B],
+          service.getTracesWithSpans({
+            projectId: PROJECT_ID,
+            traceIds: [TRACE_A, TRACE_B],
             protections,
-            { from: 0, to: Date.now() },
-            { resolveBlobs: true },
-          ),
+            occurredAt: { from: 0, to: Date.now() },
+            opts: { resolveBlobs: true },
+          }),
         ).rejects.toThrow(/resolutions must come back in input order/);
       });
     });
@@ -426,12 +429,12 @@ describe("ClickHouseTraceService — batch-resolver contract", () => {
           Promise.resolve(spans.map(passthrough)),
         );
 
-        const traces = await service.getTracesByThreadId(
-          PROJECT_ID,
-          "thread-1",
+        const traces = await service.getTracesByThreadId({
+          projectId: PROJECT_ID,
+          threadId: "thread-1",
           protections,
-          { resolveBlobs: true },
-        );
+          opts: { resolveBlobs: true },
+        });
 
         expect(traces.map((t) => t.trace_id)).toEqual([TRACE_ID]);
       });
@@ -485,11 +488,11 @@ describe("ClickHouseTraceService.getTracesByThreadId — ordering contract", () 
         const { blobStore } = makeEventRefBlobStore();
         const service = buildService(blobStore);
 
-        const traces = await service.getTracesByThreadId(
-          PROJECT_ID,
-          "thread-1",
+        const traces = await service.getTracesByThreadId({
+          projectId: PROJECT_ID,
+          threadId: "thread-1",
           protections,
-        );
+        });
 
         expect(traces.map((t) => t.trace_id)).toEqual([EARLY, LATE]);
       });
@@ -597,12 +600,12 @@ describe("ClickHouseTraceService.getTracesByThreadId — #4991 AC2 thread detail
         const { blobStore, getFromEventLog } = makeEventRefBlobStore();
         const service = buildService(blobStore);
 
-        const traces = await service.getTracesByThreadId(
-          PROJECT_ID,
-          "thread-1",
+        const traces = await service.getTracesByThreadId({
+          projectId: PROJECT_ID,
+          threadId: "thread-1",
           protections,
-          { resolveBlobs: true },
-        );
+          opts: { resolveBlobs: true },
+        });
 
         expect(getFromEventLog).toHaveBeenCalled();
         expect(traces![0]!.output?.value).toBe(FULL_OUTPUT);
@@ -615,11 +618,11 @@ describe("ClickHouseTraceService.getTracesByThreadId — #4991 AC2 thread detail
         const { blobStore, getFromEventLog } = makeEventRefBlobStore();
         const service = buildService(blobStore);
 
-        const traces = await service.getTracesByThreadId(
-          PROJECT_ID,
-          "thread-1",
+        const traces = await service.getTracesByThreadId({
+          projectId: PROJECT_ID,
+          threadId: "thread-1",
           protections,
-        );
+        });
 
         expect(getFromEventLog).not.toHaveBeenCalled();
         // Falsifiable: exact preview, not merely "not the full value".

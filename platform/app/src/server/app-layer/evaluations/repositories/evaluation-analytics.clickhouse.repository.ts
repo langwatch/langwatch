@@ -170,12 +170,12 @@ export class EvaluationAnalyticsClickHouseRepository
     );
     for (const { row } of entries) {
       if (row.tenantId !== tenantId) {
-        throw new SecurityError(
-          "EvaluationAnalyticsClickHouseRepository.upsertBatch",
-          "all rows in a single batch must share the same tenantId",
+        throw new SecurityError({
+          operation: "EvaluationAnalyticsClickHouseRepository.upsertBatch",
+          message: "all rows in a single batch must share the same tenantId",
           tenantId,
-          { mismatchedTenantId: row.tenantId },
-        );
+          context: { mismatchedTenantId: row.tenantId },
+        });
       }
     }
 

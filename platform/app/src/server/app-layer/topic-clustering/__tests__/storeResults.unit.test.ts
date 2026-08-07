@@ -82,7 +82,11 @@ describe("storeResults", () => {
       // accidentally re-grew an ES code path, the missing module would
       // surface as an import-time failure or a vi.fn() not configured —
       // either way the test fails. The absence is the assertion.
-      await storeResults("project_regression", sampleClusteringResult, false);
+      await storeResults({
+        projectId: "project_regression",
+        clusteringResult: sampleClusteringResult,
+        isIncremental: false,
+      });
 
       expect(assignTopicMock).toHaveBeenCalledTimes(2);
       expect(assignTopicMock).toHaveBeenCalledWith(

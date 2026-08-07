@@ -56,12 +56,12 @@ describe("UsageStatsService", () => {
       getResolvedUsageUnit: vi.fn().mockResolvedValue("traces"),
     };
 
-    service = new UsageStatsService(
-      mockRepository,
-      mockTraceUsage,
-      mockPlanProvider,
-      mockUsageUnitResolver,
-    );
+    service = new UsageStatsService({
+      repository: mockRepository,
+      traceUsageService: mockTraceUsage,
+      planProvider: mockPlanProvider,
+      usageUnitResolver: mockUsageUnitResolver,
+    });
   });
 
   describe("getUsageStats", () => {

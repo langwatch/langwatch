@@ -11,10 +11,12 @@ describe("LangWatchExtractor", () => {
     describe("when langwatch.metrics has valid cost", () => {
       it("sets langwatch.span.cost via setAttrIfAbsent", () => {
         const ctx = createExtractorContext({
-          [ATTR_KEYS.LANGWATCH_METRICS]: JSON.stringify({
-            type: "json",
-            value: { promptTokens: 100, completionTokens: 50, cost: 0.005 },
-          }),
+          attrs: {
+            [ATTR_KEYS.LANGWATCH_METRICS]: JSON.stringify({
+              type: "json",
+              value: { promptTokens: 100, completionTokens: 50, cost: 0.005 },
+            }),
+          },
         });
 
         extractor.apply(ctx);
@@ -30,10 +32,12 @@ describe("LangWatchExtractor", () => {
     describe("when langwatch.metrics has token counts", () => {
       it("sets gen_ai.usage.input_tokens and gen_ai.usage.output_tokens", () => {
         const ctx = createExtractorContext({
-          [ATTR_KEYS.LANGWATCH_METRICS]: JSON.stringify({
-            type: "json",
-            value: { promptTokens: 100, completionTokens: 50, cost: 0.005 },
-          }),
+          attrs: {
+            [ATTR_KEYS.LANGWATCH_METRICS]: JSON.stringify({
+              type: "json",
+              value: { promptTokens: 100, completionTokens: 50, cost: 0.005 },
+            }),
+          },
         });
 
         extractor.apply(ctx);
@@ -54,10 +58,12 @@ describe("LangWatchExtractor", () => {
     describe("when gen_ai.usage.input_tokens is already set", () => {
       it("does not override (setAttrIfAbsent)", () => {
         const ctx = createExtractorContext({
-          [ATTR_KEYS.LANGWATCH_METRICS]: JSON.stringify({
-            type: "json",
-            value: { promptTokens: 100, completionTokens: 50, cost: 0.005 },
-          }),
+          attrs: {
+            [ATTR_KEYS.LANGWATCH_METRICS]: JSON.stringify({
+              type: "json",
+              value: { promptTokens: 100, completionTokens: 50, cost: 0.005 },
+            }),
+          },
         });
         // Pre-set token values (as if GenAI extractor ran first)
         ctx.out[ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS] = 200;
@@ -74,7 +80,9 @@ describe("LangWatchExtractor", () => {
     describe("when langwatch.metrics is malformed", () => {
       it("skips gracefully for invalid JSON", () => {
         const ctx = createExtractorContext({
-          [ATTR_KEYS.LANGWATCH_METRICS]: "{not valid json",
+          attrs: {
+            [ATTR_KEYS.LANGWATCH_METRICS]: "{not valid json",
+          },
         });
 
         expect(() => extractor.apply(ctx)).not.toThrow();
@@ -84,10 +92,12 @@ describe("LangWatchExtractor", () => {
 
       it("skips gracefully when value is not an object", () => {
         const ctx = createExtractorContext({
-          [ATTR_KEYS.LANGWATCH_METRICS]: JSON.stringify({
-            type: "json",
-            value: "not-an-object",
-          }),
+          attrs: {
+            [ATTR_KEYS.LANGWATCH_METRICS]: JSON.stringify({
+              type: "json",
+              value: "not-an-object",
+            }),
+          },
         });
 
         expect(() => extractor.apply(ctx)).not.toThrow();
@@ -96,9 +106,11 @@ describe("LangWatchExtractor", () => {
 
       it("skips gracefully when missing type/value structure", () => {
         const ctx = createExtractorContext({
-          [ATTR_KEYS.LANGWATCH_METRICS]: JSON.stringify({
-            promptTokens: 100,
-          }),
+          attrs: {
+            [ATTR_KEYS.LANGWATCH_METRICS]: JSON.stringify({
+              promptTokens: 100,
+            }),
+          },
         });
 
         expect(() => extractor.apply(ctx)).not.toThrow();
@@ -109,15 +121,17 @@ describe("LangWatchExtractor", () => {
     describe("when langwatch.metrics has tokensEstimated: true", () => {
       it("sets langwatch.tokens.estimated", () => {
         const ctx = createExtractorContext({
-          [ATTR_KEYS.LANGWATCH_METRICS]: JSON.stringify({
-            type: "json",
-            value: {
-              promptTokens: 100,
-              completionTokens: 50,
-              cost: 0.005,
-              tokensEstimated: true,
-            },
-          }),
+          attrs: {
+            [ATTR_KEYS.LANGWATCH_METRICS]: JSON.stringify({
+              type: "json",
+              value: {
+                promptTokens: 100,
+                completionTokens: 50,
+                cost: 0.005,
+                tokensEstimated: true,
+              },
+            }),
+          },
         });
 
         extractor.apply(ctx);
@@ -133,10 +147,12 @@ describe("LangWatchExtractor", () => {
     describe("when langwatch.span.cost is already in the bag", () => {
       it("does not override (setAttrIfAbsent)", () => {
         const ctx = createExtractorContext({
-          [ATTR_KEYS.LANGWATCH_METRICS]: JSON.stringify({
-            type: "json",
-            value: { promptTokens: 100, completionTokens: 50, cost: 0.005 },
-          }),
+          attrs: {
+            [ATTR_KEYS.LANGWATCH_METRICS]: JSON.stringify({
+              type: "json",
+              value: { promptTokens: 100, completionTokens: 50, cost: 0.005 },
+            }),
+          },
         });
         // Pre-set cost (as if enrichment or another extractor already set it)
         ctx.out[ATTR_KEYS.LANGWATCH_SPAN_COST] = 0.01;
@@ -151,10 +167,12 @@ describe("LangWatchExtractor", () => {
     describe("when langwatch.metrics has zero cost", () => {
       it("does not set langwatch.span.cost", () => {
         const ctx = createExtractorContext({
-          [ATTR_KEYS.LANGWATCH_METRICS]: JSON.stringify({
-            type: "json",
-            value: { promptTokens: 0, completionTokens: 0, cost: 0 },
-          }),
+          attrs: {
+            [ATTR_KEYS.LANGWATCH_METRICS]: JSON.stringify({
+              type: "json",
+              value: { promptTokens: 0, completionTokens: 0, cost: 0 },
+            }),
+          },
         });
 
         extractor.apply(ctx);

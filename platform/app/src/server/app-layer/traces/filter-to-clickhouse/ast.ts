@@ -142,20 +142,20 @@ function translateTag(
   // so saved queries from the previous schema still translate cleanly.
   if (fieldName.startsWith(TRACE_ATTRIBUTE_PREFIX)) {
     const key = fieldName.slice(TRACE_ATTRIBUTE_PREFIX.length);
-    return translateTraceAttribute(key, tag, negated, ctx);
+    return translateTraceAttribute({ attrKey: key, tag, negated, ctx });
   }
   if (fieldName.startsWith(SPAN_ATTRIBUTE_PREFIX)) {
     const key = fieldName.slice(SPAN_ATTRIBUTE_PREFIX.length);
-    return translateSpanAttribute(key, tag, negated, ctx);
+    return translateSpanAttribute({ attrKey: key, tag, negated, ctx });
   }
   if (fieldName.startsWith(EVENT_ATTRIBUTE_PREFIX)) {
     const key = fieldName.slice(EVENT_ATTRIBUTE_PREFIX.length);
-    return translateEventAttribute(key, tag, negated, ctx);
+    return translateEventAttribute({ attrKey: key, tag, negated, ctx });
   }
   // Legacy alias — `attribute.<k>`. Identical SQL to `trace.attribute.<k>`.
   if (fieldName.startsWith(TRACE_ATTRIBUTE_PREFIX_LEGACY)) {
     const key = fieldName.slice(TRACE_ATTRIBUTE_PREFIX_LEGACY.length);
-    return translateTraceAttribute(key, tag, negated, ctx);
+    return translateTraceAttribute({ attrKey: key, tag, negated, ctx });
   }
   // Legacy alias — `event.<k>` (single-dot form). Skips the bare `event`
   // field so `event:<name>` still routes to the static handler map.
@@ -164,7 +164,7 @@ function translateTag(
     fieldName !== "event"
   ) {
     const key = fieldName.slice(EVENT_ATTRIBUTE_PREFIX_LEGACY.length);
-    return translateEventAttribute(key, tag, negated, ctx);
+    return translateEventAttribute({ attrKey: key, tag, negated, ctx });
   }
 
   // `.get()` — own keys only. A plain-object index would resolve a field named
@@ -179,12 +179,17 @@ function translateTag(
   return def.toClickHouse(tag, negated, ctx);
 }
 
-function translateTraceAttribute(
-  attrKey: string,
-  tag: TagToken,
-  negated: boolean,
-  ctx: TranslationContext,
-): string {
+function translateTraceAttribute({
+  attrKey,
+  tag,
+  negated,
+  ctx,
+}: {
+  attrKey: string;
+  tag: TagToken;
+  negated: boolean;
+  ctx: TranslationContext;
+}): string {
   if (!attrKey) {
     throw new FilterParseError(
       "trace.attribute.<key> requires a key after the dot",
@@ -208,12 +213,17 @@ function translateTraceAttribute(
  * String))` — `arrayExists` short-circuits on the first match, cheap
  * relative to materialising the nested column for each row.
  */
-function translateEventAttribute(
-  attrKey: string,
-  tag: TagToken,
-  negated: boolean,
-  ctx: TranslationContext,
-): string {
+function translateEventAttribute({
+  attrKey,
+  tag,
+  negated,
+  ctx,
+}: {
+  attrKey: string;
+  tag: TagToken;
+  negated: boolean;
+  ctx: TranslationContext;
+}): string {
   if (!attrKey) {
     throw new FilterParseError(
       "event.attribute.<key> requires a key after the dot",
@@ -244,12 +254,17 @@ function translateEventAttribute(
  * payloads, so this stays cheap even on traces with megabyte-class
  * `gen_ai.input.messages` blobs.
  */
-function translateSpanAttribute(
-  attrKey: string,
-  tag: TagToken,
-  negated: boolean,
-  ctx: TranslationContext,
-): string {
+function translateSpanAttribute({
+  attrKey,
+  tag,
+  negated,
+  ctx,
+}: {
+  attrKey: string;
+  tag: TagToken;
+  negated: boolean;
+  ctx: TranslationContext;
+}): string {
   if (!attrKey) {
     throw new FilterParseError(
       "span.attribute.<key> requires a key after the dot",

@@ -945,25 +945,31 @@ export class TraceListService {
     // Assemble in registry order so the sidebar's group ordering is preserved.
     const facets: FacetDescriptor[] = [];
     for (const def of FACET_REGISTRY) {
-      const descriptor = await this.materializeDescriptor(
+      const descriptor = await this.materializeDescriptor({
         def,
         params,
         batchByTable,
         standaloneByKey,
         discreteByKey,
-      );
+      });
       if (descriptor) facets.push(descriptor);
     }
     return facets;
   }
 
-  private async materializeDescriptor(
-    def: FacetDefinition,
-    params: DiscoverParams,
-    batchByTable: Map<FacetTable, BatchedFacetResult>,
-    standaloneByKey: Map<string, FacetDescriptor>,
-    discreteByKey: Map<string, DiscreteFacetResult>,
-  ): Promise<FacetDescriptor | null> {
+  private async materializeDescriptor({
+    def,
+    params,
+    batchByTable,
+    standaloneByKey,
+    discreteByKey,
+  }: {
+    def: FacetDefinition;
+    params: DiscoverParams;
+    batchByTable: Map<FacetTable, BatchedFacetResult>;
+    standaloneByKey: Map<string, FacetDescriptor>;
+    discreteByKey: Map<string, DiscreteFacetResult>;
+  }): Promise<FacetDescriptor | null> {
     if (def.kind === "categorical" && isExpressionCategorical(def)) {
       if (def.expression.includes("arrayJoin")) {
         return standaloneByKey.get(def.key) ?? null;

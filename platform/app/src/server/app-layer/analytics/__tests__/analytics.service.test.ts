@@ -222,12 +222,12 @@ describe("AnalyticsService", () => {
       const { deps, spies } = makeDeps();
       const service = new AnalyticsService(deps);
 
-      const result = await service.getTopUsedDocuments(
-        "test-project",
-        Date.now() - 86400000,
-        Date.now(),
-        {},
-      );
+      const result = await service.getTopUsedDocuments({
+        projectId: "test-project",
+        startDate: Date.now() - 86400000,
+        endDate: Date.now(),
+        filters: {},
+      });
 
       expect(result.topDocuments).toHaveLength(1);
       expect(spies.getTopUsedDocuments).toHaveBeenCalledTimes(1);
@@ -239,12 +239,12 @@ describe("AnalyticsService", () => {
       const { deps, spies } = makeDeps();
       const service = new AnalyticsService(deps);
 
-      const result = await service.getFeedbacks(
-        "test-project",
-        Date.now() - 86400000,
-        Date.now(),
-        {},
-      );
+      const result = await service.getFeedbacks({
+        projectId: "test-project",
+        startDate: Date.now() - 86400000,
+        endDate: Date.now(),
+        filters: {},
+      });
 
       expect(result.events).toHaveLength(1);
       expect(spies.getFeedbacks).toHaveBeenCalledTimes(1);

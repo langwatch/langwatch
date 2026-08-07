@@ -131,12 +131,17 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
    * Also marks all evaluators for this cell as "running" since they start after target output.
    */
   const updateTargetOutput = useCallback(
-    (
-      rowIndex: number,
-      targetId: string,
-      output: unknown,
-      metadata?: { cost?: number; duration?: number; traceId?: string },
-    ) => {
+    ({
+      rowIndex,
+      targetId,
+      output,
+      metadata,
+    }: {
+      rowIndex: number;
+      targetId: string;
+      output: unknown;
+      metadata?: { cost?: number; duration?: number; traceId?: string };
+    }) => {
       // Use the store's setState directly for atomic updates
       useEvaluationsV3Store.setState((state) => {
         // Deep copy the target's array, or create new if doesn't exist
@@ -192,12 +197,17 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
    * into the workbench's autosaved state, then re-parsed them with a regex.
    */
   const updateTargetError = useCallback(
-    (
-      rowIndex: number,
-      targetId: string,
-      errorMsg: string,
-      domainError?: SerializedHandledError,
-    ) => {
+    ({
+      rowIndex,
+      targetId,
+      errorMsg,
+      domainError,
+    }: {
+      rowIndex: number;
+      targetId: string;
+      errorMsg: string;
+      domainError?: SerializedHandledError;
+    }) => {
       useEvaluationsV3Store.setState((state) => {
         const existingErrors = state.results.errors[targetId] ?? [];
         const newErrors = [...existingErrors];
@@ -235,12 +245,17 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
    * Also removes the evaluator from runningEvaluators since it has completed.
    */
   const updateEvaluatorResult = useCallback(
-    (
-      rowIndex: number,
-      targetId: string,
-      evaluatorId: string,
-      result: unknown,
-    ) => {
+    ({
+      rowIndex,
+      targetId,
+      evaluatorId,
+      result,
+    }: {
+      rowIndex: number;
+      targetId: string;
+      evaluatorId: string;
+      result: unknown;
+    }) => {
       useEvaluationsV3Store.setState((state) => {
         const existingTargetResults =
           state.results.evaluatorResults[targetId] ?? {};
@@ -305,17 +320,22 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
             // The code and the engine's raw string, side by side. The cell
             // shows the registry's copy for the code and keeps the raw string
             // for whoever asks — never as the headline.
-            updateTargetError(
-              event.rowIndex,
-              event.targetId,
-              event.error ?? UNNAMED_FAILURE,
-              event.domainError,
-            );
+            updateTargetError({
+              rowIndex: event.rowIndex,
+              targetId: event.targetId,
+              errorMsg: event.error ?? UNNAMED_FAILURE,
+              domainError: event.domainError,
+            });
           } else {
-            updateTargetOutput(event.rowIndex, event.targetId, event.output, {
-              cost: event.cost,
-              duration: event.duration,
-              traceId: event.traceId,
+            updateTargetOutput({
+              rowIndex: event.rowIndex,
+              targetId: event.targetId,
+              output: event.output,
+              metadata: {
+                cost: event.cost,
+                duration: event.duration,
+                traceId: event.traceId,
+              },
             });
           }
           if (event.cost) {
@@ -324,12 +344,12 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
           break;
 
         case "evaluator_result":
-          updateEvaluatorResult(
-            event.rowIndex,
-            event.targetId,
-            event.evaluatorId,
-            event.result,
-          );
+          updateEvaluatorResult({
+            rowIndex: event.rowIndex,
+            targetId: event.targetId,
+            evaluatorId: event.evaluatorId,
+            result: event.result,
+          });
           break;
 
         case "progress":
@@ -359,11 +379,11 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
           if (event.rowIndex !== undefined && event.targetId) {
             if (event.evaluatorId) {
               // Evaluator error
-              updateEvaluatorResult(
-                event.rowIndex,
-                event.targetId,
-                event.evaluatorId,
-                {
+              updateEvaluatorResult({
+                rowIndex: event.rowIndex,
+                targetId: event.targetId,
+                evaluatorId: event.evaluatorId,
+                result: {
                   status: "error",
                   error_type: "EvaluatorError",
                   details: detail,
@@ -372,15 +392,15 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
                     ? { domainError: event.domainError }
                     : {}),
                 },
-              );
+              });
             } else {
               // Target error — the code, not the sentence it renders as.
-              updateTargetError(
-                event.rowIndex,
-                event.targetId,
-                event.message,
-                event.domainError,
-              );
+              updateTargetError({
+                rowIndex: event.rowIndex,
+                targetId: event.targetId,
+                errorMsg: event.message,
+                domainError: event.domainError,
+              });
             }
           } else {
             // Fatal error
@@ -897,8 +917,11 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
         state.results.targetMetadata[targetId]?.[rowIndex]?.traceId;
 
       // Immediately set the evaluator result to "running" for UI feedback
-      updateEvaluatorResult(rowIndex, targetId, evaluatorId, {
-        status: "running",
+      updateEvaluatorResult({
+        rowIndex,
+        targetId,
+        evaluatorId,
+        result: { status: "running" },
       });
 
       // Build the evaluator scope with pre-computed target output

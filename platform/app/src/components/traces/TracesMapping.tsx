@@ -491,13 +491,13 @@ export const TracesMapping = ({
       .map(([col, m]) => ({ col, source: m.source }));
 
     for (const trace of traces_) {
-      const mappedEntries = mapTraceToDatasetEntry(
+      const mappedEntries = mapTraceToDatasetEntry({
         trace,
         mapping,
         expansions,
-        getAnnotationScoreOptions.data,
-        allThreadTraces.data ?? traces_,
-      );
+        annotationScoreOptions: getAnnotationScoreOptions.data,
+        allTraces: allThreadTraces.data ?? traces_,
+      });
 
       // Add each expanded entry to the final results
       for (const entry of mappedEntries) {

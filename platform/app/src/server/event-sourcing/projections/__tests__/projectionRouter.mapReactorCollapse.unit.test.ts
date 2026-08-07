@@ -53,16 +53,13 @@ describe("ProjectionRouter map-reactor dispatch over a coalesced batch", () => {
   /** Five events for one aggregate, already in occurredAt order. */
   const batch = (): Event[] =>
     Array.from({ length: BATCH_SIZE }, (_, i) =>
-      createTestEvent(
-        TEST_CONSTANTS.AGGREGATE_ID,
-        TEST_CONSTANTS.AGGREGATE_TYPE,
+      createTestEvent({
+        aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+        aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
         tenantId,
-        undefined,
-        1_000 + i,
-        undefined,
-        undefined,
-        `event-${i}`,
-      ),
+        createdAt: 1_000 + i,
+        id: `event-${i}`,
+      }),
     );
 
   /**
@@ -84,11 +81,11 @@ describe("ProjectionRouter map-reactor dispatch over a coalesced batch", () => {
       getReactorQueue: vi.fn().mockReturnValue({ send }),
     });
 
-    const router = new ProjectionRouter<Event>(
-      TEST_CONSTANTS.AGGREGATE_TYPE,
-      TEST_CONSTANTS.PIPELINE_NAME,
+    const router = new ProjectionRouter<Event>({
+      aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
+      pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
       queueManager,
-    );
+    });
 
     const mapProj = createMockMapProjectionDefinition("spans", {
       store: createMockAppendStore<Record<string, unknown>>(),

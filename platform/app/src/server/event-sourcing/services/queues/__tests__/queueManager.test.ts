@@ -169,10 +169,10 @@ describe("QueueManager", () => {
         { h1: createMockEventHandlerDefinition("h1") },
         vi.fn(),
       );
-      manager.initializeProjectionQueues(
-        { p1: createMockProjectionDefinition("p1") },
-        vi.fn(),
-      );
+      manager.initializeProjectionQueues({
+        projections: { p1: createMockProjectionDefinition("p1") },
+        onEvent: vi.fn(),
+      });
       manager.initializeCommandQueues(
         [{ name: "c1", handlerClass: createMockCommandHandlerClass("c1") }],
         vi.fn(),
@@ -232,16 +232,16 @@ describe("QueueManager", () => {
         { h1: createMockEventHandlerDefinition("h1") },
         vi.fn(),
       );
-      manager.initializeProjectionQueues(
-        { p1: createMockProjectionDefinition("p1") },
-        vi.fn(),
-      );
+      manager.initializeProjectionQueues({
+        projections: { p1: createMockProjectionDefinition("p1") },
+        onEvent: vi.fn(),
+      });
 
-      const event = createTestEvent(
-        TEST_CONSTANTS.AGGREGATE_ID,
+      const event = createTestEvent({
+        aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
         aggregateType,
         tenantId,
-      );
+      });
 
       // Handler job groupKey — hierarchical: tenantId/map/name/domainKey
       const handlerEntry = globalJobRegistry.get("test-pipeline:handler:h1");
@@ -276,13 +276,12 @@ describe("QueueManager", () => {
         vi.fn(),
       );
 
-      const event = createTestEvent(
-        TEST_CONSTANTS.AGGREGATE_ID,
+      const event = createTestEvent({
+        aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
         aggregateType,
         tenantId,
-        undefined,
-        42000,
-      );
+        createdAt: 42000,
+      });
 
       const handlerEntry = globalJobRegistry.get("test-pipeline:handler:h1");
       const score = handlerEntry?.scoreFn(event);
@@ -307,11 +306,11 @@ describe("QueueManager", () => {
         handleEventCallback,
       );
 
-      const event = createTestEvent(
-        TEST_CONSTANTS.AGGREGATE_ID,
+      const event = createTestEvent({
+        aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
         aggregateType,
         tenantId,
-      );
+      });
 
       const handlerEntry = globalJobRegistry.get("test-pipeline:handler:h1");
       await handlerEntry?.process(event);
@@ -337,16 +336,16 @@ describe("QueueManager", () => {
         globalJobRegistry,
       });
 
-      manager.initializeProjectionQueues(
-        { p1: createMockProjectionDefinition("p1") },
-        vi.fn(),
-      );
+      manager.initializeProjectionQueues({
+        projections: { p1: createMockProjectionDefinition("p1") },
+        onEvent: vi.fn(),
+      });
 
-      const event = createTestEvent(
-        TEST_CONSTANTS.AGGREGATE_ID,
+      const event = createTestEvent({
+        aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
         aggregateType,
         tenantId,
-      );
+      });
 
       const projectionEntry = globalJobRegistry.get(
         "test-pipeline:projection:p1",
@@ -452,8 +451,8 @@ describe("QueueManager", () => {
       );
       const entry = globalJobRegistry.get("test-pipeline:handler:handler1")!;
       const events = [
-        createTestEvent("one", aggregateType, tenantId),
-        createTestEvent("two", aggregateType, tenantId),
+        createTestEvent({ aggregateId: "one", aggregateType, tenantId }),
+        createTestEvent({ aggregateId: "two", aggregateType, tenantId }),
       ];
 
       await entry.processBatch!(events);
@@ -479,11 +478,11 @@ describe("QueueManager", () => {
       );
 
       const facade = manager.getHandlerQueue("handler1")!;
-      const event = createTestEvent(
-        TEST_CONSTANTS.AGGREGATE_ID,
+      const event = createTestEvent({
+        aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
         aggregateType,
         tenantId,
-      );
+      });
       await facade.send(event);
 
       expect(mockQueueProcessor.send).toHaveBeenCalledWith(
@@ -513,8 +512,16 @@ describe("QueueManager", () => {
       );
 
       const facade = manager.getHandlerQueue("handler1")!;
-      const event1 = createTestEvent("agg-1", aggregateType, tenantId);
-      const event2 = createTestEvent("agg-2", aggregateType, tenantId);
+      const event1 = createTestEvent({
+        aggregateId: "agg-1",
+        aggregateType,
+        tenantId,
+      });
+      const event2 = createTestEvent({
+        aggregateId: "agg-2",
+        aggregateType,
+        tenantId,
+      });
       await facade.sendBatch([event1, event2]);
 
       expect(mockQueueProcessor.sendBatch).toHaveBeenCalledWith(
@@ -555,11 +562,11 @@ describe("QueueManager", () => {
       );
 
       const facade = manager.getHandlerQueue("handler1")!;
-      const event = createTestEvent(
-        TEST_CONSTANTS.AGGREGATE_ID,
+      const event = createTestEvent({
+        aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
         aggregateType,
         tenantId,
-      );
+      });
       await facade.send(event);
 
       expect(mockQueueProcessor.send).toHaveBeenCalledWith(
@@ -590,11 +597,11 @@ describe("QueueManager", () => {
       );
 
       const facade = manager.getHandlerQueue("handler1")!;
-      const event = createTestEvent(
-        TEST_CONSTANTS.AGGREGATE_ID,
+      const event = createTestEvent({
+        aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
         aggregateType,
         tenantId,
-      );
+      });
       await facade.send(event);
 
       // The per-send dedup should be namespaced
@@ -627,11 +634,11 @@ describe("QueueManager", () => {
       );
 
       const facade = manager.getHandlerQueue("handler1")!;
-      const event = createTestEvent(
-        TEST_CONSTANTS.AGGREGATE_ID,
+      const event = createTestEvent({
+        aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
         aggregateType,
         tenantId,
-      );
+      });
       await facade.send(event);
 
       const sendOptions = (mockQueueProcessor.send as any).mock.calls[0]?.[1];
@@ -659,11 +666,11 @@ describe("QueueManager", () => {
       );
 
       const facade = manager.getHandlerQueue("handler1")!;
-      const event = createTestEvent(
-        TEST_CONSTANTS.AGGREGATE_ID,
+      const event = createTestEvent({
+        aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
         aggregateType,
         tenantId,
-      );
+      });
       await facade.send(event);
 
       const sendOptions = (mockQueueProcessor.send as any).mock.calls[0]?.[1];
@@ -695,10 +702,10 @@ describe("QueueManager", () => {
       };
       const processProjectionEventCallback = vi.fn();
 
-      manager.initializeProjectionQueues(
+      manager.initializeProjectionQueues({
         projections,
-        processProjectionEventCallback,
-      );
+        onEvent: processProjectionEventCallback,
+      });
 
       expect(manager.hasProjectionQueues()).toBe(false);
     });
@@ -720,10 +727,10 @@ describe("QueueManager", () => {
       };
       const processProjectionEventCallback = vi.fn();
 
-      manager.initializeProjectionQueues(
+      manager.initializeProjectionQueues({
         projections,
-        processProjectionEventCallback,
-      );
+        onEvent: processProjectionEventCallback,
+      });
 
       // Registry entries exist for each projection
       expect(
@@ -748,17 +755,19 @@ describe("QueueManager", () => {
         globalJobRegistry,
       });
 
-      manager.initializeProjectionQueues(
-        { projection1: createMockProjectionDefinition("projection1") },
-        vi.fn(),
-      );
+      manager.initializeProjectionQueues({
+        projections: {
+          projection1: createMockProjectionDefinition("projection1"),
+        },
+        onEvent: vi.fn(),
+      });
 
       const facade = manager.getProjectionQueue("projection1")!;
-      const event = createTestEvent(
-        TEST_CONSTANTS.AGGREGATE_ID,
+      const event = createTestEvent({
+        aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
         aggregateType,
         tenantId,
-      );
+      });
       await facade.send(event);
 
       expect(mockQueueProcessor.send).toHaveBeenCalledWith(
@@ -782,21 +791,23 @@ describe("QueueManager", () => {
         globalJobRegistry,
       });
 
-      manager.initializeProjectionQueues(
-        { projection1: createMockProjectionDefinition("projection1") },
-        vi.fn(),
-      );
+      manager.initializeProjectionQueues({
+        projections: {
+          projection1: createMockProjectionDefinition("projection1"),
+        },
+        onEvent: vi.fn(),
+      });
 
       const entry = globalJobRegistry.get(
         "test-pipeline:projection:projection1",
       );
       expect(entry?.groupKeyFn).toBeDefined();
 
-      const event = createTestEvent(
-        TEST_CONSTANTS.AGGREGATE_ID,
+      const event = createTestEvent({
+        aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
         aggregateType,
         tenantId,
-      );
+      });
       const groupKey = entry?.groupKeyFn(event);
       expect(groupKey).toBe(
         `${tenantId}/fold/projection1/${aggregateType}:${TEST_CONSTANTS.AGGREGATE_ID}`,
@@ -1059,11 +1070,11 @@ describe("QueueManager", () => {
       );
 
       const facade = manager.getReactorQueue("reactor1")!;
-      const event = createTestEvent(
-        TEST_CONSTANTS.AGGREGATE_ID,
+      const event = createTestEvent({
+        aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
         aggregateType,
         tenantId,
-      );
+      });
       await facade.send({ event, foldState: { count: 1 } });
 
       expect(mockQueueProcessor.send).toHaveBeenCalledWith(
@@ -1102,11 +1113,11 @@ describe("QueueManager", () => {
       );
 
       const entry = globalJobRegistry.get("test-pipeline:reactor:reactor1");
-      const event = createTestEvent(
-        TEST_CONSTANTS.AGGREGATE_ID,
+      const event = createTestEvent({
+        aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
         aggregateType,
         tenantId,
-      );
+      });
 
       const groupKey = entry?.groupKeyFn({
         event,
@@ -1134,13 +1145,12 @@ describe("QueueManager", () => {
       );
 
       const entry = globalJobRegistry.get("test-pipeline:reactor:reactor1");
-      const event = createTestEvent(
-        TEST_CONSTANTS.AGGREGATE_ID,
+      const event = createTestEvent({
+        aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
         aggregateType,
         tenantId,
-        undefined,
-        55000,
-      );
+        createdAt: 55000,
+      });
 
       const score = entry?.scoreFn({
         event,
@@ -1166,11 +1176,11 @@ describe("QueueManager", () => {
       );
 
       const facade = manager.getReactorQueue("reactor1")!;
-      const event = createTestEvent(
-        TEST_CONSTANTS.AGGREGATE_ID,
+      const event = createTestEvent({
+        aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
         aggregateType,
         tenantId,
-      );
+      });
       await facade.send({ event, foldState: {} });
 
       expect(mockQueueProcessor.send).toHaveBeenCalledWith(
@@ -1196,10 +1206,12 @@ describe("QueueManager", () => {
         { handler1: createMockEventHandlerDefinition("handler1") },
         vi.fn(),
       );
-      manager.initializeProjectionQueues(
-        { projection1: createMockProjectionDefinition("projection1") },
-        vi.fn(),
-      );
+      manager.initializeProjectionQueues({
+        projections: {
+          projection1: createMockProjectionDefinition("projection1"),
+        },
+        onEvent: vi.fn(),
+      });
       manager.initializeCommandQueues(
         [
           {

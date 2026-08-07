@@ -17,12 +17,17 @@ import { assertEnterprisePlan, ENTERPRISE_FEATURE_ERRORS } from "../enterprise";
 import { checkOrganizationPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
-async function findUniqueGroupSlug(
-  prisma: Pick<PrismaClient, "group">,
-  organizationId: string,
-  baseSlug: string,
-  excludeId?: string,
-): Promise<string> {
+async function findUniqueGroupSlug({
+  prisma,
+  organizationId,
+  baseSlug,
+  excludeId,
+}: {
+  prisma: Pick<PrismaClient, "group">;
+  organizationId: string;
+  baseSlug: string;
+  excludeId?: string;
+}): Promise<string> {
   if (!baseSlug) {
     throw new TRPCError({
       code: "BAD_REQUEST",
@@ -281,11 +286,11 @@ export const groupRouter = createTRPCRouter({
       }
 
       return ctx.prisma.$transaction(async (tx) => {
-        const slug = await findUniqueGroupSlug(
-          tx,
-          input.organizationId,
+        const slug = await findUniqueGroupSlug({
+          prisma: tx,
+          organizationId: input.organizationId,
           baseSlug,
-        );
+        });
 
         const group = await tx.group.create({
           data: {
@@ -511,12 +516,12 @@ export const groupRouter = createTRPCRouter({
       }
 
       const baseSlug = slugify(input.name, { lower: true, strict: true });
-      const slug = await findUniqueGroupSlug(
-        ctx.prisma,
-        input.organizationId,
+      const slug = await findUniqueGroupSlug({
+        prisma: ctx.prisma,
+        organizationId: input.organizationId,
         baseSlug,
-        input.groupId,
-      );
+        excludeId: input.groupId,
+      });
 
       return ctx.prisma.group.update({
         where: { id: input.groupId },
@@ -636,12 +641,12 @@ export const groupRouter = createTRPCRouter({
           lower: true,
           strict: true,
         });
-        const slug = await findUniqueGroupSlug(
-          ctx.prisma,
-          input.organizationId,
+        const slug = await findUniqueGroupSlug({
+          prisma: ctx.prisma,
+          organizationId: input.organizationId,
           baseSlug,
-          input.groupId,
-        );
+          excludeId: input.groupId,
+        });
         resolvedRename = { name: input.rename.name, slug };
       }
 

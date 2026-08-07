@@ -306,15 +306,17 @@ export class LlmConfigRepository {
   /**
    * Update an LLM config's metadata (name only)
    */
-  async updateConfig(
-    idOrHandle: string,
-    projectId: string,
-    data: Partial<CreateLlmConfigParams>,
-    options?: {
-      tx?: Prisma.TransactionClient;
-    },
-  ): Promise<LlmPromptConfig> {
-    const { tx } = options ?? {};
+  async updateConfig({
+    idOrHandle,
+    projectId,
+    data,
+    tx,
+  }: {
+    idOrHandle: string;
+    projectId: string;
+    data: Partial<CreateLlmConfigParams>;
+    tx?: Prisma.TransactionClient;
+  }): Promise<LlmPromptConfig> {
     const client = tx ?? this.prisma;
     // Get organizationId first using the proper approach
     const project = await client.project.findUnique({

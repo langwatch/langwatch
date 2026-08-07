@@ -907,7 +907,11 @@ async function enrichSpanDetailFromCodingAgentLogs({
       typeof (span.params as Record<string, unknown> | null)?.request_id ===
       "string";
     const [logRows, summaryRows] = await Promise.all([
-      app.traces.logRecords.getLogsByTraceId(tenantId, traceId, occurredAtMs),
+      app.traces.logRecords.getLogsByTraceId({
+        tenantId,
+        traceId,
+        occurredAtMs,
+      }),
       needsSiblingRefs
         ? app.traces.spans.getSpanSummaryByTraceId({
             tenantId,
@@ -1032,11 +1036,11 @@ async function loadTraceLogsWithProtections({
 }): Promise<TraceLogRecordDto[]> {
   const app = getApp();
   const visibilityCutoffMs = await getVisibilityCutoffMsForProject(projectId);
-  const rows = await app.traces.logRecords.getLogsByTraceId(
-    projectId,
+  const rows = await app.traces.logRecords.getLogsByTraceId({
+    tenantId: projectId,
     traceId,
     occurredAtMs,
-  );
+  });
   return rows.map((row) =>
     gateTraceLogVisibility(
       {

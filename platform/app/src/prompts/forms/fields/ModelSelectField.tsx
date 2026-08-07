@@ -20,11 +20,11 @@ export function ModelSelectField() {
   const currentModel = currentLLMConfig?.model ?? "";
 
   // Check if the current model is disabled
-  const { modelOption, isEmpty } = useModelSelectionOptions(
-    allModelOptions,
-    currentModel,
-    "chat",
-  );
+  const { modelOption, isEmpty } = useModelSelectionOptions({
+    options: allModelOptions,
+    model: currentModel,
+    mode: "chat",
+  });
   const isModelDisabled = modelOption?.isDisabled ?? false;
 
   return (

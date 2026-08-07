@@ -117,15 +117,20 @@ describe("eligible model providers - drawer / gateway parity on real PG", () => 
       data: { id: USER_ID, email: `${suffix}@elig.local`, name: "Elig" },
     });
 
-    const mp = (
-      id: string,
-      name: string,
+    const mp = ({
+      id,
+      name,
+      scopes,
+      overrides = {},
+    }: {
+      id: string;
+      name: string;
       scopes: Array<{
         scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
         scopeId: string;
-      }>,
-      overrides: { enabled?: boolean; disabledAt?: Date } = {},
-    ) =>
+      }>;
+      overrides?: { enabled?: boolean; disabledAt?: Date };
+    }) =>
       prisma.modelProvider.create({
         data: {
           id,
@@ -141,32 +146,42 @@ describe("eligible model providers - drawer / gateway parity on real PG", () => 
         },
       });
 
-    await mp(MP_ORG_ID, "Central OpenAI", [
-      { scopeType: "ORGANIZATION", scopeId: ORG_ID },
-    ]);
-    await mp(
-      MP_ORG_OFF_ID,
-      "Switched Off OpenAI",
-      [{ scopeType: "ORGANIZATION", scopeId: ORG_ID }],
-      { enabled: false },
-    );
-    await mp(
-      MP_ORG_WITHDRAWN_ID,
-      "Withdrawn OpenAI",
-      [{ scopeType: "ORGANIZATION", scopeId: ORG_ID }],
-      { disabledAt: new Date("2026-07-01T00:00:00Z") },
-    );
-    await mp(MP_PROJECT_ID, "Project OpenAI", [
-      { scopeType: "PROJECT", scopeId: PROJECT_ID },
-    ]);
-    await mp(MP_SIBLING_ID, "Sibling OpenAI", [
-      { scopeType: "PROJECT", scopeId: SIBLING_PROJECT_ID },
-    ]);
-    await mp(MP_MULTISCOPE_ID, "Everywhere OpenAI", [
-      { scopeType: "ORGANIZATION", scopeId: ORG_ID },
-      { scopeType: "TEAM", scopeId: TEAM_ID },
-      { scopeType: "PROJECT", scopeId: PROJECT_ID },
-    ]);
+    await mp({
+      id: MP_ORG_ID,
+      name: "Central OpenAI",
+      scopes: [{ scopeType: "ORGANIZATION", scopeId: ORG_ID }],
+    });
+    await mp({
+      id: MP_ORG_OFF_ID,
+      name: "Switched Off OpenAI",
+      scopes: [{ scopeType: "ORGANIZATION", scopeId: ORG_ID }],
+      overrides: { enabled: false },
+    });
+    await mp({
+      id: MP_ORG_WITHDRAWN_ID,
+      name: "Withdrawn OpenAI",
+      scopes: [{ scopeType: "ORGANIZATION", scopeId: ORG_ID }],
+      overrides: { disabledAt: new Date("2026-07-01T00:00:00Z") },
+    });
+    await mp({
+      id: MP_PROJECT_ID,
+      name: "Project OpenAI",
+      scopes: [{ scopeType: "PROJECT", scopeId: PROJECT_ID }],
+    });
+    await mp({
+      id: MP_SIBLING_ID,
+      name: "Sibling OpenAI",
+      scopes: [{ scopeType: "PROJECT", scopeId: SIBLING_PROJECT_ID }],
+    });
+    await mp({
+      id: MP_MULTISCOPE_ID,
+      name: "Everywhere OpenAI",
+      scopes: [
+        { scopeType: "ORGANIZATION", scopeId: ORG_ID },
+        { scopeType: "TEAM", scopeId: TEAM_ID },
+        { scopeType: "PROJECT", scopeId: PROJECT_ID },
+      ],
+    });
 
     await prisma.virtualKey.create({
       data: {

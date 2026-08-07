@@ -103,7 +103,7 @@ describe("orchestrator", () => {
       const datasetRows = createTestDataset(3);
       const scope: ExecutionScope = { type: "full" };
 
-      const cells = generateCells(state, datasetRows, scope);
+      const cells = generateCells({ state, datasetRows, scope });
 
       expect(cells).toHaveLength(6); // 3 rows × 2 targets
 
@@ -123,7 +123,7 @@ describe("orchestrator", () => {
       const datasetRows = createTestDataset(3);
       const scope: ExecutionScope = { type: "rows", rowIndices: [1] };
 
-      const cells = generateCells(state, datasetRows, scope);
+      const cells = generateCells({ state, datasetRows, scope });
 
       expect(cells).toHaveLength(2); // 1 row × 2 targets
       expect(cells.every((c) => c.rowIndex === 1)).toBe(true);
@@ -134,7 +134,7 @@ describe("orchestrator", () => {
       const datasetRows = createTestDataset(5);
       const scope: ExecutionScope = { type: "rows", rowIndices: [0, 2, 4] };
 
-      const cells = generateCells(state, datasetRows, scope);
+      const cells = generateCells({ state, datasetRows, scope });
 
       expect(cells).toHaveLength(6); // 3 rows × 2 targets
       const rowIndices = new Set(cells.map((c) => c.rowIndex));
@@ -146,7 +146,7 @@ describe("orchestrator", () => {
       const datasetRows = createTestDataset(3);
       const scope: ExecutionScope = { type: "target", targetId: "target-1" };
 
-      const cells = generateCells(state, datasetRows, scope);
+      const cells = generateCells({ state, datasetRows, scope });
 
       expect(cells).toHaveLength(3); // 3 rows × 1 target
       expect(cells.every((c) => c.targetId === "target-1")).toBe(true);
@@ -161,7 +161,7 @@ describe("orchestrator", () => {
         targetId: "target-2",
       };
 
-      const cells = generateCells(state, datasetRows, scope);
+      const cells = generateCells({ state, datasetRows, scope });
 
       expect(cells).toHaveLength(1);
       expect(cells[0]?.rowIndex).toBe(2);
@@ -176,7 +176,7 @@ describe("orchestrator", () => {
         targetId: "non-existent",
       };
 
-      const cells = generateCells(state, datasetRows, scope);
+      const cells = generateCells({ state, datasetRows, scope });
 
       expect(cells).toHaveLength(0);
     });
@@ -186,7 +186,7 @@ describe("orchestrator", () => {
       const datasetRows = createTestDataset(3); // 0, 1, 2
       const scope: ExecutionScope = { type: "rows", rowIndices: [1, 10, 20] };
 
-      const cells = generateCells(state, datasetRows, scope);
+      const cells = generateCells({ state, datasetRows, scope });
 
       expect(cells).toHaveLength(2); // Only row 1 × 2 targets
       expect(cells.every((c) => c.rowIndex === 1)).toBe(true);
@@ -197,7 +197,7 @@ describe("orchestrator", () => {
       const datasetRows = [{ question: "Hello", expected: "World" }];
       const scope: ExecutionScope = { type: "full" };
 
-      const cells = generateCells(state, datasetRows, scope);
+      const cells = generateCells({ state, datasetRows, scope });
 
       expect(cells[0]?.datasetEntry).toEqual({
         _datasetId: "dataset-1",
@@ -211,7 +211,7 @@ describe("orchestrator", () => {
       const datasetRows = [{ question: "Test", expected: "Test" }];
       const scope: ExecutionScope = { type: "full" };
 
-      const cells = generateCells(state, datasetRows, scope);
+      const cells = generateCells({ state, datasetRows, scope });
 
       expect(cells[0]?.evaluatorConfigs).toHaveLength(3);
     });
@@ -238,7 +238,7 @@ describe("orchestrator", () => {
       const datasetRows = createTestDataset(1);
       const scope: ExecutionScope = { type: "full" };
 
-      const cells = generateCells(state, datasetRows, scope);
+      const cells = generateCells({ state, datasetRows, scope });
 
       expect(cells).toHaveLength(2);
       expect(
@@ -272,7 +272,7 @@ describe("orchestrator", () => {
       const datasetRows = createTestDataset(1);
       const scope: ExecutionScope = { type: "full" };
 
-      const cells = generateCells(state, datasetRows, scope);
+      const cells = generateCells({ state, datasetRows, scope });
 
       expect(cells.map((cell) => cell.targetId)).toEqual([
         "target-1",
@@ -303,7 +303,7 @@ describe("orchestrator", () => {
       const datasetRows = createTestDataset(1);
       const scope: ExecutionScope = { type: "full" };
 
-      const cells = generateCells(state, datasetRows, scope);
+      const cells = generateCells({ state, datasetRows, scope });
 
       expect(cells.map((cell) => cell.targetId)).toEqual([
         "target-1",
@@ -338,10 +338,15 @@ describe("orchestrator", () => {
         targetId: "comparison-target",
       };
 
-      const cells = generateCells(state, datasetRows, scope, {
-        seedTargetOutputs: {
-          "0:target-1": { output: "variant 1" },
-          "0:target-2": { output: "variant 2" },
+      const cells = generateCells({
+        state,
+        datasetRows,
+        scope,
+        options: {
+          seedTargetOutputs: {
+            "0:target-1": { output: "variant 1" },
+            "0:target-2": { output: "variant 2" },
+          },
         },
       });
 
@@ -375,9 +380,14 @@ describe("orchestrator", () => {
         targetId: "comparison-target",
       };
 
-      const cells = generateCells(state, datasetRows, scope, {
-        seedTargetOutputs: {
-          "0:target-1": { output: "variant 1" },
+      const cells = generateCells({
+        state,
+        datasetRows,
+        scope,
+        options: {
+          seedTargetOutputs: {
+            "0:target-1": { output: "variant 1" },
+          },
         },
       });
 
@@ -409,7 +419,7 @@ describe("orchestrator", () => {
         const datasetRows = createTestDataset(1);
         const scope: ExecutionScope = { type: "full" };
 
-        const cells = generateCells(state, datasetRows, scope);
+        const cells = generateCells({ state, datasetRows, scope });
 
         expect(cells.length).toBeGreaterThan(0);
         for (const cell of cells) {
@@ -1645,7 +1655,7 @@ describe("orchestrator", () => {
         },
       };
 
-      const cells = generateCells(state, datasetRows, scope);
+      const cells = generateCells({ state, datasetRows, scope });
 
       // Only rows 0, 1, 3 have outputs - row 2 is skipped
       expect(cells).toHaveLength(3);
@@ -1667,7 +1677,7 @@ describe("orchestrator", () => {
         traceIds: {},
       };
 
-      const cells = generateCells(state, datasetRows, scope);
+      const cells = generateCells({ state, datasetRows, scope });
 
       for (const cell of cells) {
         expect(cell.skipTarget).toBe(true);
@@ -1688,7 +1698,7 @@ describe("orchestrator", () => {
         traceIds: {},
       };
 
-      const cells = generateCells(state, datasetRows, scope);
+      const cells = generateCells({ state, datasetRows, scope });
 
       for (const cell of cells) {
         expect(cell.evaluatorConfigs).toHaveLength(1);
@@ -1713,7 +1723,7 @@ describe("orchestrator", () => {
         },
       };
 
-      const cells = generateCells(state, datasetRows, scope);
+      const cells = generateCells({ state, datasetRows, scope });
 
       expect(cells[0]?.precomputedTargetOutput).toEqual({ output: "result-0" });
       expect(cells[0]?.traceId).toBe("trace-0");
@@ -1734,7 +1744,7 @@ describe("orchestrator", () => {
         traceIds: {},
       };
 
-      const cells = generateCells(state, datasetRows, scope);
+      const cells = generateCells({ state, datasetRows, scope });
 
       expect(cells).toHaveLength(0);
     });
@@ -1752,7 +1762,7 @@ describe("orchestrator", () => {
         traceIds: {},
       };
 
-      const cells = generateCells(state, datasetRows, scope);
+      const cells = generateCells({ state, datasetRows, scope });
 
       expect(cells).toHaveLength(0);
     });
@@ -1789,7 +1799,7 @@ describe("orchestrator", () => {
         traceIds: {},
       };
 
-      const cells = generateCells(state, datasetRows, scope);
+      const cells = generateCells({ state, datasetRows, scope });
 
       expect(cells).toHaveLength(0);
     });
@@ -1824,7 +1834,7 @@ describe("orchestrator", () => {
         targetOutput: { output: "result-0" },
       };
 
-      const cells = generateCells(state, datasetRows, scope);
+      const cells = generateCells({ state, datasetRows, scope });
 
       expect(cells).toHaveLength(0);
     });
@@ -1836,7 +1846,7 @@ describe("orchestrator", () => {
       const datasetRows = createTestDataset(2);
       const scope: ExecutionScope = { type: "full" };
 
-      const cells = generateCells(state, datasetRows, scope);
+      const cells = generateCells({ state, datasetRows, scope });
 
       // Expected order: (0, t1), (0, t2), (1, t1), (1, t2)
       expect(cells[0]?.rowIndex).toBe(0);

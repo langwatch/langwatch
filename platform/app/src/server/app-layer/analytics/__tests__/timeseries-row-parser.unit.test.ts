@@ -20,7 +20,12 @@ import {
 } from "../repositories/_timeseries-row-parser";
 
 const alias = (series: SeriesInputType, index: number) =>
-  buildMetricAlias(index, series.metric, series.aggregation, series.key);
+  buildMetricAlias({
+    index,
+    metric: series.metric,
+    aggregation: series.aggregation,
+    key: series.key,
+  });
 
 const passRateSeries: SeriesInputType = {
   metric: "evaluations.evaluation_pass_rate",

@@ -334,29 +334,62 @@ describe("anchor settle predicates", () => {
   describe("isAnchorSettled", () => {
     describe("given the anchor is on-screen and unchanged since the last frame", () => {
       it("reports it settled", () => {
-        expect(isAnchorSettled(rect(), rect(), VW, 0)).toBe(true);
+        expect(
+          isAnchorSettled({
+            next: rect(),
+            previous: rect(),
+            viewportWidth: VW,
+            scrollX: 0,
+          }),
+        ).toBe(true);
       });
     });
 
     describe("given the anchor is still parked off-screen", () => {
       it("is never settled, even if unchanged (parked, not resting)", () => {
         const parked = rect({ left: VW });
-        expect(isAnchorSettled(parked, parked, VW, 0)).toBe(false);
+        expect(
+          isAnchorSettled({
+            next: parked,
+            previous: parked,
+            viewportWidth: VW,
+            scrollX: 0,
+          }),
+        ).toBe(false);
       });
     });
 
     describe("given the anchor moved since the last frame", () => {
       it("is not settled (still riding in)", () => {
         expect(
-          isAnchorSettled(rect({ left: 200 }), rect({ left: 260 }), VW, 0),
+          isAnchorSettled({
+            next: rect({ left: 200 }),
+            previous: rect({ left: 260 }),
+            viewportWidth: VW,
+            scrollX: 0,
+          }),
         ).toBe(false);
       });
     });
 
     describe("given there is no prior frame to compare", () => {
       it("is not settled yet", () => {
-        expect(isAnchorSettled(rect(), null, VW, 0)).toBe(false);
-        expect(isAnchorSettled(null, rect(), VW, 0)).toBe(false);
+        expect(
+          isAnchorSettled({
+            next: rect(),
+            previous: null,
+            viewportWidth: VW,
+            scrollX: 0,
+          }),
+        ).toBe(false);
+        expect(
+          isAnchorSettled({
+            next: null,
+            previous: rect(),
+            viewportWidth: VW,
+            scrollX: 0,
+          }),
+        ).toBe(false);
       });
     });
   });

@@ -173,12 +173,12 @@ describe("translateRouter.translate()", () => {
 
   describe("when the model cannot be resolved", () => {
     it("propagates a typed MODEL_NOT_CONFIGURED cause to its own toast surface", async () => {
-      const modelError = new ModelNotConfiguredError(
-        "translate.text",
-        "FAST",
-        "Inline translation",
-        "project_abc123",
-      );
+      const modelError = new ModelNotConfiguredError({
+        featureKey: "translate.text",
+        role: "FAST",
+        featureDisplayName: "Inline translation",
+        projectId: "project_abc123",
+      });
       mockGetVercelAIModel.mockRejectedValue(modelError);
 
       await expect(
@@ -196,16 +196,16 @@ describe("translateRouter.translate()", () => {
     });
 
     it("propagates a typed MODEL_PROVIDER_DISABLED cause to its own toast surface", async () => {
-      const modelError = new ModelProviderDisabledError(
-        "translate.text",
-        "Inline translation",
-        "FAST",
-        "project_abc123",
-        "project",
-        "openai/gpt-5-mini",
-        "openai",
-        null,
-      );
+      const modelError = new ModelProviderDisabledError({
+        featureKey: "translate.text",
+        featureDisplayName: "Inline translation",
+        role: "FAST",
+        projectId: "project_abc123",
+        resolvedScope: "project",
+        resolvedModel: "openai/gpt-5-mini",
+        providerKey: "openai",
+        alternate: null,
+      });
       mockGetVercelAIModel.mockRejectedValue(modelError);
 
       const error = await caller

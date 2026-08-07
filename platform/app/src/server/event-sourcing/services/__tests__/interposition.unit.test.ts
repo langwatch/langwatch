@@ -80,11 +80,11 @@ describe("given EventSourcingService is configured with a map projection", () =>
       });
 
       const events = [
-        createTestEvent(
-          TEST_CONSTANTS.AGGREGATE_ID,
-          TEST_CONSTANTS.AGGREGATE_TYPE,
+        createTestEvent({
+          aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+          aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
           tenantId,
-        ),
+        }),
       ];
 
       await service.storeEvents(events, context);
@@ -119,21 +119,21 @@ describe("given EventSourcingService is configured with a map projection", () =>
       });
 
       const events = [
-        createTestEvent(
-          TEST_CONSTANTS.AGGREGATE_ID,
-          TEST_CONSTANTS.AGGREGATE_TYPE,
+        createTestEvent({
+          aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+          aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
           tenantId,
-        ),
-        createTestEvent(
-          TEST_CONSTANTS.AGGREGATE_ID,
-          TEST_CONSTANTS.AGGREGATE_TYPE,
+        }),
+        createTestEvent({
+          aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+          aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
           tenantId,
-        ),
-        createTestEvent(
-          TEST_CONSTANTS.AGGREGATE_ID,
-          TEST_CONSTANTS.AGGREGATE_TYPE,
+        }),
+        createTestEvent({
+          aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+          aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
           tenantId,
-        ),
+        }),
       ];
 
       await service.storeEvents(events, context);
@@ -162,11 +162,11 @@ describe("given EventSourcingService is configured with a map projection", () =>
       });
 
       const events = [
-        createTestEvent(
-          TEST_CONSTANTS.AGGREGATE_ID,
-          TEST_CONSTANTS.AGGREGATE_TYPE,
+        createTestEvent({
+          aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+          aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
           tenantId,
-        ),
+        }),
       ];
 
       await expect(service.storeEvents(events, context)).rejects.toThrow(
@@ -212,11 +212,11 @@ describe("given EventSourcingService is configured with a map projection", () =>
       });
 
       const events = [
-        createTestEvent(
-          TEST_CONSTANTS.AGGREGATE_ID,
-          TEST_CONSTANTS.AGGREGATE_TYPE,
+        createTestEvent({
+          aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+          aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
           tenantId,
-        ),
+        }),
       ];
 
       await service.storeEvents(events, context);

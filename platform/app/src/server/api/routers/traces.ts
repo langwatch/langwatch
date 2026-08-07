@@ -50,12 +50,12 @@ export const tracesRouter = createTRPCRouter({
         ctx.prisma,
         buildTraceBlobResolutionDeps(),
       );
-      const trace = await traceService.getById(
-        input.projectId,
-        input.traceId,
+      const trace = await traceService.getById({
+        projectId: input.projectId,
+        traceId: input.traceId,
         protections,
-        { full: true },
-      );
+        opts: { full: true },
+      });
 
       if (!trace) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Trace not found." });
@@ -205,14 +205,12 @@ export const tracesRouter = createTRPCRouter({
         buildTraceBlobResolutionDeps(),
       );
 
-      return traceService.getTracesByThreadId(
+      return traceService.getTracesByThreadId({
         projectId,
         threadId,
         protections,
-        {
-          full: true,
-        },
-      );
+        opts: { full: true },
+      });
     }),
 
   getTracesWithSpans: protectedProcedure
@@ -228,13 +226,12 @@ export const tracesRouter = createTRPCRouter({
         ctx.prisma,
         buildTraceBlobResolutionDeps(),
       );
-      return traceService.getTracesWithSpans(
+      return traceService.getTracesWithSpans({
         projectId,
         traceIds,
         protections,
-        undefined,
-        { full: true },
-      );
+        opts: { full: true },
+      });
     }),
 
   getFormattedSpansDigest: protectedProcedure
@@ -247,11 +244,11 @@ export const tracesRouter = createTRPCRouter({
       });
 
       const traceService = TraceService.create(ctx.prisma);
-      const traces = await traceService.getTracesWithSpans(
+      const traces = await traceService.getTracesWithSpans({
         projectId,
         traceIds,
         protections,
-      );
+      });
 
       return Object.fromEntries(
         await Promise.all(
@@ -277,12 +274,12 @@ export const tracesRouter = createTRPCRouter({
         ctx.prisma,
         buildTraceBlobResolutionDeps(),
       );
-      return traceService.getTracesWithSpansByThreadIds(
+      return traceService.getTracesWithSpansByThreadIds({
         projectId,
         threadIds,
         protections,
-        { full: true },
-      );
+        opts: { full: true },
+      });
     }),
 
   getSampleTracesDataset: protectedProcedure
@@ -323,13 +320,13 @@ export const tracesRouter = createTRPCRouter({
         return [];
       }
 
-      return traceService.getTracesWithSpans(
-        input.projectId,
+      return traceService.getTracesWithSpans({
+        projectId: input.projectId,
         traceIds,
         protections,
-        { from: input.startDate, to: input.endDate },
-        { full: true },
-      );
+        occurredAt: { from: input.startDate, to: input.endDate },
+        opts: { full: true },
+      });
     }),
 
   getFieldNames: protectedProcedure
@@ -394,13 +391,13 @@ export const tracesRouter = createTRPCRouter({
       const { projectId, evaluatorType, preconditions, expectedResults } =
         input;
 
-      const traceWithSpans = await traceService.getTracesWithSpans(
+      const traceWithSpans = await traceService.getTracesWithSpans({
         projectId,
         traceIds,
         protections,
-        { from: input.startDate, to: input.endDate },
-        { full: true },
-      );
+        occurredAt: { from: input.startDate, to: input.endDate },
+        opts: { full: true },
+      });
 
       const passedPreconditions = traceWithSpans.filter((trace) => {
         if (!evaluatorType) return false;

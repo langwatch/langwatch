@@ -117,12 +117,17 @@ class OttlGatewayUnavailableError extends Error {
  * pulls in Hono context types we don't want in this lightweight EE
  * service module.
  */
-function canonical(
-  method: string,
-  path: string,
-  timestamp: string,
-  body: string,
-): string {
+function canonical({
+  method,
+  path,
+  timestamp,
+  body,
+}: {
+  method: string;
+  path: string;
+  timestamp: string;
+  body: string;
+}): string {
   const bodyHash = createHash("sha256").update(body).digest("hex");
   return `${method}\n${path}\n${timestamp}\n${bodyHash}`;
 }
@@ -185,7 +190,10 @@ async function postSigned(path: string, body: unknown): Promise<Response> {
   }
   const ts = Math.floor(Date.now() / 1000).toString();
   const bodyJson = JSON.stringify(body);
-  const sig = sign(secret, canonical("POST", path, ts, bodyJson));
+  const sig = sign(
+    secret,
+    canonical({ method: "POST", path, timestamp: ts, body: bodyJson }),
+  );
   const url = `${baseUrl.replace(/\/$/, "")}${path}`;
   return await fetch(url, {
     method: "POST",

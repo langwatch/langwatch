@@ -43,7 +43,7 @@ export async function invokeLLM({
     const inputs = extractInputs(data);
 
     // Create the event payload
-    const event = createEventPayload(traceId, workflow, nodeId, inputs);
+    const event = createEventPayload({ traceId, workflow, nodeId, inputs });
 
     // Result object that we'll update as events arrive
     const result: PromptExecutionResult = { status: "waiting" };
@@ -169,12 +169,17 @@ function extractInputs(
 /**
  * Creates the event payload for the API request
  */
-function createEventPayload(
-  traceId: string,
-  workflow: Workflow,
-  nodeId: string,
-  inputs: Record<string, string>,
-) {
+function createEventPayload({
+  traceId,
+  workflow,
+  nodeId,
+  inputs,
+}: {
+  traceId: string;
+  workflow: Workflow;
+  nodeId: string;
+  inputs: Record<string, string>;
+}) {
   return {
     type: "execute_component",
     payload: {
