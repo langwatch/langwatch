@@ -64,6 +64,7 @@ Feature: One ClickHouse client, reached one way, bounded where it can be seen
     Given a statement is waiting for a slot
     When no slot frees before the wait bound elapses
     Then it is refused with an error that names overload as the cause
+    And the refusal is classified as recoverable, so the job is re-staged rather than dropped
     And the statement already running is left alone
     And the wait bound is shorter than the time one statement may spend on the wire
 

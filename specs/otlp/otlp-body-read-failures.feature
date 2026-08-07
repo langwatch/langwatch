@@ -42,6 +42,15 @@ Feature: OTLP body read failures
     Then the response status is 400
     And the response names the encoding that was refused
 
+  # A body truncated by a disconnect, or one that was never the encoding it
+  # claimed, both surface from zlib rather than from the read. Same fault, so
+  # the same answer - it reached the boundary unclassified before.
+  @unit @regression
+  Scenario: A body that does not decompress is the sender's fault
+    When a body arrives that does not decompress under its declared encoding
+    Then the failure is reported as an unreadable body
+    And the response status is 400
+
   # ---------------------------------------------------------------------------
   # The original error survives
   #

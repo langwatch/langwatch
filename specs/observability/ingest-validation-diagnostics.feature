@@ -70,7 +70,7 @@ Feature: Ingest validation diagnostics
   Scenario: The request body is not logged
     When a trace body fails schema validation
     Then the body does not appear in the log
-    And the body does not appear in the error report sent to Sentry
+    And the body does not appear in the captured error report
 
   # ---------------------------------------------------------------------------
   # Level

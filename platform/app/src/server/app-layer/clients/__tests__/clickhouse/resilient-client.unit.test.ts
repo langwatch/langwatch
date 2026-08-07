@@ -257,7 +257,7 @@ describe("createResilientClickHouseClient()", () => {
 
     // Loki derives a record's level from a field called `error`, so leaving the
     // cause there re-promotes exactly the records this change moved down.
-    /** @scenario The cause never rides on a field named error */
+    /** @scenario The cause rides on the named query-cause field */
     it("keeps the cause off a field named error", async () => {
       const mock = makeMockClient({
         query: vi.fn().mockRejectedValue(new Error("Syntax error in query")),

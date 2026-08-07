@@ -37,10 +37,14 @@ Feature: Structured Logging for ClickHouse Queries
     Then the attempt is logged at warning level
     And the failure is still counted for alerting
 
+  # The field name is a contract, not just "anything but error" — log queries
+  # read it by name, so a rename to some other wrong key breaks them just as
+  # thoroughly as leaving it on "error" would.
   @unit @regression
-  Scenario: The cause never rides on a field named error
+  Scenario: The cause rides on the named query-cause field
     When a ClickHouse attempt fails
-    Then the cause is attached under a field that is not named "error"
+    Then the cause is attached under the field "queryError"
+    And no field named "error" is emitted
     And the record does not claim a failure the level did not
 
   @unit @regression
