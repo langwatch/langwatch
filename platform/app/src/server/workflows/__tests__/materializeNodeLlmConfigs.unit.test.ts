@@ -59,12 +59,12 @@ describe("materializeNodeLlmConfigs", () => {
 
   it("falls back to DEFAULT_MODEL when nothing is configured at any scope", async () => {
     vi.mocked(resolveModelForFeature).mockRejectedValue(
-      new ModelNotConfiguredError(
-        "workflows.create_default",
-        "DEFAULT",
-        "New workflow model",
-        "p1",
-      ),
+      new ModelNotConfiguredError({
+        featureKey: "workflows.create_default",
+        role: "DEFAULT",
+        featureDisplayName: "New workflow model",
+        projectId: "p1",
+      }),
     );
     const dsl = dslWith({ model: "", temperature: 0.2 });
 

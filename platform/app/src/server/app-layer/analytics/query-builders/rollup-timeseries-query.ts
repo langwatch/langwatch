@@ -205,7 +205,13 @@ export function buildRollupTimeseriesQuery(
         `Rollup builder cannot serve aggregation "${s.aggregation}". Percentiles, min/max + distinct counts go to slim.`,
       );
     }
-    const alias = buildMetricAlias(i, s.metric, s.aggregation, s.key, s.subkey);
+    const alias = buildMetricAlias({
+      index: i,
+      metric: s.metric,
+      aggregation: s.aggregation,
+      key: s.key,
+      subkey: s.subkey,
+    });
     const expr = rollupAggExpression({
       agg: s.aggregation,
       column: rollupColumnFor(s.metric),

@@ -52,20 +52,25 @@ function generateDeterministicSpanRecordId(event: SpanReceivedEvent): string {
   const startTimeUnixMs = TraceRequestUtils.convertUnixNanoToUnixMs(
     TraceRequestUtils.normalizeOtlpUnixNano(event.data.span.startTimeUnixNano),
   );
-  return generateDeterministicSpanRecordIdFromData(
-    String(event.tenantId),
+  return generateDeterministicSpanRecordIdFromData({
+    tenantId: String(event.tenantId),
     traceId,
     spanId,
     startTimeUnixMs,
-  );
+  });
 }
 
-function generateDeterministicSpanRecordIdFromData(
-  tenantId: string,
-  traceId: string,
-  spanId: string,
-  startTimeUnixMs: number,
-): string {
+function generateDeterministicSpanRecordIdFromData({
+  tenantId,
+  traceId,
+  spanId,
+  startTimeUnixMs,
+}: {
+  tenantId: string;
+  traceId: string;
+  spanId: string;
+  startTimeUnixMs: number;
+}): string {
   EventUtils.validateTenantId(
     { tenantId },
     "generateDeterministicSpanRecordIdFromData",

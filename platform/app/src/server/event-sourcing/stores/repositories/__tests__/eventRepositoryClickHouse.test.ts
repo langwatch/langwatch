@@ -30,7 +30,11 @@ describe("EventRepositoryClickHouse.getEventRecords", () => {
     });
 
     const repository = new EventRepositoryClickHouse(async () => client);
-    const rows = await repository.getEventRecords("tenant", "agg", "id");
+    const rows = await repository.getEventRecords({
+      tenantId: "tenant",
+      aggregateType: "agg",
+      aggregateId: "id",
+    });
 
     expect(rows[0]?.EventPayload).toEqual({
       data: {
@@ -48,7 +52,11 @@ describe("EventRepositoryClickHouse.getEventRecords", () => {
     );
 
     const repository = new EventRepositoryClickHouse(async () => client);
-    const rows = await repository.getEventRecords("tenant", "agg", "id");
+    const rows = await repository.getEventRecords({
+      tenantId: "tenant",
+      aggregateType: "agg",
+      aggregateId: "id",
+    });
 
     expect(rows[0]?.EventPayload).toEqual(
       '{"data":{"value":"123.45","text":"still-string"}}',
@@ -60,7 +68,12 @@ describe("EventRepositoryClickHouse.getEventRecords", () => {
       const client = createMockClient({});
       const repository = new EventRepositoryClickHouse(async () => client);
 
-      await repository.getEventRecords("tenant", "trace", "id", 1700000000000);
+      await repository.getEventRecords({
+        tenantId: "tenant",
+        aggregateType: "trace",
+        aggregateId: "id",
+        occurredAtFromMs: 1700000000000,
+      });
 
       const call = (client.query as ReturnType<typeof vi.fn>).mock.calls[0]![0];
       expect(call.query).toContain(
@@ -77,7 +90,11 @@ describe("EventRepositoryClickHouse.getEventRecords", () => {
       const client = createMockClient({});
       const repository = new EventRepositoryClickHouse(async () => client);
 
-      await repository.getEventRecords("tenant", "trace", "id");
+      await repository.getEventRecords({
+        tenantId: "tenant",
+        aggregateType: "trace",
+        aggregateId: "id",
+      });
 
       const call = (client.query as ReturnType<typeof vi.fn>).mock.calls[0]![0];
       expect(call.query).not.toContain("EventOccurredAt >=");
@@ -88,7 +105,12 @@ describe("EventRepositoryClickHouse.getEventRecords", () => {
       const client = createMockClient({});
       const repository = new EventRepositoryClickHouse(async () => client);
 
-      await repository.getEventRecords("tenant", "trace", "id", 0);
+      await repository.getEventRecords({
+        tenantId: "tenant",
+        aggregateType: "trace",
+        aggregateId: "id",
+        occurredAtFromMs: 0,
+      });
 
       const call = (client.query as ReturnType<typeof vi.fn>).mock.calls[0]![0];
       expect(call.query).not.toContain("EventOccurredAt >=");

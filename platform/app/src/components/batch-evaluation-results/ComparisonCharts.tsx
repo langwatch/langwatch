@@ -84,12 +84,17 @@ const formatLatency = (value: number): string => {
  * Calculate optimal Y-axis width based on formatted value lengths.
  * Uses approximate character width (7px per char) + padding.
  */
-const calculateYAxisWidth = (
-  values: number[],
-  formatter: (value: number) => string,
+const calculateYAxisWidth = ({
+  values,
+  formatter,
   minWidth = 35,
   maxWidth = 80,
-): number => {
+}: {
+  values: number[];
+  formatter: (value: number) => string;
+  minWidth?: number;
+  maxWidth?: number;
+}): number => {
   if (values.length === 0) return minWidth;
 
   // Get the max formatted string length
@@ -833,8 +838,11 @@ export const ComparisonCharts = ({
     const latencyValues = chartData.map((d) => (d.latency as number) ?? 0);
 
     return {
-      cost: calculateYAxisWidth(costValues, formatCost),
-      latency: calculateYAxisWidth(latencyValues, formatLatency),
+      cost: calculateYAxisWidth({ values: costValues, formatter: formatCost }),
+      latency: calculateYAxisWidth({
+        values: latencyValues,
+        formatter: formatLatency,
+      }),
     };
   }, [chartData]);
 

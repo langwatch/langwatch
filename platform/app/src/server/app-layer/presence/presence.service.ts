@@ -44,12 +44,27 @@ export interface PresenceLeaveInput {
 export class PresenceService {
   private readonly logger = createLogger("langwatch:presence-service");
 
-  constructor(
-    private readonly repository: PresenceRepository,
-    private readonly broadcast: BroadcastService,
-    private readonly projects: PresenceProjectLookup,
-    private readonly ttlSeconds: number = PRESENCE_TTL_SECONDS,
-  ) {}
+  private readonly repository: PresenceRepository;
+  private readonly broadcast: BroadcastService;
+  private readonly projects: PresenceProjectLookup;
+  private readonly ttlSeconds: number;
+
+  constructor({
+    repository,
+    broadcast,
+    projects,
+    ttlSeconds = PRESENCE_TTL_SECONDS,
+  }: {
+    repository: PresenceRepository;
+    broadcast: BroadcastService;
+    projects: PresenceProjectLookup;
+    ttlSeconds?: number;
+  }) {
+    this.repository = repository;
+    this.broadcast = broadcast;
+    this.projects = projects;
+    this.ttlSeconds = ttlSeconds;
+  }
 
   /**
    * Whether multiplayer presence is allowed for the given project. Org-level
@@ -134,12 +149,12 @@ export class PresenceService {
       emittedAt: Date.now(),
     };
     try {
-      await this.broadcast.broadcastToTenantRateLimited(
-        input.projectId,
-        JSON.stringify(event),
-        "presence_cursor",
-        "delta",
-      );
+      await this.broadcast.broadcastToTenantRateLimited({
+        tenantId: input.projectId,
+        event: JSON.stringify(event),
+        eventType: "presence_cursor",
+        tier: "delta",
+      });
     } catch (error) {
       this.logger.warn(
         { error, projectId: input.projectId },

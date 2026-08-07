@@ -33,11 +33,11 @@ describe("MapProjectionExecutor.execute", () => {
         map: (_event) => ({ name: "mapped-record" }),
       });
 
-      const event = createTestEvent(
-        TEST_CONSTANTS.AGGREGATE_ID,
-        TEST_CONSTANTS.AGGREGATE_TYPE,
+      const event = createTestEvent({
+        aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+        aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
         tenantId,
-      );
+      });
 
       const context: ProjectionStoreContext = {
         aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
@@ -63,11 +63,11 @@ describe("MapProjectionExecutor.execute", () => {
         map: (_event) => null,
       });
 
-      const event = createTestEvent(
-        TEST_CONSTANTS.AGGREGATE_ID,
-        TEST_CONSTANTS.AGGREGATE_TYPE,
+      const event = createTestEvent({
+        aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+        aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
         tenantId,
-      );
+      });
 
       const context: ProjectionStoreContext = {
         aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
@@ -92,11 +92,11 @@ describe("MapProjectionExecutor.execute", () => {
         },
       });
 
-      const event = createTestEvent(
-        TEST_CONSTANTS.AGGREGATE_ID,
-        TEST_CONSTANTS.AGGREGATE_TYPE,
+      const event = createTestEvent({
+        aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+        aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
         tenantId,
-      );
+      });
 
       const context: ProjectionStoreContext = {
         aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
@@ -121,11 +121,11 @@ describe("MapProjectionExecutor.execute", () => {
         map: (_event) => ({ name: "mapped-record" }),
       });
 
-      const event = createTestEvent(
-        TEST_CONSTANTS.AGGREGATE_ID,
-        TEST_CONSTANTS.AGGREGATE_TYPE,
+      const event = createTestEvent({
+        aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+        aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
         tenantId,
-      );
+      });
 
       const context: ProjectionStoreContext = {
         aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
@@ -152,7 +152,11 @@ describe("MapProjectionExecutor.executeBatch", () => {
       map: (event) => ({ aggregateId: String(event.aggregateId) }),
     });
     const events = ["one", "two"].map((aggregateId) =>
-      createTestEvent(aggregateId, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId),
+      createTestEvent({
+        aggregateId,
+        aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
+        tenantId,
+      }),
     );
     const contexts = events.map((event) => ({
       aggregateId: String(event.aggregateId),
@@ -191,8 +195,16 @@ describe("MapProjectionExecutor.executeBatch", () => {
         const tenantA = createTestTenantId("tenant-a");
         const tenantB = createTestTenantId("tenant-b");
         const events = [
-          createTestEvent("one", TEST_CONSTANTS.AGGREGATE_TYPE, tenantA),
-          createTestEvent("two", TEST_CONSTANTS.AGGREGATE_TYPE, tenantB),
+          createTestEvent({
+            aggregateId: "one",
+            aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
+            tenantId: tenantA,
+          }),
+          createTestEvent({
+            aggregateId: "two",
+            aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
+            tenantId: tenantB,
+          }),
         ];
         const contexts = events.map((event) => ({
           aggregateId: String(event.aggregateId),

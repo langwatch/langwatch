@@ -175,15 +175,20 @@ export const countCellsForTarget = (
  * Count completed cells for a target based on results.
  * A cell is completed if it has an output or error.
  */
-export const countCompletedCellsForTarget = (
-  cellSet: Set<string>,
-  targetId: string,
+export const countCompletedCellsForTarget = ({
+  cellSet,
+  targetId,
+  results,
+  maxRowIndex,
+}: {
+  cellSet: Set<string>;
+  targetId: string;
   results: {
     targetOutputs: Record<string, unknown[]>;
     errors: Record<string, string[]>;
-  },
-  maxRowIndex: number,
-): number => {
+  };
+  maxRowIndex: number;
+}): number => {
   let count = 0;
   for (let i = 0; i <= maxRowIndex; i++) {
     if (cellSet.has(`${i}:${targetId}`)) {

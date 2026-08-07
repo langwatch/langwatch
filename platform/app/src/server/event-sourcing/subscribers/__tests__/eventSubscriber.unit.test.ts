@@ -42,11 +42,11 @@ describe("event subscribers", () => {
           eventStore,
           subscribers: [subscriber],
         });
-        const event = createTestEvent(
-          TEST_CONSTANTS.AGGREGATE_ID,
+        const event = createTestEvent({
+          aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
           aggregateType,
           tenantId,
-        );
+        });
 
         await service.storeEvents([event], context);
 
@@ -81,11 +81,11 @@ describe("event subscribers", () => {
           eventStore,
           subscribers: [subscriber],
         });
-        const event = createTestEvent(
-          TEST_CONSTANTS.AGGREGATE_ID,
+        const event = createTestEvent({
+          aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
           aggregateType,
           tenantId,
-        );
+        });
 
         await service.storeEvents([event], context);
 

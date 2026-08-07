@@ -20,10 +20,10 @@ describe("HaystackExtractor", () => {
         { document: { content: "Document 1 content", id: "doc-1" } },
         { document: { content: "Document 2 content" } },
       ];
-      const ctx = createExtractorContext(
-        { [ATTR_KEYS.RETRIEVAL_DOCUMENTS]: JSON.stringify(docs) },
-        haystackScope,
-      );
+      const ctx = createExtractorContext({
+        attrs: { [ATTR_KEYS.RETRIEVAL_DOCUMENTS]: JSON.stringify(docs) },
+        spanOverrides: haystackScope,
+      });
 
       extractor.apply(ctx);
 
@@ -35,10 +35,10 @@ describe("HaystackExtractor", () => {
 
     it("infers span type as rag", () => {
       const docs = [{ document: { content: "Some content" } }];
-      const ctx = createExtractorContext(
-        { [ATTR_KEYS.RETRIEVAL_DOCUMENTS]: JSON.stringify(docs) },
-        haystackScope,
-      );
+      const ctx = createExtractorContext({
+        attrs: { [ATTR_KEYS.RETRIEVAL_DOCUMENTS]: JSON.stringify(docs) },
+        spanOverrides: haystackScope,
+      });
 
       extractor.apply(ctx);
 
@@ -47,10 +47,10 @@ describe("HaystackExtractor", () => {
 
     it("extracts document_id when present", () => {
       const docs = [{ document: { content: "Content", id: "my-doc-id" } }];
-      const ctx = createExtractorContext(
-        { [ATTR_KEYS.RETRIEVAL_DOCUMENTS]: JSON.stringify(docs) },
-        haystackScope,
-      );
+      const ctx = createExtractorContext({
+        attrs: { [ATTR_KEYS.RETRIEVAL_DOCUMENTS]: JSON.stringify(docs) },
+        spanOverrides: haystackScope,
+      });
 
       extractor.apply(ctx);
 
@@ -67,10 +67,10 @@ describe("HaystackExtractor", () => {
         { document: { content: "" } },
         { document: { id: "no-content" } },
       ];
-      const ctx = createExtractorContext(
-        { [ATTR_KEYS.RETRIEVAL_DOCUMENTS]: JSON.stringify(docs) },
-        haystackScope,
-      );
+      const ctx = createExtractorContext({
+        attrs: { [ATTR_KEYS.RETRIEVAL_DOCUMENTS]: JSON.stringify(docs) },
+        spanOverrides: haystackScope,
+      });
 
       extractor.apply(ctx);
 
@@ -83,10 +83,12 @@ describe("HaystackExtractor", () => {
   describe("when instrumentationScope.name is NOT haystack", () => {
     it("does nothing", () => {
       const docs = [{ document: { content: "Content" } }];
-      const ctx = createExtractorContext(
-        { [ATTR_KEYS.RETRIEVAL_DOCUMENTS]: JSON.stringify(docs) },
-        { instrumentationScope: { name: "other", version: null } },
-      );
+      const ctx = createExtractorContext({
+        attrs: { [ATTR_KEYS.RETRIEVAL_DOCUMENTS]: JSON.stringify(docs) },
+        spanOverrides: {
+          instrumentationScope: { name: "other", version: null },
+        },
+      });
 
       extractor.apply(ctx);
 
@@ -96,10 +98,10 @@ describe("HaystackExtractor", () => {
 
   describe("when retrieval.documents is empty or malformed", () => {
     it("does nothing for empty array", () => {
-      const ctx = createExtractorContext(
-        { [ATTR_KEYS.RETRIEVAL_DOCUMENTS]: JSON.stringify([]) },
-        haystackScope,
-      );
+      const ctx = createExtractorContext({
+        attrs: { [ATTR_KEYS.RETRIEVAL_DOCUMENTS]: JSON.stringify([]) },
+        spanOverrides: haystackScope,
+      });
 
       extractor.apply(ctx);
 
@@ -107,10 +109,10 @@ describe("HaystackExtractor", () => {
     });
 
     it("does nothing for non-array", () => {
-      const ctx = createExtractorContext(
-        { [ATTR_KEYS.RETRIEVAL_DOCUMENTS]: "not-json" },
-        haystackScope,
-      );
+      const ctx = createExtractorContext({
+        attrs: { [ATTR_KEYS.RETRIEVAL_DOCUMENTS]: "not-json" },
+        spanOverrides: haystackScope,
+      });
 
       extractor.apply(ctx);
 

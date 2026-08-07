@@ -49,12 +49,12 @@ describe("classifyClusteringError", () => {
       ["analytics.topic_clustering_llm", "FAST" as const],
       ["analytics.topic_clustering_embeddings", "EMBEDDINGS" as const],
     ])("classifies %s as user-actionable", (featureKey, role) => {
-      const error = new ModelNotConfiguredError(
+      const error = new ModelNotConfiguredError({
         featureKey,
         role,
-        "Topic clustering",
-        "project_mDIreHYSk8qhfNVnbpPyb",
-      );
+        featureDisplayName: "Topic clustering",
+        projectId: "project_mDIreHYSk8qhfNVnbpPyb",
+      });
 
       expect(classifyClusteringError(error)).toEqual({
         code: "model_not_configured",

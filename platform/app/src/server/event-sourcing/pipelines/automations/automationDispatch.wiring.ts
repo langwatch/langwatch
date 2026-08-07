@@ -268,7 +268,7 @@ export function buildAutomationDispatchPorts({
       emailSuppressions.filterSuppressed({ projectId, triggerId, emails }),
     traceById: async (projectId, traceId) => {
       const protections = await getProtectionsDeduped(projectId);
-      return traceService.getById(projectId, traceId, protections);
+      return traceService.getById({ projectId, traceId, protections });
     },
     addToAnnotationQueue: async (params) => {
       await createOrUpdateQueueItems({ ...params, prisma });

@@ -191,6 +191,7 @@ function createQueryClientConfig() {
      * @see extractLimitExceededInfo in trpcError.ts
      */
     mutationCache: new MutationCache({
+      // biome-ignore lint/complexity/useMaxParams: TanStack Query's MutationCache onError callback contract is positional
       onError: (error, _variables, _context, _mutation) => {
         const limitInfo = extractLimitExceededInfo(error);
         if (limitInfo) {

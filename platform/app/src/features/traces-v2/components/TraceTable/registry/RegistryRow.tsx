@@ -186,6 +186,18 @@ function RegistryRowComponent<TRow>({
   // direct hover.
   const showExpandedBg = hoverScope === "split" && isExpanded && !!expandedBg;
 
+  // Cell-independent render context, built once per row rather than per cell.
+  const cellCtx = {
+    row: tanstackRow.original,
+    density: tokens,
+    densityMode,
+    isExpanded,
+    isSelected,
+    isFocused,
+    actions,
+    enabledAddonIds: addons,
+  };
+
   const mainRow = (
     <Tr
       outline={isFocused ? "1px solid" : undefined}
@@ -290,7 +302,11 @@ function RegistryRowComponent<TRow>({
             // `whiteSpace=nowrap` themselves; the Td-level clip is the
             // belt-and-suspenders that catches anything that doesn't.
             overflow="hidden"
-            {...cellPropsFor(cell, style.borderColor, i)}
+            {...cellPropsFor({
+              cell,
+              leftBorderColor: style.borderColor,
+              index: i,
+            })}
           >
             {isLoading ? (
               isSelectCell ? (
@@ -303,15 +319,11 @@ function RegistryRowComponent<TRow>({
                 />
               )
             ) : (
-              pickCell(registry, cell.column.id, densityMode, {
-                row: tanstackRow.original,
-                density: tokens,
-                densityMode,
-                isExpanded,
-                isSelected,
-                isFocused,
-                actions,
-                enabledAddonIds: addons,
+              pickCell({
+                registry,
+                id: cell.column.id,
+                density: densityMode,
+                ctx: cellCtx,
               })
             )}
           </Td>

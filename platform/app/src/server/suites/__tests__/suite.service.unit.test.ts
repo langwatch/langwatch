@@ -138,13 +138,13 @@ function createService(overrides?: {
   );
   const suiteRunService = createMockSuiteRunService();
 
-  const service = new SuiteService(
-    suiteRepo as unknown as SuiteRepository,
-    scenarioRepo as unknown as ScenarioRepository,
-    agentRepo as unknown as AgentRepository,
-    llmConfigRepo as unknown as LlmConfigRepository,
+  const service = new SuiteService({
+    repository: suiteRepo as unknown as SuiteRepository,
+    scenarioRepository: scenarioRepo as unknown as ScenarioRepository,
+    agentRepository: agentRepo as unknown as AgentRepository,
+    llmConfigRepository: llmConfigRepo as unknown as LlmConfigRepository,
     suiteRunService,
-  );
+  });
 
   return {
     service,

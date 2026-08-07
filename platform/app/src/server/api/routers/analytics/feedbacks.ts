@@ -11,10 +11,10 @@ export const feedbacks = protectedProcedure
   .use(checkProjectPermission("cost:view"))
   .query(async ({ input }) => {
     const analyticsService = getApp().analytics.service;
-    return analyticsService.getFeedbacks(
-      input.projectId,
-      input.startDate,
-      input.endDate,
-      input.filters,
-    );
+    return analyticsService.getFeedbacks({
+      projectId: input.projectId,
+      startDate: input.startDate,
+      endDate: input.endDate,
+      filters: input.filters,
+    });
   });

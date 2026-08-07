@@ -27,12 +27,17 @@ const CONVERSATION = "conv-1";
 const TURN = "turn-1";
 const RUN_TOKEN = "rt-super-secret-never-show-the-client";
 
-function event(
-  typeKey: keyof typeof LANGY_CONVERSATION_EVENT_TYPES,
-  version: string,
-  data: Record<string, unknown>,
-  occurredAt: number,
-): LangyConversationProcessingEvent {
+function event({
+  typeKey,
+  version,
+  data,
+  occurredAt,
+}: {
+  typeKey: keyof typeof LANGY_CONVERSATION_EVENT_TYPES;
+  version: string;
+  data: Record<string, unknown>;
+  occurredAt: number;
+}): LangyConversationProcessingEvent {
   return {
     id: `event-${occurredAt}`,
     aggregateId: CONVERSATION,
@@ -60,12 +65,12 @@ const hasRunTokenKey = (o: object) =>
 
 describe("runToken projection exclusion", () => {
   describe("given a conversation created with a runToken", () => {
-    const startedEvent = event(
-      "CONVERSATION_STARTED",
-      LANGY_CONVERSATION_EVENT_VERSIONS.CONVERSATION_STARTED,
-      { userId: "alice", runToken: RUN_TOKEN },
-      1000,
-    );
+    const startedEvent = event({
+      typeKey: "CONVERSATION_STARTED",
+      version: LANGY_CONVERSATION_EVENT_VERSIONS.CONVERSATION_STARTED,
+      data: { userId: "alice", runToken: RUN_TOKEN },
+      occurredAt: 1000,
+    });
 
     it("keeps the token on the server-only state fold", () => {
       const state = new LangyConversationStateFoldProjection({
@@ -84,16 +89,16 @@ describe("runToken projection exclusion", () => {
       // the runToken — the turn fold has no field for it — but assert on the
       // serialised doc so a future leak (a stray field, a spread of state) fails.
       for (const e of [
-        event(
-          "AGENT_TURN_ACCEPTED",
-          LANGY_CONVERSATION_EVENT_VERSIONS.AGENT_TURN_ACCEPTED,
-          { turnId: TURN },
-          2000,
-        ),
-        event(
-          "AGENT_RESPONDED",
-          LANGY_CONVERSATION_EVENT_VERSIONS.AGENT_RESPONDED,
-          {
+        event({
+          typeKey: "AGENT_TURN_ACCEPTED",
+          version: LANGY_CONVERSATION_EVENT_VERSIONS.AGENT_TURN_ACCEPTED,
+          data: { turnId: TURN },
+          occurredAt: 2000,
+        }),
+        event({
+          typeKey: "AGENT_RESPONDED",
+          version: LANGY_CONVERSATION_EVENT_VERSIONS.AGENT_RESPONDED,
+          data: {
             turnId: TURN,
             messageId: "m1",
             role: "assistant",
@@ -101,8 +106,8 @@ describe("runToken projection exclusion", () => {
             outcome: "completed",
             error: null,
           },
-          3000,
-        ),
+          occurredAt: 3000,
+        }),
       ]) {
         doc = turn.apply(doc, e);
       }

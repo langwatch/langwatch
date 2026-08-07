@@ -104,7 +104,13 @@ describe("fetchTracesFromClickHouse integration", () => {
 
   describe("when fetching a full batch", () => {
     it("returns the 2000 newest traces, newest first, all with input", async () => {
-      const res = await fetchTracesFromClickHouse(ch, TENANT_ID, false, [], []);
+      const res = await fetchTracesFromClickHouse({
+        clickhouse: ch,
+        projectId: TENANT_ID,
+        isIncrementalProcessing: false,
+        topicIds: [],
+        subtopicIds: [],
+      });
 
       expect(res.traces).toHaveLength(2000);
       expect(res.returnedCount).toBe(2000);
@@ -116,21 +122,21 @@ describe("fetchTracesFromClickHouse integration", () => {
 
   describe("when the search cursor advances", () => {
     it("returns strictly older, non-overlapping traces", async () => {
-      const first = await fetchTracesFromClickHouse(
-        ch,
-        TENANT_ID,
-        false,
-        [],
-        [],
-      );
-      const second = await fetchTracesFromClickHouse(
-        ch,
-        TENANT_ID,
-        false,
-        [],
-        [],
-        first.lastSort!,
-      );
+      const first = await fetchTracesFromClickHouse({
+        clickhouse: ch,
+        projectId: TENANT_ID,
+        isIncrementalProcessing: false,
+        topicIds: [],
+        subtopicIds: [],
+      });
+      const second = await fetchTracesFromClickHouse({
+        clickhouse: ch,
+        projectId: TENANT_ID,
+        isIncrementalProcessing: false,
+        topicIds: [],
+        subtopicIds: [],
+        searchAfter: first.lastSort!,
+      });
 
       expect(second.traces.length).toBeGreaterThan(0);
       const firstIds = new Set(first.traces.map((t) => t.trace_id));
@@ -164,13 +170,13 @@ describe("fetchTracesFromClickHouse integration", () => {
     });
 
     it("advances the cursor past a full empty page to reach older traces", async () => {
-      const page1 = await fetchTracesFromClickHouse(
-        ch,
-        EMPTY_TENANT,
-        false,
-        [],
-        [],
-      );
+      const page1 = await fetchTracesFromClickHouse({
+        clickhouse: ch,
+        projectId: EMPTY_TENANT,
+        isIncrementalProcessing: false,
+        topicIds: [],
+        subtopicIds: [],
+      });
 
       // Page 1 is a full page of empty-input traces: nothing to cluster, but
       // the cursor must still track the page boundary (the 2000th trace).
@@ -180,14 +186,14 @@ describe("fetchTracesFromClickHouse integration", () => {
 
       // Page 2, seeked from that cursor, reaches the older input-bearing
       // traces that the pre-fix SQL filter would have stranded.
-      const page2 = await fetchTracesFromClickHouse(
-        ch,
-        EMPTY_TENANT,
-        false,
-        [],
-        [],
-        page1.lastSort!,
-      );
+      const page2 = await fetchTracesFromClickHouse({
+        clickhouse: ch,
+        projectId: EMPTY_TENANT,
+        isIncrementalProcessing: false,
+        topicIds: [],
+        subtopicIds: [],
+        searchAfter: page1.lastSort!,
+      });
       expect(page2.traces).toHaveLength(OLDER_WITH_INPUT);
       expect(page2.traces.every((t) => t.input.length > 0)).toBe(true);
       expect(page2.traces[0]?.trace_id).toBe(`${EMPTY_TENANT}-trace-002000`);
@@ -222,13 +228,13 @@ describe("fetchTracesFromClickHouse integration", () => {
     });
 
     it("returns the in-window trace and excludes the older one", async () => {
-      const res = await fetchTracesFromClickHouse(
-        ch,
-        WINDOW_TENANT,
-        false,
-        [],
-        [],
-      );
+      const res = await fetchTracesFromClickHouse({
+        clickhouse: ch,
+        projectId: WINDOW_TENANT,
+        isIncrementalProcessing: false,
+        topicIds: [],
+        subtopicIds: [],
+      });
       const ids = res.traces.map((t) => t.trace_id);
       expect(ids).toContain(`${WINDOW_TENANT}-recent`);
       expect(ids).not.toContain(`${WINDOW_TENANT}-stale`);

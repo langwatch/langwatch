@@ -96,16 +96,16 @@ describe("ClaudeCodeExtractor.applyLog", () => {
 
 describe("ClaudeCodeExtractor.apply (span side)", () => {
   it("lifts the CLI's bare-named token + model attrs onto canonical gen_ai.usage.* on the native llm_request span", () => {
-    const ctx = createExtractorContext(
-      {
+    const ctx = createExtractorContext({
+      attrs: {
         model: "claude-opus-4-7",
         input_tokens: 120,
         output_tokens: 45,
         cache_read_tokens: 900,
         cache_creation_tokens: 30,
       },
-      { name: "claude_code.llm_request" },
-    );
+      spanOverrides: { name: "claude_code.llm_request" },
+    });
 
     new ClaudeCodeExtractor().apply(ctx);
 
@@ -123,10 +123,10 @@ describe("ClaudeCodeExtractor.apply (span side)", () => {
     // Gateway-proxied traffic (and every other claude_code span, like the
     // tool span) must not be touched here — this method exists ONLY for the
     // CLI's own native model-call span.
-    const ctx = createExtractorContext(
-      { model: "claude-opus-4-7", input_tokens: 120 },
-      { name: "claude_code.tool" },
-    );
+    const ctx = createExtractorContext({
+      attrs: { model: "claude-opus-4-7", input_tokens: 120 },
+      spanOverrides: { name: "claude_code.tool" },
+    });
 
     new ClaudeCodeExtractor().apply(ctx);
 
@@ -137,10 +137,10 @@ describe("ClaudeCodeExtractor.apply (span side)", () => {
   it("never overwrites a canonical attribute a gateway-proxied gen_ai.* span already set", () => {
     // setAttrIfAbsent semantics: if GenAIExtractor (or an earlier rule) already
     // claimed the canonical key, this extractor must not clobber it.
-    const ctx = createExtractorContext(
-      { input_tokens: 999 },
-      { name: "claude_code.llm_request" },
-    );
+    const ctx = createExtractorContext({
+      attrs: { input_tokens: 999 },
+      spanOverrides: { name: "claude_code.llm_request" },
+    });
     ctx.out["gen_ai.usage.input_tokens"] = 10;
 
     new ClaudeCodeExtractor().apply(ctx);
@@ -149,10 +149,10 @@ describe("ClaudeCodeExtractor.apply (span side)", () => {
   });
 
   it("does not fire for a zero-valued token count", () => {
-    const ctx = createExtractorContext(
-      { input_tokens: 0, output_tokens: 0 },
-      { name: "claude_code.llm_request" },
-    );
+    const ctx = createExtractorContext({
+      attrs: { input_tokens: 0, output_tokens: 0 },
+      spanOverrides: { name: "claude_code.llm_request" },
+    });
 
     new ClaudeCodeExtractor().apply(ctx);
 

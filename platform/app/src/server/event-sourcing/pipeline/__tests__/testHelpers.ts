@@ -21,7 +21,10 @@ import type {
 import type { EventSourcedQueueProcessor } from "../../queues";
 import { createTestEvent } from "../../services/__tests__/testHelpers";
 import type { JobRegistryEntry } from "../../services/queues/queueManager";
-import type { EventStore } from "../../stores/eventStore.types";
+import type {
+  EventStore,
+  EventStoreReadContext,
+} from "../../stores/eventStore.types";
 import { definePipeline } from "../staticBuilder";
 
 /**
@@ -35,13 +38,23 @@ export function createMockEventStore<T extends Event>(): EventStore<T> {
     getEventsUpTo: vi
       .fn()
       .mockImplementation(
-        async (aggregateId, context, aggregateType, upToEvent) => {
+        async ({
+          aggregateId,
+          context,
+          aggregateType,
+          upToEvent,
+        }: {
+          aggregateId: string;
+          context: EventStoreReadContext<T>;
+          aggregateType: AggregateType;
+          upToEvent: T;
+        }) => {
           // Default implementation: get all events and filter
-          const allEvents = await mockStore.getEvents(
+          const allEvents = await mockStore.getEvents({
             aggregateId,
             context,
             aggregateType,
-          );
+          });
           const upToIndex = allEvents.findIndex(
             (e: T) => e.id === upToEvent.id,
           );
@@ -250,19 +263,29 @@ export function createTestEventForBuilder(
   tenantId = createTenantId(TEST_CONSTANTS.TENANT_ID_VALUE),
   aggregateType: AggregateType = "trace",
 ): TestEvent {
-  return createTestEvent(aggregateId, aggregateType, tenantId) as TestEvent;
+  return createTestEvent({
+    aggregateId,
+    aggregateType,
+    tenantId,
+  }) as TestEvent;
 }
 
 /**
  * Creates a test projection with proper typing.
  */
-export function createTestProjection<TData = unknown>(
-  id: string,
-  aggregateId: string,
-  tenantId: ReturnType<typeof createTenantId>,
-  version: string = TEST_CONSTANTS.PROJECTION_VERSION,
-  data: TData = {} as TData,
-): Projection<TData> {
+export function createTestProjection<TData = unknown>({
+  id,
+  aggregateId,
+  tenantId,
+  version = TEST_CONSTANTS.PROJECTION_VERSION,
+  data = {} as TData,
+}: {
+  id: string;
+  aggregateId: string;
+  tenantId: ReturnType<typeof createTenantId>;
+  version?: string;
+  data?: TData;
+}): Projection<TData> {
   return {
     id,
     aggregateId,

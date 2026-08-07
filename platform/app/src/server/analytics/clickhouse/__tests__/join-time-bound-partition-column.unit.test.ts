@@ -280,12 +280,12 @@ describe("analytics JOIN time bounds", () => {
         "evaluations.evaluator_id.guardrails_only",
       ] as FilterField[]) {
         resetParamCounter();
-        const { sql } = buildDataForFilterQuery(
-          baseInput.projectId,
+        const { sql } = buildDataForFilterQuery({
+          projectId: baseInput.projectId,
           field,
-          baseInput.startDate,
-          baseInput.endDate,
-        );
+          startDate: baseInput.startDate,
+          endDate: baseInput.endDate,
+        });
         violations.push(
           ...missingJoinViolations(sql, "evaluation_runs"),
           ...partitionBoundViolations(sql),
@@ -361,12 +361,12 @@ describe("analytics JOIN time bounds", () => {
      */
     it("bounds stored_spans on StartTime", () => {
       resetParamCounter();
-      const { sql } = buildDataForFilterQuery(
-        baseInput.projectId,
-        "spans.model" as FilterField,
-        baseInput.startDate,
-        baseInput.endDate,
-      );
+      const { sql } = buildDataForFilterQuery({
+        projectId: baseInput.projectId,
+        field: "spans.model" as FilterField,
+        startDate: baseInput.startDate,
+        endDate: baseInput.endDate,
+      });
 
       expect(missingJoinViolations(sql, "stored_spans")).toEqual([]);
       expect(rangeBoundColumnsByTable(sql).get("stored_spans")).toEqual(

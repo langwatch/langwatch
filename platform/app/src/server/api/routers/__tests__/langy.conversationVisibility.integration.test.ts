@@ -121,7 +121,7 @@ const recordedSteps = (
 
 /** The ClickHouse event-log read, the one boundary this file substitutes. */
 const eventsReader = {
-  getEventsOccurredSince: async (aggregateId: string) =>
+  getEventsOccurredSince: async ({ aggregateId }: { aggregateId: string }) =>
     recordedSteps(aggregateId),
 };
 
@@ -236,12 +236,11 @@ describe("Langy conversation updates reach exactly the members who may read", ()
     });
 
     broadcast = new BroadcastService(null);
-    const conversations = new LangyConversationService(
-      new PrismaLangyConversationRepository(prisma),
-      {} as never,
-      undefined,
-      eventsReader,
-    );
+    const conversations = new LangyConversationService({
+      repository: new PrismaLangyConversationRepository(prisma),
+      commands: {} as never,
+      events: eventsReader,
+    });
     appHolder.current = { broadcast, langy: { conversations } };
 
     const subscriber = createLangyConversationUpdateBroadcastSubscriber({

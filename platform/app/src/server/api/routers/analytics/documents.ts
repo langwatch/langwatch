@@ -8,10 +8,10 @@ export const topUsedDocuments = protectedProcedure
   .use(checkProjectPermission("cost:view"))
   .query(async ({ input }) => {
     const analyticsService = getApp().analytics.service;
-    return analyticsService.getTopUsedDocuments(
-      input.projectId,
-      input.startDate,
-      input.endDate,
-      input.filters,
-    );
+    return analyticsService.getTopUsedDocuments({
+      projectId: input.projectId,
+      startDate: input.startDate,
+      endDate: input.endDate,
+      filters: input.filters,
+    });
   });

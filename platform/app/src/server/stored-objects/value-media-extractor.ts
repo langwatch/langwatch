@@ -163,12 +163,17 @@ function isBareDataUri(value: string): boolean {
   );
 }
 
-function collectCandidates(
-  value: unknown,
-  depth: number,
-  path: PathSeg[],
-  sites: CandidateSite[],
-): void {
+function collectCandidates({
+  value,
+  depth,
+  path,
+  sites,
+}: {
+  value: unknown;
+  depth: number;
+  path: PathSeg[];
+  sites: CandidateSite[];
+}): void {
   if (value == null || depth > MAX_MEDIA_WALK_DEPTH) return;
 
   if (typeof value === "string") {
@@ -190,13 +195,23 @@ function collectCandidates(
       return;
     }
     if (typeof parsed !== "object" || parsed === null) return;
-    collectCandidates(parsed, depth + 1, [...path, { json: true }], sites);
+    collectCandidates({
+      value: parsed,
+      depth: depth + 1,
+      path: [...path, { json: true }],
+      sites,
+    });
     return;
   }
 
   if (Array.isArray(value)) {
     for (let i = 0; i < value.length; i++) {
-      collectCandidates(value[i], depth + 1, [...path, { index: i }], sites);
+      collectCandidates({
+        value: value[i],
+        depth: depth + 1,
+        path: [...path, { index: i }],
+        sites,
+      });
     }
     return;
   }
@@ -210,7 +225,12 @@ function collectCandidates(
     }
     const obj = value as Record<string, unknown>;
     for (const key of Object.keys(obj)) {
-      collectCandidates(obj[key], depth + 1, [...path, { key }], sites);
+      collectCandidates({
+        value: obj[key],
+        depth: depth + 1,
+        path: [...path, { key }],
+        sites,
+      });
     }
   }
 }
@@ -267,12 +287,17 @@ async function processSite(
   return { ...site, replacement: part };
 }
 
-async function storeCandidates(
-  sites: CandidateSite[],
-  params: WalkParams,
-  budget: ExtractionBudget,
-  refs: ExtractedRef[],
-): Promise<StoredSite[]> {
+async function storeCandidates({
+  sites,
+  params,
+  budget,
+  refs,
+}: {
+  sites: CandidateSite[];
+  params: WalkParams;
+  budget: ExtractionBudget;
+  refs: ExtractedRef[];
+}): Promise<StoredSite[]> {
   let takeable = sites;
   if (sites.length > budget.remainingParts) {
     budget.droppedByCap += sites.length - budget.remainingParts;
@@ -396,16 +421,16 @@ export async function extractInlineMediaFromValue({
   refs: ExtractedRef[];
 }> {
   const sites: CandidateSite[] = [];
-  collectCandidates(value, 0, [], sites);
+  collectCandidates({ value, depth: 0, path: [], sites });
   if (sites.length === 0) return { value, refs: [] };
 
   const refs: ExtractedRef[] = [];
-  const stored = await storeCandidates(
+  const stored = await storeCandidates({
     sites,
-    { projectId, purpose, ownerKind, ownerId, service },
-    budget ?? createExtractionBudget(),
+    params: { projectId, purpose, ownerKind, ownerId, service },
+    budget: budget ?? createExtractionBudget(),
     refs,
-  );
+  });
   if (stored.length === 0) return { value, refs };
 
   return { value: rebuild(value, stored, 0), refs };

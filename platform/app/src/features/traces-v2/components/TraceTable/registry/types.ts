@@ -79,12 +79,17 @@ export interface Registry<TRow> {
   addons: Record<string, AddonDef<TRow>>;
 }
 
-export function pickCell<TRow>(
-  registry: Registry<TRow>,
-  id: string,
-  density: Density,
-  ctx: CellRenderContext<TRow>,
-): ReactNode {
+export function pickCell<TRow>({
+  registry,
+  id,
+  density,
+  ctx,
+}: {
+  registry: Registry<TRow>;
+  id: string;
+  density: Density;
+  ctx: CellRenderContext<TRow>;
+}): ReactNode {
   const def = registry.cells[id];
   if (!def) return null;
   if (density === "compact" && def.renderCompact) return def.renderCompact(ctx);

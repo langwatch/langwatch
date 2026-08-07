@@ -196,20 +196,35 @@ export type CreatedVirtualKey = {
  * - RBAC is enforced by tRPC / Hono layers before reaching the service.
  */
 export class VirtualKeyService {
-  constructor(
-    private readonly prisma: PrismaClient,
-    private readonly repository: VirtualKeyRepository,
-    private readonly changeEvents: ChangeEventRepository,
-    private readonly auditLog: GatewayAuditAdapter,
-  ) {}
+  private readonly prisma: PrismaClient;
+  private readonly repository: VirtualKeyRepository;
+  private readonly changeEvents: ChangeEventRepository;
+  private readonly auditLog: GatewayAuditAdapter;
+
+  constructor({
+    prisma,
+    repository,
+    changeEvents,
+    auditLog,
+  }: {
+    prisma: PrismaClient;
+    repository: VirtualKeyRepository;
+    changeEvents: ChangeEventRepository;
+    auditLog: GatewayAuditAdapter;
+  }) {
+    this.prisma = prisma;
+    this.repository = repository;
+    this.changeEvents = changeEvents;
+    this.auditLog = auditLog;
+  }
 
   static create(prisma: PrismaClient): VirtualKeyService {
-    return new VirtualKeyService(
+    return new VirtualKeyService({
       prisma,
-      new VirtualKeyRepository(prisma),
-      new ChangeEventRepository(prisma),
-      new GatewayAuditAdapter(prisma),
-    );
+      repository: new VirtualKeyRepository(prisma),
+      changeEvents: new ChangeEventRepository(prisma),
+      auditLog: new GatewayAuditAdapter(prisma),
+    });
   }
 
   async getAll(organizationId: string): Promise<VirtualKeyWithScopes[]> {
@@ -530,15 +545,15 @@ export class VirtualKeyService {
     const previousSecretValidUntil = new Date(Date.now() + ROTATION_GRACE_MS);
 
     const rotated = await this.prisma.$transaction(async (tx) => {
-      const vk = await this.repository.rotateSecret(
-        input.id,
-        input.organizationId,
+      const vk = await this.repository.rotateSecret({
+        id: input.id,
+        organizationId: input.organizationId,
         newHashedSecret,
         newDisplayPrefix,
-        existing.hashedSecret,
+        previousHashedSecret: existing.hashedSecret,
         previousSecretValidUntil,
         tx,
-      );
+      });
       await this.changeEvents.append(
         {
           organizationId: input.organizationId,
@@ -574,12 +589,12 @@ export class VirtualKeyService {
 
     return this.prisma
       .$transaction(async (tx) => {
-        const vk = await this.repository.revoke(
-          input.id,
-          input.organizationId,
-          input.actorUserId,
+        const vk = await this.repository.revoke({
+          id: input.id,
+          organizationId: input.organizationId,
+          revokedById: input.actorUserId,
           tx,
-        );
+        });
         // A dead key's cap is retired, not deleted: the ledger rows behind
         // it are the spend record, and an admin asking "what did this key
         // cost us before we killed it" needs the budget row to read them

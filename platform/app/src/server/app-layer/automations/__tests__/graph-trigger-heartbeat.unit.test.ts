@@ -16,12 +16,17 @@ const TRIGGER_NO_DATA = "trig-no-data";
 const TRIGGER_OPEN = "trig-open";
 const TRIGGER_NORMAL = "trig-normal";
 
-function makeTrigger(
-  id: string,
-  projectId: string,
-  actionParams: Record<string, unknown>,
+function makeTrigger({
+  id,
+  projectId,
+  actionParams,
   customGraphId = `graph-${id}`,
-): TriggerSummary {
+}: {
+  id: string;
+  projectId: string;
+  actionParams: Record<string, unknown>;
+  customGraphId?: string;
+}): TriggerSummary {
   return {
     id,
     projectId,
@@ -143,10 +148,14 @@ describe("decideGraphTriggerHeartbeat", () => {
     it("emits no enqueues — real-time path handles them", async () => {
       const triggers = makeTriggersService({
         [PROJECT_A]: [
-          makeTrigger(TRIGGER_NORMAL, PROJECT_A, {
-            threshold: 50,
-            operator: "gt",
-            timePeriod: 60,
+          makeTrigger({
+            id: TRIGGER_NORMAL,
+            projectId: PROJECT_A,
+            actionParams: {
+              threshold: 50,
+              operator: "gt",
+              timePeriod: 60,
+            },
           }),
         ],
       });
@@ -172,10 +181,14 @@ describe("decideGraphTriggerHeartbeat", () => {
       chStub = makeClickHouseStub({ [PROJECT_A]: null });
       const triggers = makeTriggersService({
         [PROJECT_A]: [
-          makeTrigger(TRIGGER_NO_DATA, PROJECT_A, {
-            threshold: 1,
-            operator: "lt",
-            timePeriod: 5,
+          makeTrigger({
+            id: TRIGGER_NO_DATA,
+            projectId: PROJECT_A,
+            actionParams: {
+              threshold: 1,
+              operator: "lt",
+              timePeriod: 5,
+            },
           }),
         ],
       });
@@ -205,10 +218,14 @@ describe("decideGraphTriggerHeartbeat", () => {
       chStub = makeClickHouseStub({ [PROJECT_A]: recentMs });
       const triggers = makeTriggersService({
         [PROJECT_A]: [
-          makeTrigger(TRIGGER_NO_DATA, PROJECT_A, {
-            threshold: 1,
-            operator: "lt",
-            timePeriod: 5,
+          makeTrigger({
+            id: TRIGGER_NO_DATA,
+            projectId: PROJECT_A,
+            actionParams: {
+              threshold: 1,
+              operator: "lt",
+              timePeriod: 5,
+            },
           }),
         ],
       });
@@ -236,10 +253,14 @@ describe("decideGraphTriggerHeartbeat", () => {
       prismaStub = makePrismaStub({ [PROJECT_B]: [TRIGGER_OPEN] });
       const triggers = makeTriggersService({
         [PROJECT_B]: [
-          makeTrigger(TRIGGER_OPEN, PROJECT_B, {
-            threshold: 100,
-            operator: "gt",
-            timePeriod: 5,
+          makeTrigger({
+            id: TRIGGER_OPEN,
+            projectId: PROJECT_B,
+            actionParams: {
+              threshold: 100,
+              operator: "gt",
+              timePeriod: 5,
+            },
           }),
         ],
       });
@@ -272,17 +293,25 @@ describe("decideGraphTriggerHeartbeat", () => {
       });
       const triggers = makeTriggersService({
         [PROJECT_A]: [
-          makeTrigger(TRIGGER_NO_DATA, PROJECT_A, {
-            threshold: 1,
-            operator: "lt",
-            timePeriod: 5,
+          makeTrigger({
+            id: TRIGGER_NO_DATA,
+            projectId: PROJECT_A,
+            actionParams: {
+              threshold: 1,
+              operator: "lt",
+              timePeriod: 5,
+            },
           }),
         ],
         [PROJECT_B]: [
-          makeTrigger(TRIGGER_NO_DATA, PROJECT_B, {
-            threshold: 1,
-            operator: "lt",
-            timePeriod: 5,
+          makeTrigger({
+            id: TRIGGER_NO_DATA,
+            projectId: PROJECT_B,
+            actionParams: {
+              threshold: 1,
+              operator: "lt",
+              timePeriod: 5,
+            },
           }),
         ],
       });

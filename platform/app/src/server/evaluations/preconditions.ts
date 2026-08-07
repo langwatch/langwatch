@@ -52,7 +52,7 @@ function resolveFieldValue({
     return null;
   }
 
-  return matcher(data, value, key, subkey);
+  return matcher({ data, value, key, subkey });
 }
 
 // ---------------------------------------------------------------------------

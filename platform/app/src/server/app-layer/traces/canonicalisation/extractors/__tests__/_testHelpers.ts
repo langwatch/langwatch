@@ -23,12 +23,17 @@ export { parseJsonStringAttrs };
  * raw string values instead, exercising an extractor's own defensive
  * safeJsonParse path.
  */
-export function createExtractorContext(
-  attrs: Record<string, unknown>,
-  spanOverrides?: Partial<ExtractorContext["span"]>,
-  events?: NormalizedEvent[],
-  options?: { skipJsonParsing?: boolean },
-): ExtractorContext {
+export function createExtractorContext({
+  attrs,
+  spanOverrides,
+  events,
+  options,
+}: {
+  attrs: Record<string, unknown>;
+  spanOverrides?: Partial<ExtractorContext["span"]>;
+  events?: NormalizedEvent[];
+  options?: { skipJsonParsing?: boolean };
+}): ExtractorContext {
   const parsed = options?.skipJsonParsing ? attrs : parseJsonStringAttrs(attrs);
   const bag = new SpanDataBag(parsed as NormalizedAttributes, events ?? []);
   const out: NormalizedAttributes = {};

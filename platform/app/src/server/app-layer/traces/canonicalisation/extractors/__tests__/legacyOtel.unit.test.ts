@@ -10,7 +10,9 @@ describe("LegacyOtelTracesExtractor", () => {
   describe("when type attribute is present", () => {
     it("maps to langwatch.span.type", () => {
       const ctx = createExtractorContext({
-        [ATTR_KEYS.TYPE]: "llm",
+        attrs: {
+          [ATTR_KEYS.TYPE]: "llm",
+        },
       });
 
       extractor.apply(ctx);
@@ -22,7 +24,9 @@ describe("LegacyOtelTracesExtractor", () => {
   describe("when span.kind includes SERVER", () => {
     it("sets langwatch.span.type to server", () => {
       const ctx = createExtractorContext({
-        [ATTR_KEYS.SPAN_KIND]: "SERVER",
+        attrs: {
+          [ATTR_KEYS.SPAN_KIND]: "SERVER",
+        },
       });
 
       extractor.apply(ctx);
@@ -34,7 +38,9 @@ describe("LegacyOtelTracesExtractor", () => {
   describe("when llm.request.type is chat", () => {
     it("infers llm span type", () => {
       const ctx = createExtractorContext({
-        [ATTR_KEYS.LLM_REQUEST_TYPE]: "chat",
+        attrs: {
+          [ATTR_KEYS.LLM_REQUEST_TYPE]: "chat",
+        },
       });
 
       extractor.apply(ctx);
@@ -46,7 +52,9 @@ describe("LegacyOtelTracesExtractor", () => {
   describe("when input.value is present", () => {
     it("maps to langwatch.input", () => {
       const ctx = createExtractorContext({
-        [ATTR_KEYS.INPUT_VALUE]: "some input data",
+        attrs: {
+          [ATTR_KEYS.INPUT_VALUE]: "some input data",
+        },
       });
 
       extractor.apply(ctx);
@@ -59,7 +67,9 @@ describe("LegacyOtelTracesExtractor", () => {
 
     it("does not overwrite existing langwatch.input", () => {
       const ctx = createExtractorContext({
-        [ATTR_KEYS.INPUT_VALUE]: "legacy input",
+        attrs: {
+          [ATTR_KEYS.INPUT_VALUE]: "legacy input",
+        },
       });
       ctx.out[ATTR_KEYS.LANGWATCH_INPUT] = "existing";
 
@@ -72,7 +82,9 @@ describe("LegacyOtelTracesExtractor", () => {
   describe("when output.value is present", () => {
     it("maps to langwatch.output", () => {
       const ctx = createExtractorContext({
-        [ATTR_KEYS.OUTPUT_VALUE]: "some output data",
+        attrs: {
+          [ATTR_KEYS.OUTPUT_VALUE]: "some output data",
+        },
       });
 
       extractor.apply(ctx);
@@ -88,7 +100,9 @@ describe("LegacyOtelTracesExtractor", () => {
     it("maps to langwatch.input for tool spans", () => {
       const args = JSON.stringify({ query: "test" });
       const ctx = createExtractorContext({
-        [ATTR_KEYS.AI_TOOL_CALL_ARGS]: args,
+        attrs: {
+          [ATTR_KEYS.AI_TOOL_CALL_ARGS]: args,
+        },
       });
 
       extractor.apply(ctx);
@@ -103,8 +117,10 @@ describe("LegacyOtelTracesExtractor", () => {
   describe("when error indicators are present", () => {
     it("extracts error.message from span.error.has_error + span.error.message", () => {
       const ctx = createExtractorContext({
-        [ATTR_KEYS.SPAN_ERROR_HAS_ERROR]: true,
-        [ATTR_KEYS.SPAN_ERROR_MESSAGE]: "Something went wrong",
+        attrs: {
+          [ATTR_KEYS.SPAN_ERROR_HAS_ERROR]: true,
+          [ATTR_KEYS.SPAN_ERROR_MESSAGE]: "Something went wrong",
+        },
       });
 
       extractor.apply(ctx);
@@ -117,8 +133,10 @@ describe("LegacyOtelTracesExtractor", () => {
 
     it("accepts string 'true' for span.error.has_error", () => {
       const ctx = createExtractorContext({
-        [ATTR_KEYS.SPAN_ERROR_HAS_ERROR]: "true",
-        [ATTR_KEYS.SPAN_ERROR_MESSAGE]: "Something went wrong",
+        attrs: {
+          [ATTR_KEYS.SPAN_ERROR_HAS_ERROR]: "true",
+          [ATTR_KEYS.SPAN_ERROR_MESSAGE]: "Something went wrong",
+        },
       });
 
       extractor.apply(ctx);
@@ -131,8 +149,10 @@ describe("LegacyOtelTracesExtractor", () => {
 
     it("extracts separate error.type and error.message from exception attributes", () => {
       const ctx = createExtractorContext({
-        [ATTR_KEYS.EXCEPTION_TYPE]: "ValueError",
-        [ATTR_KEYS.EXCEPTION_MESSAGE]: "Invalid input",
+        attrs: {
+          [ATTR_KEYS.EXCEPTION_TYPE]: "ValueError",
+          [ATTR_KEYS.EXCEPTION_MESSAGE]: "Invalid input",
+        },
       });
 
       extractor.apply(ctx);
@@ -149,7 +169,9 @@ describe("LegacyOtelTracesExtractor", () => {
 
     it("extracts error.message from status.message as fallback", () => {
       const ctx = createExtractorContext({
-        [ATTR_KEYS.STATUS_MESSAGE]: "Request failed",
+        attrs: {
+          [ATTR_KEYS.STATUS_MESSAGE]: "Request failed",
+        },
       });
 
       extractor.apply(ctx);

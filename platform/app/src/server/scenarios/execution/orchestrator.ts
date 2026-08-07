@@ -87,13 +87,16 @@ export class ScenarioExecutionOrchestrator {
 
       tracerHandle = this.createTracer(project.apiKey, scenario.id, context);
 
-      return await this.runScenario(
+      return await this.runScenario({
         scenario,
-        adapterResult.adapter,
-        modelParamsResult.params,
-        context.batchRunId,
-        { endpoint: this.deps.telemetryEndpoint, apiKey: project.apiKey },
-      );
+        adapter: adapterResult.adapter,
+        modelParams: modelParamsResult.params,
+        batchRunId: context.batchRunId,
+        telemetry: {
+          endpoint: this.deps.telemetryEndpoint,
+          apiKey: project.apiKey,
+        },
+      });
     } catch (error) {
       logger.error({ error, context }, "Scenario execution failed");
       return this.failure(
@@ -155,13 +158,19 @@ export class ScenarioExecutionOrchestrator {
     });
   }
 
-  private async runScenario(
-    scenario: ScenarioConfig,
-    adapter: Parameters<typeof this.deps.scenarioExecutor.run>[1],
-    modelParams: LiteLLMParams,
-    batchRunId: string,
-    telemetry: { endpoint: string; apiKey: string },
-  ) {
+  private async runScenario({
+    scenario,
+    adapter,
+    modelParams,
+    batchRunId,
+    telemetry,
+  }: {
+    scenario: ScenarioConfig;
+    adapter: Parameters<typeof this.deps.scenarioExecutor.run>[1];
+    modelParams: LiteLLMParams;
+    batchRunId: string;
+    telemetry: { endpoint: string; apiKey: string };
+  }) {
     return this.deps.scenarioExecutor.run(
       scenario,
       adapter,

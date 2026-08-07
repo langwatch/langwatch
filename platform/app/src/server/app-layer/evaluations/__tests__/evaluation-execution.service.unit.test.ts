@@ -438,20 +438,21 @@ describe("EvaluationExecutionService", () => {
         });
 
         expect(mockWorkflowExecutor.runEvaluationWorkflow).toHaveBeenCalledWith(
-          "my-workflow",
-          "proj-1",
-          expect.objectContaining({
-            trace_id: "trace-1",
-            do_not_trace: true,
-          }),
-          undefined,
-          expect.any(Number),
-          // parentTrace: defaultTrace's trace_id is "trace-1" (not
-          // 32-hex), so extractParentTraceForNlpgo returns undefined.
-          // Adapter-level OTel trace_ids would set this to a real
-          // {traceId, parentSpanId} — separately covered by
-          // extractParentTraceForNlpgo's own tests.
-          undefined,
+          {
+            workflowId: "my-workflow",
+            projectId: "proj-1",
+            inputs: expect.objectContaining({
+              trace_id: "trace-1",
+              do_not_trace: true,
+            }),
+            causalityDepth: expect.any(Number),
+            // parentTrace: defaultTrace's trace_id is "trace-1" (not
+            // 32-hex), so extractParentTraceForNlpgo returns undefined.
+            // Adapter-level OTel trace_ids would set this to a real
+            // {traceId, parentSpanId} — separately covered by
+            // extractParentTraceForNlpgo's own tests.
+            parentTrace: undefined,
+          },
         );
       });
 
@@ -516,16 +517,16 @@ describe("EvaluationExecutionService", () => {
 
           expect(
             mockTraceService.getTracesWithSpansByThreadIds,
-          ).toHaveBeenCalledWith(
-            "proj-1",
-            ["thread-1"],
-            expect.objectContaining({
+          ).toHaveBeenCalledWith({
+            projectId: "proj-1",
+            threadIds: ["thread-1"],
+            protections: expect.objectContaining({
               canSeeCosts: true,
               canSeeCapturedInput: true,
               canSeeCapturedOutput: true,
             }),
-            { full: true },
-          );
+            opts: { full: true },
+          });
         });
 
         /** @scenario a thread-based monitor still runs for a trace with a thread_id */

@@ -33,12 +33,17 @@ export class LogRecordStorageClickHouseRepository
 {
   constructor(private readonly resolveClient: ClickHouseClientResolver) {}
 
-  async getLogsByTraceId(
-    tenantId: string,
-    traceId: string,
-    occurredAtMs?: number,
-    limit: number = TRACE_LOG_READ_CAP,
-  ): Promise<StoredLogRecordRow[]> {
+  async getLogsByTraceId({
+    tenantId,
+    traceId,
+    occurredAtMs,
+    limit = TRACE_LOG_READ_CAP,
+  }: {
+    tenantId: string;
+    traceId: string;
+    occurredAtMs?: number;
+    limit?: number;
+  }): Promise<StoredLogRecordRow[]> {
     EventUtils.validateTenantId(
       { tenantId },
       "LogRecordStorageClickHouseRepository.getLogsByTraceId",

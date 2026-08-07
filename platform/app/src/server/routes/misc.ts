@@ -335,24 +335,24 @@ secured
         const userId = `user_${nanoid()}`;
         const userInput = (await getInitialMessage()) ?? "";
 
-        const assistantResponse = await firstChatMessage(
+        const assistantResponse = await firstChatMessage({
           userInput,
           threadId,
           userId,
-          authToken as string,
-        );
+          authToken: authToken as string,
+        });
         const expectedUserResponse = await userResponse(
           userInput,
           assistantResponse ?? "",
         );
-        await secondChatMessage(
+        await secondChatMessage({
           userInput,
-          assistantResponse ?? "",
-          expectedUserResponse ?? "",
+          assistantResponse: assistantResponse ?? "",
+          expectedUserResponse: expectedUserResponse ?? "",
           threadId,
           userId,
-          authToken as string,
-        );
+          authToken: authToken as string,
+        });
 
         return c.json({ message: "Sent to LangWatch" });
       } catch (error: any) {
@@ -1620,15 +1620,23 @@ const processDSPyStep = async (project: Project, param: DSPyStepRESTParams) => {
 
 // --- Hotel bot helpers ---
 
-const langwatchAPI = async (
-  completion: any,
-  input: string,
-  authToken: string,
-  threadId: string,
-  userId: string,
-  type?: string,
-  contexts: string[] = [],
-) => {
+const langwatchAPI = async ({
+  completion,
+  input,
+  authToken,
+  threadId,
+  userId,
+  type,
+  contexts = [],
+}: {
+  completion: any;
+  input: string;
+  authToken: string;
+  threadId: string;
+  userId: string;
+  type?: string;
+  contexts?: string[];
+}) => {
   try {
     const contentPrefixId = Math.round(Math.random());
     const ragTime = Math.round(Math.random() * 300);
@@ -1764,24 +1772,29 @@ const ragMessage = async (authToken: string) => {
     )
   ).map((c) => c.choices[0]!.message.content ?? "");
 
-  await langwatchAPI(
+  await langwatchAPI({
     completion,
-    userInput,
+    input: userInput,
     authToken,
     threadId,
     userId,
-    "rag",
-    completions,
-  );
+    type: "rag",
+    contexts: completions,
+  });
   return completion.choices[0]!.message.content;
 };
 
-const firstChatMessage = async (
-  userInput: string,
-  threadId: string,
-  userId: string,
-  authToken: string,
-) => {
+const firstChatMessage = async ({
+  userInput,
+  threadId,
+  userId,
+  authToken,
+}: {
+  userInput: string;
+  threadId: string;
+  userId: string;
+  authToken: string;
+}) => {
   const completion = await hotelBotOpenai.chat.completions.create({
     messages: [
       { role: "system", content: HOTEL_SYSTEM_PROMPT },
@@ -1789,18 +1802,31 @@ const firstChatMessage = async (
     ],
     model: "gpt-3.5-turbo",
   });
-  await langwatchAPI(completion, userInput ?? "", authToken, threadId, userId);
+  await langwatchAPI({
+    completion,
+    input: userInput ?? "",
+    authToken,
+    threadId,
+    userId,
+  });
   return completion.choices[0]!.message.content;
 };
 
-const secondChatMessage = async (
-  userInput: string,
-  assistantResponse: string,
-  expectedUserResponse: string,
-  threadId: string,
-  userId: string,
-  authToken: string,
-) => {
+const secondChatMessage = async ({
+  userInput,
+  assistantResponse,
+  expectedUserResponse,
+  threadId,
+  userId,
+  authToken,
+}: {
+  userInput: string;
+  assistantResponse: string;
+  expectedUserResponse: string;
+  threadId: string;
+  userId: string;
+  authToken: string;
+}) => {
   const completion = await hotelBotOpenai.chat.completions.create({
     messages: [
       { role: "system", content: HOTEL_SYSTEM_PROMPT },
@@ -1810,13 +1836,13 @@ const secondChatMessage = async (
     ],
     model: "gpt-3.5-turbo",
   });
-  await langwatchAPI(
+  await langwatchAPI({
     completion,
-    expectedUserResponse ?? "",
+    input: expectedUserResponse ?? "",
     authToken,
     threadId,
     userId,
-  );
+  });
   return completion.choices[0]!.message.content;
 };
 

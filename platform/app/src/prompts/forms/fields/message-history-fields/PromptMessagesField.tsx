@@ -62,12 +62,12 @@ type MessageRowProps = {
     sourceId: string,
     field: string,
   ) => void;
-  onAddEdge?: (
-    id: string,
-    handle: string,
-    content: PromptTextAreaOnAddMention,
-    idx: number,
-  ) => string | void;
+  onAddEdge?: (params: {
+    id: string;
+    handle: string;
+    content: PromptTextAreaOnAddMention;
+    idx: number;
+  }) => string | void;
   /** Whether to show role label and remove button */
   showControls?: boolean;
   /** Whether to render textarea in borderless mode (for horizontal layout) */
@@ -145,7 +145,7 @@ function MessageRow({
                 onCreateVariable={onCreateVariable}
                 onSetVariableMapping={onSetVariableMapping}
                 onAddEdge={(id, handle, content) => {
-                  return onAddEdge?.(id, handle, content, idx);
+                  return onAddEdge?.({ id, handle, content, idx });
                 }}
                 showAddContextButton
                 borderless={borderless}
@@ -199,7 +199,7 @@ function MessageRow({
             onCreateVariable={onCreateVariable}
             onSetVariableMapping={onSetVariableMapping}
             onAddEdge={(id, handle, content) => {
-              return onAddEdge?.(id, handle, content, idx);
+              return onAddEdge?.({ id, handle, content, idx });
             }}
             showAddContextButton
             borderless={borderless}
@@ -247,12 +247,12 @@ export function PromptMessagesField({
     sourceId: string,
     field: string,
   ) => void;
-  onAddEdge?: (
-    id: string,
-    handle: string,
-    content: PromptTextAreaOnAddMention,
-    idx: number,
-  ) => string | void;
+  onAddEdge?: (params: {
+    id: string;
+    handle: string;
+    content: PromptTextAreaOnAddMention;
+    idx: number;
+  }) => string | void;
 }) {
   const form = useFormContext<PromptConfigFormValues>();
   const { formState, control } = form;

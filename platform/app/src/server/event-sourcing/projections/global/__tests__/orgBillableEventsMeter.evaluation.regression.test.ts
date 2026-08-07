@@ -35,11 +35,11 @@ import type { BillableEventRecord } from "../orgBillableEventsMeter.store";
  */
 function createMeterRouterWithSpyStore() {
   const appendSpy = vi.fn().mockResolvedValue(void 0);
-  const router = new ProjectionRouter(
-    TEST_CONSTANTS.AGGREGATE_TYPE,
-    TEST_CONSTANTS.PIPELINE_NAME,
-    createMockQueueManager(),
-  );
+  const router = new ProjectionRouter({
+    aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
+    pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
+    queueManager: createMockQueueManager(),
+  });
   router.registerMapProjection({
     ...orgBillableEventsMeterProjection,
     store: {
@@ -59,12 +59,12 @@ function createReportedEvent(
   evaluationId: string,
 ): Event {
   return {
-    ...createTestEvent(
-      evaluationId,
-      TEST_CONSTANTS.AGGREGATE_TYPE,
+    ...createTestEvent({
+      aggregateId: evaluationId,
+      aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
       tenantId,
-      EVALUATION_EVENT_TYPES.REPORTED,
-    ),
+      type: EVALUATION_EVENT_TYPES.REPORTED,
+    }),
     idempotencyKey: `${tenantId}:${evaluationId}:reported`,
   };
 }
@@ -123,18 +123,18 @@ describe("orgBillableEventsMeter — evaluation billing (issue #5124)", () => {
 
         await router.dispatch(
           [
-            createTestEvent(
-              "eval-1",
-              TEST_CONSTANTS.AGGREGATE_TYPE,
+            createTestEvent({
+              aggregateId: "eval-1",
+              aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
               tenantId,
-              EVALUATION_EVENT_TYPES.SCHEDULED,
-            ),
-            createTestEvent(
-              "eval-2",
-              TEST_CONSTANTS.AGGREGATE_TYPE,
+              type: EVALUATION_EVENT_TYPES.SCHEDULED,
+            }),
+            createTestEvent({
+              aggregateId: "eval-2",
+              aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
               tenantId,
-              EVALUATION_EVENT_TYPES.STARTED,
-            ),
+              type: EVALUATION_EVENT_TYPES.STARTED,
+            }),
           ],
           { tenantId },
         );
@@ -151,12 +151,12 @@ describe("orgBillableEventsMeter — canonical metrics remain shadow-only", () =
       it("keeps the production billable store untouched", async () => {
         const tenantId = createTestTenantId();
         const { router, appendSpy } = createMeterRouterWithSpyStore();
-        const metricEvent = createTestEvent(
-          "a".repeat(64),
-          TEST_CONSTANTS.AGGREGATE_TYPE,
+        const metricEvent = createTestEvent({
+          aggregateId: "a".repeat(64),
+          aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
           tenantId,
-          METRIC_DATA_POINT_RECEIVED_EVENT_TYPE,
-        );
+          type: METRIC_DATA_POINT_RECEIVED_EVENT_TYPE,
+        });
 
         await router.dispatch([metricEvent], { tenantId });
 

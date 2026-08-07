@@ -363,12 +363,12 @@ export const organizationRouter = createTRPCRouter({
           // NOTE: imported as a standalone function (not a service method) because
           // getApp().organizations is wrapped by traced() which would turn this
           // sync call into a Promise and silently drop team.members.
-          const enriched = enrichTeamWithRoleBindings(
+          const enriched = enrichTeamWithRoleBindings({
             team,
             userId,
             userRoleBindings,
-            organization.id,
-          );
+            organizationId: organization.id,
+          });
           team.members = enriched.members;
 
           if (isDemoOrg) return true;
@@ -1403,24 +1403,24 @@ export const organizationRouter = createTRPCRouter({
               })()
             : undefined;
 
-          const changeType = getRoleChangeType(
-            OrganizationUserRole.EXTERNAL,
+          const changeType = getRoleChangeType({
+            oldRole: OrganizationUserRole.EXTERNAL,
             oldPermissions,
-            OrganizationUserRole.EXTERNAL,
-            undefined,
-          );
+            newRole: OrganizationUserRole.EXTERNAL,
+            newPermissions: undefined,
+          });
 
           const subscriptionLimits = await getApp().planProvider.getActivePlan({
             organizationId: team.organizationId,
             user: ctx.session.user,
           });
           const licenseRepo = new LicenseEnforcementRepository(prisma);
-          await assertMemberTypeLimitNotExceeded(
+          await assertMemberTypeLimitNotExceeded({
             changeType,
-            team.organizationId,
+            organizationId: team.organizationId,
             licenseRepo,
-            subscriptionLimits,
-          );
+            limits: subscriptionLimits,
+          });
         }
       }
 
@@ -1543,24 +1543,24 @@ export const organizationRouter = createTRPCRouter({
         return allPermissions.length > 0 ? allPermissions : undefined;
       })();
 
-      const changeType = getRoleChangeType(
-        currentMember.role,
-        userPermissions,
-        input.role,
-        undefined,
-      );
+      const changeType = getRoleChangeType({
+        oldRole: currentMember.role,
+        oldPermissions: userPermissions,
+        newRole: input.role,
+        newPermissions: undefined,
+      });
 
       const subscriptionLimits = await getApp().planProvider.getActivePlan({
         organizationId: input.organizationId,
         user: ctx.session.user,
       });
       const licenseRepo = new LicenseEnforcementRepository(prisma);
-      await assertMemberTypeLimitNotExceeded(
+      await assertMemberTypeLimitNotExceeded({
         changeType,
-        input.organizationId,
+        organizationId: input.organizationId,
         licenseRepo,
-        subscriptionLimits,
-      );
+        limits: subscriptionLimits,
+      });
 
       const hasCustomRoleAssignment = (input.teamRoleUpdates ?? []).some(
         (update) =>

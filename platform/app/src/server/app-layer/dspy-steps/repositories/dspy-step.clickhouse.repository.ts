@@ -151,12 +151,12 @@ export class DspyStepClickHouseRepository implements DspyStepRepository {
 
   async upsertStep(data: DspyStepData): Promise<void> {
     try {
-      const existing = await this.getStep(
-        data.tenantId,
-        data.experimentId,
-        data.runId,
-        data.stepIndex,
-      );
+      const existing = await this.getStep({
+        tenantId: data.tenantId,
+        experimentId: data.experimentId,
+        runId: data.runId,
+        stepIndex: data.stepIndex,
+      });
       const retentionDays = await this.resolveTracesRetentionDays(
         data.tenantId,
       );
@@ -291,12 +291,17 @@ export class DspyStepClickHouseRepository implements DspyStepRepository {
     }
   }
 
-  async getStep(
-    tenantId: string,
-    experimentId: string,
-    runId: string,
-    stepIndex: string,
-  ): Promise<DspyStepData | null> {
+  async getStep({
+    tenantId,
+    experimentId,
+    runId,
+    stepIndex,
+  }: {
+    tenantId: string;
+    experimentId: string;
+    runId: string;
+    stepIndex: string;
+  }): Promise<DspyStepData | null> {
     try {
       const client = await this.resolveClient(tenantId);
       // IN-tuple dedup over the ReplacingMergeTree (see

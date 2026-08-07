@@ -21,7 +21,7 @@ const STATUS_LABEL_VALUES = ["succeeded", "failed"] as const;
 function buildEvaluatorExistsCondition(
   additionalWhere: string,
 ): FilterConditionBuilder {
-  return (values, paramId) => ({
+  return ({ values, paramId }) => ({
     sql: `EXISTS (
       SELECT 1 FROM evaluation_runs es
       WHERE es.TenantId = ts.TenantId
@@ -44,33 +44,33 @@ export const clickHouseFilterConditions: Record<
   FilterConditionBuilder | null
 > = {
   // Topics
-  "topics.topics": (values, paramId) => ({
+  "topics.topics": ({ values, paramId }) => ({
     sql: `ts.TopicId IN ({${paramId}_values:Array(String)})`,
     params: { [`${paramId}_values`]: values },
   }),
-  "topics.subtopics": (values, paramId) => ({
+  "topics.subtopics": ({ values, paramId }) => ({
     sql: `ts.SubTopicId IN ({${paramId}_values:Array(String)})`,
     params: { [`${paramId}_values`]: values },
   }),
 
   // Metadata
-  "metadata.user_id": (values, paramId) => ({
+  "metadata.user_id": ({ values, paramId }) => ({
     sql: `ts.Attributes['langwatch.user_id'] IN ({${paramId}_values:Array(String)})`,
     params: { [`${paramId}_values`]: values },
   }),
-  "metadata.thread_id": (values, paramId) => ({
+  "metadata.thread_id": ({ values, paramId }) => ({
     sql: `ts.Attributes['gen_ai.conversation.id'] IN ({${paramId}_values:Array(String)})`,
     params: { [`${paramId}_values`]: values },
   }),
-  "metadata.customer_id": (values, paramId) => ({
+  "metadata.customer_id": ({ values, paramId }) => ({
     sql: `ts.Attributes['langwatch.customer_id'] IN ({${paramId}_values:Array(String)})`,
     params: { [`${paramId}_values`]: values },
   }),
-  "metadata.labels": (values, paramId) => ({
+  "metadata.labels": ({ values, paramId }) => ({
     sql: `hasAny(JSONExtractArrayRaw(ts.Attributes['langwatch.labels']), arrayMap(x -> concat('"', x, '"'), {${paramId}_values:Array(String)}))`,
     params: { [`${paramId}_values`]: values },
   }),
-  "metadata.key": (values, paramId) => {
+  "metadata.key": ({ values, paramId }) => {
     if (values.length === 0) return { sql: "1=0", params: {} };
     // Check all three legacy key formats for each metadata key:
     // - metadata.{key} (canonical, from Python SDK canonicalization)
@@ -94,7 +94,7 @@ export const clickHouseFilterConditions: Record<
       params,
     };
   },
-  "metadata.value": (values, paramId, key) => {
+  "metadata.value": ({ values, paramId, key }) => {
     if (!key) return { sql: "1=0", params: {} };
     const rawKey = key.replaceAll("·", ".");
     // Match all three legacy key formats for existing data:
@@ -111,7 +111,7 @@ export const clickHouseFilterConditions: Record<
       },
     };
   },
-  "metadata.prompt_ids": (values, paramId) => ({
+  "metadata.prompt_ids": ({ values, paramId }) => ({
     sql: `hasAny(JSONExtractArrayRaw(ts.Attributes['langwatch.prompt_ids']), arrayMap(x -> concat('"', x, '"'), {${paramId}_values:Array(String)}))`,
     params: { [`${paramId}_values`]: values },
   }),
@@ -119,7 +119,7 @@ export const clickHouseFilterConditions: Record<
   // Traces
   // The dropdown maps empty/NULL origin to "application" via ifNull().
   // Apply the same mapping here so the condition matches what the dropdown counted.
-  "traces.origin": (values, paramId) => {
+  "traces.origin": ({ values, paramId }) => {
     if (values.length === 0) {
       return { sql: "1=0", params: {} };
     }
@@ -130,7 +130,7 @@ export const clickHouseFilterConditions: Record<
     };
   },
 
-  "traces.error": (values, _paramId) => {
+  "traces.error": ({ values }) => {
     const hasTrue = values.includes("true");
     const hasFalse = values.includes("false");
     if (hasTrue && hasFalse) return { sql: "1=1", params: {} };
@@ -138,13 +138,13 @@ export const clickHouseFilterConditions: Record<
     if (hasFalse) return { sql: "ts.ContainsErrorStatus = false", params: {} };
     return { sql: "1=0", params: {} };
   },
-  "traces.name": (values, paramId) => ({
+  "traces.name": ({ values, paramId }) => ({
     sql: `ts.TraceName IN ({${paramId}_values:Array(String)})`,
     params: { [`${paramId}_values`]: values },
   }),
 
   // Spans
-  "spans.type": (values, paramId, _key, _subkey, options) => ({
+  "spans.type": ({ values, paramId, options }) => ({
     sql: `EXISTS (
       SELECT 1 FROM stored_spans sp
       WHERE sp.TenantId = ts.TenantId
@@ -153,13 +153,13 @@ export const clickHouseFilterConditions: Record<
     )`,
     params: { [`${paramId}_values`]: values },
   }),
-  "spans.model": (values, paramId) => ({
+  "spans.model": ({ values, paramId }) => ({
     sql: `hasAny(ts.Models, {${paramId}_values:Array(String)})`,
     params: { [`${paramId}_values`]: values },
   }),
 
   // Annotations
-  "annotations.hasAnnotation": (values, _paramId) => {
+  "annotations.hasAnnotation": ({ values }) => {
     const hasTrue = values.includes("true");
     const hasFalse = values.includes("false");
     if (hasTrue && hasFalse) return { sql: "1=1", params: {} };
@@ -191,7 +191,7 @@ export const clickHouseFilterConditions: Record<
     `AND es.Label IS NOT NULL AND es.Label != '' AND es.Label NOT IN ('${STATUS_LABEL_VALUES.join("', '")}')`,
   ),
 
-  "evaluations.passed": (values, paramId, key) => {
+  "evaluations.passed": ({ values, paramId, key }) => {
     if (!key) return { sql: "1=0", params: {} };
     const passedValues = values.map((v) => (v === "true" || v === "1" ? 1 : 0));
     return {
@@ -210,7 +210,7 @@ export const clickHouseFilterConditions: Record<
     };
   },
 
-  "evaluations.score": (values, paramId, key) => {
+  "evaluations.score": ({ values, paramId, key }) => {
     if (!key || values.length < 2) return { sql: "1=0", params: {} };
     const minScore = parseFloat(values[0] ?? "");
     const maxScore = parseFloat(values[1] ?? "");
@@ -239,7 +239,7 @@ export const clickHouseFilterConditions: Record<
     };
   },
 
-  "evaluations.state": (values, paramId, key) => {
+  "evaluations.state": ({ values, paramId, key }) => {
     if (!key) return { sql: "1=0", params: {} };
     return {
       sql: `EXISTS (
@@ -257,7 +257,7 @@ export const clickHouseFilterConditions: Record<
     };
   },
 
-  "evaluations.label": (values, paramId, key) => {
+  "evaluations.label": ({ values, paramId, key }) => {
     if (!key) return { sql: "1=0", params: {} };
     return {
       sql: `EXISTS (
@@ -276,7 +276,7 @@ export const clickHouseFilterConditions: Record<
   },
 
   // Events - using stored_spans table with span attributes
-  "events.event_type": (values, paramId, _key, _subkey, options) => ({
+  "events.event_type": ({ values, paramId, options }) => ({
     sql: `EXISTS (
       SELECT 1 FROM stored_spans sp
       WHERE sp.TenantId = ts.TenantId
@@ -286,7 +286,7 @@ export const clickHouseFilterConditions: Record<
     params: { [`${paramId}_values`]: values },
   }),
 
-  "events.metrics.key": (values, paramId, key, _subkey, options) => {
+  "events.metrics.key": ({ values, paramId, key, options }) => {
     if (!key) return { sql: "1=0", params: {} };
     // Build OR conditions for each metric key - these are attribute names, not values
     // Since attribute names are controlled internally, we use them directly
@@ -311,7 +311,7 @@ export const clickHouseFilterConditions: Record<
     };
   },
 
-  "events.metrics.value": (values, paramId, key, subkey, options) => {
+  "events.metrics.value": ({ values, paramId, key, subkey, options }) => {
     if (!key || !subkey || values.length < 2) return { sql: "1=0", params: {} };
     const minValue = parseFloat(values[0] ?? "");
     const maxValue = parseFloat(values[1] ?? "");
@@ -340,7 +340,7 @@ export const clickHouseFilterConditions: Record<
     };
   },
 
-  "events.event_details.key": (values, paramId, key, _subkey, options) => {
+  "events.event_details.key": ({ values, paramId, key, options }) => {
     if (!key) return { sql: "1=0", params: {} };
     // Build OR conditions for each detail key
     const detailConditions = values.map(
@@ -375,14 +375,21 @@ export const clickHouseFilterConditions: Record<
  * @param allParams - Accumulated query parameters
  * @returns Object with conditions array and unsupported filter flag
  */
-function collectClickHouseConditions(
-  field: FilterField,
-  params: string[] | Record<string, unknown>,
-  keys: string[],
-  paramCounter: { value: number },
-  allParams: Record<string, unknown>,
-  options: FilterConditionOptions,
-): { conditions: string[]; hasUnsupported: boolean } {
+function collectClickHouseConditions({
+  field,
+  params,
+  keys,
+  paramCounter,
+  allParams,
+  options,
+}: {
+  field: FilterField;
+  params: string[] | Record<string, unknown>;
+  keys: string[];
+  paramCounter: { value: number };
+  allParams: Record<string, unknown>;
+  options: FilterConditionOptions;
+}): { conditions: string[]; hasUnsupported: boolean } {
   const key = keys[0];
   const subkey = keys[1];
   const conditionBuilder = clickHouseFilterConditions[field];
@@ -398,7 +405,13 @@ function collectClickHouseConditions(
     }
 
     const paramId = `f${paramCounter.value++}`;
-    const result = conditionBuilder(params, paramId, key, subkey, options);
+    const result = conditionBuilder({
+      values: params,
+      paramId,
+      key,
+      subkey,
+      options,
+    });
     Object.assign(allParams, result.params);
 
     return { conditions: [result.sql], hasUnsupported: false };
@@ -410,14 +423,14 @@ function collectClickHouseConditions(
     let hasUnsupported = false;
 
     for (const [nextKey, nextValue] of Object.entries(params)) {
-      const result = collectClickHouseConditions(
+      const result = collectClickHouseConditions({
         field,
-        nextValue as string[] | Record<string, unknown>,
-        [...keys, nextKey], // Accumulate keys as we recurse
+        params: nextValue as string[] | Record<string, unknown>,
+        keys: [...keys, nextKey], // Accumulate keys as we recurse
         paramCounter,
         allParams,
         options,
-      );
+      });
 
       if (result.hasUnsupported) hasUnsupported = true;
       nestedConditions.push(...result.conditions);
@@ -524,14 +537,14 @@ export function generateClickHouseFilterConditions(
     }
 
     // Use recursive helper to handle any nesting depth
-    const result = collectClickHouseConditions(
-      filterField,
-      filterParams,
-      [], // Start with empty keys array
+    const result = collectClickHouseConditions({
+      field: filterField,
+      params: filterParams,
+      keys: [], // Start with empty keys array
       paramCounter,
       allParams,
       options,
-    );
+    });
 
     if (result.hasUnsupported) hasUnsupportedFilters = true;
     conditions.push(...result.conditions);

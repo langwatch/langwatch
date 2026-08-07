@@ -286,12 +286,17 @@ const createProjectLambda = async (
   return response;
 };
 
-const pollLambdaUntilReady = async (
-  lambda: LambdaClient,
-  functionName: string,
+const pollLambdaUntilReady = async ({
+  lambda,
+  functionName,
   maxAttempts = 60, // 5 minutes with 5-second intervals
   intervalMs = 500,
-): Promise<void> => {
+}: {
+  lambda: LambdaClient;
+  functionName: string;
+  maxAttempts?: number;
+  intervalMs?: number;
+}): Promise<void> => {
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     const config = await checkLambdaExists(lambda, functionName);
 
@@ -322,12 +327,17 @@ const pollLambdaUntilReady = async (
   );
 };
 
-const updateProjectLambdaImage = async (
-  lambda: LambdaClient,
-  functionName: string,
-  newImageUri: string,
-  projectId: string,
-): Promise<FunctionConfiguration> => {
+const updateProjectLambdaImage = async ({
+  lambda,
+  functionName,
+  newImageUri,
+  projectId,
+}: {
+  lambda: LambdaClient;
+  functionName: string;
+  newImageUri: string;
+  projectId: string;
+}): Promise<FunctionConfiguration> => {
   logger.info(
     { projectId },
     `Updating Lambda function ${functionName} with new image: ${newImageUri}`,
@@ -489,12 +499,12 @@ const resolveProjectLambdaArn = async (
       );
 
       try {
-        lambdaConfig = await updateProjectLambdaImage(
+        lambdaConfig = await updateProjectLambdaImage({
           lambda,
           functionName,
-          config.image_uri,
+          newImageUri: config.image_uri,
           projectId,
-        );
+        });
       } catch (error) {
         if (
           error instanceof Error &&
@@ -512,7 +522,7 @@ const resolveProjectLambdaArn = async (
   }
 
   // Poll until Lambda is ready
-  await pollLambdaUntilReady(lambda, functionName);
+  await pollLambdaUntilReady({ lambda, functionName });
 
   // Return the ARN
   if (!lambdaConfig.FunctionArn) {
@@ -522,30 +532,34 @@ const resolveProjectLambdaArn = async (
   return lambdaConfig.FunctionArn;
 };
 
-export const invokeLambda = async (
-  projectId: string,
-  event: StudioClientEvent,
-  s3CacheKey: string | undefined,
-  options: {
-    /** Path under the NLP service. Defaults to `/studio/execute` for the
-     *  legacy Python SSE handler. Set to `/go/studio/execute` to route
-     *  the same SSE event shape to the Go engine. */
-    path?: string;
-    /** Extra headers merged after the defaults (e.g. X-LangWatch-Origin). */
-    headers?: Record<string, string>;
-    /** When true, an oversized invoke body is offloaded to S3 and replaced
-     *  with an X-Payload-S3-URL header so it doesn't hit the 6 MB Lambda
-     *  invoke cap. Only set this for receivers that fetch the header (the Go
-     *  engine — services/nlpgo/adapters/httpapi/staged_payload.go). The legacy
-     *  Python handler does not, so leave it false there. */
-    supportsStaging?: boolean;
-  } = {},
-): Promise<ReadableStreamDefaultReader<Uint8Array>> => {
-  const path = options.path ?? "/studio/execute";
+export const invokeLambda = async ({
+  projectId,
+  event,
+  s3CacheKey,
+  path = "/studio/execute",
+  headers: extraHeaders,
+  supportsStaging,
+}: {
+  projectId: string;
+  event: StudioClientEvent;
+  s3CacheKey: string | undefined;
+  /** Path under the NLP service. Defaults to `/studio/execute` for the
+   *  legacy Python SSE handler. Set to `/go/studio/execute` to route
+   *  the same SSE event shape to the Go engine. */
+  path?: string;
+  /** Extra headers merged after the defaults (e.g. X-LangWatch-Origin). */
+  headers?: Record<string, string>;
+  /** When true, an oversized invoke body is offloaded to S3 and replaced
+   *  with an X-Payload-S3-URL header so it doesn't hit the 6 MB Lambda
+   *  invoke cap. Only set this for receivers that fetch the header (the Go
+   *  engine — services/nlpgo/adapters/httpapi/staged_payload.go). The legacy
+   *  Python handler does not, so leave it false there. */
+  supportsStaging?: boolean;
+}): Promise<ReadableStreamDefaultReader<Uint8Array>> => {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     ...(s3CacheKey ? { "X-S3-Cache-Key": s3CacheKey } : {}),
-    ...(options.headers ?? {}),
+    ...(extraHeaders ?? {}),
   };
   const payload: { body: string; headers: Record<string, string> } = {
     body: JSON.stringify(event),
@@ -582,7 +596,7 @@ export const invokeLambda = async (
     // only crosses the cap after escaping is still offloaded.
     let stagedInvoke: StagedObject | null = null;
     let invokeBody = buildInvokeBody(payload);
-    if (options.supportsStaging) {
+    if (supportsStaging) {
       const invokeBytes = Buffer.byteLength(invokeBody, "utf-8");
       const threshold =
         env.LANGEVALS_STAGING_THRESHOLD_BYTES ??

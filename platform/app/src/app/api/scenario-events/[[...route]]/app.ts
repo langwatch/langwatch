@@ -487,12 +487,12 @@ async function broadcastStreamingEvent(
         ? ("delta" as const)
         : ("structural" as const);
 
-    await getApp().broadcast.broadcastToTenantRateLimited(
-      projectId,
-      payload,
-      "simulation_updated",
+    await getApp().broadcast.broadcastToTenantRateLimited({
+      tenantId: projectId,
+      event: payload,
+      eventType: "simulation_updated",
       tier,
-    );
+    });
   } catch (err) {
     logger.warn({ err, projectId }, "Failed to broadcast streaming event");
   }

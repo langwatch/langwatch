@@ -232,11 +232,15 @@ describe("resultMapper", () => {
 
   describe("mapTargetResult", () => {
     it("maps successful target result", () => {
-      const result = mapTargetResult("target-1", 0, {
-        outputs: { output: "Hello world" },
-        cost: 0.001,
-        timestamps: { started_at: 1000, finished_at: 2000 },
-        trace_id: "trace-123",
+      const result = mapTargetResult({
+        nodeId: "target-1",
+        rowIndex: 0,
+        executionState: {
+          outputs: { output: "Hello world" },
+          cost: 0.001,
+          timestamps: { started_at: 1000, finished_at: 2000 },
+          trace_id: "trace-123",
+        },
       });
 
       expect(result).toEqual({
@@ -252,9 +256,13 @@ describe("resultMapper", () => {
     });
 
     it("maps target error result", () => {
-      const result = mapTargetResult("target-1", 2, {
-        error: "API key invalid",
-        timestamps: { finished_at: 3000 },
+      const result = mapTargetResult({
+        nodeId: "target-1",
+        rowIndex: 2,
+        executionState: {
+          error: "API key invalid",
+          timestamps: { finished_at: 3000 },
+        },
       });
 
       expect(result).toEqual({
@@ -270,11 +278,15 @@ describe("resultMapper", () => {
     });
 
     it("lifts a coded engine failure onto the handled channel", () => {
-      const result = mapTargetResult("target-1", 1, {
-        error:
-          'httpblock: Post "https://api.example.com": lookup api.example.com: no such host',
-        error_type: "http_error",
-        trace_id: "trace-9",
+      const result = mapTargetResult({
+        nodeId: "target-1",
+        rowIndex: 1,
+        executionState: {
+          error:
+            'httpblock: Post "https://api.example.com": lookup api.example.com: no such host',
+          error_type: "http_error",
+          trace_id: "trace-9",
+        },
       });
 
       if (result.type !== "target_result") throw new Error("wrong event");
@@ -287,10 +299,14 @@ describe("resultMapper", () => {
     });
 
     it("carries the upstream status for an upstream_http_error", () => {
-      const result = mapTargetResult("target-1", 0, {
-        error: "httpblock: upstream returned 500",
-        error_type: "upstream_http_error",
-        upstream_status: 500,
+      const result = mapTargetResult({
+        nodeId: "target-1",
+        rowIndex: 0,
+        executionState: {
+          error: "httpblock: upstream returned 500",
+          error_type: "upstream_http_error",
+          upstream_status: 500,
+        },
       });
 
       if (result.type !== "target_result") throw new Error("wrong event");
@@ -298,7 +314,11 @@ describe("resultMapper", () => {
     });
 
     it("leaves domainError unset when the engine sent no code", () => {
-      const result = mapTargetResult("target-1", 0, { error: "plain string" });
+      const result = mapTargetResult({
+        nodeId: "target-1",
+        rowIndex: 0,
+        executionState: { error: "plain string" },
+      });
 
       if (result.type !== "target_result") throw new Error("wrong event");
       expect(result.domainError).toBeUndefined();
@@ -306,8 +326,10 @@ describe("resultMapper", () => {
     });
 
     it("handles missing timestamps", () => {
-      const result = mapTargetResult("target-1", 0, {
-        outputs: { output: "test" },
+      const result = mapTargetResult({
+        nodeId: "target-1",
+        rowIndex: 0,
+        executionState: { outputs: { output: "test" } },
       });
 
       expect(result.type).toBe("target_result");
@@ -319,11 +341,15 @@ describe("resultMapper", () => {
 
   describe("mapEvaluatorResult", () => {
     it("maps successful evaluator result with passed=true", () => {
-      const result = mapEvaluatorResult("target-1.eval-1", 0, {
-        status: "success",
-        outputs: { passed: true, score: 1.0 },
-        cost: 0.0001,
-        timestamps: { started_at: 1000, finished_at: 1500 },
+      const result = mapEvaluatorResult({
+        nodeId: "target-1.eval-1",
+        rowIndex: 0,
+        executionState: {
+          status: "success",
+          outputs: { passed: true, score: 1.0 },
+          cost: 0.0001,
+          timestamps: { started_at: 1000, finished_at: 1500 },
+        },
       });
 
       expect(result).toEqual({
@@ -344,10 +370,14 @@ describe("resultMapper", () => {
     });
 
     it("includes duration when timestamps are present", () => {
-      const result = mapEvaluatorResult("target-1.eval-1", 0, {
-        status: "success",
-        outputs: { passed: true, score: 1.0 },
-        timestamps: { started_at: 1000, finished_at: 2500 },
+      const result = mapEvaluatorResult({
+        nodeId: "target-1.eval-1",
+        rowIndex: 0,
+        executionState: {
+          status: "success",
+          outputs: { passed: true, score: 1.0 },
+          timestamps: { started_at: 1000, finished_at: 2500 },
+        },
       });
 
       expect(result.type).toBe("evaluator_result");
@@ -357,9 +387,13 @@ describe("resultMapper", () => {
     });
 
     it("omits duration when timestamps are missing", () => {
-      const result = mapEvaluatorResult("target-1.eval-1", 0, {
-        status: "success",
-        outputs: { passed: true, score: 1.0 },
+      const result = mapEvaluatorResult({
+        nodeId: "target-1.eval-1",
+        rowIndex: 0,
+        executionState: {
+          status: "success",
+          outputs: { passed: true, score: 1.0 },
+        },
       });
 
       expect(result.type).toBe("evaluator_result");
@@ -370,15 +404,15 @@ describe("resultMapper", () => {
 
     it("includes the evaluator's request inputs when provided", () => {
       const candidates = [{ id: "target-a" }, { id: "target-b" }];
-      const result = mapEvaluatorResult(
-        "target-1.eval-1",
-        0,
-        {
+      const result = mapEvaluatorResult({
+        nodeId: "target-1.eval-1",
+        rowIndex: 0,
+        executionState: {
           status: "success",
           outputs: { label: "target-a" },
         },
-        { inputs: { candidates } },
-      );
+        options: { inputs: { candidates } },
+      });
 
       expect(result.type).toBe("evaluator_result");
       if (result.type === "evaluator_result") {
@@ -390,11 +424,11 @@ describe("resultMapper", () => {
       // Everything but the ids duplicates what the run already stores per
       // target, and this column reaches ClickHouse twice, the browser via a
       // `SELECT *`, and the storage meter — at rows x targets x evaluators.
-      const result = mapEvaluatorResult(
-        "target-1.eval-1",
-        0,
-        { status: "success", outputs: { label: "target-a" } },
-        {
+      const result = mapEvaluatorResult({
+        nodeId: "target-1.eval-1",
+        rowIndex: 0,
+        executionState: { status: "success", outputs: { label: "target-a" } },
+        options: {
           inputs: {
             candidates: [
               { id: "target-a", output: "a long answer", cost: 0.01 },
@@ -404,7 +438,7 @@ describe("resultMapper", () => {
             input: "the task",
           },
         },
-      );
+      });
 
       expect(result.type).toBe("evaluator_result");
       if (result.type === "evaluator_result") {
@@ -417,12 +451,15 @@ describe("resultMapper", () => {
     it("omits inputs for an evaluator that has no candidate list", () => {
       // A non-Comparison evaluator persists nothing here rather than an
       // empty object.
-      const result = mapEvaluatorResult(
-        "target-1.eval-1",
-        0,
-        { status: "success", outputs: { passed: true, score: 1.0 } },
-        { inputs: { input: "the task", output: "the answer" } },
-      );
+      const result = mapEvaluatorResult({
+        nodeId: "target-1.eval-1",
+        rowIndex: 0,
+        executionState: {
+          status: "success",
+          outputs: { passed: true, score: 1.0 },
+        },
+        options: { inputs: { input: "the task", output: "the answer" } },
+      });
 
       expect(result.type).toBe("evaluator_result");
       if (result.type === "evaluator_result") {
@@ -431,9 +468,13 @@ describe("resultMapper", () => {
     });
 
     it("omits inputs when none are provided", () => {
-      const result = mapEvaluatorResult("target-1.eval-1", 0, {
-        status: "success",
-        outputs: { passed: true, score: 1.0 },
+      const result = mapEvaluatorResult({
+        nodeId: "target-1.eval-1",
+        rowIndex: 0,
+        executionState: {
+          status: "success",
+          outputs: { passed: true, score: 1.0 },
+        },
       });
 
       expect(result.type).toBe("evaluator_result");
@@ -443,9 +484,13 @@ describe("resultMapper", () => {
     });
 
     it("maps successful evaluator result with passed=false", () => {
-      const result = mapEvaluatorResult("target-1.eval-1", 1, {
-        status: "success",
-        outputs: { passed: false, score: 0.0 },
+      const result = mapEvaluatorResult({
+        nodeId: "target-1.eval-1",
+        rowIndex: 1,
+        executionState: {
+          status: "success",
+          outputs: { passed: false, score: 0.0 },
+        },
       });
 
       expect(result.type).toBe("evaluator_result");
@@ -459,9 +504,13 @@ describe("resultMapper", () => {
     });
 
     it("maps evaluator result with label", () => {
-      const result = mapEvaluatorResult("target-1.eval-2", 0, {
-        status: "success",
-        outputs: { label: "positive", score: 0.85 },
+      const result = mapEvaluatorResult({
+        nodeId: "target-1.eval-2",
+        rowIndex: 0,
+        executionState: {
+          status: "success",
+          outputs: { label: "positive", score: 0.85 },
+        },
       });
 
       expect(result.type).toBe("evaluator_result");
@@ -475,9 +524,13 @@ describe("resultMapper", () => {
     });
 
     it("maps evaluator error result from execution-level error", () => {
-      const result = mapEvaluatorResult("target-1.eval-1", 0, {
-        status: "error",
-        error: "Evaluator timeout",
+      const result = mapEvaluatorResult({
+        nodeId: "target-1.eval-1",
+        rowIndex: 0,
+        executionState: {
+          status: "error",
+          error: "Evaluator timeout",
+        },
       });
 
       expect(result.type).toBe("evaluator_result");
@@ -494,9 +547,13 @@ describe("resultMapper", () => {
     describe("given the evaluator failed with provider auth", () => {
       /** @scenario Judge auth failures are serialized as domain errors */
       it("serializes a domain error for raw 403 responses", () => {
-        const result = mapEvaluatorResult("target-1.eval-1", 0, {
-          status: "error",
-          error: '403 {\n  "message": "Missing Authentication Token"\n}',
+        const result = mapEvaluatorResult({
+          nodeId: "target-1.eval-1",
+          rowIndex: 0,
+          executionState: {
+            status: "error",
+            error: '403 {\n  "message": "Missing Authentication Token"\n}',
+          },
         });
 
         expect(result.type).toBe("evaluator_result");
@@ -512,9 +569,13 @@ describe("resultMapper", () => {
       });
 
       it("does not reclassify non-auth error strings", () => {
-        const result = mapEvaluatorResult("target-1.eval-1", 0, {
-          status: "error",
-          error: "Evaluator timeout",
+        const result = mapEvaluatorResult({
+          nodeId: "target-1.eval-1",
+          rowIndex: 0,
+          executionState: {
+            status: "error",
+            error: "Evaluator timeout",
+          },
         });
 
         expect(result.type).toBe("evaluator_result");
@@ -527,12 +588,16 @@ describe("resultMapper", () => {
     it("maps evaluator error result from outputs.status === 'error'", () => {
       // This covers the case where the NLP execution succeeds but the evaluator
       // returns an error in its outputs (e.g., langevals returns 404)
-      const result = mapEvaluatorResult("target-1.eval-1", 0, {
-        status: "success", // Execution succeeded
-        outputs: {
-          status: "error", // But evaluator itself returned error
-          details:
-            "EvaluatorException('404 Evaluator not found: langevals/invalid')",
+      const result = mapEvaluatorResult({
+        nodeId: "target-1.eval-1",
+        rowIndex: 0,
+        executionState: {
+          status: "success", // Execution succeeded
+          outputs: {
+            status: "error", // But evaluator itself returned error
+            details:
+              "EvaluatorException('404 Evaluator not found: langevals/invalid')",
+          },
         },
       });
 
@@ -549,12 +614,16 @@ describe("resultMapper", () => {
     });
 
     it("prefers execution-level error over outputs.status error", () => {
-      const result = mapEvaluatorResult("target-1.eval-1", 0, {
-        status: "error",
-        error: "Execution failed",
-        outputs: {
+      const result = mapEvaluatorResult({
+        nodeId: "target-1.eval-1",
+        rowIndex: 0,
+        executionState: {
           status: "error",
-          details: "Evaluator error",
+          error: "Execution failed",
+          outputs: {
+            status: "error",
+            details: "Evaluator error",
+          },
         },
       });
 
@@ -567,20 +636,24 @@ describe("resultMapper", () => {
 
     it("throws for non-evaluator node ID", () => {
       expect(() =>
-        mapEvaluatorResult("target-1", 0, { status: "success" }),
+        mapEvaluatorResult({
+          nodeId: "target-1",
+          rowIndex: 0,
+          executionState: { status: "success" },
+        }),
       ).toThrow("Expected evaluator node ID");
     });
 
     it("strips score when stripScore option is true", () => {
-      const result = mapEvaluatorResult(
-        "target-1.eval-1",
-        0,
-        {
+      const result = mapEvaluatorResult({
+        nodeId: "target-1.eval-1",
+        rowIndex: 0,
+        executionState: {
           status: "success",
           outputs: { passed: true, score: 1.0, label: "exact" },
         },
-        { stripScore: true },
-      );
+        options: { stripScore: true },
+      });
 
       expect(result.type).toBe("evaluator_result");
       if (result.type === "evaluator_result") {
@@ -594,15 +667,15 @@ describe("resultMapper", () => {
     });
 
     it("preserves score when stripScore option is false", () => {
-      const result = mapEvaluatorResult(
-        "target-1.eval-1",
-        0,
-        {
+      const result = mapEvaluatorResult({
+        nodeId: "target-1.eval-1",
+        rowIndex: 0,
+        executionState: {
           status: "success",
           outputs: { passed: true, score: 0.85 },
         },
-        { stripScore: false },
-      );
+        options: { stripScore: false },
+      });
 
       expect(result.type).toBe("evaluator_result");
       if (result.type === "evaluator_result") {
@@ -615,9 +688,13 @@ describe("resultMapper", () => {
     });
 
     it("preserves score when no options provided", () => {
-      const result = mapEvaluatorResult("target-1.eval-1", 0, {
-        status: "success",
-        outputs: { passed: false, score: 0.0 },
+      const result = mapEvaluatorResult({
+        nodeId: "target-1.eval-1",
+        rowIndex: 0,
+        executionState: {
+          status: "success",
+          outputs: { passed: false, score: 0.0 },
+        },
       });
 
       expect(result.type).toBe("evaluator_result");
@@ -630,9 +707,13 @@ describe("resultMapper", () => {
     });
 
     it("coerces string score from workflow evaluators", () => {
-      const result = mapEvaluatorResult("target-1.eval-1", 0, {
-        status: "success",
-        outputs: { score: "0.85", passed: true },
+      const result = mapEvaluatorResult({
+        nodeId: "target-1.eval-1",
+        rowIndex: 0,
+        executionState: {
+          status: "success",
+          outputs: { score: "0.85", passed: true },
+        },
       });
 
       expect(result.type).toBe("evaluator_result");
@@ -646,9 +727,13 @@ describe("resultMapper", () => {
     });
 
     it("coerces string passed from workflow evaluators", () => {
-      const result = mapEvaluatorResult("target-1.eval-1", 0, {
-        status: "success",
-        outputs: { passed: "true", score: 1.0 },
+      const result = mapEvaluatorResult({
+        nodeId: "target-1.eval-1",
+        rowIndex: 0,
+        executionState: {
+          status: "success",
+          outputs: { passed: "true", score: 1.0 },
+        },
       });
 
       expect(result.type).toBe("evaluator_result");
@@ -662,9 +747,13 @@ describe("resultMapper", () => {
     });
 
     it("coerces string 'false' passed value", () => {
-      const result = mapEvaluatorResult("target-1.eval-1", 0, {
-        status: "success",
-        outputs: { passed: "False", score: "0" },
+      const result = mapEvaluatorResult({
+        nodeId: "target-1.eval-1",
+        rowIndex: 0,
+        executionState: {
+          status: "success",
+          outputs: { passed: "False", score: "0" },
+        },
       });
 
       expect(result.type).toBe("evaluator_result");
@@ -678,9 +767,13 @@ describe("resultMapper", () => {
     });
 
     it("returns undefined for non-numeric string score", () => {
-      const result = mapEvaluatorResult("target-1.eval-1", 0, {
-        status: "success",
-        outputs: { score: "not-a-number", passed: true },
+      const result = mapEvaluatorResult({
+        nodeId: "target-1.eval-1",
+        rowIndex: 0,
+        executionState: {
+          status: "success",
+          outputs: { score: "not-a-number", passed: true },
+        },
       });
 
       expect(result.type).toBe("evaluator_result");
@@ -695,9 +788,13 @@ describe("resultMapper", () => {
 
     describe("when details is null (regression: sticky details)", () => {
       it("does not include details in the result", () => {
-        const result = mapEvaluatorResult("target-1.eval-1", 0, {
-          status: "success",
-          outputs: { passed: true, score: 1.0, details: null },
+        const result = mapEvaluatorResult({
+          nodeId: "target-1.eval-1",
+          rowIndex: 0,
+          executionState: {
+            status: "success",
+            outputs: { passed: true, score: 1.0, details: null },
+          },
         });
 
         expect(result.type).toBe("evaluator_result");
@@ -712,9 +809,13 @@ describe("resultMapper", () => {
 
     describe("when details is an empty string", () => {
       it("does not include details in the result", () => {
-        const result = mapEvaluatorResult("target-1.eval-1", 0, {
-          status: "success",
-          outputs: { passed: true, score: 1.0, details: "" },
+        const result = mapEvaluatorResult({
+          nodeId: "target-1.eval-1",
+          rowIndex: 0,
+          executionState: {
+            status: "success",
+            outputs: { passed: true, score: 1.0, details: "" },
+          },
         });
 
         expect(result.type).toBe("evaluator_result");
@@ -729,12 +830,16 @@ describe("resultMapper", () => {
 
     describe("when details is a non-empty string", () => {
       it("includes details in the result", () => {
-        const result = mapEvaluatorResult("target-1.eval-1", 0, {
-          status: "success",
-          outputs: {
-            passed: true,
-            score: 1.0,
-            details: "Output matched exactly",
+        const result = mapEvaluatorResult({
+          nodeId: "target-1.eval-1",
+          rowIndex: 0,
+          executionState: {
+            status: "success",
+            outputs: {
+              passed: true,
+              score: 1.0,
+              details: "Output matched exactly",
+            },
           },
         });
 
@@ -749,15 +854,15 @@ describe("resultMapper", () => {
     });
 
     it("does not affect error results when stripScore is true", () => {
-      const result = mapEvaluatorResult(
-        "target-1.eval-1",
-        0,
-        {
+      const result = mapEvaluatorResult({
+        nodeId: "target-1.eval-1",
+        rowIndex: 0,
+        executionState: {
           status: "error",
           error: "Failed",
         },
-        { stripScore: true },
-      );
+        options: { stripScore: true },
+      });
 
       expect(result.type).toBe("evaluator_result");
       if (result.type === "evaluator_result") {
@@ -774,13 +879,16 @@ describe("resultMapper", () => {
   describe("mapWorkflowEvaluatorResult", () => {
     describe("when the evaluator node has a display name", () => {
       it("carries the name on the event so results show it over the raw node id", () => {
-        const result = mapWorkflowEvaluatorResult(
-          0,
-          "workflow-target",
-          "evaluator_node_abc",
-          "Exact Match",
-          { status: "success", outputs: { passed: true, score: 1 } },
-        );
+        const result = mapWorkflowEvaluatorResult({
+          rowIndex: 0,
+          targetId: "workflow-target",
+          evaluatorId: "evaluator_node_abc",
+          evaluatorName: "Exact Match",
+          executionState: {
+            status: "success",
+            outputs: { passed: true, score: 1 },
+          },
+        });
 
         expect(result.type).toBe("evaluator_result");
         if (result.type === "evaluator_result") {
@@ -796,13 +904,13 @@ describe("resultMapper", () => {
 
     describe("when the evaluator node has no display name", () => {
       it("leaves the name undefined so storage falls back to null", () => {
-        const result = mapWorkflowEvaluatorResult(
-          1,
-          "workflow-target",
-          "evaluator_node_xyz",
-          undefined,
-          { status: "success", outputs: { score: 0.5 } },
-        );
+        const result = mapWorkflowEvaluatorResult({
+          rowIndex: 1,
+          targetId: "workflow-target",
+          evaluatorId: "evaluator_node_xyz",
+          evaluatorName: undefined,
+          executionState: { status: "success", outputs: { score: 0.5 } },
+        });
 
         expect(result.type).toBe("evaluator_result");
         if (result.type === "evaluator_result") {

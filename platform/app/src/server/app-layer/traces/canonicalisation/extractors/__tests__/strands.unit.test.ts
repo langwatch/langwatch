@@ -265,10 +265,12 @@ describe("StrandsExtractor", () => {
 
   describe("when NOT a Strands span", () => {
     it("does nothing", () => {
-      const ctx = createExtractorContext(
-        { [ATTR_KEYS.GEN_AI_OPERATION_NAME]: "chat" },
-        { instrumentationScope: { name: "opentelemetry", version: null } },
-      );
+      const ctx = createExtractorContext({
+        attrs: { [ATTR_KEYS.GEN_AI_OPERATION_NAME]: "chat" },
+        spanOverrides: {
+          instrumentationScope: { name: "opentelemetry", version: null },
+        },
+      });
 
       extractor.apply(ctx);
 

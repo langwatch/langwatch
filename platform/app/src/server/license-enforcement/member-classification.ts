@@ -103,18 +103,23 @@ export type RoleChangeType =
  * Determines if a role change would change the member type.
  * Used for license limit validation when updating member roles.
  *
- * @param oldRole - Current organization user role
- * @param oldPermissions - Current custom role permissions (if any)
- * @param newRole - New organization user role
- * @param newPermissions - New custom role permissions (if any)
+ * @param params.oldRole - Current organization user role
+ * @param params.oldPermissions - Current custom role permissions (if any)
+ * @param params.newRole - New organization user role
+ * @param params.newPermissions - New custom role permissions (if any)
  * @returns RoleChangeType indicating if/how the member type would change
  */
-export function getRoleChangeType(
-  oldRole: OrganizationUserRole,
-  oldPermissions: string[] | undefined,
-  newRole: OrganizationUserRole,
-  newPermissions: string[] | undefined,
-): RoleChangeType {
+export function getRoleChangeType({
+  oldRole,
+  oldPermissions,
+  newRole,
+  newPermissions,
+}: {
+  oldRole: OrganizationUserRole;
+  oldPermissions: string[] | undefined;
+  newRole: OrganizationUserRole;
+  newPermissions: string[] | undefined;
+}): RoleChangeType {
   const wasFull = isFullMember(oldRole, oldPermissions);
   const willBeFull = isFullMember(newRole, newPermissions);
 

@@ -150,12 +150,17 @@ function makeRegularKey(id: string, name: string) {
   };
 }
 
-function makeIngestionKey(
-  id: string,
-  name: string,
-  sourceType: string,
-  createdByDeviceLabel: string | null = "Rogerio's MacBook Pro",
-) {
+function makeIngestionKey({
+  id,
+  name,
+  sourceType,
+  createdByDeviceLabel = "Rogerio's MacBook Pro",
+}: {
+  id: string;
+  name: string;
+  sourceType: string;
+  createdByDeviceLabel?: string | null;
+}) {
   return {
     id,
     name,
@@ -210,7 +215,11 @@ describe("<ApiKeysSection /> ingestion-key split", () => {
       it("renders an 'Ingestion keys' heading", () => {
         mockApiKeyList.mockReturnValue({
           data: [
-            makeIngestionKey("key-ingest", "claude_code ingest", "claude_code"),
+            makeIngestionKey({
+              id: "key-ingest",
+              name: "claude_code ingest",
+              sourceType: "claude_code",
+            }),
             makeRegularKey("key-ci", "CI Pipeline"),
           ],
           isLoading: false,
@@ -226,7 +235,11 @@ describe("<ApiKeysSection /> ingestion-key split", () => {
       it("gives the regular keys table no heading of its own, keeping the security warning", () => {
         mockApiKeyList.mockReturnValue({
           data: [
-            makeIngestionKey("key-ingest", "claude_code ingest", "claude_code"),
+            makeIngestionKey({
+              id: "key-ingest",
+              name: "claude_code ingest",
+              sourceType: "claude_code",
+            }),
             makeRegularKey("key-ci", "CI Pipeline"),
           ],
           isLoading: false,
@@ -248,7 +261,11 @@ describe("<ApiKeysSection /> ingestion-key split", () => {
       it("shows the ingestion key's source tool and a revoke button without a permissions editor", () => {
         mockApiKeyList.mockReturnValue({
           data: [
-            makeIngestionKey("key-ingest", "claude_code ingest", "claude_code"),
+            makeIngestionKey({
+              id: "key-ingest",
+              name: "claude_code ingest",
+              sourceType: "claude_code",
+            }),
             makeRegularKey("key-ci", "CI Pipeline"),
           ],
           isLoading: false,
@@ -304,7 +321,11 @@ describe("<ApiKeysSection /> ingestion-key split", () => {
     beforeEach(() => {
       mockApiKeyList.mockReturnValue({
         data: [
-          makeIngestionKey("key-ingest", "claude_code ingest", "claude_code"),
+          makeIngestionKey({
+            id: "key-ingest",
+            name: "claude_code ingest",
+            sourceType: "claude_code",
+          }),
           makeRegularKey("key-ci", "CI Pipeline"),
         ],
         isLoading: false,
@@ -350,7 +371,14 @@ describe("<ApiKeysSection /> ingestion-key split", () => {
     /** @scenario Ingestion key names the device session that minted it */
     it("falls back to 'Unknown device' when no device label was captured", () => {
       mockApiKeyList.mockReturnValue({
-        data: [makeIngestionKey("key-x", "no-device ingest", "codex", null)],
+        data: [
+          makeIngestionKey({
+            id: "key-x",
+            name: "no-device ingest",
+            sourceType: "codex",
+            createdByDeviceLabel: null,
+          }),
+        ],
         isLoading: false,
       });
       renderSection();

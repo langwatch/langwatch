@@ -296,12 +296,12 @@ describe("AnalyticsComparator", () => {
 
       // Does not throw
       expect(() => {
-        comparator.compare(
-          "getTimeseries",
-          { projectId: "test" },
+        comparator.compare({
+          operation: "getTimeseries",
+          input: { projectId: "test" },
           esResult,
           chResult,
-        );
+        });
       }).not.toThrow();
     });
 
@@ -313,12 +313,12 @@ describe("AnalyticsComparator", () => {
       };
 
       expect(() => {
-        comparator.compare(
-          "getTimeseries",
-          { projectId: "test" },
-          result,
-          result,
-        );
+        comparator.compare({
+          operation: "getTimeseries",
+          input: { projectId: "test" },
+          esResult: result,
+          chResult: result,
+        });
       }).not.toThrow();
     });
   });

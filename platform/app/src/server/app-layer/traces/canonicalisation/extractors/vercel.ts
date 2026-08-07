@@ -122,12 +122,12 @@ export class VercelExtractor implements CanonicalAttributesExtractor {
     // Normalized to "openai/gpt-4" format
     // ─────────────────────────────────────────────────────────────────────────
     if (
-      !extractModelToBoth(
+      !extractModelToBoth({
         ctx,
-        ATTR_KEYS.AI_MODEL,
-        (raw) => normaliseModelFromAiModelObject(raw),
-        `${this.id}:ai.model->gen_ai.*.model`,
-      )
+        sourceKey: ATTR_KEYS.AI_MODEL,
+        transform: (raw) => normaliseModelFromAiModelObject(raw),
+        ruleId: `${this.id}:ai.model->gen_ai.*.model`,
+      })
     ) {
       // Consume attribute even if not used, to reduce leftovers
       attrs.take(ATTR_KEYS.AI_MODEL);

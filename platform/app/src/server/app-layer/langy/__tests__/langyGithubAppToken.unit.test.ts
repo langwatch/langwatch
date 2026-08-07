@@ -44,6 +44,7 @@ function fakeRedis(): RedisLike & { store: Map<string, string> } {
       return store.delete(k) ? 1 : 0;
     },
     // Implements the compare-and-delete release script: eval(script, 1, key, token).
+    // biome-ignore lint/complexity/useMaxParams: fake of ioredis's positional eval(script, numKeys, ...args)
     async eval(_script, _numKeys, key, token) {
       if (store.get(key) === token) {
         store.delete(key);

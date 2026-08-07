@@ -69,7 +69,7 @@ export function evaluateQueryInMemory(
   }
 
   const state: WalkState = { nodeCount: 0, unsupportedFields: [] };
-  const result = evaluateNode(ast, false, trace, state);
+  const result = evaluateNode({ node: ast, negated: false, trace, state });
 
   // A field that can never evaluate positively at dispatch (span-scoped fields,
   // `size`, the scenario dimensions) compiles to valid SQL and passes the
@@ -98,12 +98,17 @@ interface WalkState {
   unsupportedFields: string[];
 }
 
-function evaluateNode(
-  node: LiqeQuery,
-  negated: boolean,
-  trace: InMemoryTrace,
-  state: WalkState,
-): boolean | Unsupported {
+function evaluateNode({
+  node,
+  negated,
+  trace,
+  state,
+}: {
+  node: LiqeQuery;
+  negated: boolean;
+  trace: InMemoryTrace;
+  state: WalkState;
+}): boolean | Unsupported {
   state.nodeCount++;
   if (state.nodeCount > MAX_NODE_COUNT) return UNSUPPORTED;
 
@@ -124,9 +129,14 @@ function evaluateNode(
       const logExpr = node as LogicalExpressionToken;
       // Negation threads down unchanged and the operator stays as-is — the
       // exact shape `translateNode` compiles, so both sides always agree.
-      const left = evaluateNode(logExpr.left, negated, trace, state);
+      const left = evaluateNode({ node: logExpr.left, negated, trace, state });
       if (left === UNSUPPORTED) return UNSUPPORTED;
-      const right = evaluateNode(logExpr.right, negated, trace, state);
+      const right = evaluateNode({
+        node: logExpr.right,
+        negated,
+        trace,
+        state,
+      });
       if (right === UNSUPPORTED) return UNSUPPORTED;
       return logExpr.operator.operator === "OR" ? left || right : left && right;
     }
@@ -134,12 +144,17 @@ function evaluateNode(
     case "UnaryOperator": {
       const unary = node as UnaryOperatorToken;
       const isNeg = unary.operator === "NOT" || unary.operator === "-";
-      return evaluateNode(unary.operand, negated !== isNeg, trace, state);
+      return evaluateNode({
+        node: unary.operand,
+        negated: negated !== isNeg,
+        trace,
+        state,
+      });
     }
 
     case "ParenthesizedExpression": {
       const paren = node as ParenthesizedExpressionToken;
-      return evaluateNode(paren.expression, negated, trace, state);
+      return evaluateNode({ node: paren.expression, negated, trace, state });
     }
 
     default:
@@ -160,12 +175,12 @@ function evaluateTag(
 
   // Attribute prefixes — mirror `translateTag`'s routing order exactly.
   if (fieldName.startsWith(TRACE_ATTRIBUTE_PREFIX)) {
-    return evaluateTraceAttribute(
-      fieldName.slice(TRACE_ATTRIBUTE_PREFIX.length),
+    return evaluateTraceAttribute({
+      key: fieldName.slice(TRACE_ATTRIBUTE_PREFIX.length),
       tag,
       negated,
       trace,
-    );
+    });
   }
   if (fieldName.startsWith(SPAN_ATTRIBUTE_PREFIX)) {
     // span.attribute.<k> resolves via stored_spans; spans aren't derived at
@@ -173,31 +188,31 @@ function evaluateTag(
     return UNSUPPORTED;
   }
   if (fieldName.startsWith(EVENT_ATTRIBUTE_PREFIX)) {
-    return evaluateEventAttribute(
-      fieldName.slice(EVENT_ATTRIBUTE_PREFIX.length),
+    return evaluateEventAttribute({
+      key: fieldName.slice(EVENT_ATTRIBUTE_PREFIX.length),
       tag,
       negated,
       trace,
-    );
+    });
   }
   if (fieldName.startsWith(TRACE_ATTRIBUTE_PREFIX_LEGACY)) {
-    return evaluateTraceAttribute(
-      fieldName.slice(TRACE_ATTRIBUTE_PREFIX_LEGACY.length),
+    return evaluateTraceAttribute({
+      key: fieldName.slice(TRACE_ATTRIBUTE_PREFIX_LEGACY.length),
       tag,
       negated,
       trace,
-    );
+    });
   }
   if (
     fieldName.startsWith(EVENT_ATTRIBUTE_PREFIX_LEGACY) &&
     fieldName !== "event"
   ) {
-    return evaluateEventAttribute(
-      fieldName.slice(EVENT_ATTRIBUTE_PREFIX_LEGACY.length),
+    return evaluateEventAttribute({
+      key: fieldName.slice(EVENT_ATTRIBUTE_PREFIX_LEGACY.length),
       tag,
       negated,
       trace,
-    );
+    });
   }
 
   // `.get()` — own keys only, so `constructor` / `toString` / `__proto__` are
@@ -265,12 +280,17 @@ function ilikeContains(
   return column.toLowerCase().includes(lowerValue);
 }
 
-function evaluateTraceAttribute(
-  key: string,
-  tag: TagToken,
-  negated: boolean,
-  trace: InMemoryTrace,
-): boolean | Unsupported {
+function evaluateTraceAttribute({
+  key,
+  tag,
+  negated,
+  trace,
+}: {
+  key: string;
+  tag: TagToken;
+  negated: boolean;
+  trace: InMemoryTrace;
+}): boolean | Unsupported {
   // Empty key throws on the SQL side (422) — fail closed.
   if (!key) return UNSUPPORTED;
   const value = extractStringValue(tag);
@@ -278,12 +298,17 @@ function evaluateTraceAttribute(
   return negated ? !matched : matched;
 }
 
-function evaluateEventAttribute(
-  key: string,
-  tag: TagToken,
-  negated: boolean,
-  trace: InMemoryTrace,
-): boolean | Unsupported {
+function evaluateEventAttribute({
+  key,
+  tag,
+  negated,
+  trace,
+}: {
+  key: string;
+  tag: TagToken;
+  negated: boolean;
+  trace: InMemoryTrace;
+}): boolean | Unsupported {
   if (!key) return UNSUPPORTED;
   if (trace.events == null) return UNSUPPORTED;
   const value = extractStringValue(tag);

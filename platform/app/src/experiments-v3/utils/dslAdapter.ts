@@ -78,13 +78,13 @@ export const stateToWorkflow = (
     // Create evaluator nodes for ALL evaluators (they apply to all targets)
     // Evaluators are duplicated per-target in the DSL
     state.evaluators.forEach((evaluator, evalIndex) => {
-      const evaluatorNode = createEvaluatorNode(
+      const evaluatorNode = createEvaluatorNode({
         evaluator,
-        datasetId,
-        target.id,
+        activeDatasetId: datasetId,
+        targetId: target.id,
         targetIndex,
         evalIndex,
-      );
+      });
       evaluatorNodes.push(evaluatorNode);
     });
   });
@@ -257,13 +257,19 @@ const createHttpNode = (
  * Node ID is {targetId}.{evaluatorId} for clear result mapping back to the table.
  * Sets default values on inputs that have value mappings.
  */
-const createEvaluatorNode = (
-  evaluator: EvaluatorConfig,
-  activeDatasetId: string,
-  targetId: string,
-  targetIndex: number,
-  evalIndex: number,
-): Node<Evaluator> => {
+const createEvaluatorNode = ({
+  evaluator,
+  activeDatasetId,
+  targetId,
+  targetIndex,
+  evalIndex,
+}: {
+  evaluator: EvaluatorConfig;
+  activeDatasetId: string;
+  targetId: string;
+  targetIndex: number;
+  evalIndex: number;
+}): Node<Evaluator> => {
   // Get the mappings for this dataset and target
   const datasetMappings = evaluator.mappings[activeDatasetId];
   const targetMappings = datasetMappings?.[targetId] ?? {};

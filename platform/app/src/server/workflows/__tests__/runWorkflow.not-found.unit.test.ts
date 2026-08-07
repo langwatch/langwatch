@@ -25,7 +25,11 @@ describe("runWorkflow()", () => {
       findUniqueMock.mockResolvedValue(null);
 
       await expect(
-        runWorkflow("nonexistent-workflow", "project_123", {}),
+        runWorkflow({
+          workflowId: "nonexistent-workflow",
+          projectId: "project_123",
+          inputs: {},
+        }),
       ).rejects.toBeInstanceOf(NotFoundError);
     });
   });
@@ -35,7 +39,11 @@ describe("runWorkflow()", () => {
       findUniqueMock.mockResolvedValue({ id: "wf_1", publishedId: null });
 
       await expect(
-        runWorkflow("wf_1", "project_123", {}),
+        runWorkflow({
+          workflowId: "wf_1",
+          projectId: "project_123",
+          inputs: {},
+        }),
       ).rejects.toBeInstanceOf(ValidationError);
     });
   });

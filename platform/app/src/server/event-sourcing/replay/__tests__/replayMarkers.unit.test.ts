@@ -58,6 +58,7 @@ function createRedisMock() {
           });
           return pipe;
         },
+        // biome-ignore lint/complexity/useMaxParams: fake of ioredis's positional pipeline set(key, value, "EX", seconds)
         set: (key: string, value: string, mode?: string, seconds?: number) => {
           pipelineOps.push(() => {
             strings.set(key, value);

@@ -22,25 +22,31 @@ const describeRefusal = (domainError: SerializedHandledError): string => {
  * Provides validation state and functions to trigger validation.
  * Uses tRPC to call the backend validation endpoints.
  *
- * @param provider - The provider key (e.g., "openai", "gemini")
- * @param customKeys - The form state containing API keys and configuration
- * @param projectId - Project handle for the tenant, when there is one
- * @param organizationId - Organization handle for the tenant
- * @param scopes - Scopes the credential is being set up for. On the
+ * @param params.provider - The provider key (e.g., "openai", "gemini")
+ * @param params.customKeys - The form state containing API keys and configuration
+ * @param params.projectId - Project handle for the tenant, when there is one
+ * @param params.organizationId - Organization handle for the tenant
+ * @param params.scopes - Scopes the credential is being set up for. On the
  *   no-project path these are what the probe is authorized against, so a
  *   caller who cannot manage them cannot reach the outbound request.
  * @returns Object containing validation state and functions
  */
-export function useModelProviderApiKeyValidation(
-  provider: string,
-  customKeys: Record<string, string>,
-  projectId: string | undefined,
-  organizationId: string | undefined,
+export function useModelProviderApiKeyValidation({
+  provider,
+  customKeys,
+  projectId,
+  organizationId,
+  scopes,
+}: {
+  provider: string;
+  customKeys: Record<string, string>;
+  projectId: string | undefined;
+  organizationId: string | undefined;
   scopes?: Array<{
     scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
     scopeId: string;
-  }>,
-) {
+  }>;
+}) {
   const [isValidating, setIsValidating] = useState(false);
   const [validationError, setValidationError] = useState<string | undefined>();
   const utils = api.useContext();

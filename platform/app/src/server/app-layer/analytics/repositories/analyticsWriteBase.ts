@@ -38,12 +38,12 @@ function assertSingleTenant<TRow extends { tenantId: string }>(
 ): void {
   for (const row of rows) {
     if (row.tenantId !== tenantId) {
-      throw new SecurityError(
-        scope,
-        "all rows in a single batch must share the same tenantId",
+      throw new SecurityError({
+        operation: scope,
+        message: "all rows in a single batch must share the same tenantId",
         tenantId,
-        { mismatchedTenantId: row.tenantId },
-      );
+        context: { mismatchedTenantId: row.tenantId },
+      });
     }
   }
 }

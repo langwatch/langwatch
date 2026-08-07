@@ -296,12 +296,17 @@ export function SignaturePropertiesPanelForm({
     return newHandle;
   };
 
-  const onAddMessageEdge = (
-    id: string,
-    handle: string,
-    content: PromptTextAreaOnAddMention,
-    idx: number,
-  ): string | undefined => {
+  const onAddMessageEdge = ({
+    id,
+    handle,
+    content,
+    idx,
+  }: {
+    id: string;
+    handle: string;
+    content: PromptTextAreaOnAddMention;
+    idx: number;
+  }): string | undefined => {
     const {
       node: stateNode,
       newPrompt,

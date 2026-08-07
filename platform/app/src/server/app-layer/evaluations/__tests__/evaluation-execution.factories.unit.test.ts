@@ -51,7 +51,11 @@ describe("setupModelEnv", () => {
       });
 
       await expect(
-        setupModelEnv("gemini/gemini-2.5-pro", false, "proj-1"),
+        setupModelEnv({
+          model: "gemini/gemini-2.5-pro",
+          embeddings: false,
+          projectId: "proj-1",
+        }),
       ).resolves.toBeDefined();
     });
   });
@@ -71,7 +75,11 @@ describe("setupModelEnv", () => {
       });
 
       await expect(
-        setupModelEnv("gemini/gemini-1.5-pro", false, "proj-1"),
+        setupModelEnv({
+          model: "gemini/gemini-1.5-pro",
+          embeddings: false,
+          projectId: "proj-1",
+        }),
       ).resolves.toBeDefined();
     });
 
@@ -89,7 +97,11 @@ describe("setupModelEnv", () => {
       });
 
       await expect(
-        setupModelEnv("gemini/custom-embed", true, "proj-1"),
+        setupModelEnv({
+          model: "gemini/custom-embed",
+          embeddings: true,
+          projectId: "proj-1",
+        }),
       ).resolves.toBeDefined();
     });
   });
@@ -101,7 +113,11 @@ describe("setupModelEnv", () => {
       });
 
       await expect(
-        setupModelEnv("gemini/nonexistent-model", false, "proj-1"),
+        setupModelEnv({
+          model: "gemini/nonexistent-model",
+          embeddings: false,
+          projectId: "proj-1",
+        }),
       ).rejects.toThrow(EvaluatorConfigError);
     });
   });
@@ -113,7 +129,11 @@ describe("setupModelEnv", () => {
       });
 
       await expect(
-        setupModelEnv("gemini/any-model", false, "proj-1"),
+        setupModelEnv({
+          model: "gemini/any-model",
+          embeddings: false,
+          projectId: "proj-1",
+        }),
       ).resolves.toBeDefined();
     });
   });
@@ -123,7 +143,11 @@ describe("setupModelEnv", () => {
       vi.mocked(getProjectModelProviders).mockResolvedValue({});
 
       await expect(
-        setupModelEnv("gemini/gemini-2.5-pro", false, "proj-1"),
+        setupModelEnv({
+          model: "gemini/gemini-2.5-pro",
+          embeddings: false,
+          projectId: "proj-1",
+        }),
       ).rejects.toThrow("Provider gemini is not configured");
     });
   });
@@ -135,7 +159,11 @@ describe("setupModelEnv", () => {
       });
 
       await expect(
-        setupModelEnv("gemini/gemini-2.5-pro", false, "proj-1"),
+        setupModelEnv({
+          model: "gemini/gemini-2.5-pro",
+          embeddings: false,
+          projectId: "proj-1",
+        }),
       ).rejects.toThrow("Provider gemini is not enabled");
     });
   });

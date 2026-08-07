@@ -481,7 +481,12 @@ function ConfigCell({
   // update; AI features for this role are disabled at this scope until
   // they do.
   const resolvedRole = anchorScope
-    ? resolveAtScope(role, configs, anchorScope.type, anchorScope.id)
+    ? resolveAtScope({
+        key: role,
+        configs,
+        scopeType: anchorScope.type,
+        scopeId: anchorScope.id,
+      })
     : null;
   const resolvedRoleModel = resolvedRole?.model ?? config[role] ?? null;
 
@@ -596,12 +601,17 @@ function mostSpecificScope(
  * configs by createdAt DESC and taking the first that has the key.
  * Returns null if no config in the visible set carries the key.
  */
-function resolveAtScope(
-  key: string,
-  configs: ConfigRow[],
-  scopeType: "ORGANIZATION" | "TEAM" | "PROJECT",
-  scopeId: string,
-): NonNullable<Payload["effective"][ModelRoleKey]> | null {
+function resolveAtScope({
+  key,
+  configs,
+  scopeType,
+  scopeId,
+}: {
+  key: string;
+  configs: ConfigRow[];
+  scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
+  scopeId: string;
+}): NonNullable<Payload["effective"][ModelRoleKey]> | null {
   const tier =
     scopeType === "PROJECT"
       ? ["PROJECT", "TEAM", "ORGANIZATION"]

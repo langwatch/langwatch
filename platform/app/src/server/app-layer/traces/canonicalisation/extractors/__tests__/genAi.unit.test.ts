@@ -10,7 +10,7 @@ describe("GenAIExtractor", () => {
   describe("when gen_ai.system is present", () => {
     it("maps to gen_ai.provider.name and consumes original", () => {
       const ctx = createExtractorContext({
-        [ATTR_KEYS.GEN_AI_SYSTEM]: "openai",
+        attrs: { [ATTR_KEYS.GEN_AI_SYSTEM]: "openai" },
       });
 
       extractor.apply(ctx);
@@ -23,7 +23,7 @@ describe("GenAIExtractor", () => {
   describe("when gen_ai.agent.name is present", () => {
     it("passes through as-is", () => {
       const ctx = createExtractorContext({
-        [ATTR_KEYS.GEN_AI_AGENT_NAME]: "my-agent",
+        attrs: { [ATTR_KEYS.GEN_AI_AGENT_NAME]: "my-agent" },
       });
 
       extractor.apply(ctx);
@@ -35,7 +35,7 @@ describe("GenAIExtractor", () => {
   describe("when gen_ai.agent (legacy) is present", () => {
     it("maps to gen_ai.agent.name", () => {
       const ctx = createExtractorContext({
-        [ATTR_KEYS.GEN_AI_AGENT]: "legacy-agent",
+        attrs: { [ATTR_KEYS.GEN_AI_AGENT]: "legacy-agent" },
       });
 
       extractor.apply(ctx);
@@ -47,7 +47,7 @@ describe("GenAIExtractor", () => {
   describe("when agent.name is present", () => {
     it("maps to gen_ai.agent.name", () => {
       const ctx = createExtractorContext({
-        [ATTR_KEYS.AGENT_NAME]: "named-agent",
+        attrs: { [ATTR_KEYS.AGENT_NAME]: "named-agent" },
       });
 
       extractor.apply(ctx);
@@ -59,7 +59,7 @@ describe("GenAIExtractor", () => {
   describe("when llm.model_name is present", () => {
     it("maps to both gen_ai.request.model and gen_ai.response.model", () => {
       const ctx = createExtractorContext({
-        [ATTR_KEYS.LLM_MODEL_NAME]: "gpt-4",
+        attrs: { [ATTR_KEYS.LLM_MODEL_NAME]: "gpt-4" },
       });
 
       extractor.apply(ctx);
@@ -72,7 +72,7 @@ describe("GenAIExtractor", () => {
   describe("when gen_ai.prompt is present", () => {
     it("maps to gen_ai.input.messages as user message", () => {
       const ctx = createExtractorContext({
-        [ATTR_KEYS.GEN_AI_PROMPT]: "What is 2+2?",
+        attrs: { [ATTR_KEYS.GEN_AI_PROMPT]: "What is 2+2?" },
       });
 
       extractor.apply(ctx);
@@ -88,7 +88,7 @@ describe("GenAIExtractor", () => {
         { role: "user", content: "Hi" },
       ];
       const ctx = createExtractorContext({
-        [ATTR_KEYS.GEN_AI_PROMPT]: JSON.stringify(messages),
+        attrs: { [ATTR_KEYS.GEN_AI_PROMPT]: JSON.stringify(messages) },
       });
 
       extractor.apply(ctx);
@@ -107,7 +107,7 @@ describe("GenAIExtractor", () => {
         { role: "assistant", content: "Hi there" },
       ];
       const ctx = createExtractorContext({
-        [ATTR_KEYS.GEN_AI_INPUT_MESSAGES]: messages,
+        attrs: { [ATTR_KEYS.GEN_AI_INPUT_MESSAGES]: messages },
       });
 
       extractor.apply(ctx);
@@ -127,7 +127,7 @@ describe("GenAIExtractor", () => {
         { role: "assistant", content: "Hi" },
       ];
       const ctx = createExtractorContext({
-        [ATTR_KEYS.GEN_AI_INPUT_MESSAGES]: messages,
+        attrs: { [ATTR_KEYS.GEN_AI_INPUT_MESSAGES]: messages },
       });
 
       extractor.apply(ctx);
@@ -141,7 +141,7 @@ describe("GenAIExtractor", () => {
   describe("when gen_ai.completion is present", () => {
     it("maps to gen_ai.output.messages as assistant message", () => {
       const ctx = createExtractorContext({
-        [ATTR_KEYS.GEN_AI_COMPLETION]: "The answer is 4.",
+        attrs: { [ATTR_KEYS.GEN_AI_COMPLETION]: "The answer is 4." },
       });
 
       extractor.apply(ctx);
@@ -156,7 +156,7 @@ describe("GenAIExtractor", () => {
     it("maps to gen_ai.input.messages", () => {
       const messages = [{ role: "user", content: "Hello" }];
       const ctx = createExtractorContext({
-        [ATTR_KEYS.LLM_INPUT_MESSAGES]: JSON.stringify(messages),
+        attrs: { [ATTR_KEYS.LLM_INPUT_MESSAGES]: JSON.stringify(messages) },
       });
 
       extractor.apply(ctx);
@@ -169,7 +169,7 @@ describe("GenAIExtractor", () => {
     it("maps to gen_ai.output.messages", () => {
       const messages = [{ role: "assistant", content: "Hi there" }];
       const ctx = createExtractorContext({
-        [ATTR_KEYS.LLM_OUTPUT_MESSAGES]: JSON.stringify(messages),
+        attrs: { [ATTR_KEYS.LLM_OUTPUT_MESSAGES]: JSON.stringify(messages) },
       });
 
       extractor.apply(ctx);
@@ -181,7 +181,7 @@ describe("GenAIExtractor", () => {
   describe("when usage tokens are present", () => {
     it("maps gen_ai.usage.input_tokens", () => {
       const ctx = createExtractorContext({
-        [ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS]: 100,
+        attrs: { [ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS]: 100 },
       });
 
       extractor.apply(ctx);
@@ -191,7 +191,7 @@ describe("GenAIExtractor", () => {
 
     it("maps gen_ai.usage.prompt_tokens (legacy) to input_tokens", () => {
       const ctx = createExtractorContext({
-        [ATTR_KEYS.GEN_AI_USAGE_PROMPT_TOKENS]: 50,
+        attrs: { [ATTR_KEYS.GEN_AI_USAGE_PROMPT_TOKENS]: 50 },
       });
 
       extractor.apply(ctx);
@@ -201,7 +201,7 @@ describe("GenAIExtractor", () => {
 
     it("maps gen_ai.usage.output_tokens", () => {
       const ctx = createExtractorContext({
-        [ATTR_KEYS.GEN_AI_USAGE_OUTPUT_TOKENS]: 200,
+        attrs: { [ATTR_KEYS.GEN_AI_USAGE_OUTPUT_TOKENS]: 200 },
       });
 
       extractor.apply(ctx);
@@ -211,7 +211,7 @@ describe("GenAIExtractor", () => {
 
     it("maps gen_ai.usage.completion_tokens (legacy) to output_tokens", () => {
       const ctx = createExtractorContext({
-        [ATTR_KEYS.GEN_AI_USAGE_COMPLETION_TOKENS]: 75,
+        attrs: { [ATTR_KEYS.GEN_AI_USAGE_COMPLETION_TOKENS]: 75 },
       });
 
       extractor.apply(ctx);
@@ -223,7 +223,7 @@ describe("GenAIExtractor", () => {
   describe("when reasoning tokens arrive as a string", () => {
     it("coerces string to number", () => {
       const ctx = createExtractorContext({
-        [ATTR_KEYS.GEN_AI_USAGE_REASONING_TOKENS]: "720",
+        attrs: { [ATTR_KEYS.GEN_AI_USAGE_REASONING_TOKENS]: "720" },
       });
 
       extractor.apply(ctx);
@@ -233,7 +233,7 @@ describe("GenAIExtractor", () => {
 
     it("leaves numeric values untouched (passes through remaining)", () => {
       const ctx = createExtractorContext({
-        [ATTR_KEYS.GEN_AI_USAGE_REASONING_TOKENS]: 500,
+        attrs: { [ATTR_KEYS.GEN_AI_USAGE_REASONING_TOKENS]: 500 },
       });
 
       extractor.apply(ctx);
@@ -248,7 +248,7 @@ describe("GenAIExtractor", () => {
   describe("when cache tokens arrive as strings", () => {
     it("coerces cache_read.input_tokens string to number", () => {
       const ctx = createExtractorContext({
-        [ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]: "1024",
+        attrs: { [ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]: "1024" },
       });
 
       extractor.apply(ctx);
@@ -260,7 +260,9 @@ describe("GenAIExtractor", () => {
 
     it("coerces cache_creation.input_tokens string to number", () => {
       const ctx = createExtractorContext({
-        [ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS]: "256",
+        attrs: {
+          [ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS]: "256",
+        },
       });
 
       extractor.apply(ctx);
@@ -274,7 +276,7 @@ describe("GenAIExtractor", () => {
   describe("when request parameters arrive as strings", () => {
     it("coerces temperature string to number", () => {
       const ctx = createExtractorContext({
-        [ATTR_KEYS.GEN_AI_REQUEST_TEMPERATURE]: "1",
+        attrs: { [ATTR_KEYS.GEN_AI_REQUEST_TEMPERATURE]: "1" },
       });
 
       extractor.apply(ctx);
@@ -284,7 +286,7 @@ describe("GenAIExtractor", () => {
 
     it("coerces max_tokens string to number", () => {
       const ctx = createExtractorContext({
-        [ATTR_KEYS.GEN_AI_REQUEST_MAX_TOKENS]: "4096",
+        attrs: { [ATTR_KEYS.GEN_AI_REQUEST_MAX_TOKENS]: "4096" },
       });
 
       extractor.apply(ctx);
@@ -294,7 +296,7 @@ describe("GenAIExtractor", () => {
 
     it("coerces top_p string to number", () => {
       const ctx = createExtractorContext({
-        [ATTR_KEYS.GEN_AI_REQUEST_TOP_P]: "0.9",
+        attrs: { [ATTR_KEYS.GEN_AI_REQUEST_TOP_P]: "0.9" },
       });
 
       extractor.apply(ctx);
@@ -304,7 +306,7 @@ describe("GenAIExtractor", () => {
 
     it("leaves numeric values untouched (passes through remaining)", () => {
       const ctx = createExtractorContext({
-        [ATTR_KEYS.GEN_AI_REQUEST_TEMPERATURE]: 0.7,
+        attrs: { [ATTR_KEYS.GEN_AI_REQUEST_TEMPERATURE]: 0.7 },
       });
 
       extractor.apply(ctx);
@@ -317,14 +319,16 @@ describe("GenAIExtractor", () => {
   describe("when llm.invocation_parameters JSON is present", () => {
     it("extracts temperature, max_tokens, top_p, frequency_penalty, presence_penalty, seed", () => {
       const ctx = createExtractorContext({
-        [ATTR_KEYS.LLM_INVOCATION_PARAMETERS]: JSON.stringify({
-          temperature: 0.7,
-          max_tokens: 1000,
-          top_p: 0.9,
-          frequency_penalty: 0.5,
-          presence_penalty: 0.3,
-          seed: 42,
-        }),
+        attrs: {
+          [ATTR_KEYS.LLM_INVOCATION_PARAMETERS]: JSON.stringify({
+            temperature: 0.7,
+            max_tokens: 1000,
+            top_p: 0.9,
+            frequency_penalty: 0.5,
+            presence_penalty: 0.3,
+            seed: 42,
+          }),
+        },
       });
 
       extractor.apply(ctx);
@@ -339,9 +343,11 @@ describe("GenAIExtractor", () => {
 
     it("extracts stop sequences as string array", () => {
       const ctx = createExtractorContext({
-        [ATTR_KEYS.LLM_INVOCATION_PARAMETERS]: JSON.stringify({
-          stop: ["END", "STOP"],
-        }),
+        attrs: {
+          [ATTR_KEYS.LLM_INVOCATION_PARAMETERS]: JSON.stringify({
+            stop: ["END", "STOP"],
+          }),
+        },
       });
 
       extractor.apply(ctx);
@@ -354,7 +360,9 @@ describe("GenAIExtractor", () => {
 
     it("skips choice count when n=1", () => {
       const ctx = createExtractorContext({
-        [ATTR_KEYS.LLM_INVOCATION_PARAMETERS]: JSON.stringify({ n: 1 }),
+        attrs: {
+          [ATTR_KEYS.LLM_INVOCATION_PARAMETERS]: JSON.stringify({ n: 1 }),
+        },
       });
 
       extractor.apply(ctx);
@@ -364,7 +372,9 @@ describe("GenAIExtractor", () => {
 
     it("sets choice count when n>1", () => {
       const ctx = createExtractorContext({
-        [ATTR_KEYS.LLM_INVOCATION_PARAMETERS]: JSON.stringify({ n: 3 }),
+        attrs: {
+          [ATTR_KEYS.LLM_INVOCATION_PARAMETERS]: JSON.stringify({ n: 3 }),
+        },
       });
 
       extractor.apply(ctx);
@@ -376,7 +386,7 @@ describe("GenAIExtractor", () => {
   describe("when span type is llm", () => {
     it("sets gen_ai.operation.name to chat", () => {
       const ctx = createExtractorContext({
-        [ATTR_KEYS.SPAN_TYPE]: "llm",
+        attrs: { [ATTR_KEYS.SPAN_TYPE]: "llm" },
       });
 
       extractor.apply(ctx);
@@ -388,7 +398,7 @@ describe("GenAIExtractor", () => {
   describe("when span type is tool", () => {
     it("sets gen_ai.operation.name to tool", () => {
       const ctx = createExtractorContext({
-        [ATTR_KEYS.SPAN_TYPE]: "tool",
+        attrs: { [ATTR_KEYS.SPAN_TYPE]: "tool" },
       });
 
       extractor.apply(ctx);

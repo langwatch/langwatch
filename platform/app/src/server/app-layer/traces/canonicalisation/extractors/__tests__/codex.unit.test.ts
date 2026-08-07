@@ -126,8 +126,8 @@ describe("CodexExtractor.applyLog", () => {
 
   describe("CodexExtractor.apply (span side)", () => {
     it("lifts codex.turn.token_usage.* + model + turn.id off the codex_cli_rs session_task.turn span", () => {
-      const ctx = createExtractorContext(
-        {
+      const ctx = createExtractorContext({
+        attrs: {
           model: "gpt-5.5",
           "codex.turn.token_usage.input_tokens": "14365",
           "codex.turn.token_usage.output_tokens": "6",
@@ -136,11 +136,11 @@ describe("CodexExtractor.applyLog", () => {
           "codex.turn.reasoning_effort": "high",
           "turn.id": "019e939c-48a1-7021-a71d-714f74d6ad64",
         },
-        {
+        spanOverrides: {
           name: "session_task.turn",
           instrumentationScope: { name: "codex_cli_rs", version: null },
         },
-      );
+      });
 
       new CodexExtractor().apply(ctx);
 
@@ -159,16 +159,16 @@ describe("CodexExtractor.applyLog", () => {
 
     /** @scenario "Codex reasoning effort is canonicalised from the turn span" */
     it("canonicalises codex.turn.reasoning_effort to gen_ai.request.reasoning_effort", () => {
-      const ctx = createExtractorContext(
-        {
+      const ctx = createExtractorContext({
+        attrs: {
           model: "gpt-5.5",
           "codex.turn.reasoning_effort": "high",
         },
-        {
+        spanOverrides: {
           name: "session_task.turn",
           instrumentationScope: { name: "codex_cli_rs", version: null },
         },
-      );
+      });
 
       new CodexExtractor().apply(ctx);
 
@@ -177,18 +177,18 @@ describe("CodexExtractor.applyLog", () => {
 
     /** @scenario "Codex reasoning output tokens are captured" */
     it("lifts codex.turn.token_usage.reasoning_output_tokens to gen_ai.usage.reasoning_tokens", () => {
-      const ctx = createExtractorContext(
-        {
+      const ctx = createExtractorContext({
+        attrs: {
           model: "gpt-5.5",
           "codex.turn.token_usage.input_tokens": "1000",
           "codex.turn.token_usage.output_tokens": "50",
           "codex.turn.token_usage.reasoning_output_tokens": "10",
         },
-        {
+        spanOverrides: {
           name: "session_task.turn",
           instrumentationScope: { name: "codex_cli_rs", version: null },
         },
-      );
+      });
 
       new CodexExtractor().apply(ctx);
 
@@ -196,16 +196,16 @@ describe("CodexExtractor.applyLog", () => {
     });
 
     it("flags a non-turn codex span carrying usage as a redundant token copy", () => {
-      const ctx = createExtractorContext(
-        {
+      const ctx = createExtractorContext({
+        attrs: {
           "gen_ai.usage.input_tokens": 13297,
           "gen_ai.usage.output_tokens": 23,
         },
-        {
+        spanOverrides: {
           name: "handle_responses",
           instrumentationScope: { name: "codex_cli_rs", version: null },
         },
-      );
+      });
 
       new CodexExtractor().apply(ctx);
 
@@ -219,16 +219,16 @@ describe("CodexExtractor.applyLog", () => {
       // A hypothetical future codex span that carries usage NOT folded into the
       // turn rollup must be counted, not silently dropped — so it is typed as a
       // model call but NOT marked skip_token_accumulation.
-      const ctx = createExtractorContext(
-        {
+      const ctx = createExtractorContext({
+        attrs: {
           "gen_ai.usage.input_tokens": 4096,
           "gen_ai.usage.output_tokens": 128,
         },
-        {
+        spanOverrides: {
           name: "handle_completions",
           instrumentationScope: { name: "codex_cli_rs", version: null },
         },
-      );
+      });
 
       new CodexExtractor().apply(ctx);
 
@@ -242,13 +242,13 @@ describe("CodexExtractor.applyLog", () => {
     });
 
     it("does not flag a non-turn codex span without usage", () => {
-      const ctx = createExtractorContext(
-        { "code.module.name": "session" },
-        {
+      const ctx = createExtractorContext({
+        attrs: { "code.module.name": "session" },
+        spanOverrides: {
           name: "build_tool_call",
           instrumentationScope: { name: "codex_cli_rs", version: null },
         },
-      );
+      });
 
       new CodexExtractor().apply(ctx);
 
@@ -258,16 +258,16 @@ describe("CodexExtractor.applyLog", () => {
     });
 
     it("is a no-op for codex_cli_rs spans other than session_task.turn", () => {
-      const ctx = createExtractorContext(
-        {
+      const ctx = createExtractorContext({
+        attrs: {
           model: "gpt-5.5",
           turn_id: "abc",
         },
-        {
+        spanOverrides: {
           name: "run_sampling_request",
           instrumentationScope: { name: "codex_cli_rs", version: null },
         },
-      );
+      });
 
       new CodexExtractor().apply(ctx);
 
@@ -276,19 +276,19 @@ describe("CodexExtractor.applyLog", () => {
     });
 
     it("is a no-op for non-codex scopes (Path A gen_ai.* spans are GenAIExtractor's lane)", () => {
-      const ctx = createExtractorContext(
-        {
+      const ctx = createExtractorContext({
+        attrs: {
           "gen_ai.request.model": "gpt-5.5",
           "gen_ai.usage.input_tokens": "100",
         },
-        {
+        spanOverrides: {
           name: "session_task.turn",
           instrumentationScope: {
             name: "@langwatch/aigateway",
             version: null,
           },
         },
-      );
+      });
 
       new CodexExtractor().apply(ctx);
 
@@ -297,15 +297,15 @@ describe("CodexExtractor.applyLog", () => {
     });
 
     it("lifts only present fields", () => {
-      const ctx = createExtractorContext(
-        {
+      const ctx = createExtractorContext({
+        attrs: {
           model: "gpt-5.5",
         },
-        {
+        spanOverrides: {
           name: "session_task.turn",
           instrumentationScope: { name: "codex_cli_rs", version: null },
         },
-      );
+      });
 
       new CodexExtractor().apply(ctx);
 
@@ -321,21 +321,21 @@ describe("CodexExtractor.applyLog", () => {
   describe("when the span identifies the codex account provider", () => {
     /** @scenario "A gateway codex span is stamped with the non-billable marker" */
     it("stamps langwatch.cost.non_billable off the gateway's provider name", () => {
-      const ctx = createExtractorContext(
-        {
+      const ctx = createExtractorContext({
+        attrs: {
           "gen_ai.provider.name": "openai_codex",
           "gen_ai.request.model": "gpt-5.6-terra",
           "gen_ai.usage.input_tokens": "37749",
           "gen_ai.usage.output_tokens": "181",
         },
-        {
+        spanOverrides: {
           name: "gen_ai.responses",
           instrumentationScope: {
             name: "langwatch-service-aigateway",
             version: null,
           },
         },
-      );
+      });
 
       new CodexExtractor().apply(ctx);
 
@@ -345,17 +345,17 @@ describe("CodexExtractor.applyLog", () => {
 
     /** @scenario "A span running a codex-prefixed model is stamped with the non-billable marker" */
     it("stamps langwatch.cost.non_billable off the openai_codex/ model prefix", () => {
-      const ctx = createExtractorContext(
-        {
+      const ctx = createExtractorContext({
+        attrs: {
           "gen_ai.request.model": "openai_codex/gpt-5.6-terra",
           "gen_ai.usage.input_tokens": "1000",
           "gen_ai.usage.output_tokens": "50",
         },
-        {
+        spanOverrides: {
           name: "ai.streamText.doStream",
           instrumentationScope: { name: "opencode", version: null },
         },
-      );
+      });
 
       new CodexExtractor().apply(ctx);
 
@@ -364,15 +364,15 @@ describe("CodexExtractor.applyLog", () => {
     });
 
     it("stamps the marker when only the response model carries the prefix", () => {
-      const ctx = createExtractorContext(
-        {
+      const ctx = createExtractorContext({
+        attrs: {
           "gen_ai.response.model": "openai_codex/gpt-5.6-terra",
         },
-        {
+        spanOverrides: {
           name: "gen_ai.responses",
           instrumentationScope: { name: "opencode", version: null },
         },
-      );
+      });
 
       new CodexExtractor().apply(ctx);
 
@@ -381,20 +381,20 @@ describe("CodexExtractor.applyLog", () => {
 
     /** @scenario "An explicit wire-level non-billable marker is left untouched" */
     it("leaves an explicit wire-level marker untouched", () => {
-      const ctx = createExtractorContext(
-        {
+      const ctx = createExtractorContext({
+        attrs: {
           "gen_ai.provider.name": "openai_codex",
           "gen_ai.request.model": "gpt-5.6-terra",
           "langwatch.cost.non_billable": "false",
         },
-        {
+        spanOverrides: {
           name: "gen_ai.responses",
           instrumentationScope: {
             name: "langwatch-service-aigateway",
             version: null,
           },
         },
-      );
+      });
 
       new CodexExtractor().apply(ctx);
 
@@ -403,17 +403,17 @@ describe("CodexExtractor.applyLog", () => {
     });
 
     it("does not stamp a plain OpenAI span running the same underlying model", () => {
-      const ctx = createExtractorContext(
-        {
+      const ctx = createExtractorContext({
+        attrs: {
           "gen_ai.provider.name": "openai.responses",
           "gen_ai.request.model": "gpt-5.6-terra",
           "gen_ai.usage.input_tokens": "1000",
         },
-        {
+        spanOverrides: {
           name: "ai.streamText.doStream",
           instrumentationScope: { name: "opencode", version: null },
         },
-      );
+      });
 
       new CodexExtractor().apply(ctx);
 
@@ -425,17 +425,17 @@ describe("CodexExtractor.applyLog", () => {
 
 describe("CodexExtractor.apply on the codex_exec scope (exec wire, no turn rollup)", () => {
   it("keeps the response span's tokens counted: no skip marker under codex_exec", () => {
-    const ctx = createExtractorContext(
-      {
+    const ctx = createExtractorContext({
+      attrs: {
         "gen_ai.usage.input_tokens": 13005,
         "gen_ai.usage.output_tokens": 10,
         "gen_ai.usage.cache_read.input_tokens": "12032",
       },
-      {
+      spanOverrides: {
         name: "handle_responses",
         instrumentationScope: { name: "codex_exec", version: null },
       },
-    );
+    });
 
     new CodexExtractor().apply(ctx);
 
@@ -445,16 +445,16 @@ describe("CodexExtractor.apply on the codex_exec scope (exec wire, no turn rollu
   });
 
   it("still types the response span as a model call, which the skip marker is independent of", () => {
-    const ctx = createExtractorContext(
-      {
+    const ctx = createExtractorContext({
+      attrs: {
         "gen_ai.usage.input_tokens": 13005,
         "gen_ai.usage.output_tokens": 10,
       },
-      {
+      spanOverrides: {
         name: "handle_responses",
         instrumentationScope: { name: "codex_exec", version: null },
       },
-    );
+    });
 
     new CodexExtractor().apply(ctx);
 
@@ -463,8 +463,8 @@ describe("CodexExtractor.apply on the codex_exec scope (exec wire, no turn rollu
 
   /** @scenario "Codex reasoning effort is canonicalised from the response span when no turn rollup exists" */
   it("lifts reasoning effort, reasoning tokens, and cache writes from the response span", () => {
-    const ctx = createExtractorContext(
-      {
+    const ctx = createExtractorContext({
+      attrs: {
         "codex.request.reasoning_effort": "max",
         "codex.usage.reasoning_output_tokens": "233",
         "codex.usage.total_tokens": "13015",
@@ -472,11 +472,11 @@ describe("CodexExtractor.apply on the codex_exec scope (exec wire, no turn rollu
         "gen_ai.usage.input_tokens": 13005,
         "gen_ai.usage.output_tokens": 240,
       },
-      {
+      spanOverrides: {
         name: "handle_responses",
         instrumentationScope: { name: "codex_exec", version: null },
       },
-    );
+    });
 
     new CodexExtractor().apply(ctx);
 
@@ -486,17 +486,17 @@ describe("CodexExtractor.apply on the codex_exec scope (exec wire, no turn rollu
   });
 
   it("still lifts the response-span extras under the TUI scope while keeping the skip marker", () => {
-    const ctx = createExtractorContext(
-      {
+    const ctx = createExtractorContext({
+      attrs: {
         "codex.request.reasoning_effort": "high",
         "gen_ai.usage.input_tokens": 13297,
         "gen_ai.usage.output_tokens": 23,
       },
-      {
+      spanOverrides: {
         name: "handle_responses",
         instrumentationScope: { name: "codex_cli_rs", version: null },
       },
-    );
+    });
 
     new CodexExtractor().apply(ctx);
 
@@ -508,17 +508,17 @@ describe("CodexExtractor.apply on the codex_exec scope (exec wire, no turn rollu
 describe("CodexExtractor turn-span cache writes", () => {
   /** @scenario "Codex cache write tokens are canonicalised from the turn span" */
   it("lifts cache_write_input_tokens onto the canonical cache creation key", () => {
-    const ctx = createExtractorContext(
-      {
+    const ctx = createExtractorContext({
+      attrs: {
         model: "gpt-5.5",
         "codex.turn.token_usage.input_tokens": "1000",
         "codex.turn.token_usage.cache_write_input_tokens": "384",
       },
-      {
+      spanOverrides: {
         name: "session_task.turn",
         instrumentationScope: { name: "codex_cli_rs", version: null },
       },
-    );
+    });
 
     new CodexExtractor().apply(ctx);
 

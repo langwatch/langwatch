@@ -60,11 +60,11 @@ describe("QueueManager.initializeReactorQueues with hierarchical group keys", ()
       const entry = globalJobRegistry.get(
         "test-pipeline:reactor:evaluationTrigger",
       );
-      const event = createTestEvent(
-        TEST_CONSTANTS.AGGREGATE_ID,
+      const event = createTestEvent({
+        aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
         aggregateType,
         tenantId,
-      );
+      });
 
       const groupKey = entry?.groupKeyFn({ event, foldState: {} });
       expect(groupKey).toBe(
@@ -100,11 +100,11 @@ describe("QueueManager.initializeReactorQueues with hierarchical group keys", ()
       const entry = globalJobRegistry.get(
         "test-pipeline:reactor:spanStorageBroadcast",
       );
-      const event = createTestEvent(
-        TEST_CONSTANTS.AGGREGATE_ID,
+      const event = createTestEvent({
+        aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
         aggregateType,
         tenantId,
-      );
+      });
 
       const groupKey = entry?.groupKeyFn({ event, foldState: {} });
       expect(groupKey).toBe(
@@ -147,11 +147,11 @@ describe("QueueManager.initializeReactorQueues with hierarchical group keys", ()
         "test-pipeline:reactor:customReactor",
       );
       const event = {
-        ...createTestEvent(
-          TEST_CONSTANTS.AGGREGATE_ID,
+        ...createTestEvent({
+          aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
           aggregateType,
           tenantId,
-        ),
+        }),
         data: { runId: "run-42" },
       };
 
@@ -192,11 +192,11 @@ describe("QueueManager.initializeReactorQueues with hierarchical group keys", ()
         vi.fn(),
       );
 
-      const event = createTestEvent(
-        TEST_CONSTANTS.AGGREGATE_ID,
+      const event = createTestEvent({
+        aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
         aggregateType,
         tenantId,
-      );
+      });
       const payload = { event, foldState: {} };
 
       const evalTriggerEntry = globalJobRegistry.get(

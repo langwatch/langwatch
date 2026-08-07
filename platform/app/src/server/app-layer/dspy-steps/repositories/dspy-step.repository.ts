@@ -6,12 +6,12 @@ export interface DspyStepRepository {
     tenantId: string,
     experimentId: string,
   ): Promise<DspyStepSummaryData[]>;
-  getStep(
-    tenantId: string,
-    experimentId: string,
-    runId: string,
-    stepIndex: string,
-  ): Promise<DspyStepData | null>;
+  getStep(params: {
+    tenantId: string;
+    experimentId: string;
+    runId: string;
+    stepIndex: string;
+  }): Promise<DspyStepData | null>;
   deleteByExperiment(tenantId: string, experimentId: string): Promise<void>;
 }
 
@@ -98,12 +98,17 @@ export class InMemoryDspyStepRepository implements DspyStepRepository {
     return results.sort((a, b) => a.createdAt - b.createdAt);
   }
 
-  async getStep(
-    tenantId: string,
-    experimentId: string,
-    runId: string,
-    stepIndex: string,
-  ): Promise<DspyStepData | null> {
+  async getStep({
+    tenantId,
+    experimentId,
+    runId,
+    stepIndex,
+  }: {
+    tenantId: string;
+    experimentId: string;
+    runId: string;
+    stepIndex: string;
+  }): Promise<DspyStepData | null> {
     return (
       this.store.get(`${tenantId}/${experimentId}/${runId}/${stepIndex}`) ??
       null

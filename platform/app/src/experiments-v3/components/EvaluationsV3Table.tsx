@@ -160,12 +160,17 @@ export const isComparisonConfigured = (e: EvaluatorConfig) => {
  * silently drop every column-target comparison's row data. Exported so it can
  * be unit-tested directly instead of only through a full table render.
  */
-export const buildTargetEvaluatorsForRow = (
-  target: TargetConfig,
-  evaluators: EvaluatorConfig[],
-  results: EvaluationResults,
-  rowIndex: number,
-): Record<string, unknown> =>
+export const buildTargetEvaluatorsForRow = ({
+  target,
+  evaluators,
+  results,
+  rowIndex,
+}: {
+  target: TargetConfig;
+  evaluators: EvaluatorConfig[];
+  results: EvaluationResults;
+  rowIndex: number;
+}): Record<string, unknown> =>
   Object.fromEntries([
     ...evaluators.map(
       (evaluator) =>
@@ -1318,12 +1323,12 @@ export function EvaluationsV3Table({
             {
               output: results.targetOutputs[target.id]?.[index] ?? null,
               // All evaluators apply to all targets
-              evaluators: buildTargetEvaluatorsForRow(
+              evaluators: buildTargetEvaluatorsForRow({
                 target,
                 evaluators,
                 results,
-                index,
-              ),
+                rowIndex: index,
+              }),
               // Error for this target/row: the engine's raw string, plus the
               // code the cell reads its customer-facing copy from.
               error: results.errors[target.id]?.[index] ?? null,

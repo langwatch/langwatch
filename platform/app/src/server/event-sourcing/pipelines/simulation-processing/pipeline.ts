@@ -116,16 +116,16 @@ export function createSimulationProcessingPipeline(
     .withCommand("finishRun", FinishRunCommand)
     .withCommand("cancelRun", CancelRunCommand)
     .withCommand("deleteRun", DeleteRunCommand)
-    .withCommandInstance(
-      "computeRunMetrics",
-      ComputeRunMetricsCommand,
-      deps.computeRunMetricsCommand,
-      {
+    .withCommandInstance({
+      name: "computeRunMetrics",
+      handlerClass: ComputeRunMetricsCommand,
+      instance: deps.computeRunMetricsCommand,
+      options: {
         deduplication: {
           makeId: ComputeRunMetricsCommand.makeJobId,
           ttlMs: 60_000,
         },
       },
-    )
+    })
     .build();
 }

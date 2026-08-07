@@ -44,14 +44,24 @@ export class LogRecordStorageService {
    * inspector, drawer log accordions, the coding-agent transcript) and the
    * read-path Claude Code content enrichment.
    */
-  async getLogsByTraceId(
-    tenantId: string,
-    traceId: string,
-    occurredAtMs?: number,
-    limit?: number,
-  ): Promise<StoredLogRecordRow[]> {
+  async getLogsByTraceId({
+    tenantId,
+    traceId,
+    occurredAtMs,
+    limit,
+  }: {
+    tenantId: string;
+    traceId: string;
+    occurredAtMs?: number;
+    limit?: number;
+  }): Promise<StoredLogRecordRow[]> {
     const [legacy, canonical] = await Promise.all([
-      this.repository.getLogsByTraceId(tenantId, traceId, occurredAtMs, limit),
+      this.repository.getLogsByTraceId({
+        tenantId,
+        traceId,
+        occurredAtMs,
+        limit,
+      }),
       this.canonical.getLogsByTraceId({
         tenantId,
         traceId,

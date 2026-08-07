@@ -29,13 +29,15 @@ vi.mock("../../../../../optimization_studio/server/addEnvs", async () => {
 const capturedPaths: string[] = [];
 vi.mock("../../../../../optimization_studio/server/lambda", () => ({
   invokeLambda: vi.fn(
-    async (
-      _projectId: string,
-      _event: StudioClientEvent,
-      _s3CacheKey: string | undefined,
-      options: { path?: string } = {},
-    ) => {
-      capturedPaths.push(options.path ?? "/studio/execute");
+    async ({
+      path,
+    }: {
+      projectId: string;
+      event: StudioClientEvent;
+      s3CacheKey: string | undefined;
+      path?: string;
+    }) => {
+      capturedPaths.push(path ?? "/studio/execute");
       // One valid `done` frame so studioBackendPostEvent's reader exits
       // cleanly via its `serverEvent.type === "done"` short-circuit
       // instead of logging a "Studio invalid response" error on close.

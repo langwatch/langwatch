@@ -131,11 +131,11 @@ describe("ProjectionRegistry", () => {
       it("logs warning and drops events", async () => {
         const registry = new ProjectionRegistry();
         const events = [
-          createTestEvent(
-            TEST_CONSTANTS.AGGREGATE_ID,
-            TEST_CONSTANTS.AGGREGATE_TYPE,
+          createTestEvent({
+            aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+            aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
             tenantId,
-          ),
+          }),
         ];
 
         // Does not throw, just warns
@@ -156,11 +156,11 @@ describe("ProjectionRegistry", () => {
         registry.initialize(globalQueue, globalJobRegistry);
 
         const events = [
-          createTestEvent(
-            TEST_CONSTANTS.AGGREGATE_ID,
-            TEST_CONSTANTS.AGGREGATE_TYPE,
+          createTestEvent({
+            aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+            aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
             tenantId,
-          ),
+          }),
         ];
 
         await registry.dispatch(events, { tenantId });

@@ -36,12 +36,17 @@ async function loadSourceEvaluator(
  * if a workflow evaluator has no saved version to copy — creating the evaluator
  * without a workflow would leave a structurally broken replica.
  */
-async function copyWorkflowForEvaluator(
-  ctx: CopyEvaluatorCtx,
-  source: SourceEvaluator,
-  targetProjectId: string,
-  sourceProjectId: string,
-): Promise<string | null> {
+async function copyWorkflowForEvaluator({
+  ctx,
+  source,
+  targetProjectId,
+  sourceProjectId,
+}: {
+  ctx: CopyEvaluatorCtx;
+  source: SourceEvaluator;
+  targetProjectId: string;
+  sourceProjectId: string;
+}): Promise<string | null> {
   if (source.type !== "workflow") return null;
 
   if (!source.workflowId || !source.workflow?.latestVersion?.dsl) {
@@ -110,12 +115,12 @@ export async function copyEvaluatorToProject({
   newEvaluatorId?: string;
 }) {
   const source = await loadSourceEvaluator(ctx, evaluatorId, sourceProjectId);
-  const newWorkflowId = await copyWorkflowForEvaluator(
+  const newWorkflowId = await copyWorkflowForEvaluator({
     ctx,
     source,
     targetProjectId,
     sourceProjectId,
-  );
+  });
 
   const evaluatorService = EvaluatorService.create(ctx.prisma);
   try {

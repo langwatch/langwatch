@@ -120,12 +120,17 @@ function isPathStyleEndpoint(
  * rejects with a 403 AuthenticationFailed — no test hits this path unless
  * it asserts the actual signed bytes, not just the header's prefix.
  */
-function canonicalisedResource(
-  accountName: string,
-  container: string,
-  blobPath: string,
-  pathStyle: boolean,
-): string {
+function canonicalisedResource({
+  accountName,
+  container,
+  blobPath,
+  pathStyle,
+}: {
+  accountName: string;
+  container: string;
+  blobPath: string;
+  pathStyle: boolean;
+}): string {
   // A blank blobPath addresses the CONTAINER itself (e.g. container-create),
   // not a blob under it — omit the trailing "/" so the resource path reads
   // `/{account}/{container}`, not `/{account}/{container}/`.
@@ -221,7 +226,7 @@ function signRequest({
     "", // Range
     canonicalisedHeaders(xMsHeaders),
     withCanonicalisedQuery(
-      canonicalisedResource(accountName, container, blobPath, pathStyle),
+      canonicalisedResource({ accountName, container, blobPath, pathStyle }),
       queryParams,
     ),
   ].join("\n");

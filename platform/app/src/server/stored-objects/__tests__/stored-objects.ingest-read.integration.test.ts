@@ -137,12 +137,17 @@ function sha256Of(bytes: Buffer): string {
  * immediately but the data may not be visible to SELECT for a brief window.
  * Polling with a short backoff is the standard test pattern for this.
  */
-async function waitForRow(
-  client: ClickHouseClient,
-  projectId: string,
-  id: string,
+async function waitForRow({
+  client,
+  projectId,
+  id,
   timeoutMs = 10_000,
-): Promise<boolean> {
+}: {
+  client: ClickHouseClient;
+  projectId: string;
+  id: string;
+  timeoutMs?: number;
+}): Promise<boolean> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     const result = await client.query({
@@ -256,7 +261,11 @@ describe("StoredObjectsService (ingest + read path)", () => {
           expect(result.id).toBeTruthy();
           expect(result.isDuplicate).toBe(false);
 
-          const found = await waitForRow(ch, PROJECT_A, result.id);
+          const found = await waitForRow({
+            client: ch,
+            projectId: PROJECT_A,
+            id: result.id,
+          });
           expect(found).toBe(true);
         });
       });
@@ -285,7 +294,7 @@ describe("StoredObjectsService (ingest + read path)", () => {
           // deterministic UUID v5 of (project_id, sha256) — both inserts
           // produce the same row key and RMT collapses them. In this test
           // we want to observe the dedup-hit branch explicitly.
-          await waitForRow(ch, PROJECT_A, first.id);
+          await waitForRow({ client: ch, projectId: PROJECT_A, id: first.id });
 
           const second = await service.storeFromBytes({
             projectId: PROJECT_A,
@@ -300,7 +309,7 @@ describe("StoredObjectsService (ingest + read path)", () => {
           expect(second.isDuplicate).toBe(true);
 
           // Only one row should exist for this sha256 + project
-          await waitForRow(ch, PROJECT_A, first.id);
+          await waitForRow({ client: ch, projectId: PROJECT_A, id: first.id });
           const result = await ch.query({
             query: `SELECT count() AS cnt FROM stored_objects WHERE project_id = {projectId:String} AND sha256 = {sha256:String}`,
             query_params: { projectId: PROJECT_A, sha256: sha256Of(bytes) },
@@ -346,8 +355,8 @@ describe("StoredObjectsService (ingest + read path)", () => {
           expect(resultB.isDuplicate).toBe(false);
 
           await Promise.all([
-            waitForRow(ch, PROJECT_A, resultA.id),
-            waitForRow(ch, PROJECT_B, resultB.id),
+            waitForRow({ client: ch, projectId: PROJECT_A, id: resultA.id }),
+            waitForRow({ client: ch, projectId: PROJECT_B, id: resultB.id }),
           ]);
 
           // Each row belongs to its respective project
@@ -388,7 +397,7 @@ describe("StoredObjectsService (ingest + read path)", () => {
             bytes,
           });
 
-          await waitForRow(ch, PROJECT_A, id);
+          await waitForRow({ client: ch, projectId: PROJECT_A, id });
 
           const result = await service.getById({ projectId: PROJECT_A, id });
 
@@ -424,7 +433,7 @@ describe("StoredObjectsService (ingest + read path)", () => {
             bytes,
           });
 
-          await waitForRow(ch, PROJECT_A, id);
+          await waitForRow({ client: ch, projectId: PROJECT_A, id });
 
           // Delete the file from storage so the next GET gets an ENOENT
           const sha256 = sha256Of(bytes);
@@ -478,7 +487,9 @@ describe("StoredObjectsService (ingest + read path)", () => {
           // Assert the row is visible before reading — a bare await would let
           // a CH async-insert timeout (waitForRow → false) pass silently and
           // flake the cross-tenant assertion below.
-          expect(await waitForRow(ch, PROJECT_A, id)).toBe(true);
+          expect(
+            await waitForRow({ client: ch, projectId: PROJECT_A, id }),
+          ).toBe(true);
 
           // Project B scoping the read by A's object id finds nothing: the CH
           // query is `WHERE project_id = B AND id = ...`, which prunes to B's
@@ -526,7 +537,7 @@ describe("StoredObjectsService (ingest + read path)", () => {
           mediaType: "text/plain",
           bytes,
         });
-        await waitForRow(ch, PROJECT_A, stored.id);
+        await waitForRow({ client: ch, projectId: PROJECT_A, id: stored.id });
 
         // Read path: a span must be recorded
         await service.getById({ projectId: PROJECT_A, id: stored.id });
@@ -563,7 +574,7 @@ describe("StoredObjectsService (ingest + read path)", () => {
             bytes,
           });
 
-          await waitForRow(ch, PROJECT_A, id);
+          await waitForRow({ client: ch, projectId: PROJECT_A, id });
 
           const result = await ch.query({
             query: `SELECT project_id, storage_uri FROM stored_objects WHERE id = {id:String} LIMIT 1`,
@@ -612,8 +623,16 @@ describe("StoredObjectsService (ingest + read path)", () => {
             bytes: makeBytes(`cascade-bytes-2-${nanoid(6)}`),
           });
 
-          await waitForRow(ch, cascadeProj, stored1.id);
-          await waitForRow(ch, cascadeProj, stored2.id);
+          await waitForRow({
+            client: ch,
+            projectId: cascadeProj,
+            id: stored1.id,
+          });
+          await waitForRow({
+            client: ch,
+            projectId: cascadeProj,
+            id: stored2.id,
+          });
 
           // Sanity: both files are readable before the cascade runs.
           const before1 = await service.getById({

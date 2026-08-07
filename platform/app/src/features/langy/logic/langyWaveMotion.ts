@@ -188,12 +188,17 @@ export function deriveWaveActivity({
 }
 
 /** Exponential approach with a real time constant — frame-rate independent. */
-function approach(
-  current: number,
-  target: number,
-  dt: number,
-  tau: number,
-): number {
+function approach({
+  current,
+  target,
+  dt,
+  tau,
+}: {
+  current: number;
+  target: number;
+  dt: number;
+  tau: number;
+}): number {
   return current + (target - current) * (1 - Math.exp(-dt / tau));
 }
 
@@ -212,22 +217,33 @@ export function stepWaveMotion({
 }): LangyWaveMotion {
   const target = WAVE_MOTION_TARGETS[activity];
   return {
-    energy: approach(
-      current.energy,
-      target.energy,
+    energy: approach({
+      current: current.energy,
+      target: target.energy,
       dt,
-      target.energy > current.energy
-        ? WAVE_ENERGY_RISE_TAU_S
-        : WAVE_ENERGY_FALL_TAU_S,
-    ),
-    drift: approach(current.drift, target.drift, dt, WAVE_CHARACTER_TAU_S),
-    flutter: approach(
-      current.flutter,
-      target.flutter,
+      tau:
+        target.energy > current.energy
+          ? WAVE_ENERGY_RISE_TAU_S
+          : WAVE_ENERGY_FALL_TAU_S,
+    }),
+    drift: approach({
+      current: current.drift,
+      target: target.drift,
       dt,
-      WAVE_CHARACTER_TAU_S,
-    ),
-    pulse: approach(current.pulse, target.pulse, dt, WAVE_CHARACTER_TAU_S),
+      tau: WAVE_CHARACTER_TAU_S,
+    }),
+    flutter: approach({
+      current: current.flutter,
+      target: target.flutter,
+      dt,
+      tau: WAVE_CHARACTER_TAU_S,
+    }),
+    pulse: approach({
+      current: current.pulse,
+      target: target.pulse,
+      dt,
+      tau: WAVE_CHARACTER_TAU_S,
+    }),
   };
 }
 

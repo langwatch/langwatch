@@ -24,13 +24,19 @@ import {
 // ClickHouse compilation (unchanged output — the byte-identical invariant)
 // ---------------------------------------------------------------------------
 
-export function translateNumericField(
-  columnExpr: string,
-  tag: TagToken,
-  negated: boolean,
-  ctx: TranslationContext,
+export function translateNumericField({
+  columnExpr,
+  tag,
+  negated,
+  ctx,
   name = "value",
-): string {
+}: {
+  columnExpr: string;
+  tag: TagToken;
+  negated: boolean;
+  ctx: TranslationContext;
+  name?: string;
+}): string {
   if (tag.expression.type === "RangeExpression") {
     const min = tag.expression.range.min;
     const max = tag.expression.range.max;
@@ -65,13 +71,19 @@ export function translateNumericField(
   }
 }
 
-export function translateStringField(
-  columnExpr: string,
-  tag: TagToken,
-  negated: boolean,
-  ctx: TranslationContext,
+export function translateStringField({
+  columnExpr,
+  tag,
+  negated,
+  ctx,
   name = "value",
-): string {
+}: {
+  columnExpr: string;
+  tag: TagToken;
+  negated: boolean;
+  ctx: TranslationContext;
+  name?: string;
+}): string {
   const value = extractStringValue(tag);
   validateValueLength(value);
   const p = nextParam(ctx, name);
@@ -84,7 +96,7 @@ function stringEqualityHandler(
   name?: string,
 ): FieldHandler {
   return (tag, negated, ctx) =>
-    translateStringField(expression, tag, negated, ctx, name);
+    translateStringField({ columnExpr: expression, tag, negated, ctx, name });
 }
 
 function numericComparisonHandler(
@@ -92,15 +104,20 @@ function numericComparisonHandler(
   name?: string,
 ): FieldHandler {
   return (tag, negated, ctx) =>
-    translateNumericField(expression, tag, negated, ctx, name);
+    translateNumericField({ columnExpr: expression, tag, negated, ctx, name });
 }
 
-function crossTableStringHandler(
-  table: string,
-  timeColumn: string,
-  expression: string,
+function crossTableStringHandler({
+  table,
+  timeColumn,
+  expression,
   name = "value",
-): FieldHandler {
+}: {
+  table: string;
+  timeColumn: string;
+  expression: string;
+  name?: string;
+}): FieldHandler {
   return (tag, negated, ctx) => {
     const value = extractStringValue(tag);
     validateValueLength(value);
@@ -121,12 +138,17 @@ const NUMERIC_OP_MAP: Record<string, string> = {
   ":<=": "<=",
 };
 
-function crossTableNumericHandler(
-  table: string,
-  timeColumn: string,
-  expression: string,
+function crossTableNumericHandler({
+  table,
+  timeColumn,
+  expression,
   name = "value",
-): FieldHandler {
+}: {
+  table: string;
+  timeColumn: string;
+  expression: string;
+  name?: string;
+}): FieldHandler {
   return (tag, negated, ctx) => {
     if (tag.expression.type === "RangeExpression") {
       const min = tag.expression.range.min;
@@ -193,12 +215,17 @@ export function matchNumericInMemory(value: number, tag: TagToken): boolean {
   }
 }
 
-function evaluateCategorical(
-  read: CategoricalRead,
-  tag: TagToken,
-  negated: boolean,
-  trace: InMemoryTrace,
-): boolean | Unsupported {
+function evaluateCategorical({
+  read,
+  tag,
+  negated,
+  trace,
+}: {
+  read: CategoricalRead;
+  tag: TagToken;
+  negated: boolean;
+  trace: InMemoryTrace;
+}): boolean | Unsupported {
   const actual = read(trace);
   if (actual === UNSUPPORTED) return UNSUPPORTED;
   const target = extractStringValue(tag);
@@ -210,12 +237,17 @@ function evaluateCategorical(
   return negated ? !matched : matched;
 }
 
-function evaluateRange(
-  read: RangeRead,
-  tag: TagToken,
-  negated: boolean,
-  trace: InMemoryTrace,
-): boolean | Unsupported {
+function evaluateRange({
+  read,
+  tag,
+  negated,
+  trace,
+}: {
+  read: RangeRead;
+  tag: TagToken;
+  negated: boolean;
+  trace: InMemoryTrace;
+}): boolean | Unsupported {
   const actual = read(trace);
   if (actual === UNSUPPORTED) return UNSUPPORTED;
   // NULL numeric column: excluded under both polarities (see above).
@@ -238,7 +270,7 @@ export function categorical(
   return {
     toClickHouse: stringEqualityHandler(expression, name),
     evaluateInMemory: (tag, negated, trace) =>
-      evaluateCategorical(read, tag, negated, trace),
+      evaluateCategorical({ read, tag, negated, trace }),
   };
 }
 
@@ -251,7 +283,7 @@ export function range(
   return {
     toClickHouse: numericComparisonHandler(expression, name),
     evaluateInMemory: (tag, negated, trace) =>
-      evaluateRange(read, tag, negated, trace),
+      evaluateRange({ read, tag, negated, trace }),
   };
 }
 
@@ -260,35 +292,59 @@ export function range(
  * (`evaluation_runs` / `stored_spans`). `read` collects the candidate values
  * from the referenced collection (or {@link UNSUPPORTED} when it isn't loaded).
  */
-export function crossTableCategorical(
-  table: string,
-  timeColumn: string,
-  expression: string,
-  read: CategoricalRead,
-  needs: FieldNeeds,
+export function crossTableCategorical({
+  table,
+  timeColumn,
+  expression,
+  read,
+  needs,
   name = "value",
-): FieldDef {
+}: {
+  table: string;
+  timeColumn: string;
+  expression: string;
+  read: CategoricalRead;
+  needs: FieldNeeds;
+  name?: string;
+}): FieldDef {
   return {
     needs,
-    toClickHouse: crossTableStringHandler(table, timeColumn, expression, name),
+    toClickHouse: crossTableStringHandler({
+      table,
+      timeColumn,
+      expression,
+      name,
+    }),
     evaluateInMemory: (tag, negated, trace) =>
-      evaluateCategorical(read, tag, negated, trace),
+      evaluateCategorical({ read, tag, negated, trace }),
   };
 }
 
 /** Numeric comparison answered by a partition-pruned cross-table subquery. */
-export function crossTableRange(
-  table: string,
-  timeColumn: string,
-  expression: string,
-  read: RangeRead,
-  needs: FieldNeeds,
+export function crossTableRange({
+  table,
+  timeColumn,
+  expression,
+  read,
+  needs,
   name = "value",
-): FieldDef {
+}: {
+  table: string;
+  timeColumn: string;
+  expression: string;
+  read: RangeRead;
+  needs: FieldNeeds;
+  name?: string;
+}): FieldDef {
   return {
     needs,
-    toClickHouse: crossTableNumericHandler(table, timeColumn, expression, name),
+    toClickHouse: crossTableNumericHandler({
+      table,
+      timeColumn,
+      expression,
+      name,
+    }),
     evaluateInMemory: (tag, negated, trace) =>
-      evaluateRange(read, tag, negated, trace),
+      evaluateRange({ read, tag, negated, trace }),
   };
 }

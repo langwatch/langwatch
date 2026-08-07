@@ -552,12 +552,12 @@ export class ExperimentRunService {
           // Enrich target items with costs from trace_summaries.
           // The SDK doesn't send costs in recordTargetResult, but the
           // trace processing pipeline computes them from LLM span data.
-          const enrichedItems = await this.enrichItemsWithTraceCosts(
+          const enrichedItems = await this.enrichItemsWithTraceCosts({
             clickHouseClient,
             projectId,
-            itemRows,
+            items: itemRows,
             occurredAtRange,
-          );
+          });
 
           const result = mapClickHouseItemsToRunWithItems({
             runRecord,
@@ -750,12 +750,17 @@ export class ExperimentRunService {
    * the trace cost is split evenly across items (each target execution is
    * a child span of the same iteration trace).
    */
-  private async enrichItemsWithTraceCosts(
-    clickHouseClient: ProjectClickHouseClient,
-    projectId: string,
-    items: ClickHouseExperimentRunItemRow[],
-    occurredAtRange: { minOccurredAt: string; maxOccurredAt: string },
-  ): Promise<ClickHouseExperimentRunItemRow[]> {
+  private async enrichItemsWithTraceCosts({
+    clickHouseClient,
+    projectId,
+    items,
+    occurredAtRange,
+  }: {
+    clickHouseClient: ProjectClickHouseClient;
+    projectId: string;
+    items: ClickHouseExperimentRunItemRow[];
+    occurredAtRange: { minOccurredAt: string; maxOccurredAt: string };
+  }): Promise<ClickHouseExperimentRunItemRow[]> {
     // Collect unique traceIds from target items that are missing costs
     const traceIds = [
       ...new Set(

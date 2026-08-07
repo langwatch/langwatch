@@ -91,24 +91,24 @@ export function parseEventPayload(rawPayload: unknown): unknown {
     try {
       return JSON.parse(rawPayload);
     } catch (error) {
-      throw new StoreError(
-        "parsePayload",
-        "EventStore",
-        `Failed to parse EventPayload JSON: ${error instanceof Error ? error.message : String(error)}`,
-        ErrorCategory.CRITICAL,
-        { rawPayloadLength: rawPayload.length },
-      );
+      throw new StoreError({
+        operation: "parsePayload",
+        store: "EventStore",
+        message: `Failed to parse EventPayload JSON: ${error instanceof Error ? error.message : String(error)}`,
+        category: ErrorCategory.CRITICAL,
+        context: { rawPayloadLength: rawPayload.length },
+      });
     }
   } else if (typeof rawPayload === "object") {
     return rawPayload;
   } else {
-    throw new StoreError(
-      "parsePayload",
-      "EventStore",
-      `EventPayload is not a string or object, it is of type ${typeof rawPayload}`,
-      ErrorCategory.CRITICAL,
-      { rawPayloadType: typeof rawPayload },
-    );
+    throw new StoreError({
+      operation: "parsePayload",
+      store: "EventStore",
+      message: `EventPayload is not a string or object, it is of type ${typeof rawPayload}`,
+      category: ErrorCategory.CRITICAL,
+      context: { rawPayloadType: typeof rawPayload },
+    });
   }
 }
 
@@ -147,20 +147,20 @@ export function validateEventTenant<EventType extends Event>(
 ): void {
   const eventTenantId = event.tenantId;
   if (!eventTenantId) {
-    throw new SecurityError(
-      "validateEventTenant",
-      `Event at index ${index} has no tenantId`,
-      void 0,
-      { index },
-    );
+    throw new SecurityError({
+      operation: "validateEventTenant",
+      message: `Event at index ${index} has no tenantId`,
+      tenantId: void 0,
+      context: { index },
+    });
   }
   if (eventTenantId !== context.tenantId) {
-    throw new SecurityError(
-      "validateEventTenant",
-      `Event at index ${index} has a tenantId that does not match the context`,
-      void 0,
-      { index },
-    );
+    throw new SecurityError({
+      operation: "validateEventTenant",
+      message: `Event at index ${index} has a tenantId that does not match the context`,
+      tenantId: void 0,
+      context: { index },
+    });
   }
 }
 
@@ -173,11 +173,11 @@ export function validateEventAggregateType<EventType extends Event>(
   index: number,
 ): void {
   if (event.aggregateType !== aggregateType) {
-    throw new ValidationError(
-      `Event at index ${index} has aggregate type '${event.aggregateType}' that does not match pipeline aggregate type '${aggregateType}'`,
-      "aggregateType",
-      event.aggregateType,
-      { index, expectedAggregateType: aggregateType },
-    );
+    throw new ValidationError({
+      reason: `Event at index ${index} has aggregate type '${event.aggregateType}' that does not match pipeline aggregate type '${aggregateType}'`,
+      field: "aggregateType",
+      value: event.aggregateType,
+      context: { index, expectedAggregateType: aggregateType },
+    });
   }
 }

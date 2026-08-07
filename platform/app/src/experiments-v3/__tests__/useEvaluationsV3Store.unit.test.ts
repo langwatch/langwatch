@@ -18,7 +18,12 @@ describe("useEvaluationsV3Store", () => {
   describe("Dataset operations", () => {
     it("sets cell value in active dataset", () => {
       const store = useEvaluationsV3Store.getState();
-      store.setCellValue(DEFAULT_TEST_DATA_ID, 0, "input", "Hello world");
+      store.setCellValue({
+        datasetId: DEFAULT_TEST_DATA_ID,
+        row: 0,
+        columnId: "input",
+        value: "Hello world",
+      });
 
       const state = useEvaluationsV3Store.getState();
       const activeDataset = state.datasets.find(
@@ -29,7 +34,12 @@ describe("useEvaluationsV3Store", () => {
 
     it("expands records array when setting value at higher row index", () => {
       const store = useEvaluationsV3Store.getState();
-      store.setCellValue(DEFAULT_TEST_DATA_ID, 5, "input", "Value at row 5");
+      store.setCellValue({
+        datasetId: DEFAULT_TEST_DATA_ID,
+        row: 5,
+        columnId: "input",
+        value: "Value at row 5",
+      });
 
       const state = useEvaluationsV3Store.getState();
       const activeDataset = state.datasets.find(
@@ -98,7 +108,12 @@ describe("useEvaluationsV3Store", () => {
       // Initial state has 3 empty rows
       expect(store.getRowCount(DEFAULT_TEST_DATA_ID)).toBe(3);
 
-      store.setCellValue(DEFAULT_TEST_DATA_ID, 10, "input", "Value");
+      store.setCellValue({
+        datasetId: DEFAULT_TEST_DATA_ID,
+        row: 10,
+        columnId: "input",
+        value: "Value",
+      });
 
       expect(
         useEvaluationsV3Store.getState().getRowCount(DEFAULT_TEST_DATA_ID),
@@ -283,15 +298,22 @@ describe("useEvaluationsV3Store", () => {
       });
 
       // Add mappings for both inputs
-      store.setTargetMapping("target-1", DEFAULT_TEST_DATA_ID, "question", {
-        type: "source",
-        source: "dataset",
-        sourceId: DEFAULT_TEST_DATA_ID,
-        sourceField: "input",
+      store.setTargetMapping({
+        targetId: "target-1",
+        datasetId: DEFAULT_TEST_DATA_ID,
+        inputField: "question",
+        mapping: {
+          type: "source",
+          source: "dataset",
+          sourceId: DEFAULT_TEST_DATA_ID,
+          sourceField: "input",
+        },
       });
-      store.setTargetMapping("target-1", DEFAULT_TEST_DATA_ID, "context", {
-        type: "value",
-        value: "some context",
+      store.setTargetMapping({
+        targetId: "target-1",
+        datasetId: DEFAULT_TEST_DATA_ID,
+        inputField: "context",
+        mapping: { type: "value", value: "some context" },
       });
 
       // Verify both mappings exist
@@ -324,12 +346,16 @@ describe("useEvaluationsV3Store", () => {
     it("sets target mapping for specific dataset", () => {
       const store = useEvaluationsV3Store.getState();
       store.addTarget(createTestTarget("target-1"));
-      // setTargetMapping now takes: targetId, datasetId, inputField, mapping
-      store.setTargetMapping("target-1", DEFAULT_TEST_DATA_ID, "input", {
-        type: "source",
-        source: "dataset",
-        sourceId: DEFAULT_TEST_DATA_ID,
-        sourceField: "input",
+      store.setTargetMapping({
+        targetId: "target-1",
+        datasetId: DEFAULT_TEST_DATA_ID,
+        inputField: "input",
+        mapping: {
+          type: "source",
+          source: "dataset",
+          sourceId: DEFAULT_TEST_DATA_ID,
+          sourceField: "input",
+        },
       });
 
       const state = useEvaluationsV3Store.getState();
@@ -347,19 +373,18 @@ describe("useEvaluationsV3Store", () => {
       const store = useEvaluationsV3Store.getState();
       store.addTarget(createTestTarget("target-1"));
       store.addEvaluator(createTestEvaluator("eval-1"));
-      // setEvaluatorMapping now takes: evaluatorId, datasetId, targetId, inputField, mapping
-      store.setEvaluatorMapping(
-        "eval-1",
-        DEFAULT_TEST_DATA_ID,
-        "target-1",
-        "output",
-        {
+      store.setEvaluatorMapping({
+        evaluatorId: "eval-1",
+        datasetId: DEFAULT_TEST_DATA_ID,
+        targetId: "target-1",
+        inputField: "output",
+        mapping: {
           type: "source",
           source: "target",
           sourceId: "target-1",
           sourceField: "output",
         },
-      );
+      });
       store.removeTarget("target-1");
 
       const state = useEvaluationsV3Store.getState();
@@ -375,12 +400,16 @@ describe("useEvaluationsV3Store", () => {
       const store = useEvaluationsV3Store.getState();
       store.addTarget(createTestTarget("target-1"));
       store.addTarget(createTestTarget("target-2"));
-      // setTargetMapping now takes: targetId, datasetId, inputField, mapping
-      store.setTargetMapping("target-2", DEFAULT_TEST_DATA_ID, "input", {
-        type: "source",
-        source: "target",
-        sourceId: "target-1",
-        sourceField: "output",
+      store.setTargetMapping({
+        targetId: "target-2",
+        datasetId: DEFAULT_TEST_DATA_ID,
+        inputField: "input",
+        mapping: {
+          type: "source",
+          source: "target",
+          sourceId: "target-1",
+          sourceField: "output",
+        },
       });
       store.removeTarget("target-1");
 
@@ -485,19 +514,18 @@ describe("useEvaluationsV3Store", () => {
       const store = useEvaluationsV3Store.getState();
       store.addTarget(createTestTarget("target-1"));
       store.addEvaluator(createTestEvaluator("eval-1"));
-      // setEvaluatorMapping now takes: evaluatorId, datasetId, targetId, inputField, mapping
-      store.setEvaluatorMapping(
-        "eval-1",
-        DEFAULT_TEST_DATA_ID,
-        "target-1",
-        "output",
-        {
+      store.setEvaluatorMapping({
+        evaluatorId: "eval-1",
+        datasetId: DEFAULT_TEST_DATA_ID,
+        targetId: "target-1",
+        inputField: "output",
+        mapping: {
           type: "source",
           source: "target",
           sourceId: "target-1",
           sourceField: "output",
         },
-      );
+      });
 
       const state = useEvaluationsV3Store.getState();
       const evaluator = state.evaluators.find((e) => e.id === "eval-1");
@@ -523,30 +551,30 @@ describe("useEvaluationsV3Store", () => {
       expect(state.evaluators).toHaveLength(1);
       expect(state.targets).toHaveLength(2);
       // Both targets can have mappings set for this evaluator
-      store.setEvaluatorMapping(
-        "eval-1",
-        DEFAULT_TEST_DATA_ID,
-        "target-1",
-        "output",
-        {
+      store.setEvaluatorMapping({
+        evaluatorId: "eval-1",
+        datasetId: DEFAULT_TEST_DATA_ID,
+        targetId: "target-1",
+        inputField: "output",
+        mapping: {
           type: "source",
           source: "target",
           sourceId: "target-1",
           sourceField: "output",
         },
-      );
-      store.setEvaluatorMapping(
-        "eval-1",
-        DEFAULT_TEST_DATA_ID,
-        "target-2",
-        "output",
-        {
+      });
+      store.setEvaluatorMapping({
+        evaluatorId: "eval-1",
+        datasetId: DEFAULT_TEST_DATA_ID,
+        targetId: "target-2",
+        inputField: "output",
+        mapping: {
           type: "source",
           source: "target",
           sourceId: "target-2",
           sourceField: "output",
         },
-      );
+      });
 
       const updatedState = useEvaluationsV3Store.getState();
       const evaluator = updatedState.evaluators.find((e) => e.id === "eval-1");
@@ -726,13 +754,23 @@ describe("useEvaluationsV3Store", () => {
       const store = useEvaluationsV3Store.getState();
 
       // Make a change
-      store.setCellValue(DEFAULT_TEST_DATA_ID, 0, "input", "First value");
+      store.setCellValue({
+        datasetId: DEFAULT_TEST_DATA_ID,
+        row: 0,
+        columnId: "input",
+        value: "First value",
+      });
 
       // Wait for debounce
       await new Promise((resolve) => setTimeout(resolve, 150));
 
       // Make another change
-      store.setCellValue(DEFAULT_TEST_DATA_ID, 0, "input", "Second value");
+      store.setCellValue({
+        datasetId: DEFAULT_TEST_DATA_ID,
+        row: 0,
+        columnId: "input",
+        value: "Second value",
+      });
 
       // Wait for debounce
       await new Promise((resolve) => setTimeout(resolve, 150));
@@ -761,7 +799,12 @@ describe("useEvaluationsV3Store", () => {
       const store = useEvaluationsV3Store.getState();
 
       // Set initial data
-      store.setCellValue(DEFAULT_TEST_DATA_ID, 0, "input", "Initial");
+      store.setCellValue({
+        datasetId: DEFAULT_TEST_DATA_ID,
+        row: 0,
+        columnId: "input",
+        value: "Initial",
+      });
 
       // Wait for debounce
       await new Promise((resolve) => setTimeout(resolve, 150));

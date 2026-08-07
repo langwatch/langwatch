@@ -10,7 +10,7 @@ describe("TraceloopExtractor", () => {
   describe("when traceloop.span.kind is present", () => {
     it("maps llm to langwatch.span.type llm", () => {
       const ctx = createExtractorContext({
-        [ATTR_KEYS.TRACELOOP_SPAN_KIND]: "llm",
+        attrs: { [ATTR_KEYS.TRACELOOP_SPAN_KIND]: "llm" },
       });
 
       extractor.apply(ctx);
@@ -20,7 +20,7 @@ describe("TraceloopExtractor", () => {
 
     it("maps tool to langwatch.span.type tool", () => {
       const ctx = createExtractorContext({
-        [ATTR_KEYS.TRACELOOP_SPAN_KIND]: "tool",
+        attrs: { [ATTR_KEYS.TRACELOOP_SPAN_KIND]: "tool" },
       });
 
       extractor.apply(ctx);
@@ -30,8 +30,10 @@ describe("TraceloopExtractor", () => {
 
     it("consumes traceloop.span.kind even when langwatch.span.type already set", () => {
       const ctx = createExtractorContext({
-        [ATTR_KEYS.SPAN_TYPE]: "agent",
-        [ATTR_KEYS.TRACELOOP_SPAN_KIND]: "llm",
+        attrs: {
+          [ATTR_KEYS.SPAN_TYPE]: "agent",
+          [ATTR_KEYS.TRACELOOP_SPAN_KIND]: "llm",
+        },
       });
 
       extractor.apply(ctx);
@@ -47,7 +49,7 @@ describe("TraceloopExtractor", () => {
     it("maps to gen_ai.input.messages", () => {
       const messages = [{ role: "user", content: "Hello" }];
       const ctx = createExtractorContext({
-        [ATTR_KEYS.TRACELOOP_ENTITY_INPUT]: JSON.stringify(messages),
+        attrs: { [ATTR_KEYS.TRACELOOP_ENTITY_INPUT]: JSON.stringify(messages) },
       });
 
       extractor.apply(ctx);
@@ -57,12 +59,14 @@ describe("TraceloopExtractor", () => {
 
     it("does not overwrite existing gen_ai.input.messages", () => {
       const ctx = createExtractorContext({
-        [ATTR_KEYS.GEN_AI_INPUT_MESSAGES]: JSON.stringify([
-          { role: "user", content: "existing" },
-        ]),
-        [ATTR_KEYS.TRACELOOP_ENTITY_INPUT]: JSON.stringify([
-          { role: "user", content: "traceloop" },
-        ]),
+        attrs: {
+          [ATTR_KEYS.GEN_AI_INPUT_MESSAGES]: JSON.stringify([
+            { role: "user", content: "existing" },
+          ]),
+          [ATTR_KEYS.TRACELOOP_ENTITY_INPUT]: JSON.stringify([
+            { role: "user", content: "traceloop" },
+          ]),
+        },
       });
 
       extractor.apply(ctx);
@@ -76,7 +80,9 @@ describe("TraceloopExtractor", () => {
     it("maps to gen_ai.output.messages", () => {
       const messages = [{ role: "assistant", content: "Hi there" }];
       const ctx = createExtractorContext({
-        [ATTR_KEYS.TRACELOOP_ENTITY_OUTPUT]: JSON.stringify(messages),
+        attrs: {
+          [ATTR_KEYS.TRACELOOP_ENTITY_OUTPUT]: JSON.stringify(messages),
+        },
       });
 
       extractor.apply(ctx);

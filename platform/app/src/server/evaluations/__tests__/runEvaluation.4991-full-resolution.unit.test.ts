@@ -145,12 +145,12 @@ describe("runEvaluation — #4991 full blob resolution on evaluator reads", () =
         });
 
         expectConstructedWithDeps();
-        expect(getByIdMock).toHaveBeenCalledWith(
-          "project-1",
-          "trace-1",
-          expect.anything(),
-          { full: true },
-        );
+        expect(getByIdMock).toHaveBeenCalledWith({
+          projectId: "project-1",
+          traceId: "trace-1",
+          protections: expect.anything(),
+          opts: { full: true },
+        });
       });
     });
   });
@@ -179,12 +179,12 @@ describe("runEvaluation — #4991 full blob resolution on evaluator reads", () =
         });
 
         expectConstructedWithDeps();
-        expect(getTracesByThreadIdMock).toHaveBeenCalledWith(
-          "project-1",
-          "thread-1",
-          expect.anything(),
-          { full: true },
-        );
+        expect(getTracesByThreadIdMock).toHaveBeenCalledWith({
+          projectId: "project-1",
+          threadId: "thread-1",
+          protections: expect.anything(),
+          opts: { full: true },
+        });
       });
     });
   });

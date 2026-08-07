@@ -32,7 +32,13 @@ describe("topicClustering page fetch memory guard", () => {
         },
       } as unknown as ClickHouseClient;
 
-      await fetchTracesFromClickHouse(clickhouse, "project-1", false, [], []);
+      await fetchTracesFromClickHouse({
+        clickhouse,
+        projectId: "project-1",
+        isIncrementalProcessing: false,
+        topicIds: [],
+        subtopicIds: [],
+      });
 
       const pageFetch = captured.find((c) => c.query.includes("ComputedInput"));
       expect(pageFetch).toBeDefined();

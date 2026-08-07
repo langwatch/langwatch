@@ -105,7 +105,7 @@ describe("LogfireExtractor", () => {
 
   describe("when neither raw_input nor gen_ai.choice events exist", () => {
     it("does nothing", () => {
-      const ctx = createExtractorContext({});
+      const ctx = createExtractorContext({ attrs: {} });
 
       extractor.apply(ctx);
 

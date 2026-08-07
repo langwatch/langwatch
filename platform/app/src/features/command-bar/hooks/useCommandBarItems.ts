@@ -15,16 +15,25 @@ import type { FilteredProject } from "./useFilteredProjects";
 /**
  * Hook that builds the flat list of all items for keyboard navigation and display.
  */
-export function useCommandBarItems(
-  query: string,
-  filteredCommands: FilteredCommands,
-  filteredProjects: FilteredProject[],
-  searchResults: SearchResult[],
-  idResult: SearchResult | null,
-  groupedItems: GroupedRecentItems,
-  projectSlug: string | undefined,
-  langyEnabled: boolean,
-): {
+export function useCommandBarItems({
+  query,
+  filteredCommands,
+  filteredProjects,
+  searchResults,
+  idResult,
+  groupedItems,
+  projectSlug,
+  langyEnabled,
+}: {
+  query: string;
+  filteredCommands: FilteredCommands;
+  filteredProjects: FilteredProject[];
+  searchResults: SearchResult[];
+  idResult: SearchResult | null;
+  groupedItems: GroupedRecentItems;
+  projectSlug: string | undefined;
+  langyEnabled: boolean;
+}): {
   allItems: ListItem[];
   recentItemsLimited: RecentItem[];
   searchInTracesItem: ListItem | null;

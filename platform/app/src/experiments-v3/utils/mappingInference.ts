@@ -334,12 +334,17 @@ const DATASET_INPUT_FIELDS = new Set([
  * @param existingMappings - Any existing mappings to preserve
  * @returns New mappings to apply
  */
-export const inferEvaluatorMappings = (
-  evaluatorInputs: Field[],
-  dataset: DatasetReference,
-  target: TargetConfig,
-  existingMappings: Record<string, FieldMapping> = {},
-): Record<string, FieldMapping> => {
+export const inferEvaluatorMappings = ({
+  evaluatorInputs,
+  dataset,
+  target,
+  existingMappings = {},
+}: {
+  evaluatorInputs: Field[];
+  dataset: DatasetReference;
+  target: TargetConfig;
+  existingMappings?: Record<string, FieldMapping>;
+}): Record<string, FieldMapping> => {
   const newMappings: Record<string, FieldMapping> = {};
 
   for (const input of evaluatorInputs) {
@@ -477,12 +482,12 @@ export const inferAllEvaluatorMappings = (
   for (const dataset of datasets) {
     for (const target of targets) {
       const existingMappings = result[dataset.id]?.[target.id] ?? {};
-      const newMappings = inferEvaluatorMappings(
-        evaluator.inputs,
+      const newMappings = inferEvaluatorMappings({
+        evaluatorInputs: evaluator.inputs,
         dataset,
         target,
         existingMappings,
-      );
+      });
 
       if (Object.keys(newMappings).length > 0) {
         if (!result[dataset.id]) {

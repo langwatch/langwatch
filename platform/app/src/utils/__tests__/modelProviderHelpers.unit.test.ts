@@ -127,7 +127,7 @@ describe("modelProviderHelpers", () => {
         OPENAI_BASE_URL: "https://api.openai.com/v1",
       };
 
-      const result = buildCustomKeyState(displayKeyMap, storedKeys);
+      const result = buildCustomKeyState({ displayKeyMap, storedKeys });
 
       expect(result).toEqual({
         OPENAI_API_KEY: "sk-stored123",
@@ -140,11 +140,11 @@ describe("modelProviderHelpers", () => {
       const storedKeys = { OPENAI_API_KEY: "sk-old" };
       const previousKeys = { OPENAI_API_KEY: "sk-user-typing" };
 
-      const result = buildCustomKeyState(
+      const result = buildCustomKeyState({
         displayKeyMap,
         storedKeys,
         previousKeys,
-      );
+      });
 
       expect(result.OPENAI_API_KEY).toBe("sk-user-typing");
     });
@@ -154,11 +154,11 @@ describe("modelProviderHelpers", () => {
       const storedKeys = {};
       const previousKeys = { MANAGED: "true" };
 
-      const result = buildCustomKeyState(
+      const result = buildCustomKeyState({
         displayKeyMap,
         storedKeys,
         previousKeys,
-      );
+      });
 
       expect(result).toEqual({ MANAGED: "true" });
     });
@@ -168,12 +168,11 @@ describe("modelProviderHelpers", () => {
       const storedKeys = {};
       const options = { providerEnabledWithEnvVars: true };
 
-      const result = buildCustomKeyState(
+      const result = buildCustomKeyState({
         displayKeyMap,
         storedKeys,
-        undefined,
         options,
-      );
+      });
 
       expect(result.OPENAI_API_KEY).toBe(MASKED_KEY_PLACEHOLDER);
       expect(result.OPENAI_BASE_URL).toBe(""); // URL fields are not masked
@@ -183,7 +182,7 @@ describe("modelProviderHelpers", () => {
       const displayKeyMap = { OPENAI_API_KEY: {}, OPENAI_BASE_URL: {} };
       const storedKeys = {};
 
-      const result = buildCustomKeyState(displayKeyMap, storedKeys);
+      const result = buildCustomKeyState({ displayKeyMap, storedKeys });
 
       expect(result).toEqual({ OPENAI_API_KEY: "", OPENAI_BASE_URL: "" });
     });
@@ -193,18 +192,17 @@ describe("modelProviderHelpers", () => {
       const storedKeys = { OPENAI_API_KEY: "sk-actual-key" };
       const options = { providerEnabledWithEnvVars: true };
 
-      const result = buildCustomKeyState(
+      const result = buildCustomKeyState({
         displayKeyMap,
         storedKeys,
-        undefined,
         options,
-      );
+      });
 
       expect(result.OPENAI_API_KEY).toBe("sk-actual-key");
     });
 
     it("handles empty display key map", () => {
-      const result = buildCustomKeyState({}, {});
+      const result = buildCustomKeyState({ displayKeyMap: {}, storedKeys: {} });
       expect(result).toEqual({});
     });
   });

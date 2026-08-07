@@ -207,12 +207,17 @@ export class BroadcastService {
    * (and silently drops the event) when the per-tenant per-tier bucket is
    * exhausted, preventing upstream overload on high-frequency delta streams.
    */
-  async broadcastToTenantRateLimited(
-    tenantId: string,
-    event: string,
-    eventType: BroadcastEventType = "trace_updated",
-    tier: "structural" | "delta" = "structural",
-  ): Promise<boolean> {
+  async broadcastToTenantRateLimited({
+    tenantId,
+    event,
+    eventType = "trace_updated",
+    tier = "structural",
+  }: {
+    tenantId: string;
+    event: string;
+    eventType?: BroadcastEventType;
+    tier?: "structural" | "delta";
+  }): Promise<boolean> {
     if (!this.active) throw new BroadcasterNotActiveError();
     if (!this.senderRateLimiter.tryConsume(tenantId, tier)) {
       return false;

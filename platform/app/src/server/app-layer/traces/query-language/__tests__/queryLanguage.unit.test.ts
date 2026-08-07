@@ -183,11 +183,15 @@ describe("parse LRU cache", () => {
 describe("parse operator matrix", () => {
   describe("comparison operators", () => {
     it.each([
-      [">", "cost:>5", ":>", 5],
-      [">=", "cost:>=5", ":>=", 5],
-      ["<", "cost:<5", ":<", 5],
-      ["<=", "cost:<=5", ":<=", 5],
-    ])("parses `%s` as a Tag with the matching liqe operator", (_, query, op, value) => {
+      { label: ">", query: "cost:>5", op: ":>", value: 5 },
+      { label: ">=", query: "cost:>=5", op: ":>=", value: 5 },
+      { label: "<", query: "cost:<5", op: ":<", value: 5 },
+      { label: "<=", query: "cost:<=5", op: ":<=", value: 5 },
+    ])("parses `$label` as a Tag with the matching liqe operator", ({
+      query,
+      op,
+      value,
+    }) => {
       const ast = parse(query) as unknown as {
         type: string;
         operator: { operator: string };

@@ -52,7 +52,12 @@ export function ScopeFilter({
 }: Props) {
   const [moreOpen, setMoreOpen] = useState(false);
 
-  const label = filterLabel(value, available, currentTeamId, currentProjectId);
+  const label = filterLabel({
+    filter: value,
+    available,
+    currentTeamId,
+    currentProjectId,
+  });
 
   return (
     <Menu.Root>
@@ -191,12 +196,17 @@ function ScopeOptionItem({
   );
 }
 
-function filterLabel(
-  filter: ScopeFilter,
-  available: AvailableScopes,
-  currentTeamId?: string | null,
-  currentProjectId?: string | null,
-): string {
+function filterLabel({
+  filter,
+  available,
+  currentTeamId,
+  currentProjectId,
+}: {
+  filter: ScopeFilter;
+  available: AvailableScopes;
+  currentTeamId?: string | null;
+  currentProjectId?: string | null;
+}): string {
   if (filter.kind === "all") return "All you can see";
   if (filter.kind === "team-current") {
     const team = available.teams.find((t) => t.id === currentTeamId);

@@ -52,16 +52,13 @@ describe("fold redelivery telemetry", () => {
 
   const events = (count: number): Event[] =>
     Array.from({ length: count }, (_, i) =>
-      createTestEvent(
-        TEST_CONSTANTS.AGGREGATE_ID,
-        TEST_CONSTANTS.AGGREGATE_TYPE,
+      createTestEvent({
+        aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+        aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
         tenantId,
-        undefined,
-        1_000 + i,
-        undefined,
-        undefined,
-        `event-${i}`,
-      ),
+        createdAt: 1_000 + i,
+        id: `event-${i}`,
+      }),
     );
 
   describe("given a retry whose applied-event-id set did not survive", () => {

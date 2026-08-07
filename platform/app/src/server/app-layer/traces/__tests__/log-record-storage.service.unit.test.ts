@@ -53,33 +53,36 @@ describe("LogRecordStorageService.getLogsByTraceId", () => {
     it("delegates to the repository with the tenant, trace, time hint, and row cap", async () => {
       const { service, getLogsByTraceId } = makeService();
 
-      const result = await service.getLogsByTraceId(
-        "project_test",
-        "trace-1",
-        1_700_000_000_000,
-        250,
-      );
+      const result = await service.getLogsByTraceId({
+        tenantId: "project_test",
+        traceId: "trace-1",
+        occurredAtMs: 1_700_000_000_000,
+        limit: 250,
+      });
 
-      expect(getLogsByTraceId).toHaveBeenCalledWith(
-        "project_test",
-        "trace-1",
-        1_700_000_000_000,
-        250,
-      );
+      expect(getLogsByTraceId).toHaveBeenCalledWith({
+        tenantId: "project_test",
+        traceId: "trace-1",
+        occurredAtMs: 1_700_000_000_000,
+        limit: 250,
+      });
       expect(result).toEqual([row]);
     });
 
     it("passes an undefined time hint and cap straight through so the repository default applies", async () => {
       const { service, getLogsByTraceId } = makeService();
 
-      await service.getLogsByTraceId("project_test", "trace-1");
+      await service.getLogsByTraceId({
+        tenantId: "project_test",
+        traceId: "trace-1",
+      });
 
-      expect(getLogsByTraceId).toHaveBeenCalledWith(
-        "project_test",
-        "trace-1",
-        undefined,
-        undefined,
-      );
+      expect(getLogsByTraceId).toHaveBeenCalledWith({
+        tenantId: "project_test",
+        traceId: "trace-1",
+        occurredAtMs: undefined,
+        limit: undefined,
+      });
     });
 
     it("queries the canonical store with the same read and returns rows only it holds", async () => {
@@ -91,12 +94,12 @@ describe("LogRecordStorageService.getLogsByTraceId", () => {
         canonicalRows: [canonicalRow],
       });
 
-      const result = await service.getLogsByTraceId(
-        "project_test",
-        "trace-1",
-        1_700_000_000_000,
-        250,
-      );
+      const result = await service.getLogsByTraceId({
+        tenantId: "project_test",
+        traceId: "trace-1",
+        occurredAtMs: 1_700_000_000_000,
+        limit: 250,
+      });
 
       expect(canonicalGetLogsByTraceId).toHaveBeenCalledWith({
         tenantId: "project_test",
@@ -113,7 +116,10 @@ describe("LogRecordStorageService.getLogsByTraceId", () => {
         canonicalRows: [canonicalRow],
       });
 
-      const result = await service.getLogsByTraceId("project_test", "trace-1");
+      const result = await service.getLogsByTraceId({
+        tenantId: "project_test",
+        traceId: "trace-1",
+      });
 
       expect(result).toEqual([row, canonicalRow]);
     });

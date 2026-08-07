@@ -109,19 +109,26 @@ const checkForRequiredLLMKeys = (
   return true;
 };
 
-export async function runEvaluationWorkflow(
-  workflowId: string,
-  projectId: string,
-  inputs: Record<string, string>,
-  versionId?: string,
-  causalityDepth?: number,
-  parentTrace?: { traceId: string; parentSpanId: string },
-): Promise<{
+export async function runEvaluationWorkflow({
+  workflowId,
+  projectId,
+  inputs,
+  versionId,
+  causalityDepth,
+  parentTrace,
+}: {
+  workflowId: string;
+  projectId: string;
+  inputs: Record<string, string>;
+  versionId?: string;
+  causalityDepth?: number;
+  parentTrace?: { traceId: string; parentSpanId: string };
+}): Promise<{
   result: SingleEvaluationResult;
   status: ExecutionStatus;
 }> {
   try {
-    const data = await runWorkflow(
+    const data = await runWorkflow({
       workflowId,
       projectId,
       inputs,
@@ -136,15 +143,15 @@ export async function runEvaluationWorkflow(
       // execute_component) get a fresh trace_id and land as a
       // separate orphan trace. See the 2026-05-14 prod regression
       // reported by rchaves.
-      false, // do_not_trace
-      false, // run_evaluations - disable evaluators inside the workflow when running as an online evaluation
-      "evaluation",
+      do_not_trace: false,
+      run_evaluations: false, // disable evaluators inside the workflow when running as an online evaluation
+      origin: "evaluation",
       // Always pass a concrete depth (default 0) so the downstream
       // header gate in nlpgoFetch sees this as an evaluator-chain call
       // even when the parent had no depth attribute yet.
-      causalityDepth ?? 0,
+      causalityDepth: causalityDepth ?? 0,
       parentTrace,
-    );
+    });
 
     // Process the result
     if (data.result) {
@@ -180,17 +187,27 @@ export async function runEvaluationWorkflow(
   }
 }
 
-export async function runWorkflow(
-  workflowId: string,
-  projectId: string,
-  inputs: Record<string, string>,
-  versionId?: string,
-  do_not_trace?: boolean,
-  run_evaluations?: boolean,
-  origin: NLPOrigin = "workflow",
-  causalityDepth?: number,
-  parentTrace?: { traceId: string; parentSpanId: string },
-) {
+export async function runWorkflow({
+  workflowId,
+  projectId,
+  inputs,
+  versionId,
+  do_not_trace,
+  run_evaluations,
+  origin = "workflow",
+  causalityDepth,
+  parentTrace,
+}: {
+  workflowId: string;
+  projectId: string;
+  inputs: Record<string, string>;
+  versionId?: string;
+  do_not_trace?: boolean;
+  run_evaluations?: boolean;
+  origin?: NLPOrigin;
+  causalityDepth?: number;
+  parentTrace?: { traceId: string; parentSpanId: string };
+}) {
   const workflow = await prisma.workflow.findUnique({
     where: { id: workflowId, projectId },
   });

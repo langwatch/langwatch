@@ -22,7 +22,11 @@ function dedupVersion(acceptedAt: number): string {
 function validate(record: CanonicalLogRecord, operation: string) {
   EventUtils.validateTenantId({ tenantId: record.tenantId }, operation);
   if (!/^[a-f0-9]{64}$/.test(record.recordId)) {
-    throw new SecurityError(operation, "invalid RecordId", record.tenantId);
+    throw new SecurityError({
+      operation,
+      message: "invalid RecordId",
+      tenantId: record.tenantId,
+    });
   }
 }
 

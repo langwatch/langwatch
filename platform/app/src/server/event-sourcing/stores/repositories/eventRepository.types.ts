@@ -37,12 +37,17 @@ export interface EventRepository {
    * `rehydrationLowerBoundMs`. It is purely a partition-pruning optimisation and
    * must never change the result set for a correctly-classified aggregate.
    */
-  getEventRecords(
-    tenantId: string,
-    aggregateType: string,
-    aggregateId: string,
-    occurredAtFromMs?: number,
-  ): Promise<EventRecord[]>;
+  getEventRecords({
+    tenantId,
+    aggregateType,
+    aggregateId,
+    occurredAtFromMs,
+  }: {
+    tenantId: string;
+    aggregateType: string;
+    aggregateId: string;
+    occurredAtFromMs?: number;
+  }): Promise<EventRecord[]>;
 
   /**
    * Retrieves event records up to and including a specific event.
@@ -94,13 +99,19 @@ export interface EventRepository {
    * Counts event records that come before a given event.
    * Returns raw count without validation.
    */
-  countEventRecords(
-    tenantId: string,
-    aggregateType: string,
-    aggregateId: string,
-    beforeTimestamp: number,
-    beforeEventId: string,
-  ): Promise<number>;
+  countEventRecords({
+    tenantId,
+    aggregateType,
+    aggregateId,
+    beforeTimestamp,
+    beforeEventId,
+  }: {
+    tenantId: string;
+    aggregateType: string;
+    aggregateId: string;
+    beforeTimestamp: number;
+    beforeEventId: string;
+  }): Promise<number>;
 
   /**
    * Inserts event records into storage.

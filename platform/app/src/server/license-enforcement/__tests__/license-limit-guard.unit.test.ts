@@ -63,12 +63,12 @@ describe("assertMemberTypeLimitNotExceeded", () => {
       const mockRepo = createMockRepo();
       const limits = createLimits();
 
-      await assertMemberTypeLimitNotExceeded(
-        "no-change",
+      await assertMemberTypeLimitNotExceeded({
+        changeType: "no-change",
         organizationId,
-        mockRepo,
+        licenseRepo: mockRepo,
         limits,
-      );
+      });
 
       expect(mockRepo.getMemberCount).not.toHaveBeenCalled();
       expect(mockRepo.getMembersLiteCount).not.toHaveBeenCalled();
@@ -78,12 +78,12 @@ describe("assertMemberTypeLimitNotExceeded", () => {
       const mockRepo = createMockRepo();
       const limits = createLimits();
 
-      await assertMemberTypeLimitNotExceeded(
-        "no-change",
+      await assertMemberTypeLimitNotExceeded({
+        changeType: "no-change",
         organizationId,
-        mockRepo,
+        licenseRepo: mockRepo,
         limits,
-      );
+      });
 
       expect(mockNotifyResourceLimitReached).not.toHaveBeenCalled();
     });
@@ -94,12 +94,12 @@ describe("assertMemberTypeLimitNotExceeded", () => {
       const mockRepo = createMockRepo();
       const limits = createLimits(5, 10, true);
 
-      await assertMemberTypeLimitNotExceeded(
-        "lite-to-full",
+      await assertMemberTypeLimitNotExceeded({
+        changeType: "lite-to-full",
         organizationId,
-        mockRepo,
+        licenseRepo: mockRepo,
         limits,
-      );
+      });
 
       expect(mockRepo.getMemberCount).not.toHaveBeenCalled();
       expect(mockRepo.getMembersLiteCount).not.toHaveBeenCalled();
@@ -109,12 +109,12 @@ describe("assertMemberTypeLimitNotExceeded", () => {
       const mockRepo = createMockRepo();
       const limits = createLimits(5, 10, true);
 
-      await assertMemberTypeLimitNotExceeded(
-        "lite-to-full",
+      await assertMemberTypeLimitNotExceeded({
+        changeType: "lite-to-full",
         organizationId,
-        mockRepo,
+        licenseRepo: mockRepo,
         limits,
-      );
+      });
 
       expect(mockNotifyResourceLimitReached).not.toHaveBeenCalled();
     });
@@ -127,12 +127,12 @@ describe("assertMemberTypeLimitNotExceeded", () => {
       const limits = createLimits(5);
 
       await expect(
-        assertMemberTypeLimitNotExceeded(
-          "lite-to-full",
+        assertMemberTypeLimitNotExceeded({
+          changeType: "lite-to-full",
           organizationId,
-          mockRepo,
+          licenseRepo: mockRepo,
           limits,
-        ),
+        }),
       ).resolves.toBeUndefined();
 
       expect(mockRepo.getMemberCount).toHaveBeenCalledWith(organizationId);
@@ -142,12 +142,12 @@ describe("assertMemberTypeLimitNotExceeded", () => {
       const mockRepo = createMockRepo(3);
       const limits = createLimits(5);
 
-      await assertMemberTypeLimitNotExceeded(
-        "lite-to-full",
+      await assertMemberTypeLimitNotExceeded({
+        changeType: "lite-to-full",
         organizationId,
-        mockRepo,
+        licenseRepo: mockRepo,
         limits,
-      );
+      });
 
       expect(mockNotifyResourceLimitReached).not.toHaveBeenCalled();
     });
@@ -157,12 +157,12 @@ describe("assertMemberTypeLimitNotExceeded", () => {
       const mockRepo = createMockRepo(5); // 5 members, limit is 5
       const limits = createLimits(5);
 
-      const error = await assertMemberTypeLimitNotExceeded(
-        "lite-to-full",
+      const error = await assertMemberTypeLimitNotExceeded({
+        changeType: "lite-to-full",
         organizationId,
-        mockRepo,
+        licenseRepo: mockRepo,
         limits,
-      ).catch((e) => e);
+      }).catch((e) => e);
 
       // The allowance travels as `meta` under a stable code, which is what lets
       // the client name which seats ran out. Asserting the code rather than the
@@ -182,12 +182,12 @@ describe("assertMemberTypeLimitNotExceeded", () => {
       const mockRepo = createMockRepo(5);
       const limits = createLimits(5);
 
-      await assertMemberTypeLimitNotExceeded(
-        "lite-to-full",
+      await assertMemberTypeLimitNotExceeded({
+        changeType: "lite-to-full",
         organizationId,
-        mockRepo,
+        licenseRepo: mockRepo,
         limits,
-      ).catch(() => {});
+      }).catch(() => {});
 
       expect(mockNotifyResourceLimitReached).toHaveBeenCalledWith({
         organizationId,
@@ -202,12 +202,12 @@ describe("assertMemberTypeLimitNotExceeded", () => {
       const limits = createLimits(5);
 
       await expect(
-        assertMemberTypeLimitNotExceeded(
-          "lite-to-full",
+        assertMemberTypeLimitNotExceeded({
+          changeType: "lite-to-full",
           organizationId,
-          mockRepo,
+          licenseRepo: mockRepo,
           limits,
-        ),
+        }),
       ).rejects.toThrow(LimitExceededError);
     });
   });
@@ -218,12 +218,12 @@ describe("assertMemberTypeLimitNotExceeded", () => {
       const limits = createLimits(5, 10);
 
       await expect(
-        assertMemberTypeLimitNotExceeded(
-          "full-to-lite",
+        assertMemberTypeLimitNotExceeded({
+          changeType: "full-to-lite",
           organizationId,
-          mockRepo,
+          licenseRepo: mockRepo,
           limits,
-        ),
+        }),
       ).resolves.toBeUndefined();
 
       expect(mockRepo.getMembersLiteCount).toHaveBeenCalledWith(organizationId);
@@ -233,12 +233,12 @@ describe("assertMemberTypeLimitNotExceeded", () => {
       const mockRepo = createMockRepo(0, 5);
       const limits = createLimits(5, 10);
 
-      await assertMemberTypeLimitNotExceeded(
-        "full-to-lite",
+      await assertMemberTypeLimitNotExceeded({
+        changeType: "full-to-lite",
         organizationId,
-        mockRepo,
+        licenseRepo: mockRepo,
         limits,
-      );
+      });
 
       expect(mockNotifyResourceLimitReached).not.toHaveBeenCalled();
     });
@@ -247,12 +247,12 @@ describe("assertMemberTypeLimitNotExceeded", () => {
       const mockRepo = createMockRepo(0, 10); // 10 lite members, limit is 10
       const limits = createLimits(5, 10);
 
-      const error = await assertMemberTypeLimitNotExceeded(
-        "full-to-lite",
+      const error = await assertMemberTypeLimitNotExceeded({
+        changeType: "full-to-lite",
         organizationId,
-        mockRepo,
+        licenseRepo: mockRepo,
         limits,
-      ).catch((e) => e);
+      }).catch((e) => e);
 
       expect(error).toMatchObject({
         code: "resource_limit_exceeded",
@@ -269,12 +269,12 @@ describe("assertMemberTypeLimitNotExceeded", () => {
       const mockRepo = createMockRepo(0, 10);
       const limits = createLimits(5, 10);
 
-      await assertMemberTypeLimitNotExceeded(
-        "full-to-lite",
+      await assertMemberTypeLimitNotExceeded({
+        changeType: "full-to-lite",
         organizationId,
-        mockRepo,
+        licenseRepo: mockRepo,
         limits,
-      ).catch(() => {});
+      }).catch(() => {});
 
       expect(mockNotifyResourceLimitReached).toHaveBeenCalledWith({
         organizationId,
@@ -289,12 +289,12 @@ describe("assertMemberTypeLimitNotExceeded", () => {
       const limits = createLimits(5, 10);
 
       await expect(
-        assertMemberTypeLimitNotExceeded(
-          "full-to-lite",
+        assertMemberTypeLimitNotExceeded({
+          changeType: "full-to-lite",
           organizationId,
-          mockRepo,
+          licenseRepo: mockRepo,
           limits,
-        ),
+        }),
       ).rejects.toThrow(LimitExceededError);
     });
   });
@@ -312,12 +312,12 @@ describe("assertMemberTypeLimitNotExceeded", () => {
       const mockRepo = createMockRepo(plan.maxMembers);
 
       await expect(
-        assertMemberTypeLimitNotExceeded(
-          "lite-to-full",
+        assertMemberTypeLimitNotExceeded({
+          changeType: "lite-to-full",
           organizationId,
-          mockRepo,
-          plan,
-        ),
+          licenseRepo: mockRepo,
+          limits: plan,
+        }),
       ).rejects.toMatchObject({
         code: "resource_limit_exceeded",
         meta: { limitType: "members" },
@@ -331,12 +331,12 @@ describe("assertMemberTypeLimitNotExceeded", () => {
       const mockRepo = createMockRepo(plan.maxMembers - 1);
 
       await expect(
-        assertMemberTypeLimitNotExceeded(
-          "lite-to-full",
+        assertMemberTypeLimitNotExceeded({
+          changeType: "lite-to-full",
           organizationId,
-          mockRepo,
-          plan,
-        ),
+          licenseRepo: mockRepo,
+          limits: plan,
+        }),
       ).resolves.toBeUndefined();
     });
   });

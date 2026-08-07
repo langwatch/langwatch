@@ -325,13 +325,19 @@ export type ExecutionDataInputs = {
   parameters?: Record<string, string | number | boolean>;
 };
 
-export const loadExecutionData = async (
-  projectId: string,
-  dataset: DatasetInput,
-  targets: TargetForLoading[],
-  evaluators: EvaluatorForLoading[],
-  inputs?: ExecutionDataInputs,
-): Promise<LoadedExecutionData | { error: string; status: number }> => {
+export const loadExecutionData = async ({
+  projectId,
+  dataset,
+  targets,
+  evaluators,
+  inputs,
+}: {
+  projectId: string;
+  dataset: DatasetInput;
+  targets: TargetForLoading[];
+  evaluators: EvaluatorForLoading[];
+  inputs?: ExecutionDataInputs;
+}): Promise<LoadedExecutionData | { error: string; status: number }> => {
   // Resolve the base rows + columns: inline data, a saved dataset id, or the
   // attached dataset reference, in that precedence.
   let baseDataset: LoadedDataset;

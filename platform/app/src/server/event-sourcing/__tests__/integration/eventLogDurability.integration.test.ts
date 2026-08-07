@@ -287,11 +287,11 @@ describe.skipIf(!hasTestcontainers)(
           format: "JSONEachRow",
         });
 
-        const events = await eventStore.getEvents(
-          traceId,
-          { tenantId: createTenantId(tenantId) },
-          "trace" as AggregateType,
-        );
+        const events = await eventStore.getEvents({
+          aggregateId: traceId,
+          context: { tenantId: createTenantId(tenantId) },
+          aggregateType: "trace" as AggregateType,
+        });
 
         expect(events.length).toBeGreaterThanOrEqual(1);
         const evt = events[0]!;
@@ -389,11 +389,11 @@ describe.skipIf(!hasTestcontainers)(
         await deleteStoredSpansForTenant(client, tenantId);
         await new Promise((r) => setTimeout(r, 1000));
 
-        const events = await eventStore.getEvents(
-          traceId,
-          { tenantId: createTenantId(tenantId) },
-          "trace" as AggregateType,
-        );
+        const events = await eventStore.getEvents({
+          aggregateId: traceId,
+          context: { tenantId: createTenantId(tenantId) },
+          aggregateType: "trace" as AggregateType,
+        });
 
         expect(events.length).toBeGreaterThanOrEqual(1);
         const evt = events.find((e: any) => e.type === "SpanReceivedEvent");
@@ -449,16 +449,16 @@ describe.skipIf(!hasTestcontainers)(
         await deleteStoredSpansForTenant(client, tenantId);
         await new Promise((r) => setTimeout(r, 1500));
 
-        const eventsA = await eventStore.getEvents(
-          traceA,
-          { tenantId: createTenantId(tenantId) },
-          "trace" as AggregateType,
-        );
-        const eventsB = await eventStore.getEvents(
-          traceB,
-          { tenantId: createTenantId(tenantId) },
-          "trace" as AggregateType,
-        );
+        const eventsA = await eventStore.getEvents({
+          aggregateId: traceA,
+          context: { tenantId: createTenantId(tenantId) },
+          aggregateType: "trace" as AggregateType,
+        });
+        const eventsB = await eventStore.getEvents({
+          aggregateId: traceB,
+          context: { tenantId: createTenantId(tenantId) },
+          aggregateType: "trace" as AggregateType,
+        });
 
         expect(eventsA.length).toBeGreaterThanOrEqual(1);
         expect(eventsB.length).toBeGreaterThanOrEqual(1);
@@ -493,16 +493,16 @@ describe.skipIf(!hasTestcontainers)(
           format: "JSONEachRow",
         });
 
-        const eventsForOwner = await eventStore.getEvents(
-          traceId,
-          { tenantId: createTenantId(ownerTenant) },
-          "trace" as AggregateType,
-        );
-        const eventsForOther = await eventStore.getEvents(
-          traceId,
-          { tenantId: createTenantId(otherTenant) },
-          "trace" as AggregateType,
-        );
+        const eventsForOwner = await eventStore.getEvents({
+          aggregateId: traceId,
+          context: { tenantId: createTenantId(ownerTenant) },
+          aggregateType: "trace" as AggregateType,
+        });
+        const eventsForOther = await eventStore.getEvents({
+          aggregateId: traceId,
+          context: { tenantId: createTenantId(otherTenant) },
+          aggregateType: "trace" as AggregateType,
+        });
 
         expect(eventsForOwner.length).toBeGreaterThanOrEqual(1);
         expect(eventsForOther.length).toBe(0);
@@ -535,11 +535,11 @@ describe.skipIf(!hasTestcontainers)(
         });
         await new Promise((r) => setTimeout(r, 500));
 
-        const events = await eventStore.getEvents(
-          traceId,
-          { tenantId: createTenantId(tenantId) },
-          "trace" as AggregateType,
-        );
+        const events = await eventStore.getEvents({
+          aggregateId: traceId,
+          context: { tenantId: createTenantId(tenantId) },
+          aggregateType: "trace" as AggregateType,
+        });
 
         const matchingEventIds = events
           .filter((e: any) => e.type === "SpanReceivedEvent")

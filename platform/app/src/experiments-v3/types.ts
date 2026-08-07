@@ -633,22 +633,22 @@ export type EvaluationsV3Actions = {
   exportInlineToSaved: (datasetId: string, savedDatasetId: string) => void;
 
   // Dataset cell/column actions (works for both inline and saved)
-  setCellValue: (
-    datasetId: string,
-    row: number,
-    columnId: string,
-    value: string,
-  ) => void;
+  setCellValue: (params: {
+    datasetId: string;
+    row: number;
+    columnId: string;
+    value: string;
+  }) => void;
   getCellValue: (datasetId: string, row: number, columnId: string) => string;
   getRowCount: (datasetId: string) => number;
 
   // Saved dataset actions
-  updateSavedRecordValue: (
-    datasetId: string,
-    rowIndex: number,
-    columnId: string,
-    value: string,
-  ) => void;
+  updateSavedRecordValue: (params: {
+    datasetId: string;
+    rowIndex: number;
+    columnId: string;
+    value: string;
+  }) => void;
   clearPendingChange: (dbDatasetId: string, recordId: string) => void;
   getSavedRecordInfo: (
     datasetId: string,
@@ -673,12 +673,12 @@ export type EvaluationsV3Actions = {
   updateTarget: (targetId: string, updates: Partial<TargetConfig>) => void;
   removeTarget: (targetId: string) => void;
   /** Set a mapping for a target input field for a specific dataset */
-  setTargetMapping: (
-    targetId: string,
-    datasetId: string,
-    inputField: string,
-    mapping: FieldMapping,
-  ) => void;
+  setTargetMapping: (params: {
+    targetId: string;
+    datasetId: string;
+    inputField: string;
+    mapping: FieldMapping;
+  }) => void;
   /** Remove a mapping for a target input field for a specific dataset */
   removeTargetMapping: (
     targetId: string,
@@ -704,20 +704,20 @@ export type EvaluationsV3Actions = {
   removeEvaluator: (evaluatorId: string) => void;
 
   /** Set a mapping for an evaluator input field for a specific dataset and target */
-  setEvaluatorMapping: (
-    evaluatorId: string,
-    datasetId: string,
-    targetId: string,
-    inputField: string,
-    mapping: FieldMapping,
-  ) => void;
+  setEvaluatorMapping: (params: {
+    evaluatorId: string;
+    datasetId: string;
+    targetId: string;
+    inputField: string;
+    mapping: FieldMapping;
+  }) => void;
   /** Remove a mapping for an evaluator input field for a specific dataset and target */
-  removeEvaluatorMapping: (
-    evaluatorId: string,
-    datasetId: string,
-    targetId: string,
-    inputField: string,
-  ) => void;
+  removeEvaluatorMapping: (params: {
+    evaluatorId: string;
+    datasetId: string;
+    targetId: string;
+    inputField: string;
+  }) => void;
 
   // Results actions
   setResults: (results: Partial<EvaluationResults>) => void;

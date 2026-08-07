@@ -249,7 +249,7 @@ function matchField(
   // Simple array: resolve field and check if any value matches
   if (Array.isArray(filterValue)) {
     if (filterValue.length === 0) return true;
-    return matchSimpleArray(traceData, field, filterValue);
+    return matchSimpleArray({ traceData, field, filterValues: filterValue });
   }
 
   // Nested object: OR across keys (matches ClickHouse filter generation)
@@ -260,7 +260,7 @@ function matchField(
       // Record<string, string[]> — resolve with key
       if (subValue.length === 0) continue;
       hasActionableCondition = true;
-      if (matchSimpleArray(traceData, field, subValue, key)) {
+      if (matchSimpleArray({ traceData, field, filterValues: subValue, key })) {
         return true;
       }
     } else if (typeof subValue === "object" && subValue !== null) {
@@ -268,7 +268,15 @@ function matchField(
       for (const [subkey, values] of Object.entries(subValue)) {
         if (!Array.isArray(values) || values.length === 0) continue;
         hasActionableCondition = true;
-        if (matchSimpleArray(traceData, field, values, key, subkey)) {
+        if (
+          matchSimpleArray({
+            traceData,
+            field,
+            filterValues: values,
+            key,
+            subkey,
+          })
+        ) {
           return true;
         }
       }
@@ -282,20 +290,31 @@ function matchField(
  * Resolves a field value using the precondition matcher registry and
  * checks if any of the filter values match.
  */
-function matchSimpleArray(
-  traceData: PreconditionTraceData,
-  field: FilterField,
-  filterValues: string[],
-  key?: string,
-  subkey?: string,
-): boolean {
+function matchSimpleArray({
+  traceData,
+  field,
+  filterValues,
+  key,
+  subkey,
+}: {
+  traceData: PreconditionTraceData;
+  field: FilterField;
+  filterValues: string[];
+  key?: string;
+  subkey?: string;
+}): boolean {
   const matcher: PreconditionFieldMatcher | null | undefined =
     PRECONDITION_FIELD_MATCHERS[field];
 
   // Key-selector fields (metadata.key) and unavailable fields
   if (!matcher) return false;
 
-  const resolved = matcher(traceData, filterValues[0]!, key, subkey);
+  const resolved = matcher({
+    data: traceData,
+    value: filterValues[0]!,
+    key,
+    subkey,
+  });
 
   if (resolved == null) return false;
 

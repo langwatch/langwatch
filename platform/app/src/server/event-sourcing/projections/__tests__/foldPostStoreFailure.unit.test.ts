@@ -50,16 +50,13 @@ describe("fold failures after the state was stored", () => {
 
   const events = (count: number): Event[] =>
     Array.from({ length: count }, (_, i) =>
-      createTestEvent(
-        TEST_CONSTANTS.AGGREGATE_ID,
-        TEST_CONSTANTS.AGGREGATE_TYPE,
+      createTestEvent({
+        aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+        aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
         tenantId,
-        undefined,
-        1_000 + i,
-        undefined,
-        undefined,
-        `event-${i}`,
-      ),
+        createdAt: 1_000 + i,
+        id: `event-${i}`,
+      }),
     );
 
   /**
@@ -75,11 +72,11 @@ describe("fold failures after the state was stored", () => {
     shouldStoreFail?: boolean;
   }): ReturnType<typeof vi.fn> {
     const queueManager = createMockQueueManager({ hasReactorQueues: false });
-    const router = new ProjectionRouter<Event>(
-      TEST_CONSTANTS.AGGREGATE_TYPE,
-      TEST_CONSTANTS.PIPELINE_NAME,
+    const router = new ProjectionRouter<Event>({
+      aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
+      pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
       queueManager,
-    );
+    });
 
     const store = createMockFoldProjectionStore<{ count: number }>();
     (store.get as ReturnType<typeof vi.fn>).mockResolvedValue(null);
@@ -115,7 +112,8 @@ describe("fold failures after the state was stored", () => {
     shouldReactorFail?: boolean;
     shouldStoreFail?: boolean;
   }): Promise<unknown> {
-    const onEventBatch = buildFoldQueues(options).mock.calls[0]?.[2] as (
+    const onEventBatch = buildFoldQueues(options).mock.calls[0]?.[0]
+      ?.onEventBatch as (
       projectionName: string,
       events: Event[],
       context: unknown,
@@ -132,7 +130,7 @@ describe("fold failures after the state was stored", () => {
     shouldReactorFail?: boolean;
     shouldStoreFail?: boolean;
   }): Promise<unknown> {
-    const onEvent = buildFoldQueues(options).mock.calls[0]?.[1] as (
+    const onEvent = buildFoldQueues(options).mock.calls[0]?.[0]?.onEvent as (
       projectionName: string,
       event: Event,
       context: unknown,

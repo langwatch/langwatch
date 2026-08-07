@@ -345,9 +345,9 @@ export class SimulationRunStateFoldProjection
       LastSnapshotOccurredAt: event.occurredAt,
       Messages: event.data.messages.map((m, i) => {
         if (!isRecord(m)) {
-          throw new ValidationError(
-            `Simulation ${state.ScenarioRunId} failed with invalid message on index ${i}`,
-          );
+          throw new ValidationError({
+            reason: `Simulation ${state.ScenarioRunId} failed with invalid message on index ${i}`,
+          });
         }
 
         // Content can be either:

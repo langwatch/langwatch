@@ -27,12 +27,17 @@ export const calculateGridPositions = <T extends GridItem>(
 
   const cellKey = (col: number, row: number) => `${col},${row}`;
 
-  const isAreaFree = (
-    col: number,
-    row: number,
-    colSpan: number,
-    rowSpan: number,
-  ) => {
+  const isAreaFree = ({
+    col,
+    row,
+    colSpan,
+    rowSpan,
+  }: {
+    col: number;
+    row: number;
+    colSpan: number;
+    rowSpan: number;
+  }) => {
     for (let c = col; c < col + colSpan; c++) {
       for (let r = row; r < row + rowSpan; r++) {
         if (c >= 2 || occupied.has(cellKey(c, r))) {
@@ -43,12 +48,17 @@ export const calculateGridPositions = <T extends GridItem>(
     return true;
   };
 
-  const occupyArea = (
-    col: number,
-    row: number,
-    colSpan: number,
-    rowSpan: number,
-  ) => {
+  const occupyArea = ({
+    col,
+    row,
+    colSpan,
+    rowSpan,
+  }: {
+    col: number;
+    row: number;
+    colSpan: number;
+    rowSpan: number;
+  }) => {
     for (let c = col; c < col + colSpan; c++) {
       for (let r = row; r < row + rowSpan; r++) {
         occupied.add(cellKey(c, r));
@@ -65,8 +75,8 @@ export const calculateGridPositions = <T extends GridItem>(
 
     while (!placed) {
       for (let col = 0; col <= 2 - colSpan; col++) {
-        if (isAreaFree(col, row, colSpan, rowSpan)) {
-          occupyArea(col, row, colSpan, rowSpan);
+        if (isAreaFree({ col, row, colSpan, rowSpan })) {
+          occupyArea({ col, row, colSpan, rowSpan });
           layouts.push({
             graphId: item.id,
             gridColumn: col,

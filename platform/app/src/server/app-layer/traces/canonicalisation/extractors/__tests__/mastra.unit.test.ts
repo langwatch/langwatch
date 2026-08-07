@@ -13,10 +13,10 @@ describe("MastraExtractor", () => {
     };
 
     it("maps agent_run to agent", () => {
-      const ctx = createExtractorContext(
-        { [ATTR_KEYS.MASTRA_SPAN_TYPE]: "agent_run" },
-        mastraScope,
-      );
+      const ctx = createExtractorContext({
+        attrs: { [ATTR_KEYS.MASTRA_SPAN_TYPE]: "agent_run" },
+        spanOverrides: mastraScope,
+      });
 
       extractor.apply(ctx);
 
@@ -24,10 +24,10 @@ describe("MastraExtractor", () => {
     });
 
     it("maps workflow_run to workflow", () => {
-      const ctx = createExtractorContext(
-        { [ATTR_KEYS.MASTRA_SPAN_TYPE]: "workflow_run" },
-        mastraScope,
-      );
+      const ctx = createExtractorContext({
+        attrs: { [ATTR_KEYS.MASTRA_SPAN_TYPE]: "workflow_run" },
+        spanOverrides: mastraScope,
+      });
 
       extractor.apply(ctx);
 
@@ -35,10 +35,10 @@ describe("MastraExtractor", () => {
     });
 
     it("maps model_generation to llm", () => {
-      const ctx = createExtractorContext(
-        { [ATTR_KEYS.MASTRA_SPAN_TYPE]: "model_generation" },
-        mastraScope,
-      );
+      const ctx = createExtractorContext({
+        attrs: { [ATTR_KEYS.MASTRA_SPAN_TYPE]: "model_generation" },
+        spanOverrides: mastraScope,
+      });
 
       extractor.apply(ctx);
 
@@ -46,10 +46,10 @@ describe("MastraExtractor", () => {
     });
 
     it("maps tool_call to tool", () => {
-      const ctx = createExtractorContext(
-        { [ATTR_KEYS.MASTRA_SPAN_TYPE]: "tool_call" },
-        mastraScope,
-      );
+      const ctx = createExtractorContext({
+        attrs: { [ATTR_KEYS.MASTRA_SPAN_TYPE]: "tool_call" },
+        spanOverrides: mastraScope,
+      });
 
       extractor.apply(ctx);
 
@@ -57,10 +57,10 @@ describe("MastraExtractor", () => {
     });
 
     it("maps mcp_tool_call to tool", () => {
-      const ctx = createExtractorContext(
-        { [ATTR_KEYS.MASTRA_SPAN_TYPE]: "mcp_tool_call" },
-        mastraScope,
-      );
+      const ctx = createExtractorContext({
+        attrs: { [ATTR_KEYS.MASTRA_SPAN_TYPE]: "mcp_tool_call" },
+        spanOverrides: mastraScope,
+      });
 
       extractor.apply(ctx);
 
@@ -68,10 +68,10 @@ describe("MastraExtractor", () => {
     });
 
     it("maps generic to span", () => {
-      const ctx = createExtractorContext(
-        { [ATTR_KEYS.MASTRA_SPAN_TYPE]: "generic" },
-        mastraScope,
-      );
+      const ctx = createExtractorContext({
+        attrs: { [ATTR_KEYS.MASTRA_SPAN_TYPE]: "generic" },
+        spanOverrides: mastraScope,
+      });
 
       extractor.apply(ctx);
 
@@ -79,10 +79,10 @@ describe("MastraExtractor", () => {
     });
 
     it("maps unknown types to span (default)", () => {
-      const ctx = createExtractorContext(
-        { [ATTR_KEYS.MASTRA_SPAN_TYPE]: "something_new" },
-        mastraScope,
-      );
+      const ctx = createExtractorContext({
+        attrs: { [ATTR_KEYS.MASTRA_SPAN_TYPE]: "something_new" },
+        spanOverrides: mastraScope,
+      });
 
       extractor.apply(ctx);
 
@@ -96,10 +96,10 @@ describe("MastraExtractor", () => {
     };
 
     it("maps agent_run to agent", () => {
-      const ctx = createExtractorContext(
-        { [ATTR_KEYS.MASTRA_SPAN_TYPE]: "agent_run" },
-        mastraBridgeScope,
-      );
+      const ctx = createExtractorContext({
+        attrs: { [ATTR_KEYS.MASTRA_SPAN_TYPE]: "agent_run" },
+        spanOverrides: mastraBridgeScope,
+      });
 
       extractor.apply(ctx);
 
@@ -107,10 +107,10 @@ describe("MastraExtractor", () => {
     });
 
     it("maps processor_run to component", () => {
-      const ctx = createExtractorContext(
-        { [ATTR_KEYS.MASTRA_SPAN_TYPE]: "processor_run" },
-        mastraBridgeScope,
-      );
+      const ctx = createExtractorContext({
+        attrs: { [ATTR_KEYS.MASTRA_SPAN_TYPE]: "processor_run" },
+        spanOverrides: mastraBridgeScope,
+      });
 
       extractor.apply(ctx);
 
@@ -118,10 +118,10 @@ describe("MastraExtractor", () => {
     });
 
     it("maps model_generation to llm", () => {
-      const ctx = createExtractorContext(
-        { [ATTR_KEYS.MASTRA_SPAN_TYPE]: "model_generation" },
-        mastraBridgeScope,
-      );
+      const ctx = createExtractorContext({
+        attrs: { [ATTR_KEYS.MASTRA_SPAN_TYPE]: "model_generation" },
+        spanOverrides: mastraBridgeScope,
+      });
 
       extractor.apply(ctx);
 
@@ -131,10 +131,12 @@ describe("MastraExtractor", () => {
 
   describe("when detected by mastra.span.type attribute only", () => {
     it("maps span type even without @mastra/* scope", () => {
-      const ctx = createExtractorContext(
-        { [ATTR_KEYS.MASTRA_SPAN_TYPE]: "tool_call" },
-        { instrumentationScope: { name: "unknown-scope", version: null } },
-      );
+      const ctx = createExtractorContext({
+        attrs: { [ATTR_KEYS.MASTRA_SPAN_TYPE]: "tool_call" },
+        spanOverrides: {
+          instrumentationScope: { name: "unknown-scope", version: null },
+        },
+      });
 
       extractor.apply(ctx);
 
@@ -142,10 +144,12 @@ describe("MastraExtractor", () => {
     });
 
     it("maps model_step to llm without @mastra/* scope", () => {
-      const ctx = createExtractorContext(
-        { [ATTR_KEYS.MASTRA_SPAN_TYPE]: "model_step" },
-        { instrumentationScope: { name: "other-lib", version: null } },
-      );
+      const ctx = createExtractorContext({
+        attrs: { [ATTR_KEYS.MASTRA_SPAN_TYPE]: "model_step" },
+        spanOverrides: {
+          instrumentationScope: { name: "other-lib", version: null },
+        },
+      });
 
       extractor.apply(ctx);
 
@@ -155,10 +159,12 @@ describe("MastraExtractor", () => {
 
   describe("when instrumentationScope.name is NOT mastra and no mastra attributes", () => {
     it("does nothing (no span type set)", () => {
-      const ctx = createExtractorContext(
-        {},
-        { instrumentationScope: { name: "other-lib", version: null } },
-      );
+      const ctx = createExtractorContext({
+        attrs: {},
+        spanOverrides: {
+          instrumentationScope: { name: "other-lib", version: null },
+        },
+      });
 
       extractor.apply(ctx);
 
@@ -169,13 +175,15 @@ describe("MastraExtractor", () => {
 
   describe("when langwatch.span.type already exists in bag", () => {
     it("preserves user-explicit span type over Mastra mapping", () => {
-      const ctx = createExtractorContext(
-        {
+      const ctx = createExtractorContext({
+        attrs: {
           [ATTR_KEYS.SPAN_TYPE]: "agent",
           [ATTR_KEYS.MASTRA_SPAN_TYPE]: "model_generation",
         },
-        { instrumentationScope: { name: "@mastra/otel", version: null } },
-      );
+        spanOverrides: {
+          instrumentationScope: { name: "@mastra/otel", version: null },
+        },
+      });
 
       extractor.apply(ctx);
 
@@ -186,12 +194,14 @@ describe("MastraExtractor", () => {
 
   describe("when span type was set by a prior extractor (ctx.out)", () => {
     it("overrides extractor-inferred span type with Mastra mapping", () => {
-      const ctx = createExtractorContext(
-        {
+      const ctx = createExtractorContext({
+        attrs: {
           [ATTR_KEYS.MASTRA_SPAN_TYPE]: "model_generation",
         },
-        { instrumentationScope: { name: "@mastra/otel", version: null } },
-      );
+        spanOverrides: {
+          instrumentationScope: { name: "@mastra/otel", version: null },
+        },
+      });
       // Simulate a prior extractor having set span type
       ctx.out[ATTR_KEYS.SPAN_TYPE] = "span";
 
@@ -215,13 +225,13 @@ describe("MastraExtractor", () => {
           content: [{ type: "text", text: "what's the weather in london?" }],
         },
       ]);
-      const ctx = createExtractorContext(
-        {
+      const ctx = createExtractorContext({
+        attrs: {
           [ATTR_KEYS.MASTRA_SPAN_TYPE]: "agent_run",
           [ATTR_KEYS.MASTRA_AGENT_RUN_INPUT]: messages,
         },
-        mastraScope,
-      );
+        spanOverrides: mastraScope,
+      });
 
       extractor.apply(ctx);
 
@@ -235,13 +245,13 @@ describe("MastraExtractor", () => {
         { role: "system", content: "You are helpful" },
         { role: "user", content: "hello world" },
       ]);
-      const ctx = createExtractorContext(
-        {
+      const ctx = createExtractorContext({
+        attrs: {
           [ATTR_KEYS.MASTRA_SPAN_TYPE]: "agent_run",
           [ATTR_KEYS.MASTRA_AGENT_RUN_INPUT]: messages,
         },
-        mastraScope,
-      );
+        spanOverrides: mastraScope,
+      });
 
       extractor.apply(ctx);
 
@@ -254,13 +264,13 @@ describe("MastraExtractor", () => {
         { role: "assistant", content: "first answer" },
         { role: "user", content: "second question" },
       ]);
-      const ctx = createExtractorContext(
-        {
+      const ctx = createExtractorContext({
+        attrs: {
           [ATTR_KEYS.MASTRA_SPAN_TYPE]: "agent_run",
           [ATTR_KEYS.MASTRA_AGENT_RUN_INPUT]: messages,
         },
-        mastraScope,
-      );
+        spanOverrides: mastraScope,
+      });
 
       extractor.apply(ctx);
 
@@ -271,14 +281,14 @@ describe("MastraExtractor", () => {
       const messages = JSON.stringify([
         { role: "user", content: "from mastra" },
       ]);
-      const ctx = createExtractorContext(
-        {
+      const ctx = createExtractorContext({
+        attrs: {
           [ATTR_KEYS.MASTRA_SPAN_TYPE]: "agent_run",
           [ATTR_KEYS.MASTRA_AGENT_RUN_INPUT]: messages,
           [ATTR_KEYS.LANGWATCH_INPUT]: "already set",
         },
-        mastraScope,
-      );
+        spanOverrides: mastraScope,
+      });
 
       extractor.apply(ctx);
 
@@ -296,13 +306,13 @@ describe("MastraExtractor", () => {
         text: "The weather in London is sunny, 15°C.",
         files: [],
       });
-      const ctx = createExtractorContext(
-        {
+      const ctx = createExtractorContext({
+        attrs: {
           [ATTR_KEYS.MASTRA_SPAN_TYPE]: "agent_run",
           [ATTR_KEYS.MASTRA_AGENT_RUN_OUTPUT]: output,
         },
-        mastraScope,
-      );
+        spanOverrides: mastraScope,
+      });
 
       extractor.apply(ctx);
 
@@ -313,13 +323,13 @@ describe("MastraExtractor", () => {
 
     it("does not set langwatch.output for empty text", () => {
       const output = JSON.stringify({ text: "", files: [] });
-      const ctx = createExtractorContext(
-        {
+      const ctx = createExtractorContext({
+        attrs: {
           [ATTR_KEYS.MASTRA_SPAN_TYPE]: "agent_run",
           [ATTR_KEYS.MASTRA_AGENT_RUN_OUTPUT]: output,
         },
-        mastraScope,
-      );
+        spanOverrides: mastraScope,
+      });
 
       extractor.apply(ctx);
 
@@ -328,14 +338,14 @@ describe("MastraExtractor", () => {
 
     it("does not overwrite existing langwatch.output", () => {
       const output = JSON.stringify({ text: "from mastra", files: [] });
-      const ctx = createExtractorContext(
-        {
+      const ctx = createExtractorContext({
+        attrs: {
           [ATTR_KEYS.MASTRA_SPAN_TYPE]: "agent_run",
           [ATTR_KEYS.MASTRA_AGENT_RUN_OUTPUT]: output,
           [ATTR_KEYS.LANGWATCH_OUTPUT]: "already set",
         },
-        mastraScope,
-      );
+        spanOverrides: mastraScope,
+      });
 
       extractor.apply(ctx);
 
@@ -349,13 +359,13 @@ describe("MastraExtractor", () => {
     };
 
     it("maps mastra.metadata.threadId to gen_ai.conversation.id", () => {
-      const ctx = createExtractorContext(
-        {
+      const ctx = createExtractorContext({
+        attrs: {
           [ATTR_KEYS.MASTRA_SPAN_TYPE]: "agent_run",
           "mastra.metadata.threadId": "thread-abc",
         },
-        mastraScope,
-      );
+        spanOverrides: mastraScope,
+      });
 
       extractor.apply(ctx);
 
@@ -363,13 +373,13 @@ describe("MastraExtractor", () => {
     });
 
     it("does not overwrite existing gen_ai.conversation.id", () => {
-      const ctx = createExtractorContext(
-        {
+      const ctx = createExtractorContext({
+        attrs: {
           [ATTR_KEYS.MASTRA_SPAN_TYPE]: "agent_run",
           "mastra.metadata.threadId": "mastra-thread",
         },
-        mastraScope,
-      );
+        spanOverrides: mastraScope,
+      });
 
       // Pre-set conversation.id
       ctx.out[ATTR_KEYS.GEN_AI_CONVERSATION_ID] = "existing-thread";
@@ -380,8 +390,8 @@ describe("MastraExtractor", () => {
     });
 
     it("leaves non-threadId metadata keys untouched in the bag", () => {
-      const ctx = createExtractorContext(
-        {
+      const ctx = createExtractorContext({
+        attrs: {
           [ATTR_KEYS.MASTRA_SPAN_TYPE]: "agent_run",
           "mastra.metadata.runId": "run-42",
           "mastra.metadata.headers": JSON.stringify({
@@ -389,8 +399,8 @@ describe("MastraExtractor", () => {
           }),
           "mastra.metadata.body": JSON.stringify({ key: "value" }),
         },
-        mastraScope,
-      );
+        spanOverrides: mastraScope,
+      });
 
       extractor.apply(ctx);
 
@@ -405,14 +415,14 @@ describe("MastraExtractor", () => {
     });
 
     it("consumes only threadId from the bag", () => {
-      const ctx = createExtractorContext(
-        {
+      const ctx = createExtractorContext({
+        attrs: {
           [ATTR_KEYS.MASTRA_SPAN_TYPE]: "agent_run",
           "mastra.metadata.threadId": "t1",
           "mastra.metadata.runId": "r1",
         },
-        mastraScope,
-      );
+        spanOverrides: mastraScope,
+      });
 
       extractor.apply(ctx);
 
@@ -427,13 +437,13 @@ describe("MastraExtractor", () => {
     };
 
     it("maps to gen_ai.usage.cache_read.input_tokens", () => {
-      const ctx = createExtractorContext(
-        {
+      const ctx = createExtractorContext({
+        attrs: {
           [ATTR_KEYS.MASTRA_SPAN_TYPE]: "model_step",
           [ATTR_KEYS.GEN_AI_USAGE_CACHED_INPUT_TOKENS]: "150",
         },
-        mastraScope,
-      );
+        spanOverrides: mastraScope,
+      });
 
       extractor.apply(ctx);
 
@@ -441,13 +451,13 @@ describe("MastraExtractor", () => {
     });
 
     it("does not overwrite existing cache_read.input_tokens", () => {
-      const ctx = createExtractorContext(
-        {
+      const ctx = createExtractorContext({
+        attrs: {
           [ATTR_KEYS.MASTRA_SPAN_TYPE]: "model_step",
           [ATTR_KEYS.GEN_AI_USAGE_CACHED_INPUT_TOKENS]: "150",
         },
-        mastraScope,
-      );
+        spanOverrides: mastraScope,
+      });
 
       // Pre-set canonical name
       ctx.out[ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS] = 200;
@@ -458,13 +468,13 @@ describe("MastraExtractor", () => {
     });
 
     it("coerces string value to number", () => {
-      const ctx = createExtractorContext(
-        {
+      const ctx = createExtractorContext({
+        attrs: {
           [ATTR_KEYS.MASTRA_SPAN_TYPE]: "model_step",
           [ATTR_KEYS.GEN_AI_USAGE_CACHED_INPUT_TOKENS]: "720",
         },
-        mastraScope,
-      );
+        spanOverrides: mastraScope,
+      });
 
       extractor.apply(ctx);
 
@@ -485,13 +495,13 @@ describe("MastraExtractor", () => {
         text: "The current weather in London is sunny, 15°C.",
         toolCalls: [],
       });
-      const ctx = createExtractorContext(
-        {
+      const ctx = createExtractorContext({
+        attrs: {
           [ATTR_KEYS.MASTRA_SPAN_TYPE]: "model_step",
           [ATTR_KEYS.MASTRA_MODEL_STEP_OUTPUT]: output,
         },
-        mastraScope,
-      );
+        spanOverrides: mastraScope,
+      });
 
       extractor.apply(ctx);
 
@@ -505,13 +515,13 @@ describe("MastraExtractor", () => {
         text: "The answer is 42.",
         toolCalls: [],
       });
-      const ctx = createExtractorContext(
-        {
+      const ctx = createExtractorContext({
+        attrs: {
           [ATTR_KEYS.MASTRA_SPAN_TYPE]: "model_step",
           [ATTR_KEYS.MASTRA_MODEL_STEP_OUTPUT]: output,
         },
-        mastraScope,
-      );
+        spanOverrides: mastraScope,
+      });
 
       extractor.apply(ctx);
 
@@ -525,13 +535,13 @@ describe("MastraExtractor", () => {
         text: "Hello",
         toolCalls: [],
       });
-      const ctx = createExtractorContext(
-        {
+      const ctx = createExtractorContext({
+        attrs: {
           [ATTR_KEYS.MASTRA_SPAN_TYPE]: "model_step",
           [ATTR_KEYS.MASTRA_MODEL_STEP_OUTPUT]: output,
         },
-        mastraScope,
-      );
+        spanOverrides: mastraScope,
+      });
 
       extractor.apply(ctx);
 
@@ -546,13 +556,13 @@ describe("MastraExtractor", () => {
         object: { score: 9 },
         text: "",
       });
-      const ctx = createExtractorContext(
-        {
+      const ctx = createExtractorContext({
+        attrs: {
           [ATTR_KEYS.MASTRA_SPAN_TYPE]: "model_step",
           [ATTR_KEYS.MASTRA_MODEL_STEP_OUTPUT]: output,
         },
-        { ...mastraScope, parentSpanId: null },
-      );
+        spanOverrides: { ...mastraScope, parentSpanId: null },
+      });
 
       extractor.apply(ctx);
 
@@ -561,13 +571,13 @@ describe("MastraExtractor", () => {
 
     it("does not set langwatch.output for empty text", () => {
       const output = JSON.stringify({ text: "", toolCalls: [] });
-      const ctx = createExtractorContext(
-        {
+      const ctx = createExtractorContext({
+        attrs: {
           [ATTR_KEYS.MASTRA_SPAN_TYPE]: "model_step",
           [ATTR_KEYS.MASTRA_MODEL_STEP_OUTPUT]: output,
         },
-        mastraScope,
-      );
+        spanOverrides: mastraScope,
+      });
 
       extractor.apply(ctx);
 
@@ -576,14 +586,14 @@ describe("MastraExtractor", () => {
 
     it("does not set langwatch.output when already exists", () => {
       const output = JSON.stringify({ text: "from mastra", toolCalls: [] });
-      const ctx = createExtractorContext(
-        {
+      const ctx = createExtractorContext({
+        attrs: {
           [ATTR_KEYS.MASTRA_SPAN_TYPE]: "model_step",
           [ATTR_KEYS.MASTRA_MODEL_STEP_OUTPUT]: output,
           [ATTR_KEYS.LANGWATCH_OUTPUT]: "already set",
         },
-        mastraScope,
-      );
+        spanOverrides: mastraScope,
+      });
 
       extractor.apply(ctx);
 
@@ -592,13 +602,13 @@ describe("MastraExtractor", () => {
 
     it("does not set langwatch.output for agent_run spans", () => {
       const output = JSON.stringify({ text: "concatenated text" });
-      const ctx = createExtractorContext(
-        {
+      const ctx = createExtractorContext({
+        attrs: {
           [ATTR_KEYS.MASTRA_SPAN_TYPE]: "agent_run",
           [ATTR_KEYS.MASTRA_MODEL_STEP_OUTPUT]: output,
         },
-        mastraScope,
-      );
+        spanOverrides: mastraScope,
+      });
 
       extractor.apply(ctx);
 
@@ -618,13 +628,13 @@ describe("MastraExtractor", () => {
           messages: [{ role: "user", content: "hello" }],
         },
       });
-      const ctx = createExtractorContext(
-        {
+      const ctx = createExtractorContext({
+        attrs: {
           [ATTR_KEYS.MASTRA_SPAN_TYPE]: "model_step",
           [ATTR_KEYS.MASTRA_MODEL_STEP_INPUT]: input,
         },
-        mastraScope,
-      );
+        spanOverrides: mastraScope,
+      });
 
       extractor.apply(ctx);
 
@@ -642,13 +652,13 @@ describe("MastraExtractor", () => {
           ],
         },
       });
-      const ctx = createExtractorContext(
-        {
+      const ctx = createExtractorContext({
+        attrs: {
           [ATTR_KEYS.MASTRA_SPAN_TYPE]: "model_step",
           [ATTR_KEYS.MASTRA_MODEL_STEP_INPUT]: input,
         },
-        mastraScope,
-      );
+        spanOverrides: mastraScope,
+      });
 
       extractor.apply(ctx);
 
@@ -670,13 +680,13 @@ describe("MastraExtractor", () => {
           ],
         },
       });
-      const ctx = createExtractorContext(
-        {
+      const ctx = createExtractorContext({
+        attrs: {
           [ATTR_KEYS.MASTRA_SPAN_TYPE]: "model_step",
           [ATTR_KEYS.MASTRA_MODEL_STEP_INPUT]: input,
         },
-        mastraScope,
-      );
+        spanOverrides: mastraScope,
+      });
 
       extractor.apply(ctx);
 
@@ -694,13 +704,13 @@ describe("MastraExtractor", () => {
           messages: [{ role: "user", content: "hi" }],
         },
       });
-      const ctx = createExtractorContext(
-        {
+      const ctx = createExtractorContext({
+        attrs: {
           [ATTR_KEYS.MASTRA_SPAN_TYPE]: "model_step",
           [ATTR_KEYS.MASTRA_MODEL_STEP_INPUT]: input,
         },
-        mastraScope,
-      );
+        spanOverrides: mastraScope,
+      });
 
       extractor.apply(ctx);
 
@@ -720,13 +730,13 @@ describe("MastraExtractor", () => {
           ],
         },
       });
-      const ctx = createExtractorContext(
-        {
+      const ctx = createExtractorContext({
+        attrs: {
           [ATTR_KEYS.MASTRA_SPAN_TYPE]: "model_step",
           [ATTR_KEYS.MASTRA_MODEL_STEP_INPUT]: input,
         },
-        mastraScope,
-      );
+        spanOverrides: mastraScope,
+      });
 
       extractor.apply(ctx);
 
@@ -742,14 +752,14 @@ describe("MastraExtractor", () => {
           messages: [{ role: "user", content: "hi" }],
         },
       });
-      const ctx = createExtractorContext(
-        {
+      const ctx = createExtractorContext({
+        attrs: {
           [ATTR_KEYS.MASTRA_SPAN_TYPE]: "model_step",
           [ATTR_KEYS.MASTRA_MODEL_STEP_INPUT]: input,
           [ATTR_KEYS.GEN_AI_REQUEST_MODEL]: "existing-model",
         },
-        mastraScope,
-      );
+        spanOverrides: mastraScope,
+      });
 
       extractor.apply(ctx);
 
@@ -764,13 +774,13 @@ describe("MastraExtractor", () => {
           messages: [{ role: "user", content: "hi" }],
         },
       });
-      const ctx = createExtractorContext(
-        {
+      const ctx = createExtractorContext({
+        attrs: {
           [ATTR_KEYS.MASTRA_SPAN_TYPE]: "model_step",
           [ATTR_KEYS.MASTRA_MODEL_STEP_INPUT]: input,
         },
-        mastraScope,
-      );
+        spanOverrides: mastraScope,
+      });
 
       extractor.apply(ctx);
 
@@ -784,13 +794,13 @@ describe("MastraExtractor", () => {
           messages: [{ role: "user", content: "hi" }],
         },
       });
-      const ctx = createExtractorContext(
-        {
+      const ctx = createExtractorContext({
+        attrs: {
           [ATTR_KEYS.MASTRA_SPAN_TYPE]: "model_generation",
           [ATTR_KEYS.MASTRA_MODEL_STEP_INPUT]: input,
         },
-        mastraScope,
-      );
+        spanOverrides: mastraScope,
+      });
 
       extractor.apply(ctx);
 
@@ -804,8 +814,8 @@ describe("MastraExtractor", () => {
     };
 
     it("uses modelMetadata.modelId as fallback for model name", () => {
-      const ctx = createExtractorContext(
-        {
+      const ctx = createExtractorContext({
+        attrs: {
           [ATTR_KEYS.MASTRA_SPAN_TYPE]: "model_step",
           "mastra.metadata.modelMetadata": JSON.stringify({
             modelId: "gpt-4o",
@@ -813,8 +823,8 @@ describe("MastraExtractor", () => {
             modelProvider: "openai",
           }),
         },
-        mastraScope,
-      );
+        spanOverrides: mastraScope,
+      });
 
       extractor.apply(ctx);
 
@@ -829,16 +839,16 @@ describe("MastraExtractor", () => {
           messages: [{ role: "user", content: "hi" }],
         },
       });
-      const ctx = createExtractorContext(
-        {
+      const ctx = createExtractorContext({
+        attrs: {
           [ATTR_KEYS.MASTRA_SPAN_TYPE]: "model_step",
           [ATTR_KEYS.MASTRA_MODEL_STEP_INPUT]: input,
           "mastra.metadata.modelMetadata": JSON.stringify({
             modelId: "gpt-4o",
           }),
         },
-        mastraScope,
-      );
+        spanOverrides: mastraScope,
+      });
 
       extractor.apply(ctx);
 
@@ -852,10 +862,10 @@ describe("MastraExtractor", () => {
     };
 
     it("maps to evaluation type instead of llm", () => {
-      const ctx = createExtractorContext(
-        { [ATTR_KEYS.MASTRA_SPAN_TYPE]: "model_step" },
-        { ...mastraScope, parentSpanId: null },
-      );
+      const ctx = createExtractorContext({
+        attrs: { [ATTR_KEYS.MASTRA_SPAN_TYPE]: "model_step" },
+        spanOverrides: { ...mastraScope, parentSpanId: null },
+      });
 
       extractor.apply(ctx);
 
@@ -875,13 +885,13 @@ describe("MastraExtractor", () => {
           ],
         },
       });
-      const ctx = createExtractorContext(
-        {
+      const ctx = createExtractorContext({
+        attrs: {
           [ATTR_KEYS.MASTRA_SPAN_TYPE]: "model_step",
           [ATTR_KEYS.MASTRA_MODEL_STEP_INPUT]: input,
         },
-        { ...mastraScope, parentSpanId: null },
-      );
+        spanOverrides: { ...mastraScope, parentSpanId: null },
+      });
 
       extractor.apply(ctx);
 
@@ -895,13 +905,13 @@ describe("MastraExtractor", () => {
         object: { score: 9, reason: "Accurate translation" },
         text: "",
       });
-      const ctx = createExtractorContext(
-        {
+      const ctx = createExtractorContext({
+        attrs: {
           [ATTR_KEYS.MASTRA_SPAN_TYPE]: "model_step",
           [ATTR_KEYS.MASTRA_MODEL_STEP_OUTPUT]: output,
         },
-        { ...mastraScope, parentSpanId: null },
-      );
+        spanOverrides: { ...mastraScope, parentSpanId: null },
+      });
 
       extractor.apply(ctx);
 
@@ -915,13 +925,13 @@ describe("MastraExtractor", () => {
       const output = JSON.stringify({
         text: "Score: 8/10",
       });
-      const ctx = createExtractorContext(
-        {
+      const ctx = createExtractorContext({
+        attrs: {
           [ATTR_KEYS.MASTRA_SPAN_TYPE]: "model_step",
           [ATTR_KEYS.MASTRA_MODEL_STEP_OUTPUT]: output,
         },
-        { ...mastraScope, parentSpanId: null },
-      );
+        spanOverrides: { ...mastraScope, parentSpanId: null },
+      });
 
       extractor.apply(ctx);
 
@@ -938,13 +948,13 @@ describe("MastraExtractor", () => {
           ],
         },
       });
-      const ctx = createExtractorContext(
-        {
+      const ctx = createExtractorContext({
+        attrs: {
           [ATTR_KEYS.MASTRA_SPAN_TYPE]: "model_step",
           [ATTR_KEYS.MASTRA_MODEL_STEP_INPUT]: input,
         },
-        { ...mastraScope, parentSpanId: null },
-      );
+        spanOverrides: { ...mastraScope, parentSpanId: null },
+      });
 
       extractor.apply(ctx);
 
@@ -962,13 +972,13 @@ describe("MastraExtractor", () => {
           ],
         },
       });
-      const ctx = createExtractorContext(
-        {
+      const ctx = createExtractorContext({
+        attrs: {
           [ATTR_KEYS.MASTRA_SPAN_TYPE]: "model_step",
           [ATTR_KEYS.MASTRA_MODEL_STEP_INPUT]: input,
         },
-        { ...mastraScope, parentSpanId: null },
-      );
+        spanOverrides: { ...mastraScope, parentSpanId: null },
+      });
 
       extractor.apply(ctx);
 
@@ -982,13 +992,13 @@ describe("MastraExtractor", () => {
           messages: [{ role: "user", content: "test" }],
         },
       });
-      const ctx = createExtractorContext(
-        {
+      const ctx = createExtractorContext({
+        attrs: {
           [ATTR_KEYS.MASTRA_SPAN_TYPE]: "model_step",
           [ATTR_KEYS.MASTRA_MODEL_STEP_INPUT]: input,
         },
-        { ...mastraScope, parentSpanId: null },
-      );
+        spanOverrides: { ...mastraScope, parentSpanId: null },
+      });
 
       extractor.apply(ctx);
 
@@ -996,10 +1006,10 @@ describe("MastraExtractor", () => {
     });
 
     it("uses bare Eval when no model or system prompt available", () => {
-      const ctx = createExtractorContext(
-        { [ATTR_KEYS.MASTRA_SPAN_TYPE]: "model_step" },
-        { ...mastraScope, parentSpanId: null },
-      );
+      const ctx = createExtractorContext({
+        attrs: { [ATTR_KEYS.MASTRA_SPAN_TYPE]: "model_step" },
+        spanOverrides: { ...mastraScope, parentSpanId: null },
+      });
 
       extractor.apply(ctx);
 
@@ -1020,13 +1030,13 @@ describe("MastraExtractor", () => {
           ],
         },
       });
-      const ctx = createExtractorContext(
-        {
+      const ctx = createExtractorContext({
+        attrs: {
           [ATTR_KEYS.MASTRA_SPAN_TYPE]: "model_step",
           [ATTR_KEYS.MASTRA_MODEL_STEP_INPUT]: input,
         },
-        { ...mastraScope, parentSpanId: "parent-agent-run" },
-      );
+        spanOverrides: { ...mastraScope, parentSpanId: "parent-agent-run" },
+      });
 
       extractor.apply(ctx);
 
@@ -1040,13 +1050,13 @@ describe("MastraExtractor", () => {
           messages: [{ role: "user", content: "hi" }],
         },
       });
-      const ctx = createExtractorContext(
-        {
+      const ctx = createExtractorContext({
+        attrs: {
           [ATTR_KEYS.MASTRA_SPAN_TYPE]: "model_step",
           [ATTR_KEYS.MASTRA_MODEL_STEP_INPUT]: input,
         },
-        { ...mastraScope, parentSpanId: "parent-123" },
-      );
+        spanOverrides: { ...mastraScope, parentSpanId: "parent-123" },
+      });
 
       extractor.apply(ctx);
 
@@ -1060,10 +1070,10 @@ describe("MastraExtractor", () => {
     };
 
     it("does not set display name for agent_run", () => {
-      const ctx = createExtractorContext(
-        { [ATTR_KEYS.MASTRA_SPAN_TYPE]: "agent_run" },
-        { ...mastraScope, name: "invoke_agent Weather Agent" },
-      );
+      const ctx = createExtractorContext({
+        attrs: { [ATTR_KEYS.MASTRA_SPAN_TYPE]: "agent_run" },
+        spanOverrides: { ...mastraScope, name: "invoke_agent Weather Agent" },
+      });
 
       extractor.apply(ctx);
 
@@ -1071,10 +1081,10 @@ describe("MastraExtractor", () => {
     });
 
     it("does not set display name for model_step without model", () => {
-      const ctx = createExtractorContext(
-        { [ATTR_KEYS.MASTRA_SPAN_TYPE]: "model_step" },
-        mastraScope,
-      );
+      const ctx = createExtractorContext({
+        attrs: { [ATTR_KEYS.MASTRA_SPAN_TYPE]: "model_step" },
+        spanOverrides: mastraScope,
+      });
 
       extractor.apply(ctx);
 
@@ -1082,10 +1092,10 @@ describe("MastraExtractor", () => {
     });
 
     it("does not set display name for model_chunk", () => {
-      const ctx = createExtractorContext(
-        { [ATTR_KEYS.MASTRA_SPAN_TYPE]: "model_chunk" },
-        mastraScope,
-      );
+      const ctx = createExtractorContext({
+        attrs: { [ATTR_KEYS.MASTRA_SPAN_TYPE]: "model_chunk" },
+        spanOverrides: mastraScope,
+      });
 
       extractor.apply(ctx);
 

@@ -88,15 +88,23 @@ function getHttpConfig(config: AgentComponentConfig): HttpComponentConfig {
 /**
  * Build DSL-compatible config for HTTP agent
  */
-function buildHttpConfig(
-  url: string,
-  method: HttpMethod,
-  bodyTemplate: string,
-  outputPath: string,
-  headers: HttpHeader[],
-  auth: HttpAuth | undefined,
-  scenarioMappings: Record<string, FieldMapping>,
-): HttpComponentConfig {
+function buildHttpConfig({
+  url,
+  method,
+  bodyTemplate,
+  outputPath,
+  headers,
+  auth,
+  scenarioMappings,
+}: {
+  url: string;
+  method: HttpMethod;
+  bodyTemplate: string;
+  outputPath: string;
+  headers: HttpHeader[];
+  auth: HttpAuth | undefined;
+  scenarioMappings: Record<string, FieldMapping>;
+}): HttpComponentConfig {
   return {
     name: "HTTP",
     description: "HTTP API endpoint",
@@ -361,7 +369,7 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
   const handleSave = useCallback(() => {
     if (!project?.id || !isValid) return;
 
-    const config = buildHttpConfig(
+    const config = buildHttpConfig({
       url,
       method,
       bodyTemplate,
@@ -369,7 +377,7 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
       headers,
       auth,
       scenarioMappings,
-    );
+    });
 
     if (agentId) {
       // Editing existing agent

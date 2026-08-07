@@ -42,22 +42,33 @@ export class AiCallFailedError extends HandledError {
    */
   public readonly cause = AI_CALL_FAILED_CAUSE;
 
-  constructor(
-    public readonly featureKey: string,
-    public readonly role: ModelRole,
-    public readonly featureDisplayName: string,
-    /**
-     * The provider's / SDK's own sentence.
-     *
-     * SERVER-SIDE ONLY. It is a raw upstream string — deployment names,
-     * endpoint hosts, fragments of the response body, sometimes a credential
-     * echoed back — so it is deliberately absent from `message` (which the
-     * REST boundary ships verbatim), from `meta` (the client contract) and
-     * from {@link toResponseBody}. `wrapAiCall` logs it; that is where
-     * internals belong.
-     */
-    public readonly originalErrorMessage: string,
-  ) {
+  public readonly featureKey: string;
+  public readonly role: ModelRole;
+  public readonly featureDisplayName: string;
+
+  /**
+   * The provider's / SDK's own sentence.
+   *
+   * SERVER-SIDE ONLY. It is a raw upstream string — deployment names,
+   * endpoint hosts, fragments of the response body, sometimes a credential
+   * echoed back — so it is deliberately absent from `message` (which the
+   * REST boundary ships verbatim), from `meta` (the client contract) and
+   * from {@link toResponseBody}. `wrapAiCall` logs it; that is where
+   * internals belong.
+   */
+  public readonly originalErrorMessage: string;
+
+  constructor({
+    featureKey,
+    role,
+    featureDisplayName,
+    originalErrorMessage,
+  }: {
+    featureKey: string;
+    role: ModelRole;
+    featureDisplayName: string;
+    originalErrorMessage: string;
+  }) {
     super("ai_call_failed", `AI call failed for "${featureKey}".`, {
       httpStatus: 400,
       fault: "provider",
@@ -68,6 +79,10 @@ export class AiCallFailedError extends HandledError {
       meta: { featureKey, role, featureDisplayName },
     });
     this.name = "AiCallFailedError";
+    this.featureKey = featureKey;
+    this.role = role;
+    this.featureDisplayName = featureDisplayName;
+    this.originalErrorMessage = originalErrorMessage;
   }
 
   toResponseBody(): {
@@ -111,11 +126,11 @@ export async function wrapAiCall<T>(
     // `data.cause` sidecar until that block is retired, and a stack-laden
     // provider error should not be dragged along wholesale.
     const firstLine = message.split("\n")[0]!.slice(0, 200);
-    throw new AiCallFailedError(
-      feature.key,
-      feature.role,
-      feature.displayName,
-      firstLine,
-    );
+    throw new AiCallFailedError({
+      featureKey: feature.key,
+      role: feature.role,
+      featureDisplayName: feature.displayName,
+      originalErrorMessage: firstLine,
+    });
   }
 }

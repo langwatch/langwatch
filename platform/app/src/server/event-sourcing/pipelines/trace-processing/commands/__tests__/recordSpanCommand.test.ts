@@ -18,13 +18,19 @@ import {
   type RecordSpanCommandDependencies,
 } from "../recordSpanCommand";
 
-function createMockCommand(
-  tenantId: string,
-  traceId: string,
-  spanId: string,
-  attributes: Array<{ key: string; value: { stringValue?: string } }> = [],
-  piiRedactionLevel?: PIIRedactionLevel,
-): Command<RecordSpanCommandData> {
+function createMockCommand({
+  tenantId,
+  traceId,
+  spanId,
+  attributes = [],
+  piiRedactionLevel,
+}: {
+  tenantId: string;
+  traceId: string;
+  spanId: string;
+  attributes?: Array<{ key: string; value: { stringValue?: string } }>;
+  piiRedactionLevel?: PIIRedactionLevel;
+}): Command<RecordSpanCommandData> {
   return {
     type: RECORD_SPAN_COMMAND_TYPE,
     aggregateId: traceId,
@@ -107,54 +113,63 @@ describe("RecordSpanCommand", () => {
   describe("handle", () => {
     describe("PII redaction", () => {
       it("calls PII redaction service with piiRedactionLevel from command", async () => {
-        const command = createMockCommand(
-          "project-123",
-          "trace-1",
-          "span-1",
-          [{ key: "gen_ai.prompt", value: { stringValue: "sensitive data" } }],
-          "STRICT",
-        );
+        const command = createMockCommand({
+          tenantId: "project-123",
+          traceId: "trace-1",
+          spanId: "span-1",
+          attributes: [
+            { key: "gen_ai.prompt", value: { stringValue: "sensitive data" } },
+          ],
+          piiRedactionLevel: "STRICT",
+        });
 
         await handler.handle(command);
 
-        expect(mockRedactSpan).toHaveBeenCalledWith(
-          expect.objectContaining({ traceId: "trace-1", spanId: "span-1" }),
-          expect.any(Object),
-          "STRICT",
-          "project-123",
-        );
+        expect(mockRedactSpan).toHaveBeenCalledWith({
+          span: expect.objectContaining({
+            traceId: "trace-1",
+            spanId: "span-1",
+          }),
+          resource: expect.any(Object),
+          piiRedactionLevel: "STRICT",
+          tenantId: "project-123",
+        });
       });
 
       it("defaults to ESSENTIAL when piiRedactionLevel is not provided", async () => {
-        const command = createMockCommand("project-456", "trace-1", "span-1");
+        const command = createMockCommand({
+          tenantId: "project-456",
+          traceId: "trace-1",
+          spanId: "span-1",
+        });
 
         await handler.handle(command);
 
-        expect(mockRedactSpan).toHaveBeenCalledWith(
-          expect.any(Object),
-          expect.anything(),
-          "ESSENTIAL",
-          "project-456",
-        );
+        expect(mockRedactSpan).toHaveBeenCalledWith({
+          span: expect.any(Object),
+          resource: expect.anything(),
+          piiRedactionLevel: "ESSENTIAL",
+          tenantId: "project-456",
+        });
       });
 
       it("uses DISABLED level when specified", async () => {
-        const command = createMockCommand(
-          "project-789",
-          "trace-1",
-          "span-1",
-          [],
-          "DISABLED",
-        );
+        const command = createMockCommand({
+          tenantId: "project-789",
+          traceId: "trace-1",
+          spanId: "span-1",
+          attributes: [],
+          piiRedactionLevel: "DISABLED",
+        });
 
         await handler.handle(command);
 
-        expect(mockRedactSpan).toHaveBeenCalledWith(
-          expect.any(Object),
-          expect.anything(),
-          "DISABLED",
-          "project-789",
-        );
+        expect(mockRedactSpan).toHaveBeenCalledWith({
+          span: expect.any(Object),
+          resource: expect.anything(),
+          piiRedactionLevel: "DISABLED",
+          tenantId: "project-789",
+        });
       });
     });
 
@@ -164,7 +179,11 @@ describe("RecordSpanCommand", () => {
         mockRedactSpan.mockRejectedValue(new Error("PII service unavailable"));
         const cmd = new RecordSpanCommand(deps);
 
-        const command = createMockCommand("project-123", "trace-1", "span-1");
+        const command = createMockCommand({
+          tenantId: "project-123",
+          traceId: "trace-1",
+          spanId: "span-1",
+        });
 
         await expect(cmd.handle(command)).rejects.toThrow(
           "PII service unavailable",
@@ -176,7 +195,11 @@ describe("RecordSpanCommand", () => {
         mockEnrichSpan.mockRejectedValue(new Error("Cost API timeout"));
         const cmd = new RecordSpanCommand(deps);
 
-        const command = createMockCommand("project-123", "trace-1", "span-1");
+        const command = createMockCommand({
+          tenantId: "project-123",
+          traceId: "trace-1",
+          spanId: "span-1",
+        });
 
         const events = await cmd.handle(command);
 
@@ -191,7 +214,11 @@ describe("RecordSpanCommand", () => {
         mockEnrichSpan.mockRejectedValue(new Error("Cost failure"));
         const cmd = new RecordSpanCommand(deps);
 
-        const command = createMockCommand("project-123", "trace-1", "span-1");
+        const command = createMockCommand({
+          tenantId: "project-123",
+          traceId: "trace-1",
+          spanId: "span-1",
+        });
 
         await expect(cmd.handle(command)).rejects.toThrow("PII failure");
       });
@@ -201,8 +228,15 @@ describe("RecordSpanCommand", () => {
       it("creates SpanReceivedEvent with redacted span data", async () => {
         // Mock redactSpan to mutate the span (simulating redaction)
         mockRedactSpan.mockImplementation(
-          async (span: {
-            attributes: Array<{ key: string; value: { stringValue?: string } }>;
+          async ({
+            span,
+          }: {
+            span: {
+              attributes: Array<{
+                key: string;
+                value: { stringValue?: string };
+              }>;
+            };
           }) => {
             const attr = span.attributes.find((a) => a.key === "gen_ai.prompt");
             if (attr?.value.stringValue) {
@@ -211,13 +245,15 @@ describe("RecordSpanCommand", () => {
           },
         );
 
-        const command = createMockCommand(
-          "project-123",
-          "trace-1",
-          "span-1",
-          [{ key: "gen_ai.prompt", value: { stringValue: "sensitive" } }],
-          "STRICT",
-        );
+        const command = createMockCommand({
+          tenantId: "project-123",
+          traceId: "trace-1",
+          spanId: "span-1",
+          attributes: [
+            { key: "gen_ai.prompt", value: { stringValue: "sensitive" } },
+          ],
+          piiRedactionLevel: "STRICT",
+        });
 
         const events = await handler.handle(command);
 
@@ -231,11 +267,11 @@ describe("RecordSpanCommand", () => {
       });
 
       it("creates valid SpanReceivedEvent structure", async () => {
-        const command = createMockCommand(
-          "project-123",
-          "trace-abc",
-          "span-def",
-        );
+        const command = createMockCommand({
+          tenantId: "project-123",
+          traceId: "trace-abc",
+          spanId: "span-def",
+        });
 
         const events = await handler.handle(command);
 
@@ -250,11 +286,17 @@ describe("RecordSpanCommand", () => {
       });
 
       it("does not mutate the original command data", async () => {
-        mockRedactSpan.mockImplementation(async (span: { name: string }) => {
-          span.name = "[REDACTED]";
-        });
+        mockRedactSpan.mockImplementation(
+          async ({ span }: { span: { name: string } }) => {
+            span.name = "[REDACTED]";
+          },
+        );
 
-        const command = createMockCommand("project-123", "trace-1", "span-1");
+        const command = createMockCommand({
+          tenantId: "project-123",
+          traceId: "trace-1",
+          spanId: "span-1",
+        });
         const originalName = command.data.span.name;
 
         await handler.handle(command);
@@ -266,13 +308,18 @@ describe("RecordSpanCommand", () => {
 
     describe("when reserved attributes are present", () => {
       it("strips langwatch.reserved.* attributes from span before processing", async () => {
-        const command = createMockCommand("project-123", "trace-1", "span-1", [
-          {
-            key: "langwatch.reserved.pii_redaction_status",
-            value: { stringValue: "true" },
-          },
-          { key: "gen_ai.prompt", value: { stringValue: "hello" } },
-        ]);
+        const command = createMockCommand({
+          tenantId: "project-123",
+          traceId: "trace-1",
+          spanId: "span-1",
+          attributes: [
+            {
+              key: "langwatch.reserved.pii_redaction_status",
+              value: { stringValue: "true" },
+            },
+            { key: "gen_ai.prompt", value: { stringValue: "hello" } },
+          ],
+        });
 
         const events = await handler.handle(command);
 
@@ -289,7 +336,11 @@ describe("RecordSpanCommand", () => {
       });
 
       it("strips langwatch.reserved.* attributes from events", async () => {
-        const command = createMockCommand("project-123", "trace-1", "span-1");
+        const command = createMockCommand({
+          tenantId: "project-123",
+          traceId: "trace-1",
+          spanId: "span-1",
+        });
         command.data.span.events = [
           {
             timeUnixNano: { low: 0, high: 0 },
@@ -318,17 +369,22 @@ describe("RecordSpanCommand", () => {
         // The fix is a passthrough allowlist; this test pins the
         // attribute name as load-bearing — renaming or removing the
         // entry would silently re-break loop prevention in production.
-        const command = createMockCommand("project-123", "trace-1", "span-1", [
-          {
-            key: "langwatch.reserved.causality_depth",
-            value: { stringValue: "1" },
-          },
-          {
-            key: "langwatch.reserved.pii_redaction_status",
-            value: { stringValue: "true" },
-          },
-          { key: "gen_ai.prompt", value: { stringValue: "hello" } },
-        ]);
+        const command = createMockCommand({
+          tenantId: "project-123",
+          traceId: "trace-1",
+          spanId: "span-1",
+          attributes: [
+            {
+              key: "langwatch.reserved.causality_depth",
+              value: { stringValue: "1" },
+            },
+            {
+              key: "langwatch.reserved.pii_redaction_status",
+              value: { stringValue: "true" },
+            },
+            { key: "gen_ai.prompt", value: { stringValue: "hello" } },
+          ],
+        });
 
         const events = await handler.handle(command);
 
@@ -353,12 +409,17 @@ describe("RecordSpanCommand", () => {
         // the meter, and the trace-summary fold reads the stamp to count
         // the usage once. Stripping it would silently double every Langy
         // turn's token/cost totals.
-        const command = createMockCommand("project-123", "trace-1", "span-1", [
-          {
-            key: "langwatch.reserved.skip_token_accumulation",
-            value: { stringValue: "true" },
-          },
-        ]);
+        const command = createMockCommand({
+          tenantId: "project-123",
+          traceId: "trace-1",
+          spanId: "span-1",
+          attributes: [
+            {
+              key: "langwatch.reserved.skip_token_accumulation",
+              value: { stringValue: "true" },
+            },
+          ],
+        });
 
         const events = await handler.handle(command);
 
@@ -371,12 +432,17 @@ describe("RecordSpanCommand", () => {
       });
 
       it("preserves original command data when stripping reserved attributes", async () => {
-        const command = createMockCommand("project-123", "trace-1", "span-1", [
-          {
-            key: "langwatch.reserved.something",
-            value: { stringValue: "value" },
-          },
-        ]);
+        const command = createMockCommand({
+          tenantId: "project-123",
+          traceId: "trace-1",
+          spanId: "span-1",
+          attributes: [
+            {
+              key: "langwatch.reserved.something",
+              value: { stringValue: "value" },
+            },
+          ],
+        });
 
         await handler.handle(command);
 
@@ -394,7 +460,11 @@ describe("RecordSpanCommand", () => {
       // namespaces, so a provenance name that lands in one is deleted between
       // the receiver writing it and the span being stored.
       async function emittedResourceAfterReceiver(apiKeyId: string | null) {
-        const command = createMockCommand("project-123", "trace-1", "span-1");
+        const command = createMockCommand({
+          tenantId: "project-123",
+          traceId: "trace-1",
+          spanId: "span-1",
+        });
         const request = {
           resourceSpans: [{ resource: command.data.resource }],
         };
@@ -439,9 +509,14 @@ describe("RecordSpanCommand", () => {
     describe("when an attribute value is oversized", () => {
       it("caps a multi-MB base64 image attribute on the emitted span", async () => {
         const bigDataUrl = `data:image/png;base64,${"A".repeat(2 * 1024 * 1024)}`;
-        const command = createMockCommand("project-123", "trace-1", "span-1", [
-          { key: "langwatch.input", value: { stringValue: bigDataUrl } },
-        ]);
+        const command = createMockCommand({
+          tenantId: "project-123",
+          traceId: "trace-1",
+          spanId: "span-1",
+          attributes: [
+            { key: "langwatch.input", value: { stringValue: bigDataUrl } },
+          ],
+        });
 
         const events = await handler.handle(command);
 
@@ -461,9 +536,14 @@ describe("RecordSpanCommand", () => {
       });
 
       it("leaves a normal small span attribute unchanged", async () => {
-        const command = createMockCommand("project-123", "trace-1", "span-1", [
-          { key: "langwatch.input", value: { stringValue: "what is 2+2?" } },
-        ]);
+        const command = createMockCommand({
+          tenantId: "project-123",
+          traceId: "trace-1",
+          spanId: "span-1",
+          attributes: [
+            { key: "langwatch.input", value: { stringValue: "what is 2+2?" } },
+          ],
+        });
 
         const events = await handler.handle(command);
 

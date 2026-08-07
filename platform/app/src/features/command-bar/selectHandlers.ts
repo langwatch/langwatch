@@ -40,13 +40,19 @@ export function createNavigate(ctx: NavigationContext) {
 /**
  * Handle selection of a command item.
  */
-export function handleCommandSelect(
-  cmd: Command,
-  projectSlug: string,
-  ctx: NavigationContext,
-  addRecentItem: AddRecentItem,
-  openDrawer: OpenDrawer,
-) {
+export function handleCommandSelect({
+  cmd,
+  projectSlug,
+  ctx,
+  addRecentItem,
+  openDrawer,
+}: {
+  cmd: Command;
+  projectSlug: string;
+  ctx: NavigationContext;
+  addRecentItem: AddRecentItem;
+  openDrawer: OpenDrawer;
+}) {
   const navigate = createNavigate(ctx);
 
   if (cmd.category === "navigation" && cmd.path) {
@@ -121,13 +127,19 @@ export function handleCommandSelect(
 /**
  * Handle selection of a search result item.
  */
-export function handleSearchResultSelect(
-  result: SearchResult,
-  projectSlug: string,
-  ctx: NavigationContext,
-  addRecentItem: AddRecentItem,
-  openDrawer: OpenDrawer,
-) {
+export function handleSearchResultSelect({
+  result,
+  projectSlug,
+  ctx,
+  addRecentItem,
+  openDrawer,
+}: {
+  result: SearchResult;
+  projectSlug: string;
+  ctx: NavigationContext;
+  addRecentItem: AddRecentItem;
+  openDrawer: OpenDrawer;
+}) {
   const navigate = createNavigate(ctx);
 
   // Check if this should open a drawer instead of navigating
@@ -159,12 +171,17 @@ export function handleSearchResultSelect(
 /**
  * Handle selection of a recent item.
  */
-export function handleRecentItemSelect(
-  item: RecentItem,
-  ctx: NavigationContext,
-  addRecentItem: AddRecentItem,
-  openDrawer: OpenDrawer,
-) {
+export function handleRecentItemSelect({
+  item,
+  ctx,
+  addRecentItem,
+  openDrawer,
+}: {
+  item: RecentItem;
+  ctx: NavigationContext;
+  addRecentItem: AddRecentItem;
+  openDrawer: OpenDrawer;
+}) {
   const navigate = createNavigate(ctx);
 
   addRecentItem({

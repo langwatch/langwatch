@@ -463,12 +463,12 @@ async function fetchAgentData(
     );
   }
   if (target.type === "code") {
-    return fetchCodeAgentData(
+    return fetchCodeAgentData({
       projectId,
-      target.referenceId,
-      deps.agentFetcher,
-      deps.projectSecretsFetcher,
-    );
+      agentId: target.referenceId,
+      fetcher: deps.agentFetcher,
+      projectSecretsFetcher: deps.projectSecretsFetcher,
+    });
   }
   if (target.type === "workflow") {
     return fetchWorkflowAgentData({
@@ -581,12 +581,17 @@ const RawCodeAgentConfigSchema = z.object({
   scenarioOutputField: z.string().optional(),
 });
 
-async function fetchCodeAgentData(
-  projectId: string,
-  agentId: string,
-  fetcher: AgentFetcher,
-  projectSecretsFetcher: ProjectSecretsFetcher,
-): Promise<CodeAgentData | null> {
+async function fetchCodeAgentData({
+  projectId,
+  agentId,
+  fetcher,
+  projectSecretsFetcher,
+}: {
+  projectId: string;
+  agentId: string;
+  fetcher: AgentFetcher;
+  projectSecretsFetcher: ProjectSecretsFetcher;
+}): Promise<CodeAgentData | null> {
   const agent = await fetcher.findById({ projectId, id: agentId });
   if (agent?.type !== "code") return null;
 

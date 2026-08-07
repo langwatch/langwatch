@@ -84,11 +84,11 @@ export const EvaluatorLLMConfigField = ({ prefix }: { prefix: string }) => {
   // playground and workflow LLM-node pickers. While the providers
   // query is in flight, render a skeleton so the empty state doesn't
   // flash before the data resolves.
-  const { isEmpty, isLoading } = useModelSelectionOptions(
-    allModelOptions,
-    llmConfig.model,
-    "chat",
-  );
+  const { isEmpty, isLoading } = useModelSelectionOptions({
+    options: allModelOptions,
+    model: llmConfig.model,
+    mode: "chat",
+  });
   if (isLoading) {
     return <Skeleton width="full" height="40px" borderRadius="md" />;
   }

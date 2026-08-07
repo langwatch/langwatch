@@ -58,7 +58,7 @@ export function LlmPanel({ trace, spans }: LlmPanelProps) {
   const { events } = useTraceEvents();
 
   const markdown = useMemo(
-    () => buildTraceMarkdown(trace, spans, config, fullSpans, events),
+    () => buildTraceMarkdown({ trace, spans, opts: config, fullSpans, events }),
     [trace, spans, config, fullSpans, events],
   );
   const chunks = useMemo(() => splitTraceMarkdown(markdown), [markdown]);

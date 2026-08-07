@@ -312,12 +312,12 @@ describe("evaluation_runs JOIN time bounds", () => {
     /** @scenario A late-scheduled evaluator is still offered as a filter value */
     it("lists the evaluator in the filter values for the window", async () => {
       resetParamCounter();
-      const { sql, params } = buildDataForFilterQuery(
-        TENANT_ID,
-        "evaluations.evaluator_id" as FilterField,
-        baseInput.startDate,
-        baseInput.endDate,
-      );
+      const { sql, params } = buildDataForFilterQuery({
+        projectId: TENANT_ID,
+        field: "evaluations.evaluator_id" as FilterField,
+        startDate: baseInput.startDate,
+        endDate: baseInput.endDate,
+      });
 
       const result = await ch.query({
         query: sql,

@@ -98,13 +98,19 @@ const nodeTypes: NodeTypes = {
   spanNode: SpanNode,
 };
 
-function buildNodesAndEdges(
-  spans: SpanConfig[],
-  selectedId: string | null,
-  parentId: string | null = null,
+function buildNodesAndEdges({
+  spans,
+  selectedId,
+  parentId = null,
   x = 0,
   y = 0,
-): { nodes: Node<SpanNodeData>[]; edges: Edge[]; width: number } {
+}: {
+  spans: SpanConfig[];
+  selectedId: string | null;
+  parentId?: string | null;
+  x?: number;
+  y?: number;
+}): { nodes: Node<SpanNodeData>[]; edges: Edge[]; width: number } {
   const nodes: Node<SpanNodeData>[] = [];
   const edges: Edge[] = [];
   const nodeGap = 180;
@@ -112,13 +118,13 @@ function buildNodesAndEdges(
   let currentX = x;
 
   for (const span of spans) {
-    const childResult = buildNodesAndEdges(
-      span.children,
+    const childResult = buildNodesAndEdges({
+      spans: span.children,
       selectedId,
-      span.id,
-      currentX,
-      y + levelGap,
-    );
+      parentId: span.id,
+      x: currentX,
+      y: y + levelGap,
+    });
 
     const childWidth = Math.max(childResult.width, nodeGap);
     const nodeX = currentX + childWidth / 2 - nodeGap / 2;
@@ -161,7 +167,7 @@ export function GraphView() {
   const colorMode = useColorMode();
 
   const { nodes, edges } = useMemo(
-    () => buildNodesAndEdges(spans, selectedSpanId),
+    () => buildNodesAndEdges({ spans, selectedId: selectedSpanId }),
     [spans, selectedSpanId],
   );
 

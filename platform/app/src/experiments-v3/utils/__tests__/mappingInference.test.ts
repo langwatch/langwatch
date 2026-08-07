@@ -46,12 +46,17 @@ const createTestDataset = (
   columns,
 });
 
-const createTestTarget = (
-  id: string,
-  inputs: Field[],
-  outputs: Field[] = [{ identifier: "output", type: "str" }],
-  mappings: TargetConfig["mappings"] = {},
-): TargetConfig => ({
+const createTestTarget = ({
+  id,
+  inputs,
+  outputs = [{ identifier: "output", type: "str" }],
+  mappings = {},
+}: {
+  id: string;
+  inputs: Field[];
+  outputs?: Field[];
+  mappings?: TargetConfig["mappings"];
+}): TargetConfig => ({
   id,
   type: "prompt",
   inputs,
@@ -456,12 +461,17 @@ describe("inferEvaluatorMappings", () => {
       createTestColumn("input"),
       createTestColumn("expected_output"),
     ]);
-    const target = createTestTarget("target-1", [
-      { identifier: "input", type: "str" },
-    ]);
+    const target = createTestTarget({
+      id: "target-1",
+      inputs: [{ identifier: "input", type: "str" }],
+    });
     const evaluatorInputs: Field[] = [{ identifier: "output", type: "str" }];
 
-    const mappings = inferEvaluatorMappings(evaluatorInputs, dataset, target);
+    const mappings = inferEvaluatorMappings({
+      evaluatorInputs,
+      dataset,
+      target,
+    });
 
     expect(mappings.output).toEqual({
       type: "source",
@@ -476,14 +486,19 @@ describe("inferEvaluatorMappings", () => {
       createTestColumn("input"),
       createTestColumn("expected_output"),
     ]);
-    const target = createTestTarget("target-1", [
-      { identifier: "input", type: "str" },
-    ]);
+    const target = createTestTarget({
+      id: "target-1",
+      inputs: [{ identifier: "input", type: "str" }],
+    });
     const evaluatorInputs: Field[] = [
       { identifier: "expected_output", type: "str" },
     ];
 
-    const mappings = inferEvaluatorMappings(evaluatorInputs, dataset, target);
+    const mappings = inferEvaluatorMappings({
+      evaluatorInputs,
+      dataset,
+      target,
+    });
 
     expect(mappings.expected_output).toEqual({
       type: "source",
@@ -499,12 +514,17 @@ describe("inferEvaluatorMappings", () => {
       createTestColumn("output"), // Dataset also has "output"
       createTestColumn("expected_output"),
     ]);
-    const target = createTestTarget("target-1", [
-      { identifier: "input", type: "str" },
-    ]);
+    const target = createTestTarget({
+      id: "target-1",
+      inputs: [{ identifier: "input", type: "str" }],
+    });
     const evaluatorInputs: Field[] = [{ identifier: "output", type: "str" }];
 
-    const mappings = inferEvaluatorMappings(evaluatorInputs, dataset, target);
+    const mappings = inferEvaluatorMappings({
+      evaluatorInputs,
+      dataset,
+      target,
+    });
 
     // Should map to target output, not dataset column
     expect(mappings.output?.type).toBe("source");
@@ -518,16 +538,20 @@ describe("inferEvaluatorMappings", () => {
     const dataset = createTestDataset("ds-1", "Dataset 1", [
       createTestColumn("input"),
     ]);
-    const target = createTestTarget(
-      "target-1",
-      [{ identifier: "input", type: "str" }],
-      [
+    const target = createTestTarget({
+      id: "target-1",
+      inputs: [{ identifier: "input", type: "str" }],
+      outputs: [
         { identifier: "answer", type: "str" }, // Target outputs "answer" not "output"
       ],
-    );
+    });
     const evaluatorInputs: Field[] = [{ identifier: "output", type: "str" }];
 
-    const mappings = inferEvaluatorMappings(evaluatorInputs, dataset, target);
+    const mappings = inferEvaluatorMappings({
+      evaluatorInputs,
+      dataset,
+      target,
+    });
 
     expect(mappings.output?.type).toBe("source");
     if (mappings.output?.type === "source") {
@@ -544,21 +568,21 @@ describe("inferEvaluatorMappings", () => {
           createTestColumn("input"),
           createTestColumn("expected_output"),
         ]);
-        const target = createTestTarget(
-          "target-1",
-          [{ identifier: "input", type: "str" }],
+        const target = createTestTarget({
+          id: "target-1",
+          inputs: [{ identifier: "input", type: "str" }],
           // Single output whose name does not match "output" by any rule
-          [{ identifier: "category", type: "str" }],
-        );
+          outputs: [{ identifier: "category", type: "str" }],
+        });
         const evaluatorInputs: Field[] = [
           { identifier: "output", type: "str" },
         ];
 
-        const mappings = inferEvaluatorMappings(
+        const mappings = inferEvaluatorMappings({
           evaluatorInputs,
           dataset,
           target,
-        );
+        });
 
         expect(mappings.output).toEqual({
           type: "source",
@@ -575,23 +599,23 @@ describe("inferEvaluatorMappings", () => {
         const dataset = createTestDataset("ds-1", "Dataset 1", [
           createTestColumn("input"),
         ]);
-        const target = createTestTarget(
-          "target-1",
-          [{ identifier: "input", type: "str" }],
-          [
+        const target = createTestTarget({
+          id: "target-1",
+          inputs: [{ identifier: "input", type: "str" }],
+          outputs: [
             { identifier: "category", type: "str" },
             { identifier: "confidence", type: "str" },
           ],
-        );
+        });
         const evaluatorInputs: Field[] = [
           { identifier: "output", type: "str" },
         ];
 
-        const mappings = inferEvaluatorMappings(
+        const mappings = inferEvaluatorMappings({
           evaluatorInputs,
           dataset,
           target,
-        );
+        });
 
         expect(mappings.output).toBeUndefined();
       });
@@ -602,9 +626,10 @@ describe("inferEvaluatorMappings", () => {
     const dataset = createTestDataset("ds-1", "Dataset 1", [
       createTestColumn("input"),
     ]);
-    const target = createTestTarget("target-1", [
-      { identifier: "input", type: "str" },
-    ]);
+    const target = createTestTarget({
+      id: "target-1",
+      inputs: [{ identifier: "input", type: "str" }],
+    });
     const evaluatorInputs: Field[] = [{ identifier: "output", type: "str" }];
     const existingMappings = {
       output: {
@@ -613,12 +638,12 @@ describe("inferEvaluatorMappings", () => {
       },
     };
 
-    const mappings = inferEvaluatorMappings(
+    const mappings = inferEvaluatorMappings({
       evaluatorInputs,
       dataset,
       target,
       existingMappings,
-    );
+    });
 
     expect(mappings.output).toBeUndefined(); // Should not override
   });
@@ -627,19 +652,23 @@ describe("inferEvaluatorMappings", () => {
     const dataset = createTestDataset("ds-1", "Dataset 1", [
       createTestColumn("expected_output"),
     ]);
-    const target = createTestTarget(
-      "target-1",
-      [{ identifier: "input", type: "str" }],
-      [
+    const target = createTestTarget({
+      id: "target-1",
+      inputs: [{ identifier: "input", type: "str" }],
+      outputs: [
         { identifier: "output", type: "str" },
         { identifier: "expected_output", type: "str" }, // Target also has "expected_output"
       ],
-    );
+    });
     const evaluatorInputs: Field[] = [
       { identifier: "expected_output", type: "str" },
     ];
 
-    const mappings = inferEvaluatorMappings(evaluatorInputs, dataset, target);
+    const mappings = inferEvaluatorMappings({
+      evaluatorInputs,
+      dataset,
+      target,
+    });
 
     // Should map to dataset, not target
     expect(mappings.expected_output?.type).toBe("source");
@@ -653,17 +682,21 @@ describe("inferEvaluatorMappings", () => {
     const dataset = createTestDataset("ds-1", "Dataset 1", [
       createTestColumn("input"),
     ]);
-    const target = createTestTarget(
-      "target-1",
-      [{ identifier: "input", type: "str" }],
-      [
+    const target = createTestTarget({
+      id: "target-1",
+      inputs: [{ identifier: "input", type: "str" }],
+      outputs: [
         { identifier: "output", type: "str" },
         { identifier: "input", type: "str" }, // Target also has "input" as output
       ],
-    );
+    });
     const evaluatorInputs: Field[] = [{ identifier: "input", type: "str" }];
 
-    const mappings = inferEvaluatorMappings(evaluatorInputs, dataset, target);
+    const mappings = inferEvaluatorMappings({
+      evaluatorInputs,
+      dataset,
+      target,
+    });
 
     // Should map to dataset, not target output
     expect(mappings.input?.type).toBe("source");
@@ -691,17 +724,21 @@ describe("inferEvaluatorMappings", () => {
       // shortcut, so `output` must stay empty rather than grab the dataset's
       // "output" column (the customer-reported self-grading bug). The
       // single-output auto-map is covered separately above.
-      const target = createTestTarget(
-        "target-1",
-        [{ identifier: "input", type: "str" }],
-        [
+      const target = createTestTarget({
+        id: "target-1",
+        inputs: [{ identifier: "input", type: "str" }],
+        outputs: [
           { identifier: "irrelevant", type: "str" },
           { identifier: "also_irrelevant", type: "str" },
         ],
-      );
+      });
       const evaluatorInputs: Field[] = [{ identifier: "output", type: "str" }];
 
-      const mappings = inferEvaluatorMappings(evaluatorInputs, dataset, target);
+      const mappings = inferEvaluatorMappings({
+        evaluatorInputs,
+        dataset,
+        target,
+      });
 
       expect(mappings.output).toBeUndefined();
     });
@@ -711,16 +748,20 @@ describe("inferEvaluatorMappings", () => {
       const dataset = createTestDataset("ds-1", "Dataset 1", [
         createTestColumn("irrelevant"),
       ]);
-      const target = createTestTarget(
-        "target-1",
-        [{ identifier: "input", type: "str" }],
-        [{ identifier: "expected_output", type: "str" }], // target has expected_output
-      );
+      const target = createTestTarget({
+        id: "target-1",
+        inputs: [{ identifier: "input", type: "str" }],
+        outputs: [{ identifier: "expected_output", type: "str" }], // target has expected_output
+      });
       const evaluatorInputs: Field[] = [
         { identifier: "expected_output", type: "str" },
       ];
 
-      const mappings = inferEvaluatorMappings(evaluatorInputs, dataset, target);
+      const mappings = inferEvaluatorMappings({
+        evaluatorInputs,
+        dataset,
+        target,
+      });
 
       expect(mappings.expected_output).toBeUndefined();
     });
@@ -730,14 +771,18 @@ describe("inferEvaluatorMappings", () => {
       const dataset = createTestDataset("ds-1", "Dataset 1", [
         createTestColumn("irrelevant"),
       ]);
-      const target = createTestTarget(
-        "target-1",
-        [{ identifier: "input", type: "str" }],
-        [{ identifier: "input", type: "str" }], // target also emits an "input" output
-      );
+      const target = createTestTarget({
+        id: "target-1",
+        inputs: [{ identifier: "input", type: "str" }],
+        outputs: [{ identifier: "input", type: "str" }], // target also emits an "input" output
+      });
       const evaluatorInputs: Field[] = [{ identifier: "input", type: "str" }];
 
-      const mappings = inferEvaluatorMappings(evaluatorInputs, dataset, target);
+      const mappings = inferEvaluatorMappings({
+        evaluatorInputs,
+        dataset,
+        target,
+      });
 
       expect(mappings.input).toBeUndefined();
     });
@@ -748,14 +793,18 @@ describe("inferEvaluatorMappings", () => {
       const dataset = createTestDataset("ds-1", "Dataset 1", [
         createTestColumn("irrelevant"),
       ]);
-      const target = createTestTarget(
-        "target-1",
-        [{ identifier: "input", type: "str" }],
-        [{ identifier: "score", type: "float" }],
-      );
+      const target = createTestTarget({
+        id: "target-1",
+        inputs: [{ identifier: "input", type: "str" }],
+        outputs: [{ identifier: "score", type: "float" }],
+      });
       const evaluatorInputs: Field[] = [{ identifier: "score", type: "float" }];
 
-      const mappings = inferEvaluatorMappings(evaluatorInputs, dataset, target);
+      const mappings = inferEvaluatorMappings({
+        evaluatorInputs,
+        dataset,
+        target,
+      });
 
       expect(mappings.score?.type).toBe("source");
       if (mappings.score?.type === "source") {
@@ -772,10 +821,13 @@ describe("inferEvaluatorMappings", () => {
 
 describe("inferAllTargetMappings", () => {
   it("infers mappings for all datasets", () => {
-    const target = createTestTarget("target-1", [
-      { identifier: "input", type: "str" },
-      { identifier: "context", type: "str" },
-    ]);
+    const target = createTestTarget({
+      id: "target-1",
+      inputs: [
+        { identifier: "input", type: "str" },
+        { identifier: "context", type: "str" },
+      ],
+    });
     const datasets = [
       createTestDataset("ds-1", "Dataset 1", [
         createTestColumn("input"),
@@ -815,11 +867,11 @@ describe("inferAllTargetMappings", () => {
   });
 
   it("preserves existing mappings", () => {
-    const target = createTestTarget(
-      "target-1",
-      [{ identifier: "input", type: "str" }],
-      [{ identifier: "output", type: "str" }],
-      {
+    const target = createTestTarget({
+      id: "target-1",
+      inputs: [{ identifier: "input", type: "str" }],
+      outputs: [{ identifier: "output", type: "str" }],
+      mappings: {
         "ds-1": {
           input: {
             type: "value",
@@ -827,7 +879,7 @@ describe("inferAllTargetMappings", () => {
           },
         },
       },
-    );
+    });
     const datasets = [
       createTestDataset("ds-1", "Dataset 1", [createTestColumn("input")]),
     ];

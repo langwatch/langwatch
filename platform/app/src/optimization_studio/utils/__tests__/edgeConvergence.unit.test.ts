@@ -14,13 +14,19 @@ const node = (id: string, type: string): Node => ({
   data: {},
 });
 
-const edge = (
-  id: string,
-  source: string,
-  sourceHandle: string,
-  target: string,
-  targetHandle: string,
-): Edge => ({
+const edge = ({
+  id,
+  source,
+  sourceHandle,
+  target,
+  targetHandle,
+}: {
+  id: string;
+  source: string;
+  sourceHandle: string;
+  target: string;
+  targetHandle: string;
+}): Edge => ({
   id,
   source,
   target,
@@ -29,12 +35,17 @@ const edge = (
   type: "default",
 });
 
-const connection = (
-  source: string,
-  sourceHandle: string,
-  target: string,
-  targetHandle: string,
-): Connection => ({
+const connection = ({
+  source,
+  sourceHandle,
+  target,
+  targetHandle,
+}: {
+  source: string;
+  sourceHandle: string;
+  target: string;
+  targetHandle: string;
+}): Connection => ({
   source,
   target,
   sourceHandle: `outputs.${sourceHandle}`,
@@ -51,9 +62,27 @@ const forkNodes: Node[] = [
   node("end", "end"),
 ];
 const forkEdges: Edge[] = [
-  edge("e1", "entry", "q", "gate", "context"),
-  edge("e2", "gate", "true", "codeA", "gate"),
-  edge("e3", "gate", "false", "codeB", "gate"),
+  edge({
+    id: "e1",
+    source: "entry",
+    sourceHandle: "q",
+    target: "gate",
+    targetHandle: "context",
+  }),
+  edge({
+    id: "e2",
+    source: "gate",
+    sourceHandle: "true",
+    target: "codeA",
+    targetHandle: "gate",
+  }),
+  edge({
+    id: "e3",
+    source: "gate",
+    sourceHandle: "false",
+    target: "codeB",
+    targetHandle: "gate",
+  }),
 ];
 
 describe("computeNodeGuards", () => {
@@ -82,8 +111,20 @@ describe("computeNodeGuards", () => {
       const nodes = [...forkNodes, node("merge", "code")];
       const edges = [
         ...forkEdges,
-        edge("m1", "codeA", "out", "merge", "x"),
-        edge("m2", "codeB", "out", "merge", "x"),
+        edge({
+          id: "m1",
+          source: "codeA",
+          sourceHandle: "out",
+          target: "merge",
+          targetHandle: "x",
+        }),
+        edge({
+          id: "m2",
+          source: "codeB",
+          sourceHandle: "out",
+          target: "merge",
+          targetHandle: "x",
+        }),
       ];
       const guards = computeNodeGuards({ nodes, edges });
       expect([...(guards.get("merge") ?? [])]).toEqual([]);
@@ -95,8 +136,20 @@ describe("computeNodeGuards", () => {
       const nodes = [...forkNodes, node("either", "code")];
       const edges = [
         ...forkEdges,
-        edge("b1", "gate", "true", "either", "x"),
-        edge("b2", "gate", "false", "either", "x"),
+        edge({
+          id: "b1",
+          source: "gate",
+          sourceHandle: "true",
+          target: "either",
+          targetHandle: "x",
+        }),
+        edge({
+          id: "b2",
+          source: "gate",
+          sourceHandle: "false",
+          target: "either",
+          targetHandle: "x",
+        }),
       ];
       const guards = computeNodeGuards({ nodes, edges });
       // gate itself has no guards, and neither side is required -> empty.
@@ -113,9 +166,27 @@ describe("computeNodeGuards", () => {
         node("leaf", "code"),
       ];
       const edges = [
-        edge("e1", "entry", "q", "outer", "c"),
-        edge("e2", "outer", "true", "inner", "c"),
-        edge("e3", "inner", "true", "leaf", "g"),
+        edge({
+          id: "e1",
+          source: "entry",
+          sourceHandle: "q",
+          target: "outer",
+          targetHandle: "c",
+        }),
+        edge({
+          id: "e2",
+          source: "outer",
+          sourceHandle: "true",
+          target: "inner",
+          targetHandle: "c",
+        }),
+        edge({
+          id: "e3",
+          source: "inner",
+          sourceHandle: "true",
+          target: "leaf",
+          targetHandle: "g",
+        }),
       ];
       const guards = computeNodeGuards({ nodes, edges });
       expect(guards.get("inner")).toEqual(new Set(["outer:true"]));
@@ -174,7 +245,12 @@ describe("canConvergeOnInput", () => {
         canConvergeOnInput({
           nodes: forkNodes,
           edges: forkEdges,
-          connection: connection("codeA", "out", "end", "answer"),
+          connection: connection({
+            source: "codeA",
+            sourceHandle: "out",
+            target: "end",
+            targetHandle: "answer",
+          }),
         }),
       ).toBe(true);
     });
@@ -184,13 +260,24 @@ describe("canConvergeOnInput", () => {
     it("allows two mutually exclusive branches to converge", () => {
       const edges = [
         ...forkEdges,
-        edge("conv", "codeA", "out", "end", "answer"),
+        edge({
+          id: "conv",
+          source: "codeA",
+          sourceHandle: "out",
+          target: "end",
+          targetHandle: "answer",
+        }),
       ];
       expect(
         canConvergeOnInput({
           nodes: forkNodes,
           edges,
-          connection: connection("codeB", "out", "end", "answer"),
+          connection: connection({
+            source: "codeB",
+            sourceHandle: "out",
+            target: "end",
+            targetHandle: "answer",
+          }),
         }),
       ).toBe(true);
     });
@@ -205,15 +292,38 @@ describe("canConvergeOnInput", () => {
         node("end", "end"),
       ];
       const edges = [
-        edge("e1", "entry", "q", "x", "in"),
-        edge("e2", "entry", "q", "y", "in"),
-        edge("conv", "x", "out", "end", "answer"),
+        edge({
+          id: "e1",
+          source: "entry",
+          sourceHandle: "q",
+          target: "x",
+          targetHandle: "in",
+        }),
+        edge({
+          id: "e2",
+          source: "entry",
+          sourceHandle: "q",
+          target: "y",
+          targetHandle: "in",
+        }),
+        edge({
+          id: "conv",
+          source: "x",
+          sourceHandle: "out",
+          target: "end",
+          targetHandle: "answer",
+        }),
       ];
       expect(
         canConvergeOnInput({
           nodes,
           edges,
-          connection: connection("y", "out", "end", "answer"),
+          connection: connection({
+            source: "y",
+            sourceHandle: "out",
+            target: "end",
+            targetHandle: "answer",
+          }),
         }),
       ).toBe(false);
     });
@@ -224,13 +334,24 @@ describe("canConvergeOnInput", () => {
     it("rejects two outputs of one node on the same input", () => {
       const edges = [
         ...forkEdges,
-        edge("conv", "codeA", "out1", "end", "answer"),
+        edge({
+          id: "conv",
+          source: "codeA",
+          sourceHandle: "out1",
+          target: "end",
+          targetHandle: "answer",
+        }),
       ];
       expect(
         canConvergeOnInput({
           nodes: forkNodes,
           edges,
-          connection: connection("codeA", "out2", "end", "answer"),
+          connection: connection({
+            source: "codeA",
+            sourceHandle: "out2",
+            target: "end",
+            targetHandle: "answer",
+          }),
         }),
       ).toBe(false);
     });
@@ -252,19 +373,66 @@ describe("canConvergeOnInput", () => {
         node("end", "end"),
       ];
       const baseEdges = [
-        edge("e1", "entry", "q", "outer", "c"),
-        edge("e2", "outer", "false", "leafOuterFalse", "g"),
-        edge("e3", "outer", "true", "inner", "c"),
-        edge("e4", "inner", "true", "leafInnerTrue", "g"),
-        edge("e5", "inner", "false", "leafInnerFalse", "g"),
-        edge("c1", "leafOuterFalse", "out", "end", "answer"),
-        edge("c2", "leafInnerTrue", "out", "end", "answer"),
+        edge({
+          id: "e1",
+          source: "entry",
+          sourceHandle: "q",
+          target: "outer",
+          targetHandle: "c",
+        }),
+        edge({
+          id: "e2",
+          source: "outer",
+          sourceHandle: "false",
+          target: "leafOuterFalse",
+          targetHandle: "g",
+        }),
+        edge({
+          id: "e3",
+          source: "outer",
+          sourceHandle: "true",
+          target: "inner",
+          targetHandle: "c",
+        }),
+        edge({
+          id: "e4",
+          source: "inner",
+          sourceHandle: "true",
+          target: "leafInnerTrue",
+          targetHandle: "g",
+        }),
+        edge({
+          id: "e5",
+          source: "inner",
+          sourceHandle: "false",
+          target: "leafInnerFalse",
+          targetHandle: "g",
+        }),
+        edge({
+          id: "c1",
+          source: "leafOuterFalse",
+          sourceHandle: "out",
+          target: "end",
+          targetHandle: "answer",
+        }),
+        edge({
+          id: "c2",
+          source: "leafInnerTrue",
+          sourceHandle: "out",
+          target: "end",
+          targetHandle: "answer",
+        }),
       ];
       expect(
         canConvergeOnInput({
           nodes,
           edges: baseEdges,
-          connection: connection("leafInnerFalse", "out", "end", "answer"),
+          connection: connection({
+            source: "leafInnerFalse",
+            sourceHandle: "out",
+            target: "end",
+            targetHandle: "answer",
+          }),
         }),
       ).toBe(true);
     });

@@ -40,11 +40,11 @@ describe("EventSourcingService - Error Handling Flows", () => {
       });
 
       const events = [
-        createTestEvent(
-          TEST_CONSTANTS.AGGREGATE_ID,
-          TEST_CONSTANTS.AGGREGATE_TYPE,
+        createTestEvent({
+          aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+          aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
           tenantId,
-        ),
+        }),
       ];
 
       await expect(service.storeEvents(events, context)).rejects.toThrow(
@@ -69,11 +69,11 @@ describe("EventSourcingService - Error Handling Flows", () => {
       });
 
       const events = [
-        createTestEvent(
-          TEST_CONSTANTS.AGGREGATE_ID,
-          TEST_CONSTANTS.AGGREGATE_TYPE,
+        createTestEvent({
+          aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+          aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
           tenantId,
-        ),
+        }),
       ];
 
       await expect(service.storeEvents(events, context)).rejects.toThrow(
@@ -115,11 +115,11 @@ describe("EventSourcingService - Error Handling Flows", () => {
         logger: logger as any,
       });
 
-      const event = createTestEvent(
-        TEST_CONSTANTS.AGGREGATE_ID,
-        TEST_CONSTANTS.AGGREGATE_TYPE,
+      const event = createTestEvent({
+        aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+        aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
         tenantId,
-      );
+      });
 
       await expect(
         service.storeEvents([event], context),
@@ -145,11 +145,11 @@ describe("EventSourcingService - Error Handling Flows", () => {
         mapProjections: [mapDef1, mapDef2],
       });
 
-      const event = createTestEvent(
-        TEST_CONSTANTS.AGGREGATE_ID,
-        TEST_CONSTANTS.AGGREGATE_TYPE,
+      const event = createTestEvent({
+        aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+        aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
         tenantId,
-      );
+      });
 
       await expect(
         service.storeEvents([event], context),
@@ -175,11 +175,11 @@ describe("EventSourcingService - Error Handling Flows", () => {
         mapProjections: [mapDef],
       });
 
-      const event = createTestEvent(
-        TEST_CONSTANTS.AGGREGATE_ID,
-        TEST_CONSTANTS.AGGREGATE_TYPE,
+      const event = createTestEvent({
+        aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+        aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
         tenantId,
-      );
+      });
 
       await expect(
         service.storeEvents([event], context),
@@ -207,11 +207,11 @@ describe("EventSourcingService - Error Handling Flows", () => {
       });
 
       const events = [
-        createTestEvent(
-          TEST_CONSTANTS.AGGREGATE_ID,
-          TEST_CONSTANTS.AGGREGATE_TYPE,
+        createTestEvent({
+          aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+          aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
           tenantId,
-        ),
+        }),
       ];
 
       await expect(service.storeEvents(events, context)).resolves.not.toThrow();
@@ -222,11 +222,11 @@ describe("EventSourcingService - Error Handling Flows", () => {
       const foldDef1 = createMockFoldProjectionDefinition("projection1");
       const foldDef2 = createMockFoldProjectionDefinition("projection2");
       const events = [
-        createTestEvent(
-          TEST_CONSTANTS.AGGREGATE_ID,
-          TEST_CONSTANTS.AGGREGATE_TYPE,
+        createTestEvent({
+          aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+          aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
           tenantId,
-        ),
+        }),
       ];
 
       (foldDef1.apply as ReturnType<typeof vi.fn>).mockImplementation(() => {
@@ -251,11 +251,11 @@ describe("EventSourcingService - Error Handling Flows", () => {
       const eventStore = createMockEventStore<Event>();
       const foldDef = createMockFoldProjectionDefinition("projection");
       const events = [
-        createTestEvent(
-          TEST_CONSTANTS.AGGREGATE_ID,
-          TEST_CONSTANTS.AGGREGATE_TYPE,
+        createTestEvent({
+          aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+          aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
           tenantId,
-        ),
+        }),
       ];
 
       (foldDef.apply as ReturnType<typeof vi.fn>).mockImplementation(() => {
@@ -280,8 +280,16 @@ describe("EventSourcingService - Error Handling Flows", () => {
       const aggregate1 = "aggregate-1";
       const aggregate2 = "aggregate-2";
       const events = [
-        createTestEvent(aggregate1, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId),
-        createTestEvent(aggregate2, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId),
+        createTestEvent({
+          aggregateId: aggregate1,
+          aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
+          tenantId,
+        }),
+        createTestEvent({
+          aggregateId: aggregate2,
+          aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
+          tenantId,
+        }),
       ];
 
       // Fail apply only for the first event (aggregate-1)
@@ -320,11 +328,11 @@ describe("EventSourcingService - Error Handling Flows", () => {
       });
 
       const events = [
-        createTestEvent(
-          TEST_CONSTANTS.AGGREGATE_ID,
-          TEST_CONSTANTS.AGGREGATE_TYPE,
+        createTestEvent({
+          aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+          aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
           tenantId,
-        ),
+        }),
       ];
 
       await expect(service.storeEvents(events, context)).resolves.not.toThrow();
@@ -339,11 +347,11 @@ describe("EventSourcingService - Error Handling Flows", () => {
       });
 
       const events = [
-        createTestEvent(
-          TEST_CONSTANTS.AGGREGATE_ID,
-          TEST_CONSTANTS.AGGREGATE_TYPE,
+        createTestEvent({
+          aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+          aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
           tenantId,
-        ),
+        }),
       ];
 
       await expect(service.storeEvents(events, context)).resolves.not.toThrow();
@@ -360,11 +368,11 @@ describe("EventSourcingService - Error Handling Flows", () => {
       });
 
       await expect(
-        service.getProjectionByName(
-          "nonexistent" as any,
-          TEST_CONSTANTS.AGGREGATE_ID,
+        service.getProjectionByName({
+          projectionName: "nonexistent" as any,
+          aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
           context,
-        ),
+        }),
       ).rejects.toThrow(/nonexistent/);
     });
   });

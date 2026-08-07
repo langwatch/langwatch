@@ -51,11 +51,11 @@ describe("EventSourcingService - Handler Flows", () => {
         logger: logger as any,
       });
 
-      const event = createTestEvent(
-        TEST_CONSTANTS.AGGREGATE_ID,
-        TEST_CONSTANTS.AGGREGATE_TYPE,
+      const event = createTestEvent({
+        aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+        aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
         tenantId,
-      );
+      });
 
       await expect(
         service.storeEvents([event], context),
@@ -83,11 +83,11 @@ describe("EventSourcingService - Handler Flows", () => {
         mapProjections: [mapDef1, mapDef2],
       });
 
-      const event = createTestEvent(
-        TEST_CONSTANTS.AGGREGATE_ID,
-        TEST_CONSTANTS.AGGREGATE_TYPE,
+      const event = createTestEvent({
+        aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+        aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
         tenantId,
-      );
+      });
 
       await expect(
         service.storeEvents([event], context),
@@ -120,11 +120,11 @@ describe("EventSourcingService - Handler Flows", () => {
         globalJobRegistry,
       });
 
-      const event = createTestEvent(
-        TEST_CONSTANTS.AGGREGATE_ID,
-        TEST_CONSTANTS.AGGREGATE_TYPE,
+      const event = createTestEvent({
+        aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+        aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
         tenantId,
-      );
+      });
 
       await service.storeEvents([event], context);
 

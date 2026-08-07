@@ -201,12 +201,17 @@ export function getDisplayKeysForProvider(
  * When provider is enabled but has no stored keys (using env vars),
  * API key fields will show MASKED_KEY_PLACEHOLDER.
  */
-export function buildCustomKeyState(
-  displayKeyMap: Record<string, unknown>,
-  storedKeys: Record<string, unknown>,
-  previousKeys?: Record<string, string>,
-  options?: { providerEnabledWithEnvVars?: boolean },
-): Record<string, string> {
+export function buildCustomKeyState({
+  displayKeyMap,
+  storedKeys,
+  previousKeys,
+  options,
+}: {
+  displayKeyMap: Record<string, unknown>;
+  storedKeys: Record<string, unknown>;
+  previousKeys?: Record<string, string>;
+  options?: { providerEnabledWithEnvVars?: boolean };
+}): Record<string, string> {
   if (previousKeys?.MANAGED) {
     return previousKeys;
   }

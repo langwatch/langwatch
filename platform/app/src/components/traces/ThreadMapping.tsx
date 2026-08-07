@@ -110,12 +110,9 @@ const mapThreadToDatasetEntry = (
             const traceMapping =
               TRACE_MAPPINGS[field as keyof typeof TRACE_MAPPINGS];
             if (traceMapping) {
-              filteredTrace[field] = traceMapping.mapping(
-                trace as any,
-                "",
-                "",
-                {},
-              );
+              filteredTrace[field] = traceMapping.mapping({
+                trace: trace as any,
+              });
             }
           }
           return filteredTrace;

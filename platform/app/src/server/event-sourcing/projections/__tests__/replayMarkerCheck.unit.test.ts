@@ -26,24 +26,59 @@ function makeEvent(overrides: Partial<Event> = {}): Event {
 
 describe("isAtOrBeforeCutoff", () => {
   it("returns true when event timestamp is before cutoff", () => {
-    expect(isAtOrBeforeCutoff(1000, "evt-001", 2000, "evt-999")).toBe(true);
+    expect(
+      isAtOrBeforeCutoff({
+        eventTimestamp: 1000,
+        eventId: "evt-001",
+        cutoffTimestamp: 2000,
+        cutoffEventId: "evt-999",
+      }),
+    ).toBe(true);
   });
 
   it("returns false when event timestamp is after cutoff", () => {
-    expect(isAtOrBeforeCutoff(3000, "evt-001", 2000, "evt-999")).toBe(false);
+    expect(
+      isAtOrBeforeCutoff({
+        eventTimestamp: 3000,
+        eventId: "evt-001",
+        cutoffTimestamp: 2000,
+        cutoffEventId: "evt-999",
+      }),
+    ).toBe(false);
   });
 
   describe("when timestamps are equal", () => {
     it("returns true when eventId is before cutoffEventId", () => {
-      expect(isAtOrBeforeCutoff(1000, "evt-001", 1000, "evt-002")).toBe(true);
+      expect(
+        isAtOrBeforeCutoff({
+          eventTimestamp: 1000,
+          eventId: "evt-001",
+          cutoffTimestamp: 1000,
+          cutoffEventId: "evt-002",
+        }),
+      ).toBe(true);
     });
 
     it("returns true when eventId equals cutoffEventId", () => {
-      expect(isAtOrBeforeCutoff(1000, "evt-002", 1000, "evt-002")).toBe(true);
+      expect(
+        isAtOrBeforeCutoff({
+          eventTimestamp: 1000,
+          eventId: "evt-002",
+          cutoffTimestamp: 1000,
+          cutoffEventId: "evt-002",
+        }),
+      ).toBe(true);
     });
 
     it("returns false when eventId is after cutoffEventId", () => {
-      expect(isAtOrBeforeCutoff(1000, "evt-003", 1000, "evt-002")).toBe(false);
+      expect(
+        isAtOrBeforeCutoff({
+          eventTimestamp: 1000,
+          eventId: "evt-003",
+          cutoffTimestamp: 1000,
+          cutoffEventId: "evt-002",
+        }),
+      ).toBe(false);
     });
   });
 });

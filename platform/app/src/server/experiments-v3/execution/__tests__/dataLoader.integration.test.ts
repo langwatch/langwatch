@@ -97,12 +97,16 @@ describe("loadExecutionData", () => {
       });
       cleanupAgentIds.push(agent.id);
 
-      const result = await loadExecutionData(
+      const result = await loadExecutionData({
         projectId,
-        { type: "inline", columns: [], inline: { columns: [], records: {} } },
-        [{ type: "agent", dbAgentId: agent.id }],
-        [],
-      );
+        dataset: {
+          type: "inline",
+          columns: [],
+          inline: { columns: [], records: {} },
+        },
+        targets: [{ type: "agent", dbAgentId: agent.id }],
+        evaluators: [],
+      });
 
       if ("error" in result) {
         throw new Error(`loadExecutionData failed: ${result.error}`);
@@ -146,12 +150,16 @@ describe("loadExecutionData", () => {
       });
       cleanupAgentIds.push(agent.id);
 
-      const result = await loadExecutionData(
+      const result = await loadExecutionData({
         projectId,
-        { type: "inline", columns: [], inline: { columns: [], records: {} } },
-        [{ type: "agent", dbAgentId: agent.id }],
-        [],
-      );
+        dataset: {
+          type: "inline",
+          columns: [],
+          inline: { columns: [], records: {} },
+        },
+        targets: [{ type: "agent", dbAgentId: agent.id }],
+        evaluators: [],
+      });
 
       expect("error" in result).toBe(true);
       if ("error" in result) {

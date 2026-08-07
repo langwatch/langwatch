@@ -35,7 +35,7 @@ export function createTenantId(value: string): TenantId {
       const message =
         error.issues[0]?.message ??
         "TenantId must be a non-empty string for tenant isolation";
-      throw new SecurityError("createTenantId", message);
+      throw new SecurityError({ operation: "createTenantId", message });
     }
     throw error;
   }

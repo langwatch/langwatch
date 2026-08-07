@@ -24,12 +24,17 @@ const TENANT = createTenantId("project-1");
 const CONVERSATION = "conv-1";
 const TURN = "turn-1";
 
-function event(
-  typeKey: keyof typeof LANGY_CONVERSATION_EVENT_TYPES,
-  version: string,
-  data: Record<string, unknown>,
-  occurredAt: number,
-): LangyConversationProcessingEvent {
+function event({
+  typeKey,
+  version,
+  data,
+  occurredAt,
+}: {
+  typeKey: keyof typeof LANGY_CONVERSATION_EVENT_TYPES;
+  version: string;
+  data: Record<string, unknown>;
+  occurredAt: number;
+}): LangyConversationProcessingEvent {
   return {
     id: `event-${occurredAt}`,
     aggregateId: CONVERSATION,
@@ -44,23 +49,23 @@ function event(
 }
 
 const started = (occurredAt: number) =>
-  event(
-    "AGENT_TURN_ACCEPTED",
-    LANGY_CONVERSATION_EVENT_VERSIONS.AGENT_TURN_ACCEPTED,
-    {},
+  event({
+    typeKey: "AGENT_TURN_ACCEPTED",
+    version: LANGY_CONVERSATION_EVENT_VERSIONS.AGENT_TURN_ACCEPTED,
+    data: {},
     occurredAt,
-  );
+  });
 
 const toolInitiated = (
   data: Record<string, unknown>,
   occurredAt: number,
 ): LangyConversationProcessingEvent =>
-  event(
-    "TOOL_CALL_INITIATED",
-    LANGY_CONVERSATION_EVENT_VERSIONS.TOOL_CALL_INITIATED,
-    { toolCallId: "tc-1", toolName: "bash", ...data },
+  event({
+    typeKey: "TOOL_CALL_INITIATED",
+    version: LANGY_CONVERSATION_EVENT_VERSIONS.TOOL_CALL_INITIATED,
+    data: { toolCallId: "tc-1", toolName: "bash", ...data },
     occurredAt,
-  );
+  });
 
 describe("LangyConversationTurnFoldProjection", () => {
   describe("the composite key", () => {
@@ -92,12 +97,12 @@ describe("LangyConversationTurnFoldProjection", () => {
     it("folds the question parts into the turn document when carried", () => {
       const state = fold.apply(
         fold.init(),
-        event(
-          "AGENT_TURN_ACCEPTED",
-          LANGY_CONVERSATION_EVENT_VERSIONS.AGENT_TURN_ACCEPTED,
-          { questionParts: [{ type: "text", text: "why failing?" }] },
-          1000,
-        ),
+        event({
+          typeKey: "AGENT_TURN_ACCEPTED",
+          version: LANGY_CONVERSATION_EVENT_VERSIONS.AGENT_TURN_ACCEPTED,
+          data: { questionParts: [{ type: "text", text: "why failing?" }] },
+          occurredAt: 1000,
+        }),
       );
       expect(state.QuestionParts).toEqual([
         { type: "text", text: "why failing?" },
@@ -127,12 +132,12 @@ describe("LangyConversationTurnFoldProjection", () => {
 
         const succeeded = fold.apply(
           initiated,
-          event(
-            "TOOL_CALL_SUCCEEDED",
-            LANGY_CONVERSATION_EVENT_VERSIONS.TOOL_CALL_SUCCEEDED,
-            { toolCallId: "tc-1", toolName: "bash", durationMs: 42 },
-            1200,
-          ),
+          event({
+            typeKey: "TOOL_CALL_SUCCEEDED",
+            version: LANGY_CONVERSATION_EVENT_VERSIONS.TOOL_CALL_SUCCEEDED,
+            data: { toolCallId: "tc-1", toolName: "bash", durationMs: 42 },
+            occurredAt: 1200,
+          }),
         );
         expect(succeeded.ToolCalls).toHaveLength(1);
         expect(succeeded.ToolCalls[0]).toMatchObject({
@@ -149,12 +154,12 @@ describe("LangyConversationTurnFoldProjection", () => {
         const initiated = fold.apply(running, toolInitiated({}, 1100));
         const failed = fold.apply(
           initiated,
-          event(
-            "TOOL_CALL_FAILED",
-            LANGY_CONVERSATION_EVENT_VERSIONS.TOOL_CALL_FAILED,
-            { toolCallId: "tc-1", toolName: "bash", errorText: "boom" },
-            1200,
-          ),
+          event({
+            typeKey: "TOOL_CALL_FAILED",
+            version: LANGY_CONVERSATION_EVENT_VERSIONS.TOOL_CALL_FAILED,
+            data: { toolCallId: "tc-1", toolName: "bash", errorText: "boom" },
+            occurredAt: 1200,
+          }),
         );
         expect(failed.ToolCalls[0]).toMatchObject({
           status: LANGY_TURN_TOOL_CALL_STATUS.FAILED,
@@ -167,12 +172,12 @@ describe("LangyConversationTurnFoldProjection", () => {
       it("still records the tool call", () => {
         const succeeded = fold.apply(
           running,
-          event(
-            "TOOL_CALL_SUCCEEDED",
-            LANGY_CONVERSATION_EVENT_VERSIONS.TOOL_CALL_SUCCEEDED,
-            { toolCallId: "tc-9", toolName: "read", durationMs: 5 },
-            1200,
-          ),
+          event({
+            typeKey: "TOOL_CALL_SUCCEEDED",
+            version: LANGY_CONVERSATION_EVENT_VERSIONS.TOOL_CALL_SUCCEEDED,
+            data: { toolCallId: "tc-9", toolName: "read", durationMs: 5 },
+            occurredAt: 1200,
+          }),
         );
         expect(succeeded.ToolCalls).toHaveLength(1);
         expect(succeeded.ToolCalls[0]).toMatchObject({
@@ -190,17 +195,17 @@ describe("LangyConversationTurnFoldProjection", () => {
       it("stores the answer parts and marks the turn completed", () => {
         const state = fold.apply(
           running,
-          event(
-            "AGENT_RESPONDED",
-            LANGY_CONVERSATION_EVENT_VERSIONS.AGENT_RESPONDED,
-            {
+          event({
+            typeKey: "AGENT_RESPONDED",
+            version: LANGY_CONVERSATION_EVENT_VERSIONS.AGENT_RESPONDED,
+            data: {
               messageId: "a1",
               role: "assistant",
               parts: [{ type: "text", text: "here is why" }],
               outcome: "completed",
             },
-            2000,
-          ),
+            occurredAt: 2000,
+          }),
         );
         expect(state.Status).toBe(LANGY_CONVERSATION_TURN_STATUS.COMPLETED);
         expect(state.AnswerParts).toEqual([
@@ -215,18 +220,18 @@ describe("LangyConversationTurnFoldProjection", () => {
       it("marks the turn failed and carries the error", () => {
         const state = fold.apply(
           running,
-          event(
-            "AGENT_RESPONDED",
-            LANGY_CONVERSATION_EVENT_VERSIONS.AGENT_RESPONDED,
-            {
+          event({
+            typeKey: "AGENT_RESPONDED",
+            version: LANGY_CONVERSATION_EVENT_VERSIONS.AGENT_RESPONDED,
+            data: {
               messageId: "a1",
               role: "assistant",
               parts: [],
               outcome: "failed",
               error: "model timeout",
             },
-            2000,
-          ),
+            occurredAt: 2000,
+          }),
         );
         expect(state.Status).toBe(LANGY_CONVERSATION_TURN_STATUS.FAILED);
         expect(state.Error).toBe("model timeout");
@@ -238,17 +243,17 @@ describe("LangyConversationTurnFoldProjection", () => {
       it("marks the turn stopped, keeps the partial answer, and is not an error", () => {
         const state = fold.apply(
           running,
-          event(
-            "AGENT_RESPONDED",
-            LANGY_CONVERSATION_EVENT_VERSIONS.AGENT_RESPONDED,
-            {
+          event({
+            typeKey: "AGENT_RESPONDED",
+            version: LANGY_CONVERSATION_EVENT_VERSIONS.AGENT_RESPONDED,
+            data: {
               messageId: "a1",
               role: "assistant",
               parts: [{ type: "text", text: "here is what I had so f" }],
               outcome: "stopped",
             },
-            2000,
-          ),
+            occurredAt: 2000,
+          }),
         );
         // A stop is its own terminal: the partial stays, it renders distinctly
         // from a clean completion, and it is never a red error (ADR-078).
@@ -265,12 +270,12 @@ describe("LangyConversationTurnFoldProjection", () => {
       it("marks the turn failed with the error and no answer parts", () => {
         const state = fold.apply(
           running,
-          event(
-            "AGENT_RESPONSE_FAILED",
-            LANGY_CONVERSATION_EVENT_VERSIONS.AGENT_RESPONSE_FAILED,
-            { error: "turn stalled" },
-            2000,
-          ),
+          event({
+            typeKey: "AGENT_RESPONSE_FAILED",
+            version: LANGY_CONVERSATION_EVENT_VERSIONS.AGENT_RESPONSE_FAILED,
+            data: { error: "turn stalled" },
+            occurredAt: 2000,
+          }),
         );
         expect(state.Status).toBe(LANGY_CONVERSATION_TURN_STATUS.FAILED);
         expect(state.Error).toBe("turn stalled");
@@ -285,12 +290,12 @@ describe("LangyConversationTurnFoldProjection", () => {
       items: Array<{ content: string; status: string }>,
       occurredAt: number,
     ) =>
-      event(
-        "PLAN_UPDATED",
-        LANGY_CONVERSATION_EVENT_VERSIONS.PLAN_UPDATED,
-        { items },
+      event({
+        typeKey: "PLAN_UPDATED",
+        version: LANGY_CONVERSATION_EVENT_VERSIONS.PLAN_UPDATED,
+        data: { items },
         occurredAt,
-      );
+      });
 
     it("starts with no plan", () => {
       expect(fold.init().Plan).toBeNull();

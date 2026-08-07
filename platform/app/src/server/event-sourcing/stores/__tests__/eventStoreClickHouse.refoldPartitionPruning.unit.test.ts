@@ -53,13 +53,23 @@ const lastCall = () =>
 
 describe("re-fold reads prune partitions — unpaged, time-local aggregate", () => {
   it("filters on EventOccurredAt so ClickHouse can prune partitions", async () => {
-    await store.getEventsUpTo("trace-1", { tenantId }, TIME_LOCAL, upToEvent);
+    await store.getEventsUpTo({
+      aggregateId: "trace-1",
+      context: { tenantId },
+      aggregateType: TIME_LOCAL,
+      upToEvent,
+    });
 
     expect(lastCall().query).toContain("EventOccurredAt >=");
   });
 
   it("anchors the window on the triggering event, one window back", async () => {
-    await store.getEventsUpTo("trace-1", { tenantId }, TIME_LOCAL, upToEvent);
+    await store.getEventsUpTo({
+      aggregateId: "trace-1",
+      context: { tenantId },
+      aggregateType: TIME_LOCAL,
+      upToEvent,
+    });
 
     expect(lastCall().query_params.occurredAtFromMs).toBe(
       OCCURRED_AT - REHYDRATION_WINDOW_MS,
@@ -67,7 +77,12 @@ describe("re-fold reads prune partitions — unpaged, time-local aggregate", () 
   });
 
   it("keeps rows with an unknown occurred time, so the bound can never drop one", async () => {
-    await store.getEventsUpTo("trace-1", { tenantId }, TIME_LOCAL, upToEvent);
+    await store.getEventsUpTo({
+      aggregateId: "trace-1",
+      context: { tenantId },
+      aggregateType: TIME_LOCAL,
+      upToEvent,
+    });
 
     expect(lastCall().query).toContain("EventOccurredAt = 0 OR");
   });
@@ -112,12 +127,12 @@ describe("re-fold reads prune partitions — paged, time-local aggregate", () =>
  */
 describe("re-fold reads prune partitions — long-lived aggregate type", () => {
   it("issues no lower bound, leaving the scan unbounded", async () => {
-    await store.getEventsUpTo(
-      "global-1",
-      { tenantId },
-      "global" as AggregateType,
+    await store.getEventsUpTo({
+      aggregateId: "global-1",
+      context: { tenantId },
+      aggregateType: "global" as AggregateType,
       upToEvent,
-    );
+    });
 
     expect(lastCall().query).not.toContain("EventOccurredAt >=");
     expect(lastCall().query_params.occurredAtFromMs).toBeUndefined();
@@ -145,11 +160,16 @@ describe("re-fold reads prune partitions — event with no usable occurred time"
   it("issues no lower bound rather than anchoring on zero", async () => {
     // Anchoring on 0 would produce a bound in 1970 and prune nothing, or
     // worse, a negative bound. Better to skip it.
-    await store.getEventsUpTo("trace-1", { tenantId }, TIME_LOCAL, {
-      id: "event-1",
-      createdAt: 1000,
-      occurredAt: 0,
-    } as unknown as Event);
+    await store.getEventsUpTo({
+      aggregateId: "trace-1",
+      context: { tenantId },
+      aggregateType: TIME_LOCAL,
+      upToEvent: {
+        id: "event-1",
+        createdAt: 1000,
+        occurredAt: 0,
+      } as unknown as Event,
+    });
 
     expect(lastCall().query).not.toContain("EventOccurredAt >=");
     expect(lastCall().query_params.occurredAtFromMs).toBeUndefined();

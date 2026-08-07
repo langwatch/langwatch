@@ -113,12 +113,12 @@ describe("PromptService", () => {
           data: updateData,
         });
 
-        expect(mockRepository.updateConfig).toHaveBeenCalledWith(
-          "test-prompt",
-          "project-1",
-          { handle: "updated-prompt", scope: undefined },
-          { tx: mockPrisma },
-        );
+        expect(mockRepository.updateConfig).toHaveBeenCalledWith({
+          idOrHandle: "test-prompt",
+          projectId: "project-1",
+          data: { handle: "updated-prompt", scope: undefined },
+          tx: mockPrisma,
+        });
       });
 
       it("updates scope if provided", async () => {
@@ -144,12 +144,12 @@ describe("PromptService", () => {
           data: updateData,
         });
 
-        expect(mockRepository.updateConfig).toHaveBeenCalledWith(
-          "test-prompt",
-          "project-1",
-          { handle: undefined, scope: "ORGANIZATION" },
-          { tx: mockPrisma },
-        );
+        expect(mockRepository.updateConfig).toHaveBeenCalledWith({
+          idOrHandle: "test-prompt",
+          projectId: "project-1",
+          data: { handle: undefined, scope: "ORGANIZATION" },
+          tx: mockPrisma,
+        });
       });
 
       it("creates new version with provided version data", async () => {

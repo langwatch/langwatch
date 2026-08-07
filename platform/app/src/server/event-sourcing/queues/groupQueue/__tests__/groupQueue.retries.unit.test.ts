@@ -13,7 +13,10 @@ import { isRetryableJobError, retryBackoffMsFor } from "../groupQueue";
 describe("groupQueue retry categorization", () => {
   describe("when error is a ValidationError", () => {
     it("categorizes as CRITICAL (non-retryable)", () => {
-      const error = new ValidationError("invalid schema", "traceId");
+      const error = new ValidationError({
+        reason: "invalid schema",
+        field: "traceId",
+      });
 
       const category = categorizeError(error);
 
@@ -23,7 +26,11 @@ describe("groupQueue retry categorization", () => {
 
   describe("when error is a SecurityError", () => {
     it("categorizes as CRITICAL (non-retryable)", () => {
-      const error = new SecurityError("checkTenant", "tenant mismatch", "t1");
+      const error = new SecurityError({
+        operation: "checkTenant",
+        message: "tenant mismatch",
+        tenantId: "t1",
+      });
 
       const category = categorizeError(error);
 
@@ -43,7 +50,11 @@ describe("groupQueue retry categorization", () => {
 
   describe("when error is a QueueError", () => {
     it("categorizes as RECOVERABLE (retryable)", () => {
-      const error = new QueueError("test-queue", "send", "connection lost");
+      const error = new QueueError({
+        queueName: "test-queue",
+        operation: "send",
+        message: "connection lost",
+      });
 
       const category = categorizeError(error);
 
@@ -71,13 +82,17 @@ describe("groupQueue retry categorization", () => {
 
   describe("retry decision logic", () => {
     it("skips retries for ValidationError on first attempt", () => {
-      const error = new ValidationError("bad data", "field");
+      const error = new ValidationError({ reason: "bad data", field: "field" });
 
       expect(isRetryableJobError(error)).toBe(false);
     });
 
     it("allows retries for QueueError", () => {
-      const error = new QueueError("q", "op", "transient");
+      const error = new QueueError({
+        queueName: "q",
+        operation: "op",
+        message: "transient",
+      });
 
       expect(isRetryableJobError(error)).toBe(true);
     });

@@ -628,10 +628,10 @@ export class MetricDataPointClickHouseRepository
     query: MetricUsageEstimateQuery,
   ): Promise<MetricUsageEstimate[]> {
     if (!query.organizationId) {
-      throw new SecurityError(
-        "MetricDataPointClickHouseRepository.queryUsageEstimates",
-        "organizationId is required",
-      );
+      throw new SecurityError({
+        operation: "MetricDataPointClickHouseRepository.queryUsageEstimates",
+        message: "organizationId is required",
+      });
     }
     const client = query.tenantId
       ? await this.resolveClient(query.tenantId)
@@ -651,10 +651,11 @@ export class MetricDataPointClickHouseRepository
     fromMs: number;
   }): Promise<SeriesTotalByPointAttribute[]> {
     if (!tenantId) {
-      throw new SecurityError(
-        "MetricDataPointClickHouseRepository.getSeriesTotalsByPointAttribute",
-        "tenantId is required",
-      );
+      throw new SecurityError({
+        operation:
+          "MetricDataPointClickHouseRepository.getSeriesTotalsByPointAttribute",
+        message: "tenantId is required",
+      });
     }
     const client = await this.resolveClient(tenantId);
     // Two hops in one query: the series catalog names the label-matched

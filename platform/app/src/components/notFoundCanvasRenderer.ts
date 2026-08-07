@@ -128,12 +128,17 @@ export function createNotFoundRenderer() {
       return [sx, sy, scale];
     };
 
-    const projectLine = (
-      gx1: number,
-      gz1: number,
-      gx2: number,
-      gz2: number,
-    ): [[number, number, number], [number, number, number]] | null => {
+    const projectLine = ({
+      gx1,
+      gz1,
+      gx2,
+      gz2,
+    }: {
+      gx1: number;
+      gz1: number;
+      gx2: number;
+      gz2: number;
+    }): [[number, number, number], [number, number, number]] | null => {
       let [x1, y1, z1] = toCamera(gx1, gz1);
       let [x2, y2, z2] = toCamera(gx2, gz2);
 
@@ -310,14 +315,21 @@ export function createNotFoundRenderer() {
     // Line segments — recomputed each frame for camera wobble
     const lineSegments: GridLineSegment[] = [];
 
-    const pushLine = (
-      id: number,
-      x1: number,
-      y1: number,
-      x2: number,
-      y2: number,
-      alpha: number,
-    ) => {
+    const pushLine = ({
+      id,
+      x1,
+      y1,
+      x2,
+      y2,
+      alpha,
+    }: {
+      id: number;
+      x1: number;
+      y1: number;
+      x2: number;
+      y2: number;
+      alpha: number;
+    }) => {
       const depthFade = getDepthFade(y1, y2);
       const nearBoost = getNearBoost(y1, y2);
       const startAlpha = Math.min(1, alpha * getAtmosphereFade(y1) * nearBoost);
@@ -357,22 +369,39 @@ export function createNotFoundRenderer() {
     };
 
     for (let gz = -gridExtent; gz <= gridExtent; gz += step) {
-      const result = projectLine(-gridExtent, gz, gridExtent, gz);
+      const result = projectLine({
+        gx1: -gridExtent,
+        gz1: gz,
+        gx2: gridExtent,
+        gz2: gz,
+      });
       if (result) {
         const [[sx1, sy1], [sx2, sy2]] = result;
         const dist = Math.abs(gz) / gridExtent;
         const alpha = 0.65 * edgeFade(dist) * alphaScale;
-        pushLine(gz, sx1, sy1, sx2, sy2, alpha);
+        pushLine({ id: gz, x1: sx1, y1: sy1, x2: sx2, y2: sy2, alpha });
       }
     }
 
     for (let gx = -gridExtent; gx <= gridExtent; gx += step) {
-      const result = projectLine(gx, -gridExtent, gx, gridExtent);
+      const result = projectLine({
+        gx1: gx,
+        gz1: -gridExtent,
+        gx2: gx,
+        gz2: gridExtent,
+      });
       if (result) {
         const [[sx1, sy1], [sx2, sy2]] = result;
         const dist = Math.abs(gx) / gridExtent;
         const alpha = 0.65 * edgeFade(dist) * alphaScale;
-        pushLine(gx + 10000, sx1, sy1, sx2, sy2, alpha);
+        pushLine({
+          id: gx + 10000,
+          x1: sx1,
+          y1: sy1,
+          x2: sx2,
+          y2: sy2,
+          alpha,
+        });
       }
     }
 

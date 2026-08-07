@@ -275,7 +275,7 @@ export function EditableCell({
         setValidationError(true);
         return;
       }
-      setCellValue(datasetId, row, columnId, result.normalized);
+      setCellValue({ datasetId, row, columnId, value: result.normalized });
       setValidationError(false);
       setEditingCell(undefined);
       return;
@@ -288,14 +288,14 @@ export function EditableCell({
         setValidationError(true);
         return;
       }
-      setCellValue(datasetId, row, columnId, result.normalized);
+      setCellValue({ datasetId, row, columnId, value: result.normalized });
       setValidationError(false);
       setEditingCell(undefined);
       return;
     }
 
     // Other types: save as-is
-    setCellValue(datasetId, row, columnId, editValue);
+    setCellValue({ datasetId, row, columnId, value: editValue });
     setEditingCell(undefined);
   }, [
     datasetId,
@@ -668,7 +668,7 @@ export function EditableCell({
                   }
                   colorPalette="green"
                   onClick={() => {
-                    setCellValue(datasetId, row, columnId, "true");
+                    setCellValue({ datasetId, row, columnId, value: "true" });
                     setEditingCell(undefined);
                   }}
                   onMouseDown={(e) => e.preventDefault()}
@@ -682,7 +682,7 @@ export function EditableCell({
                   }
                   colorPalette="red"
                   onClick={() => {
-                    setCellValue(datasetId, row, columnId, "false");
+                    setCellValue({ datasetId, row, columnId, value: "false" });
                     setEditingCell(undefined);
                   }}
                   onMouseDown={(e) => e.preventDefault()}

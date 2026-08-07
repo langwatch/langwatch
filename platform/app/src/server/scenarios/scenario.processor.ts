@@ -412,12 +412,12 @@ export async function executeScenarioRun(
     };
 
     const childStartTime = Date.now();
-    const result = await spawnScenarioChildProcess(
+    const result = await spawnScenarioChildProcess({
       jobData,
       childProcessData,
-      prefetchResult.telemetry,
+      telemetry: prefetchResult.telemetry,
       pool,
-    );
+    });
 
     const totalDurationMs = Date.now() - startTime;
     const childDurationMs = Date.now() - childStartTime;
@@ -451,12 +451,17 @@ export async function executeScenarioRun(
 /**
  * Spawn a child process to execute the scenario with isolated OTEL context.
  */
-async function spawnScenarioChildProcess(
-  jobData: ExecutionJobData,
-  childProcessData: ChildProcessJobData,
-  telemetry: { endpoint: string; apiKey: string },
-  pool: ScenarioExecutionPool,
-): Promise<ScenarioExecutionResult> {
+async function spawnScenarioChildProcess({
+  jobData,
+  childProcessData,
+  telemetry,
+  pool,
+}: {
+  jobData: ExecutionJobData;
+  childProcessData: ChildProcessJobData;
+  telemetry: { endpoint: string; apiKey: string };
+  pool: ScenarioExecutionPool;
+}): Promise<ScenarioExecutionResult> {
   return new Promise((resolve) => {
     const { scenarioId, projectId, batchRunId, setId } = jobData;
     const childLogger = logger.child({

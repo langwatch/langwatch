@@ -268,13 +268,11 @@ async function addTraceToDataset({
 
   const entries: DatasetRecordEntry[] = [];
 
-  const mappedEntries = mapTraceToDatasetEntry(
+  const mappedEntries = mapTraceToDatasetEntry({
     trace,
-    mapping as TraceMapping,
+    mapping: mapping as TraceMapping,
     expansions,
-    undefined,
-    undefined,
-  );
+  });
 
   for (let i = 0; i < mappedEntries.length; i++) {
     const entry = mappedEntries[i]!;

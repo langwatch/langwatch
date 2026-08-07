@@ -21,12 +21,17 @@ const fold = new LangyConversationStateFoldProjection({ store: noopStore });
 const TENANT = createTenantId("project-1");
 const CONVERSATION = "conv-1";
 
-function event(
-  typeKey: keyof typeof LANGY_CONVERSATION_EVENT_TYPES,
-  version: string,
-  data: Record<string, unknown>,
-  occurredAt: number,
-): LangyConversationProcessingEvent {
+function event({
+  typeKey,
+  version,
+  data,
+  occurredAt,
+}: {
+  typeKey: keyof typeof LANGY_CONVERSATION_EVENT_TYPES;
+  version: string;
+  data: Record<string, unknown>;
+  occurredAt: number;
+}): LangyConversationProcessingEvent {
   return {
     id: `event-${occurredAt}`,
     aggregateId: CONVERSATION,
@@ -44,12 +49,18 @@ const messageSent = (
   data: Record<string, unknown>,
   occurredAt: number,
 ): LangyConversationProcessingEvent =>
-  event(
-    "MESSAGE_RECORDED",
-    LANGY_CONVERSATION_EVENT_VERSIONS.MESSAGE_RECORDED,
-    { userId: "alice", messageId: "m1", role: "user", parts: [], ...data },
+  event({
+    typeKey: "MESSAGE_RECORDED",
+    version: LANGY_CONVERSATION_EVENT_VERSIONS.MESSAGE_RECORDED,
+    data: {
+      userId: "alice",
+      messageId: "m1",
+      role: "user",
+      parts: [],
+      ...data,
+    },
     occurredAt,
-  );
+  });
 
 describe("LangyConversationStateFoldProjection", () => {
   describe("given a fresh conversation", () => {
@@ -57,12 +68,12 @@ describe("LangyConversationStateFoldProjection", () => {
       it("seeds owner and title, active status, and no message yet", () => {
         const state = fold.apply(
           fold.init(),
-          event(
-            "CONVERSATION_STARTED",
-            LANGY_CONVERSATION_EVENT_VERSIONS.CONVERSATION_STARTED,
-            { userId: "alice", title: "seeded" },
-            1000,
-          ),
+          event({
+            typeKey: "CONVERSATION_STARTED",
+            version: LANGY_CONVERSATION_EVENT_VERSIONS.CONVERSATION_STARTED,
+            data: { userId: "alice", title: "seeded" },
+            occurredAt: 1000,
+          }),
         );
 
         expect(state.ConversationId).toBe(CONVERSATION);
@@ -75,12 +86,12 @@ describe("LangyConversationStateFoldProjection", () => {
       it("keeps the original owner when a later message arrives from another user", () => {
         const created = fold.apply(
           fold.init(),
-          event(
-            "CONVERSATION_STARTED",
-            LANGY_CONVERSATION_EVENT_VERSIONS.CONVERSATION_STARTED,
-            { userId: "alice" },
-            1000,
-          ),
+          event({
+            typeKey: "CONVERSATION_STARTED",
+            version: LANGY_CONVERSATION_EVENT_VERSIONS.CONVERSATION_STARTED,
+            data: { userId: "alice" },
+            occurredAt: 1000,
+          }),
         );
         const state = fold.apply(
           created,
@@ -93,12 +104,12 @@ describe("LangyConversationStateFoldProjection", () => {
 
     describe("when it carries a runToken (§0a)", () => {
       const started = (runToken: unknown, occurredAt: number) =>
-        event(
-          "CONVERSATION_STARTED",
-          LANGY_CONVERSATION_EVENT_VERSIONS.CONVERSATION_STARTED,
-          { userId: "alice", runToken },
+        event({
+          typeKey: "CONVERSATION_STARTED",
+          version: LANGY_CONVERSATION_EVENT_VERSIONS.CONVERSATION_STARTED,
+          data: { userId: "alice", runToken },
           occurredAt,
-        );
+        });
 
       it("folds the runToken onto the server-only state column", () => {
         const state = fold.apply(fold.init(), started("rt-secret-abc", 1000));
@@ -166,12 +177,12 @@ describe("LangyConversationStateFoldProjection", () => {
   describe("given an agent turn is in progress", () => {
     const started = fold.apply(
       fold.apply(fold.init(), messageSent({}, 1000)),
-      event(
-        "AGENT_TURN_ACCEPTED",
-        LANGY_CONVERSATION_EVENT_VERSIONS.AGENT_TURN_ACCEPTED,
-        { turnId: "turn-1" },
-        1500,
-      ),
+      event({
+        typeKey: "AGENT_TURN_ACCEPTED",
+        version: LANGY_CONVERSATION_EVENT_VERSIONS.AGENT_TURN_ACCEPTED,
+        data: { turnId: "turn-1" },
+        occurredAt: 1500,
+      }),
     );
 
     it("marks the conversation running and records the current turn", () => {
@@ -183,18 +194,18 @@ describe("LangyConversationStateFoldProjection", () => {
       it("appends the assistant message, returns to idle, and clears the turn", () => {
         const state = fold.apply(
           started,
-          event(
-            "AGENT_RESPONDED",
-            LANGY_CONVERSATION_EVENT_VERSIONS.AGENT_RESPONDED,
-            {
+          event({
+            typeKey: "AGENT_RESPONDED",
+            version: LANGY_CONVERSATION_EVENT_VERSIONS.AGENT_RESPONDED,
+            data: {
               turnId: "turn-1",
               messageId: "a1",
               role: "assistant",
               parts: [],
               outcome: "completed",
             },
-            2000,
-          ),
+            occurredAt: 2000,
+          }),
         );
 
         expect(state.MessageCount).toBe(2);
@@ -210,18 +221,18 @@ describe("LangyConversationStateFoldProjection", () => {
       it("keeps the partial answer and returns the conversation to idle, continuable — not failed", () => {
         const state = fold.apply(
           started,
-          event(
-            "AGENT_RESPONDED",
-            LANGY_CONVERSATION_EVENT_VERSIONS.AGENT_RESPONDED,
-            {
+          event({
+            typeKey: "AGENT_RESPONDED",
+            version: LANGY_CONVERSATION_EVENT_VERSIONS.AGENT_RESPONDED,
+            data: {
               turnId: "turn-1",
               messageId: "a1",
               role: "assistant",
               parts: [{ type: "text", text: "half an answer" }],
               outcome: "stopped",
             },
-            2000,
-          ),
+            occurredAt: 2000,
+          }),
         );
 
         // The conversation spine reads a stop as a non-failed terminal: the
@@ -239,12 +250,12 @@ describe("LangyConversationStateFoldProjection", () => {
       it("fails the conversation and records the error", () => {
         const state = fold.apply(
           started,
-          event(
-            "AGENT_RESPONSE_FAILED",
-            LANGY_CONVERSATION_EVENT_VERSIONS.AGENT_RESPONSE_FAILED,
-            { turnId: "turn-1", error: "worker stopped" },
-            2000,
-          ),
+          event({
+            typeKey: "AGENT_RESPONSE_FAILED",
+            version: LANGY_CONVERSATION_EVENT_VERSIONS.AGENT_RESPONSE_FAILED,
+            data: { turnId: "turn-1", error: "worker stopped" },
+            occurredAt: 2000,
+          }),
         );
 
         expect(state.Status).toBe(LANGY_CONVERSATION_STATUS.FAILED);
@@ -257,12 +268,12 @@ describe("LangyConversationStateFoldProjection", () => {
       it("ignores it and leaves the in-flight turn untouched", () => {
         const state = fold.apply(
           started,
-          event(
-            "AGENT_RESPONSE_FAILED",
-            LANGY_CONVERSATION_EVENT_VERSIONS.AGENT_RESPONSE_FAILED,
-            { turnId: "turn-0-stale", error: "worker stopped" },
-            2000,
-          ),
+          event({
+            typeKey: "AGENT_RESPONSE_FAILED",
+            version: LANGY_CONVERSATION_EVENT_VERSIONS.AGENT_RESPONSE_FAILED,
+            data: { turnId: "turn-0-stale", error: "worker stopped" },
+            occurredAt: 2000,
+          }),
         );
 
         expect(state.Status).toBe(LANGY_CONVERSATION_STATUS.RUNNING);
@@ -275,30 +286,30 @@ describe("LangyConversationStateFoldProjection", () => {
       it("keeps the completed answer — idle status, no error", () => {
         const completed = fold.apply(
           started,
-          event(
-            "AGENT_RESPONDED",
-            LANGY_CONVERSATION_EVENT_VERSIONS.AGENT_RESPONDED,
-            {
+          event({
+            typeKey: "AGENT_RESPONDED",
+            version: LANGY_CONVERSATION_EVENT_VERSIONS.AGENT_RESPONDED,
+            data: {
               turnId: "turn-1",
               messageId: "a1",
               role: "assistant",
               parts: [],
               outcome: "completed",
             },
-            2000,
-          ),
+            occurredAt: 2000,
+          }),
         );
 
         // The late failure for the SAME turn — e.g. a liveness sweep that
         // decided on a stale snapshot. It must not bury the answer.
         const state = fold.apply(
           completed,
-          event(
-            "AGENT_RESPONSE_FAILED",
-            LANGY_CONVERSATION_EVENT_VERSIONS.AGENT_RESPONSE_FAILED,
-            { turnId: "turn-1", error: "worker stopped" },
-            3000,
-          ),
+          event({
+            typeKey: "AGENT_RESPONSE_FAILED",
+            version: LANGY_CONVERSATION_EVENT_VERSIONS.AGENT_RESPONSE_FAILED,
+            data: { turnId: "turn-1", error: "worker stopped" },
+            occurredAt: 3000,
+          }),
         );
 
         expect(state.Status).toBe(LANGY_CONVERSATION_STATUS.IDLE);
@@ -312,10 +323,10 @@ describe("LangyConversationStateFoldProjection", () => {
       it("records the failure status and error", () => {
         const state = fold.apply(
           started,
-          event(
-            "AGENT_RESPONDED",
-            LANGY_CONVERSATION_EVENT_VERSIONS.AGENT_RESPONDED,
-            {
+          event({
+            typeKey: "AGENT_RESPONDED",
+            version: LANGY_CONVERSATION_EVENT_VERSIONS.AGENT_RESPONDED,
+            data: {
               turnId: "turn-1",
               messageId: "a1",
               role: "assistant",
@@ -323,8 +334,8 @@ describe("LangyConversationStateFoldProjection", () => {
               outcome: "failed",
               error: "model timeout",
             },
-            2000,
-          ),
+            occurredAt: 2000,
+          }),
         );
 
         expect(state.Status).toBe(LANGY_CONVERSATION_STATUS.FAILED);
@@ -336,7 +347,12 @@ describe("LangyConversationStateFoldProjection", () => {
   describe("given an archived conversation", () => {
     const archived = fold.apply(
       fold.apply(fold.init(), messageSent({}, 1000)),
-      event("ARCHIVED", LANGY_CONVERSATION_EVENT_VERSIONS.ARCHIVED, {}, 3000),
+      event({
+        typeKey: "ARCHIVED",
+        version: LANGY_CONVERSATION_EVENT_VERSIONS.ARCHIVED,
+        data: {},
+        occurredAt: 3000,
+      }),
     );
 
     it("flips status to archived and stamps ArchivedAt", () => {
@@ -360,12 +376,12 @@ describe("LangyConversationStateFoldProjection", () => {
       const base = fold.apply(fold.init(), messageSent({ title: "old" }, 1000));
       const state = fold.apply(
         base,
-        event(
-          "METADATA_UPDATED",
-          LANGY_CONVERSATION_EVENT_VERSIONS.METADATA_UPDATED,
-          { title: "new name", isShared: true, sharedById: "alice" },
-          2000,
-        ),
+        event({
+          typeKey: "METADATA_UPDATED",
+          version: LANGY_CONVERSATION_EVENT_VERSIONS.METADATA_UPDATED,
+          data: { title: "new name", isShared: true, sharedById: "alice" },
+          occurredAt: 2000,
+        }),
       );
 
       expect(state.Title).toBe("new name");
@@ -381,17 +397,17 @@ describe("LangyConversationStateFoldProjection", () => {
       data: Record<string, unknown>,
       occurredAt: number,
     ): LangyConversationProcessingEvent =>
-      event(
-        "TITLE_GENERATED",
-        LANGY_CONVERSATION_EVENT_VERSIONS.TITLE_GENERATED,
-        {
+      event({
+        typeKey: "TITLE_GENERATED",
+        version: LANGY_CONVERSATION_EVENT_VERSIONS.TITLE_GENERATED,
+        data: {
           title: "Generated Title",
           source: "auto",
           model: "openai/gpt-5-mini",
           ...data,
         },
         occurredAt,
-      );
+      });
 
     describe("when the first message derives a placeholder title", () => {
       it("records the title source as derived", () => {
@@ -437,12 +453,12 @@ describe("LangyConversationStateFoldProjection", () => {
         );
         const state = fold.apply(
           base,
-          event(
-            "METADATA_UPDATED",
-            LANGY_CONVERSATION_EVENT_VERSIONS.METADATA_UPDATED,
-            { title: "My Own Name" },
-            2000,
-          ),
+          event({
+            typeKey: "METADATA_UPDATED",
+            version: LANGY_CONVERSATION_EVENT_VERSIONS.METADATA_UPDATED,
+            data: { title: "My Own Name" },
+            occurredAt: 2000,
+          }),
         );
         expect(state.Title).toBe("My Own Name");
         expect(state.TitleSource).toBe(LANGY_TITLE_SOURCE.USER);
@@ -453,12 +469,12 @@ describe("LangyConversationStateFoldProjection", () => {
       it("never overrides the user's title", () => {
         const renamed = fold.apply(
           fold.apply(fold.init(), messageSent({ title: "placeholder" }, 1000)),
-          event(
-            "METADATA_UPDATED",
-            LANGY_CONVERSATION_EVENT_VERSIONS.METADATA_UPDATED,
-            { title: "My Own Name" },
-            2000,
-          ),
+          event({
+            typeKey: "METADATA_UPDATED",
+            version: LANGY_CONVERSATION_EVENT_VERSIONS.METADATA_UPDATED,
+            data: { title: "My Own Name" },
+            occurredAt: 2000,
+          }),
         );
         const state = fold.apply(renamed, titleGenerated({}, 3000));
         expect(state.Title).toBe("My Own Name");
@@ -487,12 +503,16 @@ describe("LangyConversationStateFoldProjection", () => {
       const base = fold.apply(fold.init(), messageSent({}, 1000));
       const state = fold.apply(
         base,
-        event(
-          "TOOL_CALL_INITIATED",
-          LANGY_CONVERSATION_EVENT_VERSIONS.TOOL_CALL_INITIATED,
-          { turnId: "turn-1", toolCallId: "tc-1", toolName: "search_traces" },
-          1200,
-        ),
+        event({
+          typeKey: "TOOL_CALL_INITIATED",
+          version: LANGY_CONVERSATION_EVENT_VERSIONS.TOOL_CALL_INITIATED,
+          data: {
+            turnId: "turn-1",
+            toolCallId: "tc-1",
+            toolName: "search_traces",
+          },
+          occurredAt: 1200,
+        }),
       );
 
       expect(state.LastActivityAt).toBe(1200);
@@ -504,22 +524,22 @@ describe("LangyConversationStateFoldProjection", () => {
   describe("given an agent turn in progress that hands off on shutdown (ADR-048)", () => {
     const started = fold.apply(
       fold.apply(fold.init(), messageSent({}, 1000)),
-      event(
-        "AGENT_TURN_ACCEPTED",
-        LANGY_CONVERSATION_EVENT_VERSIONS.AGENT_TURN_ACCEPTED,
-        { turnId: "turn-1" },
-        1500,
-      ),
+      event({
+        typeKey: "AGENT_TURN_ACCEPTED",
+        version: LANGY_CONVERSATION_EVENT_VERSIONS.AGENT_TURN_ACCEPTED,
+        data: { turnId: "turn-1" },
+        occurredAt: 1500,
+      }),
     );
 
     const handedOff = fold.apply(
       started,
-      event(
-        "CONVERSATION_HANDOFF_PENDING",
-        LANGY_CONVERSATION_EVENT_VERSIONS.CONVERSATION_HANDOFF_PENDING,
-        { turnId: "turn-1", token: "opaque-resume-token" },
-        1800,
-      ),
+      event({
+        typeKey: "CONVERSATION_HANDOFF_PENDING",
+        version: LANGY_CONVERSATION_EVENT_VERSIONS.CONVERSATION_HANDOFF_PENDING,
+        data: { turnId: "turn-1", token: "opaque-resume-token" },
+        occurredAt: 1800,
+      }),
     );
 
     describe("when the turn checkpoints and hands off", () => {
@@ -539,12 +559,13 @@ describe("LangyConversationStateFoldProjection", () => {
     describe("when the next turn consumes the pending handoff", () => {
       const consumed = fold.apply(
         handedOff,
-        event(
-          "CONVERSATION_HANDOFF_CONSUMED",
-          LANGY_CONVERSATION_EVENT_VERSIONS.CONVERSATION_HANDOFF_CONSUMED,
-          { turnId: "turn-1" },
-          2000,
-        ),
+        event({
+          typeKey: "CONVERSATION_HANDOFF_CONSUMED",
+          version:
+            LANGY_CONVERSATION_EVENT_VERSIONS.CONVERSATION_HANDOFF_CONSUMED,
+          data: { turnId: "turn-1" },
+          occurredAt: 2000,
+        }),
       );
 
       it("clears the pending token", () => {
@@ -555,12 +576,13 @@ describe("LangyConversationStateFoldProjection", () => {
       it("consuming again is a no-op on an already-cleared fold (idempotent)", () => {
         const consumedTwice = fold.apply(
           consumed,
-          event(
-            "CONVERSATION_HANDOFF_CONSUMED",
-            LANGY_CONVERSATION_EVENT_VERSIONS.CONVERSATION_HANDOFF_CONSUMED,
-            { turnId: "turn-1" },
-            2100,
-          ),
+          event({
+            typeKey: "CONVERSATION_HANDOFF_CONSUMED",
+            version:
+              LANGY_CONVERSATION_EVENT_VERSIONS.CONVERSATION_HANDOFF_CONSUMED,
+            data: { turnId: "turn-1" },
+            occurredAt: 2100,
+          }),
         );
         expect(consumedTwice.PendingHandoffToken).toBeNull();
         expect(consumedTwice.PendingHandoffTurnId).toBeNull();

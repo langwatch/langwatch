@@ -108,13 +108,19 @@ async function forEachWithConcurrency<T>(
 }
 
 /** Logs a per-field resolution failure at warn level (no silent truncation). */
-function warnResolutionFailure(
-  logger: WarnLogger,
-  projectId: string,
-  span: NormalizedSpan,
-  attrKey: string,
-  error: unknown,
-): void {
+function warnResolutionFailure({
+  logger,
+  projectId,
+  span,
+  attrKey,
+  error,
+}: {
+  logger: WarnLogger;
+  projectId: string;
+  span: NormalizedSpan;
+  attrKey: string;
+  error: unknown;
+}): void {
   if (
     error instanceof BlobNotFoundError ||
     error instanceof BlobFieldNotFoundError
@@ -245,7 +251,13 @@ export async function resolveOffloadedTracesBatch({
           resolvedAttrs[attrKey] = result.value;
           anyResolved = true;
         } else if (result && !result.ok) {
-          warnResolutionFailure(logger, projectId, span, attrKey, result.error);
+          warnResolutionFailure({
+            logger,
+            projectId,
+            span,
+            attrKey,
+            error: result.error,
+          });
         }
       }
       return { ...span, spanAttributes: resolvedAttrs };

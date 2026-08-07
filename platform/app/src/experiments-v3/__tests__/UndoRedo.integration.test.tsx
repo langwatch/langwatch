@@ -72,9 +72,12 @@ describe("UndoRedo Component", () => {
       render(<UndoRedo />, { wrapper: Wrapper });
 
       // Make a change
-      useEvaluationsV3Store
-        .getState()
-        .setCellValue("test-data", 0, "input", "hello");
+      useEvaluationsV3Store.getState().setCellValue({
+        datasetId: "test-data",
+        row: 0,
+        columnId: "input",
+        value: "hello",
+      });
 
       // Wait for the debounce in temporal middleware
       await vi.advanceTimersByTimeAsync(150);
@@ -89,9 +92,12 @@ describe("UndoRedo Component", () => {
       render(<UndoRedo />, { wrapper: Wrapper });
 
       // Make a change
-      useEvaluationsV3Store
-        .getState()
-        .setCellValue("test-data", 0, "input", "hello");
+      useEvaluationsV3Store.getState().setCellValue({
+        datasetId: "test-data",
+        row: 0,
+        columnId: "input",
+        value: "hello",
+      });
       await vi.advanceTimersByTimeAsync(150);
 
       // Undo
@@ -110,13 +116,19 @@ describe("UndoRedo Component", () => {
       render(<UndoRedo />, { wrapper: Wrapper });
 
       // Make two changes (temporal requires distinct state changes for history)
-      useEvaluationsV3Store
-        .getState()
-        .setCellValue("test-data", 0, "input", "first");
+      useEvaluationsV3Store.getState().setCellValue({
+        datasetId: "test-data",
+        row: 0,
+        columnId: "input",
+        value: "first",
+      });
       await vi.advanceTimersByTimeAsync(150);
-      useEvaluationsV3Store
-        .getState()
-        .setCellValue("test-data", 0, "input", "second");
+      useEvaluationsV3Store.getState().setCellValue({
+        datasetId: "test-data",
+        row: 0,
+        columnId: "input",
+        value: "second",
+      });
       await vi.advanceTimersByTimeAsync(150);
 
       // Verify change was made
@@ -145,13 +157,19 @@ describe("UndoRedo Component", () => {
       render(<UndoRedo />, { wrapper: Wrapper });
 
       // Make two changes
-      useEvaluationsV3Store
-        .getState()
-        .setCellValue("test-data", 0, "input", "first");
+      useEvaluationsV3Store.getState().setCellValue({
+        datasetId: "test-data",
+        row: 0,
+        columnId: "input",
+        value: "first",
+      });
       await vi.advanceTimersByTimeAsync(150);
-      useEvaluationsV3Store
-        .getState()
-        .setCellValue("test-data", 0, "input", "second");
+      useEvaluationsV3Store.getState().setCellValue({
+        datasetId: "test-data",
+        row: 0,
+        columnId: "input",
+        value: "second",
+      });
       await vi.advanceTimersByTimeAsync(150);
 
       // Undo
@@ -192,13 +210,19 @@ describe("UndoRedo Component", () => {
       );
 
       // Make two changes
-      useEvaluationsV3Store
-        .getState()
-        .setCellValue("test-data", 0, "input", "first");
+      useEvaluationsV3Store.getState().setCellValue({
+        datasetId: "test-data",
+        row: 0,
+        columnId: "input",
+        value: "first",
+      });
       await vi.advanceTimersByTimeAsync(150);
-      useEvaluationsV3Store
-        .getState()
-        .setCellValue("test-data", 0, "input", "second");
+      useEvaluationsV3Store.getState().setCellValue({
+        datasetId: "test-data",
+        row: 0,
+        columnId: "input",
+        value: "second",
+      });
       await vi.advanceTimersByTimeAsync(150);
 
       // Focus textarea and simulate Cmd+Z
@@ -324,11 +348,21 @@ describe("Undo/Redo store actions (unit)", () => {
     const store = useEvaluationsV3Store.getState();
 
     // First change
-    store.setCellValue("test-data", 0, "input", "first");
+    store.setCellValue({
+      datasetId: "test-data",
+      row: 0,
+      columnId: "input",
+      value: "first",
+    });
     await new Promise((resolve) => setTimeout(resolve, 110));
 
     // Second change
-    store.setCellValue("test-data", 0, "input", "second");
+    store.setCellValue({
+      datasetId: "test-data",
+      row: 0,
+      columnId: "input",
+      value: "second",
+    });
     await new Promise((resolve) => setTimeout(resolve, 110));
 
     expect(getRecords()?.input?.[0]).toBe("second");
@@ -343,11 +377,21 @@ describe("Undo/Redo store actions (unit)", () => {
     const store = useEvaluationsV3Store.getState();
 
     // First change
-    store.setCellValue("test-data", 0, "input", "first");
+    store.setCellValue({
+      datasetId: "test-data",
+      row: 0,
+      columnId: "input",
+      value: "first",
+    });
     await new Promise((resolve) => setTimeout(resolve, 110));
 
     // Second change
-    store.setCellValue("test-data", 0, "input", "second");
+    store.setCellValue({
+      datasetId: "test-data",
+      row: 0,
+      columnId: "input",
+      value: "second",
+    });
     await new Promise((resolve) => setTimeout(resolve, 110));
 
     expect(getRecords()?.input?.[0]).toBe("second");
@@ -365,9 +409,24 @@ describe("Undo/Redo store actions (unit)", () => {
     const store = useEvaluationsV3Store.getState();
 
     // Set up some data
-    store.setCellValue("test-data", 0, "input", "row0");
-    store.setCellValue("test-data", 1, "input", "row1");
-    store.setCellValue("test-data", 2, "input", "row2");
+    store.setCellValue({
+      datasetId: "test-data",
+      row: 0,
+      columnId: "input",
+      value: "row0",
+    });
+    store.setCellValue({
+      datasetId: "test-data",
+      row: 1,
+      columnId: "input",
+      value: "row1",
+    });
+    store.setCellValue({
+      datasetId: "test-data",
+      row: 2,
+      columnId: "input",
+      value: "row2",
+    });
     await new Promise((resolve) => setTimeout(resolve, 110));
 
     expect(getRecords()?.input?.[0]).toBe("row0");
@@ -403,14 +462,24 @@ describe("Undo/Redo store actions (unit)", () => {
     store.setEditingCell({ row: 0, columnId: "input" });
 
     // User types and saves (which clears editingCell and updates value)
-    store.setCellValue("test-data", 0, "input", "first edit");
+    store.setCellValue({
+      datasetId: "test-data",
+      row: 0,
+      columnId: "input",
+      value: "first edit",
+    });
     store.setEditingCell(undefined);
     await new Promise((resolve) => setTimeout(resolve, 110));
 
     // User edits another cell
     store.setSelectedCell({ row: 1, columnId: "input" });
     store.setEditingCell({ row: 1, columnId: "input" });
-    store.setCellValue("test-data", 1, "input", "second edit");
+    store.setCellValue({
+      datasetId: "test-data",
+      row: 1,
+      columnId: "input",
+      value: "second edit",
+    });
     store.setEditingCell(undefined);
     await new Promise((resolve) => setTimeout(resolve, 110));
 
@@ -437,7 +506,12 @@ describe("Undo/Redo store actions (unit)", () => {
     store.setEditingCell({ row: 0, columnId: "input" });
 
     // User types - this happens WHILE editingCell is still set
-    store.setCellValue("test-data", 0, "input", "first");
+    store.setCellValue({
+      datasetId: "test-data",
+      row: 0,
+      columnId: "input",
+      value: "first",
+    });
 
     // Wait for debounce - state is saved to history with editingCell still set
     await new Promise((resolve) => setTimeout(resolve, 110));
@@ -450,7 +524,12 @@ describe("Undo/Redo store actions (unit)", () => {
     store.setEditingCell({ row: 0, columnId: "input" });
 
     // User types
-    store.setCellValue("test-data", 0, "input", "second");
+    store.setCellValue({
+      datasetId: "test-data",
+      row: 0,
+      columnId: "input",
+      value: "second",
+    });
 
     // Wait for debounce
     await new Promise((resolve) => setTimeout(resolve, 110));
@@ -482,12 +561,22 @@ describe("Undo/Redo store actions (unit)", () => {
 
     // Edit cell at row 0
     store.setSelectedCell({ row: 0, columnId: "input" });
-    store.setCellValue("test-data", 0, "input", "first");
+    store.setCellValue({
+      datasetId: "test-data",
+      row: 0,
+      columnId: "input",
+      value: "first",
+    });
     await new Promise((resolve) => setTimeout(resolve, 110));
 
     // Edit cell at row 1
     store.setSelectedCell({ row: 1, columnId: "input" });
-    store.setCellValue("test-data", 1, "input", "second");
+    store.setCellValue({
+      datasetId: "test-data",
+      row: 1,
+      columnId: "input",
+      value: "second",
+    });
     await new Promise((resolve) => setTimeout(resolve, 110));
 
     // Current selection is row 1
@@ -532,7 +621,12 @@ describe("Undo/Redo store actions (unit)", () => {
     // User makes a content change (use unique value to avoid matching previous test state)
     const uniqueValue = `navigation-test-${Date.now()}`;
     store.setSelectedCell({ row: 0, columnId: "input" });
-    store.setCellValue("test-data", 0, "input", uniqueValue);
+    store.setCellValue({
+      datasetId: "test-data",
+      row: 0,
+      columnId: "input",
+      value: uniqueValue,
+    });
     await new Promise((resolve) => setTimeout(resolve, 110));
 
     // Count history entries after content change

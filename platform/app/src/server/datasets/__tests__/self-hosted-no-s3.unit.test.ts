@@ -80,12 +80,12 @@ const makeService = (overrides: {
   recordRepository?: Record<string, unknown>;
   prisma?: unknown;
 }) =>
-  new DatasetService(
-    (overrides.prisma ?? {}) as never,
-    (overrides.repository ?? {}) as never,
-    (overrides.recordRepository ?? {}) as never,
-    {} as never,
-  );
+  new DatasetService({
+    prisma: (overrides.prisma ?? {}) as never,
+    repository: (overrides.repository ?? {}) as never,
+    recordRepository: (overrides.recordRepository ?? {}) as never,
+    experimentRepository: {} as never,
+  });
 
 beforeEach(() => {
   vi.clearAllMocks();

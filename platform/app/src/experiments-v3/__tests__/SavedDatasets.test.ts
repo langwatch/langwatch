@@ -239,7 +239,12 @@ describe("Saved datasets in workbench", () => {
       store.addDataset(savedDataset);
 
       // Update value
-      store.updateSavedRecordValue("saved_abc123", 0, "input", "updated value");
+      store.updateSavedRecordValue({
+        datasetId: "saved_abc123",
+        rowIndex: 0,
+        columnId: "input",
+        value: "updated value",
+      });
 
       const state = useEvaluationsV3Store.getState();
       const dataset = state.datasets.find((d) => d.id === "saved_abc123");
@@ -260,7 +265,12 @@ describe("Saved datasets in workbench", () => {
       };
 
       store.addDataset(savedDataset);
-      store.updateSavedRecordValue("saved_abc123", 0, "input", "changed");
+      store.updateSavedRecordValue({
+        datasetId: "saved_abc123",
+        rowIndex: 0,
+        columnId: "input",
+        value: "changed",
+      });
 
       // Should track that rec1 has pending changes
       const pendingChanges =

@@ -32,7 +32,11 @@ describe("LogRecordStorageClickHouseRepository.getLogsByTraceId", () => {
       const { repo, query } = repoCapturingQuery();
       const occurredAtMs = 1_700_000_000_000;
 
-      await repo.getLogsByTraceId("project_test", "trace-1", occurredAtMs);
+      await repo.getLogsByTraceId({
+        tenantId: "project_test",
+        traceId: "trace-1",
+        occurredAtMs,
+      });
 
       const { query: sql, query_params } = capturedQuery(query);
       expect(sql.match(/TimeUnixMs >= fromUnixTimestamp64Milli/g)).toHaveLength(
@@ -52,7 +56,11 @@ describe("LogRecordStorageClickHouseRepository.getLogsByTraceId", () => {
     it("does not re-widen — it issues exactly one query", async () => {
       const { repo, query } = repoCapturingQuery([]);
 
-      await repo.getLogsByTraceId("project_test", "trace-1", 1_700_000_000_000);
+      await repo.getLogsByTraceId({
+        tenantId: "project_test",
+        traceId: "trace-1",
+        occurredAtMs: 1_700_000_000_000,
+      });
 
       expect(query).toHaveBeenCalledTimes(1);
       const { query_params } = capturedQuery(query);
@@ -69,7 +77,10 @@ describe("LogRecordStorageClickHouseRepository.getLogsByTraceId", () => {
       const { repo, query } = repoCapturingQuery();
       const before = Date.now();
 
-      await repo.getLogsByTraceId("project_test", "trace-1");
+      await repo.getLogsByTraceId({
+        tenantId: "project_test",
+        traceId: "trace-1",
+      });
 
       const after = Date.now();
       const { query: sql, query_params } = capturedQuery(query);
@@ -106,7 +117,11 @@ describe("LogRecordStorageClickHouseRepository.getLogsByTraceId", () => {
     it("bounds the query at the default cap plus one detection row", async () => {
       const { repo, query } = repoCapturingQuery();
 
-      await repo.getLogsByTraceId("project_test", "trace-1", 1_700_000_000_000);
+      await repo.getLogsByTraceId({
+        tenantId: "project_test",
+        traceId: "trace-1",
+        occurredAtMs: 1_700_000_000_000,
+      });
 
       const { query: sql, query_params } = capturedQuery(query);
       expect(sql).toContain("LIMIT {limitPlusOne:UInt32}");
@@ -120,12 +135,12 @@ describe("LogRecordStorageClickHouseRepository.getLogsByTraceId", () => {
         storedRow(2),
       ]);
 
-      const rows = await repo.getLogsByTraceId(
-        "project_test",
-        "trace-1",
-        1_700_000_000_000,
-        2,
-      );
+      const rows = await repo.getLogsByTraceId({
+        tenantId: "project_test",
+        traceId: "trace-1",
+        occurredAtMs: 1_700_000_000_000,
+        limit: 2,
+      });
 
       expect(rows.map((row) => row.spanId)).toEqual(["span-0", "span-1"]);
     });
@@ -135,7 +150,11 @@ describe("LogRecordStorageClickHouseRepository.getLogsByTraceId", () => {
     it("selects the Body + Attributes and does not filter on the claude kind attr", async () => {
       const { repo, query } = repoCapturingQuery();
 
-      await repo.getLogsByTraceId("project_test", "trace-1", 1_700_000_000_000);
+      await repo.getLogsByTraceId({
+        tenantId: "project_test",
+        traceId: "trace-1",
+        occurredAtMs: 1_700_000_000_000,
+      });
 
       const { query: sql, query_params } = capturedQuery(query);
       expect(sql).toContain("Body");
@@ -161,11 +180,11 @@ describe("LogRecordStorageClickHouseRepository.getLogsByTraceId", () => {
         },
       ]);
 
-      const rows = await repo.getLogsByTraceId(
-        "project_test",
-        "trace-1",
-        1_700_000_000_000,
-      );
+      const rows = await repo.getLogsByTraceId({
+        tenantId: "project_test",
+        traceId: "trace-1",
+        occurredAtMs: 1_700_000_000_000,
+      });
 
       expect(rows).toEqual([
         {

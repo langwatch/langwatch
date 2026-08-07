@@ -9,6 +9,7 @@ import {
 function fakeRedis() {
   const keys = new Set<string>();
   const set = vi.fn(
+    // biome-ignore lint/complexity/useMaxParams: fake of ioredis's positional set(key, value, "EX", ttl, "NX")
     async (key: string, _v: string, _ex: string, _ttl: number, _nx: string) => {
       if (keys.has(key)) return null;
       keys.add(key);

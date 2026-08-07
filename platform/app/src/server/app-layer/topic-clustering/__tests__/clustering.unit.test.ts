@@ -403,13 +403,13 @@ describe("fetchTracesFromClickHouse de-duplication", () => {
       }),
     } as any;
 
-    const res = await fetchTracesFromClickHouse(
-      mockCh,
-      "proj-1",
-      false,
-      [],
-      [],
-    );
+    const res = await fetchTracesFromClickHouse({
+      clickhouse: mockCh,
+      projectId: "proj-1",
+      isIncrementalProcessing: false,
+      topicIds: [],
+      subtopicIds: [],
+    });
 
     expect(res.returnedCount).toBe(2); // t-0 counted once + t-1
     expect(res.traces).toHaveLength(2);

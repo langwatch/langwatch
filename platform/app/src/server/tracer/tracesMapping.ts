@@ -142,7 +142,7 @@ function filterThreadTraces(
         const traceMapping =
           TRACE_MAPPINGS[field as keyof typeof TRACE_MAPPINGS];
         if (traceMapping) {
-          filteredTrace[field] = traceMapping.mapping(threadTrace, "", "", {});
+          filteredTrace[field] = traceMapping.mapping({ trace: threadTrace });
         } else {
           filteredTrace[field] =
             threadTrace[field as keyof TraceWithAnnotations];
@@ -157,26 +157,30 @@ function filterThreadTraces(
 
 export const TRACE_MAPPINGS = {
   trace_id: {
-    mapping: (trace: TraceWithAnnotations) => trace.trace_id,
+    mapping: ({ trace }: { trace: TraceWithAnnotations }) => trace.trace_id,
   },
   thread_id: {
-    mapping: (trace: TraceWithAnnotations) => trace.metadata?.thread_id ?? "",
+    mapping: ({ trace }: { trace: TraceWithAnnotations }) =>
+      trace.metadata?.thread_id ?? "",
   },
   timestamp: {
-    mapping: (trace: TraceWithAnnotations) =>
+    mapping: ({ trace }: { trace: TraceWithAnnotations }) =>
       new Date(trace.timestamps.started_at).toISOString(),
   },
   input: {
-    mapping: (trace: TraceWithAnnotations) => trace.input?.value ?? "",
+    mapping: ({ trace }: { trace: TraceWithAnnotations }) =>
+      trace.input?.value ?? "",
   },
   output: {
-    mapping: (trace: TraceWithAnnotations) => trace.output?.value ?? "",
+    mapping: ({ trace }: { trace: TraceWithAnnotations }) =>
+      trace.output?.value ?? "",
   },
   contexts: {
-    mapping: (trace: TraceWithAnnotations) => getRAGChunks(trace.spans ?? []),
+    mapping: ({ trace }: { trace: TraceWithAnnotations }) =>
+      getRAGChunks(trace.spans ?? []),
   },
   "contexts.string_list": {
-    mapping: (trace: TraceWithAnnotations) => {
+    mapping: ({ trace }: { trace: TraceWithAnnotations }) => {
       try {
         return getRAGInfo(trace.spans ?? []).contexts ?? [];
       } catch {
@@ -185,24 +189,27 @@ export const TRACE_MAPPINGS = {
     },
   },
   "metrics.total_cost": {
-    mapping: (trace: TraceWithAnnotations) => trace.metrics?.total_cost ?? 0,
+    mapping: ({ trace }: { trace: TraceWithAnnotations }) =>
+      trace.metrics?.total_cost ?? 0,
   },
   "metrics.first_token_ms": {
-    mapping: (trace: TraceWithAnnotations) =>
+    mapping: ({ trace }: { trace: TraceWithAnnotations }) =>
       trace.metrics?.first_token_ms ?? 0,
   },
   "metrics.total_time_ms": {
-    mapping: (trace: TraceWithAnnotations) => trace.metrics?.total_time_ms ?? 0,
+    mapping: ({ trace }: { trace: TraceWithAnnotations }) =>
+      trace.metrics?.total_time_ms ?? 0,
   },
   "metrics.prompt_tokens": {
-    mapping: (trace: TraceWithAnnotations) => trace.metrics?.prompt_tokens ?? 0,
+    mapping: ({ trace }: { trace: TraceWithAnnotations }) =>
+      trace.metrics?.prompt_tokens ?? 0,
   },
   "metrics.completion_tokens": {
-    mapping: (trace: TraceWithAnnotations) =>
+    mapping: ({ trace }: { trace: TraceWithAnnotations }) =>
       trace.metrics?.completion_tokens ?? 0,
   },
   "metrics.total_tokens": {
-    mapping: (trace: TraceWithAnnotations) =>
+    mapping: ({ trace }: { trace: TraceWithAnnotations }) =>
       (trace.metrics?.prompt_tokens ?? 0) +
       (trace.metrics?.completion_tokens ?? 0),
   },
@@ -233,7 +240,15 @@ export const TRACE_MAPPINGS = {
           label: key,
         }));
     },
-    mapping: (trace: TraceWithAnnotations, key: string, subkey: string) => {
+    mapping: ({
+      trace,
+      key,
+      subkey,
+    }: {
+      trace: TraceWithAnnotations;
+      key?: string;
+      subkey?: string;
+    }) => {
       const traceSpans = esSpansToDatasetSpans(trace.spans ?? []);
       if (!key) {
         return traceSpans;
@@ -254,14 +269,14 @@ export const TRACE_MAPPINGS = {
     expandable_by: "spans.all.span_id",
   },
   "spans.llm.input": {
-    mapping: (trace: TraceWithAnnotations) =>
+    mapping: ({ trace }: { trace: TraceWithAnnotations }) =>
       trace.spans
         ?.filter((span) => span.type === "llm")
         ?.map((span) => span.input?.value) ?? [],
     expandable_by: "spans.llm.span_id",
   },
   "spans.llm.output": {
-    mapping: (trace: TraceWithAnnotations) =>
+    mapping: ({ trace }: { trace: TraceWithAnnotations }) =>
       trace.spans
         ?.filter((span) => span.type === "llm")
         ?.map((span) => span.output?.value) ?? [],
@@ -288,7 +303,13 @@ export const TRACE_MAPPINGS = {
         label: reservedKeys.includes(key) ? `${key}` : key,
       }));
     },
-    mapping: (trace: TraceWithAnnotations, key: string) => {
+    mapping: ({
+      trace,
+      key,
+    }: {
+      trace: TraceWithAnnotations;
+      key?: string;
+    }) => {
       // Handle * as wildcard - return full metadata object
       if (key === "*") {
         return trace.metadata;
@@ -331,7 +352,15 @@ export const TRACE_MAPPINGS = {
           label: key,
         }));
     },
-    mapping: (trace: TraceWithAnnotations, key: string, subkey: string) => {
+    mapping: ({
+      trace,
+      key,
+      subkey,
+    }: {
+      trace: TraceWithAnnotations;
+      key?: string;
+      subkey?: string;
+    }) => {
       if (!key) {
         return trace.evaluations ?? [];
       }
@@ -372,12 +401,17 @@ export const TRACE_MAPPINGS = {
         label: option.name,
       }));
     },
-    mapping: (
-      trace: TraceWithAnnotations,
-      key: string,
-      subkey: string,
-      data: { annotationScoreOptions?: AnnotationScore[] },
-    ) => {
+    mapping: ({
+      trace,
+      key,
+      subkey,
+      data = {},
+    }: {
+      trace: TraceWithAnnotations;
+      key?: string;
+      subkey?: string;
+      data?: { annotationScoreOptions?: AnnotationScore[] };
+    }) => {
       if (!key) {
         return trace.annotations ?? [];
       }
@@ -452,7 +486,15 @@ export const TRACE_MAPPINGS = {
         }),
       );
     },
-    mapping: (trace: TraceWithAnnotations, key: string, subkey: string) => {
+    mapping: ({
+      trace,
+      key,
+      subkey,
+    }: {
+      trace: TraceWithAnnotations;
+      key?: string;
+      subkey?: string;
+    }) => {
       if (!key) {
         return trace.events;
       }
@@ -478,26 +520,32 @@ export const TRACE_MAPPINGS = {
     expandable_by: "events.event_id",
   },
   threads: {
-    mapping: (
-      trace: TraceWithAnnotations,
-      _key: string,
-      _subkey: string,
-      data: {
+    mapping: ({
+      trace,
+      data = {},
+    }: {
+      trace: TraceWithAnnotations;
+      key?: string;
+      subkey?: string;
+      data?: {
         allTraces?: TraceWithAnnotations[];
         selectedFields?: string[];
-      } = {},
-    ) => filterThreadTraces(trace, data),
+      };
+    }) => filterThreadTraces(trace, data),
   },
   threads_until_current: {
-    mapping: (
-      trace: TraceWithAnnotations,
-      _key: string,
-      _subkey: string,
-      data: {
+    mapping: ({
+      trace,
+      data = {},
+    }: {
+      trace: TraceWithAnnotations;
+      key?: string;
+      subkey?: string;
+      data?: {
         allTraces?: TraceWithAnnotations[];
         selectedFields?: string[];
-      } = {},
-    ) =>
+      };
+    }) =>
       filterThreadTraces(trace, data, (t) => {
         return t.timestamps.started_at <= trace.timestamps.started_at;
       }),
@@ -514,25 +562,16 @@ export const TRACE_MAPPINGS = {
       key: string;
       label: string;
     }[];
-    mapping:
-      | ((
-          trace: TraceWithAnnotations,
-        ) => string | number | object | undefined | unknown[])
-      | ((
-          trace: TraceWithAnnotations,
-          key: string,
-        ) => string | number | object | undefined | unknown[])
-      | ((
-          trace: TraceWithAnnotations,
-          key: string,
-          subkey: string,
-        ) => string | number | object | undefined | unknown[])
-      | ((
-          trace: TraceWithAnnotations,
-          key: string,
-          subkey: string,
-          data: { annotationScoreOptions?: AnnotationScore[] },
-        ) => string | number | object | undefined | unknown[]);
+    mapping: (params: {
+      trace: TraceWithAnnotations;
+      key?: string;
+      subkey?: string;
+      data?: {
+        annotationScoreOptions?: AnnotationScore[];
+        allTraces?: TraceWithAnnotations[];
+        selectedFields?: string[];
+      };
+    }) => string | number | object | undefined | unknown[];
     expandable_by?: keyof typeof TRACE_EXPANSIONS;
   }
 >;
@@ -608,7 +647,7 @@ export const extractTracesFields = (
     for (const field of fields) {
       const traceMapping = TRACE_MAPPINGS[field];
       if (traceMapping) {
-        result[field] = traceMapping.mapping(trace as any, "", "", {});
+        result[field] = traceMapping.mapping({ trace: trace as any });
       }
     }
     return result;
@@ -818,8 +857,14 @@ const esSpansToDatasetSpans = (spans: Span[]): DatasetSpan[] => {
   }
 };
 
-export const mapTraceToDatasetEntry = (
-  trace: TraceWithAnnotations,
+export const mapTraceToDatasetEntry = ({
+  trace,
+  mapping,
+  expansions,
+  annotationScoreOptions,
+  allTraces,
+}: {
+  trace: TraceWithAnnotations;
   mapping: Record<
     string,
     {
@@ -828,11 +873,11 @@ export const mapTraceToDatasetEntry = (
       subkey?: string;
       selectedFields?: string[];
     }
-  >,
-  expansions: Set<keyof typeof TRACE_EXPANSIONS>,
-  annotationScoreOptions?: AnnotationScore[],
-  allTraces?: TraceWithAnnotations[],
-): Record<string, string | number>[] => {
+  >;
+  expansions: Set<keyof typeof TRACE_EXPANSIONS>;
+  annotationScoreOptions?: AnnotationScore[];
+  allTraces?: TraceWithAnnotations[];
+}): Record<string, string | number>[] => {
   let expandedTraces: TraceWithAnnotations[] = [trace];
 
   for (const expansion of expansions) {
@@ -852,10 +897,15 @@ export const mapTraceToDatasetEntry = (
               ? TRACE_MAPPINGS[source as keyof typeof TRACE_MAPPINGS]
               : undefined;
 
-          let value = source_?.mapping(trace, key!, subkey!, {
-            annotationScoreOptions,
-            allTraces,
-            selectedFields,
+          let value = source_?.mapping({
+            trace,
+            key,
+            subkey,
+            data: {
+              annotationScoreOptions,
+              allTraces,
+              selectedFields,
+            },
           });
 
           if (

@@ -19,12 +19,17 @@ const hrProject: DataPrivacyScopeFacts = {
   departmentId: "hr",
 };
 
-function rule(
-  scopeType: DataPrivacyRow["scopeType"],
-  scopeId: string,
-  config: DataPrivacyConfig,
+function rule({
+  scopeType,
+  scopeId,
+  config,
   personalOnly = false,
-): DataPrivacyRow {
+}: {
+  scopeType: DataPrivacyRow["scopeType"];
+  scopeId: string;
+  config: DataPrivacyConfig;
+  personalOnly?: boolean;
+}): DataPrivacyRow {
   return { scopeType, scopeId, personalOnly, config };
 }
 
@@ -45,8 +50,10 @@ describe("resolveDataPrivacy", () => {
     /** @scenario An organization rule applies to every project in the org */
     it("applies to a project with no closer rule", () => {
       const rows = [
-        rule("ORGANIZATION", "acme", {
-          categories: { input: { disposition: "drop" } },
+        rule({
+          scopeType: "ORGANIZATION",
+          scopeId: "acme",
+          config: { categories: { input: { disposition: "drop" } } },
         }),
       ];
 
@@ -60,11 +67,15 @@ describe("resolveDataPrivacy", () => {
     /** @scenario A project rule beats an organization rule */
     it("lets the project rule win", () => {
       const rows = [
-        rule("ORGANIZATION", "acme", {
-          categories: { input: { disposition: "drop" } },
+        rule({
+          scopeType: "ORGANIZATION",
+          scopeId: "acme",
+          config: { categories: { input: { disposition: "drop" } } },
         }),
-        rule("PROJECT", "web-app", {
-          categories: { input: { disposition: "capture" } },
+        rule({
+          scopeType: "PROJECT",
+          scopeId: "web-app",
+          config: { categories: { input: { disposition: "capture" } } },
         }),
       ];
 
@@ -78,11 +89,15 @@ describe("resolveDataPrivacy", () => {
     /** @scenario A team rule sits between organization and project */
     it("lets the team rule win over the organization rule", () => {
       const rows = [
-        rule("ORGANIZATION", "acme", {
-          categories: { input: { disposition: "capture" } },
+        rule({
+          scopeType: "ORGANIZATION",
+          scopeId: "acme",
+          config: { categories: { input: { disposition: "capture" } } },
         }),
-        rule("TEAM", "platform", {
-          categories: { input: { disposition: "drop" } },
+        rule({
+          scopeType: "TEAM",
+          scopeId: "platform",
+          config: { categories: { input: { disposition: "drop" } } },
         }),
       ];
 
@@ -96,9 +111,13 @@ describe("resolveDataPrivacy", () => {
     /** @scenario A department rule applies to projects assigned to that department */
     it("applies the department rule", () => {
       const rows = [
-        rule("DEPARTMENT", "hr", {
-          categories: {
-            output: { disposition: "restrict", audience: { admins: true } },
+        rule({
+          scopeType: "DEPARTMENT",
+          scopeId: "hr",
+          config: {
+            categories: {
+              output: { disposition: "restrict", audience: { admins: true } },
+            },
           },
         }),
       ];
@@ -112,11 +131,15 @@ describe("resolveDataPrivacy", () => {
     /** @scenario A department rule beats a team rule for the same project */
     it("lets the department rule win over the team rule", () => {
       const rows = [
-        rule("TEAM", "platform", {
-          categories: { output: { disposition: "capture" } },
+        rule({
+          scopeType: "TEAM",
+          scopeId: "platform",
+          config: { categories: { output: { disposition: "capture" } } },
         }),
-        rule("DEPARTMENT", "hr", {
-          categories: { output: { disposition: "drop" } },
+        rule({
+          scopeType: "DEPARTMENT",
+          scopeId: "hr",
+          config: { categories: { output: { disposition: "drop" } } },
         }),
       ];
 
@@ -130,13 +153,23 @@ describe("resolveDataPrivacy", () => {
     /** @scenario Settings resolve independently across tiers */
     it("resolves each field from its own most-specific rule", () => {
       const rows = [
-        rule("ORGANIZATION", "acme", { pii: { level: "strict" } }),
-        rule("TEAM", "platform", {
-          categories: { input: { disposition: "drop" } },
+        rule({
+          scopeType: "ORGANIZATION",
+          scopeId: "acme",
+          config: { pii: { level: "strict" } },
         }),
-        rule("PROJECT", "web-app", {
-          categories: {
-            output: { disposition: "restrict", audience: { admins: true } },
+        rule({
+          scopeType: "TEAM",
+          scopeId: "platform",
+          config: { categories: { input: { disposition: "drop" } } },
+        }),
+        rule({
+          scopeType: "PROJECT",
+          scopeId: "web-app",
+          config: {
+            categories: {
+              output: { disposition: "restrict", audience: { admins: true } },
+            },
           },
         }),
       ];
@@ -161,12 +194,12 @@ describe("resolveDataPrivacy", () => {
     /** @scenario A rule for all personal projects covers a personal workspace but not a team project */
     it("covers a personal workspace but leaves a team project at the default", () => {
       const rows = [
-        rule(
-          "ORGANIZATION",
-          "acme",
-          { categories: { input: { disposition: "drop" } } },
-          true,
-        ),
+        rule({
+          scopeType: "ORGANIZATION",
+          scopeId: "acme",
+          config: { categories: { input: { disposition: "drop" } } },
+          personalOnly: true,
+        }),
       ];
 
       expect(
@@ -192,12 +225,12 @@ describe("resolveDataPrivacy", () => {
     /** @scenario A department rule narrowed to personal projects follows the owner's department */
     it("applies to a personal project whose owner is in that department", () => {
       const rows = [
-        rule(
-          "DEPARTMENT",
-          "hr",
-          { categories: { input: { disposition: "drop" } } },
-          true,
-        ),
+        rule({
+          scopeType: "DEPARTMENT",
+          scopeId: "hr",
+          config: { categories: { input: { disposition: "drop" } } },
+          personalOnly: true,
+        }),
       ];
 
       const resolved = resolveDataPrivacy({ rows, facts: bobWorkspace });
@@ -210,15 +243,23 @@ describe("resolveDataPrivacy", () => {
     /** @scenario Custom attribute rules accumulate down the cascade */
     it("unions the distinct patterns from every matching rule", () => {
       const rows = [
-        rule("ORGANIZATION", "acme", {
-          customAttributes: [
-            { pattern: "http.request.body", disposition: "drop" },
-          ],
+        rule({
+          scopeType: "ORGANIZATION",
+          scopeId: "acme",
+          config: {
+            customAttributes: [
+              { pattern: "http.request.body", disposition: "drop" },
+            ],
+          },
         }),
-        rule("PROJECT", "web-app", {
-          customAttributes: [
-            { pattern: "app.session_token", disposition: "drop" },
-          ],
+        rule({
+          scopeType: "PROJECT",
+          scopeId: "web-app",
+          config: {
+            customAttributes: [
+              { pattern: "app.session_token", disposition: "drop" },
+            ],
+          },
         }),
       ];
 
@@ -232,19 +273,27 @@ describe("resolveDataPrivacy", () => {
     /** @scenario A narrower scope overrides the same attribute pattern from a wider scope */
     it("lets the most-specific scope win when both set the same pattern", () => {
       const rows = [
-        rule("ORGANIZATION", "acme", {
-          customAttributes: [
-            { pattern: "app.session_token", disposition: "drop" },
-          ],
+        rule({
+          scopeType: "ORGANIZATION",
+          scopeId: "acme",
+          config: {
+            customAttributes: [
+              { pattern: "app.session_token", disposition: "drop" },
+            ],
+          },
         }),
-        rule("PROJECT", "web-app", {
-          customAttributes: [
-            {
-              pattern: "app.session_token",
-              disposition: "restrict",
-              audience: { admins: true },
-            },
-          ],
+        rule({
+          scopeType: "PROJECT",
+          scopeId: "web-app",
+          config: {
+            customAttributes: [
+              {
+                pattern: "app.session_token",
+                disposition: "restrict",
+                audience: { admins: true },
+              },
+            ],
+          },
         }),
       ];
 
@@ -262,8 +311,12 @@ describe("resolveDataPrivacy", () => {
   describe("when a custom PII level selects entities", () => {
     it("carries the level and its entities through the cascade", () => {
       const rows = [
-        rule("PROJECT", "web-app", {
-          pii: { level: "custom", entities: ["EMAIL_ADDRESS", "BR_CPF"] },
+        rule({
+          scopeType: "PROJECT",
+          scopeId: "web-app",
+          config: {
+            pii: { level: "custom", entities: ["EMAIL_ADDRESS", "BR_CPF"] },
+          },
         }),
       ];
 
@@ -280,9 +333,21 @@ describe("resolveDataPrivacy", () => {
   // what makes the settings page's effective summary follow the scope filter.
   describe("given org, team, and project rules on PII", () => {
     const rows = [
-      rule("ORGANIZATION", "acme", { pii: { level: "essential" } }),
-      rule("TEAM", "platform", { pii: { level: "strict" } }),
-      rule("PROJECT", "web-app", { pii: { level: "disabled" } }),
+      rule({
+        scopeType: "ORGANIZATION",
+        scopeId: "acme",
+        config: { pii: { level: "essential" } },
+      }),
+      rule({
+        scopeType: "TEAM",
+        scopeId: "platform",
+        config: { pii: { level: "strict" } },
+      }),
+      rule({
+        scopeType: "PROJECT",
+        scopeId: "web-app",
+        config: { pii: { level: "disabled" } },
+      }),
     ];
 
     /** @scenario The effective summary resolves a baseline for the selected scope tier */
@@ -321,11 +386,22 @@ describe("resolveDataPrivacy PII exception patterns", () => {
   it("unions exceptions across the chain while the level stays first-set-wins", () => {
     const resolved = resolveDataPrivacy({
       rows: [
-        rule("ORGANIZATION", "acme", {
-          pii: { level: "essential", exceptPatterns: ["00\\d{12}"] },
+        rule({
+          scopeType: "ORGANIZATION",
+          scopeId: "acme",
+          config: {
+            pii: { level: "essential", exceptPatterns: ["00\\d{12}"] },
+          },
         }),
-        rule("PROJECT", "web-app", {
-          pii: { level: "strict", exceptPatterns: ["orders@acme\\.example"] },
+        rule({
+          scopeType: "PROJECT",
+          scopeId: "web-app",
+          config: {
+            pii: {
+              level: "strict",
+              exceptPatterns: ["orders@acme\\.example"],
+            },
+          },
         }),
       ],
       facts: teamProject,

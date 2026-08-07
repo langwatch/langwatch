@@ -38,11 +38,11 @@ describe("FoldProjectionExecutor.execute", () => {
         }),
       });
 
-      const event = createTestEvent(
-        TEST_CONSTANTS.AGGREGATE_ID,
-        TEST_CONSTANTS.AGGREGATE_TYPE,
+      const event = createTestEvent({
+        aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+        aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
         tenantId,
-      );
+      });
 
       const context: ProjectionStoreContext = {
         aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
@@ -78,11 +78,11 @@ describe("FoldProjectionExecutor.execute", () => {
         }),
       });
 
-      const event = createTestEvent(
-        TEST_CONSTANTS.AGGREGATE_ID,
-        TEST_CONSTANTS.AGGREGATE_TYPE,
+      const event = createTestEvent({
+        aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+        aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
         tenantId,
-      );
+      });
 
       const context: ProjectionStoreContext = {
         aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
@@ -113,11 +113,11 @@ describe("FoldProjectionExecutor.execute", () => {
         eventTypes: [],
       });
 
-      const event = createTestEvent(
-        TEST_CONSTANTS.AGGREGATE_ID,
-        TEST_CONSTANTS.AGGREGATE_TYPE,
+      const event = createTestEvent({
+        aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+        aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
         tenantId,
-      );
+      });
 
       const context: ProjectionStoreContext = {
         aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
@@ -148,11 +148,11 @@ describe("FoldProjectionExecutor.execute", () => {
         eventTypes: ["some.other.event"],
       });
 
-      const event = createTestEvent(
-        TEST_CONSTANTS.AGGREGATE_ID,
-        TEST_CONSTANTS.AGGREGATE_TYPE,
+      const event = createTestEvent({
+        aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+        aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
         tenantId,
-      );
+      });
 
       const context: ProjectionStoreContext = {
         aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
@@ -180,11 +180,11 @@ describe("FoldProjectionExecutor.execute", () => {
         }),
       });
 
-      const event = createTestEvent(
-        TEST_CONSTANTS.AGGREGATE_ID,
-        TEST_CONSTANTS.AGGREGATE_TYPE,
+      const event = createTestEvent({
+        aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+        aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
         tenantId,
-      );
+      });
 
       const context: ProjectionStoreContext = {
         aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
@@ -213,11 +213,11 @@ describe("FoldProjectionExecutor.execute", () => {
         }),
       });
 
-      const event = createTestEvent(
-        TEST_CONSTANTS.AGGREGATE_ID,
-        TEST_CONSTANTS.AGGREGATE_TYPE,
+      const event = createTestEvent({
+        aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+        aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
         tenantId,
-      );
+      });
       // No usable occurredAt -> the context must be passed through unchanged.
       (event as { occurredAt?: number }).occurredAt = 0;
 
@@ -271,16 +271,14 @@ describe("FoldProjectionExecutor.executeBatch", () => {
   };
 
   const makeEvent = (occurredAt: number, id: string) =>
-    createTestEvent(
-      TEST_CONSTANTS.AGGREGATE_ID,
-      TEST_CONSTANTS.AGGREGATE_TYPE,
+    createTestEvent({
+      aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+      aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
       tenantId,
-      undefined,
-      occurredAt,
-      undefined,
-      {},
+      createdAt: occurredAt,
+      data: {},
       id,
-    );
+    });
 
   beforeEach(() => {
     vi.useFakeTimers();

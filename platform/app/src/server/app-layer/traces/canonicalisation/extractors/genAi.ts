@@ -106,12 +106,12 @@ export class GenAIExtractor implements CanonicalAttributesExtractor {
     // ─────────────────────────────────────────────────────────────────────────
     // Model (from legacy llm.model_name if gen_ai.*.model not present)
     // ─────────────────────────────────────────────────────────────────────────
-    extractModelToBoth(
+    extractModelToBoth({
       ctx,
-      ATTR_KEYS.LLM_MODEL_NAME,
-      (raw) => (typeof raw === "string" ? raw : null),
-      `${this.id}:model(llm.model_name)`,
-    );
+      sourceKey: ATTR_KEYS.LLM_MODEL_NAME,
+      transform: (raw) => (typeof raw === "string" ? raw : null),
+      ruleId: `${this.id}:model(llm.model_name)`,
+    });
 
     // ─────────────────────────────────────────────────────────────────────────
     // Input Messages

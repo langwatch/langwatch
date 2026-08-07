@@ -125,11 +125,11 @@ export function createEvaluationProcessingPipeline(
   }
 
   return builder
-    .withCommandInstance(
-      "executeEvaluation",
-      ExecuteEvaluationCommand,
-      deps.executeEvaluationCommand,
-      {
+    .withCommandInstance({
+      name: "executeEvaluation",
+      handlerClass: ExecuteEvaluationCommand,
+      instance: deps.executeEvaluationCommand,
+      options: {
         serializeByAggregate: true,
         delay: 30_000,
         deduplication: {
@@ -137,7 +137,7 @@ export function createEvaluationProcessingPipeline(
           ttlMs: 30_000,
         },
       },
-    )
+    })
     .withCommand("startEvaluation", StartEvaluationCommand, {
       serializeByAggregate: true,
     })

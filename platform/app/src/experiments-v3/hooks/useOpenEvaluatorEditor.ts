@@ -170,20 +170,20 @@ export const useOpenEvaluatorEditor = () => {
         mapping: UIFieldMapping | undefined,
       ) => {
         if (mapping) {
-          setEvaluatorMapping(
-            evaluator.id,
-            activeDatasetId,
-            target.id,
-            identifier,
-            convertFromUIMapping(mapping, isDatasetSource),
-          );
+          setEvaluatorMapping({
+            evaluatorId: evaluator.id,
+            datasetId: activeDatasetId,
+            targetId: target.id,
+            inputField: identifier,
+            mapping: convertFromUIMapping(mapping, isDatasetSource),
+          });
         } else {
-          removeEvaluatorMapping(
-            evaluator.id,
-            activeDatasetId,
-            target.id,
-            identifier,
-          );
+          removeEvaluatorMapping({
+            evaluatorId: evaluator.id,
+            datasetId: activeDatasetId,
+            targetId: target.id,
+            inputField: identifier,
+          });
         }
       };
 

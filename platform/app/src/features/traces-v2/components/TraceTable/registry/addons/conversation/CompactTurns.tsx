@@ -192,7 +192,7 @@ const ConversationTurnRow: React.FC<ConversationTurnRowProps> = ({
             style={i === 0 ? { backgroundColor: firstCellBg } : undefined}
             padding={`${density.rowPaddingY} 8px`}
             overflow="hidden"
-            {...cellPropsFor(cell, borderColor, i)}
+            {...cellPropsFor({ cell, leftBorderColor: borderColor, index: i })}
           >
             {turnCellContent({ columnId: cell.column.id, trace, turnIndex })}
           </Td>

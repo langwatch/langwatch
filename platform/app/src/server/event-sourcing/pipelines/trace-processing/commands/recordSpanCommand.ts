@@ -282,12 +282,12 @@ export class RecordSpanCommand
         // Run PII redaction, cost enrichment, and token estimation in parallel.
         // Safe: PII modifies existing attr values; cost and tokens push new entries.
         const [piiResult, costResult, tokenResult] = await Promise.allSettled([
-          this.deps.piiRedactionService.redactSpan(
-            spanToProcess,
-            resourceToProcess,
+          this.deps.piiRedactionService.redactSpan({
+            span: spanToProcess,
+            resource: resourceToProcess,
             piiRedactionLevel,
             tenantId,
-          ),
+          }),
           this.deps.costEnrichmentService.enrichSpan(
             spanToProcess,
             tenantIdStr,

@@ -27,7 +27,13 @@ vi.mock("~/components/ModelSelector", () => ({
   ModelSelector: ({ model }: { model: string }) => (
     <div data-testid="model-selector">{model}</div>
   ),
-  useModelSelectionOptions: (options: string[], model: string) => ({
+  useModelSelectionOptions: ({
+    options,
+    model,
+  }: {
+    options: string[];
+    model: string;
+  }) => ({
     selectOptions: options.map((value) => ({
       value,
       label: value,

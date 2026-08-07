@@ -94,11 +94,11 @@ export function NewVersionFields({
   );
 
   const defaultModel = resolvedDefault.data?.model ?? "";
-  const { modelOption } = useModelSelectionOptions(
-    allModelOptions,
-    defaultModel,
-    "chat",
-  );
+  const { modelOption } = useModelSelectionOptions({
+    options: allModelOptions,
+    model: defaultModel,
+    mode: "chat",
+  });
   const isDefaultModelDisabled = modelOption?.isDisabled ?? false;
   const isModelConfigured =
     resolvedDefault.data != null && !isDefaultModelDisabled;

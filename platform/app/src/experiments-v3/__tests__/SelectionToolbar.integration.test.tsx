@@ -282,9 +282,24 @@ describe("Row deletion - inline dataset", () => {
       const store = useEvaluationsV3Store.getState();
 
       // Set up initial data
-      store.setCellValue("test-data", 0, "input", "row 0 input");
-      store.setCellValue("test-data", 1, "input", "row 1 input");
-      store.setCellValue("test-data", 2, "input", "row 2 input");
+      store.setCellValue({
+        datasetId: "test-data",
+        row: 0,
+        columnId: "input",
+        value: "row 0 input",
+      });
+      store.setCellValue({
+        datasetId: "test-data",
+        row: 1,
+        columnId: "input",
+        value: "row 1 input",
+      });
+      store.setCellValue({
+        datasetId: "test-data",
+        row: 2,
+        columnId: "input",
+        value: "row 2 input",
+      });
 
       // Select rows 0 and 2
       store.toggleRowSelection(0);
@@ -304,7 +319,12 @@ describe("Row deletion - inline dataset", () => {
     it("deleteSelectedRows clears row selection after delete", () => {
       const store = useEvaluationsV3Store.getState();
 
-      store.setCellValue("test-data", 0, "input", "row 0");
+      store.setCellValue({
+        datasetId: "test-data",
+        row: 0,
+        columnId: "input",
+        value: "row 0",
+      });
       store.toggleRowSelection(0);
 
       // Get fresh state after toggle
@@ -336,11 +356,36 @@ describe("Row deletion - inline dataset", () => {
     it("deleteSelectedRows deletes rows in correct order (no index shifting issues)", () => {
       const store = useEvaluationsV3Store.getState();
 
-      store.setCellValue("test-data", 0, "input", "A");
-      store.setCellValue("test-data", 1, "input", "B");
-      store.setCellValue("test-data", 2, "input", "C");
-      store.setCellValue("test-data", 3, "input", "D");
-      store.setCellValue("test-data", 4, "input", "E");
+      store.setCellValue({
+        datasetId: "test-data",
+        row: 0,
+        columnId: "input",
+        value: "A",
+      });
+      store.setCellValue({
+        datasetId: "test-data",
+        row: 1,
+        columnId: "input",
+        value: "B",
+      });
+      store.setCellValue({
+        datasetId: "test-data",
+        row: 2,
+        columnId: "input",
+        value: "C",
+      });
+      store.setCellValue({
+        datasetId: "test-data",
+        row: 3,
+        columnId: "input",
+        value: "D",
+      });
+      store.setCellValue({
+        datasetId: "test-data",
+        row: 4,
+        columnId: "input",
+        value: "E",
+      });
 
       // Select non-consecutive rows
       store.toggleRowSelection(1); // B
@@ -369,8 +414,18 @@ describe("Selected row visual indication", () => {
 
   it("adds data-selected attribute to selected rows", async () => {
     const store = useEvaluationsV3Store.getState();
-    store.setCellValue("test-data", 0, "input", "row 0");
-    store.setCellValue("test-data", 1, "input", "row 1");
+    store.setCellValue({
+      datasetId: "test-data",
+      row: 0,
+      columnId: "input",
+      value: "row 0",
+    });
+    store.setCellValue({
+      datasetId: "test-data",
+      row: 1,
+      columnId: "input",
+      value: "row 1",
+    });
     store.toggleRowSelection(0);
 
     render(<EvaluationsV3Table disableVirtualization />, { wrapper: Wrapper });

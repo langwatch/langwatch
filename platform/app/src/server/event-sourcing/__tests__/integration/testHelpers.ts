@@ -122,7 +122,15 @@ export function createTestPipeline(): PipelineWithCommandHandlers<
  * Waits for a fold projection to reach the expected event count.
  * Replaces checkpoint-based waiting — the fold state IS the checkpoint.
  */
-export async function waitForProjection(
+export async function waitForProjection({
+  pipeline,
+  projectionName,
+  aggregateId,
+  tenantId,
+  expectedEventCount,
+  timeoutMs = 5000,
+  pollIntervalMs = 100,
+}: {
   pipeline: {
     service: {
       getProjectionByName: (
@@ -131,23 +139,23 @@ export async function waitForProjection(
         context: any,
       ) => Promise<any>;
     };
-  },
-  projectionName: string,
-  aggregateId: string,
-  tenantId: ReturnType<typeof createTenantId>,
-  expectedEventCount: number,
-  timeoutMs = 5000,
-  pollIntervalMs = 100,
-): Promise<void> {
+  };
+  projectionName: string;
+  aggregateId: string;
+  tenantId: ReturnType<typeof createTenantId>;
+  expectedEventCount: number;
+  timeoutMs?: number;
+  pollIntervalMs?: number;
+}): Promise<void> {
   const startTime = Date.now();
 
   while (Date.now() - startTime < timeoutMs) {
     try {
-      const projection = (await pipeline.service.getProjectionByName(
+      const projection = (await pipeline.service.getProjectionByName({
         projectionName,
         aggregateId,
-        { tenantId },
-      )) as TestProjection | null;
+        context: { tenantId },
+      })) as TestProjection | null;
 
       if (projection && projection.data.eventCount >= expectedEventCount) {
         return;
@@ -169,11 +177,11 @@ export async function waitForProjection(
 
   // Final attempt
   try {
-    const projection = (await pipeline.service.getProjectionByName(
+    const projection = (await pipeline.service.getProjectionByName({
       projectionName,
       aggregateId,
-      { tenantId },
-    )) as TestProjection | null;
+      context: { tenantId },
+    })) as TestProjection | null;
 
     if (projection && projection.data.eventCount >= expectedEventCount) {
       return;
@@ -199,13 +207,19 @@ export async function waitForProjection(
  * Waits for an event handler (map projection) to process an event.
  * Polls the test_event_handler_log table in ClickHouse.
  */
-export async function waitForEventHandler(
-  aggregateId: string,
-  tenantId: string,
-  expectedCount: number,
+export async function waitForEventHandler({
+  aggregateId,
+  tenantId,
+  expectedCount,
   timeoutMs = 5000,
   pollIntervalMs = 100,
-): Promise<void> {
+}: {
+  aggregateId: string;
+  tenantId: string;
+  expectedCount: number;
+  timeoutMs?: number;
+  pollIntervalMs?: number;
+}): Promise<void> {
   const startTime = Date.now();
 
   while (Date.now() - startTime < timeoutMs) {

@@ -45,11 +45,15 @@ describe("PRECONDITION_FIELD_MATCHERS", () => {
     const matcher = PRECONDITION_FIELD_MATCHERS.input!;
 
     it("returns the input value from trace data", () => {
-      expect(matcher(makeTraceData({ input: "hello" }), "")).toBe("hello");
+      expect(
+        matcher({ data: makeTraceData({ input: "hello" }), value: "" }),
+      ).toBe("hello");
     });
 
     it("returns null when input is null", () => {
-      expect(matcher(makeTraceData({ input: null }), "")).toBeNull();
+      expect(
+        matcher({ data: makeTraceData({ input: null }), value: "" }),
+      ).toBeNull();
     });
   });
 
@@ -57,11 +61,15 @@ describe("PRECONDITION_FIELD_MATCHERS", () => {
     const matcher = PRECONDITION_FIELD_MATCHERS.output!;
 
     it("returns the output value from trace data", () => {
-      expect(matcher(makeTraceData({ output: "world" }), "")).toBe("world");
+      expect(
+        matcher({ data: makeTraceData({ output: "world" }), value: "" }),
+      ).toBe("world");
     });
 
     it("returns null when output is null", () => {
-      expect(matcher(makeTraceData({ output: null }), "")).toBeNull();
+      expect(
+        matcher({ data: makeTraceData({ output: null }), value: "" }),
+      ).toBeNull();
     });
   });
 
@@ -69,27 +77,33 @@ describe("PRECONDITION_FIELD_MATCHERS", () => {
     const matcher = PRECONDITION_FIELD_MATCHERS["traces.origin"]!;
 
     it("returns null when origin is undefined", () => {
-      expect(matcher(makeTraceData({ origin: undefined }), "")).toBeNull();
+      expect(
+        matcher({ data: makeTraceData({ origin: undefined }), value: "" }),
+      ).toBeNull();
     });
 
     it("returns null when origin is null", () => {
-      expect(matcher(makeTraceData({ origin: null }), "")).toBeNull();
+      expect(
+        matcher({ data: makeTraceData({ origin: null }), value: "" }),
+      ).toBeNull();
     });
 
     it("returns empty string when origin is empty string", () => {
-      expect(matcher(makeTraceData({ origin: "" }), "")).toBe("");
+      expect(matcher({ data: makeTraceData({ origin: "" }), value: "" })).toBe(
+        "",
+      );
     });
 
     it("returns 'application' when origin is explicitly 'application'", () => {
-      expect(matcher(makeTraceData({ origin: "application" }), "")).toBe(
-        "application",
-      );
+      expect(
+        matcher({ data: makeTraceData({ origin: "application" }), value: "" }),
+      ).toBe("application");
     });
 
     it("returns the origin value when present", () => {
-      expect(matcher(makeTraceData({ origin: "playground" }), "")).toBe(
-        "playground",
-      );
+      expect(
+        matcher({ data: makeTraceData({ origin: "playground" }), value: "" }),
+      ).toBe("playground");
     });
   });
 
@@ -97,15 +111,21 @@ describe("PRECONDITION_FIELD_MATCHERS", () => {
     const matcher = PRECONDITION_FIELD_MATCHERS["traces.error"]!;
 
     it("returns 'true' when hasError is true", () => {
-      expect(matcher(makeTraceData({ hasError: true }), "")).toBe("true");
+      expect(
+        matcher({ data: makeTraceData({ hasError: true }), value: "" }),
+      ).toBe("true");
     });
 
     it("returns 'false' when hasError is false", () => {
-      expect(matcher(makeTraceData({ hasError: false }), "")).toBe("false");
+      expect(
+        matcher({ data: makeTraceData({ hasError: false }), value: "" }),
+      ).toBe("false");
     });
 
     it("returns 'false' when hasError is null", () => {
-      expect(matcher(makeTraceData({ hasError: null }), "")).toBe("false");
+      expect(
+        matcher({ data: makeTraceData({ hasError: null }), value: "" }),
+      ).toBe("false");
     });
   });
 
@@ -113,11 +133,15 @@ describe("PRECONDITION_FIELD_MATCHERS", () => {
     const matcher = PRECONDITION_FIELD_MATCHERS["metadata.user_id"]!;
 
     it("returns userId from trace data", () => {
-      expect(matcher(makeTraceData({ userId: "user_1" }), "")).toBe("user_1");
+      expect(
+        matcher({ data: makeTraceData({ userId: "user_1" }), value: "" }),
+      ).toBe("user_1");
     });
 
     it("returns undefined when userId is not set", () => {
-      expect(matcher(makeTraceData({ userId: undefined }), "")).toBeUndefined();
+      expect(
+        matcher({ data: makeTraceData({ userId: undefined }), value: "" }),
+      ).toBeUndefined();
     });
   });
 
@@ -125,7 +149,9 @@ describe("PRECONDITION_FIELD_MATCHERS", () => {
     const matcher = PRECONDITION_FIELD_MATCHERS["metadata.thread_id"]!;
 
     it("returns threadId from trace data", () => {
-      expect(matcher(makeTraceData({ threadId: "t_1" }), "")).toBe("t_1");
+      expect(
+        matcher({ data: makeTraceData({ threadId: "t_1" }), value: "" }),
+      ).toBe("t_1");
     });
   });
 
@@ -133,9 +159,9 @@ describe("PRECONDITION_FIELD_MATCHERS", () => {
     const matcher = PRECONDITION_FIELD_MATCHERS["metadata.customer_id"]!;
 
     it("returns customerId from trace data", () => {
-      expect(matcher(makeTraceData({ customerId: "cust_1" }), "")).toBe(
-        "cust_1",
-      );
+      expect(
+        matcher({ data: makeTraceData({ customerId: "cust_1" }), value: "" }),
+      ).toBe("cust_1");
     });
   });
 
@@ -143,14 +169,15 @@ describe("PRECONDITION_FIELD_MATCHERS", () => {
     const matcher = PRECONDITION_FIELD_MATCHERS["metadata.labels"]!;
 
     it("returns labels array from trace data", () => {
-      expect(matcher(makeTraceData({ labels: ["a", "b"] }), "")).toEqual([
-        "a",
-        "b",
-      ]);
+      expect(
+        matcher({ data: makeTraceData({ labels: ["a", "b"] }), value: "" }),
+      ).toEqual(["a", "b"]);
     });
 
     it("returns empty array when labels is empty", () => {
-      expect(matcher(makeTraceData({ labels: [] }), "")).toEqual([]);
+      expect(
+        matcher({ data: makeTraceData({ labels: [] }), value: "" }),
+      ).toEqual([]);
     });
   });
 
@@ -158,10 +185,12 @@ describe("PRECONDITION_FIELD_MATCHERS", () => {
     const matcher = PRECONDITION_FIELD_MATCHERS["metadata.prompt_ids"]!;
 
     it("returns promptIds array from trace data", () => {
-      expect(matcher(makeTraceData({ promptIds: ["p1", "p2"] }), "")).toEqual([
-        "p1",
-        "p2",
-      ]);
+      expect(
+        matcher({
+          data: makeTraceData({ promptIds: ["p1", "p2"] }),
+          value: "",
+        }),
+      ).toEqual(["p1", "p2"]);
     });
   });
 
@@ -179,14 +208,14 @@ describe("PRECONDITION_FIELD_MATCHERS", () => {
         const data = makeTraceData({
           customMetadata: { env: "prod", region: "us" },
         });
-        expect(matcher(data, "", "env")).toBe("prod");
+        expect(matcher({ data, value: "", key: "env" })).toBe("prod");
       });
 
       it("returns null when key is missing from metadata", () => {
         const data = makeTraceData({
           customMetadata: { env: "prod" },
         });
-        expect(matcher(data, "", "region")).toBeNull();
+        expect(matcher({ data, value: "", key: "region" })).toBeNull();
       });
     });
 
@@ -195,14 +224,14 @@ describe("PRECONDITION_FIELD_MATCHERS", () => {
         const data = makeTraceData({
           customMetadata: { env: "prod" },
         });
-        expect(matcher(data, "")).toBeNull();
+        expect(matcher({ data, value: "" })).toBeNull();
       });
     });
 
     describe("when customMetadata is null", () => {
       it("returns null", () => {
         const data = makeTraceData({ customMetadata: null });
-        expect(matcher(data, "", "env")).toBeNull();
+        expect(matcher({ data, value: "", key: "env" })).toBeNull();
       });
     });
   });
@@ -211,9 +240,12 @@ describe("PRECONDITION_FIELD_MATCHERS", () => {
     const matcher = PRECONDITION_FIELD_MATCHERS["spans.type"]!;
 
     it("returns spanTypes array from trace data", () => {
-      expect(matcher(makeTraceData({ spanTypes: ["llm", "rag"] }), "")).toEqual(
-        ["llm", "rag"],
-      );
+      expect(
+        matcher({
+          data: makeTraceData({ spanTypes: ["llm", "rag"] }),
+          value: "",
+        }),
+      ).toEqual(["llm", "rag"]);
     });
   });
 
@@ -221,9 +253,9 @@ describe("PRECONDITION_FIELD_MATCHERS", () => {
     const matcher = PRECONDITION_FIELD_MATCHERS["spans.model"]!;
 
     it("returns spanModels array from trace data", () => {
-      expect(matcher(makeTraceData({ spanModels: ["gpt-4"] }), "")).toEqual([
-        "gpt-4",
-      ]);
+      expect(
+        matcher({ data: makeTraceData({ spanModels: ["gpt-4"] }), value: "" }),
+      ).toEqual(["gpt-4"]);
     });
   });
 
@@ -231,13 +263,15 @@ describe("PRECONDITION_FIELD_MATCHERS", () => {
     const matcher = PRECONDITION_FIELD_MATCHERS["topics.topics"]!;
 
     it("returns topicId wrapped in array when present", () => {
-      expect(matcher(makeTraceData({ topicId: "topic_1" }), "")).toEqual([
-        "topic_1",
-      ]);
+      expect(
+        matcher({ data: makeTraceData({ topicId: "topic_1" }), value: "" }),
+      ).toEqual(["topic_1"]);
     });
 
     it("returns null when topicId is not set", () => {
-      expect(matcher(makeTraceData({ topicId: undefined }), "")).toBeNull();
+      expect(
+        matcher({ data: makeTraceData({ topicId: undefined }), value: "" }),
+      ).toBeNull();
     });
   });
 
@@ -245,13 +279,15 @@ describe("PRECONDITION_FIELD_MATCHERS", () => {
     const matcher = PRECONDITION_FIELD_MATCHERS["topics.subtopics"]!;
 
     it("returns subTopicId wrapped in array when present", () => {
-      expect(matcher(makeTraceData({ subTopicId: "sub_1" }), "")).toEqual([
-        "sub_1",
-      ]);
+      expect(
+        matcher({ data: makeTraceData({ subTopicId: "sub_1" }), value: "" }),
+      ).toEqual(["sub_1"]);
     });
 
     it("returns null when subTopicId is not set", () => {
-      expect(matcher(makeTraceData({ subTopicId: undefined }), "")).toBeNull();
+      expect(
+        matcher({ data: makeTraceData({ subTopicId: undefined }), value: "" }),
+      ).toBeNull();
     });
   });
 
@@ -259,18 +295,26 @@ describe("PRECONDITION_FIELD_MATCHERS", () => {
     const matcher = PRECONDITION_FIELD_MATCHERS["annotations.hasAnnotation"]!;
 
     it("returns 'true' when annotationIds is non-empty", () => {
-      expect(matcher(makeTraceData({ annotationIds: ["ann-1"] }), "")).toBe(
-        "true",
-      );
+      expect(
+        matcher({
+          data: makeTraceData({ annotationIds: ["ann-1"] }),
+          value: "",
+        }),
+      ).toBe("true");
     });
 
     it("returns 'false' when annotationIds is empty", () => {
-      expect(matcher(makeTraceData({ annotationIds: [] }), "")).toBe("false");
+      expect(
+        matcher({ data: makeTraceData({ annotationIds: [] }), value: "" }),
+      ).toBe("false");
     });
 
     it("returns null when annotationIds is undefined", () => {
       expect(
-        matcher(makeTraceData({ annotationIds: undefined }), ""),
+        matcher({
+          data: makeTraceData({ annotationIds: undefined }),
+          value: "",
+        }),
       ).toBeNull();
     });
   });
@@ -285,11 +329,16 @@ describe("PRECONDITION_FIELD_MATCHERS", () => {
           { event_type: "purchase", metrics: [], event_details: [] },
         ],
       });
-      expect(matcher(data, "")).toEqual(["thumbs_up_down", "purchase"]);
+      expect(matcher({ data, value: "" })).toEqual([
+        "thumbs_up_down",
+        "purchase",
+      ]);
     });
 
     it("returns null when events is null", () => {
-      expect(matcher(makeTraceData({ events: null }), "")).toBeNull();
+      expect(
+        matcher({ data: makeTraceData({ events: null }), value: "" }),
+      ).toBeNull();
     });
   });
 
@@ -306,7 +355,9 @@ describe("PRECONDITION_FIELD_MATCHERS", () => {
           },
         ],
       });
-      expect(matcher(data, "", "thumbs_up_down")).toEqual(["vote"]);
+      expect(matcher({ data, value: "", key: "thumbs_up_down" })).toEqual([
+        "vote",
+      ]);
     });
 
     it("returns null when key (event_type) is not provided", () => {
@@ -319,7 +370,7 @@ describe("PRECONDITION_FIELD_MATCHERS", () => {
           },
         ],
       });
-      expect(matcher(data, "")).toBeNull();
+      expect(matcher({ data, value: "" })).toBeNull();
     });
 
     it("returns null when no matching event type", () => {
@@ -332,7 +383,7 @@ describe("PRECONDITION_FIELD_MATCHERS", () => {
           },
         ],
       });
-      expect(matcher(data, "", "thumbs_up_down")).toBeNull();
+      expect(matcher({ data, value: "", key: "thumbs_up_down" })).toBeNull();
     });
   });
 
@@ -349,7 +400,7 @@ describe("PRECONDITION_FIELD_MATCHERS", () => {
           },
         ],
       });
-      expect(matcher(data, "", "purchase")).toEqual(["item"]);
+      expect(matcher({ data, value: "", key: "purchase" })).toEqual(["item"]);
     });
 
     it("returns null when key (event_type) is not provided", () => {
@@ -362,7 +413,7 @@ describe("PRECONDITION_FIELD_MATCHERS", () => {
           },
         ],
       });
-      expect(matcher(data, "")).toBeNull();
+      expect(matcher({ data, value: "" })).toBeNull();
     });
   });
 

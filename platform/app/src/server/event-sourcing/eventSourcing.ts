@@ -466,12 +466,12 @@ export class EventSourcing {
       identity,
       "No handler registered for this job in this worker; rejecting it for retry rather than dropping it",
     );
-    throw new QueueError(
+    throw new QueueError({
       queueName,
-      "process",
-      "job routing key is not registered in this worker",
-      identity,
-    );
+      operation: "process",
+      message: "job routing key is not registered in this worker",
+      context: identity,
+    });
   }
 
   private initializeStores(): void {

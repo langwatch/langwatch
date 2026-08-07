@@ -136,12 +136,17 @@ export const useVariableMenu = ({
 
   // Insert variable at current position (undo-able via Ctrl+Z)
   const insertVariable = useCallback(
-    (
-      fieldName: string,
-      fieldType: FieldType,
-      sourceId: string,
-      isOtherNodeField: boolean,
-    ) => {
+    ({
+      fieldName,
+      fieldType,
+      sourceId,
+      isOtherNodeField,
+    }: {
+      fieldName: string;
+      fieldType: FieldType;
+      sourceId: string;
+      isOtherNodeField: boolean;
+    }) => {
       if (triggerStart === null) return;
 
       const nativeTextarea = containerRef.current?.querySelector("textarea");
@@ -238,12 +243,12 @@ export const useVariableMenu = ({
         otherNodesFields,
         option.source.id,
       );
-      insertVariable(
-        option.field.name,
-        option.field.type,
-        option.source.id,
+      insertVariable({
+        fieldName: option.field.name,
+        fieldType: option.field.type,
+        sourceId: option.source.id,
         isOtherNodeField,
-      );
+      });
     } else if (option.type === "create" && onCreateVariable) {
       const normalizedName = option.name.replace(/ /g, "_").toLowerCase();
       if (triggerStart === null) return;
@@ -295,12 +300,12 @@ export const useVariableMenu = ({
         otherNodesFields,
         field.sourceId,
       );
-      insertVariable(
-        field.fieldName,
-        field.fieldType,
-        field.sourceId,
+      insertVariable({
+        fieldName: field.fieldName,
+        fieldType: field.fieldType,
+        sourceId: field.sourceId,
         isOtherNodeField,
-      );
+      });
     },
     [insertVariable, otherNodesFields],
   );

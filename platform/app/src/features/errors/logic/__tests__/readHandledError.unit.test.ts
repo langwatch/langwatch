@@ -427,12 +427,17 @@ describe("readAuthoredMessage", () => {
   // the only place that can tell copy from an accident — it needs `cause`, and
   // `cause` never crosses the wire. Default it on here so each test says what
   // it is actually about.
-  const trpcError = (
-    httpStatus: number,
-    message: string,
-    error: unknown = null,
+  const trpcError = ({
+    httpStatus,
+    message,
+    error = null,
     authored = true,
-  ) => ({
+  }: {
+    httpStatus: number;
+    message: string;
+    error?: unknown;
+    authored?: boolean;
+  }) => ({
     message,
     data: { httpStatus, error, authored },
   });
@@ -442,12 +447,17 @@ describe("readAuthoredMessage", () => {
     it("returns the prose the procedure authored", () => {
       // These are real: user.register throws them, and #5984 deliberately
       // left non-5xx messages alone.
-      expect(readAuthoredMessage(trpcError(409, "User already exists"))).toBe(
-        "User already exists",
-      );
       expect(
         readAuthoredMessage(
-          trpcError(429, "Too many signup attempts. Please try again later."),
+          trpcError({ httpStatus: 409, message: "User already exists" }),
+        ),
+      ).toBe("User already exists");
+      expect(
+        readAuthoredMessage(
+          trpcError({
+            httpStatus: 429,
+            message: "Too many signup attempts. Please try again later.",
+          }),
         ),
       ).toBe("Too many signup attempts. Please try again later.");
     });
@@ -457,9 +467,10 @@ describe("readAuthoredMessage", () => {
     it("declines a handled error — its copy comes from the registry", () => {
       expect(
         readAuthoredMessage(
-          trpcError(404, "trace_not_found", {
-            code: "trace_not_found",
+          trpcError({
             httpStatus: 404,
+            message: "trace_not_found",
+            error: { code: "trace_not_found", httpStatus: 404 },
           }),
         ),
       ).toBeUndefined();
@@ -467,13 +478,20 @@ describe("readAuthoredMessage", () => {
 
     it("declines a 5xx — its message can carry internals", () => {
       expect(
-        readAuthoredMessage(trpcError(500, "connect ECONNREFUSED 10.0.0.4")),
+        readAuthoredMessage(
+          trpcError({
+            httpStatus: 500,
+            message: "connect ECONNREFUSED 10.0.0.4",
+          }),
+        ),
       ).toBeUndefined();
     });
 
     it("declines anything shaped like a code slug", () => {
       expect(
-        readAuthoredMessage(trpcError(422, "validation_error")),
+        readAuthoredMessage(
+          trpcError({ httpStatus: 422, message: "validation_error" }),
+        ),
       ).toBeUndefined();
     });
 
@@ -481,7 +499,10 @@ describe("readAuthoredMessage", () => {
       // The registry has several. Matching on shape alone let these through
       // and rendered a slug as though it were a sentence.
       for (const code of ["unauthorized", "not_found", "internal_error"]) {
-        expect(readAuthoredMessage(trpcError(401, code)), code).toBeUndefined();
+        expect(
+          readAuthoredMessage(trpcError({ httpStatus: 401, message: code })),
+          code,
+        ).toBeUndefined();
       }
     });
 
@@ -505,7 +526,14 @@ describe("readAuthoredMessage", () => {
       // `new TRPCError({ code: "NOT_FOUND" })` with no message: tRPC uses the
       // code name, so the customer read "NOT_FOUND".
       expect(
-        readAuthoredMessage(trpcError(404, "NOT_FOUND", null, false)),
+        readAuthoredMessage(
+          trpcError({
+            httpStatus: 404,
+            message: "NOT_FOUND",
+            error: null,
+            authored: false,
+          }),
+        ),
       ).toBeUndefined();
     });
 
@@ -514,15 +542,33 @@ describe("readAuthoredMessage", () => {
       // `new TRPCError({ code: "BAD_REQUEST", cause: err })` inherits the
       // caught error's message — a driver string, presented as our own copy.
       expect(
-        readAuthoredMessage(trpcError(400, "fetch failed", null, false)),
+        readAuthoredMessage(
+          trpcError({
+            httpStatus: 400,
+            message: "fetch failed",
+            error: null,
+            authored: false,
+          }),
+        ),
       ).toBeUndefined();
       expect(
-        readAuthoredMessage(trpcError(400, "Invalid time value", null, false)),
+        readAuthoredMessage(
+          trpcError({
+            httpStatus: 400,
+            message: "Invalid time value",
+            error: null,
+            authored: false,
+          }),
+        ),
       ).toBeUndefined();
     });
 
     it("declines SCREAMING_CASE even if something marked it authored", () => {
-      expect(readAuthoredMessage(trpcError(404, "NOT_FOUND"))).toBeUndefined();
+      expect(
+        readAuthoredMessage(
+          trpcError({ httpStatus: 404, message: "NOT_FOUND" }),
+        ),
+      ).toBeUndefined();
     });
   });
 
@@ -539,7 +585,9 @@ describe("readAuthoredMessage", () => {
       "This is only available at Enterprise (contact sales).",
       "The IP 10.0.0.1 is not allowed as a webhook destination.",
     ])("keeps %s", (message) => {
-      expect(readAuthoredMessage(trpcError(400, message))).toBe(message);
+      expect(readAuthoredMessage(trpcError({ httpStatus: 400, message }))).toBe(
+        message,
+      );
     });
 
     /** @scenario "A machine's diagnostic is not mistaken for authored copy" */
@@ -550,7 +598,9 @@ describe("readAuthoredMessage", () => {
       ["a stack frame", "boom\n    at Object.handler (/app/index.js:1:1)"],
       ["a runtime error prefix", "TypeError: cannot read properties of null"],
     ])("still refuses %s", (_label, message) => {
-      expect(readAuthoredMessage(trpcError(400, message))).toBeUndefined();
+      expect(
+        readAuthoredMessage(trpcError({ httpStatus: 400, message })),
+      ).toBeUndefined();
     });
   });
 });

@@ -827,18 +827,23 @@ async function runProbeChain({
  * Validates an API key against a custom URL or default URL.
  * Gets API key from stored DB value OR env var (whichever exists).
  *
- * @param projectId - The project ID to look up stored keys
- * @param provider - The provider key (e.g., "openai", "anthropic")
- * @param customBaseUrl - Optional custom base URL to validate against. If not provided, uses default URL.
- * @param prisma - Prisma client instance
+ * @param params.projectId - The project ID to look up stored keys
+ * @param params.provider - The provider key (e.g., "openai", "anthropic")
+ * @param params.customBaseUrl - Optional custom base URL to validate against. If not provided, uses default URL.
+ * @param params.prisma - Prisma client instance
  * @returns Promise resolving to validation result
  */
-export async function validateKeyWithCustomUrl(
-  projectId: string,
-  provider: string,
-  customBaseUrl: string | undefined,
-  prisma: PrismaClient,
-): Promise<ValidationResult> {
+export async function validateKeyWithCustomUrl({
+  projectId,
+  provider,
+  customBaseUrl,
+  prisma,
+}: {
+  projectId: string;
+  provider: string;
+  customBaseUrl: string | undefined;
+  prisma: PrismaClient;
+}): Promise<ValidationResult> {
   const providerDef = modelProviders[provider as keyof typeof modelProviders];
   if (!providerDef) {
     return { valid: true }; // Unknown provider, skip validation

@@ -103,13 +103,12 @@ describe("FoldProjectionExecutor trustAbsentMiss", () => {
   });
 
   const eventAt = (occurredAt: number) =>
-    createTestEvent(
-      TEST_CONSTANTS.AGGREGATE_ID,
-      TEST_CONSTANTS.AGGREGATE_TYPE,
+    createTestEvent({
+      aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+      aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
       tenantId,
-      undefined,
-      occurredAt,
-    );
+      createdAt: occurredAt,
+    });
 
   describe("given a fold that trusts an absent miss", () => {
     describe("when the windowed read misses on a get()-only store", () => {

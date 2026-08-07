@@ -437,12 +437,17 @@ function extractContexts(
  * statusMessage is often a short HTTP-status summary ("Bad Request") that
  * loses the actionable detail.
  */
-function extractError(
-  statusCode: NormalizedStatusCode | null,
-  statusMessage: string | null,
-  spanAttributes: NormalizedAttributes,
-  events: readonly { name: string; attributes: NormalizedAttributes }[],
-): ErrorCapture | null {
+function extractError({
+  statusCode,
+  statusMessage,
+  spanAttributes,
+  events,
+}: {
+  statusCode: NormalizedStatusCode | null;
+  statusMessage: string | null;
+  spanAttributes: NormalizedAttributes;
+  events: readonly { name: string; attributes: NormalizedAttributes }[];
+}): ErrorCapture | null {
   if (statusCode !== NormalizedStatusCode.ERROR) {
     return null;
   }
@@ -529,12 +534,12 @@ export function mapNormalizedSpanToSpan(normalizedSpan: NormalizedSpan): Span {
     name: normalizedSpan.name,
     input: extractInput(normalizedSpan.spanAttributes),
     output: extractOutput(normalizedSpan.spanAttributes),
-    error: extractError(
-      normalizedSpan.statusCode,
-      normalizedSpan.statusMessage,
-      normalizedSpan.spanAttributes,
-      normalizedSpan.events,
-    ),
+    error: extractError({
+      statusCode: normalizedSpan.statusCode,
+      statusMessage: normalizedSpan.statusMessage,
+      spanAttributes: normalizedSpan.spanAttributes,
+      events: normalizedSpan.events,
+    }),
     timestamps,
     metrics: extractMetrics(normalizedSpan.spanAttributes),
     params: unflattenDotNotation(normalizedSpan.spanAttributes),

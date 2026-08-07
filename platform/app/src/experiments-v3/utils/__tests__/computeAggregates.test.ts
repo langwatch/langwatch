@@ -26,12 +26,12 @@ describe("computeTargetAggregates", () => {
     const results = createResults();
     const evaluators = [{ id: "eval-1", name: "Exact Match" }];
 
-    const aggregates = computeTargetAggregates(
-      "target-1",
+    const aggregates = computeTargetAggregates({
+      targetId: "target-1",
       results,
       evaluators,
-      3,
-    );
+      rowCount: 3,
+    });
 
     expect(aggregates.completedRows).toBe(0);
     expect(aggregates.totalRows).toBe(3);
@@ -55,12 +55,12 @@ describe("computeTargetAggregates", () => {
     });
     const evaluators = [{ id: "eval-1", name: "Exact Match" }];
 
-    const aggregates = computeTargetAggregates(
-      "target-1",
+    const aggregates = computeTargetAggregates({
+      targetId: "target-1",
       results,
       evaluators,
-      3,
-    );
+      rowCount: 3,
+    });
 
     expect(aggregates.completedRows).toBe(2);
     expect(aggregates.totalRows).toBe(3);
@@ -81,12 +81,12 @@ describe("computeTargetAggregates", () => {
     });
     const evaluators = [{ id: "eval-1", name: "Exact Match" }];
 
-    const aggregates = computeTargetAggregates(
-      "target-1",
+    const aggregates = computeTargetAggregates({
+      targetId: "target-1",
       results,
       evaluators,
-      2,
-    );
+      rowCount: 2,
+    });
 
     // Only 1 row is complete (row 0 has both target and evaluator done)
     expect(aggregates.completedRows).toBe(1);
@@ -102,12 +102,12 @@ describe("computeTargetAggregates", () => {
     });
     const evaluators: Array<{ id: string; name: string }> = [];
 
-    const aggregates = computeTargetAggregates(
-      "target-1",
+    const aggregates = computeTargetAggregates({
+      targetId: "target-1",
       results,
       evaluators,
-      3,
-    );
+      rowCount: 3,
+    });
 
     expect(aggregates.completedRows).toBe(2);
     expect(aggregates.totalRows).toBe(3);
@@ -128,12 +128,12 @@ describe("computeTargetAggregates", () => {
     });
     const evaluators: Array<{ id: string; name: string }> = [];
 
-    const aggregates = computeTargetAggregates(
-      "target-1",
+    const aggregates = computeTargetAggregates({
+      targetId: "target-1",
       results,
       evaluators,
-      3,
-    );
+      rowCount: 3,
+    });
 
     expect(aggregates.completedRows).toBe(2);
     expect(aggregates.errorRows).toBe(1);
@@ -156,12 +156,12 @@ describe("computeTargetAggregates", () => {
     });
     const evaluators = [{ id: "eval-1", name: "Exact Match" }];
 
-    const aggregates = computeTargetAggregates(
-      "target-1",
+    const aggregates = computeTargetAggregates({
+      targetId: "target-1",
       results,
       evaluators,
-      3,
-    );
+      rowCount: 3,
+    });
 
     expect(aggregates.evaluators[0]?.total).toBe(3);
     expect(aggregates.evaluators[0]?.passed).toBe(2);
@@ -184,12 +184,12 @@ describe("computeTargetAggregates", () => {
     });
     const evaluators = [{ id: "eval-1", name: "Score Evaluator" }];
 
-    const aggregates = computeTargetAggregates(
-      "target-1",
+    const aggregates = computeTargetAggregates({
+      targetId: "target-1",
       results,
       evaluators,
-      3,
-    );
+      rowCount: 3,
+    });
 
     expect(aggregates.evaluators[0]?.averageScore).toBeCloseTo(0.667, 2);
   });
@@ -208,12 +208,12 @@ describe("computeTargetAggregates", () => {
     });
     const evaluators = [{ id: "eval-1", name: "Exact Match" }];
 
-    const aggregates = computeTargetAggregates(
-      "target-1",
+    const aggregates = computeTargetAggregates({
+      targetId: "target-1",
       results,
       evaluators,
-      3,
-    );
+      rowCount: 3,
+    });
 
     expect(aggregates.evaluators[0]?.errors).toBe(1);
     expect(aggregates.evaluators[0]?.total).toBe(3);
@@ -234,12 +234,12 @@ describe("computeTargetAggregates", () => {
     });
     const evaluators = [{ id: "eval-1", name: "LLM Score" }];
 
-    const aggregates = computeTargetAggregates(
-      "target-1",
+    const aggregates = computeTargetAggregates({
+      targetId: "target-1",
       results,
       evaluators,
-      3,
-    );
+      rowCount: 3,
+    });
 
     // Score-only results should have null passRate
     expect(aggregates.evaluators[0]?.passRate).toBeNull();
@@ -273,12 +273,12 @@ describe("computeTargetAggregates", () => {
       { id: "eval-score-only", name: "LLM Score" },
     ];
 
-    const aggregates = computeTargetAggregates(
-      "target-1",
+    const aggregates = computeTargetAggregates({
+      targetId: "target-1",
       results,
       evaluators,
-      2,
-    );
+      rowCount: 2,
+    });
 
     // Pass/fail evaluator should have pass rate
     expect(aggregates.evaluators[0]?.passRate).toBe(50); // 1 passed / 2 total
@@ -308,12 +308,12 @@ describe("computeTargetAggregates", () => {
     });
     const evaluators = [{ id: "eval-1", name: "Score Evaluator" }];
 
-    const aggregates = computeTargetAggregates(
-      "target-1",
+    const aggregates = computeTargetAggregates({
+      targetId: "target-1",
       results,
       evaluators,
-      2,
-    );
+      rowCount: 2,
+    });
 
     // passed: null should be treated as score-only, not pass/fail
     expect(aggregates.evaluators[0]?.passRate).toBeNull();
@@ -340,12 +340,12 @@ describe("computeTargetAggregates", () => {
       { id: "eval-2", name: "Evaluator 2" },
     ];
 
-    const aggregates = computeTargetAggregates(
-      "target-1",
+    const aggregates = computeTargetAggregates({
+      targetId: "target-1",
       results,
       evaluators,
-      2,
-    );
+      rowCount: 2,
+    });
 
     expect(aggregates.evaluators).toHaveLength(2);
     expect(aggregates.evaluators[0]?.passRate).toBe(100);
@@ -369,12 +369,12 @@ describe("computeTargetAggregates", () => {
     });
     const evaluators: Array<{ id: string; name: string }> = [];
 
-    const aggregates = computeTargetAggregates(
-      "target-1",
+    const aggregates = computeTargetAggregates({
+      targetId: "target-1",
       results,
       evaluators,
-      3,
-    );
+      rowCount: 3,
+    });
 
     expect(aggregates.averageCost).toBeCloseTo(0.002, 6);
     expect(aggregates.totalCost).toBeCloseTo(0.006, 6);
@@ -401,12 +401,12 @@ describe("computeTargetAggregates", () => {
       { id: "eval-2", name: "Evaluator 2" },
     ];
 
-    const aggregates = computeTargetAggregates(
-      "target-1",
+    const aggregates = computeTargetAggregates({
+      targetId: "target-1",
       results,
       evaluators,
-      2,
-    );
+      rowCount: 2,
+    });
 
     // eval-1 avg = 1.0, eval-2 avg = 0.0, overall avg = 0.5
     expect(aggregates.overallAverageScore).toBeCloseTo(0.5, 2);
@@ -427,12 +427,12 @@ describe("computeTargetAggregates", () => {
     });
     const evaluators: Array<{ id: string; name: string }> = [];
 
-    const aggregates = computeTargetAggregates(
-      "target-1",
+    const aggregates = computeTargetAggregates({
+      targetId: "target-1",
       results,
       evaluators,
-      3,
-    );
+      rowCount: 3,
+    });
 
     // Only 2 rows have cost
     expect(aggregates.averageCost).toBeCloseTo(0.002, 6);
@@ -456,12 +456,12 @@ describe("computeTargetAggregates", () => {
     });
     const evaluators: Array<{ id: string; name: string }> = [];
 
-    const aggregates = computeTargetAggregates(
-      "target-1",
+    const aggregates = computeTargetAggregates({
+      targetId: "target-1",
       results,
       evaluators,
-      3,
-    );
+      rowCount: 3,
+    });
 
     // Total duration should be sum: 500 + 300 + 700 = 1500
     expect(aggregates.totalDuration).toBe(1500);
@@ -483,12 +483,12 @@ describe("computeTargetAggregates", () => {
     });
     const evaluators: Array<{ id: string; name: string }> = [];
 
-    const aggregates = computeTargetAggregates(
-      "target-1",
+    const aggregates = computeTargetAggregates({
+      targetId: "target-1",
       results,
       evaluators,
-      2,
-    );
+      rowCount: 2,
+    });
 
     expect(aggregates.totalDuration).toBeNull();
     expect(aggregates.averageLatency).toBeNull();
@@ -635,7 +635,12 @@ describe("computeTargetAggregates latencyStats and costStats", () => {
       },
     });
 
-    const aggregates = computeTargetAggregates("target-1", results, [], 3);
+    const aggregates = computeTargetAggregates({
+      targetId: "target-1",
+      results,
+      evaluators: [],
+      rowCount: 3,
+    });
 
     expect(aggregates.latencyStats).not.toBeNull();
     expect(aggregates.latencyStats!.min).toBe(500);
@@ -659,7 +664,12 @@ describe("computeTargetAggregates latencyStats and costStats", () => {
       },
     });
 
-    const aggregates = computeTargetAggregates("target-1", results, [], 1);
+    const aggregates = computeTargetAggregates({
+      targetId: "target-1",
+      results,
+      evaluators: [],
+      rowCount: 1,
+    });
 
     expect(aggregates.latencyStats).toBeNull();
     expect(aggregates.costStats).toBeNull();

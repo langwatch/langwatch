@@ -205,8 +205,11 @@ describe("TraceService — AC1: getById with full=true resolves from event_log",
       it("calls BlobStore.getFromEventLog at least once (resolution runs)", async () => {
         setupGetTracesWithSpansMocks();
 
-        await service.getById(PROJECT_ID_A, TRACE_ID, protections, {
-          full: true,
+        await service.getById({
+          projectId: PROJECT_ID_A,
+          traceId: TRACE_ID,
+          protections,
+          opts: { full: true },
         });
 
         expect(blobStore.getFromEventLog).toHaveBeenCalledTimes(1);
@@ -215,12 +218,12 @@ describe("TraceService — AC1: getById with full=true resolves from event_log",
       it("the resolved span attribute is defined", async () => {
         setupGetTracesWithSpansMocks();
 
-        const trace = await service.getById(
-          PROJECT_ID_A,
-          TRACE_ID,
+        const trace = await service.getById({
+          projectId: PROJECT_ID_A,
+          traceId: TRACE_ID,
           protections,
-          { full: true },
-        );
+          opts: { full: true },
+        });
 
         const span = trace?.spans?.[0] as
           | { params?: { langwatch?: { output?: string } } }
@@ -231,12 +234,12 @@ describe("TraceService — AC1: getById with full=true resolves from event_log",
       it("the resolved span attribute byte length equals the full 400 KB value", async () => {
         setupGetTracesWithSpansMocks();
 
-        const trace = await service.getById(
-          PROJECT_ID_A,
-          TRACE_ID,
+        const trace = await service.getById({
+          projectId: PROJECT_ID_A,
+          traceId: TRACE_ID,
           protections,
-          { full: true },
-        );
+          opts: { full: true },
+        });
 
         const span = trace?.spans?.[0] as
           | { params?: { langwatch?: { output?: string } } }
@@ -248,12 +251,12 @@ describe("TraceService — AC1: getById with full=true resolves from event_log",
       it("no langwatch.reserved.* key survives in the returned span (key-level check)", async () => {
         setupGetTracesWithSpansMocks();
 
-        const trace = await service.getById(
-          PROJECT_ID_A,
-          TRACE_ID,
+        const trace = await service.getById({
+          projectId: PROJECT_ID_A,
+          traceId: TRACE_ID,
           protections,
-          { full: true },
-        );
+          opts: { full: true },
+        });
 
         const span = trace?.spans?.[0] as
           | { params?: { langwatch?: { reserved?: unknown } } }
@@ -273,12 +276,12 @@ describe("TraceService — AC1: getById with full=true resolves from event_log",
       it("the recomputed trace.output value equals the full 400 KB value", async () => {
         setupGetTracesWithSpansMocks();
 
-        const trace = await service.getById(
-          PROJECT_ID_A,
-          TRACE_ID,
+        const trace = await service.getById({
+          projectId: PROJECT_ID_A,
+          traceId: TRACE_ID,
           protections,
-          { full: true },
-        );
+          opts: { full: true },
+        });
 
         expect(trace?.output?.value).toBe(FULL_OUTPUT);
       });
@@ -301,15 +304,14 @@ describe("TraceService — AC1: getTracesWithSpans with full=true resolves from 
       it("calls BlobStore.getFromEventLog at least once", async () => {
         setupGetTracesWithSpansMocks();
 
-        await service.getTracesWithSpans(
-          PROJECT_ID_A,
-          [TRACE_ID],
+        await service.getTracesWithSpans({
+          projectId: PROJECT_ID_A,
+          traceIds: [TRACE_ID],
           protections,
-          undefined,
-          {
+          opts: {
             full: true,
           },
-        );
+        });
 
         expect(blobStore.getFromEventLog).toHaveBeenCalledTimes(1);
       });
@@ -317,13 +319,12 @@ describe("TraceService — AC1: getTracesWithSpans with full=true resolves from 
       it("the recomputed trace.output value equals the full 400 KB value", async () => {
         setupGetTracesWithSpansMocks();
 
-        const traces = await service.getTracesWithSpans(
-          PROJECT_ID_A,
-          [TRACE_ID],
+        const traces = await service.getTracesWithSpans({
+          projectId: PROJECT_ID_A,
+          traceIds: [TRACE_ID],
           protections,
-          undefined,
-          { full: true },
-        );
+          opts: { full: true },
+        });
 
         expect(traces[0]?.output?.value).toBe(FULL_OUTPUT);
       });
@@ -349,8 +350,11 @@ describe("TraceService — AC2: getById without full resolves nothing (preview)"
     it("BlobStore.getFromEventLog is called 0 times", async () => {
       setupGetTracesWithSpansMocks();
 
-      await service.getById(PROJECT_ID_A, TRACE_ID, protections, {
-        full: false,
+      await service.getById({
+        projectId: PROJECT_ID_A,
+        traceId: TRACE_ID,
+        protections,
+        opts: { full: false },
       });
 
       expect(blobStore.getFromEventLog).toHaveBeenCalledTimes(0);
@@ -361,7 +365,11 @@ describe("TraceService — AC2: getById without full resolves nothing (preview)"
     it("BlobStore.getFromEventLog is called 0 times", async () => {
       setupGetTracesWithSpansMocks();
 
-      await service.getById(PROJECT_ID_A, TRACE_ID, protections);
+      await service.getById({
+        projectId: PROJECT_ID_A,
+        traceId: TRACE_ID,
+        protections,
+      });
 
       expect(blobStore.getFromEventLog).toHaveBeenCalledTimes(0);
     });
@@ -369,7 +377,11 @@ describe("TraceService — AC2: getById without full resolves nothing (preview)"
     it("the returned trace.output is the ≤64 KB preview, not the full value", async () => {
       setupGetTracesWithSpansMocks();
 
-      const trace = await service.getById(PROJECT_ID_A, TRACE_ID, protections);
+      const trace = await service.getById({
+        projectId: PROJECT_ID_A,
+        traceId: TRACE_ID,
+        protections,
+      });
 
       expect(trace?.output?.value).not.toBe(FULL_OUTPUT);
     });
@@ -390,7 +402,11 @@ describe("TraceService — AC2: getTracesWithSpans without full resolves nothing
     it("BlobStore.getFromEventLog is called 0 times", async () => {
       setupGetTracesWithSpansMocks();
 
-      await service.getTracesWithSpans(PROJECT_ID_A, [TRACE_ID], protections);
+      await service.getTracesWithSpans({
+        projectId: PROJECT_ID_A,
+        traceIds: [TRACE_ID],
+        protections,
+      });
 
       expect(blobStore.getFromEventLog).toHaveBeenCalledTimes(0);
     });
@@ -400,15 +416,14 @@ describe("TraceService — AC2: getTracesWithSpans without full resolves nothing
     it("BlobStore.getFromEventLog is called 0 times", async () => {
       setupGetTracesWithSpansMocks();
 
-      await service.getTracesWithSpans(
-        PROJECT_ID_A,
-        [TRACE_ID],
+      await service.getTracesWithSpans({
+        projectId: PROJECT_ID_A,
+        traceIds: [TRACE_ID],
         protections,
-        undefined,
-        {
+        opts: {
           full: false,
         },
-      );
+      });
 
       expect(blobStore.getFromEventLog).toHaveBeenCalledTimes(0);
     });
@@ -426,13 +441,12 @@ describe("TraceService — AC2: a service constructed without blobResolutionDeps
         setupGetTracesWithSpansMocks();
         const listService = new TraceService({} as never);
 
-        const traces = await listService.getTracesWithSpans(
-          PROJECT_ID_A,
-          [TRACE_ID],
+        const traces = await listService.getTracesWithSpans({
+          projectId: PROJECT_ID_A,
+          traceIds: [TRACE_ID],
           protections,
-          undefined,
-          { full: true },
-        );
+          opts: { full: true },
+        });
 
         // No resolver → preview kept, no full value.
         expect(traces[0]?.output?.value).not.toBe(FULL_OUTPUT);
@@ -459,8 +473,11 @@ describe("TraceService — AC7: cross-tenant event_log read denied, preview retu
         setupGetTracesWithSpansMocks();
         const serviceB = makeService(blobStore);
 
-        await serviceB.getById(PROJECT_ID_B, TRACE_ID, protections, {
-          full: true,
+        await serviceB.getById({
+          projectId: PROJECT_ID_B,
+          traceId: TRACE_ID,
+          protections,
+          opts: { full: true },
         });
 
         const callArgs = blobStore.getFromEventLog.mock.calls[0]?.[0] as
@@ -473,12 +490,12 @@ describe("TraceService — AC7: cross-tenant event_log read denied, preview retu
         setupGetTracesWithSpansMocks();
         const serviceB = makeService(blobStore);
 
-        const trace = await serviceB.getById(
-          PROJECT_ID_B,
-          TRACE_ID,
+        const trace = await serviceB.getById({
+          projectId: PROJECT_ID_B,
+          traceId: TRACE_ID,
           protections,
-          { full: true },
-        );
+          opts: { full: true },
+        });
 
         expect(trace?.output?.value).not.toBe(FULL_OUTPUT);
       });
@@ -488,7 +505,12 @@ describe("TraceService — AC7: cross-tenant event_log read denied, preview retu
         const serviceB = makeService(blobStore);
 
         await expect(
-          serviceB.getById(PROJECT_ID_B, TRACE_ID, protections, { full: true }),
+          serviceB.getById({
+            projectId: PROJECT_ID_B,
+            traceId: TRACE_ID,
+            protections,
+            opts: { full: true },
+          }),
         ).resolves.not.toThrow();
       });
     });
@@ -580,15 +602,14 @@ describe("ClickHouseTraceService — #4888 full resolution crosses the mapper", 
         });
         const service = buildService(blobStore);
 
-        await service.getTracesWithSpans(
-          PROJECT_ID_CH,
-          [TRACE_ID_CH],
+        await service.getTracesWithSpans({
+          projectId: PROJECT_ID_CH,
+          traceIds: [TRACE_ID_CH],
           protections,
-          undefined,
-          {
+          opts: {
             resolveBlobs: true,
           },
-        );
+        });
 
         expect(getFromEventLogSpy).toHaveBeenCalledOnce();
       });
@@ -600,13 +621,12 @@ describe("ClickHouseTraceService — #4888 full resolution crosses the mapper", 
         });
         const service = buildService(blobStore);
 
-        const traces = await service.getTracesWithSpans(
-          PROJECT_ID_CH,
-          [TRACE_ID_CH],
+        const traces = await service.getTracesWithSpans({
+          projectId: PROJECT_ID_CH,
+          traceIds: [TRACE_ID_CH],
           protections,
-          undefined,
-          { resolveBlobs: true },
-        );
+          opts: { resolveBlobs: true },
+        });
 
         const span = traces![0]!.spans[0] as unknown as {
           params?: { langwatch?: { output?: string } };
@@ -621,13 +641,12 @@ describe("ClickHouseTraceService — #4888 full resolution crosses the mapper", 
         });
         const service = buildService(blobStore);
 
-        const traces = await service.getTracesWithSpans(
-          PROJECT_ID_CH,
-          [TRACE_ID_CH],
+        const traces = await service.getTracesWithSpans({
+          projectId: PROJECT_ID_CH,
+          traceIds: [TRACE_ID_CH],
           protections,
-          undefined,
-          { resolveBlobs: true },
-        );
+          opts: { resolveBlobs: true },
+        });
 
         const span = traces![0]!.spans[0] as unknown as {
           params?: { langwatch?: { output?: string } };
@@ -643,13 +662,12 @@ describe("ClickHouseTraceService — #4888 full resolution crosses the mapper", 
         });
         const service = buildService(blobStore);
 
-        const traces = await service.getTracesWithSpans(
-          PROJECT_ID_CH,
-          [TRACE_ID_CH],
+        const traces = await service.getTracesWithSpans({
+          projectId: PROJECT_ID_CH,
+          traceIds: [TRACE_ID_CH],
           protections,
-          undefined,
-          { resolveBlobs: true },
-        );
+          opts: { resolveBlobs: true },
+        });
 
         const span = traces![0]!.spans[0] as unknown as {
           params?: { langwatch?: { output?: string } };
@@ -664,13 +682,12 @@ describe("ClickHouseTraceService — #4888 full resolution crosses the mapper", 
         });
         const service = buildService(blobStore);
 
-        const traces = await service.getTracesWithSpans(
-          PROJECT_ID_CH,
-          [TRACE_ID_CH],
+        const traces = await service.getTracesWithSpans({
+          projectId: PROJECT_ID_CH,
+          traceIds: [TRACE_ID_CH],
           protections,
-          undefined,
-          { resolveBlobs: true },
-        );
+          opts: { resolveBlobs: true },
+        });
 
         const span = traces![0]!.spans[0] as unknown as {
           params?: { langwatch?: { reserved?: unknown } };
@@ -694,13 +711,12 @@ describe("ClickHouseTraceService — #4888 full resolution crosses the mapper", 
         });
         const service = buildService(blobStore);
 
-        const traces = await service.getTracesWithSpans(
-          PROJECT_ID_CH,
-          [TRACE_ID_CH],
+        const traces = await service.getTracesWithSpans({
+          projectId: PROJECT_ID_CH,
+          traceIds: [TRACE_ID_CH],
           protections,
-          undefined,
-          { resolveBlobs: true },
-        );
+          opts: { resolveBlobs: true },
+        });
 
         expect(traces![0]!.output?.value).toBeDefined();
       });
@@ -712,13 +728,12 @@ describe("ClickHouseTraceService — #4888 full resolution crosses the mapper", 
         });
         const service = buildService(blobStore);
 
-        const traces = await service.getTracesWithSpans(
-          PROJECT_ID_CH,
-          [TRACE_ID_CH],
+        const traces = await service.getTracesWithSpans({
+          projectId: PROJECT_ID_CH,
+          traceIds: [TRACE_ID_CH],
           protections,
-          undefined,
-          { resolveBlobs: true },
-        );
+          opts: { resolveBlobs: true },
+        });
 
         const outputVal = traces![0]!.output?.value as string | undefined;
         expect(Buffer.byteLength(outputVal!, "utf8")).toBeGreaterThan(
@@ -733,13 +748,12 @@ describe("ClickHouseTraceService — #4888 full resolution crosses the mapper", 
         });
         const service = buildService(blobStore);
 
-        const traces = await service.getTracesWithSpans(
-          PROJECT_ID_CH,
-          [TRACE_ID_CH],
+        const traces = await service.getTracesWithSpans({
+          projectId: PROJECT_ID_CH,
+          traceIds: [TRACE_ID_CH],
           protections,
-          undefined,
-          { resolveBlobs: true },
-        );
+          opts: { resolveBlobs: true },
+        });
 
         expect(traces![0]!.output?.value).toBe(FULL_OUTPUT);
       });
@@ -753,15 +767,14 @@ describe("ClickHouseTraceService — #4888 full resolution crosses the mapper", 
         });
         const service = buildService(blobStore);
 
-        await service.getTracesWithSpans(
-          PROJECT_ID_CH,
-          [TRACE_ID_CH],
+        await service.getTracesWithSpans({
+          projectId: PROJECT_ID_CH,
+          traceIds: [TRACE_ID_CH],
           protections,
-          undefined,
-          {
+          opts: {
             resolveBlobs: false,
           },
-        );
+        });
 
         expect(getFromEventLogSpy).not.toHaveBeenCalled();
       });
@@ -773,13 +786,12 @@ describe("ClickHouseTraceService — #4888 full resolution crosses the mapper", 
         });
         const service = buildService(blobStore);
 
-        const traces = await service.getTracesWithSpans(
-          PROJECT_ID_CH,
-          [TRACE_ID_CH],
+        const traces = await service.getTracesWithSpans({
+          projectId: PROJECT_ID_CH,
+          traceIds: [TRACE_ID_CH],
           protections,
-          undefined,
-          { resolveBlobs: false },
-        );
+          opts: { resolveBlobs: false },
+        });
 
         expect(traces![0]!.output?.value).not.toBe(FULL_OUTPUT);
       });

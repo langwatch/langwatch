@@ -65,12 +65,17 @@ export type TargetAggregate = {
 /**
  * Computes aggregate statistics for a target from evaluation results.
  */
-export const computeTargetAggregates = (
-  targetId: string,
-  results: EvaluationResults,
-  evaluators: Array<{ id: string }>,
-  rowCount: number,
-): TargetAggregate => {
+export const computeTargetAggregates = ({
+  targetId,
+  results,
+  evaluators,
+  rowCount,
+}: {
+  targetId: string;
+  results: EvaluationResults;
+  evaluators: Array<{ id: string }>;
+  rowCount: number;
+}): TargetAggregate => {
   const targetOutputs = results.targetOutputs[targetId] ?? [];
   const targetMetadata = results.targetMetadata?.[targetId] ?? [];
   const targetErrors = results.errors[targetId] ?? [];

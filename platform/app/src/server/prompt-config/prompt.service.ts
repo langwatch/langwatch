@@ -58,6 +58,14 @@ type ConfigData = z.infer<
   ReturnType<typeof getLatestConfigVersionSchema>
 >["configData"];
 
+/** Message shape carried by prompt update payloads. */
+type UpdateMessages =
+  | Array<{
+      role: "user" | "assistant" | "system";
+      content: string;
+    }>
+  | undefined;
+
 /**
  * Full prompt shape that combines prompt config with version data.
  * This is the complete shape that should be returned to API consumers.
@@ -747,11 +755,11 @@ export class PromptService {
       projectId,
     });
 
-    const updatedConfig = await this.repository.updateConfig(
+    const updatedConfig = await this.repository.updateConfig({
       idOrHandle,
       projectId,
       data,
-    );
+    });
 
     // Get the latest version to return complete prompt
     const latestVersionRaw = await this.repository.versions.getLatestVersion(
@@ -841,27 +849,23 @@ export class PromptService {
     ) {
       const normalizedUpdate = this.normalizeSystemMessage(configDataUpdates);
       configDataUpdates.prompt = normalizedUpdate.prompt;
-      configDataUpdates.messages = normalizedUpdate.messages as unknown as
-        | Array<{
-            role: "user" | "assistant" | "system";
-            content: string;
-          }>
-        | undefined;
+      configDataUpdates.messages =
+        normalizedUpdate.messages as unknown as UpdateMessages;
     }
 
     // Handle in a transaction to ensure atomicity
     const result = await this.prisma.$transaction(
       async (tx: Prisma.TransactionClient) => {
         // Update the config metadata (handle/scope)
-        const updatedConfig = await this.repository.updateConfig(
+        const updatedConfig = await this.repository.updateConfig({
           idOrHandle,
           projectId,
-          {
+          data: {
             handle,
             scope,
           },
-          { tx },
-        );
+          tx,
+        });
 
         // Get the latest version
         // TODO: This should use the version service instead of accessing the repository directly

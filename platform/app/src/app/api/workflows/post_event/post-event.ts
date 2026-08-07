@@ -99,7 +99,10 @@ export const studioBackendPostEvent = async ({
 
     const s3CacheKey = getS3CacheKey(projectId);
 
-    reader = await invokeLambda(projectId, message, s3CacheKey, {
+    reader = await invokeLambda({
+      projectId,
+      event: message,
+      s3CacheKey,
       path: "/go/studio/execute",
       headers: { "X-LangWatch-Origin": "workflow" },
       supportsStaging: true,

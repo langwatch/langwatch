@@ -415,7 +415,13 @@ export function buildSlimTimeseriesQuery(
         `Slim builder cannot serve metric "${s.metric}". The router should have routed this to trace_summaries.`,
       );
     }
-    const alias = buildMetricAlias(i, s.metric, s.aggregation, s.key, s.subkey);
+    const alias = buildMetricAlias({
+      index: i,
+      metric: s.metric,
+      aggregation: s.aggregation,
+      key: s.key,
+      subkey: s.subkey,
+    });
     const expr = slimAggExpression(s.aggregation, slimColumnFor(s.metric));
     selectExprs.push(`${expr} AS ${alias}`);
   }

@@ -1380,12 +1380,12 @@ describe("aggregation-builder", () => {
     const endDate = new Date("2024-01-02T00:00:00Z");
 
     it("builds query for topics.topics", () => {
-      const result = buildDataForFilterQuery(
+      const result = buildDataForFilterQuery({
         projectId,
-        "topics.topics",
+        field: "topics.topics",
         startDate,
         endDate,
-      );
+      });
 
       expect(result.sql).toContain("ts.TopicId AS field");
       expect(result.sql).toContain("count() AS count");
@@ -1395,69 +1395,69 @@ describe("aggregation-builder", () => {
     });
 
     it("builds query for topics.subtopics", () => {
-      const result = buildDataForFilterQuery(
+      const result = buildDataForFilterQuery({
         projectId,
-        "topics.subtopics",
+        field: "topics.subtopics",
         startDate,
         endDate,
-      );
+      });
 
       expect(result.sql).toContain("ts.SubTopicId AS field");
     });
 
     it("builds query for metadata.user_id", () => {
-      const result = buildDataForFilterQuery(
+      const result = buildDataForFilterQuery({
         projectId,
-        "metadata.user_id",
+        field: "metadata.user_id",
         startDate,
         endDate,
-      );
+      });
 
       expect(result.sql).toContain("Attributes['langwatch.user_id']");
     });
 
     it("builds query for metadata.thread_id", () => {
-      const result = buildDataForFilterQuery(
+      const result = buildDataForFilterQuery({
         projectId,
-        "metadata.thread_id",
+        field: "metadata.thread_id",
         startDate,
         endDate,
-      );
+      });
 
       expect(result.sql).toContain("Attributes['gen_ai.conversation.id']");
     });
 
     it("builds query for spans.model with JOIN", () => {
-      const result = buildDataForFilterQuery(
+      const result = buildDataForFilterQuery({
         projectId,
-        "spans.model",
+        field: "spans.model",
         startDate,
         endDate,
-      );
+      });
 
       expect(result.sql).toContain("FROM stored_spans");
       expect(result.sql).toContain("gen_ai.request.model");
     });
 
     it("builds query for spans.type with JOIN", () => {
-      const result = buildDataForFilterQuery(
+      const result = buildDataForFilterQuery({
         projectId,
-        "spans.type",
+        field: "spans.type",
         startDate,
         endDate,
-      );
+      });
 
       expect(result.sql).toContain("FROM stored_spans");
       expect(result.sql).toContain("langwatch.span.type");
     });
 
     it("builds query for evaluations.evaluator_id with JOIN", () => {
-      const result = buildDataForFilterQuery(
+      const result = buildDataForFilterQuery({
         projectId,
-        "evaluations.evaluator_id",
+        field: "evaluations.evaluator_id",
         startDate,
         endDate,
-      );
+      });
 
       expect(result.sql).toContain("FROM evaluation_runs");
       expect(result.sql).toContain("GROUP BY TenantId, EvaluationId");
@@ -1465,23 +1465,23 @@ describe("aggregation-builder", () => {
     });
 
     it("filters guardrails only for evaluations.evaluator_id.guardrails_only", () => {
-      const result = buildDataForFilterQuery(
+      const result = buildDataForFilterQuery({
         projectId,
-        "evaluations.evaluator_id.guardrails_only",
+        field: "evaluations.evaluator_id.guardrails_only",
         startDate,
         endDate,
-      );
+      });
 
       expect(result.sql).toContain("es.IsGuardrail = 1");
     });
 
     it("builds query for traces.error", () => {
-      const result = buildDataForFilterQuery(
+      const result = buildDataForFilterQuery({
         projectId,
-        "traces.error",
+        field: "traces.error",
         startDate,
         endDate,
-      );
+      });
 
       expect(result.sql).toContain("ContainsErrorStatus");
       expect(result.sql).toContain("'Traces with error'");
@@ -1489,27 +1489,25 @@ describe("aggregation-builder", () => {
     });
 
     it("adds search query filter when provided", () => {
-      const result = buildDataForFilterQuery(
+      const result = buildDataForFilterQuery({
         projectId,
-        "topics.topics",
+        field: "topics.topics",
         startDate,
         endDate,
-        undefined,
-        undefined,
-        "search-term",
-      );
+        searchQuery: "search-term",
+      });
 
       expect(result.sql).toContain("ILIKE");
       expect(result.params.searchQuery).toBe("%search-term%");
     });
 
     it("returns empty result for unknown field", () => {
-      const result = buildDataForFilterQuery(
+      const result = buildDataForFilterQuery({
         projectId,
-        "unknown.field" as any,
+        field: "unknown.field" as any,
         startDate,
         endDate,
-      );
+      });
 
       expect(result.sql).toContain("WHERE 1=0");
     });
@@ -1521,7 +1519,7 @@ describe("aggregation-builder", () => {
     const endDate = new Date("2024-01-02T00:00:00Z");
 
     it("builds query for top documents", () => {
-      const result = buildTopDocumentsQuery(projectId, startDate, endDate);
+      const result = buildTopDocumentsQuery({ projectId, startDate, endDate });
 
       expect(result.sql).toContain("documentId");
       expect(result.sql).toContain("count");
@@ -1532,13 +1530,13 @@ describe("aggregation-builder", () => {
     });
 
     it("includes JOIN with stored_spans", () => {
-      const result = buildTopDocumentsQuery(projectId, startDate, endDate);
+      const result = buildTopDocumentsQuery({ projectId, startDate, endDate });
 
       expect(result.sql).toContain("JOIN stored_spans");
     });
 
     it("prunes the stored_spans join to the StartTime partition window", () => {
-      const result = buildTopDocumentsQuery(projectId, startDate, endDate);
+      const result = buildTopDocumentsQuery({ projectId, startDate, endDate });
 
       // stored_spans is partitioned by toYearWeek(StartTime); without a
       // StartTime bound the join scans every weekly partition (incl. cold S3).
@@ -1556,7 +1554,7 @@ describe("aggregation-builder", () => {
     });
 
     it("includes query for total unique documents", () => {
-      const result = buildTopDocumentsQuery(projectId, startDate, endDate);
+      const result = buildTopDocumentsQuery({ projectId, startDate, endDate });
 
       // Query has two parts separated by semicolon
       expect(result.sql).toContain(";");
@@ -1568,24 +1566,24 @@ describe("aggregation-builder", () => {
       const filters = {
         "topics.topics": ["topic-1"],
       };
-      const result = buildTopDocumentsQuery(
+      const result = buildTopDocumentsQuery({
         projectId,
         startDate,
         endDate,
         filters,
-      );
+      });
 
       expect(result.sql).toContain("ts.TopicId IN");
     });
 
     it("limits results to top 10", () => {
-      const result = buildTopDocumentsQuery(projectId, startDate, endDate);
+      const result = buildTopDocumentsQuery({ projectId, startDate, endDate });
 
       expect(result.sql).toContain("LIMIT 10");
     });
 
     it("prunes the deduped trace_summaries read to identity columns", () => {
-      const result = buildTopDocumentsQuery(projectId, startDate, endDate);
+      const result = buildTopDocumentsQuery({ projectId, startDate, endDate });
 
       // The document payload comes from the stored_spans ARRAY JOIN, so the
       // deduped trace_summaries subquery only needs identity/date columns and
@@ -1596,8 +1594,13 @@ describe("aggregation-builder", () => {
     });
 
     it("adds filter-referenced columns to the deduped read so filtered queries stay valid", () => {
-      const result = buildTopDocumentsQuery(projectId, startDate, endDate, {
-        "topics.topics": ["topic-1"],
+      const result = buildTopDocumentsQuery({
+        projectId,
+        startDate,
+        endDate,
+        filters: {
+          "topics.topics": ["topic-1"],
+        },
       });
 
       // TopicId is referenced by the filter WHERE, so the deduped subquery must
@@ -1615,7 +1618,7 @@ describe("aggregation-builder", () => {
     const endDate = new Date("2024-01-02T00:00:00Z");
 
     it("builds query for feedbacks", () => {
-      const result = buildFeedbacksQuery(projectId, startDate, endDate);
+      const result = buildFeedbacksQuery({ projectId, startDate, endDate });
 
       expect(result.sql).toContain("trace_id");
       expect(result.sql).toContain("event_id");
@@ -1626,13 +1629,13 @@ describe("aggregation-builder", () => {
     });
 
     it("filters for thumbs_up_down events", () => {
-      const result = buildFeedbacksQuery(projectId, startDate, endDate);
+      const result = buildFeedbacksQuery({ projectId, startDate, endDate });
 
       expect(result.sql).toContain("event_name = 'thumbs_up_down'");
     });
 
     it("filters for thumbs_up_down events with vote metric", () => {
-      const result = buildFeedbacksQuery(projectId, startDate, endDate);
+      const result = buildFeedbacksQuery({ projectId, startDate, endDate });
 
       expect(result.sql).toContain(
         "mapContains(event_attrs, 'event.metrics.vote')",
@@ -1640,7 +1643,7 @@ describe("aggregation-builder", () => {
     });
 
     it("includes ARRAY JOIN for event arrays", () => {
-      const result = buildFeedbacksQuery(projectId, startDate, endDate);
+      const result = buildFeedbacksQuery({ projectId, startDate, endDate });
 
       expect(result.sql).toContain("ARRAY JOIN");
       expect(result.sql).toContain('Events.Timestamp"');
@@ -1649,7 +1652,7 @@ describe("aggregation-builder", () => {
     });
 
     it("prunes the stored_spans join to the StartTime partition window", () => {
-      const result = buildFeedbacksQuery(projectId, startDate, endDate);
+      const result = buildFeedbacksQuery({ projectId, startDate, endDate });
 
       // Same partition-pruning rationale as the documents query: bound the
       // stored_spans scan to the date window instead of every weekly partition.
@@ -1665,12 +1668,12 @@ describe("aggregation-builder", () => {
       const filters = {
         "metadata.user_id": ["user-1"],
       };
-      const result = buildFeedbacksQuery(
+      const result = buildFeedbacksQuery({
         projectId,
         startDate,
         endDate,
         filters,
-      );
+      });
 
       // Filter values are now parameterized, key is in params
       expect(result.sql).toContain("ts.Attributes[{metaValues_");
@@ -1682,19 +1685,19 @@ describe("aggregation-builder", () => {
     });
 
     it("limits results to 100", () => {
-      const result = buildFeedbacksQuery(projectId, startDate, endDate);
+      const result = buildFeedbacksQuery({ projectId, startDate, endDate });
 
       expect(result.sql).toContain("LIMIT 100");
     });
 
     it("orders by timestamp descending", () => {
-      const result = buildFeedbacksQuery(projectId, startDate, endDate);
+      const result = buildFeedbacksQuery({ projectId, startDate, endDate });
 
       expect(result.sql).toContain("ORDER BY event_timestamp DESC");
     });
 
     it("prunes the deduped trace_summaries read to identity columns", () => {
-      const result = buildFeedbacksQuery(projectId, startDate, endDate);
+      const result = buildFeedbacksQuery({ projectId, startDate, endDate });
 
       // Feedback payload comes from the stored_spans Events arrays, so the
       // deduped trace_summaries subquery only needs identity/date columns.
@@ -1704,8 +1707,13 @@ describe("aggregation-builder", () => {
     });
 
     it("adds a filter-referenced Attributes read to the deduped subquery", () => {
-      const result = buildFeedbacksQuery(projectId, startDate, endDate, {
-        "metadata.user_id": ["user-1"],
+      const result = buildFeedbacksQuery({
+        projectId,
+        startDate,
+        endDate,
+        filters: {
+          "metadata.user_id": ["user-1"],
+        },
       });
 
       // The user_id filter references ts.Attributes[...], so Attributes must be

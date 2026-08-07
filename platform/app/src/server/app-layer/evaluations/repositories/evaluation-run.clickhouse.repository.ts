@@ -86,13 +86,13 @@ export class EvaluationRunClickHouseRepository
 
     try {
       const client = await this.resolveClient(tenantId);
-      const record = this.toClickHouseRecord(
+      const record = this.toClickHouseRecord({
         data,
         tenantId,
         projectionId,
-        EVALUATION_PROJECTION_VERSIONS.STATE,
+        version: EVALUATION_PROJECTION_VERSIONS.STATE,
         retentionDays,
-      );
+      });
 
       await client.insert({
         table: TABLE_NAME,
@@ -136,13 +136,13 @@ export class EvaluationRunClickHouseRepository
                 data.scheduledAt,
               )
             : data.evaluationId;
-          return this.toClickHouseRecord(
+          return this.toClickHouseRecord({
             data,
-            tid,
+            tenantId: tid,
             projectionId,
-            EVALUATION_PROJECTION_VERSIONS.STATE,
-            rd,
-          );
+            version: EVALUATION_PROJECTION_VERSIONS.STATE,
+            retentionDays: rd,
+          });
         },
       );
 
@@ -569,13 +569,19 @@ export class EvaluationRunClickHouseRepository
     };
   }
 
-  private toClickHouseRecord(
-    data: EvaluationRunData,
-    tenantId: string,
-    projectionId: string,
-    version: string,
+  private toClickHouseRecord({
+    data,
+    tenantId,
+    projectionId,
+    version,
     retentionDays = PLATFORM_DEFAULT_RETENTION_DAYS,
-  ): ClickHouseEvaluationRunWriteRecord {
+  }: {
+    data: EvaluationRunData;
+    tenantId: string;
+    projectionId: string;
+    version: string;
+    retentionDays?: number;
+  }): ClickHouseEvaluationRunWriteRecord {
     // Belt-and-braces write caps (ADR-040): unconditional, flag-independent,
     // last line of defence that keeps the part merge-safe even if the offload
     // path is off, failed open, or a different writer inserted a fat payload.

@@ -88,7 +88,11 @@ describe("automations pipeline", () => {
 
         const events = await eventSourcing
           .getEventStore<AutomationEvent>()!
-          .getEvents("trigger-1", { tenantId }, "trigger");
+          .getEvents({
+            aggregateId: "trigger-1",
+            context: { tenantId },
+            aggregateType: "trigger",
+          });
         const process = await processStore.findByRef<SettlementState>({
           ref: {
             processName: "triggerSettlement",
@@ -121,7 +125,11 @@ describe("automations pipeline", () => {
 
         const events = await eventSourcing
           .getEventStore<AutomationEvent>()!
-          .getEvents("trigger-1", { tenantId }, "trigger");
+          .getEvents({
+            aggregateId: "trigger-1",
+            context: { tenantId },
+            aggregateType: "trigger",
+          });
         const process = await processStore.findByRef<SettlementState>({
           ref: {
             processName: "triggerSettlement",
@@ -176,7 +184,11 @@ describe("automations pipeline", () => {
 
         const events = await eventSourcing
           .getEventStore<AutomationEvent>()!
-          .getEvents("trigger-1", { tenantId }, "trigger");
+          .getEvents({
+            aggregateId: "trigger-1",
+            context: { tenantId },
+            aggregateType: "trigger",
+          });
 
         expect(events.map((event) => event.idempotencyKey)).toEqual([
           "trigger-1:trace-1:30000-0",
@@ -314,11 +326,11 @@ describe.skipIf(!hasRedis)(
 
             await vi.waitFor(
               async () => {
-                const events = await eventStore.getEvents(
-                  "trigger-1",
-                  { tenantId },
-                  "trigger",
-                );
+                const events = await eventStore.getEvents({
+                  aggregateId: "trigger-1",
+                  context: { tenantId },
+                  aggregateType: "trigger",
+                });
                 expect(events).toHaveLength(3);
               },
               { timeout: 15_000, interval: 50 },

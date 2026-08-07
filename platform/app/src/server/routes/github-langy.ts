@@ -141,13 +141,18 @@ function popupHtml(
 }
 
 // Render the setup error path consistently across popup and redirect modes.
-function setupError(
+function setupError({
+  c,
+  state,
+  errorMessage,
+  status,
+}: {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  c: any,
-  state: GithubOauthStatePayload | null,
-  errorMessage: string,
-  status: number,
-): Response {
+  c: any;
+  state: GithubOauthStatePayload | null;
+  errorMessage: string;
+  status: number;
+}): Response {
   if (state && state.mode === "redirect") {
     const returnTo = safeReturnTo(state.returnTo);
     return c.redirect(withGithubError(returnTo, errorMessage), 302);
@@ -262,7 +267,12 @@ secured
     const state = verifyState(c.req.query("state") ?? null);
     const installationId = c.req.query("installation_id");
     if (!state || !installationId) {
-      return setupError(c, state, "Invalid state or missing installation", 400);
+      return setupError({
+        c,
+        state,
+        errorMessage: "Invalid state or missing installation",
+        status: 400,
+      });
     }
 
     // Re-bind the session to the state's user.
@@ -270,14 +280,24 @@ secured
       req: c.req.raw as NextRequestShim,
     });
     if (!session?.user || session.user.id !== state.userId) {
-      return setupError(c, state, "Session changed mid-flow", 401);
+      return setupError({
+        c,
+        state,
+        errorMessage: "Session changed mid-flow",
+        status: 401,
+      });
     }
 
     // Burn the single-use nonce (skips when Redis was down at /install).
     if (state.nonceRegistered) {
       const consumed = await consumeGithubInstallNonce(state.nonce);
       if (consumed === false) {
-        return setupError(c, state, "Installation link already used", 401);
+        return setupError({
+          c,
+          state,
+          errorMessage: "Installation link already used",
+          status: 401,
+        });
       }
     }
 
@@ -288,7 +308,12 @@ secured
         organizationId: state.organizationId,
       }))
     ) {
-      return setupError(c, state, "Not a member of this organization", 403);
+      return setupError({
+        c,
+        state,
+        errorMessage: "Not a member of this organization",
+        status: 403,
+      });
     }
 
     // Re-check the connect permission too: the caller's role may have been
@@ -301,7 +326,7 @@ secured
         "langy:manage",
       ))
     ) {
-      return setupError(c, state, "Forbidden", 403);
+      return setupError({ c, state, errorMessage: "Forbidden", status: 403 });
     }
 
     // Re-check the Langy gate before persisting anything. The install may have
@@ -315,12 +340,12 @@ secured
         organizationId: state.organizationId,
       }))
     ) {
-      return setupError(
+      return setupError({
         c,
         state,
-        "The GitHub integration is not enabled for this account.",
-        404,
-      );
+        errorMessage: "The GitHub integration is not enabled for this account.",
+        status: 404,
+      });
     }
 
     const returnTo = safeReturnTo(state.returnTo);

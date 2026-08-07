@@ -95,11 +95,11 @@ export class SessionMetricSeriesClickHouseRepository
     // line.
     for (const record of records) {
       if (record.tenantId !== tenantId) {
-        throw new SecurityError(
-          "SessionMetricSeriesClickHouseRepository.ensure",
-          "session metric series batch spans multiple tenants",
+        throw new SecurityError({
+          operation: "SessionMetricSeriesClickHouseRepository.ensure",
+          message: "session metric series batch spans multiple tenants",
           tenantId,
-        );
+        });
       }
     }
 

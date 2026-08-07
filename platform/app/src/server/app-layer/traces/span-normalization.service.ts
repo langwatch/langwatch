@@ -30,12 +30,17 @@ export class SpanNormalizationPipelineService {
     private readonly canonicalizeSpanAttributesService: CanonicalizeSpanAttributesService,
   ) {}
 
-  normalizeSpanReceived(
-    tenantId: string,
-    otlpSpan: OtlpSpan,
-    otlpResource: OtlpResource | null,
-    otlpInstrumentationScope: OtlpInstrumentationScope | null,
-  ): NormalizedSpan {
+  normalizeSpanReceived({
+    tenantId,
+    otlpSpan,
+    otlpResource,
+    otlpInstrumentationScope,
+  }: {
+    tenantId: string;
+    otlpSpan: OtlpSpan;
+    otlpResource: OtlpResource | null;
+    otlpInstrumentationScope: OtlpInstrumentationScope | null;
+  }): NormalizedSpan {
     return this.tracer.withActiveSpan(
       "SpanNormalizationPipelineService.normalizeSpanReceived",
       {
@@ -52,12 +57,12 @@ export class SpanNormalizationPipelineService {
           "SpanNormalizationPipelineService.normalizeSpanReceived",
         );
 
-        const normalizedSpan = this.decodeOtlpSpan(
+        const normalizedSpan = this.decodeOtlpSpan({
           tenantId,
           otlpSpan,
           otlpResource,
           otlpInstrumentationScope,
-        );
+        });
 
         span.setAttributes({
           "span.record_id": normalizedSpan.id,
@@ -83,12 +88,17 @@ export class SpanNormalizationPipelineService {
     );
   }
 
-  private decodeOtlpSpan(
-    tenantId: string,
-    otlpSpan: OtlpSpan,
-    otlpResource: OtlpResource | null,
-    otlpInstrumentationScope: OtlpInstrumentationScope | null,
-  ): NormalizedSpan {
+  private decodeOtlpSpan({
+    tenantId,
+    otlpSpan,
+    otlpResource,
+    otlpInstrumentationScope,
+  }: {
+    tenantId: string;
+    otlpSpan: OtlpSpan;
+    otlpResource: OtlpResource | null;
+    otlpInstrumentationScope: OtlpInstrumentationScope | null;
+  }): NormalizedSpan {
     // decode span data
     const { traceId, spanId } =
       TraceRequestUtils.normalizeOtlpSpanIds(otlpSpan);
@@ -111,12 +121,12 @@ export class SpanNormalizationPipelineService {
       );
 
     return {
-      id: IdUtils.generateDeterministicSpanRecordIdFromData(
+      id: IdUtils.generateDeterministicSpanRecordIdFromData({
         tenantId,
         traceId,
         spanId,
         startTimeUnixMs,
-      ),
+      }),
       tenantId,
       traceId,
       spanId,

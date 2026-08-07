@@ -167,12 +167,17 @@ function entryIsCurrent(
   return current.kind === "project" && current.projectId === entry.projectId;
 }
 
-function currentLabel(
-  current: WorkspaceSwitcherCurrent,
-  personals: WorkspaceSwitcherProps["personals"],
-  teams: WorkspaceSwitcherProps["teams"],
-  projects: WorkspaceSwitcherProps["projects"],
-): { label: string; kind: keyof typeof ICON_BY_KIND } {
+function currentLabel({
+  current,
+  personals,
+  teams,
+  projects,
+}: {
+  current: WorkspaceSwitcherCurrent;
+  personals: WorkspaceSwitcherProps["personals"];
+  teams: WorkspaceSwitcherProps["teams"];
+  projects: WorkspaceSwitcherProps["projects"];
+}): { label: string; kind: keyof typeof ICON_BY_KIND } {
   if (current.kind === "personal") {
     const match =
       personals?.find((p) => (p.orgId ?? null) === (current.orgId ?? null)) ??
@@ -225,12 +230,12 @@ export const WorkspaceSwitcher = React.memo(function WorkspaceSwitcher({
   const derivedCurrent = useWorkspaceCurrent({ teams, projects });
   const current = currentProp ?? derivedCurrent;
 
-  const { label: triggerLabel, kind: triggerKind } = currentLabel(
+  const { label: triggerLabel, kind: triggerKind } = currentLabel({
     current,
     personals,
     teams,
     projects,
-  );
+  });
   const TriggerIcon = ICON_BY_KIND[triggerKind];
   // For project context, render the colored ProjectAvatar in the trigger to
   // preserve parity with the legacy ProjectSelector — projects are visually

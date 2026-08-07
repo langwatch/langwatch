@@ -15,12 +15,17 @@ import { createInnerTRPCContext } from "../../trpc";
  * Retry a query until it returns a result or max attempts reached.
  * Helps with occasional DB sync delays in integration tests.
  */
-async function waitForEvaluator(
-  workflowId: string,
-  projectId: string,
+async function waitForEvaluator({
+  workflowId,
+  projectId,
   maxAttempts = 3,
   delayMs = 50,
-) {
+}: {
+  workflowId: string;
+  projectId: string;
+  maxAttempts?: number;
+  delayMs?: number;
+}) {
   for (let i = 0; i < maxAttempts; i++) {
     const evaluator = await prisma.evaluator.findFirst({
       where: { workflowId, projectId, archivedAt: null },
@@ -123,7 +128,10 @@ describe("Optimization Publish - Evaluator Integration", () => {
       expect(updatedWorkflow?.isComponent).toBe(false);
 
       // Verify evaluator was created (with retry for DB sync)
-      const evaluator = await waitForEvaluator(workflow.id, projectId);
+      const evaluator = await waitForEvaluator({
+        workflowId: workflow.id,
+        projectId,
+      });
 
       expect(evaluator).not.toBeNull();
       expect(evaluator?.name).toBe("Bias Detection Evaluator");
@@ -147,7 +155,10 @@ describe("Optimization Publish - Evaluator Integration", () => {
       });
 
       // Get the evaluator (with retry for DB sync)
-      const evaluator = await waitForEvaluator(workflow.id, projectId);
+      const evaluator = await waitForEvaluator({
+        workflowId: workflow.id,
+        projectId,
+      });
       expect(evaluator?.name).toBe("Original Name");
       createdEvaluatorIds.push(evaluator!.id);
 

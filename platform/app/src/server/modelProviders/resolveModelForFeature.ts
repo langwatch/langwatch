@@ -279,12 +279,12 @@ export async function resolveModelForFeature(
 
   // 2. Nothing in the cascade. AI features for this role are disabled
   // until the user configures a default.
-  throw new ModelNotConfiguredError(
-    feature.key,
-    feature.role,
-    feature.displayName,
-    ctx.projectId,
-  );
+  throw new ModelNotConfiguredError({
+    featureKey: feature.key,
+    role: feature.role,
+    featureDisplayName: feature.displayName,
+    projectId: ctx.projectId,
+  });
 }
 
 /**

@@ -70,11 +70,16 @@ describe("Per-Dataset Mappings", () => {
       const store = useEvaluationsV3Store.getState();
 
       store.addTarget(createTestTarget("target-1"));
-      store.setTargetMapping("target-1", DEFAULT_TEST_DATA_ID, "question", {
-        type: "source",
-        source: "dataset",
-        sourceId: DEFAULT_TEST_DATA_ID,
-        sourceField: "input",
+      store.setTargetMapping({
+        targetId: "target-1",
+        datasetId: DEFAULT_TEST_DATA_ID,
+        inputField: "question",
+        mapping: {
+          type: "source",
+          source: "dataset",
+          sourceId: DEFAULT_TEST_DATA_ID,
+          sourceField: "input",
+        },
       });
 
       const state = useEvaluationsV3Store.getState();
@@ -101,19 +106,29 @@ describe("Per-Dataset Mappings", () => {
       store.addTarget(createTestTarget("target-1"));
 
       // Set mapping for default dataset
-      store.setTargetMapping("target-1", DEFAULT_TEST_DATA_ID, "question", {
-        type: "source",
-        source: "dataset",
-        sourceId: DEFAULT_TEST_DATA_ID,
-        sourceField: "input",
+      store.setTargetMapping({
+        targetId: "target-1",
+        datasetId: DEFAULT_TEST_DATA_ID,
+        inputField: "question",
+        mapping: {
+          type: "source",
+          source: "dataset",
+          sourceId: DEFAULT_TEST_DATA_ID,
+          sourceField: "input",
+        },
       });
 
       // Set different mapping for dataset-2
-      store.setTargetMapping("target-1", "dataset-2", "question", {
-        type: "source",
-        source: "dataset",
-        sourceId: "dataset-2",
-        sourceField: "foo",
+      store.setTargetMapping({
+        targetId: "target-1",
+        datasetId: "dataset-2",
+        inputField: "question",
+        mapping: {
+          type: "source",
+          source: "dataset",
+          sourceId: "dataset-2",
+          sourceField: "foo",
+        },
       });
 
       const state = useEvaluationsV3Store.getState();
@@ -134,15 +149,22 @@ describe("Per-Dataset Mappings", () => {
       const store = useEvaluationsV3Store.getState();
 
       store.addTarget(createTestTarget("target-1"));
-      store.setTargetMapping("target-1", DEFAULT_TEST_DATA_ID, "question", {
-        type: "source",
-        source: "dataset",
-        sourceId: DEFAULT_TEST_DATA_ID,
-        sourceField: "input",
+      store.setTargetMapping({
+        targetId: "target-1",
+        datasetId: DEFAULT_TEST_DATA_ID,
+        inputField: "question",
+        mapping: {
+          type: "source",
+          source: "dataset",
+          sourceId: DEFAULT_TEST_DATA_ID,
+          sourceField: "input",
+        },
       });
-      store.setTargetMapping("target-1", DEFAULT_TEST_DATA_ID, "context", {
-        type: "value",
-        value: "some context",
+      store.setTargetMapping({
+        targetId: "target-1",
+        datasetId: DEFAULT_TEST_DATA_ID,
+        inputField: "context",
+        mapping: { type: "value", value: "some context" },
       });
 
       store.removeTargetMapping("target-1", DEFAULT_TEST_DATA_ID, "question");
@@ -177,11 +199,16 @@ describe("Per-Dataset Mappings", () => {
       const store = useEvaluationsV3Store.getState();
 
       store.addTarget(createTestTarget("target-1"));
-      store.setTargetMapping("target-1", DEFAULT_TEST_DATA_ID, "question", {
-        type: "source",
-        source: "dataset",
-        sourceId: DEFAULT_TEST_DATA_ID,
-        sourceField: "input",
+      store.setTargetMapping({
+        targetId: "target-1",
+        datasetId: DEFAULT_TEST_DATA_ID,
+        inputField: "question",
+        mapping: {
+          type: "source",
+          source: "dataset",
+          sourceId: DEFAULT_TEST_DATA_ID,
+          sourceField: "input",
+        },
       });
 
       const { result } = renderHook(() => useEvaluationMappings("target-1"));
@@ -206,17 +233,27 @@ describe("Per-Dataset Mappings", () => {
       );
       store.addTarget(createTestTarget("target-1"));
 
-      store.setTargetMapping("target-1", DEFAULT_TEST_DATA_ID, "question", {
-        type: "source",
-        source: "dataset",
-        sourceId: DEFAULT_TEST_DATA_ID,
-        sourceField: "input",
+      store.setTargetMapping({
+        targetId: "target-1",
+        datasetId: DEFAULT_TEST_DATA_ID,
+        inputField: "question",
+        mapping: {
+          type: "source",
+          source: "dataset",
+          sourceId: DEFAULT_TEST_DATA_ID,
+          sourceField: "input",
+        },
       });
-      store.setTargetMapping("target-1", "dataset-2", "question", {
-        type: "source",
-        source: "dataset",
-        sourceId: "dataset-2",
-        sourceField: "foo",
+      store.setTargetMapping({
+        targetId: "target-1",
+        datasetId: "dataset-2",
+        inputField: "question",
+        mapping: {
+          type: "source",
+          source: "dataset",
+          sourceId: "dataset-2",
+          sourceField: "foo",
+        },
       });
 
       const { result, rerender } = renderHook(() =>
@@ -257,11 +294,16 @@ describe("Per-Dataset Mappings", () => {
       store.addTarget(createTestTarget("target-1"));
 
       // Only add mapping for default dataset
-      store.setTargetMapping("target-1", DEFAULT_TEST_DATA_ID, "question", {
-        type: "source",
-        source: "dataset",
-        sourceId: DEFAULT_TEST_DATA_ID,
-        sourceField: "input",
+      store.setTargetMapping({
+        targetId: "target-1",
+        datasetId: DEFAULT_TEST_DATA_ID,
+        inputField: "question",
+        mapping: {
+          type: "source",
+          source: "dataset",
+          sourceId: DEFAULT_TEST_DATA_ID,
+          sourceField: "input",
+        },
       });
 
       const { result, rerender } = renderHook(() =>
@@ -311,18 +353,18 @@ describe("Per-Dataset Mappings", () => {
         mappings: {},
       });
 
-      store.setEvaluatorMapping(
-        "eval-1",
-        DEFAULT_TEST_DATA_ID,
-        "target-1",
-        "output",
-        {
+      store.setEvaluatorMapping({
+        evaluatorId: "eval-1",
+        datasetId: DEFAULT_TEST_DATA_ID,
+        targetId: "target-1",
+        inputField: "output",
+        mapping: {
           type: "source",
           source: "target",
           sourceId: "target-1",
           sourceField: "output",
         },
-      );
+      });
 
       const state = useEvaluationsV3Store.getState();
       const evaluator = state.evaluators.find((e) => e.id === "eval-1");
@@ -361,23 +403,29 @@ describe("Per-Dataset Mappings", () => {
       });
 
       // Different expected_output mappings for different datasets
-      store.setEvaluatorMapping(
-        "eval-1",
-        DEFAULT_TEST_DATA_ID,
-        "target-1",
-        "expected",
-        {
+      store.setEvaluatorMapping({
+        evaluatorId: "eval-1",
+        datasetId: DEFAULT_TEST_DATA_ID,
+        targetId: "target-1",
+        inputField: "expected",
+        mapping: {
           type: "source",
           source: "dataset",
           sourceId: DEFAULT_TEST_DATA_ID,
           sourceField: "expected_output",
         },
-      );
-      store.setEvaluatorMapping("eval-1", "dataset-2", "target-1", "expected", {
-        type: "source",
-        source: "dataset",
-        sourceId: "dataset-2",
-        sourceField: "expected",
+      });
+      store.setEvaluatorMapping({
+        evaluatorId: "eval-1",
+        datasetId: "dataset-2",
+        targetId: "target-1",
+        inputField: "expected",
+        mapping: {
+          type: "source",
+          source: "dataset",
+          sourceId: "dataset-2",
+          sourceField: "expected",
+        },
       });
 
       const state = useEvaluationsV3Store.getState();
@@ -420,9 +468,11 @@ describe("Per-Dataset Mappings", () => {
       });
 
       // Manually set a custom mapping for "question"
-      store.setTargetMapping("target-1", "ds-1", "question", {
-        type: "value",
-        value: "hardcoded value",
+      store.setTargetMapping({
+        targetId: "target-1",
+        datasetId: "ds-1",
+        inputField: "question",
+        mapping: { type: "value", value: "hardcoded value" },
       });
 
       // Update target (doesn't touch inputs)

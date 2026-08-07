@@ -86,16 +86,16 @@ export class LegacyAnalyticsBackendClickHouseRepository
     const client = await this.resolveClient(projectId);
     if (!client) throw new AnalyticsClientUnavailableError(projectId);
 
-    const { sql, params } = buildDataForFilterQuery(
+    const { sql, params } = buildDataForFilterQuery({
       projectId,
       field,
-      new Date(startDate),
-      new Date(endDate),
+      startDate: new Date(startDate),
+      endDate: new Date(endDate),
       key,
       subkey,
       searchQuery,
       filters,
-    );
+    });
 
     logger.debug({ sql, params }, "Executing dataForFilter query");
 
@@ -139,12 +139,12 @@ export class LegacyAnalyticsBackendClickHouseRepository
     const client = await this.resolveClient(projectId);
     if (!client) throw new AnalyticsClientUnavailableError(projectId);
 
-    const { sql, params } = buildTopDocumentsQuery(
+    const { sql, params } = buildTopDocumentsQuery({
       projectId,
-      new Date(startDate),
-      new Date(endDate),
+      startDate: new Date(startDate),
+      endDate: new Date(endDate),
       filters,
-    );
+    });
 
     logger.debug({ sql, params }, "Executing topDocuments query");
 
@@ -216,12 +216,12 @@ export class LegacyAnalyticsBackendClickHouseRepository
     const client = await this.resolveClient(projectId);
     if (!client) throw new AnalyticsClientUnavailableError(projectId);
 
-    const { sql, params } = buildFeedbacksQuery(
+    const { sql, params } = buildFeedbacksQuery({
       projectId,
-      new Date(startDate),
-      new Date(endDate),
+      startDate: new Date(startDate),
+      endDate: new Date(endDate),
       filters,
-    );
+    });
 
     logger.debug({ sql, params }, "Executing feedbacks query");
 

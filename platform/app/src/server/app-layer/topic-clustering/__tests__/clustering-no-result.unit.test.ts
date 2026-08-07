@@ -177,14 +177,22 @@ describe("storeResults", () => {
   describe("given the clustering call returned no result", () => {
     describe("when storing in batch mode", () => {
       it("leaves the existing topic model in place", async () => {
-        await storeResults("proj-1", undefined, false);
+        await storeResults({
+          projectId: "proj-1",
+          clusteringResult: undefined,
+          isIncremental: false,
+        });
 
         expect(recordTopicsMock).not.toHaveBeenCalled();
       });
 
       it("returns null so the caller can report a skip", async () => {
         await expect(
-          storeResults("proj-1", undefined, false),
+          storeResults({
+            projectId: "proj-1",
+            clusteringResult: undefined,
+            isIncremental: false,
+          }),
         ).resolves.toBeNull();
       });
     });
@@ -195,11 +203,16 @@ describe("storeResults", () => {
       it("keeps the previous topics rather than replacing them with nothing", async () => {
         // An empty replacement would leave the project with no topics at
         // all, which is strictly worse than keeping the previous model.
-        await storeResults(
-          "proj-1",
-          { topics: [], subtopics: [], traces: [], cost: undefined } as any,
-          false,
-        );
+        await storeResults({
+          projectId: "proj-1",
+          clusteringResult: {
+            topics: [],
+            subtopics: [],
+            traces: [],
+            cost: undefined,
+          } as any,
+          isIncremental: false,
+        });
 
         expect(recordTopicsMock).not.toHaveBeenCalled();
       });
@@ -209,9 +222,9 @@ describe("storeResults", () => {
   describe("given the clustering call returned topics", () => {
     describe("when storing in batch mode", () => {
       it("replaces the topic model as before", async () => {
-        await storeResults(
-          "proj-1",
-          {
+        await storeResults({
+          projectId: "proj-1",
+          clusteringResult: {
             topics: [
               {
                 id: "topic_a",
@@ -224,8 +237,8 @@ describe("storeResults", () => {
             traces: [],
             cost: undefined,
           } as any,
-          false,
-        );
+          isIncremental: false,
+        });
 
         expect(recordTopicsMock).toHaveBeenCalledWith(
           expect.objectContaining({

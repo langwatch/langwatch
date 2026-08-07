@@ -27,12 +27,17 @@ const scoreOptionSchema = z.object({
 const scoreOptions = z.record(z.string(), scoreOptionSchema);
 
 // Helper function to fetch and enrich queue items with traces and annotations
-const enrichQueueItemsWithTracesAndAnnotations = async (
-  ctx: { prisma: PrismaClient; session: Session | null },
-  projectId: string,
-  queueItems: AnnotationQueueItem[],
-  protections: Protections,
-) => {
+const enrichQueueItemsWithTracesAndAnnotations = async ({
+  ctx,
+  projectId,
+  queueItems,
+  protections,
+}: {
+  ctx: { prisma: PrismaClient; session: Session | null };
+  projectId: string;
+  queueItems: AnnotationQueueItem[];
+  protections: Protections;
+}) => {
   // Get all unique trace IDs from queue items
   const traceIds = [...new Set(queueItems.map((item) => item.traceId))];
 
@@ -58,13 +63,12 @@ const enrichQueueItemsWithTracesAndAnnotations = async (
     ctx.prisma,
     buildTraceBlobResolutionDeps(),
   );
-  const traces = await traceService.getTracesWithSpans(
+  const traces = await traceService.getTracesWithSpans({
     projectId,
     traceIds,
     protections,
-    undefined,
-    { full: true },
-  );
+    opts: { full: true },
+  });
 
   // Create lookup maps for O(1) access
   const traceMap = new Map(traces.map((trace) => [trace.trace_id, trace]));
@@ -496,13 +500,12 @@ export const annotationRouter = createTRPCRouter({
         ctx.prisma,
         buildTraceBlobResolutionDeps(),
       );
-      const traces = await traceService.getTracesWithSpans(
-        input.projectId,
+      const traces = await traceService.getTracesWithSpans({
+        projectId: input.projectId,
         traceIds,
         protections,
-        undefined,
-        { full: true },
-      );
+        opts: { full: true },
+      });
       const traceMap = new Map(traces.map((trace) => [trace.trace_id, trace]));
 
       return queueItems.map((item) => ({
@@ -859,10 +862,12 @@ export const annotationRouter = createTRPCRouter({
 
       // Enrich the paginated queue items with traces and annotations
       const enrichedQueueItems = await enrichQueueItemsWithTracesAndAnnotations(
-        ctx,
-        input.projectId,
-        queueItems,
-        protections,
+        {
+          ctx,
+          projectId: input.projectId,
+          queueItems,
+          protections,
+        },
       );
 
       // Create a map of enriched items by their original ID for easy lookup

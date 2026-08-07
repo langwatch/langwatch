@@ -567,7 +567,7 @@ export class LangyTurnRelay {
         // see `resourceLinks`); everything else goes through the normal path.
         const invocation = this.soleNavigateInvocationOf(frame);
         if (invocation) {
-          return this.applyNavigateTool(projectId, at, frame, invocation);
+          return this.applyNavigateTool({ projectId, at, frame, invocation });
         }
 
         // The model sometimes CHAINS the navigate onto its lookup
@@ -579,7 +579,12 @@ export class LangyTurnRelay {
         // (Remembering stays sole-invocation-gated — stdout provenance.)
         if (frame.phase === "end" && !frame.isError) {
           for (const chained of this.chainedNavigateInvocationsOf(frame)) {
-            await this.applyNavigateTool(projectId, at, frame, chained);
+            await this.applyNavigateTool({
+              projectId,
+              at,
+              frame,
+              invocation: chained,
+            });
           }
         }
         return this.applyTool(projectId, at, frame);
@@ -837,12 +842,17 @@ export class LangyTurnRelay {
    * (an unknown/unresolvable/inaccessible destination silently drops — the
    * turn is otherwise unaffected).
    */
-  private async applyNavigateTool(
-    projectId: string,
-    at: { conversationId: string; turnId: string },
-    frame: Extract<LangyRelayFrame, { type: "tool" }>,
-    invocation: { resourceId: string },
-  ): Promise<LangyRelayOutcome> {
+  private async applyNavigateTool({
+    projectId,
+    at,
+    frame,
+    invocation,
+  }: {
+    projectId: string;
+    at: { conversationId: string; turnId: string };
+    frame: Extract<LangyRelayFrame, { type: "tool" }>;
+    invocation: { resourceId: string };
+  }): Promise<LangyRelayOutcome> {
     if (frame.phase === "start" || frame.isError) return { status: "applied" };
 
     // The conversation's remembered link first; on a miss, the platform's own

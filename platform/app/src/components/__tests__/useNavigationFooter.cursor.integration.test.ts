@@ -30,12 +30,17 @@ vi.mock("~/utils/compat/next-router", () => ({
 const { useMessagesNavigationFooter } = await import("../NavigationFooter");
 
 // A valid base64-encoded cursor that decodes to a ClickHouse scroll cursor
-function makeCursor(
-  lastTimestamp: number,
-  lastTraceId: string,
+function makeCursor({
+  lastTimestamp,
+  lastTraceId,
   pageSize = 25,
-  sortDirection: "asc" | "desc" = "desc",
-): string {
+  sortDirection = "desc",
+}: {
+  lastTimestamp: number;
+  lastTraceId: string;
+  pageSize?: number;
+  sortDirection?: "asc" | "desc";
+}): string {
   return btoa(
     JSON.stringify({ lastTimestamp, lastTraceId, pageSize, sortDirection }),
   );
@@ -54,8 +59,14 @@ describe("useMessagesNavigationFooter()", () => {
           useMessagesNavigationFooter(),
         );
 
-        const cursor1 = makeCursor(1700000000000, "trace-page2");
-        const cursor2 = makeCursor(1699999000000, "trace-page3");
+        const cursor1 = makeCursor({
+          lastTimestamp: 1700000000000,
+          lastTraceId: "trace-page2",
+        });
+        const cursor2 = makeCursor({
+          lastTimestamp: 1699999000000,
+          lastTraceId: "trace-page3",
+        });
 
         // Navigate forward: page 1 → page 2 (cursor mode activates)
         act(() => {
@@ -97,7 +108,10 @@ describe("useMessagesNavigationFooter()", () => {
           useMessagesNavigationFooter(),
         );
 
-        const cursor1 = makeCursor(1700000000000, "trace-page2");
+        const cursor1 = makeCursor({
+          lastTimestamp: 1700000000000,
+          lastTraceId: "trace-page2",
+        });
 
         // Navigate forward: page 1 → page 2
         act(() => {

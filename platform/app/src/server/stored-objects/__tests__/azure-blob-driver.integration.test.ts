@@ -97,12 +97,17 @@ function sha256Of(bytes: Buffer): string {
   return crypto.createHash("sha256").update(bytes).digest("hex");
 }
 
-async function waitForRow(
-  client: ClickHouseClient,
-  projectId: string,
-  id: string,
+async function waitForRow({
+  client,
+  projectId,
+  id,
   timeoutMs = 10_000,
-): Promise<boolean> {
+}: {
+  client: ClickHouseClient;
+  projectId: string;
+  id: string;
+  timeoutMs?: number;
+}): Promise<boolean> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     const result = await client.query({
@@ -276,7 +281,9 @@ describe("StoredObjectsService against a real Azurite emulator", () => {
         bytes,
       });
 
-      expect(await waitForRow(ch, PROJECT, stored.id)).toBe(true);
+      expect(
+        await waitForRow({ client: ch, projectId: PROJECT, id: stored.id }),
+      ).toBe(true);
 
       const result = await service.getById({
         projectId: PROJECT,

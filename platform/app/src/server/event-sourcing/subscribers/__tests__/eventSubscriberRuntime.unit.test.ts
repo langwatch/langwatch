@@ -110,16 +110,16 @@ afterEach(() => {
 });
 
 function makeEvent(id: string): Event {
-  return createTestEvent(
-    TEST_CONSTANTS.AGGREGATE_ID,
+  return createTestEvent({
+    aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
     aggregateType,
     tenantId,
-    TEST_CONSTANTS.EVENT_TYPE_1,
-    TEST_CONSTANTS.BASE_TIMESTAMP,
-    "2025-12-17",
-    { marker: id },
+    type: TEST_CONSTANTS.EVENT_TYPE_1,
+    createdAt: TEST_CONSTANTS.BASE_TIMESTAMP,
+    version: "2025-12-17",
+    data: { marker: id },
     id,
-  );
+  });
 }
 
 describe("event-subscriber runtime boundary", () => {

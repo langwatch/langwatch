@@ -193,13 +193,19 @@ function buildEventMetadataWithCurrentProcessingTraceparent<
  * @param version - Version/timestamp (defaults to current time)
  * @returns A new projection object
  */
-function createProjection<Data = unknown>(
-  id: string,
-  aggregateId: string,
-  tenantId: TenantId,
-  data: Data,
-  version: string,
-): Projection<Data> {
+function createProjection<Data = unknown>({
+  id,
+  aggregateId,
+  tenantId,
+  data,
+  version,
+}: {
+  id: string;
+  aggregateId: string;
+  tenantId: TenantId;
+  data: Data;
+  version: string;
+}): Projection<Data> {
   return {
     id,
     aggregateId,
@@ -266,17 +272,17 @@ function validateTenantId(
   operation: string,
 ): void {
   if (!context) {
-    throw new SecurityError(
+    throw new SecurityError({
       operation,
-      `${operation} requires a context with tenantId for tenant isolation`,
-    );
+      message: `${operation} requires a context with tenantId for tenant isolation`,
+    });
   }
 
   if (!context.tenantId) {
-    throw new SecurityError(
+    throw new SecurityError({
       operation,
-      `${operation} requires a tenantId for tenant isolation`,
-    );
+      message: `${operation} requires a tenantId for tenant isolation`,
+    });
   }
 
   // Use TenantIdSchema for consistent validation (handles empty strings, whitespace, etc.)
@@ -285,7 +291,7 @@ function validateTenantId(
     const errorMessage =
       result.error.issues[0]?.message ??
       "TenantId must be a non-empty string for tenant isolation";
-    throw new SecurityError(operation, errorMessage);
+    throw new SecurityError({ operation, message: errorMessage });
   }
 }
 

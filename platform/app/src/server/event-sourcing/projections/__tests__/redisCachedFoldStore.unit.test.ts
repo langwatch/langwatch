@@ -100,6 +100,7 @@ function createRedis() {
     values,
     get: vi.fn(async (key: string) => values.get(key)?.value ?? null),
     set: vi.fn(
+      // biome-ignore lint/complexity/useMaxParams: fake of ioredis's positional set(key, value, "EX", ttl)
       async (key: string, value: string, _mode: string, ttlSeconds: number) => {
         values.set(key, { value, ttlSeconds });
         return "OK";

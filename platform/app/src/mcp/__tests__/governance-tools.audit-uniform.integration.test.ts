@@ -56,6 +56,7 @@ function mockMcpServer(): {
 } {
   const tools = new Map<string, CapturedTool>();
   return {
+    // biome-ignore lint/complexity/useMaxParams: fake of the MCP SDK's positional McpServer.tool(name, description, schema, cb)
     tool(name, description, schema, cb) {
       tools.set(name, { name, description, schema, cb });
       return null;

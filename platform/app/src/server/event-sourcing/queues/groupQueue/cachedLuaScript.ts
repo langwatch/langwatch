@@ -33,7 +33,12 @@ export class CachedLuaScript {
     numKeys: number,
     ...keysAndArgs: Array<string | number>
   ): Promise<unknown> {
-    return await this.runCancellable(redis, null, numKeys, ...keysAndArgs);
+    return await this.runCancellable({
+      redis,
+      isCancelled: null,
+      numKeys,
+      keysAndArgs,
+    });
   }
 
   /**
@@ -51,12 +56,17 @@ export class CachedLuaScript {
    * Returns null when withdrawn, which every caller treats as "no refresh
    * happened" — the same outcome as a heartbeat that never fired.
    */
-  async runCancellable(
-    redis: IORedis | Cluster,
-    isCancelled: (() => boolean) | null,
-    numKeys: number,
-    ...keysAndArgs: Array<string | number>
-  ): Promise<unknown> {
+  async runCancellable({
+    redis,
+    isCancelled,
+    numKeys,
+    keysAndArgs,
+  }: {
+    redis: IORedis | Cluster;
+    isCancelled: (() => boolean) | null;
+    numKeys: number;
+    keysAndArgs: Array<string | number>;
+  }): Promise<unknown> {
     try {
       return await redis.evalsha(this.sha, numKeys, ...keysAndArgs);
     } catch (err) {

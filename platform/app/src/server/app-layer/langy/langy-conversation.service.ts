@@ -72,12 +72,17 @@ export type { LangyConversationRepository as LangyConversationReadRepository } f
  * cold-scanning a long conversation's whole history on every tail fetch.
  */
 export interface LangyConversationEventsReader {
-  getEventsOccurredSince(
-    aggregateId: string,
-    context: { tenantId: TenantId },
-    aggregateType: "langy_conversation",
-    occurredAtFromMs: number,
-  ): Promise<readonly LangyConversationProcessingEvent[]>;
+  getEventsOccurredSince({
+    aggregateId,
+    context,
+    aggregateType,
+    occurredAtFromMs,
+  }: {
+    aggregateId: string;
+    context: { tenantId: TenantId };
+    aggregateType: "langy_conversation";
+    occurredAtFromMs: number;
+  }): Promise<readonly LangyConversationProcessingEvent[]>;
 }
 
 /**
@@ -234,12 +239,27 @@ function toListItem(
  * projection; writes remain event-sourcing commands.
  */
 export class LangyConversationService {
-  constructor(
-    private readonly repository: LangyConversationRepository,
-    private readonly commands: LangyConversationCommands,
-    private readonly messages: LangyMessageRepository = new NullLangyMessageRepository(),
-    private readonly events: LangyConversationEventsReader | null = null,
-  ) {}
+  private readonly repository: LangyConversationRepository;
+  private readonly commands: LangyConversationCommands;
+  private readonly messages: LangyMessageRepository;
+  private readonly events: LangyConversationEventsReader | null;
+
+  constructor({
+    repository,
+    commands,
+    messages = new NullLangyMessageRepository(),
+    events = null,
+  }: {
+    repository: LangyConversationRepository;
+    commands: LangyConversationCommands;
+    messages?: LangyMessageRepository;
+    events?: LangyConversationEventsReader | null;
+  }) {
+    this.repository = repository;
+    this.commands = commands;
+    this.messages = messages;
+    this.events = events;
+  }
 
   /**
    * The visibility read, tolerant of the DISPATCH window.
@@ -379,12 +399,12 @@ export class LangyConversationService {
     // durable events at all — an empty tail is the honest answer.
     if (!this.events) return { events: [], cursor: after, truncated: false };
 
-    const all = await this.events.getEventsOccurredSince(
-      conversationId,
-      { tenantId: createTenantId(projectId) },
-      "langy_conversation",
-      Math.max(0, after.acceptedAt - REHYDRATION_WINDOW_MS),
-    );
+    const all = await this.events.getEventsOccurredSince({
+      aggregateId: conversationId,
+      context: { tenantId: createTenantId(projectId) },
+      aggregateType: "langy_conversation",
+      occurredAtFromMs: Math.max(0, after.acceptedAt - REHYDRATION_WINDOW_MS),
+    });
 
     const turnTypes: readonly string[] = LANGY_CONVERSATION_TURN_EVENT_TYPES;
     const tail = all.filter(
@@ -1182,12 +1202,22 @@ export class LangyConversationService {
     return { deletedCount: ids.length };
   }
 
-  static create(
-    commands: LangyConversationCommands,
-    repository: LangyConversationRepository,
-    messages?: LangyMessageRepository,
-    events?: LangyConversationEventsReader | null,
-  ): LangyConversationService {
-    return new LangyConversationService(repository, commands, messages, events);
+  static create({
+    commands,
+    repository,
+    messages,
+    events,
+  }: {
+    commands: LangyConversationCommands;
+    repository: LangyConversationRepository;
+    messages?: LangyMessageRepository;
+    events?: LangyConversationEventsReader | null;
+  }): LangyConversationService {
+    return new LangyConversationService({
+      repository,
+      commands,
+      messages,
+      events,
+    });
   }
 }

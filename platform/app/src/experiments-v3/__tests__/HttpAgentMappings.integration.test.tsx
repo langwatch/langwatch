@@ -65,12 +65,17 @@ const createTestDataset = (
 /**
  * Create an HTTP agent target for testing.
  */
-const createHttpAgentTarget = (
-  id: string,
-  inputs: Array<{ identifier: string; type: string }>,
-  bodyTemplate: string,
-  mappings: TargetConfig["mappings"] = {},
-): TargetConfig => ({
+const createHttpAgentTarget = ({
+  id,
+  inputs,
+  bodyTemplate,
+  mappings = {},
+}: {
+  id: string;
+  inputs: Array<{ identifier: string; type: string }>;
+  bodyTemplate: string;
+  mappings?: TargetConfig["mappings"];
+}): TargetConfig => ({
   id,
   type: "agent",
   agentType: "http",
@@ -179,15 +184,15 @@ describe("HTTP agent target shows input mapping section", () => {
   });
 
   it("validates HTTP agent inputs against mappings", () => {
-    const target = createHttpAgentTarget(
-      "http-1",
-      [
+    const target = createHttpAgentTarget({
+      id: "http-1",
+      inputs: [
         { identifier: "thread_id", type: "str" },
         { identifier: "input", type: "str" },
       ],
-      `{"thread_id": "{{thread_id}}", "input": "{{input}}"}`,
-      {},
-    );
+      bodyTemplate: `{"thread_id": "{{thread_id}}", "input": "{{input}}"}`,
+      mappings: {},
+    });
 
     const result = getTargetMissingMappings(target, DEFAULT_TEST_DATA_ID);
 
@@ -202,15 +207,15 @@ describe("HTTP agent target shows input mapping section", () => {
   });
 
   it("is valid when at least one HTTP agent input is mapped", () => {
-    const target = createHttpAgentTarget(
-      "http-partial",
-      [
+    const target = createHttpAgentTarget({
+      id: "http-partial",
+      inputs: [
         { identifier: "thread_id", type: "str" },
         { identifier: "input", type: "str" },
         { identifier: "messages", type: "str" },
       ],
-      `{"thread_id": "{{thread_id}}", "input": "{{input}}", "messages": {{messages}}}`,
-      {
+      bodyTemplate: `{"thread_id": "{{thread_id}}", "input": "{{input}}", "messages": {{messages}}}`,
+      mappings: {
         [DEFAULT_TEST_DATA_ID]: {
           // Only input is mapped, thread_id and messages are not
           input: {
@@ -221,7 +226,7 @@ describe("HTTP agent target shows input mapping section", () => {
           },
         },
       },
-    );
+    });
 
     const result = getTargetMissingMappings(target, DEFAULT_TEST_DATA_ID);
 
@@ -232,14 +237,14 @@ describe("HTTP agent target shows input mapping section", () => {
   });
 
   it("accepts value mappings for HTTP agent inputs", () => {
-    const target = createHttpAgentTarget(
-      "http-1",
-      [
+    const target = createHttpAgentTarget({
+      id: "http-1",
+      inputs: [
         { identifier: "thread_id", type: "str" },
         { identifier: "input", type: "str" },
       ],
-      `{"thread_id": "{{thread_id}}", "input": "{{input}}"}`,
-      {
+      bodyTemplate: `{"thread_id": "{{thread_id}}", "input": "{{input}}"}`,
+      mappings: {
         [DEFAULT_TEST_DATA_ID]: {
           thread_id: {
             type: "value",
@@ -253,7 +258,7 @@ describe("HTTP agent target shows input mapping section", () => {
           },
         },
       },
-    );
+    });
 
     const result = getTargetMissingMappings(target, DEFAULT_TEST_DATA_ID);
     expect(result.isValid).toBe(true);
@@ -385,12 +390,12 @@ describe("HTTP agent mappings auto-infer from dataset columns", () => {
 
 describe("Missing HTTP agent mappings show alert on target chip", () => {
   it("shows alert icon when HTTP agent has unmapped required input", () => {
-    const target = createHttpAgentTarget(
-      "http-missing",
-      [{ identifier: "messages", type: "str" }],
-      `{"messages": {{messages}}}`,
-      {}, // No mappings
-    );
+    const target = createHttpAgentTarget({
+      id: "http-missing",
+      inputs: [{ identifier: "messages", type: "str" }],
+      bodyTemplate: `{"messages": {{messages}}}`,
+      mappings: {}, // No mappings
+    });
 
     renderWithProviders(
       <TargetHeader
@@ -406,11 +411,11 @@ describe("Missing HTTP agent mappings show alert on target chip", () => {
   });
 
   it("does not show alert when all HTTP agent inputs are mapped", () => {
-    const target = createHttpAgentTarget(
-      "http-complete",
-      [{ identifier: "messages", type: "str" }],
-      `{"messages": {{messages}}}`,
-      {
+    const target = createHttpAgentTarget({
+      id: "http-complete",
+      inputs: [{ identifier: "messages", type: "str" }],
+      bodyTemplate: `{"messages": {{messages}}}`,
+      mappings: {
         [DEFAULT_TEST_DATA_ID]: {
           messages: {
             type: "source",
@@ -420,7 +425,7 @@ describe("Missing HTTP agent mappings show alert on target chip", () => {
           },
         },
       },
-    );
+    });
 
     renderWithProviders(
       <TargetHeader
@@ -438,12 +443,12 @@ describe("Missing HTTP agent mappings show alert on target chip", () => {
   });
 
   it("calls onEdit when play button is clicked with missing mappings", () => {
-    const target = createHttpAgentTarget(
-      "http-missing-play",
-      [{ identifier: "messages", type: "str" }],
-      `{"messages": {{messages}}}`,
-      {}, // No mappings
-    );
+    const target = createHttpAgentTarget({
+      id: "http-missing-play",
+      inputs: [{ identifier: "messages", type: "str" }],
+      bodyTemplate: `{"messages": {{messages}}}`,
+      mappings: {}, // No mappings
+    });
     const onEdit = vi.fn();
     const onRun = vi.fn();
 
@@ -473,14 +478,14 @@ describe("Missing HTTP agent mappings show alert on target chip", () => {
 describe("HTTP agent has different validation than code agent", () => {
   it("HTTP agent is valid with partial mappings, code agent requires all", () => {
     // HTTP agent target with partial mappings (only 'input' mapped)
-    const httpTarget = createHttpAgentTarget(
-      "http-target",
-      [
+    const httpTarget = createHttpAgentTarget({
+      id: "http-target",
+      inputs: [
         { identifier: "input", type: "str" },
         { identifier: "context", type: "str" },
       ],
-      `{"input": "{{input}}", "context": "{{context}}"}`,
-      {
+      bodyTemplate: `{"input": "{{input}}", "context": "{{context}}"}`,
+      mappings: {
         [DEFAULT_TEST_DATA_ID]: {
           input: {
             type: "source",
@@ -491,7 +496,7 @@ describe("HTTP agent has different validation than code agent", () => {
           // context is NOT mapped
         },
       },
-    );
+    });
 
     // Code agent target with same partial mappings
     const codeTarget: TargetConfig = {
@@ -533,12 +538,12 @@ describe("HTTP agent has different validation than code agent", () => {
   });
 
   it("both are invalid with no mappings", () => {
-    const httpTarget = createHttpAgentTarget(
-      "http-target",
-      [{ identifier: "input", type: "str" }],
-      `{"input": "{{input}}"}`,
-      {},
-    );
+    const httpTarget = createHttpAgentTarget({
+      id: "http-target",
+      inputs: [{ identifier: "input", type: "str" }],
+      bodyTemplate: `{"input": "{{input}}"}`,
+      mappings: {},
+    });
 
     const codeTarget: TargetConfig = {
       id: "code-target",

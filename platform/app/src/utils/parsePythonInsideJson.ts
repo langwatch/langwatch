@@ -39,6 +39,7 @@ const grammar = ohm.grammar(`
 const semantics = grammar.createSemantics().addOperation("toJSON", {
   Expression: (e) => e.toJSON(),
   ObjectExpr: (e) => e.toJSON(),
+  // biome-ignore lint/complexity/useMaxParams: ohm-js semantic actions receive one positional argument per grammar-rule child
   ClassExpr: (id, _1, args, _2) => {
     let argIndex = 0;
     const processedArgs = args.toJSON().map((arg: any) => {
@@ -60,6 +61,7 @@ const semantics = grammar.createSemantics().addOperation("toJSON", {
   Array: (_, elements, __) => elements.toJSON(),
   String: (q1, chars, q2) => chars.sourceString,
   Number: (n) => n.toJSON(),
+  // biome-ignore lint/complexity/useMaxParams: ohm-js semantic actions receive one positional argument per grammar-rule child
   float: function (neg, whole, dot, fract, e, eneg, exp) {
     return parseFloat(this.sourceString);
   },

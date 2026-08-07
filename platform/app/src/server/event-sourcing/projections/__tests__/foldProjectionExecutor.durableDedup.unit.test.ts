@@ -31,16 +31,14 @@ describe("FoldProjectionExecutor durable dedup", () => {
   const init = (): FoldState => ({ ids: [], LastEventOccurredAt: 0 });
 
   function makeEvent(id: string, createdAt: number): Event {
-    return createTestEvent(
-      TEST_CONSTANTS.AGGREGATE_ID,
-      TEST_CONSTANTS.AGGREGATE_TYPE,
+    return createTestEvent({
+      aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+      aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
       tenantId,
-      undefined,
       createdAt,
-      undefined,
-      {},
+      data: {},
       id,
-    );
+    });
   }
 
   /**

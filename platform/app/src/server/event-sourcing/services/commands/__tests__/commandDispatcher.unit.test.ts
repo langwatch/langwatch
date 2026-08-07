@@ -43,13 +43,13 @@ describe("processCommand", () => {
 
   // Build a valid event via the test helper
   function makeValidEvent(overrides?: Partial<Event>): Event {
-    return createTestEvent(
-      overrides?.aggregateId ?? TEST_CONSTANTS.AGGREGATE_ID,
-      overrides?.aggregateType ?? aggregateType,
-      overrides?.tenantId ?? tenantId,
-      overrides?.type ?? TEST_CONSTANTS.EVENT_TYPE_1,
-      overrides?.createdAt ?? TEST_CONSTANTS.BASE_TIMESTAMP,
-    );
+    return createTestEvent({
+      aggregateId: overrides?.aggregateId ?? TEST_CONSTANTS.AGGREGATE_ID,
+      aggregateType: overrides?.aggregateType ?? aggregateType,
+      tenantId: overrides?.tenantId ?? tenantId,
+      type: overrides?.type ?? TEST_CONSTANTS.EVENT_TYPE_1,
+      createdAt: overrides?.createdAt ?? TEST_CONSTANTS.BASE_TIMESTAMP,
+    });
   }
 
   // ---- Reusable mock factories ----
@@ -349,13 +349,13 @@ describe("processCommandBatch", () => {
   });
 
   function makeValidEvent(): Event {
-    return createTestEvent(
-      TEST_CONSTANTS.AGGREGATE_ID,
+    return createTestEvent({
+      aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
       aggregateType,
-      createTestTenantId(),
-      TEST_CONSTANTS.EVENT_TYPE_1,
-      TEST_CONSTANTS.BASE_TIMESTAMP,
-    );
+      tenantId: createTestTenantId(),
+      type: TEST_CONSTANTS.EVENT_TYPE_1,
+      createdAt: TEST_CONSTANTS.BASE_TIMESTAMP,
+    });
   }
 
   // A valid event carrying an idempotency key derived from its command, so the

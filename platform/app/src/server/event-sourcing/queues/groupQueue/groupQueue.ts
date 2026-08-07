@@ -207,11 +207,11 @@ function assertNoReservedKeys(
 ): void {
   for (const key of Object.keys(payload)) {
     if (key.startsWith("__") && !CALLER_RESERVED_KEYS.has(key)) {
-      throw new QueueError(
+      throw new QueueError({
         queueName,
-        method,
-        `Payload key "${key}" is in the reserved __* namespace (queue machinery). User payloads must not start with "__" except __pipelineName / __jobType / __jobName.`,
-      );
+        operation: method,
+        message: `Payload key "${key}" is in the reserved __* namespace (queue machinery). User payloads must not start with "__" except __pipelineName / __jobType / __jobName.`,
+      });
     }
   }
 }
@@ -528,11 +528,11 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     options?: QueueSendOptions<Payload>,
   ): Promise<void> {
     if (this.shutdownRequested) {
-      throw new QueueError(
-        this.queueName,
-        "send",
-        "Cannot send to queue after shutdown has been requested",
-      );
+      throw new QueueError({
+        queueName: this.queueName,
+        operation: "send",
+        message: "Cannot send to queue after shutdown has been requested",
+      });
     }
     assertNoReservedKeys(
       payload as Record<string, unknown>,
@@ -644,11 +644,11 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     options?: QueueSendOptions<Payload>,
   ): Promise<void> {
     if (this.shutdownRequested) {
-      throw new QueueError(
-        this.queueName,
-        "sendBatch",
-        "Cannot send to queue after shutdown has been requested",
-      );
+      throw new QueueError({
+        queueName: this.queueName,
+        operation: "sendBatch",
+        message: "Cannot send to queue after shutdown has been requested",
+      });
     }
 
     if (payloads.length === 0) {
@@ -2339,11 +2339,11 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
           shutdownTimer = setTimeout(
             () =>
               reject(
-                new QueueError(
-                  this.queueName,
-                  "close",
-                  `Shutdown timed out after ${GROUP_QUEUE_CONFIG.shutdownTimeoutMs}ms`,
-                ),
+                new QueueError({
+                  queueName: this.queueName,
+                  operation: "close",
+                  message: `Shutdown timed out after ${GROUP_QUEUE_CONFIG.shutdownTimeoutMs}ms`,
+                }),
               ),
             GROUP_QUEUE_CONFIG.shutdownTimeoutMs,
           );

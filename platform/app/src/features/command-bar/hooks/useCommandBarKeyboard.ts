@@ -4,13 +4,21 @@ import type { ListItem } from "../getIconInfo";
 /**
  * Hook that handles keyboard navigation and shortcuts for the command bar.
  */
-export function useCommandBarKeyboard(
-  allItems: ListItem[],
-  selectedIndex: number,
-  setSelectedIndex: (index: number | ((prev: number) => number)) => void,
-  handleSelect: (item: ListItem, newTab?: boolean) => void,
-  handleCopyLink: () => void,
-  isMac: boolean,
+export function useCommandBarKeyboard({
+  allItems,
+  selectedIndex,
+  setSelectedIndex,
+  handleSelect,
+  handleCopyLink,
+  isMac,
+  onAskLangy,
+}: {
+  allItems: ListItem[];
+  selectedIndex: number;
+  setSelectedIndex: (index: number | ((prev: number) => number)) => void;
+  handleSelect: (item: ListItem, newTab?: boolean) => void;
+  handleCopyLink: () => void;
+  isMac: boolean;
   /**
    * Hand what is typed to Langy, on Tab.
    *
@@ -18,8 +26,8 @@ export function useCommandBarKeyboard(
    * through to its normal job of moving focus: a shortcut that silently does
    * nothing is worse than one that was never offered.
    */
-  onAskLangy?: () => void,
-) {
+  onAskLangy?: () => void;
+}) {
   return useCallback(
     (e: React.KeyboardEvent) => {
       const modKey = isMac ? e.metaKey : e.ctrlKey;

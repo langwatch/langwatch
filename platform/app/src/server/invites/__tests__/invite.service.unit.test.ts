@@ -160,7 +160,11 @@ describe("InviteService", () => {
       getActivePlan: vi.fn(),
     };
 
-    service = new InviteService(mockPrisma, mockLicenseRepo, mockPlanProvider);
+    service = new InviteService({
+      prisma: mockPrisma,
+      licenseRepo: mockLicenseRepo,
+      planProvider: mockPlanProvider,
+    });
   });
 
   /**

@@ -1025,11 +1025,11 @@ describe("ClickHouseTraceService", () => {
           project: { findUnique: mockPrismaFindUnique },
         } as never);
 
-        const traces = await service.getTracesWithSpans(
-          "proj_123",
+        const traces = await service.getTracesWithSpans({
+          projectId: "proj_123",
           traceIds,
           protections,
-        );
+        });
 
         expect(traces).not.toBeNull();
         expect(traces!.map((t) => t.trace_id).sort()).toEqual(traceIds);
@@ -1080,11 +1080,11 @@ describe("ClickHouseTraceService", () => {
           project: { findUnique: mockPrismaFindUnique },
         } as never);
 
-        const traces = await service.getTracesWithSpans(
-          "proj_123",
+        const traces = await service.getTracesWithSpans({
+          projectId: "proj_123",
           traceIds,
           protections,
-        );
+        });
 
         expect(traces).toHaveLength(30);
         // call 0 = resolve, 1 = OOM full summary, 2 = summary batch1,
@@ -1105,7 +1105,11 @@ describe("ClickHouseTraceService", () => {
         } as never);
 
         await expect(
-          service.getTracesWithSpans("proj_123", ["trace-0"], protections),
+          service.getTracesWithSpans({
+            projectId: "proj_123",
+            traceIds: ["trace-0"],
+            protections,
+          }),
         ).rejects.toThrow();
         // The resolve fails open (call 1), then the summary's non-OOM error
         // propagates without per-batch retries (call 2) — no retry loop.
@@ -1129,9 +1133,14 @@ describe("ClickHouseTraceService", () => {
           project: { findUnique: mockPrismaFindUnique },
         } as never);
 
-        await service.getTracesWithSpans("proj_123", ["trace-0"], protections, {
-          from: 1_000_000,
-          to: 2_000_000,
+        await service.getTracesWithSpans({
+          projectId: "proj_123",
+          traceIds: ["trace-0"],
+          protections,
+          occurredAt: {
+            from: 1_000_000,
+            to: 2_000_000,
+          },
         });
 
         const summaryCall = mockClickHouseQuery.mock.calls[0]![0];
@@ -1170,7 +1179,11 @@ describe("ClickHouseTraceService", () => {
           project: { findUnique: mockPrismaFindUnique },
         } as never);
 
-        await service.getTracesWithSpans("proj_123", ["trace-0"], protections);
+        await service.getTracesWithSpans({
+          projectId: "proj_123",
+          traceIds: ["trace-0"],
+          protections,
+        });
 
         const resolveCall = mockClickHouseQuery.mock.calls[0]![0];
         expect(resolveCall.query).toContain("min(OccurredAt)");
@@ -1203,7 +1216,11 @@ describe("ClickHouseTraceService", () => {
           project: { findUnique: mockPrismaFindUnique },
         } as never);
 
-        await service.getTracesWithSpans("proj_123", ["trace-0"], protections);
+        await service.getTracesWithSpans({
+          projectId: "proj_123",
+          traceIds: ["trace-0"],
+          protections,
+        });
 
         const summaryCall = mockClickHouseQuery.mock.calls[1]![0];
         // No OccurredAt predicate inlined at all, and no window params.
@@ -1228,11 +1245,11 @@ describe("ClickHouseTraceService", () => {
           project: { findUnique: mockPrismaFindUnique },
         } as never);
 
-        const traces = await service.getTracesWithSpans(
-          "proj_123",
-          ["trace-0"],
+        const traces = await service.getTracesWithSpans({
+          projectId: "proj_123",
+          traceIds: ["trace-0"],
           protections,
-        );
+        });
 
         // The read still succeeds; the summary just stays unbounded (the
         // pre-optimization behaviour) rather than propagating the resolve error.

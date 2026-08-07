@@ -268,23 +268,38 @@ export type BudgetCheckResult = {
 };
 
 export class GatewayBudgetService {
-  constructor(
-    private readonly prisma: PrismaClient,
-    private readonly changeEvents = new ChangeEventRepository(prisma),
-    private readonly auditLog = new GatewayAuditAdapter(prisma),
-    private readonly chRepo?: GatewayBudgetClickHouseRepository,
-  ) {}
+  private readonly prisma: PrismaClient;
+  private readonly changeEvents: ChangeEventRepository;
+  private readonly auditLog: GatewayAuditAdapter;
+  private readonly chRepo?: GatewayBudgetClickHouseRepository;
+
+  constructor({
+    prisma,
+    changeEvents = new ChangeEventRepository(prisma),
+    auditLog = new GatewayAuditAdapter(prisma),
+    chRepo,
+  }: {
+    prisma: PrismaClient;
+    changeEvents?: ChangeEventRepository;
+    auditLog?: GatewayAuditAdapter;
+    chRepo?: GatewayBudgetClickHouseRepository;
+  }) {
+    this.prisma = prisma;
+    this.changeEvents = changeEvents;
+    this.auditLog = auditLog;
+    this.chRepo = chRepo;
+  }
 
   static create(
     prisma: PrismaClient,
     chRepo?: GatewayBudgetClickHouseRepository,
   ): GatewayBudgetService {
-    return new GatewayBudgetService(
+    return new GatewayBudgetService({
       prisma,
-      new ChangeEventRepository(prisma),
-      new GatewayAuditAdapter(prisma),
+      changeEvents: new ChangeEventRepository(prisma),
+      auditLog: new GatewayAuditAdapter(prisma),
       chRepo,
-    );
+    });
   }
 
   async list(organizationId: string): Promise<GatewayBudgetWithSeats[]> {

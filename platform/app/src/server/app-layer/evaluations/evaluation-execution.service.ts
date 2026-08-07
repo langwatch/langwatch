@@ -74,14 +74,14 @@ export interface ModelEnvResolver {
 }
 
 export interface WorkflowExecutor {
-  runEvaluationWorkflow(
-    workflowId: string,
-    projectId: string,
-    inputs: Record<string, string>,
-    versionId?: string,
-    causalityDepth?: number,
-    parentTrace?: { traceId: string; parentSpanId: string },
-  ): Promise<{ result: SingleEvaluationResult; status: string }>;
+  runEvaluationWorkflow(params: {
+    workflowId: string;
+    projectId: string;
+    inputs: Record<string, string>;
+    versionId?: string;
+    causalityDepth?: number;
+    parentTrace?: { traceId: string; parentSpanId: string };
+  }): Promise<{ result: SingleEvaluationResult; status: string }>;
 }
 
 const TRACE_ID_HEX = /^[0-9a-fA-F]{32}$/;
@@ -225,13 +225,12 @@ export class EvaluationExecutionService {
     // preview), so opt into blob resolution (#4888). Under the per-call gate
     // (replacing construction-time gating) this is what keeps the eval path
     // resolving offloaded event refs.
-    const traces = await this.deps.traceService.getTracesWithSpans(
+    const traces = await this.deps.traceService.getTracesWithSpans({
       projectId,
-      [traceId],
-      INTERNAL_PROTECTIONS,
-      undefined,
-      { full: true },
-    );
+      traceIds: [traceId],
+      protections: INTERNAL_PROTECTIONS,
+      opts: { full: true },
+    });
     const trace = traces[0];
 
     if (!trace) {
@@ -391,12 +390,12 @@ export class EvaluationExecutionService {
           trace,
           mappings,
           getThreadTraces: (threadId) =>
-            this.deps.traceService.getTracesWithSpansByThreadIds(
+            this.deps.traceService.getTracesWithSpansByThreadIds({
               projectId,
-              [threadId],
-              INTERNAL_PROTECTIONS,
-              { full: true },
-            ),
+              threadIds: [threadId],
+              protections: INTERNAL_PROTECTIONS,
+              opts: { full: true },
+            }),
         });
       }
     }
@@ -455,12 +454,12 @@ export class EvaluationExecutionService {
     }
 
     const threadTraces =
-      await this.deps.traceService.getTracesWithSpansByThreadIds(
+      await this.deps.traceService.getTracesWithSpansByThreadIds({
         projectId,
-        [threadId],
-        INTERNAL_PROTECTIONS,
-        { full: true },
-      );
+        threadIds: [threadId],
+        protections: INTERNAL_PROTECTIONS,
+        opts: { full: true },
+      });
 
     const result: Record<string, unknown> = {};
 
@@ -520,13 +519,11 @@ export class EvaluationExecutionService {
             key: mappingConfig.key,
             subkey: mappingConfig.subkey,
           };
-          const mapped = mapTraceToDatasetEntry(
+          const mapped = mapTraceToDatasetEntry({
             trace,
-            { [targetField]: traceMappingConfig },
-            new Set(),
-            undefined,
-            undefined,
-          )[0];
+            mapping: { [targetField]: traceMappingConfig },
+            expansions: new Set(),
+          })[0];
           result[targetField] = mapped?.[targetField];
         }
       }
@@ -571,14 +568,14 @@ export class EvaluationExecutionService {
           parentTrace: extractParentTraceForNlpgo(trace),
         });
       }
-      return this.runCustomEvaluation(
+      return this.runCustomEvaluation({
         projectId,
         evaluatorType,
-        data.data,
+        data: data.data,
         trace,
         workflowId,
         parentCausalityDepth,
-      );
+      });
     }
 
     // Built-in evaluators
@@ -630,14 +627,21 @@ export class EvaluationExecutionService {
     });
   }
 
-  private async runCustomEvaluation(
-    projectId: string,
-    evaluatorType: string,
-    data: Record<string, unknown>,
-    trace?: Trace,
-    workflowId?: string | null,
-    parentCausalityDepth?: number,
-  ): Promise<SingleEvaluationResult> {
+  private async runCustomEvaluation({
+    projectId,
+    evaluatorType,
+    data,
+    trace,
+    workflowId,
+    parentCausalityDepth,
+  }: {
+    projectId: string;
+    evaluatorType: string;
+    data: Record<string, unknown>;
+    trace?: Trace;
+    workflowId?: string | null;
+    parentCausalityDepth?: number;
+  }): Promise<SingleEvaluationResult> {
     const resolvedWorkflowId = workflowId ?? evaluatorType.split("/")[1];
 
     if (!resolvedWorkflowId) {
@@ -656,14 +660,13 @@ export class EvaluationExecutionService {
     // bug rchaves caught in prod).
     const parentTrace = extractParentTraceForNlpgo(trace);
 
-    const response = await this.deps.workflowExecutor.runEvaluationWorkflow(
-      resolvedWorkflowId,
+    const response = await this.deps.workflowExecutor.runEvaluationWorkflow({
+      workflowId: resolvedWorkflowId,
       projectId,
-      requestBody as Record<string, string>,
-      undefined,
-      parentCausalityDepth,
+      inputs: requestBody as Record<string, string>,
+      causalityDepth: parentCausalityDepth,
       parentTrace,
-    );
+    });
 
     if (response.status !== "success") {
       return { ...response.result, status: "error" } as SingleEvaluationResult;
@@ -686,9 +689,9 @@ function switchMapping(
       ? mapping_
       : migrateLegacyMappings(mapping_ as unknown as Record<string, string>);
 
-  return mapTraceToDatasetEntry(
+  return mapTraceToDatasetEntry({
     trace,
-    mapping.mapping as Record<
+    mapping: mapping.mapping as Record<
       string,
       {
         source: string;
@@ -696,8 +699,6 @@ function switchMapping(
         subkey?: string;
       }
     >,
-    new Set(),
-    undefined,
-    undefined,
-  )[0];
+    expansions: new Set(),
+  })[0];
 }

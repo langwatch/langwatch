@@ -43,11 +43,11 @@ describe("EventSourcingService - Projection Flows", () => {
         foldProjections: [foldDef],
       });
 
-      const result = await service.getProjectionByName(
-        "projection",
-        TEST_CONSTANTS.AGGREGATE_ID,
+      const result = await service.getProjectionByName({
+        projectionName: "projection",
+        aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
         context,
-      );
+      });
 
       expect(result).not.toBeNull();
       expect(foldStore.get).toHaveBeenCalledWith(
@@ -69,11 +69,11 @@ describe("EventSourcingService - Projection Flows", () => {
       });
 
       await expect(
-        service.getProjectionByName(
-          "nonexistent" as any,
-          TEST_CONSTANTS.AGGREGATE_ID,
+        service.getProjectionByName({
+          projectionName: "nonexistent" as any,
+          aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
           context,
-        ),
+        }),
       ).rejects.toThrow(/nonexistent/);
     });
 
@@ -86,11 +86,11 @@ describe("EventSourcingService - Projection Flows", () => {
       });
 
       await expect(
-        service.getProjectionByName(
-          "projection",
-          TEST_CONSTANTS.AGGREGATE_ID,
+        service.getProjectionByName({
+          projectionName: "projection",
+          aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
           context,
-        ),
+        }),
       ).rejects.toThrow(/projection/i);
     });
   });
@@ -114,11 +114,11 @@ describe("EventSourcingService - Projection Flows", () => {
         foldProjections: [foldDef],
       });
 
-      const result = await service.hasProjectionByName(
-        "projection",
-        TEST_CONSTANTS.AGGREGATE_ID,
+      const result = await service.hasProjectionByName({
+        projectionName: "projection",
+        aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
         context,
-      );
+      });
 
       expect(result).toBe(true);
     });
@@ -139,11 +139,11 @@ describe("EventSourcingService - Projection Flows", () => {
         foldProjections: [foldDef],
       });
 
-      const result = await service.hasProjectionByName(
-        "projection",
-        TEST_CONSTANTS.AGGREGATE_ID,
+      const result = await service.hasProjectionByName({
+        projectionName: "projection",
+        aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
         context,
-      );
+      });
 
       expect(result).toBe(false);
     });
@@ -158,11 +158,11 @@ describe("EventSourcingService - Projection Flows", () => {
       });
 
       await expect(
-        service.hasProjectionByName(
-          "nonexistent" as any,
-          TEST_CONSTANTS.AGGREGATE_ID,
+        service.hasProjectionByName({
+          projectionName: "nonexistent" as any,
+          aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
           context,
-        ),
+        }),
       ).rejects.toThrow(/nonexistent/);
     });
 
@@ -175,11 +175,11 @@ describe("EventSourcingService - Projection Flows", () => {
       });
 
       await expect(
-        service.hasProjectionByName(
-          "projection",
-          TEST_CONSTANTS.AGGREGATE_ID,
+        service.hasProjectionByName({
+          projectionName: "projection",
+          aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
           context,
-        ),
+        }),
       ).rejects.toThrow(/projection/i);
     });
   });
@@ -213,11 +213,11 @@ describe("EventSourcingService - Projection Flows", () => {
       const foldDef = createMockFoldProjectionDefinition("projection");
 
       const events = [
-        createTestEvent(
-          TEST_CONSTANTS.AGGREGATE_ID,
-          TEST_CONSTANTS.AGGREGATE_TYPE,
+        createTestEvent({
+          aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+          aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
           tenantId,
-        ),
+        }),
       ];
 
       const service = new EventSourcingService({
@@ -240,11 +240,11 @@ describe("EventSourcingService - Projection Flows", () => {
       const foldDef1 = createMockFoldProjectionDefinition("projection1");
       const foldDef2 = createMockFoldProjectionDefinition("projection2");
       const events = [
-        createTestEvent(
-          TEST_CONSTANTS.AGGREGATE_ID,
-          TEST_CONSTANTS.AGGREGATE_TYPE,
+        createTestEvent({
+          aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+          aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
           tenantId,
-        ),
+        }),
       ];
 
       const service = new EventSourcingService({
@@ -269,8 +269,16 @@ describe("EventSourcingService - Projection Flows", () => {
       const aggregate1 = "aggregate-1";
       const aggregate2 = "aggregate-2";
       const events = [
-        createTestEvent(aggregate1, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId),
-        createTestEvent(aggregate2, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId),
+        createTestEvent({
+          aggregateId: aggregate1,
+          aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
+          tenantId,
+        }),
+        createTestEvent({
+          aggregateId: aggregate2,
+          aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
+          tenantId,
+        }),
       ];
 
       const service = new EventSourcingService({

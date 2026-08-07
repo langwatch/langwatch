@@ -219,13 +219,13 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
     isValidating: isValidatingApiKey,
     validationError: apiKeyValidationError,
     clearError: clearApiKeyError,
-  } = useModelProviderApiKeyValidation(
-    backendModelProviderKey,
-    state.customKeys,
+  } = useModelProviderApiKeyValidation({
+    provider: backendModelProviderKey,
+    customKeys: state.customKeys,
     projectId,
-    organization?.id,
-    state.scopes,
-  );
+    organizationId: organization?.id,
+    scopes: state.scopes,
+  });
 
   // The same gate the settings drawer uses. Without it this surface — which
   // includes the "Langy needs a model to get started" step, where there is no

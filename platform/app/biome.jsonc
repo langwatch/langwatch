@@ -19,7 +19,16 @@
 	//
 	//   noExcessiveLinesPerFunction     3592
 	//   noExcessiveCognitiveComplexity  2055
-	//   useMaxParams                     324
+	//   useMaxParams                     324  — burned to 0 in 2026-08 and
+	//                                          promoted to error. The only
+	//                                          exemptions are inline
+	//                                          biome-ignore pragmas on ~10
+	//                                          signatures a library fixes
+	//                                          (React Profiler onRender,
+	//                                          ioredis set/eval fakes,
+	//                                          TanStack MutationCache
+	//                                          onError, ohm-js semantic
+	//                                          actions, an MCP SDK fake)
 	//   noEmptyBlockStatements            93
 	//   noFloatingPromises                39
 	//   noMisusedPromises                 19
@@ -105,7 +114,7 @@
 					}
 				},
 				"useMaxParams": {
-					"level": "warn",
+					"level": "error",
 					"options": { "max": 3 }
 				}
 			},

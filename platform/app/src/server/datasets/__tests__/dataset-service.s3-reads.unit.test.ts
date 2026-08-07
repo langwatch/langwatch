@@ -26,12 +26,12 @@ const makeService = (overrides: {
   recordRepository?: Record<string, unknown>;
   prisma?: unknown;
 }) => {
-  const service = new DatasetService(
-    {} as never,
-    (overrides.repository ?? {}) as never,
-    (overrides.recordRepository ?? {}) as never,
-    {} as never,
-  );
+  const service = new DatasetService({
+    prisma: {} as never,
+    repository: (overrides.repository ?? {}) as never,
+    recordRepository: (overrides.recordRepository ?? {}) as never,
+    experimentRepository: {} as never,
+  });
   if (overrides.prisma) {
     (service as unknown as { prisma: unknown }).prisma = overrides.prisma;
   }

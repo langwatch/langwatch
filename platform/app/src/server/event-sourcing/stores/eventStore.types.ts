@@ -84,12 +84,17 @@ export interface ReadOnlyEventStore<EventType extends Event = Event> {
    * **Security:** Implementations MUST call validateTenantId(context, 'getEvents')
    * before executing the query to ensure tenant isolation.
    */
-  getEvents(
-    aggregateId: string,
-    context: EventStoreReadContext<EventType>,
-    aggregateType: AggregateType,
-    anchorOccurredAtMs?: number,
-  ): Promise<readonly EventType[]>;
+  getEvents({
+    aggregateId,
+    context,
+    aggregateType,
+    anchorOccurredAtMs,
+  }: {
+    aggregateId: string;
+    context: EventStoreReadContext<EventType>;
+    aggregateType: AggregateType;
+    anchorOccurredAtMs?: number;
+  }): Promise<readonly EventType[]>;
 
   /**
    * Retrieves events with an EXPLICIT occurred-at lower bound (ms), applied
@@ -104,12 +109,17 @@ export interface ReadOnlyEventStore<EventType extends Event = Event> {
    * **Security:** Implementations MUST validate tenantId exactly as for
    * `getEvents`.
    */
-  getEventsOccurredSince(
-    aggregateId: string,
-    context: EventStoreReadContext<EventType>,
-    aggregateType: AggregateType,
-    occurredAtFromMs: number,
-  ): Promise<readonly EventType[]>;
+  getEventsOccurredSince({
+    aggregateId,
+    context,
+    aggregateType,
+    occurredAtFromMs,
+  }: {
+    aggregateId: string;
+    context: EventStoreReadContext<EventType>;
+    aggregateType: AggregateType;
+    occurredAtFromMs: number;
+  }): Promise<readonly EventType[]>;
 
   /**
    * Retrieves events for a given aggregate up to and including a specific event.
@@ -125,12 +135,17 @@ export interface ReadOnlyEventStore<EventType extends Event = Event> {
    * **Security:** Implementations MUST call validateTenantId(context, 'getEventsUpTo')
    * before executing the query to ensure tenant isolation.
    */
-  getEventsUpTo(
-    aggregateId: string,
-    context: EventStoreReadContext<EventType>,
-    aggregateType: AggregateType,
-    upToEvent: EventType,
-  ): Promise<readonly EventType[]>;
+  getEventsUpTo({
+    aggregateId,
+    context,
+    aggregateType,
+    upToEvent,
+  }: {
+    aggregateId: string;
+    context: EventStoreReadContext<EventType>;
+    aggregateType: AggregateType;
+    upToEvent: EventType;
+  }): Promise<readonly EventType[]>;
 
   /**
    * Cursor-paginated variant of {@link getEventsUpTo}: returns at most `limit`
@@ -177,13 +192,19 @@ export interface ReadOnlyEventStore<EventType extends Event = Event> {
    * **Security:** Implementations MUST call validateTenantId(context, 'countEventsBefore')
    * before executing the query to ensure tenant isolation.
    */
-  countEventsBefore(
-    aggregateId: string,
-    context: EventStoreReadContext<EventType>,
-    aggregateType: AggregateType,
-    beforeTimestamp: number,
-    beforeEventId: string,
-  ): Promise<number>;
+  countEventsBefore({
+    aggregateId,
+    context,
+    aggregateType,
+    beforeTimestamp,
+    beforeEventId,
+  }: {
+    aggregateId: string;
+    context: EventStoreReadContext<EventType>;
+    aggregateType: AggregateType;
+    beforeTimestamp: number;
+    beforeEventId: string;
+  }): Promise<number>;
 }
 
 /**

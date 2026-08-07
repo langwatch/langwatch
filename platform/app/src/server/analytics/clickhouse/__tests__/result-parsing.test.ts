@@ -27,11 +27,11 @@ describe("result-parsing", () => {
       };
 
       // This is the alias used when parsing results (always index 0 for first series)
-      const parsingAlias = buildMetricAlias(
-        0,
-        series.metric,
-        series.aggregation,
-      );
+      const parsingAlias = buildMetricAlias({
+        index: 0,
+        metric: series.metric,
+        aggregation: series.aggregation,
+      });
 
       // Build a query with this metric
       const input = {
@@ -263,13 +263,11 @@ describe("result-parsing", () => {
 
         for (let i = 0; i < series.length; i++) {
           const seriesItem = series[i]!;
-          const alias = buildMetricAlias(
-            i,
-            seriesItem.metric,
-            seriesItem.aggregation,
-            undefined,
-            undefined,
-          );
+          const alias = buildMetricAlias({
+            index: i,
+            metric: seriesItem.metric,
+            aggregation: seriesItem.aggregation,
+          });
 
           // This is how parseTimeseriesResults looks up values
           const value = (row as Record<string, unknown>)[alias];
@@ -349,13 +347,13 @@ describe("result-parsing", () => {
 
           for (let i = 0; i < series.length; i++) {
             const seriesItem = series[i]!;
-            const alias = buildMetricAlias(
-              i,
-              seriesItem.metric,
-              seriesItem.aggregation,
-              seriesItem.key,
-              seriesItem.subkey,
-            );
+            const alias = buildMetricAlias({
+              index: i,
+              metric: seriesItem.metric,
+              aggregation: seriesItem.aggregation,
+              key: seriesItem.key,
+              subkey: seriesItem.subkey,
+            });
             const aggregation =
               seriesItem.aggregation === "terms"
                 ? "cardinality"
@@ -374,13 +372,13 @@ describe("result-parsing", () => {
           // Non-grouped results — mirrors parseTimeseriesResults lines 271-288
           for (let i = 0; i < series.length; i++) {
             const seriesItem = series[i]!;
-            const alias = buildMetricAlias(
-              i,
-              seriesItem.metric,
-              seriesItem.aggregation,
-              seriesItem.key,
-              seriesItem.subkey,
-            );
+            const alias = buildMetricAlias({
+              index: i,
+              metric: seriesItem.metric,
+              aggregation: seriesItem.aggregation,
+              key: seriesItem.key,
+              subkey: seriesItem.subkey,
+            });
             const aggregation =
               seriesItem.aggregation === "terms"
                 ? "cardinality"

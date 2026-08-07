@@ -122,13 +122,12 @@ beforeEach(() => {
 
 function expectFullResolution() {
   expect(mockCreate).toHaveBeenCalledWith(expect.anything(), BLOB_DEPS);
-  expect(mockGetTracesWithSpans).toHaveBeenCalledWith(
-    "project_123",
-    ["t1"],
-    expect.any(Object),
-    undefined,
-    { full: true },
-  );
+  expect(mockGetTracesWithSpans).toHaveBeenCalledWith({
+    projectId: "project_123",
+    traceIds: ["t1"],
+    protections: expect.any(Object),
+    opts: { full: true },
+  });
 }
 
 describe("annotation router — #4991 AC3 annotation-queue reads", () => {

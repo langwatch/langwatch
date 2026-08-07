@@ -341,11 +341,11 @@ describe("ClickHouse field-name queries (integration)", () => {
 
       /** @scenario A trace with many spans exposes all of its spans */
       it("returns all spans of the trace, none dropped", async () => {
-        const traces = await service.getTracesWithSpans(
-          tenantId,
-          [traceId],
-          openProtections,
-        );
+        const traces = await service.getTracesWithSpans({
+          projectId: tenantId,
+          traceIds: [traceId],
+          protections: openProtections,
+        });
 
         expect(traces).not.toBeNull();
         expect(traces).toHaveLength(1);

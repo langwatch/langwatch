@@ -566,12 +566,17 @@ export class StaticPipelineBuilderWithNameAndType<
   withCommandInstance<
     TStatic extends CommandHandlerClassStatic<any, any>,
     Name extends string,
-  >(
-    name: Name,
-    handlerClass: TStatic,
-    instance: CommandHandler<any, any>,
-    options?: CommandHandlerOptions,
-  ): StaticPipelineBuilderWithNameAndType<
+  >({
+    name,
+    handlerClass,
+    instance,
+    options,
+  }: {
+    name: Name;
+    handlerClass: TStatic;
+    instance: CommandHandler<any, any>;
+    options?: CommandHandlerOptions;
+  }): StaticPipelineBuilderWithNameAndType<
     EventType,
     RegisteredProjections,
     | RegisteredCommands

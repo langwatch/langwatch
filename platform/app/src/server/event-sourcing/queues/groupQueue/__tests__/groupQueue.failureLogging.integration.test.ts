@@ -149,7 +149,10 @@ describe.skipIf(!hasTestcontainers)(
       describe("when the job skips retries and the group is blocked", () => {
         it("logs the full Error on both the non-retryable and blocked records", async () => {
           function invalidPayloadHandlerForStackAssertion(): never {
-            throw new ValidationError("bad payload", "field");
+            throw new ValidationError({
+              reason: "bad payload",
+              field: "field",
+            });
           }
           const queue = createQueue(async () => {
             invalidPayloadHandlerForStackAssertion();

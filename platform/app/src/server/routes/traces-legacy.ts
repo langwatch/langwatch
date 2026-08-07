@@ -128,8 +128,11 @@ secured.access(tracesViewAuth).get("/trace/:id", async (c) => {
       prisma,
       buildTraceBlobResolutionDeps(),
     );
-    const trace = await traceService.getById(project.id, traceId, protections, {
-      full: true,
+    const trace = await traceService.getById({
+      projectId: project.id,
+      traceId,
+      protections,
+      opts: { full: true },
     });
     if (!trace) {
       return c.json({ message: "Trace not found." }, 404);
@@ -347,12 +350,12 @@ secured.access(tracesViewAuth).get("/thread/:id", async (c) => {
     prisma,
     buildTraceBlobResolutionDeps(),
   );
-  const traces = await traceService.getTracesByThreadId(
-    project.id,
+  const traces = await traceService.getTracesByThreadId({
+    projectId: project.id,
     threadId,
     protections,
-    { full: true },
-  );
+    opts: { full: true },
+  });
 
   markUsed();
   return c.json({ traces });
