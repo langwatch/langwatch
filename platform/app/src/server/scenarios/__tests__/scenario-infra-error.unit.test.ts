@@ -159,7 +159,10 @@ describe("classifyScenarioInfraError", () => {
     /** @scenario "A codex coding-assistant-surface refusal becomes a named, actionable error" */
     it.each([
       ["the featureKey-style wording (codexGatewayModel.ts)", gatewayWording],
-      ["the litellm-params-style wording (modelProviders.utils.ts)", litellmWording],
+      [
+        "the litellm-params-style wording (modelProviders.utils.ts)",
+        litellmWording,
+      ],
     ])("classifies %s to the dedicated code", (_label, raw) => {
       const result = classifyScenarioInfraError(raw);
       expect(result.code).toBe(

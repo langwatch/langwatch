@@ -97,5 +97,10 @@ export function createAdapter({
     throw new Error(`Unknown adapter type: ${adapterData.type}`);
   }
 
-  return factory({ data: adapterData, modelParams, nlpServiceUrl, projectApiKey });
+  return factory({
+    data: adapterData,
+    modelParams,
+    nlpServiceUrl,
+    projectApiKey,
+  });
 }

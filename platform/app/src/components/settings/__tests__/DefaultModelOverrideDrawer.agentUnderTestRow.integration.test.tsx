@@ -16,10 +16,19 @@
  * @see specs/model-providers/model-default-config-cascade.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { featureByKey, featuresByRole } from "~/server/modelProviders/featureRegistry";
+import {
+  featureByKey,
+  featuresByRole,
+} from "~/server/modelProviders/featureRegistry";
 import { DefaultModelOverrideDrawer } from "../DefaultModelOverrideDrawer";
 
 const mockCloseDrawer = vi.fn();

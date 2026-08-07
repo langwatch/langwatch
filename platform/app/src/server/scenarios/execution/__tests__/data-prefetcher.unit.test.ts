@@ -178,10 +178,14 @@ describe("prefetchScenarioData", () => {
             },
           });
 
-          await prefetchScenarioData(defaultContext, {
-            type: "prompt",
-            referenceId: "prompt_123",
-          }, deps);
+          await prefetchScenarioData(
+            defaultContext,
+            {
+              type: "prompt",
+              referenceId: "prompt_123",
+            },
+            deps,
+          );
 
           expect(deps.modelResolver.resolve).not.toHaveBeenCalledWith(
             "scenarios.agent_under_test",
@@ -313,7 +317,11 @@ describe("prefetchScenarioData", () => {
         projectId: "proj_123",
         config: {
           parameters: [
-            { identifier: "code", type: "code", value: "def execute(input):\n    return input" },
+            {
+              identifier: "code",
+              type: "code",
+              value: "def execute(input):\n    return input",
+            },
           ],
           inputs: [{ identifier: "input", type: "str" }],
           outputs: [{ identifier: "output", type: "str" }],
@@ -344,8 +352,16 @@ describe("prefetchScenarioData", () => {
         target: TargetConfig;
         agent: typeof httpAgent | typeof codeAgent | typeof workflowAgent;
       }> = [
-        { label: "http", target: { type: "http", referenceId: "agent_http" }, agent: httpAgent },
-        { label: "code", target: { type: "code", referenceId: "agent_code" }, agent: codeAgent },
+        {
+          label: "http",
+          target: { type: "http", referenceId: "agent_http" },
+          agent: httpAgent,
+        },
+        {
+          label: "code",
+          target: { type: "code", referenceId: "agent_code" },
+          agent: codeAgent,
+        },
         {
           label: "workflow",
           target: { type: "workflow", referenceId: "agent_workflow" },
@@ -385,7 +401,11 @@ describe("prefetchScenarioData", () => {
         it("prepares model params exactly twice — simulator and judge only", async () => {
           const deps = depsFor();
 
-          const result = await prefetchScenarioData(defaultContext, target, deps);
+          const result = await prefetchScenarioData(
+            defaultContext,
+            target,
+            deps,
+          );
 
           expect(result.success).toBe(true);
           expect(deps.modelParamsProvider.prepare).toHaveBeenCalledTimes(2);

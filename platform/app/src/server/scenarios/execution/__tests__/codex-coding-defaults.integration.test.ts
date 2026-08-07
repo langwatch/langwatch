@@ -90,7 +90,10 @@ describe.skipIf(!hasCredentialsSecret)(
       projectId = project.id;
 
       const user = await prisma.user.create({
-        data: { name: "Codex Coding Test User", email: `codex-coding-${ns}@example.com` },
+        data: {
+          name: "Codex Coding Test User",
+          email: `codex-coding-${ns}@example.com`,
+        },
       });
       userId = user.id;
 
@@ -290,18 +293,27 @@ describe.skipIf(!hasCredentialsSecret)(
     });
 
     describe("given a project whose FAST role default is a codex model", () => {
-      const cases: Array<{ label: "workflow" | "code" | "http"; referenceId: () => string }> = [
+      const cases: Array<{
+        label: "workflow" | "code" | "http";
+        referenceId: () => string;
+      }> = [
         { label: "workflow", referenceId: () => workflowAgentId },
         { label: "code", referenceId: () => codeAgentId },
         { label: "http", referenceId: () => httpAgentId },
       ];
 
-      describe.each(cases)("when the run is against a $label target", ({ label, referenceId }) => {
+      describe.each(cases)("when the run is against a $label target", ({
+        label,
+        referenceId,
+      }) => {
         /** @scenario "A project whose FAST/coding default is codex still runs workflow, code, and http simulations" */
         /** @scenario "Coding defaults never break a simulation run" */
         it("prefetches successfully instead of hitting the codex coding-assistant backstop", async () => {
           const deps = createDataPrefetcherDependencies();
-          const target: TargetConfig = { type: label, referenceId: referenceId() };
+          const target: TargetConfig = {
+            type: label,
+            referenceId: referenceId(),
+          };
 
           const result = await prefetchScenarioData(
             {

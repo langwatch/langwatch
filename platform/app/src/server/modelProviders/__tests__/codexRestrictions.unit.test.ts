@@ -90,7 +90,10 @@ describe("codexRestrictions", () => {
     // default is codex still resolves a real inference model for the
     // agent under test.
     const feature = featureByKey("scenarios.agent_under_test");
-    expect(feature, 'feature "scenarios.agent_under_test" must exist').toBeTruthy();
+    expect(
+      feature,
+      'feature "scenarios.agent_under_test" must exist',
+    ).toBeTruthy();
     expect(feature?.role).toBe("DEFAULT");
     expect(
       isModelAllowedForFeature({

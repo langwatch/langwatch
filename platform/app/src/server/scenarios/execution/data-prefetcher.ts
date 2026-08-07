@@ -407,10 +407,9 @@ export async function prefetchScenarioData(
     "Prefetch complete",
   );
 
-  const modelParams =
-    modelParamsResult !== undefined && modelParamsResult.success
-      ? modelParamsResult.params
-      : undefined;
+  const modelParams = modelParamsResult?.success
+    ? modelParamsResult.params
+    : undefined;
 
   return {
     success: true,

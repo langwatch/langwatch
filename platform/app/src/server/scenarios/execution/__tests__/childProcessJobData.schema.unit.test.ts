@@ -17,10 +17,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import {
-  ChildProcessJobDataSchema,
-  type LiteLLMParams,
-} from "../types";
+import { ChildProcessJobDataSchema, type LiteLLMParams } from "../types";
 
 const scenario = {
   id: "scen_1",
@@ -124,9 +121,7 @@ describe("ChildProcessJobDataSchema", () => {
         expect(result.data.simulatorModelParams?.model).toBe(
           "openai/sim-model",
         );
-        expect(result.data.judgeModelParams?.model).toBe(
-          "openai/judge-model",
-        );
+        expect(result.data.judgeModelParams?.model).toBe("openai/judge-model");
       }
     });
   });

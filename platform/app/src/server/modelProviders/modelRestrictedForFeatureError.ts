@@ -36,7 +36,13 @@ export class ModelRestrictedForFeatureError extends HandledError {
       `"${restrictedModel}" ${CODING_ASSISTANT_SURFACES_ONLY_NEEDLE} and cannot be the model for "${featureKey}".`,
       {
         httpStatus: 400,
-        meta: { featureKey, role, featureDisplayName, projectId, restrictedModels },
+        meta: {
+          featureKey,
+          role,
+          featureDisplayName,
+          projectId,
+          restrictedModels,
+        },
       },
     );
     this.name = "ModelRestrictedForFeatureError";

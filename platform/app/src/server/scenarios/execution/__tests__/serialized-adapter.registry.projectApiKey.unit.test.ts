@@ -55,7 +55,9 @@ const modelParams: LiteLLMParams = {
 
 const nlpServiceUrl = "http://localhost:8080";
 
-function nlpResponse(result: Record<string, unknown> | null = { output: "ok" }) {
+function nlpResponse(
+  result: Record<string, unknown> | null = { output: "ok" },
+) {
   return {
     ok: true,
     status: 200,
