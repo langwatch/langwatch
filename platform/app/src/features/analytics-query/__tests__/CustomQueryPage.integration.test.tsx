@@ -45,6 +45,29 @@ vi.mock("~/utils/api", () => ({
           }),
         },
       },
+      savedWorkbenchCharts: {
+        getAll: {
+          useQuery: () => ({ data: [], isLoading: false, error: null }),
+        },
+        create: {
+          useMutation: () => ({
+            mutateAsync: async () => ({}),
+            isPending: false,
+          }),
+        },
+        update: {
+          useMutation: () => ({
+            mutateAsync: async () => ({}),
+            isPending: false,
+          }),
+        },
+        delete: {
+          useMutation: () => ({
+            mutateAsync: async () => ({}),
+            isPending: false,
+          }),
+        },
+      },
     },
   },
 }));
