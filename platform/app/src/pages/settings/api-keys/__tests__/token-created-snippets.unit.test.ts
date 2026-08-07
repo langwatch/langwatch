@@ -256,8 +256,10 @@ describe("given the token-created-snippets feature is implemented", () => {
       const dialog = readFile(
         "src/pages/settings/api-keys/TokenCreatedDialog.tsx",
       );
+      // Import statements are the invariant — comments may (and do) name
+      // shikiAdapter when explaining the pre-existing JsonHighlight chain.
       expect(dialog).not.toMatch(/^import (?!type ).*from "shiki"/m);
-      expect(dialog).not.toContain("shikiAdapter");
+      expect(dialog).not.toMatch(/^import .*shikiAdapter/m);
     });
 
     /** @scenario The Shiki engine loads only when a code block renders */

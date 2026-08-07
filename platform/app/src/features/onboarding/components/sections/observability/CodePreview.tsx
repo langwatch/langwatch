@@ -15,6 +15,33 @@ import { toaster } from "../../../../../components/ui/toaster";
 import { Tooltip } from "../../../../../components/ui/tooltip";
 import { InlineCopyButton } from "../shared/InlineCopyButton";
 
+/**
+ * The header copy control. With `copyText` it renders the shared
+ * InlineCopyButton feeding the clipboard that exact value; without it, the
+ * default CodeBlock trigger, which copies the rendered (possibly masked)
+ * string.
+ */
+function SnippetCopyControl({
+  copyText,
+  filename,
+}: {
+  copyText?: string;
+  filename: string;
+}): React.ReactElement {
+  if (copyText !== undefined) {
+    return <InlineCopyButton text={copyText} label={filename} />;
+  }
+  return (
+    <CodeBlock.CopyTrigger asChild>
+      <IconButton variant="ghost" size="2xs" aria-label="Copy">
+        <CodeBlock.CopyIndicator copied={<Check size={14} />}>
+          <Copy size={14} />
+        </CodeBlock.CopyIndicator>
+      </IconButton>
+    </CodeBlock.CopyTrigger>
+  );
+}
+
 interface CodePreviewProps {
   code: string;
   filename: string;
@@ -216,18 +243,9 @@ export function CodePreview({
                     </IconButton>
                   </Tooltip>
                 )}
-                {!disableActions &&
-                  (copyText !== undefined ? (
-                    <InlineCopyButton text={copyText} label={filename} />
-                  ) : (
-                    <CodeBlock.CopyTrigger asChild>
-                      <IconButton variant="ghost" size="2xs" aria-label="Copy">
-                        <CodeBlock.CopyIndicator copied={<Check size={14} />}>
-                          <Copy size={14} />
-                        </CodeBlock.CopyIndicator>
-                      </IconButton>
-                    </CodeBlock.CopyTrigger>
-                  ))}
+                {!disableActions && (
+                  <SnippetCopyControl copyText={copyText} filename={filename} />
+                )}
               </HStack>
             </CodeBlock.Header>
             <CodeBlock.Content
