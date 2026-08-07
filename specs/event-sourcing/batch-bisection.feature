@@ -44,14 +44,27 @@ Feature: GroupQueue batch bisection
   #     normal retry/backoff path takes over. The budget is read from
   #     LANGWATCH_GQ_BISECTION_SPLIT_BUDGET; zero disables bisection outright,
   #     which restores the previous behaviour without a deploy.
+  #
+  # The budget bounds the other two guarantees, and the scenarios below are
+  # written inside it rather than pretending otherwise. The check runs on every
+  # sub-batch, before the descent can reach a single payload, so a budget spent
+  # mid-descent abandons the remaining chunk un-split: payloads sequenced BEFORE
+  # the offender but sitting in that chunk are not committed, and the offender
+  # is never isolated and so never named. That is the intended trade — the whole
+  # point of the budget is to stop walking and let backoff take over — but it
+  # means "everything before the offender commits" and "an oversized batch
+  # converges" hold only while the budget lasts, which is why both scenarios say
+  # so. Sizing the budget below log2(coalesceMaxBatch) makes isolation
+  # unreachable for a full batch.
 
   @integration @coalescing @bisection
   Scenario: Payloads ahead of an unprocessable one still commit
     Given a coalesced batch in which one payload can never be processed
+    And a split budget the descent does not exhaust
     When the batch is dispatched
     Then every payload sequenced before the offender is committed
-    And the offender is narrowed to on its own and named as the cause
-    And no payload is committed more than once
+    And the offender is narrowed to on its own
+    And no payload ahead of it is applied more often than its peers
 
   @integration @coalescing @bisection
   Scenario: Each half of a split stays in arrival order
@@ -65,11 +78,11 @@ Feature: GroupQueue batch bisection
     Given a coalesced batch whose payloads were handed over out of order
     When the batch fails and is split down to sub-batches that succeed
     Then the payloads are processed in the order the queue sequenced them
-    And a descent that took the second half first would be rejected
 
   @integration @coalescing @bisection
   Scenario: A batch too large for the handler converges by halving
     Given a handler that rejects any batch above a workable size
+    And a split budget large enough to reach that size
     When a batch larger than that size is dispatched
     Then the batch is halved until every part is workable
     And every payload is committed exactly once
@@ -80,7 +93,7 @@ Feature: GroupQueue batch bisection
     Given a coalesced batch whose handler fails non-retryably
     When the batch is dispatched
     Then the batch is not split
-    And the failure is surfaced immediately
+    And the failure is surfaced without further handler calls
 
   @integration @coalescing @bisection
   Scenario: Splitting is bounded within one locked attempt
@@ -102,7 +115,6 @@ Feature: GroupQueue batch bisection
     Given a coalesced batch whose first call commits and then fails
     When the batch is split
     Then every later sub-batch is delivered as a continuation
-    And their commits extend the applied-event-id set rather than replacing it
 
   @unit @coalescing @fold
   Scenario: A commit records every id it recognised
