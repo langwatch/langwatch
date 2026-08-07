@@ -520,6 +520,24 @@ export class DatabricksGeniePuller
       });
       events.push(...read.items);
       if (!read.complete) complete = false;
+
+      // A budget that ran out INSIDE this space leaves its tail unread. Resume
+      // at THIS space, not the next one. The top-of-loop check above only sees
+      // the exhaustion one iteration late and would hand the resume marker to
+      // space i+1, skipping this space's tail — and then a later complete sweep
+      // would advance the watermark past those never-fetched messages: silent,
+      // permanent loss on exactly the large workspaces this resume path exists
+      // for. Re-reading the whole space next run is safe: the watermark is held
+      // and both sinks dedup on the message id.
+      //
+      // Gated on `budget.exhausted()`, not on `!read.complete` alone: an
+      // isolated 403/429/cycle on one conversation also sets `complete: false`
+      // but must NOT stop the sweep — the held watermark plus a full re-sweep
+      // next run already makes that case lossless, and bailing here would wedge
+      // the sweep on a permanently-unreadable space and never reach the rest.
+      if (!read.complete && budget.exhausted()) {
+        return { events, complete: false, resumeSpaceId: space.space_id };
+      }
     }
 
     return { events, complete, resumeSpaceId: null };

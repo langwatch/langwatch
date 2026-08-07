@@ -483,6 +483,12 @@ type FixtureWorkspace = ReturnType<typeof createFixtureWorkspace>;
 async function startFixtureServer(params: {
   workspace: FixtureWorkspace;
   onBeforeSpace?: (spaceId: string) => void;
+  /**
+   * Awaited before a conversation's messages are served. The budget-truncation
+   * test uses it to make one message page slow, so a run's deadline crosses
+   * WHILE the sweep is inside a space rather than cleanly between two.
+   */
+  onMessages?: (conversationId: string) => Promise<void> | void;
 }): Promise<{
   baseUrl: string;
   conversationRequests: string[];
@@ -498,6 +504,13 @@ async function startFixtureServer(params: {
   const MESSAGE_PAGE = 1;
 
   const server = http.createServer((req, res) => {
+    void handle(req, res);
+  });
+
+  async function handle(
+    req: http.IncomingMessage,
+    res: http.ServerResponse,
+  ): Promise<void> {
     const url = new URL(req.url ?? "/", "http://localhost");
     const token = url.searchParams.get("page_token");
     requestCounts.set(url.pathname, (requestCounts.get(url.pathname) ?? 0) + 1);
@@ -559,6 +572,7 @@ async function startFixtureServer(params: {
         url.pathname,
       );
     if (messages) {
+      await params.onMessages?.(messages[1]!);
       const all = workspace.messages[messages[1]!] ?? [];
       const offset = token ? Number(token) : 0;
       const slice = all.slice(offset, offset + MESSAGE_PAGE);
@@ -586,7 +600,7 @@ async function startFixtureServer(params: {
 
     res.statusCode = 404;
     send({ error: `unrouted ${url.pathname}` });
-  });
+  }
 
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   return {
@@ -1098,6 +1112,91 @@ describe("given a sweep too large for one run's budget", () => {
       // The sweep drained, so the in-flight anchor is released.
       expect(done.spaceId).toBeNull();
       expect(done.sweepStartedAtMs).toBeNull();
+    }, 60_000);
+  });
+
+  describe("when the budget is cut PARTWAY through a space", () => {
+    /**
+     * The test above cuts the run cleanly BETWEEN spaces — deadline already
+     * behind, nothing read. This one cuts it INSIDE space-alpha: after its
+     * first conversation's messages, before its second's. That is the case
+     * that used to lose data. The sweep resumed at the NEXT space, skipping the
+     * cut space's unread tail, and a later complete sweep then advanced the
+     * watermark past those never-fetched messages — silently and for good.
+     *
+     * Regression: resume must land on the CUT space so its tail is re-read.
+     */
+    /** @scenario "A sweep cut short by its budget resumes where it stopped" */
+    it("resumes at the cut space and loses no message from its tail", async () => {
+      const workspace = createFixtureWorkspace();
+      let slowedOnce = false;
+      // Slow ONLY the first conversation's first message page, so the run's
+      // deadline crosses while the sweep is still inside space-alpha rather
+      // than at a tidy space boundary.
+      const fixture = await startFixtureServer({
+        workspace,
+        onMessages: async (conversationId) => {
+          if (conversationId === "conv-alpha-1" && !slowedOnce) {
+            slowedOnce = true;
+            await new Promise((resolve) => setTimeout(resolve, 1_500));
+          }
+        },
+      });
+
+      try {
+        const adapter = new DatabricksGeniePuller();
+        const config = adapter.validateConfig({
+          adapter: DATABRICKS_GENIE_ADAPTER_ID,
+          workspaceUrl: fixture.baseUrl,
+          spaceIds: ["space-alpha", "space-beta"],
+          startingAt: "2020-01-01T00:00:00.000Z",
+          schedule: "*/15 * * * *",
+        });
+        const credentials = { token: "fixture-token" };
+
+        // The three localhost requests before the slow page clear this deadline
+        // easily; the 1.5s page does not. So the cut lands inside space-alpha.
+        const first = await adapter.runOnce(
+          { cursor: null, credentials, deadlineMs: Date.now() + 800 },
+          config,
+        );
+        const firstCursor = decodeCursor(first.cursor);
+
+        // The assertion that bites: resume is the CUT space, not the next one.
+        // Before the fix this read "space-beta" and space-alpha's tail was gone.
+        expect(firstCursor.spaceId).toBe("space-alpha");
+        // Cut mid-space, so the window is held where it started.
+        expect(firstCursor.sinceMs).toBe(
+          Date.parse("2020-01-01T00:00:00.000Z"),
+        );
+
+        // Run two, no deadline: resumes at space-alpha, re-reads its tail, and
+        // drains the rest.
+        const second = await adapter.runOnce(
+          { cursor: first.cursor, credentials },
+          config,
+        );
+        const secondCursor = decodeCursor(second.cursor);
+
+        const emitted = new Set(
+          [...first.events, ...second.events].map((e) => e.source_event_id),
+        );
+        // The whole workspace, with nothing dropped at the cut. msg-alpha-2 and
+        // msg-alpha-3 are the tail of the cut space that used to vanish.
+        for (const id of [
+          "msg-alpha-1",
+          "msg-alpha-2",
+          "msg-alpha-3",
+          "msg-beta-1",
+        ]) {
+          expect(emitted).toContain(id);
+        }
+        // Only now that everything was read does the sweep finish and release.
+        expect(secondCursor.spaceId).toBeNull();
+        expect(secondCursor.sweepStartedAtMs).toBeNull();
+      } finally {
+        await fixture.close();
+      }
     }, 60_000);
   });
 });
