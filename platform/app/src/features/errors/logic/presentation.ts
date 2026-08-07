@@ -544,6 +544,25 @@ const presentations = {
     describe: () =>
       "It may have been removed, or it isn't available here. Reload to see the current list.",
   },
+  model_provider_test_rate_limited: {
+    // Nothing is wrong with the credential — we simply stopped asking. Saying
+    // "wait" without saying how long invites the customer to keep clicking,
+    // which is the behaviour the limit exists to stop, so the number rides in
+    // `meta` and gets read back here.
+    title: "Too many connection tests",
+    describe: (error) => {
+      // Rounded up here rather than trusted from the wire. The server sends a
+      // whole number today, but this is a client contract read by whatever
+      // sends the code, and a fraction would print "about 30.427 seconds" and
+      // slip past the `=== 1` singular check. Up, not down: rounding down
+      // invites a retry the limiter is still going to refuse.
+      const raw = Number(error.meta.retryAfterSeconds);
+      const seconds = Number.isFinite(raw) ? Math.ceil(raw) : 0;
+      return seconds > 0
+        ? `Wait about ${seconds} second${seconds === 1 ? "" : "s"} and try again.`
+        : "Wait a moment and try again.";
+    },
+  },
   provider_key_invalid: {
     // The provider positively identified the credential as wrong, which is the
     // one refusal a new key actually fixes. Deliberately says nothing about
@@ -552,6 +571,14 @@ const presentations = {
     title: "That API key was refused",
     describe: () =>
       "The provider didn't recognise it. Check you copied the whole key, and that it belongs to the right account.",
+  },
+  provider_endpoint_redirected: {
+    // Not "we couldn't reach it" — something answered, and it wants us
+    // somewhere else. Saying so is the difference between the customer
+    // checking their network and the customer fixing a URL.
+    title: "That endpoint redirects somewhere else",
+    describe: () =>
+      "We don't follow redirects when sending a credential. Point the base URL at the address the provider actually serves — an http:// URL redirecting to https:// is the usual cause.",
   },
   provider_key_missing: {
     title: "No API key to check",

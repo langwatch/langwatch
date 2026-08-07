@@ -16,8 +16,15 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { validateProviderApiKey } from "../providerValidation";
 
+// The probe goes out through the SSRF-validated fetch rather than
+// `global.fetch`, so that is the seam these tests stand in for.
+// Only the fetch is stood in for; the rest of the module stays real, so the
+// redirect message the production matcher compares against is the true one.
 const mockFetch = vi.fn();
-global.fetch = mockFetch;
+vi.mock("../../../utils/ssrfProtection", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../../utils/ssrfProtection")>()),
+  ssrfSafeFetch: (...args: unknown[]) => mockFetch(...args),
+}));
 
 const AGENT_PLATFORM_CREDENTIALS = {
   GEMINI_API_KEY: "AQ.AnAgentPlatformKey",
@@ -190,7 +197,7 @@ describe("validateProviderApiKey for gemini's two Google doors", () => {
         AGENT_PLATFORM_CREDENTIALS,
       );
 
-      expect(result).toEqual({ valid: true });
+      expect(result.outcome).toBe("verified");
     });
   });
 
@@ -299,7 +306,11 @@ describe("validateProviderApiKey for gemini's two Google doors", () => {
       expect(sentRequest().url).toContain(
         "/projects/acme-123/locations/global/",
       );
-      expect(result).toEqual({ valid: true });
+      // `verified`, not merely `valid` — which is the whole point of this
+      // test. The defect it guards is a row reported as fine after no
+      // request at all, and `unchecked` also carries `valid: true`, so
+      // asserting on `valid` alone could not tell the two apart.
+      expect(result.outcome).toBe("verified");
     });
 
     /** @scenario A legacy row still validates through the Agent Platform door during the fold window */

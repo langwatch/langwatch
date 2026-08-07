@@ -162,3 +162,33 @@ export class ModelProviderScopeForbiddenError extends HandledError {
     this.name = "ModelProviderScopeForbiddenError";
   }
 }
+
+/**
+ * Too many credential checks in too short a window.
+ *
+ * Every check is an outbound request from our servers carrying a customer's
+ * credential, and the control that triggers it sits one click away in
+ * settings. Without a ceiling the page is an egress amplifier: rows multiply
+ * across provider types, projects and scopes, so the budget is the
+ * organization's rather than the row's.
+ *
+ * `retryAfterSeconds` rides in `meta` so the client can say how long rather
+ * than inventing a number — the sentence here is the fallback for callers
+ * that render the message directly.
+ */
+export class ModelProviderTestRateLimitedError extends HandledError {
+  declare readonly code: "model_provider_test_rate_limited";
+
+  constructor({ retryAfterSeconds }: { retryAfterSeconds: number }) {
+    super(
+      "model_provider_test_rate_limited",
+      "Too many connection tests. Wait a moment and try again.",
+      {
+        meta: { retryAfterSeconds },
+        httpStatus: 429,
+        fault: "customer",
+      },
+    );
+    this.name = "ModelProviderTestRateLimitedError";
+  }
+}

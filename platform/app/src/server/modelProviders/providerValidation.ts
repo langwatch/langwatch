@@ -7,10 +7,23 @@ import type { PrismaClient } from "@prisma/client";
 import {
   providerApiRoots,
   providerDefaultBaseUrls,
-} from "../../../features/onboarding/regions/model-providers/registry";
-import { MASKED_KEY_PLACEHOLDER } from "../../../utils/constants";
-import { ModelProviderRepository } from "../../modelProviders/modelProvider.repository";
-import { modelProviders } from "../../modelProviders/registry";
+} from "../../features/onboarding/regions/model-providers/registry";
+import { MASKED_KEY_PLACEHOLDER } from "../../utils/constants";
+import {
+  RedirectRefusedError,
+  ssrfSafeFetch,
+} from "../../utils/ssrfProtection";
+import { ModelProviderRepository } from "./modelProvider.repository";
+import { modelProviders } from "./registry";
+
+/**
+ * The response shape the probe actually receives.
+ *
+ * `ssrfSafeFetch` goes out through undici so it can pin the resolved IP, and
+ * undici ships its own `Response` type. Deriving the alias from the function
+ * rather than naming either one keeps this correct if that ever changes.
+ */
+type ProbeResponse = Awaited<ReturnType<typeof ssrfSafeFetch>>;
 
 /**
  * The answer to "does this credential work".
@@ -26,8 +39,49 @@ import { modelProviders } from "../../modelProviders/registry";
  * `explainSerializedError`.
  */
 export type ValidationResult =
-  | { valid: true }
-  | { valid: false; domainError: SerializedHandledError };
+  | { outcome: "verified"; valid: true }
+  | { outcome: "refused"; valid: false; domainError: SerializedHandledError }
+  | { outcome: "unchecked"; valid: true; reason: UncheckedReason };
+
+/**
+ * Why a check never reached the provider.
+ *
+ * These used to be indistinguishable from a pass, which was safe for exactly
+ * as long as the answer stayed inside the save path: a skip should not block
+ * a save, so `valid: true` was the right thing to return. Put the same value
+ * in front of a customer and it becomes a claim we cannot support — six of
+ * the sixteen registered providers reach one of these paths, so a control
+ * that read `valid` alone would report more than a third of the list as
+ * working without having sent a packet.
+ *
+ * `valid` still says what the save path needs. `outcome` says what a reader
+ * needs. Neither has to lie for the other.
+ */
+export type UncheckedReason =
+  /** Complex or non-probeable auth — AWS, gcloud, subscription-key services. */
+  | "provider_not_probeable"
+  /** The stored key came back as the masked placeholder, not a credential. */
+  | "credential_masked"
+  /** Nothing is stored and no environment variable supplies one. */
+  | "no_credential"
+  /** No endpoint is known or configured, so there is nowhere to ask. */
+  | "no_endpoint"
+  /** Not a provider in the registry. */
+  | "unknown_provider";
+
+const verified = (): ValidationResult => ({ outcome: "verified", valid: true });
+
+const refused = (domainError: SerializedHandledError): ValidationResult => ({
+  outcome: "refused",
+  valid: false,
+  domainError,
+});
+
+const unchecked = (reason: UncheckedReason): ValidationResult => ({
+  outcome: "unchecked",
+  valid: true,
+  reason,
+});
 
 /**
  * Authentication strategy for API key validation.
@@ -85,8 +139,29 @@ const AGENT_PLATFORM_PROBE_BODY = JSON.stringify({
   generationConfig: { maxOutputTokens: 1 },
 });
 
-/** Providers with complex auth (AWS, gcloud, etc.) that skip validation */
-const SKIP_VALIDATION = new Set(["bedrock", "vertex_ai", "azure"]);
+/**
+ * Providers we will not probe, and must not pretend to have probed.
+ *
+ * `bedrock`, `vertex_ai` and `azure` are here for the original reason: their
+ * credentials are AWS signatures, gcloud application-default credentials and
+ * deployment-scoped Azure keys, none of which a models listing exercises.
+ *
+ * `azure_safety` is here because leaving it out was a bug waiting for a
+ * caller. It is a content-safety service, not a language model: it
+ * authenticates with `Ocp-Apim-Subscription-Key` and has no `/models` route.
+ * Nothing in this module excluded it, and it carries an endpoint field, so a
+ * stored endpoint was enough to send it down the bearer branch and have a
+ * perfectly good credential reported as refused. Until now the only thing
+ * standing in the way was `isLlmProvider` in the settings form — a client-side
+ * gate, in front of one of several callers. The rule belongs here, where every
+ * caller passes.
+ */
+const NOT_PROBEABLE: ReadonlySet<string> = new Set([
+  "bedrock",
+  "vertex_ai",
+  "azure",
+  "azure_safety",
+] as const);
 
 /**
  * Validation endpoints for providers that are not part of the onboarding
@@ -242,6 +317,34 @@ export class ProviderKeyMissingError extends HandledError {
  * The one failure here that is thrown rather than returned: a refused key is
  * an answer, an unreachable provider is the absence of one.
  */
+/**
+ * The endpoint answered with a redirect, and we will not follow it.
+ *
+ * `fault: "customer"` because the fix is theirs and it is a small one: point
+ * the base URL at the address the endpoint actually serves. Following the hop
+ * is not an option — it would carry the credential to a host the SSRF
+ * validator never saw, and a cross-origin hop keeps the provider-specific auth
+ * headers even where it drops `Authorization`.
+ */
+export class ProviderEndpointRedirectedError extends HandledError {
+  constructor({ provider }: { provider: string }) {
+    super(
+      "provider_endpoint_redirected",
+      `The endpoint configured for ${provider} redirects elsewhere`,
+      {
+        fault: "customer",
+        httpStatus: 400,
+        meta: { provider },
+        tips: [
+          "Point the base URL at the address the provider actually serves.",
+          "An http:// URL that redirects to https:// is the usual cause.",
+        ],
+      },
+    );
+    this.name = "ProviderEndpointRedirectedError";
+  }
+}
+
 export class ProviderUnreachableError extends HandledError {
   constructor({
     provider,
@@ -398,7 +501,7 @@ function redactApiKey(text: string, apiKey: string): string {
  * unreadable body just means we fall back to the generic message.
  */
 async function readUpstreamRefusal(
-  response: Response,
+  response: ProbeResponse,
   apiKey: string,
 ): Promise<UpstreamRefusal> {
   let raw: string;
@@ -486,7 +589,7 @@ async function handleHttpError({
   response,
   context,
 }: {
-  response: Response;
+  response: ProbeResponse;
   context: ProbeContext;
 }): Promise<RankedFailure> {
   const { message, reason } = await readUpstreamRefusal(
@@ -767,6 +870,35 @@ function unreachableFailure(context: ProbeContext): RankedFailure {
 }
 
 /**
+ * The endpoint answered — with a redirect we will not follow.
+ *
+ * Worth telling apart from "never answered". The endpoint is reachable and
+ * something is listening; it just wants us somewhere else, and we decline
+ * because a hop carries the credential to a host the validator has not seen.
+ * Reporting that as unreachable sends the customer to check their network
+ * when what they need to change is a URL — the misdiagnosis this module
+ * exists to remove, and one three previous fixes were about.
+ *
+ * Matched by type, not by message. The helper's own catch rewrites a plain
+ * `Error` into "Connection failed to host:port: …" on its way out, so any
+ * string comparison here would be testing text this module never receives —
+ * and would report every refused redirect as a connection failure while
+ * looking entirely correct.
+ */
+function isRefusedRedirect(err: unknown): boolean {
+  return err instanceof RedirectRefusedError;
+}
+
+function redirectedFailure(context: ProbeContext): RankedFailure {
+  return refusal(
+    new ProviderEndpointRedirectedError({ provider: context.provider }),
+    // Explained rather than unreachable: this says something actionable about
+    // the endpoint, so it should win over a bare timeout from another shape.
+    FAILURE_RANK.explained,
+  );
+}
+
+/**
  * One auth shape, asked once: accepted, refused, or never answered.
  *
  * Only the request is guarded. Reading the refusal happens outside the
@@ -788,16 +920,40 @@ async function probeOnce({
   | { accepted: true; failure?: undefined }
   | { accepted: false; failure: RankedFailure }
 > {
-  let response: Response;
+  let response: ProbeResponse;
   try {
-    response = await fetch(candidate.url, {
+    // Through the SSRF validator, not bare `fetch`.
+    //
+    // Every request here carries a customer's credential to a URL a customer
+    // chose. Several providers expose a configurable endpoint, so "the URL on
+    // the row" is not a trusted value just because nobody passed one in on
+    // this call — an endpoint saved earlier is as attacker-controlled as one
+    // supplied now, and the stored key rides along either way. That makes this
+    // the shape `utils/ssrfProtection` exists for: a cloud-metadata denylist
+    // that applies regardless of configuration, private-address blocking, and
+    // IP pinning so a name cannot resolve to something else between the check
+    // and the connection.
+    //
+    // `followRedirects: false` for the reason the webhook destination gives at
+    // `httpDestination.ts:39-43`: hop re-validation falls back to the weaker
+    // env-gated validator, and — measured on this repo's Node — a cross-origin
+    // redirect strips `Authorization` but carries `x-api-key`, `x-goog-api-key`
+    // and `xi-api-key` straight through to the new host. A redirect is not
+    // something a models listing needs.
+    response = await ssrfSafeFetch(candidate.url, {
       method: candidate.method ?? "GET",
       headers: candidate.headers,
       ...(candidate.body === undefined ? {} : { body: candidate.body }),
       signal: deadline,
+      followRedirects: false,
     });
-  } catch {
-    return { accepted: false, failure: unreachableFailure(context) };
+  } catch (err) {
+    return {
+      accepted: false,
+      failure: isRefusedRedirect(err)
+        ? redirectedFailure(context)
+        : unreachableFailure(context),
+    };
   }
 
   if (response.ok) return { accepted: true };
@@ -841,7 +997,7 @@ async function runProbeChain({
     const outcome = await probeOnce({ candidate, context, deadline });
 
     if (outcome.accepted) {
-      return { valid: true };
+      return verified();
     }
 
     failures.push(outcome.failure);
@@ -867,7 +1023,7 @@ async function runProbeChain({
     });
   }
 
-  return { valid: false, domainError: chosen.domainError };
+  return refused(chosen.domainError);
 }
 
 /**
@@ -880,19 +1036,24 @@ async function runProbeChain({
  * @param prisma - Prisma client instance
  * @returns Promise resolving to validation result
  */
-export async function validateKeyWithCustomUrl(
-  projectId: string,
-  provider: string,
-  customBaseUrl: string | undefined,
-  prisma: PrismaClient,
-): Promise<ValidationResult> {
+export async function validateKeyWithCustomUrl({
+  projectId,
+  provider,
+  customBaseUrl,
+  prisma,
+}: {
+  projectId: string;
+  provider: string;
+  customBaseUrl: string | undefined;
+  prisma: PrismaClient;
+}): Promise<ValidationResult> {
   const providerDef = modelProviders[provider as keyof typeof modelProviders];
   if (!providerDef) {
-    return { valid: true }; // Unknown provider, skip validation
+    return unchecked("unknown_provider");
   }
 
-  if (SKIP_VALIDATION.has(provider)) {
-    return { valid: true };
+  if (NOT_PROBEABLE.has(provider)) {
+    return unchecked("provider_not_probeable");
   }
 
   const apiKeyField = providerDef.apiKey;
@@ -914,10 +1075,7 @@ export async function validateKeyWithCustomUrl(
   }
 
   if (!apiKey) {
-    return {
-      valid: false,
-      domainError: new ProviderKeyMissingError({ provider }).serialize(),
-    };
+    return refused(new ProviderKeyMissingError({ provider }).serialize());
   }
 
   // Start from what's stored, not from a blank object: a provider whose
@@ -963,6 +1121,96 @@ export async function validateKeyWithCustomUrl(
  * });
  * ```
  */
+/**
+ * The credential-shaped reasons we decline to ask: nothing usable to send, or
+ * nowhere to send it.
+ *
+ * `null` means the probe can go ahead. The two provider-shaped reasons —
+ * an unrecognised provider, and one whose auth we cannot exercise — are
+ * decided by the callers before they get here, because both need the registry
+ * entry this function is deliberately not given.
+ *
+ * Kept out of the probe because these are the answers a customer reads as "we
+ * did not check", and a branch that quietly returned a pass instead is the
+ * failure the third verdict exists to prevent.
+ */
+/**
+ * The project and location that name Gemini's Agent Platform door, if the
+ * credential carries them.
+ *
+ * Two field-name pairs reach the same door. A row created since the fold uses
+ * `GEMINI_*`; a legacy row created while Agent Platform was its own provider
+ * still wears the retired names, and goes on working until those rows are
+ * converted. Both are read here so no caller has to know which era a
+ * credential came from.
+ */
+function agentPlatformPair({
+  provider,
+  customKeys,
+}: {
+  provider: string;
+  customKeys: Record<string, string>;
+}): { project: string; location: string } {
+  if (provider === "google_agent_platform") {
+    return {
+      project: customKeys.GOOGLE_AGENT_PLATFORM_PROJECT?.trim() ?? "",
+      location: customKeys.GOOGLE_AGENT_PLATFORM_LOCATION?.trim() ?? "",
+    };
+  }
+  return {
+    project: customKeys.GEMINI_PROJECT?.trim() ?? "",
+    location: customKeys.GEMINI_LOCATION?.trim() ?? "",
+  };
+}
+
+function whyNotCheckable({
+  provider,
+  apiKey,
+  baseUrl,
+  defaultBaseUrl,
+  hasAgentPlatformDoor,
+}: {
+  provider: string;
+  apiKey: string;
+  baseUrl: string;
+  defaultBaseUrl: string;
+  /**
+   * Whether the credential names the Agent Platform door (a project and a
+   * location). That probe builds its URL from the API root and needs no base
+   * URL, so "nowhere to ask" is false for it however empty the endpoint
+   * fields are.
+   */
+  hasAgentPlatformDoor: boolean;
+}): UncheckedReason | null {
+  // The stored value came back as the mask, not a credential — the customer is
+  // editing a provider without touching its key.
+  if (apiKey === MASKED_KEY_PLACEHOLDER) {
+    return "credential_masked";
+  }
+
+  // No key at all. `custom` is the exception: an endpoint on its own is worth
+  // probing, since that is the part most likely to be wrong.
+  if (!apiKey && (provider !== "custom" || !baseUrl)) {
+    return "no_credential";
+  }
+
+  // Nowhere to ask (e.g. voyage, which has no models listing). Probing anyway
+  // would fetch a relative URL, throw, and surface as a misleading "check your
+  // network connection". The key is exercised on the first real call instead.
+  //
+  // The Agent Platform door is exempt, and that exemption is load-bearing: a
+  // legacy row reaching it has no onboarding tile left to supply a default
+  // base URL, so without this it would be declined without a request and — on
+  // the old two-state result — reported as a pass. A key that was never probed
+  // coming back green is the failure both this exemption and the third verdict
+  // exist to prevent, from either end.
+  if (!baseUrl && !defaultBaseUrl && !hasAgentPlatformDoor) {
+    return "no_endpoint";
+  }
+
+  return null;
+}
+
 export async function validateProviderApiKey(
   provider: string,
   customKeys: Record<string, string>,
@@ -970,12 +1218,11 @@ export async function validateProviderApiKey(
   // Get provider definition from registry
   const providerDef = modelProviders[provider as keyof typeof modelProviders];
   if (!providerDef) {
-    return { valid: true }; // Unknown provider, skip validation
+    return unchecked("unknown_provider");
   }
 
-  // Skip validation for providers with complex auth (AWS, gcloud, etc.)
-  if (SKIP_VALIDATION.has(provider)) {
-    return { valid: true };
+  if (NOT_PROBEABLE.has(provider)) {
+    return unchecked("provider_not_probeable");
   }
 
   // Extract API key and base URL using registry field names
@@ -987,19 +1234,6 @@ export async function validateProviderApiKey(
     ? (customKeys[endpointField]?.trim() ?? "")
     : "";
 
-  // Skip validation if API key is masked (user editing existing provider without changing key)
-  if (apiKey === MASKED_KEY_PLACEHOLDER) {
-    return { valid: true };
-  }
-
-  // Skip validation if no API key provided (schema validation handles required fields)
-  // For custom provider, only skip if no base URL either
-  if (!apiKey) {
-    if (provider !== "custom" || !baseUrl) {
-      return { valid: true };
-    }
-  }
-
   // Get auth strategy (default to bearer) and base URL
   const authStrategy = PROVIDER_AUTH_OVERRIDES[provider] ?? "bearer";
   const defaultBaseUrl =
@@ -1007,36 +1241,17 @@ export async function validateProviderApiKey(
     VALIDATION_ONLY_BASE_URLS[provider] ??
     "";
 
-  // Legacy rows from the fold window read their pair from the retired
-  // field names; new gemini rows carry the GEMINI_* pair. Both validate
-  // through the same Agent Platform door. The legacy branch goes with the
-  // deprecated `google_agent_platform` registry entry.
-  const agentPlatform =
-    provider === "google_agent_platform"
-      ? {
-          project: customKeys.GOOGLE_AGENT_PLATFORM_PROJECT?.trim() ?? "",
-          location: customKeys.GOOGLE_AGENT_PLATFORM_LOCATION?.trim() ?? "",
-        }
-      : {
-          project: customKeys.GEMINI_PROJECT?.trim() ?? "",
-          location: customKeys.GEMINI_LOCATION?.trim() ?? "",
-        };
+  const agentPlatform = agentPlatformPair({ provider, customKeys });
 
-  // No endpoint to probe (e.g. voyage, which has no models listing): skip
-  // rather than fetch a relative URL, which would always throw and surface
-  // as a misleading "check your network connection" error. The key is
-  // exercised on the first real call instead.
-  //
-  // A credential naming the Agent Platform door is exempt: that probe
-  // builds its URL from AGENT_PLATFORM_API_ROOT and never needs a base
-  // URL. Without the exemption, a legacy `google_agent_platform` row —
-  // whose onboarding tile (the source of providerDefaultBaseUrls) is gone
-  // — returned `valid: true` after ZERO requests: a green check on a key
-  // that was never probed.
-  const hasAgentPlatformDoor =
-    !!agentPlatform.project && !!agentPlatform.location;
-  if (!baseUrl && !defaultBaseUrl && !hasAgentPlatformDoor) {
-    return { valid: true };
+  const cannotCheck = whyNotCheckable({
+    provider,
+    apiKey,
+    baseUrl,
+    defaultBaseUrl,
+    hasAgentPlatformDoor: !!agentPlatform.project && !!agentPlatform.location,
+  });
+  if (cannotCheck) {
+    return unchecked(cannotCheck);
   }
 
   return runProbeChain({
@@ -1052,14 +1267,34 @@ export async function validateProviderApiKey(
       provider,
       apiKey,
       hasConfigurableEndpoint: !!endpointField,
-      ...(provider === "gemini" || provider === "google_agent_platform"
-        ? {
-            googleDoor:
-              agentPlatform.project && agentPlatform.location
-                ? ("agent-platform" as const)
-                : ("gemini-api" as const),
-          }
-        : {}),
+      ...googleDoorFor({ provider, agentPlatform }),
     },
   });
+}
+
+/**
+ * Which of Google's two doors a credential is being checked against, for the
+ * providers that have two.
+ *
+ * Carried on the probe context so a refusal can say which door refused —
+ * "fill in the project and location" and "clear them" are opposite
+ * instructions, and giving the wrong one sends the customer the wrong way.
+ * Absent entirely for every other provider, which has only one door.
+ */
+function googleDoorFor({
+  provider,
+  agentPlatform,
+}: {
+  provider: string;
+  agentPlatform: { project: string; location: string };
+}): { googleDoor?: "agent-platform" | "gemini-api" } {
+  if (provider !== "gemini" && provider !== "google_agent_platform") {
+    return {};
+  }
+  return {
+    googleDoor:
+      agentPlatform.project && agentPlatform.location
+        ? "agent-platform"
+        : "gemini-api",
+  };
 }
