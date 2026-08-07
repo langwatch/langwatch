@@ -12,6 +12,7 @@ import { app as adminApp } from "../../ee/admin/routes/admin";
 import { app as agentsApp } from "../app/api/agents/[[...route]]/app";
 import { app as analyticsApp } from "../app/api/analytics/[...route]/app";
 import { app as apiKeysApp } from "../app/api/api-keys/[[...route]]/app";
+import { app as codingAgentApp } from "../app/api/coding-agent/[[...route]]/app";
 import { app as copilotKitApp } from "../app/api/copilotkit/[[...route]]/app";
 import { app as dashboardsApp } from "../app/api/dashboards/[[...route]]/app";
 import { app as datasetApp } from "../app/api/dataset/[[...route]]/app";
@@ -56,7 +57,7 @@ import {
 } from "./routes/experiments-v3";
 import { app as gatewayInternalApp } from "./routes/gateway-internal";
 import { app as gatewayOpenApiApp } from "./routes/gateway-openapi";
-import { app as githubLangyApp } from "./routes/github-langy";
+import { app as githubApp } from "./routes/github";
 import { app as healthApp } from "./routes/health";
 import { app as healthChecksApp } from "./routes/health-checks";
 import { app as ingestionRoutesApp } from "./routes/ingest/ingestionRoutes";
@@ -113,6 +114,7 @@ export function createApiRouter() {
   api.route("/", agentsApp);
   api.route("/", analyticsApp);
   api.route("/", copilotKitApp);
+  api.route("/", codingAgentApp);
   api.route("/", dashboardsApp);
   api.route("/", datasetApp);
   api.route("/", evaluatorsApp);
@@ -165,7 +167,7 @@ export function createApiRouter() {
   api.route("/", playgroundApp);
   api.route("/", langyInternalApp);
   api.route("/", langyRelayApp);
-  api.route("/", githubLangyApp);
+  api.route("/", githubApp);
   api.route("/", scenarioGenerateApp);
   api.route("/", scimApp);
   api.route("/", webhooksApp);

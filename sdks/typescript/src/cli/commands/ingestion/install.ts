@@ -4,7 +4,13 @@ import {
   GovernanceCliError,
   mintIngestionKey,
 } from "@/cli/utils/governance/cli-api";
-import { isLoggedIn, loadConfig } from "@/cli/utils/governance/config";
+import {
+  isLoggedIn,
+  loadConfig,
+  saveConfig,
+} from "@/cli/utils/governance/config";
+import { installOpencodeSessionContextPlugin } from "@/cli/utils/governance/opencode-plugin";
+import { installSessionContextHooks } from "@/cli/utils/governance/session-context-hooks";
 import { writeCodexOtelBlock } from "@/cli/utils/codex-config-toml";
 
 /**
@@ -12,15 +18,17 @@ import { writeCodexOtelBlock } from "@/cli/utils/codex-config-toml";
  *
  * Distinct from the gateway-only `langwatch <tool>` wrapper (Path A).
  * Mints the user's personal ingest key (sk-lw-*), prints the OTLP
- * export block, and — for codex specifically — idempotently merges
- * the [otel] activation block into ~/.codex/config.toml so the user
- * pastes nothing manual.
+ * export block, and wires whatever out-of-band activation the tool
+ * needs so the user pastes nothing manual.
  *
  * Tools handled today:
- *   - codex      : toml merge + env exports
- *   - claude_code: env exports (no toml needed)
+ *   - codex      : toml merge + env exports + the session context hooks
+ *                  merged into the codex hooks.json
+ *   - claude_code: env exports + the session context hooks merged into
+ *                  ~/.claude/settings.json
  *   - gemini     : env exports (no toml needed; envs are read directly)
- *   - opencode   : env exports (no toml needed)
+ *   - opencode   : env exports + the session context plugin written into
+ *                  the opencode plugins directory
  *
  * Returning early when the slug isn't recognised keeps the surface
  * forward-compatible — adding a new template is a one-line edit
@@ -37,7 +45,7 @@ type SupportedTool = (typeof SUPPORTED_TOOLS)[number];
 
 export interface InstallOptions {
   json?: boolean;
-  /** Suppress the toml write; useful for previewing exports only. */
+  /** Suppress the config-file writes; useful for previewing exports only. */
   envOnly?: boolean;
   /**
    * Override the codex config.toml path. Test-only — exposed because
@@ -45,6 +53,13 @@ export interface InstallOptions {
    * keeps the default unless explicitly threaded through.
    */
   codexConfigPath?: string;
+  /**
+   * Override the hook file the session context hooks are merged into
+   * (claude's settings.json, codex's hooks.json). Test-only, same reason.
+   */
+  hooksPath?: string;
+  /** Override the opencode plugins directory. Test-only, same reason. */
+  opencodePluginDir?: string;
 }
 
 interface InstallReport {
@@ -55,6 +70,12 @@ interface InstallReport {
   token_prefix: string;
   codex_config_action?: "created" | "updated" | "unchanged";
   codex_config_path?: string;
+  /**
+   * How the tool's session context seam was left: the hook entries for
+   * claude_code and codex, the plugin file for opencode.
+   */
+  session_hooks_action?: "created" | "updated" | "unchanged";
+  session_hooks_path?: string;
   env_block: string[];
 }
 
@@ -115,6 +136,22 @@ async function runInstall(
   const { token, prefix, endpoint } = await mintIngestionKey(cfg, tool);
   const envBlock = buildEnvBlock(tool, endpoint, token);
 
+  // Minting revokes the tool's previous key, so the config cache is now stale
+  // and everything reading it (the wrapper's reuse path, the session-context
+  // hook's fallback target) would authenticate with a dead key. Best-effort:
+  // a config we cannot write is not a reason to fail an install that worked.
+  try {
+    saveConfig({
+      ...cfg,
+      default_personal_ingest_keys: {
+        ...(cfg.default_personal_ingest_keys ?? {}),
+        [tool]: { secret: token, prefix },
+      },
+    });
+  } catch {
+    // The env block above is still valid; only the cache went unwritten.
+  }
+
   const report: InstallReport = {
     tool,
     source_type: tool,
@@ -139,6 +176,28 @@ async function runInstall(
     );
     report.codex_config_action = result.action;
     report.codex_config_path = result.path;
+  }
+
+  // Every agent knows which repository, branch and worktree a session runs in
+  // and exports none of it over telemetry. The session context seam is what
+  // reports it, so activating capture installs it alongside the export block.
+  if (!options.envOnly) {
+    if (tool === "claude_code" || tool === "codex") {
+      const result = installSessionContextHooks({
+        tool,
+        filePath: options.hooksPath,
+      });
+      report.session_hooks_action = result.action;
+      report.session_hooks_path = result.displayPath;
+    }
+
+    if (tool === "opencode") {
+      const result = installOpencodeSessionContextPlugin({
+        dirPath: options.opencodePluginDir,
+      });
+      report.session_hooks_action = result.action;
+      report.session_hooks_path = result.displayPath;
+    }
   }
 
   return report;
@@ -245,6 +304,17 @@ function renderHumanReport(report: InstallReport): void {
     );
   }
 
+  if (report.session_hooks_action) {
+    const hooksVerb =
+      report.session_hooks_action === "unchanged"
+        ? "already up to date"
+        : report.session_hooks_action;
+    const what = report.tool === "opencode" ? "session plugin" : "session hooks";
+    process.stdout.write(
+      `${chalk.green("✓")} ${report.session_hooks_path} ${what} ${hooksVerb}\n`,
+    );
+  }
+
   process.stdout.write("\nAdd to your shell rc (or run in this shell):\n");
   for (const line of report.env_block) {
     process.stdout.write(`  ${line}\n`);
@@ -254,7 +324,27 @@ function renderHumanReport(report: InstallReport): void {
     process.stdout.write(
       `\nThe [otel] activation block in your codex config.toml has been wired automatically.\n`,
     );
+    if (report.session_hooks_action) {
+      process.stdout.write(
+        `\nSession hooks were added to your Codex hooks file, so every session reports\n` +
+          `the repository, branch and worktree it ran in. Your own hooks are untouched.\n` +
+          `Codex asks you to review a newly added hook the next time you start it, and it\n` +
+          `will not run until you do.\n`,
+      );
+    }
+  } else if (report.tool === "claude_code" && report.session_hooks_action) {
+    process.stdout.write(
+      `\nSession hooks were added to your Claude Code settings, so every session reports\n` +
+        `the repository, branch and worktree it ran in. Your own hooks are untouched.\n`,
+    );
   } else if (report.tool === "opencode") {
+    if (report.session_hooks_action) {
+      process.stdout.write(
+        `\nA session plugin was added to your opencode plugins directory, so every session\n` +
+          `reports the repository, branch and worktree it ran in. Your own plugins are\n` +
+          `untouched.\n`,
+      );
+    }
     process.stdout.write(
       `\nNote: opencode 1.14 emits structural spans but no gen_ai.* attributes yet.\n` +
         `Spans will land but per-call tokens/model/cost wait on upstream semconv support.\n`,

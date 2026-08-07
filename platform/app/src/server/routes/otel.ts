@@ -20,7 +20,6 @@ import { createLogger } from "@langwatch/observability";
 import { SpanKind, SpanStatusCode } from "@opentelemetry/api";
 import type { IExportTraceServiceRequest } from "@opentelemetry/otlp-transformer";
 import * as root from "@opentelemetry/otlp-transformer/build/src/generated/root";
-import { bodyLimit } from "hono/body-limit";
 import { getLangWatchTracer } from "langwatch";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import {
@@ -44,6 +43,7 @@ import {
 } from "~/server/otel/parseOtlpBody";
 import { decodeBase64OpenTelemetryId } from "~/server/tracer/utils";
 import { captureException } from "~/utils/posthogErrorCapture";
+import { bodyLimit } from "./_lib/body-limit";
 
 const traceRequestType = (root as any).opentelemetry.proto.collector.trace.v1
   .ExportTraceServiceRequest;

@@ -812,6 +812,12 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [Update an agent by its id](https://langwatch.ai/docs/api-reference/agents/update-agents.md)
 - [Archive an agent](https://langwatch.ai/docs/api-reference/agents/delete-agents.md)
 
+## Coding Agents
+
+- [Overview](https://langwatch.ai/docs/api-reference/coding-agents/overview.md): Read what a coding agent session did and what it cost. Walk one session's events call by call, with the tokens, cost and compactions of each, or roll a whole pull request up into sessions, tokens and cost per project, user and agent.
+- [Get pull request coding agent usage](https://langwatch.ai/docs/api-reference/coding-agents/get-pull-request-coding-agent-usage.md)
+- [List coding agent session events](https://langwatch.ai/docs/api-reference/coding-agents/list-coding-agent-session-events.md)
+
 ## Triggers
 
 - [Overview](https://langwatch.ai/docs/api-reference/triggers/overview.md): Manage automation triggers that fire actions based on trace events. Create Slack notifications, webhooks, and other automated responses.

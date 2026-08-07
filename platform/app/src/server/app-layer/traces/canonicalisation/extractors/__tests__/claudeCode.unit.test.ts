@@ -5,6 +5,7 @@ import {
   ClaudeCodeExtractor,
   extractAssistantOutputFromResponseBody,
   extractAssistantTextFromResponseBody,
+  extractSessionTitleFromResponseBody,
   isConversationalQuerySource,
 } from "../claudeCode";
 import {
@@ -341,6 +342,64 @@ describe("extractAssistantOutputFromResponseBody", () => {
     expect(extractAssistantOutputFromResponseBody("")).toBeNull();
     expect(extractAssistantOutputFromResponseBody("{not json")).toBeNull();
     expect(extractAssistantOutputFromResponseBody(null)).toBeNull();
+  });
+});
+
+describe("extractSessionTitleFromResponseBody", () => {
+  const titleBody = (text: string): string =>
+    JSON.stringify({ content: [{ type: "text", text }] });
+
+  describe("given the title generator's own reply", () => {
+    /** @scenario The title lifts from a generate_session_title response body, capped */
+    it("reads the title out of the JSON text block", () => {
+      expect(
+        extractSessionTitleFromResponseBody(
+          titleBody('{"title": "Fix the flaky session fold test"}'),
+        ),
+      ).toBe("Fix the flaky session fold test");
+    });
+
+    /** @scenario The title lifts from a generate_session_title response body, capped */
+    it("caps a title long enough to be something other than a title", () => {
+      const title = extractSessionTitleFromResponseBody(
+        titleBody(JSON.stringify({ title: "b".repeat(4_000) })),
+      );
+      expect(title).toHaveLength(512);
+    });
+  });
+
+  describe("given a body that is not a title", () => {
+    /** @scenario An unparseable title body sets no title */
+    it("answers null for every deviation instead of guessing", () => {
+      // Unparseable body, and the truncation claude applies past its inline cap.
+      expect(extractSessionTitleFromResponseBody("{not json")).toBeNull();
+      expect(
+        extractSessionTitleFromResponseBody(
+          '{"content":[{"type":"text","text":"{\\"title\\": \\"Fix the fl',
+        ),
+      ).toBeNull();
+      // Parseable body whose text is prose, not the title JSON.
+      expect(
+        extractSessionTitleFromResponseBody(titleBody("Done, pushed.")),
+      ).toBeNull();
+      // Right shape, wrong type or empty.
+      expect(
+        extractSessionTitleFromResponseBody(titleBody('{"title": 7}')),
+      ).toBeNull();
+      expect(
+        extractSessionTitleFromResponseBody(titleBody('{"title": "   "}')),
+      ).toBeNull();
+      expect(
+        extractSessionTitleFromResponseBody(titleBody('["a title"]')),
+      ).toBeNull();
+      // No text block at all.
+      expect(
+        extractSessionTitleFromResponseBody(
+          JSON.stringify({ content: [{ type: "tool_use", name: "Bash" }] }),
+        ),
+      ).toBeNull();
+      expect(extractSessionTitleFromResponseBody("")).toBeNull();
+    });
   });
 });
 

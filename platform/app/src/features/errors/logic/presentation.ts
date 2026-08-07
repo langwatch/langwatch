@@ -700,6 +700,23 @@ const presentations = {
     title: "Your account doesn't include this",
     describe: () => "Ask an admin on your team to upgrade your access.",
   },
+  personal_project_key_required: {
+    // Reached with a key in hand, so the answer is which key to use instead.
+    // "Personal workspace" is the name the product uses on the page the right
+    // key comes from, which is what makes it findable rather than a rule.
+    title: "That API key isn't for a personal workspace",
+    describe: () =>
+      "This shows one person's own activity, so it needs the API key from your personal workspace. A shared or team workspace key covers everybody in it and can't answer for one person.",
+  },
+  personal_usage_key_mismatch: {
+    // A deliberate denial rather than a mistake to correct: being allowed to
+    // view somebody's workspace is not the same as it being yours, so the copy
+    // has to close the retry rather than invite one. Nothing here names whose
+    // workspace it is, which is the question the refusal exists to withhold.
+    title: "That workspace is somebody else's",
+    describe: () =>
+      "A key only reports on the personal workspace it belongs to, even where you can otherwise view the workspace. Use the API key from your own personal workspace.",
+  },
   personal_workspace_not_managed_here: {
     // Whoever reads this was managing somebody's access, so the answer has to
     // say why there is nothing to manage here rather than restate the rule. An
@@ -1453,6 +1470,35 @@ const presentations = {
   guardrail_attach_forbidden: {
     title: "You don't have permission to attach guardrails",
     describe: () => "Ask an admin on your team for access to this project.",
+  },
+  github_not_connected: {
+    title: "GitHub is not connected",
+    describe: () =>
+      "Connect GitHub for this organization in Settings, Integrations. An organization admin can do it.",
+  },
+  github_installation_suspended: {
+    // Only a person on github.com can lift a suspension, so there is nothing to
+    // retry and nothing to change in LangWatch.
+    title: "The GitHub connection is suspended",
+    describe: () =>
+      "GitHub has suspended the LangWatch app for this account. Resume it from the app's page on GitHub.",
+  },
+  github_repo_not_accessible: {
+    title: "That repository isn't available to LangWatch",
+    describe: () =>
+      "The GitHub app doesn't have access to that repository. Grant it access from Settings, Integrations, Configure, then try again.",
+  },
+  github_rate_limited: {
+    // fault: provider. Nobody did anything wrong, GitHub is simply throttling.
+    title: "GitHub is rate limiting requests",
+    describe: () => "Try again in a few minutes.",
+  },
+  github_pr_not_mapped: {
+    // Two causes, one sentence each: the repository was never connected, or it
+    // was and the mapping has not run yet. Both are waits, not mistakes.
+    title: "That pull request isn't linked yet",
+    describe: () =>
+      "Connect the repository in Settings, Integrations, or wait a few minutes for the linking to catch up.",
   },
   virtual_key_not_found: {
     title: "Virtual key not found",

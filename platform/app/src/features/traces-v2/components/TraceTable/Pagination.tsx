@@ -1,7 +1,7 @@
 import { Button, Flex, IconButton, Skeleton, Text } from "@chakra-ui/react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import type React from "react";
-import type { TraceListCursor } from "../../stores/filterStore";
+import type { PageCursor } from "../../stores/filterStore";
 import { useFilterStore } from "../../stores/filterStore";
 import { useTraceTableScrollElement } from "./scrollContext";
 
@@ -10,8 +10,10 @@ const PAGE_SIZE_OPTIONS = [25, 50, 100, 250, 500, 1000] as const;
 interface PaginationProps {
   totalHits: number;
   /** Cursor returned by the current batch; null means the end. */
-  nextCursor?: TraceListCursor | null;
+  nextCursor?: PageCursor | null;
   visibleCount?: number;
+  /** What one row is, for the totals copy: "traces" (default) or "sessions". */
+  itemNoun?: string;
   /**
    * Renders a placeholder bar in place of the rows-per-page selector +
    * "Page X of Y" copy while data is loading, so the pagination row
@@ -23,14 +25,49 @@ interface PaginationProps {
   isLoading?: boolean;
   /** Prevent page-racing only while a different page key is replacing data. */
   isTransitioning?: boolean;
+  /**
+   * Upper bound of the active lens's page-size domain. The rows-per-page
+   * preference is shared across lenses, so a larger persisted value clamps
+   * to this bound for the range copy and the highlighted option, and sizes
+   * beyond it are not offered. Unset means the full option list applies.
+   */
+  maxPageSize?: number;
 }
+
+const PageSizeSelector: React.FC<{
+  options: readonly number[];
+  selected: number;
+  onSelect: (size: number) => void;
+}> = ({ options, selected, onSelect }) => (
+  <Flex align="center" gap={0.5}>
+    <Text textStyle="xs" color="fg.subtle" flexShrink={0}>
+      Rows
+    </Text>
+    {options.map((size) => (
+      <Button
+        key={size}
+        variant="ghost"
+        size="2xs"
+        color={selected === size ? "fg" : "fg.subtle"}
+        fontWeight={selected === size ? "semibold" : "normal"}
+        onClick={() => onSelect(size)}
+        paddingX={1.5}
+        minWidth="auto"
+      >
+        {size}
+      </Button>
+    ))}
+  </Flex>
+);
 
 export const Pagination: React.FC<PaginationProps> = ({
   totalHits,
   nextCursor = null,
   visibleCount = 0,
+  itemNoun = "traces",
   isLoading = false,
   isTransitioning = false,
+  maxPageSize,
 }) => {
   const page = useFilterStore((s) => s.page);
   const pageSize = useFilterStore((s) => s.pageSize);
@@ -39,8 +76,17 @@ export const Pagination: React.FC<PaginationProps> = ({
   const setPageSize = useFilterStore((s) => s.setPageSize);
   const scrollElement = useTraceTableScrollElement();
 
+  // The size the data source actually pages by, which is what the range
+  // copy must count by when the shared preference exceeds the lens's cap.
+  const effectivePageSize =
+    maxPageSize !== undefined ? Math.min(pageSize, maxPageSize) : pageSize;
+  const sizeOptions =
+    maxPageSize !== undefined
+      ? PAGE_SIZE_OPTIONS.filter((size) => size <= maxPageSize)
+      : PAGE_SIZE_OPTIONS;
+
   const safePage = Math.max(page, 1);
-  const rangeStart = (safePage - 1) * pageSize + 1;
+  const rangeStart = (safePage - 1) * effectivePageSize + 1;
   const rangeEnd = rangeStart + Math.max(visibleCount - 1, 0);
   // A background refresh of the CURRENT page must not lock navigation. On a
   // busy live project SSE can keep `isFetching` true almost continuously;
@@ -56,7 +102,7 @@ export const Pagination: React.FC<PaginationProps> = ({
 
   const goToNext = () => {
     if (busy || !nextCursor) return;
-    setPageCursor(safePage + 1, nextCursor);
+    setPageCursor({ page: safePage + 1, cursor: nextCursor });
     setPage(safePage + 1);
     scrollElement?.scrollTo({ top: 0, behavior: "auto" });
   };
@@ -79,27 +125,13 @@ export const Pagination: React.FC<PaginationProps> = ({
         <Skeleton height="14px" width="240px" borderRadius="sm" />
       ) : (
         <>
-          <Flex align="center" gap={0.5}>
-            <Text textStyle="xs" color="fg.subtle" flexShrink={0}>
-              Rows
-            </Text>
-            {PAGE_SIZE_OPTIONS.map((size) => (
-              <Button
-                key={size}
-                variant="ghost"
-                size="2xs"
-                color={pageSize === size ? "fg" : "fg.subtle"}
-                fontWeight={pageSize === size ? "semibold" : "normal"}
-                onClick={() => setPageSize(size)}
-                paddingX={1.5}
-                minWidth="auto"
-              >
-                {size}
-              </Button>
-            ))}
-          </Flex>
+          <PageSizeSelector
+            options={sizeOptions}
+            selected={effectivePageSize}
+            onSelect={setPageSize}
+          />
           <Text textStyle="xs" color="fg.subtle">
-            {totalHits.toLocaleString()} traces · showing {rangeStart}–
+            {totalHits.toLocaleString()} {itemNoun} · showing {rangeStart}–
             {rangeEnd}
           </Text>
         </>

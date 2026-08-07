@@ -842,6 +842,113 @@ describe("CodingAgentSessionClickHouseRepository list-read dedup scope", () => {
 });
 
 /**
+ * A client that records the tenants each query was sent with and answers with
+ * the rows it was given. One per endpoint, so a read that fans out is visible
+ * as two recorded queries rather than one.
+ */
+function endpointClient(rows: Array<Record<string, unknown>>): {
+  client: ClickHouseClient;
+  sentTenantIds: () => string[][];
+} {
+  const sent: string[][] = [];
+  const client = {
+    query: async (args: { query_params: Record<string, unknown> }) => {
+      sent.push(args.query_params.tenantIds as string[]);
+      return { json: async () => rows };
+    },
+  } as unknown as ClickHouseClient;
+  return { client, sentTenantIds: () => sent };
+}
+
+function branchSession({
+  tenantId,
+  sessionId,
+  costUsd,
+}: {
+  tenantId: string;
+  sessionId: string;
+  costUsd: number;
+}): Record<string, unknown> {
+  return {
+    TenantId: tenantId,
+    SessionId: sessionId,
+    StartedAt: chTime(WINDOW_FROM),
+    UpdatedAt: chTime(WINDOW_FROM),
+    CostUsd: costUsd,
+    Agent: "claude_code",
+    Models: ["claude-fable-5"],
+    UserId: "agent-1",
+    GitBranch: "feat/git-context",
+  };
+}
+
+describe("CodingAgentSessionClickHouseRepository branch-list routing", () => {
+  describe("given tenants that resolve to two different endpoints", () => {
+    describe("when the repository's branch sessions are listed", () => {
+      it("queries each endpoint for its own tenants and returns both answers", async () => {
+        const first = endpointClient([
+          branchSession({
+            tenantId: "tenant-a",
+            sessionId: "session-a",
+            costUsd: 3,
+          }),
+        ]);
+        const second = endpointClient([
+          branchSession({
+            tenantId: "tenant-b",
+            sessionId: "session-b",
+            costUsd: 4,
+          }),
+        ]);
+        const repository = new CodingAgentSessionClickHouseRepository(
+          async (tenantId) =>
+            tenantId === "tenant-a" ? first.client : second.client,
+        );
+
+        const listed = await repository.listByRepositoryBranch({
+          tenantIds: ["tenant-a", "tenant-b"],
+          repositoryHost: "github.com",
+          repositoryOwner: "acme",
+          repositoryName: "widgets",
+          branches: ["feat/git-context"],
+          startedAtFromMs: WINDOW_FROM,
+        });
+
+        expect(first.sentTenantIds()).toEqual([["tenant-a"]]);
+        expect(second.sentTenantIds()).toEqual([["tenant-b"]]);
+        expect(listed.map((row) => row.sessionId)).toEqual([
+          "session-a",
+          "session-b",
+        ]);
+        expect(listed.map((row) => row.costUsd)).toEqual([3, 4]);
+      });
+    });
+  });
+
+  describe("given tenants that all resolve to one endpoint", () => {
+    describe("when the repository's branch sessions are listed", () => {
+      it("asks for all of them in a single query", async () => {
+        const only = endpointClient([]);
+        const repository = new CodingAgentSessionClickHouseRepository(
+          async () => only.client,
+        );
+
+        await repository.listByRepositoryBranch({
+          tenantIds: ["tenant-a", "tenant-b"],
+          repositoryHost: "github.com",
+          repositoryOwner: "acme",
+          repositoryName: "widgets",
+          branches: ["feat/git-context"],
+          startedAtFromMs: WINDOW_FROM,
+        });
+
+        expect(only.sentTenantIds()).toEqual([["tenant-a", "tenant-b"]]);
+      });
+    });
+  });
+});
+
+/**
  * Reads the list-read duration histogram's observation count straight off the
  * prom registry, for this table — a spy on a destructured copy would intercept
  * nothing and pass regardless. Deltas, never absolutes: the registry is

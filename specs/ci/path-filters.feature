@@ -55,6 +55,29 @@ Feature: CI path filters skip unnecessary workflows on non-code changes
     Then all workflows run regardless of which files changed
 
   # ============================================================================
+  # Live ingest coverage
+  # ============================================================================
+
+  @unit
+  Scenario: A change to the app's HTTP ingest spine runs the SDK end-to-end job
+    Given the SDK end-to-end job is the only check that posts real telemetry to a running server
+    When a PR changes the app's ingest routes, their router, their OpenTelemetry body reader, or the server entrypoint
+    Then the SDK end-to-end job runs even though no SDK file changed
+
+  @unit
+  Scenario: A change to the app's HTTP ingest spine does not run the paid SDK test job
+    Given the SDK test job drives live model traffic through the AI Gateway
+    When a PR changes app code and no SDK file
+    Then the SDK test job stays skipped
+
+  @unit
+  Scenario: Every path filter the SDK workflow reads is declared by the change detector
+    Given the change detector exposes only the outputs it declares
+    And an undeclared output reads as an empty string rather than failing
+    When the SDK workflow gates a job on a path filter
+    Then that filter is declared as an output of the change detector and forced true on non-diff events
+
+  # ============================================================================
   # Dependency scanners are path-gated, secret and SAST scanners are not
   # ============================================================================
 

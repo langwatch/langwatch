@@ -39,6 +39,7 @@ import type { TriggerService } from "../app-layer/automations/trigger.service";
 import type { BillingCheckpointService } from "../app-layer/billing/billingCheckpoint.service";
 import type { BroadcastService } from "../app-layer/broadcast/broadcast.service";
 import type { CodingAgentSessionRepository } from "../app-layer/coding-agent/repositories/coding-agent-session.repository";
+import type { CodingAgentSessionEventsRepository } from "../app-layer/coding-agent/repositories/coding-agent-session-events.repository";
 import type { CodingAgentTraceSessionRepository } from "../app-layer/coding-agent/repositories/coding-agent-trace-session.repository";
 import type { SessionMetricSeriesRepository } from "../app-layer/coding-agent/repositories/session-metric-series.repository";
 import { getAzureSafetyEnvFromProject } from "../app-layer/evaluations/azure-safety-env.server";
@@ -100,9 +101,14 @@ import { createCodingAgentProcessingPipeline } from "./pipelines/coding-agent-pr
 import type { CodingAgentSessionState } from "./pipelines/coding-agent-processing/projections/codingAgentSession.foldProjection";
 import { CodingAgentSessionStore } from "./pipelines/coding-agent-processing/projections/codingAgentSession.store";
 import {
+  CodingAgentSessionEventsAppendStore,
   CodingAgentTraceSessionAppendStore,
   SessionMetricSeriesAppendStore,
 } from "./pipelines/coding-agent-processing/projections/stores";
+import {
+  createPullRequestMappingReactor,
+  type PullRequestMappingReactorDeps,
+} from "./pipelines/coding-agent-processing/reactors/pullRequestMapping.reactor";
 import { createCodingAgentLogFactsDispatchSubscriber } from "./pipelines/coding-agent-processing/subscribers/codingAgentLogFactsDispatch.subscriber";
 import { createCodingAgentMetricFactsDispatchSubscriber } from "./pipelines/coding-agent-processing/subscribers/codingAgentMetricFactsDispatch.subscriber";
 import { createCodingAgentSpanFactsDispatchSubscriber } from "./pipelines/coding-agent-processing/subscribers/codingAgentSpanFactsDispatch.subscriber";
@@ -126,6 +132,7 @@ import { createGatewaySpendProcessingPipeline } from "./pipelines/gateway-spend-
 import type { GatewaySpendState } from "./pipelines/gateway-spend-processing/projections/gatewaySpend.foldProjection";
 import { GatewaySpendStore } from "./pipelines/gateway-spend-processing/projections/gatewaySpend.store";
 import { GATEWAY_SPEND_PIPELINE_NAME } from "./pipelines/gateway-spend-processing/schemas/constants";
+import { createGithubMaintenancePipeline } from "./pipelines/github-maintenance/pipeline";
 import { createGovernanceEventsPipeline } from "./pipelines/governance-events/pipeline";
 import { createLangyConversationProcessingPipeline } from "./pipelines/langy-conversation-processing/pipeline";
 import type { LangyAnalyticsEventProjectionRecord } from "./pipelines/langy-conversation-processing/projections/langyAnalyticsEvent.mapProjection";
@@ -264,6 +271,8 @@ export interface PipelineRepositories {
   codingAgentTraceSession: CodingAgentTraceSessionRepository;
   /** ADR-056 §5: converged per-series metric totals per session. */
   sessionMetricSeries: SessionMetricSeriesRepository;
+  /** The per-call fact table: one row per session event (migration 00073). */
+  codingAgentSessionEvents: CodingAgentSessionEventsRepository;
   metricDataPointStorage: MetricDataPointRepository;
   /** ADR-034 Phase 1: per-span rollup repository (app-side, replaces the MV). */
   traceAnalyticsRollup: TraceAnalyticsRollupRepository;
@@ -346,6 +355,31 @@ export interface PipelineRegistryDeps {
   governanceKpisSync?: GovernanceKpisSyncReactorDeps;
   governanceOcsfEventsSync?: GovernanceOcsfEventsSyncReactorDeps;
   retentionPolicyResolver?: RetentionPolicyResolver;
+  codingAgent?: {
+    /**
+     * Maps a folded session's branch to its pull requests. Late-bound: the
+     * mapping service is composed after the registry (it needs the GitHub
+     * connection), so presets passes a `Deferred`'s callable proxy here.
+     * Omitted where there is no GitHub connection to ask.
+     */
+    pullRequestMapping: PullRequestMappingReactorDeps;
+  };
+  /**
+   * The fleet-wide GitHub linkage maintenance the scheduled process manager
+   * drives. Late-bound for the same reason `codingAgent` is: the mapping
+   * service and its repository are composed after the registry, so presets
+   * passes `Deferred` callable proxies. Omitted where there is no GitHub
+   * connection, in which case the pipeline is not registered at all.
+   */
+  github?: {
+    /** One recheck pass; returns how many branches were re-asked about. */
+    recheckDueBranches: () => Promise<number>;
+    /** One retention pass over the two linkage tables. */
+    pruneStaleBranchLinkage: () => Promise<{
+      branchChecks: number;
+      pullRequests: number;
+    }>;
+  };
 }
 
 /**
@@ -437,6 +471,25 @@ export class PipelineRegistry {
         },
       }),
     );
+
+    // Pull-request linkage maintenance, on the same footing. It used to be a
+    // `setTimeout` chain on every replica with no lock, so the fleet ran the
+    // same cross-tenant scan N times every ten minutes.
+    if (this.deps.github) {
+      const github = this.deps.github;
+      this.deps.eventSourcing.register(
+        createGithubMaintenancePipeline({
+          branchRecheck: {
+            recheck: () => github.recheckDueBranches(),
+            prune: () => github.pruneStaleBranchLinkage(),
+            deleteDispatchedBefore: (params) =>
+              this.deps.repositories.processStore.deleteDispatchedBefore(
+                params,
+              ),
+          },
+        }),
+      );
+    }
 
     const automationCommands = mapCommands(automationPipeline.commands);
     const evalPipeline = this.registerEvaluationPipeline({
@@ -823,6 +876,17 @@ export class PipelineRegistry {
         sessionMetricSeriesAppendStore: new SessionMetricSeriesAppendStore(
           this.deps.repositories.sessionMetricSeries,
         ),
+        codingAgentSessionEventsAppendStore:
+          new CodingAgentSessionEventsAppendStore(
+            this.deps.repositories.codingAgentSessionEvents,
+          ),
+        ...(this.deps.codingAgent
+          ? {
+              pullRequestMappingReactor: createPullRequestMappingReactor(
+                this.deps.codingAgent.pullRequestMapping,
+              ),
+            }
+          : {}),
       }),
     );
   }
