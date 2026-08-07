@@ -870,6 +870,7 @@ describe.skipIf(!hasTestcontainers)(
       });
 
       describe("when one payload in a coalesced batch is unprocessable", () => {
+        /** @scenario 'Payloads ahead of an unprocessable one still commit' */
         it("commits every payload ahead of it and narrows the failure to it alone", async () => {
           // Payloads AFTER the offender deliberately do not commit here: the
           // fold derives fields from arrival order, so applying j6 while j5 is
@@ -959,6 +960,7 @@ describe.skipIf(!hasTestcontainers)(
           expect(isolated.length).toBeGreaterThanOrEqual(1);
         });
 
+        /** @scenario 'Each half of a split stays in arrival order' */
         it("keeps each half in arrival order while splitting", async () => {
           const POISON = "j6";
           const attempted: TestPayload[][] = [];
@@ -1019,6 +1021,7 @@ describe.skipIf(!hasTestcontainers)(
       });
 
       describe("when payloads arrive out of order and the batch is bisected", () => {
+        /** @scenario "A split descent emits in the queue's order" */
         it("still processes every payload in the queue's order, across sub-batches", async () => {
           // The contiguity check above proves each sub-batch is internally
           // ordered. It cannot see the order the sub-batches RUN in — a
@@ -1084,6 +1087,7 @@ describe.skipIf(!hasTestcontainers)(
       });
 
       describe("when a coalesced batch fails only because it is too large", () => {
+        /** @scenario 'A batch too large for the handler converges by halving' */
         it("halves it until it fits and commits every payload once", async () => {
           const MAX_WORKABLE = 2;
           const seen: string[] = [];
@@ -1159,6 +1163,7 @@ describe.skipIf(!hasTestcontainers)(
       });
 
       describe("when a coalesced batch fails non-retryably", () => {
+        /** @scenario 'A non-retryable failure is never split' */
         it("fails fast without splitting", async () => {
           const attempts: number[] = [];
 
@@ -1203,6 +1208,7 @@ describe.skipIf(!hasTestcontainers)(
       });
 
       describe("when the split budget is set to zero", () => {
+        /** @scenario 'Setting the split budget to zero disables bisection' */
         it("never splits, restoring the pre-bisection behaviour", async () => {
           // The kill switch: an operator can disable bisection through the
           // environment rather than waiting on a deploy.
@@ -1255,6 +1261,7 @@ describe.skipIf(!hasTestcontainers)(
         // Driven through the bisector directly: this is about which delivery
         // flags the descent emits, and staged dispatch adds timing noise that
         // has nothing to do with the contract.
+        /** @scenario 'Sub-batches after the first commit are marked as continuations' */
         it("marks the sub-batches as continuations so their commits extend rather than replace", async () => {
           const deliveries: (JobDelivery | undefined)[] = [];
           let rootFailed = false;
@@ -1316,6 +1323,7 @@ describe.skipIf(!hasTestcontainers)(
         // how large a root the drain assembles varies with staging timing, and
         // this contract — bounded work per locked attempt — must hold for any
         // shape, so the test pins it on the worst one deterministically.
+        /** @scenario 'Splitting is bounded within one locked attempt' */
         it("stops splitting at the budget and rethrows to the retry path", async () => {
           const sizes: number[] = [];
           const queue = createQueue(async () => {}, {
