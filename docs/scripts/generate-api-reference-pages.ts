@@ -58,6 +58,9 @@ const UNDOCUMENTED_CALLER_IDENTITY =
 const UNDOCUMENTED_MODEL_DEFAULTS =
   "Not yet documented in the API reference: the default-model cascade routes have no reference pages yet.";
 
+const UNDOCUMENTED_GOVERNED_ANALYTICS_SQL =
+  "Not yet documented in the API reference: the governed analytics SQL routes ship behind the release_governed_sql_workbench flag and have no reference pages yet.";
+
 /**
  * Spec paths that deliberately get no reference page, each with the reason it
  * is excluded. Every other spec path has to be owned by an ENDPOINT_GROUPS
@@ -81,6 +84,10 @@ const SKIP_PATHS: Record<string, string> = {
   "/api/me/usage": UNDOCUMENTED_CALLER_IDENTITY,
   "/api/model-defaults": UNDOCUMENTED_MODEL_DEFAULTS,
   "/api/model-defaults/{id}": UNDOCUMENTED_MODEL_DEFAULTS,
+  "/api/v1/projects/{projectId}/analytics/query/clickhouse":
+    UNDOCUMENTED_GOVERNED_ANALYTICS_SQL,
+  "/api/v1/projects/{projectId}/analytics/schema":
+    UNDOCUMENTED_GOVERNED_ANALYTICS_SQL,
 };
 
 const ENDPOINT_GROUPS: EndpointGroup[] = [
