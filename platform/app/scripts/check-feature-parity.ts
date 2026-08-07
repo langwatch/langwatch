@@ -485,7 +485,6 @@ const LEGACY_INERT: string[] = [
   "specs/model-config/model-parameter-display.feature",
   "specs/model-config/model-selector-ux.feature",
   "specs/model-config/unified-reasoning-ui.feature",
-  "specs/model-providers/codex-account-provider.feature",
   "specs/model-providers/custom-model-max-tokens.feature",
   "specs/model-providers/default-provider.feature",
   "specs/model-providers/provider-list.feature",
