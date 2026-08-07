@@ -187,6 +187,21 @@ const presentations = {
     describe: () =>
       "This project doesn't have the SQL workbench enabled yet. Ask your administrator to switch it on.",
   },
+  saved_workbench_chart_not_found: {
+    title: "That saved chart isn't here",
+    describe: () =>
+      "It may have been deleted, or it belongs to another project. Check the list of saved charts.",
+  },
+  saved_workbench_chart_specification_refused: {
+    title: "This chart specification isn't allowed",
+    describe: () =>
+      "The specification reads something the chart policy doesn't permit. Repair the parts it names and save again.",
+  },
+  saved_workbench_chart_definition_invalid: {
+    title: "This saved chart can't be opened",
+    describe: () =>
+      "We can't read what was stored for it. Rebuild the chart in the workbench and save it again.",
+  },
   governed_sql_unavailable: {
     title: "Analytics SQL isn't available here",
     describe: () =>

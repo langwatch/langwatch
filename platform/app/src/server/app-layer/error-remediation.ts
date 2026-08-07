@@ -100,6 +100,25 @@ const registry = {
       "Ask an administrator to enable the SQL workbench for this project",
     ],
   },
+  saved_workbench_chart_not_found: {
+    tips: [
+      "Check the chart id — a chart saved in another project is not readable from this one",
+      "List the project's saved charts to see which ids exist",
+    ],
+  },
+  saved_workbench_chart_specification_refused: {
+    tips: [
+      "Read `meta.errors` — each entry names the rule (`rule`) and the JSON path (`path`) that was refused",
+      "A specification may only read the datasets the workbench registers, and may not load anything over the network",
+      "The same specification is refused when rendering, so saving it unchanged will not help",
+    ],
+  },
+  saved_workbench_chart_definition_invalid: {
+    tips: [
+      "This is a defect on our side — the stored chart cannot be read back and retrying will not help",
+      "Save the chart again from the workbench to replace the unreadable definition",
+    ],
+  },
   governed_sql_unavailable: {
     tips: [
       "The governed analytics SQL API is not provisioned on this deployment — retrying will not help",

@@ -69,7 +69,10 @@ import {
 } from "./executor";
 import { describeGovernedSchema, type GovernedSchema } from "./schema";
 import { governedSqlValidationError } from "./validation/errors";
-import { validateGovernedSql } from "./validation/validate";
+import {
+  type AcceptedGovernedSql,
+  validateGovernedSql,
+} from "./validation/validate";
 
 const logger = createLogger("langwatch:analytics:governed-sql");
 
@@ -177,20 +180,36 @@ export class GovernedSqlService {
   }
 
   /**
-   * Validates a submitted statement against this caller's permissions, then
-   * executes it as the restricted identity.
+   * Decides whether a statement may run for these permissions, without running
+   * it — steps 2 and 3 of the order this file documents.
+   *
+   * Exposed as its own step because a second caller needs the verdict and not
+   * the rows: saving a workbench chart stores SQL that will be executed later,
+   * by whoever opens it, and must refuse at write what the query endpoint would
+   * refuse at run (`server/analytics/saved-workbench-charts`). That caller
+   * asking this rather than re-deriving the policy is what keeps one refusal
+   * decision in the codebase — and {@link execute} calling it too is what stops
+   * the two drifting apart.
+   *
+   * Needs no executor: a deployment with no restricted identity still knows
+   * what it would have refused.
    *
    * @throws the validator's handled error when the policy refuses the query,
-   *   {@link GovernedSqlParameterMissingError} when a declared parameter has no
-   *   value, and {@link GovernedSqlUnavailableError} when no governed identity
-   *   is provisioned.
+   *   and {@link GovernedSqlParameterMissingError} when a declared parameter
+   *   has no value.
    */
-  async execute({
-    project,
+  validate({
+    projectId,
     protections,
     sql,
     parameters,
-  }: GovernedSqlExecuteInput): Promise<GovernedSqlQueryResult> {
+  }: {
+    /** Logged with a refusal. The database, not this, decides the tenant. */
+    readonly projectId: string;
+    readonly protections: Protections;
+    readonly sql: string;
+    readonly parameters?: Readonly<Record<string, unknown>>;
+  }): AcceptedGovernedSql {
     const validation = validateGovernedSql({
       sql,
       // The datasets this caller can reach, not every dataset the catalog has.
@@ -213,7 +232,7 @@ export class GovernedSqlService {
     if (!validation.ok) {
       logger.info(
         {
-          projectId: project.id,
+          projectId,
           violations: validation.violations.map((violation) => violation.code),
         },
         "governed SQL refused by policy",
@@ -226,6 +245,31 @@ export class GovernedSqlService {
       .filter((name) => parameters?.[name] === undefined)
       .sort();
     if (missing.length > 0) throw new GovernedSqlParameterMissingError(missing);
+
+    return validation;
+  }
+
+  /**
+   * Validates a submitted statement against this caller's permissions, then
+   * executes it as the restricted identity.
+   *
+   * @throws the validator's handled error when the policy refuses the query,
+   *   {@link GovernedSqlParameterMissingError} when a declared parameter has no
+   *   value, and {@link GovernedSqlUnavailableError} when no governed identity
+   *   is provisioned.
+   */
+  async execute({
+    project,
+    protections,
+    sql,
+    parameters,
+  }: GovernedSqlExecuteInput): Promise<GovernedSqlQueryResult> {
+    const validation = this.validate({
+      projectId: project.id,
+      protections,
+      sql,
+      ...(parameters ? { parameters } : {}),
+    });
 
     // Fail closed. The check is here rather than in the constructor so that a
     // deployment with no governed identity still answers the schema endpoint,

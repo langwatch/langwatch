@@ -729,8 +729,17 @@ model CustomGraph {
   projectId String
   project   Project  @relation(fields: [projectId], references: [id])
   name      String
+  /// The chart's definition, in the shape its `kind` names.
   graph     Json
   filters   Json?
+  /// Discriminator for the two chart shapes that share this table:
+  ///   - "builder" (default) - the chart builder's own `graph` payload
+  ///   - "workbench_sql"     - a saved governed SQL workbench chart, whose
+  ///     `graph` holds the versioned { sql, parameters, vegaLiteSpec }
+  ///     definition (see server/analytics/saved-workbench-charts)
+  /// Each reader filters by its own kind, so neither sees the other's rows and
+  /// a builder chart can never be interpreted as a workbench definition.
+  kind      String   @default("builder")
   createdAt DateTime @default(now())
   updatedAt DateTime @default(now()) @updatedAt
 
@@ -748,6 +757,7 @@ model CustomGraph {
 
   @@index([projectId])
   @@index([dashboardId])
+  @@index([projectId, kind])
 }
 
 model BatchEvaluation {
