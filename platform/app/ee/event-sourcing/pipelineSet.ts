@@ -1,7 +1,12 @@
 import { createIngestionPullProcessingPipeline } from "@ee/event-sourcing/pipelines/ingestion-pull-processing";
 import type { IngestionPullOutcomeCommands } from "@ee/event-sourcing/pipelines/ingestion-pull-processing/process-manager/ingestionPullEffects";
+import { createPulledUsageProcessingPipeline } from "@ee/event-sourcing/pipelines/pulled-usage-processing";
+import type { PulledUsageLedgerProcessDeps } from "@ee/governance/process-manager/pulledUsageLedger.process";
 import { reconcileIngestionPullProcesses } from "@ee/governance/services/pullers/ingestionPullLifecycle";
-import { runIngestionPull } from "@ee/governance/services/pullers/pullerWorker";
+import {
+  type PulledUsageDispatcher,
+  runIngestionPull,
+} from "@ee/governance/services/pullers/pullerWorker";
 import { PrismaIngestionPullRunProjectionRepository } from "@ee/governance/services/pullers/repositories/ingestion-pull-run-projection.prisma.repository";
 import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "@prisma/client";
@@ -14,13 +19,23 @@ const logger = createLogger("langwatch:enterprise:event-sourcing");
 export interface EnterprisePipelineSetConfig {
   prisma: PrismaClient;
   runsWorkers: boolean;
+  /**
+   * The pulled-usage ledger writer. Absent without ClickHouse — the pipeline
+   * still records every observation, only the ledger row is skipped.
+   */
+  pulledUsageLedger?: PulledUsageLedgerProcessDeps;
 }
 
 type EnterprisePipelineRuntimeDeps = EnterprisePipelineSetConfig & {
   eventSourcing: EventSourcing;
 };
 
-function registerIngestionPullPipeline(deps: EnterprisePipelineRuntimeDeps) {
+function registerIngestionPullPipeline(
+  deps: EnterprisePipelineRuntimeDeps & {
+    /** The pulled-usage write surface the pull effect emits cost through. */
+    pulledUsage: PulledUsageDispatcher;
+  },
+) {
   // Late-bind the outcome commands: they are this same pipeline's own write
   // surface and exist only after `.build()`; dispatch happens long after that.
   let outcomeCommands: IngestionPullOutcomeCommands | null = null;
@@ -30,7 +45,10 @@ function registerIngestionPullPipeline(deps: EnterprisePipelineRuntimeDeps) {
         deps.prisma,
       ),
       dispatch: {
-        runPort: { run: runIngestionPull },
+        runPort: {
+          run: (params) =>
+            runIngestionPull({ ...params, pulledUsage: deps.pulledUsage }),
+        },
         commands: () => {
           if (!outcomeCommands) {
             throw new Error(
@@ -75,6 +93,21 @@ function registerIngestionPullPipeline(deps: EnterprisePipelineRuntimeDeps) {
 }
 
 /**
+ * The `pulled_usage` write surface (ADR-088).
+ *
+ * A sibling of the ingestion-pull pipeline rather than a part of it: that one
+ * is per-source and per-run, this one is per usage item, and a per-run stream
+ * cannot carry a per-item price. The puller effect dispatches
+ * `recordPulledUsage` in the same loop that writes the OCSF audit row.
+ */
+function registerPulledUsagePipeline(deps: EnterprisePipelineRuntimeDeps) {
+  const pipeline = deps.eventSourcing.register(
+    createPulledUsageProcessingPipeline({ ledger: deps.pulledUsageLedger }),
+  );
+  return { commands: mapCommands(pipeline.commands) };
+}
+
+/**
  * Registers the complete enterprise pipeline set with the shared
  * event-sourcing runtime. Domain definitions stay under /ee; their process
  * managers are declared on the pipelines (ADR-052 builder), so the shared
@@ -84,10 +117,24 @@ function registerIngestionPullPipeline(deps: EnterprisePipelineRuntimeDeps) {
 export function registerEnterprisePipelineSet(
   deps: EnterprisePipelineRuntimeDeps,
 ) {
-  const ingestionPull = registerIngestionPullPipeline(deps);
+  // Pulled usage registers first because the pull effect emits through it.
+  // Its commands exist the moment its own pipeline is built, so this one
+  // needs no late-binding getter — only the ingestion-pull pipeline's own
+  // outcome commands do, and those are its own write surface.
+  const pulledUsage = registerPulledUsagePipeline(deps);
+  const ingestionPull = registerIngestionPullPipeline({
+    ...deps,
+    // No cast. The dispatcher's argument type IS the command's, so renaming a
+    // field on the event schema breaks this line at compile time instead of
+    // surfacing as an outbox parse failure in production.
+    pulledUsage: { recordPulledUsage: pulledUsage.commands.recordPulledUsage },
+  });
 
   return {
-    commands: { ingestionPull: ingestionPull.commands },
+    commands: {
+      ingestionPull: ingestionPull.commands,
+      pulledUsage: pulledUsage.commands,
+    },
   };
 }
 
@@ -103,6 +150,9 @@ export function createNoopEnterprisePipelineCommands(): EnterprisePipelineComman
       disable: noop,
       recordRunCompleted: noop,
       recordRunFailed: noop,
+    },
+    pulledUsage: {
+      recordPulledUsage: noop,
     },
   } satisfies EnterprisePipelineCommands;
 }

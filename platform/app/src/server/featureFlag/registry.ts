@@ -134,6 +134,23 @@ export const FEATURE_FLAGS = [
     family: "Collector",
   },
 
+  // Per-organization gate for pulled provider usage cost (ADR-088). Checked
+  // once per pull run, not per usage item. Off by default: with it off the
+  // puller behaves exactly as it did before — OCSF audit rows only, no
+  // `PulledUsageObserved` event and no ledger row — so enabling is an explicit
+  // opt-in for the first provider integration. It is the ADR's stated gate for
+  // "new pulled_usage event + ledger write", and the reason it is per-ORG
+  // rather than per-project is that pulled usage is attributed at org/team and
+  // has no project of its own (Decision 4, deferred).
+  {
+    key: "release_pulled_usage_cost_enabled",
+    scope: "PRODUCT",
+    defaultValue: false,
+    description:
+      "Records cost pulled from a provider's own usage/cost report as a priced record on the customer's usage screens (ADR-088). Off by default; enable per organization via the operator store or a PostHog rule. With it off the puller writes audit rows only. For local dev use FEATURE_FLAG_FORCE_ENABLE=release_pulled_usage_cost_enabled.",
+    family: "Governance",
+  },
+
   // ----- PRODUCT -----
   {
     key: "release_ui_ai_gateway_menu_enabled",
