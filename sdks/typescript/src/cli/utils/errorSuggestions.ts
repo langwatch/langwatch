@@ -46,6 +46,17 @@ const FALLBACK_BY_CODE: Record<string, ErrorExplanation> = {
       "Ask a workspace admin to grant you access to this project or resource",
     ],
   },
+  // The management APIs (organization, members, invites, roles, role bindings,
+  // groups, SCIM tokens) answer 402 below an Enterprise plan. Nothing the
+  // caller changes about the request fixes that, so the advice is the upgrade
+  // path rather than a retry.
+  enterprise_plan_required: {
+    suggestions: [
+      "This capability is part of the Enterprise plan; upgrade the organization's plan to use it",
+      "meta.feature names which capability was refused",
+    ],
+    docUrl: `${DOCS}/pricing`,
+  },
   not_found: {
     suggestions: [
       "Check the id or handle you passed",

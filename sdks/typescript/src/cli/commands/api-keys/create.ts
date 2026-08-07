@@ -2,8 +2,14 @@ import chalk from "chalk";
 import { createSpinner } from "../../utils/spinner";
 import { ApiKeysApiService } from "@/client-sdk/services/api-keys/api-keys-api.service";
 import { resolveCredentials } from "../../utils/apiKey";
+import {
+  parseBindingFlags,
+  parsePermissionFlags,
+  parsePermissionMode,
+} from "../../utils/managementFlags";
 import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
+import { withParsedFlags } from "../management/_shared";
 
 export interface CreateApiKeyOptions {
   name: string;
@@ -11,6 +17,13 @@ export interface CreateApiKeyOptions {
   description?: string;
   expiresAt?: string;
   projectId?: string[];
+  /** Repeatable `role:scopeType:scopeId` — precisely what the key may reach. */
+  binding?: string[];
+  /** Repeatable `resource:action`, for a restricted key. */
+  permission?: string[];
+  permissionMode?: string;
+  /** Organization admins only: the member the key acts as. */
+  assignedToUserId?: string;
 }
 
 /**
@@ -33,6 +46,18 @@ export const createApiKeyCommand = async (
     process.exit(1);
   }
 
+  const access = withParsedFlags(() => ({
+    bindings: parseBindingFlags(options.binding).map((binding) => ({
+      role: binding.role,
+      scopeType: binding.scopeType,
+      scopeId: binding.scopeId,
+    })),
+    permissions: parsePermissionFlags(options.permission),
+    ...(options.permissionMode !== undefined
+      ? { permissionMode: parsePermissionMode(options.permissionMode) }
+      : {}),
+  }));
+
   const service = new ApiKeysApiService();
   const keyType = options.keyType ?? "service";
   const spinner = createSpinner(`Creating ${keyType} API key "${options.name}"...`).start();
@@ -44,6 +69,16 @@ export const createApiKeyCommand = async (
       description: options.description,
       expiresAt: options.expiresAt,
       projectIds: options.projectId,
+      ...(options.assignedToUserId !== undefined
+        ? { assignedToUserId: options.assignedToUserId }
+        : {}),
+      ...(access.permissionMode !== undefined
+        ? { permissionMode: access.permissionMode }
+        : {}),
+      ...(access.permissions.length > 0
+        ? { permissions: access.permissions }
+        : {}),
+      ...(access.bindings.length > 0 ? { bindings: access.bindings } : {}),
     });
 
     spinner.succeed(`Created ${keyType} API key "${chalk.cyan(result.apiKey.name)}"`);

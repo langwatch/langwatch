@@ -124,6 +124,7 @@ export const SURFACE_LABEL: Record<CapabilitySurface, string> = {
   apiKeys: "API keys",
   modelProviders: "Model providers",
   gateway: "AI Gateway",
+  organization: "Organization",
   platform: "LangWatch",
 };
 
@@ -188,6 +189,10 @@ const SURFACE_ROUTE_CONFIG: Record<CapabilitySurface, SurfaceRouteConfig> = {
   apiKeys: { path: "settings/authentication", deepLink: false },
   modelProviders: { path: "settings/model-providers", deepLink: false },
   gateway: { path: "settings", deepLink: false },
+  // The provisioning pages all hang off the members screen, and none of them
+  // are project-scoped, so a card points at the surface and never deep-links
+  // into a specific member, role or binding.
+  organization: { path: "settings/members", deepLink: false },
   platform: { path: "settings", deepLink: false },
 };
 
@@ -362,6 +367,13 @@ export const SURFACE_BY_FEATURE: Record<string, CapabilitySurface> = {
   triggers: "automations",
   "settings.projects": "projects",
   "settings.api-keys": "apiKeys",
+  "settings.organization": "organization",
+  "settings.members": "organization",
+  "settings.teams": "organization",
+  "settings.groups": "organization",
+  "settings.roles": "organization",
+  "settings.role-bindings": "organization",
+  "settings.scim": "organization",
   "settings.model-providers": "modelProviders",
   "settings.secrets": "secrets",
 };

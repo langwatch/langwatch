@@ -1124,6 +1124,8 @@
               "cli": [
                 "api-keys list",
                 "api-keys create",
+                "api-keys get",
+                "api-keys update",
                 "api-keys revoke"
               ],
               "skill": null,
@@ -1145,6 +1147,263 @@
           "sync": null,
           "produces": [
             "api-keys"
+          ],
+          "consumes": []
+        },
+        {
+          "id": "settings.organization",
+          "name": "Organization",
+          "description": "Read and update the organization profile, and provision organizations on a self-hosted instance",
+          "surfaces": {
+            "code": {
+              "sdk": {
+                "python": null,
+                "typescript": null
+              },
+              "cli": [
+                "organization get",
+                "organization update",
+                "organizations create",
+                "organizations list",
+                "organizations get"
+              ],
+              "skill": null,
+              "docs": null
+            },
+            "platform": {
+              "ui": "/settings",
+              "mcp": [],
+              "skill": null,
+              "docs": null
+            },
+            "api": "/api/organization",
+            "docs": null
+          },
+          "sync": null,
+          "produces": [
+            "organizations"
+          ],
+          "consumes": []
+        },
+        {
+          "id": "settings.members",
+          "name": "Members and Invites",
+          "description": "Manage who belongs to the organization: member roles, access, removal, and pending invites",
+          "surfaces": {
+            "code": {
+              "sdk": {
+                "python": null,
+                "typescript": null
+              },
+              "cli": [
+                "members list",
+                "members get",
+                "members update",
+                "members disable",
+                "members enable",
+                "members remove",
+                "members access",
+                "invites list",
+                "invites create",
+                "invites revoke"
+              ],
+              "skill": null,
+              "docs": null
+            },
+            "platform": {
+              "ui": "/settings/members",
+              "mcp": [],
+              "skill": null,
+              "docs": null
+            },
+            "api": "/api/organization/members",
+            "docs": null
+          },
+          "sync": null,
+          "produces": [
+            "members",
+            "invites"
+          ],
+          "consumes": []
+        },
+        {
+          "id": "settings.teams",
+          "name": "Teams",
+          "description": "Create and manage the teams that group projects and people",
+          "surfaces": {
+            "code": {
+              "sdk": {
+                "python": null,
+                "typescript": null
+              },
+              "cli": [
+                "teams list",
+                "teams get",
+                "teams create",
+                "teams update",
+                "teams archive",
+                "teams members list",
+                "teams members add",
+                "teams members remove"
+              ],
+              "skill": null,
+              "docs": null
+            },
+            "platform": {
+              "ui": "/settings/teams",
+              "mcp": [],
+              "skill": null,
+              "docs": null
+            },
+            "api": "/api/teams",
+            "docs": null
+          },
+          "sync": null,
+          "produces": [
+            "teams"
+          ],
+          "consumes": []
+        },
+        {
+          "id": "settings.groups",
+          "name": "Access Groups",
+          "description": "Group members so a single role binding grants everyone in the group",
+          "surfaces": {
+            "code": {
+              "sdk": {
+                "python": null,
+                "typescript": null
+              },
+              "cli": [
+                "groups list",
+                "groups get",
+                "groups create",
+                "groups rename",
+                "groups delete",
+                "groups members list",
+                "groups members add",
+                "groups members remove",
+                "groups bindings list",
+                "groups bindings add",
+                "groups bindings remove"
+              ],
+              "skill": null,
+              "docs": null
+            },
+            "platform": {
+              "ui": "/settings/groups",
+              "mcp": [],
+              "skill": null,
+              "docs": null
+            },
+            "api": "/api/groups",
+            "docs": null
+          },
+          "sync": null,
+          "produces": [
+            "groups"
+          ],
+          "consumes": []
+        },
+        {
+          "id": "settings.roles",
+          "name": "Custom Roles",
+          "description": "Define custom roles from resource and action permissions, and read the permission catalog",
+          "surfaces": {
+            "code": {
+              "sdk": {
+                "python": null,
+                "typescript": null
+              },
+              "cli": [
+                "roles list",
+                "roles get",
+                "roles create",
+                "roles update",
+                "roles delete",
+                "roles permissions"
+              ],
+              "skill": null,
+              "docs": null
+            },
+            "platform": {
+              "ui": "/settings/roles",
+              "mcp": [],
+              "skill": null,
+              "docs": null
+            },
+            "api": "/api/roles",
+            "docs": null
+          },
+          "sync": null,
+          "produces": [
+            "custom-roles"
+          ],
+          "consumes": []
+        },
+        {
+          "id": "settings.role-bindings",
+          "name": "Role Bindings",
+          "description": "Grant a role to a user, a group or an API key at an organization, team or project scope",
+          "surfaces": {
+            "code": {
+              "sdk": {
+                "python": null,
+                "typescript": null
+              },
+              "cli": [
+                "role-bindings list",
+                "role-bindings create",
+                "role-bindings delete"
+              ],
+              "skill": null,
+              "docs": null
+            },
+            "platform": {
+              "ui": "/settings/role-bindings",
+              "mcp": [],
+              "skill": null,
+              "docs": null
+            },
+            "api": "/api/role-bindings",
+            "docs": null
+          },
+          "sync": null,
+          "produces": [
+            "role-bindings"
+          ],
+          "consumes": []
+        },
+        {
+          "id": "settings.scim",
+          "name": "SCIM Provisioning",
+          "description": "Mint and revoke the bearer tokens an identity provider uses to sync users and groups",
+          "surfaces": {
+            "code": {
+              "sdk": {
+                "python": null,
+                "typescript": null
+              },
+              "cli": [
+                "scim-tokens list",
+                "scim-tokens create",
+                "scim-tokens revoke"
+              ],
+              "skill": null,
+              "docs": null
+            },
+            "platform": {
+              "ui": "/settings/scim",
+              "mcp": [],
+              "skill": null,
+              "docs": null
+            },
+            "api": "/api/scim-tokens",
+            "docs": null
+          },
+          "sync": null,
+          "produces": [
+            "scim-tokens"
           ],
           "consumes": []
         },

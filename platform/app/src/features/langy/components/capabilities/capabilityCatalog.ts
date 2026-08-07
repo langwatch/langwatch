@@ -30,6 +30,9 @@ import type { DigestStrategy } from "@langwatch/langy";
  *
  * `gateway` covers the AI Gateway's org-level pages (virtual keys, budgets,
  * governance, ingestion) — settings surfaces, so never deep-linked.
+ * `organization` covers the provisioning surface (the organization itself,
+ * members, invites, teams, groups, roles, role bindings, SCIM tokens), which
+ * are settings pages too, so also never deep-linked.
  * `platform` is the fallback surface for a resource the catalog has never
  * heard of: a neutral icon, no deep link, wording from the command itself.
  */
@@ -53,6 +56,7 @@ export const CAPABILITY_SURFACES = [
   "apiKeys",
   "modelProviders",
   "gateway",
+  "organization",
   "platform",
 ] as const;
 
@@ -87,7 +91,9 @@ export type CapabilityIconName =
   | "coins"
   | "radioTower"
   | "shieldCheck"
-  | "slidersHorizontal";
+  | "slidersHorizontal"
+  | "users"
+  | "building";
 
 /** The verb tones a body override can key on (mirrors `CliVerbTone`). */
 type CatalogTone = "read" | "created" | "updated" | "removed";
@@ -285,6 +291,74 @@ export const CAPABILITY_CATALOG = {
         "ingestion-templates": "rows",
       },
     },
+  },
+  // ── Organization provisioning ──────────────────────────────────────────────
+  // Every one of these reads or writes access rather than product data, so they
+  // share the organization surface and none of them deep-links: the settings
+  // pages they belong to have no per-resource route.
+  organization: {
+    surface: "organization",
+    // One organization per credential, addressed by nothing: the result is the
+    // profile itself, so there is no id to hydrate from.
+    digestStrategy: "reduced",
+    noun: { singular: "organization", plural: "organization" },
+    icon: "building",
+  },
+  members: {
+    surface: "organization",
+    digestStrategy: "id-ref",
+    noun: { singular: "member", plural: "members" },
+    icon: "users",
+    body: {
+      // The access breakdown is a list of grants, not a single resource.
+      byVerb: { access: "rows" },
+    },
+  },
+  invites: {
+    surface: "organization",
+    digestStrategy: "id-ref",
+    noun: { singular: "invite", plural: "invites" },
+    icon: "users",
+  },
+  teams: {
+    surface: "organization",
+    digestStrategy: "id-ref",
+    noun: { singular: "team", plural: "teams" },
+    icon: "users",
+    body: { byVerb: { members: "rows" } },
+  },
+  groups: {
+    surface: "organization",
+    digestStrategy: "id-ref",
+    noun: { singular: "access group", plural: "access groups" },
+    icon: "users",
+    body: { byVerb: { members: "rows", bindings: "rows" } },
+  },
+  roles: {
+    surface: "organization",
+    digestStrategy: "id-ref",
+    noun: { singular: "custom role", plural: "custom roles" },
+    icon: "shieldCheck",
+    // The permission catalog is a reference table, not this org's roles.
+    body: { byVerb: { permissions: "rows" } },
+  },
+  "role-bindings": {
+    surface: "organization",
+    digestStrategy: "id-ref",
+    noun: { singular: "role binding", plural: "role bindings" },
+    icon: "shieldCheck",
+  },
+  "scim-tokens": {
+    surface: "organization",
+    digestStrategy: "id-ref",
+    noun: { singular: "SCIM token", plural: "SCIM tokens" },
+    icon: "key",
+  },
+  organizations: {
+    surface: "organization",
+    digestStrategy: "id-ref",
+    noun: { singular: "organization", plural: "organizations" },
+    icon: "building",
   },
   ingest: {
     surface: "gateway",
