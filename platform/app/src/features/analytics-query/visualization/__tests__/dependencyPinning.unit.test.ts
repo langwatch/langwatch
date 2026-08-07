@@ -39,27 +39,31 @@ describe("the Vega dependency set", () => {
       /** @scenario "The Vega dependency set is pinned and compatible" */
       it("declares all four as direct, exact-pinned, mutually compatible versions", () => {
         const manifest = readManifest(join(APP_ROOT, "package.json"));
-        const dependencies = manifest.dependencies ?? {};
+        // Browser-only libraries live in devDependencies (they exist at build
+        // time only; the bundler inlines them), which is where the manifest
+        // keeps every other UI package.
+        const devDependencies = manifest.devDependencies ?? {};
 
         for (const [name, version] of Object.entries(PINNED_VEGA_PACKAGES)) {
           expect(
-            dependencies[name],
-            `${name} must be a direct dependency`,
+            devDependencies[name],
+            `${name} must be a direct devDependency`,
           ).toBe(version);
           expect(
             /^[~^><=*]|\s|x/.test(version),
             `${name} must be exact-pinned`,
           ).toBe(false);
           expect(
-            manifest.devDependencies?.[name],
-            `${name} belongs in dependencies`,
+            manifest.dependencies?.[name],
+            `${name} belongs in devDependencies`,
           ).toBeUndefined();
         }
 
         // React is the peer react-vega@8 declares; a major bump on either side
         // has to be reconciled deliberately rather than resolved silently.
-        expect(dependencies.react).toBeDefined();
-        expect(dependencies.react?.startsWith("^19")).toBe(true);
+        const react = manifest.dependencies?.react;
+        expect(react).toBeDefined();
+        expect(react?.startsWith("^19")).toBe(true);
       });
 
       it("agrees with what the installed packages say they need", () => {
