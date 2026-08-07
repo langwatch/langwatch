@@ -2,6 +2,16 @@ import { PricingModel } from "@prisma/client";
 
 export type UsageUnit = "traces" | "events";
 
+/**
+ * Display labels for each usage unit (title case, for use as a label in
+ * internal alerts). Mirrors LIMIT_TYPE_DISPLAY_LABELS for resource limits so
+ * plan-limit and resource-limit alerts read the same way.
+ */
+export const USAGE_UNIT_DISPLAY_LABELS: Record<UsageUnit, string> = {
+  traces: "Monthly Traces",
+  events: "Monthly Events",
+} as const;
+
 export interface MeterDecision {
   usageUnit: UsageUnit;
   reason: string;
