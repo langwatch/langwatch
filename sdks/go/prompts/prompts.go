@@ -5,17 +5,17 @@
 //
 // The shape mirrors python-sdk byte-for-byte:
 //
-//   - PromptApiService.get
-//       langwatch.prompt.variables = JSON {"type":"json","value":{"prompt_id":"<id>"[,"tag":"<tag>"]}}
-//       langwatch.prompt.id        = "<handle>:<version>"  (only when both resolved)
+//	PromptApiService.get
+//	  langwatch.prompt.variables = JSON {"type":"json","value":{"prompt_id":"<id>"[,"tag":"<tag>"]}}
+//	  langwatch.prompt.id        = "<handle>:<version>"  (only when both resolved)
 //
-//   - Prompt.compile
-//       langwatch.prompt.id            = <id>           (optional)
-//       langwatch.prompt.handle        = <handle>       (optional)
-//       langwatch.prompt.version.id    = <version_id>   (optional)
-//       langwatch.prompt.version.number= <version_num>  (optional)
-//       langwatch.prompt.variables     = JSON {"type":"json","value":{...vars}}
-//       langwatch.prompt.draft         = true           (only when applied unsaved)
+//	Prompt.compile
+//	  langwatch.prompt.id            = <id>           (optional)
+//	  langwatch.prompt.handle        = <handle>       (optional)
+//	  langwatch.prompt.version.id    = <version_id>   (optional)
+//	  langwatch.prompt.version.number= <version_num>  (optional)
+//	  langwatch.prompt.variables     = JSON {"type":"json","value":{...vars}}
+//	  langwatch.prompt.draft         = true           (only when applied unsaved)
 //
 // Reference: python-sdk/src/langwatch/prompts/decorators/{prompt_service_tracing,prompt_tracing}.py.
 package prompts

@@ -64,6 +64,10 @@ export interface TraceProcessingPipelineDeps {
     TraceProcessingEvent,
     TraceSummaryData
   >;
+  trackedEventSyncReactor: ReactorDefinition<
+    TraceProcessingEvent,
+    TraceSummaryData
+  >;
   traceUpdateBroadcastReactor: ReactorDefinition<
     TraceProcessingEvent,
     TraceSummaryData
@@ -172,6 +176,11 @@ export function createTraceProcessingPipeline(
       "traceSummary",
       "customEvaluationSync",
       deps.customEvaluationSyncReactor,
+    )
+    .withReactor(
+      "traceSummary",
+      "trackedEventSync",
+      deps.trackedEventSyncReactor,
     )
     .withReactor(
       "traceSummary",
