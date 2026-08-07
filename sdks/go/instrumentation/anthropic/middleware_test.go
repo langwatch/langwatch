@@ -3,8 +3,10 @@ package anthropic
 import (
 	"context"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/anthropics/anthropic-sdk-go"
@@ -298,6 +300,208 @@ data: {"type":"message_stop"}
 	require.Len(t, outMsgs, 1)
 	assert.Equal(t, langwatch.ChatRoleAssistant, outMsgs[0].Role)
 	assert.Equal(t, "Let me reason. Answer", outMsgs[0].Content)
+}
+
+// TestMiddleware_Messages_NonStreaming_Thinking pins the buffered path to the
+// streamed one: the same extended-thinking response must produce the same
+// output text whether or not it was streamed. The streaming accumulator writes
+// thinking_delta into the output, so the buffered path must keep thinking
+// blocks too — see TestMiddleware_Messages_Streaming_Thinking, which asserts the
+// identical string.
+func TestMiddleware_Messages_NonStreaming_Thinking(t *testing.T) {
+	const respBody = `{"id":"msg_think_ns","type":"message","role":"assistant","model":"claude-opus-4-5","content":[{"type":"thinking","thinking":"Let me reason. ","signature":"sig"},{"type":"text","text":"Answer"}],"stop_reason":"end_turn","usage":{"input_tokens":5,"output_tokens":8}}`
+
+	rt := &mockRoundTripper{statusCode: http.StatusOK, respBody: respBody}
+	provider, exporter := newTestProvider(t)
+	client := anthropic.NewClient(
+		option.WithAPIKey("dummy-key"),
+		option.WithHTTPClient(newMockClient(rt)),
+		option.WithMiddleware(Middleware(WithTracerProvider(provider))),
+	)
+
+	_, err := client.Messages.New(context.Background(), anthropic.MessageNewParams{
+		Model:     anthropic.ModelClaudeOpus4_5,
+		MaxTokens: 1024,
+		Messages:  []anthropic.MessageParam{anthropic.NewUserMessage(anthropic.NewTextBlock("Think"))},
+	})
+	require.NoError(t, err)
+
+	span := requireSingleSpan(t, provider, exporter)
+	attrs := spanAttrs(span)
+
+	require.Contains(t, attrs, genAIOutputKey, "thinking + text output must be captured")
+	outMsgs := genAIMessages(t, attrs[genAIOutputKey].AsString())
+	require.Len(t, outMsgs, 1)
+	assert.Equal(t, langwatch.ChatRoleAssistant, outMsgs[0].Role)
+	assert.Equal(t, "Let me reason. Answer", outMsgs[0].Content)
+}
+
+// TestMiddleware_Messages_NonStreaming_Thinking_WithToolUse covers the rich-part
+// path: a thinking block alongside a tool_use block must still carry the
+// reasoning text, not just the tool call.
+func TestMiddleware_Messages_NonStreaming_Thinking_WithToolUse(t *testing.T) {
+	const respBody = `{"id":"msg_think_tool","type":"message","role":"assistant","model":"claude-opus-4-5","content":[{"type":"thinking","thinking":"Weather needs a tool.","signature":"sig"},{"type":"tool_use","id":"toolu_9","name":"get_weather","input":{"city":"SF"}}],"stop_reason":"tool_use","usage":{"input_tokens":5,"output_tokens":8}}`
+
+	rt := &mockRoundTripper{statusCode: http.StatusOK, respBody: respBody}
+	provider, exporter := newTestProvider(t)
+	client := anthropic.NewClient(
+		option.WithAPIKey("dummy-key"),
+		option.WithHTTPClient(newMockClient(rt)),
+		option.WithMiddleware(Middleware(WithTracerProvider(provider))),
+	)
+
+	_, err := client.Messages.New(context.Background(), anthropic.MessageNewParams{
+		Model:     anthropic.ModelClaudeOpus4_5,
+		MaxTokens: 1024,
+		Messages:  []anthropic.MessageParam{anthropic.NewUserMessage(anthropic.NewTextBlock("Weather?"))},
+	})
+	require.NoError(t, err)
+
+	span := requireSingleSpan(t, provider, exporter)
+	attrs := spanAttrs(span)
+
+	outMsgs := genAIMessages(t, attrs[genAIOutputKey].AsString())
+	require.Len(t, outMsgs, 1)
+	parts, ok := outMsgs[0].Content.([]any)
+	require.True(t, ok, "content should be rich parts, got %T", outMsgs[0].Content)
+	require.Len(t, parts, 2, "the thinking block is kept alongside the tool call")
+	assert.Equal(t, "Weather needs a tool.", parts[0].(map[string]any)["text"])
+	assert.Equal(t, "tool_call", parts[1].(map[string]any)["type"])
+}
+
+// TestMiddleware_Messages_Streaming_ErrorEvent covers an Anthropic mid-stream
+// failure: `event: error` arrives over an HTTP 200 response, so nothing in the
+// transport marks the call as failed. The partial generation must not be
+// recorded as a success.
+func TestMiddleware_Messages_Streaming_ErrorEvent(t *testing.T) {
+	const streamBody = `event: message_start
+data: {"type":"message_start","message":{"id":"msg_err","type":"message","role":"assistant","model":"claude-haiku-4-5","content":[],"usage":{"input_tokens":7,"output_tokens":1}}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Partial"}}
+
+event: error
+data: {"type":"error","error":{"type":"overloaded_error","message":"Overloaded"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":" trailing"}}
+
+`
+
+	rt := &mockRoundTripper{statusCode: http.StatusOK, respBody: streamBody, contentType: "text/event-stream"}
+	provider, exporter := newTestProvider(t)
+	client := anthropic.NewClient(
+		option.WithAPIKey("dummy-key"),
+		option.WithHTTPClient(newMockClient(rt)),
+		option.WithMiddleware(Middleware(WithTracerProvider(provider))),
+	)
+
+	stream := client.Messages.NewStreaming(context.Background(), anthropic.MessageNewParams{
+		Model:     anthropic.ModelClaudeHaiku4_5,
+		MaxTokens: 1024,
+		Messages:  []anthropic.MessageParam{anthropic.NewUserMessage(anthropic.NewTextBlock("Greet me"))},
+	})
+	for stream.Next() {
+		_ = stream.Current()
+	}
+	require.NoError(t, stream.Close())
+
+	span := requireSingleSpan(t, provider, exporter)
+	attrs := spanAttrs(span)
+
+	// The failure is recorded on the span three ways: the status, an exception
+	// event carrying the Anthropic error type + message, and error.type for
+	// querying.
+	//
+	// The status assertion is the regression guard for a subtle one. A mid-stream
+	// Anthropic error arrives as SSE `event: error` over an HTTP 200, so the
+	// otelhttp base used to mark the span codes.Ok the moment the response
+	// headers landed. OTel treats Ok as final and refuses to downgrade it, which
+	// silently swallowed this accumulator's SetStatus(codes.Error) and exported a
+	// failed generation as a successful one. otelhttp now withholds Ok for a
+	// streamed body precisely so this assertion can hold.
+	assert.Equal(t, codes.Error, span.Status().Code)
+	assert.Equal(t, attribute.StringValue("overloaded_error"), attrs[semconv.ErrorTypeKey])
+	var exception bool
+	for _, event := range span.Events() {
+		if event.Name != "exception" {
+			continue
+		}
+		exception = true
+		for _, attr := range event.Attributes {
+			if attr.Key == semconv.ExceptionMessageKey {
+				assert.Equal(t, "overloaded_error: Overloaded", attr.Value.AsString())
+			}
+		}
+	}
+	assert.True(t, exception, "a mid-stream error event must be recorded on the span")
+
+	// Consumption stops at the error: the text streamed before it is kept as
+	// evidence, the text after it is not.
+	outMsgs := genAIMessages(t, attrs[genAIOutputKey].AsString())
+	require.Len(t, outMsgs, 1)
+	assert.Equal(t, "Partial", outMsgs[0].Content)
+}
+
+// TestMiddleware_Messages_SchemaDrift_StillRecordsIdentity pins the resilience
+// path that actually runs when the Anthropic wire shape drifts away from the
+// typed structs. The Anthropic SDK decodes through apijson, which never returns
+// an error for a type mismatch — a drifted field decodes to its zero value and
+// everything else still lands. Here max_tokens arrives as a string and usage as
+// a string; the span must still carry request model, response id, response model
+// and stop_reason, and the fields that did decode (temperature, content) must
+// still be recorded.
+//
+// This is deliberately NOT a test of extractRequestGeneric /
+// extractResponseGeneric: those run only when encoding/json itself fails, which
+// takes malformed JSON, and on malformed JSON the otelhttp.ParseBody call inside
+// both of them fails identically and they return without recording anything.
+func TestMiddleware_Messages_SchemaDrift_StillRecordsIdentity(t *testing.T) {
+	const reqBody = `{"model":"claude-generic","max_tokens":"1024","temperature":0.5,"messages":[{"role":"user","content":"hi"}]}`
+	const respBody = `{"id":"msg_generic","type":"message","role":"assistant","model":"claude-generic-resp","content":[{"type":"text","text":"still here"}],"stop_reason":"max_tokens","usage":"unavailable"}`
+
+	provider, exporter := newTestProvider(t)
+	mw := Middleware(WithTracerProvider(provider))
+
+	req := httptest.NewRequest(http.MethodPost, "https://api.anthropic.com/v1/messages", strings.NewReader(reqBody))
+	req.Header.Set("Content-Type", "application/json")
+
+	var next option.MiddlewareNext = func(*http.Request) (*http.Response, error) {
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Header:     http.Header{"Content-Type": []string{"application/json"}},
+			Body:       io.NopCloser(strings.NewReader(respBody)),
+		}, nil
+	}
+
+	resp, err := mw(req, next)
+	require.NoError(t, err)
+	_, err = io.Copy(io.Discard, resp.Body)
+	require.NoError(t, err)
+	require.NoError(t, resp.Body.Close())
+
+	span := requireSingleSpan(t, provider, exporter)
+	attrs := spanAttrs(span)
+
+	assert.Equal(t, "messages.claude-generic", span.Name())
+	assert.Equal(t, attribute.StringValue("llm"), attrs[langwatch.AttributeLangWatchSpanType])
+	assert.Equal(t, attribute.StringValue("claude-generic"), attrs[semconv.GenAIRequestModelKey])
+	assert.Equal(t, attribute.Float64Value(0.5), attrs[semconv.GenAIRequestTemperatureKey])
+	assert.Equal(t, attribute.StringValue("msg_generic"), attrs[semconv.GenAIResponseIDKey])
+	assert.Equal(t, attribute.StringValue("claude-generic-resp"), attrs[semconv.GenAIResponseModelKey])
+	assert.Equal(t, attribute.StringSliceValue([]string{"max_tokens"}), attrs[semconv.GenAIResponseFinishReasonsKey])
+
+	outMsgs := genAIMessages(t, attrs[genAIOutputKey].AsString())
+	require.Len(t, outMsgs, 1)
+	assert.Equal(t, "still here", outMsgs[0].Content)
+
+	inMsgs := genAIMessages(t, attrs[genAIInputKey].AsString())
+	require.Len(t, inMsgs, 1)
+	assert.Equal(t, langwatch.ChatRoleUser, inMsgs[0].Role)
+	inParts, ok := inMsgs[0].Content.([]any)
+	require.True(t, ok, "user content should be rich parts, got %T", inMsgs[0].Content)
+	require.Len(t, inParts, 1)
+	assert.Equal(t, "hi", inParts[0].(map[string]any)["text"])
 }
 
 // TestMiddleware_Messages_Streaming_ToolUse verifies a streamed tool_use block

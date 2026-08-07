@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.opentelemetry.io/otel/attribute"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 	semconv "go.opentelemetry.io/otel/semconv/v1.41.0"
@@ -76,6 +77,16 @@ func TestOptions(t *testing.T) {
 			// WithGenAIProvider, to keep the backwards-compatible path covered.
 			name: "With GenAISystem deprecated alias",
 			opts: []Option{WithGenAISystem(semconv.GenAIProviderNameGroq)},
+			expectedConf: config{
+				genAIProvider: semconv.GenAIProviderNameGroq,
+			},
+		},
+		{
+			// The alias must re-key onto gen_ai.provider.name. Callers written
+			// against the old convention pass a gen_ai.system-keyed value; storing
+			// it verbatim would emit the removed gen_ai.system attribute.
+			name: "With GenAISystem re-keys a gen_ai.system value",
+			opts: []Option{WithGenAISystem(attribute.Key("gen_ai.system").String("groq"))},
 			expectedConf: config{
 				genAIProvider: semconv.GenAIProviderNameGroq,
 			},

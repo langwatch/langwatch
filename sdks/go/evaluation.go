@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"log"
 
-	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -59,7 +58,7 @@ func (s *Span) RecordEvaluation(eval Evaluation) *Span {
 		return s
 	}
 	s.AddEvent(string(AttributeLangWatchEvaluationCustom), trace.WithAttributes(
-		attribute.String("json_encoded_event", string(payload)),
+		AttributeEvaluationPayload.String(string(payload)),
 	))
 	return s
 }

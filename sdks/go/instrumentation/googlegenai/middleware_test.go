@@ -88,8 +88,11 @@ func TestGenerateContent_NonStreaming(t *testing.T) {
 	// ALL usage from usageMetadata, via gen_ai.usage.* attributes.
 	// promptTokenCount=11 includes the 4 cached tokens, so the exclusive split
 	// is input=7 / cached=4. totalTokenCount stays the reported 21.
+	// candidatesTokenCount=7 EXCLUDES thoughtsTokenCount=3 on Gemini, and Google
+	// bills thoughts at the output rate, so output_tokens is the 10 billable
+	// output tokens with reasoning.output_tokens carrying the 3 as the subset.
 	assert.Equal(t, attribute.IntValue(7), attrs[semconv.GenAIUsageInputTokensKey])
-	assert.Equal(t, attribute.IntValue(7), attrs[semconv.GenAIUsageOutputTokensKey])
+	assert.Equal(t, attribute.IntValue(10), attrs[semconv.GenAIUsageOutputTokensKey])
 	assert.Equal(t, attribute.IntValue(21), attrs[attribute.Key("gen_ai.usage.total_tokens")])
 	assert.Equal(t, attribute.IntValue(4), attrs[attribute.Key("gen_ai.usage.cached_input_tokens")])
 	assert.Equal(t, attribute.IntValue(3), attrs[attribute.Key("gen_ai.usage.reasoning.output_tokens")])
@@ -179,9 +182,10 @@ data: {"candidates":[{"content":{"parts":[{"text":"!"}],"role":"model"},"finishR
 	require.Contains(t, attrs, attribute.Key("gen_ai.response.time_to_first_chunk"), "streaming must record TTFT")
 	assert.GreaterOrEqual(t, attrs[attribute.Key("gen_ai.response.time_to_first_chunk")].AsFloat64(), 0.0)
 
-	// Usage arrives in the final chunk.
+	// Usage arrives in the final chunk. candidatesTokenCount=3 plus the 2
+	// thoughts tokens Google bills at the output rate gives output_tokens=5.
 	assert.Equal(t, attribute.IntValue(5), attrs[semconv.GenAIUsageInputTokensKey])
-	assert.Equal(t, attribute.IntValue(3), attrs[semconv.GenAIUsageOutputTokensKey])
+	assert.Equal(t, attribute.IntValue(5), attrs[semconv.GenAIUsageOutputTokensKey])
 	assert.Equal(t, attribute.IntValue(8), attrs[attribute.Key("gen_ai.usage.total_tokens")])
 	assert.Equal(t, attribute.IntValue(2), attrs[attribute.Key("gen_ai.usage.reasoning.output_tokens")])
 

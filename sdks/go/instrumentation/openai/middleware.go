@@ -1,5 +1,5 @@
 // Package openai provides OpenTelemetry instrumentation for the official OpenAI
-// Go SDK (github.com/openai/openai-go).
+// Go SDK (github.com/openai/openai-go/v3).
 //
 // It wires a Stainless option.Middleware that traces every call the client
 // makes, recording gen_ai.* / langwatch.* attributes for chat completions, the

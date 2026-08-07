@@ -64,9 +64,12 @@ func NewTransportWithBase(base http.RoundTripper, opts ...Option) http.RoundTrip
 }
 
 // WrapConfig sets cfg.HTTPClient to an *http.Client whose transport traces
-// go-openai's HTTP calls to LangWatch. An existing cfg.HTTPClient's transport is
-// preserved as the base of the chain when it is an *http.Client; otherwise the
-// traced client wraps http.DefaultTransport.
+// go-openai's HTTP calls to LangWatch. The caller's configuration is preserved:
+// an existing *http.Client keeps its Timeout, CheckRedirect and Jar, and its
+// transport becomes the base of the tracing chain; a caller-supplied HTTPDoer
+// that is not an *http.Client is adapted into the chain rather than dropped, so
+// its behaviour (retries, auth, circuit breaking, …) still runs underneath the
+// tracing layer.
 //
 //	config := openai.DefaultConfig(token)
 //	gopenai.WrapConfig(&config)
@@ -75,18 +78,46 @@ func WrapConfig(cfg *openai.ClientConfig, opts ...Option) {
 	if cfg == nil {
 		return
 	}
-	base := baseTransport(cfg.HTTPClient)
-	cfg.HTTPClient = &http.Client{Transport: NewTransportWithBase(base, opts...)}
+	traced := tracedClient(cfg.HTTPClient)
+	traced.Transport = NewTransportWithBase(traced.Transport, opts...)
+	cfg.HTTPClient = traced
 }
 
-// baseTransport extracts a usable base round tripper from go-openai's configured
-// HTTPDoer, so an already-customised *http.Client keeps its transport (timeouts,
-// proxies, …) underneath the tracing layer.
-func baseTransport(doer openai.HTTPDoer) http.RoundTripper {
-	if client, ok := doer.(*http.Client); ok && client != nil && client.Transport != nil {
-		return client.Transport
+// tracedClient returns the *http.Client to install on the config, carrying over
+// every field of an already-customised *http.Client (Timeout lives on the
+// client, not on its Transport, so rebuilding a bare client would silently drop
+// it). Its Transport field is the base for the tracing chain.
+func tracedClient(doer openai.HTTPDoer) *http.Client {
+	if client, ok := doer.(*http.Client); ok {
+		if client == nil {
+			return &http.Client{Transport: http.DefaultTransport}
+		}
+		copied := *client
+		if copied.Transport == nil {
+			copied.Transport = http.DefaultTransport
+		}
+		return &copied
 	}
-	return http.DefaultTransport
+	return &http.Client{Transport: doerTransport(doer)}
+}
+
+// doerTransport adapts a non-*http.Client HTTPDoer into an http.RoundTripper so
+// a custom doer stays in the chain underneath the tracing layer. A nil doer
+// falls back to http.DefaultTransport.
+func doerTransport(doer openai.HTTPDoer) http.RoundTripper {
+	if doer == nil {
+		return http.DefaultTransport
+	}
+	return doerRoundTripper{doer: doer}
+}
+
+// doerRoundTripper bridges go-openai's HTTPDoer onto http.RoundTripper. The
+// contracts are identical in shape (Do and RoundTrip both take a *http.Request
+// and return a *http.Response), so the call is a straight delegation.
+type doerRoundTripper struct{ doer openai.HTTPDoer }
+
+func (d doerRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	return d.doer.Do(req)
 }
 
 // newTracer builds the otelhttp.Tracer that owns the span lifecycle, body

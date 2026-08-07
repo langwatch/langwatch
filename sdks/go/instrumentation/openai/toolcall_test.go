@@ -127,11 +127,14 @@ func TestMiddleware_Responses_NonStreaming_ToolCalls(t *testing.T) {
 	parts, ok := msgs[0].Content.([]any)
 	require.True(t, ok, "content should be rich parts, got %T", msgs[0].Content)
 	require.Len(t, parts, 1)
-	toolPart := parts[0].(map[string]any)
+	toolPart, ok := parts[0].(map[string]any)
+	require.True(t, ok, "part should be an object, got %T", parts[0])
 	assert.Equal(t, "tool_call", toolPart["type"])
 	assert.Equal(t, "search", toolPart["toolName"])
 	assert.Equal(t, "fc_1", toolPart["toolCallId"])
-	assert.JSONEq(t, `{"term":"go"}`, toolPart["args"].(string))
+	args, ok := toolPart["args"].(string)
+	require.True(t, ok, "args should be a string, got %T", toolPart["args"])
+	assert.JSONEq(t, `{"term":"go"}`, args)
 	assert.NotContains(t, attrs, outputKey, "chat output is under gen_ai, not langwatch.output")
 }
 

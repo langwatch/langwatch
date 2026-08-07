@@ -10,7 +10,9 @@ import (
 // genAIOperationFromPath derives the gen_ai.operation.name attribute from an
 // Ollama native request URL path. Ollama paths follow /api/{operation}:
 // /api/chat → chat, /api/generate → text_completion, /api/embed and the legacy
-// /api/embeddings → embeddings.
+// /api/embeddings → embeddings. Anything else — including an empty path — is
+// reported as "unknown" rather than guessed at, so a span never claims to be a
+// chat it is not.
 func genAIOperationFromPath(urlPath string) attribute.KeyValue {
 	segments := strings.Split(strings.Trim(urlPath, "/"), "/")
 
@@ -28,10 +30,9 @@ func genAIOperationFromPath(urlPath string) attribute.KeyValue {
 		return semconv.GenAIOperationNameTextCompletion
 	case "embed", "embeddings":
 		return semconv.GenAIOperationNameEmbeddings
+	case "":
+		return semconv.GenAIOperationNameKey.String("unknown")
 	default:
-		if operationSegment != "" {
-			return semconv.GenAIOperationNameKey.String(operationSegment)
-		}
-		return semconv.GenAIOperationNameChat
+		return semconv.GenAIOperationNameKey.String(operationSegment)
 	}
 }

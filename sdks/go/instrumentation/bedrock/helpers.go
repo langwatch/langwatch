@@ -228,12 +228,33 @@ func imageMimeType(format types.ImageFormat) string {
 	return "image/" + string(format)
 }
 
-// documentMimeType maps a Converse DocumentFormat to a MIME type, best-effort.
+// documentMimeType maps a Converse DocumentFormat to its registered MIME type.
+// The format name is not a MIME subtype ("csv" is text/csv, not
+// application/csv), so every supported Bedrock format is mapped explicitly;
+// anything unrecognised falls back to application/octet-stream.
 func documentMimeType(format types.DocumentFormat) string {
-	if format == "" {
+	switch format {
+	case types.DocumentFormatPdf:
+		return "application/pdf"
+	case types.DocumentFormatCsv:
+		return "text/csv"
+	case types.DocumentFormatDoc:
+		return "application/msword"
+	case types.DocumentFormatDocx:
+		return "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+	case types.DocumentFormatXls:
+		return "application/vnd.ms-excel"
+	case types.DocumentFormatXlsx:
+		return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+	case types.DocumentFormatHtml:
+		return "text/html"
+	case types.DocumentFormatTxt:
+		return "text/plain"
+	case types.DocumentFormatMd:
+		return "text/markdown"
+	default:
 		return "application/octet-stream"
 	}
-	return "application/" + string(format)
 }
 
 // marshalDocument renders a smithy document (e.g. a tool-use input) to its JSON

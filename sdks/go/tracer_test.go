@@ -64,7 +64,7 @@ func TestWithActiveSpan(t *testing.T) {
 		return TracerFromProvider(provider, "test"), exporter
 	}
 
-	t.Run("when fn succeeds it ends the span with an Ok status", func(t *testing.T) {
+	t.Run("when fn succeeds it ends the span leaving the status unset", func(t *testing.T) {
 		tracer, exporter := newTracer()
 
 		var ran bool
@@ -78,7 +78,38 @@ func TestWithActiveSpan(t *testing.T) {
 		assert.True(t, ran)
 		spans := exporter.GetSpans()
 		require.Len(t, spans, 1)
-		assert.Equal(t, codes.Ok, spans[0].Status.Code)
+		assert.Equal(t, codes.Unset, spans[0].Status.Code)
+	})
+
+	t.Run("when fn sets an Error status and returns nil the status survives", func(t *testing.T) {
+		tracer, exporter := newTracer()
+
+		err := tracer.WithActiveSpan(context.Background(), "op", func(ctx context.Context, span *Span) error {
+			span.SetStatus(codes.Error, "degraded")
+			return nil
+		})
+		require.NoError(t, err)
+
+		spans := exporter.GetSpans()
+		require.Len(t, spans, 1)
+		assert.Equal(t, codes.Error, spans[0].Status.Code, "an Ok status would have outranked and erased this")
+		assert.Equal(t, "degraded", spans[0].Status.Description)
+	})
+
+	t.Run("when fn panics it records the panic, ends the span and re-raises", func(t *testing.T) {
+		tracer, exporter := newTracer()
+
+		assert.PanicsWithValue(t, "boom", func() {
+			_ = tracer.WithActiveSpan(context.Background(), "op", func(ctx context.Context, span *Span) error {
+				panic("boom")
+			})
+		})
+
+		spans := exporter.GetSpans()
+		require.Len(t, spans, 1, "the span must still be ended and exported")
+		assert.Equal(t, codes.Error, spans[0].Status.Code)
+		assert.Equal(t, "panic: boom", spans[0].Status.Description)
+		require.NotEmpty(t, spans[0].Events, "the panic must be recorded as a span event")
 	})
 
 	t.Run("when fn fails it records the error and sets an Error status", func(t *testing.T) {

@@ -66,7 +66,7 @@ type collectorEvaluationRequest struct {
 // the collector is the supported ingestion path the SDKs share, and it dispatches
 // the evaluation into the same pipeline as a live span event.
 func (s *EvaluationsService) Create(ctx context.Context, traceID string, eval Evaluation) error {
-	return s.CreateBatch(ctx, traceID, []Evaluation{eval})
+	return s.create(ctx, "Evaluations.Create", traceID, []Evaluation{eval})
 }
 
 // CreateBatch submits several evaluation results against one trace in a single
@@ -79,11 +79,20 @@ func (s *EvaluationsService) Create(ctx context.Context, traceID string, eval Ev
 //		{Name: "toxicity", Score: langwatch.Float64(0.01), Passed: langwatch.Bool(true)},
 //	})
 func (s *EvaluationsService) CreateBatch(ctx context.Context, traceID string, evals []Evaluation) error {
+	return s.create(ctx, "Evaluations.CreateBatch", traceID, evals)
+}
+
+// create is the shared implementation behind [EvaluationsService.Create] and
+// [EvaluationsService.CreateBatch]. The operation name is passed down rather
+// than hard-coded so a validation error and an [*APIError].Operation always name
+// the method the caller actually invoked — Operation is part of the public error
+// surface, so it must match the entry point.
+func (s *EvaluationsService) create(ctx context.Context, operation, traceID string, evals []Evaluation) error {
 	if traceID == "" {
-		return fmt.Errorf("langwatch: Evaluations.Create: traceID is required")
+		return fmt.Errorf("langwatch: %s: traceID is required", operation)
 	}
 	if len(evals) == 0 {
-		return fmt.Errorf("langwatch: Evaluations.Create: at least one evaluation is required")
+		return fmt.Errorf("langwatch: %s: at least one evaluation is required", operation)
 	}
 
 	body := collectorEvaluationRequest{
@@ -99,5 +108,5 @@ func (s *EvaluationsService) CreateBatch(ctx context.Context, traceID string, ev
 	}
 
 	resp, err := s.client.rawJSON(ctx, http.MethodPost, collectorEvaluationPath, body)
-	return decodeInto("Evaluations.Create", resp, err, nil)
+	return decodeInto(operation, resp, err, nil)
 }

@@ -61,9 +61,9 @@ func (NoopAccumulator) Consume(string)                                    {}
 func (NoopAccumulator) IsTerminal(string) bool                            { return false }
 func (NoopAccumulator) Finish(*langwatch.Span, langwatch.DataCaptureMode) {}
 
-// selectRequestExtractor returns the first extractor accepting the request, or
+// SelectRequestExtractor returns the first extractor accepting the request, or
 // the last extractor (the provider's fallback) when none match.
-func selectRequestExtractor(extractors []Extractor, body JSONObject, pathHint string) Extractor {
+func SelectRequestExtractor(extractors []Extractor, body JSONObject, pathHint string) Extractor {
 	for _, e := range extractors {
 		if e.MatchesRequest(body, pathHint) {
 			return e
@@ -75,9 +75,9 @@ func selectRequestExtractor(extractors []Extractor, body JSONObject, pathHint st
 	return nil
 }
 
-// selectResponseExtractor returns the first extractor accepting the response, or
+// SelectResponseExtractor returns the first extractor accepting the response, or
 // the last extractor (the provider's fallback) when none match.
-func selectResponseExtractor(extractors []Extractor, objectField, contentType string) Extractor {
+func SelectResponseExtractor(extractors []Extractor, objectField, contentType string) Extractor {
 	for _, e := range extractors {
 		if e.MatchesResponse(objectField, contentType) {
 			return e

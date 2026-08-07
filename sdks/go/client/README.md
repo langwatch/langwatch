@@ -308,6 +308,14 @@ using exponential backoff with full jitter, honouring any `Retry-After` header,
 up to `client.DefaultMaxRetries` extra attempts. Every request respects the
 context you pass, so cancellation and deadlines are entirely in your control.
 
+"Idempotent" is enforced, not assumed. `GET`, `HEAD`, `OPTIONS`, `TRACE`, `PUT`
+and `DELETE` are replayable per RFC 9110 and are retried. `POST` and `PATCH` are
+not, so they are attempted **once** — a server can complete a write and still
+fail to get the response back to you, and a blind retry would create a second
+prompt version, evaluation or tracked event. The exception is a request carrying
+an `Idempotency-Key` header, which the API uses to collapse a replay onto the
+original write; those are retried like any idempotent request.
+
 ```go
 lw, err := client.New(
 	client.WithMaxRetries(5),                 // 0 disables retries
@@ -339,14 +347,22 @@ hasMore := pg.Page*pg.Limit < pg.Total
 
 ```go
 page, err := lw.Scenarios.ListRuns(ctx, client.SimulationRunsParams{Limit: 50})
-for err == nil && page.HasMore {
+for err == nil {
 	// process page.Runs ...
+
+	// The last page reports HasMore == false, so test it *after* processing —
+	// otherwise a result set that fits in one page processes nothing at all.
+	if !page.HasMore || page.NextCursor == "" {
+		break
+	}
 	page, err = lw.Scenarios.ListRuns(ctx, client.SimulationRunsParams{
 		Limit:  50,
 		Cursor: page.NextCursor,
 	})
 }
 ```
+
+Or let `lw.Scenarios.AllRuns` do it for you — see below.
 
 ## Streaming large result sets
 
@@ -424,4 +440,3 @@ keeps the core tracing SDK lean: the only third-party dependency the client adds
 is the tiny `github.com/oapi-codegen/runtime` (plus `go-jsonmerge` and
 `google/uuid`, the latter already used by the core). No web frameworks are
 compiled in.
-```

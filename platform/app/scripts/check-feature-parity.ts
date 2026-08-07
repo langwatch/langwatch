@@ -138,6 +138,12 @@ const DEFAULT_GO_TEST_ROOTS: string[] = [
   // this root those scenarios could only ever be @unimplemented or bound to a
   // TS stub that proves nothing.
   "services/langyagent",
+  // The Go SDK. Its span-attribute scenarios (typed input/output envelopes,
+  // binary content parts, metadata hoisting, data capture) are satisfied by Go
+  // tests and by nothing else, so without this root those scenarios could only
+  // ever be @unimplemented or bound to a TS test that exercises a different
+  // SDK — a binding that reads green while proving nothing about Go.
+  "sdks/go",
   "pkg",
   "tools/thuishaven",
   "tools/herrgen",

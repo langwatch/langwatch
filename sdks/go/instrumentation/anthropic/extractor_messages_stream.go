@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"strings"
 
+	"go.opentelemetry.io/otel/codes"
 	semconv "go.opentelemetry.io/otel/semconv/v1.41.0"
 
 	langwatch "github.com/langwatch/langwatch/sdks/go"
@@ -29,6 +30,12 @@ import (
 //     delta.stop_reason
 //   - message_stop
 //   - ping                 — keep-alive, ignored
+//   - error                — a mid-stream failure, delivered as SSE
+//     `event: error` over an HTTP 200 response; it aborts the generation
+//
+// Because the transport status is 200, an error event is the ONLY signal that
+// the generation failed, so it must not be treated as structural noise: the
+// accumulator captures it, stops consuming, and Finish marks the span errored.
 type messagesStreamAccumulator struct {
 	id         string
 	model      string
@@ -36,6 +43,10 @@ type messagesStreamAccumulator struct {
 	output     strings.Builder
 	usage      usage
 	haveUsage  bool // a message_start or message_delta supplied usage
+	// errType / errMsg come from a mid-stream `error` event; either being set
+	// means the generation failed and everything after it is discarded.
+	errType string
+	errMsg  string
 	// toolCalls accumulates streamed tool_use blocks keyed by their content-block
 	// index; toolCallOrder preserves first-seen order for deterministic output.
 	toolCalls     map[int]*streamToolCall
@@ -52,12 +63,23 @@ type streamToolCall struct {
 }
 
 // IsTerminal reports the stream-terminating sentinel. Anthropic uses typed
-// events and never sends "[DONE]", so this is always false and the base ends
-// the stream on EOF.
-func (a *messagesStreamAccumulator) IsTerminal(string) bool { return false }
+// events and never sends "[DONE]", so under normal operation this is false and
+// the base ends the stream on EOF. Once an `error` event has been seen the
+// generation is over, so the stream is reported terminated and the base stops
+// scanning the remaining body.
+func (a *messagesStreamAccumulator) IsTerminal(string) bool { return a.failed() }
+
+// failed reports whether a mid-stream error event aborted the generation.
+func (a *messagesStreamAccumulator) failed() bool {
+	return a.errType != "" || a.errMsg != ""
+}
 
 // Consume processes one SSE data payload (the JSON after "data:").
 func (a *messagesStreamAccumulator) Consume(dataLine string) {
+	if a.failed() {
+		return // the generation already failed; anything after it is discarded
+	}
+
 	var ev streamEvent
 	if err := json.Unmarshal([]byte(dataLine), &ev); err != nil {
 		return // never fail the caller's stream on a parse error
@@ -123,7 +145,18 @@ func (a *messagesStreamAccumulator) Consume(dataLine string) {
 				a.usage.cacheCreationInputTokens = ev.Usage.CacheCreationInputTokens
 			}
 		}
-	case "message_stop", "content_block_stop", "ping", "error":
+	case "error":
+		// Anthropic reports mid-stream failures as `event: error` on a 200
+		// response. Capture it so the partial generation is not recorded as a
+		// success; IsTerminal then stops the base consuming the rest of the body.
+		if ev.Error != nil {
+			a.errType = ev.Error.Type
+			a.errMsg = ev.Error.Message
+		}
+		if !a.failed() {
+			a.errType = "anthropic_stream_error"
+		}
+	case "message_stop", "content_block_stop", "ping":
 		// message_stop / content_block_stop are structural; ping is a keep-alive.
 	}
 }
@@ -191,6 +224,41 @@ func (a *messagesStreamAccumulator) Finish(span *langwatch.Span, capture langwat
 			span.SetGenAIOutputMessages([]langwatch.ChatMessage{langwatch.TextMessage(langwatch.ChatRoleAssistant, a.output.String())})
 		}
 	}
+	// A mid-stream error event arrives on a 200 response, so nothing before this
+	// point marks the span as failed. Record it last, after the partial output
+	// and usage, which stay on the span as evidence of how far the call got.
+	//
+	// SetStatus is the right call to make and is kept, but note it is currently
+	// swallowed: the otelhttp base sets codes.Ok when the 200 headers arrive,
+	// and the OpenTelemetry SDK will not downgrade Ok to Error. Until the base
+	// defers that Ok for streamed bodies, error.type and the exception event are
+	// what actually reach the consumer.
+	if a.failed() {
+		err := &streamError{errType: a.errType, message: a.errMsg}
+		span.SetStatus(codes.Error, err.Error())
+		span.RecordError(err)
+		if a.errType != "" {
+			span.SetAttributes(semconv.ErrorTypeKey.String(a.errType))
+		}
+	}
+}
+
+// streamError is a mid-stream Anthropic `error` event as a Go error, so it can
+// be recorded on the span like any other failure.
+type streamError struct {
+	errType string
+	message string
+}
+
+func (e *streamError) Error() string {
+	switch {
+	case e.errType == "":
+		return e.message
+	case e.message == "":
+		return e.errType
+	default:
+		return e.errType + ": " + e.message
+	}
 }
 
 // streamEvent is the generic shape of an Anthropic SSE event payload. The
@@ -202,6 +270,14 @@ type streamEvent struct {
 	ContentBlock *streamEventContentBlock `json:"content_block"`
 	Delta        *streamEventDelta        `json:"delta"`
 	Usage        *streamUsage             `json:"usage"`
+	Error        *streamEventError        `json:"error"`
+}
+
+// streamEventError is the `error` event payload's nested error object, e.g.
+// {"type":"error","error":{"type":"overloaded_error","message":"Overloaded"}}.
+type streamEventError struct {
+	Type    string `json:"type"`
+	Message string `json:"message"`
 }
 
 // streamEventContentBlock is the content_block_start payload's nested block. For

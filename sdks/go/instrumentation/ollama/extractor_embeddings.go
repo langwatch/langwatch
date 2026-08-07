@@ -98,12 +98,14 @@ func (embeddingsExtractor) ExtractNonStreaming(span *langwatch.Span, raw []byte,
 		LoadDuration:    resp.LoadDuration,
 	})
 
-	// The embedding vectors are large and rarely useful in a trace; record only
-	// their count as the output when output capture is enabled.
-	if capture.CaptureOutput() {
-		if count := embeddingsCount(resp); count > 0 {
-			span.SetAttributes(langwatch.AttributeGenAIResponseEmbeddingsCount.Int(count))
-		}
+	// The embedding vectors themselves are large and rarely useful in a trace, so
+	// they are never recorded. Their count is span structure, not content — the
+	// mirror of gen_ai.embeddings.dimension.count on the request side — so it is
+	// recorded regardless of the capture mode, as the documented contract
+	// requires ("span structure, metrics, models, usage and identity are always
+	// recorded").
+	if count := embeddingsCount(resp); count > 0 {
+		span.SetAttributes(langwatch.AttributeGenAIResponseEmbeddingsCount.Int(count))
 	}
 }
 

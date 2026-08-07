@@ -53,6 +53,22 @@ const (
 	// to sync custom evaluations to evaluation_runs.
 	AttributeLangWatchEvaluationCustom = attribute.Key("langwatch.evaluation.custom")
 
+	// AttributeEvaluationPayload carries the JSON-encoded evaluation on the
+	// langwatch.evaluation.custom span event. See RecordEvaluation.
+	AttributeEvaluationPayload = attribute.Key("json_encoded_event")
+
+	// AttributeLangWatchEvent names the span event carrying a LangWatch tracked
+	// event — user feedback or a product signal. See RecordEvent.
+	AttributeLangWatchEvent = attribute.Key("langwatch.event")
+
+	// Tracked-event attribute keys on the langwatch.event span event, matching
+	// the server's track-event model: a classifying type, numeric measurements
+	// under EventMetricsPrefix and free-text annotations under
+	// EventDetailsPrefix.
+	AttributeEventType = attribute.Key("event.type")
+	EventMetricsPrefix = "event.metrics."
+	EventDetailsPrefix = "event.details."
+
 	// Prompt-span identity (mirrors python-sdk attributes.py LangWatchPrompt*).
 	//
 	// PromptID carries either a bare prompt id ("prompt_4RXLJtB9Cj-OA1BaLpxWc")
@@ -89,6 +105,13 @@ const (
 	// AttributeGenAIRequestTools carries the request's tool/function definitions
 	// as a JSON string (gen_ai.request.tools).
 	AttributeGenAIRequestTools = attribute.Key("gen_ai.request.tools")
+	// AttributeGenAIRequestParallelToolCalls records whether the request allowed
+	// the model to emit tool calls in parallel
+	// (gen_ai.request.parallel_tool_calls).
+	AttributeGenAIRequestParallelToolCalls = attribute.Key("gen_ai.request.parallel_tool_calls")
+	// AttributeGenAIRequestToolChoice carries the request's tool-choice
+	// directive as a JSON string (gen_ai.request.tool_choice).
+	AttributeGenAIRequestToolChoice = attribute.Key("gen_ai.request.tool_choice")
 	// AttributeGenAIResponseStatus is the provider response status, e.g.
 	// "completed" (gen_ai.response.status).
 	AttributeGenAIResponseStatus = attribute.Key("gen_ai.response.status")

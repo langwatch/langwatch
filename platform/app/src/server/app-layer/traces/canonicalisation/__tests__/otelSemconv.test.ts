@@ -117,8 +117,9 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
   // ─────────────────────────────────────────────────────────────────────────
   // Inference Span — v1.41 reasoning / streaming attributes (Go SDK)
   // ─────────────────────────────────────────────────────────────────────────
-  describe("inference span with v1.41 reasoning and streaming attributes", () => {
+  describe("given an inference span carrying v1.41 reasoning and streaming attributes", () => {
     describe("when the span carries gen_ai.usage.reasoning.output_tokens", () => {
+      /** @scenario "Reasoning output tokens use the current usage convention" */
       it("canonicalises it to gen_ai.usage.reasoning_tokens", () => {
         const result = service.canonicalize(
           {
@@ -135,6 +136,7 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
     });
 
     describe("when the span carries the legacy gen_ai.usage.reasoning_tokens", () => {
+      /** @scenario "A legacy reasoning token attribute still counts" */
       it("keeps reading it as a fallback", () => {
         const result = service.canonicalize(
           {
@@ -151,6 +153,7 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
     });
 
     describe("when both reasoning token attributes are present", () => {
+      /** @scenario "A legacy reasoning token attribute still counts" */
       it("lets the current convention win", () => {
         const result = service.canonicalize(
           {
@@ -168,6 +171,7 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
     });
 
     describe("when the span carries gen_ai.response.time_to_first_chunk in seconds", () => {
+      /** @scenario "Time to first chunk populates the trace time to first token" */
       it("canonicalises it to gen_ai.server.time_to_first_token in milliseconds", () => {
         const result = service.canonicalize(
           {
@@ -205,6 +209,7 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
     });
 
     describe("when the span carries gen_ai.request.stream", () => {
+      /** @scenario "A streaming request is flagged on the span" */
       it("records the boolean stream flag", () => {
         const result = service.canonicalize(
           {

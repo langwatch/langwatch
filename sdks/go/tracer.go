@@ -2,6 +2,7 @@ package langwatch
 
 import (
 	"context"
+	"fmt"
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
@@ -38,16 +39,26 @@ func TracerFromProvider(provider trace.TracerProvider, name string, options ...t
 }
 
 func (t *LangWatchTracer) Start(ctx context.Context, name string, opts ...trace.SpanStartOption) (context.Context, *Span) {
-	opts = append(opts, trace.WithAttributes(sdkAttributes...))
-	ctx, span := t.tracer.Start(ctx, name, opts...)
+	// Build a fresh slice: appending to opts would write into the caller's
+	// backing array whenever they passed their own slice with spare capacity.
+	all := make([]trace.SpanStartOption, 0, len(opts)+1)
+	all = append(all, opts...)
+	all = append(all, trace.WithAttributes(sdkAttributes...))
+
+	ctx, span := t.tracer.Start(ctx, name, all...)
 	return ctx, &Span{span}
 }
 
 // WithActiveSpan starts a span, runs fn with the span-scoped context and the
-// span, then ends the span automatically. If fn returns an error, the span is
-// marked with an Error status and the error is recorded; otherwise the status
-// is set to Ok. This mirrors the TypeScript SDK's withActiveSpan and removes the
-// boilerplate of deferring End and wiring up error status by hand.
+// span, then ends the span automatically. This mirrors the TypeScript SDK's
+// withActiveSpan and removes the boilerplate of deferring End and wiring up
+// error status by hand.
+//
+// If fn returns an error, the span is marked Error and the error is recorded.
+// If fn panics, the panic is recorded as an error on the span and re-raised so
+// the caller's own recovery still sees it. On success the status is left Unset,
+// the OTel default for "nothing went wrong": Ok is final and outranks Error, so
+// setting it here would silently discard a status fn set itself.
 func (t *LangWatchTracer) WithActiveSpan(
 	ctx context.Context,
 	name string,
@@ -57,12 +68,21 @@ func (t *LangWatchTracer) WithActiveSpan(
 	ctx, span := t.Start(ctx, name, opts...)
 	defer span.End()
 
+	// Registered second, so it runs first and can still record on the span
+	// before the deferred End above closes it out during the re-raised panic.
+	defer func() {
+		if r := recover(); r != nil {
+			panicErr := fmt.Errorf("panic: %v", r)
+			span.SetStatus(codes.Error, panicErr.Error())
+			span.RecordError(panicErr, trace.WithStackTrace(true))
+			panic(r)
+		}
+	}()
+
 	if err := fn(ctx, span); err != nil {
 		span.SetStatus(codes.Error, err.Error())
 		span.RecordError(err)
 		return err
 	}
-
-	span.SetStatus(codes.Ok, "")
 	return nil
 }

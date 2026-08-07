@@ -147,27 +147,41 @@ func recordMessageResult(span *langwatch.Span, msg anthropic.Message, capture la
 	}
 }
 
-// messageText concatenates the text from a Message's content blocks.
+// messageText concatenates the text from a Message's content blocks. Extended
+// thinking blocks are included in block order, matching the streaming
+// accumulator, which appends thinking_delta and text_delta to the same buffer as
+// they arrive — the same request must produce the same span output whether or
+// not it streamed. Redacted thinking carries no readable text and is skipped.
 func messageText(content []anthropic.ContentBlockUnion) string {
 	var b strings.Builder
 	for _, block := range content {
-		if block.Type == "text" {
+		switch block.Type {
+		case "text":
 			b.WriteString(block.Text)
+		case "thinking":
+			b.WriteString(block.Thinking)
 		}
 	}
 	return b.String()
 }
 
 // messageContentParts expands a Message's content blocks into LangWatch rich
-// content parts, mapping text blocks to text parts and tool_use blocks to
-// tool_call parts. hasToolUse reports whether any tool_use block was present, so
-// the caller keeps the plain-text path for pure-text responses.
+// content parts, mapping text and extended-thinking blocks to text parts and
+// tool_use blocks to tool_call parts. hasToolUse reports whether any tool_use
+// block was present, so the caller keeps the plain-text path for pure-text
+// responses. Thinking is kept for the same reason messageText keeps it: the
+// streaming accumulator records thinking_delta, so dropping it here would make
+// the span output depend on whether the request streamed.
 func messageContentParts(content []anthropic.ContentBlockUnion) (parts []langwatch.ChatRichContent, hasToolUse bool) {
 	for _, block := range content {
 		switch block.Type {
 		case "text":
 			if block.Text != "" {
 				parts = append(parts, langwatch.TextPart(block.Text))
+			}
+		case "thinking":
+			if block.Thinking != "" {
+				parts = append(parts, langwatch.TextPart(block.Thinking))
 			}
 		case "tool_use":
 			hasToolUse = true
@@ -204,6 +218,12 @@ func systemText(system []anthropic.TextBlockParam) string {
 
 // extractRequestGeneric is the best-effort fallback when the typed request body
 // fails to unmarshal: it records the model and streaming flag from the raw JSON.
+//
+// Note on reachability: the Anthropic SDK decodes through apijson, which never
+// errors on a type mismatch — a drifted field decodes to its zero value — so the
+// typed unmarshal only fails on malformed JSON, and ParseBody below then fails
+// for the same reason. Schema drift is handled by the typed path itself (see
+// TestMiddleware_Messages_SchemaDrift_StillRecordsIdentity), not here.
 func extractRequestGeneric(span *langwatch.Span, raw []byte, capture langwatch.DataCaptureMode) bool {
 	span.SetType(langwatch.SpanTypeLLM)
 	body, ok := otelhttp.ParseBody(raw)
@@ -230,7 +250,8 @@ func extractRequestGeneric(span *langwatch.Span, raw []byte, capture langwatch.D
 }
 
 // extractResponseGeneric is the best-effort fallback when the typed response
-// body fails to unmarshal.
+// body fails to unmarshal. The same reachability note as extractRequestGeneric
+// applies.
 func extractResponseGeneric(span *langwatch.Span, raw []byte, capture langwatch.DataCaptureMode) {
 	body, ok := otelhttp.ParseBody(raw)
 	if !ok {
@@ -262,6 +283,18 @@ type usage struct {
 // Anthropic does not return a total, so it is synthesized as
 // input+output+cache_read+cache_creation — cache-read and cache-creation are
 // real input tokens, so excluding them understates usage.
+//
+// Cache-exclusive contract. Every LangWatch instrumentation reports the token
+// buckets as a DISJOINT split: gen_ai.usage.input_tokens counts only the
+// uncached prompt tokens, gen_ai.usage.cached_input_tokens counts the
+// cache-read tokens, and gen_ai.usage.cache_creation.input_tokens counts the
+// tokens written to the cache. The buckets are priced additively by the
+// backend, so any overlap double-bills. Providers whose wire format reports an
+// INCLUSIVE input count (OpenAI's prompt_tokens, Gemini's promptTokenCount both
+// contain the cached tokens) must subtract the cached count before recording.
+// Anthropic needs no such adjustment: input_tokens already excludes both
+// cache_read_input_tokens and cache_creation_input_tokens on the wire, so the
+// values are passed through as-is.
 func recordUsage(span *langwatch.Span, u usage) {
 	genUsage := langwatch.GenAIUsage{}
 

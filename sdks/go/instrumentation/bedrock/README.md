@@ -129,7 +129,7 @@ Every span is a client span with:
 | `InferenceConfig.StopSequences`    | `gen_ai.request.stop_sequences` |
 | `ToolConfig.Tools`                 | `gen_ai.request.tools` (JSON) |
 | `System` (text blocks)             | `gen_ai.system_instructions` (gated by capture) |
-| `Messages` (all content blocks)    | `langwatch.input` as `chat_messages` (gated by capture) |
+| `Messages` (all content blocks)    | `gen_ai.input.messages` (gated by capture) |
 
 Message content blocks are expanded into LangWatch chat content: `text` →
 plain text, `image`/`document` → binary parts (MIME type, filename), `toolUse` →
@@ -140,7 +140,7 @@ a tool-call part (name, id, JSON args), `toolResult` → a tool-result part,
 
 | Source field                                            | Recorded as |
 | ------------------------------------------------------- | ----------- |
-| `Output` message (Converse) / accumulated message (stream) | `langwatch.output` (gated by capture) — recorded as `chat_messages` carrying any `toolUse` blocks as `tool_call` parts, else as text |
+| `Output` message (Converse) / accumulated message (stream) | `gen_ai.output.messages` (gated by capture) — carrying any `toolUse` blocks as `tool_call` parts, else as text |
 | `StopReason` / `messageStop.stopReason`                 | `gen_ai.response.finish_reasons` |
 | `Usage.InputTokens`                                     | `gen_ai.usage.input_tokens` |
 | `Usage.OutputTokens`                                    | `gen_ai.usage.output_tokens` |

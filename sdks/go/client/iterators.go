@@ -2,6 +2,7 @@ package client
 
 import (
 	"context"
+	"fmt"
 	"iter"
 )
 
@@ -181,9 +182,19 @@ func (s *ProjectsService) All(ctx context.Context, params ListProjectsParams) it
 // result set). A page-fetch error is yielded once as (zero, err) and ends
 // iteration; breaking out of the loop stops fetching immediately; the supplied
 // context is honoured between pages.
+//
+// Auto-pagination and scroll cursors are mutually exclusive: a scroll cursor
+// already encodes its own position, so replaying one against an advancing
+// pageOffset would re-serve the same page forever. Passing params.ScrollID here
+// therefore yields a single (zero, err) and stops — drive a scroll by hand with
+// [TracesService.Search] instead.
 func (s *TracesService) All(ctx context.Context, params TraceSearchParams) iter.Seq2[Trace, error] {
 	pageSize := resolvePageSize(params.PageSize)
 	return func(yield func(Trace, error) bool) {
+		if params.ScrollID != "" {
+			yield(Trace{}, fmt.Errorf("langwatch: Traces.All: ScrollID cannot be combined with auto-pagination; use Traces.Search to drive a scroll cursor"))
+			return
+		}
 		offset := 0
 		for {
 			if err := ctx.Err(); err != nil {
@@ -212,7 +223,9 @@ func (s *TracesService) All(ctx context.Context, params TraceSearchParams) iter.
 // searchPage fetches one offset-addressed page of trace-search results. It is
 // the per-page engine behind [TracesService.All]. The request body mirrors
 // [TracesService.Search] but pins pageOffset/pageSize for deterministic paging;
-// the response reuses [TraceSearchResponse].
+// the response reuses [TraceSearchResponse]. params.ScrollID is deliberately not
+// forwarded — [TracesService.All] rejects it up front, and a fixed cursor
+// re-sent alongside an advancing offset would pin every request to one page.
 func (s *TracesService) searchPage(ctx context.Context, params TraceSearchParams, offset, pageSize int) ([]Trace, error) {
 	body := map[string]any{
 		"pageOffset": offset,
@@ -229,9 +242,6 @@ func (s *TracesService) searchPage(ctx context.Context, params TraceSearchParams
 	}
 	if params.Filters != nil {
 		body["filters"] = params.Filters
-	}
-	if params.ScrollID != "" {
-		body["scrollId"] = params.ScrollID
 	}
 
 	reader, err := jsonReader(body)

@@ -14,28 +14,26 @@ import (
 	"github.com/langwatch/langwatch/sdks/go/instrumentation/otelhttp"
 )
 
-// selectRequest walks Extractors() in precedence order and returns the Name of
-// the first extractor whose MatchesRequest accepts the body, mirroring the
-// otelhttp base's shape dispatch (the generic fallback is last and always
-// matches, so this never falls through).
+// selectRequest reports which extractor the otelhttp base would dispatch a
+// request to. It calls the production selector rather than re-walking
+// Extractors() here, so a precedence change in otelhttp shows up as a failure
+// in these tests instead of passing against a private copy of the rule.
 func selectRequest(body otelhttp.JSONObject, pathHint string) string {
-	for _, e := range Extractors() {
-		if e.MatchesRequest(body, pathHint) {
-			return e.Name()
-		}
+	e := otelhttp.SelectRequestExtractor(Extractors(), body, pathHint)
+	if e == nil {
+		return ""
 	}
-	return ""
+	return e.Name()
 }
 
-// selectResponse walks Extractors() in precedence order and returns the Name of
-// the first extractor whose MatchesResponse accepts the response.
+// selectResponse is the response-side counterpart, dispatching through the same
+// production selector.
 func selectResponse(objectField, contentType string) string {
-	for _, e := range Extractors() {
-		if e.MatchesResponse(objectField, contentType) {
-			return e.Name()
-		}
+	e := otelhttp.SelectResponseExtractor(Extractors(), objectField, contentType)
+	if e == nil {
+		return ""
 	}
-	return ""
+	return e.Name()
 }
 
 func TestSelectRequestExtractor(t *testing.T) {
@@ -168,39 +166,49 @@ func TestResponsesStreamAccumulator(t *testing.T) {
 }
 
 // TestResponsesStreamAccumulator_ErrorEvent verifies a top-level error event
-// marks the span as errored.
+// marks the span as errored, whether or not text deltas preceded it.
 func TestResponsesStreamAccumulator_ErrorEvent(t *testing.T) {
-	span, exporter := newSpan(t)
+	cases := []struct {
+		name        string
+		precedingev string
+		event       string
+		wantCode    string
+		wantMessage string
+	}{
+		{
+			name:        "after a text delta",
+			precedingev: `{"type":"response.output_text.delta","delta":"part"}`,
+			event:       `{"type":"error","code":"server_error","message":"upstream exploded"}`,
+			wantCode:    "server_error",
+			wantMessage: "upstream exploded",
+		},
+		{
+			name:        "with no preceding delta",
+			event:       `{"type":"error","code":"rate_limit_exceeded","message":"slow down"}`,
+			wantCode:    "rate_limit_exceeded",
+			wantMessage: "slow down",
+		},
+	}
 
-	acc := ResponsesExtractor{}.NewStreamAccumulator()
-	acc.Consume(`{"type":"response.output_text.delta","delta":"part"}`)
-	acc.Consume(`{"type":"error","code":"server_error","message":"upstream exploded"}`)
-	acc.Finish(span, langwatch.DataCaptureAll)
-	span.End()
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			span, exporter := newSpan(t)
 
-	read := requireSingleSpan(t, exporter)
-	assert.Equal(t, codes.Error, read.Status.Code)
-	assert.Equal(t, "upstream exploded", read.Status.Description)
-	attrs := attrsOf(read.Attributes)
-	assert.Equal(t, attribute.StringValue("server_error"), attrs[attribute.Key("error.type")])
-}
+			acc := ResponsesExtractor{}.NewStreamAccumulator()
+			if tc.precedingev != "" {
+				acc.Consume(tc.precedingev)
+			}
+			acc.Consume(tc.event)
+			acc.Finish(span, langwatch.DataCaptureAll)
+			span.End()
 
-// TestResponsesStreamErrorEvent verifies the error event sets the span error
-// status and type even with no preceding deltas.
-func TestResponsesStreamErrorEvent(t *testing.T) {
-	t.Run("an error event sets the span error status and type", func(t *testing.T) {
-		span, exporter := newSpan(t)
-		acc := ResponsesExtractor{}.NewStreamAccumulator()
-		acc.Consume(`{"type":"error","code":"rate_limit_exceeded","message":"slow down"}`)
-		acc.Finish(span, langwatch.DataCaptureAll)
-		span.End()
-
-		read := requireSingleSpan(t, exporter)
-		assert.Equal(t, codes.Error, read.Status.Code)
-		assert.Equal(t, "slow down", read.Status.Description)
-		attrs := attrsOf(read.Attributes)
-		assert.Equal(t, attribute.StringValue("rate_limit_exceeded"), attrs[attribute.Key("error.type")])
-	})
+			read := requireSingleSpan(t, exporter)
+			assert.Equal(t, codes.Error, read.Status.Code)
+			assert.Equal(t, tc.wantMessage, read.Status.Description)
+			attrs := attrsOf(read.Attributes)
+			assert.Equal(t, attribute.StringValue(tc.wantCode), attrs[attribute.Key("error.type")])
+		})
+	}
 }
 
 // TestResponsesArrayInputRecorded verifies the array input is recorded (as JSON)
@@ -272,11 +280,14 @@ func TestResponsesFunctionCallOutput(t *testing.T) {
 	parts, ok := msgs[0].Content.([]any)
 	require.True(t, ok, "content should be rich parts, got %T", msgs[0].Content)
 	require.Len(t, parts, 1)
-	toolPart := parts[0].(map[string]any)
+	toolPart, ok := parts[0].(map[string]any)
+	require.True(t, ok, "part should be an object, got %T", parts[0])
 	assert.Equal(t, "tool_call", toolPart["type"])
 	assert.Equal(t, "search", toolPart["toolName"])
 	assert.Equal(t, "fc_1", toolPart["toolCallId"])
-	assert.JSONEq(t, `{"term":"go"}`, toolPart["args"].(string))
+	args, ok := toolPart["args"].(string)
+	require.True(t, ok, "args should be a string, got %T", toolPart["args"])
+	assert.JSONEq(t, `{"term":"go"}`, args)
 	assert.NotContains(t, attrs, outputKey)
 }
 

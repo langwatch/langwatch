@@ -74,8 +74,13 @@ func (ResponsesExtractor) ExtractRequest(span *langwatch.Span, raw []byte, captu
 		return GenericExtractor{}.ExtractRequest(span, raw, capture)
 	}
 
-	span.SetRequestModel(req.Model)
-	span.SetName("responses." + req.Model)
+	// The model is optional on /v1/responses (previous_response_id can carry it),
+	// so guard on presence rather than recording an empty model and naming the
+	// span "responses." with a trailing dot.
+	if req.Model != "" {
+		span.SetRequestModel(req.Model)
+		span.SetName("responses." + req.Model)
+	}
 
 	reqParams := langwatch.GenAIRequestParams{}
 	if req.MaxOutputTokens != nil {
@@ -93,7 +98,7 @@ func (ResponsesExtractor) ExtractRequest(span *langwatch.Span, raw []byte, captu
 	span.SetGenAIRequestParams(reqParams)
 
 	if req.ParallelToolCalls != nil {
-		span.SetAttributes(attribute.Bool("gen_ai.request.parallel_tool_calls", *req.ParallelToolCalls))
+		span.SetAttributes(langwatch.AttributeGenAIRequestParallelToolCalls.Bool(*req.ParallelToolCalls))
 	}
 	if len(req.Tools) > 0 {
 		otelhttp.SetJSONAttribute(span, string(langwatch.AttributeGenAIRequestTools), req.Tools)
@@ -124,7 +129,7 @@ func recordToolChoice(span *langwatch.Span, raw json.RawMessage) {
 	if err := json.Unmarshal(raw, &decoded); err != nil {
 		return
 	}
-	otelhttp.SetJSONAttribute(span, "gen_ai.request.tool_choice", decoded)
+	otelhttp.SetJSONAttribute(span, string(langwatch.AttributeGenAIRequestToolChoice), decoded)
 }
 
 func (ResponsesExtractor) ExtractNonStreaming(span *langwatch.Span, raw []byte, capture langwatch.DataCaptureMode) {
@@ -210,7 +215,9 @@ func recordResponsesResult(span *langwatch.Span, resp responsesResponse, capture
 	if resp.ID != "" {
 		span.SetAttributes(semconv.GenAIResponseID(resp.ID))
 	}
-	span.SetResponseModel(resp.Model)
+	if resp.Model != "" {
+		span.SetResponseModel(resp.Model)
+	}
 	if resp.Status != "" {
 		span.SetAttributes(langwatch.AttributeGenAIResponseStatus.String(resp.Status))
 		span.SetGenAIResponseFinishReasons(resp.Status)

@@ -128,14 +128,14 @@ func recordMessagesInput(span *langwatch.Span, rawMessages json.RawMessage) {
 
 // decodeInputMessage maps an Ollama request message onto a LangWatch
 // ChatMessage. Unlike an assistant response message, an input message keeps its
-// declared role (system/user/assistant/tool) and carries any images as their
-// count (raw image bytes are not inlined into the trace).
+// declared role (system/user/assistant/tool). Any images on the message are
+// dropped: raw image bytes would bloat the trace and no consumer reads an
+// image-count attribute today.
 func decodeInputMessage(raw json.RawMessage) (langwatch.ChatMessage, bool) {
 	var wire struct {
 		ollamaMessage
 		ToolName   string `json:"tool_name"`
 		ToolCallID string `json:"tool_call_id"`
-		Images     []any  `json:"images"`
 	}
 	if err := json.Unmarshal(raw, &wire); err != nil {
 		return langwatch.ChatMessage{}, false
@@ -258,6 +258,11 @@ func (a *chatStreamAccumulator) Consume(line string) {
 	}
 	if chunk.Message.Thinking != "" {
 		a.thinking.WriteString(chunk.Message.Thinking)
+		// Reasoning counts as output. A thinking model can stream only thinking
+		// chunks before the final line, and without this Finish would discard the
+		// whole accumulated message — the non-streaming path keeps a
+		// reasoning-only message (decodeOllamaMessage).
+		a.sawAnyOutput = true
 	}
 	if len(chunk.Message.ToolCalls) > 0 {
 		a.toolCalls = append(a.toolCalls, chunk.Message.ToolCalls...)

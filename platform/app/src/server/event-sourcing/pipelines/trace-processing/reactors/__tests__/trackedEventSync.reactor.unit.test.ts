@@ -16,6 +16,8 @@ import {
 type FeedbackEvent = {
   type?: string;
   metrics?: Record<string, number>;
+  /** Metrics sent the way OTLP encodes an integer, rather than as a double. */
+  intMetrics?: Record<string, number | string | { low: number; high: number }>;
   details?: Record<string, string>;
 };
 
@@ -39,6 +41,10 @@ function makeOtlpSpan(feedbackEvents: FeedbackEvent[]): OtlpSpan {
         ...Object.entries(feedback.metrics ?? {}).map(([key, value]) => ({
           key: `event.metrics.${key}`,
           value: { doubleValue: value },
+        })),
+        ...Object.entries(feedback.intMetrics ?? {}).map(([key, value]) => ({
+          key: `event.metrics.${key}`,
+          value: { intValue: value },
         })),
         ...Object.entries(feedback.details ?? {}).map(([key, value]) => ({
           key: `event.details.${key}`,
@@ -171,6 +177,41 @@ describe("extractTrackedEventsFromSpan", () => {
     });
   });
 
+  describe("given a metric encoded as an OTLP integer", () => {
+    it("reads a plain intValue", () => {
+      const span = makeOtlpSpan([
+        { type: "thumbs_up_down", intMetrics: { vote: 1 } },
+      ]);
+
+      expect(extractTrackedEventsFromSpan(span)[0]?.metrics).toEqual({
+        vote: 1,
+      });
+    });
+
+    it("reads a stringified intValue", () => {
+      const span = makeOtlpSpan([
+        { type: "thumbs_up_down", intMetrics: { vote: "-1" } },
+      ]);
+
+      expect(extractTrackedEventsFromSpan(span)[0]?.metrics).toEqual({
+        vote: -1,
+      });
+    });
+
+    it("reads a protobuf Long intValue", () => {
+      const span = makeOtlpSpan([
+        {
+          type: "waited_to_finish",
+          intMetrics: { finished: { low: 1, high: 0 } },
+        },
+      ]);
+
+      expect(extractTrackedEventsFromSpan(span)[0]?.metrics).toEqual({
+        finished: 1,
+      });
+    });
+  });
+
   describe("given a span with no feedback events", () => {
     it("returns an empty array", () => {
       const span = makeOtlpSpan([]);
@@ -262,7 +303,23 @@ describe("trackedEventSync reactor", () => {
     });
   });
 
+  describe("when the span carries a langwatch.event with no event type", () => {
+    /** @scenario "A malformed feedback event is ignored" */
+    it("attaches no tracked event to the trace", async () => {
+      const reactor = createTrackedEventSyncReactor(deps);
+      const span = makeOtlpSpan([{ metrics: { vote: 1 } }]);
+
+      await reactor.handle(
+        createSpanReceivedEvent(span),
+        createContext(createFoldState()),
+      );
+
+      expect(deps.recordTrackedEvent).not.toHaveBeenCalled();
+    });
+  });
+
   describe("when the span carries a thumbs-up feedback event", () => {
+    /** @scenario "A thumbs-up vote on a span becomes a tracked event" */
     it("records a tracked event with the type, metrics, and details", async () => {
       const reactor = createTrackedEventSyncReactor(deps);
       const span = makeOtlpSpan([
@@ -334,6 +391,47 @@ describe("trackedEventSync reactor", () => {
       );
 
       expect(deps.recordTrackedEvent).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe("when recording the first of two feedback events fails", () => {
+    it("still records the second event", async () => {
+      vi.mocked(deps.recordTrackedEvent)
+        .mockRejectedValueOnce(new Error("clickhouse unavailable"))
+        .mockResolvedValueOnce(undefined);
+      const reactor = createTrackedEventSyncReactor(deps);
+      const span = makeOtlpSpan([
+        { type: "thumbs_up_down", metrics: { vote: 1 } },
+        { type: "waited_to_finish", metrics: { finished: 1 } },
+      ]);
+
+      await expect(
+        reactor.handle(
+          createSpanReceivedEvent(span),
+          createContext(createFoldState()),
+        ),
+      ).rejects.toThrow("clickhouse unavailable");
+
+      expect(deps.recordTrackedEvent).toHaveBeenCalledTimes(2);
+      const secondCall = vi.mocked(deps.recordTrackedEvent).mock.calls[1]![0];
+      expect(secondCall.body.event_type).toBe("waited_to_finish");
+    });
+
+    it("rethrows so the framework retries the whole span", async () => {
+      vi.mocked(deps.recordTrackedEvent).mockRejectedValue(
+        new Error("clickhouse unavailable"),
+      );
+      const reactor = createTrackedEventSyncReactor(deps);
+      const span = makeOtlpSpan([
+        { type: "thumbs_up_down", metrics: { vote: 1 } },
+      ]);
+
+      await expect(
+        reactor.handle(
+          createSpanReceivedEvent(span),
+          createContext(createFoldState()),
+        ),
+      ).rejects.toThrow("clickhouse unavailable");
     });
   });
 

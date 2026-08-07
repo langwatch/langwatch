@@ -195,6 +195,52 @@ func TestChat_Streaming_ToolCalls(t *testing.T) {
 	assert.JSONEq(t, `{"q":"x"}`, msgs[0].ToolCalls[0].Function.Arguments)
 }
 
+// reasoningContents parses the reasoning_content field off a
+// gen_ai.output.messages payload. The shared chatMessage helper does not carry
+// it, and reasoning is the whole point of these cases.
+func reasoningContents(t *testing.T, raw string) []string {
+	t.Helper()
+	var msgs []struct {
+		ReasoningContent string `json:"reasoning_content"`
+	}
+	require.NoError(t, json.Unmarshal([]byte(raw), &msgs), "parse gen_ai messages: %s", raw)
+	out := make([]string, 0, len(msgs))
+	for _, m := range msgs {
+		out = append(out, m.ReasoningContent)
+	}
+	return out
+}
+
+// TestChat_Streaming_ReasoningOnly pins that a thinking model whose stream
+// carries only `thinking` chunks still records its output message. Reasoning is
+// output: treating it as "no output seen" discarded the whole accumulated
+// message, while the non-streaming path kept a reasoning-only message.
+func TestChat_Streaming_ReasoningOnly(t *testing.T) {
+	const streamBody = `{"model":"deepseek-r1","message":{"role":"assistant","thinking":"let me "},"done":false}
+{"model":"deepseek-r1","message":{"role":"assistant","thinking":"think"},"done":false}
+{"model":"deepseek-r1","message":{"role":"assistant","content":""},"done":true,"done_reason":"stop","prompt_eval_count":3,"eval_count":9}
+`
+
+	rt := &mockRoundTripper{statusCode: 200, respBody: streamBody, contentType: "application/x-ndjson"}
+	provider, exporter := newTestProvider(t)
+	client := newTracedClient(t, rt, WithTracerProvider(provider))
+
+	err := client.Chat(context.Background(), &api.ChatRequest{
+		Model:    "deepseek-r1",
+		Messages: []api.Message{{Role: "user", Content: "think"}},
+	}, func(api.ChatResponse) error { return nil })
+	require.NoError(t, err)
+
+	span := requireSingleSpan(t, provider, exporter)
+	attrs := spanAttrs(span)
+
+	require.Contains(t, attrs, genAIOutputKey, "a reasoning-only stream must still record its output message")
+	msgs := genAIMessages(t, attrs[genAIOutputKey].AsString())
+	require.Len(t, msgs, 1)
+	assert.Equal(t, "assistant", msgs[0].Role)
+	assert.Equal(t, []string{"let me think"}, reasoningContents(t, attrs[genAIOutputKey].AsString()))
+}
+
 func TestGenerate_NonStreaming(t *testing.T) {
 	const respBody = `{"model":"llama3.2","created_at":"2024-01-01T00:00:00Z","response":"the answer is 4","done":true,"done_reason":"stop","total_duration":2000000000,"prompt_eval_count":8,"eval_count":5}`
 
@@ -267,6 +313,54 @@ func TestGenerate_Streaming(t *testing.T) {
 	assert.Equal(t, "hello", outMsgs[0].Content)
 }
 
+// TestGenerate_Thinking pins that /api/generate keeps the reasoning text
+// Ollama's thinking models return under "thinking", on both the non-streaming
+// and the streamed path — the chat path already exposes it as
+// reasoning_content, and dropping it on generate lost the model's reasoning.
+func TestGenerate_Thinking(t *testing.T) {
+	t.Run("non-streaming keeps thinking as reasoning content", func(t *testing.T) {
+		const respBody = `{"model":"deepseek-r1","response":"4","thinking":"2 plus 2 is 4","done":true,"done_reason":"stop","prompt_eval_count":8,"eval_count":5}`
+
+		rt := &mockRoundTripper{statusCode: 200, respBody: respBody, contentType: "application/json"}
+		provider, exporter := newTestProvider(t)
+		client := newTracedClient(t, rt, WithTracerProvider(provider))
+
+		err := client.Generate(context.Background(), &api.GenerateRequest{
+			Model:  "deepseek-r1",
+			Prompt: "what is 2+2?",
+			Stream: boolPtr(false),
+		}, func(api.GenerateResponse) error { return nil })
+		require.NoError(t, err)
+
+		attrs := spanAttrs(requireSingleSpan(t, provider, exporter))
+		msgs := genAIMessages(t, attrs[genAIOutputKey].AsString())
+		require.Len(t, msgs, 1)
+		assert.Equal(t, "4", msgs[0].Content)
+		assert.Equal(t, []string{"2 plus 2 is 4"}, reasoningContents(t, attrs[genAIOutputKey].AsString()))
+	})
+
+	t.Run("a reasoning-only stream still records its output message", func(t *testing.T) {
+		const streamBody = `{"model":"deepseek-r1","thinking":"let me ","done":false}
+{"model":"deepseek-r1","thinking":"think","done":false}
+{"model":"deepseek-r1","response":"","done":true,"done_reason":"stop","prompt_eval_count":3,"eval_count":9}
+`
+
+		rt := &mockRoundTripper{statusCode: 200, respBody: streamBody, contentType: "application/x-ndjson"}
+		provider, exporter := newTestProvider(t)
+		client := newTracedClient(t, rt, WithTracerProvider(provider))
+
+		err := client.Generate(context.Background(), &api.GenerateRequest{
+			Model:  "deepseek-r1",
+			Prompt: "think",
+		}, func(api.GenerateResponse) error { return nil })
+		require.NoError(t, err)
+
+		attrs := spanAttrs(requireSingleSpan(t, provider, exporter))
+		require.Contains(t, attrs, genAIOutputKey, "a reasoning-only stream must still record its output message")
+		assert.Equal(t, []string{"let me think"}, reasoningContents(t, attrs[genAIOutputKey].AsString()))
+	})
+}
+
 func TestEmbed_NonStreaming(t *testing.T) {
 	const respBody = `{"model":"all-minilm","embeddings":[[0.1,0.2,0.3],[0.4,0.5,0.6]],"total_duration":1000000000,"prompt_eval_count":6}`
 
@@ -300,6 +394,32 @@ func TestEmbed_NonStreaming(t *testing.T) {
 	// Input recorded; output records only the vector count.
 	inputTV := parseTypedValue(t, attrs[inputKey].AsString())
 	assert.Equal(t, "text", inputTV.Type)
+	assert.Equal(t, attribute.IntValue(2), attrs[attribute.Key("gen_ai.response.embeddings_count")])
+}
+
+// TestEmbed_CountIsStructureNotContent pins that the embeddings count survives
+// DataCaptureNone. The count is span structure — the response-side mirror of
+// gen_ai.embeddings.dimension.count, which is already recorded unconditionally —
+// not captured content, and the documented contract is that span structure,
+// metrics, models, usage and identity are always recorded.
+func TestEmbed_CountIsStructureNotContent(t *testing.T) {
+	const respBody = `{"model":"all-minilm","embeddings":[[0.1,0.2],[0.3,0.4]],"prompt_eval_count":6}`
+
+	rt := &mockRoundTripper{statusCode: 200, respBody: respBody, contentType: "application/json"}
+	provider, exporter := newTestProvider(t)
+	client := newTracedClient(t, rt, WithTracerProvider(provider), WithDataCapture(langwatch.DataCaptureNone))
+
+	_, err := client.Embed(context.Background(), &api.EmbedRequest{
+		Model:      "all-minilm",
+		Input:      "embed me",
+		Dimensions: 256,
+	})
+	require.NoError(t, err)
+
+	attrs := spanAttrs(requireSingleSpan(t, provider, exporter))
+
+	assert.NotContains(t, attrs, inputKey, "content is gated under DataCaptureNone")
+	assert.Equal(t, attribute.IntValue(256), attrs[semconv.GenAIEmbeddingsDimensionCountKey])
 	assert.Equal(t, attribute.IntValue(2), attrs[attribute.Key("gen_ai.response.embeddings_count")])
 }
 
@@ -489,7 +609,9 @@ func TestGenAIOperationFromPath(t *testing.T) {
 		{"/api/embed", semconv.GenAIOperationNameEmbeddings},
 		{"/api/embeddings", semconv.GenAIOperationNameEmbeddings},
 		{"/api/unknown", semconv.GenAIOperationNameKey.String("unknown")},
-		{"", semconv.GenAIOperationNameChat},
+		// An empty path is not a chat: it reports "unknown" exactly as any other
+		// path no extractor recognizes does.
+		{"", semconv.GenAIOperationNameKey.String("unknown")},
 	}
 
 	for _, test := range tests {
@@ -502,8 +624,9 @@ func TestGenAIOperationFromPath(t *testing.T) {
 	}
 }
 
-// jsonEqRaw is a small guard that the request body we send round-trips as valid
-// JSON the extractor can parse — a sanity check on the mock capture path.
+// TestRequestBodyCaptured is a small guard that the request body we send
+// round-trips as valid JSON the extractor can parse — a sanity check on the mock
+// capture path.
 func TestRequestBodyCaptured(t *testing.T) {
 	const respBody = `{"model":"llama3.2","message":{"role":"assistant","content":"ok"},"done":true,"prompt_eval_count":1,"eval_count":1}`
 

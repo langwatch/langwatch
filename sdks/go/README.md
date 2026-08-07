@@ -494,8 +494,15 @@ Data capture controls whether span **input/output content** leaves the process.
 It is enforced at export time, so one setting governs every instrumentation
 (the OpenAI middleware, manual spans, …). Span structure, metrics, metadata,
 models and identity are always kept; only the content attributes
-(`langwatch.input`/`output` and the `gen_ai.*` message/prompt/completion
-equivalents) are stripped. The default, unconfigured, captures everything.
+(`langwatch.input`/`output`, `langwatch.rag.contexts` and the `gen_ai.*`
+message/prompt/completion equivalents) are stripped. The default, unconfigured,
+captures everything.
+
+`DataCaptureNone` also reaches the free content a span carries in its **events**:
+a tracked event's `event.details.*` annotations and an evaluation's free-text
+`details` are dropped, while the event type, its metrics and the evaluation's
+score and pass/fail survive. Errors recorded with `RecordError` are diagnostics,
+not captured content, and are never stripped.
 
 ```go
 // Fixed mode for all spans

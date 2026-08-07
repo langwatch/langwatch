@@ -35,7 +35,9 @@ func (m *mockRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) 
 
 	contentType := m.contentType
 	if contentType == "" {
-		if strings.Contains(m.respBody, "data:") {
+		// Anchored on the SSE line prefix: a substring match would classify a
+		// fixture merely containing a data: URL as a stream.
+		if strings.HasPrefix(m.respBody, "data: ") {
 			contentType = "text/event-stream"
 		} else {
 			contentType = "application/json"

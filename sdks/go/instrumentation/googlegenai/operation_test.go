@@ -1,7 +1,9 @@
 package googlegenai
 
 import (
+	"io"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -88,11 +90,29 @@ func TestOperationAttrs(t *testing.T) {
 	t.Run("non-model path yields no attributes", func(t *testing.T) {
 		assert.Empty(t, operationAttrs("/v1beta/cachedContents"))
 	})
+
+	t.Run("an unmapped verb is normalised to snake_case", func(t *testing.T) {
+		assert.Equal(t, "predict", operationName("predict"))
+		assert.Equal(t, "stream_raw_predict", operationName("streamRawPredict"))
+		assert.Equal(t, "count_tokens", operationName("countTokens"))
+		assert.Empty(t, operationName(""))
+	})
 }
 
-// baseMarkerTransport is a sentinel base round tripper used to assert that an
-// existing client transport is preserved underneath the tracing layer.
-type baseMarkerTransport struct{ http.RoundTripper }
+// baseMarkerTransport is a sentinel base round tripper that counts the requests
+// it serves, used to assert that an existing client transport really stays in
+// the chain underneath the tracing layer.
+type baseMarkerTransport struct{ hits int }
+
+func (t *baseMarkerTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	t.hits++
+	return &http.Response{
+		StatusCode: http.StatusOK,
+		Header:     http.Header{"Content-Type": []string{"application/json"}},
+		Body:       io.NopCloser(strings.NewReader(`{}`)),
+		Request:    req,
+	}, nil
+}
 
 func TestWrapClientConfig(t *testing.T) {
 	t.Run("it sets the HTTPClient on a nil-client config", func(t *testing.T) {
@@ -103,13 +123,22 @@ func TestWrapClientConfig(t *testing.T) {
 	})
 
 	t.Run("it preserves an existing client transport as the base", func(t *testing.T) {
-		base := &baseMarkerTransport{RoundTripper: http.DefaultTransport}
+		base := &baseMarkerTransport{}
 		cc := &genai.ClientConfig{APIKey: "k", HTTPClient: &http.Client{Transport: base}}
 		WrapClientConfig(cc)
-		// The traced transport now wraps the original base; baseTransport must
-		// have returned the marker so the user's transport stays in the chain.
-		assert.Same(t, http.RoundTripper(base), baseTransport(&http.Client{Transport: base}))
-		assert.NotNil(t, cc.HTTPClient.Transport)
+		require.NotNil(t, cc.HTTPClient)
+
+		// Drive a request through the wrapped client: the marker must serve it, so
+		// the user's transport is provably still underneath the tracing layer.
+		req, err := http.NewRequest(http.MethodPost,
+			"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+			strings.NewReader(`{}`))
+		require.NoError(t, err)
+		resp, err := cc.HTTPClient.Do(req)
+		require.NoError(t, err)
+		require.NoError(t, resp.Body.Close())
+
+		assert.Equal(t, 1, base.hits, "the traced transport must delegate to the original base transport")
 	})
 
 	t.Run("it is a no-op on a nil config", func(t *testing.T) {

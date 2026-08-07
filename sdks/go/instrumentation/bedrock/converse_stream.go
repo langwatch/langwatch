@@ -233,27 +233,7 @@ func (a *streamAccumulator) assembledParts() (parts []langwatch.ChatRichContent,
 // finish records the accumulated stream results on the span and ends it.
 func (r *observingReader) finish() {
 	r.once.Do(func() {
-		r.accLock.Lock()
-		acc := &r.acc
-		r.accLock.Unlock()
-
-		if acc.stopReason != "" {
-			r.span.SetGenAIResponseFinishReasons(acc.stopReason)
-		}
-		recordTokenUsage(r.span, acc.usage)
-		if r.capture.CaptureOutput() {
-			// Record structured chat messages when tool_use blocks were streamed
-			// (the common agent case), so they are not discarded; otherwise keep
-			// the plain-text path for pure-text responses.
-			if parts, hasToolUse := acc.assembledParts(); hasToolUse {
-				r.span.SetGenAIOutputMessages([]langwatch.ChatMessage{{
-					Role:    langwatch.ChatRoleAssistant,
-					Content: parts,
-				}})
-			} else if acc.output.Len() > 0 {
-				r.span.SetGenAIOutputMessages([]langwatch.ChatMessage{langwatch.TextMessage(langwatch.ChatRoleAssistant, acc.output.String())})
-			}
-		}
+		r.recordAccumulated()
 		if err := r.upstream.Err(); err != nil {
 			r.span.SetStatus(codes.Error, err.Error())
 			r.span.RecordError(err)
@@ -262,6 +242,35 @@ func (r *observingReader) finish() {
 		}
 		r.span.End()
 	})
+}
+
+// recordAccumulated writes the accumulated stream results onto the span. It
+// holds accLock for the whole read: finish() can be called from the consumer
+// goroutine (via Close) while the pump goroutine is still inside observe()
+// writing the same accumulator, and sync.Once serialises finish against itself
+// only. Reading any accumulator field outside the lock is a data race.
+func (r *observingReader) recordAccumulated() {
+	r.accLock.Lock()
+	defer r.accLock.Unlock()
+
+	if r.acc.stopReason != "" {
+		r.span.SetGenAIResponseFinishReasons(r.acc.stopReason)
+	}
+	recordTokenUsage(r.span, r.acc.usage)
+	if !r.capture.CaptureOutput() {
+		return
+	}
+	// Record structured chat messages when tool_use blocks were streamed (the
+	// common agent case), so they are not discarded; otherwise keep the
+	// plain-text path for pure-text responses.
+	if parts, hasToolUse := r.acc.assembledParts(); hasToolUse {
+		r.span.SetGenAIOutputMessages([]langwatch.ChatMessage{{
+			Role:    langwatch.ChatRoleAssistant,
+			Content: parts,
+		}})
+	} else if r.acc.output.Len() > 0 {
+		r.span.SetGenAIOutputMessages([]langwatch.ChatMessage{langwatch.TextMessage(langwatch.ChatRoleAssistant, r.acc.output.String())})
+	}
 }
 
 // Events returns the consumer-facing event channel.

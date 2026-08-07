@@ -92,3 +92,63 @@ func TestToGenAIUsage_TotalTokensUnchanged(t *testing.T) {
 	require.NotNil(t, usage.InputTokens)
 	assert.Equal(t, 200, *usage.InputTokens)
 }
+
+// TestToGenAIUsage_ThoughtsBilledAsOutput pins the inclusive output split.
+// Gemini reports totalTokenCount = promptTokenCount + candidatesTokenCount +
+// thoughtsTokenCount, so candidatesTokenCount EXCLUDES the reasoning tokens —
+// unlike OpenAI, whose completion_tokens already includes them. Google bills
+// thoughts at the output rate and LangWatch prices output from
+// gen_ai.usage.output_tokens, so OutputTokens must carry both while
+// ReasoningTokens carries the thoughts on their own as the subset detail.
+func TestToGenAIUsage_ThoughtsBilledAsOutput(t *testing.T) {
+	cases := []struct {
+		name          string
+		candidates    int
+		thoughts      int
+		wantOutput    *int
+		wantReasoning *int
+	}{
+		{
+			name:          "thoughts are added to the visible candidates",
+			candidates:    7,
+			thoughts:      3,
+			wantOutput:    langwatch.Int(10),
+			wantReasoning: langwatch.Int(3),
+		},
+		{
+			name:          "no thoughts leaves candidates untouched",
+			candidates:    7,
+			thoughts:      0,
+			wantOutput:    langwatch.Int(7),
+			wantReasoning: nil,
+		},
+		{
+			name:          "a thoughts-only response still reports billable output",
+			candidates:    0,
+			thoughts:      4,
+			wantOutput:    langwatch.Int(4),
+			wantReasoning: langwatch.Int(4),
+		},
+		{
+			name:          "absent output records nothing",
+			candidates:    0,
+			thoughts:      0,
+			wantOutput:    nil,
+			wantReasoning: nil,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			u := &usageMetadata{
+				CandidatesTokenCount: tc.candidates,
+				ThoughtsTokenCount:   tc.thoughts,
+			}
+
+			usage := u.toGenAIUsage()
+
+			assert.Equal(t, tc.wantOutput, usage.OutputTokens)
+			assert.Equal(t, tc.wantReasoning, usage.ReasoningTokens)
+		})
+	}
+}

@@ -135,9 +135,9 @@ func NewExporter(ctx context.Context, opts ...ExporterOption) (*LangWatchExporte
 		return nil, err
 	}
 
-	fe := NewFilteringExporter(otlpExporter, cfg.filters...)
-	fe.dataCapture = cfg.dataCapture
-	return &LangWatchExporter{FilteringExporter: fe}, nil
+	return &LangWatchExporter{
+		FilteringExporter: newFilteringExporter(otlpExporter, cfg.dataCapture, cfg.filters...),
+	}, nil
 }
 
 // NewDefaultExporter creates a LangWatch exporter with the ExcludeHTTPRequests preset.
@@ -159,10 +159,25 @@ type FilteringExporter struct {
 
 // NewFilteringExporter creates a filtering wrapper around any SpanExporter.
 // This is useful for testing or when you want to add filtering to a custom exporter.
+//
+// It applies no data-capture policy: content reaches the wrapped exporter as
+// recorded. Use NewExporter with WithDataCapture / WithDataCaptureFunc for a
+// capture-gated exporter.
 func NewFilteringExporter(wrapped sdktrace.SpanExporter, filters ...Filter) *FilteringExporter {
+	return newFilteringExporter(wrapped, dataCaptureConfig{}, filters...)
+}
+
+// newFilteringExporter builds the wrapper with a resolved capture policy, so no
+// construction path depends on assigning dataCapture after the fact.
+func newFilteringExporter(
+	wrapped sdktrace.SpanExporter,
+	capture dataCaptureConfig,
+	filters ...Filter,
+) *FilteringExporter {
 	return &FilteringExporter{
-		wrapped: wrapped,
-		filters: filters,
+		wrapped:     wrapped,
+		filters:     filters,
+		dataCapture: capture,
 	}
 }
 

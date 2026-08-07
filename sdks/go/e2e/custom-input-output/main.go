@@ -98,17 +98,14 @@ func main() {
 		log.Fatalf("Chat completion failed: %v", err)
 	}
 
-	// Record the preferred choice as output, plus token usage. The output will be
-	// shown in the LangWatch UI and the token usage rolls up to the trace. Token
-	// counts are recorded as gen_ai.usage.* (SetGenAIUsage); langwatch.metrics
-	// (SetMetrics) carries cost and the estimated-tokens flag.
-	span.
-		SetOutputText(response.Choices[0].Message.Content).
-		SetGenAIUsage(langwatch.GenAIUsage{
-			InputTokens:  langwatch.Int(int(response.Usage.PromptTokens)),
-			OutputTokens: langwatch.Int(int(response.Usage.CompletionTokens)),
-			TotalTokens:  langwatch.Int(int(response.Usage.TotalTokens)),
-		})
+	// Record the preferred choice as output; it will be shown in the LangWatch UI.
+	//
+	// Token usage is deliberately NOT recorded here. DataCaptureNone suppresses
+	// content only, so the middleware still reports gen_ai.usage.* on its own
+	// child span — recording it again on this parent would count every token
+	// twice in the trace totals. Record usage by hand (SetGenAIUsage) only on
+	// spans no instrumentation covers.
+	span.SetOutputText(response.Choices[0].Message.Content)
 
 	// This whole journey will now be available in the LangWatch UI
 	log.Printf("Chat completion response: %v", response.Choices[0].Message.Content)

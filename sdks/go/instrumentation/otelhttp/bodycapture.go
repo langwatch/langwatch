@@ -44,7 +44,10 @@ type boundedBuffer struct {
 }
 
 func (b *boundedBuffer) write(p []byte) {
-	if b.truncated {
+	// A nil buf means the capture is finished and the buffer has gone back to the
+	// pool; truncated is set alongside, so this is belt-and-braces against a
+	// write that would land in another request's buffer.
+	if b.truncated || b.buf == nil {
 		return
 	}
 	room := maxCaptureBytes - b.buf.Len()
@@ -96,8 +99,17 @@ func (c *capturingBody) Close() error {
 
 func (c *capturingBody) complete() {
 	c.once.Do(func() {
-		c.onComplete(c.cap.buf.Bytes(), c.cap.truncated)
-		putCaptureBuffer(c.cap.buf)
+		buf, truncated := c.cap.buf, c.cap.truncated
+		// Drop our reference and stop accepting writes BEFORE the buffer goes back
+		// to the pool. A consumer may keep reading (or Close) after EOF, and
+		// another request may already own the pooled buffer by then — writing into
+		// it would corrupt that request's capture, and reading it would leak it.
+		c.cap.buf = nil
+		c.cap.truncated = true
+		// onComplete runs while we still hold the buffer, so the bytes it is handed
+		// are stable; it must not retain them past the call.
+		c.onComplete(buf.Bytes(), truncated)
+		putCaptureBuffer(buf)
 	})
 }
 

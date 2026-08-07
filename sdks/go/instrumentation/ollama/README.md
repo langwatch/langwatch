@@ -194,7 +194,7 @@ the exporter strips it at export time.
   (`num_predict` → `gen_ai.request.max_tokens`,
   `gen_ai.request.{temperature,top_p,top_k,seed,frequency_penalty,presence_penalty,stop_sequences}`),
   `gen_ai.request.tools`, `gen_ai.request.structured_output` (the `format`),
-  `gen_ai.embeddings.dimension_count`, `gen_ai.request.stream`, and the input
+  `gen_ai.embeddings.dimension.count`, `gen_ai.request.stream`, and the input
   (`langwatch.input`, as `chat_messages` for chat / text for generate +
   embeddings).
 - **Response**: `gen_ai.response.model`, `gen_ai.response.finish_reasons` (the

@@ -1,6 +1,9 @@
 package langwatch
 
 import (
+	"encoding/json"
+	"strings"
+
 	"go.opentelemetry.io/otel/attribute"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/trace"
@@ -9,9 +12,15 @@ import (
 )
 
 // DataCaptureMode controls whether a span's input and/or output *content* is
-// exported. It gates the content attributes (langwatch.input/output and their
-// gen_ai.* message/prompt/completion equivalents) — span structure, metrics,
-// metadata, models and identity are always kept.
+// exported. It gates the content attributes (langwatch.input/output, the RAG
+// contexts and their gen_ai.* message/prompt/completion equivalents) — span
+// structure, metrics, metadata, models and identity are always kept.
+//
+// DataCaptureNone additionally strips the free content a span carries in its
+// *events*: a tracked event's event.details.* annotations and an evaluation's
+// free-text details. Their signal (event type, metrics, evaluation score and
+// pass/fail) survives. Errors recorded with RecordError are diagnostics, not
+// captured content, and are never stripped.
 //
 // Capture is enforced at export time by a LangWatch exporter configured with
 // WithDataCapture / WithDataCaptureFunc, so it applies uniformly across every
@@ -59,10 +68,14 @@ type DataCapturePredicate func(DataCaptureContext) DataCaptureMode
 // The gen_ai.* keys reference the SAME semconv keys the setters emit
 // (SetGenAIInputMessages, SetGenAISystemInstructions, …) so the strip-list
 // cannot drift from what is recorded.
+//
+// RAG contexts count as input: langwatch.rag.contexts carries the text of the
+// retrieved documents that were fed to the model, not just their identifiers.
 var (
 	dataCaptureInputKeys = map[attribute.Key]struct{}{
 		AttributeLangWatchInput:            {},
 		AttributeLangWatchInstructions:     {},
+		AttributeLangWatchRAGContexts:      {},
 		semconv.GenAIInputMessagesKey:      {},
 		attribute.Key("gen_ai.prompt"):     {},
 		semconv.GenAISystemInstructionsKey: {},
@@ -104,15 +117,18 @@ func spanTypeAttr(span sdktrace.ReadOnlySpan) string {
 	return ""
 }
 
-// filteredSpan wraps a ReadOnlySpan, overriding Attributes() to return a reduced
-// set. Embedding the interface promotes all its methods (including unexported
-// ones), so filteredSpan still satisfies sdktrace.ReadOnlySpan.
+// filteredSpan wraps a ReadOnlySpan, overriding Attributes() and Events() to
+// return reduced sets. Embedding the interface promotes all its methods
+// (including unexported ones), so filteredSpan still satisfies
+// sdktrace.ReadOnlySpan.
 type filteredSpan struct {
 	sdktrace.ReadOnlySpan
-	attrs []attribute.KeyValue
+	attrs  []attribute.KeyValue
+	events []sdktrace.Event
 }
 
 func (f filteredSpan) Attributes() []attribute.KeyValue { return f.attrs }
+func (f filteredSpan) Events() []sdktrace.Event         { return f.events }
 
 // applyDataCapture returns the span with input/output content attributes removed
 // per mode. If nothing is stripped, the original span is returned unchanged.
@@ -138,5 +154,63 @@ func applyDataCapture(span sdktrace.ReadOnlySpan, mode DataCaptureMode) sdktrace
 		}
 		kept = append(kept, kv)
 	}
-	return filteredSpan{ReadOnlySpan: span, attrs: kept}
+
+	// Span events carry content of their own — a tracked event's free-text
+	// annotations, an evaluation's free-text details — that no attribute filter
+	// reaches. A span event is neither model input nor model output, so it is
+	// only stripped by the mode that captures nothing at all.
+	events := span.Events()
+	if dropInput && dropOutput {
+		events = stripEventContent(events)
+	}
+
+	return filteredSpan{ReadOnlySpan: span, attrs: kept, events: events}
+}
+
+// stripEventContent removes free content from span events while keeping the
+// signal they carry: a tracked event keeps its type and numeric metrics but
+// loses its event.details.* annotations, and an evaluation keeps its identity,
+// status, score and pass/fail but loses its free-text details. An evaluation
+// payload that cannot be decoded is dropped rather than forwarded whole.
+func stripEventContent(events []sdktrace.Event) []sdktrace.Event {
+	out := make([]sdktrace.Event, 0, len(events))
+	for _, event := range events {
+		kept := make([]attribute.KeyValue, 0, len(event.Attributes))
+		for _, kv := range event.Attributes {
+			switch {
+			case strings.HasPrefix(string(kv.Key), EventDetailsPrefix):
+				continue
+			case kv.Key == AttributeEvaluationPayload:
+				redacted, ok := redactEvaluationPayload(kv.Value.AsString())
+				if !ok {
+					continue
+				}
+				kept = append(kept, AttributeEvaluationPayload.String(redacted))
+			default:
+				kept = append(kept, kv)
+			}
+		}
+		event.Attributes = kept
+		out = append(out, event)
+	}
+	return out
+}
+
+// redactEvaluationPayload removes the free-text details field from an encoded
+// evaluation, reporting whether the payload could be decoded at all.
+func redactEvaluationPayload(payload string) (string, bool) {
+	var eval map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(payload), &eval); err != nil {
+		return "", false
+	}
+	if _, ok := eval["details"]; !ok {
+		return payload, true
+	}
+
+	delete(eval, "details")
+	redacted, err := json.Marshal(eval)
+	if err != nil {
+		return "", false
+	}
+	return string(redacted), true
 }

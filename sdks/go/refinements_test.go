@@ -1,28 +1,12 @@
 package langwatch
 
 import (
-	"context"
 	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	sdktrace "go.opentelemetry.io/otel/sdk/trace"
-	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 )
-
-// recordSpanStub records a span and returns its exported stub (attributes + events).
-func recordSpanStub(t *testing.T, fn func(s *Span)) tracetest.SpanStub {
-	t.Helper()
-	exporter := tracetest.NewInMemoryExporter()
-	provider := sdktrace.NewTracerProvider(sdktrace.WithSpanProcessor(sdktrace.NewSimpleSpanProcessor(exporter)))
-	_, span := TracerFromProvider(provider, "test").Start(context.Background(), "op")
-	fn(span)
-	span.End()
-	spans := exporter.GetSpans()
-	require.Len(t, spans, 1)
-	return spans[0]
-}
 
 func TestSetGenAIMessages(t *testing.T) {
 	t.Run("input/output messages are emitted in the gen_ai format", func(t *testing.T) {
@@ -117,6 +101,13 @@ func TestRecordEvent(t *testing.T) {
 		assert.Equal(t, "thumbs_up_down", got["event.type"])
 		assert.EqualValues(t, 1, vote)
 		assert.Equal(t, "great answer", got["event.details.feedback"])
+	})
+
+	t.Run("an event with no type is dropped rather than recorded unclassifiable", func(t *testing.T) {
+		stub := recordSpanStub(t, func(s *Span) {
+			s.RecordEvent(Event{Metrics: map[string]float64{"vote": 1}})
+		})
+		assert.Empty(t, stub.Events, "the server classifies by event.type, so an empty Type is unusable")
 	})
 
 	t.Run("thumbs down records vote -1 with no feedback detail", func(t *testing.T) {

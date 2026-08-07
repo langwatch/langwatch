@@ -33,7 +33,12 @@ func main() {
 	// Create instrumented OpenAI client
 	client := openai.NewClient(
 		oaioption.WithAPIKey(openaiAPIKey),
-		oaioption.WithMiddleware(otelopenai.Middleware("filtered-spans-openai-client")),
+		oaioption.WithMiddleware(otelopenai.Middleware("filtered-spans-openai-client",
+			// This example is about span filtering, so it keeps the middleware
+			// default and records request/response content. Be mindful of
+			// sensitive data — DataCaptureInput/Output/None narrow what is sent.
+			otelopenai.WithDataCapture(langwatch.DataCaptureAll),
+		)),
 	)
 
 	// Setup some tracers that we don't want to see in LangWatch

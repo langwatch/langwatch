@@ -1,11 +1,25 @@
 package langwatch
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"go.opentelemetry.io/otel/attribute"
 )
+
+// keysWithPrefix returns the recorded keys sharing a prefix, so an
+// "it records nothing" assertion names what leaked when it fails — and cannot
+// pass vacuously the way a loop over an empty map does.
+func keysWithPrefix(attrs map[attribute.Key]attribute.Value, prefix string) []attribute.Key {
+	var found []attribute.Key
+	for key := range attrs {
+		if strings.HasPrefix(string(key), prefix) {
+			found = append(found, key)
+		}
+	}
+	return found
+}
 
 func TestSetGenAIRequestParams(t *testing.T) {
 	t.Run("it records only the set params under gen_ai.request.*", func(t *testing.T) {
@@ -56,12 +70,12 @@ func TestSetGenAIRequestParamsAllFields(t *testing.T) {
 		attrs := recordSpan(t, func(s *Span) {
 			s.SetGenAIRequestParams(GenAIRequestParams{})
 		})
-		for key := range attrs {
-			assert.NotContains(t, string(key), "gen_ai.request.")
-		}
+		assert.NotEmpty(t, attrs, "the SDK identity attributes are always recorded")
+		assert.Empty(t, keysWithPrefix(attrs, "gen_ai.request."))
 	})
 }
 
+// @scenario "Token usage is recorded under the gen_ai usage attributes"
 func TestSetGenAIUsage(t *testing.T) {
 	t.Run("it records token usage under gen_ai.usage.*", func(t *testing.T) {
 		attrs := recordSpan(t, func(s *Span) {
@@ -95,9 +109,8 @@ func TestSetGenAIUsage(t *testing.T) {
 		attrs := recordSpan(t, func(s *Span) {
 			s.SetGenAIUsage(GenAIUsage{})
 		})
-		for key := range attrs {
-			assert.NotContains(t, string(key), "gen_ai.usage.")
-		}
+		assert.NotEmpty(t, attrs, "the SDK identity attributes are always recorded")
+		assert.Empty(t, keysWithPrefix(attrs, "gen_ai.usage."))
 	})
 }
 
@@ -122,6 +135,7 @@ func TestSetGenAIOperationAndFinishReasons(t *testing.T) {
 	})
 }
 
+// @scenario "The provider is named with the current convention"
 func TestSetGenAIProvider(t *testing.T) {
 	t.Run("it records the provider name", func(t *testing.T) {
 		attrs := recordSpan(t, func(s *Span) { s.SetGenAIProvider("openai") })
