@@ -25,33 +25,11 @@ import { z } from "zod";
 
 import { getGovernedSqlService } from "~/server/analytics/governed-sql";
 import { GovernedSqlNotEnabledError } from "~/server/analytics/governed-sql/errors";
-import { featureFlagService } from "~/server/featureFlag";
+import { workbenchEnabled } from "~/server/analytics/workbenchFeatureGate";
 
 import { checkProjectPermission } from "../../rbac";
 import { createTRPCRouter, protectedProcedure } from "../../trpc";
 import { getUserProtectionsForProject } from "../../utils";
-
-/**
- * The experimental gate over the whole surface.
- *
- * One flag, checked server-side, so the browser cannot flip it: `availability`
- * answers false while it is off — which is what hides the navigation entry and
- * the page — and `schema`/`query` refuse outright, so a caller who skips the
- * availability question gets the same answer.
- */
-const GOVERNED_SQL_FLAG = "release_governed_sql_workbench";
-
-const workbenchEnabled = ({
-  userId,
-  projectId,
-}: {
-  userId: string;
-  projectId: string;
-}): Promise<boolean> =>
-  featureFlagService.isEnabled(GOVERNED_SQL_FLAG, {
-    distinctId: userId,
-    projectId,
-  });
 
 /**
  * Longest statement this router accepts.
@@ -91,6 +69,7 @@ const availability = protectedProcedure
       (await workbenchEnabled({
         userId: ctx.session.user.id,
         projectId: input.projectId,
+        prisma: ctx.prisma,
       })) && getGovernedSqlService().available,
   }));
 
@@ -103,6 +82,7 @@ const schema = protectedProcedure
       !(await workbenchEnabled({
         userId: ctx.session.user.id,
         projectId: input.projectId,
+        prisma: ctx.prisma,
       }))
     ) {
       throw new GovernedSqlNotEnabledError();
@@ -138,6 +118,7 @@ const query = protectedProcedure
       !(await workbenchEnabled({
         userId: ctx.session.user.id,
         projectId: input.projectId,
+        prisma: ctx.prisma,
       }))
     ) {
       throw new GovernedSqlNotEnabledError();
