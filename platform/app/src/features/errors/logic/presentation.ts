@@ -244,6 +244,11 @@ const presentations = {
     describe: () =>
       "The query declares parameters that weren't given values. Supply one for each and try again.",
   },
+  governed_sql_not_enabled: {
+    title: "Custom SQL isn't switched on here",
+    describe: () =>
+      "This project doesn't have the SQL workbench enabled yet. Ask your administrator to switch it on.",
+  },
   governed_sql_unavailable: {
     title: "Analytics SQL isn't available here",
     describe: () =>

@@ -1,0 +1,175 @@
+/**
+ * One cell of the governed SQL result table.
+ *
+ * The classification and the words are decided in
+ * `../logic/governedSqlValueFormat`; this decides how each kind *looks* and
+ * what a member can do with it. Two rules carry the weight:
+ *
+ *  - the six ways a value can be empty or non-finite are marked with
+ *    `data-cell-kind`, so "null", "missing" and a String column literally
+ *    holding the text `null` stay tellable apart by a reader and by a test;
+ *  - only cells whose display is not the whole truth — a structure, or a value
+ *    long enough to be clipped — grow controls. A copy button on every cell
+ *    would put a hundred extra tab stops between a keyboard user and the next
+ *    row for no gain, because an unclipped value is already on screen and
+ *    selectable.
+ *
+ * @see specs/analytics/governed-sql-workbench.feature
+ */
+
+import { Box, Button, HStack, Text } from "@chakra-ui/react";
+import { useState } from "react";
+
+import { Popover } from "~/components/ui/popover";
+
+import {
+  type GovernedSqlCell,
+  governedSqlCellCopyText,
+  governedSqlCellText,
+} from "../logic/governedSqlValueFormat";
+
+export interface GovernedSqlValueCellProps {
+  cell: GovernedSqlCell;
+  /** Named in the expanded view so the member knows which column they opened. */
+  columnName: string;
+}
+
+export function GovernedSqlValueCell({
+  cell,
+  columnName,
+}: GovernedSqlValueCellProps) {
+  const text = governedSqlCellText(cell);
+
+  // Every other kind is a token standing in for a value rather than being one:
+  // absent, null, empty, or non-finite. Written as a narrowing check rather
+  // than a set membership test so the compiler carries the distinction too.
+  if (cell.kind !== "scalar" && cell.kind !== "structured") {
+    return (
+      <Text
+        as="span"
+        data-cell-kind={cell.kind}
+        color="fg.muted"
+        fontStyle="italic"
+        fontSize="12.5px"
+      >
+        {text}
+      </Text>
+    );
+  }
+
+  const expandable = cell.kind === "structured" || cell.clipped;
+
+  return (
+    <HStack gap={1} align="baseline" minWidth={0}>
+      <Text
+        as="span"
+        data-cell-kind={cell.kind}
+        fontSize="12.5px"
+        fontFamily={cell.kind === "structured" ? "mono" : undefined}
+        whiteSpace="pre"
+        overflow="hidden"
+        textOverflow="ellipsis"
+      >
+        {text}
+      </Text>
+      {expandable && <ExpandedValue cell={cell} columnName={columnName} />}
+    </HStack>
+  );
+}
+
+/**
+ * The whole value, on request.
+ *
+ * Controlled rather than left to the popover's own trigger handling so that
+ * opening it is one state change a test can drive the same way a member does,
+ * and so the content mounts only while it is open — a table window holds
+ * dozens of these.
+ */
+function ExpandedValue({
+  cell,
+  columnName,
+}: {
+  cell: GovernedSqlCell;
+  columnName: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const full =
+    cell.kind === "structured"
+      ? cell.pretty
+      : (governedSqlCellCopyText(cell) ?? "");
+
+  return (
+    <Popover.Root
+      open={open}
+      onOpenChange={(details) => setOpen(details.open)}
+      positioning={{ placement: "bottom-start" }}
+    >
+      <Popover.Trigger asChild>
+        <Button
+          size="2xs"
+          variant="ghost"
+          aria-label={`Show the full value of ${columnName}`}
+        >
+          Show
+        </Button>
+      </Popover.Trigger>
+      <Popover.Content width="480px" maxWidth="90vw">
+        <Popover.Body>
+          <HStack justify="space-between" align="center" marginBottom={2}>
+            <Text fontSize="12.5px" fontWeight="medium">
+              {columnName}
+            </Text>
+            <CopyValueButton cell={cell} columnName={columnName} />
+          </HStack>
+          {/* Bounded on purpose: a cell can hold a document larger than the
+              popover, and a viewer that grows to fit it scrolls the page
+              instead of itself. */}
+          <Box
+            as="pre"
+            data-testid="governed-sql-value-full"
+            maxHeight="320px"
+            overflow="auto"
+            fontSize="12px"
+            fontFamily="mono"
+            whiteSpace="pre-wrap"
+            wordBreak="break-word"
+          >
+            {full}
+          </Box>
+        </Popover.Body>
+      </Popover.Content>
+    </Popover.Root>
+  );
+}
+
+/**
+ * Copies the underlying value, never the clipped rendering of it.
+ *
+ * `navigator.clipboard` is absent on an insecure origin and rejects when the
+ * document is not focused, so the failure is swallowed rather than allowed to
+ * reject unhandled — a cell copy is not worth an error boundary, and the value
+ * stays selectable either way.
+ */
+function CopyValueButton({
+  cell,
+  columnName,
+}: {
+  cell: GovernedSqlCell;
+  columnName: string;
+}) {
+  const copyText = governedSqlCellCopyText(cell);
+  if (copyText === null) return null;
+
+  return (
+    <Button
+      size="2xs"
+      variant="subtle"
+      aria-label={`Copy the full value of ${columnName}`}
+      onClick={() => {
+        void navigator.clipboard?.writeText(copyText).catch(() => undefined);
+      }}
+    >
+      Copy
+    </Button>
+  );
+}

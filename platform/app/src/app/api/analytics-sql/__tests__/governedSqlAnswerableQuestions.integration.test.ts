@@ -762,6 +762,9 @@ describe("given the governed analytics SQL API and a seed with known answers", (
   };
 
   beforeAll(async () => {
+    // The surface ships behind the experimental feature switch, off by
+    // default; the suite runs with it on via the flag's own env override.
+    process.env.RELEASE_GOVERNED_SQL_WORKBENCH = "1";
     // Three of the questions below are answered from PostgreSQL-resident
     // datasets, and every governed view over that half reads an engine table
     // that has to exist before the view can be created.
@@ -867,6 +870,7 @@ describe("given the governed analytics SQL API and a seed with known answers", (
   }, 600_000);
 
   afterAll(async () => {
+    delete process.env.RELEASE_GOVERNED_SQL_WORKBENCH;
     setGovernedSqlService(null);
     // Guarded on the identifier each statement actually uses: `team` gates
     // everything keyed by teamId, while `organization.delete` gets its own

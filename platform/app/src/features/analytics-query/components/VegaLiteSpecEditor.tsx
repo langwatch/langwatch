@@ -1,0 +1,100 @@
+/**
+ * The chart specification editor.
+ *
+ * It edits text and reports how much is wrong with it. That is the whole of it:
+ * changing a chart is a change to how the result is drawn, never a change to
+ * the query, so nothing here can cause the database to be asked anything. The
+ * editor holds no query hook, issues no request, and writes nothing anywhere —
+ * a specification lives as long as the member is looking at this result and no
+ * longer.
+ *
+ * The problems themselves are rendered by the policy panel beside this editor;
+ * what this keeps is the live count, as a status line a screen reader hears
+ * without having to find the panel.
+ *
+ * @see specs/analytics/governed-sql-workbench.feature
+ */
+
+import { Box, Text, VStack } from "@chakra-ui/react";
+import type { editor } from "monaco-editor";
+
+import { useColorMode } from "~/components/ui/color-mode";
+import dynamic from "~/utils/compat/next-dynamic";
+
+import type { VegaValidationError } from "../visualization/visualization.types";
+
+const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
+  ssr: false,
+  loading: () => (
+    <Box padding={4} color="fg.muted">
+      Loading the editor
+    </Box>
+  ),
+});
+
+const EDITOR_OPTIONS: editor.IStandaloneEditorConstructionOptions = {
+  minimap: { enabled: false },
+  fontSize: 12,
+  wordWrap: "on",
+  automaticLayout: true,
+  scrollBeyondLastLine: false,
+  lineNumbers: "on",
+  folding: true,
+};
+
+export interface VegaLiteSpecEditorProps {
+  specText: string;
+  onSpecTextChange: (specText: string) => void;
+  /**
+   * Everything wrong with the specification as it currently stands, recomputed
+   * by the caller on every edit so the count a member hears is never a count
+   * from two keystrokes ago.
+   */
+  errors: readonly VegaValidationError[];
+}
+
+export function VegaLiteSpecEditor({
+  specText,
+  onSpecTextChange,
+  errors,
+}: VegaLiteSpecEditorProps) {
+  const { colorMode } = useColorMode();
+
+  return (
+    <VStack
+      align="stretch"
+      gap={0}
+      height="full"
+      minHeight="240px"
+      data-testid="vega-spec-editor"
+    >
+      <Box flex="1" minHeight="200px">
+        <MonacoEditor
+          height="100%"
+          language="json"
+          value={specText}
+          theme={colorMode === "dark" ? "vs-dark" : "vs"}
+          onChange={(value: string | undefined) =>
+            onSpecTextChange(value ?? "")
+          }
+          options={EDITOR_OPTIONS}
+        />
+      </Box>
+      {errors.length > 0 && (
+        <Text
+          fontSize="12px"
+          color="fg.muted"
+          role="status"
+          paddingX={4}
+          paddingY={1}
+          borderTopWidth="1px"
+          borderColor="border"
+        >
+          {errors.length === 1
+            ? "1 problem to fix"
+            : `${errors.length} problems to fix`}
+        </Text>
+      )}
+    </VStack>
+  );
+}

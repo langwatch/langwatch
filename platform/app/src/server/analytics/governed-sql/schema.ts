@@ -53,6 +53,13 @@ import {
 /** How many columns an example query names. Enough to be a template, not a dump. */
 const EXAMPLE_COLUMN_COUNT = 3;
 
+/**
+ * Never in an example's projection: the server pins every query to one tenant,
+ * so this column holds a single repeated value and selecting it teaches
+ * nothing. It stays published and selectable — only the example skips it.
+ */
+const EXAMPLE_SKIPPED_COLUMN = "TenantId";
+
 /** How far back an example query looks. A week is a real question, not a toy one. */
 const EXAMPLE_LOOKBACK_DAYS = 7;
 
@@ -125,6 +132,7 @@ export function governedExampleSql({
 }): string {
   const projection = view.columns
     .filter((column) => governedColumnGates({ view, column }).length === 0)
+    .filter((column) => column.name !== EXAMPLE_SKIPPED_COLUMN)
     .slice(0, EXAMPLE_COLUMN_COUNT)
     .map((column) => column.name);
   return (
