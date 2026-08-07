@@ -140,12 +140,12 @@ describe("legacy GET /api/thread/:id — #4991 AC2", () => {
 
     it("calls getTracesByThreadId with full:true (resolves offloaded IO)", async () => {
       await makeThreadRequest("thread-1");
-      expect(mockGetTracesByThreadId).toHaveBeenCalledWith(
-        "project-123",
-        "thread-1",
-        expect.any(Object),
-        { full: true },
-      );
+      expect(mockGetTracesByThreadId).toHaveBeenCalledWith({
+        projectId: "project-123",
+        threadId: "thread-1",
+        protections: expect.any(Object),
+        opts: { full: true },
+      });
     });
 
     it("returns 200 with the thread traces", async () => {
