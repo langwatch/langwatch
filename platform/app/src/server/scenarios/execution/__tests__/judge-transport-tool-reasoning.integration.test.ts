@@ -33,12 +33,21 @@ import { createServer, type Server } from "node:http";
 import { APICallError, generateText, tool } from "ai";
 import { afterEach, describe, expect, it } from "vitest";
 import { z } from "zod";
-import { createModelFromParams } from "../model.factory";
+import {
+  createJudgeModelFromParams,
+  createModelFromParams,
+} from "../model.factory";
 import type { LiteLLMParams } from "../types";
 
 const JUDGE_PARAMS: LiteLLMParams = {
   api_key: "test-key",
   model: "openai/gpt-5.6-sol",
+};
+
+/** A judge model NOT on #6620's known-incompatible list — no preemptive default. */
+const UNLISTED_JUDGE_PARAMS: LiteLLMParams = {
+  api_key: "test-key",
+  model: "openai/gpt-5.7-nova",
 };
 
 /** The finish_test tool the judge forces — shape mirrors the SDK's. */
@@ -53,8 +62,10 @@ const finishTest = tool({
 type EndpointRule =
   | "accept"
   | "reject-tools-without-reasoning-off"
+  | "reject-reasoning-always"
   | "reject-reasoning-without-remedy"
-  | "reject-unrelated";
+  | "reject-unrelated"
+  | "reject-not-json";
 
 interface StubEndpoint {
   url: string;
@@ -136,7 +147,7 @@ function completionFor(body: Record<string, unknown>, carriesTools: boolean) {
 function responseFor(
   rule: EndpointRule,
   body: Record<string, unknown>,
-): { status: number; payload: unknown } {
+): { status: number; payload: unknown; raw?: string } {
   const carriesTools =
     Array.isArray(body.tools) && (body.tools as unknown[]).length > 0;
 
@@ -145,6 +156,12 @@ function responseFor(
   }
   if (rule === "reject-reasoning-without-remedy") {
     return { status: 400, payload: UNSPECIFIC_REASONING_REJECTION };
+  }
+  if (rule === "reject-not-json") {
+    return { status: 400, payload: undefined, raw: "Bad Request" };
+  }
+  if (rule === "reject-reasoning-always") {
+    return { status: 400, payload: reasoningRejectionFor(body.model) };
   }
   if (
     rule === "reject-tools-without-reasoning-off" &&
@@ -176,7 +193,12 @@ async function startEndpoint(
     req.on("end", () => {
       const body = JSON.parse(raw) as Record<string, unknown>;
       bodies.push(body);
-      const { status, payload } = responseFor(rule, body);
+      const { status, payload, raw: rawResponse } = responseFor(rule, body);
+      if (rawResponse !== undefined) {
+        res.writeHead(status, { "Content-Type": "text/plain" });
+        res.end(rawResponse);
+        return;
+      }
       res.writeHead(status, { "Content-Type": "application/json" });
       res.end(JSON.stringify(payload));
     });
@@ -248,11 +270,44 @@ describe("judge transport: function tools and reasoning effort", () => {
       });
     });
 
-    describe("when the judge grades a conversation against its criteria", () => {
+    describe("when the judge grades with a model not on the known-incompatible list", () => {
       /** @scenario "A criteria-graded run reports the verdict its criteria produced" */
-      it("reaches a verdict instead of an infrastructure error", async () => {
+      it("reaches a verdict through the judge factory instead of an infrastructure error", async () => {
         endpoint = await startEndpoint("reject-tools-without-reasoning-off");
-        const model = createModelFromParams({
+        // The production judge path: no preemptive default applies to an
+        // unlisted model, so only the transport retry stands between the
+        // refusal and the verdict.
+        const model = createJudgeModelFromParams({
+          litellmParams: UNLISTED_JUDGE_PARAMS,
+          nlpServiceUrl: endpoint.url,
+        });
+
+        const result = await generateText({
+          model,
+          messages: [{ role: "user", content: "grade this" }],
+          tools: { finishTest },
+          toolChoice: "required",
+        });
+
+        const bodies = endpoint.bodies();
+        expect(bodies).toHaveLength(2);
+        expect(bodies[0]).not.toHaveProperty("reasoning_effort");
+        expect(bodies[1]?.reasoning_effort).toBe("none");
+        expect(result.toolCalls[0]?.input).toEqual({
+          verdict: "success",
+          reasoning: "criteria met",
+        });
+      });
+    });
+
+    describe("when the judge grades with a model on the known-incompatible list", () => {
+      /** @scenario "A judge model already known to need reasoning off asks only once" */
+      it("sends one request already declaring reasoning off and gets the verdict", async () => {
+        endpoint = await startEndpoint("reject-tools-without-reasoning-off");
+        // Composition of the two mechanisms: #6620's preemptive default puts
+        // reasoning off on the FIRST body for a listed model, which also makes
+        // the retry ineligible — one request, no wasted round-trip.
+        const model = createJudgeModelFromParams({
           litellmParams: JUDGE_PARAMS,
           nlpServiceUrl: endpoint.url,
         });
@@ -264,6 +319,9 @@ describe("judge transport: function tools and reasoning effort", () => {
           toolChoice: "required",
         });
 
+        const bodies = endpoint.bodies();
+        expect(bodies).toHaveLength(1);
+        expect(bodies[0]?.reasoning_effort).toBe("none");
         expect(result.toolCalls[0]?.input).toEqual({
           verdict: "success",
           reasoning: "criteria met",
@@ -356,6 +414,94 @@ describe("judge transport: function tools and reasoning effort", () => {
         const bodies = endpoint.bodies();
         expect(bodies).toHaveLength(1);
         expect(bodies[0]).not.toHaveProperty("reasoning_effort");
+      });
+    });
+  });
+
+  describe("given an endpoint that refuses reasoning even when it is off", () => {
+    describe("when the request carries function tools", () => {
+      /** @scenario "A second refusal ends the exchange" */
+      it("stops after exactly two requests and surfaces the second refusal", async () => {
+        endpoint = await startEndpoint("reject-reasoning-always");
+        const model = createModelFromParams({
+          litellmParams: JUDGE_PARAMS,
+          nlpServiceUrl: endpoint.url,
+        });
+
+        const rejection = await surfacedRejection(
+          generateText({
+            model,
+            messages: [{ role: "user", content: "grade this" }],
+            tools: { finishTest },
+            toolChoice: "required",
+          }),
+        );
+        expect(rejection).toEqual({
+          statusCode: 400,
+          param: "reasoning_effort",
+        });
+
+        // The second body already declares reasoning off, so it is not
+        // retry-eligible — the exchange is bounded at two requests.
+        const bodies = endpoint.bodies();
+        expect(bodies).toHaveLength(2);
+        expect(bodies[1]?.reasoning_effort).toBe("none");
+      });
+    });
+
+    describe("when the request asks for no tools", () => {
+      /** @scenario "A request that asks for no tools is never retried" */
+      it("surfaces the rejection without a second request", async () => {
+        endpoint = await startEndpoint("reject-reasoning-always");
+        const model = createModelFromParams({
+          litellmParams: JUDGE_PARAMS,
+          nlpServiceUrl: endpoint.url,
+        });
+
+        const rejection = await surfacedRejection(
+          generateText({
+            model,
+            messages: [{ role: "user", content: "just answer" }],
+          }),
+        );
+        expect(rejection).toEqual({
+          statusCode: 400,
+          param: "reasoning_effort",
+        });
+
+        // The guard that keeps ordinary chat traffic from being rewritten:
+        // without tools the request is not retry-eligible at all.
+        expect(endpoint.bodies()).toHaveLength(1);
+      });
+    });
+  });
+
+  describe("given an endpoint whose rejection body is not JSON", () => {
+    describe("when the request carries function tools", () => {
+      /** @scenario "A rejection that is not JSON is surfaced untouched" */
+      it("surfaces the raw 400 without retrying", async () => {
+        endpoint = await startEndpoint("reject-not-json");
+        const model = createModelFromParams({
+          litellmParams: JUDGE_PARAMS,
+          nlpServiceUrl: endpoint.url,
+        });
+
+        const failure = await generateText({
+          model,
+          messages: [{ role: "user", content: "grade this" }],
+          tools: { finishTest },
+          toolChoice: "required",
+        }).then(
+          () => {
+            throw new Error("expected the request to be rejected");
+          },
+          (error: unknown) => error,
+        );
+
+        if (!APICallError.isInstance(failure)) throw failure;
+        expect(failure.statusCode).toBe(400);
+        expect(failure.responseBody).toBe("Bad Request");
+        expect(endpoint.bodies()).toHaveLength(1);
       });
     });
   });
