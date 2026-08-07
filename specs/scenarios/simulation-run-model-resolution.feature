@@ -167,7 +167,9 @@ Feature: Simulation run model resolution per target type
     # reaching model construction, so it can't discriminate pre- vs.
     # post-fix behavior as an automated test today — see
     # childProcessJobData.schema.unit.test.ts for the payload-contract
-    # half of this (modelParams optional, sim/judge required, parses).
+    # half of this (every model params field individually optional; the
+    # payload rejected only when a role can be built from neither its own
+    # params nor the pre-split fallback).
     # This scenario's real-spawn proof is exercised manually in the
     # post-fix verification run, per dev/docs/TESTING_PHILOSOPHY.md's
     # "run scenario tests end-to-end locally" guidance.

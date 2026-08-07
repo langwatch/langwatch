@@ -81,7 +81,7 @@ describe("codexRestrictions", () => {
     );
   });
 
-  it("registers the run-time agent-under-test key as DEFAULT-role and codex-forbidden", () => {
+  describe("given the two sibling scenario feature keys", () => {
     // The scenario run's agent-under-test resolution (issue #6634) is a
     // NEW, separate feature key from "scenarios.generator" (the FAST-role
     // authoring assist used by scenario generation, not by a run) — see
@@ -89,29 +89,35 @@ describe("codexRestrictions", () => {
     // DEFAULT-role (never codex-eligible) so a project whose FAST/coding
     // default is codex still resolves a real inference model for the
     // agent under test.
-    const feature = featureByKey("scenarios.agent_under_test");
-    expect(
-      feature,
-      'feature "scenarios.agent_under_test" must exist',
-    ).toBeTruthy();
-    expect(feature?.role).toBe("DEFAULT");
-    expect(
-      isModelAllowedForFeature({
-        modelId: CODEX_DEFAULT_MODEL,
-        featureKey: "scenarios.agent_under_test",
-      }),
-    ).toBe(false);
-  });
+    describe("when the run-time agent-under-test key is checked", () => {
+      it("registers it as DEFAULT-role and refuses codex", () => {
+        const feature = featureByKey("scenarios.agent_under_test");
+        expect(
+          feature,
+          'feature "scenarios.agent_under_test" must exist',
+        ).toBeTruthy();
+        expect(feature?.role).toBe("DEFAULT");
+        expect(
+          isModelAllowedForFeature({
+            modelId: CODEX_DEFAULT_MODEL,
+            featureKey: "scenarios.agent_under_test",
+          }),
+        ).toBe(false);
+      });
+    });
 
-  it("keeps scenarios.generator FAST and codex-allowed, unaffected by the new run-time key", () => {
-    const generator = featureByKey("scenarios.generator");
-    expect(generator?.role).toBe("FAST");
-    expect(
-      isModelAllowedForFeature({
-        modelId: CODEX_DEFAULT_MODEL,
-        featureKey: "scenarios.generator",
-      }),
-    ).toBe(true);
+    describe("when the authoring-time generator key is checked", () => {
+      it("keeps it FAST and codex-allowed, unaffected by the new run-time key", () => {
+        const generator = featureByKey("scenarios.generator");
+        expect(generator?.role).toBe("FAST");
+        expect(
+          isModelAllowedForFeature({
+            modelId: CODEX_DEFAULT_MODEL,
+            featureKey: "scenarios.generator",
+          }),
+        ).toBe(true);
+      });
+    });
   });
 
   it("leaves unrestricted providers untouched on every feature", () => {

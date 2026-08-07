@@ -286,31 +286,66 @@ export type ScenarioExecutionResult = z.infer<
 /**
  * Complete data package for child process execution.
  * Contains everything needed to run a scenario without DB access.
+ *
+ * All three model-params fields are individually optional because the
+ * producer and the consumer of a job payload can be on different builds: a
+ * job queued just before the simulator/judge model split carries only
+ * `modelParams`, and it must still parse and run after the deploy that
+ * introduced the split. What is NOT optional is that every role ends up with
+ * a model — the refinement below rejects a payload from which the simulator
+ * or the judge could not be built, so that failure is a named schema error at
+ * the process boundary rather than an opaque "undefined has no properties"
+ * crash three layers into model construction (issue #6634).
+ *
+ * `selectRoleModelParams` (job-model-params.ts) applies the fallback the
+ * refinement guarantees is available.
  */
-export const ChildProcessJobDataSchema = z.object({
-  context: ExecutionContextSchema,
-  scenario: ScenarioConfigSchema,
-  /** Pre-generated scenario run ID so the SDK uses the same aggregate ID. */
-  scenarioRunId: z.string().optional(),
-  adapterData: TargetAdapterDataSchema,
-  /**
-   * Model params for the target adapter (the prompt under test). Only a
-   * prompt target ever resolves one — workflow / code / http targets send
-   * the project's platform API key instead (see
-   * serialized-adapter.registry.ts) and never consume an LLM key for the
-   * agent under test, so this is absent for them.
-   */
-  modelParams: LiteLLMParamsSchema.optional(),
-  /**
-   * Model params for the user-simulator agent. Resolved from the run-plan /
-   * scenario override or the scenarios.user_simulator default. Every run
-   * genuinely needs one.
-   */
-  simulatorModelParams: LiteLLMParamsSchema,
-  /** Model params for the judge agent — same resolution as the simulator,
-   *  from the scenarios.judge default. Every run genuinely needs one. */
-  judgeModelParams: LiteLLMParamsSchema,
-  nlpServiceUrl: z.string(),
-  target: TargetConfigSchema,
-});
+export const ChildProcessJobDataSchema = z
+  .object({
+    context: ExecutionContextSchema,
+    scenario: ScenarioConfigSchema,
+    /** Pre-generated scenario run ID so the SDK uses the same aggregate ID. */
+    scenarioRunId: z.string().optional(),
+    adapterData: TargetAdapterDataSchema,
+    /**
+     * Model params for the target adapter (the prompt under test). Only a
+     * prompt target ever resolves one — workflow / code / http targets send
+     * the project's platform API key instead (see
+     * serialized-adapter.registry.ts) and never consume an LLM key for the
+     * agent under test, so this is absent for them.
+     *
+     * Doubles as the legacy fallback for the two fields below: before the
+     * model split this single value drove all three agents.
+     */
+    modelParams: LiteLLMParamsSchema.optional(),
+    /**
+     * Model params for the user-simulator agent. Resolved from the run-plan /
+     * scenario override or the scenarios.user_simulator default. Absent only
+     * on a pre-split payload, which falls back to `modelParams`.
+     */
+    simulatorModelParams: LiteLLMParamsSchema.optional(),
+    /** Model params for the judge agent — same resolution and same pre-split
+     *  fallback as the simulator, from the scenarios.judge default. */
+    judgeModelParams: LiteLLMParamsSchema.optional(),
+    nlpServiceUrl: z.string(),
+    target: TargetConfigSchema,
+  })
+  .superRefine((data, ctx) => {
+    if (!data.simulatorModelParams && !data.modelParams) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["simulatorModelParams"],
+        message:
+          "No model params for the user simulator, and no modelParams to fall back to",
+      });
+    }
+    if (!data.judgeModelParams && !data.modelParams) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["judgeModelParams"],
+        message:
+          "No model params for the judge, and no modelParams to fall back to",
+      });
+    }
+  });
 export type ChildProcessJobData = z.infer<typeof ChildProcessJobDataSchema>;

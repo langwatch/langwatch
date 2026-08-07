@@ -21,9 +21,6 @@ import { describe, expect, it } from "vitest";
 
 import { CODEX_DEFAULT_MODEL } from "../codexRestrictions";
 import { ModelNotConfiguredError } from "../modelNotConfiguredError";
-// NOT YET CREATED — planned at
-// src/server/modelProviders/modelRestrictedForFeatureError.ts. This import
-// is why every test in this file is red until that module exists.
 import { ModelRestrictedForFeatureError } from "../modelRestrictedForFeatureError";
 import { resolveModelForFeature } from "../resolveModelForFeature";
 

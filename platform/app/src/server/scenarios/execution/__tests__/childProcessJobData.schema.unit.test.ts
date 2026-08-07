@@ -1,15 +1,17 @@
 /**
  * @vitest-environment node
  *
- * Issue #6634's child-process serialization boundary flip: `modelParams`
- * (the agent-under-test's model) becomes OPTIONAL — workflow / code / http
- * targets never resolve one — while `simulatorModelParams` and
- * `judgeModelParams` become NON-optional going forward, since every run
- * genuinely needs both. `scenario-child-process.ts` must validate the
- * payload against `ChildProcessJobDataSchema` (a real `.parse()`, not the
- * unchecked type cast it uses today) so a malformed payload fails loudly
- * with a named Zod error instead of an opaque `undefined` crash three
- * layers into model construction.
+ * Issue #6634's child-process serialization boundary. Every model-params
+ * field is individually optional — workflow / code / http targets resolve no
+ * adapter-role `modelParams`, and a job queued before the simulator/judge
+ * split carries only `modelParams` — but the payload as a whole must still
+ * yield a model for each role. The schema enforces that as a refinement, and
+ * `selectRoleModelParams` applies the pre-split fallback, so
+ * `scenario-child-process.ts` fails loudly with a named Zod error instead of
+ * an opaque `undefined` crash three layers into model construction.
+ *
+ * These tests run the real parse and then the real selection, so a payload
+ * that would break a straddling deploy cannot pass them.
  *
  * @see specs/scenarios/simulation-run-model-resolution.feature
  *   ("A job payload missing every model params field fails at schema
@@ -17,6 +19,7 @@
  */
 import { describe, expect, it } from "vitest";
 
+import { selectRoleModelParams } from "../job-model-params";
 import { ChildProcessJobDataSchema, type LiteLLMParams } from "../types";
 
 const scenario = {
@@ -72,7 +75,8 @@ describe("ChildProcessJobDataSchema", () => {
         return;
       }
       const paths = result.error.issues.map((issue) => issue.path.join("."));
-      // Both roles genuinely need a model — a payload missing them both
+      // Both roles genuinely need a model. With no own params AND no
+      // adapter-role params to fall back to, neither can be built — that
       // must be caught here, not three call frames deeper as an
       // "undefined has no properties" crash.
       expect(paths).toEqual(
@@ -93,36 +97,55 @@ describe("ChildProcessJobDataSchema", () => {
     });
   });
 
-  describe("given a frozen, already-in-flight job payload (all three model params present)", () => {
+  describe("given a pre-split job payload carrying only the legacy modelParams", () => {
+    // Frozen literal — exactly the shape a worker queued before the
+    // simulator/judge split would have produced, with no simulatorModelParams
+    // and no judgeModelParams at all. Queued jobs straddle a deploy, so this
+    // is the payload a freshly-deployed child process actually meets.
+    const legacyPayload = {
+      ...basePayload,
+      modelParams: litellmParams,
+    };
+
     /** @scenario "An older job payload shape still parses and runs" */
-    it("still parses under the new schema", () => {
-      // Frozen literal — exactly the shape a worker queued just before
-      // #6634 shipped would have produced (modelParams was mandatory;
-      // simulatorModelParams/judgeModelParams were already being written
-      // but were still optional on the reading side). It must never stop
-      // parsing once simulatorModelParams/judgeModelParams flip to
-      // mandatory on the reading side — a payload that already carries
-      // both satisfies that requirement trivially.
-      const oldShapePayload = {
-        context,
-        scenario,
-        adapterData: workflowAdapterData,
+    it("parses, and both the simulator and the judge fall back to it", () => {
+      const result = ChildProcessJobDataSchema.safeParse(legacyPayload);
+      expect(result.success).toBe(true);
+      if (!result.success) {
+        expect.fail("expected the legacy payload to parse");
+        return;
+      }
+
+      // The payload genuinely carries neither split field — the fallback is
+      // what makes the run possible, not a value the fixture smuggled in.
+      expect(result.data.simulatorModelParams).toBeUndefined();
+      expect(result.data.judgeModelParams).toBeUndefined();
+
+      const roleModelParams = selectRoleModelParams(result.data);
+      expect(roleModelParams.simulator).toEqual(litellmParams);
+      expect(roleModelParams.judge).toEqual(litellmParams);
+    });
+  });
+
+  describe("given a payload carrying its own simulator and judge model params", () => {
+    it("selects each role's own params over the legacy fallback", () => {
+      const splitPayload = {
+        ...basePayload,
         modelParams: litellmParams,
         simulatorModelParams: { api_key: "sk-sim", model: "openai/sim-model" },
         judgeModelParams: { api_key: "sk-judge", model: "openai/judge-model" },
-        nlpServiceUrl: "http://langwatch_nlp:5561",
-        target: { type: "workflow" as const, referenceId: "agent_1" },
       };
 
-      const result = ChildProcessJobDataSchema.safeParse(oldShapePayload);
+      const result = ChildProcessJobDataSchema.safeParse(splitPayload);
       expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data.modelParams).toEqual(litellmParams);
-        expect(result.data.simulatorModelParams?.model).toBe(
-          "openai/sim-model",
-        );
-        expect(result.data.judgeModelParams?.model).toBe("openai/judge-model");
+      if (!result.success) {
+        expect.fail("expected the split payload to parse");
+        return;
       }
+
+      const roleModelParams = selectRoleModelParams(result.data);
+      expect(roleModelParams.simulator.model).toBe("openai/sim-model");
+      expect(roleModelParams.judge.model).toBe("openai/judge-model");
     });
   });
 });

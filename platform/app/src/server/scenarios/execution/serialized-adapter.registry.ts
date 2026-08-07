@@ -65,11 +65,11 @@ export const SERIALIZED_ADAPTER_FACTORIES: Record<string, AdapterFactory> = {
     if (!projectApiKey) {
       throw new Error("Workflow adapter requires projectApiKey");
     }
-    return new SerializedWorkflowAgentAdapter(
-      data as WorkflowAgentData,
+    return new SerializedWorkflowAgentAdapter({
+      config: data as WorkflowAgentData,
       nlpServiceUrl,
       projectApiKey,
-    );
+    });
   },
 };
 

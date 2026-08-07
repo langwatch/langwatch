@@ -203,14 +203,15 @@ export async function resolveModelForFeature(
   const chain = await loadScopeChain(ctx.prisma, ctx.projectId);
   const configs = await loadConfigsForChain(ctx.prisma, chain);
 
-  // Distinct model ids skipped specifically because isModelAllowedForFeature
-  // refused them (never an unresolvable-latest-alias skip — see the
-  // `continue` sites below). Lets exhaustion tell "nothing configured" apart
-  // from "something was configured but restricted", so the resolver can
-  // throw the more specific ModelRestrictedForFeatureError instead of
-  // sending the user to set up a first default that would just be refused
-  // again.
-  const restrictedModels: string[] = [];
+  // Model ids skipped specifically because isModelAllowedForFeature refused
+  // them (never an unresolvable-latest-alias skip — see the `continue` sites
+  // below). A Set because the same restricted value routinely appears at
+  // several tiers and the caller names these back to the user. Lets
+  // exhaustion tell "nothing configured" apart from "something was
+  // configured but restricted", so the resolver can throw the more specific
+  // ModelRestrictedForFeatureError instead of sending the user to set up a
+  // first default that would just be refused again.
+  const restrictedModels = new Set<string>();
 
   // Walk tiers in specificity order (project most specific). At each
   // tier, sort configs attached to THIS tier by createdAt DESC and
@@ -246,7 +247,7 @@ export async function resolveModelForFeature(
             featureKey: feature.key,
           })
         ) {
-          restrictedModels.push(expanded);
+          restrictedModels.add(expanded);
           continue;
         }
         return {
@@ -269,7 +270,7 @@ export async function resolveModelForFeature(
             featureKey: feature.key,
           })
         ) {
-          restrictedModels.push(expanded);
+          restrictedModels.add(expanded);
           continue;
         }
         return {
@@ -295,13 +296,13 @@ export async function resolveModelForFeature(
   // that had to be skipped is a different, more actionable failure than
   // genuinely nothing being set (see ModelRestrictedForFeatureError's doc
   // comment for why this is a sibling error, not a subclass).
-  if (restrictedModels.length > 0) {
+  if (restrictedModels.size > 0) {
     throw new ModelRestrictedForFeatureError({
       featureKey: feature.key,
       role: feature.role,
       featureDisplayName: feature.displayName,
       projectId: ctx.projectId,
-      restrictedModels,
+      restrictedModels: [...restrictedModels],
     });
   }
 

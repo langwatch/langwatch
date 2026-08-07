@@ -94,7 +94,7 @@ describe("createAdapter — project API key threading", () => {
         modelParams,
         nlpServiceUrl,
         projectApiKey: PROJECT_API_KEY,
-      } as Parameters<typeof createAdapter>[0] & { projectApiKey: string });
+      });
 
       await adapter.call(defaultInput);
 
@@ -121,7 +121,7 @@ describe("createAdapter — project API key threading", () => {
         modelParams,
         nlpServiceUrl,
         projectApiKey: PROJECT_API_KEY,
-      } as Parameters<typeof createAdapter>[0] & { projectApiKey: string });
+      });
 
       await adapter.call(defaultInput);
 
@@ -142,15 +142,14 @@ describe("createAdapter — project API key threading", () => {
 
     /** @scenario "An HTTP target resolves no adapter-role model and consumes no project key" */
     it("builds successfully with no project API key given (the factory consumes neither)", () => {
-      // No projectApiKey, no modelParams — the http factory's signature
-      // takes only { data }. If the registry ever starts requiring one for
-      // http, this call becomes a type error and the test file itself
-      // fails to compile, which is the point: http must stay the one
-      // factory that touches neither key.
+      // Neither key is passed at all — the http factory's signature takes
+      // only { data }. If the registry ever starts requiring one for http,
+      // this call becomes a type error and the test file itself fails to
+      // compile, which is the point: http must stay the one factory that
+      // touches neither key.
       expect(() =>
         createAdapter({
           adapterData: httpData,
-          modelParams: undefined as unknown as LiteLLMParams,
           nlpServiceUrl,
         }),
       ).not.toThrow();

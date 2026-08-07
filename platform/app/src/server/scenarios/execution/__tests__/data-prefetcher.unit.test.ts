@@ -15,6 +15,7 @@ import {
   type AgentFetcher,
   type DataPrefetcherDependencies,
   type ModelParamsProvider,
+  type ModelParamsResult,
   type ProjectFetcher,
   type ProjectSecretsFetcher,
   type PromptFetcher,
@@ -1380,6 +1381,8 @@ describe("prefetchScenarioData", () => {
       // refused for using a restricted model outside its allowed surface
       // must still be refused, and the refusal must name that node's
       // model, not a generic failure.
+      const CODEX_NODE_MODEL = "openai_codex/gpt-5.6-terra";
+
       const codexNodeDsl = {
         workflow_id: "wf_1",
         nodes: [
@@ -1392,7 +1395,7 @@ describe("prefetchScenarioData", () => {
                 {
                   identifier: "llm",
                   type: "llm",
-                  value: { model: "openai_codex/gpt-5.6-terra" },
+                  value: { model: CODEX_NODE_MODEL },
                 },
               ],
             },
@@ -1400,6 +1403,30 @@ describe("prefetchScenarioData", () => {
         ],
         edges: [],
       };
+
+      /**
+       * Refuses exactly the codex model and nothing else, and builds the
+       * refusal FROM the model it was asked about. A blanket-failure stub
+       * stays green with the codex pin removed from the DSL — the simulator
+       * and judge preparations fail on their own, and its hard-coded message
+       * still names a model nothing in the workflow pinned.
+       */
+      const modelAwarePrepare = vi.fn(
+        async (
+          _projectId: string,
+          model: string,
+        ): Promise<ModelParamsResult> =>
+          model === CODEX_NODE_MODEL
+            ? {
+                success: false,
+                reason: "preparation_error",
+                message: `"${model}" serves the coding-assistant surfaces only and cannot run workflows, evaluations or the playground.`,
+              }
+            : {
+                success: true,
+                params: { api_key: "sk-usable", model },
+              },
+      );
 
       /** @scenario "A workflow node still pinned to a restricted model correctly fails" */
       it("returns a structured failure naming the codex model, not a silent pass", async () => {
@@ -1413,14 +1440,7 @@ describe("prefetchScenarioData", () => {
               dsl: codexNodeDsl,
             }),
           },
-          modelParamsProvider: {
-            prepare: vi.fn().mockResolvedValue({
-              success: false as const,
-              reason: "preparation_error",
-              message:
-                '"openai_codex/gpt-5.6-terra" serves the coding-assistant surfaces only and cannot run workflows, evaluations or the playground.',
-            }),
-          },
+          modelParamsProvider: { prepare: modelAwarePrepare },
         });
 
         const result = await prefetchScenarioData(
@@ -1429,9 +1449,14 @@ describe("prefetchScenarioData", () => {
           deps,
         );
 
+        expect(modelAwarePrepare).toHaveBeenCalledWith(
+          defaultContext.projectId,
+          CODEX_NODE_MODEL,
+        );
         expect(result.success).toBe(false);
         if (!result.success) {
-          expect(result.error).toContain("openai_codex/gpt-5.6-terra");
+          expect(result.reason).toBe("preparation_error");
+          expect(result.error).toContain(CODEX_NODE_MODEL);
         }
       });
     });

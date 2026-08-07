@@ -5,14 +5,10 @@
  */
 
 import { describe, expect, it } from "vitest";
-// NOT YET CREATED — planned at
-// src/server/modelProviders/codexRefusalMessage.ts (issue #6634). This
-// shared needle is what couples the classifier to the four sites that
-// actually throw the codex coding-assistant-surfaces refusal
-// (codexGatewayModel.ts, api/routers/modelProviders.utils.ts,
-// modelDefaults.service.ts x2) so a wording change at the source can't
-// silently stop being recognised here. Its absence is why this describe
-// block is red until that module exists.
+// The shared needle couples this classifier to the four sites that actually
+// throw the codex coding-assistant-surfaces refusal (codexGatewayModel.ts,
+// api/routers/modelProviders.utils.ts, modelDefaults.service.ts x2), so a
+// wording change at the source can't silently stop being recognised here.
 import { CODING_ASSISTANT_SURFACES_ONLY_NEEDLE } from "../../modelProviders/codexRefusalMessage";
 import {
   classifyScenarioInfraError,

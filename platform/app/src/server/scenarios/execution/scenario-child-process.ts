@@ -28,6 +28,7 @@ import * as ScenarioRunner from "@langwatch/scenario";
 import { type TracerProvider, trace } from "@opentelemetry/api";
 import { bridgeTraceIdFromAdapterToJudge } from "./bridge-trace-id";
 import { createChildProcessLogger } from "./child-logger";
+import { selectRoleModelParams } from "./job-model-params";
 import {
   createJudgeModelFromParams,
   createModelFromParams,
@@ -81,11 +82,12 @@ async function readJobDataFromStdin(): Promise<ChildProcessJobData> {
     });
     process.stdin.on("end", () => {
       try {
-        // A real .parse(), not an unchecked cast: modelParams is now
-        // optional (workflow/code/http targets never resolve one) while
-        // simulatorModelParams/judgeModelParams are mandatory, so a
-        // malformed payload must fail loudly here with a named Zod error
-        // rather than as an opaque "undefined has no properties" crash
+        // A real .parse(), not an unchecked cast: every model-params field
+        // is individually optional (workflow/code/http targets resolve no
+        // adapter model; a pre-split payload carries only modelParams), so
+        // the schema's refinement is what guarantees each role can be built.
+        // A payload that fails it must fail loudly here with a named Zod
+        // error rather than as an opaque "undefined has no properties" crash
         // three layers into model construction (issue #6634).
         resolve(ChildProcessJobDataSchema.parse(JSON.parse(data)));
       } catch (error) {
@@ -97,16 +99,8 @@ async function readJobDataFromStdin(): Promise<ChildProcessJobData> {
 }
 
 async function executeScenario(jobData: ChildProcessJobData): Promise<void> {
-  const {
-    context,
-    scenario,
-    adapterData,
-    modelParams,
-    simulatorModelParams,
-    judgeModelParams,
-    nlpServiceUrl,
-    target,
-  } = jobData;
+  const { context, scenario, adapterData, modelParams, nlpServiceUrl, target } =
+    jobData;
 
   // These are injected as env vars by the parent process (scenario.processor.ts
   // buildChildProcessEnv). They originate from prefetchScenarioData telemetry.
@@ -130,15 +124,16 @@ async function executeScenario(jobData: ChildProcessJobData): Promise<void> {
     projectApiKey: langwatchApiKey,
   });
   // The user-simulator and judge resolve their own models (run-plan /
-  // scenario override or the DEFAULT-role scenarios.* defaults). Older jobs
-  // only carried modelParams, so fall back to it when the split params are
-  // absent — preserves the previous single-model behavior during rollout.
+  // scenario override or the DEFAULT-role scenarios.* defaults). A job queued
+  // before that split carried only modelParams, so both roles fall back to it
+  // — preserving the previous single-model behavior across a deploy.
+  const roleModelParams = selectRoleModelParams(jobData);
   const simulatorModel = createModelFromParams({
-    litellmParams: simulatorModelParams ?? modelParams,
+    litellmParams: roleModelParams.simulator,
     nlpServiceUrl,
   });
   const judgeModel = createJudgeModelFromParams({
-    litellmParams: judgeModelParams ?? modelParams,
+    litellmParams: roleModelParams.judge,
     nlpServiceUrl,
   });
 
