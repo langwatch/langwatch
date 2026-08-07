@@ -4,8 +4,8 @@ import {
   getStatusCodeFromError,
   hasAuthorizationToken,
   logHttpRequest,
-  REQUEST_CAUSE_FIELD,
 } from "../request/requestLogging";
+import { REQUEST_CAUSE_FIELD } from "../constants";
 
 describe("requestLogging", () => {
   describe("getStatusCodeFromError", () => {
