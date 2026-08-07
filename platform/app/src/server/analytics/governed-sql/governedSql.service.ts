@@ -11,8 +11,11 @@
  *     authenticated server context. Never from the request, never from the SQL.
  *  2. Derive the validator's policy from the catalog *for those permissions*,
  *     so `allowedTables` and `gatedColumns` are a function of who is asking.
- *  3. Validate. A refusal is thrown as the validator's own handled error and
- *     the query never reaches the database.
+ *  3. Validate, then resolve the surface's time window into the reserved
+ *     parameters the statement declares (`./resolveTimeWindow.ts`) — in that order,
+ *     because an injected window is what satisfies the missing-parameter check.
+ *     A refusal is thrown as the validator's own handled error and the query
+ *     never reaches the database.
  *  4. Execute as the restricted identity, carrying the caller's tenant
  *     capability as the one setting the profile lets a query change.
  *  5. Shape the result, and run the advisory diagnostics (`./diagnostics.ts`)
@@ -67,7 +70,9 @@ import {
   type GovernedSqlStatistics,
   governedSqlConnectionFromEnv,
 } from "./executor";
+import { resolveGovernedTimeWindow } from "./resolveTimeWindow";
 import { describeGovernedSchema, type GovernedSchema } from "./schema";
+import type { GovernedSqlTimeWindow } from "./timeWindow";
 import { governedSqlValidationError } from "./validation/errors";
 import {
   type AcceptedGovernedSql,
@@ -89,6 +94,18 @@ export interface GovernedSqlQueryResult {
    * `GOVERNED_SQL_CLEAN_DIAGNOSTICS_MEANING` in `./diagnostics.ts`.
    */
   readonly diagnostics: readonly GovernedSqlDiagnostic[];
+  /**
+   * Whether the statement declared the reserved time-window parameters and so
+   * followed the period the surface is showing.
+   *
+   * `false` is not a failure — an all-time total is a legitimate chart — but it
+   * is the fact a card has to say out loud, because a chart that quietly ignores
+   * the period beside one that follows it is the bug this contract exists to
+   * prevent.
+   *
+   * @see ./timeWindow.ts
+   */
+  readonly followsTimeWindow: boolean;
 }
 
 /** The tenant a query runs for. Only these two fields are ever needed. */
@@ -107,6 +124,40 @@ export interface GovernedSqlExecuteInput {
   readonly sql: string;
   /** Values for the parameters the SQL declares. */
   readonly parameters?: Readonly<Record<string, unknown>>;
+  /**
+   * The period the surface is showing, supplied by the surface and never by the
+   * caller's own parameters. Injected into the reserved names the statement
+   * declares, and ignored by a statement that declares neither.
+   *
+   * @see ./timeWindow.ts
+   */
+  readonly timeWindow?: GovernedSqlTimeWindow;
+}
+
+/**
+ * A statement that passed the gate, plus what the surface's time window means
+ * for it.
+ *
+ * The two extra facts are here rather than on {@link AcceptedGovernedSql}
+ * because they are not properties of the parse: they depend on what the caller
+ * sent and on which surface is asking.
+ */
+export interface ValidatedGovernedSql extends AcceptedGovernedSql {
+  /** Whether the statement declares the reserved time-window parameters. */
+  readonly followsTimeWindow: boolean;
+  /**
+   * The values to execute with — the caller's, plus the window this surface
+   * injected for the reserved names the statement declares.
+   */
+  readonly boundParameters?: Readonly<Record<string, unknown>>;
+  /**
+   * Reserved names the statement declares that no window filled.
+   *
+   * Never a refusal here: validating for a *save* has no window and must not be
+   * refused for it, because the window belongs to whoever later renders the
+   * chart. {@link GovernedSqlService.execute} is what cannot proceed with one.
+   */
+  readonly awaitingTimeWindow: readonly string[];
 }
 
 export interface GovernedSqlServiceDependencies {
@@ -195,21 +246,25 @@ export class GovernedSqlService {
    * what it would have refused.
    *
    * @throws the validator's handled error when the policy refuses the query,
-   *   and {@link GovernedSqlParameterMissingError} when a declared parameter
-   *   has no value.
+   *   {@link GovernedSqlParameterMissingError} when a declared parameter has no
+   *   value, and the two time-window refusals in `./timeWindow.ts` when a
+   *   reserved name is supplied by the caller or declared as a non-date-time.
    */
   validate({
     projectId,
     protections,
     sql,
     parameters,
+    timeWindow,
   }: {
     /** Logged with a refusal. The database, not this, decides the tenant. */
     readonly projectId: string;
     readonly protections: Protections;
     readonly sql: string;
     readonly parameters?: Readonly<Record<string, unknown>>;
-  }): AcceptedGovernedSql {
+    /** The period the surface is showing, when one is asking. */
+    readonly timeWindow?: GovernedSqlTimeWindow;
+  }): ValidatedGovernedSql {
     const validation = validateGovernedSql({
       sql,
       // The datasets this caller can reach, not every dataset the catalog has.
@@ -240,13 +295,30 @@ export class GovernedSqlService {
       throw governedSqlValidationError(validation);
     }
 
+    // Before the missing-parameter check, never after: an injected window IS a
+    // value, and checking first would refuse every period-aware statement for
+    // the two names the surface was about to supply.
+    const window = resolveGovernedTimeWindow({
+      declared: validation.parameters,
+      ...(parameters ? { parameters } : {}),
+      ...(timeWindow ? { timeWindow } : {}),
+    });
+
     const missing = validation.parameters
       .map((parameter) => parameter.name)
-      .filter((name) => parameters?.[name] === undefined)
+      .filter((name) => window.parameters?.[name] === undefined)
+      // A reserved name with no window yet is not missing — it is deferred to
+      // the surface, and `execute` is where that becomes a refusal.
+      .filter((name) => !window.awaitingTimeWindow.includes(name))
       .sort();
     if (missing.length > 0) throw new GovernedSqlParameterMissingError(missing);
 
-    return validation;
+    return {
+      ...validation,
+      followsTimeWindow: window.followsTimeWindow,
+      ...(window.parameters ? { boundParameters: window.parameters } : {}),
+      awaitingTimeWindow: window.awaitingTimeWindow,
+    };
   }
 
   /**
@@ -263,13 +335,22 @@ export class GovernedSqlService {
     protections,
     sql,
     parameters,
+    timeWindow,
   }: GovernedSqlExecuteInput): Promise<GovernedSqlQueryResult> {
     const validation = this.validate({
       projectId: project.id,
       protections,
       sql,
       ...(parameters ? { parameters } : {}),
+      ...(timeWindow ? { timeWindow } : {}),
     });
+
+    // A statement that asks for the period but was handed none cannot run: the
+    // database would answer `UNKNOWN_QUERY_PARAMETER`, which reaches the caller
+    // as an unknown 500 for something a surface can fix by sending its window.
+    if (validation.awaitingTimeWindow.length > 0) {
+      throw new GovernedSqlParameterMissingError(validation.awaitingTimeWindow);
+    }
 
     // Fail closed. The check is here rather than in the constructor so that a
     // deployment with no governed identity still answers the schema endpoint,
@@ -286,7 +367,11 @@ export class GovernedSqlService {
 
     const execution = await executor.execute({
       sql,
-      ...(parameters ? { parameters } : {}),
+      // The resolved record, not the caller's: it is the one carrying the
+      // window this surface injected.
+      ...(validation.boundParameters
+        ? { parameters: validation.boundParameters }
+        : {}),
       tenantCapability: governedTenantCapability({ apiKey: project.apiKey }),
       limits: this.limits,
     });
@@ -315,6 +400,7 @@ export class GovernedSqlService {
         elapsedMs: execution.statistics.elapsedMs,
         truncated: execution.truncated,
         diagnostics: diagnostics.map((diagnostic) => diagnostic.code),
+        followsTimeWindow: validation.followsTimeWindow,
       },
       "governed SQL executed",
     );
@@ -325,6 +411,7 @@ export class GovernedSqlService {
       statistics: execution.statistics,
       truncated: execution.truncated,
       diagnostics,
+      followsTimeWindow: validation.followsTimeWindow,
     };
   }
 }
