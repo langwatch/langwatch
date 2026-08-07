@@ -36,7 +36,9 @@ export type FrameworkKey =
   | "openrouter"
   | "semantic_kernel"
   | "smol_agents"
-  | "dspy";
+  | "dspy"
+  | "bedrock"
+  | "genkit";
 
 export const LARGE_FRAMEWORK_ICON_KEYS: readonly FrameworkKey[] = [
   "mastra",

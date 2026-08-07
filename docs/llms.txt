@@ -194,7 +194,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 ### Go
 
 - [Go Integration Guide](https://langwatch.ai/docs/integration/go/guide.md): Use the LangWatch Go SDK to trace LLM calls, measure performance, and support observability-driven AI agent testing.
-- [Go SDK API Reference](https://langwatch.ai/docs/integration/go/reference.md): Complete API reference for the LangWatch Go SDK, including core functions, OpenAI instrumentation, and span types.
+- [Go SDK API Reference](https://langwatch.ai/docs/integration/go/reference.md): Complete API reference for the LangWatch Go SDK, including the exporter, tracer, span helpers, provider instrumentations, data capture and the REST client.
 
 - [OpenTelemetry Integration Guide](https://langwatch.ai/docs/integration/opentelemetry/guide.md): Integrate OpenTelemetry with LangWatch to collect LLM spans from any language for unified AI agent evaluation data.
 - [Running LangWatch with Other OTel SDKs](https://langwatch.ai/docs/integration/opentelemetry/multiple-providers.md): How to configure LangWatch for complete trace isolation when running alongside another OpenTelemetry-based SDK.
@@ -273,6 +273,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [Instructor AI Instrumentation](https://langwatch.ai/docs/integration/python/integrations/instructor.md): Instrument Instructor AI with LangWatch to track structured outputs, detect errors, and enhance AI agent testing workflows.
 - [SmolAgents Instrumentation](https://langwatch.ai/docs/integration/python/integrations/smolagents.md): Add SmolAgents tracing with LangWatch to analyze behaviors, detect errors, and improve AI agent testing accuracy.
 - [Google Agent Development Kit (ADK) Instrumentation](https://langwatch.ai/docs/integration/python/integrations/google-ai.md): Integrate Google ADK agents into LangWatch to trace actions, tools, and interactions for structured AI agent evaluations.
+- [Firebase Genkit Integration](https://langwatch.ai/docs/integration/go/integrations/genkit.md): Export Firebase Genkit Go traces to LangWatch to observe flows, models, and tools for AI agent evaluation.
 - [Other OpenTelemetry Instrumentors](https://langwatch.ai/docs/integration/python/integrations/other.md): Use any OpenTelemetry-compatible instrumentor with LangWatch to standardize tracing and centralize AI agent testing observability.
 
 ## Model Providers
@@ -300,11 +301,12 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 ### Google Cloud
 
 - [Google Vertex AI Instrumentation](https://langwatch.ai/docs/integration/python/integrations/vertex-ai.md): Learn how to instrument Google Vertex AI API calls with the LangWatch Python SDK using OpenInference
-- [Google Gemini Integration](https://langwatch.ai/docs/integration/go/integrations/google-gemini.md): Learn how to instrument Google Gemini API calls in Go using the LangWatch SDK via a Vertex AI endpoint.
+- [Google Gemini Integration](https://langwatch.ai/docs/integration/go/integrations/google-gemini.md): Instrument Google Gemini and Vertex AI calls in Go using the LangWatch SDK's native genai instrumentation.
 
 ### Amazon Web Services
 
 - [AWS Bedrock Instrumentation](https://langwatch.ai/docs/integration/python/integrations/aws-bedrock.md): Instrument AWS Bedrock calls using OpenInference and LangWatch to capture metrics and behaviors for AI agent testing workflows.
+- [Amazon Bedrock Integration](https://langwatch.ai/docs/integration/go/integrations/amazon-bedrock.md): Instrument AWS Bedrock Runtime calls in Go using LangWatch to capture model usage, tokens, and cost for AI agent evaluation.
 
 - [Groq Integration](https://langwatch.ai/docs/integration/go/integrations/groq.md): Instrument Groq API calls in Go using LangWatch for fast LLM observability, cost tracking, and agent evaluation insights.
 - [Grok (xAI) Integration](https://langwatch.ai/docs/integration/go/integrations/grok.md): Instrument Grok (xAI) API calls in Go using LangWatch to capture high-speed traces and improve AI agent evaluations.
