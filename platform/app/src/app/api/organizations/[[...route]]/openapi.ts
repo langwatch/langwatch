@@ -10,13 +10,36 @@
  * every path answers 404 — the reference documents the self-hosted
  * capability.
  */
-import type { DescribeRouteOptions } from "hono-openapi";
+import type { DescribeRouteOptions, OpenApiSpecsOptions } from "hono-openapi";
 
 type ResponseSpec = NonNullable<DescribeRouteOptions["responses"]>[string];
 
 const INSTANCE_KEY_SECURITY: DescribeRouteOptions["security"] = [
   { instance_admin_key: [] },
 ];
+
+/**
+ * The instance credential itself, reaching the merged document through
+ * `generateSpecs(organizationsApp, ORGANIZATIONS_SPEC_OPTIONS)`. A security
+ * requirement naming a scheme the document never declares does not degrade
+ * gracefully: the reference renders an operation nobody can authenticate, and
+ * a client generator resolving `#/components/securitySchemes/...` finds
+ * nothing there.
+ */
+export const ORGANIZATIONS_SPEC_OPTIONS: OpenApiSpecsOptions = {
+  documentation: {
+    components: {
+      securitySchemes: {
+        instance_admin_key: {
+          type: "http",
+          scheme: "bearer",
+          description:
+            "Instance administrator key, set as LANGWATCH_INSTANCE_ADMIN_API_KEY on a self-hosted deployment. It exists to create the first organization, before any organization key does; every other management API takes an organization key instead.",
+        },
+      },
+    },
+  },
+};
 
 const ORGANIZATION_SUMMARY_SCHEMA = {
   type: "object" as const,

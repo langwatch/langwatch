@@ -37410,6 +37410,2408 @@
         "description": "Revoke a SCIM token so it stops verifying immediately. An unknown or already-revoked id answers 404 scim_token_not_found."
       }
     },
+    "/api/scim/v2/ServiceProviderConfig": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "The supported capabilities.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "schemas": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "The SCIM schema URNs this resource conforms to."
+                    },
+                    "documentationUri": {
+                      "type": "string"
+                    },
+                    "patch": {
+                      "type": "object",
+                      "properties": {
+                        "supported": {
+                          "type": "boolean"
+                        }
+                      }
+                    },
+                    "bulk": {
+                      "type": "object",
+                      "properties": {
+                        "supported": {
+                          "type": "boolean"
+                        },
+                        "maxOperations": {
+                          "type": "integer"
+                        },
+                        "maxPayloadSize": {
+                          "type": "integer"
+                        }
+                      }
+                    },
+                    "filter": {
+                      "type": "object",
+                      "properties": {
+                        "supported": {
+                          "type": "boolean"
+                        },
+                        "maxResults": {
+                          "type": "integer"
+                        }
+                      }
+                    },
+                    "changePassword": {
+                      "type": "object",
+                      "properties": {
+                        "supported": {
+                          "type": "boolean"
+                        }
+                      }
+                    },
+                    "sort": {
+                      "type": "object",
+                      "properties": {
+                        "supported": {
+                          "type": "boolean"
+                        }
+                      }
+                    },
+                    "etag": {
+                      "type": "object",
+                      "properties": {
+                        "supported": {
+                          "type": "boolean"
+                        }
+                      }
+                    },
+                    "authenticationSchemes": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "description": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "operationId": "scimGetServiceProviderConfig",
+        "tags": [
+          "SCIM"
+        ],
+        "parameters": [],
+        "summary": "Get the SCIM service provider configuration",
+        "description": "What this SCIM implementation supports (RFC 7643 section 5), which is how an identity provider decides what it may call: PATCH and filtering are supported, bulk operations, sorting, ETags and password change are not. Unauthenticated, because a provider reads it while being configured, before a token exists.",
+        "security": []
+      }
+    },
+    "/api/scim/v2/ResourceTypes": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "The User and Group resource types.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "schemas": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "The SCIM schema URNs this resource conforms to."
+                    },
+                    "totalResults": {
+                      "type": "integer",
+                      "description": "How many resources match, before pagination."
+                    },
+                    "startIndex": {
+                      "type": "integer"
+                    },
+                    "itemsPerPage": {
+                      "type": "integer"
+                    },
+                    "Resources": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "schemas": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            },
+                            "description": "The SCIM schema URNs this resource conforms to."
+                          },
+                          "id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "endpoint": {
+                            "type": "string"
+                          },
+                          "schema": {
+                            "type": "string",
+                            "description": "The URN of the schema this resource type is defined by."
+                          },
+                          "meta": {
+                            "type": "object",
+                            "properties": {
+                              "resourceType": {
+                                "type": "string"
+                              },
+                              "location": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "operationId": "scimListResourceTypes",
+        "tags": [
+          "SCIM"
+        ],
+        "parameters": [],
+        "summary": "List the SCIM resource types",
+        "description": "The resources this service provisions, User and Group, each naming the endpoint and the schema URN that serves it (RFC 7643 section 6). Unauthenticated, like the rest of SCIM discovery.",
+        "security": []
+      }
+    },
+    "/api/scim/v2/Schemas": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "The User and Group schema definitions.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "schemas": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "The SCIM schema URNs this resource conforms to."
+                    },
+                    "totalResults": {
+                      "type": "integer",
+                      "description": "How many resources match, before pagination."
+                    },
+                    "startIndex": {
+                      "type": "integer"
+                    },
+                    "itemsPerPage": {
+                      "type": "integer"
+                    },
+                    "Resources": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "schemas": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            },
+                            "description": "The SCIM schema URNs this resource conforms to."
+                          },
+                          "id": {
+                            "type": "string",
+                            "description": "The schema URN."
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "description": {
+                            "type": "string"
+                          },
+                          "attributes": {
+                            "type": "array",
+                            "description": "The attribute definitions, in the shape RFC 7643 section 7 gives them.",
+                            "items": {
+                              "type": "object"
+                            }
+                          },
+                          "meta": {
+                            "type": "object",
+                            "properties": {
+                              "resourceType": {
+                                "type": "string"
+                              },
+                              "location": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "operationId": "scimListSchemas",
+        "tags": [
+          "SCIM"
+        ],
+        "parameters": [],
+        "summary": "List the SCIM resource schemas",
+        "description": "The attribute definitions for the User and Group resources (RFC 7643 section 7), which an identity provider reads to build its attribute mapping. A LangWatch group is an access group: its membership drives role bindings, and it is not a team. Unauthenticated, like the rest of SCIM discovery.",
+        "security": []
+      }
+    },
+    "/api/scim/v2/Users": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "A page of provisioned users.",
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "schemas": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "The SCIM schema URNs this resource conforms to."
+                    },
+                    "totalResults": {
+                      "type": "integer",
+                      "description": "How many resources match, before pagination."
+                    },
+                    "startIndex": {
+                      "type": "integer"
+                    },
+                    "itemsPerPage": {
+                      "type": "integer"
+                    },
+                    "Resources": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "schemas": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            },
+                            "description": "The SCIM schema URNs this resource conforms to."
+                          },
+                          "id": {
+                            "type": "string",
+                            "description": "The LangWatch user id. Use it as the resource id in later calls, and as a member value on a group."
+                          },
+                          "userName": {
+                            "type": "string",
+                            "format": "email",
+                            "description": "The member's email address, which is their login."
+                          },
+                          "name": {
+                            "type": "object",
+                            "properties": {
+                              "givenName": {
+                                "type": "string"
+                              },
+                              "familyName": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          "emails": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "value": {
+                                  "type": "string",
+                                  "format": "email"
+                                },
+                                "primary": {
+                                  "type": "boolean"
+                                },
+                                "type": {
+                                  "type": "string"
+                                }
+                              }
+                            }
+                          },
+                          "active": {
+                            "type": "boolean",
+                            "description": "False once the account is deactivated."
+                          },
+                          "meta": {
+                            "type": "object",
+                            "properties": {
+                              "resourceType": {
+                                "type": "string"
+                              },
+                              "created": {
+                                "type": "string",
+                                "format": "date-time"
+                              },
+                              "lastModified": {
+                                "type": "string",
+                                "format": "date-time"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The Authorization header is missing, is not a bearer token, or names a token this deployment does not know.",
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "schemas": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "The SCIM schema URNs this resource conforms to."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "The HTTP status, as a string."
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The token is valid but the organization's plan no longer includes SCIM provisioning. Entitlement is checked on every call, so a directory connection stops the moment the Enterprise plan lapses.",
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "schemas": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "The SCIM schema URNs this resource conforms to."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "The HTTP status, as a string."
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "operationId": "scimListUsers",
+        "tags": [
+          "SCIM"
+        ],
+        "parameters": [
+          {
+            "name": "filter",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "A SCIM filter. Only `userName eq \"...\"` is applied; anything else is ignored and the full page is returned."
+          },
+          {
+            "name": "startIndex",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 1
+            },
+            "description": "1-based index of the first resource to return. Anything that does not parse as a positive integer is read as 1."
+          },
+          {
+            "name": "count",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 100
+            },
+            "description": "How many resources to return. Anything that does not parse as a positive integer is read as 100."
+          }
+        ],
+        "summary": "List provisioned users",
+        "description": "The members of the organization the token belongs to, as SCIM users. One filter expression is understood, `userName eq \"someone@example.com\"`, matched against the member's email without regard to case.",
+        "security": [
+          {
+            "scim_bearer": []
+          }
+        ]
+      },
+      "post": {
+        "responses": {
+          "201": {
+            "description": "The provisioned user.",
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "schemas": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "The SCIM schema URNs this resource conforms to."
+                    },
+                    "id": {
+                      "type": "string",
+                      "description": "The LangWatch user id. Use it as the resource id in later calls, and as a member value on a group."
+                    },
+                    "userName": {
+                      "type": "string",
+                      "format": "email",
+                      "description": "The member's email address, which is their login."
+                    },
+                    "name": {
+                      "type": "object",
+                      "properties": {
+                        "givenName": {
+                          "type": "string"
+                        },
+                        "familyName": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "emails": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "value": {
+                            "type": "string",
+                            "format": "email"
+                          },
+                          "primary": {
+                            "type": "boolean"
+                          },
+                          "type": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "active": {
+                      "type": "boolean",
+                      "description": "False once the account is deactivated."
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "resourceType": {
+                          "type": "string"
+                        },
+                        "created": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "lastModified": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request body is not JSON, or does not match the SCIM schema for this operation.",
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "schemas": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "The SCIM schema URNs this resource conforms to."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "The HTTP status, as a string."
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The Authorization header is missing, is not a bearer token, or names a token this deployment does not know.",
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "schemas": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "The SCIM schema URNs this resource conforms to."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "The HTTP status, as a string."
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The token is valid but the organization's plan no longer includes SCIM provisioning. Entitlement is checked on every call, so a directory connection stops the moment the Enterprise plan lapses.",
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "schemas": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "The SCIM schema URNs this resource conforms to."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "The HTTP status, as a string."
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A member with this userName already exists in the organization.",
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "schemas": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "The SCIM schema URNs this resource conforms to."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "The HTTP status, as a string."
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "operationId": "scimCreateUser",
+        "tags": [
+          "SCIM"
+        ],
+        "parameters": [],
+        "summary": "Provision a user",
+        "description": "Adds a member to the organization, creating the LangWatch account when the email is new. Someone who already has an account is added and reactivated rather than refused, which is what lets a directory sync be re-run without special-casing the people it already knows. New members join with the MEMBER role at organization scope. `costCenter` on the enterprise user extension assigns their department, creating that department on first use.",
+        "security": [
+          {
+            "scim_bearer": []
+          }
+        ]
+      }
+    },
+    "/api/scim/v2/Users/{id}": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "The user.",
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "schemas": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "The SCIM schema URNs this resource conforms to."
+                    },
+                    "id": {
+                      "type": "string",
+                      "description": "The LangWatch user id. Use it as the resource id in later calls, and as a member value on a group."
+                    },
+                    "userName": {
+                      "type": "string",
+                      "format": "email",
+                      "description": "The member's email address, which is their login."
+                    },
+                    "name": {
+                      "type": "object",
+                      "properties": {
+                        "givenName": {
+                          "type": "string"
+                        },
+                        "familyName": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "emails": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "value": {
+                            "type": "string",
+                            "format": "email"
+                          },
+                          "primary": {
+                            "type": "boolean"
+                          },
+                          "type": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "active": {
+                      "type": "boolean",
+                      "description": "False once the account is deactivated."
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "resourceType": {
+                          "type": "string"
+                        },
+                        "created": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "lastModified": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The Authorization header is missing, is not a bearer token, or names a token this deployment does not know.",
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "schemas": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "The SCIM schema URNs this resource conforms to."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "The HTTP status, as a string."
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The token is valid but the organization's plan no longer includes SCIM provisioning. Entitlement is checked on every call, so a directory connection stops the moment the Enterprise plan lapses.",
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "schemas": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "The SCIM schema URNs this resource conforms to."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "The HTTP status, as a string."
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such member in this organization.",
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "schemas": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "The SCIM schema URNs this resource conforms to."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "The HTTP status, as a string."
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "operationId": "scimGetUser",
+        "tags": [
+          "SCIM"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The LangWatch user id."
+          }
+        ],
+        "summary": "Get a provisioned user",
+        "description": "Reads one member of the organization the token belongs to. An id that is not a member answers 404, whether or not it names a LangWatch account elsewhere.",
+        "security": [
+          {
+            "scim_bearer": []
+          }
+        ]
+      },
+      "put": {
+        "responses": {
+          "200": {
+            "description": "The updated user.",
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "schemas": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "The SCIM schema URNs this resource conforms to."
+                    },
+                    "id": {
+                      "type": "string",
+                      "description": "The LangWatch user id. Use it as the resource id in later calls, and as a member value on a group."
+                    },
+                    "userName": {
+                      "type": "string",
+                      "format": "email",
+                      "description": "The member's email address, which is their login."
+                    },
+                    "name": {
+                      "type": "object",
+                      "properties": {
+                        "givenName": {
+                          "type": "string"
+                        },
+                        "familyName": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "emails": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "value": {
+                            "type": "string",
+                            "format": "email"
+                          },
+                          "primary": {
+                            "type": "boolean"
+                          },
+                          "type": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "active": {
+                      "type": "boolean",
+                      "description": "False once the account is deactivated."
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "resourceType": {
+                          "type": "string"
+                        },
+                        "created": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "lastModified": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request body is not JSON, or does not match the SCIM schema for this operation.",
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "schemas": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "The SCIM schema URNs this resource conforms to."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "The HTTP status, as a string."
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The Authorization header is missing, is not a bearer token, or names a token this deployment does not know.",
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "schemas": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "The SCIM schema URNs this resource conforms to."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "The HTTP status, as a string."
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The token is valid but the organization's plan no longer includes SCIM provisioning. Entitlement is checked on every call, so a directory connection stops the moment the Enterprise plan lapses.",
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "schemas": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "The SCIM schema URNs this resource conforms to."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "The HTTP status, as a string."
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such member in this organization.",
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "schemas": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "The SCIM schema URNs this resource conforms to."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "The HTTP status, as a string."
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "operationId": "scimReplaceUser",
+        "tags": [
+          "SCIM"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The LangWatch user id."
+          }
+        ],
+        "summary": "Replace a provisioned user",
+        "description": "Replaces the member's attributes with the body. It is a whole-resource write, so an attribute the identity provider leaves out is reset rather than kept: omitting `active` reactivates the member. Send PATCH instead to change one attribute.",
+        "security": [
+          {
+            "scim_bearer": []
+          }
+        ]
+      },
+      "patch": {
+        "responses": {
+          "200": {
+            "description": "The updated user.",
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "schemas": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "The SCIM schema URNs this resource conforms to."
+                    },
+                    "id": {
+                      "type": "string",
+                      "description": "The LangWatch user id. Use it as the resource id in later calls, and as a member value on a group."
+                    },
+                    "userName": {
+                      "type": "string",
+                      "format": "email",
+                      "description": "The member's email address, which is their login."
+                    },
+                    "name": {
+                      "type": "object",
+                      "properties": {
+                        "givenName": {
+                          "type": "string"
+                        },
+                        "familyName": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "emails": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "value": {
+                            "type": "string",
+                            "format": "email"
+                          },
+                          "primary": {
+                            "type": "boolean"
+                          },
+                          "type": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "active": {
+                      "type": "boolean",
+                      "description": "False once the account is deactivated."
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "resourceType": {
+                          "type": "string"
+                        },
+                        "created": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "lastModified": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request body is not JSON, or does not match the SCIM schema for this operation.",
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "schemas": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "The SCIM schema URNs this resource conforms to."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "The HTTP status, as a string."
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The Authorization header is missing, is not a bearer token, or names a token this deployment does not know.",
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "schemas": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "The SCIM schema URNs this resource conforms to."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "The HTTP status, as a string."
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The token is valid but the organization's plan no longer includes SCIM provisioning. Entitlement is checked on every call, so a directory connection stops the moment the Enterprise plan lapses.",
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "schemas": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "The SCIM schema URNs this resource conforms to."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "The HTTP status, as a string."
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such member in this organization.",
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "schemas": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "The SCIM schema URNs this resource conforms to."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "The HTTP status, as a string."
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "operationId": "scimPatchUser",
+        "tags": [
+          "SCIM"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The LangWatch user id."
+          }
+        ],
+        "summary": "Update a provisioned user",
+        "description": "Applies RFC 7644 section 3.5.2 patch operations. What is implemented: `replace` of `active` (deactivating or reactivating the account), of `userName`, and of `name.givenName` / `name.familyName`, written either as an operation path or as keys inside a value object; and `add`, `replace` or `remove` of the enterprise `costCenter`, which reassigns the member's department. Operations outside that set are accepted and change nothing, so a provider sending its full patch set is never rejected.",
+        "security": [
+          {
+            "scim_bearer": []
+          }
+        ]
+      },
+      "delete": {
+        "responses": {
+          "204": {
+            "description": "Deprovisioned. No body."
+          },
+          "401": {
+            "description": "The Authorization header is missing, is not a bearer token, or names a token this deployment does not know.",
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "schemas": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "The SCIM schema URNs this resource conforms to."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "The HTTP status, as a string."
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The token is valid but the organization's plan no longer includes SCIM provisioning. Entitlement is checked on every call, so a directory connection stops the moment the Enterprise plan lapses.",
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "schemas": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "The SCIM schema URNs this resource conforms to."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "The HTTP status, as a string."
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such member in this organization.",
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "schemas": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "The SCIM schema URNs this resource conforms to."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "The HTTP status, as a string."
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "operationId": "scimDeleteUser",
+        "tags": [
+          "SCIM"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The LangWatch user id."
+          }
+        ],
+        "summary": "Deprovision a user",
+        "description": "Removes the member from the organization, drops the role bindings they held there, and deactivates their account. The LangWatch user record itself is kept, so past traces, evaluations and audit entries stay attributable.",
+        "security": [
+          {
+            "scim_bearer": []
+          }
+        ]
+      }
+    },
+    "/api/scim/v2/Groups": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "A page of provisioned groups.",
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "schemas": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "The SCIM schema URNs this resource conforms to."
+                    },
+                    "totalResults": {
+                      "type": "integer",
+                      "description": "How many resources match, before pagination."
+                    },
+                    "startIndex": {
+                      "type": "integer"
+                    },
+                    "itemsPerPage": {
+                      "type": "integer"
+                    },
+                    "Resources": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "schemas": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            },
+                            "description": "The SCIM schema URNs this resource conforms to."
+                          },
+                          "id": {
+                            "type": "string",
+                            "description": "The LangWatch group id."
+                          },
+                          "displayName": {
+                            "type": "string"
+                          },
+                          "members": {
+                            "type": "array",
+                            "description": "Omitted when the request excluded the members attribute. Each value is a LangWatch user id.",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "value": {
+                                  "type": "string"
+                                },
+                                "display": {
+                                  "type": "string"
+                                }
+                              }
+                            }
+                          },
+                          "meta": {
+                            "type": "object",
+                            "properties": {
+                              "resourceType": {
+                                "type": "string"
+                              },
+                              "created": {
+                                "type": "string",
+                                "format": "date-time"
+                              },
+                              "lastModified": {
+                                "type": "string",
+                                "format": "date-time"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The Authorization header is missing, is not a bearer token, or names a token this deployment does not know.",
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "schemas": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "The SCIM schema URNs this resource conforms to."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "The HTTP status, as a string."
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The token is valid but the organization's plan no longer includes SCIM provisioning. Entitlement is checked on every call, so a directory connection stops the moment the Enterprise plan lapses.",
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "schemas": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "The SCIM schema URNs this resource conforms to."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "The HTTP status, as a string."
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "operationId": "scimListGroups",
+        "tags": [
+          "SCIM"
+        ],
+        "parameters": [
+          {
+            "name": "filter",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "A SCIM filter. Only `displayName eq \"...\"` is applied; anything else is ignored and the full page is returned."
+          },
+          {
+            "name": "startIndex",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 1
+            },
+            "description": "1-based index of the first resource to return. Anything that does not parse as a positive integer is read as 1."
+          },
+          {
+            "name": "count",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 100
+            },
+            "description": "How many resources to return. Anything that does not parse as a positive integer is read as 100."
+          },
+          {
+            "name": "excludedAttributes",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Comma-separated attribute names to leave out of the response. Only `members` is honoured, and it is what lets a directory page through groups without pulling every membership."
+          }
+        ],
+        "summary": "List provisioned groups",
+        "description": "The organization's SCIM-provisioned access groups. Groups created in LangWatch itself are not listed: the directory sees what it provisioned, and nothing else. One filter expression is understood, `displayName eq \"Engineering\"`, matched without regard to case.",
+        "security": [
+          {
+            "scim_bearer": []
+          }
+        ]
+      },
+      "post": {
+        "responses": {
+          "201": {
+            "description": "The provisioned group.",
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "schemas": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "The SCIM schema URNs this resource conforms to."
+                    },
+                    "id": {
+                      "type": "string",
+                      "description": "The LangWatch group id."
+                    },
+                    "displayName": {
+                      "type": "string"
+                    },
+                    "members": {
+                      "type": "array",
+                      "description": "Omitted when the request excluded the members attribute. Each value is a LangWatch user id.",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "value": {
+                            "type": "string"
+                          },
+                          "display": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "resourceType": {
+                          "type": "string"
+                        },
+                        "created": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "lastModified": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request body is not JSON, or does not match the SCIM schema for this operation.",
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "schemas": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "The SCIM schema URNs this resource conforms to."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "The HTTP status, as a string."
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The Authorization header is missing, is not a bearer token, or names a token this deployment does not know.",
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "schemas": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "The SCIM schema URNs this resource conforms to."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "The HTTP status, as a string."
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The token is valid but the organization's plan no longer includes SCIM provisioning. Entitlement is checked on every call, so a directory connection stops the moment the Enterprise plan lapses.",
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "schemas": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "The SCIM schema URNs this resource conforms to."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "The HTTP status, as a string."
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A provisioned group with this displayName already exists in the organization.",
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "schemas": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "The SCIM schema URNs this resource conforms to."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "The HTTP status, as a string."
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "operationId": "scimCreateGroup",
+        "tags": [
+          "SCIM"
+        ],
+        "parameters": [],
+        "summary": "Provision a group",
+        "description": "Creates an access group. Members are given as LangWatch user ids, the same ids the Users endpoints return; an id that is not a member of the organization is skipped rather than failing the call, so a group can be provisioned before everyone in it is. Granting the group access is a separate step: a group carries no permissions until a role binding is created for it.",
+        "security": [
+          {
+            "scim_bearer": []
+          }
+        ]
+      }
+    },
+    "/api/scim/v2/Groups/{id}": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "The group.",
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "schemas": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "The SCIM schema URNs this resource conforms to."
+                    },
+                    "id": {
+                      "type": "string",
+                      "description": "The LangWatch group id."
+                    },
+                    "displayName": {
+                      "type": "string"
+                    },
+                    "members": {
+                      "type": "array",
+                      "description": "Omitted when the request excluded the members attribute. Each value is a LangWatch user id.",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "value": {
+                            "type": "string"
+                          },
+                          "display": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "resourceType": {
+                          "type": "string"
+                        },
+                        "created": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "lastModified": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The Authorization header is missing, is not a bearer token, or names a token this deployment does not know.",
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "schemas": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "The SCIM schema URNs this resource conforms to."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "The HTTP status, as a string."
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The token is valid but the organization's plan no longer includes SCIM provisioning. Entitlement is checked on every call, so a directory connection stops the moment the Enterprise plan lapses.",
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "schemas": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "The SCIM schema URNs this resource conforms to."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "The HTTP status, as a string."
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such group in this organization.",
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "schemas": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "The SCIM schema URNs this resource conforms to."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "The HTTP status, as a string."
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "operationId": "scimGetGroup",
+        "tags": [
+          "SCIM"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The LangWatch group id."
+          },
+          {
+            "name": "excludedAttributes",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Comma-separated attribute names to leave out of the response. Only `members` is honoured, and it is what lets a directory page through groups without pulling every membership."
+          }
+        ],
+        "summary": "Get a provisioned group",
+        "description": "Reads one provisioned group and its members. A group that exists but was created in LangWatch rather than provisioned is not readable here.",
+        "security": [
+          {
+            "scim_bearer": []
+          }
+        ]
+      },
+      "put": {
+        "responses": {
+          "200": {
+            "description": "The updated group.",
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "schemas": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "The SCIM schema URNs this resource conforms to."
+                    },
+                    "id": {
+                      "type": "string",
+                      "description": "The LangWatch group id."
+                    },
+                    "displayName": {
+                      "type": "string"
+                    },
+                    "members": {
+                      "type": "array",
+                      "description": "Omitted when the request excluded the members attribute. Each value is a LangWatch user id.",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "value": {
+                            "type": "string"
+                          },
+                          "display": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "resourceType": {
+                          "type": "string"
+                        },
+                        "created": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "lastModified": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request body is not JSON, or does not match the SCIM schema for this operation.",
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "schemas": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "The SCIM schema URNs this resource conforms to."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "The HTTP status, as a string."
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The Authorization header is missing, is not a bearer token, or names a token this deployment does not know.",
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "schemas": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "The SCIM schema URNs this resource conforms to."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "The HTTP status, as a string."
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The token is valid but the organization's plan no longer includes SCIM provisioning. Entitlement is checked on every call, so a directory connection stops the moment the Enterprise plan lapses.",
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "schemas": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "The SCIM schema URNs this resource conforms to."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "The HTTP status, as a string."
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such group in this organization.",
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "schemas": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "The SCIM schema URNs this resource conforms to."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "The HTTP status, as a string."
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "operationId": "scimReplaceGroup",
+        "tags": [
+          "SCIM"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The LangWatch group id."
+          }
+        ],
+        "summary": "Replace a provisioned group",
+        "description": "Replaces the group's display name and its membership with the body. Membership is a whole-resource write: a member absent from `members` is removed from the group, and omitting `members` empties it. Role bindings granted to the group are untouched.",
+        "security": [
+          {
+            "scim_bearer": []
+          }
+        ]
+      },
+      "patch": {
+        "responses": {
+          "200": {
+            "description": "The updated group.",
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "schemas": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "The SCIM schema URNs this resource conforms to."
+                    },
+                    "id": {
+                      "type": "string",
+                      "description": "The LangWatch group id."
+                    },
+                    "displayName": {
+                      "type": "string"
+                    },
+                    "members": {
+                      "type": "array",
+                      "description": "Omitted when the request excluded the members attribute. Each value is a LangWatch user id.",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "value": {
+                            "type": "string"
+                          },
+                          "display": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "resourceType": {
+                          "type": "string"
+                        },
+                        "created": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "lastModified": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request body is not JSON, or does not match the SCIM schema for this operation.",
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "schemas": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "The SCIM schema URNs this resource conforms to."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "The HTTP status, as a string."
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The Authorization header is missing, is not a bearer token, or names a token this deployment does not know.",
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "schemas": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "The SCIM schema URNs this resource conforms to."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "The HTTP status, as a string."
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The token is valid but the organization's plan no longer includes SCIM provisioning. Entitlement is checked on every call, so a directory connection stops the moment the Enterprise plan lapses.",
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "schemas": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "The SCIM schema URNs this resource conforms to."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "The HTTP status, as a string."
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such group in this organization.",
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "schemas": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "The SCIM schema URNs this resource conforms to."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "The HTTP status, as a string."
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "operationId": "scimPatchGroup",
+        "tags": [
+          "SCIM"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The LangWatch group id."
+          }
+        ],
+        "summary": "Update a provisioned group",
+        "description": "Applies RFC 7644 section 3.5.2 patch operations. What is implemented: `add` of members, `remove` of members (named by a value filter on the path, as Entra ID writes it, or in the operation value), `replace` of `displayName`, and `replace` of the whole member list. Operations outside that set are accepted and change nothing.",
+        "security": [
+          {
+            "scim_bearer": []
+          }
+        ]
+      },
+      "delete": {
+        "responses": {
+          "204": {
+            "description": "Deprovisioned. No body."
+          },
+          "401": {
+            "description": "The Authorization header is missing, is not a bearer token, or names a token this deployment does not know.",
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "schemas": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "The SCIM schema URNs this resource conforms to."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "The HTTP status, as a string."
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The token is valid but the organization's plan no longer includes SCIM provisioning. Entitlement is checked on every call, so a directory connection stops the moment the Enterprise plan lapses.",
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "schemas": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "The SCIM schema URNs this resource conforms to."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "The HTTP status, as a string."
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such group in this organization.",
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "schemas": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "The SCIM schema URNs this resource conforms to."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "The HTTP status, as a string."
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "operationId": "scimDeleteGroup",
+        "tags": [
+          "SCIM"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The LangWatch group id."
+          }
+        ],
+        "summary": "Deprovision a group",
+        "description": "Deletes the group along with its memberships and every role binding granted through it, so the access it carried is revoked with it. The members themselves keep their organization membership and any access they hold directly.",
+        "security": [
+          {
+            "scim_bearer": []
+          }
+        ]
+      }
+    },
     "/api/scenario-events": {
       "post": {
         "responses": {
@@ -53612,6 +56014,16 @@
         "type": "http",
         "scheme": "bearer",
         "description": "Admin API key for organization-level operations (managing projects, API keys). Create one in Settings > API Keys or via POST /api/api-keys. Format: sk-lw-{id}_{secret}."
+      },
+      "scim_bearer": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "SCIM token for one organization's directory connection, created with POST /api/scim-tokens or in Settings > SCIM. It authenticates provisioning calls only, and stops working if the organization's Enterprise plan lapses."
+      },
+      "instance_admin_key": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Instance administrator key, set as LANGWATCH_INSTANCE_ADMIN_API_KEY on a self-hosted deployment. It exists to create the first organization, before any organization key does; every other management API takes an organization key instead."
       }
     }
   }
