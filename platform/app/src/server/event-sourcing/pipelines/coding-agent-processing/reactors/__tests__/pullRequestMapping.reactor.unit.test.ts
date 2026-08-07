@@ -146,7 +146,13 @@ describe("pullRequestMapping reactor", () => {
 
       const jobId = reactor.options?.makeJobId?.({
         event,
-        foldState: foldState(),
+        // A session records the casing its git remote carries, and the mapping
+        // service's durable claim resolves it lowercased. The key folds to
+        // match, so the throttle counts the one repository the claim counts.
+        foldState: foldState({
+          repositoryOwner: "Acme",
+          repositoryName: "Widgets",
+        }),
       });
 
       expect(jobId).toBe("prmap:project-1:acme/widgets:feat/linkage");
@@ -186,6 +192,10 @@ describe("pullRequestMapping reactor", () => {
      * reads the miss as "already dispatched". Both the key and the group must
      * name the same thing.
      *
+     * The second worktree here names the repository in its remote's own casing,
+     * because two clones of one repository need not agree on it and the group
+     * has to fold the way the mapping service's claim does.
+     *
      * @scenario "Concurrent sessions on one branch ask GitHub once"
      */
     it("groups the job on the same branch its dedup id is keyed on", () => {
@@ -195,7 +205,10 @@ describe("pullRequestMapping reactor", () => {
       const first = { event, foldState: foldState() };
       const second = {
         event: { ...event, aggregateId: "session-2" },
-        foldState: foldState(),
+        foldState: foldState({
+          repositoryOwner: "Acme",
+          repositoryName: "Widgets",
+        }),
       };
 
       const groupKey = reactor.options?.groupKeyFn;
@@ -208,13 +221,21 @@ describe("pullRequestMapping reactor", () => {
       const reactor = createPullRequestMappingReactor({
         requestBranchMapping: vi.fn(),
       });
+      const groupKey = reactor.options?.groupKeyFn;
 
-      expect(
-        reactor.options?.groupKeyFn?.({ event, foldState: foldState() }),
-      ).not.toBe(
-        reactor.options?.groupKeyFn?.({
+      expect(groupKey?.({ event, foldState: foldState() })).not.toBe(
+        groupKey?.({
           event,
           foldState: foldState({ gitBranch: "feat/other" }),
+        }),
+      );
+      // The repository folds and the branch does not: `feat/X` and `feat/x` are
+      // two branches, and collapsing them would map one and leave the other
+      // looking like it has no pull request.
+      expect(groupKey?.({ event, foldState: foldState() })).not.toBe(
+        groupKey?.({
+          event,
+          foldState: foldState({ gitBranch: "feat/Linkage" }),
         }),
       );
     });

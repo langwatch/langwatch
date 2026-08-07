@@ -32,12 +32,24 @@ import { PrismaGithubInstallationsRepository } from "../repositories/github-inst
 import { PrismaGithubPullRequestsRepository } from "../repositories/github-pull-requests.prisma.repository";
 
 const tag = nanoid(8);
-const REPO_FULL_NAME = `acme-${tag}/widgets`;
+/**
+ * The spelling a reader arrives with, mixed case on both halves: hosts are case
+ * insensitive and a session records whatever casing its git remote carries. The
+ * store folds host and repository on every read and write, so the status cache
+ * sitting in front of it has to fold the same way, or one pull request's status
+ * splits across as many entries as there are spellings and each pays its own
+ * GitHub call.
+ */
+const REPO_HOST = "GitHub.com";
+const REPO_FULL_NAME = `Acme-${tag}/Widgets`;
+/** The one spelling the store and its cache key resolve to. */
+const FOLDED_HOST = REPO_HOST.toLowerCase();
+const FOLDED_REPO_FULL_NAME = REPO_FULL_NAME.toLowerCase();
 const INSTALLATION_ID = `8${Date.now().toString().slice(-8)}`;
 const PR_NUMBER = 41;
 
 const REF = {
-  repositoryHost: "github.com",
+  repositoryHost: REPO_HOST,
   repositoryFullName: REPO_FULL_NAME,
   prNumber: PR_NUMBER,
 };
@@ -48,7 +60,7 @@ let organizationId: string;
 const repository = new PrismaGithubPullRequestsRepository(prisma);
 
 function cacheKey(): string {
-  return `gh:prstatus:${organizationId}:github.com:${REPO_FULL_NAME}:${PR_NUMBER}`;
+  return `gh:prstatus:${organizationId}:${FOLDED_HOST}:${FOLDED_REPO_FULL_NAME}:${PR_NUMBER}`;
 }
 
 function serviceWith(getPullRequest: ReturnType<typeof vi.fn>) {
@@ -72,20 +84,21 @@ function serviceWith(getPullRequest: ReturnType<typeof vi.fn>) {
 }
 
 /**
- * The stored snapshot as the mapping first wrote it. Re-applied per test
- * because a live read that finds GitHub has moved on writes the new state
- * back, which is the behaviour one of these tests is about.
+ * The stored snapshot as the mapping first wrote it, under the folded spelling
+ * the store keys by. Re-applied per test because a live read that finds GitHub
+ * has moved on writes the new state back, which is the behaviour one of these
+ * tests is about.
  */
 async function seedOpenSnapshot(): Promise<void> {
   await repository.upsertPullRequests({
     pullRequests: [
       {
         organizationId,
-        repositoryHost: "github.com",
-        repositoryFullName: REPO_FULL_NAME,
+        repositoryHost: FOLDED_HOST,
+        repositoryFullName: FOLDED_REPO_FULL_NAME,
         headBranch: "feat/linkage",
         prNumber: PR_NUMBER,
-        htmlUrl: `https://github.com/${REPO_FULL_NAME}/pull/${PR_NUMBER}`,
+        htmlUrl: `https://github.com/${FOLDED_REPO_FULL_NAME}/pull/${PR_NUMBER}`,
         title: "Link sessions to pull requests",
         state: "open",
         isDraft: false,

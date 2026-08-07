@@ -79,6 +79,20 @@ export function shouldMapPullRequests(
  * normalize to the same host at the service, so two folds sharing this key
  * always name the same repository. Which is what makes collapsing them into one
  * job the same answer rather than a guess.
+ *
+ * The owner and the name are folded, which is the other half of that same
+ * argument. A session records whatever casing its git remote carries, and
+ * everything below this job keys the repository lowercased: the durable branch
+ * claim in the mapping service already resolves `Acme/Widgets` and
+ * `acme/widgets` to one row. Leaving them raw here would not cost a second
+ * GitHub call, because the second job loses that claim, but it would stage a
+ * job whose only possible outcome is to lose it, and split one branch's work
+ * across two queue groups on the way. Folding makes the throttle see the one
+ * repository the claim sees.
+ *
+ * `gitBranch` is not folded: `feat/X` and `feat/x` really are two branches, and
+ * collapsing them would map one and leave the other with no pull request.
+ * `tenantId` is an opaque id rather than a name, so it is keyed verbatim.
  */
 export function pullRequestMappingJobId({
   tenantId,
@@ -90,7 +104,9 @@ export function pullRequestMappingJobId({
     "repositoryOwner" | "repositoryName" | "gitBranch"
   >;
 }): string {
-  return `prmap:${tenantId}:${state.repositoryOwner}/${state.repositoryName}:${state.gitBranch}`;
+  const repository =
+    `${state.repositoryOwner}/${state.repositoryName}`.toLowerCase();
+  return `prmap:${tenantId}:${repository}:${state.gitBranch}`;
 }
 
 /**
