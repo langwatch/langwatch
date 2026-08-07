@@ -45,7 +45,7 @@ Feature: Structured Logging for ClickHouse Queries
     When a ClickHouse attempt fails
     Then the cause is attached under the field "queryError"
     And no field named "error" is emitted
-    And the record does not claim a failure the level did not
+    And the record does not claim a failure that the level did not establish
 
   @unit @regression
   Scenario: Query successes are logged at debug level
