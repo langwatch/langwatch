@@ -148,8 +148,27 @@ Feature: Large trace payloads — event_log as single source of truth · transie
     And the event is written to event_log with the full content as EventPayload
     And after event_log INSERT succeeds the S3 spool object is best-effort DELETEd
 
-  @integration @track2 @unimplemented
-  # Bound by edge-offload.unit.test.ts written in Step 4.
+  @unit @track2
+  # The spool is on by default, so a deployment that already has object
+  # storage keeps oversized content intact without configuring anything.
+  # The edge resolves the flag against the operator store and falls back to
+  # the registry default (never PostHog, which per-span ingestion cannot
+  # afford), so the default only lands if it flows through that lookup.
+  # Bound by featureFlagStore.postgres.unit.test.ts.
+  Scenario: A deployment that configured object storage spools oversized spans with no flag setup
+    Given a deployment with object storage configured
+    And no operator row or targeting rule exists for "release_trace_blob_offload"
+    When the ingestion edge resolves the flag for a project
+    Then the flag resolves to enabled from the registry default
+    And a span whose serialized command exceeds 256 KB is spooled rather than
+        truncated at the 256 KB per-value cap
+    And an operator row switching the flag off still wins, fleet-wide or for
+        a single project
+
+  @unit @track2
+  # Bound by edge-offload.unit.test.ts, which also pins what the span loses
+  # on this path: capOversizedAttributes replaces the over-cap value with a
+  # truncation marker once the command reaches the worker.
   Scenario: When edge S3 spool PUT fails, ingestion falls back to inline (fail-open)
     Given a span whose serialized command payload exceeds 256 KB
     And the S3 spool PUT fails at the edge

@@ -2,6 +2,7 @@ import { createLogger } from "@langwatch/observability";
 import { prisma } from "../db";
 import { TtlCache } from "../utils/ttlCache";
 import { KILL_SWITCH_CACHE_TTL_MS } from "./constants";
+import { type FeatureFlagKey, resolveFlagDefinition } from "./registry";
 import {
   evaluateRules,
   type FeatureFlagRules,
@@ -68,6 +69,28 @@ export class FeatureFlagStorePostgres {
     if (row === null) return null;
     const ruleHit = evaluateRules(row.rules, ctx);
     return ruleHit ?? row.enabled;
+  }
+
+  /**
+   * Same resolution as `get`, but an absent row resolves to the flag's
+   * registry default instead of `null`.
+   *
+   * For hot-path callers that must decide without the service layer: the
+   * PRODUCT branch of `FeatureFlagService` falls through to PostHog when no
+   * row exists, which per-span ingestion cannot afford. Reading `get`
+   * directly instead makes an absent row read as "off" and silently strands
+   * the registry default, so a flag that ships on by default would never
+   * reach a deployment that has not written an operator row. This method is
+   * the resolution those callers actually want: operator row (with its
+   * targeting rules) first, registry default second, PostHog never.
+   */
+  async getOrRegistryDefault(
+    key: FeatureFlagKey,
+    ctx: RuleEvaluationContext = {},
+  ): Promise<boolean> {
+    const stored = await this.get(key, ctx);
+    if (stored !== null) return stored;
+    return resolveFlagDefinition(key)?.defaultValue ?? false;
   }
 
   /**
