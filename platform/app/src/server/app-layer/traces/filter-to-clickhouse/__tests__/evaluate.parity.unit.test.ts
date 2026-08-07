@@ -606,8 +606,26 @@ const cases: Case[] = [
     expected: false,
   },
   {
-    name: "UNSUPPORTED poisons an OR that would otherwise pass",
+    name: "UNSUPPORTED on the right fails an OR that would otherwise pass",
     query: "topic:t1 OR size:100",
+    trace: makeTrace({ topicId: "t1" }),
+    expected: false,
+  },
+  {
+    name: "UNSUPPORTED on the left fails an OR that would otherwise pass",
+    query: "size:100 OR topic:t1",
+    trace: makeTrace({ topicId: "t1" }),
+    expected: false,
+  },
+  {
+    name: "UNSUPPORTED on the right fails an AND",
+    query: "topic:t1 AND size:100",
+    trace: makeTrace({ topicId: "t1" }),
+    expected: false,
+  },
+  {
+    name: "UNSUPPORTED on the left fails an AND",
+    query: "size:100 AND topic:t1",
     trace: makeTrace({ topicId: "t1" }),
     expected: false,
   },

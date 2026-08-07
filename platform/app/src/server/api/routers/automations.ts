@@ -19,6 +19,7 @@ import {
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { getApp } from "~/server/app-layer/app";
+import { diagnoseAutomationReachability } from "~/server/app-layer/automations/automation-reachability";
 import { AutomationCustomGraphService } from "~/server/app-layer/automations/custom-graph.service";
 import { listSlackChannels } from "~/server/app-layer/automations/delivery/slackWebApi";
 import { NOTIFY_TRIGGER_ACTIONS } from "~/server/app-layer/automations/dispatch/triggerActionDispatch";
@@ -63,6 +64,7 @@ import { featureFlagService } from "~/server/featureFlag";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import {
   sanitizeTriggerFilters,
+  type TriggerFilters,
   triggerFiltersPermissiveSchema,
   triggerFiltersSchema,
 } from "../../filters/types";
@@ -86,6 +88,49 @@ function redactTriggerForRead<
       trigger.actionParams ?? {},
     ),
   };
+}
+
+function reachabilityForRead({
+  trigger,
+  parsedFilters,
+}: {
+  trigger: {
+    triggerKind?: TriggerKind;
+    customGraphId?: string | null;
+    filters: unknown;
+    filterQuery?: string | null;
+  };
+  parsedFilters?: TriggerFilters;
+}) {
+  // Reports fire from the scheduler and graph alerts use threshold rules; the
+  // trace matcher diagnostics do not apply to either surface.
+  if (
+    trigger.triggerKind === TriggerKind.REPORT ||
+    trigger.customGraphId != null
+  ) {
+    return null;
+  }
+
+  let filters: TriggerFilters = parsedFilters ?? {};
+  if (!parsedFilters && typeof trigger.filters === "string") {
+    try {
+      filters = JSON.parse(trigger.filters) as TriggerFilters;
+    } catch {
+      // getTriggerById has no earlier parse, so it tolerates malformed legacy
+      // rows. There is no field-only diagnostic to expose for that payload.
+    }
+  } else if (
+    !parsedFilters &&
+    trigger.filters &&
+    typeof trigger.filters === "object"
+  ) {
+    filters = trigger.filters as TriggerFilters;
+  }
+
+  return diagnoseAutomationReachability({
+    filters,
+    filterQuery: trigger.filterQuery,
+  });
 }
 
 const templateDraftSchema = z.object({
@@ -450,6 +495,10 @@ export const automationRouter = createTRPCRouter({
           ...redactTriggerForRead(trigger),
           checks,
           customGraph,
+          reachability: reachabilityForRead({
+            trigger,
+            parsedFilters: triggerFilters,
+          }),
         };
       });
 
@@ -605,7 +654,12 @@ export const automationRouter = createTRPCRouter({
         projectId: input.projectId,
       });
       // Never return the encrypted bot token to the browser (ADR-041).
-      return trigger ? redactTriggerForRead(trigger) : trigger;
+      return trigger
+        ? {
+            ...redactTriggerForRead(trigger),
+            reachability: reachabilityForRead({ trigger }),
+          }
+        : trigger;
     }),
   /**
    * List the Slack channels a bot token can see, to populate the channel

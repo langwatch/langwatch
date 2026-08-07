@@ -31,6 +31,7 @@ import { Switch } from "~/components/ui/switch";
 import { toaster } from "~/components/ui/toaster";
 import { Tooltip } from "~/components/ui/tooltip";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
+import { AutomationReachabilityWarning } from "~/features/automations/components/AutomationReachabilityWarning";
 import { UseCaseStrip } from "~/features/automations/components/page/AutomationsEducation";
 import { AutomationsHistory } from "~/features/automations/components/page/AutomationsHistory";
 import {
@@ -896,7 +897,13 @@ function AutomationsPage() {
                               >
                                 <Table.Row {...sharedRowProps(trigger)}>
                                   <Table.Cell fontWeight="medium">
-                                    {trigger.name}
+                                    <VStack align="start" gap={1}>
+                                      <Text>{trigger.name}</Text>
+                                      <AutomationReachabilityWarning
+                                        diagnostic={trigger.reachability}
+                                        compact
+                                      />
+                                    </VStack>
                                   </Table.Cell>
                                   <Table.Cell maxWidth="360px">
                                     <VStack gap={2} align="stretch">
