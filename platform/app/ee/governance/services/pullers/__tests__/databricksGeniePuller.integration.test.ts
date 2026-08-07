@@ -281,11 +281,15 @@ const USERS: Record<string, Record<string, string | null>> = {
   },
 };
 
+/** Nobody the directory knows — every SCIM lookup for this id 404s. */
+const DELETED_USER_ID = 799_999_999_999_999;
+
 const SPACE_TITLES: Record<string, string> = {
   "space-alpha": "ACME Revenue Analyst",
   "space-beta": "ACME Trip Analytics",
   "space-forbidden": "ACME Restricted",
   "space-loop": "ACME Broken Pagination",
+  "space-orphan": "ACME Departed Analyst",
 };
 
 function sqlAttachment(id: string, query: string, rowCount: number) {
@@ -372,6 +376,15 @@ function createFixtureWorkspace(options: { betaAgeMs?: number } = {}) {
     ],
     "space-forbidden": [],
     "space-loop": [],
+    // One conversation, several messages, all by someone the directory has
+    // since deleted.
+    "space-orphan": [
+      {
+        conversation_id: "conv-orphan-1",
+        title: "Questions from a departed analyst",
+        created_timestamp: alphaMs,
+      },
+    ],
   };
 
   const messages: Record<string, Array<ReturnType<typeof message>>> = {
@@ -407,6 +420,17 @@ function createFixtureWorkspace(options: { betaAgeMs?: number } = {}) {
         sql: "SELECT `region`, SUM(`revenue`) FROM `acme`.`sales`.`orders` WHERE `quarter` = 'Q3' GROUP BY `region`",
       }),
     ],
+    "conv-orphan-1": [1, 2, 3].map((n) =>
+      message({
+        id: `msg-orphan-${n}`,
+        conversationId: "conv-orphan-1",
+        spaceId: "space-orphan",
+        userId: DELETED_USER_ID,
+        content: `Question ${n} from an account that no longer exists`,
+        createdMs: alphaMs + n,
+        sql: "SELECT 1",
+      }),
+    ),
     "conv-beta-1": [
       message({
         id: "msg-beta-1",
@@ -598,6 +622,7 @@ describe("given a Genie workspace the credential can fully read", () => {
   });
 
   describe("when the puller sweeps it", () => {
+    /** @scenario "Every page of every list is read" */
     it("reads every page of every list, not just the first", async () => {
       const rows = await ocsfRowsFor(seeded.govProjectId);
       // One message sits on conversation page 2 and another on message page 2.
@@ -612,6 +637,7 @@ describe("given a Genie workspace the credential can fully read", () => {
       );
     });
 
+    /** @scenario "One record per question, carrying the question and the SQL" */
     it("carries the question and the SQL it generated", async () => {
       const rows = await ocsfRowsFor(seeded.govProjectId);
       const alpha = rows.find((r) => r.EventId.endsWith("msg-alpha-1"))!;
@@ -627,6 +653,7 @@ describe("given a Genie workspace the credential can fully read", () => {
       expect(extra.rowCount).toBe(5);
     });
 
+    /** @scenario "Every user's activity is captured, not just the caller's" */
     it("asks for every user's conversations, not just the caller's", () => {
       // The failure this guards is silent: without include_all the sweep
       // returns the service account's own conversations, reports success, and
@@ -637,29 +664,33 @@ describe("given a Genie workspace the credential can fully read", () => {
       }
     });
 
-    it("keys identity on the IdP object id, and falls back to the login", async () => {
+    /** @scenario "Identity resolves to the directory's object id when it has one" */
+    it("keys a record on the IdP object id when the directory has one", async () => {
       const rows = await ocsfRowsFor(seeded.govProjectId);
       const withObjectId = extensionOf(
         rows.find((r) => r.EventId.endsWith("msg-alpha-1"))!,
-      );
-      const withoutObjectId = extensionOf(
-        rows.find((r) => r.EventId.endsWith("msg-beta-1"))!,
       );
 
       expect(withObjectId.actorKey).toBe(
         "11111111-2222-3333-4444-555555555555",
       );
       expect(withObjectId.actorEmail).toBe("dana.hoffman@acme.test");
+    });
+
+    /** @scenario "Identity falls back to the login when there is no object id" */
+    it("keys a record on the login when the directory has no object id", async () => {
+      const rows = await ocsfRowsFor(seeded.govProjectId);
+      const row = rows.find((r) => r.EventId.endsWith("msg-beta-1"))!;
+      const withoutObjectId = extensionOf(row);
 
       // No object id in the directory, so the login carries the identity — and
       // the record is still attributed rather than anonymous.
       expect(withoutObjectId.actorExternalId).toBe("");
       expect(withoutObjectId.actorKey).toBe("priya.nair@acme.test");
-      expect(
-        rows.find((r) => r.EventId.endsWith("msg-beta-1"))!.ActorEmail,
-      ).toBe("priya.nair@acme.test");
+      expect(row.ActorEmail).toBe("priya.nair@acme.test");
     });
 
+    /** @scenario "A question costs nothing and is never priced" */
     it("records the questions with no cost attached", async () => {
       const totals = await pulledTotalsFor({
         tenantId: seeded.govProjectId,
@@ -746,18 +777,26 @@ describe("given someone asks a question while a sweep is running", () => {
   });
 
   describe("when the next sweep runs", () => {
-    it("records the question the first sweep raced past", async () => {
+    /** Rows after BOTH sweeps; the second deliberately overlaps the first. */
+    let rowsAfterBothSweeps: Awaited<ReturnType<typeof ocsfRowsFor>>;
+    /** Rows after the first sweep only. */
+    let rowsAfterFirstSweep: Awaited<ReturnType<typeof ocsfRowsFor>>;
+
+    beforeAll(async () => {
       const first = await pullThroughTheRealPipeline({
         sourceId: seeded.sourceId,
         cursor: null,
       });
-      // The injected message was created after the sweep read that space, so
-      // the first run cannot have it.
-      const firstRows = await ocsfRowsFor(seeded.govProjectId);
-      expect(firstRows.map((r) => r.EventId)).not.toContain(
-        `databricks_genie:${seeded.sourceId}:msg-alpha-late`,
-      );
+      rowsAfterFirstSweep = await ocsfRowsFor(seeded.govProjectId);
+      await pullThroughTheRealPipeline({
+        sourceId: seeded.sourceId,
+        cursor: first.nextCursor,
+      });
+      rowsAfterBothSweeps = await ocsfRowsFor(seeded.govProjectId);
+    }, 180_000);
 
+    /** @scenario "Activity during a sweep is caught by the next one" */
+    it("records the question the first sweep raced past", () => {
       // The property that gives this scenario its teeth, asserted rather than
       // assumed: the injected message must be OLDER than the newest message
       // the first sweep saw, or a max-seen watermark would have caught it too
@@ -774,16 +813,27 @@ describe("given someone asks a question while a sweep is running", () => {
       );
       expect(injected.created_timestamp).toBeLessThan(newestSeen);
 
-      await pullThroughTheRealPipeline({
-        sourceId: seeded.sourceId,
-        cursor: first.nextCursor,
-      });
-
-      const rows = await ocsfRowsFor(seeded.govProjectId);
-      expect(rows.map((r) => r.EventId)).toContain(
+      // Created after the sweep read that space, so the first run cannot have
+      // it — and the second must.
+      expect(rowsAfterFirstSweep.map((r) => r.EventId)).not.toContain(
         `databricks_genie:${seeded.sourceId}:msg-alpha-late`,
       );
-    }, 120_000);
+      expect(rowsAfterBothSweeps.map((r) => r.EventId)).toContain(
+        `databricks_genie:${seeded.sourceId}:msg-alpha-late`,
+      );
+    });
+
+    /** @scenario "A re-read message is recorded once" */
+    it("keeps a message read by both sweeps as a single record", () => {
+      // The lag window means the second run deliberately re-reads part of the
+      // first's, so this message arrived twice. It must still be ONE record —
+      // the sinks dedup on the message id, which is what makes an overlapping
+      // window safe to re-read in the first place.
+      const reRead = rowsAfterBothSweeps.filter((r) =>
+        r.EventId.endsWith("msg-beta-1"),
+      );
+      expect(reRead).toHaveLength(1);
+    });
   });
 });
 
@@ -819,6 +869,7 @@ describe("given one space the credential cannot read", () => {
   });
 
   describe("when the sweep hits it", () => {
+    /** @scenario "One unreadable space does not discard the others" */
     it("still records everything the readable spaces held", async () => {
       const rows = await ocsfRowsFor(seeded.govProjectId);
       expect(rows.map((r) => r.EventId).sort()).toEqual(
@@ -831,6 +882,7 @@ describe("given one space the credential cannot read", () => {
       );
     });
 
+    /** @scenario "The watermark never moves past data that was not fetched" */
     it("holds the watermark, so nothing behind the failure is skipped", () => {
       // The sweep was incomplete, so the window must not advance — the next
       // run reads the same history again rather than stepping over whatever
@@ -866,6 +918,7 @@ describe("given a list endpoint whose page token never advances", () => {
   });
 
   describe("when the puller reads it", () => {
+    /** @scenario "Pagination that does not advance is refused" */
     it("refuses rather than re-reading the same page until the budget dies", async () => {
       const outcome = await pullThroughTheRealPipeline({
         sourceId: seeded.sourceId,
@@ -893,6 +946,57 @@ describe("given a list endpoint whose page token never advances", () => {
   });
 });
 
+describe("given messages by an author the directory no longer has", () => {
+  let workspace: FixtureWorkspace;
+  let fixture: Awaited<ReturnType<typeof startFixtureServer>>;
+  let seeded: Awaited<ReturnType<typeof seedSource>>;
+
+  beforeAll(async () => {
+    workspace = createFixtureWorkspace();
+    fixture = await startFixtureServer({ workspace });
+    seeded = await seedSource({
+      slug: `orphan-${ns}`,
+      pullConfig: genieConfig({
+        baseUrl: fixture.baseUrl,
+        spaceIds: ["space-orphan"],
+        startingAt: "2020-01-01T00:00:00.000Z",
+      }),
+    });
+    await pullThroughTheRealPipeline({
+      sourceId: seeded.sourceId,
+      cursor: null,
+    });
+  }, 120_000);
+
+  afterAll(async () => {
+    await fixture.close();
+    await dropTenant(seeded.govProjectId);
+    await cleanupOrg(seeded.organizationId);
+  });
+
+  describe("when the puller resolves them", () => {
+    /** @scenario "An author the directory no longer has is looked up once" */
+    it("asks the directory once, and still records every question", async () => {
+      // A deleted account 404s every time, so a lookup per message would turn
+      // one departed analyst into a lookup per question they ever asked.
+      const lookups =
+        fixture.requestCounts.get(
+          `/api/2.0/preview/scim/v2/Users/${DELETED_USER_ID}`,
+        ) ?? 0;
+      expect(lookups).toBe(1);
+
+      // The questions still land. A missing author must cost the attribution,
+      // never the visibility.
+      const rows = await ocsfRowsFor(seeded.govProjectId);
+      expect(rows).toHaveLength(3);
+      for (const row of rows) {
+        expect(extensionOf(row).question).not.toBe("");
+        expect(row.ActorEmail).toBe("");
+      }
+    });
+  });
+});
+
 describe("given a sweep too large for one run's budget", () => {
   let workspace: FixtureWorkspace;
   let fixture: Awaited<ReturnType<typeof startFixtureServer>>;
@@ -914,6 +1018,7 @@ describe("given a sweep too large for one run's budget", () => {
      * the watermark — lives in the adapter, and the pipeline tiers above
      * already cover the path from an event to a row.
      */
+    /** @scenario "A sweep cut short by its budget resumes where it stopped" */
     it("anchors the watermark to the FIRST run's start, not the last one's", async () => {
       const adapter = new DatabricksGeniePuller();
       const config = adapter.validateConfig({
