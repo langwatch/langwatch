@@ -10,7 +10,7 @@ function createMockPrisma() {
       findFirst: vi.fn(),
       findMany: vi.fn(),
       update: vi.fn(),
-      delete: vi.fn(),
+      deleteMany: vi.fn(),
     },
   } as unknown as Parameters<typeof ScimTokenService.create>[0];
 }
@@ -160,13 +160,10 @@ describe("ScimTokenService", () => {
 
   describe("revoke()", () => {
     describe("when the token belongs to the organization", () => {
-      it("deletes it", async () => {
+      it("deletes it in a single scoped statement", async () => {
         (
-          prisma.scimToken.findFirst as ReturnType<typeof vi.fn>
-        ).mockResolvedValue({ id: "token-1" });
-        (prisma.scimToken.delete as ReturnType<typeof vi.fn>).mockResolvedValue(
-          {},
-        );
+          prisma.scimToken.deleteMany as ReturnType<typeof vi.fn>
+        ).mockResolvedValue({ count: 1 });
 
         const result = await service.revoke({
           organizationId: "org-1",
@@ -174,23 +171,21 @@ describe("ScimTokenService", () => {
         });
 
         expect(result).toEqual({ success: true });
-        expect(prisma.scimToken.delete).toHaveBeenCalledWith({
+        expect(prisma.scimToken.deleteMany).toHaveBeenCalledWith({
           where: { id: "token-1", organizationId: "org-1" },
         });
       });
     });
 
     describe("when the token id is unknown or from another organization", () => {
-      it("answers not found and deletes nothing", async () => {
+      it("answers not found", async () => {
         (
-          prisma.scimToken.findFirst as ReturnType<typeof vi.fn>
-        ).mockResolvedValue(null);
+          prisma.scimToken.deleteMany as ReturnType<typeof vi.fn>
+        ).mockResolvedValue({ count: 0 });
 
         await expect(
           service.revoke({ organizationId: "org-1", tokenId: "foreign" }),
         ).rejects.toMatchObject({ code: "scim_token_not_found" });
-
-        expect(prisma.scimToken.delete).not.toHaveBeenCalled();
       });
     });
   });

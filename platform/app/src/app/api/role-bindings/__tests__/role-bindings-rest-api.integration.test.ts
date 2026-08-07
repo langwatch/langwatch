@@ -56,7 +56,9 @@ describe("Feature: Role bindings REST API", () => {
   let groupId: string;
   let serviceApiKeyId: string;
   let customRoleId: string;
-  let foreignOrgId: string;
+  // Optional so a beforeAll that dies before seeding it cannot hand the
+  // cleanup an undefined filter, which Prisma would treat as unfiltered.
+  let foreignOrgId: string | undefined;
   let foreignTeamId: string;
 
   const authHeaders = () => ({
@@ -189,11 +191,15 @@ describe("Feature: Role bindings REST API", () => {
       ["group", { organizationId: seeded.organization.id }],
       ["project", { team: { organizationId: seeded.organization.id } }],
       ["team", { organizationId: seeded.organization.id }],
-      ["team", { organizationId: foreignOrgId }],
+      ...(foreignOrgId
+        ? ([["team", { organizationId: foreignOrgId }]] as const)
+        : []),
       ["organizationUser", { organizationId: seeded.organization.id }],
       ["user", { email: { endsWith: `-${ns}@example.com` } }],
       ["organization", { id: seeded.organization.id }],
-      ["organization", { id: foreignOrgId }],
+      ...(foreignOrgId
+        ? ([["organization", { id: foreignOrgId }]] as const)
+        : []),
     ]);
     await resetApp();
   });

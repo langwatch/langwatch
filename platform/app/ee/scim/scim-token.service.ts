@@ -107,16 +107,15 @@ export class ScimTokenService {
     organizationId: string;
     tokenId: string;
   }): Promise<{ success: true }> {
-    const token = await this.prisma.scimToken.findFirst({
+    // A single deleteMany keeps revocation atomic: a find-then-delete pair
+    // lets a concurrent or retried revoke land between the two statements
+    // and surface as a raw Prisma P2025 instead of the stable code.
+    const { count } = await this.prisma.scimToken.deleteMany({
       where: { id: tokenId, organizationId },
-      select: { id: true },
     });
-    if (!token) {
+    if (count === 0) {
       throw new ScimTokenNotFoundError(tokenId);
     }
-    await this.prisma.scimToken.delete({
-      where: { id: tokenId, organizationId },
-    });
     return { success: true };
   }
 
