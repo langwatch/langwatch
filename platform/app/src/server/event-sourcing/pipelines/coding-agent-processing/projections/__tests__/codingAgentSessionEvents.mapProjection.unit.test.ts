@@ -270,6 +270,20 @@ describe("CodingAgentSessionEventsMapProjection", () => {
 
     const admittedNames = Object.keys(EVENT_KIND_BY_RAW_NAME);
 
+    /**
+     * One contribution per name per spelling the wire uses: bare, and
+     * namespaced by the agent that emitted it. Both spellings reach the gate
+     * in a real session, so both have to be answered the same way.
+     */
+    const contributionsInBothSpellings = (
+      names: readonly string[],
+    ): LogFactsContributedEvent[] =>
+      names.flatMap((name) =>
+        [name, `claude_code.${name}`].map((spelling) =>
+          logFactsEvent({ "event.name": spelling }),
+        ),
+      );
+
     it("declares the gate on the projection so the router can read it", () => {
       expect(makeProjection().options?.enqueue?.filter).toBe(
         mapsToCodingAgentSessionEvent,
@@ -280,14 +294,11 @@ describe("CodingAgentSessionEventsMapProjection", () => {
     it("admits every wire name the projection maps, in both spellings", () => {
       const projection = makeProjection();
 
-      for (const name of admittedNames) {
-        for (const spelling of [name, `claude_code.${name}`]) {
-          const event = logFactsEvent({ "event.name": spelling });
-          expect(mapsToCodingAgentSessionEvent(event as Event)).toBe(true);
-          expect(
-            projection.mapCodingAgentSessionLogFactsContributed(event),
-          ).not.toBeNull();
-        }
+      for (const event of contributionsInBothSpellings(admittedNames)) {
+        expect(mapsToCodingAgentSessionEvent(event as Event)).toBe(true);
+        expect(
+          projection.mapCodingAgentSessionLogFactsContributed(event),
+        ).not.toBeNull();
       }
     });
 
@@ -302,15 +313,19 @@ describe("CodingAgentSessionEventsMapProjection", () => {
      */
     it("never rejects a contribution the projection would have mapped", () => {
       const projection = makeProjection();
+      const rejected = contributionsInBothSpellings([
+        ...admittedNames,
+        ...DECLINED_WIRE_NAMES,
+      ]).filter((event) => !mapsToCodingAgentSessionEvent(event as Event));
 
-      for (const name of [...admittedNames, ...DECLINED_WIRE_NAMES]) {
-        for (const spelling of [name, `claude_code.${name}`]) {
-          const event = logFactsEvent({ "event.name": spelling });
-          if (mapsToCodingAgentSessionEvent(event as Event)) continue;
-          expect(
-            projection.mapCodingAgentSessionLogFactsContributed(event),
-          ).toBeNull();
-        }
+      // Without this the loop below passes by having nothing to check, which
+      // is the one way this invariant can go quiet without anyone noticing.
+      expect(rejected.length).toBeGreaterThan(0);
+
+      for (const event of rejected) {
+        expect(
+          projection.mapCodingAgentSessionLogFactsContributed(event),
+        ).toBeNull();
       }
     });
 

@@ -40,6 +40,39 @@ async function drainWithinCap(
 }
 
 /**
+ * The size the wire states authoritatively, or null when it states none.
+ *
+ * A chunked upload declares no length at all, and a request carrying both
+ * headers is only honest about the transfer encoding. In either case the size
+ * is knowable only by reading the body.
+ */
+function declaredSize(headers: Headers): number | null {
+  if (!headers.has("content-length") || headers.has("transfer-encoding")) {
+    return null;
+  }
+  return parseInt(headers.get("content-length") ?? "0", 10);
+}
+
+/**
+ * The request a route reads after the body has been drained to measure it.
+ *
+ * Built from the URL rather than from the previous request, for the reason on
+ * `bodyLimit` below: the constructor must never be handed another request
+ * object to interpret.
+ */
+function withBufferedBody(
+  request: Request,
+  body: Uint8Array<ArrayBuffer>,
+): Request {
+  return new Request(request.url, {
+    method: request.method,
+    headers: request.headers,
+    body,
+    signal: request.signal,
+  });
+}
+
+/**
  * Caps the size of a request body, rejecting anything larger with 413.
  *
  * This is the app's own middleware rather than `hono/body-limit` because that
@@ -73,24 +106,17 @@ export const bodyLimit = (options: BodyLimitOptions): MiddlewareHandler => {
     const request = c.req.raw;
     if (!request.body) return next();
 
-    const headers = request.headers;
-
     // A declared length is authoritative and free to read, so an oversized
     // body is rejected before a single byte arrives.
-    if (headers.has("content-length") && !headers.has("transfer-encoding")) {
-      const declared = parseInt(headers.get("content-length") ?? "0", 10);
+    const declared = declaredSize(request.headers);
+    if (declared !== null) {
       return declared > maxSize ? onError(c, next) : next();
     }
 
     const body = await drainWithinCap(request.body, maxSize);
     if (!body) return onError(c, next);
 
-    c.req.raw = new Request(request.url, {
-      method: request.method,
-      headers,
-      body,
-      signal: request.signal,
-    });
+    c.req.raw = withBufferedBody(request, body);
 
     return next();
   };
