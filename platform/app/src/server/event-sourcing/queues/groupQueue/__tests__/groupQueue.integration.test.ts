@@ -16,11 +16,12 @@ import {
   stopTestContainers,
 } from "../../../__tests__/integration/testContainers";
 import { ConfigurationError } from "../../../services/errorHandling";
-import type { EventSourcedQueueDefinition } from "../../queue.types";
-import {
-  GroupQueueProcessor,
-  MAX_BISECTION_SPLITS_PER_DISPATCH,
-} from "../groupQueue";
+import type {
+  EventSourcedQueueDefinition,
+  JobDelivery,
+} from "../../queue.types";
+import { GroupQueueProcessor } from "../groupQueue";
+import { DEFAULT_BISECTION_SPLITS_PER_DISPATCH } from "../scripts";
 
 async function foreignSiblingsRestagedCount(
   queueName: string,
@@ -1136,6 +1137,115 @@ describe.skipIf(!hasTestcontainers)(
         });
       });
 
+      describe("when the split budget is set to zero", () => {
+        it("never splits, restoring the pre-bisection behaviour", async () => {
+          // The kill switch: an operator can disable bisection through the
+          // environment rather than waiting on a deploy.
+          vi.stubEnv("LANGWATCH_GQ_BISECTION_SPLIT_BUDGET", "0");
+          const sizes: number[] = [];
+          const queue = createQueue(async () => {}, {
+            processBatch: async (ps) => {
+              sizes.push(ps.length);
+              throw new Error("retryable");
+            },
+            coalesceMaxBatch: () => 8,
+          });
+          await queue.waitUntilReady();
+
+          const entries = Array.from({ length: 4 }, (_, i) => ({
+            payload: { id: `j${i}`, groupId: "group-a", value: String(i) },
+            stagedJobId: `job-${i}`,
+          }));
+
+          await expect(
+            (
+              queue as unknown as {
+                processBatchBisecting: (args: {
+                  entries: typeof entries;
+                  attempt: number;
+                  routingLabels: Record<string, string>;
+                  span: never;
+                }) => Promise<void>;
+              }
+            ).processBatchBisecting({
+              entries,
+              attempt: 1,
+              routingLabels: {
+                queue_name: "q",
+                pipeline_name: "p",
+                job_type: "t",
+                job_name: "n",
+              },
+              span: { addEvent: () => {}, setAttribute: () => {} } as never,
+            }),
+          ).rejects.toThrow("retryable");
+
+          // One call, the whole batch, no descent.
+          expect(sizes).toEqual([4]);
+          vi.unstubAllEnvs();
+        });
+      });
+
+      describe("when the root of a bisected batch commits and then fails", () => {
+        // Driven through the bisector directly: this is about which delivery
+        // flags the descent emits, and staged dispatch adds timing noise that
+        // has nothing to do with the contract.
+        it("marks the sub-batches as continuations so their commits extend rather than replace", async () => {
+          const deliveries: (JobDelivery | undefined)[] = [];
+          let rootFailed = false;
+
+          const queue = createQueue(async () => {}, {
+            processBatch: async (ps, delivery) => {
+              deliveries.push(delivery);
+              // The post-store window: the handler COMMITS and only then
+              // throws (a reactor failing after the fold stored). The commit
+              // is the part that matters — a later sub-batch that replaces
+              // the applied set erases what this call recorded.
+              if (!rootFailed && ps.length > 1) {
+                rootFailed = true;
+                throw new Error("reactor failed after the fold was stored");
+              }
+            },
+            coalesceMaxBatch: () => 8,
+          });
+          await queue.waitUntilReady();
+
+          const entries = Array.from({ length: 4 }, (_, i) => ({
+            payload: { id: `j${i}`, groupId: "group-a", value: String(i) },
+            stagedJobId: `job-${i}`,
+          }));
+
+          await (
+            queue as unknown as {
+              processBatchBisecting: (args: {
+                entries: typeof entries;
+                attempt: number;
+                routingLabels: Record<string, string>;
+                span: never;
+              }) => Promise<void>;
+            }
+          ).processBatchBisecting({
+            entries,
+            attempt: 1,
+            routingLabels: {
+              queue_name: "q",
+              pipeline_name: "p",
+              job_type: "t",
+              job_name: "n",
+            },
+            span: { addEvent: () => {}, setAttribute: () => {} } as never,
+          });
+
+          // The root is a fresh delivery; every call the split produces after
+          // it must be a continuation, because the root already wrote.
+          expect(deliveries[0]?.isContinuation).toBeUndefined();
+          expect(deliveries.length).toBeGreaterThan(1);
+          expect(
+            deliveries.slice(1).every((d) => d?.isContinuation === true),
+          ).toBe(true);
+        });
+      });
+
       describe("when a batch degrades toward singletons", () => {
         // Driven through the bisector directly rather than via staged dispatch:
         // how large a root the drain assembles varies with staging timing, and
@@ -1189,14 +1299,14 @@ describe.skipIf(!hasTestcontainers)(
           ).rejects.toThrow("only singletons fit");
 
           // Splits are the calls that failed with more than one payload; the
-          // budget caps them at MAX_BISECTION_SPLITS_PER_DISPATCH. Total calls
+          // budget caps them at DEFAULT_BISECTION_SPLITS_PER_DISPATCH. Total calls
           // stay far below the 127-call full walk that completing without a
           // budget would require — and the throw above is the yield itself:
           // the dispatch fails to the normal restage/backoff machinery instead
           // of finishing the walk under the group lock.
           const splits = sizes.filter((n) => n > 1).length;
           expect(splits).toBeLessThanOrEqual(
-            MAX_BISECTION_SPLITS_PER_DISPATCH + 1,
+            DEFAULT_BISECTION_SPLITS_PER_DISPATCH + 1,
           );
           expect(sizes.length).toBeLessThan(80);
           expect(sizes.length).toBeGreaterThan(5);

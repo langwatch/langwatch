@@ -270,11 +270,11 @@ export class FoldProjectionExecutor {
   private appliedIdsForCommit({
     context,
     loadedAppliedIds,
-    freshIds,
+    deliveredIds,
   }: {
     context: ProjectionStoreContext;
     loadedAppliedIds: readonly string[];
-    freshIds: readonly string[];
+    deliveredIds: readonly string[];
   }): string[] {
     // Replace ONLY on the first commit of a fresh delivery — that is the
     // garbage collection that keeps the applied set bounded at one delivery's
@@ -288,8 +288,11 @@ export class FoldProjectionExecutor {
     //   would double-apply the committed prefix (#6578).
     const isRetry = (context.deliveryAttempt ?? 1) > 1;
     return isRetry || context.isDeliveryContinuation
-      ? mergeAppliedEventIds({ previous: loadedAppliedIds, applied: freshIds })
-      : [...freshIds];
+      ? mergeAppliedEventIds({
+          previous: loadedAppliedIds,
+          applied: deliveredIds,
+        })
+      : [...deliveredIds];
   }
 
   /**
@@ -412,7 +415,7 @@ export class FoldProjectionExecutor {
             this.appliedIdsForCommit({
               context,
               loadedAppliedIds: appliedEventIds,
-              freshIds: [event.id],
+              deliveredIds: [event.id],
             }),
           ),
         );
@@ -491,7 +494,7 @@ export class FoldProjectionExecutor {
         this.appliedIdsForCommit({
           context,
           loadedAppliedIds: appliedEventIds,
-          freshIds: [event.id],
+          deliveredIds: [event.id],
         }),
       ),
     );
@@ -586,7 +589,7 @@ export class FoldProjectionExecutor {
             this.appliedIdsForCommit({
               context,
               loadedAppliedIds: appliedEventIds,
-              freshIds: ordered.map((event) => event.id),
+              deliveredIds: ordered.map((event) => event.id),
             }),
           ),
         );
@@ -664,7 +667,12 @@ export class FoldProjectionExecutor {
         this.appliedIdsForCommit({
           context,
           loadedAppliedIds: appliedEventIds,
-          freshIds: fresh.map((event) => event.id),
+          // `ordered`, not `fresh`: an id dropped as already-applied is still
+          // an id the state being committed absorbs, so the set must keep
+          // vouching for it. Recording only the freshly-folded ids EVICTS a
+          // redelivered id that rode along, and whoever sees it next folds it
+          // a second time (#6578).
+          deliveredIds: ordered.map((event) => event.id),
         }),
       ),
     );

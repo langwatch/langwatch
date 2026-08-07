@@ -93,20 +93,11 @@ import {
   type DispatchResult,
   type DrainedJob,
   GroupStagingScripts,
+  readBisectionSplitBudget,
   readClaimStrikeThreshold,
   readGroupQuarantineThreshold,
 } from "./scripts";
 import { type ObjectStore, TransientBlobStoreError } from "./tieredBlobStore";
-
-/**
- * Splits one dispatch may perform before bisection gives up and lets the
- * normal retry/backoff path take over. Sized to cover every useful descent
- * (isolating one poison payload in a 256 batch costs 8 splits; converging to
- * sub-batches of 8 costs 31) while cutting off the pathological
- * singleton-degradation walk (~2N calls) that would otherwise run under the
- * group lock for the whole tree.
- */
-export const MAX_BISECTION_SPLITS_PER_DISPATCH = 32;
 
 /** Mutable state shared across one dispatch's bisection descent. */
 interface BisectionDispatchState {
@@ -324,6 +315,14 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
    */
   private readonly quarantineFailStreakThreshold =
     readGroupQuarantineThreshold();
+
+  /**
+   * Splits allowed per dispatch before bisection yields to retry/backoff. Read
+   * once at construction; 0 disables bisection outright, which restores the
+   * pre-bisection behaviour without a deploy. See
+   * {@link readBisectionSplitBudget}.
+   */
+  private readonly bisectionSplitBudget = readBisectionSplitBudget();
 
   private shutdownRequested = false;
   /** Tracks in-flight jobs for active count metrics. */
@@ -1009,7 +1008,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     const maxBatch = this.coalesceMaxBatch?.(payload) ?? 1;
     let batchPayloads: Payload[] | null = null;
     // Staged-job id per batch member, index-aligned with batchPayloads, so a
-    // bisected failure can name the payload it isNarrowed to.
+    // bisected failure can name the payload it narrowed to.
     let batchJobIds: string[] = [];
     let drainedSiblings: DrainedJob[] = [];
     if (maxBatch > 1 && this.processBatch) {
@@ -1842,7 +1841,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
    * descent — a handler that only accepts singletons turns a full batch into
    * ~2N sequential calls — would hold the group lock and a worker slot for the
    * whole walk instead of yielding to retry/backoff. After
-   * MAX_BISECTION_SPLITS_PER_DISPATCH splits the current failure propagates
+   * the split budget is spent the current failure propagates
    * un-split: committed prefixes stay committed, the failed remainder re-stages
    * through the normal failure path, and backoff takes over.
    */
@@ -1879,13 +1878,27 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       throw new Error("processBatchBisecting called without a batch handler");
     }
 
+    let failure: { err: unknown } | undefined;
     try {
       await this.processBatch(
         entries.map((entry) => entry.payload),
         { attempt, ...(dispatch.hasCommitted ? { isContinuation: true } : {}) },
       );
-      dispatch.hasCommitted = true;
     } catch (err) {
+      failure = { err };
+    }
+
+    // Set on BOTH outcomes, and before the split recurses. The flag means "an
+    // earlier call in this descent MAY have written", which is what a later
+    // commit needs to know — a handler that stored and then threw (a reactor
+    // failing after the fold committed) has written just as surely as one that
+    // returned. Treating that as a fresh delivery lets the next sub-batch's
+    // commit REPLACE the applied set the failed call recorded (#6578). The
+    // flag only ever turns a replace into a merge, so over-setting it is the
+    // safe direction and under-setting it is what double-applies.
+    dispatch.hasCommitted = true;
+
+    if (failure) {
       await this.splitFailedBatch({
         entries,
         attempt,
@@ -1893,7 +1906,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
         span,
         isNarrowed,
         dispatch,
-        err,
+        err: failure.err,
       });
     }
   }
@@ -1950,7 +1963,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     // descents — isolating one poison payload in a 256 batch costs 8 splits,
     // converging to sub-batches of 8 costs 31 — and cuts off only the
     // pathological walk where backoff is the right behaviour anyway.
-    if (dispatch.splits >= MAX_BISECTION_SPLITS_PER_DISPATCH) {
+    if (dispatch.splits >= this.bisectionSplitBudget) {
       this.logger.warn(
         {
           queueName: this.queueName,
@@ -2006,7 +2019,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
   }
 
   /**
-   * Names the payload a bisection isNarrowed to, so the offender is attributable
+   * Names the payload a bisection narrowed to, so the offender is attributable
    * rather than "something in that batch".
    *
    * `entry` is undefined when the failing batch of one was never split — an
@@ -2032,7 +2045,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
         attempt,
         error: err instanceof Error ? err : new Error(String(err)),
       },
-      "Coalesced batch isNarrowed to a single failing payload; this staged job is the offender",
+      "Coalesced batch narrowed to a single failing payload; this staged job is the offender",
     );
     span.setAttribute("queue.batch_offending_job_id", entry.stagedJobId);
   }
