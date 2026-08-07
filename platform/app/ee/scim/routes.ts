@@ -23,6 +23,7 @@ import {
 import { ScimGroupService } from "@ee/scim/scim-group.service";
 import { ScimTokenService } from "@ee/scim/scim-token.service";
 import type { Context } from "hono";
+import { ENTERPRISE_FEATURE_ERRORS } from "~/server/api/enterprise";
 import { createServiceApp, internalSecret } from "~/server/api/security";
 import { prisma } from "~/server/db";
 
@@ -53,19 +54,35 @@ function scimJson(c: Context, data: unknown, status = 200) {
   });
 }
 
-async function requireAuth(c: Context): Promise<string | null> {
+/**
+ * The organization behind the bearer credential, or the SCIM-shaped refusal
+ * to answer with (RFC 7644 error format, since the caller is an identity
+ * provider speaking SCIM, not our own client).
+ *
+ * Entitlement is checked on every call, not only at mint time: a SCIM token
+ * is exercised by directory sync for as long as it lives, so the plan lapsing
+ * must refuse here or the sync quietly outlives the Enterprise plan it was
+ * sold under. An unknown token stays 401 (retry with the right credential);
+ * a real token on a lapsed plan is 403: the credential is fine, the account
+ * is not, and telling the identity provider to retry would be a lie.
+ */
+async function requireAuth(c: Context): Promise<string | Response> {
   const authHeader = c.req.header("authorization");
 
   if (!authHeader?.startsWith("Bearer ")) {
-    return null;
+    return scimError(c, 401, "Bearer token is required");
   }
 
   const token = authHeader.slice(7);
   const tokenService = ScimTokenService.create(prisma);
-  const result = await tokenService.verify({ token });
+  const result = await tokenService.verifyEntitled({ token });
 
-  if (!result) {
-    return null;
+  if (result.status === "invalid_token") {
+    return scimError(c, 401, "Bearer token is required");
+  }
+
+  if (result.status === "plan_not_entitled") {
+    return scimError(c, 403, ENTERPRISE_FEATURE_ERRORS.SCIM);
   }
 
   return result.organizationId;
@@ -269,8 +286,8 @@ secured.access(SCIM_POLICY).get("/Schemas", (c) => {
 
 secured.access(SCIM_POLICY).get("/Users", async (c) => {
   const organizationId = await requireAuth(c);
-  if (!organizationId) {
-    return scimError(c, 401, "Bearer token is required");
+  if (organizationId instanceof Response) {
+    return organizationId;
   }
 
   const scimService = ScimService.create(prisma);
@@ -291,8 +308,8 @@ secured.access(SCIM_POLICY).get("/Users", async (c) => {
 
 secured.access(SCIM_POLICY).post("/Users", async (c) => {
   const organizationId = await requireAuth(c);
-  if (!organizationId) {
-    return scimError(c, 401, "Bearer token is required");
+  if (organizationId instanceof Response) {
+    return organizationId;
   }
 
   const scimService = ScimService.create(prisma);
@@ -321,8 +338,8 @@ secured.access(SCIM_POLICY).post("/Users", async (c) => {
 
 secured.access(SCIM_POLICY).get("/Users/:id", async (c) => {
   const organizationId = await requireAuth(c);
-  if (!organizationId) {
-    return scimError(c, 401, "Bearer token is required");
+  if (organizationId instanceof Response) {
+    return organizationId;
   }
 
   const { id } = c.req.param();
@@ -339,8 +356,8 @@ secured.access(SCIM_POLICY).get("/Users/:id", async (c) => {
 
 secured.access(SCIM_POLICY).put("/Users/:id", async (c) => {
   const organizationId = await requireAuth(c);
-  if (!organizationId) {
-    return scimError(c, 401, "Bearer token is required");
+  if (organizationId instanceof Response) {
+    return organizationId;
   }
 
   const { id } = c.req.param();
@@ -371,8 +388,8 @@ secured.access(SCIM_POLICY).put("/Users/:id", async (c) => {
 
 secured.access(SCIM_POLICY).patch("/Users/:id", async (c) => {
   const organizationId = await requireAuth(c);
-  if (!organizationId) {
-    return scimError(c, 401, "Bearer token is required");
+  if (organizationId instanceof Response) {
+    return organizationId;
   }
 
   const { id } = c.req.param();
@@ -403,8 +420,8 @@ secured.access(SCIM_POLICY).patch("/Users/:id", async (c) => {
 
 secured.access(SCIM_POLICY).delete("/Users/:id", async (c) => {
   const organizationId = await requireAuth(c);
-  if (!organizationId) {
-    return scimError(c, 401, "Bearer token is required");
+  if (organizationId instanceof Response) {
+    return organizationId;
   }
 
   const { id } = c.req.param();
@@ -423,8 +440,8 @@ secured.access(SCIM_POLICY).delete("/Users/:id", async (c) => {
 
 secured.access(SCIM_POLICY).get("/Groups", async (c) => {
   const organizationId = await requireAuth(c);
-  if (!organizationId) {
-    return scimError(c, 401, "Bearer token is required");
+  if (organizationId instanceof Response) {
+    return organizationId;
   }
 
   const service = ScimGroupService.create(prisma);
@@ -447,8 +464,8 @@ secured.access(SCIM_POLICY).get("/Groups", async (c) => {
 
 secured.access(SCIM_POLICY).post("/Groups", async (c) => {
   const organizationId = await requireAuth(c);
-  if (!organizationId) {
-    return scimError(c, 401, "Bearer token is required");
+  if (organizationId instanceof Response) {
+    return organizationId;
   }
 
   const service = ScimGroupService.create(prisma);
@@ -477,8 +494,8 @@ secured.access(SCIM_POLICY).post("/Groups", async (c) => {
 
 secured.access(SCIM_POLICY).get("/Groups/:id", async (c) => {
   const organizationId = await requireAuth(c);
-  if (!organizationId) {
-    return scimError(c, 401, "Bearer token is required");
+  if (organizationId instanceof Response) {
+    return organizationId;
   }
 
   const { id } = c.req.param();
@@ -503,8 +520,8 @@ secured.access(SCIM_POLICY).get("/Groups/:id", async (c) => {
 
 secured.access(SCIM_POLICY).put("/Groups/:id", async (c) => {
   const organizationId = await requireAuth(c);
-  if (!organizationId) {
-    return scimError(c, 401, "Bearer token is required");
+  if (organizationId instanceof Response) {
+    return organizationId;
   }
 
   const { id } = c.req.param();
@@ -534,8 +551,8 @@ secured.access(SCIM_POLICY).put("/Groups/:id", async (c) => {
 
 secured.access(SCIM_POLICY).patch("/Groups/:id", async (c) => {
   const organizationId = await requireAuth(c);
-  if (!organizationId) {
-    return scimError(c, 401, "Bearer token is required");
+  if (organizationId instanceof Response) {
+    return organizationId;
   }
 
   const { id } = c.req.param();
@@ -565,8 +582,8 @@ secured.access(SCIM_POLICY).patch("/Groups/:id", async (c) => {
 
 secured.access(SCIM_POLICY).delete("/Groups/:id", async (c) => {
   const organizationId = await requireAuth(c);
-  if (!organizationId) {
-    return scimError(c, 401, "Bearer token is required");
+  if (organizationId instanceof Response) {
+    return organizationId;
   }
 
   const { id } = c.req.param();

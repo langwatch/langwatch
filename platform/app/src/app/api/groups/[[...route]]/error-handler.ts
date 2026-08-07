@@ -12,8 +12,14 @@ export const handleGroupError = async (
   error: Error & { status?: ContentfulStatusCode },
   c: Context,
 ): Promise<Response> => {
+  // A handled error's status lives on `httpStatus`; without reading it, a
+  // 402 plan refusal would be logged as a 500 while the response says 402.
   const status =
-    error instanceof HttpError ? error.status : (error.status ?? 500);
+    error instanceof HttpError
+      ? error.status
+      : HandledError.isHandled(error)
+        ? (error.httpStatus as ContentfulStatusCode)
+        : (error.status ?? 500);
 
   logger.error(
     {

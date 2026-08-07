@@ -254,6 +254,27 @@ export type OrgAuthVariables = {
 };
 
 /**
+ * A refusal from {@link createOrgAuthMiddleware} in its throwing mode.
+ *
+ * One class for the three auth refusals rather than one each, because the
+ * refusal descriptors in {@link resolveOrgPrincipal} are the single source of
+ * code, message and status for BOTH modes; a per-code subclass would be a
+ * second place for those to drift apart. Callers branch on `error.code`
+ * (`missing_credentials` / `invalid_credentials` / `organization_not_found`),
+ * which is the cross-boundary discriminant anyway (ADR-045).
+ */
+export class OrgAuthRefusedError extends HandledError {
+  constructor(refusal: AuthRefusal) {
+    super(refusal.code, refusal.message, {
+      httpStatus: refusal.status,
+      fault: "customer",
+      ...(refusal.meta ? { meta: refusal.meta } : {}),
+    });
+    this.name = "OrgAuthRefusedError";
+  }
+}
+
+/**
  * Org-level Hono auth middleware for endpoints that operate at the
  * organization level (e.g. project CRUD). Only accepts API key tokens —
  * legacy project keys are rejected since they lack org context.
@@ -267,13 +288,26 @@ export type OrgAuthVariables = {
  * a family that emits the canonical envelope from its handlers must not
  * answer a flat body when the same request fails one layer earlier. Families
  * predating the envelope stay on `legacy` until they migrate deliberately.
+ *
+ * `refusals` picks WHO turns a refusal into a response. The default,
+ * `"respond"`, answers here in the family's `errorEnvelope`, unchanged for
+ * every existing consumer. `"throw"` raises the same refusal as a
+ * `HandledError` instead (`missing_credentials` / `invalid_credentials` /
+ * `organization_not_found`, via {@link OrgAuthRefusedError}) so a family whose
+ * error handler owns the response shape serialises auth refusals exactly like
+ * its domain errors. A database failure during auth is not a refusal and stays
+ * a plain error in throw mode: it rethrows as-is and degrades to the generic
+ * unknown response at the boundary (ADR-045), rather than being dressed up as
+ * handled.
  */
 export function createOrgAuthMiddleware({
   prisma,
   errorEnvelope = "legacy",
+  refusals = "respond",
 }: {
   prisma: PrismaClient;
   errorEnvelope?: ApiErrorEnvelope;
+  refusals?: "respond" | "throw";
 }): MiddlewareHandler {
   const resolver = TokenResolver.create(prisma);
   const orgLogger = createLogger("langwatch:api:org-auth");
@@ -289,6 +323,12 @@ export function createOrgAuthMiddleware({
     });
 
     if (!outcome.ok) {
+      if (refusals === "throw") {
+        // The infra-failure branch carries the original error; rethrow it
+        // plain so it stays an unhandled 500, not a fake handled one.
+        if (outcome.refusal.cause !== undefined) throw outcome.refusal.cause;
+        throw new OrgAuthRefusedError(outcome.refusal);
+      }
       return c.json(refusal(outcome.refusal), outcome.refusal.status as 401);
     }
 
@@ -318,6 +358,14 @@ type AuthRefusal = {
   code: string;
   legacyError: string;
   message: string;
+  meta?: Record<string, unknown>;
+  /**
+   * The underlying failure when the refusal is an infrastructure error rather
+   * than a credential problem. Only the throwing mode reads it: it rethrows
+   * the original error plain instead of minting a handled one. The responding
+   * mode ignores it, so its bodies are unchanged by this field existing.
+   */
+  cause?: unknown;
 };
 
 /**
@@ -369,6 +417,7 @@ async function resolveOrgPrincipal({
         code: "internal_error",
         legacyError: "Internal Server Error",
         message: "Authentication service error",
+        cause: error,
       },
     };
   }

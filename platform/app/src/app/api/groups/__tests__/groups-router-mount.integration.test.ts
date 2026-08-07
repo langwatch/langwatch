@@ -20,9 +20,13 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { ApiKeyService } from "~/server/api-key/api-key.service";
 import { createApiRouter } from "~/server/api-router";
+import { globalForApp, resetApp } from "~/server/app-layer/app";
+import { createTestApp } from "~/server/app-layer/presets";
+import { PlanProviderService } from "~/server/app-layer/subscription/plan-provider";
 import { prisma } from "~/server/db";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { KSUID_RESOURCES } from "~/utils/constants";
+import { FREE_PLAN } from "../../../../../ee/licensing/constants";
 
 describe("Feature: Groups REST API through the composed router", () => {
   const ns = `groups-mount-${nanoid(8)}`;
@@ -32,6 +36,20 @@ describe("Feature: Groups REST API through the composed router", () => {
   let patToken: string;
 
   beforeAll(async () => {
+    // The mount is what is under test; the Enterprise gate on the family
+    // would otherwise answer 402 before the route proves it is reachable, so
+    // the fixture organization is entitled.
+    await resetApp();
+    globalForApp.__langwatch_app = createTestApp({
+      planProvider: PlanProviderService.create({
+        getActivePlan: async () => ({
+          ...FREE_PLAN,
+          type: "ENTERPRISE",
+          free: false,
+        }),
+      }),
+    });
+
     testOrganization = await prisma.organization.create({
       data: { name: "Groups Mount Org", slug: `--test-org-${ns}` },
     });
@@ -86,6 +104,7 @@ describe("Feature: Groups REST API through the composed router", () => {
       ["user", { id: userId }],
       ["organization", { id: testOrganization.id }],
     ]);
+    await resetApp();
   });
 
   /** @scenario The groups API is reachable through the composed router */

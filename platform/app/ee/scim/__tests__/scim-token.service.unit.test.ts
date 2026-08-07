@@ -62,6 +62,79 @@ describe("ScimTokenService", () => {
     });
   });
 
+  describe("verifyEntitled()", () => {
+    const getActivePlan = vi.fn();
+    const planProvider = { getActivePlan };
+    const hashedToken = crypto
+      .createHash("sha256")
+      .update("valid-token")
+      .digest("hex");
+
+    beforeEach(() => {
+      getActivePlan.mockReset();
+      service = ScimTokenService.create(prisma, { planProvider });
+    });
+
+    describe("when the token does not exist", () => {
+      it("reports an invalid token without consulting the plan", async () => {
+        (
+          prisma.scimToken.findFirst as ReturnType<typeof vi.fn>
+        ).mockResolvedValue(null);
+
+        const result = await service.verifyEntitled({ token: "unknown" });
+
+        expect(result).toEqual({ status: "invalid_token" });
+        expect(getActivePlan).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when the token is valid and the organization is on Enterprise", () => {
+      it("returns ok with the organization id", async () => {
+        (
+          prisma.scimToken.findFirst as ReturnType<typeof vi.fn>
+        ).mockResolvedValue({
+          id: "token-1",
+          organizationId: "org-1",
+          hashedToken,
+        });
+        (prisma.scimToken.update as ReturnType<typeof vi.fn>).mockResolvedValue(
+          {},
+        );
+        getActivePlan.mockResolvedValue({ type: "ENTERPRISE" });
+
+        const result = await service.verifyEntitled({ token: "valid-token" });
+
+        expect(result).toEqual({ status: "ok", organizationId: "org-1" });
+        expect(getActivePlan).toHaveBeenCalledWith({
+          organizationId: "org-1",
+        });
+      });
+    });
+
+    describe("when the token is valid but the plan has lapsed", () => {
+      it("reports the plan as not entitled so the token cannot outlive Enterprise", async () => {
+        (
+          prisma.scimToken.findFirst as ReturnType<typeof vi.fn>
+        ).mockResolvedValue({
+          id: "token-1",
+          organizationId: "org-1",
+          hashedToken,
+        });
+        (prisma.scimToken.update as ReturnType<typeof vi.fn>).mockResolvedValue(
+          {},
+        );
+        getActivePlan.mockResolvedValue({ type: "FREE" });
+
+        const result = await service.verifyEntitled({ token: "valid-token" });
+
+        expect(result).toEqual({
+          status: "plan_not_entitled",
+          organizationId: "org-1",
+        });
+      });
+    });
+  });
+
   describe("verify()", () => {
     describe("when the token exists", () => {
       it("returns the organization ID and updates lastUsedAt", async () => {

@@ -9,9 +9,13 @@ import {
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { ApiKeyService } from "~/server/api-key/api-key.service";
+import { globalForApp, resetApp } from "~/server/app-layer/app";
+import { createTestApp } from "~/server/app-layer/presets";
+import { PlanProviderService } from "~/server/app-layer/subscription/plan-provider";
 import { prisma } from "~/server/db";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { KSUID_RESOURCES } from "~/utils/constants";
+import { FREE_PLAN } from "../../../../../ee/licensing/constants";
 import { app } from "../[[...route]]/app";
 
 describe("Feature: Groups REST API", () => {
@@ -50,6 +54,21 @@ describe("Feature: Groups REST API", () => {
   };
 
   beforeAll(async () => {
+    // Groups are Enterprise-gated on every route, and this suite is about the
+    // family's behavior, not the gate, so the fixture organization is
+    // entitled. The gate's own coverage lives in
+    // groups-enterprise-gate.integration.test.ts.
+    await resetApp();
+    globalForApp.__langwatch_app = createTestApp({
+      planProvider: PlanProviderService.create({
+        getActivePlan: async () => ({
+          ...FREE_PLAN,
+          type: "ENTERPRISE",
+          free: false,
+        }),
+      }),
+    });
+
     testOrganization = await prisma.organization.create({
       data: { name: "Groups Test Org", slug: `--test-org-${ns}` },
     });
@@ -138,6 +157,7 @@ describe("Feature: Groups REST API", () => {
         where: { id: testOrganization.id },
       })
       .catch(() => {});
+    await resetApp();
   });
 
   describe("GET /api/groups", () => {

@@ -1,5 +1,7 @@
 import { HandledError, NotFoundError } from "@langwatch/handled-error";
 
+import { remediation } from "../error-remediation";
+
 export class OrganizationNotFoundForTeamError extends NotFoundError {
   declare readonly code: "organization_not_found_for_team";
 
@@ -37,5 +39,92 @@ export class NoAdminConfiguredError extends HandledError {
       fault: "platform",
     });
     this.name = "NoAdminConfiguredError";
+  }
+}
+
+/** The user id is not a member of the caller's organization. */
+export class MemberNotFoundError extends NotFoundError {
+  declare readonly code: "member_not_found";
+
+  constructor(userId: string) {
+    super("member_not_found", "Organization member", userId, {
+      meta: { userId },
+    });
+    this.name = "MemberNotFoundError";
+  }
+}
+
+/**
+ * An admin tried to disable their own membership. Refused so an organization
+ * cannot lock itself out through its last acting administrator; disabling
+ * anyone else remains a normal, reversible operation.
+ */
+export class CannotDisableSelfError extends HandledError {
+  declare readonly code: "cannot_disable_self";
+
+  constructor() {
+    super("cannot_disable_self", "You cannot disable your own membership", {
+      httpStatus: 400,
+    });
+    this.name = "CannotDisableSelfError";
+  }
+}
+
+/** The removal named the caller's own membership. Same guard as disabling. */
+export class CannotRemoveSelfError extends HandledError {
+  declare readonly code: "cannot_remove_self";
+
+  constructor() {
+    super(
+      "cannot_remove_self",
+      "You cannot remove yourself from the organization",
+      { httpStatus: 400 },
+    );
+    this.name = "CannotRemoveSelfError";
+  }
+}
+
+/**
+ * The change needs a member seat the plan does not have left: re-enabling a
+ * disabled member, moving an external member to a full seat, or inviting
+ * beyond the allowance. 403, not 402: the plan exists and the credential is
+ * fine, the allowance is simply used up, and freeing a seat fixes it without
+ * a purchase.
+ */
+export class MemberSeatLimitReachedError extends HandledError {
+  declare readonly code: "member_seat_limit_reached";
+
+  constructor(options: { meta?: Record<string, unknown> } = {}) {
+    super(
+      "member_seat_limit_reached",
+      "The plan's member seats are all in use",
+      {
+        httpStatus: 403,
+        ...(options.meta ? { meta: options.meta } : {}),
+      },
+    );
+    this.name = "MemberSeatLimitReachedError";
+  }
+}
+
+/**
+ * The requested organization slug is already claimed on this instance.
+ * Deterministic 409 on the natural key, so provisioning tools can branch on
+ * it (retry with another slug, or adopt the existing organization).
+ */
+export class OrganizationSlugTakenError extends HandledError {
+  declare readonly code: "organization_slug_taken";
+
+  constructor(slug: string) {
+    super(
+      "organization_slug_taken",
+      "An organization with this slug already exists",
+      {
+        httpStatus: 409,
+        meta: { slug },
+        ...remediation("organization_slug_taken"),
+      },
+    );
+    this.name = "OrganizationSlugTakenError";
   }
 }

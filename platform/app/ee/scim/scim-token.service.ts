@@ -1,16 +1,46 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import type { PrismaClient } from "@prisma/client";
 import crypto from "crypto";
+import { isEnterpriseTier } from "~/server/api/enterprise";
+import { getApp } from "~/server/app-layer/app";
+import type { PlanProvider } from "~/server/app-layer/subscription/plan-provider";
+
+/**
+ * The three answers a bearer credential can get from {@link ScimTokenService.verifyEntitled}:
+ * the token is unknown, the token is real but the organization's plan no
+ * longer includes SCIM, or both checks passed. Discriminated so the SCIM
+ * boundary can answer 401 and 403 differently: an identity provider retrying
+ * a 401 forever is a different incident from one that must be told the plan
+ * lapsed.
+ */
+export type ScimTokenEntitlement =
+  | { status: "invalid_token" }
+  | { status: "plan_not_entitled"; organizationId: string }
+  | { status: "ok"; organizationId: string };
 
 /**
  * Manages SCIM bearer tokens: generation, hashing, and verification.
  * Each token is scoped to a single organization.
+ *
+ * `planProvider` is injectable for tests; it defaults lazily to the app's own
+ * (the InviteService pattern), so production callers keep constructing with
+ * just Prisma.
  */
 export class ScimTokenService {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(
+    private readonly prisma: PrismaClient,
+    private readonly deps: { planProvider?: PlanProvider } = {},
+  ) {}
 
-  static create(prisma: PrismaClient): ScimTokenService {
-    return new ScimTokenService(prisma);
+  static create(
+    prisma: PrismaClient,
+    deps: { planProvider?: PlanProvider } = {},
+  ): ScimTokenService {
+    return new ScimTokenService(prisma, deps);
+  }
+
+  private get planProvider(): PlanProvider {
+    return this.deps.planProvider ?? getApp().planProvider;
   }
 
   /**
@@ -63,6 +93,40 @@ export class ScimTokenService {
     });
 
     return { organizationId: scimToken.organizationId };
+  }
+
+  /**
+   * {@link verify}, plus the entitlement the token was minted under.
+   *
+   * A SCIM token is checked on every directory-sync call, so this is the
+   * point where a lapsed plan takes effect: without it, an organization that
+   * leaves Enterprise keeps a working sync for as long as the token lives,
+   * quietly outliving the entitlement it was sold under. The SCIM boundary
+   * calls this instead of `verify` and turns `plan_not_entitled` into a
+   * SCIM-shaped 403.
+   */
+  async verifyEntitled({
+    token,
+  }: {
+    token: string;
+  }): Promise<ScimTokenEntitlement> {
+    const verified = await this.verify({ token });
+    if (!verified) {
+      return { status: "invalid_token" };
+    }
+
+    const plan = await this.planProvider.getActivePlan({
+      organizationId: verified.organizationId,
+    });
+
+    if (!isEnterpriseTier(plan.type)) {
+      return {
+        status: "plan_not_entitled",
+        organizationId: verified.organizationId,
+      };
+    }
+
+    return { status: "ok", organizationId: verified.organizationId };
   }
 
   private hashToken(token: string): string {

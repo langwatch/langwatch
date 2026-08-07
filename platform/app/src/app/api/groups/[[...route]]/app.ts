@@ -19,6 +19,7 @@ import {
 } from "~/server/app-layer/groups/group.service";
 import { RoleNotAssignableError } from "~/server/role/errors";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
+import { requireEnterprisePlanRest } from "../../middleware/enterprise-gate";
 import type { GroupServiceMiddlewareVariables } from "../../middleware/group-service";
 import { groupServiceMiddleware } from "../../middleware/group-service";
 import {
@@ -71,12 +72,22 @@ const secured = createOrgApp<GroupServiceMiddlewareVariables>({
 
 secured.hono.onError(handleGroupError);
 
+/**
+ * Groups are an Enterprise capability, so every route carries this gate.
+ * Per-route and after the `.access(...)` chain on purpose: the gate reads the
+ * organization that org auth resolved onto the context, so an app-level
+ * `.use` would run before authentication and find nothing, and the RBAC
+ * denial should fire before the plan denial anyway.
+ */
+const enterpriseGate = requireEnterprisePlanRest("GROUPS");
+
 // ── List groups ──────────────────────────────────────────────────────────────
 
 secured
   .access(requires("organization:manage"))
   .get(
     "/",
+    enterpriseGate,
     groupServiceMiddleware,
     describeRoute({ description: "List all groups for the organization" }),
     zValidator("query", paginationQuerySchema),
@@ -120,6 +131,7 @@ secured
   .access(requires("organization:manage"))
   .post(
     "/",
+    enterpriseGate,
     groupServiceMiddleware,
     describeRoute({ description: "Create a new group" }),
     zValidator("json", createGroupSchema),
@@ -164,6 +176,7 @@ secured
   .access(requires("organization:manage"))
   .get(
     "/:id",
+    enterpriseGate,
     groupServiceMiddleware,
     describeRoute({ description: "Get a group with members and bindings" }),
     async (c) => {
@@ -206,6 +219,7 @@ secured
   .access(requires("organization:manage"))
   .patch(
     "/:id",
+    enterpriseGate,
     groupServiceMiddleware,
     describeRoute({ description: "Rename a group" }),
     zValidator("json", updateGroupSchema),
@@ -244,6 +258,7 @@ secured
   .access(requires("organization:manage"))
   .delete(
     "/:id",
+    enterpriseGate,
     groupServiceMiddleware,
     describeRoute({ description: "Delete a group" }),
     async (c) => {
@@ -270,6 +285,7 @@ secured
   .access(requires("organization:manage"))
   .get(
     "/:id/members",
+    enterpriseGate,
     groupServiceMiddleware,
     describeRoute({ description: "List members of a group" }),
     async (c) => {
@@ -298,6 +314,7 @@ secured
   .access(requires("organization:manage"))
   .post(
     "/:id/members",
+    enterpriseGate,
     groupServiceMiddleware,
     describeRoute({ description: "Add a member to a group" }),
     zValidator("json", addMemberSchema),
@@ -335,6 +352,7 @@ secured
   .access(requires("organization:manage"))
   .delete(
     "/:id/members/:userId",
+    enterpriseGate,
     groupServiceMiddleware,
     describeRoute({ description: "Remove a member from a group" }),
     async (c) => {
@@ -368,6 +386,7 @@ secured
   .access(requires("organization:manage"))
   .get(
     "/:id/bindings",
+    enterpriseGate,
     groupServiceMiddleware,
     describeRoute({ description: "List role bindings for a group" }),
     async (c) => {
@@ -399,6 +418,7 @@ secured
   .access(requires("organization:manage"))
   .post(
     "/:id/bindings",
+    enterpriseGate,
     groupServiceMiddleware,
     describeRoute({ description: "Add a role binding to a group" }),
     zValidator("json", addBindingSchema),
@@ -448,6 +468,7 @@ secured
   .access(requires("organization:manage"))
   .delete(
     "/:id/bindings/:bindingId",
+    enterpriseGate,
     groupServiceMiddleware,
     describeRoute({ description: "Remove a role binding from a group" }),
     async (c) => {
