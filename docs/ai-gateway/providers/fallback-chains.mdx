@@ -77,7 +77,7 @@ Fallback attribution today:
 
 - Prometheus counter `gateway_provider_attempts_total{credential_id, outcome}` increments once per attempt, with `outcome` in `success | fallback_success | retryable_5xx | not_found | rate_limit | timeout | network | circuit_open | non_retryable | chain_exhausted | context_done`.
 - Response header `X-LangWatch-Fallback-Count: N`, how many fallbacks were attempted before success.
-- Request-id correlation via `X-LangWatch-Request-Id`, join the metric + log line back to the specific trace.
+- Request-id correlation via `X-LangWatch-Gateway-Request-Id`, join the metric + log line back to the specific trace.
 
 <Info>Per-attempt nested spans (`langwatch.fallback.attempt`, `.reason` attrs) are a v1.1 observability follow-up. In v1, the counter + header give you the aggregate picture; per-attempt reasoning lives in the gateway log line for that request-id.</Info>
 

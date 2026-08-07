@@ -15,17 +15,17 @@ If no feature file exists for your task, create one before writing code.
 
 **For frontend work, read the UX docs first.** Before any non-trivial frontend change (anything beyond a specific, targeted tweak the user spelled out), read the relevant pattern docs under `dev/docs/best_practices/` so you extend existing patterns instead of reinventing them. The UI ones: `react.md`, `drawers.md`, `row-actions-overflow-menu.md`, `selection-action-bar.md`, `scope-selector-and-badges.md`. If the surface you are building has no doc yet, write one as part of the change.
 
-**Error paths are part of the feature, not an afterthought.** Any code that can fail — a route, a service method, a mutation, a form submit — ships its failure modes deliberately: read `dev/docs/best_practices/error-handling.md` and [ADR-045](dev/docs/adr/045-domain-errors-handled-boundary.md). The rule in one line: throw a `HandledError` **only** when we know the cause *and* the caller can act on it; everything else stays a plain `Error` and correctly degrades to a generic "unknown" plus a trace id. When you add a feature, name its expected failures in the spec alongside the golden path, and give each one a stable `code`, customer-safe `message`, correct `fault`, remediation copy, and an entry in the client presentation registry (`langwatch/src/features/errors/logic/presentation.ts`) — that registry, keyed by `code`, is where the words a customer actually reads live. "Unknown error" reaching a user for a failure we could have named is a bug in the feature, not a gap in the error system. **A failure scenario in a spec enforces nothing until it is tagged and bound.** `check-feature-parity.ts` only counts scenarios carrying `@unit`, `@integration`, `@e2e` or `@regression` (and skips `@unimplemented`), so an untagged `.feature` file reports `0/0 scenarios bound` / `✓ all bound` and reads green while binding nothing at all. Every scenario you write for an error path needs a binding tag **and** a `@scenario "<title>"` annotation on the test that covers it, or it is vacuously bound.
+**Error paths are part of the feature, not an afterthought.** Any code that can fail — a route, a service method, a mutation, a form submit — ships its failure modes deliberately: read `dev/docs/best_practices/error-handling.md` and [ADR-045](dev/docs/adr/045-domain-errors-handled-boundary.md). The rule in one line: throw a `HandledError` **only** when we know the cause *and* the caller can act on it; everything else stays a plain `Error` and correctly degrades to a generic "unknown" plus a trace id. When you add a feature, name its expected failures in the spec alongside the golden path, and give each one a stable `code`, customer-safe `message`, correct `fault`, remediation copy, and an entry in the client presentation registry (`platform/app/src/features/errors/logic/presentation.ts`) — that registry, keyed by `code`, is where the words a customer actually reads live. "Unknown error" reaching a user for a failure we could have named is a bug in the feature, not a gap in the error system. **A failure scenario in a spec enforces nothing until it is tagged and bound.** `check-feature-parity.ts` only counts scenarios carrying `@unit`, `@integration`, `@e2e` or `@regression` (and skips `@unimplemented`), so an untagged `.feature` file reports `0/0 scenarios bound` / `✓ all bound` and reads green while binding nothing at all. Every scenario you write for an error path needs a binding tag **and** a `@scenario "<title>"` annotation on the test that covers it, or it is vacuously bound.
 
 ## Development Environment
 
-`make quickstart` is the single entry point. It asks what you're working on and starts only the services you need, overriding only the URLs whose services are local. Your `langwatch/.env` is the source of truth for everything else.
+`make quickstart` is the single entry point. It asks what you're working on and starts only the services you need, overriding only the URLs whose services are local. Your `platform/app/.env` is the source of truth for everything else.
 
 ### Running with no container runtime
 
 Nothing in the day-to-day loop needs Docker or colima. If you run ClickHouse,
 Postgres and Redis natively (brew, or a LaunchAgent), point `.env` at them and
-set these three, and `pnpm dev:haven` brings up the whole application stack,
+set these three, and `make haven up` brings up the whole application stack,
 everything except the observability container, with no container runtime
 installed at all:
 
@@ -35,7 +35,7 @@ LANGWATCH_HAVEN_OBS=0         # skip the LGTM telemetry stack
 LANGY_UNSAFE_HOST_ACCESS=1    # run the langyagent worker on the host, not in colima
 ```
 
-haven resolves its own knobs from `langwatch/.env` (then `.env.portless`) as
+haven resolves its own knobs from `platform/app/.env` (then `.env.portless`) as
 well as the shell, so these travel with the worktree; an exported variable still
 wins for a single run. Postgres and Redis stay haven-managed either way: it
 starts them through brew, not a container.
@@ -55,7 +55,7 @@ the sandboxed/container langy tiers. Both are opt-in.
 
 ### Local dev by hostname — thuishaven / portless (recommended)
 
-Stop juggling ports. Opt in with `pnpm dev:haven` and traffic routes through
+Stop juggling ports. Opt in with `make haven up` and traffic routes through
 **`haven`** (the Go orchestrator in `tools/thuishaven`, binary `cmd/haven`), which
 gives every worktree's services a
 stable hostname via the [portless](https://github.com/vercel-labs/portless) proxy —
@@ -67,10 +67,10 @@ so there is no `/etc/hosts`, DNS, or sudo for name resolution, and two worktrees
 can never collide.
 
 Hostname routing is **opt-in** — `pnpm dev` uses the plain `PORT`+offset scheme;
-`pnpm dev:haven` (or `make haven up`) routes through haven.
+`make haven up` (or `make haven up`) routes through haven.
 
 ```bash
-pnpm dev:haven          # == make haven up (bootstraps portless itself on first run)
+make haven up          # == make haven up (bootstraps portless itself on first run)
 make haven install      # optional: go install so plain `haven ...` works everywhere
 make haven status       # every stack, service health, shared servers — one shot
 haven up +langy         # add a service to this worktree's stack, sticky
@@ -80,7 +80,7 @@ haven logs nlp -t       # tail one service's logs from any terminal
 Open `https://langwatch.localhost` for the cross-worktree dashboard;
 `observability.langwatch.localhost` proxies the local Grafana LGTM stack;
 `telemetry.langwatch.localhost` fans OTLP out to every running stack. haven's
-resolved config lands in `langwatch/.env.portless` (loaded last with
+resolved config lands in `platform/app/.env.portless` (loaded last with
 `override: true` so it beats `.env`). Agent-driving haven? Add `--agent` (or
 `HAVEN_AGENT=1`) for plain, token-free output; `haven status --json` is
 machine-readable. See `tools/thuishaven/README.md`.
@@ -100,7 +100,7 @@ make service svc=aigateway             # Start the Go AI Gateway data plane on :
 make help                              # Full target list including boxd workflows
 ```
 
-The preset-picker writes `langwatch/.env.dev-up` listing only the URLs to override; everything else comes from your `langwatch/.env`. **Credentials never go in the overlay** — only non-rotating infrastructure shape (bucket / endpoint / region / connection-host). For `dev-storage`, refresh AWS SSO credentials in `.env` first via `bash langwatch/scripts/refresh-dev-s3-env.sh` (the launcher hard-fails without S3_SESSION_TOKEN).
+The preset-picker writes `platform/app/.env.dev-up` listing only the URLs to override; everything else comes from your `platform/app/.env`. **Credentials never go in the overlay** — only non-rotating infrastructure shape (bucket / endpoint / region / connection-host). For `dev-storage`, refresh AWS SSO credentials in `.env` first via `bash platform/app/scripts/refresh-dev-s3-env.sh` (the launcher hard-fails without S3_SESSION_TOKEN).
 
 The legacy `make dev` / `make dev-nlp` / `make dev-scenarios` / `make dev-test` / `make dev-full` aliases were removed in #4053. Use the preset names directly. `make dev-up` / `make dev-down` / `make dev-logs` still exist for per-worktree isolated stacks (the `dev-up.sh` use case — separate from `quickstart`).
 
@@ -110,13 +110,22 @@ For per-PR / per-issue cloud environments via boxd, see `dev/docs/boxd-makefile.
 
 See `dev/docs/adr/004-docker-dev-environment.md` for architecture decisions.
 
-**Running the app outside Docker (the default for TS work):** just run `pnpm dev` from `langwatch/` (or `PORT=5570 pnpm dev` for a second instance). You never need to hunt processes by hand. If the ports are already held, `check-ports.sh` refuses to start and prints two ready-to-paste options: a free-port-slot command (`PORT=5570 pnpm dev`), and a one-liner that kills only the node processes holding those exact ports by process group (Docker and everything else are left alone). Paste whichever fits. Do not reinvent process-tree walking, `pkill -f`, or pgid hunting; the script already does it correctly and port-scoped.
+**Running the app outside Docker (the default for TS work):** just run `pnpm dev` from the repo root (or `PORT=5570 pnpm dev` for a second instance). You never need to hunt processes by hand. If the ports are already held, `check-ports.sh` refuses to start and prints two ready-to-paste options: a free-port-slot command (`PORT=5570 pnpm dev`), and a one-liner that kills only the node processes holding those exact ports by process group (Docker and everything else are left alone). Paste whichever fits. Do not reinvent process-tree walking, `pkill -f`, or pgid hunting; the script already does it correctly and port-scoped.
 
-**Two processes vs one (workers).** By default `pnpm dev` runs the app and the background workers as two Node processes (a separate `workers` lane under `concurrently`), matching prod's separate app/worker deployments. To run them as a **single process** locally, use `pnpm dev:single` (or `WORKERS_IN_PROCESS=1 pnpm dev`): the app boots with the `"all"` process role and hosts the worker stack in-process via `startWorkers()`, saving the RAM of a second Node process. **Under haven the default is a single process:** `pnpm dev:haven` hosts the workers in the app child (no separate `workers` lane) to save the RAM of a second Node process — the sensible default when a laptop juggles several worktrees. Workers keep their `langwatch:workers` logger name, so their lines stay identifiable without a lane of their own. Opt into a standalone `workers` lane with `haven up +workers` (sticky, per worktree; `pnpm dev:workers:haven` wraps it). This is dev-only — `NODE_ENV=production` ignores the flag. See `dev/docs/adr/004-docker-dev-environment.md` (Amendment: In-process workers) and `specs/setup/in-process-workers-dev.feature`. Whether a role runs the worker stack is `roleRunsWorkers(role)` (`src/server/app-layer/config.ts`) — use it, never compare `processRole === "worker"` directly.
+**One process by default (workers).** `pnpm dev` runs the app and the background workers as a **single** Node process: it sets `WORKERS_IN_PROCESS=1`, the app boots with the `"all"` process role, and it hosts the worker stack in-process via `startWorkers()`. Workers keep their `langwatch:workers` logger name, so their lines stay identifiable without a lane of their own. The dev surface is four scripts and no flags to remember, all runnable from the repo root:
+
+| Script | What runs |
+|---|---|
+| `pnpm dev` | app + workers in one process (the default) |
+| `pnpm dev:app` | app only, no workers |
+| `pnpm dev:worker` | workers only |
+| `pnpm dev:concurrent` | app + workers as two processes, the way prod deploys them |
+
+haven already defaulted to a single process, so plain `pnpm dev` disagreeing with it was the surprise rather than the safeguard; opt into a standalone `workers` lane under haven with `haven up +workers` (sticky, per worktree). This is dev-only — `NODE_ENV=production` ignores the flag and prod runs web and worker as separate deployments. See `dev/docs/adr/004-docker-dev-environment.md` (Amendment: In-process workers) and `specs/setup/in-process-workers-dev.feature`. Whether a role runs the worker stack is `roleRunsWorkers(role)` (`src/server/app-layer/config.ts`) — use it, never compare `processRole === "worker"` directly.
 
 ### AI Gateway (Go, services/aigateway/)
 
-The gateway is a separate Go service (not in `compose.dev.yml`) that terminates
+The gateway is a separate Go service (not in `dev/compose.dev.yml`) that terminates
 virtual-key traffic, fans out to providers via Bifrost, and reports usage back to
 the control plane. `pnpm dev` auto-starts it alongside vite + api when the Go
 toolchain is on PATH; the process appears as `gateway` in the concurrent output
@@ -131,9 +140,9 @@ make service svc=aigateway       # run once
 make service-watch svc=aigateway # live reload via air
 ```
 
-Requires `langwatch/.env` with `LW_GATEWAY_INTERNAL_SECRET`,
+Requires `platform/app/.env` with `LW_GATEWAY_INTERNAL_SECRET`,
 `LW_GATEWAY_JWT_SECRET`, and `LW_GATEWAY_BASE_URL` set — see the
-"AI GATEWAY" block at the bottom of `langwatch/.env.example`. Generate
+"AI GATEWAY" block at the bottom of `platform/app/.env.example`. Generate
 secrets with `openssl rand -hex 32`. The Go gateway and the TS
 control-plane both source the same `.env`, so each secret lives in
 exactly one place (no prefix duplication). Set
@@ -167,18 +176,35 @@ pnpm test:integration # Integration tests
 pnpm test:e2e         # E2E tests
 ```
 
-When debugging locally, **prefer the observability stack over the log file if it is up** (haven starts it by default; `make haven status` confirms). Query the real logs/traces/metrics by attribute with `gcx` — Grafana's CLI, wired by `make observability-connect` — instead of grepping the giant `langwatch/server.log`: indexed attribute search finds the failure far faster, and with the stack up the console is muted to warn+ anyway so the detail only lives in Grafana. Filter to your own worktree with the `langwatch_worktree` structured-metadata field (a pipe filter, not a stream label), e.g. `gcx logs query '{service_name="langwatch-app"} | langwatch_worktree="<slug>"' --since 15m` and `gcx traces query '{ resource.service.name = "langwatch-service-langyagent" }' --since 15m`. See `dev/docs/best_practices/local-observability.md` ("Reading the data as an agent"). `pnpm dev` still tees to `langwatch/server.log`; grep it as the fallback when the stack is down.
+**Whole-repo checks take a machine-wide slot.** A tsgo run peaks around 3 to 4
+GiB and uses every core; a biome run over 6,800 files spends 38 CPU-seconds in 4
+seconds of wall clock. That is fine once and ruinous four times over, so
+`typecheck`, `typecheck:tests`, `typecheck:legacy`, `lint`, `lint:fix`,
+`lint:plugins` and `format` all go through `dev/scripts/check-queue.mjs`. It
+counts the runs live across every worktree, terminal and agent on the machine
+against **one** counter (they compete for the same cores), and a run past the
+limit waits its turn instead of piling on. With a slot free it prints nothing
+and is otherwise transparent (same stdio, same exit code). Queued, it says so on
+stderr, which is what tells you a slow run was waiting rather than hung.
+`CHECK_SLOTS=N` overrides the limit and `CHECK_SLOTS=0` turns the queue off;
+unset, the limit comes from the machine (one per 6 GiB of RAM, capped at one per
+4 cores) and CI does not queue at all. `node dev/scripts/check-queue.mjs
+--explain` shows the limit and who currently holds a slot. Don't cap the tools'
+own threads instead (`RAYON_NUM_THREADS` does work on biome): it spends the same
+CPU over 5x the wall clock. See `specs/setup/check-slots.feature`.
+
+When debugging locally, **prefer the observability stack over the log file if it is up** (haven starts it by default; `make haven status` confirms). Query the real logs/traces/metrics by attribute with `gcx` — Grafana's CLI, wired by `make observability-connect` — instead of grepping the giant `platform/app/server.log`: indexed attribute search finds the failure far faster, and with the stack up the console is muted to warn+ anyway so the detail only lives in Grafana. Filter to your own worktree with the `langwatch_worktree` structured-metadata field (a pipe filter, not a stream label), e.g. `gcx logs query '{service_name="langwatch-app"} | langwatch_worktree="<slug>"' --since 15m` and `gcx traces query '{ resource.service.name = "langwatch-service-langyagent" }' --since 15m`. See `dev/docs/best_practices/local-observability.md` ("Reading the data as an agent"). `pnpm dev` still tees to `platform/app/server.log`; grep it as the fallback when the stack is down.
 
 ## Structure
 
 ```
-langwatch/           # Next.js app (main product)
+platform/app/        # Vite app (main product)
 langwatch_server/    # Python server
 services/nlpgo/      # Go NLP engine (:5561, built as langwatch/langwatch_nlp)
 services/aigateway/  # Go AI Gateway data plane (:5563)
-charts/gateway/      # Helm sub-chart for the gateway
-python-sdk/          # Python SDK
-typescript-sdk/      # TypeScript SDK
+charts/gateway/ # Helm sub-chart for the gateway
+sdks/python/         # Python SDK
+sdks/typescript/     # TypeScript SDK
 specs/               # BDD feature specs
 ```
 
@@ -209,7 +235,7 @@ specs/               # BDD feature specs
 | Shared types in `types.ts` | Colocate unless truly shared |
 | Duplicating Zod + TS types | When you need both validation AND types, use Zod only with `infer`. For internal constants (no external input), `as const` is sufficient |
 | Skipping test run after edits | Always run tests after any code change to catch regressions immediately |
-| Running `npx vitest` / `npm exec vitest` directly | Always go through the package scripts: `pnpm test:unit run <path>`, `pnpm test:integration run <path>`. Only they carry the repo's RAM guardrails (`pool: "vmThreads"`, `maxWorkers: "50%"`, `vmMemoryLimit: "512MB"`; integration adds `pool: "forks"` + `fileParallelism: false`) |
+| Running `npx vitest` / `npm exec vitest` directly | Always go through the package scripts: `pnpm test:unit run <path>`, `pnpm test:integration run <path>`. Only they carry the repo's RAM guardrails (`pool: "vmForks"` + `isolate: false`, `maxWorkers: "50%"`, `vmMemoryLimit: "512MB"`; integration adds `pool: "forks"` + `fileParallelism: false`) |
 | Hand-rolling a throwaway `vitest.*.config.ts` (in `/tmp` or a worktree) | Never. A bare config inherits none of the guardrails above, so vitest defaults to the `forks` pool at `availableParallelism - 1` workers (10 on an 11-core laptop) at ~200-500MB each — several GB per run, multiplied by every parallel agent worktree. Use an existing config |
 | Writing a jsdom config because the repo "has no jsdom environment" | It is per-file on purpose — neither config declares a global `environment`; 515 test files set `// @vitest-environment jsdom` in a docblock. Add the docblock to your test file |
 | Reaching for `--maxWorkers=1` to be gentle on RAM | It serializes the run so it stays resident far longer, overlapping every other agent's run. Scope the run down instead — pass a narrower path |
@@ -241,12 +267,16 @@ specs/               # BDD feature specs
 | Asserting on error message prose in tests | Assert on `code` — the message is copy and will change. Use `code` equality rather than `instanceof` anywhere the error may have crossed a process, worker, or serialisation boundary |
 | Hono routes calling repositories directly | Routes must go through a service layer — never instantiate or import from repositories. Business logic (validation, guards) belongs in the service, not the route |
 | Using `list` or `get` for repository methods | Repositories use `findAll`/`findById`. Services use `getAll`/`getById`. Routes call services only |
-| Setting up a Monitor / sleep that *can* take more than 5 minutes | Anthropic's prompt cache TTL is 5min, so any wait that crosses it forces an uncached re-read of the full conversation on wake-up (slower + double-pays for tokens). Cap each poll cycle at **4.5 min (270s)** — re-check, then re-arm. If the work is obviously hours away (long deploy, overnight run), don't sit on a Monitor at all — drop it and hand control back to the user |
-| Using inline `import("...")` anywhere | Never use inline `import()` — always use top-level `import` / `import type` statements. **One exception: the CLI startup path** (`typescript-sdk/src/cli/**` and `typescript-sdk/tsup.config.ts`), where lazy `import()` is load-bearing — it is what keeps commander, chalk, zod, js-yaml, the command modules and the command catalog off the boot graph and the cold start at ~30ms. There, defer at the seam (command actions, format branches) and keep the boot graph pinned by `src/cli/__tests__/index-boot.unit.test.ts`. Everywhere else the ban stands |
+| Setting up a Monitor / sleep that *can* cross the prompt-cache TTL | A wait that crosses the TTL forces an uncached re-read of the full conversation on wake-up (slower + double-pays for tokens). **The TTL depends on where you are running: main sessions get 1h, subagents get 5min.** In a main session cap each poll cycle at ~15 min; inside a subagent cap it at **4.5 min (270s)** — re-check, then re-arm either way. If the work is obviously hours away (long deploy, overnight run), don't sit on a Monitor at all — drop it and hand control back to the user |
+| Using inline `import("...")` anywhere | Never use inline `import()` — always use top-level `import` / `import type` statements. **One exception: the CLI startup path** (`sdks/typescript/src/cli/**` and `sdks/typescript/tsup.config.ts`), where lazy `import()` is load-bearing — it is what keeps commander, chalk, zod, js-yaml, the command modules and the command catalog off the boot graph and the cold start at ~30ms. There, defer at the seam (command actions, format branches) and keep the boot graph pinned by `src/cli/__tests__/index-boot.unit.test.ts`. Everywhere else the ban stands |
 | Running `pnpm typecheck` and assuming the TypeScript is checked | `tsconfig.tsgo.json` excludes `**/*.test.ts`, `**/*.test.tsx` and `**/__tests__/**`, so `pnpm typecheck` never looks at a test file. CI runs `pnpm typecheck` **and** `pnpm typecheck:tests` as separate steps in the same job. Use `pnpm typecheck:all`, which is both, or a change confined to a test file will typecheck clean locally and fail CI |
 | Assuming `go build`, `go test` and `gofmt` are enough before pushing Go | Run `golangci-lint run ./services/aigateway/... ./services/nlpgo/... ./pkg/... ./cmd/... ./tools/migrationorder/...`, which is exactly what `go-ci / lint` runs. It catches a class the other three never will, most often `misspell` (it enforces US spelling, so `behaviour`, `unrecognised`, `labelled` and `funnelled` all fail even though the repo's prose uses British forms), `nolintlint` (a `//nolint` for a code already in the global `gosec.excludes` is flagged as unused) and `testifylint`. The pinned version is in `.golangci.yml`; `golangci-lint run --fix` handles misspell and nolintlint automatically |
 | Rewriting `assert.Equal(t, 1.0, ...)` to `assert.InEpsilon` because testifylint's `float-compare` says so | Check whether the expectation can be zero first. `InEpsilon` divides by the expected value, so it returns false even for `InEpsilon(0.0, 0.0)`, and a counter assertion meaning "this did not move" becomes one that always fails. For Prometheus counters, which are exact integers in a float64, `assert.Equal` is correct and `float-compare` is a false positive; `.golangci.yml` scopes an exclusion to `adapters/gatewaymetrics/*_test.go` rather than contorting the assertions |
-| Running only the root `pnpm install` in a fresh clone or worktree | Install twice: once at the repo root, then again inside `langwatch/`. The root `pnpm-workspace.yaml` lists only `packages/*` and deliberately leaves `langwatch/` out, because it is its own workspace and treating it as a peer would double-install React and Next. Skip the second install and `pnpm start:prepare:files` fails with `ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command "prisma" not found`, which reads like a broken toolchain but is just a missing `langwatch/node_modules` |
+| Installing from inside `langwatch/`, `typescript-sdk/`, `mcp-server/` or `skills/` | One `pnpm install` at the **repo root** covers every JavaScript project — the repo is a single pnpm workspace with one lockfile (ADR-076). Installing from a subdirectory resolves the whole workspace anyway, because pnpm walks up to the root. To install just one project, filter from the root: `pnpm install --filter "@langwatch/web..."` (the trailing `...` includes its workspace dependencies) |
+| Adding a security `override` to a single project's `package.json` | pnpm honours `overrides` only at the workspace root, so put it in the root `pnpm-workspace.yaml`. A `pnpm` block in a member package.json is silently ignored — it looks active and does nothing. This is why the pins used to drift when the repo had six install roots |
+| Referring to the app as the `langwatch` package | The app is `@langwatch/web` (in `langwatch/`). `langwatch` is the published TypeScript SDK, in `typescript-sdk/`. They collided until ADR-076; `pnpm --filter langwatch` now unambiguously means the SDK |
+| `cd langwatch` before every command | The repo root proxies the common ones, so `pnpm dev`, `pnpm test:unit`, `pnpm typecheck`, `pnpm lint`, `pnpm prisma:migrate` and friends work from wherever you are. `cd` only when you want a script the root does not proxy — `pnpm --filter @langwatch/web <script>` reaches any of them |
+| Importing a component into server code to reuse a constant it happens to export | **Enforced:** no *value*-import chain from server code may reach a browser-only package (React, Chakra, Ark, Emotion, react-router, lucide-react, browser OTel) — `src/server/__tests__/frontend-boundary.unit.test.ts` walks the real graph transitively and fails the build. One such import pulled 2,020 modules / 212 MB RSS into every backend process. `src/server/mailer/**` is the one exception, since react-email renders templates server-side. **Convention on top (not enforced):** don't value-import a `**/components/**` file at all, even a framework-free one — it invites exactly that chain later. A few such imports predate the guard (`server/datasets/upload-utils.ts`, `server/app-layer/langy/streaming/langyTurnRelay.ts`, `server/scenarios/execution/data-prefetcher.ts`); don't add more. Move the shared value into a framework-free module both sides import (`import type` is always fine — types are erased) |
 
 ## TypeScript
 
@@ -272,4 +302,4 @@ specs/               # BDD feature specs
 | Not filtering on the partition key column in WHERE | Always include `StartedAt`/`OccurredAt`/`StartTime` range in WHERE when a date range is available — this enables partition pruning. Without it, ClickHouse scans ALL partitions including cold storage on S3, turning 100ms queries into 1-2s |
 | Writing down migrations in ClickHouse migration files | Always comment out down migrations to prevent accidental data loss. Add a note: "To roll back, uncomment and run manually" |
 | Putting multiple ALTER TABLE statements in one StatementBegin block | ClickHouse does not support multi-statement queries. Each ALTER TABLE needs its own `-- +goose StatementBegin` / `-- +goose StatementEnd` block |
-| Getting "Cannot find module" errors for generated files (.prisma/client, types.generated, evaluators.generated) | Run `pnpm start:prepare:files` in the `langwatch/` directory to regenerate all generated types (Prisma, Zod, SDK versions, langevals). This is needed after fresh clones, worktree creation, or any schema changes |
+| Getting "Cannot find module" errors for generated files (.prisma/client, types.generated, evaluators.generated) | Run `pnpm start:prepare:files` in the `langwatch/` directory to regenerate all generated types (Prisma, Zod, SDK versions, langevals) — run it in the `platform/app/` directory. This is needed after fresh clones, worktree creation, or any schema changes |

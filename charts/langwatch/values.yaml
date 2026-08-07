@@ -119,21 +119,21 @@ images:
   ## @param images.app.pullPolicy [string] App image pull policy.
   app:
     repository: langwatch/langwatch
-    tag: 3.8.0 # x-release-please-version
+    tag: 3.10.0 # x-release-please-version
     pullPolicy: IfNotPresent
   ## @param images.langwatch_nlp.repository [string] NLP image repository (Go nlpgo binary, published as langwatch_nlp).
   ## @param images.langwatch_nlp.tag [string] NLP image tag.
   ## @param images.langwatch_nlp.pullPolicy [string] NLP image pull policy.
   langwatch_nlp:
     repository: langwatch/langwatch_nlp
-    tag: 3.8.0 # x-release-please-version
+    tag: 3.10.0 # x-release-please-version
     pullPolicy: IfNotPresent
   ## @param images.langevals.repository [string] Langevals image repository.
   ## @param images.langevals.tag [string] Langevals image tag.
   ## @param images.langevals.pullPolicy [string] Langevals image pull policy.
   langevals:
     repository: langwatch/langevals
-    tag: 3.8.0 # x-release-please-version
+    tag: 3.10.0 # x-release-please-version
     pullPolicy: IfNotPresent
 
 # =============================================================================
@@ -222,6 +222,16 @@ app:
     # simulation runners call back to. Empty = self-reference over localhost so
     # chart-default installs boot past the post-#3541 required-env validation.
     langwatchEndpoint: ""
+
+  # Base URL for content-hashed frontend assets (JS/CSS chunks). Empty (default)
+  # serves them same-origin straight from the pod, exactly as before. Set to a
+  # commit-prefixed CDN base — e.g. "https://cdn.langwatch.ai/git-<short-sha>/" — so
+  # a rolling deploy never strands a browser on a 404: every past build's assets
+  # remain under their own immutable prefix. The deploy pipeline both uploads
+  # dist/client/assets to that prefix and sets this value for the same SHA. See
+  # ADR-086. Rendered into the LANGWATCH_ASSET_BASE env var when non-empty.
+  ## @param app.assetBase [string, default: ""] CDN base URL for content-hashed assets; empty = serve same-origin from the pod.
+  assetBase: ""
 
   # Feature flags to enable/disable specific functionality
   ## @extra app.features Feature flags for the app.
@@ -376,17 +386,22 @@ app:
       storageClassName: ""
 
   # Email notification configuration
-  # Enables sending alerts and notifications via email
+  # Naming a provider is what turns email on, so there is one switch rather
+  # than a toggle and a name that can disagree with each other.
   ## @extra app.email Email provider configuration.
-  ## @param app.email.enabled [default: false] Enable email notifications.
   ## @param app.email.defaultFrom [string] Default "from" address.
-  ## @param app.email.provider [string, default: sendgrid] Email provider.
+  ## @param app.email.provider [string] Email provider. Empty sends no email.
   email:
-    enabled: false
     defaultFrom: ""
-    # Email provider to use. Options: sendgrid (default)
-    # When set to 'sendgrid', enables SendGrid integration
-    provider: sendgrid
+    # Gateway to send through: sendgrid, ses, smtp or resend. Leave empty and
+    # LangWatch sends no email at all.
+    # Use 'smtp' for an internal relay, Azure Communication Services, Office 365,
+    # Postmark, Mailgun or any other gateway that speaks SMTP.
+    # Deployments whose only egress is a corporate proxy can set HTTPS_PROXY and
+    # NO_PROXY through app.extraEnvs; every gateway that calls a vendor API over
+    # HTTPS routes through it. Only smtp ignores them, on purpose, because an
+    # internal relay is reached directly.
+    provider: ""
 
     providers:
       ## @extra app.email.providers.sendgrid Sendgrid provider configuration.
@@ -397,6 +412,70 @@ app:
           ## @param app.email.providers.sendgrid.apiKey.secretKeyRef [object] Secret ref for SendGrid API key.
           secretKeyRef: { name: "", key: "" }
 
+      ## @extra app.email.providers.ses AWS SES provider configuration.
+      ## @param app.email.providers.ses.region [string] AWS region for SES.
+      ## @param app.email.providers.ses.endpoint [string] Override the SES endpoint (VPC endpoint or egress relay).
+      ses:
+        region: ""
+        endpoint: ""
+
+      ## @extra app.email.providers.smtp SMTP relay configuration.
+      ## @param app.email.providers.smtp.url.value [string] Full SMTP connection URL. Takes precedence over the discrete settings.
+      ## @param app.email.providers.smtp.host [string] SMTP host, when not using a URL.
+      ## @param app.email.providers.smtp.port [string] SMTP port. Defaults to 587.
+      ## @param app.email.providers.smtp.secure [string] Force implicit TLS ("true") or STARTTLS ("false"). Defaults to true on port 465.
+      ## @param app.email.providers.smtp.user [string] Username. Omit for an unauthenticated internal relay.
+      smtp:
+        url:
+          value: ""
+          ## @param app.email.providers.smtp.url.secretKeyRef [object] Secret ref for the SMTP URL.
+          secretKeyRef: { name: "", key: "" }
+        host: ""
+        port: ""
+        secure: ""
+        user: ""
+        ## @param app.email.providers.smtp.password.value [string] SMTP password.
+        password:
+          value: ""
+          ## @param app.email.providers.smtp.password.secretKeyRef [object] Secret ref for the SMTP password.
+          secretKeyRef: { name: "", key: "" }
+
+      ## @extra app.email.providers.resend Resend provider configuration.
+      ## @param app.email.providers.resend.apiKey.value [string] Resend API key.
+      resend:
+        apiKey:
+          value: ""
+          ## @param app.email.providers.resend.apiKey.secretKeyRef [object] Secret ref for the Resend API key.
+          secretKeyRef: { name: "", key: "" }
+
+  # Enterprise license, applied to the whole instance.
+  #
+  # Leave empty to run the open source edition: unlimited people, projects,
+  # teams and history, with no license needed. A license adds the enterprise
+  # security surface (SSO, SCIM provisioning, audit logs) and support.
+  # See https://docs.langwatch.ai/self-hosting/licensing
+  #
+  # The alternative to setting it here is activating the same key per
+  # organization in Settings > License, which suits a single-tenant install
+  # but has to be repeated for every organization the instance hosts.
+  ## @extra app.license Enterprise license configuration.
+  ## @param app.license.key.value [string] License key issued by LangWatch.
+  ## @param app.license.key.secretKeyRef [object] Secret ref holding the license key.
+  ## @param app.license.publicKey.value [string] Verification key, only for a private signing chain.
+  ## @param app.license.publicKey.secretKeyRef [object] Secret ref holding the verification key.
+  license:
+    key:
+      value: ""
+      secretKeyRef: { name: "", key: "" }
+    # Overrides the built-in verification key. Almost no deployment sets this:
+    # it exists for installs that LangWatch issues licenses to from a separate
+    # signing chain. Replacing this key does not grant an Enterprise License,
+    # and a key that verifies only against a replaced value is not one; see
+    # platform/app/ee/LICENSE.md.
+    publicKey:
+      value: ""
+      secretKeyRef: { name: "", key: "" }
+
   # NextAuth.js authentication configuration
   # Handles user authentication and session management
   # Note: publicUrl is automatically used from http.publicUrl
@@ -404,14 +483,16 @@ app:
   ## @param app.nextAuth.provider [string, default: email] Default auth provider.
   ## @param app.nextAuth.secret.value [string] NextAuth secret value (not recommended inline for production).
   nextAuth:
-    # Authentication provider to use. Options: email (default), google, github, gitlab, azureAd, cognito, okta
-    # When set to 'email', enables email-based authentication
-    # When set to 'google', enables Google OAuth integration
-    # When set to 'github', enables GitHub OAuth integration
-    # When set to 'gitlab', enables GitLab OAuth integration
-    # When set to 'azureAd', enables Azure Active Directory OAuth integration
-    # When set to 'cognito', enables AWS Cognito OAuth integration
-    # When set to 'okta', enables Okta OAuth integration
+    # Authentication provider to use. This value is passed to the app verbatim
+    # as NEXTAUTH_PROVIDER, so it has to be one the app recognises:
+    #   email (default), google, github, gitlab, azure-ad, auth0, okta,
+    #   cognito, onelogin, oidc
+    # Note that Azure AD is 'azure-ad' here while its credentials live under
+    # providers.azureAd below — the first is the app's provider id, the second
+    # is this chart's key for the AZURE_AD_* variables.
+    # A value the app does not recognise, or one whose credentials are missing,
+    # starts the deployment in email mode rather than leaving it unsignable.
+    # Every provider except email needs an Enterprise license to take effect.
     provider: email
     secret:
       value: ""
@@ -423,9 +504,6 @@ app:
     providers:
       # Auth0 OAuth integration
       ## @extra app.nextAuth.providers.auth0 Auth0 OAuth configuration.
-      ## @param app.nextAuth.providers.auth0.clientId.value [string] Auth0 client ID.
-      ## @param app.nextAuth.providers.auth0.clientSecret.value [string] Auth0 client secret.
-      ## @param app.nextAuth.providers.auth0.issuer.value [string] Auth0 issuer URL.
       auth0:
         clientId:
           ## @param app.nextAuth.providers.auth0.clientId.value [string] Auth0 client ID.
@@ -474,6 +552,9 @@ app:
           ## @param app.nextAuth.providers.cognito.clientSecret.secretKeyRef [object] Secret ref for Cognito client secret.
           secretKeyRef: { name: "", key: "" }
         issuer:
+          # The user pool's issuer, https://cognito-idp.<region>.amazonaws.com/<userPoolId>,
+          # not the hosted-UI domain. The hosted-UI endpoints are read from the
+          # issuer's discovery document.
           ## @param app.nextAuth.providers.cognito.issuer.value [string] Cognito issuer URL.
           value: ""
           ## @param app.nextAuth.providers.cognito.issuer.secretKeyRef [object] Secret ref for Cognito issuer URL.
@@ -534,6 +615,44 @@ app:
           ## @param app.nextAuth.providers.okta.issuer.value [string] Okta issuer URL.
           value: ""
           ## @param app.nextAuth.providers.okta.issuer.secretKeyRef [object] Secret ref for Okta issuer URL.
+          secretKeyRef: { name: "", key: "" }
+      # OneLogin OAuth integration
+      ## @extra app.nextAuth.providers.onelogin OneLogin OAuth configuration.
+      onelogin:
+        clientId:
+          ## @param app.nextAuth.providers.onelogin.clientId.value [string] OneLogin client ID.
+          value: ""
+          ## @param app.nextAuth.providers.onelogin.clientId.secretKeyRef [object] Secret ref for OneLogin client ID.
+          secretKeyRef: { name: "", key: "" }
+        clientSecret:
+          ## @param app.nextAuth.providers.onelogin.clientSecret.value [string] OneLogin client secret.
+          value: ""
+          ## @param app.nextAuth.providers.onelogin.clientSecret.secretKeyRef [object] Secret ref for OneLogin client secret.
+          secretKeyRef: { name: "", key: "" }
+        issuer:
+          # https://<subdomain>.onelogin.com/oidc/2
+          ## @param app.nextAuth.providers.onelogin.issuer.value [string] OneLogin issuer URL.
+          value: ""
+          ## @param app.nextAuth.providers.onelogin.issuer.secretKeyRef [object] Secret ref for OneLogin issuer URL.
+          secretKeyRef: { name: "", key: "" }
+      # Any other OpenID Connect provider, configured by issuer alone
+      ## @extra app.nextAuth.providers.oidc Generic OpenID Connect configuration.
+      oidc:
+        clientId:
+          ## @param app.nextAuth.providers.oidc.clientId.value [string] OIDC client ID.
+          value: ""
+          ## @param app.nextAuth.providers.oidc.clientId.secretKeyRef [object] Secret ref for OIDC client ID.
+          secretKeyRef: { name: "", key: "" }
+        clientSecret:
+          ## @param app.nextAuth.providers.oidc.clientSecret.value [string] OIDC client secret.
+          value: ""
+          ## @param app.nextAuth.providers.oidc.clientSecret.secretKeyRef [object] Secret ref for OIDC client secret.
+          secretKeyRef: { name: "", key: "" }
+        issuer:
+          # Whatever your provider publishes .well-known/openid-configuration under.
+          ## @param app.nextAuth.providers.oidc.issuer.value [string] OIDC issuer URL.
+          value: ""
+          ## @param app.nextAuth.providers.oidc.issuer.secretKeyRef [object] Secret ref for OIDC issuer URL.
           secretKeyRef: { name: "", key: "" }
 
   # Telemetry and monitoring configuration
@@ -976,6 +1095,13 @@ langevals:
 
   # Resource requirements for evaluation tasks
   # Higher memory requirements due to model loading and evaluation
+  #
+  # The CPU limit here also sizes the service's worker pool, via the CPU_COUNT
+  # the chart derives from it: each worker loads its own copy of every local
+  # model it serves (~2.1Gi), so memory scales with the pool. Raise the CPU and
+  # the memory together, or pin the pool with a CPU_COUNT of your own in
+  # extraEnvs. See langwatch.langevals.cpuCount in templates/_helpers.tpl.
+  #
   # See: https://kubespec.dev/v1/Pod#spec.containers.resources
   ## @extra langevals.resources Resource requests and limits.
   ## @param langevals.resources.requests.cpu [string, default: 1000m] Requested CPU.

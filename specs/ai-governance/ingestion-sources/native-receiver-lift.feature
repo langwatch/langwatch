@@ -8,7 +8,7 @@ Feature: Native receiver-side lift via canonicalisation extractor pipeline
   (GenAI / Mastra / Vercel / Traceloop / Logfire / Strands / Haystack).
 
   Architecture decision: each platform tool is a class under
-  `langwatch/src/server/app-layer/traces/canonicalisation/extractors/`
+  `platform/app/src/server/app-layer/traces/canonicalisation/extractors/`
   that implements the `applyLog(LogExtractorContext)` method on the
   `CanonicalAttributesExtractor` interface. The trace-processing log
   fold projection runs the registry via

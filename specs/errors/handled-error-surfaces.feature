@@ -195,3 +195,45 @@ Feature: Knowable failures reach the customer as themselves
     When a per-member budget is requested
     Then the refusal is attributed to the platform
     And the copy does not name the storage engine
+
+  # ---------------------------------------------------------------------------
+  # Member and team governance refusals
+  #
+  # Each of these was raised as a bare ValidationError: a real sentence in the
+  # `message`, and nothing in `meta`. Since the wire message became the code
+  # slug, the presentation registry had only `validation_error` to go on, which
+  # reads its copy off `meta.fieldErrors` / `meta.formErrors` and so fell all
+  # the way through to "Some of the values aren't valid." The server knew which
+  # team and which admin; the customer was told to check their input.
+  #
+  # A refusal about who administers a team names the team, because "this team"
+  # is not a thing the reader can act on when they are looking at a member who
+  # belongs to several.
+  # ---------------------------------------------------------------------------
+
+  @unit
+  Scenario: Refusing to leave a team without an admin names the team
+    Given a member is the only admin of a shared team
+    When a change would leave that team with no admin
+    Then the refusal carries the last-team-admin code
+    And the copy names the team and says to promote another admin first
+
+  @unit
+  Scenario: Being the last admin oneself is a different sentence
+    Given an admin is the only admin of their own team
+    When they try to demote themselves there
+    Then the copy tells them somebody else has to hold the role first
+    And it does not read as though a colleague could fix it for them
+
+  @unit
+  Scenario: A Lite Member seat that only allows Viewer says so as itself
+    Given a member on a Lite Member seat
+    When a team role other than Viewer is requested for them
+    Then the refusal carries the lite-member-viewer-only code
+    And the copy explains that the seat decides the team role
+
+  @unit
+  Scenario: None of these refusals reach the customer as check-your-input
+    Given the member and team governance refusals
+    When each is presented
+    Then none of them falls through to the generic validation copy

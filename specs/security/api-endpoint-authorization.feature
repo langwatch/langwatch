@@ -58,6 +58,22 @@ Feature: Hono API endpoint authorization and tenant isolation
       Then the route registry records the real permission, not "any authenticated"
 
     @unit
+    Scenario: A canonical family refuses unauthenticated calls canonically
+      Given a project-scoped app declaring the canonical error envelope
+      When a request arrives with no credentials
+      Then the response status is 401
+      And the body is the canonical error envelope with code "missing_credentials"
+      # Authentication runs beneath the family's own error handler, so this is
+      # the layer that answers a flat body unless the envelope is threaded to it.
+
+    @unit
+    Scenario: A legacy family keeps the flat error body its consumers parse
+      Given a project-scoped app that declares no envelope
+      When a request arrives with no credentials
+      Then the response status is 401
+      And the body is the flat legacy error shape
+
+    @unit
     Scenario: An any-method route enforces its policy on every method
       Given a route registered with .all and an internalSecret policy
       When the route is called with GET, POST, or DELETE
@@ -240,8 +256,10 @@ Feature: Hono API endpoint authorization and tenant isolation
     spends the project's model budget. It now has its own permission family:
     view to read conversations, create to start or continue a turn, update to
     rename, delete to archive. Manage is org-tier as well, where it gates the
-    GitHub App connection that grants Langy repository access for every project
-    underneath.
+    Langy surfaces an admin configures. The organization's GitHub connection is
+    not one of them any more: it belongs to the organization rather than to
+    Langy, so organization management gates it
+    (specs/integrations/github-connection.feature).
 
     Granted from MEMBER upward and to org admins; below that, nothing. The
     permission grain is not what keeps Langy scarce — the rollout flag is — so
@@ -260,11 +278,11 @@ Feature: Hono API endpoint authorization and tenant isolation
       But they may not administer Langy
 
     @unit
-    Scenario: Connecting the organization's GitHub App is admin-only
+    Scenario: Changing the organization's GitHub connection is admin-only
       Given an organization member who is not an admin
-      When they try to read or change the organization's Langy GitHub connection
+      When they try to change the organization's GitHub connection
       Then the request is refused
-      And the Langy rollout flag is never evaluated for that organization
+      And no repository name is read for that organization
 
     @unit
     Scenario: The demo project refuses Langy on every surface

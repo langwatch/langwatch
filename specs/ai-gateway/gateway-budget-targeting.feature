@@ -163,3 +163,43 @@ Feature: Gateway budget targeting
     Then its budget no longer applies to anything
     And no leftover budget keeps charging against the removed team
     # Cleanup runs in the service layer rather than via a database cascade.
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # The MANUAL window and period resets
+  # ────────────────────────────────────────────────────────────────────────────
+
+  @unit
+  Scenario: A MANUAL window never resets on its own
+    Given a budget on the MANUAL window
+    When its next reset instant is computed
+    Then it is the never-resets sentinel
+    And the automatic reset check always answers no
+    # The period is owned by the customer's billing cycle: the boundary
+    # moves only when they say so.
+
+  @unit
+  Scenario: The period floor follows the stored boundary, not the calendar
+    Given a MANUAL budget and a calendar budget reset mid-period
+    When each budget's spend-read floor is computed
+    Then the MANUAL budget always reads from its stored boundary
+    And the reset calendar budget reads from its boundary until the next calendar edge passes
+    And an unreset lifetime budget keeps its whole-bucket read
+    # The rollup fast path answers calendar periods only; a moved boundary
+    # reads the raw ledger bounded by time.
+
+  @integration
+  Scenario: Resetting a budget moves the boundary and never the ledger
+    Given a budget with recorded spend this period
+    When the budget is reset
+    Then its current-period spend reads as zero
+    And every ledger row that existed before the reset still exists
+    # Recorded spend is immutable; reconciliation and billing events are
+    # unaffected by resets, unlike counter-zeroing designs.
+
+  @integration
+  Scenario: Resetting one end-user bucket leaves the template period alone
+    Given an attributed-user template with spend from two end users
+    When one end user's bucket is reset
+    Then that user's current-period spend reads as zero
+    And the other user's spend is unchanged
+    And the template's own boundary did not move

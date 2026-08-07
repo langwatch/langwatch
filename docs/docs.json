@@ -249,6 +249,7 @@
             "group": "Help",
             "pages": [
               "pricing",
+              "pricing/billable-events",
               "support",
               "status"
             ]
@@ -566,12 +567,22 @@
             ]
           },
           {
+            "group": "Billing & Metering",
+            "pages": [
+              "ai-gateway/billing-events",
+              "features/webhooks",
+              "ai-gateway/cookbooks/metering-and-rebilling",
+              "ai-gateway/demo-agent-platform"
+            ]
+          },
+          {
             "group": "Governance",
             "pages": [
               "ai-gateway/governance/overview",
               "ai-gateway/governance/personal-keys",
               "ai-gateway/governance/admin-setup",
-              "ai-gateway/governance/routing-policies"
+              "ai-gateway/governance/routing-policies",
+              "ai-gateway/governance/retention"
             ]
           },
           {
@@ -686,7 +697,8 @@
             "pages": [
               "ai-governance/workspaces",
               "ai-governance/members-and-invites",
-              "ai-governance/roles-and-permissions"
+              "ai-governance/roles-and-permissions",
+              "ai-governance/audit-log"
             ]
           },
           {
@@ -801,6 +813,7 @@
             "group": "Overview",
             "pages": [
               "self-hosting/overview",
+              "self-hosting/licensing",
               "hybrid-setup/overview",
               "self-hosting/troubleshooting"
             ]
@@ -812,18 +825,10 @@
               "self-hosting/configuration/sizing-and-scaling",
               "self-hosting/configuration/backups",
               "self-hosting/configuration/sso",
+              "self-hosting/configuration/email",
               "self-hosting/configuration/observability",
-              "self-hosting/configuration/third-party-integrations"
-            ]
-          },
-          {
-            "group": "Langy",
-            "pages": [
-              "self-hosting/langy/overview",
-              "self-hosting/langy/setup",
-              "self-hosting/langy/github-app",
-              "self-hosting/langy/environment-variables",
-              "self-hosting/langy/networking-and-egress"
+              "self-hosting/configuration/third-party-integrations",
+              "self-hosting/webhooks"
             ]
           },
           {
@@ -862,6 +867,16 @@
               "self-hosting/ops/dejaview",
               "self-hosting/ops/foundry"
             ]
+          },
+          {
+            "group": "Langy",
+            "pages": [
+              "self-hosting/langy/overview",
+              "self-hosting/langy/setup",
+              "self-hosting/langy/github-app",
+              "self-hosting/langy/environment-variables",
+              "self-hosting/langy/networking-and-egress"
+            ]
           }
         ]
       },
@@ -874,9 +889,9 @@
             "pages": [
               "api-reference/traces/overview",
               "api-reference/traces/search",
-              "api-reference/traces/projection-dsl",
               "api-reference/traces/get-trace",
-              "api-reference/traces/update-metadata",
+              "api-reference/traces/get-transcript",
+              "api-reference/traces/update-trace-metadata",
               "api-reference/traces/create-public-trace-path",
               "api-reference/traces/delete-public-trace-path"
             ]
@@ -887,16 +902,22 @@
               "api-reference/datasets/overview",
               "api-reference/datasets/list-dataset",
               "api-reference/datasets/create-dataset",
+              "api-reference/datasets/create-direct-upload",
+              "api-reference/datasets/evaluate-a-dataset",
               "api-reference/datasets/create-upload",
               "api-reference/datasets/get-dataset",
               "api-reference/datasets/get-records",
               "api-reference/datasets/update-dataset",
               "api-reference/datasets/update-records",
+              "api-reference/datasets/update-staging",
               "api-reference/datasets/post-dataset-entries",
               "api-reference/datasets/action-records",
               "api-reference/datasets/action-upload",
+              "api-reference/datasets/action-finalize",
+              "api-reference/datasets/action-retry",
               "api-reference/datasets/delete-dataset",
-              "api-reference/datasets/delete-records"
+              "api-reference/datasets/delete-records",
+              "api-reference/datasets/delete-direct-upload"
             ]
           },
           {
@@ -940,14 +961,7 @@
               {
                 "group": "RAG Quality",
                 "pages": [
-                  "api-reference/evaluators/ragas-answer-correctness",
-                  "api-reference/evaluators/ragas-answer-relevancy",
-                  "api-reference/evaluators/ragas-context-precision",
-                  "api-reference/evaluators/ragas-context-recall",
-                  "api-reference/evaluators/ragas-context-relevancy",
-                  "api-reference/evaluators/ragas-context-utilization",
                   "api-reference/evaluators/ragas-faithfulness",
-                  "api-reference/evaluators/ragas-faithfulness-1",
                   "api-reference/evaluators/ragas-response-context-precision",
                   "api-reference/evaluators/ragas-response-context-recall",
                   "api-reference/evaluators/ragas-response-relevancy",
@@ -981,11 +995,27 @@
             ]
           },
           {
-            "group": "Evaluations v3",
+            "group": "Evaluations",
             "pages": [
               "api-reference/evaluations/overview",
-              "api-reference/evaluations/get-runs",
-              "api-reference/evaluations/action-run"
+              "api-reference/evaluations/list-the-built-in-evaluators",
+              "api-reference/evaluations/run-an-evaluator",
+              "api-reference/evaluations/run-a-namespaced-evaluator",
+              "api-reference/evaluations/run-an-evaluator-as-a-guardrail",
+              "api-reference/evaluations/report-batch-evaluation-results"
+            ]
+          },
+          {
+            "group": "Experiments",
+            "pages": [
+              "api-reference/experiments/overview",
+              "api-reference/experiments/create-an-experiment",
+              "api-reference/experiments/list-experiments-for-the-project",
+              "api-reference/experiments/run-an-experiment",
+              "api-reference/experiments/list-runs-of-an-experiment",
+              "api-reference/experiments/poll-a-run",
+              "api-reference/experiments/read-run-results",
+              "api-reference/experiments/report-dspy-optimizer-steps"
             ]
           },
           {
@@ -1047,6 +1077,7 @@
             "pages": [
               "api-reference/scenario-events/overview",
               "api-reference/scenario-events/create-scenario-events",
+              "api-reference/scenario-events/create-browser-tab",
               "api-reference/scenario-events/delete-scenario-events"
             ]
           },
@@ -1084,14 +1115,31 @@
             ]
           },
           {
+            "group": "Coding Agents",
+            "pages": [
+              "api-reference/coding-agents/overview",
+              "api-reference/coding-agents/get-pull-request-coding-agent-usage",
+              "api-reference/coding-agents/list-coding-agent-session-events"
+            ]
+          },
+          {
             "group": "Triggers",
             "pages": [
               "api-reference/triggers/overview",
               "api-reference/triggers/list-triggers",
+              "api-reference/triggers/create-a-slack-alert-trigger",
               "api-reference/triggers/create-triggers",
               "api-reference/triggers/get-triggers",
               "api-reference/triggers/update-triggers",
               "api-reference/triggers/delete-triggers"
+            ]
+          },
+          {
+            "group": "Events",
+            "pages": [
+              "api-reference/events/overview",
+              "api-reference/events/create-track",
+              "api-reference/events/track-an-event-legacy-path"
             ]
           },
           {
@@ -1101,6 +1149,10 @@
               "api-reference/workflows/list-workflows",
               "api-reference/workflows/get-workflows",
               "api-reference/workflows/update-workflows",
+              "api-reference/workflows/run-a-workflow-version-legacy-path",
+              "api-reference/workflows/action-evaluate",
+              "api-reference/workflows/run-a-specific-workflow-version",
+              "api-reference/workflows/run-a-workflow",
               "api-reference/workflows/delete-workflows"
             ]
           },
@@ -1131,6 +1183,7 @@
             "group": "Analytics",
             "pages": [
               "api-reference/analytics/overview",
+              "api-reference/analytics/query-analytics-timeseries-legacy-path",
               "api-reference/analytics/create-timeseries"
             ]
           },
@@ -1160,10 +1213,10 @@
               "api-reference/projects/list-projects",
               "api-reference/projects/create-project",
               "api-reference/projects/get-project",
-              "api-reference/projects/update-project",
-              "api-reference/projects/archive-project",
               "api-reference/projects/get-api-key",
-              "api-reference/projects/regenerate-api-key"
+              "api-reference/projects/update-project",
+              "api-reference/projects/regenerate-api-key",
+              "api-reference/projects/archive-project"
             ]
           },
           {
@@ -1173,12 +1226,12 @@
               "api-reference/teams/list-teams",
               "api-reference/teams/create-team",
               "api-reference/teams/get-team",
-              "api-reference/teams/update-team",
-              "api-reference/teams/archive-team",
               "api-reference/teams/list-members",
+              "api-reference/teams/list-projects",
+              "api-reference/teams/update-team",
               "api-reference/teams/add-member",
-              "api-reference/teams/remove-member",
-              "api-reference/teams/list-projects"
+              "api-reference/teams/archive-team",
+              "api-reference/teams/remove-member"
             ]
           },
           {
@@ -1188,14 +1241,14 @@
               "api-reference/groups/list-groups",
               "api-reference/groups/create-group",
               "api-reference/groups/get-group",
-              "api-reference/groups/rename-group",
-              "api-reference/groups/delete-group",
-              "api-reference/groups/list-members",
-              "api-reference/groups/add-member",
-              "api-reference/groups/remove-member",
               "api-reference/groups/list-bindings",
+              "api-reference/groups/list-members",
+              "api-reference/groups/rename-group",
               "api-reference/groups/add-binding",
-              "api-reference/groups/remove-binding"
+              "api-reference/groups/add-member",
+              "api-reference/groups/delete-group",
+              "api-reference/groups/remove-binding",
+              "api-reference/groups/remove-member"
             ]
           },
           {
@@ -1214,19 +1267,12 @@
               "api-reference/gateway-virtual-keys/list-virtual-keys",
               "api-reference/gateway-virtual-keys/create-virtual-key",
               "api-reference/gateway-virtual-keys/get-virtual-key",
+              "api-reference/gateway-virtual-keys/read-a-virtual-key-s-spend",
               "api-reference/gateway-virtual-keys/update-virtual-key",
+              "api-reference/gateway-virtual-keys/disable-virtual-key",
+              "api-reference/gateway-virtual-keys/enable-virtual-key",
               "api-reference/gateway-virtual-keys/revoke-virtual-key",
               "api-reference/gateway-virtual-keys/rotate-virtual-key-secret"
-            ]
-          },
-          {
-            "group": "Gateway: Provider Bindings",
-            "pages": [
-              "api-reference/gateway-providers/overview",
-              "api-reference/gateway-providers/list-provider-bindings",
-              "api-reference/gateway-providers/bind-a-model-provider-to-the-gateway",
-              "api-reference/gateway-providers/update-provider-binding",
-              "api-reference/gateway-providers/disable-provider-binding"
             ]
           },
           {
@@ -1235,7 +1281,9 @@
               "api-reference/gateway-budgets/overview",
               "api-reference/gateway-budgets/list-budgets-applicable-to-the-project",
               "api-reference/gateway-budgets/create-budget",
+              "api-reference/gateway-budgets/get-budget",
               "api-reference/gateway-budgets/update-budget",
+              "api-reference/gateway-budgets/reset-budget-period",
               "api-reference/gateway-budgets/archive-budget"
             ]
           },
@@ -1248,6 +1296,34 @@
               "api-reference/gateway-cache-rules/get-a-cache-rule",
               "api-reference/gateway-cache-rules/update-a-cache-rule",
               "api-reference/gateway-cache-rules/archive-a-cache-rule"
+            ]
+          },
+          {
+            "group": "Gateway: Spend",
+            "pages": [
+              "api-reference/gateway-spend/overview",
+              "api-reference/gateway-spend/list-spend-events",
+              "api-reference/gateway-spend/list-spend-summaries",
+              "api-reference/gateway-spend/replay-spend-events-to-an-endpoint",
+              "api-reference/gateway-spend/read-one-end-user-s-spend"
+            ]
+          },
+          {
+            "group": "Webhooks",
+            "pages": [
+              "api-reference/webhooks/overview",
+              "api-reference/webhooks/list-webhook-endpoints",
+              "api-reference/webhooks/list-subscribable-event-types",
+              "api-reference/webhooks/list-emitted-events",
+              "api-reference/webhooks/create-a-webhook-endpoint",
+              "api-reference/webhooks/get-a-webhook-endpoint",
+              "api-reference/webhooks/list-an-endpoint-s-delivery-attempts",
+              "api-reference/webhooks/read-an-endpoint-s-delivery-health",
+              "api-reference/webhooks/get-one-emitted-event",
+              "api-reference/webhooks/update-a-webhook-endpoint",
+              "api-reference/webhooks/roll-an-endpoint-s-signing-secret",
+              "api-reference/webhooks/send-a-test-event-to-an-endpoint",
+              "api-reference/webhooks/archive-a-webhook-endpoint"
             ]
           }
         ]
@@ -1316,7 +1392,7 @@
   },
   "redirects": [
     {
-      "source": "/ci/cache/busted/1785491410",
+      "source": "/ci/cache/busted/1786132622",
       "destination": "/"
     },
     {

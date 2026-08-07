@@ -1,6 +1,6 @@
 /**
  * The digest extractor, pinned against the CLI's REAL `--format json` output
- * shapes (grounded on the command implementations in `typescript-sdk/src/cli`):
+ * shapes (grounded on the command implementations in `sdks/typescript/src/cli`):
  * trace search wraps in `{ traces, pagination.totalHits }`, dataset list in
  * `{ data, pagination.total }`, prompt/evaluator/scenario lists are bare
  * arrays, experiment status is a single run document, analytics is a

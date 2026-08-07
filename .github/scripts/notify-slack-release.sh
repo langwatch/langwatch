@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Usage: notify-slack-release.sh <changelog_path> <component_name> <version>
-# Example: notify-slack-release.sh python-sdk/CHANGELOG.md "Python SDK" "0.4.2"
+# Example: notify-slack-release.sh sdks/python/CHANGELOG.md "Python SDK" "0.4.2"
 
 set -e
 

@@ -29,7 +29,7 @@ Another process is using port 5560. Find and stop it:
 
 ```bash
 lsof -i :5560
-# Then either stop that process or change the port in compose.yml
+# Then either stop that process or change the port in infra/compose.yml
 ```
 
 ### Containers keep restarting
@@ -140,6 +140,43 @@ clickhouse:
 ```
 
 The subchart auto-tunes internal memory limits based on this value.
+
+### Evaluations service OOM kills
+
+The evaluations service runs a pool of workers, and each worker that serves a
+local-model evaluator (PII detection, language detection) loads its own copy of
+that model, around 2.1Gi per worker. Its memory is therefore set by how many
+workers it runs, and the chart sizes the pool from `langevals.resources`: ask
+for less CPU and you get a smaller pool and a smaller footprint.
+
+Give one worker room for every local model it may load:
+
+```yaml
+langevals:
+  resources:
+    requests: { cpu: 100m, memory: 768Mi }
+    limits:   { cpu: 500m, memory: 4Gi }
+```
+
+The limit is a ceiling, not a reservation, so a generous one costs nothing until
+an evaluator actually loads a model.
+
+To pin the pool independently of the CPU allowance, set `CPU_COUNT`:
+
+```yaml
+langevals:
+  extraEnvs:
+    - { name: CPU_COUNT, value: "1" }
+```
+
+`CPU_COUNT` is the variable that governs this, and yours wins over the chart's.
+`WEB_CONCURRENCY` has no effect: the service passes an explicit worker count to
+gunicorn, which overrides the environment default.
+
+If you are on an older chart that does not set `CPU_COUNT`, set it yourself. The
+service otherwise sizes the pool from the **node's** CPU count rather than the
+container's, so a container limited to half a core still starts one worker per
+core on the node.
 
 ### ClickHouse connection errors
 

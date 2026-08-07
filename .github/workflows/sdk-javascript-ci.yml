@@ -28,21 +28,64 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       relevant: ${{ steps.detect.outputs.relevant }}
+      ingest: ${{ steps.detect.outputs.ingest }}
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          # The gate reads no working-tree content: on pull_request events
+          # dorny/paths-filter takes the changed-file list from the API, and
+          # every file this job needs on disk lives under .github/. Checking
+          # out the rest of the tree is pure runner time.
+          sparse-checkout: .github
       - uses: ./.github/actions/detect-changes
         id: detect
         with:
           # push-strategy diff + no release-please-manifest entry: the test
           # and e2e steps spend real LLM money, so they must not run on
           # pushes or release PRs that touched nothing under
-          # typescript-sdk/. An SDK release PR still matches via
-          # typescript-sdk/CHANGELOG.md.
+          # sdks/typescript/. An SDK release PR still matches via
+          # sdks/typescript/CHANGELOG.md.
           push-strategy: diff
           filters: |
             relevant:
-              - 'typescript-sdk/**'
+              - 'sdks/typescript/**'
+              # The single lockfile, workspace definition, root manifest and
+              # hoist config live at the repo root since ADR-076; a dependency
+              # or override change touches only these.
+              - 'pnpm-lock.yaml'
+              - 'pnpm-workspace.yaml'
+              - 'package.json'
+              - '.npmrc'
               - '.github/workflows/sdk-javascript-ci.yml'
+            # Gates `e2e` only, never `ci`. The e2e job boots a real server
+            # and posts real SDK telemetry at it, so it is the only check in
+            # the repo that watches the ingest routes answer over a socket,
+            # and app-only changes are exactly what `relevant` misses. It
+            # cannot be folded into `relevant`: `ci` shares that filter and
+            # `ci` spends LLM budget on every match.
+            #
+            # Scoped to the HTTP transport spine the SDK traffic crosses
+            # before any of it becomes business logic. Everything those
+            # handlers go on to call has unit and integration coverage of its
+            # own; what has none is the seam between a socket and a handler,
+            # which only a live request can exercise.
+            ingest:
+              # The Hono route modules the SDK posts to, and the shared
+              # middleware under `_lib/` that the capped ones mount:
+              # /api/otel/v1/{traces,logs,metrics} and /api/collector.
+              - 'platform/app/src/server/routes/**'
+              # Mounts those modules and fixes their order. A route that
+              # resolves in the router but not on the wire is a mount bug,
+              # and mount order has silently swallowed API surfaces before.
+              - 'platform/app/src/server/api-router.ts'
+              # Reads the OTLP request body for those routes and decodes it,
+              # including the byte ceiling they enforce on it.
+              - 'platform/app/src/server/otel/**'
+              # Wires the Node bridge into Hono and decides whether the
+              # process keeps its own global Request/Response. Behaviour that
+              # depends on that seam is invisible to every test that does not
+              # go over a real socket.
+              - 'platform/app/src/start.ts'
 
   ci:
     needs: changes
@@ -54,21 +97,29 @@ jobs:
     # Run lint, typecheck, tests, and build for TypeScript SDK
     defaults:
       run:
-        working-directory: typescript-sdk
+        working-directory: sdks/typescript
     steps:
       - name: Checkout
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - uses: ./.github/actions/setup-pnpm-node
         with:
-          cache-dependency-path: "typescript-sdk/pnpm-lock.yaml"
-          install-dir: typescript-sdk
+          install: "langwatch..."
 
-      - name: Install TypeScript Native Preview
-        run: pnpm install -D -w @typescript/native-preview
-
+      # The "Install TypeScript Native Preview" step that used to sit here is
+      # gone. It ran `pnpm install -D -w @typescript/native-preview`, and `-w`
+      # means "the workspace root" — which used to BE typescript-sdk/ when it
+      # was its own install root. Since ADR-076 the root is the repo, so it
+      # would have written the dependency into the root manifest and the
+      # SHARED lockfile mid-job, leaving every later step running against a
+      # lockfile that no longer matches the repo.
+      #
+      # Dropping it rather than rescoping it, because nothing in this package
+      # uses it: `lint` is `eslint .` and `typecheck` is `tsc --noEmit`, and
+      # the SDK references neither `tsgo` nor native-preview anywhere. It was
+      # installing a toolchain no step invokes.
       - name: Run lint check
         run: pnpm run lint
 
@@ -98,7 +149,8 @@ jobs:
   e2e:
     needs: changes
     if: >
-      needs.changes.outputs.relevant == 'true'
+      (needs.changes.outputs.relevant == 'true'
+       || needs.changes.outputs.ingest == 'true')
       && (github.event_name != 'pull_request_target'
           || github.event.label.name == 'approved-ci')
     runs-on: ubuntu-latest
@@ -159,16 +211,16 @@ jobs:
 
     defaults:
       run:
-        working-directory: typescript-sdk
+        working-directory: sdks/typescript
 
     steps:
       - name: Checkout
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
         with:
           version: 10.24.0
 
@@ -176,14 +228,11 @@ jobs:
       # e2e job (typescript-sdk, langwatch app, mcp-server). Calling
       # setup-node twice silently discards the first cache config.
       - name: Setup Node
-        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
         with:
           node-version: 24
           cache: "pnpm"
-          cache-dependency-path: |
-            typescript-sdk/pnpm-lock.yaml
-            langwatch/pnpm-lock.yaml
-            mcp-server/pnpm-lock.yaml
+          cache-dependency-path: pnpm-lock.yaml
 
       # node-pty@1.1.0 only ships prebuilds for darwin/win32, so on Linux
       # its postinstall always falls back to `node-gyp rebuild`. With
@@ -193,24 +242,27 @@ jobs:
       - name: Install node-gyp (for node-pty postinstall)
         run: npm install -g node-gyp@12.3.0
 
-      - name: Build mcp-server
-        working-directory: mcp-server
-        run: pnpm install --frozen-lockfile && pnpm run build
+      # One install covering the app, the MCP server (a workspace dependency
+      # of the app) and the SDK under test. See ADR-076.
+      - name: Install dependencies
+        run: >
+          CI=true pnpm install --frozen-lockfile
+          --filter "@langwatch/web..."
+          --filter "langwatch..."
 
-      - name: Install LangWatch app dependencies
-        working-directory: langwatch
-        run: CI=true pnpm install --frozen-lockfile
+      - name: Build mcp-server
+        run: pnpm --filter @langwatch/mcp-server run build
 
       - name: Prepare LangWatch files
-        working-directory: langwatch
+        working-directory: platform/app
         run: pnpm start:prepare:files
 
       - name: Setup database
-        working-directory: langwatch
+        working-directory: platform/app
         run: pnpm prisma:migrate
 
       - name: Seed test project
-        working-directory: langwatch
+        working-directory: platform/app
         env:
           # Seed the credential the SDK test process receives without putting
           # LANGWATCH_API_KEY on the platform process itself.
@@ -218,24 +270,24 @@ jobs:
         run: pnpm prisma:seed
 
       - name: Install goose
-        # Override job-level defaults.run.working-directory (typescript-sdk)
+        # Override job-level defaults.run.working-directory (sdks/typescript)
         # so the script path resolves from the repo root.
         working-directory: .
         run: bash .github/scripts/install-goose.sh
 
       - name: Setup ClickHouse
-        working-directory: langwatch
+        working-directory: platform/app
         run: pnpm clickhouse:migrate
 
       # Build the app so we can run a production server (dev mode is
       # unreliable in CI — turbopack JIT compilation can hang under
       # memory pressure, causing the server to become unresponsive).
       - name: Build LangWatch app
-        working-directory: langwatch
+        working-directory: platform/app
         run: NODE_ENV=test pnpm build
 
       - name: Start LangWatch server and worker
-        working-directory: langwatch
+        working-directory: platform/app
         env:
           # The workflow-global LANGWATCH_API_KEY is for the SDK under test.
           # Platform processes refuse to boot with it set (the self-referencing
@@ -250,8 +302,7 @@ jobs:
           timeout 60 bash -c 'until curl -f http://localhost:5560 2>/dev/null | grep -q "LangWatch\|<!DOCTYPE"; do sleep 2; done'
           echo "✅ LangWatch server is ready"
 
-      - name: Install SDK dependencies
-        run: pnpm install --frozen-lockfile
+      # Already installed above alongside the app; nothing further to fetch.
 
       - name: Build SDK
         run: pnpm run build

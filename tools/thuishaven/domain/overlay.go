@@ -40,7 +40,7 @@ func (s Stack) svc(name string) Service {
 }
 
 // OverlayEnv returns the KEY=VALUE lines that carry the resolved hostname URLs +
-// ports. These are (a) written to langwatch/.env.portless — the overlay every TS
+// ports. These are (a) written to platform/app/.env.portless — the overlay every TS
 // entry point loads last with override:true so it beats anything pinned in .env —
 // and (b) injected directly into each supervised child. Deriving them from the
 // Stack (which already holds every URL/port) keeps this the single source of
@@ -96,6 +96,13 @@ func (s Stack) OverlayEnv() []string {
 	// is ever set; domain_test.go pins that this overlay never emits it.
 	if s.LocalAPIKey != "" {
 		env = append(env, "HAVEN_SEED_LANGWATCH_API_KEY="+s.LocalAPIKey)
+	}
+	// Google DLP off by default locally: no local workflow wants trace text leaving
+	// for Google, and the app skips loading @google-cloud/dlp (grpc + generated
+	// protos) entirely when this is set. False emits nothing, leaving .env to decide
+	// — which is how you opt back in to running the DLP check locally.
+	if s.DisableGoogleDLP {
+		env = append(env, "LANGWATCH_DISABLE_GOOGLE_DLP=true")
 	}
 	// The rest of the static seeded identity (see prisma/seed.ts's header comment
 	// for the full rationale) — same story: fixed values so any worktree or agent

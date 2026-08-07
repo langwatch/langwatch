@@ -145,7 +145,7 @@ clean follow-up to stop them accumulating in Postgres.
   empty, the chart refuses to render (mirrors the existing `replicaCount` guard
   and the `service.type` guard in `service.yaml`). This makes the values.yaml
   "refuses to deploy without gVisor" claim real.
-- **e2e manifest regen:** `langwatch/e2e/langy/k8s/pod.yaml` is regenerated from
+- **e2e manifest regen:** `platform/app/e2e/langy/k8s/pod.yaml` is regenerated from
   the production chart's securityContext (root + the five per-UID caps
   `CHOWN/DAC_OVERRIDE/FOWNER/SETUID/SETGID`), so per-worker UID isolation
   actually functions, behind a prominent "LOCAL E2E ONLY — DO NOT USE IN PROD"

@@ -21,7 +21,7 @@ Feature: Gateway span shape — mandatory attributes per completed request
   # ─────────────────────────────────────────────────────────────────────────
   # Per rchaves iter 107: "EVERYTHING should follow the gen_ai specs."
   # The LangWatch trace pipeline already canonicalises these attributes
-  # from SDK-instrumented clients (see langwatch/src/server/tracer/
+  # from SDK-instrumented clients (see platform/app/src/server/tracer/
   # otel.traces.ts). Gateway spans MUST carry the same set so UI,
   # evaluators, and analytics treat gateway traffic identically to
   # SDK-instrumented traffic.
@@ -142,6 +142,21 @@ Feature: Gateway span shape — mandatory attributes per completed request
     And exception.type + exception.message carry the upstream error shape
     But gen_ai.usage.input_tokens / output_tokens are ABSENT (not emitted as 0)
     # Absent signals "no data" — downstream shouldn't treat 0 as "0 tokens used".
+
+  # Not every failure after model resolution is the provider's. A handled
+  # error already carries the two facts the span needs — the status the client
+  # was answered with, and a stable code — so recording a generic 502
+  # provider_error instead sends the customer to a provider status page for a
+  # failure only they can fix (a dead sign-in, a guardrail block, a limit we
+  # imposed).
+  # Bindings: services/aigateway/app/pipeline/trace_classify_test.go
+  Scenario: A gateway-authored failure records its own status and code
+    Given the request fails after model resolution with one of the gateway's own handled errors
+    When the exported span arrives at the collector
+    Then http.response.status_code is the status that error answers with
+    And error.type is that error's own code, not a generic provider_error
+    # An error we cannot type at all is still the upstream's until proven otherwise.
+    And an untyped failure still records the generic 502 provider_error
 
   # ─────────────────────────────────────────────────────────────────────────
   # §6. Fallback attempts

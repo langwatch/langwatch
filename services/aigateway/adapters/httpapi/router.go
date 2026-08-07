@@ -51,11 +51,10 @@ type RouterDeps struct {
 	// Required when OTTLServer is set.
 	InternalSecret string
 	// MaxRequestBodyBytes caps the per-request body size. 0 falls back to
-	// config.DefaultMaxRequestBodyBytes (128 MiB) — sized for large-context
-	// LLM workloads where legitimate requests run tens of MB (a 10M-token
-	// text context alone is ~40-50 MB). Set higher on enterprise deployments
-	// that send full-context multi-image / media payloads; lower on public
-	// edge deployments to tighten DDoS protection.
+	// config.DefaultMaxRequestBodyBytes (32 MiB), which fits a 1M-context
+	// multimodal payload. Raise it on a deployment that legitimately sends
+	// more, lower it on a public edge deployment to tighten DDoS
+	// protection.
 	MaxRequestBodyBytes int64
 	// HeartbeatInterval sets how often a non-streaming response writes a
 	// keep-alive byte while dispatch is still in flight, so a large-context
@@ -73,6 +72,13 @@ type RouterDeps struct {
 	// answer 503: a gateway that cannot observe its control plane must not
 	// report itself healthy to a public status page.
 	Status StatusReporter
+	// ControlPlaneBaseURL is the resolved control-plane target this
+	// gateway process ships spend, budget and auth traffic to. Surfaced
+	// read-only on GET /debug/control-plane so dev tooling can tell a
+	// stale or foreign gateway apart from this worktree's own before
+	// reusing an already-bound port (specs/setup/
+	// aigateway-control-plane-target.feature).
+	ControlPlaneBaseURL string
 }
 
 // NewRouter creates the chi router with all gateway routes mounted.
@@ -116,6 +122,13 @@ func NewRouter(deps RouterDeps) http.Handler {
 		r.Handle("/metrics", deps.Metrics.Handler())
 	}
 
+	// Unauthenticated and kept off the public ingress the same way as the
+	// probes and /metrics above (charts/gateway/templates/ingress.yaml
+	// allowlists only /v1 and the exact /health path). Reveals nothing but
+	// a URL: dev tooling polls it to verify an already-running gateway
+	// before trusting it on a reused port.
+	r.Get("/debug/control-plane", debugControlPlaneHandler(deps.ControlPlaneBaseURL))
+
 	r.Route("/v1", func(v1 chi.Router) {
 		v1.Use(AuthMiddleware(deps.App.Auth()))
 		v1.Use(DispatchMetaMiddleware())
@@ -149,7 +162,7 @@ func NewRouter(deps RouterDeps) http.Handler {
 	// secret (`LW_GATEWAY_INTERNAL_SECRET`). Currently used by the
 	// LangWatch governance ingestion pipeline to validate and execute
 	// OTTL statements over inbound OTLP payloads. See
-	// `langwatch/ee/governance/services/activity-monitor/ottlGatewayClient.ts`
+	// `platform/app/ee/governance/services/activity-monitor/ottlGatewayClient.ts`
 	// for the matching client.
 	if deps.OTTLServer != nil {
 		r.Route("/internal", func(in chi.Router) {
@@ -938,6 +951,10 @@ func writeJSONResponse(w http.ResponseWriter, resp *domain.Response) {
 		w.Header().Set(k, v)
 	}
 	w.Header().Set("Content-Type", ct)
+	// A provider must not be able to make its body look LangWatch-authored —
+	// same rule as writeUpstreamError. This lane forwards resp.Headers
+	// wholesale, so an upstream echoing this header must not survive.
+	w.Header().Del(herr.HandledErrorHeader)
 	if resp.StatusCode > 0 {
 		w.WriteHeader(resp.StatusCode)
 	}
@@ -1133,6 +1150,9 @@ func writeUpstreamError(w http.ResponseWriter, ue *domain.UpstreamError) {
 	for k, v := range ue.Headers {
 		w.Header().Set(k, v)
 	}
+	// A provider must not be able to make its body look LangWatch-authored.
+	// herr.WriteHTTP sets this marker only for our handled envelopes.
+	w.Header().Del(herr.HandledErrorHeader)
 	if ue.Provider != "" {
 		w.Header().Set("X-LangWatch-Provider", ue.Provider)
 	}
@@ -1178,6 +1198,8 @@ func registerErrorStatuses() {
 	}
 	errorsRegistered = true
 	herr.RegisterStatus(domain.ErrInvalidAPIKey, http.StatusUnauthorized)
+	herr.RegisterStatus(domain.ErrKeyRevoked, http.StatusForbidden)
+	herr.RegisterStatus(domain.ErrKeyDisabled, http.StatusForbidden)
 	herr.RegisterStatus(domain.ErrRateLimited, http.StatusTooManyRequests)
 	herr.RegisterStatus(domain.ErrBudgetExceeded, http.StatusPaymentRequired)
 	herr.RegisterStatus(domain.ErrGuardrailBlocked, http.StatusForbidden)
@@ -1187,6 +1209,12 @@ func registerErrorStatuses() {
 	herr.RegisterStatus(domain.ErrProviderError, http.StatusBadGateway)
 	herr.RegisterStatus(domain.ErrProviderTimeout, http.StatusGatewayTimeout)
 	herr.RegisterStatus(domain.ErrBadRequest, http.StatusBadRequest)
+	herr.RegisterStatus(domain.ErrMissingModel, http.StatusBadRequest)
+	// Fail-closed attribution: the request is missing a required field
+	// (the end-user id) while a per-end-user template is active. A
+	// request-shape error like the two around it, so 400 per the house
+	// table; unregistered it fell to 500 and read as a platform bug.
+	herr.RegisterStatus(domain.ErrEndUserRequired, http.StatusBadRequest)
 	herr.RegisterStatus(domain.ErrUnsupportedParameter, http.StatusBadRequest)
 	herr.RegisterStatus(domain.ErrPayloadTooLarge, http.StatusRequestEntityTooLarge)
 	herr.RegisterStatus(domain.ErrChainExhausted, http.StatusBadGateway)
@@ -1198,6 +1226,7 @@ func registerErrorStatuses() {
 	herr.RegisterStatus(domain.ErrNotFound, http.StatusNotFound)
 	herr.RegisterStatus(domain.ErrInternal, http.StatusInternalServerError)
 	herr.RegisterStatus(domain.ErrNoProviderConfigured, http.StatusBadRequest)
+	herr.RegisterStatus(domain.ErrCodexSessionExpired, http.StatusUnauthorized)
 	// Retryable by contract: the control plane failed us, not the caller.
 	// A 5xx keeps client SDKs retrying instead of bubbling a config error.
 	herr.RegisterStatus(domain.ErrAuthUpstream, http.StatusServiceUnavailable)

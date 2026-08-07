@@ -1,8 +1,8 @@
 # Conversation turn ledger — the per-turn separator line
 #
 # Implementation:
-#   langwatch/src/features/traces-v2/components/TraceDrawer/conversationView/ChatTurnRow.tsx
-#   langwatch/src/features/traces-v2/utils/formatters.ts (formatRelativeTimeAgo)
+#   platform/app/src/features/traces-v2/components/TraceDrawer/conversationView/ChatTurnRow.tsx
+#   platform/app/src/features/traces-v2/utils/formatters.ts (formatRelativeTimeAgo)
 #
 # Motivation: a customer found the separator between conversation turns too
 # busy and cryptic: "TURN 3 · small · 20.9s · 4.5K→538 · 1h". The model

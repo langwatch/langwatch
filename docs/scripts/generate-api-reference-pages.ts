@@ -26,16 +26,62 @@ interface EndpointGroup {
   dirName: string;
   pathPrefixes: string[];
   overviewDescription: string;
+  /**
+   * `METHOD /path` keys, in the order a reader should meet them.
+   *
+   * The default sort is CRUD-shaped — list, create, get, update, delete — which
+   * is right for a resource but wrong for a family that is a sequence of steps.
+   * A group whose overview describes a lifecycle sets this so the sidebar and
+   * the prose agree; anything the list omits falls in behind, still sorted the
+   * default way.
+   */
+  endpointOrder?: string[];
 }
 
 const METHOD_ORDER = ["get", "post", "put", "patch", "delete"] as const;
 
-// Legacy paths that have modern equivalents - skip these
-const SKIP_PATHS = new Set([
-  "/api/trace/search", // use /api/traces/search
-  "/api/trace/{id}", // use /api/traces/{traceId}
-  "/", // root endpoints from prompts app (not real API routes)
-]);
+/**
+ * Reasons per family, shared by the paths that belong to the same surface.
+ * A reason states which kind of exclusion this is: a retired surface that is
+ * intentionally undocumented, or a live surface that is not yet documented in
+ * the API reference.
+ */
+const RETIRED_GATEWAY_PROVIDER_BINDINGS =
+  "Retired surface, intentionally undocumented: the gateway provider binding routes answer 410 Gone, and the credentials they wrapped are managed under /api/model-providers.";
+
+const UNDOCUMENTED_INGESTION_TEMPLATES =
+  "Not yet documented in the API reference: the governance ingestion template routes have no reference pages yet.";
+
+const UNDOCUMENTED_CALLER_IDENTITY =
+  "Not yet documented in the API reference: the calling key's own project and usage routes have no reference pages yet.";
+
+const UNDOCUMENTED_MODEL_DEFAULTS =
+  "Not yet documented in the API reference: the default-model cascade routes have no reference pages yet.";
+
+/**
+ * Spec paths that deliberately get no reference page, each with the reason it
+ * is excluded. Every other spec path has to be owned by an ENDPOINT_GROUPS
+ * entry, and the generator fails when one is owned by neither.
+ */
+const SKIP_PATHS: Record<string, string> = {
+  "/": "Not an API route: the prompts app serves the spec's root path, so there is nothing to document.",
+  "/api/trace/search":
+    "Retired surface, intentionally undocumented: superseded by /api/traces/search.",
+  "/api/trace/{id}":
+    "Retired surface, intentionally undocumented: superseded by /api/traces/{traceId}.",
+  "/api/gateway/v1/providers": RETIRED_GATEWAY_PROVIDER_BINDINGS,
+  "/api/gateway/v1/providers/{id}": RETIRED_GATEWAY_PROVIDER_BINDINGS,
+  "/api/governance/ingestion-templates": UNDOCUMENTED_INGESTION_TEMPLATES,
+  "/api/governance/ingestion-templates/admin": UNDOCUMENTED_INGESTION_TEMPLATES,
+  "/api/governance/ingestion-templates/clone": UNDOCUMENTED_INGESTION_TEMPLATES,
+  "/api/governance/ingestion-templates/{id}": UNDOCUMENTED_INGESTION_TEMPLATES,
+  "/api/governance/ingestion-templates/{id}/ottl-rules":
+    UNDOCUMENTED_INGESTION_TEMPLATES,
+  "/api/me/project": UNDOCUMENTED_CALLER_IDENTITY,
+  "/api/me/usage": UNDOCUMENTED_CALLER_IDENTITY,
+  "/api/model-defaults": UNDOCUMENTED_MODEL_DEFAULTS,
+  "/api/model-defaults/{id}": UNDOCUMENTED_MODEL_DEFAULTS,
+};
 
 const ENDPOINT_GROUPS: EndpointGroup[] = [
   {
@@ -60,11 +106,40 @@ const ENDPOINT_GROUPS: EndpointGroup[] = [
       "Manage evaluator configurations for your project. Create, update, and organize evaluators used for online evaluations, guardrails, and experiments.",
   },
   {
-    name: "Evaluations v3",
+    name: "Evaluations",
     dirName: "evaluations",
-    pathPrefixes: ["/api/evaluations"],
+    // The guardrail path is the same call in gating mode, so it reads with the
+    // evaluate endpoints rather than in a section of its own.
+    pathPrefixes: ["/api/evaluations", "/api/guardrails"],
     overviewDescription:
-      "Run and monitor evaluation experiments. Start evaluation runs and poll for progress and results.",
+      "Run an evaluator over a single input and get its score back, or run it as a guardrail and gate on one boolean. List the built-in evaluators to see which ids you can address and what each one needs.",
+    endpointOrder: [
+      "GET /api/evaluations/list",
+      "POST /api/evaluations/{evaluator}/evaluate",
+      "POST /api/evaluations/{evaluator}/{subpath}/evaluate",
+      "POST /api/guardrails/{evaluator}/evaluate",
+    ],
+  },
+  {
+    name: "Experiments",
+    dirName: "experiments",
+    // Two prefixes, because the create endpoint is singular: `/api/experiments`
+    // does not start with `/api/experiment/`, so one prefix would leave either
+    // the create call or the rest of the family unowned.
+    pathPrefixes: ["/api/experiments", "/api/experiment", "/api/dspy"],
+    overviewDescription:
+      "Create experiments, run them, and read their results over HTTP. Create an experiment against a slug you choose, start a run, then poll it and pull the per-row results. This is the same surface the SDKs use, so anything they do you can do directly.",
+    // The order the overview describes, so a reader going down the sidebar
+    // meets the calls in the order they would make them.
+    endpointOrder: [
+      "POST /api/experiment/init",
+      "GET /api/experiments",
+      "POST /api/experiments/{slug}/run",
+      "GET /api/experiments/runs",
+      "GET /api/experiments/runs/{runId}",
+      "GET /api/experiments/runs/{runId}/results",
+      "POST /api/dspy/log_steps",
+    ],
   },
   {
     name: "Monitors",
@@ -122,16 +197,35 @@ const ENDPOINT_GROUPS: EndpointGroup[] = [
       "Manage AI agent configurations. Create, update, and organize agents that are tracked and evaluated in LangWatch.",
   },
   {
+    name: "Coding Agents",
+    dirName: "coding-agents",
+    pathPrefixes: ["/api/coding-agent"],
+    overviewDescription:
+      "Read what a coding agent session did and what it cost. Walk one session's events call by call, with the tokens, cost and compactions of each, or roll a whole pull request up into sessions, tokens and cost per project, user and agent.",
+  },
+  {
     name: "Triggers",
     dirName: "triggers",
-    pathPrefixes: ["/api/triggers"],
+    pathPrefixes: ["/api/triggers", "/api/trigger"],
     overviewDescription:
       "Manage automation triggers that fire actions based on trace events. Create Slack notifications, webhooks, and other automated responses.",
   },
   {
+    name: "Events",
+    dirName: "events",
+    // `/api/track_event` is the older spelling of the same call, still the one
+    // most SDK versions in the wild send.
+    pathPrefixes: ["/api/events", "/api/track_event"],
+    overviewDescription:
+      "Record customer events against a trace or thread, so behaviour like a thumbs-up, a conversion or a refund sits alongside the trace that produced it.",
+    endpointOrder: ["POST /api/events/track", "POST /api/track_event"],
+  },
+  {
     name: "Workflows",
     dirName: "workflows",
-    pathPrefixes: ["/api/workflows"],
+    // `/api/optimization/...` is the older spelling of the version-pinned
+    // workflow run, and reads as part of the same family.
+    pathPrefixes: ["/api/workflows", "/api/optimization"],
     overviewDescription:
       "Manage Optimization Studio workflows. List, update, and archive workflows used for prompt optimization and agent design.",
   },
@@ -185,6 +279,13 @@ const ENDPOINT_GROUPS: EndpointGroup[] = [
       "Manage teams within your organization. Teams group members and control access to projects.",
   },
   {
+    name: "Groups",
+    dirName: "groups",
+    pathPrefixes: ["/api/groups"],
+    overviewDescription:
+      "Manage groups: named sets of members that carry role bindings and can hold a per-member spend allowance.",
+  },
+  {
     name: "API Keys",
     dirName: "api-keys",
     pathPrefixes: ["/api/api-keys"],
@@ -199,13 +300,6 @@ const ENDPOINT_GROUPS: EndpointGroup[] = [
       "Manage virtual keys for the AI Gateway. Virtual keys abstract provider credentials and enable usage tracking, rate limiting, and access control.",
   },
   {
-    name: "Gateway: Provider Bindings",
-    dirName: "gateway-providers",
-    pathPrefixes: ["/api/gateway/v1/providers"],
-    overviewDescription:
-      "Manage provider credential bindings for the AI Gateway. Bind model providers (OpenAI, Anthropic, etc.) to enable routing through the gateway.",
-  },
-  {
     name: "Gateway: Budgets",
     dirName: "gateway-budgets",
     pathPrefixes: ["/api/gateway/v1/budgets"],
@@ -218,6 +312,24 @@ const ENDPOINT_GROUPS: EndpointGroup[] = [
     pathPrefixes: ["/api/gateway/v1/cache-rules"],
     overviewDescription:
       "Manage cache-control rules for the AI Gateway. Configure semantic caching to reduce latency and costs for repeated queries.",
+  },
+  {
+    name: "Gateway: Spend",
+    dirName: "gateway-spend",
+    pathPrefixes: [
+      "/api/gateway/v1/spend-events",
+      "/api/gateway/v1/spend-summaries",
+      "/api/gateway/v1/end-users",
+    ],
+    overviewDescription:
+      "Pull the per-request spend record for billing reconciliation: cursor-paged spend events, aggregate checksums, per-end-user rollups, and replay to a webhook endpoint.",
+  },
+  {
+    name: "Webhooks",
+    dirName: "webhooks",
+    pathPrefixes: ["/api/webhooks/v1"],
+    overviewDescription:
+      "Register endpoints that receive signed, retried batches of LangWatch events, and inspect their delivery log, health, and the events the organization emitted.",
   },
 ];
 
@@ -301,21 +413,43 @@ function generateFileName(
   return base;
 }
 
-function matchesGroup(apiPath: string, group: EndpointGroup): boolean {
+/**
+ * How much of `apiPath` this group's best prefix covers, or 0 when none match.
+ * Ownership goes to the longest match, so `/api/gateway/v1/spend-events` beats
+ * a shorter sibling prefix and a sub-path like `/spend-events/replay` lands in
+ * the same group as its parent instead of nowhere.
+ */
+function matchStrength(apiPath: string, group: EndpointGroup): number {
+  let best = 0;
   for (const prefix of group.pathPrefixes) {
     if (
       apiPath === prefix ||
       apiPath.startsWith(prefix + "/") ||
       apiPath.startsWith(prefix + "?")
     ) {
-      if (prefix.includes("gateway/v1/")) {
-        const remainder = apiPath.substring(prefix.length).replace(/^\//, "");
-        if (remainder && !remainder.startsWith("{")) continue;
-      }
-      return true;
+      best = Math.max(best, prefix.length);
     }
   }
-  return false;
+  return best;
+}
+
+/** The group that owns each spec path, by longest matching prefix. */
+function resolveOwners(specPaths: string[]): Map<string, EndpointGroup> {
+  const owners = new Map<string, EndpointGroup>();
+  for (const apiPath of specPaths) {
+    if (Object.hasOwn(SKIP_PATHS, apiPath)) continue;
+    let winner: EndpointGroup | undefined;
+    let winningStrength = 0;
+    for (const group of ENDPOINT_GROUPS) {
+      const strength = matchStrength(apiPath, group);
+      if (strength > winningStrength) {
+        winner = group;
+        winningStrength = strength;
+      }
+    }
+    if (winner) owners.set(apiPath, winner);
+  }
+  return owners;
 }
 
 function findExistingMdxFiles(dirPath: string): Map<string, string> {
@@ -358,7 +492,28 @@ function main() {
   let totalCreated = 0;
   let totalExisting = 0;
 
-  const claimedPaths = new Set<string>();
+  const owners = resolveOwners(Object.keys(spec.paths));
+
+  const unowned = Object.keys(spec.paths).filter(
+    (apiPath) => !Object.hasOwn(SKIP_PATHS, apiPath) && !owners.has(apiPath)
+  );
+  if (unowned.length > 0) {
+    const noun = unowned.length === 1 ? "spec path has" : "spec paths have";
+    console.error(
+      `ERROR: ${unowned.length} ${noun} no ENDPOINT_GROUPS entry and no SKIP_PATHS reason:`
+    );
+    for (const apiPath of unowned.sort()) console.error(`  ${apiPath}`);
+    console.error(
+      "\nEvery path above needs one of two resolutions in docs/scripts/generate-api-reference-pages.ts:"
+    );
+    console.error(
+      "  1. add an ENDPOINT_GROUPS entry covering it, so the path gets a reference page, or"
+    );
+    console.error(
+      "  2. add a SKIP_PATHS entry whose reason says why it is deliberately undocumented, either a retired surface or a live surface not yet documented in the API reference."
+    );
+    process.exit(1);
+  }
 
   for (const group of ENDPOINT_GROUPS) {
     const dirPath = path.join(API_REF_DIR, group.dirName);
@@ -373,10 +528,7 @@ function main() {
     }> = [];
 
     for (const [apiPath, methods] of Object.entries(spec.paths)) {
-      if (SKIP_PATHS.has(apiPath)) continue;
-      if (!matchesGroup(apiPath, group)) continue;
-      if (claimedPaths.has(apiPath)) continue;
-      claimedPaths.add(apiPath);
+      if (owners.get(apiPath) !== group) continue;
 
       for (const [method, op] of Object.entries(methods)) {
         if (!METHOD_ORDER.includes(method)) continue;
@@ -386,7 +538,24 @@ function main() {
 
     if (endpoints.length === 0) continue;
 
+    // A declared order wins; everything it does not name keeps the CRUD sort
+    // and follows behind, so adding a route never silently reshuffles the rest.
+    const declaredOrder = group.endpointOrder ?? [];
+    const declaredIndex = ({
+      method,
+      apiPath,
+    }: {
+      method: string;
+      apiPath: string;
+    }): number => {
+      const at = declaredOrder.indexOf(`${method.toUpperCase()} ${apiPath}`);
+      return at === -1 ? Number.MAX_SAFE_INTEGER : at;
+    };
+
     endpoints.sort((a, b) => {
+      const aDeclared = declaredIndex({ method: a.method, apiPath: a.path });
+      const bDeclared = declaredIndex({ method: b.method, apiPath: b.path });
+      if (aDeclared !== bDeclared) return aDeclared - bDeclared;
       const aScore = sortScore(a.method, a.path);
       const bScore = sortScore(b.method, b.path);
       if (aScore !== bScore) return aScore - bScore;
@@ -492,14 +661,7 @@ const BUILTIN_EVALUATOR_CATEGORIES: Record<string, string[]> = {
     "summarization-score",
   ],
   "RAG Quality": [
-    "ragas-answer-correctness",
-    "ragas-answer-relevancy",
-    "ragas-context-precision",
-    "ragas-context-recall",
-    "ragas-context-relevancy",
-    "ragas-context-utilization",
     "ragas-faithfulness",
-    "ragas-faithfulness-1",
     "ragas-response-context-precision",
     "ragas-response-context-recall",
     "ragas-response-relevancy",
