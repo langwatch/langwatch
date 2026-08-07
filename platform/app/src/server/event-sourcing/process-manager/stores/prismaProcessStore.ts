@@ -40,7 +40,7 @@ function asDate(epochMs: number): Date {
 
 function toJsonInput(
   value: JsonValue,
-): Prisma.InputJsonValue | Prisma.NullTypes.JsonNull {
+): Prisma.InputJsonValue | typeof Prisma.JsonNull {
   return value === null ? Prisma.JsonNull : value;
 }
 
@@ -113,6 +113,7 @@ export class PrismaProcessStore implements ProcessStore {
         // Revision remains an explicit compare-and-swap below; the lock also
         // closes the absent-row race for the first commit.
         await tx.$queryRaw`
+          -- @tenancy: advisory-lock helper, key is process-ref-bounded
           WITH process_lock AS MATERIALIZED (
             SELECT pg_advisory_xact_lock(
               hashtextextended(${refLockKey(commit.ref)}, 0)
@@ -306,6 +307,7 @@ export class PrismaProcessStore implements ProcessStore {
       : Prisma.empty;
     const rows = await this.prisma.$transaction(async (tx) => {
       return await tx.$queryRaw<ProcessManagerOutbox[]>(Prisma.sql`
+        -- @tenancy: outbox claim is cross-project worker infrastructure by design
         WITH candidates AS (
           SELECT "id"
           FROM "ProcessManagerOutbox"

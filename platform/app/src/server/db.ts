@@ -1,11 +1,10 @@
-import { PrismaPg } from "@prisma/adapter-pg";
-
 import { PrismaClient } from "~/generated/prisma/client";
 import { env } from "../env.mjs";
 import type { GuardNext, GuardParams } from "../utils/dbGuardMiddleware";
 import { guardEnMasse } from "../utils/dbMassDeleteProtection";
 import { guardProjectId } from "../utils/dbMultiTenancyProtection";
 import { guardOrganizationId } from "../utils/dbOrganizationIdProtection";
+import { createPrismaPgAdapter } from "./prismaPgAdapter";
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
@@ -28,7 +27,7 @@ const withGuards = (
 
 const createGuardedPrismaClient = (): PrismaClient => {
   const client = new PrismaClient({
-    adapter: new PrismaPg({ connectionString: env.DATABASE_URL }),
+    adapter: createPrismaPgAdapter(env.DATABASE_URL),
     log: env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],
   });
 

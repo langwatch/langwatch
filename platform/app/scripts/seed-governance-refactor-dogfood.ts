@@ -48,15 +48,17 @@
  */
 import { randomBytes } from "node:crypto";
 import { Prisma, PrismaClient } from "../src/generated/prisma/client";
-
 import { nextResetAt } from "../src/server/gateway/budgetWindow";
 import {
   hashVirtualKeySecret,
   mintVirtualKeySecret,
 } from "../src/server/gateway/virtualKey.crypto";
+import { createPrismaPgAdapter } from "../src/server/prismaPgAdapter";
 import { encrypt } from "../src/utils/encryption";
 
-const prisma = new PrismaClient();
+const prisma = new PrismaClient({
+  adapter: createPrismaPgAdapter(process.env.DATABASE_URL ?? ""),
+});
 
 const DOGFOOD_USER_EMAIL = "dogfood@acme.test";
 const DOGFOOD_USER_NAME = "Dogfood Admin";

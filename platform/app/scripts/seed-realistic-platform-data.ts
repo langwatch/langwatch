@@ -6,12 +6,14 @@
  * simulation, and experiment-run lifecycles are emitted as real event-sourcing
  * commands, so the event log and every projection are exercised together.
  */
-import { PrismaClient } from "../src/generated/prisma/client";
+
 import { DEMO_PLATFORM_IDS } from "../prisma/demo-platform-ids";
 import { seedDemoPlatform } from "../prisma/seed-demo-platform";
+import { PrismaClient } from "../src/generated/prisma/client";
 import { resetApp } from "../src/server/app-layer/app";
 import { initializeDefaultApp } from "../src/server/app-layer/presets";
 import { getClickHouseClientForProject } from "../src/server/clickhouse/clickhouseClient";
+import { createPrismaPgAdapter } from "../src/server/prismaPgAdapter";
 import { getSuiteSetId } from "../src/server/suites/suite-set-id";
 import {
   EXPERIMENT_ROWS,
@@ -445,7 +447,9 @@ async function waitForProjections(): Promise<ProjectionCounts> {
 }
 
 async function main(): Promise<void> {
-  const prisma = new PrismaClient();
+  const prisma = new PrismaClient({
+    adapter: createPrismaPgAdapter(process.env.DATABASE_URL ?? ""),
+  });
   try {
     await seedDemoPlatform({ prisma, projectId: PROJECT_ID, userId: USER_ID });
     const historicalRuns = buildHistoricalScenarioRuns();

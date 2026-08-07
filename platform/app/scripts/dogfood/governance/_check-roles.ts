@@ -1,7 +1,10 @@
 import { PrismaClient } from "../../../src/generated/prisma/client";
+import { createPrismaPgAdapter } from "../../../src/server/prismaPgAdapter";
 
 const email = process.argv[2] ?? "rogerio@langwatch.ai";
-const prisma = new PrismaClient();
+const prisma = new PrismaClient({
+  adapter: createPrismaPgAdapter(process.env.DATABASE_URL ?? ""),
+});
 
 void (async () => {
   try {

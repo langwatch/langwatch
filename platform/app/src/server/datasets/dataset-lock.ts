@@ -68,7 +68,8 @@ export const withDatasetLock = async <T>(
       // `$executeRaw` (not `$queryRaw`): pg_advisory_xact_lock returns `void`,
       // which $queryRaw can't deserialize. $executeRaw runs the statement and
       // ignores the result, acquiring the lock as a side effect.
-      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`dataset:${datasetId}`}, 0))`;
+      await tx.$executeRaw`-- @tenancy: advisory-lock helper, key is dataset-bounded
+SELECT pg_advisory_xact_lock(hashtextextended(${`dataset:${datasetId}`}, 0))`;
       return fn(tx);
     },
     {

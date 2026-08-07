@@ -1,7 +1,8 @@
+import { createPrismaPgAdapter } from "../../../src/server/prismaPgAdapter";
 import { PrismaClient } from "../../../src/generated/prisma/client";
 import bcrypt from "bcrypt";
 
-const prisma = new PrismaClient();
+const prisma = new PrismaClient({ adapter: createPrismaPgAdapter(process.env.DATABASE_URL ?? "") });
 const email = "ariana-zone-admin@acme.test";
 const newPassword = "ArianaTest123!";
 const hash = await bcrypt.hash(newPassword, 12);

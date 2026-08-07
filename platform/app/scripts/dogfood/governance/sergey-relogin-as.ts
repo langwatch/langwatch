@@ -14,8 +14,9 @@
 import { spawn } from "node:child_process";
 import { setTimeout as wait } from "node:timers/promises";
 import { PersonalVirtualKeyService } from "@ee/governance/services/personalVirtualKey.service";
-import { PrismaClient } from "../../../src/generated/prisma/client";
 import { approveDeviceCode } from "~/server/routes/auth-cli";
+import { PrismaClient } from "../../../src/generated/prisma/client";
+import { createPrismaPgAdapter } from "../../../src/server/prismaPgAdapter";
 
 interface Args {
   email: string;
@@ -39,7 +40,9 @@ function parseArgs(argv: string[]): Args {
 
 async function main() {
   const args = parseArgs(process.argv);
-  const raw = new PrismaClient();
+  const raw = new PrismaClient({
+    adapter: createPrismaPgAdapter(process.env.DATABASE_URL ?? ""),
+  });
 
   const userRows: any[] = await raw.$queryRawUnsafe(
     `SELECT id, email, name FROM mydb."User" WHERE email=$1 LIMIT 1`,
