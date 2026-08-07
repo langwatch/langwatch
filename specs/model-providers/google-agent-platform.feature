@@ -130,6 +130,22 @@ Feature: Gemini credentials work through either Google door
   # migration, run per deployment, and it is not part of this change — so
   # nothing here may assume it has happened.
 
+  # Hiding the tile is not enforcement. If the API keeps accepting new
+  # rows under the retired name, their number never reaches zero and the
+  # compatibility entry can never be removed.
+  @unit
+  Scenario: The retired provider accepts no new credentials, from anywhere
+    Given the retired Google Agent Platform provider
+    When a request tries to add a credential under it
+    Then the request is refused
+    And the refusal points at Gemini as the provider to use instead
+
+  @unit
+  Scenario: An already-stored credential under the retired provider can still be changed
+    Given a stored model provider row for Google Agent Platform
+    When a request updates that row
+    Then the request is allowed
+
   # A green check on a key that was never probed is worse than no check:
   # the fold-window row keeps its retired provider name, and nothing about
   # that name may quietly disable the walk to the Agent Platform door.

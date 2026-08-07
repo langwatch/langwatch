@@ -31,7 +31,10 @@ import { TriggerAnchor } from "../../components/ui/TriggerAnchor";
 import { Tooltip } from "../../components/ui/tooltip";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { buildCustomModelDisplayNames } from "../../server/modelProviders/customModelDisplayNames";
-import { modelProviders as modelProvidersRegistry } from "../../server/modelProviders/registry";
+import {
+  modelProviders as modelProvidersRegistry,
+  providerDeprecation,
+} from "../../server/modelProviders/registry";
 import { filterProvidersByScope } from "../../utils/filterProvidersByScope";
 
 export default function ModelsPage() {
@@ -136,14 +139,9 @@ export default function ModelsPage() {
   const addableProviders = useMemo(() => {
     return Object.keys(modelProvidersRegistry)
       .filter(
-        // Deprecated providers accept no new rows — stored rows still
-        // render in the table below until their migration folds them.
-        (providerKey) =>
-          !(
-            modelProvidersRegistry[
-              providerKey as keyof typeof modelProvidersRegistry
-            ] as { deprecated?: true }
-          ).deprecated,
+        // Deprecated providers accept no new rows — the server refuses to
+        // create one either. Stored rows still render in the table below.
+        (providerKey) => !providerDeprecation(providerKey),
       )
       .map((providerKey) => ({
         provider: providerKey as keyof typeof modelProvidersRegistry,

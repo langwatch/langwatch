@@ -159,6 +159,19 @@ const PROVIDER_OUTAGE_REASONS: ReadonlySet<string> = new Set([
 ]);
 
 /**
+ * The provider a retired one was folded into, written the way the product
+ * writes it. Keyed by the registry slug that rides in `meta.replacement`.
+ *
+ * A table rather than a title-cased slug, because provider names are brand
+ * names ("OpenAI", "vLLM") that no casing rule gets right, and because an
+ * unmapped slug should fall back to a sentence that omits the name rather
+ * than print a raw identifier at a customer.
+ */
+const DEPRECATED_PROVIDER_REPLACEMENTS: Record<string, string> = {
+  gemini: "Gemini",
+};
+
+/**
  * Looks a label up in one of the tables below, without trusting the key.
  *
  * Every key passed here comes from `meta` — a field name, a `fieldErrors`
@@ -453,6 +466,23 @@ const presentations = {
       str(error, "requires", "") === "project"
         ? "Removing a provider by name needs a project. Pick one and try again."
         : "Choose a project or an organization, then try again.",
+  },
+  model_provider_deprecated: {
+    // Reader tried to ADD a provider that has been absorbed into another
+    // one — from the API, an SDK, or a page open since before the change,
+    // since the Add menu no longer offers it. Their stored rows are fine
+    // and the copy says so, because "no longer available" otherwise reads
+    // as "the one I already have just broke".
+    title: "This provider has moved",
+    describe: (error) => {
+      const replacement = label(
+        DEPRECATED_PROVIDER_REPLACEMENTS,
+        str(error, "replacement", ""),
+      );
+      return replacement
+        ? `Add ${replacement} instead — it now covers this. Providers you already set up keep working.`
+        : "It has been merged into another provider. Providers you already set up keep working.";
+    },
   },
   model_provider_scopes_required: {
     title: "Choose where this provider applies",

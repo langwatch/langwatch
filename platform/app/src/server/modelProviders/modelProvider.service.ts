@@ -8,6 +8,7 @@ import type { CustomModelsInput } from "./customModel.schema";
 import { toLegacyCompatibleCustomModels } from "./customModel.schema";
 import {
   ModelProviderAnchorRequiredError,
+  ModelProviderDeprecatedError,
   ModelProviderNotFoundError,
   ModelProviderScopesRequiredError,
 } from "./errors";
@@ -25,6 +26,7 @@ import {
   getProviderModelOptions,
   type MaybeStoredModelProvider,
   modelProviders,
+  providerDeprecation,
 } from "./registry";
 import { seedOnboardingDefaultsForProvider } from "./seedOnboardingDefaults";
 
@@ -526,6 +528,21 @@ export class ModelProviderService {
     // NOT_FOUND so the client can refetch and retry.
     if (id && !existingProvider) {
       throw new ModelProviderNotFoundError();
+    }
+
+    // A deprecated provider accepts no NEW rows. The Add menu hides it,
+    // but hiding a tile is not enforcement: a direct API call, an SDK, or
+    // a stale frontend would keep minting rows under a provider whose
+    // whole purpose is to reach zero, and the compatibility entry could
+    // never be deleted. Keyed on there being no existing row, so editing,
+    // disabling, re-scoping and deleting a stored row all stay open —
+    // that is what keeps a deployment mid-fold from being stranded.
+    const deprecation = providerDeprecation(provider);
+    if (!existingProvider && deprecation) {
+      throw new ModelProviderDeprecatedError({
+        provider,
+        replacement: deprecation.replacedBy,
+      });
     }
 
     // Resolve input scope set. Callers may pass `scopes: [...]` directly,

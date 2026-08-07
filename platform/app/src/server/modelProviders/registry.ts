@@ -68,13 +68,18 @@ type ModelProviderDefinition = {
    */
   restrictedToFeatureKeys?: readonly string[];
   /**
-   * The provider no longer accepts new rows — the Add menu hides it —
-   * but stored rows stay readable, editable and validatable so no
-   * deployment ever strands them. Used for a provider absorbed into
-   * another (google_agent_platform → gemini); the entry is deleted in a
-   * later release, once the rows have been converted.
+   * The provider no longer accepts new rows. The Add menu hides it and
+   * `updateModelProvider` refuses to create one — hiding a tile is not
+   * enforcement, and the stored population has to be able to reach zero
+   * or this entry can never be deleted. Stored rows stay readable,
+   * editable, validatable and dispatchable, so no deployment is ever
+   * stranded mid-fold.
+   *
+   * `replacedBy` names the provider that absorbed it
+   * (google_agent_platform → gemini), which is what turns the refusal
+   * into something the caller can act on.
    */
-  deprecated?: true;
+  deprecated?: { replacedBy: string };
 };
 
 export type MaybeStoredModelProvider = Omit<
@@ -425,7 +430,7 @@ export const modelProviders = {
       GOOGLE_AGENT_PLATFORM_LOCATION: z.string().min(1),
     }),
     enabledSince: new Date("2026-07-29"),
-    deprecated: true,
+    deprecated: { replacedBy: "gemini" },
   },
   elevenlabs: {
     name: "ElevenLabs",
@@ -557,6 +562,25 @@ export const modelProviders = {
       "Azure Content Safety for content moderation, prompt injection, and jailbreak detection. Your subscription is billed directly by Microsoft.",
   },
 } satisfies Record<string, ModelProviderDefinition>;
+
+/**
+ * The deprecation on a provider, or undefined when it still accepts new
+ * rows.
+ *
+ * `modelProviders` is a literal typed by `satisfies`, so each entry keeps
+ * its own exact shape and `.deprecated` is only reachable on the entries
+ * that declare it — reading it off an arbitrary key needs a cast. One
+ * narrowing here beats a cast at every caller, and it is the single place
+ * that has to change when the flag grows a field.
+ */
+export const providerDeprecation = (
+  provider: string,
+): { replacedBy: string } | undefined =>
+  (
+    modelProviders[provider as keyof typeof modelProviders] as
+      | ModelProviderDefinition
+      | undefined
+  )?.deprecated;
 
 // ============================================================================
 // Parameter Constraints
