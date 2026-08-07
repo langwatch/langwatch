@@ -98,8 +98,14 @@ const SELECT_STYLE = {
   height: "32px",
 } as const;
 
-/** The names the last submission left unset, said where they are answered. */
-function MissingParameters({ names }: { names: readonly string[] }) {
+/** A refusal about named parameters, said where those parameters are edited. */
+function ParameterAlert({
+  title,
+  names,
+}: {
+  title: string;
+  names: readonly string[];
+}) {
   if (names.length === 0) return null;
 
   return (
@@ -112,7 +118,7 @@ function MissingParameters({ names }: { names: readonly string[] }) {
       paddingY={2}
     >
       <Text fontSize="13px" fontWeight="600">
-        Give these parameters a value
+        {title}
       </Text>
       <Text fontSize="12.5px" color="fg.muted">
         {names.join(", ")}
@@ -215,6 +221,11 @@ export interface GovernedSqlParametersEditorProps {
   /** Names the last submission declared and did not supply. */
   missingParameters: readonly string[];
   /**
+   * Names the last submission sent that the surface owns — `period_start` and
+   * `period_end`, which are set by the time window rather than here.
+   */
+  reservedParameters: readonly string[];
+  /**
    * Values to start from — a saved chart's, when one has been opened.
    *
    * Read once, at mount. The workbench remounts this form (by key) when it
@@ -247,6 +258,7 @@ function rowsOf(
 export function GovernedSqlParametersEditor({
   onChange,
   missingParameters,
+  reservedParameters,
   initialParameters,
 }: GovernedSqlParametersEditorProps) {
   const [rows, setRows] = useState<readonly ParameterRow[]>(() =>
@@ -256,7 +268,8 @@ export function GovernedSqlParametersEditor({
 
   // A refusal that names parameters is answered in this form, so the form has
   // to be open to answer it.
-  const isOpen = expanded || missingParameters.length > 0;
+  const isOpen =
+    expanded || missingParameters.length > 0 || reservedParameters.length > 0;
 
   const update = useCallback(
     (next: readonly ParameterRow[]) => {
@@ -299,7 +312,14 @@ export function GovernedSqlParametersEditor({
         )}
       </HStack>
 
-      <MissingParameters names={missingParameters} />
+      <ParameterAlert
+        title="Give these parameters a value"
+        names={missingParameters}
+      />
+      <ParameterAlert
+        title="Remove these — the time window above sets them"
+        names={reservedParameters}
+      />
 
       {isOpen && (
         <Stack gap={2}>

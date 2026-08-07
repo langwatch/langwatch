@@ -23,10 +23,34 @@ import type { GovernedSqlQueryResult } from "~/server/analytics/governed-sql";
  */
 export type GovernedSqlParameterValue = string | number | boolean | null;
 
-/** The statement and its parameters, taken together. */
+/**
+ * The period a submission reports over, as instants.
+ *
+ * Epoch milliseconds rather than `Date`, so a snapshot stays comparable by
+ * value — two `Date` objects for the same instant are never `Object.is`-equal,
+ * and a staleness test built on them would call every result stale on the next
+ * render. Epoch milliseconds are also what `useFilterParams` already hands the
+ * rest of the analytics surfaces.
+ */
+export interface GovernedSqlTimeWindowValues {
+  readonly start: number;
+  readonly end: number;
+}
+
+/** The statement, its parameters and the period it reports over, taken together. */
 export interface GovernedSqlSnapshot {
   readonly sql: string;
   readonly parameters: Readonly<Record<string, GovernedSqlParameterValue>>;
+  /**
+   * The window the surface supplies for the reserved `period_start` /
+   * `period_end` parameters. Part of the snapshot because it is part of the
+   * request: a result produced for last week's period is not current for this
+   * week's, and only a snapshot that carries it can say so.
+   *
+   * Absent on a workbench with no page period behind it, which is every caller
+   * that only ever writes unbounded statements.
+   */
+  readonly timeWindow?: GovernedSqlTimeWindowValues;
 }
 
 /**
@@ -91,6 +115,10 @@ export type GovernedSqlRequestAction =
       readonly type: "parametersEdited";
       readonly parameters: Readonly<Record<string, GovernedSqlParameterValue>>;
     }
+  | {
+      readonly type: "timeWindowChanged";
+      readonly timeWindow: GovernedSqlTimeWindowValues | undefined;
+    }
   | { readonly type: "submitted"; readonly snapshot: GovernedSqlSnapshot }
   | {
       readonly type: "settled";
@@ -127,13 +155,25 @@ function parametersMatch(
   );
 }
 
+function timeWindowsMatch(
+  a: GovernedSqlTimeWindowValues | undefined,
+  b: GovernedSqlTimeWindowValues | undefined,
+): boolean {
+  if (a === undefined || b === undefined) return a === b;
+  return a.start === b.start && a.end === b.end;
+}
+
 /** Whether two snapshots would produce byte-identical requests. */
 export function governedSqlSnapshotsMatch(
   a: GovernedSqlSnapshot | null,
   b: GovernedSqlSnapshot | null,
 ): boolean {
   if (a === null || b === null) return a === b;
-  return a.sql === b.sql && parametersMatch(a.parameters, b.parameters);
+  return (
+    a.sql === b.sql &&
+    parametersMatch(a.parameters, b.parameters) &&
+    timeWindowsMatch(a.timeWindow, b.timeWindow)
+  );
 }
 
 /**
@@ -156,6 +196,8 @@ export function governedSqlRequestReducer(
       return withSql(state, action.sql);
     case "parametersEdited":
       return withParameters(state, action.parameters);
+    case "timeWindowChanged":
+      return withTimeWindow(state, action.timeWindow);
     case "submitted":
       return withSubmission(state, action.snapshot);
     case "settled":
@@ -179,6 +221,18 @@ function withParameters(
 ): GovernedSqlRequestState {
   if (parametersMatch(parameters, state.draft.parameters)) return state;
   return { ...state, draft: { ...state.draft, parameters } };
+}
+
+function withTimeWindow(
+  state: GovernedSqlRequestState,
+  timeWindow: GovernedSqlTimeWindowValues | undefined,
+): GovernedSqlRequestState {
+  if (timeWindowsMatch(timeWindow, state.draft.timeWindow)) return state;
+  const { timeWindow: _dropped, ...rest } = state.draft;
+  return {
+    ...state,
+    draft: { ...rest, ...(timeWindow ? { timeWindow } : {}) },
+  };
 }
 
 /** Refuses a second submission by returning the state unchanged. */

@@ -27,6 +27,7 @@ import {
   type GovernedSqlActionLabel,
   type GovernedSqlParameterValue,
   type GovernedSqlRequestState,
+  type GovernedSqlTimeWindowValues,
   governedSqlActionLabel,
   isGovernedSqlResultStale,
 } from "../logic/governedSqlRequestState";
@@ -41,6 +42,8 @@ export interface UseGovernedSqlQuery {
   setParameters: (
     parameters: Readonly<Record<string, GovernedSqlParameterValue>>,
   ) => void;
+  /** Sets the period the next submission reports over, or clears it. */
+  setTimeWindow: (timeWindow: GovernedSqlTimeWindowValues | undefined) => void;
   /** Submits the current draft. Ignored while a request is in flight. */
   runQuery: () => void;
   /** Re-sends the submitted snapshot, never the draft. */
@@ -90,6 +93,11 @@ export function useGovernedSqlQuery({
       controller.setParameters(parameters),
     [controller],
   );
+  const setTimeWindow = useCallback(
+    (timeWindow: GovernedSqlTimeWindowValues | undefined) =>
+      controller.setTimeWindow(timeWindow),
+    [controller],
+  );
   const runQuery = useCallback(() => controller.runQuery(), [controller]);
   const reload = useCallback(() => controller.reload(), [controller]);
   const cancelQuery = useCallback(() => controller.cancel(), [controller]);
@@ -100,6 +108,7 @@ export function useGovernedSqlQuery({
     actionLabel: governedSqlActionLabel(state),
     setSql,
     setParameters,
+    setTimeWindow,
     runQuery,
     reload,
     cancelQuery,

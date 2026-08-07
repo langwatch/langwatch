@@ -29,6 +29,13 @@ import { useMemo, useState } from "react";
 
 import { SearchInput } from "~/components/ui/SearchInput";
 import { HandledErrorAlert } from "~/features/errors";
+// The leaf module, never the barrel: `timeWindow.ts` is import-free precisely
+// so the browser can read the same names the database is bound with, while the
+// barrel would drag the executor and the remediation registry in with it.
+import {
+  GOVERNED_SQL_PERIOD_END_PARAMETER,
+  GOVERNED_SQL_PERIOD_START_PARAMETER,
+} from "~/server/analytics/governed-sql/timeWindow";
 
 import {
   filterGovernedSchemaModel,
@@ -314,6 +321,36 @@ export function GovernedSchemaBrowser({
           ))}
         </Stack>
       )}
+
+      <TimeWindowNote />
     </VStack>
+  );
+}
+
+/**
+ * The two reserved parameter names, said where a member is writing the `WHERE`
+ * clause that would use them.
+ *
+ * Here rather than in a tooltip on the time-window fields: a chart that ignores
+ * the period it is placed on is decided when the statement is typed, and by the
+ * time someone reads the fields the statement already does or does not declare
+ * them.
+ */
+function TimeWindowNote() {
+  return (
+    <Box borderTopWidth="1px" borderColor="border" paddingTop={3} marginTop={1}>
+      <Text
+        fontSize="11px"
+        fontWeight="600"
+        letterSpacing="0.06em"
+        textTransform="uppercase"
+        color="fg.subtle"
+      >
+        Time window
+      </Text>
+      <Text fontSize="12px" color="fg.muted" marginTop={1}>
+        {`Declare {${GOVERNED_SQL_PERIOD_START_PARAMETER}:DateTime} and {${GOVERNED_SQL_PERIOD_END_PARAMETER}:DateTime} and the page — or the dashboard this chart is later placed on — fills them with the period it is showing. The interval is half-open, so write >= {${GOVERNED_SQL_PERIOD_START_PARAMETER}:DateTime} AND < {${GOVERNED_SQL_PERIOD_END_PARAMETER}:DateTime}. A query that declares neither runs over all time and says so.`}
+      </Text>
+    </Box>
   );
 }

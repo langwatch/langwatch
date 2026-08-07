@@ -55,6 +55,21 @@ const parameterValueSchema = z.union([
 const projectScopeSchema = z.object({ projectId: z.string() });
 
 /**
+ * The period the page is showing.
+ *
+ * Coerced rather than typed as a `Date`, so the same shape is accepted whether
+ * the client sent epoch milliseconds, an ISO string, or a real `Date` through
+ * superjson. Which of the reserved parameters this fills, and whether it fills
+ * any at all, is decided by the service from the statement itself.
+ *
+ * @see ~/server/analytics/governed-sql/timeWindow
+ */
+const timeWindowSchema = z.object({
+  start: z.coerce.date(),
+  end: z.coerce.date(),
+});
+
+/**
  * Whether the governed query path is provisioned on this deployment.
  *
  * Separate from `schema` because the schema is answerable without an executor
@@ -110,6 +125,7 @@ const query = protectedProcedure
       // one that was submitted.
       sql: z.string().min(1).max(MAX_SQL_LENGTH),
       parameters: z.record(z.string(), parameterValueSchema).optional(),
+      timeWindow: timeWindowSchema.optional(),
     }),
   )
   .use(checkProjectPermission("analytics:view"))
@@ -142,6 +158,7 @@ const query = protectedProcedure
       }),
       sql: input.sql,
       ...(input.parameters ? { parameters: input.parameters } : {}),
+      ...(input.timeWindow ? { timeWindow: input.timeWindow } : {}),
     });
   });
 

@@ -77,6 +77,8 @@ export const APP_ERROR_CODES = [
   "governed_sql_not_enabled",
   "governed_sql_not_permitted",
   "governed_sql_parameter_missing",
+  "governed_sql_reserved_parameter_supplied",
+  "governed_sql_reserved_parameter_type",
   "governed_sql_unavailable",
   "governed_sql_unparseable",
   "guardrail_attach_forbidden",

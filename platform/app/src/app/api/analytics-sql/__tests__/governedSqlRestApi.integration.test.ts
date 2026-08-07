@@ -744,6 +744,124 @@ describe("given the governed analytics SQL REST endpoints", () => {
     });
   });
 
+  /**
+   * The reserved time-window parameters, against the real server.
+   *
+   * The format is pinned as a unit property; what only a database can answer is
+   * whether ClickHouse *accepts* the literal we inject and bounds the read the
+   * way the contract says it does. Both are asked here.
+   *
+   * The process zone is pinned away from UTC for the length of this group: with
+   * `TZ` unset — which is most runners — an implementation formatting the
+   * window with the *local* getters would agree with the correct one on every
+   * instant, and every count below would be green either way.
+   */
+  describe("when the surface supplies the reserved time window", () => {
+    const originalZone = process.env.TZ;
+    beforeAll(() => {
+      process.env.TZ = "America/Sao_Paulo";
+    });
+    afterAll(() => {
+      process.env.TZ = originalZone;
+    });
+
+    /** Every seeded trace shares this instant. */
+    const SEEDED_AT = new Date(`${SEED_AT.replace(" ", "T")}Z`);
+    const second = (offset: number) =>
+      new Date(SEEDED_AT.getTime() + offset * 1000);
+
+    const PERIOD_SQL = () =>
+      `SELECT count() AS value FROM ${database}.traces ` +
+      `WHERE OccurredAt >= {period_start:DateTime} AND OccurredAt < {period_end:DateTime}`;
+
+    /** Rows a period-aware statement returns for one window. */
+    const countFor = async (timeWindow: { start: Date; end: Date }) => {
+      const response = await post(openProject, {
+        sql: PERIOD_SQL(),
+        timeWindow,
+      });
+      const body = (await response.json()) as Record<string, any>;
+      expect(response.status, `query failed: ${JSON.stringify(body)}`).toBe(
+        200,
+      );
+      expect(body.followsTimeWindow).toBe(true);
+      return Number(body.rows[0].value);
+    };
+
+    /**
+     * The same minute, bounded with literals instead of the reserved names.
+     *
+     * A control rather than a constant: it is what the injected window has to
+     * agree with, and asserting it is non-zero first is what stops "the two
+     * agree" from being two zeroes agreeing.
+     */
+    const literalBaseline = async () => {
+      const body = await run(
+        openProject,
+        `SELECT count() AS value FROM ${database}.traces ` +
+          `WHERE OccurredAt >= toDateTime64('2026-02-20 11:59:00', 3) ` +
+          `AND OccurredAt < toDateTime64('2026-02-20 12:01:00', 3)`,
+      );
+      const count = Number(body.rows[0].value);
+      expect(
+        count,
+        "nothing is seeded in the window under test",
+      ).toBeGreaterThan(0);
+      return count;
+    };
+
+    /** @scenario "The window the surface sends is the window the database reads" */
+    it("returns the rows inside the window and none outside it", async () => {
+      const expected = await literalBaseline();
+
+      expect(await countFor({ start: second(-60), end: second(60) })).toBe(
+        expected,
+      );
+
+      // An hour and a half later. Under a local-time bug this window would
+      // still bracket the seeded instant, because the pinned zone is three
+      // hours behind UTC — so a non-zero answer here names that bug.
+      expect(await countFor({ start: second(5400), end: second(9000) })).toBe(
+        0,
+      );
+    });
+
+    /** @scenario "The period is half-open, so the start instant is included and the end instant is not" */
+    it("includes a row sitting exactly on the start and excludes one on the end", async () => {
+      const expected = await literalBaseline();
+
+      expect(await countFor({ start: SEEDED_AT, end: second(1) })).toBe(
+        expected,
+      );
+      expect(await countFor({ start: second(-1), end: SEEDED_AT })).toBe(0);
+    });
+
+    /** @scenario "A caller that supplies a reserved period parameter itself is refused" */
+    it("refuses a request that pins the window under its own parameters", async () => {
+      const response = await post(openProject, {
+        sql: PERIOD_SQL(),
+        parameters: { period_start: "2020-01-01 00:00:00" },
+        timeWindow: { start: second(-60), end: second(60) },
+      });
+      const body = (await response.json()) as Record<string, any>;
+
+      expect(response.status).toBe(400);
+      expect(body.error).toBe("governed_sql_reserved_parameter_supplied");
+    });
+
+    /** @scenario "A statement with no period parameters runs, and says so" */
+    it("runs a statement that declares neither, and reports that it does not follow the period", async () => {
+      const body = await run(
+        openProject,
+        `SELECT count() AS value FROM ${database}.traces ` +
+          `WHERE OccurredAt >= toDateTime64('${SEED_WINDOW.from}', 3)`,
+      );
+
+      expect(Number(body.rows[0].value)).toBeGreaterThan(0);
+      expect(body.followsTimeWindow).toBe(false);
+    });
+  });
+
   describe("when two tenants have rows", () => {
     /** @scenario "A governed view returns only the calling tenant's rows" */
     it("gives each caller its own tenant and never the other's", async () => {

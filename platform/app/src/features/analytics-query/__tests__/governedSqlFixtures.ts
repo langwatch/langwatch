@@ -118,6 +118,7 @@ export function governedSqlResult(
     },
     truncated: false,
     diagnostics: [],
+    followsTimeWindow: true,
     ...overrides,
   };
 }
