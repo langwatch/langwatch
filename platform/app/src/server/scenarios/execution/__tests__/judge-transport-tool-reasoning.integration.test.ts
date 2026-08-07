@@ -29,7 +29,6 @@
  * specs/scenarios/judge-transport-tool-reasoning.feature.
  */
 
-import { createServer, type Server } from "node:http";
 import { APICallError, generateText, tool } from "ai";
 import { afterEach, describe, expect, it } from "vitest";
 import { z } from "zod";
@@ -38,6 +37,11 @@ import {
   createModelFromParams,
 } from "../model.factory";
 import type { LiteLLMParams } from "../types";
+import {
+  type StubEndpoint,
+  startEndpoint,
+  surfacedRejection,
+} from "./support/chat-completions-stub-endpoint";
 
 const JUDGE_PARAMS: LiteLLMParams = {
   api_key: "test-key",
@@ -58,184 +62,6 @@ const finishTest = tool({
     reasoning: z.string(),
   }),
 });
-
-type EndpointRule =
-  | "accept"
-  | "reject-tools-without-reasoning-off"
-  | "reject-reasoning-always"
-  | "reject-reasoning-without-remedy"
-  | "reject-unrelated"
-  | "reject-not-json";
-
-interface StubEndpoint {
-  url: string;
-  bodies: () => Array<Record<string, unknown>>;
-  close: () => Promise<void>;
-}
-
-const UNRELATED_REJECTION = {
-  error: {
-    type: "invalid_request_error",
-    message: "Unsupported value for parameter 'temperature'.",
-    param: "temperature",
-  },
-};
-
-/**
- * A rejection carrying the same structured `param` as the one the retry answers,
- * but asking for nothing: the provider refused the reasoning setting without
- * saying what it would accept. Keying the retry on `param` alone would answer
- * this by re-sending the request with a value nobody requested.
- */
-const UNSPECIFIC_REASONING_REJECTION = {
-  error: {
-    type: "invalid_request_error",
-    message: "Unsupported value for parameter 'reasoning_effort'.",
-    param: "reasoning_effort",
-  },
-};
-
-/** The upstream 400 verbatim, including the structured `param` the retry keys on. */
-function reasoningRejectionFor(model: unknown) {
-  return {
-    error: {
-      type: "invalid_request_error",
-      message: `Function tools with reasoning_effort are not supported for ${String(
-        model,
-      )} in /v1/chat/completions. To use function tools, use /v1/responses or set reasoning_effort to 'none'.`,
-      param: "reasoning_effort",
-    },
-  };
-}
-
-function completionFor(body: Record<string, unknown>, carriesTools: boolean) {
-  return {
-    id: "chatcmpl-stub",
-    object: "chat.completion",
-    created: 0,
-    model: body.model,
-    choices: [
-      {
-        index: 0,
-        message: carriesTools
-          ? {
-              role: "assistant",
-              content: null,
-              tool_calls: [
-                {
-                  id: "call_1",
-                  type: "function",
-                  function: {
-                    name: "finishTest",
-                    arguments: JSON.stringify({
-                      verdict: "success",
-                      reasoning: "criteria met",
-                    }),
-                  },
-                },
-              ],
-            }
-          : { role: "assistant", content: "plain answer" },
-        finish_reason: carriesTools ? "tool_calls" : "stop",
-      },
-    ],
-    usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
-  };
-}
-
-/** What the endpoint answers for one request under the given rule. */
-function responseFor(
-  rule: EndpointRule,
-  body: Record<string, unknown>,
-): { status: number; payload: unknown; raw?: string } {
-  const carriesTools =
-    Array.isArray(body.tools) && (body.tools as unknown[]).length > 0;
-
-  if (rule === "reject-unrelated") {
-    return { status: 400, payload: UNRELATED_REJECTION };
-  }
-  if (rule === "reject-reasoning-without-remedy") {
-    return { status: 400, payload: UNSPECIFIC_REASONING_REJECTION };
-  }
-  if (rule === "reject-not-json") {
-    return { status: 400, payload: undefined, raw: "Bad Request" };
-  }
-  if (rule === "reject-reasoning-always") {
-    return { status: 400, payload: reasoningRejectionFor(body.model) };
-  }
-  if (
-    rule === "reject-tools-without-reasoning-off" &&
-    carriesTools &&
-    body.reasoning_effort !== "none"
-  ) {
-    return { status: 400, payload: reasoningRejectionFor(body.model) };
-  }
-  return { status: 200, payload: completionFor(body, carriesTools) };
-}
-
-/**
- * Stands in for the chat-completions endpoint behind the gateway proxy.
- *
- * "reject-tools-without-reasoning-off" enforces the upstream rule.
- * "reject-reasoning-without-remedy" refuses the reasoning setting without
- * naming a value it would accept.
- * "reject-unrelated" answers a 400 that has nothing to do with reasoning.
- * "accept" takes anything and exists only to record the wire body.
- */
-async function startEndpoint(
-  rule: EndpointRule = "accept",
-): Promise<StubEndpoint> {
-  const bodies: Array<Record<string, unknown>> = [];
-
-  const server: Server = createServer((req, res) => {
-    let raw = "";
-    req.on("data", (chunk: Buffer) => (raw += chunk.toString()));
-    req.on("end", () => {
-      const body = JSON.parse(raw) as Record<string, unknown>;
-      bodies.push(body);
-      const { status, payload, raw: rawResponse } = responseFor(rule, body);
-      if (rawResponse !== undefined) {
-        res.writeHead(status, { "Content-Type": "text/plain" });
-        res.end(rawResponse);
-        return;
-      }
-      res.writeHead(status, { "Content-Type": "application/json" });
-      res.end(JSON.stringify(payload));
-    });
-  });
-
-  await new Promise<void>((resolve) =>
-    server.listen(0, "127.0.0.1", () => resolve()),
-  );
-  const { port } = server.address() as { port: number };
-
-  return {
-    url: `http://127.0.0.1:${port}`,
-    bodies: () => bodies,
-    close: () => new Promise<void>((resolve) => server.close(() => resolve())),
-  };
-}
-
-/**
- * The structured shape of a surfaced provider rejection. Asserting on
- * `statusCode` + `error.param` (not the message prose) keeps the tests immune
- * to upstream rewording.
- */
-async function surfacedRejection(
-  request: Promise<unknown>,
-): Promise<{ statusCode: number | undefined; param: unknown }> {
-  const failure = await request.then(
-    () => {
-      throw new Error("expected the request to be rejected");
-    },
-    (error: unknown) => error,
-  );
-  if (!APICallError.isInstance(failure)) throw failure;
-  const body = JSON.parse(failure.responseBody ?? "{}") as {
-    error?: { param?: unknown };
-  };
-  return { statusCode: failure.statusCode, param: body.error?.param };
-}
 
 let endpoint: StubEndpoint | undefined;
 
