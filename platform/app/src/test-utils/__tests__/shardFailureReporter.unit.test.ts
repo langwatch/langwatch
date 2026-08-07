@@ -292,7 +292,7 @@ describe("given how long the shard may stay alive before the floor fires", () =>
       const warn = vi
         .spyOn(console, "warn")
         .mockImplementation(() => undefined);
-      vi.stubEnv("LANGWATCH_UNIT_HARD_FLOOR_MS", "");
+      vi.stubEnv("LANGWATCH_UNIT_HARD_FLOOR_MS", undefined);
       vi.stubEnv("CI", "");
 
       expect(resolveHardFloorMs()).toBeNull();

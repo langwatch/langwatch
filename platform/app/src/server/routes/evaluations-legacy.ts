@@ -340,7 +340,7 @@ secured.access(legacyEvaluationAuth).post(
       params = eSBatchEvaluationRESTParamsSchema.parse(body);
     } catch (error) {
       logger.error(
-        { error, body, projectId: project.id },
+        { error, payloadSize, projectId: project.id },
         "invalid log_results data received",
       );
       captureException(toError(error), { extra: { projectId: project.id } });
@@ -377,11 +377,11 @@ secured.access(legacyEvaluationAuth).post(
     } catch (error) {
       if (error instanceof z.ZodError) {
         logger.error(
-          { error, body: params, projectId: project.id },
+          { error, runId: params.run_id, projectId: project.id },
           "failed to validate data for batch evaluation",
         );
         captureException(toError(error), {
-          extra: { projectId: project.id, param: params },
+          extra: { projectId: project.id, runId: params.run_id },
         });
         const validationError = fromZodError(error);
         return c.json({ error: validationError.message }, 400);
@@ -396,11 +396,11 @@ secured.access(legacyEvaluationAuth).post(
         );
       } else {
         logger.error(
-          { error, body: params, projectId: project.id },
+          { error, runId: params.run_id, projectId: project.id },
           "internal server error processing batch evaluation",
         );
         captureException(toError(error), {
-          extra: { projectId: project.id, param: params },
+          extra: { projectId: project.id, runId: params.run_id },
         });
         return c.json(
           {
@@ -611,6 +611,7 @@ secured.access(legacyEvaluationAuth).post(
       },
     },
   }),
+  bodyLimit({ maxSize: 30 * 1024 * 1024 }),
   async (c) => {
     const auth = await authenticateRequest(c, "evaluations:manage");
     if ("error" in auth) {
@@ -638,7 +639,7 @@ secured.access(legacyEvaluationAuth).post(
       params = batchEvaluationInputSchema.parse(body);
     } catch (error) {
       logger.error(
-        { error, body, projectId: project.id },
+        { error, projectId: project.id },
         "invalid evaluation params received",
       );
       captureException(toError(error), { extra: { projectId: project.id } });

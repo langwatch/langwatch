@@ -21,14 +21,14 @@ import type {
  * reject a cursor this very service minted, and the caller would lose the
  * page mid-walk.
  */
-const SORT_COLUMN_KEYS: Record<SessionGroupSortColumn, true> = {
+const SORT_COLUMN_KEYS = {
   lastActivity: true,
   started: true,
   cost: true,
   tokens: true,
   duration: true,
   traces: true,
-};
+} as const satisfies Record<SessionGroupSortColumn, true>;
 
 const SORT_COLUMNS = Object.keys(SORT_COLUMN_KEYS) as [
   SessionGroupSortColumn,

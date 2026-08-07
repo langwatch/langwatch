@@ -13,7 +13,7 @@
  * unrecognised `${...}` placeholder throws instead of reaching ClickHouse.
  */
 import { randomUUID } from "node:crypto";
-import { open, readFile, rename, rm, stat } from "node:fs/promises";
+import { link, open, readFile, rename, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { ClickHouseClient } from "@clickhouse/client";
@@ -256,7 +256,8 @@ async function releaseLock({
  * the winner is the only one that gets to decide what happens next. It can
  * still move a file that was replaced between the read and the rename, which
  * is why the token is re-checked afterwards and a stranger's lock is put back
- * where it was.
+ * through `link`, the only restore that refuses to overwrite whoever took the
+ * path in the meantime.
  */
 async function removeLockOwnedBy({
   lockPath,
@@ -275,10 +276,14 @@ async function removeLockOwnedBy({
     await rm(claimPath, { force: true });
     return true;
   }
-  // A live holder's lock, moved by a claim that was already out of date. Put
-  // it back; if the path has been retaken in the meantime that holder is the
-  // live one, so this copy is simply dropped.
-  await rename(claimPath, lockPath).catch(() => rm(claimPath, { force: true }));
+  // A live holder's lock, moved by a claim that was already out of date. It
+  // goes back through `link`, which fails with EEXIST once somebody else has
+  // taken the freed path, leaving that holder's lock where it is; `rename`
+  // would replace it silently and put two replays inside the critical section
+  // believing they each hold it. The claim copy goes either way: `link` leaves
+  // its source in place.
+  await link(claimPath, lockPath).catch(() => undefined);
+  await rm(claimPath, { force: true });
   return false;
 }
 

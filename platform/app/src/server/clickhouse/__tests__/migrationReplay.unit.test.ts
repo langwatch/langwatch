@@ -13,8 +13,38 @@
 import { readFile, rm, stat, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { withReplayLock } from "./migrationReplay";
+
+/**
+ * The one interleaving no amount of ordering inside this process can produce:
+ * somebody takes the lock path in the window between the rename that frees it
+ * and the restore that puts a stranger's copy back. Set to a path and the very
+ * next rename recreates a lock there, under a third owner, before the restore
+ * runs.
+ */
+const { retakeAfterNextRename, THIRD_OWNER } = vi.hoisted(() => ({
+  retakeAfterNextRename: { path: null as string | null },
+  THIRD_OWNER: "third-owner",
+}));
+
+vi.mock("node:fs/promises", async () => {
+  const actual =
+    await vi.importActual<typeof import("node:fs/promises")>(
+      "node:fs/promises",
+    );
+  return {
+    ...actual,
+    rename: async (from: string, to: string) => {
+      await actual.rename(from, to);
+      const retaken = retakeAfterNextRename.path;
+      if (retaken !== null) {
+        retakeAfterNextRename.path = null;
+        await actual.writeFile(retaken, THIRD_OWNER);
+      }
+    },
+  };
+});
 
 /** A key of its own per test, so a run never waits on a neighbour's lock. */
 let counter = 0;
@@ -151,6 +181,29 @@ describe("given a holder whose lock was broken and taken by somebody else", () =
       await expect(readFile(lockPath, "utf-8")).resolves.toBe(
         "replacement-owner",
       );
+      await rm(lockPath, { force: true });
+    });
+  });
+
+  describe("when the path is taken again before the restore lands", () => {
+    it("leaves the newest holder's lock alone rather than evicting it", async () => {
+      const key = freshKey();
+      const lockPath = lockPathFor(key);
+
+      await withReplayLock({
+        database: key,
+        run: async () => {
+          await rm(lockPath, { force: true });
+          await writeFile(lockPath, "replacement-owner");
+          retakeAfterNextRename.path = lockPath;
+        },
+      });
+
+      // The restore refuses the path it no longer owns, so the holder that
+      // took it keeps it and the stranger's copy is dropped instead. A restore
+      // that overwrote would leave two holders each believing the lock is
+      // theirs.
+      await expect(readFile(lockPath, "utf-8")).resolves.toBe(THIRD_OWNER);
       await rm(lockPath, { force: true });
     });
   });

@@ -337,7 +337,7 @@ echo $OTEL_EXPORTER_OTLP_HEADERS
   </Accordion>
 
   <Accordion title="Large payloads or truncated content">
-    The content flags ship the Messages API request and response JSON on every turn, so `api_request_body` / `api_response_body` events can reach tens of KB each. Claude Code truncates each inline body at 60 KB (raise the limit with `CLAUDE_CODE_OTEL_CONTENT_MAX_LENGTH`) and redacts extended thinking. LangWatch caps oversized log records on ingestion to protect the pipeline, keeping the lifted input and output text while trimming the rest. If you only need cost and token data, drop `OTEL_LOG_RAW_API_BODIES` and `OTEL_LOG_TOOL_DETAILS` to keep payloads small. The other flags (`OTEL_LOG_USER_PROMPTS`, `OTEL_LOG_TOOL_CONTENT`) are lightweight.
+    The content flags ship the Messages API request and response JSON on every turn, so `api_request_body` / `api_response_body` events can reach tens of KB each. Claude Code truncates each inline body at 60 KB (raise the limit with `CLAUDE_CODE_OTEL_CONTENT_MAX_LENGTH`) and redacts extended thinking. LangWatch caps oversized log records on ingestion to protect the pipeline, keeping the lifted input and output text while trimming the rest. If you only need cost and token data, drop all four content flags. The other two (`OTEL_LOG_USER_PROMPTS`, `OTEL_LOG_TOOL_CONTENT`) send smaller records than the raw bodies do, but they are content too: a whole prompt, and the input and output of every tool call, including the contents of files a tool read or wrote.
   </Accordion>
 
   <Accordion title="Configuration not taking effect">
@@ -395,7 +395,7 @@ For comprehensive monitoring resources, see the [Claude Code Monitoring Guide](h
 ## Security and Privacy
 
 - **Telemetry is opt-in** and requires explicit configuration
-- **Prompts, tool input and output, and model request and response bodies are off by default** - only token counts and cost ship until you opt in with the content flags (`OTEL_LOG_USER_PROMPTS`, `OTEL_LOG_TOOL_DETAILS`, `OTEL_LOG_TOOL_CONTENT`, `OTEL_LOG_RAW_API_BODIES`)
+- **Prompts, tool input and output, and model request and response bodies are off by default** - without the content flags (`OTEL_LOG_USER_PROMPTS`, `OTEL_LOG_TOOL_DETAILS`, `OTEL_LOG_TOOL_CONTENT`, `OTEL_LOG_RAW_API_BODIES`) the export still carries usage: token counts, cost, latency, the tool call tree and subagent attribution. What it leaves out is the content itself
 - **Once enabled, prompt text, tool outputs, and file contents passed to tools will appear in traces** - enable the flags only where capturing that content is acceptable
 - **Every example on this page enables the content flags**, because that is what makes a trace worth reading. Trim them to the ones you want before rolling the configuration out to a team, and keep the same decision in mind for managed settings, which apply to everyone at once
 

@@ -74,7 +74,7 @@ const APP_DERIVED_PREFIXES = [
   "/api/traces",
   "/api/triggers",
   "/api/workflows",
-];
+] as const;
 
 /**
  * Whether a path is owned by one of the apps above — the prefix itself, or
@@ -268,7 +268,7 @@ const OPENAPI_METHODS = [
   "head",
   "options",
   "trace",
-];
+] as const;
 
 /**
  * Drops path entries left holding no operation.

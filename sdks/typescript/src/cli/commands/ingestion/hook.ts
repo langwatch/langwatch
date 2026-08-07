@@ -188,6 +188,19 @@ async function runHook({
   }
   const agent = spec.agent;
 
+  // Checked before stdin is read and before any git work: an agent with no
+  // telemetry configured is the common case, and it must cost nothing but this
+  // lookup. Reading first would spend the stdin deadline on a pipe the seam
+  // may never close, for a payload nothing was ever going to be sent from.
+  const target = resolveTarget({ env, agent, readCliConfig });
+  if (!target) {
+    debug({
+      message: "no telemetry target in the environment or the CLI config",
+      env,
+    });
+    return;
+  }
+
   const input = parseHookInput(await readInput());
   const sessionId = firstNonEmpty(
     input.sessionId,
@@ -201,17 +214,6 @@ async function runHook({
     message: `${input.hookEventName ?? "hook"} for session ${sessionId}`,
     env,
   });
-
-  // Checked before any git work: an agent with no telemetry configured is
-  // the common case, and it must cost nothing but this lookup.
-  const target = resolveTarget({ env, agent, readCliConfig });
-  if (!target) {
-    debug({
-      message: "no telemetry target in the environment or the CLI config",
-      env,
-    });
-    return;
-  }
 
   const projectDir = spec.projectDirVar ? env[spec.projectDirVar] : undefined;
   const directory = firstNonEmpty(projectDir, input.cwd) ?? process.cwd();

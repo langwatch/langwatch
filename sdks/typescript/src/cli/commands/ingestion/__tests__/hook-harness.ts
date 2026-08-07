@@ -99,7 +99,7 @@ export interface RunHookOptions {
    * Run with no exporter variables at all, the way Claude Code hands its hooks
    * an environment. Every other run seeds `OTEL_EXPORTER_OTLP_ENDPOINT`.
    */
-  withoutExporterEnv?: boolean;
+  shouldOmitExporterEnv?: boolean;
 }
 
 export interface HookHarness {
@@ -176,11 +176,11 @@ export const installHookHarness = (): HookHarness => {
       now = NOW,
       tool = "claude-code",
       readCliConfig = NO_CLI_CONFIG,
-      withoutExporterEnv = false,
+      shouldOmitExporterEnv = false,
     }: RunHookOptions = {}) =>
       hookCommand({
         tool,
-        env: withoutExporterEnv
+        env: shouldOmitExporterEnv
           ? env
           : { OTEL_EXPORTER_OTLP_ENDPOINT: ENDPOINT, ...env },
         readInput: () =>

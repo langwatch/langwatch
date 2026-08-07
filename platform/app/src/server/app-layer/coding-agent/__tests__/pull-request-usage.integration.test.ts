@@ -52,7 +52,6 @@ let visibleProjectId: string;
 let tokensOnlyProjectId: string;
 /** The caller may not read it at all. */
 let hiddenProjectId: string;
-/** Holds the session whose remote was reported with the host's own casing. */
 let mixedCaseProjectId: string;
 
 const pullRequests = new PrismaGithubPullRequestsRepository(prisma);

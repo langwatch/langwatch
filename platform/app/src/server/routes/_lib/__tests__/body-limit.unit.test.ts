@@ -23,7 +23,7 @@ import { HTTPException } from "hono/http-exception";
 import { describe, expect, it } from "vitest";
 import { bodyLimit } from "../body-limit";
 
-const URL = "http://127.0.0.1/echo";
+const ECHO_URL = "http://127.0.0.1/echo";
 
 /** A request whose `Content-Length` is whatever the caller says it is. */
 function request({
@@ -35,7 +35,7 @@ function request({
 }): Request {
   const headers = new Headers({ "content-type": "application/json" });
   for (const [name, value] of Object.entries(extra)) headers.set(name, value);
-  return new Request(URL, { method: "POST", headers, body: payload });
+  return new Request(ECHO_URL, { method: "POST", headers, body: payload });
 }
 
 /**
@@ -160,18 +160,20 @@ describe("the size the request body cap is willing to trust", () => {
   });
 
   describe("given a Transfer-Encoding alongside a Content-Length", () => {
-    it("believes the transfer encoding and measures the body itself", async () => {
-      const payload = JSON.stringify({ resourceSpans: [] });
-      const result = await capped({
-        maxSize: 1024,
-        incoming: request({
-          payload,
-          headers: { "content-length": "0", "transfer-encoding": "chunked" },
-        }),
-      });
+    describe("when the body fits under the cap", () => {
+      it("believes the transfer encoding and measures the body itself", async () => {
+        const payload = JSON.stringify({ resourceSpans: [] });
+        const result = await capped({
+          maxSize: 1024,
+          incoming: request({
+            payload,
+            headers: { "content-length": "0", "transfer-encoding": "chunked" },
+          }),
+        });
 
-      expect(result.drained).toBe(true);
-      expect(result.body).toBe(payload);
+        expect(result.drained).toBe(true);
+        expect(result.body).toBe(payload);
+      });
     });
   });
 

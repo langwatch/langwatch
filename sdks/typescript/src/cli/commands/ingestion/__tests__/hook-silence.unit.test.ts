@@ -92,6 +92,7 @@ describe("the session context hook's silence", () => {
       );
     });
 
+    /** @scenario "A payload that never arrives does not outlive the session" */
     it("releases the pipe, so it cannot hold the process open", async () => {
       const stream = new PassThrough();
 
@@ -107,6 +108,17 @@ describe("the session context hook's silence", () => {
       await expect(readStdin({ stream, timeoutMs: 5_000 })).resolves.toBe(
         '{"session_id":"abc"}',
       );
+    });
+  });
+
+  describe("given a seam writing far more than a payload holds", () => {
+    /** @scenario "A write too large to be a payload is not buffered" */
+    it("stops at the cap, releases the pipe and reads as empty", async () => {
+      const stream = new PassThrough();
+      stream.write(`{"session_id":"${"x".repeat(128 * 1024)}"}`);
+
+      await expect(readStdin({ stream, timeoutMs: 5_000 })).resolves.toBe("");
+      expect(stream.destroyed).toBe(true);
     });
   });
 

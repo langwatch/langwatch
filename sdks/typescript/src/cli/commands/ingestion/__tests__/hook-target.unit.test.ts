@@ -59,7 +59,7 @@ describe("the session context hook's telemetry target", () => {
   describe("given no OTLP endpoint in the environment", () => {
     /** @scenario "Without telemetry configuration the hook sends nothing and exits zero" */
     it("posts nothing and exits zero when the CLI is not signed in either", async () => {
-      await hook.runHook({ withoutExporterEnv: true, input: SESSION_ONLY });
+      await hook.runHook({ shouldOmitExporterEnv: true, input: SESSION_ONLY });
 
       expect(posted).toEqual([]);
       expect(hook.exits).toEqual([]);
@@ -68,7 +68,7 @@ describe("the session context hook's telemetry target", () => {
     /** @scenario "An agent that strips the exporter variables still reports" */
     it("falls back to the control plane and ingest key the CLI is signed in with", async () => {
       await hook.runHook({
-        withoutExporterEnv: true,
+        shouldOmitExporterEnv: true,
         input: SESSION_ONLY,
         env: { CLAUDE_PROJECT_DIR: "/repo/worktrees/review" },
         readCliConfig: () => ({
@@ -88,7 +88,7 @@ describe("the session context hook's telemetry target", () => {
     it("resolves its own agent's ingest key from the CLI config", async () => {
       await hook.runHook({
         tool: "codex",
-        withoutExporterEnv: true,
+        shouldOmitExporterEnv: true,
         readCliConfig: () => ({
           control_plane_url: "http://app.example.com",
           default_personal_ingest_keys: {
@@ -104,7 +104,7 @@ describe("the session context hook's telemetry target", () => {
     /** @scenario "A signed-in CLI with no key for this agent sends nothing" */
     it("posts nothing when the config carries no ingest key for the agent", async () => {
       await hook.runHook({
-        withoutExporterEnv: true,
+        shouldOmitExporterEnv: true,
         input: SESSION_ONLY,
         readCliConfig: () => ({
           control_plane_url: "http://app.example.com",
