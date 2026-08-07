@@ -165,6 +165,38 @@ describe("useModelProviderConnectionTest", () => {
       expect(result.current.results[PROVIDER_ROW]).toBeUndefined();
     });
 
+    /** @scenario "A verdict in flight when the credential changes is discarded" */
+    it("discards a verdict that arrives after the credential may have changed", async () => {
+      // The ordering that matters, and the one clearing alone does not cover:
+      // the probe is already in flight when the row is edited. Emptying the map
+      // does nothing to a promise that has not resolved yet, so its answer —
+      // about the key that was there before — lands a moment later and stands.
+      let settle!: (value: unknown) => void;
+      testConnectionMock.mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            settle = resolve;
+          }),
+      );
+
+      const { result } = renderTest();
+      let inFlight!: Promise<void>;
+      act(() => {
+        inFlight = result.current.test(PROVIDER_ROW);
+      });
+
+      act(() => {
+        result.current.clearResults();
+      });
+
+      await act(async () => {
+        settle({ outcome: "verified" });
+        await inFlight;
+      });
+
+      expect(result.current.results[PROVIDER_ROW]).toBeUndefined();
+    });
+
     /** @scenario "A verdict does not outlive the credential it was about" */
     it("forgets every row at once, not only the one just tested", async () => {
       testConnectionMock.mockResolvedValue({ outcome: "verified" });

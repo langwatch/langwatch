@@ -39,11 +39,11 @@ vi.mock("../../utils/api", () => ({
 }));
 
 import { TRPCClientError } from "@trpc/client";
+import { errorFormatter } from "../../server/api/trpc";
 import {
   ProviderKeyRestrictedError,
   ProviderUnreachableError,
-} from "../../server/api/routers/providerValidation";
-import { errorFormatter } from "../../server/api/trpc";
+} from "../../server/modelProviders/providerValidation";
 import { useModelProviderApiKeyValidation } from "../useModelProviderApiKeyValidation";
 
 /**

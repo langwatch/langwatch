@@ -4,13 +4,9 @@ import { env } from "~/env.mjs";
 import type { Session } from "~/server/auth";
 import { isManagedProvider } from "../../../ee/managed-providers/managedBedrockConfig";
 import { KEY_CHECK, MASKED_KEY_PLACEHOLDER } from "../../utils/constants";
+import { rateLimit } from "../rateLimit";
 import type { CustomModelsInput } from "./customModel.schema";
 import { toLegacyCompatibleCustomModels } from "./customModel.schema";
-import {
-  type ValidationResult,
-  validateProviderApiKey,
-} from "../api/routers/providerValidation";
-import { rateLimit } from "../rateLimit";
 import {
   ModelProviderAnchorRequiredError,
   ModelProviderDeprecatedError,
@@ -28,6 +24,10 @@ import {
   type ModelProviderWithScopes,
   type ScopeInput,
 } from "./modelProvider.repository";
+import {
+  type ValidationResult,
+  validateProviderApiKey,
+} from "./providerValidation";
 import {
   getProviderModelOptions,
   type MaybeStoredModelProvider,
@@ -108,6 +108,24 @@ export type UpdateModelProviderInput = {
   fallbackPriorityGlobal?: number | null;
   providerConfig?: Record<string, unknown> | null;
 };
+
+/**
+ * What a connection test needs: which row, and which tenant to resolve it in.
+ *
+ * The schema is the source and the type is inferred from it, so the router's
+ * runtime validation and the service's compile-time contract cannot drift —
+ * and it lives here, beside the method that consumes it, so the service never
+ * has to import the router to know its own input shape.
+ *
+ * Conspicuously absent: anywhere to put an endpoint. See `testConnection`.
+ */
+export const testConnectionInputSchema = z.object({
+  modelProviderId: z.string(),
+  projectId: z.string().optional(),
+  organizationId: z.string().optional(),
+});
+
+export type TestConnectionInput = z.infer<typeof testConnectionInputSchema>;
 
 export type DeleteModelProviderInput = {
   id?: string;
@@ -865,14 +883,13 @@ export class ModelProviderService {
    * satisfies it vacuously, and the org-anchored lookup has no scope
    * predicate to stop such a row being addressed by id.
    */
-  async testConnection(
-    input: {
-      modelProviderId: string;
-      projectId?: string;
-      organizationId?: string;
-    },
-    ctx: AuthzContext,
-  ): Promise<ValidationResult> {
+  async testConnection({
+    input,
+    ctx,
+  }: {
+    input: TestConnectionInput;
+    ctx: AuthzContext;
+  }): Promise<ValidationResult> {
     const { modelProviderId, projectId, organizationId } = input;
 
     const anchor = await this.resolveOrganizationAnchor({

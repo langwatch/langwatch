@@ -15,7 +15,7 @@ vi.mock("../modelProvider.repository", () => ({
   },
 }));
 
-vi.mock("../../api/routers/providerValidation", () => ({
+vi.mock("../providerValidation", () => ({
   validateProviderApiKey: (...args: unknown[]) =>
     validateProviderApiKeyMock(...args),
 }));
@@ -91,10 +91,10 @@ describe("testConnection", () => {
     it("sends the credential already stored, not one supplied with the call", async () => {
       findByIdForOrganizationMock.mockResolvedValueOnce(orgScopedRow());
 
-      await service().testConnection(
-        { modelProviderId: "mp_1", organizationId: ORGANIZATION_ID },
+      await service().testConnection({
+        input: { modelProviderId: "mp_1", organizationId: ORGANIZATION_ID },
         ctx,
-      );
+      });
 
       expect(validateProviderApiKeyMock).toHaveBeenCalledWith("openai", {
         OPENAI_API_KEY: "sk-stored",
@@ -109,15 +109,15 @@ describe("testConnection", () => {
       // The call site has nowhere to put a destination: the input is a row id
       // and a tenant handle. This is the property that keeps a credential the
       // caller may never read from being posted somewhere they choose.
-      await service().testConnection(
-        {
+      await service().testConnection({
+        input: {
           modelProviderId: "mp_1",
           organizationId: ORGANIZATION_ID,
           // @ts-expect-error — an endpoint is not part of the contract
           customBaseUrl: "https://attacker.example.com",
         },
         ctx,
-      );
+      });
 
       const [, keys] = validateProviderApiKeyMock.mock.calls[0]!;
       expect(keys.OPENAI_BASE_URL).toBe("https://saved.example.com/v1");
@@ -128,10 +128,10 @@ describe("testConnection", () => {
     it("finds a row granted at the organization scope", async () => {
       findByIdForOrganizationMock.mockResolvedValueOnce(orgScopedRow());
 
-      const result = await service().testConnection(
-        { modelProviderId: "mp_1", organizationId: ORGANIZATION_ID },
+      const result = await service().testConnection({
+        input: { modelProviderId: "mp_1", organizationId: ORGANIZATION_ID },
         ctx,
-      );
+      });
 
       // The project-shaped lookup matches PROJECT grants only, so reaching for
       // it here would report a perfectly good org-scoped credential as absent.
@@ -151,10 +151,10 @@ describe("testConnection", () => {
       hasOrganizationPermissionMock.mockResolvedValue(false);
 
       await expect(
-        service().testConnection(
-          { modelProviderId: "mp_1", organizationId: ORGANIZATION_ID },
+        service().testConnection({
+          input: { modelProviderId: "mp_1", organizationId: ORGANIZATION_ID },
           ctx,
-        ),
+        }),
       ).rejects.toBeInstanceOf(ModelProviderScopeForbiddenError);
 
       expect(validateProviderApiKeyMock).not.toHaveBeenCalled();
@@ -171,10 +171,10 @@ describe("testConnection", () => {
       );
 
       await expect(
-        service().testConnection(
-          { modelProviderId: "mp_1", organizationId: ORGANIZATION_ID },
+        service().testConnection({
+          input: { modelProviderId: "mp_1", organizationId: ORGANIZATION_ID },
           ctx,
-        ),
+        }),
       ).rejects.toBeInstanceOf(ModelProviderNotFoundError);
 
       expect(validateProviderApiKeyMock).not.toHaveBeenCalled();
@@ -184,10 +184,10 @@ describe("testConnection", () => {
       findByIdForOrganizationMock.mockResolvedValueOnce(null);
 
       await expect(
-        service().testConnection(
-          { modelProviderId: "mp_1", organizationId: ORGANIZATION_ID },
+        service().testConnection({
+          input: { modelProviderId: "mp_1", organizationId: ORGANIZATION_ID },
           ctx,
-        ),
+        }),
       ).rejects.toBeInstanceOf(ModelProviderNotFoundError);
 
       expect(validateProviderApiKeyMock).not.toHaveBeenCalled();
@@ -205,10 +205,10 @@ describe("testConnection", () => {
       });
 
       await expect(
-        service().testConnection(
-          { modelProviderId: "mp_1", organizationId: ORGANIZATION_ID },
+        service().testConnection({
+          input: { modelProviderId: "mp_1", organizationId: ORGANIZATION_ID },
           ctx,
-        ),
+        }),
       ).rejects.toBeInstanceOf(ModelProviderTestRateLimitedError);
 
       expect(validateProviderApiKeyMock).not.toHaveBeenCalled();
@@ -217,10 +217,10 @@ describe("testConnection", () => {
     it("counts the organization before the instance, and both before asking", async () => {
       findByIdForOrganizationMock.mockResolvedValueOnce(orgScopedRow());
 
-      await service().testConnection(
-        { modelProviderId: "mp_1", organizationId: ORGANIZATION_ID },
+      await service().testConnection({
+        input: { modelProviderId: "mp_1", organizationId: ORGANIZATION_ID },
         ctx,
-      );
+      });
 
       const keys = rateLimitMock.mock.calls.map(([opts]: any[]) => opts.key);
       expect(keys).toEqual([
@@ -236,10 +236,10 @@ describe("testConnection", () => {
       hasOrganizationPermissionMock.mockResolvedValue(false);
 
       await expect(
-        service().testConnection(
-          { modelProviderId: "mp_1", organizationId: ORGANIZATION_ID },
+        service().testConnection({
+          input: { modelProviderId: "mp_1", organizationId: ORGANIZATION_ID },
           ctx,
-        ),
+        }),
       ).rejects.toBeInstanceOf(ModelProviderScopeForbiddenError);
 
       expect(rateLimitMock).not.toHaveBeenCalled();
@@ -258,10 +258,10 @@ describe("testConnection", () => {
         reason: "provider_not_probeable",
       });
 
-      const result = await service().testConnection(
-        { modelProviderId: "mp_1", organizationId: ORGANIZATION_ID },
+      const result = await service().testConnection({
+        input: { modelProviderId: "mp_1", organizationId: ORGANIZATION_ID },
         ctx,
-      );
+      });
 
       expect(result.outcome).toBe("unchecked");
     });

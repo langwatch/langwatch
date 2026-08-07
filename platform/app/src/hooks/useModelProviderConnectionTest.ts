@@ -1,6 +1,9 @@
-import type { SerializedHandledError } from "@langwatch/handled-error";
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { describeError, explainSerializedError } from "../features/errors";
+import type {
+  UncheckedReason,
+  ValidationResult,
+} from "../server/modelProviders/providerValidation";
 import { api } from "../utils/api";
 
 /**
@@ -19,18 +22,16 @@ import { api } from "../utils/api";
  */
 
 /**
- * The wire shape of a verdict.
+ * The wire shape of a verdict — the server's own type, not a copy of it.
  *
- * Declared here rather than imported from the server module that owns it.
- * That module value-imports the provider repository, which reaches Prisma and
- * the encryption helpers, so importing the type by value would pull both into
- * the browser bundle. The frontend-boundary test guards server code reaching
- * browser packages, not the reverse, so the mistake would ship quietly.
+ * `import type` and not a value import: the module that owns this type reaches
+ * the provider repository, and through it Prisma and the encryption helpers, so
+ * importing anything from it by value would pull both into the browser bundle.
+ * Types are erased, so this costs nothing at runtime and buys the one thing a
+ * redeclaration cannot — a rename or a new `outcome` on the server becomes a
+ * type error here instead of a sentence that quietly stops being true.
  */
-type ConnectionTestResult =
-  | { outcome: "verified" }
-  | { outcome: "refused"; domainError: SerializedHandledError }
-  | { outcome: "unchecked"; reason: string };
+type ConnectionTestResult = ValidationResult;
 
 export type ConnectionTestState =
   | { status: "testing" }
@@ -47,7 +48,7 @@ export type ConnectionTestState =
  * is whether they still have something to do. Only the cases they can act on
  * get a next step.
  */
-const uncheckedMessage = (reason: string): string => {
+const uncheckedMessage = (reason: UncheckedReason): string => {
   if (reason === "no_credential" || reason === "credential_masked") {
     // Not "nothing is stored": a credential written before the encryption
     // secret was rotated is unreadable rather than absent, and the two are
@@ -72,9 +73,26 @@ export function useModelProviderConnectionTest({
   const { mutateAsync: testConnection } =
     api.modelProvider.testConnection.useMutation();
 
+  /**
+   * Which round of verdicts the visible ones belong to.
+   *
+   * Clearing the map is not enough on its own. A probe already in flight when
+   * the map is cleared still resolves afterwards and writes its verdict back,
+   * so the state a customer sees would be a verdict about the credential that
+   * was in the row *before* they edited it — the very thing clearing was meant
+   * to prevent, arriving a second later. Bumping a generation and discarding
+   * anything stamped with an older one closes that window; a counter rather
+   * than a boolean because several rows can be in flight at once.
+   */
+  const generation = useRef(0);
+
   const setResult = useCallback(
-    (modelProviderId: string, state: ConnectionTestState) =>
-      setResults((current) => ({ ...current, [modelProviderId]: state })),
+    (modelProviderId: string, state: ConnectionTestState, from: number) =>
+      setResults((current) =>
+        from === generation.current
+          ? { ...current, [modelProviderId]: state }
+          : current,
+      ),
     [],
   );
 
@@ -92,12 +110,19 @@ export function useModelProviderConnectionTest({
    *
    * `useCredentialProbeGate` makes the same argument for the save-time probe:
    * a refusal must not outlive the credential it was about.
+   *
+   * Bumping the generation is what makes this hold for a probe still in
+   * flight, whose answer would otherwise land after the clear.
    */
-  const clearResults = useCallback(() => setResults({}), []);
+  const clearResults = useCallback(() => {
+    generation.current += 1;
+    setResults({});
+  }, []);
 
   const test = useCallback(
     async (modelProviderId: string) => {
-      setResult(modelProviderId, { status: "testing" });
+      const asked = generation.current;
+      setResult(modelProviderId, { status: "testing" }, asked);
 
       try {
         const result = (await testConnection({
@@ -107,7 +132,7 @@ export function useModelProviderConnectionTest({
         })) as ConnectionTestResult;
 
         if (result.outcome === "verified") {
-          setResult(modelProviderId, { status: "works" });
+          setResult(modelProviderId, { status: "works" }, asked);
           return;
         }
 
@@ -121,29 +146,38 @@ export function useModelProviderConnectionTest({
           const { title, description } = explainSerializedError(
             result.domainError,
           );
-          setResult(modelProviderId, {
-            status: "refused",
-            message: description ? `${title}. ${description}` : title,
-          });
+          setResult(
+            modelProviderId,
+            {
+              status: "refused",
+              message: description ? `${title}. ${description}` : title,
+            },
+            asked,
+          );
           return;
         }
 
-        setResult(modelProviderId, {
-          status: "unchecked",
-          message: uncheckedMessage(result.reason),
-        });
+        setResult(
+          modelProviderId,
+          { status: "unchecked", message: uncheckedMessage(result.reason) },
+          asked,
+        );
       } catch (error) {
         // Not `error.message`: a handled error's message is replaced by its
         // stable code on the wire, so reading it renders a slug like
         // `model_provider_test_rate_limited` at the customer. A failure to
         // ask is reported as such, never as a verdict on the credential.
-        setResult(modelProviderId, {
-          status: "unchecked",
-          message: describeError({
-            error,
-            fallbackTitle: "Couldn't test this connection",
-          }),
-        });
+        setResult(
+          modelProviderId,
+          {
+            status: "unchecked",
+            message: describeError({
+              error,
+              fallbackTitle: "Couldn't test this connection",
+            }),
+          },
+          asked,
+        );
       }
     },
     [organizationId, projectId, setResult, testConnection],

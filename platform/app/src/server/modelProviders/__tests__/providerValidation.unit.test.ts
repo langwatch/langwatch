@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { MASKED_KEY_PLACEHOLDER } from "../../../../utils/constants";
+import { MASKED_KEY_PLACEHOLDER } from "../../../utils/constants";
 import {
   ProviderUnreachableError,
   type ValidationResult,
@@ -149,7 +149,10 @@ describe("validateProviderApiKey", () => {
         VOYAGE_API_KEY: "pa-test",
       });
 
-      expect(result.outcome).toBe("unchecked");
+      expect(result).toMatchObject({
+        outcome: "unchecked",
+        reason: "no_endpoint",
+      });
       expect(mockFetch).not.toHaveBeenCalled();
     });
   });
@@ -970,7 +973,10 @@ describe("given a check that never reached the provider", () => {
         SOME_KEY: "whatever",
       });
 
-      expect(result.outcome).toBe("unchecked");
+      expect(result).toMatchObject({
+        outcome: "unchecked",
+        reason: "provider_not_probeable",
+      });
       expect(mockFetch).not.toHaveBeenCalled();
     });
 
@@ -987,7 +993,10 @@ describe("given a check that never reached the provider", () => {
           "https://example.cognitiveservices.azure.com",
       });
 
-      expect(result.outcome).toBe("unchecked");
+      expect(result).toMatchObject({
+        outcome: "unchecked",
+        reason: "provider_not_probeable",
+      });
       expect(mockFetch).not.toHaveBeenCalled();
     });
   });
@@ -999,7 +1008,10 @@ describe("given a check that never reached the provider", () => {
         OPENAI_API_KEY: MASKED_KEY_PLACEHOLDER,
       });
 
-      expect(result.outcome).toBe("unchecked");
+      expect(result).toMatchObject({
+        outcome: "unchecked",
+        reason: "credential_masked",
+      });
       expect(mockFetch).not.toHaveBeenCalled();
     });
 
@@ -1009,7 +1021,10 @@ describe("given a check that never reached the provider", () => {
         OPENAI_API_KEY: "",
       });
 
-      expect(result.outcome).toBe("unchecked");
+      expect(result).toMatchObject({
+        outcome: "unchecked",
+        reason: "no_credential",
+      });
       expect(mockFetch).not.toHaveBeenCalled();
     });
   });
@@ -1031,7 +1046,10 @@ describe("given a check that never reached the provider", () => {
         SOME_API_KEY: "test-key",
       });
 
-      expect(result.outcome).toBe("unchecked");
+      expect(result).toMatchObject({
+        outcome: "unchecked",
+        reason: "unknown_provider",
+      });
       expect(mockFetch).not.toHaveBeenCalled();
     });
   });

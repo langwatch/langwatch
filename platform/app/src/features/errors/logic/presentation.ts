@@ -551,8 +551,14 @@ const presentations = {
     // `meta` and gets read back here.
     title: "Too many connection tests",
     describe: (error) => {
-      const seconds = Number(error.meta.retryAfterSeconds);
-      return Number.isFinite(seconds) && seconds > 0
+      // Rounded up here rather than trusted from the wire. The server sends a
+      // whole number today, but this is a client contract read by whatever
+      // sends the code, and a fraction would print "about 30.427 seconds" and
+      // slip past the `=== 1` singular check. Up, not down: rounding down
+      // invites a retry the limiter is still going to refuse.
+      const raw = Number(error.meta.retryAfterSeconds);
+      const seconds = Number.isFinite(raw) ? Math.ceil(raw) : 0;
+      return seconds > 0
         ? `Wait about ${seconds} second${seconds === 1 ? "" : "s"} and try again.`
         : "Wait a moment and try again.";
     },

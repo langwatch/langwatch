@@ -29,7 +29,14 @@ import {
   updateConfig,
 } from "../../modelProviders/modelDefaults.service";
 import { assertCanManageAllScopes } from "../../modelProviders/modelProvider.authz";
-import { ModelProviderService } from "../../modelProviders/modelProvider.service";
+import {
+  ModelProviderService,
+  testConnectionInputSchema,
+} from "../../modelProviders/modelProvider.service";
+import {
+  validateKeyWithCustomUrl,
+  validateProviderApiKey,
+} from "../../modelProviders/providerValidation";
 import {
   checkOrganizationPermission,
   checkProjectPermission,
@@ -43,10 +50,6 @@ import {
   listOrgModelProvidersForFrontend,
   listProjectModelProvidersForFrontend,
 } from "./modelProviders.utils";
-import {
-  validateKeyWithCustomUrl,
-  validateProviderApiKey,
-} from "./providerValidation";
 
 export type { ModelMetadataForFrontend } from "./modelProviders.utils";
 export {
@@ -296,20 +299,13 @@ export const modelProviderRouter = createTRPCRouter({
    * service for why the absence is the point.
    */
   testConnection: protectedProcedure
-    .input(
-      z
-        .object({
-          ...tenantAnchorSchema,
-          modelProviderId: z.string(),
-        })
-        .superRefine(requireTenantAnchor),
-    )
+    .input(testConnectionInputSchema.superRefine(requireTenantAnchor))
     .use(checkProjectOrOrganizationPermission("project:update"))
     .mutation(async ({ input, ctx }) => {
       const service = ModelProviderService.create(ctx.prisma);
-      return await service.testConnection(input, {
-        prisma: ctx.prisma,
-        session: ctx.session,
+      return await service.testConnection({
+        input,
+        ctx: { prisma: ctx.prisma, session: ctx.session },
       });
     }),
 

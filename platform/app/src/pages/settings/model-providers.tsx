@@ -582,6 +582,60 @@ export default function ModelsPage() {
 }
 
 /**
+ * What the last connection test said about this row.
+ *
+ * Three states, rendered three different ways on purpose. A check that could
+ * not run reads as neutral rather than green: it is not a pass, and dressing
+ * it as one would tell a customer their configuration is fine on the strength
+ * of never having asked.
+ *
+ * The whole verdict lives in a polite live region. The text arrives well after
+ * the click that asked for it, and a screen reader announces neither the
+ * "Testing…" transition nor the answer replacing it — so without this the
+ * control is a button that appears to do nothing at all.
+ */
+function ConnectionTestVerdict({
+  state,
+}: {
+  state: ConnectionTestState | undefined;
+}) {
+  const verdict = () => {
+    if (!state) return null;
+
+    if (state.status === "testing") {
+      return (
+        <Text fontSize="xs" color="fg.muted">
+          Testing…
+        </Text>
+      );
+    }
+
+    if (state.status === "works") {
+      return (
+        <Text fontSize="xs" color="green.fg">
+          Connection works
+        </Text>
+      );
+    }
+
+    return (
+      <Text
+        fontSize="xs"
+        color={state.status === "refused" ? "red.fg" : "fg.muted"}
+      >
+        {state.message}
+      </Text>
+    );
+  };
+
+  return (
+    <Box aria-live="polite" aria-atomic="true">
+      {verdict()}
+    </Box>
+  );
+}
+
+/**
  * Shared "Add Model Provider" menu — same provider list, same RBAC
  * gate, same click handler — wrapped around whatever trigger the
  * caller passes (header button in the page top-right + outline button
@@ -592,47 +646,6 @@ export default function ModelsPage() {
  * inert with that reason on hover, and no menu is mounted at all, so
  * adding can never open onto a list of providers that lead nowhere.
  */
-/**
- * What the last connection test said about this row.
- *
- * Three states, rendered three different ways on purpose. A check that could
- * not run reads as neutral rather than green: it is not a pass, and dressing
- * it as one would tell a customer their configuration is fine on the strength
- * of never having asked.
- */
-function ConnectionTestVerdict({
-  state,
-}: {
-  state: ConnectionTestState | undefined;
-}) {
-  if (!state) return null;
-
-  if (state.status === "testing") {
-    return (
-      <Text fontSize="xs" color="fg.muted">
-        Testing…
-      </Text>
-    );
-  }
-
-  if (state.status === "works") {
-    return (
-      <Text fontSize="xs" color="green.fg">
-        Connection works
-      </Text>
-    );
-  }
-
-  return (
-    <Text
-      fontSize="xs"
-      color={state.status === "refused" ? "red.fg" : "fg.muted"}
-    >
-      {state.message}
-    </Text>
-  );
-}
-
 function AddModelProviderMenu({
   children,
   addableProviders,

@@ -7,10 +7,10 @@ import type { PrismaClient } from "@prisma/client";
 import {
   providerApiRoots,
   providerDefaultBaseUrls,
-} from "../../../features/onboarding/regions/model-providers/registry";
-import { MASKED_KEY_PLACEHOLDER } from "../../../utils/constants";
-import { ModelProviderRepository } from "../../modelProviders/modelProvider.repository";
-import { modelProviders } from "../../modelProviders/registry";
+} from "../../features/onboarding/regions/model-providers/registry";
+import { MASKED_KEY_PLACEHOLDER } from "../../utils/constants";
+import { ModelProviderRepository } from "./modelProvider.repository";
+import { modelProviders } from "./registry";
 
 /**
  * The answer to "does this credential work".

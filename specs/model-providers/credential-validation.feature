@@ -460,6 +460,13 @@ Feature: Credential Validation
     And I am not told the connection works until I test again
 
   @unit
+  Scenario: A verdict in flight when the credential changes is discarded
+    Given a connection test that has not finished yet
+    When I edit that provider before the answer arrives
+    Then the answer is discarded when it arrives
+    And I am not told the connection works
+
+  @unit
   Scenario: Repeated tests are limited per organization
     Given I have tested connections many times in quick succession
     When I test another connection
@@ -481,10 +488,10 @@ Feature: Credential Validation
   Scenario: Every reason a check does not run is reported as unchecked
     Given a check that does not reach the provider
     When the reason is that the provider uses credentials we cannot probe
-    Or the reason is that the credential is masked
-    Or the reason is that no credential is stored
-    Or the reason is that the provider has no endpoint to probe
-    Or the reason is that the provider is not one we recognize
+    And the reason is that the credential is masked
+    And the reason is that no credential is stored
+    And the reason is that the provider has no endpoint to probe
+    And the reason is that the provider is not one we recognize
     Then each of them reports that the check did not run
 
   # A provider that could not be asked at all is covered above, under the
