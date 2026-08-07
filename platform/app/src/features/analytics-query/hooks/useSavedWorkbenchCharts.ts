@@ -12,7 +12,12 @@
  * @see specs/analytics/governed-sql-saved-charts.feature
  */
 
-import { useCallback, useState } from "react";
+import {
+  type Dispatch,
+  type SetStateAction,
+  useCallback,
+  useState,
+} from "react";
 
 import { api } from "~/utils/api";
 
@@ -95,32 +100,129 @@ export function useSavedWorkbenchCharts({
     await utils.analytics.savedWorkbenchCharts.getAll.invalidate({ projectId });
   }, [utils, projectId]);
 
-  const definitionOf = (draft: WorkbenchChartDraft) => ({
+  const writes = { projectId, setOpened, refreshList, onError };
+  const save = useSaveChart({ ...writes, opened, createChart, updateChart });
+  const open = useOpenChart({ ...writes, utils, onOpened });
+  const rename = useRenameChart({ ...writes, updateChart });
+  const remove = useRemoveChart({ ...writes, deleteChart });
+
+  return {
+    charts: list.data ?? [],
+    isLoading: list.isLoading,
+    openedChartId: opened?.id ?? null,
+    openedChartName: opened?.name ?? null,
+    isSaving: createChart.isPending || updateChart.isPending,
+    save,
+    open,
+    rename,
+    remove,
+    closeOpened: useCallback(() => setOpened(null), []),
+  };
+}
+
+/** What every write shares: the project, the opened-chart state, the list, and where refusals go. */
+interface ChartWriteContext {
+  projectId: string;
+  setOpened: Dispatch<SetStateAction<SavedChartSummary | null>>;
+  refreshList: () => Promise<void>;
+  onError: (error: unknown, fallbackTitle: string) => void;
+}
+
+function definitionOf(draft: WorkbenchChartDraft) {
+  return {
     version: 1 as const,
     sql: draft.sql,
     parameters: draft.parameters,
     ...(draft.vegaLiteSpec ? { vegaLiteSpec: draft.vegaLiteSpec } : {}),
-  });
+  };
+}
 
-  const save = useCallback(
+type CreateChartMutation = ReturnType<
+  typeof api.analytics.savedWorkbenchCharts.create.useMutation
+>;
+type UpdateChartMutation = ReturnType<
+  typeof api.analytics.savedWorkbenchCharts.update.useMutation
+>;
+
+async function writeBackToOpened({
+  projectId,
+  opened,
+  name,
+  definition,
+  updateChart,
+  setOpened,
+}: {
+  projectId: string;
+  opened: SavedChartSummary;
+  name: string | undefined;
+  definition: ReturnType<typeof definitionOf>;
+  updateChart: UpdateChartMutation;
+  setOpened: Dispatch<SetStateAction<SavedChartSummary | null>>;
+}): Promise<void> {
+  await updateChart.mutateAsync({
+    projectId,
+    id: opened.id,
+    definition,
+    ...(name === undefined ? {} : { name }),
+  });
+  if (name !== undefined) setOpened({ id: opened.id, name });
+}
+
+async function createNewChart({
+  projectId,
+  name,
+  definition,
+  createChart,
+  setOpened,
+}: {
+  projectId: string;
+  name: string | undefined;
+  definition: ReturnType<typeof definitionOf>;
+  createChart: CreateChartMutation;
+  setOpened: Dispatch<SetStateAction<SavedChartSummary | null>>;
+}): Promise<void> {
+  const created = await createChart.mutateAsync({
+    projectId,
+    name: name ?? "Untitled chart",
+    definition,
+  });
+  setOpened({ id: created.id, name: created.name });
+}
+
+function useSaveChart({
+  projectId,
+  opened,
+  setOpened,
+  refreshList,
+  onError,
+  createChart,
+  updateChart,
+}: ChartWriteContext & {
+  opened: SavedChartSummary | null;
+  createChart: CreateChartMutation;
+  updateChart: UpdateChartMutation;
+}) {
+  return useCallback(
     async ({ draft, name }: { draft: WorkbenchChartDraft; name?: string }) => {
       const definition = definitionOf(draft);
       try {
         if (opened) {
-          await updateChart.mutateAsync({
+          await writeBackToOpened({
             projectId,
-            id: opened.id,
+            opened,
+            name,
             definition,
-            ...(name === undefined ? {} : { name }),
+            updateChart,
+            setOpened,
           });
-          if (name !== undefined) setOpened({ id: opened.id, name });
         } else {
-          const created = await createChart.mutateAsync({
+          await createNewChart({
             projectId,
-            name: name ?? "Untitled chart",
+            name,
             definition,
+            createChart,
+            setOpened,
           });
-          setOpened({ id: created.id, name: created.name });
         }
         await refreshList();
       } catch (error) {
@@ -129,10 +231,29 @@ export function useSavedWorkbenchCharts({
         onError(error, "Couldn't save the chart");
       }
     },
-    [opened, projectId, createChart, updateChart, refreshList, onError],
+    [
+      opened,
+      projectId,
+      createChart,
+      updateChart,
+      setOpened,
+      refreshList,
+      onError,
+    ],
   );
+}
 
-  const open = useCallback(
+function useOpenChart({
+  projectId,
+  setOpened,
+  onError,
+  utils,
+  onOpened,
+}: ChartWriteContext & {
+  utils: ReturnType<typeof api.useUtils>;
+  onOpened: Parameters<typeof useSavedWorkbenchCharts>[0]["onOpened"];
+}) {
+  return useCallback(
     async (chartId: string) => {
       try {
         const chart = await utils.analytics.savedWorkbenchCharts.getById.fetch({
@@ -155,10 +276,22 @@ export function useSavedWorkbenchCharts({
         onError(error, "Couldn't open the chart");
       }
     },
-    [utils, projectId, onOpened, onError],
+    [utils, projectId, setOpened, onOpened, onError],
   );
+}
 
-  const rename = useCallback(
+function useRenameChart({
+  projectId,
+  setOpened,
+  refreshList,
+  onError,
+  updateChart,
+}: ChartWriteContext & {
+  updateChart: ReturnType<
+    typeof api.analytics.savedWorkbenchCharts.update.useMutation
+  >;
+}) {
+  return useCallback(
     async ({ id, name }: { id: string; name: string }) => {
       try {
         await updateChart.mutateAsync({ projectId, id, name });
@@ -170,10 +303,22 @@ export function useSavedWorkbenchCharts({
         onError(error, "Couldn't rename the chart");
       }
     },
-    [projectId, updateChart, refreshList, onError],
+    [projectId, updateChart, setOpened, refreshList, onError],
   );
+}
 
-  const remove = useCallback(
+function useRemoveChart({
+  projectId,
+  setOpened,
+  refreshList,
+  onError,
+  deleteChart,
+}: ChartWriteContext & {
+  deleteChart: ReturnType<
+    typeof api.analytics.savedWorkbenchCharts.delete.useMutation
+  >;
+}) {
+  return useCallback(
     async (chartId: string) => {
       try {
         await deleteChart.mutateAsync({ projectId, id: chartId });
@@ -183,19 +328,6 @@ export function useSavedWorkbenchCharts({
         onError(error, "Couldn't delete the chart");
       }
     },
-    [projectId, deleteChart, refreshList, onError],
+    [projectId, deleteChart, setOpened, refreshList, onError],
   );
-
-  return {
-    charts: list.data ?? [],
-    isLoading: list.isLoading,
-    openedChartId: opened?.id ?? null,
-    openedChartName: opened?.name ?? null,
-    isSaving: createChart.isPending || updateChart.isPending,
-    save,
-    open,
-    rename,
-    remove,
-    closeOpened: useCallback(() => setOpened(null), []),
-  };
 }

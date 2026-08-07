@@ -225,6 +225,13 @@ export interface GovernedSqlParametersEditorProps {
   initialParameters?: Readonly<Record<string, GovernedSqlParameterValue>>;
 }
 
+function kindOf(value: GovernedSqlParameterValue): ParameterKind {
+  if (value === null) return "null";
+  if (typeof value === "number") return "number";
+  if (typeof value === "boolean") return "boolean";
+  return "text";
+}
+
 /** Turns saved values back into rows, recovering the kind from each value. */
 function rowsOf(
   parameters: Readonly<Record<string, GovernedSqlParameterValue>>,
@@ -232,14 +239,7 @@ function rowsOf(
   return Object.entries(parameters).map(([name, value]) => ({
     id: `param-${nextRowId++}`,
     name,
-    kind:
-      value === null
-        ? "null"
-        : typeof value === "number"
-          ? "number"
-          : typeof value === "boolean"
-            ? "boolean"
-            : "text",
+    kind: kindOf(value),
     text: value === null ? "" : String(value),
   }));
 }
