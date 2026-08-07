@@ -90,10 +90,12 @@ function makePrisma({
           return found ? { ...found } : null;
         },
       ),
-      findFirst: vi.fn(async ({ where }: { where: Record<string, unknown> }) => {
-        const found = customRoles.find((role) => matches(role, where));
-        return found ? { ...found } : null;
-      }),
+      findFirst: vi.fn(
+        async ({ where }: { where: Record<string, unknown> }) => {
+          const found = customRoles.find((role) => matches(role, where));
+          return found ? { ...found } : null;
+        },
+      ),
       findMany: vi.fn(async ({ where }: { where: Record<string, unknown> }) =>
         customRoles
           .filter((role) => matches(role, where))
