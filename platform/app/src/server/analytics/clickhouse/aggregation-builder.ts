@@ -45,10 +45,10 @@ function resolveRequiredColumns(
 ): ReadonlySet<string> | undefined {
   switch (table) {
     case "stored_spans":
-      return narrowSpanAttributesColumns(
-        extractReferencedSpanColumns(expressions),
+      return narrowSpanAttributesColumns({
+        columns: extractReferencedSpanColumns(expressions),
         expressions,
-      );
+      });
     case "evaluation_runs":
       return extractReferencedEvaluationColumns(expressions);
     default:

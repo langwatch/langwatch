@@ -12,6 +12,32 @@ import { buildTimeseriesQuery } from "../aggregation-builder";
 import { fieldMappings, TRACE_IDENTITY_COLUMNS } from "../field-mappings";
 import { resetParamCounter } from "../filter-translator";
 
+/**
+ * Splits a SELECT list on the commas that separate its items, ignoring commas
+ * nested inside call parentheses or string literals. A plain `split(",")` would
+ * tear `map('k', SpanAttributes['k']) AS SpanAttributes` in half and make the
+ * whole-map assertion below meaningless.
+ */
+function splitTopLevel(selectList: string): string[] {
+  const items: string[] = [];
+  let depth = 0;
+  let quoted = false;
+  let current = "";
+  for (const char of selectList) {
+    if (char === "'") quoted = !quoted;
+    if (!quoted && char === "(") depth++;
+    if (!quoted && char === ")") depth--;
+    if (char === "," && depth === 0 && !quoted) {
+      items.push(current.trim());
+      current = "";
+      continue;
+    }
+    current += char;
+  }
+  if (current.trim() !== "") items.push(current.trim());
+  return items;
+}
+
 describe("column-pruning", () => {
   beforeEach(() => {
     resetParamCounter();
@@ -293,10 +319,16 @@ describe("column-pruning", () => {
         expect(result.sql).toContain(
           "map('langwatch.span.type', SpanAttributes['langwatch.span.type']) AS SpanAttributes",
         );
-        // The bare whole-map column is never selected into the subquery.
-        expect(result.sql).not.toMatch(
-          /,\s*SpanAttributes\s+FROM stored_spans/,
-        );
+        // The bare whole-map column is never selected into the subquery, in
+        // any position. Checked against the extracted SELECT list rather than
+        // the raw SQL, so a mid-list `SpanAttributes,` cannot slip through the
+        // way an end-of-list-only pattern would.
+        const storedSpansSelect =
+          /SELECT\s+(?<list>[\s\S]*?)\s+FROM stored_spans/.exec(result.sql)
+            ?.groups?.list;
+        expect(storedSpansSelect).toBeDefined();
+        const selectedItems = splitTopLevel(storedSpansSelect!);
+        expect(selectedItems).not.toContain("SpanAttributes");
         // Outer accesses still resolve against the reconstructed map.
         expect(result.sql).toContain(
           "ss.SpanAttributes['langwatch.span.type']",

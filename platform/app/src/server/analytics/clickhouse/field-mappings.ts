@@ -672,10 +672,13 @@ export function spanAttributesNarrowProjection(
  * the input set unchanged when SpanAttributes is not selected or cannot be
  * narrowed.
  */
-export function narrowSpanAttributesColumns(
-  columns: ReadonlySet<string>,
-  expressions: string[],
-): ReadonlySet<string> {
+export function narrowSpanAttributesColumns({
+  columns,
+  expressions,
+}: {
+  columns: ReadonlySet<string>;
+  expressions: string[];
+}): ReadonlySet<string> {
   if (!columns.has("SpanAttributes")) {
     return columns;
   }
