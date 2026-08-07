@@ -59,9 +59,11 @@ import { governedSqlRouter } from "../analytics/governedSql";
 
 const mockPrismaClient = {
   project: {
-    findUnique: vi
-      .fn()
-      .mockResolvedValue({ id: "proj_test_123", apiKey: "key" }),
+    findUnique: vi.fn().mockResolvedValue({
+      id: "proj_test_123",
+      apiKey: "key",
+      team: { organizationId: "org_test_123" },
+    }),
   },
 } as any;
 
@@ -103,6 +105,7 @@ describe("the governed SQL router's feature switch", () => {
     mockPrismaClient.project.findUnique.mockResolvedValue({
       id: "proj_test_123",
       apiKey: "key",
+      team: { organizationId: "org_test_123" },
     });
     caller = createTestCaller();
   });
@@ -161,14 +164,25 @@ describe("the governed SQL router's feature switch", () => {
         cause: { code: "governed_sql_not_enabled" },
       });
       expect(mockExecute).not.toHaveBeenCalled();
-      expect(mockPrismaClient.project.findUnique).not.toHaveBeenCalled();
+      // The switch itself resolves the project's organization, so the only
+      // project reads are that lookup — nothing the execution path needs.
+      for (const call of mockPrismaClient.project.findUnique.mock.calls) {
+        expect(call[0].select).toEqual({
+          team: { select: { organizationId: true } },
+        });
+      }
     });
 
-    it("evaluates the switch for this member and this project", async () => {
+    /** @scenario "An organization-scoped rule can switch the workbench on" */
+    it("evaluates the switch for this member, this project, and its organization", async () => {
       await caller.availability({ projectId: "proj_test_123" });
       expect(mockFeatureFlagIsEnabled).toHaveBeenCalledWith(
         "release_governed_sql_workbench",
-        { distinctId: "user_test_123", projectId: "proj_test_123" },
+        {
+          distinctId: "user_test_123",
+          projectId: "proj_test_123",
+          organizationId: "org_test_123",
+        },
       );
     });
   });

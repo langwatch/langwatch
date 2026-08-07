@@ -21,6 +21,7 @@
  */
 
 import { NotFoundError } from "@langwatch/handled-error";
+import type { PrismaClient } from "@prisma/client";
 import { z } from "zod";
 
 import { getGovernedSqlService } from "~/server/analytics/governed-sql";
@@ -41,17 +42,28 @@ import { getUserProtectionsForProject } from "../../utils";
  */
 const GOVERNED_SQL_FLAG = "release_governed_sql_workbench";
 
-const workbenchEnabled = ({
+const workbenchEnabled = async ({
+  prisma,
   userId,
   projectId,
 }: {
+  prisma: PrismaClient;
   userId: string;
   projectId: string;
-}): Promise<boolean> =>
-  featureFlagService.isEnabled(GOVERNED_SQL_FLAG, {
+}): Promise<boolean> => {
+  // The flag store's organization-scoped rules fail closed when the calling
+  // context has no organization, so the gate resolves it — without this, a
+  // rule enabling the workbench for an organization could never match.
+  const project = await prisma.project.findUnique({
+    where: { id: projectId },
+    select: { team: { select: { organizationId: true } } },
+  });
+  return featureFlagService.isEnabled(GOVERNED_SQL_FLAG, {
     distinctId: userId,
     projectId,
+    organizationId: project?.team.organizationId,
   });
+};
 
 /**
  * Longest statement this router accepts.
@@ -89,6 +101,7 @@ const availability = protectedProcedure
   .query(async ({ ctx, input }) => ({
     available:
       (await workbenchEnabled({
+        prisma: ctx.prisma,
         userId: ctx.session.user.id,
         projectId: input.projectId,
       })) && getGovernedSqlService().available,
@@ -101,6 +114,7 @@ const schema = protectedProcedure
   .query(async ({ ctx, input }) => {
     if (
       !(await workbenchEnabled({
+        prisma: ctx.prisma,
         userId: ctx.session.user.id,
         projectId: input.projectId,
       }))
@@ -136,6 +150,7 @@ const query = protectedProcedure
   .mutation(async ({ ctx, input }) => {
     if (
       !(await workbenchEnabled({
+        prisma: ctx.prisma,
         userId: ctx.session.user.id,
         projectId: input.projectId,
       }))
