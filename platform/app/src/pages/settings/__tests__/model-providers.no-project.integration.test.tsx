@@ -25,18 +25,20 @@ import {
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { mockState, mockOpenDrawer, mockDeleteProvider } = vi.hoisted(() => ({
-  mockState: {
-    project: undefined as { id: string; slug: string } | undefined,
-    permissions: { "project:manage": true, "project:create": true } as Record<
-      string,
-      boolean
-    >,
-    providers: [] as Array<Record<string, unknown>>,
-  },
-  mockOpenDrawer: vi.fn(),
-  mockDeleteProvider: vi.fn(),
-}));
+const { mockState, mockOpenDrawer, mockDeleteProvider, mockTestConnection } =
+  vi.hoisted(() => ({
+    mockState: {
+      project: undefined as { id: string; slug: string } | undefined,
+      permissions: { "project:manage": true, "project:create": true } as Record<
+        string,
+        boolean
+      >,
+      providers: [] as Array<Record<string, unknown>>,
+    },
+    mockOpenDrawer: vi.fn(),
+    mockDeleteProvider: vi.fn(),
+    mockTestConnection: vi.fn(),
+  }));
 
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({
@@ -102,6 +104,15 @@ vi.mock("~/utils/api", () => ({
       delete: {
         useMutation: () => ({
           mutateAsync: mockDeleteProvider,
+          isPending: false,
+        }),
+      },
+      // The page's connection-test hook asks for this at render time, so
+      // leaving it out fails every test in the file on a TypeError rather
+      // than on anything they are about.
+      testConnection: {
+        useMutation: () => ({
+          mutateAsync: mockTestConnection,
           isPending: false,
         }),
       },
