@@ -437,8 +437,7 @@ export const scenarioEventsRouter = createTRPCRouter({
       // this generator suspended, its emitter listener attached, and its tab
       // registered forever.
       const signal =
-        opts.ctx.signal ??
-        (opts.signal as AbortSignal | undefined);
+        opts.ctx.signal ?? (opts.signal as AbortSignal | undefined);
 
       try {
         for await (const eventArgs of on(emitter, "simulation_updated", {
