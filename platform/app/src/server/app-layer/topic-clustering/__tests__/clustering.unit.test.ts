@@ -31,6 +31,12 @@ vi.mock("~/server/api/routers/modelProviders.utils", () => ({
   prepareLitellmParams: vi.fn().mockResolvedValue({ model: "gpt-4" }),
 }));
 
+vi.mock("~/server/modelProviders/resolveModelForFeature", () => ({
+  resolveModelForFeature: vi.fn().mockResolvedValue({
+    model: "openai/gpt-4",
+  }),
+}));
+
 vi.mock("~/server/app-layer/app", () => ({
   getApp: vi.fn().mockReturnValue({
     traces: { assignTopic: vi.fn().mockResolvedValue(undefined) },
@@ -147,10 +153,7 @@ describe("clusterTopicsForProject", () => {
       expect(outcome.nextSearchAfter).toEqual([now - 14 * 1000, "trace-14"]);
     });
 
-    // Skipped: batchClusterTraces now calls getProjectTopicClusteringModelProvider
-    // which goes through ModelProviderService → ModelProviderRepository.findAll
-    // and prepareLitellmParams, requiring deeper mocking of the App singleton
-    it.skip("maps CH results to TopicClusteringTrace and calls clustering", async () => {
+    it("maps CH results to TopicClusteringTrace and calls clustering", async () => {
       vi.mocked(prisma.project.findUnique).mockResolvedValue(
         makeProject() as any,
       );
@@ -307,8 +310,7 @@ describe("clusterTopicsForProject", () => {
   });
 
   describe("when CH search returns ComputedInput", () => {
-    // Skipped: same as above — batchClusterTraces requires deeper App singleton mocking
-    it.skip("extracts input text from JSON-stringified ComputedInput", async () => {
+    it("extracts input text from JSON-stringified ComputedInput", async () => {
       vi.mocked(prisma.project.findUnique).mockResolvedValue(
         makeProject() as any,
       );

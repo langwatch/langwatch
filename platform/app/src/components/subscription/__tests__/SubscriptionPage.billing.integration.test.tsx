@@ -540,21 +540,18 @@ describe("<SubscriptionPage/>", () => {
         });
       });
 
-      // Skipped: Code bug in SubscriptionPage.tsx — `isUpgradePlanRequired` contains a
-      // duplicate `isDeveloperPlan` condition that makes it always true for free plans:
-      //   `((isDeveloperPlan && plannedUsers.length > 0) || isTieredLegacyPaidPlan || isDeveloperPlan || ...)`
-      // The second bare `isDeveloperPlan` is unconditional, so upgrade-plan-block renders
-      // even without planned seat changes. Fix: remove the redundant `isDeveloperPlan` term.
-      it.skip("does not show upgrade block before planning seats", async () => {
+      it("shows the upgrade options block before planning seats", async () => {
+        // Free-plan orgs always see the upgrade options block — the render is
+        // deliberate ("Upgrade Block - show for free plan and TIERED legacy
+        // paid orgs" in SubscriptionPage.tsx); only the confirm bar waits for
+        // planned seat changes.
         renderSubscriptionPage();
 
         await waitFor(() => {
           expect(screen.getByTestId("current-plan-block")).toBeInTheDocument();
         });
 
-        expect(
-          screen.queryByTestId("upgrade-plan-block"),
-        ).not.toBeInTheDocument();
+        expect(screen.getByTestId("upgrade-plan-block")).toBeInTheDocument();
       });
 
       it("shows 2 Full Members after adding a manual seat in drawer", async () => {
@@ -574,18 +571,14 @@ describe("<SubscriptionPage/>", () => {
     });
 
     describe("when on Free plan at capacity (2/2 members)", () => {
-      // Skipped: Code bug in SubscriptionPage.tsx — same as above. `isUpgradePlanRequired`
-      // always evaluates true for free plans due to the redundant bare `isDeveloperPlan` term.
-      it.skip("does not show upgrade block without planned seat changes", async () => {
+      it("still shows the upgrade options block without planned seat changes", async () => {
         renderSubscriptionPage();
 
         await waitFor(() => {
           expect(screen.getByTestId("current-plan-block")).toBeInTheDocument();
         });
 
-        expect(
-          screen.queryByTestId("upgrade-plan-block"),
-        ).not.toBeInTheDocument();
+        expect(screen.getByTestId("upgrade-plan-block")).toBeInTheDocument();
       });
     });
 

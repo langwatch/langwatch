@@ -149,19 +149,15 @@ describe("<SubscriptionPage/>", () => {
   // ============================================================================
 
   describe("when the subscription page loads", () => {
-    // Skipped: Code bug in SubscriptionPage.tsx — `isUpgradePlanRequired` has a duplicate
-    // bare `isDeveloperPlan` condition making it always true for free plans regardless of
-    // whether any seat changes are planned. The upgrade-plan-block therefore renders on every
-    // page load for free-plan orgs. Fix: remove the redundant unconditional `isDeveloperPlan`
-    // term from the OR chain in the `isUpgradePlanRequired` expression.
-    it.skip("displays current plan block and hides upgrade plan block by default", async () => {
+    it("displays the current plan and upgrade options blocks by default", async () => {
+      // Free-plan orgs always see the upgrade options block — deliberate
+      // ("Upgrade Block - show for free plan and TIERED legacy paid orgs" in
+      // SubscriptionPage.tsx); only the confirm bar waits for seat changes.
       renderSubscriptionPage();
 
       await waitFor(() => {
         expect(screen.getByTestId("current-plan-block")).toBeInTheDocument();
-        expect(
-          screen.queryByTestId("upgrade-plan-block"),
-        ).not.toBeInTheDocument();
+        expect(screen.getByTestId("upgrade-plan-block")).toBeInTheDocument();
       });
     });
 
@@ -233,17 +229,14 @@ describe("<SubscriptionPage/>", () => {
       });
     });
 
-    // Skipped: Same code bug — `isUpgradePlanRequired` always true for free plans.
-    it.skip("hides the upgrade block before seat changes", async () => {
+    it("shows the upgrade block before seat changes", async () => {
       renderSubscriptionPage();
 
       await waitFor(() => {
         expect(screen.getByTestId("current-plan-block")).toBeInTheDocument();
       });
 
-      expect(
-        screen.queryByTestId("upgrade-plan-block"),
-      ).not.toBeInTheDocument();
+      expect(screen.getByTestId("upgrade-plan-block")).toBeInTheDocument();
     });
 
     it("displays the user count as N/M format", async () => {

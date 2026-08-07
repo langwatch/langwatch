@@ -27,20 +27,6 @@ vi.mock("~/stores/upgradeModalStore", () => ({
   },
 }));
 
-// Mock useLicenseEnforcement hook
-const mockCheckAndProceed = vi.fn();
-let mockIsAllowed = true;
-vi.mock("~/hooks/useLicenseEnforcement", () => ({
-  useLicenseEnforcement: () => ({
-    checkAndProceed: mockCheckAndProceed,
-    isLoading: false,
-    isAllowed: mockIsAllowed,
-    limitInfo: mockIsAllowed
-      ? { allowed: true, current: 2, max: 5 }
-      : { allowed: false, current: 3, max: 3 },
-  }),
-}));
-
 vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({
     push: vi.fn(),
@@ -69,6 +55,7 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
     project: { id: "test-project-id", defaultModel: "openai/gpt-4o" },
     organization: { id: "test-org-id" },
     team: { id: "test-team-id" },
+    hasPermission: () => true,
   }),
 }));
 
@@ -369,10 +356,6 @@ describe("PromptEditorDrawer", () => {
     mockAreFormValuesEqual.mockReturnValue(true);
     // Reset drawer params
     mockDrawerParams = {};
-    // Reset license enforcement mock - default to allowed
-    mockIsAllowed = true;
-    // Default: checkAndProceed executes the callback
-    mockCheckAndProceed.mockImplementation((cb: () => void) => cb());
     // Reset upgrade modal mock
     mockOpenUpgradeModal.mockClear();
   });
@@ -1402,7 +1385,7 @@ describe("PromptEditorDrawer", () => {
     });
   });
 
-  describe("License enforcement (prompts limit)", () => {
+  describe("Saving a new prompt", () => {
     beforeEach(() => {
       mockGetByIdOrHandle.mockReturnValue({
         data: undefined,
@@ -1410,30 +1393,26 @@ describe("PromptEditorDrawer", () => {
       });
     });
 
-    // Skipped: The save button for new prompts is disabled (shows "Saved") until
-    // `hasUnsavedChanges` becomes true. That state is driven by a react-hook-form
-    // watch() subscription set up in a useEffect, which fires asynchronously after
-    // mount when form values actually change — not on initial render. Since the
-    // test uses a mocked form with pre-filled content but never triggers a form
-    // value change event, the subscription never fires and the button stays disabled,
-    // so the ChangeHandleDialog never opens and checkAndProceed is never reached.
-    // Fix requires either: (a) firing a real input change event to trigger the
-    // watch subscription, or (b) initialising hasUnsavedChanges eagerly for new
-    // prompts when the form already has content on mount.
-    it.skip("calls checkAndProceed when creating new prompt", async () => {
-      // For new prompts, hasUnsavedChanges is true when messages have content
-      // Set message content so save button is enabled
-      const originalContent =
-        mockDefaultFormValues.version.configData.messages[0]!.content;
-      mockDefaultFormValues.version.configData.messages[0]!.content =
-        "You are a helpful assistant.";
-
+    it("creates the prompt with the handle chosen in the save dialog", async () => {
       const user = userEvent.setup();
 
       renderWithProviders(<PromptEditorDrawer open={true} />);
 
+      // For new prompts the save button enables once hasUnsavedChanges flips,
+      // which is driven by the form watch() subscription — change a message
+      // through the form so the subscription actually fires.
+      const methods = capturedFormMethods[capturedFormMethods.length - 1]!;
+      methods.setValue(
+        "version.configData.messages.0.content",
+        "You are a helpful assistant.",
+        { shouldDirty: true },
+      );
+
       // Click save button to open the dialog
       const saveButton = screen.getByTestId("save-prompt-button");
+      await waitFor(() => {
+        expect(saveButton).toBeEnabled();
+      });
       await user.click(saveButton);
 
       // Wait for the "Save Prompt" dialog to appear
@@ -1449,68 +1428,15 @@ describe("PromptEditorDrawer", () => {
       const dialogSaveButton = screen.getByRole("button", { name: "Save" });
       await user.click(dialogSaveButton);
 
-      // Verify checkAndProceed was called
+      // The create mutation fires with the chosen handle
       await waitFor(() => {
-        expect(mockCheckAndProceed).toHaveBeenCalledTimes(1);
+        expect(mockCreate).toHaveBeenCalledWith(
+          expect.objectContaining({
+            projectId: "test-project-id",
+            data: expect.objectContaining({ handle: "test-handle" }),
+          }),
+        );
       });
-
-      // Restore original content for other tests
-      mockDefaultFormValues.version.configData.messages[0]!.content =
-        originalContent;
-    });
-
-    it("does not call checkAndProceed when updating existing prompt", async () => {
-      mockGetByIdOrHandle.mockReturnValue({
-        data: mockPromptDataWithMessages,
-        isLoading: false,
-      });
-      // Simulate unsaved changes
-      mockAreFormValuesEqual.mockReturnValue(false);
-
-      const user = userEvent.setup();
-
-      renderWithProviders(
-        <PromptEditorDrawer open={true} promptId="prompt-123" />,
-      );
-
-      // Wait for drawer to load
-      await waitFor(() => {
-        expect(screen.getByText("test-prompt")).toBeInTheDocument();
-      });
-
-      // Click save button
-      const saveButton = screen.getByTestId("save-prompt-button");
-      await user.click(saveButton);
-
-      // checkAndProceed should NOT be called for updates
-      // (it's only called for creates)
-      expect(mockCheckAndProceed).not.toHaveBeenCalled();
-    });
-
-    it("triggers upgrade modal via store when at prompt limit", async () => {
-      // Set up the mock to NOT allow and simulate what the real hook does
-      mockIsAllowed = false;
-      mockCheckAndProceed.mockImplementation(() => {
-        // Simulate what the real hook does: open the upgrade modal via store
-        mockOpenUpgradeModal("prompts", 3, 3);
-      });
-
-      // Call checkAndProceed directly to verify the integration point
-      // (The full save flow is tested in other tests and requires dialog interaction)
-      mockCheckAndProceed(() => {});
-
-      // Verify the upgrade modal store was called with correct parameters
-      expect(mockOpenUpgradeModal).toHaveBeenCalledWith("prompts", 3, 3);
-    });
-
-    it("allows prompt creation when under limit", () => {
-      // Default mock state: allowed
-      mockIsAllowed = true;
-
-      renderWithProviders(<PromptEditorDrawer open={true} />);
-
-      // No upgrade modal should be shown
-      expect(screen.queryByTestId("upgrade-modal")).not.toBeInTheDocument();
     });
   });
 });

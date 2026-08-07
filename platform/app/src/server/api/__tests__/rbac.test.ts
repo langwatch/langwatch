@@ -648,35 +648,46 @@ describe("RBAC Permission System", () => {
   });
 
   describe("Demo Project Functionality", () => {
-    // Note: Demo project tests are skipped due to environment mocking complexity
-    // The isDemoProject function uses env.DEMO_PROJECT_ID from ~/env.mjs
-    // which requires more complex mocking setup
-    it.skip("allows view permissions for demo project", () => {
-      // This test would require mocking the env module
+    // isDemoProjectId prefers process.env.DEMO_PROJECT_ID over the validated
+    // env module, so isDemoProject is testable without mocking ~/env.mjs.
+    const DEMO_PROJECT_ID = "demo-project-123";
+
+    beforeEach(() => {
+      process.env.DEMO_PROJECT_ID = DEMO_PROJECT_ID;
+    });
+    afterEach(() => {
+      delete process.env.DEMO_PROJECT_ID;
     });
 
-    it.skip("does not allow manage permissions for demo project", () => {
-      // This test would require mocking the env module
+    it("allows view permissions for demo project", () => {
+      expect(isDemoProject(DEMO_PROJECT_ID, "traces:view")).toBe(true);
+      expect(isDemoProject(DEMO_PROJECT_ID, "datasets:view")).toBe(true);
+      expect(isDemoProject(DEMO_PROJECT_ID, "analytics:view")).toBe(true);
     });
 
-    it.skip("does not allow create permissions for demo project", () => {
-      // This test would require mocking the env module
+    it("does not allow manage permissions for demo project", () => {
+      expect(isDemoProject(DEMO_PROJECT_ID, "datasets:manage")).toBe(false);
+      expect(isDemoProject(DEMO_PROJECT_ID, "prompts:manage")).toBe(false);
     });
 
-    it.skip("does not allow update permissions for demo project", () => {
-      // This test would require mocking the env module
+    it("does not allow create permissions for demo project", () => {
+      expect(isDemoProject(DEMO_PROJECT_ID, "traces:create")).toBe(false);
     });
 
-    it.skip("does not allow delete permissions for demo project", () => {
-      // This test would require mocking the env module
+    it("does not allow update permissions for demo project", () => {
+      expect(isDemoProject(DEMO_PROJECT_ID, "traces:update")).toBe(false);
     });
 
-    it.skip("returns false for non-demo project", () => {
-      // This test would require mocking the env module
+    it("does not allow delete permissions for demo project", () => {
+      expect(isDemoProject(DEMO_PROJECT_ID, "anomalyRules:delete")).toBe(false);
     });
 
-    it.skip("allows playground view for demo project", () => {
-      // This test would require mocking the env module
+    it("returns false for non-demo project", () => {
+      expect(isDemoProject("some-other-project", "traces:view")).toBe(false);
+    });
+
+    it("allows playground view for demo project", () => {
+      expect(isDemoProject(DEMO_PROJECT_ID, "playground:view")).toBe(true);
     });
   });
 

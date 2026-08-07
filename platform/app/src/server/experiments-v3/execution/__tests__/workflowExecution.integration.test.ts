@@ -258,25 +258,6 @@ describe.skipIf(!hasNlpService)("WorkflowExecution Integration", () => {
     }, 60000);
   });
 
-  // Note: evaluator and execute_flow tests are skipped due to a "coroutine raised StopIteration"
-  // Python async bug in the NLP service. This is being tracked separately.
-  // The key functionality (prompt execution via execute_component) works correctly.
-  describe.skip("execute_component for evaluator - NLP service bug", () => {
-    it("executes exact_match evaluator with passing result", async () => {
-      // Skipped: NLP service throws "coroutine raised StopIteration" for evaluators
-    });
-
-    it("executes exact_match evaluator with failing result", async () => {
-      // Skipped: NLP service throws "coroutine raised StopIteration" for evaluators
-    });
-  });
-
-  describe.skip("full workflow (execute_flow) - NLP service bug", () => {
-    it("executes target and evaluator in a full flow", async () => {
-      // Skipped: NLP service throws "coroutine raised StopIteration" for execute_flow
-    });
-  });
-
   describe("result structure validation", () => {
     it("target result contains expected fields", async () => {
       const cell = createCell({

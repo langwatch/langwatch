@@ -148,9 +148,7 @@ describe("Model Providers API", () => {
 
   describe("PUT /api/model-providers/:provider", () => {
     describe("when creating a new provider", () => {
-      // Skipped: route exists but requires CREDENTIALS_SECRET env var for AES-256-GCM encryption of customKeys.
-      // Set CREDENTIALS_SECRET (32-byte hex) in test env to enable.
-      it.skip("creates the provider and returns masked response", async () => {
+      it("creates the provider and returns masked response", async () => {
         const res = await helpers.api.put("/api/model-providers/openai", {
           enabled: true,
           customKeys: { OPENAI_API_KEY: "sk-new-key-67890" },
@@ -194,9 +192,7 @@ describe("Model Providers API", () => {
         });
       });
 
-      // Skipped: route exists but requires CREDENTIALS_SECRET env var for AES-256-GCM encryption of customKeys.
-      // Set CREDENTIALS_SECRET (32-byte hex) in test env to enable.
-      it.skip("updates the provider settings", async () => {
+      it("updates the provider settings", async () => {
         const res = await helpers.api.put("/api/model-providers/openai", {
           enabled: false,
           customKeys: { OPENAI_API_KEY: MASKED_KEY_PLACEHOLDER },

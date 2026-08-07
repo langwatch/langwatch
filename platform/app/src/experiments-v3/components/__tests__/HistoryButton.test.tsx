@@ -122,10 +122,7 @@ describe("HistoryButton", () => {
     );
   });
 
-  // Skipped: HistoryButton renders aria-label="View results" (text: "Results"), not
-  // aria-label="View run history". Also, <a> elements don't support the `disabled` attribute.
-  // The source component or these tests need to be updated to align on the interface.
-  it.skip("shows disabled button with 'No runs yet' tooltip when no runs exist", async () => {
+  it("shows a disabled results link when no runs exist", async () => {
     mockStoreValues.experimentId = "exp-123";
     mockStoreValues.experimentSlug = "test-slug";
 
@@ -141,14 +138,11 @@ describe("HistoryButton", () => {
 
     render(<HistoryButton />, { wrapper: Wrapper });
 
-    // Component is now a link element
-    const historyLink = screen.getByRole("link", { name: "View run history" });
+    const historyLink = screen.getByRole("link", { name: "View results" });
     expect(historyLink).toHaveAttribute("disabled");
   });
 
-  // Skipped: HistoryButton renders aria-label="View results" (text: "Results"), not
-  // aria-label="View run history". Update source or tests to align on the interface.
-  it.skip("shows enabled button when runs exist", async () => {
+  it("shows enabled button when runs exist", async () => {
     mockStoreValues.experimentId = "exp-123";
     mockStoreValues.experimentSlug = "test-slug";
 
@@ -172,14 +166,11 @@ describe("HistoryButton", () => {
 
     render(<HistoryButton />, { wrapper: Wrapper });
 
-    // Component is now a link element
-    const historyLink = screen.getByRole("link", { name: "View run history" });
+    const historyLink = screen.getByRole("link", { name: "View results" });
     expect(historyLink).not.toHaveAttribute("disabled");
   });
 
-  // Skipped: HistoryButton renders aria-label="View results" (text: "Results"), not
-  // aria-label="View run history". Update source or tests to align on the interface.
-  it.skip("navigates to experiment page using experimentSlug from store when clicked", async () => {
+  it("navigates to experiment page using experimentSlug from store when clicked", async () => {
     // Update the mock to return specific values for this test
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(useEvaluationsV3Store).mockImplementation(
@@ -211,8 +202,7 @@ describe("HistoryButton", () => {
 
     render(<HistoryButton />, { wrapper: Wrapper });
 
-    // Component is now a link element - verify href instead of onClick navigation
-    const historyLink = screen.getByRole("link", { name: "View run history" });
+    const historyLink = screen.getByRole("link", { name: "View results" });
     expect(historyLink).toHaveAttribute(
       "href",
       "/test-project/experiments/my-custom-slug",
@@ -227,9 +217,7 @@ describe("HistoryButton", () => {
     expect(container.firstChild).toBeNull();
   });
 
-  // Skipped: HistoryButton renders aria-label="View results" (text: "Results"), not
-  // aria-label="View run history". Update source or tests to align on the interface.
-  it.skip("shows disabled button while loading", () => {
+  it("shows disabled button while loading", () => {
     mockStoreValues.experimentId = "exp-123";
     mockStoreValues.experimentSlug = "test-slug";
 
@@ -245,8 +233,7 @@ describe("HistoryButton", () => {
 
     render(<HistoryButton />, { wrapper: Wrapper });
 
-    // Component is now a link element
-    const historyLink = screen.getByRole("link", { name: "View run history" });
+    const historyLink = screen.getByRole("link", { name: "View results" });
     expect(historyLink).toHaveAttribute("disabled");
   });
 });

@@ -78,6 +78,9 @@ describe("Span organizing and flattening tests", () => {
       span_id: "1-2",
       parent_id: "1",
       timestamps: { started_at: 300, finished_at: 700 },
+      // Last span to finish across the whole trace — getLastOutputAsText
+      // picks this one over the later-started top-level span 2.
+      output: { type: "text", value: "last finished output" },
     },
     {
       ...commonSpanProps,
@@ -136,9 +139,9 @@ describe("Span organizing and flattening tests", () => {
     expect(input).toBe("topmost input");
   });
 
-  it.skip("should get the very last output as text", () => {
+  it("gets the last-finishing span's output as text", () => {
     const output = getLastOutputAsText(spans.sort(() => 0.5 - Math.random()));
-    expect(output).toBe("bottommost output");
+    expect(output).toBe("last finished output");
   });
 
   it("uses http method and target as input if there are no inputs, for opentelemetry http cases", () => {

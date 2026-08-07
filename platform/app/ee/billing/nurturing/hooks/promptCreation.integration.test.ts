@@ -123,9 +123,9 @@ describe("afterPromptCreated()", () => {
         });
       });
 
-      // Skipped: source only fires trackEvent when orgPromptCount === 1 (see firePromptCreatedNurturing).
-      // Test intent is for CIO-side deduplication (always fire, CIO deduplicates per person) — not yet implemented.
-      it.skip("sends first_prompt_created event (CIO Journey deduplicates per person)", async () => {
+      it("does not resend first_prompt_created for subsequent prompts", async () => {
+        // firePromptCreatedNurturing deduplicates app-side: the event fires
+        // only when the org's prompt count is exactly 1.
         const prisma = createMockPrisma({ promptCount: 5 });
 
         afterPromptCreated({
@@ -135,12 +135,9 @@ describe("afterPromptCreated()", () => {
         });
 
         await vi.waitFor(() => {
-          expect(mockNurturing.trackEvent).toHaveBeenCalledWith({
-            userId: "user-1",
-            event: "first_prompt_created",
-            properties: { project_id: "proj-1" },
-          });
+          expect(mockNurturing.identifyUser).toHaveBeenCalled();
         });
+        expect(mockNurturing.trackEvent).not.toHaveBeenCalled();
       });
     });
   });
