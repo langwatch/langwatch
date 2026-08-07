@@ -608,6 +608,144 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end -}}
 
 {{/* ============================================================ */}}
+{{/* ClickHouse client pool sizing                                 */}}
+{{/* ============================================================ */}}
+{{/*
+     How many pods in this release hold a ClickHouse client.
+
+     This is the WHOLE fleet, not one Deployment's own replicas, and the
+     distinction is the difference between a fix and a re-run of the incident.
+     resolvePoolSize divides the entire concurrent-query share by the count it
+     is handed, so a Deployment that reports only itself sizes its pools as
+     though it owned the whole share, and every other Deployment does the same
+     against the same server. Three app pods and ten worker pods each dividing
+     the full share come to well over it between them - arithmetic of the same
+     class as the one that had ClickHouse reject tens of thousands of queries
+     with TOO_MANY_SIMULTANEOUS_QUERIES on 2026-07-31, reached from the other
+     direction. Computed here rather than passed in, so the two Deployments
+     cannot be given different answers.
+
+     The app and the workers are the whole fleet: they are the only pods this
+     chart hands ClickHouse credentials to. CronJob pods only call the app's
+     HTTP API, and no other component receives CLICKHOUSE_URL. Workers count
+     only when they are enabled, because a disabled Deployment renders no pods.
+*/}}
+{{/*
+     No `| default 1` on either count. Helm's `default` treats 0 as empty, so it
+     would turn a Deployment scaled to zero back into one pod and shrink every
+     other pool to pay for connections nobody opens. `max $fleet 1` below is the
+     floor, and it is the only one needed.
+*/}}
+{{- define "langwatch.clickhouse.clientReplicas" -}}
+{{- $fleet := int .Values.app.replicaCount -}}
+{{- if .Values.workers.enabled -}}
+{{- $fleet = add $fleet (int .Values.workers.replicaCount) -}}
+{{- end -}}
+{{- max $fleet 1 -}}
+{{- end -}}
+
+{{/*
+     What the ClickHouse this chart installs will actually admit.
+
+     The subchart's image derives `max_concurrent_queries` from its CPU
+     allowance as `min(cpu x 25, 200)` (infra/clickhouse-serverless,
+     internal/config/compute.go), so a default install with `clickhouse.cpu: 2`
+     admits 50 - and no CPU size reaches beyond the 200 cap. Any figure the
+     chart hands the clients has to live under this, or they size pools for a
+     budget the server refuses.
+
+     CPU is a Kubernetes quantity and the image rounds it UP to whole cores with
+     a floor of one (`ParseCPU`), so the same rounding is done here rather than
+     assumed away. Same shape as langwatch.langevals.cpuCount below.
+
+     Deliberately not multiplied by `clickhouse.replicas`: the limit is per
+     server, and a client's connections are not guaranteed to spread evenly
+     across replicas. Sizing against one server is the conservative read, and
+     this number is a backstop rather than a throughput budget.
+*/}}
+{{- define "langwatch.clickhouse.chartManagedAdmissionLimit" -}}
+{{- $cpu := ((.Values.clickhouse).cpu | default 2) | toString -}}
+{{- $cores := 1 -}}
+{{- if hasSuffix "m" $cpu -}}
+{{- $cores = max 1 (ceil (divf (float64 (trimSuffix "m" $cpu)) 1000.0)) -}}
+{{- else -}}
+{{- $cores = max 1 (ceil (float64 $cpu)) -}}
+{{- end -}}
+{{- min (mul $cores 25) 200 -}}
+{{- end -}}
+
+{{/*
+     The concurrent-query budget the platform's pools are allowed to fill.
+
+     Left unset, it is derived rather than guessed:
+
+       - chart-managed ClickHouse: what this chart's own server admits, above.
+       - external ClickHouse: ClickHouse's stock `max_concurrent_queries`, which
+         is the same figure the client package falls back to. The chart cannot
+         see an external server's configuration, so an operator who has tuned it
+         - or who shares it with anything else - has to say so here.
+
+     One reserve, not two. The client keeps 30% of this as headroom
+     (FLEET_SAFETY_FACTOR), so pools can occupy at most 70% of the number below
+     and the remaining 30% stays free for migrations, backups, ad-hoc queries
+     and the burst a retry adds. That single factor is the whole safety margin;
+     nothing here subtracts a second one on top of it.
+
+     Setting this above what a chart-managed server admits is refused outright.
+     The failure it prevents is silent - pools sized for a budget the server
+     never had, discovered as rejected queries - so it is better as a render
+     that stops than a release that ships.
+*/}}
+{{- define "langwatch.clickhouse.platformShare" -}}
+{{- $explicit := (.Values.clickhouse).platformConcurrentQueryShare -}}
+{{- if $explicit -}}
+{{- if (.Values.clickhouse).chartManaged -}}
+{{- $limit := include "langwatch.clickhouse.chartManagedAdmissionLimit" . -}}
+{{- if gt (int $explicit) (int $limit) -}}
+{{- fail (printf "clickhouse.platformConcurrentQueryShare is %v, but the ClickHouse this chart installs admits at most %v concurrent queries (min(cpu x 25, 200), with clickhouse.cpu=%v). Pods would size their connection pools for a budget the server refuses, which surfaces as TOO_MANY_SIMULTANEOUS_QUERIES rather than as a failed install. Lower the share, raise clickhouse.cpu, or set clickhouse.chartManaged=false and point at the larger server you mean." $explicit $limit ((.Values.clickhouse).cpu | default 2)) -}}
+{{- end -}}
+{{- end -}}
+{{- $explicit -}}
+{{- else if (.Values.clickhouse).chartManaged -}}
+{{- include "langwatch.clickhouse.chartManagedAdmissionLimit" . -}}
+{{- else -}}
+300
+{{- end -}}
+{{- end -}}
+
+{{/*
+     The pool-sizing inputs every pod that builds a ClickHouse client receives.
+
+     Both variables are identical on every such pod, by construction: they
+     describe one shared server and one shared fleet, and a pod holding a
+     different answer to either would size against a budget nobody else is
+     dividing.
+
+     Without CLICKHOUSE_CLIENT_REPLICAS the derivation is skipped entirely and
+     the client keeps a fixed 64 connections per pool - the pre-incident number.
+     Rendering these is what turns the derivation on at all.
+
+     The fleet size cannot come from the downward API: fieldRef exposes
+     pod-level fields only, and a replica count belongs to a Deployment, so a
+     pod cannot read even its own, let alone another's. It is templated from the
+     same values that set `spec.replicas`, so the numbers can never disagree in
+     a rendered release. An operator who scales outside Helm (`kubectl scale`,
+     or an autoscaler) has to keep those values in step, or the pods keep
+     sizing for the old fleet.
+
+     CLICKHOUSE_CLIENTS_PER_PROCESS is deliberately not rendered. How many
+     client instances a process constructs is a property of the application
+     code, not of the deployment, so the chart has no honest value for it and
+     the package's own default is the right answer.
+*/}}
+{{- define "langwatch.clickhousePoolSizingEnv" -}}
+- name: CLICKHOUSE_CLIENT_REPLICAS
+  value: {{ include "langwatch.clickhouse.clientReplicas" . | quote }}
+- name: CLICKHOUSE_SERVER_MAX_CONCURRENT_QUERIES
+  value: {{ include "langwatch.clickhouse.platformShare" . | quote }}
+{{- end }}
+
+{{/* ============================================================ */}}
 {{/* Shared Environment Variables                                  */}}
 {{/* ============================================================ */}}
 {{/* Common env vars shared between app and workers deployments */}}

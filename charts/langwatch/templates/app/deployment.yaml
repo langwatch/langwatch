@@ -125,6 +125,12 @@ spec:
           env:
             {{- include "langwatch.sharedEnv" . | nindent 12 }}
 
+            # ClickHouse connection-pool sizing. The fleet figure counts the
+            # app AND the workers, because both divide one server's share; a
+            # Deployment that counted only itself would size as though it owned
+            # the whole share.
+            {{- include "langwatch.clickhousePoolSizingEnv" . | nindent 12 }}
+
             # Names this process in telemetry. It becomes the OTel resource
             # `service.name` and the `service` field on every stdout log line,
             # which log shipping promotes to the Loki `service_name` label.

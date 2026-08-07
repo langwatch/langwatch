@@ -115,6 +115,26 @@ jobs:
       - name: "assert rendered worker count and memory ceiling"
         run: ./tests/langevals-sizing.sh
 
+  clickhouse-pool-sizing:
+    name: "clickhouse pool sizing"
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: charts/langwatch
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5
+        with:
+          version: v3.12.0
+      - run: helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+      - run: helm repo add langwatch https://langwatch.github.io/langwatch
+      - run: helm dependency build .
+      # A missing pool-sizing input renders as valid YAML and a healthy pod,
+      # and silently returns the client to the fixed pool size that exhausted
+      # the ClickHouse server. Only the rendered environment shows it.
+      - name: "assert rendered ClickHouse pool-sizing inputs"
+        run: ./tests/clickhouse-pool-sizing.sh
+
   email-gateway:
     name: "email gateway"
     runs-on: ubuntu-latest

@@ -1612,6 +1612,30 @@ clickhouse:
   ## @param clickhouse.chartManaged [default: true] Manage ClickHouse via this chart using the clickhouse-serverless subchart (false = external).
   chartManaged: true
 
+  # The concurrent-query budget the app and worker pods divide between them to
+  # size their ClickHouse connection pools. Leave empty and it is derived:
+  #
+  #   - chartManaged: what this chart's own ClickHouse admits, which its image
+  #     computes from CPU as min(cpu x 25, 200). At the default cpu: 2 that is
+  #     50, and no CPU size goes past the 200 cap.
+  #   - external: ClickHouse's stock max_concurrent_queries of 300.
+  #
+  # Set it when the server's real limit is not what the chart would assume: an
+  # external server you have tuned, or one you share with dashboards and ops
+  # tooling, where LangWatch should take only its own share so a reporting burst
+  # cannot starve live ingest. LangWatch Cloud, for instance, runs a 300-query
+  # server and allots the platform 270.
+  #
+  # This value DESCRIBES a limit, it does not configure one. The server side is
+  # set on the ClickHouse deployment itself. Raising this alone only tells the
+  # clients to open sockets the server will refuse, so a value above what a
+  # chart-managed ClickHouse admits is refused at render time.
+  #
+  # Pools take at most 70% of this number; the client keeps the rest as headroom
+  # for migrations, backups and ad-hoc queries. That is the only reserve applied.
+  ## @param clickhouse.platformConcurrentQueryShare [default: ""] Concurrent-query budget the app and worker pods divide to size their connection pools. Empty derives it: min(cpu x 25, 200) when chart-managed, 300 when external. Describes a limit set on the server, does not configure it.
+  platformConcurrentQueryShare: ""
+
   # ---------------------------------------------------------------------------
   # External ClickHouse (when chartManaged: false)
   # ---------------------------------------------------------------------------
