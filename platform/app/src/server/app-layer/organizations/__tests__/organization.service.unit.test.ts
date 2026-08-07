@@ -10,6 +10,18 @@ vi.mock("../../tracing", () => ({
   traced: <T>(instance: T) => instance,
 }));
 
+const { mockRevokeAllTraceShares } = vi.hoisted(() => ({
+  mockRevokeAllTraceShares: vi.fn(),
+}));
+
+// The service reaches the app singleton only for cross-aggregate effects
+// (trace-share revocation, plan resolution); pin the one this suite drives.
+vi.mock("../../app", () => ({
+  getApp: () => ({
+    share: { revokeAllTraceShares: mockRevokeAllTraceShares },
+  }),
+}));
+
 describe("OrganizationService", () => {
   const mockRepo: OrganizationRepository = {
     getOrganizationIdByTeamId: vi.fn(),
@@ -32,7 +44,11 @@ describe("OrganizationService", () => {
     getOrganizationWithMembers: vi.fn(),
     getMemberById: vi.fn(),
     getAllMembers: vi.fn(),
-    update: vi.fn(),
+    findMembership: vi.fn(),
+    listMembers: vi.fn(),
+    findMemberTeamBindings: vi.fn(),
+    findSettingsById: vi.fn(),
+    updateSettings: vi.fn(),
     deleteMember: vi.fn(),
     setMemberDisabled: vi.fn(),
     updateMemberRole: vi.fn(),
@@ -174,6 +190,269 @@ describe("OrganizationService", () => {
             ]),
           }),
         );
+      });
+    });
+  });
+
+  describe("deleteMember", () => {
+    const membership = {
+      userId: "user-456",
+      organizationId: "org-123",
+      role: OrganizationUserRole.MEMBER,
+      disabledAt: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      user: { id: "user-456", name: "Member", email: "member@example.com" },
+    };
+
+    describe("when the acting user removes themselves", () => {
+      it("refuses with cannot_remove_self before touching the repository", async () => {
+        await expect(
+          service.deleteMember({
+            organizationId: "org-123",
+            userId: "user-456",
+            actingUserId: "user-456",
+          }),
+        ).rejects.toMatchObject({ code: "cannot_remove_self" });
+
+        expect(mockRepo.findMembership).not.toHaveBeenCalled();
+        expect(mockRepo.deleteMember).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when the membership does not exist", () => {
+      it("refuses with member_not_found", async () => {
+        vi.mocked(mockRepo.findMembership).mockResolvedValue(null);
+
+        await expect(
+          service.deleteMember({
+            organizationId: "org-123",
+            userId: "user-456",
+            actingUserId: "admin-789",
+          }),
+        ).rejects.toMatchObject({ code: "member_not_found" });
+
+        expect(mockRepo.deleteMember).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when another member is removed", () => {
+      it("delegates to the repository", async () => {
+        vi.mocked(mockRepo.findMembership).mockResolvedValue(membership);
+
+        await service.deleteMember({
+          organizationId: "org-123",
+          userId: "user-456",
+          actingUserId: "admin-789",
+        });
+
+        expect(mockRepo.deleteMember).toHaveBeenCalledWith({
+          organizationId: "org-123",
+          userId: "user-456",
+        });
+      });
+    });
+
+    describe("when the credential acts as nobody", () => {
+      it("cannot trip the self-removal guard", async () => {
+        vi.mocked(mockRepo.findMembership).mockResolvedValue(membership);
+
+        await service.deleteMember({
+          organizationId: "org-123",
+          userId: "user-456",
+        });
+
+        expect(mockRepo.deleteMember).toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("setMemberDisabled", () => {
+    describe("when the acting user disables themselves", () => {
+      it("refuses with cannot_disable_self", async () => {
+        await expect(
+          service.setMemberDisabled({
+            organizationId: "org-123",
+            userId: "user-456",
+            disabled: true,
+            actingUser: { id: "user-456" },
+          }),
+        ).rejects.toMatchObject({ code: "cannot_disable_self" });
+
+        expect(mockRepo.setMemberDisabled).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when the membership does not exist", () => {
+      it("refuses with member_not_found", async () => {
+        vi.mocked(mockRepo.findMembership).mockResolvedValue(null);
+
+        await expect(
+          service.setMemberDisabled({
+            organizationId: "org-123",
+            userId: "ghost",
+            disabled: true,
+            actingUser: { id: "admin-789" },
+          }),
+        ).rejects.toMatchObject({ code: "member_not_found" });
+      });
+    });
+
+    describe("when disabling another member", () => {
+      it("delegates to the repository without a seat check", async () => {
+        vi.mocked(mockRepo.findMembership).mockResolvedValue({
+          userId: "user-456",
+          organizationId: "org-123",
+          role: OrganizationUserRole.MEMBER,
+          disabledAt: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          user: { id: "user-456", name: null, email: null },
+        });
+
+        await service.setMemberDisabled({
+          organizationId: "org-123",
+          userId: "user-456",
+          disabled: true,
+          actingUser: { id: "admin-789" },
+        });
+
+        expect(mockRepo.setMemberDisabled).toHaveBeenCalledWith({
+          organizationId: "org-123",
+          userId: "user-456",
+          disabled: true,
+        });
+      });
+    });
+  });
+
+  describe("getMember", () => {
+    describe("when the user is not a member", () => {
+      it("refuses with member_not_found", async () => {
+        vi.mocked(mockRepo.findMembership).mockResolvedValue(null);
+
+        await expect(
+          service.getMember({ organizationId: "org-123", userId: "ghost" }),
+        ).rejects.toMatchObject({ code: "member_not_found" });
+      });
+    });
+
+    describe("when the member exists", () => {
+      it("returns the membership with its team bindings", async () => {
+        vi.mocked(mockRepo.findMembership).mockResolvedValue({
+          userId: "user-456",
+          organizationId: "org-123",
+          role: OrganizationUserRole.MEMBER,
+          disabledAt: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          user: { id: "user-456", name: "Member", email: "m@example.com" },
+        });
+        vi.mocked(mockRepo.findMemberTeamBindings).mockResolvedValue([
+          {
+            teamId: "team-1",
+            teamName: "Core",
+            role: TeamUserRole.MEMBER,
+            customRoleId: null,
+            customRoleName: null,
+          },
+        ]);
+
+        const member = await service.getMember({
+          organizationId: "org-123",
+          userId: "user-456",
+        });
+
+        expect(member.role).toBe(OrganizationUserRole.MEMBER);
+        expect(member.teams).toEqual([
+          {
+            teamId: "team-1",
+            teamName: "Core",
+            role: TeamUserRole.MEMBER,
+            customRoleId: null,
+            customRoleName: null,
+          },
+        ]);
+      });
+    });
+  });
+
+  describe("updateSettings", () => {
+    describe("when trace sharing is turned off", () => {
+      it("revokes every project's existing trace shares (ADR-057)", async () => {
+        vi.mocked(mockRepo.findSettingsById).mockResolvedValue({
+          id: "org-123",
+          name: "Org",
+          slug: "org",
+          supportContact: null,
+          presenceEnabled: true,
+          traceSharingEnabled: true,
+          primaryIntent: null,
+          s3Endpoint: null,
+          s3AccessKeyId: null,
+          s3Bucket: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
+        vi.mocked(mockRepo.getProjectIds).mockResolvedValue([
+          "proj-1",
+          "proj-2",
+        ]);
+
+        await service.updateSettings({
+          organizationId: "org-123",
+          traceSharingEnabled: false,
+        });
+
+        expect(mockRepo.updateSettings).toHaveBeenCalledWith({
+          organizationId: "org-123",
+          traceSharingEnabled: false,
+        });
+        expect(mockRevokeAllTraceShares).toHaveBeenCalledTimes(2);
+        expect(mockRevokeAllTraceShares).toHaveBeenCalledWith("proj-1");
+        expect(mockRevokeAllTraceShares).toHaveBeenCalledWith("proj-2");
+      });
+    });
+
+    describe("when trace sharing was already off", () => {
+      it("does not revoke anything again", async () => {
+        vi.mocked(mockRepo.findSettingsById).mockResolvedValue({
+          id: "org-123",
+          name: "Org",
+          slug: "org",
+          supportContact: null,
+          presenceEnabled: true,
+          traceSharingEnabled: false,
+          primaryIntent: null,
+          s3Endpoint: null,
+          s3AccessKeyId: null,
+          s3Bucket: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
+
+        await service.updateSettings({
+          organizationId: "org-123",
+          traceSharingEnabled: false,
+        });
+
+        expect(mockRevokeAllTraceShares).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when the update does not touch trace sharing", () => {
+      it("writes the partial update without reading the stored settings", async () => {
+        await service.updateSettings({
+          organizationId: "org-123",
+          name: "Renamed Org",
+        });
+
+        expect(mockRepo.updateSettings).toHaveBeenCalledWith({
+          organizationId: "org-123",
+          name: "Renamed Org",
+        });
+        expect(mockRepo.findSettingsById).not.toHaveBeenCalled();
+        expect(mockRevokeAllTraceShares).not.toHaveBeenCalled();
       });
     });
   });

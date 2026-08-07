@@ -4,6 +4,7 @@ import crypto from "crypto";
 import { isEnterpriseTier } from "~/server/api/enterprise";
 import { getApp } from "~/server/app-layer/app";
 import type { PlanProvider } from "~/server/app-layer/subscription/plan-provider";
+import { ScimTokenNotFoundError } from "./errors";
 
 /**
  * The three answers a bearer credential can get from {@link ScimTokenService.verifyEntitled}:
@@ -66,6 +67,57 @@ export class ScimTokenService {
     });
 
     return { token, tokenId: scimToken.id };
+  }
+
+  /**
+   * The organization's SCIM tokens as the management surfaces list them.
+   * Never returns the stored hash, let alone a token: the plaintext exists
+   * only in the {@link generate} response, once.
+   */
+  async list({ organizationId }: { organizationId: string }): Promise<
+    Array<{
+      id: string;
+      description: string | null;
+      createdAt: Date;
+      lastUsedAt: Date | null;
+    }>
+  > {
+    return this.prisma.scimToken.findMany({
+      where: { organizationId },
+      select: {
+        id: true,
+        description: true,
+        createdAt: true,
+        lastUsedAt: true,
+      },
+      orderBy: { createdAt: "desc" },
+    });
+  }
+
+  /**
+   * Deletes a token so it stops verifying. Organization-scoped: a token id
+   * from another organization reads as not found, and so does an
+   * already-revoked one, which keeps revocation idempotent for a
+   * provisioning tool.
+   */
+  async revoke({
+    organizationId,
+    tokenId,
+  }: {
+    organizationId: string;
+    tokenId: string;
+  }): Promise<{ success: true }> {
+    const token = await this.prisma.scimToken.findFirst({
+      where: { id: tokenId, organizationId },
+      select: { id: true },
+    });
+    if (!token) {
+      throw new ScimTokenNotFoundError(tokenId);
+    }
+    await this.prisma.scimToken.delete({
+      where: { id: tokenId, organizationId },
+    });
+    return { success: true };
   }
 
   /**

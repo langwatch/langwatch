@@ -1,5 +1,5 @@
 import { generate } from "@langwatch/ksuid";
-import type { User } from "@prisma/client";
+import type { PrismaClient, User } from "@prisma/client";
 import {
   type OrganizationIntent,
   type OrganizationUserRole,
@@ -9,24 +9,49 @@ import {
 } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import type { RoleBindingForSynthesis } from "~/server/app-layer/role-bindings/repositories/role-binding.repository";
+import { createLicenseEnforcementService } from "~/server/license-enforcement";
+import { LicenseEnforcementRepository } from "~/server/license-enforcement/license-enforcement.repository";
+import type { MinimalUser } from "~/server/license-enforcement/license-enforcement.service";
+import { assertMemberTypeLimitNotExceeded } from "~/server/license-enforcement/license-limit-guard";
+import { getRoleChangeType } from "~/server/license-enforcement/member-classification";
 import type { PromptTagRepository } from "~/server/prompt-config/repositories/prompt-tag.repository";
+import {
+  assertNoPersonalTeamScope,
+  findSharedTeamIds,
+} from "~/server/role-bindings/personal-team-scope";
 import { KSUID_RESOURCES } from "~/utils/constants";
+import { decrypt } from "~/utils/encryption";
 import type { TeamRoleValue } from "~/utils/memberRoleConstraints";
 import { slugify } from "~/utils/slugify";
-import { isCustomRole } from "../../api/enterprise";
+import {
+  assertEnterprisePlanType,
+  ENTERPRISE_FEATURE_ERRORS,
+  isCustomRole,
+} from "../../api/enterprise";
+import { getApp } from "../app";
+import type { PlanProviderUser } from "../subscription/plan-provider";
 import { computeEffectiveTeamRoleUpdates } from "./compute-effective-team-role-updates";
+import {
+  CannotDisableSelfError,
+  CannotRemoveSelfError,
+  MemberNotFoundError,
+  MemberSeatLimitReachedError,
+} from "./errors";
 import type {
   AuditLogFilters,
   CreateAndAssignResult,
   EnrichedAuditLog,
   FullyLoadedOrganization,
+  MemberTeamBinding,
   OrganizationForBilling,
+  OrganizationMemberSummary,
   OrganizationMemberWithUser,
   OrganizationRepository,
+  OrganizationSettings,
   OrganizationWithAdmins,
   OrganizationWithMembersAndTheirTeams,
   UpdateMemberRoleResult,
-  UpdateOrganizationInput,
+  UpdateOrganizationSettingsInput,
 } from "./repositories/organization.repository";
 
 /**
@@ -98,6 +123,28 @@ export function enrichTeamWithRoleBindings<
       ? team.members.map((m, i) => (i === existingIndex ? bindingMember : m))
       : [...team.members, bindingMember];
   return { ...team, members: newMembers };
+}
+
+/**
+ * The raw client behind the repository, for orchestrations that compose
+ * helpers operating on one (the personal-team guard, shared-team
+ * enumeration, the license-enforcement repository). Absent only with the
+ * null repository, where these operations are not meaningful.
+ *
+ * A standalone function, NOT a method on `OrganizationService`, for the same
+ * reason as {@link enrichTeamWithRoleBindings}: the service instance is
+ * wrapped with the `traced()` proxy, which turns every method call into an
+ * async call returning a Promise, and a Promise standing in for a Prisma
+ * client fails only later, deep inside whatever received it.
+ */
+function clientFromRepo(repo: OrganizationRepository): PrismaClient {
+  const client = repo.getClient?.();
+  if (!client) {
+    throw new Error(
+      "This operation requires a Prisma-backed organization repository",
+    );
+  }
+  return client;
 }
 
 /**
@@ -259,21 +306,118 @@ export class OrganizationService {
   }
 
   /**
-   * Persists updated organization settings. Encryption is applied in the repository.
+   * The organization profile as the management surface reads it back:
+   * everything a settings write accepts except the S3 secret (write-only) and
+   * the SSO fields (staff-backoffice-only). S3 endpoint and access key id are
+   * decrypted here so callers never handle ciphertext.
    */
-  async update(input: UpdateOrganizationInput): Promise<void> {
-    return this.repo.update(input);
+  async getSettings(organizationId: string): Promise<OrganizationSettings> {
+    const settings = await this.repo.findSettingsById(organizationId);
+    if (!settings) {
+      // The organization is implied by an authenticated credential, so a
+      // miss is a platform inconsistency rather than a nameable caller error.
+      throw new Error(`Organization not found: ${organizationId}`);
+    }
+    return {
+      ...settings,
+      s3Endpoint: settings.s3Endpoint ? decrypt(settings.s3Endpoint) : null,
+      s3AccessKeyId: settings.s3AccessKeyId
+        ? decrypt(settings.s3AccessKeyId)
+        : null,
+    };
+  }
+
+  /**
+   * Partial settings update. Only the fields present are written, unlike
+   * {@link update}, whose full-form semantics clear absent S3 credentials.
+   *
+   * Owns the ADR-057 cascade: when this write turns trace sharing off, every
+   * existing trace share link across the organization's projects is revoked,
+   * not just new ones blocked, so re-enabling later never resurrects old
+   * links. The transition is detected against the stored value before the
+   * write, mirroring the project-level kill switch.
+   */
+  async updateSettings(input: UpdateOrganizationSettingsInput): Promise<void> {
+    const wasSharingEnabled =
+      input.traceSharingEnabled === false
+        ? (await this.repo.findSettingsById(input.organizationId))
+            ?.traceSharingEnabled === true
+        : false;
+
+    await this.repo.updateSettings(input);
+
+    if (input.traceSharingEnabled === false && wasSharingEnabled) {
+      const projectIds = await this.repo.getProjectIds(input.organizationId);
+      await Promise.all(
+        projectIds.map((projectId) =>
+          getApp().share.revokeAllTraceShares(projectId),
+        ),
+      );
+    }
+  }
+
+  /**
+   * Paginated membership list for the management surface. No caller
+   * pre-check: authentication happens at the boundary through the
+   * organization credential, not a session user.
+   */
+  async listMembers(params: {
+    organizationId: string;
+    includeDisabled?: boolean;
+    offset?: number;
+    limit?: number;
+  }): Promise<{ members: OrganizationMemberSummary[]; totalCount: number }> {
+    return this.repo.listMembers({
+      organizationId: params.organizationId,
+      includeDisabled: params.includeDisabled ?? false,
+      offset: params.offset ?? 0,
+      limit: params.limit ?? 50,
+    });
+  }
+
+  /**
+   * One member with their role, disabled status and team bindings (personal
+   * workspaces excluded). Throws {@link MemberNotFoundError} when the user is
+   * not a member of this organization.
+   */
+  async getMember(params: {
+    organizationId: string;
+    userId: string;
+  }): Promise<OrganizationMemberSummary & { teams: MemberTeamBinding[] }> {
+    const membership = await this.repo.findMembership(params);
+    if (!membership) {
+      throw new MemberNotFoundError(params.userId);
+    }
+    const teams = await this.repo.findMemberTeamBindings(params);
+    return { ...membership, teams };
   }
 
   /**
    * Removes a user from an organization and all its teams atomically.
-   * Self-deletion guard is enforced by the router before calling this method.
+   *
+   * Refuses to remove the acting user's own membership so an organization
+   * cannot lose its last acting administrator by accident; a credential that
+   * acts as nobody (a service key) cannot trip the guard.
    */
   async deleteMember(params: {
     organizationId: string;
     userId: string;
+    actingUserId?: string | null;
   }): Promise<void> {
-    return this.repo.deleteMember(params);
+    if (params.actingUserId != null && params.actingUserId === params.userId) {
+      throw new CannotRemoveSelfError();
+    }
+    const membership = await this.repo.findMembership({
+      organizationId: params.organizationId,
+      userId: params.userId,
+    });
+    if (!membership) {
+      throw new MemberNotFoundError(params.userId);
+    }
+    return this.repo.deleteMember({
+      organizationId: params.organizationId,
+      userId: params.userId,
+    });
   }
 
   /**
@@ -281,15 +425,184 @@ export class OrganizationService {
    * this organization and returns or takes back a licensed seat. Role,
    * department and history are untouched, so this is reversible.
    *
-   * The seat check on re-enabling is the caller's (router) job, same as
-   * `updateMemberRole`: it needs request-scoped plan context.
+   * Re-enabling consumes a seat, so it goes through the same check as
+   * inviting someone. Disabling only ever frees one, and is what an
+   * over-seats organization is being asked to do, so it is never blocked.
+   * Disabling your own membership is refused for the same reason removing
+   * it is: an organization must not lock itself out through its last acting
+   * administrator.
    */
   async setMemberDisabled(params: {
     organizationId: string;
     userId: string;
     disabled: boolean;
+    /** The user the credential acts as; null (a service key) skips the self-guard. */
+    actingUser?: MinimalUser | null;
   }): Promise<void> {
-    return this.repo.setMemberDisabled(params);
+    const { organizationId, userId, disabled, actingUser } = params;
+
+    if (disabled && actingUser?.id != null && actingUser.id === userId) {
+      throw new CannotDisableSelfError();
+    }
+
+    const membership = await this.repo.findMembership({
+      organizationId,
+      userId,
+    });
+    if (!membership) {
+      throw new MemberNotFoundError(userId);
+    }
+
+    if (!disabled) {
+      const enforcement = createLicenseEnforcementService(
+        clientFromRepo(this.repo),
+      );
+      const result = await enforcement.checkLimit(
+        organizationId,
+        "members",
+        actingUser ?? undefined,
+      );
+      if (!result.allowed) {
+        throw new MemberSeatLimitReachedError({
+          meta: {
+            limitType: result.limitType,
+            current: result.current,
+            max: result.max,
+          },
+        });
+      }
+    }
+
+    return this.repo.setMemberDisabled({ organizationId, userId, disabled });
+  }
+
+  /**
+   * The full member-role-change orchestration: personal-workspace assertion,
+   * shared-team scoping, seat classification (a Lite Member gaining non-view
+   * permissions re-checks the full-member seats) and the Enterprise gate for
+   * custom-role assignments, then the cascading role update itself.
+   *
+   * Seat overflow propagates as `LimitExceededError`
+   * (`resource_limit_exceeded`), the same refusal every other member-limit
+   * path raises, so the client's limit modal keeps opening off one shape.
+   */
+  async changeMemberRole(params: {
+    organizationId: string;
+    userId: string;
+    role: OrganizationUserRole;
+    teamRoleUpdates?: Array<{
+      teamId: string;
+      userId: string;
+      role: string;
+      customRoleId?: string;
+    }>;
+    currentUserId: string;
+    planUser?: PlanProviderUser;
+  }): Promise<UpdateMemberRoleResult> {
+    const { organizationId, userId, role, teamRoleUpdates, currentUserId } =
+      params;
+    const prisma = clientFromRepo(this.repo);
+
+    const currentMember = await this.repo.findMembership({
+      organizationId,
+      userId,
+    });
+    if (!currentMember) {
+      throw new MemberNotFoundError(userId);
+    }
+
+    // A caller who names a personal workspace outright is told so. Without
+    // this the shared-teams-only set below would answer "that team is not in
+    // the organization", which is both wrong and no help.
+    await assertNoPersonalTeamScope({
+      client: prisma,
+      scopes: (teamRoleUpdates ?? []).map((update) => ({
+        scopeType: RoleBindingScopeType.TEAM,
+        scopeId: update.teamId,
+      })),
+    });
+
+    // Only the teams the organization shares. A seat decision is about the
+    // person, so it applies to the teams they work in with other people and
+    // leaves the workspace that is only theirs alone. Including it would ask
+    // the organization to demote a team's last admin, which is refused, and
+    // the whole role change would go down with the refusal.
+    const organizationTeamIds = await findSharedTeamIds({
+      client: prisma,
+      organizationId,
+    });
+
+    const currentTeamBindings = await prisma.roleBinding.findMany({
+      where: {
+        organizationId,
+        userId,
+        scopeType: RoleBindingScopeType.TEAM,
+        scopeId: { in: organizationTeamIds },
+      },
+      select: { scopeId: true, role: true, customRoleId: true },
+    });
+
+    const currentMemberships = currentTeamBindings.map((binding) => ({
+      teamId: binding.scopeId,
+      role: binding.role,
+    }));
+
+    const userPermissions = await (async () => {
+      const customRoleIds = currentTeamBindings
+        .map((binding) => binding.customRoleId)
+        .filter((id): id is string => !!id);
+      if (customRoleIds.length === 0) return undefined;
+      const customRoles = await prisma.customRole.findMany({
+        where: { id: { in: customRoleIds }, organizationId },
+        select: { permissions: true },
+      });
+      const allPermissions: string[] = [];
+      for (const customRole of customRoles) {
+        if (customRole.permissions) {
+          allPermissions.push(...(customRole.permissions as string[]));
+        }
+      }
+      return allPermissions.length > 0 ? allPermissions : undefined;
+    })();
+
+    const changeType = getRoleChangeType(
+      currentMember.role,
+      userPermissions,
+      role,
+      undefined,
+    );
+
+    const subscriptionLimits = await getApp().planProvider.getActivePlan({
+      organizationId,
+      user: params.planUser,
+    });
+    const licenseRepo = new LicenseEnforcementRepository(prisma);
+    await assertMemberTypeLimitNotExceeded(
+      changeType,
+      organizationId,
+      licenseRepo,
+      subscriptionLimits,
+    );
+
+    const hasCustomRoleAssignment = (teamRoleUpdates ?? []).some(
+      (update) => typeof update.role === "string" && isCustomRole(update.role),
+    );
+    if (hasCustomRoleAssignment) {
+      assertEnterprisePlanType({
+        planType: subscriptionLimits.type,
+        errorMessage: ENTERPRISE_FEATURE_ERRORS.RBAC,
+      });
+    }
+
+    return await this.updateMemberRole({
+      organizationId,
+      userId,
+      role,
+      teamRoleUpdates,
+      currentMemberships,
+      organizationTeamIds,
+      currentUserId,
+    });
   }
 
   /**

@@ -8,7 +8,9 @@ function createMockPrisma() {
     scimToken: {
       create: vi.fn(),
       findFirst: vi.fn(),
+      findMany: vi.fn(),
       update: vi.fn(),
+      delete: vi.fn(),
     },
   } as unknown as Parameters<typeof ScimTokenService.create>[0];
 }
@@ -131,6 +133,64 @@ describe("ScimTokenService", () => {
           status: "plan_not_entitled",
           organizationId: "org-1",
         });
+      });
+    });
+  });
+
+  describe("list()", () => {
+    it("selects only the safe fields, never the stored hash", async () => {
+      (prisma.scimToken.findMany as ReturnType<typeof vi.fn>).mockResolvedValue(
+        [],
+      );
+
+      await service.list({ organizationId: "org-1" });
+
+      expect(prisma.scimToken.findMany).toHaveBeenCalledWith({
+        where: { organizationId: "org-1" },
+        select: {
+          id: true,
+          description: true,
+          createdAt: true,
+          lastUsedAt: true,
+        },
+        orderBy: { createdAt: "desc" },
+      });
+    });
+  });
+
+  describe("revoke()", () => {
+    describe("when the token belongs to the organization", () => {
+      it("deletes it", async () => {
+        (
+          prisma.scimToken.findFirst as ReturnType<typeof vi.fn>
+        ).mockResolvedValue({ id: "token-1" });
+        (prisma.scimToken.delete as ReturnType<typeof vi.fn>).mockResolvedValue(
+          {},
+        );
+
+        const result = await service.revoke({
+          organizationId: "org-1",
+          tokenId: "token-1",
+        });
+
+        expect(result).toEqual({ success: true });
+        expect(prisma.scimToken.delete).toHaveBeenCalledWith({
+          where: { id: "token-1", organizationId: "org-1" },
+        });
+      });
+    });
+
+    describe("when the token id is unknown or from another organization", () => {
+      it("answers not found and deletes nothing", async () => {
+        (
+          prisma.scimToken.findFirst as ReturnType<typeof vi.fn>
+        ).mockResolvedValue(null);
+
+        await expect(
+          service.revoke({ organizationId: "org-1", tokenId: "foreign" }),
+        ).rejects.toMatchObject({ code: "scim_token_not_found" });
+
+        expect(prisma.scimToken.delete).not.toHaveBeenCalled();
       });
     });
   });

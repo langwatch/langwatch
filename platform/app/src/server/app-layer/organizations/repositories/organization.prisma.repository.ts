@@ -34,15 +34,18 @@ import type {
   DeleteMemberInput,
   EnrichedAuditLog,
   FullyLoadedOrganization,
+  MemberTeamBinding,
   OrganizationForBilling,
+  OrganizationMemberSummary,
   OrganizationMemberWithUser,
   OrganizationRepository,
+  OrganizationSettings,
   OrganizationWithAdmins,
   OrganizationWithMembersAndTheirTeams,
   SetMemberDisabledInput,
   UpdateMemberRoleInput,
   UpdateMemberRoleResult,
-  UpdateOrganizationInput,
+  UpdateOrganizationSettingsInput,
   UpdateTeamMemberRoleInput,
 } from "./organization.repository";
 
@@ -66,6 +69,10 @@ async function teamNameFor({
 
 export class PrismaOrganizationRepository implements OrganizationRepository {
   constructor(private readonly prisma: PrismaClient) {}
+
+  getClient(): PrismaClient {
+    return this.prisma;
+  }
 
   async getOrganizationIdByTeamId(teamId: string): Promise<string | null> {
     const team = await this.prisma.team.findUnique({
@@ -485,30 +492,169 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
     });
   }
 
-  async update(input: UpdateOrganizationInput): Promise<void> {
+  async findMembership(params: {
+    organizationId: string;
+    userId: string;
+  }): Promise<OrganizationMemberSummary | null> {
+    const { organizationId, userId } = params;
+    return this.prisma.organizationUser.findUnique({
+      where: { userId_organizationId: { userId, organizationId } },
+      select: {
+        userId: true,
+        organizationId: true,
+        role: true,
+        disabledAt: true,
+        createdAt: true,
+        updatedAt: true,
+        user: { select: { id: true, name: true, email: true } },
+      },
+    });
+  }
+
+  async listMembers(params: {
+    organizationId: string;
+    includeDisabled: boolean;
+    offset: number;
+    limit: number;
+  }): Promise<{ members: OrganizationMemberSummary[]; totalCount: number }> {
+    const { organizationId, includeDisabled, offset, limit } = params;
+    const where = {
+      organizationId,
+      ...(includeDisabled ? {} : { disabledAt: null }),
+    };
+
+    const [members, totalCount] = await Promise.all([
+      this.prisma.organizationUser.findMany({
+        where,
+        select: {
+          userId: true,
+          organizationId: true,
+          role: true,
+          disabledAt: true,
+          createdAt: true,
+          updatedAt: true,
+          user: { select: { id: true, name: true, email: true } },
+        },
+        orderBy: [
+          { user: { name: "asc" } },
+          { user: { email: "asc" } },
+          { userId: "asc" },
+        ],
+        skip: offset,
+        take: limit,
+      }),
+      this.prisma.organizationUser.count({ where }),
+    ]);
+
+    return { members, totalCount };
+  }
+
+  async findMemberTeamBindings(params: {
+    organizationId: string;
+    userId: string;
+  }): Promise<MemberTeamBinding[]> {
+    const { organizationId, userId } = params;
+    const bindings = await this.prisma.roleBinding.findMany({
+      where: {
+        organizationId,
+        userId,
+        scopeType: RoleBindingScopeType.TEAM,
+      },
+      select: {
+        scopeId: true,
+        role: true,
+        customRoleId: true,
+        customRole: { select: { name: true } },
+      },
+      orderBy: { createdAt: "asc" },
+    });
+    if (bindings.length === 0) return [];
+
+    const teams = await this.prisma.team.findMany({
+      where: {
+        id: { in: bindings.map((b) => b.scopeId) },
+        organizationId,
+      },
+      select: { id: true, name: true, isPersonal: true },
+    });
+    const teamsById = new Map(teams.map((team) => [team.id, team]));
+
+    // A binding whose team is missing from the lookup points outside the
+    // organization (or at a deleted team) and carries no manageable access;
+    // personal workspaces are not managed from these surfaces at all.
+    return bindings.flatMap((binding) => {
+      const team = teamsById.get(binding.scopeId);
+      if (!team || team.isPersonal) return [];
+      return [
+        {
+          teamId: team.id,
+          teamName: team.name,
+          role: binding.role,
+          customRoleId: binding.customRoleId,
+          customRoleName: binding.customRole?.name ?? null,
+        },
+      ];
+    });
+  }
+
+  async findSettingsById(
+    organizationId: string,
+  ): Promise<OrganizationSettings | null> {
+    return this.prisma.organization.findUnique({
+      where: { id: organizationId },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        supportContact: true,
+        presenceEnabled: true,
+        traceSharingEnabled: true,
+        primaryIntent: true,
+        s3Endpoint: true,
+        s3AccessKeyId: true,
+        s3Bucket: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+  }
+
+  async updateSettings(input: UpdateOrganizationSettingsInput): Promise<void> {
     await this.prisma.organization.update({
       where: { id: input.organizationId },
       data: {
-        name: input.name,
-        s3Endpoint: input.s3Endpoint ? encrypt(input.s3Endpoint) : null,
-        s3AccessKeyId: input.s3AccessKeyId
-          ? encrypt(input.s3AccessKeyId)
-          : null,
-        s3SecretAccessKey: input.s3SecretAccessKey
-          ? encrypt(input.s3SecretAccessKey)
-          : null,
-        s3Bucket: input.s3Bucket,
+        ...(input.name !== undefined ? { name: input.name } : {}),
+        ...(input.supportContact !== undefined
+          ? { supportContact: input.supportContact?.trim() || null }
+          : {}),
         ...(input.presenceEnabled !== undefined
           ? { presenceEnabled: input.presenceEnabled }
           : {}),
         ...(input.traceSharingEnabled !== undefined
           ? { traceSharingEnabled: input.traceSharingEnabled }
           : {}),
-        ...(input.supportContact !== undefined
-          ? { supportContact: input.supportContact?.trim() || null }
-          : {}),
         ...(input.primaryIntent !== undefined
           ? { primaryIntent: input.primaryIntent }
+          : {}),
+        ...(input.s3Endpoint !== undefined
+          ? { s3Endpoint: input.s3Endpoint ? encrypt(input.s3Endpoint) : null }
+          : {}),
+        ...(input.s3AccessKeyId !== undefined
+          ? {
+              s3AccessKeyId: input.s3AccessKeyId
+                ? encrypt(input.s3AccessKeyId)
+                : null,
+            }
+          : {}),
+        ...(input.s3SecretAccessKey !== undefined
+          ? {
+              s3SecretAccessKey: input.s3SecretAccessKey
+                ? encrypt(input.s3SecretAccessKey)
+                : null,
+            }
+          : {}),
+        ...(input.s3Bucket !== undefined
+          ? { s3Bucket: input.s3Bucket || null }
           : {}),
       },
     });

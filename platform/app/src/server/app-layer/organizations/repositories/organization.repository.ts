@@ -7,6 +7,7 @@ import type {
   OrganizationUser,
   OrganizationUserRole,
   PricingModel,
+  PrismaClient,
   Project,
   Team,
   TeamUser,
@@ -168,22 +169,72 @@ export interface EnrichedAuditLog {
 }
 
 /**
- * Input for updating an organization's settings.
+ * Partial update for an organization's settings: only the fields present are
+ * written. `undefined` leaves a column untouched; an explicit `null` (or empty
+ * string, for the encrypted S3 credentials) clears it. Callers whose form
+ * semantics are "absent means clear" (the organization settings form
+ * round-trips every S3 field) make the clearing explicit with nulls.
  */
-export interface UpdateOrganizationInput {
+export interface UpdateOrganizationSettingsInput {
   organizationId: string;
-  name: string;
+  name?: string;
+  supportContact?: string | null;
+  presenceEnabled?: boolean;
+  traceSharingEnabled?: boolean;
+  primaryIntent?: OrganizationIntent | null;
   s3Endpoint?: string | null;
   s3AccessKeyId?: string | null;
   s3SecretAccessKey?: string | null;
   s3Bucket?: string | null;
-  presenceEnabled?: boolean;
-  /** Org-level trace-sharing kill switch (ADR-057). Off disables sharing for
-   *  every project in the org. */
-  traceSharingEnabled?: boolean;
-  supportContact?: string | null;
-  /** ADR-038 "Primary use" setting; null clears back to legacy behavior. */
-  primaryIntent?: OrganizationIntent | null;
+}
+
+/**
+ * The organization profile as the management surface reads and writes it.
+ * Deliberately excludes `ssoDomain`/`ssoProvider` (staff-backoffice-only) and
+ * `s3SecretAccessKey` (write-only: never read back). The S3 endpoint and
+ * access key id are returned as stored (encrypted); the service decrypts.
+ */
+export interface OrganizationSettings {
+  id: string;
+  name: string;
+  slug: string;
+  supportContact: string | null;
+  presenceEnabled: boolean;
+  traceSharingEnabled: boolean;
+  primaryIntent: OrganizationIntent | null;
+  s3Endpoint: string | null;
+  s3AccessKeyId: string | null;
+  s3Bucket: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/**
+ * A membership row with the user it belongs to, as the members management
+ * surface lists it. `disabledAt` is exposed rather than filtered so an admin
+ * can see who is disabled in order to re-enable them.
+ */
+export interface OrganizationMemberSummary {
+  userId: string;
+  organizationId: string;
+  role: OrganizationUserRole;
+  disabledAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+  user: { id: string; name: string | null; email: string | null };
+}
+
+/**
+ * One team the member reaches through a TEAM-scoped role binding. Personal
+ * workspaces are excluded: they are not access an administrator granted or
+ * can take away, so the management surfaces never list them.
+ */
+export interface MemberTeamBinding {
+  teamId: string;
+  teamName: string;
+  role: TeamUserRole;
+  customRoleId: string | null;
+  customRoleName: string | null;
 }
 
 /**
@@ -308,11 +359,57 @@ export interface OrganizationRepository {
 
   getAllMembers(organizationId: string): Promise<User[]>;
 
-  update(input: UpdateOrganizationInput): Promise<void>;
+  /**
+   * A single membership row with its user, disabled or not. Unlike
+   * `getMemberById` there is no caller pre-check: the management surface
+   * authenticates through the organization credential, not a session user.
+   */
+  findMembership(params: {
+    organizationId: string;
+    userId: string;
+  }): Promise<OrganizationMemberSummary | null>;
+
+  /** Paginated membership list for the management surface. */
+  listMembers(params: {
+    organizationId: string;
+    includeDisabled: boolean;
+    offset: number;
+    limit: number;
+  }): Promise<{ members: OrganizationMemberSummary[]; totalCount: number }>;
+
+  /**
+   * The member's TEAM-scoped role bindings with team names, personal
+   * workspaces excluded.
+   */
+  findMemberTeamBindings(params: {
+    organizationId: string;
+    userId: string;
+  }): Promise<MemberTeamBinding[]>;
+
+  /** The organization profile the management surface reads back. */
+  findSettingsById(
+    organizationId: string,
+  ): Promise<OrganizationSettings | null>;
+
+  /** Partial settings update; see {@link UpdateOrganizationSettingsInput}. */
+  updateSettings(input: UpdateOrganizationSettingsInput): Promise<void>;
 
   deleteMember(input: DeleteMemberInput): Promise<void>;
 
   setMemberDisabled(input: SetMemberDisabledInput): Promise<void>;
+
+  /**
+   * The raw Prisma client behind this repository, when it has one.
+   *
+   * The member-role orchestration in `OrganizationService` composes helpers
+   * that operate on a raw client (the personal-team guard, shared-team
+   * enumeration, the license-enforcement repository). Exposing the client
+   * here keeps those flows constructible from the repository alone, so every
+   * existing `new OrganizationService(repo, tags)` call site keeps working.
+   * Optional on purpose: the null repository has no client, and callers must
+   * treat its absence as "this operation is unavailable".
+   */
+  getClient?(): PrismaClient;
 
   updateMemberRole(
     input: UpdateMemberRoleInput,
@@ -444,7 +541,38 @@ export class NullOrganizationRepository implements OrganizationRepository {
     return [];
   }
 
-  async update(_input: UpdateOrganizationInput): Promise<void> {}
+  async findMembership(_params: {
+    organizationId: string;
+    userId: string;
+  }): Promise<OrganizationMemberSummary | null> {
+    return null;
+  }
+
+  async listMembers(_params: {
+    organizationId: string;
+    includeDisabled: boolean;
+    offset: number;
+    limit: number;
+  }): Promise<{ members: OrganizationMemberSummary[]; totalCount: number }> {
+    return { members: [], totalCount: 0 };
+  }
+
+  async findMemberTeamBindings(_params: {
+    organizationId: string;
+    userId: string;
+  }): Promise<MemberTeamBinding[]> {
+    return [];
+  }
+
+  async findSettingsById(
+    _organizationId: string,
+  ): Promise<OrganizationSettings | null> {
+    return null;
+  }
+
+  async updateSettings(
+    _input: UpdateOrganizationSettingsInput,
+  ): Promise<void> {}
 
   async deleteMember(_input: DeleteMemberInput): Promise<void> {}
 
