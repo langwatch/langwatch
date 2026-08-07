@@ -286,6 +286,25 @@ Feature: Credential Validation
     And the header name is still recorded
 
 
+  # Several providers expose a configurable endpoint, so the address a probe
+  # dials is a customer-supplied value however it got there — typed on this
+  # request, or saved on the row earlier and used by a later check. The
+  # credential rides along either way, which makes every probe an outbound
+  # request to an untrusted host carrying a secret.
+
+  @unit
+  Scenario: A credential is never carried to an address we have not vetted
+    Given a credential to check
+    When validation runs
+    Then the address is checked before the request is made
+    And the request is not made directly
+
+  @unit
+  Scenario: A redirect never carries the credential onward
+    Given the endpoint answers with a redirect to another host
+    When validation runs
+    Then the credential is not sent to the second host
+
   @unit
   Scenario: The API key is never sent in a URL
     Given a key to check

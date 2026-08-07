@@ -16,8 +16,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { validateProviderApiKey } from "../providerValidation";
 
+// The probe goes out through the SSRF-validated fetch rather than
+// `global.fetch`, so that is the seam these tests stand in for.
 const mockFetch = vi.fn();
-global.fetch = mockFetch;
+vi.mock("../../../utils/ssrfProtection", () => ({
+  ssrfSafeFetch: (...args: unknown[]) => mockFetch(...args),
+}));
 
 const AGENT_PLATFORM_CREDENTIALS = {
   GEMINI_API_KEY: "AQ.AnAgentPlatformKey",

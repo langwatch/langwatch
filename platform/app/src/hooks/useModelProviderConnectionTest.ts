@@ -125,11 +125,15 @@ export function useModelProviderConnectionTest({
       setResult(modelProviderId, { status: "testing" }, asked);
 
       try {
-        const result = (await testConnection({
+        // No cast. Asserting the shape here would give back exactly what
+        // importing the server's type was meant to prevent: a renamed field or
+        // a new outcome would compile, and the `never` check below would stop
+        // catching it.
+        const result: ConnectionTestResult = await testConnection({
           modelProviderId,
           projectId,
           organizationId,
-        })) as ConnectionTestResult;
+        });
 
         if (result.outcome === "verified") {
           setResult(modelProviderId, { status: "works" }, asked);
@@ -157,10 +161,22 @@ export function useModelProviderConnectionTest({
           return;
         }
 
-        setResult(
-          modelProviderId,
-          { status: "unchecked", message: uncheckedMessage(result.reason) },
-          asked,
+        if (result.outcome === "unchecked") {
+          setResult(
+            modelProviderId,
+            { status: "unchecked", message: uncheckedMessage(result.reason) },
+            asked,
+          );
+          return;
+        }
+
+        // A fourth outcome would otherwise fall into the branch above and be
+        // described as "can't be tested automatically" — a confident sentence
+        // about a verdict nobody has classified. This turns that into a
+        // compile error at the moment the server grows one.
+        const unhandled: never = result;
+        throw new Error(
+          `Unhandled connection test outcome: ${JSON.stringify(unhandled)}`,
         );
       } catch (error) {
         // Not `error.message`: a handled error's message is replaced by its

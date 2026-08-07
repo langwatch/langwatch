@@ -1,14 +1,19 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+// The probe goes out through the SSRF-validated fetch, not `global.fetch`, so
+// that is what these tests stand in for. Mocking the global would leave the
+// real validator in the path and every assertion here would be about DNS.
+const mockFetch = vi.fn();
+vi.mock("../../../utils/ssrfProtection", () => ({
+  ssrfSafeFetch: (...args: unknown[]) => mockFetch(...args),
+}));
+
 import { MASKED_KEY_PLACEHOLDER } from "../../../utils/constants";
 import {
   ProviderUnreachableError,
   type ValidationResult,
   validateProviderApiKey,
 } from "../providerValidation";
-
-// Mock fetch globally
-const mockFetch = vi.fn();
-global.fetch = mockFetch;
 
 /**
  * The code a refusal carries, or `undefined` when the key was accepted.
@@ -1051,6 +1056,50 @@ describe("given a check that never reached the provider", () => {
         reason: "unknown_provider",
       });
       expect(mockFetch).not.toHaveBeenCalled();
+    });
+  });
+
+  /**
+   * Where the probe is allowed to go.
+   *
+   * Several providers expose a configurable endpoint, so the address a probe
+   * dials is a customer-supplied value however it got there — typed on this
+   * request, or saved on a provider row earlier and picked up by a later
+   * check. The credential rides along either way, which makes every probe an
+   * outbound request to an untrusted host carrying a secret.
+   */
+  describe("when deciding where the credential may be sent", () => {
+    /** @scenario "A credential is never carried to an address we have not vetted" */
+    it("goes out through the validated fetch, and nothing slips past it", async () => {
+      const bareFetch = vi.fn();
+      const originalFetch = global.fetch;
+      global.fetch = bareFetch as unknown as typeof global.fetch;
+      mockFetch.mockResolvedValueOnce({ ok: true, status: 200 });
+
+      try {
+        await validateProviderApiKey("openai", { OPENAI_API_KEY: "sk-test" });
+
+        expect(mockFetch).toHaveBeenCalled();
+        expect(bareFetch).not.toHaveBeenCalled();
+      } finally {
+        global.fetch = originalFetch;
+      }
+    });
+
+    /** @scenario "A redirect never carries the credential onward" */
+    it("refuses to follow a redirect", async () => {
+      mockFetch.mockResolvedValueOnce({ ok: true, status: 200 });
+
+      await validateProviderApiKey("openai", { OPENAI_API_KEY: "sk-test" });
+
+      // Hop re-validation falls back to the weaker default policy, and a
+      // cross-origin redirect strips `Authorization` while carrying
+      // `x-api-key`, `x-goog-api-key` and `xi-api-key` through to the new
+      // host. A models listing has no need of a redirect.
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({ followRedirects: false }),
+      );
     });
   });
 

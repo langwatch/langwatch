@@ -9,8 +9,18 @@ import {
   providerDefaultBaseUrls,
 } from "../../features/onboarding/regions/model-providers/registry";
 import { MASKED_KEY_PLACEHOLDER } from "../../utils/constants";
+import { ssrfSafeFetch } from "../../utils/ssrfProtection";
 import { ModelProviderRepository } from "./modelProvider.repository";
 import { modelProviders } from "./registry";
+
+/**
+ * The response shape the probe actually receives.
+ *
+ * `ssrfSafeFetch` goes out through undici so it can pin the resolved IP, and
+ * undici ships its own `Response` type. Deriving the alias from the function
+ * rather than naming either one keeps this correct if that ever changes.
+ */
+type ProbeResponse = Awaited<ReturnType<typeof ssrfSafeFetch>>;
 
 /**
  * The answer to "does this credential work".
@@ -143,12 +153,12 @@ const AGENT_PLATFORM_PROBE_BODY = JSON.stringify({
  * gate, in front of one of several callers. The rule belongs here, where every
  * caller passes.
  */
-const NOT_PROBEABLE = new Set([
+const NOT_PROBEABLE: ReadonlySet<string> = new Set([
   "bedrock",
   "vertex_ai",
   "azure",
   "azure_safety",
-]);
+] as const);
 
 /**
  * Validation endpoints for providers that are not part of the onboarding
@@ -460,7 +470,7 @@ function redactApiKey(text: string, apiKey: string): string {
  * unreadable body just means we fall back to the generic message.
  */
 async function readUpstreamRefusal(
-  response: Response,
+  response: ProbeResponse,
   apiKey: string,
 ): Promise<UpstreamRefusal> {
   let raw: string;
@@ -548,7 +558,7 @@ async function handleHttpError({
   response,
   context,
 }: {
-  response: Response;
+  response: ProbeResponse;
   context: ProbeContext;
 }): Promise<RankedFailure> {
   const { message, reason } = await readUpstreamRefusal(
@@ -850,13 +860,32 @@ async function probeOnce({
   | { accepted: true; failure?: undefined }
   | { accepted: false; failure: RankedFailure }
 > {
-  let response: Response;
+  let response: ProbeResponse;
   try {
-    response = await fetch(candidate.url, {
+    // Through the SSRF validator, not bare `fetch`.
+    //
+    // Every request here carries a customer's credential to a URL a customer
+    // chose. Several providers expose a configurable endpoint, so "the URL on
+    // the row" is not a trusted value just because nobody passed one in on
+    // this call — an endpoint saved earlier is as attacker-controlled as one
+    // supplied now, and the stored key rides along either way. That makes this
+    // the shape `utils/ssrfProtection` exists for: a cloud-metadata denylist
+    // that applies regardless of configuration, private-address blocking, and
+    // IP pinning so a name cannot resolve to something else between the check
+    // and the connection.
+    //
+    // `followRedirects: false` for the reason the webhook destination gives at
+    // `httpDestination.ts:39-43`: hop re-validation falls back to the weaker
+    // env-gated validator, and — measured on this repo's Node — a cross-origin
+    // redirect strips `Authorization` but carries `x-api-key`, `x-goog-api-key`
+    // and `xi-api-key` straight through to the new host. A redirect is not
+    // something a models listing needs.
+    response = await ssrfSafeFetch(candidate.url, {
       method: candidate.method ?? "GET",
       headers: candidate.headers,
       ...(candidate.body === undefined ? {} : { body: candidate.body }),
       signal: deadline,
+      followRedirects: false,
     });
   } catch {
     return { accepted: false, failure: unreachableFailure(context) };
