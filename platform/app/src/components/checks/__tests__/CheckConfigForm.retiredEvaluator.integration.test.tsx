@@ -65,7 +65,10 @@ vi.mock("~/utils/api", () => {
     isPending: false,
   });
 
-  const overrides: Record<string, () => unknown> = {
+  const hooks: Record<string, () => unknown> = {
+    useQuery: emptyQuery,
+    useInfiniteQuery: emptyQuery,
+    useMutation: emptyMutation,
     // `useAvailableEvaluators` returns undefined until this settles, and
     // undefined short-circuits the guard under test, so it has to be a loaded
     // empty list rather than a pending one.
@@ -86,12 +89,7 @@ vi.mock("~/utils/api", () => {
     new Proxy(() => [], {
       get: (_target, prop: string) => {
         const next = path ? `${path}.${prop}` : prop;
-        const override = overrides[next];
-        if (override) return override;
-        if (prop === "useMutation") return emptyMutation;
-        if (prop === "useQuery" || prop === "useInfiniteQuery")
-          return emptyQuery;
-        return stub(next);
+        return hooks[next] ?? hooks[prop] ?? stub(next);
       },
       apply: () => [],
     });
