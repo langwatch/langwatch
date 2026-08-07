@@ -1,6 +1,7 @@
 import { buildManagedBedrockLitellmParams } from "../../../../ee/managed-providers/managedBedrockConfig";
 import { getSchemaShape } from "../../../utils/modelProviderHelpers";
 import { prisma } from "../../db";
+import { CODING_ASSISTANT_SURFACES_ONLY_NEEDLE } from "../../modelProviders/codexRefusalMessage";
 import { isCodexModel } from "../../modelProviders/codexRestrictions";
 import type {
   LLMModelEntry,
@@ -326,7 +327,7 @@ export const prepareLitellmParams = async ({
   // guard is what makes the restriction hold against a handcrafted request.
   if (isCodexModel(model) || givenModelProvider.provider === "openai_codex") {
     throw new Error(
-      `"${model}" serves the coding-assistant surfaces only and cannot run workflows, evaluations or the playground.`,
+      `"${model}" ${CODING_ASSISTANT_SURFACES_ONLY_NEEDLE} and cannot run workflows, evaluations or the playground.`,
     );
   }
 
@@ -356,7 +357,7 @@ export const prepareLitellmParams = async ({
   // it too.
   if (modelProvider.provider === "openai_codex") {
     throw new Error(
-      `"${model}" serves the coding-assistant surfaces only and cannot run workflows, evaluations or the playground.`,
+      `"${model}" ${CODING_ASSISTANT_SURFACES_ONLY_NEEDLE} and cannot run workflows, evaluations or the playground.`,
     );
   }
 

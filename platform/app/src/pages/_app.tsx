@@ -652,8 +652,16 @@ const appConfig = defineConfig({
           },
           // One step quieter than subtle. Without it, gray.400 had nowhere to
           // go but fg.subtle (gray.500), darkening ~19 hint/placeholder sites.
+          //
+          // Dark deliberately matches fg.subtle rather than stepping down
+          // again: the sites this replaces held a raw gray.400, which on the
+          // dark panel measured 6.80:1. Carrying the "one step quieter" idea
+          // into dark (gray.500) drops that to 2.64:1 — below AA-large, and
+          // worse than the raw shade it replaced. The light ladder simply has
+          // more usable room than the dark one, so faint and subtle converge
+          // there.
           faint: {
-            value: { _light: "{colors.gray.400}", _dark: "{colors.gray.500}" },
+            value: { _light: "{colors.gray.400}", _dark: "{colors.gray.400}" },
           },
           inverted: { value: { _light: "white", _dark: "{colors.gray.950}" } },
         },
