@@ -113,19 +113,117 @@ describe("DSL Adapter", () => {
       );
     });
 
-    // Note: The following tests are skipped because the new target architecture
-    // handles prompts and agents differently. Prompt targets are handled via API
-    // calls, not DSL nodes. Agent targets (code/workflow) would need updated tests.
-    it.skip("creates code node for agent target", () => {
-      // TODO: Update for new target architecture
+    it("creates code node for agent target", () => {
+      const state: EvaluationsV3State = {
+        ...createInitialState(),
+        targets: [
+          {
+            id: "target-1",
+            type: "agent",
+            agentType: "code",
+            inputs: [{ identifier: "question", type: "str" }],
+            outputs: [{ identifier: "answer", type: "str" }],
+            mappings: { [DEFAULT_TEST_DATA_ID]: {} },
+          },
+        ],
+      };
+
+      const workflow = stateToWorkflow(state);
+
+      const codeNode = workflow.nodes.find((n) => n.id === "target-1");
+      expect(codeNode?.type).toBe("code");
+      expect(codeNode?.data.inputs).toEqual([
+        { identifier: "question", type: "str" },
+      ]);
+      expect(codeNode?.data.outputs).toEqual([
+        { identifier: "answer", type: "str" },
+      ]);
     });
 
-    it.skip("creates evaluator nodes duplicated per-target", () => {
-      // TODO: Update for new target architecture
+    it("creates evaluator nodes duplicated per-target", () => {
+      const state: EvaluationsV3State = {
+        ...createInitialState(),
+        targets: [
+          {
+            id: "target-1",
+            type: "agent",
+            inputs: [{ identifier: "question", type: "str" }],
+            outputs: [{ identifier: "output", type: "str" }],
+            mappings: { [DEFAULT_TEST_DATA_ID]: {} },
+          },
+          {
+            id: "target-2",
+            type: "agent",
+            inputs: [{ identifier: "question", type: "str" }],
+            outputs: [{ identifier: "output", type: "str" }],
+            mappings: { [DEFAULT_TEST_DATA_ID]: {} },
+          },
+        ],
+        evaluators: [
+          {
+            id: "eval-1",
+            evaluatorType: "langevals/exact_match",
+            inputs: [{ identifier: "output", type: "str" }],
+            mappings: {},
+          },
+        ],
+      };
+
+      const workflow = stateToWorkflow(state);
+
+      const evaluatorNodes = workflow.nodes.filter(
+        (n) => n.type === "evaluator",
+      );
+      expect(evaluatorNodes.map((n) => n.id)).toEqual([
+        "target-1.eval-1",
+        "target-2.eval-1",
+      ]);
     });
 
-    it.skip("creates edges from target mappings with sourceId matching active dataset", () => {
-      // TODO: Update for new target architecture
+    it("creates edges from target mappings with sourceId matching active dataset", () => {
+      const state: EvaluationsV3State = {
+        ...createInitialState(),
+        targets: [
+          {
+            id: "target-1",
+            type: "agent",
+            inputs: [{ identifier: "question", type: "str" }],
+            outputs: [{ identifier: "output", type: "str" }],
+            mappings: {
+              [DEFAULT_TEST_DATA_ID]: {
+                question: {
+                  type: "source",
+                  source: "dataset",
+                  sourceId: DEFAULT_TEST_DATA_ID,
+                  sourceField: "input",
+                },
+              },
+              // Mappings for another dataset must not produce edges for the
+              // active dataset's workflow.
+              "other-dataset": {
+                question: {
+                  type: "source",
+                  source: "dataset",
+                  sourceId: "other-dataset",
+                  sourceField: "input",
+                },
+              },
+            },
+          },
+        ],
+      };
+
+      const workflow = stateToWorkflow(state);
+
+      expect(workflow.edges).toEqual([
+        {
+          id: "entry->target-1.question",
+          source: "entry",
+          sourceHandle: "output-input",
+          target: "target-1",
+          targetHandle: "input-question",
+        },
+      ]);
     });
 
     describe("value mappings", () => {

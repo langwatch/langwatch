@@ -58,8 +58,7 @@ describe("Secrets Endpoints", () => {
 
   describe("create", () => {
     describe("when creating a secret with valid input", () => {
-      // Skipped: secrets.create/update/delete call encrypt() which requires CREDENTIALS_SECRET env var (32-byte hex).
-      it.skip("creates the secret and returns metadata without the value", async () => {
+      it("creates the secret and returns metadata without the value", async () => {
         const result = await caller.secrets.create({
           projectId,
           name: "MY_API_KEY",
@@ -74,8 +73,7 @@ describe("Secrets Endpoints", () => {
         expect(result.createdAt).toBeInstanceOf(Date);
       });
 
-      // Skipped: secrets.create/update/delete call encrypt() which requires CREDENTIALS_SECRET env var (32-byte hex).
-      it.skip("encrypts the value in the database", async () => {
+      it("encrypts the value in the database", async () => {
         const result = await caller.secrets.create({
           projectId,
           name: "ENCRYPTED_CHECK",
@@ -125,8 +123,7 @@ describe("Secrets Endpoints", () => {
     });
 
     describe("when a secret with the same name already exists", () => {
-      // Skipped: secrets.create/update/delete call encrypt() which requires CREDENTIALS_SECRET env var (32-byte hex).
-      it.skip("returns a CONFLICT error", async () => {
+      it("returns a CONFLICT error", async () => {
         await caller.secrets.create({
           projectId,
           name: "DUPLICATE_KEY",
@@ -149,8 +146,7 @@ describe("Secrets Endpoints", () => {
 
   describe("list", () => {
     describe("when listing secrets for a project", () => {
-      // Skipped: secrets.create/update/delete call encrypt() which requires CREDENTIALS_SECRET env var (32-byte hex).
-      it.skip("returns secrets sorted by name without values", async () => {
+      it("returns secrets sorted by name without values", async () => {
         await caller.secrets.create({
           projectId,
           name: "ZEBRA_KEY",
@@ -182,8 +178,7 @@ describe("Secrets Endpoints", () => {
 
   describe("update", () => {
     describe("when updating a secret value", () => {
-      // Skipped: secrets.create/update/delete call encrypt() which requires CREDENTIALS_SECRET env var (32-byte hex).
-      it.skip("replaces the encrypted value in the database", async () => {
+      it("replaces the encrypted value in the database", async () => {
         const created = await caller.secrets.create({
           projectId,
           name: "UPDATE_ME",
@@ -220,8 +215,7 @@ describe("Secrets Endpoints", () => {
 
   describe("delete", () => {
     describe("when deleting a secret", () => {
-      // Skipped: secrets.create/update/delete call encrypt() which requires CREDENTIALS_SECRET env var (32-byte hex).
-      it.skip("removes the secret from the project", async () => {
+      it("removes the secret from the project", async () => {
         const created = await caller.secrets.create({
           projectId,
           name: "DELETE_ME",
