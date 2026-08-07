@@ -17,7 +17,7 @@
  *     place tenant scoping, windowed reads and query shape can be enforced at
  *     all, instead of a convention forty files are free to ignore.
  *
- * Rule 2 has a backlog. Forty files predate the rule, and rewriting them all at
+ * Rule 2 has a backlog: the files that predated the rule, which rewriting all at
  * once would be a worse change than the one it fixes. They are named below, and
  * the list is a ratchet: a file not on it fails, and a file on it that no longer
  * needs to be fails too, so the list can only shrink. Nothing new gets in.
@@ -45,6 +45,108 @@ const DRIVER_MODULE = /from\s+["']@clickhouse\/client(?:\/[^"']+)?["']/;
 /** The functions that hand out a live client. */
 const RESOLVES_CLIENT =
   /\b(getClickHouseClientForProject|getClickHouseClientForOrganization|getSharedClickHouseClient|getAllClickHouseInstances)\b/;
+
+/**
+ * A shared exported resolver is the same escape hatch again, one import away
+ * from anywhere: `clickhouseClient.ts` once exported one, and four files held
+ * a client through it without ever naming a function above. The resolver TYPE
+ * is exported and a resolver VALUE is not - the one value is built in
+ * `presets.ts` and travels by injection.
+ *
+ * Enforced as an exhaustive list of the module's VALUE exports rather than by
+ * matching a type annotation, because the thing being kept out does not need
+ * one: `export const resolveClient = async (tenantId: string) => ...` is
+ * structurally a resolver with nothing to match on. Anything this module
+ * exports that is not named below fails, which makes adding an export a
+ * decision somebody takes here, in front of the rule, instead of a line that
+ * slips past a pattern. Type exports are not listed - a type cannot hold a
+ * client.
+ */
+const CLIENT_MODULE = "src/server/clickhouse/clickhouseClient.ts";
+
+const CLIENT_MODULE_VALUE_EXPORTS = new Set([
+  "getClickHouseClientForProject",
+  "getClickHouseClientForOrganization",
+  "getAllClickHouseInstances",
+  "getSharedClickHouseClient",
+  "isClickHouseEnabled",
+  "clearCustomClientCache",
+  "getCustomClientCacheSize",
+  "clearProjectOrgCache",
+  "getPrivateClickHouseUrls",
+]);
+
+/**
+ * Every value-export form, named so the allowlist can be compared against it.
+ *
+ * `export default` and `export * from` cannot carry a name the list could
+ * hold, so they are reported as themselves and always fail - which is the
+ * right answer for this module either way: both are ways to re-export a
+ * resolver that no by-name list can see.
+ *
+ * Every pattern allows leading whitespace. A top-level export is at column 1
+ * today, but a rule that reads "everything this module exports" must not be
+ * one reformatting away from missing one.
+ */
+function valueExportsOf(source: string): string[] {
+  return [
+    ...unnamedExportsOf(source),
+    ...declarationExportsOf(source),
+    ...braceExportsOf(source),
+  ];
+}
+
+/** `export default x` and `export * from "..."` - neither carries a name. */
+function unnamedExportsOf(source: string): string[] {
+  const stars = [
+    ...source.matchAll(
+      /^[ \t]*export\s*\*\s*(?:as\s+[A-Za-z_$][\w$]*\s*)?from\s*["']([^"']+)["']/gm,
+    ),
+  ].map((match) => `* from "${match[1]}"`);
+  return /^[ \t]*export\s+default\b/m.test(source)
+    ? ["default", ...stars]
+    : stars;
+}
+
+/** `export function x`, `export const x`, `export class x`, and friends. */
+function declarationExportsOf(source: string): string[] {
+  return [
+    ...source.matchAll(
+      /^[ \t]*export\s+(?:declare\s+)?(?:async\s+)?(?:function|const|let|var|class)\s+([A-Za-z_$][\w$]*)/gm,
+    ),
+  ].map((match) => match[1]!);
+}
+
+/** `export { a, b as c }`, with or without a `from`. Skips `type` clauses. */
+function braceExportsOf(source: string): string[] {
+  return [...source.matchAll(/^[ \t]*export\s*\{([^}]*)\}/gm)]
+    .flatMap((block) => block[1]!.split(","))
+    .map((clause) => clause.trim())
+    .filter((clause) => clause.length > 0 && !clause.startsWith("type "))
+    .map((clause) => {
+      const parts = clause.split(/\s+as\s+/);
+      return (parts[1] ?? parts[0] ?? "").trim();
+    })
+    .filter((name) => name.length > 0);
+}
+
+/**
+ * `getApp().clickhouse.resolveClient` is the same escape hatch wearing the
+ * App's clothes: it hands back a live client, and the names above cannot see
+ * it. Without this it would satisfy the rule while defeating it.
+ *
+ * It exists because two call sites legitimately build repositories outside the
+ * composition root, and sharing one resolution policy beats each re-deriving
+ * its own closure. That is a narrow allowance, not a general one, so the files
+ * permitted to use it are named - it is exactly as bounded as the backlog, and
+ * shrinks the same way.
+ */
+const RESOLVES_VIA_APP = /getApp\(\)\s*\.\s*clickhouse\s*\.\s*resolveClient/;
+
+const MAY_RESOLVE_VIA_APP = new Set([
+  "src/server/traces/trace-blob-resolution.deps.ts",
+  "src/server/event-sourcing/replay/replayPreset.ts",
+]);
 
 /**
  * Allowed to construct.
@@ -94,44 +196,9 @@ function mayResolveByLocation(path: string): boolean {
  * is done. Do not add one.
  */
 const RESOLVES_DIRECTLY_BACKLOG = new Set([
-  "ee/billing/services/billableEventsQuery.ts",
-  "ee/governance/routers/governance.ts",
   "ee/governance/services/activity-monitor/activityMonitor.service.ts",
-  "ee/governance/services/cliBootstrap.service.ts",
-  "ee/governance/services/governanceOcsfExport.service.ts",
-  "ee/governance/services/personalUsage.service.ts",
-  "ee/governance/services/pullers/pullerWorker.ts",
-  "ee/governance/services/quarantineFillEvaluator.service.ts",
-  "ee/governance/services/setupState.service.ts",
-  "ee/governance/services/spendSpikeAnomalyEvaluator.service.ts",
-  "src/app/api/gateway-spend/[[...route]]/app.ts",
-  "src/app/api/webhooks/[[...route]]/app.ts",
-  "src/server/analytics/clickhouse/clickhouse-analytics.service.ts",
-  "src/server/api/routers/gatewaySpendEvents.ts",
-  "src/server/api/routers/user.ts",
-  "src/server/app-layer/analytics/analytics.service.ts",
-  "src/server/app-layer/automations/graph-trigger-heartbeat.ts",
-  "src/server/app-layer/topic-clustering/clustering.ts",
-  "src/server/app-layer/traces/log-record-storage.service.ts",
-  "src/server/collectUsageStats.ts",
-  "src/server/evaluations/evaluation.service.ts",
-  "src/server/event-sourcing/pipelineRegistry.ts",
-  "src/server/event-sourcing/projections/global/orgBillableEventsMeter.store.ts",
-  "src/server/event-sourcing/replay/replayPreset.ts",
   "src/server/experiments-v3/services/experiment-run.service.ts",
-  "src/server/gateway/clickhouseRepos.ts",
-  "src/server/gateway/endUserCaps.service.ts",
-  "src/server/routes/auth-cli.ts",
-  "src/server/routes/gateway-internal.ts",
-  "src/server/routes/ingest/ingestionRoutes.ts",
-  "src/server/routes/ops.ts",
-  "src/server/scenarios/orphaned-run-reconciliation.clickhouse.ts",
-  "src/server/scenarios/scenario.processor.ts",
-  "src/server/stored-objects/stored-objects-cross-tenant-lookup.ts",
   "src/server/traces/clickhouse-trace.service.ts",
-  "src/server/traces/span-storage.service.ts",
-  "src/server/traces/trace-blob-resolution.deps.ts",
-  "src/server/workers/startWorkers.ts",
 ]);
 
 const SKIPPED_DIRECTORIES = new Set([
@@ -162,33 +229,112 @@ interface ScannedFile {
   path: string;
   constructs: boolean;
   resolves: boolean;
+  resolvesViaApp: boolean;
 }
 
-function scan(): ScannedFile[] {
+interface ScanResult {
+  files: ScannedFile[];
+  /** Every file the walk read, matched or not. The broken-walk canary. */
+  walked: number;
+}
+
+function scan(): ScanResult {
   const files: ScannedFile[] = [];
+  let walked = 0;
   for (const root of ROOTS) {
     for (const absolute of walk(join(PACKAGE_ROOT, root))) {
+      walked += 1;
       const source = readFileSync(absolute, "utf8");
       const constructs =
         DRIVER_MODULE.test(source) && CONSTRUCTS_CLIENT.test(source);
       const resolves = RESOLVES_CLIENT.test(source);
-      if (!constructs && !resolves) continue;
+      const resolvesViaApp = RESOLVES_VIA_APP.test(source);
+      if (!constructs && !resolves && !resolvesViaApp) continue;
       files.push({
         // POSIX separators so the sets read the same on every platform.
         path: relative(PACKAGE_ROOT, absolute).split(/[\\/]/).join("/"),
         constructs,
         resolves,
+        resolvesViaApp,
       });
     }
   }
-  return files;
+  return { files, walked };
 }
 
-describe("the ClickHouse client access boundary", () => {
-  const scanned = scan();
+/**
+ * The module the export rule above is written against, in every form it has
+ * to see. The rule is only worth having if the reader cannot slip an export
+ * past it, so the reader is exercised rather than assumed.
+ */
+const EVERY_EXPORT_FORM = [
+  "  export default resolveClient;",
+  '  export * from "./more-resolvers";',
+  '\texport * as clients from "./clients";',
+  "  export const inferredResolver = async (tenantId: string) => tenantId;",
+  "export async function getClickHouseClientForProject(id: string) {}",
+  'export { _shared as getSharedClickHouseClient } from "./client";',
+  "export type ClickHouseClientResolver = (id: string) => Promise<Client>;",
+  "export interface Unrelated { a: string }",
+].join("\n");
 
-  it("finds server code to check, so a broken walk cannot pass silently", () => {
-    expect(scanned.length).toBeGreaterThan(20);
+describe("the ClickHouse client access boundary", () => {
+  const { files: scanned, walked } = scan();
+
+  describe("when a module's exports are read", () => {
+    it("finds every value-export form, indented or not", () => {
+      expect(valueExportsOf(EVERY_EXPORT_FORM)).toEqual([
+        "default",
+        '* from "./more-resolvers"',
+        '* from "./clients"',
+        "inferredResolver",
+        "getClickHouseClientForProject",
+        "getSharedClickHouseClient",
+      ]);
+    });
+
+    it("does not mistake a type export for a value", () => {
+      expect(valueExportsOf("export type Resolver = () => void;")).toEqual([]);
+      expect(valueExportsOf('export { type Foo } from "./t";')).toEqual([]);
+    });
+  });
+
+  describe("when the client module is read", () => {
+    it("exports only the values named here, so no resolver can be added quietly", () => {
+      const source = readFileSync(join(PACKAGE_ROOT, CLIENT_MODULE), "utf8");
+      const unexpected = valueExportsOf(source).filter(
+        (name) => !CLIENT_MODULE_VALUE_EXPORTS.has(name),
+      );
+
+      expect(
+        unexpected,
+        `${CLIENT_MODULE} exports a value this rule has not seen. If it hands back ` +
+          "a client, it does not belong here at all: build the one resolver in " +
+          "src/server/app-layer/presets.ts and inject it. If it does not, add it to " +
+          "CLIENT_MODULE_VALUE_EXPORTS.",
+      ).toEqual([]);
+    });
+
+    it("keeps that list honest, so a deleted export cannot sit here forever", () => {
+      const source = readFileSync(join(PACKAGE_ROOT, CLIENT_MODULE), "utf8");
+      const actual = new Set(valueExportsOf(source));
+      const stale = [...CLIENT_MODULE_VALUE_EXPORTS].filter(
+        (name) => !actual.has(name),
+      );
+
+      expect(
+        stale,
+        "These are listed as exports of the client module but no longer exist. " +
+          "Remove them from CLIENT_MODULE_VALUE_EXPORTS.",
+      ).toEqual([]);
+    });
+  });
+
+  // Counts the files READ, not the files matched. The matched count is the
+  // backlog, and the backlog is meant to reach zero - asserting on it would
+  // turn finishing this work into a failing test.
+  it("reads the server tree, so a broken walk cannot pass silently", () => {
+    expect(walked).toBeGreaterThan(1000);
   });
 
   describe("when a file builds a ClickHouse client", () => {
@@ -250,6 +396,37 @@ describe("the ClickHouse client access boundary", () => {
       expect(
         stale,
         "These files no longer resolve a client directly. Delete them from RESOLVES_DIRECTLY_BACKLOG.",
+      ).toEqual([]);
+    });
+  });
+
+  describe("when a file takes the resolver from the App", () => {
+    it("is one of the two call sites allowed to", () => {
+      const offenders = scanned
+        .filter(
+          (file) =>
+            file.resolvesViaApp &&
+            !MAY_RESOLVE_VIA_APP.has(file.path) &&
+            !mayResolveByLocation(file.path),
+        )
+        .map((file) => file.path);
+
+      expect(
+        offenders,
+        "getApp().clickhouse.resolveClient hands back a live client, so it is the same " +
+          "bypass as resolving one directly. Take a repository from the App instead.",
+      ).toEqual([]);
+    });
+
+    it("keeps that allowance shrinking too", () => {
+      const users = new Set(
+        scanned.filter((file) => file.resolvesViaApp).map((file) => file.path),
+      );
+      const stale = [...MAY_RESOLVE_VIA_APP].filter((path) => !users.has(path));
+
+      expect(
+        stale,
+        "These no longer take the resolver from the App. Remove them from MAY_RESOLVE_VIA_APP.",
       ).toEqual([]);
     });
   });

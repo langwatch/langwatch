@@ -2,7 +2,6 @@ import IORedis from "ioredis";
 import { getApp } from "../../app-layer/app";
 import { EvaluationRunClickHouseRepository } from "../../app-layer/evaluations/repositories/evaluation-run.clickhouse.repository";
 import { TraceSummaryClickHouseRepository } from "../../app-layer/traces/repositories/trace-summary.clickhouse.repository";
-import { getClickHouseClientForProject } from "../../clickhouse/clickhouseClient";
 import { EvaluationRunStore } from "../pipelines/evaluation-processing/projections/evaluationRun.store";
 import { createExperimentRunStateFoldStore } from "../pipelines/experiment-run-processing/projections/experimentRunState.store";
 import { ExperimentRunStateRepositoryClickHouse } from "../pipelines/experiment-run-processing/repositories/experimentRunState.clickhouse.repository";
@@ -50,8 +49,9 @@ const STORELESS_REPLAYABLE = new Set(["metric_processing", "log_processing"]);
 
 /**
  * Create a replay runtime using the app's tenant-aware ClickHouse resolver.
- * Every CH query routes through getClickHouseClientForProject, which
- * resolves project → org → private CH instance (or shared fallback).
+ * Every CH query routes through `getApp().clickhouse.resolveClient` — the
+ * same resolver every other repository is built from — which resolves
+ * project → org → private CH instance (or shared fallback).
  *
  * Iterates the live pipeline definitions from the EventSourcing runtime and
  * re-creates each fold projection with a raw CH store (no Redis cache).
@@ -61,12 +61,7 @@ export function createReplayRuntime(config: {
 }): ReplayRuntime {
   const redis = new IORedis(config.redisUrl, { maxRetriesPerRequest: null });
 
-  const clientResolver = async (tenantId: string) => {
-    const client = await getClickHouseClientForProject(tenantId);
-    if (!client)
-      throw new Error(`No ClickHouse client available for tenant ${tenantId}`);
-    return client;
-  };
+  const clientResolver = getApp().clickhouse.resolveClient;
 
   // Raw CH stores (no Redis cache) — keyed by pipeline name
   const storeByPipeline = new Map<string, FoldProjectionStore<any>>([

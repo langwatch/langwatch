@@ -45,7 +45,6 @@ import {
   requireApiKeyPermission,
   type UnifiedAuthVariables,
 } from "~/server/api-key/auth-middleware";
-import { getAnalyticsService } from "~/server/app-layer/analytics";
 import { getApp } from "~/server/app-layer/app";
 import type { DspyStepData } from "~/server/app-layer/dspy-steps/types";
 import {
@@ -182,7 +181,7 @@ secured
     }
 
     try {
-      const analyticsService = getAnalyticsService();
+      const analyticsService = getApp().analytics.service;
       const timeseriesResult = await analyticsService.getTimeseries(params);
       return c.json(timeseriesResult);
     } catch (e) {

@@ -8,6 +8,11 @@ import "./langwatchPlatformGuard.boot";
 
 import { metrics } from "@opentelemetry/api";
 
+import {
+  isRedisCommandTracingEnabled,
+  redisInstrumentationConfig,
+} from "./instrumentation.redis";
+
 const isEnvTrue = (value: string | undefined) => value === "true";
 
 // A trailing slash on the endpoint would produce `//v1/traces`, which some
@@ -17,6 +22,8 @@ const explicitEndpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT?.replace(
   "",
 );
 const langwatchTracingEnabled = !!process.env.LANGWATCH_API_KEY;
+
+const redisCommandTracingEnabled = isRedisCommandTracingEnabled();
 
 // Load the OTel SDK + instrumentation packages ONLY when observability is
 // actually configured (an OTLP endpoint or a LangWatch API key). When neither
@@ -50,14 +57,19 @@ if (explicitEndpoint || langwatchTracingEnabled) {
     require("langwatch/observability/node") as typeof import("langwatch/observability/node");
   const { AwsInstrumentation } =
     require("@opentelemetry/instrumentation-aws-sdk") as typeof import("@opentelemetry/instrumentation-aws-sdk");
-  const { IORedisInstrumentation } =
-    require("@opentelemetry/instrumentation-ioredis") as typeof import("@opentelemetry/instrumentation-ioredis");
   const { OpenAIInstrumentation } =
     require("@opentelemetry/instrumentation-openai") as typeof import("@opentelemetry/instrumentation-openai");
   const { PinoInstrumentation } =
     require("@opentelemetry/instrumentation-pino") as typeof import("@opentelemetry/instrumentation-pino");
   const { RuntimeNodeInstrumentation } =
     require("@opentelemetry/instrumentation-runtime-node") as typeof import("@opentelemetry/instrumentation-runtime-node");
+
+  const redisInstrumentation = () => {
+    const { IORedisInstrumentation } =
+      require("@opentelemetry/instrumentation-ioredis") as typeof import("@opentelemetry/instrumentation-ioredis");
+
+    return new IORedisInstrumentation(redisInstrumentationConfig);
+  };
 
   const spanProcessors = [] as Array<InstanceType<typeof BatchSpanProcessor>>;
   const logRecordProcessors = [] as Array<
@@ -112,30 +124,14 @@ if (explicitEndpoint || langwatchTracingEnabled) {
     // the aggregate loads all ~41 instrumentation packages at import time even
     // though the old config disabled most and the rest target frameworks this
     // server doesn't run (express, koa, hapi, connect, grpc, nest, restify, pg).
-    // These five are the ones that actually emit telemetry here; the emitted
-    // spans/metrics are unchanged. Add a new library worth tracing by adding its
-    // instrumentation package to the Promise.all above and a `new …()` here.
+    // ioredis is opt-in; see redisCommandTracingEnabled for the volume it
+    // produces when a job queue shares the process.
     instrumentations: [
       new AwsInstrumentation(),
       new OpenAIInstrumentation(),
       new PinoInstrumentation(),
       new RuntimeNodeInstrumentation(),
-      // Truncate ioredis db.statement to command + first key
-      // (avoid logging content + large attributes)
-      new IORedisInstrumentation({
-        // Redis calls are only interesting as part of some larger operation.
-        // Without this, the connection pool's `connect`/`auth`/`info` and the
-        // queue dispatcher's blocking `brpop`/`xread` — none of which have a
-        // parent — each became a root span, burying real traces in noise.
-        requireParentSpan: true,
-        dbStatementSerializer: (
-          cmdName: string,
-          cmdArgs: Array<string | Buffer | number | unknown[]>,
-        ) => {
-          const key = typeof cmdArgs[0] === "string" ? cmdArgs[0] : "";
-          return key ? `${cmdName} ${key}` : cmdName;
-        },
-      }),
+      ...(redisCommandTracingEnabled ? [redisInstrumentation()] : []),
     ],
   });
 } else {

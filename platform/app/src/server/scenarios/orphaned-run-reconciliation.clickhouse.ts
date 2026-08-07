@@ -8,7 +8,6 @@
 
 import type { ClickHouseClient } from "@clickhouse/client";
 import { createLogger } from "@langwatch/observability";
-import { getSharedClickHouseClient } from "~/server/clickhouse/clickhouseClient";
 import {
   type OrphanedRun,
   type OrphanedRunFinder,
@@ -145,25 +144,28 @@ export class ClickHouseOrphanedRunFinder implements OrphanedRunFinder {
  * Boot entrypoint: reconcile runs orphaned by a previous worker that died
  * mid-flight. No-op when ClickHouse is not configured.
  *
+ * `finder` comes from the App (`getApp().scenarios.orphanReconciliation`,
+ * built in presets.ts from the shared ClickHouse client) rather than being
+ * resolved here, so this module never reaches ClickHouse directly.
+ *
  * Limitation: tenants on private ClickHouse instances (CLICKHOUSE_URL__* envs)
  * are not swept — only the shared client is. Tracked on issue #3195.
  */
 export async function reconcileOrphanedRunsOnBoot({
   failureEmitter,
-  client = getSharedClickHouseClient(),
+  finder,
   now,
 }: {
   failureEmitter: OrphanFailureEmitter;
-  client?: ClickHouseClient | null;
+  finder: OrphanedRunFinder | null;
   now?: number;
 }): Promise<{ reconciled: number; failed: number }> {
-  if (!client) {
+  if (!finder) {
     logger.info(
       "No ClickHouse client configured; skipping orphaned-run reconciliation",
     );
     return { reconciled: 0, failed: 0 };
   }
 
-  const finder = new ClickHouseOrphanedRunFinder(client);
   return reconcileOrphanedRuns({ finder, failureEmitter, now });
 }

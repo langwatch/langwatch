@@ -36,10 +36,17 @@ vi.mock("../../rbac", async (importOriginal) => {
 
 const breakdown = vi.hoisted(() => vi.fn());
 
-vi.mock("~/server/gateway/clickhouseRepos", () => ({
-  chRepoOrUndefined: () => ({
-    getSpendForBudgetsAcrossTenants: async () => [],
-    getBucketSpendBreakdownForBudget: breakdown,
+// The router takes the budget ledger from the App, so standing in for the
+// store means standing in for `getApp()`.
+vi.mock("~/server/app-layer/app", () => ({
+  getApp: () => ({
+    gateway: {
+      budgets: {
+        getSpendForBudgetsAcrossTenants: async () => [],
+        getBucketSpendBreakdownForBudget: breakdown,
+      },
+      virtualKeySpend: undefined,
+    },
   }),
 }));
 

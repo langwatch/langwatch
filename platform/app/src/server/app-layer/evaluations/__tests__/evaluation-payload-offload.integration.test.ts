@@ -26,6 +26,7 @@ import path from "node:path";
 import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { TraceEvaluationsClickHouseRepository } from "~/server/app-layer/evaluations/repositories/trace-evaluations.clickhouse.repository";
 import * as clickhouseClientModule from "~/server/clickhouse/clickhouseClient";
 import { EvaluationService } from "~/server/evaluations/evaluation.service";
 import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
@@ -43,6 +44,10 @@ import { StoredObjectsRepository } from "~/server/stored-objects/stored-objects.
 import type { MintStorageUri } from "~/server/stored-objects/stored-objects.service";
 import { StoredObjectsService } from "~/server/stored-objects/stored-objects.service";
 import { mintFileUri } from "~/server/stored-objects/uri";
+import {
+  clearClickHouseTestApp,
+  installClickHouseTestApp,
+} from "~/test-utils/clickhouseTestApp";
 import { getTestClickHouseClient } from "../../../event-sourcing/__tests__/integration/testContainers";
 import {
   EVAL_INPUTS_HARD_CEILING_BYTES,
@@ -156,6 +161,10 @@ beforeAll(async () => {
   const client = getTestClickHouseClient();
   if (!client) throw new Error("ClickHouse test container not available");
   ch = client;
+
+  // The path under test takes its ClickHouse repositories from the App rather
+  // than resolving a client, so the fixture has to provide one.
+  installClickHouseTestApp({ resolveClient: async () => ch });
   vi.mocked(
     clickhouseClientModule.getClickHouseClientForProject,
   ).mockResolvedValue(ch);
@@ -167,6 +176,7 @@ beforeAll(async () => {
 }, 120_000);
 
 afterAll(async () => {
+  await clearClickHouseTestApp();
   if (ch) {
     await ch.exec({
       query: `ALTER TABLE evaluation_runs DELETE WHERE TenantId = {tenantId:String}`,
@@ -313,9 +323,14 @@ describe("evaluation inputs offload (integration)", () => {
       // The v1 read service resolves the marker at the read boundary. Inject
       // the same stored-objects service the write used (its client is the test
       // client via the getClickHouseClientForProject mock).
-      const service = new EvaluationService(({ projectId, inputs }) =>
-        resolveInputsMarker({ projectId, inputs, storedObjects }),
-      );
+      // The repository is injected so the read goes through the same test
+      // client the write used. The fixture App resolves one too, but the
+      // injected dependency path is the one this asserts on.
+      const service = new EvaluationService({
+        resolveInputsMarker: ({ projectId, inputs }) =>
+          resolveInputsMarker({ projectId, inputs, storedObjects }),
+        repository: new TraceEvaluationsClickHouseRepository(async () => ch),
+      });
       const readInputs = await service.getEvaluationInputs({
         projectId: tenantId,
         evaluationId,

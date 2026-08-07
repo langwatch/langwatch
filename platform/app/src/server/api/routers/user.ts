@@ -9,17 +9,13 @@ import { createLogger } from "@langwatch/observability";
 import { TRPCError } from "@trpc/server";
 import { compare, hash } from "bcrypt";
 import { z } from "zod";
+import { getApp } from "~/server/app-layer/app";
 import { NoAdminConfiguredError } from "~/server/app-layer/organizations/errors";
 import {
   Auth0ApiError,
   changeAuth0Password,
 } from "~/server/auth0/passwordService";
 import { revokeOtherSessionsForUser } from "~/server/better-auth/revokeSessions";
-import {
-  getClickHouseClientForProject,
-  isClickHouseEnabled,
-} from "~/server/clickhouse/clickhouseClient";
-import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
 import { GatewayBudgetService } from "~/server/gateway/budget.service";
 import { sendBudgetIncreaseRequestEmail } from "~/server/mailer/budgetIncreaseRequestEmail";
 import { resolveOrgAdminEmail } from "~/server/organizations/resolveOrgAdminEmail";
@@ -697,7 +693,9 @@ export const userRouter = createTRPCRouter({
             }
           : undefined;
 
-      const usage = new PersonalUsageService();
+      const usage = PersonalUsageService.create(
+        getApp().governance.personalUsage,
+      );
 
       // Ingestion-source ledger rows (Claude Code OTLP, etc.) land under
       // the org's hidden Governance Project tenant. Resolve it read-only
@@ -795,18 +793,10 @@ export const userRouter = createTRPCRouter({
       // (`_ingestion_:<sourceId>`).
       const sentinelVk = `_ingestion_:user:${userId}`;
 
-      const chRepo = isClickHouseEnabled()
-        ? new GatewayBudgetClickHouseRepository(async (projectId) => {
-            const client = await getClickHouseClientForProject(projectId);
-            if (!client) {
-              throw new Error(
-                `ClickHouse enabled but no client for project ${projectId}`,
-              );
-            }
-            return client;
-          })
-        : undefined;
-      const budgetService = GatewayBudgetService.create(ctx.prisma, chRepo);
+      const budgetService = GatewayBudgetService.create(
+        ctx.prisma,
+        getApp().gateway.budgets,
+      );
       const decision = await budgetService.check({
         organizationId: input.organizationId,
         teamId: workspace.team.id,
@@ -890,7 +880,10 @@ export const userRouter = createTRPCRouter({
     .input(z.object({ organizationId: z.string() }))
     .use(checkOrganizationPermission("organization:view"))
     .query(async ({ ctx, input }) => {
-      const service = CliBootstrapService.create(ctx.prisma);
+      const service = CliBootstrapService.create({
+        prisma: ctx.prisma,
+        budgetRepository: getApp().gateway.budgets,
+      });
       return await service.resolve({
         userId: ctx.session.user.id,
         organizationId: input.organizationId,
