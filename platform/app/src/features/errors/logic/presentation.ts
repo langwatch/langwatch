@@ -60,6 +60,35 @@ const str = (
   return typeof value === "string" && value.length > 0 ? value : fallback;
 };
 
+type MissingModelRequestType =
+  | "chat"
+  | "messages"
+  | "responses"
+  | "embeddings"
+  | "speech"
+  | "transcription"
+  | "passthrough";
+
+const missingModelDescriptions = {
+  chat: 'Add a top-level "model" field to POST /v1/chat/completions, then try again.',
+  messages:
+    'Add a top-level "model" field to POST /v1/messages, then try again.',
+  responses:
+    'Add a top-level "model" field to POST /v1/responses, then try again.',
+  embeddings:
+    'Add a top-level "model" field to POST /v1/embeddings, then try again.',
+  speech:
+    'Add a top-level "model" field to POST /v1/audio/speech, then try again.',
+  transcription:
+    'Add a "model" field to the multipart form for POST /v1/audio/transcriptions, then try again.',
+  passthrough: "Put the model in the Gemini request URL, then try again.",
+} as const satisfies Record<MissingModelRequestType, string>;
+
+const describeMissingModel = (error: HandledErrorShape): string =>
+  (missingModelDescriptions as Record<string, string>)[
+    str(error, "request_type", "")
+  ] ?? "Set the model where this endpoint expects it, then try again.";
+
 /**
  * The two plan allowances an admin meets while reconciling seats, in words that
  * read inside a sentence. Not taken from the license-enforcement labels, which
@@ -107,6 +136,26 @@ const PROVIDER_ALLOWANCE_REASONS: ReadonlySet<string> = new Set([
   "codex_plan_limit",
   "insufficient_quota",
   "billing_hard_limit_reached",
+]);
+
+/**
+ * The upstream-HTTP-status fallback reasons (llmproxy.go's
+ * upstreamReasonCodes), used when the provider's own body carried no
+ * discriminant of its own. Grouped the same way PROVIDER_ALLOWANCE_REASONS
+ * is: one remediation, one sentence.
+ */
+const PROVIDER_CREDENTIAL_REASONS: ReadonlySet<string> = new Set([
+  "upstream_unauthorized",
+  "upstream_forbidden",
+]);
+
+const PROVIDER_RATE_LIMIT_REASONS: ReadonlySet<string> = new Set([
+  "upstream_rate_limited",
+]);
+
+const PROVIDER_OUTAGE_REASONS: ReadonlySet<string> = new Set([
+  "upstream_unavailable",
+  "upstream_timeout",
 ]);
 
 /**
@@ -1476,6 +1525,10 @@ const presentations = {
     // in the registry of a code whose meta must never be rendered.
     describe: () => "We've been notified. Try again in a moment.",
   },
+  missing_model: {
+    title: "Choose a model",
+    describe: describeMissingModel,
+  },
 
   // ---- Langy agent ----
   llm_upstream_error: {
@@ -1501,10 +1554,21 @@ const presentations = {
     // cannot name is exactly the ADR-045 "unknown" case, and a trace id serves
     // the customer better than a sentence we cannot vouch for.
     title: "The model provider rejected that",
-    describe: (error) =>
-      hasReasonCode(error.reasons, PROVIDER_ALLOWANCE_REASONS)
-        ? "Your account with this model provider has no allowance left. Check its billing or usage limits, or pick a model from a different provider."
-        : "Try again, or pick a different model.",
+    describe: (error) => {
+      if (hasReasonCode(error.reasons, PROVIDER_ALLOWANCE_REASONS)) {
+        return "Your account with this model provider has no allowance left. Check its billing or usage limits, or pick a model from a different provider.";
+      }
+      if (hasReasonCode(error.reasons, PROVIDER_CREDENTIAL_REASONS)) {
+        return "The model provider refused this key or its permissions. Check the credential configured for this model.";
+      }
+      if (hasReasonCode(error.reasons, PROVIDER_RATE_LIMIT_REASONS)) {
+        return "The model provider is rate-limiting these calls. Wait a moment and try again.";
+      }
+      if (hasReasonCode(error.reasons, PROVIDER_OUTAGE_REASONS)) {
+        return "The model provider is temporarily unavailable. Try again shortly, or pick a different model.";
+      }
+      return "Try again, or pick a different model.";
+    },
   },
   agent_error: {
     title: "Something went wrong mid-answer",

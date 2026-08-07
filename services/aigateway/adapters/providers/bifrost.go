@@ -844,7 +844,10 @@ func passthroughResponseHeaders(in map[string]string) map[string]string {
 	for k, v := range in {
 		switch {
 		case strings.EqualFold(k, "Content-Length"),
-			strings.EqualFold(k, "Content-Encoding"):
+			strings.EqualFold(k, "Content-Encoding"),
+			// A provider must not be able to echo this header and have it
+			// forwarded as if the gateway had authored the response.
+			strings.EqualFold(k, herr.HandledErrorHeader):
 			continue
 		default:
 			out[k] = v

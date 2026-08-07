@@ -34,6 +34,7 @@ func TestRecorder_NilIsSafe(t *testing.T) {
 		r.RecordGuardrailVerdict(DirectionRequest, VerdictBlock)
 		r.RecordControlPlaneCall("resolve-key", "200", 0.01)
 		r.RecordRateLimitDenied("rpm", "vk_1")
+		r.RecordClientReject("bad_request", "vk_1")
 		r.StreamOpened()
 		r.StreamClosed("openai", "gpt-5-mini", domain.Usage{})
 		r.TrackDraining(func() bool { return true })
@@ -141,6 +142,60 @@ func TestRecorder_BudgetAndRateLimit(t *testing.T) {
 	assert.Equal(t, 1.0, testutil.ToFloat64(r.budgetBlocks.WithLabelValues("organization")))
 	assert.Equal(t, 1.0, testutil.ToFloat64(r.rateLimits.WithLabelValues("rpm", "vk_1")))
 	assert.Equal(t, 1.0, testutil.ToFloat64(r.rateLimits.WithLabelValues("rpd", "vk_1")))
+}
+
+// @scenario "A customer-fault rejection is counted against the key that sent it"
+func TestRecorder_ClientRejects(t *testing.T) {
+	r := New()
+
+	tests := []struct {
+		name  string
+		code  string
+		vkID  string
+		times int
+		want  float64
+	}{
+		{"a key looping on a malformed body", "bad_request", "vk_flooder", 3, 3},
+		{"the same key failing a different way", "model_not_allowed", "vk_flooder", 1, 1},
+		{"another key entirely", "bad_request", "vk_quiet", 1, 1},
+		// Belt and braces only: the gateway rejects an unauthenticated
+		// request before the choke point that records this counter, so a
+		// recorded reject always has a key. The placeholder is what keeps
+		// that guarantee cheap if a future caller records without one.
+		{"a reject recorded without a key", "bad_request", "", 1, 1},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			for range tt.times {
+				r.RecordClientReject(tt.code, tt.vkID)
+			}
+			vkID := tt.vkID
+			if vkID == "" {
+				// The placeholder is a fixed constant, never the caller's
+				// input, so even a keyless reject folds onto one series
+				// rather than minting one.
+				vkID = unknownLabel
+			}
+			assert.Equal(t, tt.want, testutil.ToFloat64(r.clientRejects.WithLabelValues(tt.code, vkID)))
+		})
+	}
+
+	assert.Equal(t, 4, testutil.CollectAndCount(r.clientRejects))
+}
+
+// @scenario "A customer-fault rejection is counted against the key that sent it"
+func TestRecorder_ClientRejectsCarryNoProjectOrModelLabel(t *testing.T) {
+	// The counter exists because gateway_http_requests_total is blind to the
+	// tenant, and it stays affordable only while its label set does not grow.
+	// Project is redundant with the key, and model is caller-controlled.
+	for _, m := range New().DeclaredMetrics() {
+		if m.Name != "gateway_client_rejects_total" {
+			continue
+		}
+		assert.ElementsMatch(t, []string{"code", "vk_id"}, m.Labels)
+		return
+	}
+	t.Fatal("gateway_client_rejects_total is not registered")
 }
 
 func TestRecorder_GaugeSourcesDefaultToZeroUntilAttached(t *testing.T) {
@@ -461,6 +516,30 @@ func TestMiddleware_LabelsByRoutePatternNotRawPath(t *testing.T) {
 
 	assert.Equal(t, 2.0, testutil.ToFloat64(r.httpRequests.WithLabelValues("/v1beta/*", "200", "gemini", "gemini-3-flash")))
 	assert.Equal(t, 1, testutil.CollectAndCount(r.httpDuration), "both paths collapse onto one route series")
+}
+
+// @scenario "A rejection on an unmetered path is still written"
+func TestMiddleware_SeedsTheRecorderOnTheRequestContext(t *testing.T) {
+	r := New()
+	router := chi.NewRouter()
+	router.Use(Middleware(r))
+
+	var seeded *Recorder
+	router.Get("/v1/models", func(w http.ResponseWriter, req *http.Request) {
+		// The error choke point is reached from helpers that never got the
+		// router's dependencies; the request context is what they all hold.
+		seeded = RecorderFromContext(req.Context())
+		w.WriteHeader(http.StatusOK)
+	})
+	router.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/v1/models", nil))
+	assert.Same(t, r, seeded)
+
+	// A request that never passed through the middleware yields nil, and
+	// every Recorder method is nil-safe, so recording stays unconditional.
+	assert.Nil(t, RecorderFromContext(context.Background()))
+	assert.NotPanics(t, func() {
+		RecorderFromContext(context.Background()).RecordClientReject("bad_request", "vk_1")
+	})
 }
 
 func TestMiddleware_RecordsStatusAndUnmatchedRoutes(t *testing.T) {
