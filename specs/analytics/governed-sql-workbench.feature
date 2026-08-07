@@ -571,6 +571,99 @@ Feature: Governed SQL query workbench — native tables and governed Vega-Lite c
     And keyboard focus moves through the surrounding controls without being trapped
     And the Table tab remains the non-visual fallback for the same result
 
+  # ---------------------------------------------------------------------------
+  # The time window — reserved period parameters (#6631)
+  #
+  # A statement opts into the page's period by declaring `{period_start:DateTime}`
+  # and `{period_end:DateTime}`. The surface owns those two names: it supplies
+  # their values and refuses a caller that tries to. A statement that declares
+  # neither is allowed and is labelled as not following the period, because the
+  # failure this contract exists to prevent is two charts on one dashboard
+  # silently showing different periods.
+  # ---------------------------------------------------------------------------
+
+  @unit
+  Scenario: A statement declaring the reserved period parameters is given the surface's window
+    Given SQL declaring period_start and period_end as ClickHouse date-times
+    And the surface supplies the window the member is looking at
+    When the member runs the query
+    Then the values the database is bound with are that window
+    And the member supplied neither of them
+
+  @unit
+  Scenario: A statement declaring only one reserved period parameter is given that one
+    Given SQL declaring period_start and no period_end
+    When the member runs the query with the surface's window
+    Then period_start is bound to the window's start
+    And no period_end value is sent
+
+  @unit
+  Scenario: A caller that supplies a reserved period parameter itself is refused
+    Given SQL declaring the reserved period parameters
+    When the request carries a value for period_start of its own
+    Then it is refused with error code governed_sql_reserved_parameter_supplied
+    And nothing reaches the database
+
+  @unit
+  Scenario: A reserved period parameter declared as anything but a date-time is refused
+    Given SQL declaring period_start as a string
+    When the statement is validated
+    Then it is refused with error code governed_sql_reserved_parameter_type
+    And the refusal comes from the validation step both running and saving pass through
+
+  @unit
+  Scenario: A statement with no period parameters runs, and says so
+    Given SQL declaring neither reserved period parameter
+    When the member runs it
+    Then it executes unchanged
+    And the answer reports that the statement does not follow the page period
+
+  @unit
+  Scenario: A period-aware statement run with no window names what is unset
+    Given SQL declaring the reserved period parameters
+    When it is run with no time window at all
+    Then it is refused with error code governed_sql_parameter_missing naming them
+    And validating that same statement is not refused, because the window is the surface's to supply
+
+  @unit
+  Scenario: The injected window is a UTC ClickHouse date-time, not an ISO-8601 instant
+    Given an instant the browser holds in its own zone
+    When it is formatted for the database
+    Then it reads as year-month-day hours:minutes:seconds in UTC
+    And it carries no zone designator or sub-second part the date-time binding would refuse
+
+  @integration
+  Scenario: The window the surface sends is the window the database reads
+    Given rows recorded at a known instant
+    When a period-aware statement runs for a window containing that instant
+    Then those rows are returned
+    And the same statement run for a window that does not contain it returns none
+
+  @integration
+  Scenario: The period is half-open, so the start instant is included and the end instant is not
+    Given a row recorded exactly at a known instant
+    When the window starts at that instant, the row is returned
+    And when the window ends at that instant, the row is not returned
+
+  @integration
+  Scenario: The workbench fills the period parameters from the page's period selector
+    Given a page whose period selector names a window
+    When the member opens the workbench
+    Then the time window shown is that window, in the format the database is bound with
+    And a page carrying a different period shows that one instead
+
+  @integration
+  Scenario: A one-off window override is what runs, and survives a re-run
+    Given the member overrides the window the page period seeded
+    When they run the query and then run it again
+    Then both requests carry the overridden window
+    And it is never sent as one of their own named parameters
+
+  @integration
+  Scenario: The schema browser names the reserved period parameters where SQL is written
+    When the member reads the schema browser
+    Then it names period_start and period_end and the half-open interval they describe
+
 # --- AC Coverage Map ---
 # Issue #6577 ACs → scenarios (grouped as in the issue body).
 #
@@ -727,3 +820,39 @@ Feature: Governed SQL query workbench — native tables and governed Vega-Lite c
 #   → Scenario: The chart renders under a CSP that forbids eval
 # AC "existing #6486 suites and application gates remain green" → process AC,
 #    proven by the CI run on the PR.
+#
+# Issue #6631 ("wire the dashboard/workbench time window into governed SQL as
+# standard start/end parameters"). Its ACs, in the order the issue's plan states
+# them:
+#
+# AC1 "a statement declaring both reserved names runs with no explicit values,
+#     and the rows change when the period changes"
+#   → Scenario: A statement declaring the reserved period parameters is given the surface's window
+#   → Scenario: The window the surface sends is the window the database reads
+# AC2 "the same statement submitted with a reserved name in `parameters` is
+#     refused and does not execute"
+#   → Scenario: A caller that supplies a reserved period parameter itself is refused
+# AC3 "`{period_start:String}` is refused at validate time, so it is refused at
+#     save as well as at run"
+#   → Scenario: A reserved period parameter declared as anything but a date-time is refused
+# AC4 "a statement declaring neither reserved name executes unchanged, and the
+#     answer reports followsTimeWindow: false"
+#   → Scenario: A statement with no period parameters runs, and says so
+# AC5 "injected values are YYYY-MM-DD HH:MM:SS UTC"
+#   → Scenario: The injected window is a UTC ClickHouse date-time, not an ISO-8601 instant
+#   → Scenario: The window the surface sends is the window the database reads
+# AC6 "the interval is half-open"
+#   → Scenario: The period is half-open, so the start instant is included and the end instant is not
+# AC7 "the workbench pre-fills both from the page period; changing the period
+#     changes them; a member override survives a re-run"
+#   → Scenario: The workbench fills the period parameters from the page's period selector
+#   → Scenario: A one-off window override is what runs, and survives a re-run
+# AC8 "each new code has a presentation entry and a remediation entry" → guarded
+#    by `features/errors/logic/__tests__/codes.unit.test.ts` and by the
+#    exhaustive `satisfies` clause in `presentation.ts`, which is a typecheck
+#    failure rather than a behaviour this file could describe.
+#
+# The surface-side half of the contract that is not an AC of its own:
+#   → Scenario: A statement declaring only one reserved period parameter is given that one
+#   → Scenario: A period-aware statement run with no window names what is unset
+#   → Scenario: The schema browser names the reserved period parameters where SQL is written
