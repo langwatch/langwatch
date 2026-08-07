@@ -113,13 +113,64 @@ describe.skipIf(!hasTestcontainers)(
     function createQueue(
       processFn: (payload: TestPayload) => Promise<void>,
       overrides?: Partial<EventSourcedQueueDefinition<TestPayload>>,
+      options?: { consumerEnabled?: boolean },
     ): GroupQueueProcessor<TestPayload> {
       const queue = new GroupQueueProcessor<TestPayload>(
         createQueueDefinition({ process: processFn, ...overrides }),
         redis,
+        options,
       );
       queues.push(queue);
       return queue;
+    }
+
+    /**
+     * Stage the whole batch through a producer-only instance, and only then
+     * start the consumer.
+     *
+     * Every coalescing test below asserts an exact descent, which holds only
+     * if the batch is claimable in one dispatch. A dispatcher that is already
+     * running races staging for that: it claims the lowest-scored due job the
+     * moment one exists, so a batch that takes longer to stage than its own
+     * head is due arrives as a short root and a second dispatch behind it.
+     *
+     * Future-dating the batch — the previous approach — does not remove the
+     * race, it just widens the window staging has to finish inside. A loaded
+     * runner overruns any margin picked here, and the failure reads as a
+     * descent bug rather than a scheduling one: an eight-payload root splits
+     * [8,4,2,2,4,2,2], while a five-payload one and its straggler split
+     * [5,3,2,1,2] then [3,2,1]. A dispatcher that does not exist yet is the
+     * only one that cannot outrun staging.
+     *
+     * Callers must also date the batch into the PAST — `SCORE_BASE_MS` — so it
+     * is already due when the consumer starts. Dating it at `Date.now()`
+     * re-opens the same race through a different door: `sendBatch` staggers
+     * dispatch times by array position to hold FIFO within a batch, so the
+     * tail sits a few milliseconds ahead of the head, the consumer starts
+     * inside that window, and the first claim takes only the payloads that
+     * have come due. Measured: a claim 12ms in took j0..j5 and left j6,j7 to
+     * a second dispatch.
+     */
+    async function stageThenConsume({
+      payloads,
+      processFn,
+      overrides,
+    }: {
+      payloads: TestPayload[];
+      processFn: (payload: TestPayload) => Promise<void>;
+      overrides: Partial<EventSourcedQueueDefinition<TestPayload>>;
+    }): Promise<GroupQueueProcessor<TestPayload>> {
+      const name = `{test/gqmain/${crypto.randomUUID().slice(0, 8)}}`;
+      const producer = createQueue(
+        processFn,
+        { ...overrides, name },
+        { consumerEnabled: false },
+      );
+      await producer.sendBatch(payloads);
+
+      const consumer = createQueue(processFn, { ...overrides, name });
+      await consumer.waitUntilReady();
+      return consumer;
     }
 
     describe("send()", () => {
@@ -870,6 +921,7 @@ describe.skipIf(!hasTestcontainers)(
       });
 
       describe("when one payload in a coalesced batch is unprocessable", () => {
+        /** @scenario 'Payloads ahead of an unprocessable one still commit' */
         it("commits every payload ahead of it and narrows the failure to it alone", async () => {
           // Payloads AFTER the offender deliberately do not commit here: the
           // fold derives fields from arrival order, so applying j6 while j5 is
@@ -884,15 +936,21 @@ describe.skipIf(!hasTestcontainers)(
           // a dispatch applies part of a batch before failing.
           const committed: string[] = [];
 
-          const queue = createQueue(
-            async (p) => {
+          const dueAt = SCORE_BASE_MS;
+          await stageThenConsume({
+            payloads: Array.from({ length: 8 }, (_, i) => ({
+              id: `j${i}`,
+              groupId: "group-a",
+              value: String((dueAt + i) / 1000),
+            })),
+            processFn: async (p) => {
               // Only reached when the queue dispatches a job with no siblings
               // to coalesce. A split that narrows to one payload still goes
               // through processBatch with a one-element batch, never here.
               if (p.id === POISON) throw new Error("unprocessable payload");
               committed.push(p.id);
             },
-            {
+            overrides: {
               processBatch: async (ps) => {
                 const batch = ps as TestPayload[];
                 attempted.push(batch);
@@ -906,20 +964,7 @@ describe.skipIf(!hasTestcontainers)(
               coalesceMaxBatch: () => 50,
               score: (p) => Number(p.value) * 1000,
             },
-          );
-          await queue.waitUntilReady();
-
-          // Future-dated so all eight are staged before any is due — staging
-          // races the dispatcher, and a partial root softens the exact descent
-          // this test asserts.
-          const dueAt = Date.now() + 2500;
-          await queue.sendBatch(
-            Array.from({ length: 8 }, (_, i) => ({
-              id: `j${i}`,
-              groupId: "group-a",
-              value: String((dueAt + i) / 1000),
-            })),
-          );
+          });
 
           const HEALTHY_PREFIX = ["j0", "j1", "j2", "j3", "j4"] as const;
 
@@ -959,15 +1004,22 @@ describe.skipIf(!hasTestcontainers)(
           expect(isolated.length).toBeGreaterThanOrEqual(1);
         });
 
+        /** @scenario 'Each half of a split stays in arrival order' */
         it("keeps each half in arrival order while splitting", async () => {
           const POISON = "j6";
           const attempted: TestPayload[][] = [];
 
-          const queue = createQueue(
-            async (p) => {
+          const dueAt = SCORE_BASE_MS;
+          await stageThenConsume({
+            payloads: Array.from({ length: 8 }, (_, i) => ({
+              id: `j${i}`,
+              groupId: "group-a",
+              value: String((dueAt + i) / 1000),
+            })),
+            processFn: async (p) => {
               if (p.id === POISON) throw new Error("unprocessable payload");
             },
-            {
+            overrides: {
               processBatch: async (ps) => {
                 const batch = ps as TestPayload[];
                 attempted.push(batch);
@@ -978,20 +1030,7 @@ describe.skipIf(!hasTestcontainers)(
               coalesceMaxBatch: () => 50,
               score: (p) => Number(p.value) * 1000,
             },
-          );
-          await queue.waitUntilReady();
-
-          // Future-dated so all eight are staged before any is due — staging
-          // races the dispatcher, and a partial root softens the exact descent
-          // this test asserts.
-          const dueAt = Date.now() + 2500;
-          await queue.sendBatch(
-            Array.from({ length: 8 }, (_, i) => ({
-              id: `j${i}`,
-              groupId: "group-a",
-              value: String((dueAt + i) / 1000),
-            })),
-          );
+          });
 
           await vi.waitFor(
             () => {
@@ -1018,7 +1057,73 @@ describe.skipIf(!hasTestcontainers)(
         });
       });
 
+      describe("when payloads arrive out of order and the batch is bisected", () => {
+        /** @scenario "A split descent emits in the queue's order" */
+        it("still processes every payload in the queue's order, across sub-batches", async () => {
+          // The contiguity check above proves each sub-batch is internally
+          // ordered. It cannot see the order the sub-batches RUN in — a
+          // descent that took the right half first would satisfy it while
+          // folding later events before earlier ones. This pins the global
+          // sequence, which is the property a fold actually depends on.
+          //
+          // Every payload shares one score so they all become due together and
+          // coalesce into a single root; `sendBatch` then breaks the tie by
+          // position (`dispatchAfterMs = score + delay + index`), so the
+          // queue's arrival order IS the send order. Sending id-shuffled makes
+          // the two differ, so a bisector keyed on the id rather than on the
+          // queue's sequence would be caught.
+          const MAX_WORKABLE = 2;
+          const processedInOrder: number[] = [];
+          const attemptedSizes: number[] = [];
+
+          const dueAt = SCORE_BASE_MS;
+          const sendOrder = [5, 2, 7, 0, 4, 1, 6, 3];
+          await stageThenConsume({
+            payloads: sendOrder.map((i) => ({
+              id: `j${i}`,
+              groupId: "group-a",
+              value: String(dueAt),
+            })),
+            processFn: async (p) => {
+              processedInOrder.push(Number(p.id.slice(1)));
+            },
+            overrides: {
+              processBatch: async (ps) => {
+                attemptedSizes.push(ps.length);
+                if (ps.length > MAX_WORKABLE) {
+                  throw new Error("batch exceeded the downstream budget");
+                }
+                for (const p of ps as TestPayload[]) {
+                  processedInOrder.push(Number(p.id.slice(1)));
+                }
+              },
+              coalesceMaxBatch: () => 50,
+              score: (p) => Number(p.value),
+            },
+          });
+
+          // At-LEAST-8, not exactly 8: an over-delivery would never satisfy an
+          // exact-length wait, so the bug would surface as an opaque 30s
+          // timeout instead of the array diff below.
+          await vi.waitFor(
+            () => {
+              expect(processedInOrder.length).toBeGreaterThanOrEqual(8);
+            },
+            { timeout: 30000, interval: 50 },
+          );
+
+          // Guard against the test going vacuous: it only says anything about
+          // bisection if a batch too large to process was actually split.
+          expect(Math.max(...attemptedSizes)).toBeGreaterThan(MAX_WORKABLE);
+
+          // Globally in the queue's order: every payload folded after the one
+          // the queue sequenced before it, however the descent carved the batch.
+          expect(processedInOrder).toEqual(sendOrder);
+        });
+      });
+
       describe("when a coalesced batch fails only because it is too large", () => {
+        /** @scenario 'A batch too large for the handler converges by halving' */
         it("halves it until it fits and commits every payload once", async () => {
           const MAX_WORKABLE = 2;
           const seen: string[] = [];
@@ -1027,11 +1132,17 @@ describe.skipIf(!hasTestcontainers)(
           let inFlight = 0;
           let maxConcurrent = 0;
 
-          const queue = createQueue(
-            async (p) => {
+          const dueAt = SCORE_BASE_MS;
+          await stageThenConsume({
+            payloads: Array.from({ length: 8 }, (_, i) => ({
+              id: `j${i}`,
+              groupId: "group-a",
+              value: String((dueAt + i) / 1000),
+            })),
+            processFn: async (p) => {
               seen.push(p.id);
             },
-            {
+            overrides: {
               processBatch: async (ps) => {
                 const batch = ps as TestPayload[];
                 sizes.push(batch.length);
@@ -1053,20 +1164,7 @@ describe.skipIf(!hasTestcontainers)(
               coalesceMaxBatch: () => 50,
               score: (p) => Number(p.value) * 1000,
             },
-          );
-          await queue.waitUntilReady();
-
-          // Future-dated so all eight are staged before any is due — staging
-          // races the dispatcher, and a partial root softens the exact descent
-          // this test asserts.
-          const dueAt = Date.now() + 2500;
-          await queue.sendBatch(
-            Array.from({ length: 8 }, (_, i) => ({
-              id: `j${i}`,
-              groupId: "group-a",
-              value: String((dueAt + i) / 1000),
-            })),
-          );
+          });
 
           await vi.waitFor(
             () => {
@@ -1094,34 +1192,31 @@ describe.skipIf(!hasTestcontainers)(
       });
 
       describe("when a coalesced batch fails non-retryably", () => {
+        /** @scenario 'A non-retryable failure is never split' */
         it("fails fast without splitting", async () => {
           const attempts: number[] = [];
 
-          const queue = createQueue(async () => {}, {
-            processBatch: async (ps) => {
-              attempts.push(ps.length);
-              // CRITICAL category — `isRetryableJobError` is false for this, so
-              // the batch must not be split: it would fail identically at every
-              // size, and bisecting only multiplies work before the same
-              // verdict.
-              throw new ConfigurationError("test-handler", "not retryable");
-            },
-            coalesceMaxBatch: () => 50,
-            score: (p) => Number(p.value) * 1000,
-          });
-          await queue.waitUntilReady();
-
-          // Future-dated so all eight are staged before any is due — staging
-          // races the dispatcher, and a partial root softens the exact descent
-          // this test asserts.
-          const dueAt = Date.now() + 2500;
-          await queue.sendBatch(
-            Array.from({ length: 8 }, (_, i) => ({
+          const dueAt = SCORE_BASE_MS;
+          await stageThenConsume({
+            payloads: Array.from({ length: 8 }, (_, i) => ({
               id: `j${i}`,
               groupId: "group-a",
               value: String((dueAt + i) / 1000),
             })),
-          );
+            processFn: async () => {},
+            overrides: {
+              processBatch: async (ps) => {
+                attempts.push(ps.length);
+                // CRITICAL category — `isRetryableJobError` is false for this,
+                // so the batch must not be split: it would fail identically at
+                // every size, and bisecting only multiplies work before the
+                // same verdict.
+                throw new ConfigurationError("test-handler", "not retryable");
+              },
+              coalesceMaxBatch: () => 50,
+              score: (p) => Number(p.value) * 1000,
+            },
+          });
 
           await vi.waitFor(
             () => {
@@ -1138,6 +1233,7 @@ describe.skipIf(!hasTestcontainers)(
       });
 
       describe("when the split budget is set to zero", () => {
+        /** @scenario 'Setting the split budget to zero disables bisection' */
         it("never splits, restoring the pre-bisection behaviour", async () => {
           // The kill switch: an operator can disable bisection through the
           // environment rather than waiting on a deploy.
@@ -1190,6 +1286,7 @@ describe.skipIf(!hasTestcontainers)(
         // Driven through the bisector directly: this is about which delivery
         // flags the descent emits, and staged dispatch adds timing noise that
         // has nothing to do with the contract.
+        /** @scenario 'Sub-batches after the first commit are marked as continuations' */
         it("marks the sub-batches as continuations so their commits extend rather than replace", async () => {
           const deliveries: (JobDelivery | undefined)[] = [];
           let rootFailed = false;
@@ -1251,6 +1348,7 @@ describe.skipIf(!hasTestcontainers)(
         // how large a root the drain assembles varies with staging timing, and
         // this contract — bounded work per locked attempt — must hold for any
         // shape, so the test pins it on the worst one deterministically.
+        /** @scenario 'Splitting is bounded within one locked attempt' */
         it("stops splitting at the budget and rethrows to the retry path", async () => {
           const sizes: number[] = [];
           const queue = createQueue(async () => {}, {

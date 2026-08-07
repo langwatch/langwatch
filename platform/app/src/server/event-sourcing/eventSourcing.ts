@@ -607,23 +607,36 @@ export class EventSourcing {
           return true;
         });
         if (survivors.length === 0) return;
-        const first = this.lookupEntry(survivors[0]!);
-        const resolved = survivors.map((payload) => this.lookupEntry(payload));
-        const homogeneous =
-          !!first?.entry.processBatch &&
-          resolved.every((r) => r?.entry === first.entry);
-        if (!homogeneous) {
-          for (const [index, result] of resolved.entries()) {
-            if (!result) {
-              this.rejectUnroutableJob(survivors[index]!, queueName);
-            }
+
+        // Reject unroutable payloads UP FRONT so everything below works with a
+        // fully-resolved list. `rejectUnroutableJob` returns `never`, so this
+        // narrows `routed` to non-null for the compiler rather than for the
+        // reader only — which is what lets the rest of this function drop its
+        // non-null assertions (#6699). Behaviour is unchanged: a null entry
+        // could only ever reach the heterogeneous branch, which rejected it
+        // there anyway.
+        const routed = survivors.map((payload) => {
+          const result = this.lookupEntry(payload);
+          if (!result) this.rejectUnroutableJob(payload, queueName);
+          return result;
+        });
+
+        // A coalesced batch is always one group → one registry entry. Guard
+        // against a mixed batch (should never happen — the GroupQueue only
+        // coalesces same-group jobs — but a stray payload must never be
+        // misrouted to the wrong handler) and fall back to per-item processing.
+        const firstEntry = routed[0]?.entry;
+        const batchHandler = firstEntry?.processBatch;
+        if (!batchHandler || !routed.every((r) => r.entry === firstEntry)) {
+          for (const result of routed) {
             await result.entry.process(result.clean, delivery);
           }
           return;
         }
+
         // Forward the delivery — see the `process` wrapper above (#6578).
-        await first.entry.processBatch!(
-          resolved.map((r) => r!.clean),
+        await batchHandler(
+          routed.map((r) => r.clean),
           delivery,
         );
       },
