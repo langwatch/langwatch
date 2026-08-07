@@ -1,12 +1,10 @@
 import { createLogger } from "@langwatch/observability";
-import { getClickHouseClientForOrganization } from "~/server/clickhouse/clickhouseClient";
+import { getApp } from "~/server/app-layer/app";
 import { resolveOrganizationId } from "~/server/organizations/resolveOrganizationId";
 import type { AppendStore } from "../mapProjection.types";
 import type { ProjectionStoreContext } from "../projectionStoreContext";
 
 const logger = createLogger("langwatch:billing:orgBillableEventsMeter");
-
-const TABLE_NAME = "billable_events" as const;
 
 export interface BillableEventRecord {
   organizationId: string;
@@ -40,26 +38,6 @@ export const orgBillableEventsMeterStore: AppendStore<BillableEventRecord> = {
       return;
     }
 
-    const client = await getClickHouseClientForOrganization(organizationId);
-    if (!client) {
-      logger.debug("ClickHouse not configured, skipping billable event insert");
-      return;
-    }
-
-    await client.insert({
-      table: TABLE_NAME,
-      values: [
-        {
-          OrganizationId: organizationId,
-          TenantId: record.tenantId,
-          EventId: record.eventId,
-          EventType: record.eventType,
-          DeduplicationKey: record.deduplicationKey,
-          EventTimestamp: new Date(record.eventTimestamp),
-        },
-      ],
-      format: "JSONEachRow",
-      clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
-    });
+    await getApp().billing.events.insert({ record, organizationId });
   },
 };

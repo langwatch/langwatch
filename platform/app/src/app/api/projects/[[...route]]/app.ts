@@ -30,6 +30,15 @@ import {
   NotFoundError,
 } from "../../shared/errors";
 import { handleProjectError } from "./error-handler";
+import {
+  ARCHIVE_PROJECT,
+  CREATE_PROJECT,
+  GET_PROJECT,
+  GET_PROJECT_API_KEY,
+  LIST_PROJECTS,
+  REGENERATE_PROJECT_API_KEY,
+  UPDATE_PROJECT,
+} from "./openapi";
 
 patchZodOpenapi();
 
@@ -43,11 +52,30 @@ const paginationQuerySchema = z.object({
 
 const createProjectSchema = z
   .object({
-    name: z.string().min(1, "name is required").max(255),
-    teamId: z.string().min(1).optional(),
-    newTeamName: z.string().min(1).max(255).optional(),
-    language: z.string().min(1, "language is required"),
-    framework: z.string().min(1, "framework is required"),
+    name: z
+      .string()
+      .min(1, "name is required")
+      .max(255)
+      .describe("Project name"),
+    teamId: z
+      .string()
+      .min(1)
+      .optional()
+      .describe("Id of an existing team to put the project in"),
+    newTeamName: z
+      .string()
+      .min(1)
+      .max(255)
+      .optional()
+      .describe("Create a team with this name and put the project in it"),
+    language: z
+      .string()
+      .min(1, "language is required")
+      .describe("Programming language, such as python or typescript"),
+    framework: z
+      .string()
+      .min(1, "framework is required")
+      .describe("Framework in use, such as langchain or openai"),
   })
   .refine((data) => data.teamId || data.newTeamName, {
     message: "Either teamId or newTeamName must be provided",
@@ -57,7 +85,11 @@ const updateProjectSchema = z.object({
   name: z.string().min(1).max(255).optional(),
   language: z.string().optional(),
   framework: z.string().optional(),
-  teamId: z.string().min(1).optional(),
+  teamId: z
+    .string()
+    .min(1)
+    .optional()
+    .describe("Moves the project to this team"),
 });
 
 function projectResponse(project: {
@@ -88,117 +120,115 @@ const secured = createOrgApp<ExtraVariables>({
 
 secured.hono.onError(handleProjectError);
 
-secured.access(requires("project:view")).get(
-  "/",
-  projectServiceMiddleware,
-  describeRoute({
-    description:
-      "List all non-archived projects for the organization (paginated)",
-  }),
-  zValidator("query", paginationQuerySchema),
-  async (c) => {
-    const organization = c.get("organization") as Organization;
-    const { page, limit } = c.req.valid("query");
-    const service = c.get("projectService") as ProjectService;
+secured
+  .access(requires("project:view"))
+  .get(
+    "/",
+    projectServiceMiddleware,
+    describeRoute(LIST_PROJECTS),
+    zValidator("query", paginationQuerySchema),
+    async (c) => {
+      const organization = c.get("organization") as Organization;
+      const { page, limit } = c.req.valid("query");
+      const service = c.get("projectService") as ProjectService;
 
-    const result = await service.listByOrganization({
-      organizationId: organization.id,
-      page,
-      limit,
-    });
-
-    return c.json({
-      data: result.data.map(projectResponse),
-      pagination: result.pagination,
-    });
-  },
-);
-
-secured.access(requires("project:create")).post(
-  "/",
-  projectServiceMiddleware,
-  apiKeyServiceMiddleware,
-  describeRoute({
-    description:
-      "Create a new project in an existing team or create a new team inline",
-  }),
-  zValidator("json", createProjectSchema),
-  async (c) => {
-    const organization = c.get("organization") as Organization;
-    const body = c.req.valid("json");
-    const service = c.get("projectService") as ProjectService;
-    const userId = c.get("apiKeyUserId") as string | null;
-
-    let project;
-    try {
-      project = await service.create({
+      const result = await service.listByOrganization({
         organizationId: organization.id,
-        userId,
-        teamId: body.teamId,
-        newTeamName: body.newTeamName,
-        name: body.name,
-        language: body.language,
-        framework: body.framework,
+        page,
+        limit,
       });
-    } catch (error) {
-      if (error instanceof TeamNotInOrganizationError) {
-        throw new BadRequestError(error.message);
-      }
-      if (error instanceof PersonalWorkspaceBoundaryError) {
-        throw new ForbiddenError(error.message);
-      }
-      if (error instanceof ProjectSlugConflictError) {
-        return c.json({ error: "Conflict", message: error.message }, 409);
-      }
-      throw error;
-    }
 
-    const apiKeyService = c.get("apiKeyService") as ApiKeyService;
-    const serviceKey = await apiKeyService.create({
-      name: `${project.name} Service Key`,
-      userId: null,
-      createdByUserId: userId,
-      organizationId: organization.id,
-      permissionMode: "all",
-      bindings: [
+      return c.json({
+        data: result.data.map(projectResponse),
+        pagination: result.pagination,
+      });
+    },
+  );
+
+secured
+  .access(requires("project:create"))
+  .post(
+    "/",
+    projectServiceMiddleware,
+    apiKeyServiceMiddleware,
+    describeRoute(CREATE_PROJECT),
+    zValidator("json", createProjectSchema),
+    async (c) => {
+      const organization = c.get("organization") as Organization;
+      const body = c.req.valid("json");
+      const service = c.get("projectService") as ProjectService;
+      const userId = c.get("apiKeyUserId") as string | null;
+
+      let project;
+      try {
+        project = await service.create({
+          organizationId: organization.id,
+          userId,
+          teamId: body.teamId,
+          newTeamName: body.newTeamName,
+          name: body.name,
+          language: body.language,
+          framework: body.framework,
+        });
+      } catch (error) {
+        if (error instanceof TeamNotInOrganizationError) {
+          throw new BadRequestError(error.message);
+        }
+        if (error instanceof PersonalWorkspaceBoundaryError) {
+          throw new ForbiddenError(error.message);
+        }
+        if (error instanceof ProjectSlugConflictError) {
+          return c.json({ error: "Conflict", message: error.message }, 409);
+        }
+        throw error;
+      }
+
+      const apiKeyService = c.get("apiKeyService") as ApiKeyService;
+      const serviceKey = await apiKeyService.create({
+        name: `${project.name} Service Key`,
+        userId: null,
+        createdByUserId: userId,
+        organizationId: organization.id,
+        permissionMode: "all",
+        bindings: [
+          {
+            role: "ADMIN",
+            scopeType: "PROJECT",
+            scopeId: project.id,
+          },
+        ],
+      });
+
+      return c.json(
         {
-          role: "ADMIN",
-          scopeType: "PROJECT",
-          scopeId: project.id,
+          ...projectResponse(project),
+          serviceApiKey: serviceKey.token,
+          serviceApiKeyId: serviceKey.apiKey.id,
         },
-      ],
-    });
+        201,
+      );
+    },
+  );
 
-    return c.json(
-      {
-        ...projectResponse(project),
-        serviceApiKey: serviceKey.token,
-        serviceApiKeyId: serviceKey.apiKey.id,
-      },
-      201,
-    );
-  },
-);
+secured
+  .access(requires("project:view"))
+  .get(
+    "/:id",
+    projectServiceMiddleware,
+    describeRoute(GET_PROJECT),
+    async (c) => {
+      const { id } = c.req.param();
+      const organization = c.get("organization") as Organization;
+      const service = c.get("projectService") as ProjectService;
 
-secured.access(requires("project:view")).get(
-  "/:id",
-  projectServiceMiddleware,
-  describeRoute({
-    description: "Get a project by its id",
-  }),
-  async (c) => {
-    const { id } = c.req.param();
-    const organization = c.get("organization") as Organization;
-    const service = c.get("projectService") as ProjectService;
+      const project = await service.getWithTeam(id);
+      if (!project || project.team.organizationId !== organization.id) {
+        throw new NotFoundError("Project not found");
+      }
 
-    const project = await service.getWithTeam(id);
-    if (!project || project.team.organizationId !== organization.id) {
-      throw new NotFoundError("Project not found");
-    }
-
-    return c.json(projectResponse(project));
-  },
-);
+      return c.json(projectResponse(project));
+    },
+  );
 
 /** The service's update failures, as the status codes they mean. */
 function asProjectUpdateHttpError(error: unknown): unknown {
@@ -214,74 +244,73 @@ function asProjectUpdateHttpError(error: unknown): unknown {
   return error;
 }
 
-secured.access(requires("project:update")).patch(
-  "/:id",
-  projectServiceMiddleware,
-  describeRoute({
-    description:
-      "Update a project by its id, including moving it to another team with teamId",
-  }),
-  zValidator("json", updateProjectSchema),
-  async (c) => {
-    const { id } = c.req.param();
-    const organization = c.get("organization") as Organization;
-    const body = c.req.valid("json");
-    const service = c.get("projectService") as ProjectService;
+secured
+  .access(requires("project:update"))
+  .patch(
+    "/:id",
+    projectServiceMiddleware,
+    describeRoute(UPDATE_PROJECT),
+    zValidator("json", updateProjectSchema),
+    async (c) => {
+      const { id } = c.req.param();
+      const organization = c.get("organization") as Organization;
+      const body = c.req.valid("json");
+      const service = c.get("projectService") as ProjectService;
 
-    let project;
-    try {
-      project = await service.update({
-        id,
-        organizationId: organization.id,
-        data: {
-          ...(body.name !== undefined && { name: body.name }),
-          ...(body.language !== undefined && { language: body.language }),
-          ...(body.framework !== undefined && { framework: body.framework }),
-          ...(body.teamId !== undefined && { teamId: body.teamId }),
-        },
-      });
-    } catch (error) {
-      throw asProjectUpdateHttpError(error);
-    }
-
-    return c.json(projectResponse(project));
-  },
-);
-
-secured.access(requires("project:delete")).delete(
-  "/:id",
-  projectServiceMiddleware,
-  describeRoute({
-    description: "Archive a project (soft-delete)",
-  }),
-  async (c) => {
-    const { id } = c.req.param();
-    const organization = c.get("organization") as Organization;
-    const service = c.get("projectService") as ProjectService;
-
-    let project;
-    try {
-      project = await service.archive({
-        id,
-        organizationId: organization.id,
-      });
-    } catch (error) {
-      if (error instanceof ProjectNotFoundError) {
-        throw new NotFoundError("Project not found");
+      let project;
+      try {
+        project = await service.update({
+          id,
+          organizationId: organization.id,
+          data: {
+            ...(body.name !== undefined && { name: body.name }),
+            ...(body.language !== undefined && { language: body.language }),
+            ...(body.framework !== undefined && { framework: body.framework }),
+            ...(body.teamId !== undefined && { teamId: body.teamId }),
+          },
+        });
+      } catch (error) {
+        throw asProjectUpdateHttpError(error);
       }
-      if (error instanceof PersonalProjectProtectedError) {
-        throw new ForbiddenError(error.message);
-      }
-      throw error;
-    }
 
-    return c.json({
-      id: project.id,
-      name: project.name,
-      archivedAt: project.archivedAt,
-    });
-  },
-);
+      return c.json(projectResponse(project));
+    },
+  );
+
+secured
+  .access(requires("project:delete"))
+  .delete(
+    "/:id",
+    projectServiceMiddleware,
+    describeRoute(ARCHIVE_PROJECT),
+    async (c) => {
+      const { id } = c.req.param();
+      const organization = c.get("organization") as Organization;
+      const service = c.get("projectService") as ProjectService;
+
+      let project;
+      try {
+        project = await service.archive({
+          id,
+          organizationId: organization.id,
+        });
+      } catch (error) {
+        if (error instanceof ProjectNotFoundError) {
+          throw new NotFoundError("Project not found");
+        }
+        if (error instanceof PersonalProjectProtectedError) {
+          throw new ForbiddenError(error.message);
+        }
+        throw error;
+      }
+
+      return c.json({
+        id: project.id,
+        name: project.name,
+        archivedAt: project.archivedAt,
+      });
+    },
+  );
 
 // ── API Key management ───────────────────────────────────────────────────────
 
@@ -296,7 +325,7 @@ secured
   .get(
     "/:id/api-key",
     projectServiceMiddleware,
-    describeRoute({ description: "Get the project API key" }),
+    describeRoute(GET_PROJECT_API_KEY),
     async (c) => {
       const { id } = c.req.param();
       const organization = c.get("organization") as Organization;
@@ -316,7 +345,7 @@ secured
   .post(
     "/:id/regenerate-api-key",
     projectServiceMiddleware,
-    describeRoute({ description: "Regenerate the project API key" }),
+    describeRoute(REGENERATE_PROJECT_API_KEY),
     async (c) => {
       const { id } = c.req.param();
       const organization = c.get("organization") as Organization;

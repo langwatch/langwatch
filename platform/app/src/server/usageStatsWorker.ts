@@ -42,7 +42,7 @@ async function sendUsageStatsForAllOrganizations(): Promise<void> {
   for (const organization of organizations) {
     const instanceId = `${organization.name}__${organization.id}`;
     try {
-      const stats = await collectUsageStats(instanceId);
+      const stats = await collectUsageStats({ instanceId });
       await fetch("https://app.langwatch.ai/api/track_usage", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

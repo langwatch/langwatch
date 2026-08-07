@@ -26,6 +26,16 @@ interface EndpointGroup {
   dirName: string;
   pathPrefixes: string[];
   overviewDescription: string;
+  /**
+   * `METHOD /path` keys, in the order a reader should meet them.
+   *
+   * The default sort is CRUD-shaped — list, create, get, update, delete — which
+   * is right for a resource but wrong for a family that is a sequence of steps.
+   * A group whose overview describes a lifecycle sets this so the sidebar and
+   * the prose agree; anything the list omits falls in behind, still sorted the
+   * default way.
+   */
+  endpointOrder?: string[];
 }
 
 const METHOD_ORDER = ["get", "post", "put", "patch", "delete"] as const;
@@ -38,9 +48,6 @@ const METHOD_ORDER = ["get", "post", "put", "patch", "delete"] as const;
  */
 const RETIRED_GATEWAY_PROVIDER_BINDINGS =
   "Retired surface, intentionally undocumented: the gateway provider binding routes answer 410 Gone, and the credentials they wrapped are managed under /api/model-providers.";
-
-const UNDOCUMENTED_EXPERIMENT_RUNS =
-  "Not yet documented in the API reference: the Evaluations v3 experiment run routes have no reference pages yet.";
 
 const UNDOCUMENTED_INGESTION_TEMPLATES =
   "Not yet documented in the API reference: the governance ingestion template routes have no reference pages yet.";
@@ -64,10 +71,6 @@ const SKIP_PATHS: Record<string, string> = {
     "Retired surface, intentionally undocumented: superseded by /api/traces/{traceId}.",
   "/api/gateway/v1/providers": RETIRED_GATEWAY_PROVIDER_BINDINGS,
   "/api/gateway/v1/providers/{id}": RETIRED_GATEWAY_PROVIDER_BINDINGS,
-  "/api/events/track":
-    "Not yet documented in the API reference: the trace event tracking route has no reference page yet.",
-  "/api/experiments/runs/{runId}": UNDOCUMENTED_EXPERIMENT_RUNS,
-  "/api/experiments/{slug}/run": UNDOCUMENTED_EXPERIMENT_RUNS,
   "/api/governance/ingestion-templates": UNDOCUMENTED_INGESTION_TEMPLATES,
   "/api/governance/ingestion-templates/admin": UNDOCUMENTED_INGESTION_TEMPLATES,
   "/api/governance/ingestion-templates/clone": UNDOCUMENTED_INGESTION_TEMPLATES,
@@ -103,11 +106,40 @@ const ENDPOINT_GROUPS: EndpointGroup[] = [
       "Manage evaluator configurations for your project. Create, update, and organize evaluators used for online evaluations, guardrails, and experiments.",
   },
   {
-    name: "Evaluations v3",
+    name: "Evaluations",
     dirName: "evaluations",
-    pathPrefixes: ["/api/evaluations"],
+    // The guardrail path is the same call in gating mode, so it reads with the
+    // evaluate endpoints rather than in a section of its own.
+    pathPrefixes: ["/api/evaluations", "/api/guardrails"],
     overviewDescription:
-      "Run and monitor evaluation experiments. Start evaluation runs and poll for progress and results.",
+      "Run an evaluator over a single input and get its score back, or run it as a guardrail and gate on one boolean. List the built-in evaluators to see which ids you can address and what each one needs.",
+    endpointOrder: [
+      "GET /api/evaluations/list",
+      "POST /api/evaluations/{evaluator}/evaluate",
+      "POST /api/evaluations/{evaluator}/{subpath}/evaluate",
+      "POST /api/guardrails/{evaluator}/evaluate",
+    ],
+  },
+  {
+    name: "Experiments",
+    dirName: "experiments",
+    // Two prefixes, because the create endpoint is singular: `/api/experiments`
+    // does not start with `/api/experiment/`, so one prefix would leave either
+    // the create call or the rest of the family unowned.
+    pathPrefixes: ["/api/experiments", "/api/experiment", "/api/dspy"],
+    overviewDescription:
+      "Create experiments, run them, and read their results over HTTP. Create an experiment against a slug you choose, start a run, then poll it and pull the per-row results. This is the same surface the SDKs use, so anything they do you can do directly.",
+    // The order the overview describes, so a reader going down the sidebar
+    // meets the calls in the order they would make them.
+    endpointOrder: [
+      "POST /api/experiment/init",
+      "GET /api/experiments",
+      "POST /api/experiments/{slug}/run",
+      "GET /api/experiments/runs",
+      "GET /api/experiments/runs/{runId}",
+      "GET /api/experiments/runs/{runId}/results",
+      "POST /api/dspy/log_steps",
+    ],
   },
   {
     name: "Monitors",
@@ -167,14 +199,26 @@ const ENDPOINT_GROUPS: EndpointGroup[] = [
   {
     name: "Triggers",
     dirName: "triggers",
-    pathPrefixes: ["/api/triggers"],
+    pathPrefixes: ["/api/triggers", "/api/trigger"],
     overviewDescription:
       "Manage automation triggers that fire actions based on trace events. Create Slack notifications, webhooks, and other automated responses.",
   },
   {
+    name: "Events",
+    dirName: "events",
+    // `/api/track_event` is the older spelling of the same call, still the one
+    // most SDK versions in the wild send.
+    pathPrefixes: ["/api/events", "/api/track_event"],
+    overviewDescription:
+      "Record customer events against a trace or thread, so behaviour like a thumbs-up, a conversion or a refund sits alongside the trace that produced it.",
+    endpointOrder: ["POST /api/events/track", "POST /api/track_event"],
+  },
+  {
     name: "Workflows",
     dirName: "workflows",
-    pathPrefixes: ["/api/workflows"],
+    // `/api/optimization/...` is the older spelling of the version-pinned
+    // workflow run, and reads as part of the same family.
+    pathPrefixes: ["/api/workflows", "/api/optimization"],
     overviewDescription:
       "Manage Optimization Studio workflows. List, update, and archive workflows used for prompt optimization and agent design.",
   },
@@ -487,7 +531,24 @@ function main() {
 
     if (endpoints.length === 0) continue;
 
+    // A declared order wins; everything it does not name keeps the CRUD sort
+    // and follows behind, so adding a route never silently reshuffles the rest.
+    const declaredOrder = group.endpointOrder ?? [];
+    const declaredIndex = ({
+      method,
+      apiPath,
+    }: {
+      method: string;
+      apiPath: string;
+    }): number => {
+      const at = declaredOrder.indexOf(`${method.toUpperCase()} ${apiPath}`);
+      return at === -1 ? Number.MAX_SAFE_INTEGER : at;
+    };
+
     endpoints.sort((a, b) => {
+      const aDeclared = declaredIndex({ method: a.method, apiPath: a.path });
+      const bDeclared = declaredIndex({ method: b.method, apiPath: b.path });
+      if (aDeclared !== bDeclared) return aDeclared - bDeclared;
       const aScore = sortScore(a.method, a.path);
       const bScore = sortScore(b.method, b.path);
       if (aScore !== bScore) return aScore - bScore;

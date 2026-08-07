@@ -23,7 +23,14 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { appRouter } from "~/server/api/root";
 import { createInnerTRPCContext } from "~/server/api/trpc";
 import { prisma } from "~/server/db";
-import { startTestContainers } from "~/server/event-sourcing/__tests__/integration/testContainers";
+import {
+  getTestClickHouseClient,
+  startTestContainers,
+} from "~/server/event-sourcing/__tests__/integration/testContainers";
+import {
+  clearClickHouseTestApp,
+  installClickHouseTestApp,
+} from "~/test-utils/clickhouseTestApp";
 import { resolveTraceProject } from "../scopeResolver";
 
 const suffix = nanoid(8)
@@ -51,6 +58,12 @@ describe("virtual key access boundaries (real PG)", () => {
 
   beforeAll(async () => {
     await startTestContainers();
+    // The routes and workers under test take their ClickHouse repositories
+    // from the App rather than resolving a client, so the fixture has to
+    // provide one or they fail with "App not initialized".
+    installClickHouseTestApp({
+      resolveClient: async () => getTestClickHouseClient(),
+    });
     await prisma.organization.create({
       data: { id: ORG_ID, name: `VKAB ${suffix}`, slug: `vkab-${suffix}` },
     });
@@ -127,6 +140,7 @@ describe("virtual key access boundaries (real PG)", () => {
   }, 120_000);
 
   afterAll(async () => {
+    await clearClickHouseTestApp();
     await prisma.gatewayBudget.deleteMany({
       where: { organizationId: ORG_ID },
     });

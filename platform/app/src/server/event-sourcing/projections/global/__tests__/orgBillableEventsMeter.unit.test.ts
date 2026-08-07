@@ -1,7 +1,7 @@
 /**
  * Unit tests for the billable events meter projection and store.
  *
- * Mocks boundaries: ClickHouse client, Prisma (org lookup), logger.
+ * Mocks boundaries: the App's billing repository, Prisma (org lookup), logger.
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -12,47 +12,41 @@ import type { ProjectionStoreContext } from "../../projectionStoreContext";
 // Hoisted mocks
 // ---------------------------------------------------------------------------
 
-const {
-  mockClickHouseInsert,
-  mockGetClickHouseClientForOrganization,
-  mockPrisma,
-  mockLoggerWarn,
-  mockLoggerDebug,
-  createMockLogger,
-} = vi.hoisted(() => {
-  const mockClickHouseInsert = vi.fn();
-  const mockGetClickHouseClientForOrganization = vi.fn();
-  const mockLoggerWarn = vi.fn();
-  const mockLoggerDebug = vi.fn();
+const { mockInsert, mockGetApp, mockPrisma, mockLoggerWarn, createMockLogger } =
+  vi.hoisted(() => {
+    const mockInsert = vi.fn();
+    const mockGetApp = vi.fn();
+    const mockLoggerWarn = vi.fn();
 
-  const createMockLogger = () => ({
-    info: vi.fn(),
-    debug: mockLoggerDebug,
-    warn: mockLoggerWarn,
-    error: vi.fn(),
-    child: vi.fn(() => createMockLogger()),
+    const createMockLogger = () => ({
+      info: vi.fn(),
+      debug: vi.fn(),
+      warn: mockLoggerWarn,
+      error: vi.fn(),
+      child: vi.fn(() => createMockLogger()),
+    });
+
+    const mockPrisma = {
+      project: { findUnique: vi.fn() },
+    };
+
+    return {
+      mockInsert,
+      mockGetApp,
+      mockPrisma,
+      mockLoggerWarn,
+      createMockLogger,
+    };
   });
-
-  const mockPrisma = {
-    project: { findUnique: vi.fn() },
-  };
-
-  return {
-    mockClickHouseInsert,
-    mockGetClickHouseClientForOrganization,
-    mockPrisma,
-    mockLoggerWarn,
-    mockLoggerDebug,
-    createMockLogger,
-  };
-});
 
 // ---------------------------------------------------------------------------
 // Module mocks
 // ---------------------------------------------------------------------------
 
-vi.mock("~/server/clickhouse/clickhouseClient", () => ({
-  getClickHouseClientForOrganization: mockGetClickHouseClientForOrganization,
+// The store takes the billable-events repository from the App, so standing
+// in for the store means standing in for `getApp()`.
+vi.mock("~/server/app-layer/app", () => ({
+  getApp: mockGetApp,
 }));
 
 vi.mock("~/server/db", () => ({ prisma: mockPrisma }));
@@ -189,11 +183,11 @@ describe("orgBillableEventsMeterStore", () => {
   });
 
   describe("given ClickHouse client is configured and org exists", () => {
-    it("resolves organizationId and inserts into ClickHouse", async () => {
-      mockGetClickHouseClientForOrganization.mockResolvedValue({
-        insert: mockClickHouseInsert,
+    it("resolves organizationId and inserts via the App's billing repository", async () => {
+      mockInsert.mockResolvedValue(undefined);
+      mockGetApp.mockReturnValue({
+        billing: { events: { insert: mockInsert } },
       });
-      mockClickHouseInsert.mockResolvedValue(undefined);
       mockPrisma.project.findUnique.mockResolvedValue({
         team: { organizationId: "org-1" },
       });
@@ -202,74 +196,31 @@ describe("orgBillableEventsMeterStore", () => {
         "../orgBillableEventsMeter.store"
       );
 
-      await orgBillableEventsMeterStore.append(
-        {
-          organizationId: "",
-          tenantId: "proj-1",
-          eventId: "evt-1",
+      const record = {
+        organizationId: "",
+        tenantId: "proj-1",
+        eventId: "evt-1",
+        eventType: "lw.obs.trace.span_received",
+        deduplicationKey: "trace-abc:span-123",
+        eventTimestamp: 1739613600000,
+      };
 
-          eventType: "lw.obs.trace.span_received",
-          deduplicationKey: "trace-abc:span-123",
-          eventTimestamp: 1739613600000,
-        },
-        dummyContext,
-      );
+      await orgBillableEventsMeterStore.append(record, dummyContext);
 
-      expect(mockClickHouseInsert).toHaveBeenCalledWith({
-        table: "billable_events",
-        values: [
-          expect.objectContaining({
-            OrganizationId: "org-1",
-            TenantId: "proj-1",
-            EventId: "evt-1",
-            EventType: "lw.obs.trace.span_received",
-            DeduplicationKey: "trace-abc:span-123",
-          }),
-        ],
-        format: "JSONEachRow",
-        clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
+      expect(mockInsert).toHaveBeenCalledWith({
+        record,
+        organizationId: "org-1",
       });
     });
   });
 
-  describe("given ClickHouse client is null (not configured)", () => {
-    it("skips gracefully", async () => {
-      mockPrisma.project.findUnique.mockResolvedValue({
-        team: { organizationId: "org-1" },
-      });
-      mockGetClickHouseClientForOrganization.mockResolvedValue(null);
-
-      const { orgBillableEventsMeterStore } = await import(
-        "../orgBillableEventsMeter.store"
-      );
-
-      await orgBillableEventsMeterStore.append(
-        {
-          organizationId: "",
-          tenantId: "proj-1",
-          eventId: "evt-1",
-
-          eventType: "lw.obs.trace.span_received",
-          deduplicationKey: "trace-abc:span-123",
-          eventTimestamp: 1739613600000,
-        },
-        dummyContext,
-      );
-
-      expect(mockClickHouseInsert).not.toHaveBeenCalled();
-      expect(mockLoggerDebug).toHaveBeenCalledWith(
-        "ClickHouse not configured, skipping billable event insert",
-      );
-    });
-  });
-
-  describe("given ClickHouse insert fails (transient error)", () => {
+  describe("given the App's repository rejects (ClickHouse insert fails)", () => {
     it("throws so the queue retries", async () => {
       const insertError = new Error("ClickHouse connection timeout");
-      mockGetClickHouseClientForOrganization.mockResolvedValue({
-        insert: mockClickHouseInsert,
+      mockInsert.mockRejectedValue(insertError);
+      mockGetApp.mockReturnValue({
+        billing: { events: { insert: mockInsert } },
       });
-      mockClickHouseInsert.mockRejectedValue(insertError);
       mockPrisma.project.findUnique.mockResolvedValue({
         team: { organizationId: "org-1" },
       });
@@ -295,7 +246,7 @@ describe("orgBillableEventsMeterStore", () => {
   });
 
   describe("given orphan project (org not found)", () => {
-    it("skips gracefully with warn log", async () => {
+    it("skips gracefully with warn log, without reaching the App", async () => {
       mockPrisma.project.findUnique.mockResolvedValue({
         team: null,
       });
@@ -316,7 +267,7 @@ describe("orgBillableEventsMeterStore", () => {
         dummyContext,
       );
 
-      expect(mockClickHouseInsert).not.toHaveBeenCalled();
+      expect(mockGetApp).not.toHaveBeenCalled();
       expect(mockLoggerWarn).toHaveBeenCalledWith(
         { projectId: "orphan-proj" },
         expect.stringContaining("orphan project detected"),

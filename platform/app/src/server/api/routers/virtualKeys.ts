@@ -17,14 +17,9 @@
 import type { PrismaClient } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-
+import { getApp } from "~/server/app-layer/app";
 import type { Session } from "~/server/auth";
-
 import { resolveApplicableBudgetsForDraftKey } from "~/server/gateway/applicableBudgets.service";
-import {
-  chRepoOrUndefined,
-  spendRepoOrUndefined,
-} from "~/server/gateway/clickhouseRepos";
 import { GatewayUsageService } from "~/server/gateway/usage.service";
 import {
   assertActorCanManageAllScopes,
@@ -134,7 +129,7 @@ export const virtualKeysRouter = createTRPCRouter({
       // Without the ClickHouse spend source there is no number to report.
       // Failing loudly lets the column render "unavailable" instead of a
       // confident $0.00 that cannot be told apart from a zero-spend key.
-      const spendRepo = spendRepoOrUndefined();
+      const spendRepo = getApp().gateway.virtualKeySpend;
       if (!spendRepo) {
         throw new TRPCError({
           code: "PRECONDITION_FAILED",
@@ -218,7 +213,7 @@ export const virtualKeysRouter = createTRPCRouter({
             traceProjectId: vk.traceProjectId,
             principalUserId: vk.principalUserId,
           },
-          chRepoOrUndefined(),
+          getApp().gateway.budgets,
         );
       }
       // For a draft (create drawer): the caller must hold
@@ -272,7 +267,7 @@ export const virtualKeysRouter = createTRPCRouter({
           traceProjectId: input.traceProjectId ?? null,
           principalUserId: input.principalUserId ?? null,
         },
-        chRepoOrUndefined(),
+        getApp().gateway.budgets,
       );
     }),
 

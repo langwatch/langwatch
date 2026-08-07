@@ -20,7 +20,6 @@
 
 import { createHash } from "crypto";
 import { getLangWatchTracer } from "langwatch";
-import { getClickHouseAnalyticsService } from "~/server/analytics/clickhouse/clickhouse-analytics.service";
 import type { TimeseriesInputType } from "~/server/analytics/registry";
 import type {
   AnalyticsBackend,
@@ -30,7 +29,6 @@ import type {
 } from "~/server/analytics/types";
 import { currentVsPreviousDates } from "~/server/api/routers/analytics/common";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
-import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
 import { featureFlagService } from "~/server/featureFlag";
 import type { FilterField } from "~/server/filters/types";
 import { TtlCache } from "~/server/utils/ttlCache";
@@ -316,44 +314,24 @@ async function isTripwireEnabled(projectId: string): Promise<boolean> {
 }
 
 /**
- * Default ClickHouse resolver — same shape as `app-layer/presets.ts`:
- * `getClickHouseClientForProject` returns `null` for "not configured"; the
- * resolver contract is "throw if no client", which lets the repository
- * `await` it without a null-check.
+ * Production wiring for `AnalyticsService`. Takes the resolver and the
+ * legacy backend from the caller (`presets.ts`) instead of resolving a
+ * ClickHouse client here — the instance this builds is handed out once as
+ * `getApp().analytics.service`, not constructed per call site.
  */
-const defaultResolveClient: ClickHouseClientResolver = async (tenantId) => {
-  const client = await getClickHouseClientForProject(tenantId);
-  if (!client)
-    throw new Error(`ClickHouse not available for tenant ${tenantId}`);
-  return client;
-};
-
-/**
- * Factory using production dependencies (real ClickHouse resolver, legacy
- * backend singleton).
- */
-export function createAnalyticsService(
-  resolveClient: ClickHouseClientResolver = defaultResolveClient,
-): AnalyticsService {
+export function createAnalyticsService({
+  resolveClient,
+  legacyBackend,
+}: {
+  resolveClient: ClickHouseClientResolver;
+  legacyBackend: AnalyticsBackend;
+}): AnalyticsService {
   return new AnalyticsService({
     rollupRepository: createTraceRollupReadRepo(resolveClient),
     slimRepository: createTraceSlimReadRepo(resolveClient),
     legacyShim: new ClickHouseLegacyAnalyticsShim(resolveClient),
     evalRollupRepository: createEvalRollupReadRepo(resolveClient),
     evalSlimRepository: createEvalSlimReadRepo(resolveClient),
-    legacyBackend: getClickHouseAnalyticsService(),
+    legacyBackend,
   });
-}
-
-let analyticsService: AnalyticsService | null = null;
-
-export function getAnalyticsService(): AnalyticsService {
-  if (!analyticsService) {
-    analyticsService = createAnalyticsService();
-  }
-  return analyticsService;
-}
-
-export function resetAnalyticsService(): void {
-  analyticsService = null;
 }

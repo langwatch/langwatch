@@ -31,6 +31,10 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { prisma } from "~/server/db";
 import { getTestClickHouseClient } from "~/server/event-sourcing/__tests__/integration/testContainers";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
+import {
+  clearClickHouseTestApp,
+  installClickHouseTestApp,
+} from "~/test-utils/clickhouseTestApp";
 import { ensureHiddenGovernanceProject } from "../../governanceProject.service";
 import { runIngestionPull } from "../pullerWorker";
 
@@ -88,6 +92,10 @@ beforeAll(async () => {
     throw new Error("Test ClickHouse client not initialised");
   }
   ch = client;
+
+  // The path under test takes its ClickHouse repositories from the App rather
+  // than resolving a client, so the fixture has to provide one.
+  installClickHouseTestApp({ resolveClient: async () => ch });
 
   // Spin up a local fixture HTTP server. ssrfSafeFetch allows localhost
   // when IS_SAAS is unset (on-prem dev mode), which is the integration
@@ -155,6 +163,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  await clearClickHouseTestApp();
   await new Promise<void>((resolve) => server.close(() => resolve()));
 
   if (govProjectId) {
