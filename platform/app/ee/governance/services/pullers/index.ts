@@ -11,6 +11,7 @@
 import { AnthropicAdminPuller } from "./anthropicAdmin.puller";
 import { ClaudeComplianceReferencePuller } from "./claudeCompliance.puller";
 import { CopilotStudioReferencePuller } from "./copilotStudio.puller";
+import { DatabricksGeniePuller } from "./databricksGenie.puller";
 import { HttpPollingPullerAdapter } from "./httpPollingPullerAdapter";
 import { OpenAiComplianceReferencePuller } from "./openaiCompliance.puller";
 import { pullerAdapterRegistry } from "./pullerAdapter";
@@ -26,6 +27,7 @@ export function registerBuiltInPullers(): void {
   pullerAdapterRegistry.register(new OpenAiComplianceReferencePuller());
   pullerAdapterRegistry.register(new ClaudeComplianceReferencePuller());
   pullerAdapterRegistry.register(new AnthropicAdminPuller());
+  pullerAdapterRegistry.register(new DatabricksGeniePuller());
   registered = true;
 }
 
@@ -36,6 +38,11 @@ export {
 } from "./anthropicAdmin.puller";
 export { CLAUDE_COMPLIANCE_PULL_CONFIG } from "./claudeCompliance.puller";
 export { COPILOT_STUDIO_PULL_CONFIG } from "./copilotStudio.puller";
+export {
+  DATABRICKS_GENIE_ADAPTER_ID,
+  type DatabricksGeniePullConfig,
+  databricksGeniePullConfigSchema,
+} from "./databricksGenie.puller";
 export type { HttpPollingConfig } from "./httpPollingPullerAdapter";
 export { OPENAI_COMPLIANCE_PULL_CONFIG } from "./openaiCompliance.puller";
 export type {
@@ -49,6 +56,7 @@ export {
   AnthropicAdminPuller,
   ClaudeComplianceReferencePuller,
   CopilotStudioReferencePuller,
+  DatabricksGeniePuller,
   HttpPollingPullerAdapter,
   OpenAiComplianceReferencePuller,
   pullerAdapterRegistry,
