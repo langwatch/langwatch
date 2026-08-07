@@ -535,6 +535,13 @@ export class DatabricksGeniePuller
       // but must NOT stop the sweep — the held watermark plus a full re-sweep
       // next run already makes that case lossless, and bailing here would wedge
       // the sweep on a permanently-unreadable space and never reach the rest.
+      //
+      // Accepted limitation: a single space whose walk exceeds one run's whole
+      // budget now pins the resume here and starves every LATER space until it
+      // fits — nothing after it is swept in the meantime. That is loud (the
+      // watermark visibly stalls) and lossless; the pre-fix path reached those
+      // later spaces only by dropping this one's tail. Sub-space resume would
+      // remove the limitation and is out of scope here.
       if (!read.complete && budget.exhausted()) {
         return { events, complete: false, resumeSpaceId: space.space_id };
       }

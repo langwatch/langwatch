@@ -504,7 +504,15 @@ async function startFixtureServer(params: {
   const MESSAGE_PAGE = 1;
 
   const server = http.createServer((req, res) => {
-    void handle(req, res);
+    handle(req, res).catch(() => {
+      // A fixture handler should never throw, but if one ever does, answer 500
+      // rather than let the rejection leak to `unhandledRejection` and flake a
+      // later test in the file.
+      if (!res.headersSent) {
+        res.statusCode = 500;
+        res.end("{}");
+      }
+    });
   });
 
   async function handle(
