@@ -9,6 +9,7 @@
 import fs from "fs";
 import path from "path";
 import { describe, expect, it } from "vitest";
+import { CODE_ASSISTANTS } from "../TokenCreatedDialog";
 
 const LANGWATCH_ROOT = path.resolve(__dirname, "../../../../../");
 
@@ -126,6 +127,39 @@ describe("given the token-created-snippets feature is implemented", () => {
       const renders =
         dialog.match(/CODE_ASSISTANTS[\s\S]{0,40}?\.map\(/g) ?? [];
       expect(renders.length).toBeGreaterThanOrEqual(2);
+    });
+  });
+
+  describe("when checking what each assistant entry builds", () => {
+    /** @scenario An assistant with an install command shows a terminal snippet */
+    it("builds each installer command around the minted token", () => {
+      const withCommand = CODE_ASSISTANTS.filter(
+        (assistant) => assistant.buildCommand,
+      );
+      expect(withCommand.length).toBeGreaterThan(0);
+
+      for (const assistant of withCommand) {
+        const command = assistant.buildCommand!({
+          apiKey: "sk-lw-real",
+          projectId: "project-abc",
+          endpoint: "https://app.langwatch.ai",
+          isSelfHosted: false,
+        });
+        expect(command).toContain("sk-lw-real");
+        expect(command).toContain("@langwatch/mcp-server");
+      }
+    });
+
+    /** @scenario An assistant without an install command points at its config file */
+    it("gives every installer-less assistant a config path", () => {
+      const configOnly = CODE_ASSISTANTS.filter(
+        (assistant) => !assistant.buildCommand,
+      );
+      expect(configOnly.length).toBeGreaterThan(0);
+
+      for (const assistant of configOnly) {
+        expect(assistant.configPath).toBeTruthy();
+      }
     });
   });
 

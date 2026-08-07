@@ -231,6 +231,8 @@ export function TokenCreatedDialog({
   // ── Per-assistant terminal command ─────────────────────────────────────
   // Both forms come from the same builder, so the value the user copies and
   // the value they read can never drift apart.
+  // Only the tab buttons set this key, and they map over the list itself, so
+  // the lookup cannot miss; the fallback only satisfies the compiler.
   const activeAssistant =
     CODE_ASSISTANTS.find((assistant) => assistant.key === assistantKey) ??
     CODE_ASSISTANTS[0]!;

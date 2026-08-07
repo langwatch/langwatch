@@ -16,8 +16,8 @@
 
 /** A light value and its dark-mode counterpart. */
 interface ColorModePair {
-  light: string;
-  dark: string;
+  readonly light: string;
+  readonly dark: string;
 }
 
 const toConditional = ({ light, dark }: ColorModePair) => ({
@@ -26,28 +26,28 @@ const toConditional = ({ light, dark }: ColorModePair) => ({
 });
 
 /** Background of a card the user has picked. */
-export const SELECTED_SURFACE_BG: ColorModePair = {
+export const SELECTED_SURFACE_BG = {
   light: "orange.50",
   dark: "orange.950/30",
-};
+} as const satisfies ColorModePair;
 
 /** Border of a card the user has picked. */
-export const SELECTED_SURFACE_BORDER: ColorModePair = {
+export const SELECTED_SURFACE_BORDER = {
   light: "orange.400",
   dark: "orange.800",
-};
+} as const satisfies ColorModePair;
 
 /** Background of the small rounded box an accent icon sits in. */
-export const ACCENT_CHIP_BG: ColorModePair = {
+export const ACCENT_CHIP_BG = {
   light: "orange.50",
   dark: "orange.950/40",
-};
+} as const satisfies ColorModePair;
 
 /** Hairline around that same box. */
-export const ACCENT_CHIP_BORDER: ColorModePair = {
+export const ACCENT_CHIP_BORDER = {
   light: "orange.100",
   dark: "orange.900",
-};
+} as const satisfies ColorModePair;
 
 export const selectedSurfaceBg = toConditional(SELECTED_SURFACE_BG);
 export const selectedSurfaceBorder = toConditional(SELECTED_SURFACE_BORDER);

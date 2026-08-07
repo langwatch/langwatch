@@ -13,6 +13,9 @@
  * read the injected stylesheet instead. A mode-aware value emits a second,
  * `.dark`-scoped rule for the element's class; a light-only token emits only
  * the base rule. That second rule is the thing that was missing.
+ *
+ * These tests carry no spec-binding annotation on purpose — this is a bug fix,
+ * and the repo does not open feature files for bug fixes.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
@@ -27,6 +30,30 @@ const noop = () => void 0;
  * True when the element's own class carries a `.dark`-scoped rule that repaints
  * `background` — i.e. the surface is mode-aware rather than light-only.
  */
+/** Every emitted CSS rule that targets one of the element's own classes. */
+function rulesFor(element: Element): string[] {
+  const classNames = (element.getAttribute("class") ?? "")
+    .split(/\s+/)
+    .filter(Boolean);
+  if (classNames.length === 0) return [];
+
+  return Array.from(document.querySelectorAll("style"))
+    .map((tag) => tag.textContent ?? "")
+    .join("\n")
+    .split("}")
+    .filter((rule) =>
+      classNames.some((className) => rule.includes(`.${className}`)),
+    );
+}
+
+/** The element's base (mode-independent) `background` declaration. */
+function backgroundDeclarationFor(element: Element): string {
+  const base = rulesFor(element).find(
+    (rule) => !rule.includes(".dark") && rule.includes("background:"),
+  );
+  return base ?? "";
+}
+
 function hasDarkModeBackgroundRule(element: Element): boolean {
   const classNames = (element.getAttribute("class") ?? "")
     .split(/\s+/)
@@ -85,7 +112,6 @@ describe("given the onboarding intent screen carries orange accent surfaces", ()
   afterEach(cleanup);
 
   describe("when a card is selected", () => {
-    /** @scenario Selected intent card repaints its surface for dark mode */
     it("gives the selected card a dark-mode background of its own", () => {
       renderIntentScreen("AGENT_GOVERNANCE");
 
@@ -97,8 +123,7 @@ describe("given the onboarding intent screen carries orange accent surfaces", ()
       expect(hasDarkModeBackgroundRule(selected!)).toBe(true);
     });
 
-    /** @scenario Selected intent card keeps its title legible */
-    it("keeps the unselected cards on the mode-aware panel surface", () => {
+    it("keeps the unselected cards on a semantic surface token", () => {
       renderIntentScreen("AGENT_GOVERNANCE");
 
       const unselected = screen
@@ -106,14 +131,17 @@ describe("given the onboarding intent screen carries orange accent surfaces", ()
         .find((card) => card.getAttribute("aria-checked") === "false");
 
       expect(unselected).toBeDefined();
-      // `bg.panel` is a semantic token and already resolves per mode, so the
-      // unselected card must never be pinned to a raw palette step either.
-      expect(unselected!.getAttribute("class")).toBeTruthy();
+      // The unselected card is mode-aware by a different route: `bg.panel` is
+      // a semantic token, so it emits ONE rule pointing at a variable whose
+      // value flips at `:root`, with no `.dark` rule of its own. Assert the
+      // variable it reaches for — a raw palette step would name the palette.
+      const background = backgroundDeclarationFor(unselected!);
+      expect(background).toContain("--chakra-colors-bg");
+      expect(background).not.toMatch(/--chakra-colors-(orange|gray|zinc)-\d/);
     });
   });
 
   describe("when the cards render their icon chip", () => {
-    /** @scenario Onboarding icon chip repaints its surface for dark mode */
     it("gives the chip a dark-mode background of its own", () => {
       const { container } = renderIntentScreen();
 
