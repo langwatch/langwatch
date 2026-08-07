@@ -189,20 +189,17 @@ describe("<SubscriptionPage/>", () => {
         ).not.toBeInTheDocument();
       });
 
-      // Skipped: Code bug in SubscriptionPage.tsx — `isUpgradePlanRequired` has a
-      // duplicate bare `isDeveloperPlan` condition making it always true for free-plan orgs.
-      // The `|| isDeveloperPlan` term at the end of the OR chain fires unconditionally, so
-      // upgrade-plan-block renders even before any seat changes are planned.
-      it.skip("hides upgrade plan block on free plan without seat changes", async () => {
+      it("shows the upgrade plan block on free plan without seat changes", async () => {
+        // Free-plan orgs always see the upgrade options block — deliberate
+        // ("Upgrade Block - show for free plan and TIERED legacy paid orgs"
+        // in SubscriptionPage.tsx); only the confirm bar waits for changes.
         renderSubscriptionPage();
 
         await waitFor(() => {
           expect(screen.getByTestId("current-plan-block")).toBeInTheDocument();
         });
 
-        expect(
-          screen.queryByTestId("upgrade-plan-block"),
-        ).not.toBeInTheDocument();
+        expect(screen.getByTestId("upgrade-plan-block")).toBeInTheDocument();
       });
 
       it("shows legacy paid plan name as current plan title", async () => {

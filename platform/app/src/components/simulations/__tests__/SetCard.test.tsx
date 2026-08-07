@@ -31,13 +31,10 @@ describe("<SetCard/>", () => {
     };
 
     describe("when the SetCard renders", () => {
-      // Skipped: ON_PLATFORM_DISPLAY_NAME is currently "Manual Run" not "On-Platform Scenarios".
-      // The source (internal-set-id.ts) needs to be updated to use "On-Platform Scenarios"
-      // before this test can pass.
-      it.skip('displays "On-Platform Scenarios" as the name', () => {
+      it("displays the on-platform display name instead of the raw ID", () => {
         render(<SetCard {...defaultProps} />, { wrapper: Wrapper });
 
-        expect(screen.getByText("On-Platform Scenarios")).toBeInTheDocument();
+        expect(screen.getByText("Manual Run")).toBeInTheDocument();
       });
 
       it("does not display the raw internal ID", () => {

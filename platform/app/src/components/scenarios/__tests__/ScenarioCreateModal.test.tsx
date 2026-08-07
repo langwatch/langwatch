@@ -300,15 +300,7 @@ describe("<ScenarioCreateModal/>", () => {
   });
 
   describe("when user clicks Generate with AI", () => {
-    // Skipped: The test expects `initialFormData` to include `labels: ["support"]`
-    // (from mockGeneratedScenario), but `generateScenarioWithAI` validates the API
-    // response through Zod's `generatedScenarioSchema` which only includes
-    // `name`, `situation`, and `criteria`. Zod strips unknown fields (including
-    // `labels`), so `openDrawer` is called with `initialFormData` that has no
-    // `labels` property. Fix: add `labels` to `generatedScenarioSchema` and update
-    // `ScenarioFormData` / `ScenarioInitialData` accordingly, or update this test
-    // to not expect `labels` in the generated output.
-    it.skip("opens drawer with generated content without creating a DB record", async () => {
+    it("opens drawer with generated content without creating a DB record", async () => {
       render(<ScenarioCreateModal open={true} onClose={vi.fn()} />, {
         wrapper: Wrapper,
       });
@@ -342,7 +334,12 @@ describe("<ScenarioCreateModal/>", () => {
         expect(mockOpenDrawer).toHaveBeenCalledWith(
           "scenarioEditor",
           expect.objectContaining({
-            initialFormData: mockGeneratedScenario,
+            // generatedScenarioSchema strips fields it does not know (labels)
+            initialFormData: {
+              name: mockGeneratedScenario.name,
+              situation: mockGeneratedScenario.situation,
+              criteria: mockGeneratedScenario.criteria,
+            },
           }),
           { resetStack: true },
         );
@@ -351,19 +348,17 @@ describe("<ScenarioCreateModal/>", () => {
   });
 
   describe("when user clicks Skip", () => {
-    // Skipped: The test expects `initialFormData` to include `labels: []`, but
-    // `handleSkip` in ScenarioCreateModal calls `openEditorWithData({ name: "",
-    // situation: "", criteria: [] })` — no `labels` key is included. Fix: add
-    // `labels: []` to the object passed to `openEditorWithData` in `handleSkip`,
-    // or update this test to not assert `labels` in the skip path.
-    it.skip("opens drawer with empty initial data without creating a DB record", async () => {
+    it("opens drawer with empty initial data without creating a DB record", async () => {
       render(<ScenarioCreateModal open={true} onClose={vi.fn()} />, {
         wrapper: Wrapper,
       });
 
       const dialog = getDialogContent();
       fireEvent.click(
-        within(dialog).getByRole("button", { name: /i'll write it myself/i }),
+        within(dialog).getByRole("button", { name: /build it myself/i }),
+      );
+      fireEvent.click(
+        within(dialog).getByRole("button", { name: /open blank editor/i }),
       );
 
       await waitFor(() => {
@@ -374,7 +369,6 @@ describe("<ScenarioCreateModal/>", () => {
               name: "",
               situation: "",
               criteria: [],
-              labels: [],
             },
           }),
           { resetStack: true },
