@@ -10,6 +10,7 @@ export {
   DEFAULT_SERVICE_NAME,
   INVALID_TRACE_ID,
   OTEL_ATTR,
+  REQUEST_CAUSE_FIELD,
   TRACER_NAMES,
 } from "./constants";
 export type {
@@ -28,7 +29,6 @@ export {
   getStatusCodeFromError,
   hasAuthorizationToken,
   logHttpRequest,
-  REQUEST_CAUSE_FIELD,
   type RequestLogData,
 } from "./request/requestLogging";
 export {

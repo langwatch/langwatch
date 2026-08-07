@@ -155,13 +155,13 @@ export function withStatementLimit<T extends ClickHouseClient>({
 interface ArmedWait {
   signal: AbortSignal | undefined;
   /** True only if OUR timer fired — never merely that the signal aborted. */
-  timedOut: () => boolean;
+  hasTimedOut: () => boolean;
   dispose: () => void;
 }
 
 const NOT_ARMED = (signal: AbortSignal | undefined): ArmedWait => ({
   signal,
-  timedOut: () => false,
+  hasTimedOut: () => false,
   dispose: () => {
     // Nothing was armed, so there is nothing to clear.
   },
@@ -194,9 +194,9 @@ function armWait({
   if (limiter.stats().inFlight < maxConcurrent) return NOT_ARMED(signal);
 
   const controller = new AbortController();
-  let fired = false;
+  let hasFired = false;
   const timer = setTimeout(() => {
-    fired = true;
+    hasFired = true;
     controller.abort();
   }, waitTimeoutMs);
   // Never a reason to hold the process open: if nothing else is running there
@@ -207,7 +207,7 @@ function armWait({
     signal: signal
       ? AbortSignal.any([signal, controller.signal])
       : controller.signal,
-    timedOut: () => fired,
+    hasTimedOut: () => hasFired,
     dispose: () => clearTimeout(timer),
   };
 }
@@ -264,7 +264,7 @@ async function run({
     // Checked against OUR timeout, never the aborted-ness of the composed
     // signal: a caller cancelling its own request must keep surfacing as the
     // cancellation it is, not be relabelled as overload.
-    if (!admitted && wait.timedOut()) {
+    if (!admitted && wait.hasTimedOut()) {
       incrementClickHouseStatementsShed(instance, operation);
       logger.warn(
         {

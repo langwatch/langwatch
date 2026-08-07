@@ -165,14 +165,28 @@ function metaForIssue(issue: RawIssue): ValidationIssueMeta {
  * Flatten a Zod error into issues, following `invalid_union` into the branch
  * errors it nests. A union failure whose branches are hidden reports only that
  * "something did not match", which is the least useful thing it could say.
+ *
+ * Counts every issue but only builds the ones that will be kept. The input here
+ * is an untrusted body - up to 10 MiB and a couple of hundred spans, each
+ * checked against union schemas that fan out a branch of issues per arm - so
+ * the difference between counting a large tree and materialising one is worth
+ * having on a path that runs per rejected request.
  */
-function collectIssues(issues: RawIssue[], into: ValidationIssueMeta[]): void {
+function collectIssues(
+  issues: RawIssue[],
+  into: ValidationIssueMeta[],
+  counter: { total: number },
+  maxIssues: number,
+): void {
   for (const issue of issues) {
-    into.push(metaForIssue(issue));
+    counter.total += 1;
+    if (into.length < maxIssues) into.push(metaForIssue(issue));
 
     if (Array.isArray(issue.unionErrors)) {
       for (const nested of issue.unionErrors) {
-        if (hasIssues(nested)) collectIssues(nested.issues, into);
+        if (hasIssues(nested)) {
+          collectIssues(nested.issues, into, counter, maxIssues);
+        }
       }
     }
   }
@@ -189,14 +203,12 @@ export function validationMeta(
 ): ValidationMeta | undefined {
   if (!hasIssues(error)) return undefined;
 
-  const all: ValidationIssueMeta[] = [];
-  collectIssues(error.issues, all);
+  const issues: ValidationIssueMeta[] = [];
+  const counter = { total: 0 };
+  collectIssues(error.issues, issues, counter, maxIssues);
 
-  const meta: ValidationMeta = {
-    issueCount: all.length,
-    issues: all.slice(0, maxIssues),
-  };
-  if (all.length > maxIssues) meta.truncated = true;
+  const meta: ValidationMeta = { issueCount: counter.total, issues };
+  if (counter.total > issues.length) meta.truncated = true;
 
   return meta;
 }

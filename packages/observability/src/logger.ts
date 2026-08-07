@@ -4,7 +4,7 @@ import pino, {
   type Logger as PinoLogger,
 } from "pino";
 import type SuperJSON from "superjson";
-import { DEFAULT_SERVICE_NAME } from "./constants";
+import { DEFAULT_SERVICE_NAME, REQUEST_CAUSE_FIELD } from "./constants";
 
 type LogContextProvider = () => Record<string, string | null>;
 
@@ -51,6 +51,23 @@ const superjsonErrorSerializer = (error: unknown) => {
     _superjson: serialized.meta,
   };
 };
+
+/**
+ * Every key a cause may be logged under, mapped to the same serializer.
+ *
+ * pino matches serializers by exact property name and nothing warns when a key
+ * has none: the value is passed to `JSON.stringify`, and an `Error` has no
+ * enumerable own properties, so it lands as `{}` with the message and stack -
+ * the only reasons it was logged - gone. Keeping the map in one exported
+ * constant is what lets a test drive the real thing rather than a copy of it.
+ *
+ * `error` for records that ARE failures; {@link REQUEST_CAUSE_FIELD} for the
+ * cause on records deliberately logged below error level.
+ */
+export const NODE_LOG_SERIALIZERS = {
+  error: superjsonErrorSerializer,
+  [REQUEST_CAUSE_FIELD]: superjsonErrorSerializer,
+} as const;
 
 export interface CreateLoggerOptions {
   /**
@@ -141,7 +158,14 @@ function createBrowserLogger(name: string): PinoLogger {
     name,
     level,
     timestamp: pino.stdTimeFunctions.isoTime,
-    serializers: { error: pino.stdSerializers.err },
+    // Both keys, same serializer. pino matches serializers by exact property
+    // name, so a cause moved to REQUEST_CAUSE_FIELD and not registered here is
+    // emitted as a bare Error - which serialises to `{}`, losing the message
+    // and stack that are the whole reason it was logged.
+    serializers: {
+      error: pino.stdSerializers.err,
+      [REQUEST_CAUSE_FIELD]: pino.stdSerializers.err,
+    },
     formatters: {
       bindings: (bindings) => bindings,
       level: (label) => ({ level: label.toUpperCase() }),
@@ -163,7 +187,7 @@ function createNodeLogger(
     name,
     level,
     timestamp: pino.stdTimeFunctions.isoTime,
-    serializers: { error: superjsonErrorSerializer },
+    serializers: NODE_LOG_SERIALIZERS,
     formatters: {
       // Adds process identity alongside pino's own pid/hostname bindings,
       // distinct from `name` (the per-module label like "langwatch:api:hono").
