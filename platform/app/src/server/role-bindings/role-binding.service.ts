@@ -11,9 +11,10 @@ import {
   getTeamRolePermissions,
 } from "~/server/api/rbac";
 import type { RoleBindingRepository } from "~/server/app-layer/role-bindings/repositories/role-binding.repository";
-import { assertUsersInOrganization } from "~/server/organizations/assertUsersInOrganization";
+import { LiteMemberViewerOnlyError } from "~/server/app-layer/teams/team.service";
 import type { RoleService } from "~/server/role/role.service";
 import { KSUID_RESOURCES } from "~/utils/constants";
+import { isBindingRoleAllowedForOrganizationRole } from "~/utils/memberRoleConstraints";
 import { assertNoPersonalTeamScope } from "./personal-team-scope";
 
 type ScopeRows = {
@@ -93,6 +94,11 @@ export class RoleBindingService {
     });
   }
 
+  /**
+   * Besides confirming the principal belongs to the organization, this
+   * returns a user's organization role, because what may be written for them
+   * depends on their seat. A group principal has no seat, so its role is null.
+   */
   private async validatePrincipalInOrganization({
     organizationId,
     userId,
@@ -101,9 +107,19 @@ export class RoleBindingService {
     organizationId: string;
     userId?: string;
     groupId?: string;
-  }): Promise<void> {
+  }): Promise<{ organizationRole: OrganizationUserRole | null }> {
     if (userId) {
-      await assertUsersInOrganization(this.prisma, organizationId, [userId]);
+      const membership = await this.prisma.organizationUser.findFirst({
+        where: { organizationId, userId },
+        select: { role: true },
+      });
+      if (!membership) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "One or more users are not in this organization",
+        });
+      }
+      return { organizationRole: membership.role };
     }
     if (groupId) {
       const group = await this.prisma.group.findFirst({
@@ -117,6 +133,51 @@ export class RoleBindingService {
         });
       }
     }
+    return { organizationRole: null };
+  }
+
+  /**
+   * A Lite Member seat means viewing only, and the stored access says so too.
+   * A direct row above Viewer, a custom role (its permissions are its own, so
+   * holding one requires a full seat), or any organization-scoped row is
+   * refused rather than stored and capped at resolution — the seat ceiling is
+   * enforced when access is written, the same way `updateTeamMemberRole`
+   * enforces it. Group bindings are never checked here: a group has no seat,
+   * and what the seat does to group-granted access is decided at resolution.
+   */
+  private async assertRowsWithinLiteMemberSeat({
+    organizationRole,
+    organizationId,
+    bindings,
+  }: {
+    /** Null when the principal is a group — a group has no seat. */
+    organizationRole: OrganizationUserRole | null;
+    organizationId: string;
+    bindings: Array<{
+      role: TeamUserRole;
+      scopeType: RoleBindingScopeType;
+      scopeId: string;
+    }>;
+  }): Promise<void> {
+    if (organizationRole !== OrganizationUserRole.EXTERNAL) return;
+
+    const offending = bindings.find(
+      (b) =>
+        b.scopeType === RoleBindingScopeType.ORGANIZATION ||
+        !isBindingRoleAllowedForOrganizationRole({
+          organizationRole,
+          role: b.role,
+        }),
+    );
+    if (!offending) return;
+
+    const { scopeNames } = await this.resolveScopes({
+      bindings: [offending],
+      organizationId,
+    });
+    throw new LiteMemberViewerOnlyError(
+      scopeNames.get(offending.scopeId) ?? null,
+    );
   }
 
   /**
@@ -489,7 +550,7 @@ export class RoleBindingService {
       client: this.prisma,
       scopes: [{ scopeType, scopeId }],
     });
-    await this.validatePrincipalInOrganization({
+    const { organizationRole } = await this.validatePrincipalInOrganization({
       organizationId,
       userId,
       groupId,
@@ -497,6 +558,11 @@ export class RoleBindingService {
     await this.validateCustomRolesAssignable({
       organizationId,
       bindings: [{ role, customRoleId }],
+    });
+    await this.assertRowsWithinLiteMemberSeat({
+      organizationRole,
+      organizationId,
+      bindings: [{ role, scopeType, scopeId }],
     });
 
     return this.prisma.roleBinding.create({
@@ -536,6 +602,23 @@ export class RoleBindingService {
       organizationId,
       bindings: [{ role, customRoleId }],
     });
+    if (binding.userId) {
+      const membership = await this.prisma.organizationUser.findFirst({
+        where: { organizationId, userId: binding.userId },
+        select: { role: true },
+      });
+      // A row can outlive its member (historical data); with nobody on a seat
+      // there is no ceiling to hold the edit against.
+      if (membership) {
+        await this.assertRowsWithinLiteMemberSeat({
+          organizationRole: membership.role,
+          organizationId,
+          bindings: [
+            { role, scopeType: binding.scopeType, scopeId: binding.scopeId },
+          ],
+        });
+      }
+    }
     return this.prisma.roleBinding.update({
       where: { id: bindingId },
       data: {
@@ -587,7 +670,10 @@ export class RoleBindingService {
   }) {
     // Validate scopes and role assignability up front so a bad input fails
     // the whole batch before we open the transaction.
-    await assertUsersInOrganization(this.prisma, organizationId, [userId]);
+    const { organizationRole } = await this.validatePrincipalInOrganization({
+      organizationId,
+      userId,
+    });
     for (const b of bindingsToCreate) {
       await this.repo.validateScopeInOrg({
         organizationId,
@@ -600,6 +686,13 @@ export class RoleBindingService {
       scopes: bindingsToCreate,
     });
     await this.validateCustomRolesAssignable({
+      organizationId,
+      bindings: bindingsToCreate,
+    });
+    // The dialog applies the seat before this batch, so the ceiling is held
+    // against the seat the member is on by the time the rows would be written.
+    await this.assertRowsWithinLiteMemberSeat({
+      organizationRole,
       organizationId,
       bindings: bindingsToCreate,
     });

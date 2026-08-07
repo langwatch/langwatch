@@ -121,6 +121,44 @@ describe("given a member who is the only admin of shared teams", () => {
       );
     });
 
+    /** @scenario Moving a member to a Lite Member seat corrects their project access rows to Viewer */
+    it("corrects their access on a shared project to viewer", async () => {
+      await moveSoloUserTo(OrganizationUserRole.EXTERNAL);
+
+      await expect(
+        fixture.projectBindingOf({
+          userId: fixture.soloUserId,
+          projectId: fixture.sharedProjectId,
+        }),
+      ).resolves.toEqual({ role: TeamUserRole.VIEWER, customRoleId: null });
+    });
+
+    /** @scenario Moving a member to a Lite Member seat corrects their project access rows to Viewer */
+    it("leaves project access as it is on the way back to a full seat", async () => {
+      await moveSoloUserTo(OrganizationUserRole.EXTERNAL);
+      await moveSoloUserTo(OrganizationUserRole.MEMBER);
+
+      // The downgrade corrects; the upgrade grants nothing back on its own.
+      await expect(
+        fixture.projectBindingOf({
+          userId: fixture.soloUserId,
+          projectId: fixture.sharedProjectId,
+        }),
+      ).resolves.toEqual({ role: TeamUserRole.VIEWER, customRoleId: null });
+    });
+
+    /** @scenario A seat correction leaves the personal workspace access row alone */
+    it("leaves the personal workspace rows untouched", async () => {
+      await moveSoloUserTo(OrganizationUserRole.EXTERNAL);
+
+      await expect(
+        fixture.teamRoleOf({
+          userId: fixture.soloUserId,
+          teamId: fixture.personalTeamId,
+        }),
+      ).resolves.toBe(TeamUserRole.ADMIN);
+    });
+
     /** @scenario The teams left without a team admin are named back to the admin */
     it("leaves out a team a group with members still administers", async () => {
       await fixture.withAdminGroupOn({

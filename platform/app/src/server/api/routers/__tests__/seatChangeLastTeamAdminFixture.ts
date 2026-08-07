@@ -47,6 +47,9 @@ type SeatChangeSeed = {
   onlyAdminTeamName: string;
   alsoOnlyAdminTeamId: string;
   sharedWithAnotherAdminTeamId: string;
+  sharedProjectId: string;
+  personalTeamId: string;
+  personalProjectId: string;
 };
 
 type SeatChangeMembers = Awaited<ReturnType<typeof createMembers>>;
@@ -150,6 +153,71 @@ async function createSharedTeams({
   };
 }
 
+/**
+ * A shared project (for PROJECT-scoped access rows the seat correction must
+ * reach) and the solo user's personal workspace (a personal team + personal
+ * project the correction must never touch — the workspace design keeps its
+ * stored owner ADMIN row and caps it at resolution, so re-promoting restores
+ * writes with no repair; see
+ * specs/ai-gateway/governance/personal-workspace-integrity.feature).
+ */
+async function createProjects({
+  prisma,
+  ns,
+  organizationId,
+  onlyAdminTeamId,
+  soloUserId,
+}: {
+  prisma: PrismaClient;
+  ns: string;
+  organizationId: string;
+  onlyAdminTeamId: string;
+  soloUserId: string;
+}) {
+  const sharedProject = await prisma.project.create({
+    data: {
+      name: `Shared project ${ns}`,
+      slug: `${ns}-shared-project`,
+      apiKey: `test-key-${ns}-shared`,
+      teamId: onlyAdminTeamId,
+      language: "other",
+      framework: "other",
+    },
+    select: { id: true },
+  });
+
+  const personalTeam = await prisma.team.create({
+    data: {
+      id: generate(KSUID_RESOURCES.TEAM).toString(),
+      name: `Workspace ${ns}`,
+      slug: `${ns}-personal`,
+      organizationId,
+      isPersonal: true,
+      ownerUserId: soloUserId,
+    },
+    select: { id: true },
+  });
+  const personalProject = await prisma.project.create({
+    data: {
+      name: `Personal project ${ns}`,
+      slug: `${ns}-personal-project`,
+      apiKey: `test-key-${ns}-personal`,
+      teamId: personalTeam.id,
+      language: "other",
+      framework: "other",
+      isPersonal: true,
+      ownerUserId: soloUserId,
+    },
+    select: { id: true },
+  });
+
+  return {
+    sharedProjectId: sharedProject.id,
+    personalTeamId: personalTeam.id,
+    personalProjectId: personalProject.id,
+  };
+}
+
 async function seedOrganization({
   prisma,
   ns,
@@ -160,6 +228,13 @@ async function seedOrganization({
   const members = await createMembers({ prisma, ns });
   const organizationId = await createOrganization({ prisma, ns, members });
   const teams = await createSharedTeams({ prisma, ns, organizationId });
+  const projects = await createProjects({
+    prisma,
+    ns,
+    organizationId,
+    onlyAdminTeamId: teams.onlyAdminTeamId,
+    soloUserId: members.soloId,
+  });
 
   return {
     organizationId,
@@ -168,6 +243,7 @@ async function seedOrganization({
     soloUserId: members.soloId,
     companionUserId: members.companionId,
     ...teams,
+    ...projects,
   };
 }
 
@@ -252,7 +328,9 @@ async function resetMemberships({
       {
         organizationId,
         userId: { in: [soloUserId, companionUserId] },
-        scopeType: RoleBindingScopeType.TEAM,
+        scopeType: {
+          in: [RoleBindingScopeType.TEAM, RoleBindingScopeType.PROJECT],
+        },
       },
     ],
   ]);
@@ -265,6 +343,7 @@ async function resetMemberships({
     seed.onlyAdminTeamId,
     seed.alsoOnlyAdminTeamId,
     seed.sharedWithAnotherAdminTeamId,
+    seed.personalTeamId,
   ]) {
     await bindTeamRole({
       prisma,
@@ -281,6 +360,16 @@ async function resetMemberships({
     teamId: seed.sharedWithAnotherAdminTeamId,
     role: TeamUserRole.ADMIN,
   });
+  await prisma.roleBinding.create({
+    data: {
+      id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+      organizationId,
+      userId: soloUserId,
+      role: TeamUserRole.ADMIN,
+      scopeType: RoleBindingScopeType.PROJECT,
+      scopeId: seed.sharedProjectId,
+    },
+  });
 }
 
 async function removeSeed({
@@ -294,6 +383,7 @@ async function removeSeed({
   await cleanupTestRows(prisma, [
     ["roleBinding", { organizationId: seed.organizationId }],
     ["organizationUser", { organizationId: seed.organizationId }],
+    ["project", { id: { in: [seed.sharedProjectId, seed.personalProjectId] } }],
     ["team", { organizationId: seed.organizationId }],
     ["organization", { id: seed.organizationId }],
     [
@@ -434,6 +524,17 @@ export async function createSeatChangeFixture({
 
     teamRoleOf: (where: { userId: string; teamId: string }) =>
       teamRoleOf({ prisma, organizationId, ...where }),
+
+    projectBindingOf: (where: { userId: string; projectId: string }) =>
+      prisma.roleBinding.findFirst({
+        where: {
+          organizationId,
+          userId: where.userId,
+          scopeType: RoleBindingScopeType.PROJECT,
+          scopeId: where.projectId,
+        },
+        select: { role: true, customRoleId: true },
+      }),
 
     organizationRoleOfSoloUser: () =>
       organizationRoleOf({ prisma, organizationId, userId: seed.soloUserId }),

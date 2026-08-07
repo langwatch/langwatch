@@ -9,9 +9,9 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import {
-  type OrganizationUserRole,
+  OrganizationUserRole,
   RoleBindingScopeType,
-  type TeamUserRole,
+  TeamUserRole,
 } from "@prisma/client";
 import { X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -114,7 +114,24 @@ export function MemberDetailDialog({
   const roleChanged = pendingRole !== member.role;
   const hasChanges = hasBindingChanges || roleChanged || hasDraftBinding;
 
-  const stageAddition = (binding: PendingBinding) => {
+  // A Lite Member seat allows Viewer only, so anything staged above it snaps
+  // down before it is listed or saved. The input row already restricts what
+  // can be picked; this holds the same line for rows staged before the seat
+  // was switched, and for whatever a stubbed row hands over in tests.
+  const constrainStagedRowToSeat = (binding: PendingBinding): PendingBinding =>
+    pendingRole === OrganizationUserRole.EXTERNAL &&
+    (binding.customRoleId || binding.role !== (TeamUserRole.VIEWER as string))
+      ? {
+          ...binding,
+          role: TeamUserRole.VIEWER,
+          roleValue: TeamUserRole.VIEWER,
+          customRoleId: undefined,
+          customRoleName: undefined,
+        }
+      : binding;
+
+  const stageAddition = (incoming: PendingBinding) => {
+    const binding = constrainStagedRowToSeat(incoming);
     const alreadyHeld = (directBindings.data ?? []).some(
       (row) =>
         !pendingBindingRemovals.has(row.id) &&
@@ -127,6 +144,29 @@ export function MemberDetailDialog({
         : [...prev, binding],
     );
   };
+
+  // Picking a Lite Member seat rewrites the staged rows the way the save
+  // cascade rewrites the stored ones: above-Viewer rows snap down, an
+  // organization row has no lite equivalent and is dropped, and rows made
+  // identical by the correction collapse to one.
+  useEffect(() => {
+    if (pendingRole !== OrganizationUserRole.EXTERNAL) return;
+    setPendingBindingAdditions((prev) => {
+      const seen = new Set<string>();
+      return prev
+        .filter(
+          (binding) => binding.scopeType !== RoleBindingScopeType.ORGANIZATION,
+        )
+        .map(constrainStagedRowToSeat)
+        .filter((binding) => {
+          const key = bindingKey(binding);
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingRole]);
 
   const refreshAccessQueries = () =>
     Promise.all([
@@ -402,6 +442,7 @@ export function MemberDetailDialog({
                   organizationId={organizationId}
                   onAdd={stageAddition}
                   onReadyChange={setHasDraftBinding}
+                  organizationRole={pendingRole}
                 />
               </Box>
             )}
@@ -461,6 +502,13 @@ export function MemberDetailDialog({
                           <Badge colorPalette="purple" size="sm">
                             {scopeTypeLabel(b.scopeType)} {b.scopeName ?? "—"}
                           </Badge>
+                          {pendingRole === OrganizationUserRole.EXTERNAL &&
+                            b.role !== (TeamUserRole.VIEWER as string) &&
+                            b.role !== (TeamUserRole.CUSTOM as string) && (
+                              <Text fontSize="xs" color="fg.muted">
+                                Applies as Viewer while on a Lite Member seat
+                              </Text>
+                            )}
                           <Spacer />
                           <Text fontSize="xs" color="fg.muted">
                             via {group.name}

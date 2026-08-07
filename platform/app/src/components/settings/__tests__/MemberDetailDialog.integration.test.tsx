@@ -136,16 +136,30 @@ vi.mock("../GroupBindingInputRow", async () => {
     scopeName: "Team One",
   };
 
+  const STUB_CUSTOM_BINDING: PendingBinding = {
+    roleValue: "CUSTOM:role-1",
+    role: "CUSTOM",
+    customRoleId: "role-1",
+    customRoleName: "Data Scientist",
+    scopeType: RoleBindingScopeType.TEAM,
+    scopeId: "team-2",
+    scopeName: "Team Two",
+  };
+
   // Mirrors the real row's two paths: Add commits the draft, while a filled
   // but never-added draft reports readiness and hands itself over on flush.
+  // The seat prop is surfaced as text so tests can prove the dialog passes
+  // the live pending seat, not the member's stored one.
   const BindingInputRow = React.forwardRef(function StubBindingInputRow(
     {
       onAdd,
       onReadyChange,
+      organizationRole,
     }: {
       organizationId: string;
       onAdd: (binding: PendingBinding) => void;
       onReadyChange?: (isReady: boolean) => void;
+      organizationRole?: OrganizationUserRole;
     },
     ref: React.Ref<{ flush: () => PendingBinding | null }>,
   ) {
@@ -159,12 +173,20 @@ vi.mock("../GroupBindingInputRow", async () => {
     }));
     return (
       <>
+        <span data-testid="stub-organization-role">{organizationRole}</span>
         <button
           type="button"
           data-testid="stub-add-binding"
           onClick={() => onAdd(STUB_BINDING)}
         >
           Stage binding
+        </button>
+        <button
+          type="button"
+          data-testid="stub-add-custom-binding"
+          onClick={() => onAdd(STUB_CUSTOM_BINDING)}
+        >
+          Stage custom binding
         </button>
         <button
           type="button"
@@ -567,6 +589,152 @@ describe("<MemberDetailDialog/>", () => {
         expect(mockInvalidateOrgWithMembers).toHaveBeenCalled();
         expect(mockInvalidateGetUsage).toHaveBeenCalled();
       });
+    });
+  });
+
+  describe("when the seat selector switches to a Lite Member seat", () => {
+    /** @scenario The dialog offers only the Viewer role for a member on a Lite Member seat */
+    it("hands the live seat to the access input row", () => {
+      renderDialog();
+
+      expect(screen.getByTestId("stub-organization-role").textContent).toBe(
+        OrganizationUserRole.MEMBER as string,
+      );
+
+      fireEvent.click(screen.getByTestId("org-role-field"));
+
+      expect(screen.getByTestId("stub-organization-role").textContent).toBe(
+        OrganizationUserRole.EXTERNAL as string,
+      );
+    });
+  });
+
+  describe("given access rows were staged before the seat changed", () => {
+    describe("when the admin picks a Lite Member seat and saves", () => {
+      /** @scenario Staged access rows correct to Viewer when the seat switches to Lite Member */
+      it("saves every staged row as Viewer with no custom role", async () => {
+        renderDialog();
+
+        fireEvent.click(screen.getByTestId("stub-add-binding"));
+        fireEvent.click(screen.getByTestId("stub-add-custom-binding"));
+        fireEvent.click(screen.getByTestId("org-role-field"));
+        fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
+
+        await vi.waitFor(() => {
+          expect(mockApplyMemberBindings).toHaveBeenCalledTimes(1);
+        });
+        expect(mockApplyMemberBindings).toHaveBeenCalledWith({
+          organizationId: "org-1",
+          userId: "user-1",
+          bindingIdsToDelete: [],
+          bindingsToCreate: [
+            {
+              role: "VIEWER",
+              customRoleId: undefined,
+              scopeType: RoleBindingScopeType.TEAM,
+              scopeId: "team-1",
+            },
+            {
+              role: "VIEWER",
+              customRoleId: undefined,
+              scopeType: RoleBindingScopeType.TEAM,
+              scopeId: "team-2",
+            },
+          ],
+        });
+      });
+
+      /** @scenario Staged access rows correct to Viewer when the seat switches to Lite Member */
+      it("shows the staged rows as Viewer before the save", () => {
+        renderDialog();
+
+        fireEvent.click(screen.getByTestId("stub-add-custom-binding"));
+        expect(screen.getByText("Data Scientist")).toBeTruthy();
+
+        fireEvent.click(screen.getByTestId("org-role-field"));
+
+        expect(screen.queryByText("Data Scientist")).toBeNull();
+        expect(screen.getByText("VIEWER")).toBeTruthy();
+      });
+    });
+  });
+
+  describe("given the member holds access above Viewer through a group", () => {
+    beforeEach(() => {
+      mockListForMemberData.current = [
+        {
+          id: "group-1",
+          name: "Platform",
+          bindings: [
+            {
+              id: "gb-1",
+              role: "ADMIN",
+              customRoleId: null,
+              customRoleName: null,
+              scopeType: RoleBindingScopeType.TEAM,
+              scopeId: "team-1",
+              scopeName: "Team One",
+            },
+          ],
+        },
+      ];
+    });
+
+    /** @scenario Group access names the Lite Member ceiling on rows above Viewer */
+    it("keeps the group's stored role and names the ceiling on a Lite Member seat", () => {
+      renderDialog({
+        member: { ...baseMember, role: OrganizationUserRole.EXTERNAL },
+      });
+
+      expect(screen.getByText("ADMIN")).toBeTruthy();
+      expect(
+        screen.getByText("Applies as Viewer while on a Lite Member seat"),
+      ).toBeTruthy();
+    });
+
+    /** @scenario Group access names the Lite Member ceiling on rows above Viewer */
+    it("adds the note the moment a Lite Member seat is picked", () => {
+      renderDialog();
+
+      expect(
+        screen.queryByText("Applies as Viewer while on a Lite Member seat"),
+      ).toBeNull();
+
+      fireEvent.click(screen.getByTestId("org-role-field"));
+
+      expect(
+        screen.getByText("Applies as Viewer while on a Lite Member seat"),
+      ).toBeTruthy();
+    });
+
+    /** @scenario Group access names the Lite Member ceiling on rows above Viewer */
+    it("leaves custom group roles unlabeled, their grant needs no correction", () => {
+      mockListForMemberData.current = [
+        {
+          id: "group-1",
+          name: "Platform",
+          bindings: [
+            {
+              id: "gb-2",
+              role: "CUSTOM",
+              customRoleId: "role-1",
+              customRoleName: "Data Scientist",
+              scopeType: RoleBindingScopeType.TEAM,
+              scopeId: "team-1",
+              scopeName: "Team One",
+            },
+          ],
+        },
+      ];
+
+      renderDialog({
+        member: { ...baseMember, role: OrganizationUserRole.EXTERNAL },
+      });
+
+      expect(screen.getByText("Data Scientist")).toBeTruthy();
+      expect(
+        screen.queryByText("Applies as Viewer while on a Lite Member seat"),
+      ).toBeNull();
     });
   });
 

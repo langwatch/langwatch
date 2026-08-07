@@ -907,6 +907,51 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
         });
       }
 
+      // The seat correction reaches everything the seat caps, and a member
+      // can hold PROJECT-scoped rows the team loop above never sees. Shared
+      // projects only: the member's own personal workspace keeps its stored
+      // rows and is capped at resolution, which is what makes re-promoting
+      // them a no-op (personal-workspace-integrity.feature). Corrected
+      // through setUserScopeBinding so ids survive, several rows on one
+      // project collapse to one, and a pre-existing Viewer row cannot collide
+      // with the correction on the partial unique index. Left alone on the
+      // way back up: an upgrade grants nothing on its own.
+      if (role === OrganizationUserRole.EXTERNAL) {
+        const projectRows = await tx.roleBinding.findMany({
+          where: {
+            organizationId,
+            userId,
+            scopeType: RoleBindingScopeType.PROJECT,
+            OR: [
+              { role: { not: TeamUserRole.VIEWER } },
+              { customRoleId: { not: null } },
+            ],
+          },
+          select: { scopeId: true },
+        });
+        if (projectRows.length > 0) {
+          const sharedProjects = await tx.project.findMany({
+            where: {
+              id: { in: projectRows.map((row) => row.scopeId) },
+              isPersonal: false,
+              team: { organizationId, isPersonal: false },
+            },
+            select: { id: true },
+          });
+          for (const project of sharedProjects) {
+            await setUserScopeBinding({
+              tx,
+              organizationId,
+              userId,
+              scopeType: RoleBindingScopeType.PROJECT,
+              scopeId: project.id,
+              role: TeamUserRole.VIEWER,
+              customRoleId: null,
+            });
+          }
+        }
+      }
+
       const finalAdminCount = await tx.organizationUser.count({
         where: {
           organizationId,

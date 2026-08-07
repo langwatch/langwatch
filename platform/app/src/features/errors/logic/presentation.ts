@@ -622,12 +622,13 @@ const presentations = {
   },
   lite_member_viewer_only: {
     // Not a field to correct: the seat sets the ceiling, so the two ways out
-    // are the two named here.
-    title: "A Lite Member can only view a team",
+    // are the two named here. The scope can be a team, a project, or the
+    // organization, so the copy names the seat rather than any of them.
+    title: "A Lite Member seat allows viewing only",
     describe: (error) => {
       const teamName = str(error, "teamName", "");
-      const team = teamName ? ` in "${teamName}"` : "";
-      return `A Lite Member seat allows the Viewer role only${team}. Leave the team role as Viewer, or move them to a full member seat to give them more.`;
+      const scope = teamName ? ` in "${teamName}"` : "";
+      return `A Lite Member seat allows the Viewer role only${scope}. Leave the role as Viewer, or move them to a full member seat to give them more.`;
     },
   },
   already_organization_member: {

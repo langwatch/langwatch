@@ -62,6 +62,7 @@ const applyForSoloUser = ({
   bindingIdsToDelete?: string[];
   bindingsToCreate?: Array<{
     role: TeamUserRole;
+    customRoleId?: string;
     scopeType: RoleBindingScopeType;
     scopeId: string;
   }>;
@@ -244,6 +245,135 @@ describe("given an organization admin editing a member's access", () => {
         await prisma.roleBinding.deleteMany({ where: { id: groupBinding.id } });
         await prisma.group.deleteMany({ where: { id: group.id } });
       }
+    });
+  });
+
+  describe("given the member is on a Lite Member seat", () => {
+    beforeEach(async () => {
+      // The dialog's order: the seat lands first, the batch follows, so the
+      // batch is validated against the seat the member is on by the time it
+      // runs.
+      await fixture.callerAsAdmin().organization.updateMemberRole({
+        organizationId: fixture.organizationId,
+        userId: fixture.soloUserId,
+        role: OrganizationUserRole.EXTERNAL,
+      });
+    });
+
+    /** @scenario The access batch refuses an access row above Viewer for a member on a Lite Member seat */
+    it("refuses a team row above Viewer, writing nothing", async () => {
+      await expect(
+        applyForSoloUser({
+          bindingsToCreate: [
+            {
+              role: TeamUserRole.ADMIN,
+              scopeType: RoleBindingScopeType.TEAM,
+              scopeId: fixture.sharedWithAnotherAdminTeamId,
+            },
+          ],
+        }),
+      ).rejects.toMatchObject({
+        cause: { code: "lite_member_viewer_only" },
+      });
+
+      await expect(
+        prisma.roleBinding.count({
+          where: {
+            organizationId: fixture.organizationId,
+            userId: fixture.soloUserId,
+            scopeType: RoleBindingScopeType.TEAM,
+            scopeId: fixture.sharedWithAnotherAdminTeamId,
+            role: TeamUserRole.ADMIN,
+          },
+        }),
+      ).resolves.toBe(0);
+    });
+
+    /** @scenario The access batch refuses an access row above Viewer for a member on a Lite Member seat */
+    it("refuses a project row above Viewer", async () => {
+      await expect(
+        applyForSoloUser({
+          bindingsToCreate: [
+            {
+              role: TeamUserRole.MEMBER,
+              scopeType: RoleBindingScopeType.PROJECT,
+              scopeId: fixture.sharedProjectId,
+            },
+          ],
+        }),
+      ).rejects.toMatchObject({
+        cause: { code: "lite_member_viewer_only" },
+      });
+    });
+
+    /** @scenario The access batch refuses a custom role for a member on a Lite Member seat */
+    it("refuses a custom role row", async () => {
+      const customRole = await prisma.customRole.create({
+        data: {
+          organizationId: fixture.organizationId,
+          name: `Deployer ${nanoid(6)}`,
+          permissions: ["traces:view"],
+          kind: "custom",
+        },
+      });
+
+      try {
+        await expect(
+          applyForSoloUser({
+            bindingsToCreate: [
+              {
+                role: TeamUserRole.CUSTOM,
+                customRoleId: customRole.id,
+                scopeType: RoleBindingScopeType.TEAM,
+                scopeId: fixture.onlyAdminTeamId,
+              },
+            ],
+          }),
+        ).rejects.toMatchObject({
+          cause: { code: "lite_member_viewer_only" },
+        });
+      } finally {
+        await prisma.customRole.deleteMany({ where: { id: customRole.id } });
+      }
+    });
+
+    /** @scenario The access batch refuses an organization access row for a member on a Lite Member seat */
+    it("refuses an organization row even at Viewer", async () => {
+      await expect(
+        applyForSoloUser({
+          bindingsToCreate: [
+            {
+              role: TeamUserRole.VIEWER,
+              scopeType: RoleBindingScopeType.ORGANIZATION,
+              scopeId: fixture.organizationId,
+            },
+          ],
+        }),
+      ).rejects.toMatchObject({
+        cause: { code: "lite_member_viewer_only" },
+      });
+    });
+
+    /** @scenario The access batch accepts a Viewer row for a member on a Lite Member seat */
+    it("accepts a Viewer team row", async () => {
+      await expect(
+        applyForSoloUser({
+          bindingsToCreate: [
+            {
+              role: TeamUserRole.VIEWER,
+              scopeType: RoleBindingScopeType.TEAM,
+              scopeId: fixture.sharedWithAnotherAdminTeamId,
+            },
+          ],
+        }),
+      ).resolves.toMatchObject({ success: true });
+
+      await expect(
+        fixture.teamRoleOf({
+          userId: fixture.soloUserId,
+          teamId: fixture.sharedWithAnotherAdminTeamId,
+        }),
+      ).resolves.toBe(TeamUserRole.VIEWER);
     });
   });
 

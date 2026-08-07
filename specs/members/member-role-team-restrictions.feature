@@ -311,3 +311,21 @@ Feature: Member Role Team Restrictions
     Given a team whose only Admin role is held by a group with members
     When an organization admin changes another member's role on that team
     Then the change is saved
+
+  # The seat correction reaches everything the seat caps: team access and
+  # project access alike, on the surfaces the organization shares. The member's
+  # own personal workspace is the documented exception, held by
+  # specs/ai-gateway/governance/personal-workspace-integrity.feature.
+
+  @integration
+  Scenario: Moving a member to a Lite Member seat corrects their project access rows to Viewer
+    Given a member holds project access above Viewer on a shared project
+    When an organization admin moves them to a Lite Member seat
+    Then their project access on that project becomes Viewer
+    And moving them back to a full seat leaves project access as it is
+
+  @integration
+  Scenario: A seat correction leaves the personal workspace access row alone
+    Given a member with a personal workspace
+    When an organization admin moves them to a Lite Member seat
+    Then their personal workspace access rows are untouched
