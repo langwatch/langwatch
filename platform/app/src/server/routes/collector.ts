@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import { createLogger } from "@langwatch/observability";
+import { createLogger, validationMeta } from "@langwatch/observability";
 import { bodyLimit } from "hono/body-limit";
 import type { ZodError } from "zod";
 import { fromZodError } from "zod-validation-error";
@@ -284,14 +284,20 @@ secured
       try {
         params = collectorRESTParamsValidatorSchema.parse(body);
       } catch (error) {
+        const validation = validationMeta(error);
+
         captureException(new Error("ZodError on parsing body"), {
-          extra: { projectId: project.id, body, zodError: error },
+          extra: { projectId: project.id, ...validation },
         });
 
         const validationError = fromZodError(error as ZodError);
 
-        logger.error(
-          { error, body, validationError },
+        // Shape, never the body. The rendered `validationError.message` quotes
+        // the offending values, so it answers the sender and stays out of the
+        // log; `validation` is the schema's own vocabulary and is what tells us
+        // whether the rule, rather than the payload, is the thing that is wrong.
+        logger.warn(
+          { projectId: project.id, ...validation },
           "invalid trace received",
         );
 
@@ -308,10 +314,12 @@ secured
         params;
 
       if (body.spans && !Array.isArray(body.spans)) {
-        logger.error(
+        // The type, not the value: whatever arrived in place of the array is
+        // still the sender's content, and the type is the whole diagnosis.
+        logger.warn(
           {
             projectId: project.id,
-            spans: body.spans,
+            receivedType: typeof body.spans,
             traceId: nullableTraceId,
           },
           "invalid spans field, expecting array",
@@ -378,20 +386,17 @@ secured
         }
       } catch (error) {
         const validationError = fromZodError(error as ZodError);
+        const validation = validationMeta(error);
+
         captureException(new Error("ZodError on parsing metadata"), {
-          extra: {
-            projectId: project.id,
-            metadata: params.metadata,
-            zodError: error,
-          },
+          extra: { projectId: project.id, ...validation },
         });
 
-        logger.error(
-          {
-            projectId: project.id,
-            metadata: params.metadata,
-            zodError: error,
-          },
+        // Metadata is customer-authored key/value content, so the values stay
+        // out. The rejected KEY names do not: a key refused across many
+        // projects is how we learn our reserved-metadata list is too narrow.
+        logger.warn(
+          { projectId: project.id, ...validation },
           "invalid metadata received",
         );
 
@@ -519,14 +524,16 @@ secured
         try {
           spans[index] = spanValidatorSchema.parse(span);
         } catch (error) {
+          const validation = validationMeta(error);
+
           captureException(new Error("ZodError on parsing spans"), {
-            extra: { projectId: project.id, span, zodError: error },
+            extra: { projectId: project.id, index, ...validation },
           });
 
           const validationError = fromZodError(error as ZodError);
 
-          logger.error(
-            { error, span, projectId: project.id, index, validationError },
+          logger.warn(
+            { projectId: project.id, index, ...validation },
             "invalid span received",
           );
 

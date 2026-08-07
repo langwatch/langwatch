@@ -28,5 +28,12 @@ export {
   getStatusCodeFromError,
   hasAuthorizationToken,
   logHttpRequest,
+  REQUEST_CAUSE_FIELD,
   type RequestLogData,
 } from "./request/requestLogging";
+export {
+  MAX_VALIDATION_ISSUES,
+  validationMeta,
+  type ValidationIssueMeta,
+  type ValidationMeta,
+} from "./validation/validationMeta";

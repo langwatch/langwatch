@@ -1,4 +1,5 @@
 import type { ClickHouseClient } from "@clickhouse/client";
+import { QUERY_CAUSE_FIELD } from "@langwatch/clickhouse-client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { mockQueryLogger, mockLogger } = vi.hoisted(() => ({
@@ -204,13 +205,33 @@ describe("createResilientClickHouseClient()", () => {
         "Syntax error in query",
       );
 
-      expect(mockQueryLogger.error).toHaveBeenCalledWith(
+      expect(mockQueryLogger.warn).toHaveBeenCalledWith(
         expect.objectContaining({
           source: "clickhouse",
           operation: "query",
         }),
         expect.any(String),
       );
+    });
+
+    // The error is on its way to the caller, which is what knows whether it
+    // ends as a 5xx, a retried job, or a dropped one. Reporting it as an error
+    // here as well counted recovered work as lost.
+    /** @scenario A failed attempt raised to the caller is not itself an error */
+    it("reports the attempt at warn, leaving the verdict to the caller", async () => {
+      const mock = makeMockClient({
+        query: vi.fn().mockRejectedValue(new Error("Syntax error in query")),
+      });
+      const client = createResilientClickHouseClient({
+        client: mock,
+        maxRetries: 3,
+      });
+
+      await expect(client.query({ query: "SELECT 1" })).rejects.toThrow(
+        "Syntax error in query",
+      );
+
+      expect(mockQueryLogger.error).not.toHaveBeenCalled();
     });
 
     it("passes the raw error object for Pino serializer", async () => {
@@ -227,11 +248,32 @@ describe("createResilientClickHouseClient()", () => {
         "Syntax error in query",
       );
 
-      const loggedObj = mockQueryLogger.error.mock.calls[0]![0] as Record<
+      const loggedObj = mockQueryLogger.warn.mock.calls[0]![0] as Record<
         string,
         unknown
       >;
-      expect(loggedObj.error).toBe(err);
+      expect(loggedObj[QUERY_CAUSE_FIELD]).toBe(err);
+    });
+
+    // Loki derives a record's level from a field called `error`, so leaving the
+    // cause there re-promotes exactly the records this change moved down.
+    /** @scenario The cause never rides on a field named error */
+    it("keeps the cause off a field named error", async () => {
+      const mock = makeMockClient({
+        query: vi.fn().mockRejectedValue(new Error("Syntax error in query")),
+      });
+      const client = createResilientClickHouseClient({
+        client: mock,
+        maxRetries: 3,
+      });
+
+      await expect(client.query({ query: "SELECT 1" })).rejects.toThrow(
+        "Syntax error in query",
+      );
+
+      expect(mockQueryLogger.warn.mock.calls[0]![0]).not.toHaveProperty(
+        "error",
+      );
     });
   });
 

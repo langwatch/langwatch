@@ -44,6 +44,32 @@ function statusOf(error: object): number | undefined {
 }
 
 /**
+ * The driver's own socket timeout, which carries neither a code nor a status —
+ * its message is the only signal it gives, so this one condition has to be
+ * recognised by text.
+ *
+ * Anchored to the WHOLE message, and that is the entire point. The previous
+ * form tested `/timeout/i` anywhere in the message, and ClickHouse echoes the
+ * failing statement back inside its error text: a query naming a `timeout`
+ * column, or setting `max_execution_time` with "timeout" anywhere in a SETTINGS
+ * clause, made a permanent failure — a syntax error, a missing table — read as
+ * transient and burn the full retry budget against a server that was never
+ * going to succeed.
+ *
+ * Every other timeout ClickHouse itself reports (`TIMEOUT_EXCEEDED`,
+ * `SOCKET_TIMEOUT`, `connect ETIMEDOUT`) arrives as a code, a status, or one of
+ * the caller's message fragments, and is matched on those instead.
+ */
+const DRIVER_TIMEOUT_MESSAGE = /^timeout error\.?$/i;
+
+function isDriverTimeout(error: Error): boolean {
+  return (
+    error.name === "TimeoutError" ||
+    DRIVER_TIMEOUT_MESSAGE.test(error.message.trim())
+  );
+}
+
+/**
  * Whether a failure is worth another attempt.
  *
  * Deliberately conservative: anything unrecognised is permanent. Retrying a
@@ -56,7 +82,7 @@ export function isTransientClickHouseError({
 }: TransientClassificationInput): boolean {
   if (!(error instanceof Error)) return false;
 
-  if (/timeout/i.test(error.message)) return true;
+  if (isDriverTimeout(error)) return true;
 
   for (const fragment of transientMessageFragments) {
     if (error.message.includes(fragment)) return true;
@@ -105,3 +131,13 @@ export function retryNoticeLevel(attempt: number): "warn" | "debug" {
 
 /** Where a retry notice attaches its cause. Never `error`; see ./logging.ts. */
 export const RETRY_CAUSE_FIELD = "retryError";
+
+/**
+ * Where a failed-attempt notice attaches its cause. Never `error`; see
+ * ./logging.ts.
+ *
+ * Separate from {@link RETRY_CAUSE_FIELD} so the two are told apart on sight: a
+ * retry notice says an attempt failed and another is coming, this one says the
+ * failure was raised to the caller.
+ */
+export const QUERY_CAUSE_FIELD = "queryError";

@@ -1,5 +1,9 @@
 import type { ClickHouseClient } from "@clickhouse/client";
-import { RETRY_CAUSE_FIELD, runWithRetry } from "@langwatch/clickhouse-client";
+import {
+  QUERY_CAUSE_FIELD,
+  RETRY_CAUSE_FIELD,
+  runWithRetry,
+} from "@langwatch/clickhouse-client";
 import { createLogger } from "@langwatch/observability";
 import {
   incrementClickHouseQueryCount,
@@ -130,6 +134,22 @@ function extractRawQuery(params: unknown): string {
   return typeof p.query === "string" ? p.query : "";
 }
 
+/**
+ * Report an attempt that failed and was raised to the caller.
+ *
+ * Warn, not error, and the cause off the `error` field — the same two rules,
+ * for the same reason, as the vendor policy in `@langwatch/clickhouse-client`.
+ * This wrapper does not know the outcome: a read's translated error is reported
+ * at the request boundary, and an insert is issued from a job the queue
+ * retries, which logs its own error and increments `gq_jobs_dropped_total` if
+ * it ever truly gives up. Claiming a verdict here made recovered work read as
+ * lost work — 17k records a day against zero jobs actually dropped — and
+ * naming the field `error` had the log pipeline promote the record's level
+ * regardless of the one chosen here.
+ *
+ * The failure is still counted: `incrementClickHouseQueryCount(_, "error")`
+ * runs at every call site, and a rate is what the alerting is built on.
+ */
 function logFailure({
   operation,
   error,
@@ -144,7 +164,7 @@ function logFailure({
   try {
     const meta = safeQueryMeta(params);
 
-    queryLogger.error(
+    queryLogger.warn(
       {
         source: "clickhouse",
         operation,
@@ -152,7 +172,7 @@ function logFailure({
         queryId: meta.queryId,
         format: meta.format,
         paramKeys: meta.paramKeys,
-        error,
+        [QUERY_CAUSE_FIELD]: error,
       },
       `ClickHouse ${operation} failed`,
     );

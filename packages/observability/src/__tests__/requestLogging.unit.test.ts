@@ -4,6 +4,7 @@ import {
   getStatusCodeFromError,
   hasAuthorizationToken,
   logHttpRequest,
+  REQUEST_CAUSE_FIELD,
 } from "../request/requestLogging";
 
 describe("requestLogging", () => {
@@ -192,6 +193,88 @@ describe("requestLogging", () => {
           expect.objectContaining({ handledErrorFault: "platform" }),
           "error handling request",
         );
+      });
+    });
+
+    /**
+     * Loki reads a field named `error` to decide a record's level, and that
+     * guess beats the severity we emitted. Records we deliberately log below
+     * error therefore have to carry their cause somewhere else, or they arrive
+     * as errors anyway — which is what buried the real 5xx behind 128k/day of
+     * handled 402s.
+     */
+    describe("when the record is logged below error level", () => {
+      const handledCustomer = Object.assign(new Error("over quota"), {
+        name: "PlanLimitExceededError",
+        code: "ERR_PLAN_LIMIT",
+        httpStatus: 402,
+        fault: "customer",
+      });
+
+      function warnData() {
+        const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() } as any;
+        logHttpRequest(logger, {
+          method: "POST",
+          url: "/api/otel/v1/traces",
+          statusCode: 402,
+          duration: 5,
+          userAgent: null,
+          error: handledCustomer,
+        });
+        return logger.warn.mock.calls[0][0];
+      }
+
+      it("does not attach the cause under a field named error", () => {
+        expect(warnData()).not.toHaveProperty("error");
+      });
+
+      it("still carries the cause for diagnosis", () => {
+        expect(warnData()[REQUEST_CAUSE_FIELD]).toBe(handledCustomer);
+      });
+
+      it("keeps the error type groupable after the move", () => {
+        expect(warnData().errorType).toBe("PlanLimitExceededError");
+      });
+
+      it("keeps the handled attribution", () => {
+        expect(warnData()).toMatchObject({
+          handledErrorCode: "ERR_PLAN_LIMIT",
+          handledErrorFault: "customer",
+        });
+      });
+
+      it("applies to info-level records too", () => {
+        const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() } as any;
+        logHttpRequest(logger, {
+          method: "GET",
+          url: "/missing",
+          statusCode: 404,
+          duration: 1,
+          userAgent: null,
+          error: Object.assign(new Error("nope"), { status: 404 }),
+        });
+
+        expect(logger.info.mock.calls[0][0]).not.toHaveProperty("error");
+      });
+    });
+
+    describe("when the record is logged at error level", () => {
+      it("keeps the cause under error so 5xx dashboards are unchanged", () => {
+        const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() } as any;
+        const boom = new Error("boom");
+
+        logHttpRequest(logger, {
+          method: "POST",
+          url: "/fail",
+          statusCode: 500,
+          duration: 100,
+          userAgent: null,
+          error: boom,
+        });
+
+        const logData = logger.error.mock.calls[0][0];
+        expect(logData.error).toBe(boom);
+        expect(logData).not.toHaveProperty(REQUEST_CAUSE_FIELD);
       });
     });
   });

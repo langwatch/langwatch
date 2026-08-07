@@ -86,6 +86,20 @@ export function getLogLevelForRequest(
 }
 
 /**
+ * Where a cause is attached on a record that is NOT at error level.
+ *
+ * Loki derives `detected_level` from the presence of a field named `error` and
+ * that guess beats the `severity_text` we actually emitted. So a handled 402,
+ * logged at warn exactly as intended, arrived in Loki as an error — 128k a day
+ * of them on one service, swamping the genuine 5xx and making every dashboard
+ * and alert built on `detected_level` read the opposite of the truth.
+ *
+ * Same rule, and same reason, as `VENDOR_CAUSE_FIELD` in
+ * `@langwatch/clickhouse-client`.
+ */
+export const REQUEST_CAUSE_FIELD = "requestError";
+
+/**
  * Logs an HTTP request with appropriate level based on status code.
  * Uses error level for 5xx, warn for 4xx, info for success.
  */
@@ -99,8 +113,23 @@ export function logHttpRequest(logger: Logger, data: RequestLogData): void {
     userAgent: data.userAgent,
   };
 
+  const level = getLogLevelForRequest(data.error, data.statusCode);
+
   if (data.error) {
-    logData.error = data.error;
+    // At error level the field keeps its name: `detected_level` and
+    // `severity_text` already agree there, and every 5xx dashboard slices on
+    // the `error_*` metadata the serializer derives from it. Only the levels
+    // where the two disagree are re-keyed.
+    if (level === "error") {
+      logData.error = data.error;
+    } else {
+      logData[REQUEST_CAUSE_FIELD] = data.error;
+      // Re-keying costs the derived `error_type`, which is how these records
+      // were grouped. Restated flat so the grouping survives the move.
+      const name = (data.error as { name?: unknown }).name;
+      if (typeof name === "string") logData.errorType = name;
+    }
+
     const fault = handledFaultOf(data.error);
     if (fault) {
       logData.handledErrorCode = (data.error as Record<string, unknown>).code;
@@ -108,7 +137,6 @@ export function logHttpRequest(logger: Logger, data: RequestLogData): void {
     }
   }
 
-  const level = getLogLevelForRequest(data.error, data.statusCode);
   const message = data.error ? "error handling request" : "request handled";
 
   logger[level](logData, message);
