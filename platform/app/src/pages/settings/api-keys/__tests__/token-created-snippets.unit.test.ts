@@ -137,66 +137,89 @@ describe("given the token-created-snippets feature is implemented", () => {
     // substring check passes happily while those are wrong. A Gemini entry
     // whose flags sat on the wrong side of the server name shipped and was
     // pulled for exactly that reason (#6654).
-    const CASES: Array<{
-      key: string;
-      context: Parameters<NonNullable<CodeAssistant["buildCommand"]>>[0];
-      expected: string;
-    }> = [
+    const API_KEY = "sk-lw-real";
+    const PROJECT_ID = "project-abc";
+    const CLOUD = "https://app.langwatch.ai";
+    const SELF_HOSTED = "https://self.host";
+
+    // Both optional flags, independently: a project id and a self-hosted
+    // endpoint are unrelated choices, and the case where BOTH are present is
+    // the densest line either builder emits — the one where an ordering
+    // mistake is most likely and least visible.
+    const COMBOS = [
       {
-        key: "claude-code",
-        context: {
-          apiKey: "sk-lw-real",
-          projectId: "project-abc",
-          endpoint: "https://app.langwatch.ai",
-          isSelfHosted: false,
-        },
-        expected:
-          "claude mcp add langwatch --env LANGWATCH_PROJECT_ID=project-abc -- npx -y @langwatch/mcp-server --api-key sk-lw-real",
+        label: "with a project id, cloud",
+        projectId: PROJECT_ID,
+        endpoint: CLOUD,
+        isSelfHosted: false,
       },
       {
-        key: "claude-code",
-        context: {
-          apiKey: "sk-lw-real",
-          projectId: undefined,
-          endpoint: "https://self.host",
-          isSelfHosted: true,
-        },
-        expected:
+        label: "with a project id, self-hosted",
+        projectId: PROJECT_ID,
+        endpoint: SELF_HOSTED,
+        isSelfHosted: true,
+      },
+      {
+        label: "without a project id, cloud",
+        projectId: undefined,
+        endpoint: CLOUD,
+        isSelfHosted: false,
+      },
+      {
+        label: "without a project id, self-hosted",
+        projectId: undefined,
+        endpoint: SELF_HOSTED,
+        isSelfHosted: true,
+      },
+    ] as const;
+
+    const EXPECTED = {
+      "claude-code": {
+        "with a project id, cloud":
+          "claude mcp add langwatch --env LANGWATCH_PROJECT_ID=project-abc -- npx -y @langwatch/mcp-server --api-key sk-lw-real",
+        "with a project id, self-hosted":
+          "claude mcp add langwatch --env LANGWATCH_PROJECT_ID=project-abc -- npx -y @langwatch/mcp-server --api-key sk-lw-real --endpoint https://self.host",
+        "without a project id, cloud":
+          "claude mcp add langwatch -- npx -y @langwatch/mcp-server --api-key sk-lw-real",
+        "without a project id, self-hosted":
           "claude mcp add langwatch -- npx -y @langwatch/mcp-server --api-key sk-lw-real --endpoint https://self.host",
       },
-      {
-        key: "codex",
-        context: {
-          apiKey: "sk-lw-real",
-          projectId: "project-abc",
-          endpoint: "https://app.langwatch.ai",
-          isSelfHosted: false,
-        },
-        expected:
+      codex: {
+        "with a project id, cloud":
           "codex mcp add langwatch --env LANGWATCH_API_KEY=sk-lw-real --env LANGWATCH_PROJECT_ID=project-abc -- npx -y @langwatch/mcp-server",
-      },
-      {
-        key: "codex",
-        context: {
-          apiKey: "sk-lw-real",
-          projectId: undefined,
-          endpoint: "https://self.host",
-          isSelfHosted: true,
-        },
-        expected:
+        "with a project id, self-hosted":
+          "codex mcp add langwatch --env LANGWATCH_API_KEY=sk-lw-real --env LANGWATCH_PROJECT_ID=project-abc --env LANGWATCH_ENDPOINT=https://self.host -- npx -y @langwatch/mcp-server",
+        "without a project id, cloud":
+          "codex mcp add langwatch --env LANGWATCH_API_KEY=sk-lw-real -- npx -y @langwatch/mcp-server",
+        "without a project id, self-hosted":
           "codex mcp add langwatch --env LANGWATCH_API_KEY=sk-lw-real --env LANGWATCH_ENDPOINT=https://self.host -- npx -y @langwatch/mcp-server",
       },
-    ];
+    } as const satisfies Record<
+      string,
+      Record<(typeof COMBOS)[number]["label"], string>
+    >;
 
-    for (const { key, context, expected } of CASES) {
-      /** @scenario An assistant with an install command shows a terminal snippet */
-      it(`builds ${key}'s command exactly, ${
-        context.isSelfHosted ? "self-hosted" : "cloud"
-      }, ${context.projectId ? "with" : "without"} a project id`, () => {
-        const assistant = CODE_ASSISTANTS.find((a) => a.key === key);
-        expect(assistant?.buildCommand).toBeDefined();
-        expect(assistant!.buildCommand!(context)).toBe(expected);
-      });
+    for (const key of Object.keys(EXPECTED) as Array<keyof typeof EXPECTED>) {
+      for (const combo of COMBOS) {
+        /** @scenario An assistant with an install command shows a terminal snippet */
+        it(`builds ${key}'s command exactly, ${combo.label}`, () => {
+          const assistant = CODE_ASSISTANTS.find((a) => a.key === key);
+          expect(assistant?.buildCommand).toBeDefined();
+
+          const context: Parameters<
+            NonNullable<CodeAssistant["buildCommand"]>
+          >[0] = {
+            apiKey: API_KEY,
+            projectId: combo.projectId,
+            endpoint: combo.endpoint,
+            isSelfHosted: combo.isSelfHosted,
+          };
+
+          expect(assistant!.buildCommand!(context)).toBe(
+            EXPECTED[key][combo.label],
+          );
+        });
+      }
     }
 
     /** @scenario An assistant with an install command shows a terminal snippet */
@@ -204,11 +227,9 @@ describe("given the token-created-snippets feature is implemented", () => {
       const withCommand = CODE_ASSISTANTS.filter((a) => a.buildCommand).map(
         (a) => a.key,
       );
-      // If someone adds an installer, this fails until its exact command is
+      // If someone adds an installer, this fails until its exact commands are
       // pinned above — which is the whole point.
-      expect([...new Set(CASES.map((c) => c.key))].sort()).toEqual(
-        withCommand.sort(),
-      );
+      expect(Object.keys(EXPECTED).sort()).toEqual(withCommand.sort());
     });
 
     /** @scenario An assistant without an install command points at its config file */
