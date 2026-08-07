@@ -1,6 +1,5 @@
 import crypto from "node:crypto";
 import { createLogger } from "@langwatch/observability";
-import { bodyLimit } from "hono/body-limit";
 import type { ZodError } from "zod";
 import { fromZodError } from "zod-validation-error";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
@@ -37,6 +36,7 @@ import {
   spanValidatorSchema,
 } from "../tracer/types";
 import { CollectorSpanUtils } from "../traces/collectorSpan.utils";
+import { bodyLimit } from "./_lib/body-limit";
 
 const logger = createLogger("langwatch.collector");
 const tokenResolver = TokenResolver.create(prisma);

@@ -20,7 +20,6 @@ import type { Project } from "@prisma/client";
 import { AlertType, ExperimentType, TriggerAction } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import crypto from "crypto";
-import { bodyLimit } from "hono/body-limit";
 import { nanoid } from "nanoid";
 import { OpenAI } from "openai";
 import type Stripe from "stripe";
@@ -88,6 +87,7 @@ import { encrypt } from "~/utils/encryption";
 import { getClientIpFromHonoContext } from "~/utils/getClientIp";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { ssrfSafeFetch } from "~/utils/ssrfProtection";
+import { bodyLimit } from "./_lib/body-limit";
 
 const logger = createLogger("langwatch:misc");
 // Shared auth middlewares for every API-key-aware handler in this file.
