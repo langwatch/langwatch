@@ -335,12 +335,14 @@ describe("Feature: Object storage provider parity and migration", () => {
       },
     ]);
 
-    // The message must name the row: this aborts the entire run, and the
-    // two addresses differ only in the bucket/account, which redaction masks
-    // — so the id is the operator's only way to tell a mis-set destination
-    // endpoint from real corruption.
+    // The message must name the row: this aborts the entire run, and the two
+    // addresses differ only in the bucket/account, which redaction masks — so
+    // the id is the operator's only way to tell a mis-set destination endpoint
+    // from real corruption. Matched as a substring rather than a pattern: the
+    // id is interpolated, and a generated id carrying one regex metacharacter
+    // would silently stop matching.
     await expect(state.migration.copy()).rejects.toThrow(
-      new RegExp(`Stored object ${row.id} \\(project project-1\\)`),
+      `Stored object ${row.id} (project project-1)`,
     );
   });
 
