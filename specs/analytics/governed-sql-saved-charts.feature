@@ -228,6 +228,105 @@ Feature: Saved governed SQL workbench charts — the persistence model and its w
     Then the renamed chart keeps its query and specification
     And the deleted one is gone from the list
 
+  # ---------------------------------------------------------------------------
+  # Slice 4 — the REST surface: saved charts under a project API key
+  #
+  # The same charts, reached by an integration rather than by a signed-in member,
+  # under the governed analytics SQL family at
+  # /api/v1/projects/{projectId}/analytics/charts. The credential is a project
+  # API key, so the project id in the path is a cross-check and never the scope,
+  # exactly as it is for the query and schema endpoints. Every route goes through
+  # the same service, so an integration cannot save anything a member could not.
+  # ---------------------------------------------------------------------------
+
+  @integration
+  Scenario: A chart created over the API reads back exactly as it was submitted
+    Given an integration holding a project API key
+    When it creates a chart and reads it back by its id
+    Then the SQL is the statement it submitted, unmodified
+    And the parameter values are the ones it submitted
+    And the specification is the one it submitted
+    And the chart appears in the project's chart listing
+
+  @integration
+  Scenario: A specification the chart policy refuses is refused over the API, and nothing is written
+    Given a specification the workbench's Vega-Lite policy refuses
+    When the integration posts a chart carrying it
+    Then the request is refused with error code saved_workbench_chart_specification_refused
+    And the refusal names the rule broken and where in the specification it was broken
+    And the project's chart listing is unchanged
+
+  @integration
+  Scenario: SQL the governed validator refuses earns the same code over the API as the query endpoint
+    Given SQL naming a content-gated column the calling key's protections withhold
+    When the integration posts a chart carrying it
+    Then the request is refused with the governed validator's own refusal code
+    And it is the identical code the governed query endpoint gives that key for that SQL
+    And the project's chart listing is unchanged
+
+  @integration
+  Scenario: Every chart endpoint stays dark while the workbench switch is off
+    Given the governed SQL feature switch is off for the project
+    When the integration lists, reads, creates, updates or deletes a chart
+    Then every one of them refuses with error code governed_sql_not_enabled
+
+  @integration
+  Scenario: The API's switch is decided for the project's organization
+    Given the feature switch is granted to the organization that owns the project
+    When the integration lists the project's charts
+    Then the surface answers, because the organization the project belongs to was resolved and offered to the switch
+    And a project in an organization without the grant is still refused
+
+  @integration
+  Scenario: A chart is invisible to another project's key
+    Given a chart created with one project's key
+    When another project's key reads, updates or deletes it by its id
+    Then each attempt is refused as not found
+    And the chart is absent from that project's listing
+    And the chart is left exactly as it was
+
+  @integration
+  Scenario: A path naming another project reaches nothing
+    Given a key for one project and the id of another project that exists
+    When the key is used against the other project's path
+    Then the request is refused with error code project_not_found
+
+  @integration
+  Scenario: A key that may read charts may not write them
+    Given a key whose permissions allow viewing analytics and nothing more
+    When it lists and reads charts and then tries to create, update or delete one
+    Then the reads succeed
+    And each write is refused before the service is reached
+    And the project's chart listing is unchanged
+
+  @integration
+  Scenario: A stored definition this build cannot read is named, not returned as data
+    Given a stored chart whose definition does not match the versioned schema
+    When the integration reads it or lists the project's charts
+    Then the read is refused with error code saved_workbench_chart_definition_invalid
+    And no raw stored payload is returned in its place
+
+  @integration
+  Scenario: An update naming neither a name nor a definition is refused rather than quietly doing nothing
+    Given a chart the integration has created
+    When it sends an update carrying neither field
+    Then the request is refused with error code validation_error
+    And the chart is left exactly as it was
+
+  @integration
+  Scenario: Deleting a chart answers with no content and empties the listing
+    Given a chart the integration has created
+    When it deletes the chart and lists the project's charts again
+    Then the deletion answers with no content
+    And the chart is gone from the listing
+    And deleting it a second time is refused as not found
+
+  @unit
+  Scenario: Every chart endpoint is published in the API document
+    Given the generated OpenAPI document
+    When the saved chart paths are looked up in it
+    Then all five operations are described, each with a summary, a tag and a response schema
+
 # --- AC Coverage Map ---
 # Issue #6582, slice 1 ("Schema + repository + service — model decision,
 # validation choke point, unit/integration tests").
@@ -297,7 +396,44 @@ Feature: Saved governed SQL workbench charts — the persistence model and its w
 #   work on screen"): a scenario the parity check reports as bound-to-nothing
 #   reads as coverage and is worse than one not yet written.
 #
+# Issue #6582, slice 4 ("REST surface — the same charts under a project API
+# key, in the governed analytics SQL family").
+#
+# AC1 "the five routes exist and round-trip"
+#   → Scenario: A chart created over the API reads back exactly as it was submitted
+#   → Scenario: Deleting a chart answers with no content and empties the listing
+# AC2 "the write gate is not bypassable over REST"
+#   → Scenario: A specification the chart policy refuses is refused over the API, and nothing is written
+#   (the listing half of that scenario is the load-bearing one: a refusal alone
+#   passes against a handler that wrote first and threw afterwards)
+# AC3 "the governed validator's own codes survive the wire"
+#   → Scenario: SQL the governed validator refuses earns the same code over the API as the query endpoint
+# AC4 "the feature switch closes every route"
+#   → Scenario: Every chart endpoint stays dark while the workbench switch is off
+#   → Scenario: The API's switch is decided for the project's organization
+# AC5 "tenancy"
+#   → Scenario: A chart is invisible to another project's key
+#   → Scenario: A path naming another project reaches nothing
+# AC6 "permissions are per-verb"
+#   → Scenario: A key that may read charts may not write them
+#   (asserted as "a view-only key is refused", not as a literal scope string:
+#   `analytics:delete` is only ever held through `analytics:manage`, so naming
+#   the string would pin an implementation choice rather than the behaviour)
+# AC7 "an unreadable stored definition is named, not returned"
+#   → Scenario: A stored definition this build cannot read is named, not returned as data
+# AC8 "the routes are published"
+#   → Scenario: Every chart endpoint is published in the API document
+#   (plus `pnpm check:openapi-route-coverage`, which fails on a handler with no
+#   `describeRoute` — the scenario is what fails when the *document* loses them)
+# AC9 "no regression" → the existing governed SQL REST suite, unedited, which
+#   runs the extracted guards through the query and schema endpoints.
+# AC10 "every slice-4 scenario is actually bound" → `pnpm check-feature-parity`.
+#
+# Design decision 1 of the slice-4 plan — PATCH rather than PUT, and a PATCH
+# carrying neither field is a refusal rather than a silent no-op:
+#   → Scenario: An update naming neither a name nor a definition is refused rather than quietly doing nothing
+#
 # Deliberately NOT in this feature file, because they are not in these slices:
-# the REST surface, dashboard placement and rendering (with #6631's time-window
-# contract), per-viewer re-execution and its degraded cards, and the MCP/langy
-# authoring tools. Each lands with its own scenarios in slices 3 to 5.
+# dashboard placement and rendering (with #6631's time-window contract),
+# per-viewer re-execution and its degraded cards, and the MCP/langy authoring
+# tools. Each lands with its own scenarios in slices 3 and 5.
