@@ -12,6 +12,27 @@ import { buildTimeseriesQuery } from "../aggregation-builder";
 import { fieldMappings, TRACE_IDENTITY_COLUMNS } from "../field-mappings";
 import { resetParamCounter } from "../filter-translator";
 
+/**
+ * Splits a SELECT list into its items. Commas inside a call cannot split an
+ * item, so parenthesised groups are emptied first, innermost outwards, until
+ * none are left: a plain `split(",")` would otherwise tear
+ * `map('k', SpanAttributes['k']) AS SpanAttributes` in half at its inner comma
+ * and make the whole-map assertion below meaningless.
+ *
+ * Emptying rather than removing keeps each item's shape, so
+ * `map(...) AS SpanAttributes` stays distinguishable from a bare
+ * `SpanAttributes`, which is the whole point of the assertion.
+ */
+function selectListItems(selectList: string): string[] {
+  let flattened = selectList;
+  let previous = "";
+  while (flattened !== previous) {
+    previous = flattened;
+    flattened = flattened.replace(/\([^()]*\)/g, "()");
+  }
+  return flattened.split(",").map((item) => item.trim());
+}
+
 describe("column-pruning", () => {
   beforeEach(() => {
     resetParamCounter();
@@ -273,6 +294,40 @@ describe("column-pruning", () => {
 
         expect(result.sql).not.toContain("ss.Input");
         expect(result.sql).not.toContain("ss.Output");
+      });
+
+      /** @scenario Stored spans JOIN materializes only the referenced SpanAttributes key */
+      it("projects a narrow SpanAttributes map instead of the whole column", () => {
+        const result = buildTimeseriesQuery({
+          ...baseInput,
+          series: [
+            {
+              metric: "metadata.trace_id" as FlattenAnalyticsMetricsEnum,
+              aggregation: "cardinality" as const,
+            },
+          ],
+          groupBy: "metadata.span_type",
+        });
+
+        // The JOIN subquery reconstructs a map of only the referenced key so the
+        // wide SpanAttributes values never reach the join buffer.
+        expect(result.sql).toContain(
+          "map('langwatch.span.type', SpanAttributes['langwatch.span.type']) AS SpanAttributes",
+        );
+        // The bare whole-map column is never selected into the subquery, in
+        // any position. Checked against the extracted SELECT list rather than
+        // the raw SQL, so a mid-list `SpanAttributes,` cannot slip through the
+        // way an end-of-list-only pattern would.
+        const storedSpansSelect =
+          /SELECT\s+(?<list>[\s\S]*?)\s+FROM stored_spans/.exec(result.sql)
+            ?.groups?.list;
+        expect(storedSpansSelect).toBeDefined();
+        const selectedItems = selectListItems(storedSpansSelect!);
+        expect(selectedItems).not.toContain("SpanAttributes");
+        // Outer accesses still resolve against the reconstructed map.
+        expect(result.sql).toContain(
+          "ss.SpanAttributes['langwatch.span.type']",
+        );
       });
     });
 
