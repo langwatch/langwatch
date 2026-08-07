@@ -418,6 +418,17 @@ export function createEnvConfig() {
       OKTA_CLIENT_SECRET: z.string().optional(),
       OKTA_ISSUER: z.string().optional(),
 
+      // OneLogin
+      ONELOGIN_CLIENT_ID: z.string().optional(),
+      ONELOGIN_CLIENT_SECRET: z.string().optional(),
+      ONELOGIN_ISSUER: z.string().optional(),
+
+      // Any other OpenID Connect provider. Its endpoints are discovered from
+      // the issuer, so there is nothing to configure beyond these three.
+      OIDC_CLIENT_ID: z.string().optional(),
+      OIDC_CLIENT_SECRET: z.string().optional(),
+      OIDC_ISSUER: z.string().optional(),
+
       POSTHOG_KEY: z.string().optional(),
       POSTHOG_HOST: z.string().optional(),
       // Feature Flags Secure API key (phs_*) — or a legacy Personal API key
@@ -601,6 +612,12 @@ export function createEnvConfig() {
       OKTA_CLIENT_ID: process.env.OKTA_CLIENT_ID,
       OKTA_CLIENT_SECRET: process.env.OKTA_CLIENT_SECRET,
       OKTA_ISSUER: process.env.OKTA_ISSUER,
+      ONELOGIN_CLIENT_ID: process.env.ONELOGIN_CLIENT_ID,
+      ONELOGIN_CLIENT_SECRET: process.env.ONELOGIN_CLIENT_SECRET,
+      ONELOGIN_ISSUER: process.env.ONELOGIN_ISSUER,
+      OIDC_CLIENT_ID: process.env.OIDC_CLIENT_ID,
+      OIDC_CLIENT_SECRET: process.env.OIDC_CLIENT_SECRET,
+      OIDC_ISSUER: process.env.OIDC_ISSUER,
       OTEL_EXPORTER_OTLP_ENDPOINT: process.env.OTEL_EXPORTER_OTLP_ENDPOINT,
       CLICKHOUSE_CLUSTER: process.env.CLICKHOUSE_CLUSTER,
       LANGWATCH_LICENSE_PUBLIC_KEY: process.env.LANGWATCH_LICENSE_PUBLIC_KEY,

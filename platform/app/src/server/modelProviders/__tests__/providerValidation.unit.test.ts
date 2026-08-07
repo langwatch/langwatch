@@ -1,14 +1,23 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { MASKED_KEY_PLACEHOLDER } from "../../../../utils/constants";
+
+// The probe goes out through the SSRF-validated fetch, not `global.fetch`, so
+// that is what these tests stand in for; mocking the global would leave the
+// real validator in the path and every assertion here would be about DNS.
+// Only the fetch is replaced — the rest of the module stays real, so the
+// error types these tests reject with are the ones production actually sees.
+const mockFetch = vi.fn();
+vi.mock("../../../utils/ssrfProtection", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../../utils/ssrfProtection")>()),
+  ssrfSafeFetch: (...args: unknown[]) => mockFetch(...args),
+}));
+
+import { MASKED_KEY_PLACEHOLDER } from "../../../utils/constants";
+import { RedirectRefusedError } from "../../../utils/ssrfProtection";
 import {
   ProviderUnreachableError,
   type ValidationResult,
   validateProviderApiKey,
 } from "../providerValidation";
-
-// Mock fetch globally
-const mockFetch = vi.fn();
-global.fetch = mockFetch;
 
 /**
  * The code a refusal carries, or `undefined` when the key was accepted.
@@ -42,7 +51,7 @@ describe("validateProviderApiKey", () => {
       const result = await validateProviderApiKey("unknown_provider", {
         SOME_API_KEY: "test-key",
       });
-      expect(result).toEqual({ valid: true });
+      expect(result.outcome).toBe("unchecked");
       expect(mockFetch).not.toHaveBeenCalled();
     });
 
@@ -51,7 +60,7 @@ describe("validateProviderApiKey", () => {
         AWS_ACCESS_KEY_ID: "test-id",
         AWS_SECRET_ACCESS_KEY: "test-secret",
       });
-      expect(result).toEqual({ valid: true });
+      expect(result.outcome).toBe("unchecked");
       expect(mockFetch).not.toHaveBeenCalled();
     });
 
@@ -59,7 +68,7 @@ describe("validateProviderApiKey", () => {
       const result = await validateProviderApiKey("vertex_ai", {
         VERTEXAI_PROJECT: "test-project",
       });
-      expect(result).toEqual({ valid: true });
+      expect(result.outcome).toBe("unchecked");
       expect(mockFetch).not.toHaveBeenCalled();
     });
 
@@ -68,7 +77,7 @@ describe("validateProviderApiKey", () => {
         AZURE_OPENAI_API_KEY: "test-key",
         AZURE_OPENAI_ENDPOINT: "https://test.openai.azure.com",
       });
-      expect(result).toEqual({ valid: true });
+      expect(result.outcome).toBe("unchecked");
       expect(mockFetch).not.toHaveBeenCalled();
     });
 
@@ -77,7 +86,7 @@ describe("validateProviderApiKey", () => {
       const result = await validateProviderApiKey("openai", {
         OPENAI_API_KEY: MASKED_KEY_PLACEHOLDER,
       });
-      expect(result).toEqual({ valid: true });
+      expect(result.outcome).toBe("unchecked");
       expect(mockFetch).not.toHaveBeenCalled();
     });
 
@@ -86,13 +95,13 @@ describe("validateProviderApiKey", () => {
       const result = await validateProviderApiKey("openai", {
         OPENAI_API_KEY: "",
       });
-      expect(result).toEqual({ valid: true });
+      expect(result.outcome).toBe("unchecked");
       expect(mockFetch).not.toHaveBeenCalled();
     });
 
     it("skips validation when API key field is missing", async () => {
       const result = await validateProviderApiKey("openai", {});
-      expect(result).toEqual({ valid: true });
+      expect(result.outcome).toBe("unchecked");
       expect(mockFetch).not.toHaveBeenCalled();
     });
   });
@@ -106,7 +115,7 @@ describe("validateProviderApiKey", () => {
         ELEVENLABS_API_KEY: "sk_test",
       });
 
-      expect(result).toEqual({ valid: true });
+      expect(result.outcome).toBe("verified");
       expect(mockFetch).toHaveBeenCalledWith(
         "https://api.elevenlabs.io/v1/models",
         expect.objectContaining({
@@ -149,7 +158,10 @@ describe("validateProviderApiKey", () => {
         VOYAGE_API_KEY: "pa-test",
       });
 
-      expect(result).toEqual({ valid: true });
+      expect(result).toMatchObject({
+        outcome: "unchecked",
+        reason: "no_endpoint",
+      });
       expect(mockFetch).not.toHaveBeenCalled();
     });
   });
@@ -165,7 +177,7 @@ describe("validateProviderApiKey", () => {
         OPENAI_API_KEY: "sk-valid-key",
       });
 
-      expect(result).toEqual({ valid: true });
+      expect(result.outcome).toBe("verified");
       expect(mockFetch).toHaveBeenCalledWith(
         expect.stringContaining("/models"),
         expect.objectContaining({
@@ -273,7 +285,7 @@ describe("validateProviderApiKey", () => {
         ANTHROPIC_API_KEY: "sk-ant-valid-key",
       });
 
-      expect(result).toEqual({ valid: true });
+      expect(result.outcome).toBe("verified");
       expect(mockFetch).toHaveBeenCalledWith(
         expect.stringContaining("/models"),
         expect.objectContaining({
@@ -329,7 +341,7 @@ describe("validateProviderApiKey", () => {
         GEMINI_API_KEY: "gemini-valid-key",
       });
 
-      expect(result).toEqual({ valid: true });
+      expect(result.outcome).toBe("verified");
       expect(mockFetch).toHaveBeenCalledWith(
         expect.stringContaining("key=gemini-valid-key"),
         expect.anything(),
@@ -711,7 +723,7 @@ describe("validateProviderApiKey", () => {
         GEMINI_API_KEY: "AIzaSyKeyThatOnlyTheOpenAiSurfaceAccepts",
       });
 
-      expect(result).toEqual({ valid: true });
+      expect(result.outcome).toBe("verified");
       expect(mockFetch).toHaveBeenCalledTimes(4);
     });
 
@@ -771,7 +783,7 @@ describe("validateProviderApiKey", () => {
         GEMINI_API_KEY: "AIzaSyAcceptedImmediately",
       });
 
-      expect(result).toEqual({ valid: true });
+      expect(result.outcome).toBe("verified");
       expect(mockFetch).toHaveBeenCalledTimes(1);
     });
 
@@ -917,7 +929,7 @@ describe("validateProviderApiKey", () => {
         CUSTOM_BASE_URL: "",
       });
 
-      expect(result).toEqual({ valid: true });
+      expect(result.outcome).toBe("unchecked");
       expect(mockFetch).not.toHaveBeenCalled();
     });
 
@@ -934,6 +946,222 @@ describe("validateProviderApiKey", () => {
 
       // Custom provider with only base URL should still attempt validation
       expect(mockFetch).toHaveBeenCalled();
+    });
+  });
+});
+
+/**
+ * The third answer.
+ *
+ * For most of this file's life a check had two outcomes, and a check that
+ * never ran returned the same value as one that succeeded. That is harmless
+ * while the answer only decides whether a save may proceed — a skip should
+ * not block a save — and it becomes a false statement the moment a customer
+ * reads it. Six of the sixteen registered providers reach one of these
+ * paths, so a control that reported them as working would be wrong on more
+ * than a third of the list.
+ */
+describe("given a check that never reached the provider", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockFetch.mockReset();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  describe("when the provider uses credentials we cannot probe", () => {
+    /** @scenario "Every reason a check does not run is reported as unchecked" */
+    it.each([
+      "bedrock",
+      "vertex_ai",
+      "azure",
+    ])("reports %s as unchecked rather than working", async (provider) => {
+      const result = await validateProviderApiKey(provider, {
+        SOME_KEY: "whatever",
+      });
+
+      expect(result).toMatchObject({
+        outcome: "unchecked",
+        reason: "provider_not_probeable",
+      });
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "Content safety credentials are never probed as a language model" */
+    it("never probes a content safety credential as a language model", async () => {
+      // azure_safety is not in the complex-auth set and carries an endpoint,
+      // so it would otherwise clear the base-url check and be probed with a
+      // bearer GET /models — against a service that authenticates with a
+      // subscription-key header and has no /models route at all. A working
+      // credential would come back refused.
+      const result = await validateProviderApiKey("azure_safety", {
+        AZURE_CONTENT_SAFETY_KEY: "a-good-key",
+        AZURE_CONTENT_SAFETY_ENDPOINT:
+          "https://example.cognitiveservices.azure.com",
+      });
+
+      expect(result).toMatchObject({
+        outcome: "unchecked",
+        reason: "provider_not_probeable",
+      });
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the credential is not one we can send", () => {
+    /** @scenario "Every reason a check does not run is reported as unchecked" */
+    it("reports a masked credential as unchecked", async () => {
+      const result = await validateProviderApiKey("openai", {
+        OPENAI_API_KEY: MASKED_KEY_PLACEHOLDER,
+      });
+
+      expect(result).toMatchObject({
+        outcome: "unchecked",
+        reason: "credential_masked",
+      });
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "Every reason a check does not run is reported as unchecked" */
+    it("reports an absent credential as unchecked", async () => {
+      const result = await validateProviderApiKey("openai", {
+        OPENAI_API_KEY: "",
+      });
+
+      expect(result).toMatchObject({
+        outcome: "unchecked",
+        reason: "no_credential",
+      });
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when there is nowhere to send it", () => {
+    /** @scenario "Every reason a check does not run is reported as unchecked" */
+    it("reports a provider with no endpoint as unchecked", async () => {
+      const result = await validateProviderApiKey("voyage", {
+        VOYAGE_API_KEY: "pa-test",
+      });
+
+      expect(result.outcome).toBe("unchecked");
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "Every reason a check does not run is reported as unchecked" */
+    it("reports an unrecognized provider as unchecked", async () => {
+      const result = await validateProviderApiKey("not_a_provider", {
+        SOME_API_KEY: "test-key",
+      });
+
+      expect(result).toMatchObject({
+        outcome: "unchecked",
+        reason: "unknown_provider",
+      });
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+  });
+
+  /**
+   * Where the probe is allowed to go.
+   *
+   * Several providers expose a configurable endpoint, so the address a probe
+   * dials is a customer-supplied value however it got there — typed on this
+   * request, or saved on a provider row earlier and picked up by a later
+   * check. The credential rides along either way, which makes every probe an
+   * outbound request to an untrusted host carrying a secret.
+   */
+  describe("when deciding where the credential may be sent", () => {
+    /** @scenario "A credential is never carried to an address we have not vetted" */
+    it("goes out through the validated fetch, and nothing slips past it", async () => {
+      const bareFetch = vi.fn();
+      const originalFetch = global.fetch;
+      global.fetch = bareFetch as unknown as typeof global.fetch;
+      mockFetch.mockResolvedValueOnce({ ok: true, status: 200 });
+
+      try {
+        await validateProviderApiKey("openai", { OPENAI_API_KEY: "sk-test" });
+
+        expect(mockFetch).toHaveBeenCalled();
+        expect(bareFetch).not.toHaveBeenCalled();
+      } finally {
+        global.fetch = originalFetch;
+      }
+    });
+
+    /** @scenario "A redirect is reported as a redirect, not as unreachable" */
+    it("says the endpoint redirected rather than that it could not be reached", async () => {
+      // The helper's own error type. An earlier version of this test rejected
+      // with a bare Error carrying the same text, which passed while the real
+      // thing did not work at all: the helper's catch rewrites a plain Error
+      // into "Connection failed to host:port: …", so the production matcher was
+      // comparing against a string it never receives. The type survives that
+      // catch, and asserting on it is what makes this test about the real path.
+      mockFetch.mockRejectedValueOnce(new RedirectRefusedError());
+
+      const result = await validateProviderApiKey("custom", {
+        CUSTOM_API_KEY: "sk-test",
+        CUSTOM_BASE_URL: "http://redirects.example.com/v1",
+      });
+
+      expect(codeOf(result)).toBe("provider_endpoint_redirected");
+      expect(codeOf(result)).not.toBe("provider_unreachable");
+    });
+
+    /** @scenario "A redirect never carries the credential onward" */
+    it("refuses to follow a redirect", async () => {
+      mockFetch.mockResolvedValueOnce({ ok: true, status: 200 });
+
+      await validateProviderApiKey("openai", { OPENAI_API_KEY: "sk-test" });
+
+      // Hop re-validation falls back to the weaker default policy, and a
+      // cross-origin redirect strips `Authorization` while carrying
+      // `x-api-key`, `x-goog-api-key` and `xi-api-key` through to the new
+      // host. A models listing has no need of a redirect.
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({ followRedirects: false }),
+      );
+    });
+  });
+
+  describe("when the answer is read by the save path", () => {
+    /** @scenario "Saving is unaffected by the third answer" */
+    it("still reports valid, so a skip does not block a save", async () => {
+      // The save path asks `valid`, and a skip has always meant "do not
+      // stand in the way". Widening the result must not change that: the
+      // new information is carried alongside, not instead.
+      const result = await validateProviderApiKey("bedrock", {
+        AWS_ACCESS_KEY_ID: "test-id",
+      });
+
+      expect(result.valid).toBe(true);
+    });
+  });
+
+  describe("when the provider did answer", () => {
+    /** @scenario "A skipped check is distinguishable from a successful one" */
+    it("marks a real round trip as verified, not unchecked", async () => {
+      mockFetch.mockResolvedValueOnce({ ok: true, status: 200 });
+
+      const result = await validateProviderApiKey("openai", {
+        OPENAI_API_KEY: "sk-valid-key",
+      });
+
+      expect(result.outcome).toBe("verified");
+      expect(mockFetch).toHaveBeenCalled();
+    });
+
+    /** @scenario "A skipped check is distinguishable from a successful one" */
+    it("marks a refusal as refused, not unchecked", async () => {
+      mockFetch.mockResolvedValueOnce({ ok: false, status: 401 });
+
+      const result = await validateProviderApiKey("openai", {
+        OPENAI_API_KEY: "sk-wrong",
+      });
+
+      expect(result.outcome).toBe("refused");
     });
   });
 });

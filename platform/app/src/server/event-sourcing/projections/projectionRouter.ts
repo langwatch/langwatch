@@ -665,6 +665,13 @@ export class ProjectionRouter<
           ...(context.deliveryAttempt !== undefined
             ? { deliveryAttempt: context.deliveryAttempt }
             : {}),
+          // A bisected sub-batch after the first commit of its dispatch: the
+          // fold commit must extend the applied-id set, not replace it
+          // (#6578). Dropping this here silently re-enables the double-apply
+          // this chain exists to prevent.
+          ...(context.isDeliveryContinuation !== undefined
+            ? { isDeliveryContinuation: context.isDeliveryContinuation }
+            : {}),
         });
       },
     );
@@ -703,7 +710,7 @@ export class ProjectionRouter<
               if (decision === "skip") return;
             }
 
-            const context = await this.buildStoreContext(event);
+            const context = await this.buildStoreContext({ event });
             const record = await withMetrics({
               fn: () => this.mapExecutor.execute(mapProj, event, context),
               onComplete: (ms) => {
@@ -756,7 +763,9 @@ export class ProjectionRouter<
             }
             if (toApply.length === 0) return;
 
-            const firstContext = await this.buildStoreContext(toApply[0]!);
+            const firstContext = await this.buildStoreContext({
+              event: toApply[0]!,
+            });
             const contexts = toApply.map((event) => ({
               ...firstContext,
               aggregateId: String(event.aggregateId),
@@ -1207,7 +1216,7 @@ export class ProjectionRouter<
               if (decision === "skip") continue;
             }
 
-            const storeContext = await this.buildStoreContext(event);
+            const storeContext = await this.buildStoreContext({ event });
             const record = await withMetrics({
               fn: () => this.mapExecutor.execute(mapProj, event, storeContext),
               onComplete: (ms) => {
@@ -1585,11 +1594,11 @@ export class ProjectionRouter<
         if (toApply.length === 0) return;
 
         const key = projection.key ? projection.key(toApply[0]!) : undefined;
-        const storeContext = await this.buildStoreContext(
-          toApply[0]!,
+        const storeContext = await this.buildStoreContext({
+          event: toApply[0]!,
           key,
-          context.deliveryAttempt,
-        );
+          deliveryAttempt: context.deliveryAttempt,
+        });
         await withMetrics({
           fn: () =>
             this.stateProjectionExecutor.execute({
@@ -1700,11 +1709,11 @@ export class ProjectionRouter<
         }
 
         const key = fold.key ? fold.key(event) : undefined;
-        const storeContext = await this.buildStoreContext(
+        const storeContext = await this.buildStoreContext({
           event,
           key,
-          context.deliveryAttempt,
-        );
+          deliveryAttempt: context.deliveryAttempt,
+        });
 
         const foldState = await withMetrics({
           fn: () => this.foldExecutor.execute(fold, event, storeContext),
@@ -1890,11 +1899,12 @@ export class ProjectionRouter<
 
         const first = toApply[0]!;
         const key = fold.key ? fold.key(first) : undefined;
-        const storeContext = await this.buildStoreContext(
-          first,
+        const storeContext = await this.buildStoreContext({
+          event: first,
           key,
-          context.deliveryAttempt,
-        );
+          deliveryAttempt: context.deliveryAttempt,
+          isDeliveryContinuation: context.isDeliveryContinuation,
+        });
 
         const foldState = await withMetrics({
           fn: () => this.foldExecutor.executeBatch(fold, toApply, storeContext),
@@ -2357,17 +2367,26 @@ export class ProjectionRouter<
    * Centralising it ensures every store sees the same shape — and any new
    * context field (e.g. process role, trace correlation) lands in one place.
    */
-  private async buildStoreContext(
-    event: EventType,
-    key?: string,
-    deliveryAttempt?: number,
-  ): Promise<ProjectionStoreContext> {
+  private async buildStoreContext({
+    event,
+    key,
+    deliveryAttempt,
+    isDeliveryContinuation,
+  }: {
+    event: EventType;
+    key?: string;
+    deliveryAttempt?: number;
+    isDeliveryContinuation?: boolean;
+  }): Promise<ProjectionStoreContext> {
     const retentionPolicy = await this.resolveRetention(event.tenantId);
     return {
       aggregateId: String(event.aggregateId),
       tenantId: event.tenantId,
       ...(key !== undefined ? { key } : {}),
       ...(deliveryAttempt !== undefined ? { deliveryAttempt } : {}),
+      ...(isDeliveryContinuation !== undefined
+        ? { isDeliveryContinuation }
+        : {}),
       retentionPolicy,
     };
   }
