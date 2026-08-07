@@ -1,10 +1,10 @@
 import { createLogger } from "@langwatch/observability";
-import { bodyLimit } from "hono/body-limit";
 import { describeRoute } from "hono-openapi";
 import { resolver } from "hono-openapi/zod";
 import { z } from "zod";
 import { createProjectApp, requires } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
+import { wireBodyLimit } from "~/server/api/wire-body-limit";
 import { getApp } from "~/server/app-layer/app";
 import {
   SCENARIO_TAB_NAVIGATE_EVENT,
@@ -42,7 +42,7 @@ const secured = createProjectApp({ basePath: "/api/scenario-events" });
 secured.access(requires("scenarios:create")).post(
   "/",
   blockTraceUsageExceededMiddleware,
-  bodyLimit({ maxSize: 50 * 1024 * 1024 }), // 50MB — accommodates inline media payloads
+  wireBodyLimit({ maxSize: 50 * 1024 * 1024 }), // 50MB — accommodates inline media payloads
   describeRoute({
     description: "Create a new scenario event",
     responses: {

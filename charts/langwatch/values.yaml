@@ -41,6 +41,29 @@ global:
     readOnlyRootFilesystem: true
   ## @param global.automountServiceAccountToken [default: false] Mount the ServiceAccount token into first-party workload pods (app, workers, nlp, langevals, cronjobs, postgresql, redis). Defaults to false — none of these call the Kubernetes API, and many clusters deny pods that automount the token. Set true only if a sidecar needs in-cluster API access.
   automountServiceAccountToken: false
+
+  # ServiceAccount for the first-party workloads that touch object storage
+  # (app, workers, cronjobs). Opt-in: disabled by default, so installs that
+  # do not need it render exactly as they did before and keep using the
+  # namespace `default` account.
+  #
+  # This is what cloud identity attaches to. Both providers grant storage
+  # access to a ServiceAccount rather than to a pod:
+  #   AWS  — annotate with eks.amazonaws.com/role-arn        (IRSA)
+  #   Azure— annotate with azure.workload.identity/client-id (workload identity)
+  #          AND label the pods azure.workload.identity/use: "true"
+  #
+  # Note this is NOT Azure-specific: without it, S3's existing keyless
+  # sign-in (the AWS SDK default provider chain) is unreachable through
+  # chart values too. See issues #6182 and #6087.
+  ## @extra global.serviceAccount ServiceAccount used by app, workers and cronjobs.
+  ## @param global.serviceAccount.create [default: false] Create a ServiceAccount for the first-party workloads.
+  ## @param global.serviceAccount.name [string] Name to use. Defaults to the release name when create is true; set to use an existing account.
+  ## @param global.serviceAccount.annotations [object] Annotations on the ServiceAccount — where the cloud identity binding goes.
+  serviceAccount:
+    create: false
+    name: ""
+    annotations: {}
   ## @extra global.scheduling Global scheduling defaults for all pods.
   ## @param global.scheduling.nodeSelector [object] Node selector labels for all pods.
   ## @param global.scheduling.affinity [object] Affinity rules for all pods.
@@ -338,6 +361,23 @@ app:
       ## @param app.dataplane.providers.azureBlob.accountKey.value [string] Azure Storage account key (not recommended in production — use accountKey.secretKeyRef).
       ## @param app.dataplane.providers.azureBlob.container.value [string] Azure Blob container name (not recommended in production — use container.secretKeyRef).
       azureBlob:
+        # How the app authenticates to Azure Blob. Explicit — never inferred
+        # from which values happen to be filled in (issue #6087).
+        #   sharedKey        the storage account key. Requires accountKey below.
+        #                    Unusable when the account sets
+        #                    allowSharedKeyAccess=false, which many enterprises
+        #                    enforce by policy.
+        #   workloadIdentity AKS workload identity. No key anywhere. Requires
+        #                    global.serviceAccount with the client-id
+        #                    annotation, and the pod label
+        #                    azure.workload.identity/use: "true".
+        #   managedIdentity  IMDS — Azure VM / VMSS / App Service.
+        #   azureCli         a developer's signed-in CLI. Local use only.
+        # Grant the identity "Storage Blob Data Contributor" on the account or
+        # container; the control-plane "Contributor" role does NOT grant data
+        # access.
+        ## @param app.dataplane.providers.azureBlob.authMode [string, default: sharedKey] Azure authentication mode: sharedKey, workloadIdentity, managedIdentity, or azureCli.
+        authMode: sharedKey
         accountName:
           value: ""
           ## @param app.dataplane.providers.azureBlob.accountName.secretKeyRef [object] Secret ref for the Azure Storage account name.
@@ -358,6 +398,21 @@ app:
           value: ""
           ## @param app.dataplane.providers.azureBlob.endpoint.secretKeyRef [object] Secret ref for a custom Azure Blob endpoint.
           secretKeyRef: { name: "", key: "" }
+        # Sovereign clouds (Azure Government, Azure China) issue tokens from a
+        # different identity authority and may use a different storage
+        # audience. Required alongside a non-public endpoint in any
+        # identity-based authMode — the app refuses to guess, because asking
+        # the public-cloud issuer for a sovereign token fails confusingly.
+        ## @param app.dataplane.providers.azureBlob.authorityHost.value [string] Entra authority host for sovereign clouds.
+        authorityHost:
+          value: ""
+          ## @param app.dataplane.providers.azureBlob.authorityHost.secretKeyRef [object] Secret ref for the identity authority host.
+          secretKeyRef: { name: "", key: "" }
+        ## @param app.dataplane.providers.azureBlob.tokenAudience.value [string] Storage token audience override for sovereign clouds.
+        tokenAudience:
+          value: ""
+          ## @param app.dataplane.providers.azureBlob.tokenAudience.secretKeyRef [object] Secret ref for the storage token audience.
+          secretKeyRef: { name: "", key: "" }
 
       # Migration aid: when provider is azureBlob, the chart still emits the
       # S3 read config below if it is populated, so legacy s3:// objects
@@ -366,6 +421,29 @@ app:
       # greenfield Azure install.
       ## @param app.dataplane.legacyS3ReadBucket [string] Existing S3 bucket to keep reading during an S3->Azure migration.
     legacyS3ReadBucket: ""
+
+    # Mirror of legacyS3ReadBucket for the Azure->S3 direction. Set true when
+    # moving writes back to S3 while objects written to Azure must stay
+    # readable: the Azure connection settings under providers.azureBlob keep
+    # being emitted, but STORED_OBJECTS_BACKEND does not, so new writes go to
+    # S3 and historical azure-blob:// URIs still resolve. Leave false unless
+    # Azure objects exist.
+    #
+    # SCOPE — this covers URI-addressed STORED OBJECTS only (externalized byte
+    # content, trace payloads, staged uploads): each one carries an
+    # `azure-blob://` URI whose scheme picks the driver, so a read re-derives
+    # its own provider regardless of the write toggle.
+    #
+    # It does NOT cover DATASET chunks. Those are addressed by
+    # {projectId, datasetId, index} with no provider recorded on the row, so
+    # dataset reads follow the CURRENT toggle and cannot reach chunks written
+    # to Azure. Switching a deployment that already has datasets makes them
+    # unreachable (not deleted — reachable again if the toggle is reverted).
+    # A migration that carries datasets needs per-dataset storage provenance,
+    # tracked in #6323. Do not use this flag on an install with datasets until
+    # that lands.
+    ## @param app.dataplane.legacyAzureRead [default: false] Keep Azure settings for reads after moving writes back to S3.
+    legacyAzureRead: false
 
   # Stored Objects - externalized byte content (audio, image, PDF, document).
   # By default, uses a local-filesystem PVC so the chart works plug-and-play

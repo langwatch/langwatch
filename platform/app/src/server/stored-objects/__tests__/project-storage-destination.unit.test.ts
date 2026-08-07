@@ -23,10 +23,8 @@ vi.mock("~/server/dataplane-s3", () => ({
 }));
 
 import { getS3ConfigForProject } from "~/server/dataplane-s3";
-import {
-  AzureBackendMisconfiguredError,
-  resolveProjectStorageDestination,
-} from "../project-storage-destination";
+import { AzureBackendMisconfiguredError } from "../azure-credentials";
+import { resolveProjectStorageDestination } from "../project-storage-destination";
 
 const mockGetS3ConfigForProject = vi.mocked(getS3ConfigForProject);
 

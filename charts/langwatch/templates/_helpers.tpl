@@ -266,21 +266,86 @@ app.kubernetes.io/instance: {{ .Release.Name }}
         {{- $errors = append $errors "app.dataplane.providers.awsS3.keySalt.secretKeyRef.name is set but key is empty" }}
       {{- end }}
     {{- end }}
-  {{- else if eq .Values.app.dataplane.provider "azureBlob" }}
+  {{- end }}
+
+  {{/* Azure settings are validated whenever they are EMITTED — when azureBlob
+       is the active provider OR when legacyAzureRead keeps them alive across an
+       Azure->S3 migration. That is deliberately the same condition the env
+       emission uses, because validating only the active-provider case let a
+       migration install render green with authMode=workloadIdentity and no
+       ServiceAccount: the pod then never received an injected token and every
+       read of a historical azure-blob:// object failed at runtime instead of at
+       deploy time. Validate exactly what you emit. */}}
+  {{- if or (eq .Values.app.dataplane.provider "azureBlob") .Values.app.dataplane.legacyAzureRead }}
+    {{- $azureWhy := ternary "app.dataplane.provider is azureBlob" "app.dataplane.legacyAzureRead is true" (eq .Values.app.dataplane.provider "azureBlob") }}
     {{- if .Values.app.dataplane.providers.azureBlob.accountName.secretKeyRef.name }}
       {{- if empty .Values.app.dataplane.providers.azureBlob.accountName.secretKeyRef.key }}
         {{- $errors = append $errors "app.dataplane.providers.azureBlob.accountName.secretKeyRef.name is set but key is empty" }}
       {{- end }}
     {{- else if empty .Values.app.dataplane.providers.azureBlob.accountName.value }}
-      {{- $errors = append $errors "app.dataplane.provider is azureBlob but providers.azureBlob.accountName is not configured" }}
+      {{- $errors = append $errors (printf "%s but providers.azureBlob.accountName is not configured" $azureWhy) }}
     {{- end }}
 
-    {{- if .Values.app.dataplane.providers.azureBlob.accountKey.secretKeyRef.name }}
-      {{- if empty .Values.app.dataplane.providers.azureBlob.accountKey.secretKeyRef.key }}
-        {{- $errors = append $errors "app.dataplane.providers.azureBlob.accountKey.secretKeyRef.name is set but key is empty" }}
+    {{- $azureAuthMode := .Values.app.dataplane.providers.azureBlob.authMode | default "sharedKey" }}
+    {{- if not (has $azureAuthMode (list "sharedKey" "workloadIdentity" "managedIdentity" "azureCli")) }}
+      {{- $errors = append $errors (printf "app.dataplane.providers.azureBlob.authMode is %q — must be one of sharedKey, workloadIdentity, managedIdentity, azureCli" $azureAuthMode) }}
+    {{- end }}
+    {{/* The account key is required by, and only by, sharedKey auth. Under an
+         identity mode it must be absent — a key that would be silently ignored
+         is worse than no key, because the operator believes it is in use. */}}
+    {{- if eq $azureAuthMode "sharedKey" }}
+      {{- if .Values.app.dataplane.providers.azureBlob.accountKey.secretKeyRef.name }}
+        {{- if empty .Values.app.dataplane.providers.azureBlob.accountKey.secretKeyRef.key }}
+          {{- $errors = append $errors "app.dataplane.providers.azureBlob.accountKey.secretKeyRef.name is set but key is empty" }}
+        {{- end }}
+      {{- else if empty .Values.app.dataplane.providers.azureBlob.accountKey.value }}
+        {{- $errors = append $errors (printf "%s with authMode sharedKey but providers.azureBlob.accountKey is not configured" $azureWhy) }}
       {{- end }}
-    {{- else if empty .Values.app.dataplane.providers.azureBlob.accountKey.value }}
-      {{- $errors = append $errors "app.dataplane.provider is azureBlob but providers.azureBlob.accountKey is not configured" }}
+    {{- else }}
+      {{- if or .Values.app.dataplane.providers.azureBlob.accountKey.value .Values.app.dataplane.providers.azureBlob.accountKey.secretKeyRef.name }}
+        {{- $errors = append $errors (printf "app.dataplane.providers.azureBlob.authMode is %q but providers.azureBlob.accountKey is also configured — remove the key, it would be ignored" $azureAuthMode) }}
+      {{- end }}
+      {{/* The app refuses a non-public endpoint in a token mode without a
+           matching identity authority (it would otherwise ask the
+           public-cloud issuer for a sovereign token). Mirror that here so a
+           sovereign install fails at deploy time rather than on the first
+           write, when the chart would otherwise have rendered green. */}}
+      {{- $azureEndpoint := .Values.app.dataplane.providers.azureBlob.endpoint.value }}
+      {{- $azureEndpointFromSecret := .Values.app.dataplane.providers.azureBlob.endpoint.secretKeyRef.name }}
+      {{- $hasAuthority := or .Values.app.dataplane.providers.azureBlob.authorityHost.value .Values.app.dataplane.providers.azureBlob.authorityHost.secretKeyRef.name }}
+      {{- if and $azureEndpoint (not (contains ".blob.core.windows.net" $azureEndpoint)) }}
+        {{- if not $hasAuthority }}
+          {{- $errors = append $errors (printf "app.dataplane.providers.azureBlob.endpoint is %q, which is not the Azure public cloud — a token-based authMode also requires providers.azureBlob.authorityHost so tokens are requested from the matching identity authority" $azureEndpoint) }}
+        {{- end }}
+      {{/* A secret-backed endpoint is checked as if it were sovereign. Helm
+           cannot read the Secret, so the hostname is unknowable at render
+           time and assuming "public cloud" is the one guess that fails
+           silently — the deploy succeeds and the first storage call is
+           refused. An install that IS on the public cloud does not need to
+           set endpoint at all (it defaults), so requiring an authority
+           alongside a secret-backed endpoint costs a correct configuration
+           nothing and catches the sovereign one. */}}
+      {{- else if and $azureEndpointFromSecret (not $hasAuthority) }}
+        {{- $errors = append $errors "app.dataplane.providers.azureBlob.endpoint is supplied through a Secret, so the chart cannot tell whether it is the Azure public cloud — a token-based authMode therefore also requires providers.azureBlob.authorityHost. Set it to the identity authority matching that endpoint, or drop the endpoint override if this install is on the public cloud" }}
+      {{- end }}
+      {{- if eq $azureAuthMode "workloadIdentity" }}
+        {{- if not (include "langwatch.serviceAccountName" .) }}
+          {{- $errors = append $errors "azureBlob authMode workloadIdentity requires global.serviceAccount (create=true or name) so the Entra identity has a ServiceAccount to bind to" }}
+        {{/* A ServiceAccount without the client-id annotation fails the same
+             way as a pod without the webhook label, one layer down: the chart
+             renders, the pods come up healthy, and the webhook has no identity
+             to bind them to, so the first Blob operation fails claiming the
+             cluster is misconfigured. Only enforceable when WE create the
+             account — an account the operator names lives outside this chart
+             and its annotations are not ours to read, so that path is a
+             documented prerequisite instead. */}}
+        {{- else if ((.Values.global).serviceAccount).create }}
+          {{- $saAnnotations := ((.Values.global).serviceAccount).annotations | default dict }}
+          {{- if not (index $saAnnotations "azure.workload.identity/client-id") }}
+            {{- $errors = append $errors "azureBlob authMode workloadIdentity with global.serviceAccount.create=true also requires the annotation azure.workload.identity/client-id on global.serviceAccount.annotations — without it the admission webhook has no identity to bind the pods to and every storage operation fails at runtime" }}
+          {{- end }}
+        {{- end }}
+      {{- end }}
     {{- end }}
 
     {{- if .Values.app.dataplane.providers.azureBlob.container.secretKeyRef.name }}
@@ -288,7 +353,7 @@ app.kubernetes.io/instance: {{ .Release.Name }}
         {{- $errors = append $errors "app.dataplane.providers.azureBlob.container.secretKeyRef.name is set but key is empty" }}
       {{- end }}
     {{- else if empty .Values.app.dataplane.providers.azureBlob.container.value }}
-      {{- $errors = append $errors "app.dataplane.provider is azureBlob but providers.azureBlob.container is not configured" }}
+      {{- $errors = append $errors (printf "%s but providers.azureBlob.container is not configured" $azureWhy) }}
     {{- end }}
   {{- end }}
 {{- end }}
@@ -806,14 +871,33 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- if eq .Values.app.dataplane.provider "azureBlob" }}
 # Azure Blob backend (AC37, issue #4133). STORED_OBJECTS_BACKEND is the
 # EXPLICIT toggle resolveProjectStorageDestination reads — AZURE_BLOB_* env
-# presence alone never selects this backend, only this value does.
+# presence alone never selects this backend, only this value does, which is
+# why the connection settings below can outlive it (see legacyAzureRead).
 - name: STORED_OBJECTS_BACKEND
   value: "azure"
+{{- end }}
+{{/* Azure connection settings are emitted when Azure is the active write
+     backend OR when legacyAzureRead is set for an Azure->S3 migration. The
+     app's driver registration resolves these for READS independently of the
+     write toggle, so keeping them after the switch is what lets already
+     written azure-blob:// objects stay readable — the mirror of
+     legacyS3ReadBucket in the other direction. */}}
+{{- if or (eq .Values.app.dataplane.provider "azureBlob") .Values.app.dataplane.legacyAzureRead }}
 {{- include "langwatch.secretOrValue" (dict "envName" "AZURE_BLOB_ACCOUNT_NAME" "fieldValues" .Values.app.dataplane.providers.azureBlob.accountName) }}
+- name: AZURE_BLOB_AUTH_MODE
+  value: {{ .Values.app.dataplane.providers.azureBlob.authMode | default "sharedKey" | quote }}
+{{- if eq (.Values.app.dataplane.providers.azureBlob.authMode | default "sharedKey") "sharedKey" }}
 {{- include "langwatch.secretOrValue" (dict "envName" "AZURE_BLOB_ACCOUNT_KEY" "fieldValues" .Values.app.dataplane.providers.azureBlob.accountKey) }}
+{{- end }}
 {{- include "langwatch.secretOrValue" (dict "envName" "AZURE_BLOB_CONTAINER" "fieldValues" .Values.app.dataplane.providers.azureBlob.container) }}
 {{- if or .Values.app.dataplane.providers.azureBlob.endpoint.value .Values.app.dataplane.providers.azureBlob.endpoint.secretKeyRef.name }}
 {{- include "langwatch.secretOrValue" (dict "envName" "AZURE_BLOB_ENDPOINT" "fieldValues" .Values.app.dataplane.providers.azureBlob.endpoint) }}
+{{- end }}
+{{- if or .Values.app.dataplane.providers.azureBlob.authorityHost.value .Values.app.dataplane.providers.azureBlob.authorityHost.secretKeyRef.name }}
+{{- include "langwatch.secretOrValue" (dict "envName" "AZURE_BLOB_AUTHORITY_HOST" "fieldValues" .Values.app.dataplane.providers.azureBlob.authorityHost) }}
+{{- end }}
+{{- if or .Values.app.dataplane.providers.azureBlob.tokenAudience.value .Values.app.dataplane.providers.azureBlob.tokenAudience.secretKeyRef.name }}
+{{- include "langwatch.secretOrValue" (dict "envName" "AZURE_BLOB_TOKEN_AUDIENCE" "fieldValues" .Values.app.dataplane.providers.azureBlob.tokenAudience) }}
 {{- end }}
 {{- if .Values.app.dataplane.legacyS3ReadBucket }}
 # S3->Azure migration: new writes go to Azure, but objects written before the
@@ -1204,3 +1288,43 @@ here, once, by name, so both consuming templates agree.
   {{- end -}}
   {{- $normalised | uniq | toJson -}}
 {{- end -}}
+
+{{/*
+ServiceAccount name for the first-party workloads (app, workers, cronjobs).
+Explicit name wins; otherwise the release name when we create one; otherwise
+empty, which callers treat as "omit serviceAccountName and use `default`".
+*/}}
+{{- define "langwatch.serviceAccountName" -}}
+{{- if ((.Values.global).serviceAccount).name -}}
+{{- ((.Values.global).serviceAccount).name -}}
+{{- else if ((.Values.global).serviceAccount).create -}}
+{{- .Release.Name -}}
+{{- end -}}
+{{- end }}
+
+{{/*
+Pod labels that activate cloud workload identity.
+
+Azure's admission webhook only mutates pods carrying
+`azure.workload.identity/use: "true"` — without it the projected federated
+token is never injected, the pod boots healthy, and every storage write then
+fails at runtime claiming the cluster is misconfigured. Rendering the label
+from the same value that selects the auth mode keeps those two facts from
+drifting apart.
+
+Renders nothing unless the azureBlob provider is active in workloadIdentity
+mode, so no other install gains a label.
+*/}}
+{{- define "langwatch.cloudIdentityPodLabels" -}}
+{{- $dp := .Values.app.dataplane | default dict -}}
+{{/* legacyAzureRead counts as "Azure is in use": after an Azure->S3 migration
+     the active provider is awsS3, but the pod still resolves reads of
+     historical azure-blob:// objects and so still needs an injected token.
+     Gating on the active provider alone stranded exactly those objects. */}}
+{{- if and $dp.enabled (or (eq ($dp.provider | default "") "azureBlob") $dp.legacyAzureRead) -}}
+{{- $azure := (($dp.providers | default dict).azureBlob | default dict) -}}
+{{- if eq ($azure.authMode | default "sharedKey") "workloadIdentity" -}}
+azure.workload.identity/use: "true"
+{{- end -}}
+{{- end -}}
+{{- end }}

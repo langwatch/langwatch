@@ -1,0 +1,350 @@
+/**
+ * Single source of truth for Azure Blob credentials (issue #6087, follow-up
+ * to #4133 / AC37).
+ *
+ * Before this module existed, three sites decided independently what
+ * "Azure is configured" meant: the destination resolver
+ * (project-storage-destination.ts), the read-driver registration in the
+ * stored-objects factory, and the dataset storage implementation. Two of
+ * them would crash on `Buffer.from(undefined)` the moment a token-based
+ * auth mode was introduced, and nothing guaranteed the destination resolver
+ * and the driver registration agreed on whether Azure was usable. Every
+ * consumer now calls `resolveAzureCredentials()` instead of reading
+ * AZURE_BLOB_* / AZURE_BLOB_AUTH_MODE env vars itself.
+ *
+ * See specs/features/scenarios/azure-blob-workload-identity.feature.
+ */
+import { env } from "~/env.mjs";
+
+/**
+ * Resolved Azure credentials for exactly one auth mode. A discriminated
+ * union — deliberately, so a construction site that only destructures
+ * `accountKey` fails to compile against the token-mode arms instead of
+ * reading `undefined` at runtime (AC "Adding an auth mode forces every
+ * Azure credential construction site to be revisited").
+ */
+export type AzureCredentials =
+  | {
+      mode: "sharedKey";
+      accountName: string;
+      accountKey: string;
+      endpointBaseUrl?: string;
+    }
+  | {
+      mode: "workloadIdentity" | "managedIdentity" | "azureCli";
+      accountName: string;
+      endpointBaseUrl?: string;
+      authorityHost?: string;
+      audience?: string;
+    };
+
+export type AzureTokenAuthMode = Extract<
+  AzureCredentials,
+  { mode: "workloadIdentity" | "managedIdentity" | "azureCli" }
+>["mode"];
+
+/**
+ * Thrown whenever Azure Blob configuration is incomplete or contradictory —
+ * a required var is missing, a shared key is set alongside a token mode, an
+ * auth mode is set without the azure backend selected, a token-based
+ * endpoint is not https, a sovereign endpoint has no matching authority
+ * host, or the platform never injected the AKS workload-identity values.
+ * Fails loud, naming exactly what's wrong — no silent fallback to S3, the
+ * local filesystem, or a different auth mode than the operator chose.
+ */
+export class AzureBackendMisconfiguredError extends Error {
+  readonly missingVariables: string[];
+
+  constructor(message: string, missingVariables: string[] = []) {
+    super(message);
+    this.name = "AzureBackendMisconfiguredError";
+    this.missingVariables = missingVariables;
+  }
+}
+
+const PUBLIC_CLOUD_SUFFIX = ".blob.core.windows.net";
+
+/**
+ * Test-only escape hatch that allows a plaintext HTTP endpoint in a
+ * token-based auth mode (e.g. driving a local emulator without TLS). A
+ * bearer token must never be transmitted over plaintext in any real
+ * deployment, so this must never be set outside test processes.
+ */
+const ALLOW_INSECURE_TOKEN_ENDPOINT_ENV =
+  "AZURE_BLOB_ALLOW_INSECURE_TOKEN_ENDPOINT_FOR_TESTS";
+
+const TOKEN_MODES = new Set<AzureTokenAuthMode>([
+  "workloadIdentity",
+  "managedIdentity",
+  "azureCli",
+]);
+
+function isTokenMode(mode: string): mode is AzureTokenAuthMode {
+  return TOKEN_MODES.has(mode as AzureTokenAuthMode);
+}
+
+/** Loopback / emulator hosts (Azurite) are local dev, not a "sovereign cloud". */
+function isLocalEmulatorHost(hostname: string): boolean {
+  return hostname === "127.0.0.1" || hostname === "localhost";
+}
+
+function assertHttpsEndpoint(endpointBaseUrl: string | undefined): void {
+  if (!endpointBaseUrl) return;
+  let url: URL;
+  try {
+    url = new URL(endpointBaseUrl);
+  } catch {
+    // An unparsable endpoint surfaces a clearer error from the driver's own
+    // URL construction; this guard only concerns the transport scheme.
+    return;
+  }
+  if (url.protocol === "https:") return;
+  // Enforced in code, not by the comment on the constant: the escape hatch is
+  // refused outright in production, so setting it on a real deployment cannot
+  // put a bearer token on the wire in plaintext no matter who sets it.
+  if (
+    process.env[ALLOW_INSECURE_TOKEN_ENDPOINT_ENV] === "1" &&
+    process.env.NODE_ENV !== "production"
+  ) {
+    return;
+  }
+
+  throw new AzureBackendMisconfiguredError(
+    `AZURE_BLOB_ENDPOINT ("${endpointBaseUrl}") must use https in a token-based ` +
+      "AZURE_BLOB_AUTH_MODE — a bearer token must never be sent over a " +
+      `plaintext connection. Set ${ALLOW_INSECURE_TOKEN_ENDPOINT_ENV}=1 only for ` +
+      "local emulator tests, never in a real deployment.",
+  );
+}
+
+function assertSovereignAuthority({
+  endpointBaseUrl,
+  authorityHost,
+}: {
+  endpointBaseUrl: string | undefined;
+  authorityHost: string | undefined;
+}): void {
+  if (!endpointBaseUrl) return;
+  let hostname: string;
+  try {
+    hostname = new URL(endpointBaseUrl).hostname;
+  } catch {
+    return;
+  }
+  if (hostname.toLowerCase().endsWith(PUBLIC_CLOUD_SUFFIX)) return;
+  if (isLocalEmulatorHost(hostname)) return;
+  if (authorityHost) return;
+
+  throw new AzureBackendMisconfiguredError(
+    `AZURE_BLOB_ENDPOINT ("${endpointBaseUrl}") does not address the public Azure ` +
+      "cloud. A sovereign or non-public-cloud storage endpoint requires " +
+      "AZURE_BLOB_AUTHORITY_HOST to be set so tokens are requested from the " +
+      "matching identity authority, not the public-cloud default.",
+  );
+}
+
+/**
+ * `workloadIdentity` relies entirely on values the AKS azure-workload-identity
+ * admission webhook injects into the pod (AZURE_CLIENT_ID, AZURE_TENANT_ID,
+ * AZURE_FEDERATED_TOKEN_FILE — and optionally AZURE_AUTHORITY_HOST). These are
+ * Microsoft's own standard env var names, read directly from process.env
+ * (not through our own zod schema) because the webhook, not our app, owns
+ * them. Their absence means the webhook never mutated this pod — never that
+ * the operator forgot to set them by hand, so the error must not suggest that.
+ */
+function assertWorkloadIdentityInjectedValues(): void {
+  const missing: string[] = [];
+  if (!process.env.AZURE_CLIENT_ID?.trim()) missing.push("AZURE_CLIENT_ID");
+  if (!process.env.AZURE_TENANT_ID?.trim()) missing.push("AZURE_TENANT_ID");
+  if (!process.env.AZURE_FEDERATED_TOKEN_FILE?.trim()) {
+    missing.push("AZURE_FEDERATED_TOKEN_FILE");
+  }
+  if (missing.length === 0) return;
+
+  throw new AzureBackendMisconfiguredError(
+    "AZURE_BLOB_AUTH_MODE=workloadIdentity but the platform-injected federated " +
+      `identity values (${missing.join(", ")}) are absent. This means the AKS ` +
+      "workload-identity admission webhook never mutated this pod. Check: " +
+      'the pod carries the label `azure.workload.identity/use: "true"`, the ' +
+      "ServiceAccount carries the `azure.workload.identity/client-id` " +
+      "annotation, and the azure-workload-identity webhook is installed on the " +
+      "cluster. Do not set these variables by hand — the webhook injects them " +
+      "automatically when all three conditions are met.",
+    missing,
+  );
+}
+
+/**
+ * Dead-config guard, for WRITE resolution only. Reads are deliberately
+ * exempt (`purpose: "read"`): an operator migrating OFF Azure flips the
+ * backend toggle to s3 and leaves the AZURE_BLOB_* values in place so the
+ * objects already written stay readable — the mirror image of the
+ * legacyS3ReadBucket path we document for the S3->Azure direction.
+ * Refusing to build a read driver there would strand every historical
+ * azure-blob:// object behind an "unregistered scheme" error.
+ */
+function assertTokenModeIsSelected({
+  purpose,
+  mode,
+}: {
+  purpose: "read" | "write";
+  mode: AzureCredentials["mode"];
+}): void {
+  if (
+    purpose === "write" &&
+    isTokenMode(mode) &&
+    env.STORED_OBJECTS_BACKEND !== "azure"
+  ) {
+    throw new AzureBackendMisconfiguredError(
+      `AZURE_BLOB_AUTH_MODE=${mode} has no effect without STORED_OBJECTS_BACKEND=azure. ` +
+        "Set STORED_OBJECTS_BACKEND=azure to use it, or unset AZURE_BLOB_AUTH_MODE.",
+    );
+  }
+}
+
+/**
+ * A shared key alongside a token mode is refused rather than ignored: silently
+ * dropping it leaves the operator guessing which credential is actually in use.
+ */
+function assertNoRedundantAccountKey({
+  mode,
+  accountKey,
+}: {
+  mode: AzureCredentials["mode"];
+  accountKey: string | undefined;
+}): void {
+  if (isTokenMode(mode) && accountKey) {
+    throw new AzureBackendMisconfiguredError(
+      `AZURE_BLOB_ACCOUNT_KEY is set alongside AZURE_BLOB_AUTH_MODE=${mode}. A ` +
+        "token-based mode never uses the shared key — it would be silently " +
+        "ignored, leaving the operator guessing which credential is actually " +
+        "in use. Remove AZURE_BLOB_ACCOUNT_KEY.",
+    );
+  }
+}
+
+/**
+ * Names every missing required variable at once, rather than one per retry.
+ *
+ * AZURE_BLOB_CONTAINER is required for WRITES only. It names where new objects
+ * go, and reads never consult it — an `azure-blob://{account}/{container}/{key}`
+ * URI already carries the container it was written to. Requiring it to build a
+ * read driver stranded exactly the migration this resolver's `purpose: "read"`
+ * arm exists to serve: an operator who moves writes back to S3 and drops the
+ * now-unused container variable would find every historical azure-blob:// object
+ * failing with "unregistered scheme".
+ */
+function assertRequiredVariablesPresent({
+  purpose,
+  mode,
+  accountName,
+  container,
+  accountKey,
+}: {
+  purpose: "read" | "write";
+  mode: AzureCredentials["mode"];
+  accountName: string | undefined;
+  container: string | undefined;
+  accountKey: string | undefined;
+}): void {
+  const missingVariables: string[] = [];
+  if (!accountName) missingVariables.push("AZURE_BLOB_ACCOUNT_NAME");
+  if (purpose === "write" && !container) {
+    missingVariables.push("AZURE_BLOB_CONTAINER");
+  }
+  if (mode === "sharedKey" && !accountKey) {
+    missingVariables.push("AZURE_BLOB_ACCOUNT_KEY");
+  }
+
+  if (missingVariables.length > 0) {
+    throw new AzureBackendMisconfiguredError(
+      `AZURE_BLOB_AUTH_MODE=${mode} requires ${missingVariables.join(", ")} to be set. ` +
+        "Refusing to silently fall back to S3 or the local filesystem.",
+      missingVariables,
+    );
+  }
+}
+
+/**
+ * Resolves Azure Blob credentials for whichever auth mode is configured, or
+ * throws `AzureBackendMisconfiguredError` naming exactly what's wrong.
+ *
+ * `purpose` distinguishes "which destination do new writes go to" from "can we
+ * still read what was written before". They are not symmetric: a deployment can
+ * legitimately need the second without the first, so the read arm skips both
+ * the dead-config guard and the container requirement.
+ *
+ * The container is never part of `AzureCredentials` — a credential describes
+ * how to authenticate to a storage ACCOUNT, not which container within it a
+ * caller addresses. A caller that needs one (`resolveProjectStorageDestination`)
+ * reads AZURE_BLOB_CONTAINER itself, and may only assume it is present when it
+ * resolved with the default `purpose: "write"`, which is what validates it.
+ */
+export function resolveAzureCredentials({
+  purpose = "write",
+}: {
+  purpose?: "read" | "write";
+} = {}): AzureCredentials {
+  // env.mjs is JavaScript, so TypeScript infers `any` for its values. Pinning
+  // the type here is what makes the exhaustiveness check at the bottom of this
+  // function real — against `any` it would silently pass.
+  const mode: AzureCredentials["mode"] =
+    (env.AZURE_BLOB_AUTH_MODE as AzureCredentials["mode"] | undefined) ??
+    "sharedKey";
+
+  assertTokenModeIsSelected({ purpose, mode });
+
+  const accountName = env.AZURE_BLOB_ACCOUNT_NAME?.trim();
+  const accountKey = env.AZURE_BLOB_ACCOUNT_KEY?.trim();
+  const container = env.AZURE_BLOB_CONTAINER?.trim();
+  const endpointBaseUrl = env.AZURE_BLOB_ENDPOINT?.trim() || undefined;
+  const authorityHost = env.AZURE_BLOB_AUTHORITY_HOST?.trim() || undefined;
+  const audience = env.AZURE_BLOB_TOKEN_AUDIENCE?.trim() || undefined;
+
+  assertNoRedundantAccountKey({ mode, accountKey });
+  assertRequiredVariablesPresent({
+    purpose,
+    mode,
+    accountName,
+    container,
+    accountKey,
+  });
+
+  if (mode === "sharedKey") {
+    return {
+      mode: "sharedKey",
+      accountName: accountName!,
+      accountKey: accountKey!,
+      endpointBaseUrl,
+    };
+  }
+
+  assertHttpsEndpoint(endpointBaseUrl);
+  assertSovereignAuthority({ endpointBaseUrl, authorityHost });
+
+  if (mode === "workloadIdentity") {
+    assertWorkloadIdentityInjectedValues();
+  }
+
+  switch (mode) {
+    case "workloadIdentity":
+    case "managedIdentity":
+    case "azureCli":
+      return {
+        mode,
+        accountName: accountName!,
+        endpointBaseUrl,
+        authorityHost,
+        audience,
+      };
+    default: {
+      // Exhaustiveness check: a fifth AZURE_BLOB_AUTH_MODE value added to
+      // azureBlobAuthModeSchema without a matching arm here fails to
+      // compile — `mode` would no longer be assignable to `never`.
+      const unreachable: never = mode;
+      throw new AzureBackendMisconfiguredError(
+        `Unsupported AZURE_BLOB_AUTH_MODE "${String(unreachable)}".`,
+      );
+    }
+  }
+}

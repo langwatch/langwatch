@@ -63,12 +63,18 @@ spec:
         {{- if .Values.workers.pod.labels }}
         {{- toYaml .Values.workers.pod.labels | nindent 8 }}
         {{- end }}
+        {{- with (include "langwatch.cloudIdentityPodLabels" .) }}
+        {{- . | nindent 8 }}
+        {{- end }}
       annotations:
         {{- with (coalesce .Values.workers.pod.annotations .Values.global.podAnnotations) }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
     spec:
       # Workers do not call the Kubernetes API, so don't mount the SA token.
+      {{- with (include "langwatch.serviceAccountName" .) }}
+      serviceAccountName: {{ . }}
+      {{- end }}
       automountServiceAccountToken: {{ .Values.global.automountServiceAccountToken }}
       securityContext:
         {{- include "langwatch.podSecurityContext" (dict "ctx" . "component" .Values.workers) | nindent 8 }}

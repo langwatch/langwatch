@@ -61,6 +61,9 @@ spec:
         {{- if .Values.app.pod.labels }}
         {{- toYaml .Values.app.pod.labels | nindent 8 }}
         {{- end }}
+        {{- with (include "langwatch.cloudIdentityPodLabels" .) }}
+        {{- . | nindent 8 }}
+        {{- end }}
       annotations:
         {{- with (coalesce .Values.app.pod.annotations .Values.global.podAnnotations) }}
         {{- toYaml . | nindent 8 }}
@@ -70,7 +73,13 @@ spec:
         prometheus.io/port: "{{ .Values.app.service.port }}"
         {{- end }}
     spec:
+      {{- with (include "langwatch.serviceAccountName" .) }}
+      serviceAccountName: {{ . }}
+      {{- end }}
       # The app does not call the Kubernetes API, so don't mount the SA token.
+      # Cloud workload identity is unaffected by this flag: the platform
+      # webhook injects its own projected token volume, which the chart
+      # deliberately does not hand-roll.
       automountServiceAccountToken: {{ .Values.global.automountServiceAccountToken }}
       # Pod security context - https://kubespec.dev/v1/Pod#spec.securityContext
       securityContext:

@@ -45,6 +45,14 @@ export const S3_TIER_THRESHOLD_BYTES = COMMAND_INLINE_THRESHOLD;
  * a re-minted s3 uri), never trusted from a stored uri, so a tampered envelope
  * can't redirect a read across tenants (ADR-030 §5).
  */
+/**
+ * `tier` says WHERE the blob lives, not WHICH provider stored it: "redis", or
+ * "s3" meaning the durable object store whatever its scheme. An Azure-only
+ * deployment produces `tier: "s3"` refs whose bytes are in Azure Blob — the
+ * provider is re-derived per operation by `mintUri`, never read off the ref
+ * (ADR-030 §5), so nothing branches on this value beyond "is it redis".
+ * Renaming it is a job-envelope wire-format change; see issue #6096.
+ */
 export type BlobRef =
   | { tier: "redis"; projectId: TenantId; hash: string }
   | { tier: "s3"; projectId: TenantId; hash: string };

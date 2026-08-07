@@ -47,8 +47,13 @@ describe("createStorageRegistry()", () => {
   describe("given Azure credentials arrive padded with whitespace", () => {
     it("builds the driver from trimmed values so the URI and the endpoint agree", () => {
       resetEnv();
+      // Every value padded: the container is part of "is Azure usable at all",
+      // so it has to be present here, and padding it proves the same
+      // normalization covers it.
+      mockEnv.STORED_OBJECTS_BACKEND = "azure";
       mockEnv.AZURE_BLOB_ACCOUNT_NAME = "  lwacct  ";
       mockEnv.AZURE_BLOB_ACCOUNT_KEY = "  a2V5  ";
+      mockEnv.AZURE_BLOB_CONTAINER = "  lw-container  ";
       mockEnv.AZURE_BLOB_ENDPOINT = "  https://lwacct.blob.core.windows.net  ";
 
       createStorageRegistry({ projectId: "proj-1" });
@@ -75,8 +80,10 @@ describe("createStorageRegistry()", () => {
   describe("given only whitespace is configured", () => {
     it("treats it as absent rather than building a driver with a blank account", () => {
       resetEnv();
+      mockEnv.STORED_OBJECTS_BACKEND = "azure";
       mockEnv.AZURE_BLOB_ACCOUNT_NAME = "   ";
       mockEnv.AZURE_BLOB_ACCOUNT_KEY = "   ";
+      mockEnv.AZURE_BLOB_CONTAINER = "   ";
 
       createStorageRegistry({ projectId: "proj-1" });
 

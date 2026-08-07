@@ -8,8 +8,11 @@
  *
  * Call once per request — construction is lightweight; drivers are stateless.
  */
-import { env } from "~/env.mjs";
 import { AzureBlobDriver } from "./azure-blob-driver";
+import {
+  AzureBackendMisconfiguredError,
+  resolveAzureCredentials,
+} from "./azure-credentials";
 import { LocalFilesystemDriver } from "./local-filesystem-driver";
 import { S3Driver } from "./s3-driver";
 import { StorageRegistry } from "./storage-registry";
@@ -17,25 +20,40 @@ import { StoredObjectsRepository } from "./stored-objects.repository";
 import { StoredObjectsService } from "./stored-objects.service";
 
 /**
- * Returns an `AzureBlobDriver` when both AZURE_BLOB_ACCOUNT_NAME and
- * AZURE_BLOB_ACCOUNT_KEY are set in the environment, otherwise `undefined`.
- * Deployments that don't use Azure don't need anything registered — the
- * StorageRegistry treats `azure-blob` URIs as an explicit error then.
+ * Returns an `AzureBlobDriver` built from `resolveAzureCredentials()`
+ * whenever Azure is usable in ANY auth mode, otherwise `undefined`.
+ *
+ * Deployments that don't use Azure at all (no STORED_OBJECTS_BACKEND=azure,
+ * no AZURE_BLOB_AUTH_MODE) don't need anything registered — the
+ * StorageRegistry treats `azure-blob` URIs as an explicit error then, and
+ * `resolveAzureCredentials()` itself throws in that case (dead-config /
+ * default-sharedKey-with-nothing-set), which this function swallows into
+ * `undefined` rather than crashing app boot for non-Azure installs.
+ *
+ * MUST agree with `resolveProjectStorageDestination`'s azure branch: both
+ * call the same `resolveAzureCredentials()`, so there is no configuration
+ * where writes resolve to azure while this driver is unregistered — the
+ * write-outage bug the previous `accountName && accountKey` check allowed
+ * for token-based modes (issue #6087).
  */
-function maybeAzureDriver(): AzureBlobDriver | undefined {
-  // Trimmed to match resolveProjectStorageDestination exactly. The resolver
-  // mints `azure-blob://{trimmed account}/...` while this built the driver
-  // from the raw value, so a padded Kubernetes Secret passed validation and
-  // then addressed `https:// account .blob...` — a URI and an endpoint that
-  // disagree, on every stored-object and tiered-blob operation.
-  const accountName = env.AZURE_BLOB_ACCOUNT_NAME?.trim();
-  const accountKey = env.AZURE_BLOB_ACCOUNT_KEY?.trim();
-  if (!accountName || !accountKey) return undefined;
-  return new AzureBlobDriver({
-    accountName,
-    accountKey,
-    endpointBaseUrl: env.AZURE_BLOB_ENDPOINT?.trim(),
-  });
+export function maybeAzureDriver(): AzureBlobDriver | undefined {
+  try {
+    // purpose: "read" — registration is deliberately NOT gated on the write
+    // toggle. An operator migrating OFF Azure flips STORED_OBJECTS_BACKEND
+    // back to s3 and keeps the AZURE_BLOB_* values so already-written objects
+    // stay readable; gating here would strand every historical
+    // azure-blob:// URI behind "unregistered scheme". A driver being
+    // available to READ is not symmetric with Azure being chosen for WRITES.
+    return new AzureBlobDriver(resolveAzureCredentials({ purpose: "read" }));
+  } catch (error: unknown) {
+    // Only a KNOWN misconfiguration declines quietly: the destination
+    // resolver raises the same error at write time with the same actionable
+    // message, so failing here too would crash every request that never
+    // touches storage. Anything else is a bug in our own code, and a bare
+    // catch would bury it as "Azure just isn't configured" forever.
+    if (error instanceof AzureBackendMisconfiguredError) return undefined;
+    throw error;
+  }
 }
 
 /**

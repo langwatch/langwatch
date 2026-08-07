@@ -20,7 +20,6 @@ import type { Project } from "@prisma/client";
 import { AlertType, ExperimentType, TriggerAction } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import crypto from "crypto";
-import { bodyLimit } from "hono/body-limit";
 import { describeRoute } from "hono-openapi";
 import { resolver } from "hono-openapi/zod";
 import { nanoid } from "nanoid";
@@ -43,6 +42,7 @@ import {
   internalSecret,
   publicEndpoint,
 } from "~/server/api/security";
+import { wireBodyLimit } from "~/server/api/wire-body-limit";
 import {
   createUnifiedAuthMiddleware,
   requireApiKeyPermission,
@@ -422,7 +422,7 @@ secured.access(experimentsManageAuth).post(
       },
     },
   }),
-  bodyLimit({ maxSize: 20 * 1024 * 1024 }),
+  wireBodyLimit({ maxSize: 20 * 1024 * 1024 }),
   authMiddleware,
   requireExperimentsManage,
   async (c) => {
@@ -1214,7 +1214,7 @@ async function enforceInstanceRateLimit(
 
 secured
   .access(publicEndpoint("anonymous product telemetry, no credential"))
-  .post("/track_usage", bodyLimit({ maxSize: 10 * 1024 }), async (c) => {
+  .post("/track_usage", wireBodyLimit({ maxSize: 10 * 1024 }), async (c) => {
     const ip = getClientIpFromHonoContext(c) ?? "unknown";
 
     const ipLimit = await enforceGlobalAndIpRateLimit(ip);
