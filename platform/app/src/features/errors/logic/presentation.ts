@@ -230,6 +230,25 @@ const presentations = {
       return field ? `There's no field called "${field}".` : "";
     },
   },
+  governed_sql_unparseable: {
+    title: "This query couldn't be read",
+    describe: () => "Check the SQL syntax and try again.",
+  },
+  governed_sql_not_permitted: {
+    title: "This query isn't allowed here",
+    describe: () =>
+      "This endpoint runs one read-only SELECT over the analytics datasets. Remove anything else and try again.",
+  },
+  governed_sql_parameter_missing: {
+    title: "This query is missing a value",
+    describe: () =>
+      "The query declares parameters that weren't given values. Supply one for each and try again.",
+  },
+  governed_sql_unavailable: {
+    title: "Analytics SQL isn't available here",
+    describe: () =>
+      "This feature isn't switched on for this workspace yet. Contact support to have it enabled.",
+  },
   clickhouse_unavailable: {
     title: "Search is temporarily unavailable",
     describe: () => "We're on it. Try again in a moment.",

@@ -54,6 +54,16 @@ describe("computeDroppedKeys", () => {
     });
   });
 
+  describe("given output is set to drop", () => {
+    it("includes the gen_ai response keys alongside the message keys", () => {
+      const keys = computeDroppedKeys(policy({ output: "drop" }));
+
+      expect(keys.has("gen_ai.output.messages")).toBe(true);
+      expect(keys.has("gen_ai.response.choices")).toBe(true);
+      expect(keys.has("gen_ai.response.finish_reasons")).toBe(true);
+    });
+  });
+
   describe("given nothing is dropped", () => {
     it("returns an empty set", () => {
       expect(computeDroppedKeys(policy({})).size).toBe(0);
