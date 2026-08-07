@@ -162,6 +162,26 @@ function createBrowserLogger(name: string): PinoLogger {
  * Returns nothing when unset, so a local run adds no field rather than an empty
  * one.
  */
+/**
+ * `OTEL_RESOURCE_ATTRIBUTES` values are percent-encoded (the spec's W3C Baggage
+ * octet string), which is how a value containing `,` or `=` survives a format
+ * that separates on both. The OTel SDK's own envDetector decodes them, so this
+ * has to as well: the whole point of reading this variable rather than adding a
+ * second one is that a log and a span cannot disagree about the version, and
+ * emitting `git%2Dabc` where the trace says `git-abc` would be exactly that
+ * disagreement.
+ *
+ * A malformed escape falls back to the raw text. `decodeURIComponent` throws on
+ * a stray `%`, and a version we can print imperfectly beats no version at all.
+ */
+function decodeAttributeValue(value: string): string {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
 export function serviceVersionField(): Record<string, string> {
   const explicit = process.env.SERVICE_VERSION?.trim();
   if (explicit) return { "service.version": explicit };
@@ -174,7 +194,7 @@ export function serviceVersionField(): Record<string, string> {
     if (separator === -1) continue;
     if (pair.slice(0, separator).trim() !== "service.version") continue;
 
-    const value = pair.slice(separator + 1).trim();
+    const value = decodeAttributeValue(pair.slice(separator + 1).trim());
     if (value) return { "service.version": value };
   }
 

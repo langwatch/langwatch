@@ -59,6 +59,25 @@ describe("serviceVersionField", () => {
       expect(serviceVersionField()).toEqual({ "service.version": "a=b" });
     });
 
+    /**
+     * The spec's format percent-encodes `,` and `=` in values, which is how a
+     * value containing either survives a format that separates on both. The
+     * OTel SDK's envDetector decodes them, so this must too — a log saying
+     * `git%2Dabc` where the trace says `git-abc` is precisely the drift this
+     * function exists to prevent.
+     */
+    it("percent-decodes the value, as the OTel SDK does", () => {
+      process.env.OTEL_RESOURCE_ATTRIBUTES = "service.version=git%2Dabc%2C1";
+
+      expect(serviceVersionField()).toEqual({ "service.version": "git-abc,1" });
+    });
+
+    it("falls back to the raw text on a malformed escape", () => {
+      process.env.OTEL_RESOURCE_ATTRIBUTES = "service.version=100%off";
+
+      expect(serviceVersionField()).toEqual({ "service.version": "100%off" });
+    });
+
     it("ignores the key when it has no value", () => {
       process.env.OTEL_RESOURCE_ATTRIBUTES = "service.version=";
 
