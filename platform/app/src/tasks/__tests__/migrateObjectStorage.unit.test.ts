@@ -265,6 +265,62 @@ describe("createCutoverAuditRedis", () => {
     expect(audit.scanNodes).toHaveLength(1);
   });
 
+  /**
+   * Nothing has returned a `cleanup` to the caller yet when the handshake
+   * fails, so this is the only place the duplicate can be closed. Leaking it
+   * leaves ioredis retrying forever behind an error the operator has already
+   * seen — a task that reports a failure and then never exits.
+   */
+  it("closes the duplicate when its handshake errors instead of leaking it", async () => {
+    const events = new Map<string, (value?: unknown) => void>();
+    const duplicated = {
+      status: "connecting",
+      nodes: vi.fn(() => []),
+      disconnect: vi.fn(),
+      once: vi.fn((event: string, handler: (value?: unknown) => void) => {
+        events.set(event, handler);
+      }),
+    };
+    const shared = Object.create(Cluster.prototype) as Cluster;
+    Object.assign(shared, { duplicate: vi.fn(() => duplicated) });
+
+    const pending = createCutoverAuditRedis(shared);
+    events.get("error")?.(new Error("CLUSTERDOWN"));
+
+    await expect(pending).rejects.toThrow("CLUSTERDOWN");
+    expect(duplicated.disconnect).toHaveBeenCalledOnce();
+  });
+
+  /**
+   * ioredis retries a cluster handshake indefinitely and emits no terminal
+   * event when every seed node is simply unreachable, so an unbounded wait
+   * would hang `finalize` silently — the one phase run with traffic paused
+   * and an operator watching.
+   */
+  it("gives up on a handshake that never completes, and closes the duplicate", async () => {
+    vi.useFakeTimers();
+    try {
+      const duplicated = {
+        status: "connecting",
+        nodes: vi.fn(() => []),
+        disconnect: vi.fn(),
+        once: vi.fn(),
+      };
+      const shared = Object.create(Cluster.prototype) as Cluster;
+      Object.assign(shared, { duplicate: vi.fn(() => duplicated) });
+
+      const pending = createCutoverAuditRedis(shared);
+      const assertion = expect(pending).rejects.toThrow(/Timed out after/);
+      await vi.advanceTimersByTimeAsync(30_000);
+      await assertion;
+
+      expect(duplicated.disconnect).toHaveBeenCalledOnce();
+      expect(duplicated.nodes).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("uses a single-node connection as-is (no replicas to mis-route to)", async () => {
     const single = { get: vi.fn() };
 

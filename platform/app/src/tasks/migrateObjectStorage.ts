@@ -414,16 +414,51 @@ export async function createCutoverAuditRedis(
   // finishes its own cluster handshake — reading it earlier would hand the
   // audit zero scan targets and silently audit nothing.
   if (masterOnly.status !== "ready") {
-    await new Promise<void>((resolve, reject) => {
-      masterOnly.once("ready", () => resolve());
-      masterOnly.once("error", (error) => reject(error));
-    });
+    try {
+      await waitForClusterReady(masterOnly);
+    } catch (error) {
+      // Nothing has returned a `cleanup` to the caller yet, so this is the
+      // only place the duplicate can be closed. Without it a failed handshake
+      // leaves an ioredis Cluster retrying forever behind an error the
+      // operator does see — a task that reports a failure and then does not
+      // exit.
+      masterOnly.disconnect();
+      throw error;
+    }
   }
   return {
     redis: masterOnly as unknown as QueueAuditRedis,
     scanNodes: masterOnly.nodes("master") as unknown as QueueAuditRedis[],
     cleanup: () => masterOnly.disconnect(),
   };
+}
+
+/**
+ * ioredis retries a cluster handshake indefinitely and emits no terminal
+ * event when every seed node is simply unreachable. Without a bound, a
+ * `finalize` run against a wedged Redis waits forever having printed nothing
+ * — indistinguishable from a slow audit, and the one phase where an operator
+ * is watching with traffic paused. Fail loudly instead.
+ */
+const CUTOVER_AUDIT_HANDSHAKE_TIMEOUT_MS = 30_000;
+
+function waitForClusterReady(cluster: Cluster): Promise<void> {
+  return new Promise<void>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(
+        new Error(
+          `Timed out after ${CUTOVER_AUDIT_HANDSHAKE_TIMEOUT_MS}ms waiting for the cutover-audit Redis connection to become ready`,
+        ),
+      );
+    }, CUTOVER_AUDIT_HANDSHAKE_TIMEOUT_MS);
+    const settle = (error?: Error) => {
+      clearTimeout(timer);
+      if (error) reject(error);
+      else resolve();
+    };
+    cluster.once("ready", () => settle());
+    cluster.once("error", (error: Error) => settle(error));
+  });
 }
 
 async function runMigrationPhase(
