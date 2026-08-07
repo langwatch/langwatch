@@ -66,12 +66,15 @@ const (
 	ErrProviderError                = herr.Code("provider_error")
 	ErrPayloadTooLarge              = herr.Code("payload_too_large")
 	ErrBadRequest                   = herr.Code("bad_request")
-	ErrNotFound                     = herr.Code("not_found")
-	ErrInternal                     = herr.Code("internal_error")
-	ErrChainExhausted               = herr.Code("chain_exhausted")
-	ErrCircuitOpen                  = herr.Code("circuit_open")
-	ErrProviderTimeout              = herr.Code("provider_timeout")
-	ErrKeyRevoked                   = herr.Code("virtual_key_revoked")
+	// ErrMissingModel is a request-shape error with its own stable identity so
+	// clients and rejection metrics do not have to infer it from prose.
+	ErrMissingModel    = herr.Code("missing_model")
+	ErrNotFound        = herr.Code("not_found")
+	ErrInternal        = herr.Code("internal_error")
+	ErrChainExhausted  = herr.Code("chain_exhausted")
+	ErrCircuitOpen     = herr.Code("circuit_open")
+	ErrProviderTimeout = herr.Code("provider_timeout")
+	ErrKeyRevoked      = herr.Code("virtual_key_revoked")
 	// ErrKeyDisabled is the REVERSIBLE stop: the key material is intact and
 	// an administrator can re-enable it. Distinct from revoked (one-way)
 	// so tenant tooling can branch on which one it is.

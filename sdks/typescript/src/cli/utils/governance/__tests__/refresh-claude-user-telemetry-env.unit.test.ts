@@ -64,15 +64,28 @@ describe("refreshClaudeUserTelemetryEnv", () => {
 	});
 
 	describe("given the block already matches the current values", () => {
-		it("returns null and leaves the file untouched", () => {
+		it("returns null and leaves the env exactly as it was", () => {
 			const target = appSettingsTargetFor("claude")!;
 			installAppEnv(target, currentClaudeVars());
-			const before = fs.readFileSync(target.path, "utf8");
+			const before = JSON.parse(fs.readFileSync(target.path, "utf8"));
 
 			expect(refreshClaudeUserTelemetryEnv({ vars: currentClaudeVars() })).toBe(
 				null,
 			);
-			expect(fs.readFileSync(target.path, "utf8")).toBe(before);
+
+			const after = JSON.parse(fs.readFileSync(target.path, "utf8"));
+			expect(after.env).toEqual(before.env);
+		});
+
+		/** @scenario "A device whose exports are already current still gets the hooks" */
+		it("installs the session hooks, which a device that persisted earlier lacks", () => {
+			const target = appSettingsTargetFor("claude")!;
+			installAppEnv(target, currentClaudeVars());
+
+			refreshClaudeUserTelemetryEnv({ vars: currentClaudeVars() });
+
+			const after = JSON.parse(fs.readFileSync(target.path, "utf8"));
+			expect(Object.keys(after.hooks)).toEqual(["SessionStart", "Stop"]);
 		});
 	});
 

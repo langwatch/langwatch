@@ -44,7 +44,7 @@ import {
 } from "~/server/otel/parseOtlpBody";
 import { decodeBase64OpenTelemetryId } from "~/server/tracer/utils";
 import { captureException } from "~/utils/posthogErrorCapture";
-import { safeBodyLimit } from "../middleware/safeBodyLimit";
+import { bodyLimit } from "./_lib/body-limit";
 
 const traceRequestType = (root as any).opentelemetry.proto.collector.trace.v1
   .ExportTraceServiceRequest;
@@ -456,123 +456,119 @@ export function peekCustomerTraceIds(
 
 secured
   .access(otelIngestAuth)
-  .post(
-    "/traces",
-    safeBodyLimit({ maxSize: OTLP_MAX_BODY_BYTES }),
-    async (c) => {
-      const tracer = getLangWatchTracer("langwatch.otel.traces");
+  .post("/traces", bodyLimit({ maxSize: OTLP_MAX_BODY_BYTES }), async (c) => {
+    const tracer = getLangWatchTracer("langwatch.otel.traces");
 
-      return tracer.withActiveSpan(
-        "TracesV1.handleTracesRequest",
-        { kind: SpanKind.SERVER },
-        async (span) => {
-          // Auth first — 401s/permission failures should not pay body decompression
-          // cost, and body content is irrelevant when we don't know who's calling.
-          const authResult = await authenticate(c, loggerTraces);
+    return tracer.withActiveSpan(
+      "TracesV1.handleTracesRequest",
+      { kind: SpanKind.SERVER },
+      async (span) => {
+        // Auth first — 401s/permission failures should not pay body decompression
+        // cost, and body content is irrelevant when we don't know who's calling.
+        const authResult = await authenticate(c, loggerTraces);
 
-          if ("error" in authResult) {
-            span.setStatus({
-              code: SpanStatusCode.ERROR,
-              message: authResult.error,
-            });
-            return c.json(authResult.body, { status: authResult.status });
-          }
-
-          const { project, resolved } = authResult;
-          span.setAttribute("langwatch.project.id", project.id);
-
-          const body = await readOtlpBody(c.req.raw);
-          const contentType = c.req.header("content-type");
-
-          // Best-effort. If the body can't be peeked (malformed, unsupported
-          // shape, etc.), customerTraceIds stays empty — the projectId is still
-          // logged on every subsequent failure for correlation.
-          const customerTraceIds = peekCustomerTraceIds(body, contentType);
-          if (customerTraceIds.length > 0) {
-            span.setAttribute(
-              "langwatch.otel.customer_trace_ids",
-              customerTraceIds.join(","),
-            );
-          }
-
-          await enforcePlanLimit({
-            project,
-            customerTraceIds,
-            logger: loggerTraces,
+        if ("error" in authResult) {
+          span.setStatus({
+            code: SpanStatusCode.ERROR,
+            message: authResult.error,
           });
+          return c.json(authResult.body, { status: authResult.status });
+        }
 
-          const emptyPartialSuccess = { rejectedSpans: 0, errorMessage: "" };
+        const { project, resolved } = authResult;
+        span.setAttribute("langwatch.project.id", project.id);
 
-          if (body.byteLength === 0) {
-            loggerTraces.debug(
-              { projectId: project.id },
-              "Received empty trace request, ignoring",
-            );
-            return c.json({
-              message: "No traces to process",
-              partialSuccess: emptyPartialSuccess,
-            });
-          }
+        const body = await readOtlpBody(c.req.raw);
+        const contentType = c.req.header("content-type");
 
-          const parsed = parseOtlpTraces(body, contentType);
-          if (!parsed.ok) {
-            loggerTraces.error(
-              {
-                error: parsed.error,
-                projectId: project.id,
-                customerTraceIds,
-                ...bodyForensics(body),
-              },
-              "error parsing traces",
-            );
-            captureException(new Error(parsed.error), {
-              extra: {
-                projectId: project.id,
-                customerTraceIds,
-              },
-            });
-            span.setStatus({
-              code: SpanStatusCode.ERROR,
-              message: "Failed to parse traces",
-            });
-            return c.json({ error: "Failed to parse traces" }, { status: 400 });
-          }
-          const traceRequest = parsed.request;
+        // Best-effort. If the body can't be peeked (malformed, unsupported
+        // shape, etc.), customerTraceIds stays empty — the projectId is still
+        // logged on every subsequent failure for correlation.
+        const customerTraceIds = peekCustomerTraceIds(body, contentType);
+        if (customerTraceIds.length > 0) {
+          span.setAttribute(
+            "langwatch.otel.customer_trace_ids",
+            customerTraceIds.join(","),
+          );
+        }
 
-          // Body successfully parsed — mark the API key as used
-          if (resolved.type === "apiKey") {
-            tokenResolver.markUsed({ apiKeyId: resolved.apiKeyId });
-          }
+        await enforcePlanLimit({
+          project,
+          customerTraceIds,
+          logger: loggerTraces,
+        });
 
-          await applyReceiverProvenanceToTraces({
-            request: traceRequest,
-            resolved,
-          });
+        const emptyPartialSuccess = { rejectedSpans: 0, errorMessage: "" };
 
-          const collectionResult =
-            await getApp().traces.collection.handleOtlpTraceRequest(
-              project.id,
-              traceRequest,
-              DEFAULT_PII_REDACTION_LEVEL,
-            );
-
+        if (body.byteLength === 0) {
+          loggerTraces.debug(
+            { projectId: project.id },
+            "Received empty trace request, ignoring",
+          );
           return c.json({
-            message: "Trace received successfully.",
-            partialSuccess: {
-              rejectedSpans: collectionResult?.rejectedSpans ?? 0,
-              errorMessage: collectionResult?.errorMessage ?? "",
+            message: "No traces to process",
+            partialSuccess: emptyPartialSuccess,
+          });
+        }
+
+        const parsed = parseOtlpTraces(body, contentType);
+        if (!parsed.ok) {
+          loggerTraces.error(
+            {
+              error: parsed.error,
+              projectId: project.id,
+              customerTraceIds,
+              ...bodyForensics(body),
+            },
+            "error parsing traces",
+          );
+          captureException(new Error(parsed.error), {
+            extra: {
+              projectId: project.id,
+              customerTraceIds,
             },
           });
-        },
-      );
-    },
-  );
+          span.setStatus({
+            code: SpanStatusCode.ERROR,
+            message: "Failed to parse traces",
+          });
+          return c.json({ error: "Failed to parse traces" }, { status: 400 });
+        }
+        const traceRequest = parsed.request;
+
+        // Body successfully parsed — mark the API key as used
+        if (resolved.type === "apiKey") {
+          tokenResolver.markUsed({ apiKeyId: resolved.apiKeyId });
+        }
+
+        await applyReceiverProvenanceToTraces({
+          request: traceRequest,
+          resolved,
+        });
+
+        const collectionResult =
+          await getApp().traces.collection.handleOtlpTraceRequest(
+            project.id,
+            traceRequest,
+            DEFAULT_PII_REDACTION_LEVEL,
+          );
+
+        return c.json({
+          message: "Trace received successfully.",
+          partialSuccess: {
+            rejectedSpans: collectionResult?.rejectedSpans ?? 0,
+            errorMessage: collectionResult?.errorMessage ?? "",
+          },
+        });
+      },
+    );
+  });
 
 // ── POST /logs ───────────────────────────────────────────────────────
 
 secured
   .access(otelIngestAuth)
-  .post("/logs", safeBodyLimit({ maxSize: OTLP_MAX_BODY_BYTES }), async (c) => {
+  .post("/logs", bodyLimit({ maxSize: OTLP_MAX_BODY_BYTES }), async (c) => {
     const tracer = getLangWatchTracer("langwatch.otel.logs");
 
     return tracer.withActiveSpan(
@@ -670,101 +666,94 @@ secured
 
 secured
   .access(otelIngestAuth)
-  .post(
-    "/metrics",
-    safeBodyLimit({ maxSize: OTLP_MAX_BODY_BYTES }),
-    async (c) => {
-      const tracer = getLangWatchTracer("langwatch.otel.metrics");
+  .post("/metrics", bodyLimit({ maxSize: OTLP_MAX_BODY_BYTES }), async (c) => {
+    const tracer = getLangWatchTracer("langwatch.otel.metrics");
 
-      return tracer.withActiveSpan(
-        "[POST] /api/otel/v1/metrics",
-        { kind: SpanKind.SERVER },
-        async (span) => {
-          const authResult = await authenticate(c, loggerMetrics);
+    return tracer.withActiveSpan(
+      "[POST] /api/otel/v1/metrics",
+      { kind: SpanKind.SERVER },
+      async (span) => {
+        const authResult = await authenticate(c, loggerMetrics);
 
-          if ("error" in authResult) {
-            span.setStatus({
-              code: SpanStatusCode.ERROR,
-              message: authResult.error,
-            });
-            return c.json(authResult.body, { status: authResult.status });
-          }
-
-          const { project, resolved } = authResult;
-          span.setAttribute("langwatch.project.id", project.id);
-
-          await enforcePlanLimit({
-            project,
-            customerTraceIds: [],
-            logger: loggerMetrics,
+        if ("error" in authResult) {
+          span.setStatus({
+            code: SpanStatusCode.ERROR,
+            message: authResult.error,
           });
+          return c.json(authResult.body, { status: authResult.status });
+        }
 
-          const body = await readOtlpBody(c.req.raw);
-          const parsed = parseOtlpMetrics(body, c.req.header("content-type"));
-          if (!parsed.ok) {
-            span.setStatus({
-              code: SpanStatusCode.ERROR,
-              message: "Failed to parse metrics",
-            });
-            span.recordException(new Error(parsed.error));
-            loggerMetrics.error(
-              {
-                error: parsed.error,
-                projectId: project.id,
-                ...bodyForensics(body),
-              },
-              "error parsing metrics",
-            );
-            captureException(new Error(parsed.error), {
-              extra: {
-                projectId: project.id,
-              },
-            });
-            return c.json(
-              { error: "Failed to parse metrics" },
-              { status: 400 },
-            );
-          }
-          const metricsRequest = parsed.request;
+        const { project, resolved } = authResult;
+        span.setAttribute("langwatch.project.id", project.id);
 
-          applyReceiverProvenanceToMetrics({
-            request: metricsRequest,
-            resolved,
+        await enforcePlanLimit({
+          project,
+          customerTraceIds: [],
+          logger: loggerMetrics,
+        });
+
+        const body = await readOtlpBody(c.req.raw);
+        const parsed = parseOtlpMetrics(body, c.req.header("content-type"));
+        if (!parsed.ok) {
+          span.setStatus({
+            code: SpanStatusCode.ERROR,
+            message: "Failed to parse metrics",
           });
-
-          // Body successfully parsed — mark the API key as used
-          if (resolved.type === "apiKey") {
-            tokenResolver.markUsed({ apiKeyId: resolved.apiKeyId });
-          }
-
-          const result =
-            await getApp().traces.metricCollection.handleOtlpMetricRequest({
-              tenantId: project.id,
-              organizationId: project.team.organizationId,
-              metricRequest: metricsRequest,
-              piiRedactionLevel: DEFAULT_PII_REDACTION_LEVEL,
-            });
-
-          // Nothing was durably accepted, and the cause is ours. OTLP treats a 200
-          // with `partialSuccess` as a permanent rejection the client must not
-          // re-send, so answering that here would turn a queue blip into fleet-wide
-          // data loss. 503 is in OTLP's retryable set.
-          if (result.outcome === "unavailable") {
-            return c.json({ error: result.errorMessage }, { status: 503 });
-          }
-
-          if (result.rejectedDataPoints === 0) return c.json({});
-          return c.json({
-            partialSuccess: {
-              rejectedDataPoints: result.rejectedDataPoints,
-              ...(result.errorMessage
-                ? { errorMessage: result.errorMessage }
-                : {}),
+          span.recordException(new Error(parsed.error));
+          loggerMetrics.error(
+            {
+              error: parsed.error,
+              projectId: project.id,
+              ...bodyForensics(body),
+            },
+            "error parsing metrics",
+          );
+          captureException(new Error(parsed.error), {
+            extra: {
+              projectId: project.id,
             },
           });
-        },
-      );
-    },
-  );
+          return c.json({ error: "Failed to parse metrics" }, { status: 400 });
+        }
+        const metricsRequest = parsed.request;
+
+        applyReceiverProvenanceToMetrics({
+          request: metricsRequest,
+          resolved,
+        });
+
+        // Body successfully parsed — mark the API key as used
+        if (resolved.type === "apiKey") {
+          tokenResolver.markUsed({ apiKeyId: resolved.apiKeyId });
+        }
+
+        const result =
+          await getApp().traces.metricCollection.handleOtlpMetricRequest({
+            tenantId: project.id,
+            organizationId: project.team.organizationId,
+            metricRequest: metricsRequest,
+            piiRedactionLevel: DEFAULT_PII_REDACTION_LEVEL,
+          });
+
+        // Nothing was durably accepted, and the cause is ours. OTLP treats a 200
+        // with `partialSuccess` as a permanent rejection the client must not
+        // re-send, so answering that here would turn a queue blip into fleet-wide
+        // data loss. 503 is in OTLP's retryable set.
+        if (result.outcome === "unavailable") {
+          return c.json({ error: result.errorMessage }, { status: 503 });
+        }
+
+        if (result.rejectedDataPoints === 0) return c.json({});
+        return c.json({
+          partialSuccess: {
+            rejectedDataPoints: result.rejectedDataPoints,
+            ...(result.errorMessage
+              ? { errorMessage: result.errorMessage }
+              : {}),
+          },
+        });
+      },
+    );
+  });
 
 export const app = secured.hono;

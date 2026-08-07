@@ -617,7 +617,10 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     .description(
       "Hidden: low-level Path B install primitive. Normal users run `langwatch <tool>` which auto-installs when needed.",
     )
-    .option("--env-only", "skip the codex config.toml write; print exports only")
+    .option(
+      "--env-only",
+      "skip the tool's own config writes; print exports only",
+    )
     .option("--json", "emit machine-readable JSON")
     .action(
       async (
@@ -630,6 +633,32 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
         await installCommand(tool, options);
       },
     );
+
+  // `langwatch ingest hook <tool>`: what the agent's own hook entries run.
+  // Hidden: nobody types this, the install path writes it into the agent's
+  // settings. It reads its payload on stdin, writes nothing to stdout (a
+  // SessionStart hook's stdout is injected into the user's session context)
+  // and always exits zero, so a hook can never be why a session broke.
+  //
+  // Registered as rendering its own result because it renders NO result, in
+  // any format. Left unregistered, the auto-detected agent mode a hook always
+  // runs under (Claude Code sets CLAUDECODE in its children) would print
+  // "the table below is not machine-readable" to stderr on every session
+  // start and stop, about a table that does not exist.
+  rendersOwnResult(
+    ingestCmd
+      .command("hook <tool>", { hidden: true })
+      .description(
+        "Hidden: reports the session's repository, branch and worktree. Run by the coding agent's own hooks, reading the hook payload on stdin.",
+      ),
+  ).action(async (tool: string) => {
+    try {
+      const { hookCommand } = await import("./commands/ingestion/hook.js");
+      await hookCommand({ tool });
+    } catch {
+      // Same contract as the command itself: never break the session.
+    }
+  });
 
   const governanceCmd = program
     .command("governance")
@@ -2343,6 +2372,25 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
   ).action(async (traceId: string, _options: unknown, command: Command) => {
     const { transcriptTraceCommand: impl } = await import("./commands/traces/transcript.js");
     await impl(traceId, command.optsWithGlobals());
+  });
+
+  // Add session command group
+  const sessionCmd = program
+    .command("session")
+    .description("Inspect coding-agent sessions");
+
+  rendersOwnResult(
+    sessionCmd
+      .command("events <sessionId>")
+      .description("List a coding-agent session's events (model calls, compactions, rate limits, tool runs) in time order")
+      .option("--kinds <kinds>", "Comma-separated event kinds to include (e.g. model_call,compaction,rate_limit)")
+      .option("--limit <n>", "Max events to return (default: 500); larger limits are fetched by cursor paging")
+      .option("--from <date>", "Start date (ISO string or epoch ms); with --to, prunes storage partitions for faster reads")
+      .option("--to <date>", "End date (ISO string or epoch ms)")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+  ).action(async (sessionId: string, _options: unknown, command: Command) => {
+    const { sessionEventsCommand: impl } = await import("./commands/sessions/events.js");
+    await impl(sessionId, command.optsWithGlobals());
   });
 
   // Add scenario command group

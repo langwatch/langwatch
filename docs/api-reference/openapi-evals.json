@@ -50,10 +50,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/EvaluationResult"
-                  }
+                  "$ref": "#/components/schemas/EvaluationResult"
                 }
               }
             }
@@ -146,10 +143,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/EvaluationResult"
-                  }
+                  "$ref": "#/components/schemas/EvaluationResult"
                 }
               }
             }
@@ -242,10 +236,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/EvaluationResult"
-                  }
+                  "$ref": "#/components/schemas/EvaluationResult"
                 }
               }
             }
@@ -338,10 +329,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/EvaluationResult"
-                  }
+                  "$ref": "#/components/schemas/EvaluationResult"
                 }
               }
             }
@@ -434,10 +422,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/EvaluationResult"
-                  }
+                  "$ref": "#/components/schemas/EvaluationResult"
                 }
               }
             }
@@ -530,10 +515,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/EvaluationResult"
-                  }
+                  "$ref": "#/components/schemas/EvaluationResult"
                 }
               }
             }
@@ -626,10 +608,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/EvaluationResult"
-                  }
+                  "$ref": "#/components/schemas/EvaluationResult"
                 }
               }
             }
@@ -722,10 +701,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/EvaluationResult"
-                  }
+                  "$ref": "#/components/schemas/EvaluationResult"
                 }
               }
             }
@@ -818,10 +794,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/EvaluationResult"
-                  }
+                  "$ref": "#/components/schemas/EvaluationResult"
                 }
               }
             }
@@ -914,10 +887,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/EvaluationResult"
-                  }
+                  "$ref": "#/components/schemas/EvaluationResult"
                 }
               }
             }
@@ -1010,10 +980,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/EvaluationResult"
-                  }
+                  "$ref": "#/components/schemas/EvaluationResult"
                 }
               }
             }
@@ -1106,10 +1073,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/EvaluationResult"
-                  }
+                  "$ref": "#/components/schemas/EvaluationResult"
                 }
               }
             }
@@ -1202,10 +1166,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/EvaluationResult"
-                  }
+                  "$ref": "#/components/schemas/EvaluationResult"
                 }
               }
             }
@@ -1298,10 +1259,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/EvaluationResult"
-                  }
+                  "$ref": "#/components/schemas/EvaluationResult"
                 }
               }
             }
@@ -1394,10 +1352,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/EvaluationResult"
-                  }
+                  "$ref": "#/components/schemas/EvaluationResult"
                 }
               }
             }
@@ -1490,10 +1445,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/EvaluationResult"
-                  }
+                  "$ref": "#/components/schemas/EvaluationResult"
                 }
               }
             }
@@ -1586,10 +1538,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/EvaluationResult"
-                  }
+                  "$ref": "#/components/schemas/EvaluationResult"
                 }
               }
             }
@@ -1682,10 +1631,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/EvaluationResult"
-                  }
+                  "$ref": "#/components/schemas/EvaluationResult"
                 }
               }
             }
@@ -1778,10 +1724,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/EvaluationResult"
-                  }
+                  "$ref": "#/components/schemas/EvaluationResult"
                 }
               }
             }
@@ -1874,10 +1817,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/EvaluationResult"
-                  }
+                  "$ref": "#/components/schemas/EvaluationResult"
                 }
               }
             }
@@ -1970,10 +1910,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/EvaluationResult"
-                  }
+                  "$ref": "#/components/schemas/EvaluationResult"
                 }
               }
             }
@@ -2066,10 +2003,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/EvaluationResult"
-                  }
+                  "$ref": "#/components/schemas/EvaluationResult"
                 }
               }
             }
@@ -2162,10 +2096,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/EvaluationResult"
-                  }
+                  "$ref": "#/components/schemas/EvaluationResult"
                 }
               }
             }
@@ -2258,10 +2189,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/EvaluationResult"
-                  }
+                  "$ref": "#/components/schemas/EvaluationResult"
                 }
               }
             }
@@ -2354,10 +2282,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/EvaluationResult"
-                  }
+                  "$ref": "#/components/schemas/EvaluationResult"
                 }
               }
             }
@@ -2450,10 +2375,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/EvaluationResult"
-                  }
+                  "$ref": "#/components/schemas/EvaluationResult"
                 }
               }
             }
@@ -2546,10 +2468,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/EvaluationResult"
-                  }
+                  "$ref": "#/components/schemas/EvaluationResult"
                 }
               }
             }
@@ -2642,10 +2561,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/EvaluationResult"
-                  }
+                  "$ref": "#/components/schemas/EvaluationResult"
                 }
               }
             }
@@ -2705,678 +2621,6 @@
         ]
       }
     },
-    "/legacy/ragas_answer_correctness/evaluate": {
-      "post": {
-        "summary": "Ragas Answer Correctness",
-        "description": "Computes with an LLM a weighted combination of factual as well as semantic similarity between the generated answer and the expected output.",
-        "operationId": "legacy_ragas_answer_correctness_evaluate",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/legacy_ragas_answer_correctnessRequest"
-                  },
-                  {
-                    "type": "object",
-                    "properties": {
-                      "settings": {
-                        "$ref": "#/components/schemas/legacy_ragas_answer_correctnessSettings"
-                      }
-                    }
-                  }
-                ]
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful evaluation",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/EvaluationResult"
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad request",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "detail": {
-                      "type": "string"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal server error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "detail": {
-                      "type": "string"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "x-codeSamples": [
-          {
-            "lang": "python",
-            "label": "Experiment",
-            "source": "import langwatch\n\ndf = langwatch.datasets.get_dataset(\"dataset-id\").to_pandas()\n\nexperiment = langwatch.experiment.init(\"my-experiment\")\n\nfor index, row in experiment.loop(df.iterrows()):\n    # your execution code here\n    experiment.evaluate(\n        \"legacy/ragas_answer_correctness\",\n        index=index,\n        data={\n            \"output\": output,\n            \"expected_output\": row[\"expected_output\"],\n            \"input\": row[\"input\"],\n        },\n        settings={}\n    )\n"
-          },
-          {
-            "lang": "python",
-            "label": "Online Evaluation",
-            "source": "import langwatch\n\n@langwatch.span()\ndef my_llm_step():\n    ... # your existing code\n    result = langwatch.evaluation.evaluate(\n        \"legacy/ragas_answer_correctness\",\n        name=\"My Ragas Answer Correctness Check\",\n        data={\n            \"output\": \"\",\n            \"expected_output\": \"\",\n            \"input\": \"\",\n        },\n        settings={},\n    )\n    print(result)"
-          },
-          {
-            "lang": "typescript",
-            "label": "Experiment",
-            "source": "import { LangWatch } from \"langwatch\";\n\nconst langwatch = new LangWatch();\n\n// Fetch dataset from LangWatch\nconst dataset = await langwatch.datasets.get(\"your-dataset-slug\");\n\nconst experiment = await langwatch.experiments.init(\"my-experiment\");\n\nawait experiment.run(\n  dataset.entries.map((e) => e.entry),\n  async ({ item, index }) => {\n    // Run your LLM/agent\n    const output = await myLLM(item.input);\n\n    // Evaluate the output\n    await experiment.evaluate(\"legacy/ragas_answer_correctness\", {\n      index,\n      data: {\n        output: output,\n        expected_output: item.expected_output,\n        input: item.input,\n      },\n    });\n  },\n  { concurrency: 4 }\n);"
-          },
-          {
-            "lang": "typescript",
-            "label": "Online Evaluation",
-            "source": "import { LangWatch } from \"langwatch\";\n\nconst langwatch = new LangWatch();\n\nasync function myLLMStep(input: string): Promise<string> {\n  // ... your existing code\n\n  // Call the evaluator\n  const result = await langwatch.evaluations.evaluate(\"legacy/ragas_answer_correctness\", {\n    name: \"my-evaluation\",\n    data: {\n      output: \"\", // your output value\n      expected_output: \"\", // your expected_output value\n      input: \"\", // your input value\n    },\n    settings: {},\n  });\n\n  console.log(result);\n  return result;\n}"
-          }
-        ]
-      }
-    },
-    "/legacy/ragas_answer_relevancy/evaluate": {
-      "post": {
-        "summary": "Ragas Answer Relevancy",
-        "description": "Evaluates how pertinent the generated answer is to the given prompt. Higher scores indicate better relevancy.",
-        "operationId": "legacy_ragas_answer_relevancy_evaluate",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/legacy_ragas_answer_relevancyRequest"
-                  },
-                  {
-                    "type": "object",
-                    "properties": {
-                      "settings": {
-                        "$ref": "#/components/schemas/legacy_ragas_answer_relevancySettings"
-                      }
-                    }
-                  }
-                ]
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful evaluation",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/EvaluationResult"
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad request",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "detail": {
-                      "type": "string"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal server error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "detail": {
-                      "type": "string"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "x-codeSamples": [
-          {
-            "lang": "python",
-            "label": "Experiment",
-            "source": "import langwatch\n\ndf = langwatch.datasets.get_dataset(\"dataset-id\").to_pandas()\n\nexperiment = langwatch.experiment.init(\"my-experiment\")\n\nfor index, row in experiment.loop(df.iterrows()):\n    # your execution code here\n    experiment.evaluate(\n        \"legacy/ragas_answer_relevancy\",\n        index=index,\n        data={\n            \"input\": row[\"input\"],\n            \"output\": output,\n        },\n        settings={}\n    )\n"
-          },
-          {
-            "lang": "python",
-            "label": "Online Evaluation",
-            "source": "import langwatch\n\n@langwatch.span()\ndef my_llm_step():\n    ... # your existing code\n    result = langwatch.evaluation.evaluate(\n        \"legacy/ragas_answer_relevancy\",\n        name=\"My Ragas Answer Relevancy Check\",\n        data={\n            \"input\": \"\",\n            \"output\": \"\",\n        },\n        settings={},\n    )\n    print(result)"
-          },
-          {
-            "lang": "typescript",
-            "label": "Experiment",
-            "source": "import { LangWatch } from \"langwatch\";\n\nconst langwatch = new LangWatch();\n\n// Fetch dataset from LangWatch\nconst dataset = await langwatch.datasets.get(\"your-dataset-slug\");\n\nconst experiment = await langwatch.experiments.init(\"my-experiment\");\n\nawait experiment.run(\n  dataset.entries.map((e) => e.entry),\n  async ({ item, index }) => {\n    // Run your LLM/agent\n    const output = await myLLM(item.input);\n\n    // Evaluate the output\n    await experiment.evaluate(\"legacy/ragas_answer_relevancy\", {\n      index,\n      data: {\n        input: item.input,\n        output: output,\n      },\n    });\n  },\n  { concurrency: 4 }\n);"
-          },
-          {
-            "lang": "typescript",
-            "label": "Online Evaluation",
-            "source": "import { LangWatch } from \"langwatch\";\n\nconst langwatch = new LangWatch();\n\nasync function myLLMStep(input: string): Promise<string> {\n  // ... your existing code\n\n  // Call the evaluator\n  const result = await langwatch.evaluations.evaluate(\"legacy/ragas_answer_relevancy\", {\n    name: \"my-evaluation\",\n    data: {\n      input: \"\", // your input value\n      output: \"\", // your output value\n    },\n    settings: {},\n  });\n\n  console.log(result);\n  return result;\n}"
-          }
-        ]
-      }
-    },
-    "/legacy/ragas_context_precision/evaluate": {
-      "post": {
-        "summary": "Ragas Context Precision",
-        "description": "This metric evaluates whether all of the ground-truth relevant items present in the contexts are ranked higher or not. Higher scores indicate better precision.",
-        "operationId": "legacy_ragas_context_precision_evaluate",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/legacy_ragas_context_precisionRequest"
-                  },
-                  {
-                    "type": "object",
-                    "properties": {
-                      "settings": {
-                        "$ref": "#/components/schemas/legacy_ragas_context_precisionSettings"
-                      }
-                    }
-                  }
-                ]
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful evaluation",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/EvaluationResult"
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad request",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "detail": {
-                      "type": "string"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal server error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "detail": {
-                      "type": "string"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "x-codeSamples": [
-          {
-            "lang": "python",
-            "label": "Experiment",
-            "source": "import langwatch\n\ndf = langwatch.datasets.get_dataset(\"dataset-id\").to_pandas()\n\nexperiment = langwatch.experiment.init(\"my-experiment\")\n\nfor index, row in experiment.loop(df.iterrows()):\n    # your execution code here\n    experiment.evaluate(\n        \"legacy/ragas_context_precision\",\n        index=index,\n        data={\n            \"input\": row[\"input\"],\n            \"contexts\": row[\"contexts\"],\n            \"expected_output\": row[\"expected_output\"],\n        },\n        settings={}\n    )\n"
-          },
-          {
-            "lang": "python",
-            "label": "Online Evaluation",
-            "source": "import langwatch\n\n@langwatch.span()\ndef my_llm_step():\n    ... # your existing code\n    result = langwatch.evaluation.evaluate(\n        \"legacy/ragas_context_precision\",\n        name=\"My Ragas Context Precision Check\",\n        data={\n            \"input\": \"\",\n            \"contexts\": \"\",\n            \"expected_output\": \"\",\n        },\n        settings={},\n    )\n    print(result)"
-          },
-          {
-            "lang": "typescript",
-            "label": "Experiment",
-            "source": "import { LangWatch } from \"langwatch\";\n\nconst langwatch = new LangWatch();\n\n// Fetch dataset from LangWatch\nconst dataset = await langwatch.datasets.get(\"your-dataset-slug\");\n\nconst experiment = await langwatch.experiments.init(\"my-experiment\");\n\nawait experiment.run(\n  dataset.entries.map((e) => e.entry),\n  async ({ item, index }) => {\n    // Run your LLM/agent\n    const output = await myLLM(item.input);\n\n    // Evaluate the output\n    await experiment.evaluate(\"legacy/ragas_context_precision\", {\n      index,\n      data: {\n        input: item.input,\n        contexts: item.contexts,\n        expected_output: item.expected_output,\n      },\n    });\n  },\n  { concurrency: 4 }\n);"
-          },
-          {
-            "lang": "typescript",
-            "label": "Online Evaluation",
-            "source": "import { LangWatch } from \"langwatch\";\n\nconst langwatch = new LangWatch();\n\nasync function myLLMStep(input: string): Promise<string> {\n  // ... your existing code\n\n  // Call the evaluator\n  const result = await langwatch.evaluations.evaluate(\"legacy/ragas_context_precision\", {\n    name: \"my-evaluation\",\n    data: {\n      input: \"\", // your input value\n      contexts: \"\", // your contexts value\n      expected_output: \"\", // your expected_output value\n    },\n    settings: {},\n  });\n\n  console.log(result);\n  return result;\n}"
-          }
-        ]
-      }
-    },
-    "/legacy/ragas_context_recall/evaluate": {
-      "post": {
-        "summary": "Ragas Context Recall",
-        "description": "This evaluator measures the extent to which the retrieved context aligns with the annotated answer, treated as the ground truth. Higher values indicate better performance.",
-        "operationId": "legacy_ragas_context_recall_evaluate",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/legacy_ragas_context_recallRequest"
-                  },
-                  {
-                    "type": "object",
-                    "properties": {
-                      "settings": {
-                        "$ref": "#/components/schemas/legacy_ragas_context_recallSettings"
-                      }
-                    }
-                  }
-                ]
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful evaluation",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/EvaluationResult"
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad request",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "detail": {
-                      "type": "string"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal server error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "detail": {
-                      "type": "string"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "x-codeSamples": [
-          {
-            "lang": "python",
-            "label": "Experiment",
-            "source": "import langwatch\n\ndf = langwatch.datasets.get_dataset(\"dataset-id\").to_pandas()\n\nexperiment = langwatch.experiment.init(\"my-experiment\")\n\nfor index, row in experiment.loop(df.iterrows()):\n    # your execution code here\n    experiment.evaluate(\n        \"legacy/ragas_context_recall\",\n        index=index,\n        data={\n            \"input\": row[\"input\"],\n            \"contexts\": row[\"contexts\"],\n            \"expected_output\": row[\"expected_output\"],\n        },\n        settings={}\n    )\n"
-          },
-          {
-            "lang": "python",
-            "label": "Online Evaluation",
-            "source": "import langwatch\n\n@langwatch.span()\ndef my_llm_step():\n    ... # your existing code\n    result = langwatch.evaluation.evaluate(\n        \"legacy/ragas_context_recall\",\n        name=\"My Ragas Context Recall Check\",\n        data={\n            \"input\": \"\",\n            \"contexts\": \"\",\n            \"expected_output\": \"\",\n        },\n        settings={},\n    )\n    print(result)"
-          },
-          {
-            "lang": "typescript",
-            "label": "Experiment",
-            "source": "import { LangWatch } from \"langwatch\";\n\nconst langwatch = new LangWatch();\n\n// Fetch dataset from LangWatch\nconst dataset = await langwatch.datasets.get(\"your-dataset-slug\");\n\nconst experiment = await langwatch.experiments.init(\"my-experiment\");\n\nawait experiment.run(\n  dataset.entries.map((e) => e.entry),\n  async ({ item, index }) => {\n    // Run your LLM/agent\n    const output = await myLLM(item.input);\n\n    // Evaluate the output\n    await experiment.evaluate(\"legacy/ragas_context_recall\", {\n      index,\n      data: {\n        input: item.input,\n        contexts: item.contexts,\n        expected_output: item.expected_output,\n      },\n    });\n  },\n  { concurrency: 4 }\n);"
-          },
-          {
-            "lang": "typescript",
-            "label": "Online Evaluation",
-            "source": "import { LangWatch } from \"langwatch\";\n\nconst langwatch = new LangWatch();\n\nasync function myLLMStep(input: string): Promise<string> {\n  // ... your existing code\n\n  // Call the evaluator\n  const result = await langwatch.evaluations.evaluate(\"legacy/ragas_context_recall\", {\n    name: \"my-evaluation\",\n    data: {\n      input: \"\", // your input value\n      contexts: \"\", // your contexts value\n      expected_output: \"\", // your expected_output value\n    },\n    settings: {},\n  });\n\n  console.log(result);\n  return result;\n}"
-          }
-        ]
-      }
-    },
-    "/legacy/ragas_context_relevancy/evaluate": {
-      "post": {
-        "summary": "Ragas Context Relevancy",
-        "description": "This metric gauges the relevancy of the retrieved context, calculated based on both the question and contexts. The values fall within the range of (0, 1), with higher values indicating better relevancy.",
-        "operationId": "legacy_ragas_context_relevancy_evaluate",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/legacy_ragas_context_relevancyRequest"
-                  },
-                  {
-                    "type": "object",
-                    "properties": {
-                      "settings": {
-                        "$ref": "#/components/schemas/legacy_ragas_context_relevancySettings"
-                      }
-                    }
-                  }
-                ]
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful evaluation",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/EvaluationResult"
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad request",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "detail": {
-                      "type": "string"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal server error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "detail": {
-                      "type": "string"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "x-codeSamples": [
-          {
-            "lang": "python",
-            "label": "Experiment",
-            "source": "import langwatch\n\ndf = langwatch.datasets.get_dataset(\"dataset-id\").to_pandas()\n\nexperiment = langwatch.experiment.init(\"my-experiment\")\n\nfor index, row in experiment.loop(df.iterrows()):\n    # your execution code here\n    experiment.evaluate(\n        \"legacy/ragas_context_relevancy\",\n        index=index,\n        data={\n            \"output\": output,\n            \"contexts\": row[\"contexts\"],\n        },\n        settings={}\n    )\n"
-          },
-          {
-            "lang": "python",
-            "label": "Online Evaluation",
-            "source": "import langwatch\n\n@langwatch.span()\ndef my_llm_step():\n    ... # your existing code\n    result = langwatch.evaluation.evaluate(\n        \"legacy/ragas_context_relevancy\",\n        name=\"My Ragas Context Relevancy Check\",\n        data={\n            \"output\": \"\",\n            \"contexts\": \"\",\n        },\n        settings={},\n    )\n    print(result)"
-          },
-          {
-            "lang": "typescript",
-            "label": "Experiment",
-            "source": "import { LangWatch } from \"langwatch\";\n\nconst langwatch = new LangWatch();\n\n// Fetch dataset from LangWatch\nconst dataset = await langwatch.datasets.get(\"your-dataset-slug\");\n\nconst experiment = await langwatch.experiments.init(\"my-experiment\");\n\nawait experiment.run(\n  dataset.entries.map((e) => e.entry),\n  async ({ item, index }) => {\n    // Run your LLM/agent\n    const output = await myLLM(item.input);\n\n    // Evaluate the output\n    await experiment.evaluate(\"legacy/ragas_context_relevancy\", {\n      index,\n      data: {\n        output: output,\n        contexts: item.contexts,\n      },\n    });\n  },\n  { concurrency: 4 }\n);"
-          },
-          {
-            "lang": "typescript",
-            "label": "Online Evaluation",
-            "source": "import { LangWatch } from \"langwatch\";\n\nconst langwatch = new LangWatch();\n\nasync function myLLMStep(input: string): Promise<string> {\n  // ... your existing code\n\n  // Call the evaluator\n  const result = await langwatch.evaluations.evaluate(\"legacy/ragas_context_relevancy\", {\n    name: \"my-evaluation\",\n    data: {\n      output: \"\", // your output value\n      contexts: \"\", // your contexts value\n    },\n    settings: {},\n  });\n\n  console.log(result);\n  return result;\n}"
-          }
-        ]
-      }
-    },
-    "/legacy/ragas_context_utilization/evaluate": {
-      "post": {
-        "summary": "Ragas Context Utilization",
-        "description": "This metric evaluates whether all of the output relevant items present in the contexts are ranked higher or not. Higher scores indicate better utilization.",
-        "operationId": "legacy_ragas_context_utilization_evaluate",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/legacy_ragas_context_utilizationRequest"
-                  },
-                  {
-                    "type": "object",
-                    "properties": {
-                      "settings": {
-                        "$ref": "#/components/schemas/legacy_ragas_context_utilizationSettings"
-                      }
-                    }
-                  }
-                ]
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful evaluation",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/EvaluationResult"
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad request",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "detail": {
-                      "type": "string"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal server error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "detail": {
-                      "type": "string"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "x-codeSamples": [
-          {
-            "lang": "python",
-            "label": "Experiment",
-            "source": "import langwatch\n\ndf = langwatch.datasets.get_dataset(\"dataset-id\").to_pandas()\n\nexperiment = langwatch.experiment.init(\"my-experiment\")\n\nfor index, row in experiment.loop(df.iterrows()):\n    # your execution code here\n    experiment.evaluate(\n        \"legacy/ragas_context_utilization\",\n        index=index,\n        data={\n            \"input\": row[\"input\"],\n            \"output\": output,\n            \"contexts\": row[\"contexts\"],\n        },\n        settings={}\n    )\n"
-          },
-          {
-            "lang": "python",
-            "label": "Online Evaluation",
-            "source": "import langwatch\n\n@langwatch.span()\ndef my_llm_step():\n    ... # your existing code\n    result = langwatch.evaluation.evaluate(\n        \"legacy/ragas_context_utilization\",\n        name=\"My Ragas Context Utilization Check\",\n        data={\n            \"input\": \"\",\n            \"output\": \"\",\n            \"contexts\": \"\",\n        },\n        settings={},\n    )\n    print(result)"
-          },
-          {
-            "lang": "typescript",
-            "label": "Experiment",
-            "source": "import { LangWatch } from \"langwatch\";\n\nconst langwatch = new LangWatch();\n\n// Fetch dataset from LangWatch\nconst dataset = await langwatch.datasets.get(\"your-dataset-slug\");\n\nconst experiment = await langwatch.experiments.init(\"my-experiment\");\n\nawait experiment.run(\n  dataset.entries.map((e) => e.entry),\n  async ({ item, index }) => {\n    // Run your LLM/agent\n    const output = await myLLM(item.input);\n\n    // Evaluate the output\n    await experiment.evaluate(\"legacy/ragas_context_utilization\", {\n      index,\n      data: {\n        input: item.input,\n        output: output,\n        contexts: item.contexts,\n      },\n    });\n  },\n  { concurrency: 4 }\n);"
-          },
-          {
-            "lang": "typescript",
-            "label": "Online Evaluation",
-            "source": "import { LangWatch } from \"langwatch\";\n\nconst langwatch = new LangWatch();\n\nasync function myLLMStep(input: string): Promise<string> {\n  // ... your existing code\n\n  // Call the evaluator\n  const result = await langwatch.evaluations.evaluate(\"legacy/ragas_context_utilization\", {\n    name: \"my-evaluation\",\n    data: {\n      input: \"\", // your input value\n      output: \"\", // your output value\n      contexts: \"\", // your contexts value\n    },\n    settings: {},\n  });\n\n  console.log(result);\n  return result;\n}"
-          }
-        ]
-      }
-    },
-    "/legacy/ragas_faithfulness/evaluate": {
-      "post": {
-        "summary": "Ragas Faithfulness",
-        "description": "This evaluator assesses the extent to which the generated answer is consistent with the provided context. Higher scores indicate better faithfulness to the context, useful for detecting hallucinations.",
-        "operationId": "legacy_ragas_faithfulness_evaluate",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/legacy_ragas_faithfulnessRequest"
-                  },
-                  {
-                    "type": "object",
-                    "properties": {
-                      "settings": {
-                        "$ref": "#/components/schemas/legacy_ragas_faithfulnessSettings"
-                      }
-                    }
-                  }
-                ]
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful evaluation",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/EvaluationResult"
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad request",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "detail": {
-                      "type": "string"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal server error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "detail": {
-                      "type": "string"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "x-codeSamples": [
-          {
-            "lang": "python",
-            "label": "Experiment",
-            "source": "import langwatch\n\ndf = langwatch.datasets.get_dataset(\"dataset-id\").to_pandas()\n\nexperiment = langwatch.experiment.init(\"my-experiment\")\n\nfor index, row in experiment.loop(df.iterrows()):\n    # your execution code here\n    experiment.evaluate(\n        \"legacy/ragas_faithfulness\",\n        index=index,\n        data={\n            \"output\": output,\n            \"contexts\": row[\"contexts\"],\n        },\n        settings={}\n    )\n"
-          },
-          {
-            "lang": "python",
-            "label": "Online Evaluation",
-            "source": "import langwatch\n\n@langwatch.span()\ndef my_llm_step():\n    ... # your existing code\n    result = langwatch.evaluation.evaluate(\n        \"legacy/ragas_faithfulness\",\n        name=\"My Ragas Faithfulness Check\",\n        data={\n            \"output\": \"\",\n            \"contexts\": \"\",\n        },\n        settings={},\n    )\n    print(result)"
-          },
-          {
-            "lang": "typescript",
-            "label": "Experiment",
-            "source": "import { LangWatch } from \"langwatch\";\n\nconst langwatch = new LangWatch();\n\n// Fetch dataset from LangWatch\nconst dataset = await langwatch.datasets.get(\"your-dataset-slug\");\n\nconst experiment = await langwatch.experiments.init(\"my-experiment\");\n\nawait experiment.run(\n  dataset.entries.map((e) => e.entry),\n  async ({ item, index }) => {\n    // Run your LLM/agent\n    const output = await myLLM(item.input);\n\n    // Evaluate the output\n    await experiment.evaluate(\"legacy/ragas_faithfulness\", {\n      index,\n      data: {\n        output: output,\n        contexts: item.contexts,\n      },\n    });\n  },\n  { concurrency: 4 }\n);"
-          },
-          {
-            "lang": "typescript",
-            "label": "Online Evaluation",
-            "source": "import { LangWatch } from \"langwatch\";\n\nconst langwatch = new LangWatch();\n\nasync function myLLMStep(input: string): Promise<string> {\n  // ... your existing code\n\n  // Call the evaluator\n  const result = await langwatch.evaluations.evaluate(\"legacy/ragas_faithfulness\", {\n    name: \"my-evaluation\",\n    data: {\n      output: \"\", // your output value\n      contexts: \"\", // your contexts value\n    },\n    settings: {},\n  });\n\n  console.log(result);\n  return result;\n}"
-          }
-        ]
-      }
-    },
     "/azure/content_safety/evaluate": {
       "post": {
         "summary": "Azure Content Safety",
@@ -3410,10 +2654,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/EvaluationResult"
-                  }
+                  "$ref": "#/components/schemas/EvaluationResult"
                 }
               }
             }
@@ -3506,10 +2747,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/EvaluationResult"
-                  }
+                  "$ref": "#/components/schemas/EvaluationResult"
                 }
               }
             }
@@ -3602,10 +2840,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/EvaluationResult"
-                  }
+                  "$ref": "#/components/schemas/EvaluationResult"
                 }
               }
             }
@@ -3698,10 +2933,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/EvaluationResult"
-                  }
+                  "$ref": "#/components/schemas/EvaluationResult"
                 }
               }
             }
@@ -5215,383 +4447,6 @@
             "description": "Minimum confidence threshold for the language detection. If the confidence is lower than this, the evaluation will be skipped.",
             "type": "number",
             "default": 0.25
-          }
-        }
-      },
-      "legacy_ragas_answer_correctnessRequest": {
-        "type": "object",
-        "properties": {
-          "trace_id": {
-            "type": "string",
-            "description": "Optional trace ID to associate this evaluation with a trace"
-          },
-          "data": {
-            "type": "object",
-            "properties": {
-              "output": {
-                "type": "string",
-                "description": "The output/response text to evaluate"
-              },
-              "expected_output": {
-                "type": "string",
-                "description": "The expected output for comparison"
-              },
-              "input": {
-                "type": "string",
-                "description": "The input text to evaluate"
-              }
-            },
-            "required": [
-              "output",
-              "expected_output"
-            ]
-          }
-        },
-        "required": [
-          "data"
-        ]
-      },
-      "legacy_ragas_answer_correctnessSettings": {
-        "type": "object",
-        "properties": {
-          "model": {
-            "description": "The model to use for evaluation.",
-            "type": "string",
-            "default": "openai/gpt-5"
-          },
-          "embeddings_model": {
-            "description": "The model to use for embeddings.",
-            "type": "string",
-            "default": "openai/text-embedding-ada-002"
-          },
-          "max_tokens": {
-            "description": "The maximum number of tokens allowed for evaluation, a too high number can be costly. Entries above this amount will be skipped.",
-            "type": "number",
-            "default": 2048
-          }
-        }
-      },
-      "legacy_ragas_answer_relevancyRequest": {
-        "type": "object",
-        "properties": {
-          "trace_id": {
-            "type": "string",
-            "description": "Optional trace ID to associate this evaluation with a trace"
-          },
-          "data": {
-            "type": "object",
-            "properties": {
-              "input": {
-                "type": "string",
-                "description": "The input text to evaluate"
-              },
-              "output": {
-                "type": "string",
-                "description": "The output/response text to evaluate"
-              }
-            },
-            "required": [
-              "input",
-              "output"
-            ]
-          }
-        },
-        "required": [
-          "data"
-        ]
-      },
-      "legacy_ragas_answer_relevancySettings": {
-        "type": "object",
-        "properties": {
-          "model": {
-            "description": "The model to use for evaluation.",
-            "type": "string",
-            "default": "openai/gpt-5"
-          },
-          "embeddings_model": {
-            "description": "The model to use for embeddings.",
-            "type": "string",
-            "default": "openai/text-embedding-ada-002"
-          },
-          "max_tokens": {
-            "description": "The maximum number of tokens allowed for evaluation, a too high number can be costly. Entries above this amount will be skipped.",
-            "type": "number",
-            "default": 2048
-          }
-        }
-      },
-      "legacy_ragas_context_precisionRequest": {
-        "type": "object",
-        "properties": {
-          "trace_id": {
-            "type": "string",
-            "description": "Optional trace ID to associate this evaluation with a trace"
-          },
-          "data": {
-            "type": "object",
-            "properties": {
-              "input": {
-                "type": "string",
-                "description": "The input text to evaluate"
-              },
-              "contexts": {
-                "type": "array",
-                "items": {
-                  "type": "string"
-                },
-                "description": "Array of context strings used for RAG evaluation"
-              },
-              "expected_output": {
-                "type": "string",
-                "description": "The expected output for comparison"
-              }
-            },
-            "required": [
-              "input",
-              "contexts",
-              "expected_output"
-            ]
-          }
-        },
-        "required": [
-          "data"
-        ]
-      },
-      "legacy_ragas_context_precisionSettings": {
-        "type": "object",
-        "properties": {
-          "model": {
-            "description": "The model to use for evaluation.",
-            "type": "string",
-            "default": "openai/gpt-5"
-          },
-          "embeddings_model": {
-            "description": "The model to use for embeddings.",
-            "type": "string",
-            "default": "openai/text-embedding-ada-002"
-          },
-          "max_tokens": {
-            "description": "The maximum number of tokens allowed for evaluation, a too high number can be costly. Entries above this amount will be skipped.",
-            "type": "number",
-            "default": 2048
-          }
-        }
-      },
-      "legacy_ragas_context_recallRequest": {
-        "type": "object",
-        "properties": {
-          "trace_id": {
-            "type": "string",
-            "description": "Optional trace ID to associate this evaluation with a trace"
-          },
-          "data": {
-            "type": "object",
-            "properties": {
-              "input": {
-                "type": "string",
-                "description": "The input text to evaluate"
-              },
-              "contexts": {
-                "type": "array",
-                "items": {
-                  "type": "string"
-                },
-                "description": "Array of context strings used for RAG evaluation"
-              },
-              "expected_output": {
-                "type": "string",
-                "description": "The expected output for comparison"
-              }
-            },
-            "required": [
-              "input",
-              "contexts",
-              "expected_output"
-            ]
-          }
-        },
-        "required": [
-          "data"
-        ]
-      },
-      "legacy_ragas_context_recallSettings": {
-        "type": "object",
-        "properties": {
-          "model": {
-            "description": "The model to use for evaluation.",
-            "type": "string",
-            "default": "openai/gpt-5"
-          },
-          "embeddings_model": {
-            "description": "The model to use for embeddings.",
-            "type": "string",
-            "default": "openai/text-embedding-ada-002"
-          },
-          "max_tokens": {
-            "description": "The maximum number of tokens allowed for evaluation, a too high number can be costly. Entries above this amount will be skipped.",
-            "type": "number",
-            "default": 2048
-          }
-        }
-      },
-      "legacy_ragas_context_relevancyRequest": {
-        "type": "object",
-        "properties": {
-          "trace_id": {
-            "type": "string",
-            "description": "Optional trace ID to associate this evaluation with a trace"
-          },
-          "data": {
-            "type": "object",
-            "properties": {
-              "output": {
-                "type": "string",
-                "description": "The output/response text to evaluate"
-              },
-              "contexts": {
-                "type": "array",
-                "items": {
-                  "type": "string"
-                },
-                "description": "Array of context strings used for RAG evaluation"
-              }
-            },
-            "required": [
-              "output",
-              "contexts"
-            ]
-          }
-        },
-        "required": [
-          "data"
-        ]
-      },
-      "legacy_ragas_context_relevancySettings": {
-        "type": "object",
-        "properties": {
-          "model": {
-            "description": "The model to use for evaluation.",
-            "type": "string",
-            "default": "openai/gpt-5"
-          },
-          "embeddings_model": {
-            "description": "The model to use for embeddings.",
-            "type": "string",
-            "default": "openai/text-embedding-ada-002"
-          },
-          "max_tokens": {
-            "description": "The maximum number of tokens allowed for evaluation, a too high number can be costly. Entries above this amount will be skipped.",
-            "type": "number",
-            "default": 2048
-          }
-        }
-      },
-      "legacy_ragas_context_utilizationRequest": {
-        "type": "object",
-        "properties": {
-          "trace_id": {
-            "type": "string",
-            "description": "Optional trace ID to associate this evaluation with a trace"
-          },
-          "data": {
-            "type": "object",
-            "properties": {
-              "input": {
-                "type": "string",
-                "description": "The input text to evaluate"
-              },
-              "output": {
-                "type": "string",
-                "description": "The output/response text to evaluate"
-              },
-              "contexts": {
-                "type": "array",
-                "items": {
-                  "type": "string"
-                },
-                "description": "Array of context strings used for RAG evaluation"
-              }
-            },
-            "required": [
-              "input",
-              "output",
-              "contexts"
-            ]
-          }
-        },
-        "required": [
-          "data"
-        ]
-      },
-      "legacy_ragas_context_utilizationSettings": {
-        "type": "object",
-        "properties": {
-          "model": {
-            "description": "The model to use for evaluation.",
-            "type": "string",
-            "default": "openai/gpt-5"
-          },
-          "embeddings_model": {
-            "description": "The model to use for embeddings.",
-            "type": "string",
-            "default": "openai/text-embedding-ada-002"
-          },
-          "max_tokens": {
-            "description": "The maximum number of tokens allowed for evaluation, a too high number can be costly. Entries above this amount will be skipped.",
-            "type": "number",
-            "default": 2048
-          }
-        }
-      },
-      "legacy_ragas_faithfulnessRequest": {
-        "type": "object",
-        "properties": {
-          "trace_id": {
-            "type": "string",
-            "description": "Optional trace ID to associate this evaluation with a trace"
-          },
-          "data": {
-            "type": "object",
-            "properties": {
-              "output": {
-                "type": "string",
-                "description": "The output/response text to evaluate"
-              },
-              "contexts": {
-                "type": "array",
-                "items": {
-                  "type": "string"
-                },
-                "description": "Array of context strings used for RAG evaluation"
-              }
-            },
-            "required": [
-              "output",
-              "contexts"
-            ]
-          }
-        },
-        "required": [
-          "data"
-        ]
-      },
-      "legacy_ragas_faithfulnessSettings": {
-        "type": "object",
-        "properties": {
-          "model": {
-            "description": "The model to use for evaluation.",
-            "type": "string",
-            "default": "openai/gpt-5"
-          },
-          "embeddings_model": {
-            "description": "The model to use for embeddings.",
-            "type": "string",
-            "default": "openai/text-embedding-ada-002"
-          },
-          "max_tokens": {
-            "description": "The maximum number of tokens allowed for evaluation, a too high number can be costly. Entries above this amount will be skipped.",
-            "type": "number",
-            "default": 2048
           }
         }
       },

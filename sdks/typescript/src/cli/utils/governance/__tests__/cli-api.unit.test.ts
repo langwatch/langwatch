@@ -3,6 +3,7 @@ import { describe, it, expect, vi } from "vitest";
 import {
   GovernanceCliError,
   SESSION_EXPIRED_MESSAGE,
+  cloneIngestionTemplateFromPlatform,
   getCliBootstrap,
   getEventsForSource,
   getGovernanceStatus,
@@ -437,6 +438,63 @@ describe("cli-api — request shape", () => {
       await expect(getCliBootstrap(baseCfg(), { fetchImpl })).rejects.toThrow(
         /500/,
       );
+    });
+  });
+  describe("ingestion-templates clone-from-platform", () => {
+    /**
+     * The command posted to `/ingestion-templates/clone-from-platform`. The
+     * route is `/ingestion-templates/clone`, which is also what the spec and
+     * the governance guide document, so the command 404'd every time it ran.
+     *
+     * The stub answers 404 for any path the app does not register, so a caller
+     * reaching for one fails here the way it failed in production.
+     */
+    const REGISTERED_TEMPLATE_PATHS = new Set([
+      "/api/governance/ingestion-templates",
+      "/api/governance/ingestion-templates/admin",
+      "/api/governance/ingestion-templates/clone",
+    ]);
+
+    const onlyRealRoutes = (): {
+      fetchImpl: typeof fetch;
+      seen: SeenCall[];
+    } => {
+      const seen: SeenCall[] = [];
+      const fetchImpl: typeof fetch = async (input, init) => {
+        const url =
+          typeof input === "string"
+            ? input
+            : input instanceof URL
+              ? input.toString()
+              : input.url;
+        const headers = (init?.headers ?? {}) as Record<string, string>;
+        seen.push({
+          url,
+          authHeader: headers.Authorization,
+          acceptHeader: headers.Accept,
+        });
+        const { pathname } = new URL(url);
+        return REGISTERED_TEMPLATE_PATHS.has(pathname)
+          ? ok({ ingestion_template: { id: "tpl_new" } })
+          : status(404, { error: "Not Found" });
+      };
+      return { fetchImpl, seen };
+    };
+
+    /** @scenario "Cloning a platform template posts to the documented route" */
+    it("posts to the route the app actually serves", async () => {
+      const { fetchImpl, seen } = onlyRealRoutes();
+
+      const out = await cloneIngestionTemplateFromPlatform(
+        baseCfg(),
+        "tpl_platform",
+        { fetchImpl },
+      );
+
+      expect(seen[0]!.url).toBe(
+        "http://app.example/api/governance/ingestion-templates/clone",
+      );
+      expect(out).toEqual({ id: "tpl_new" });
     });
   });
 });

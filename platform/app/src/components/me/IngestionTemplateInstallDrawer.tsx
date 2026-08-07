@@ -32,8 +32,14 @@ export function buildEnvSnippet(
   const base = `export OTEL_EXPORTER_OTLP_ENDPOINT="${endpoint}"
 export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ${token}"`;
   if (slug === "claude_code") {
-    // Four claude-code OTel unlock knobs, all ON (rchaves
-    // "collect all humanly possible"):
+    // Every claude-code OTel unlock knob, all ON, so a session arrives
+    // whole rather than as counters:
+    //   ENHANCED_TELEMETRY_BETA  gates span tracing itself. Claude Code
+    //                      defaults it off, and without it the exporter
+    //                      emits no spans at all, so there is no tool
+    //                      call tree, no latencies and no subagent
+    //                      branches, and TOOL_CONTENT below goes dead
+    //                      with them. Experimental, hence the name.
     //   USER_PROMPTS       lifts user prompt text onto user_prompt
     //   TOOL_DETAILS       lifts tool metadata onto tool_decision/result
     //   TOOL_CONTENT       lifts tool_input (Bash command, Edit diff,
@@ -49,6 +55,7 @@ export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ${token}"`;
     //                      to keep the CH merge ceiling safe.
     return [
       `export CLAUDE_CODE_ENABLE_TELEMETRY=1`,
+      `export CLAUDE_CODE_ENHANCED_TELEMETRY_BETA=1`,
       `export OTEL_TRACES_EXPORTER=otlp`,
       `export OTEL_LOGS_EXPORTER=otlp`,
       `export OTEL_METRICS_EXPORTER=otlp`,

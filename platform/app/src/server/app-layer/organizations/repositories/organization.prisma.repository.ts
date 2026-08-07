@@ -22,7 +22,11 @@ import {
 import { GROWTH_SEAT_PLAN_TYPES } from "../../../../../ee/billing/utils/growthSeatEvent";
 import { isCustomRole } from "../../../api/enterprise";
 import { revokeAllSessionsForUser } from "../../../better-auth/revokeSessions";
-import { LITE_MEMBER_VIEWER_ONLY_ERROR } from "../compute-effective-team-role-updates";
+import {
+  CannotRemoveSelfAsLastAdminError,
+  LiteMemberViewerOnlyError,
+  TeamLastAdminRequiredError,
+} from "../../teams/team.service";
 import type {
   AuditLogFilters,
   CreateAndAssignInput,
@@ -37,9 +41,28 @@ import type {
   OrganizationWithMembersAndTheirTeams,
   SetMemberDisabledInput,
   UpdateMemberRoleInput,
+  UpdateMemberRoleResult,
   UpdateOrganizationInput,
   UpdateTeamMemberRoleInput,
 } from "./organization.repository";
+
+/**
+ * The team's name for a refusal or a report, both of which are read by somebody
+ * who knows the team by its name and not by its id.
+ */
+async function teamNameFor({
+  tx,
+  teamId,
+}: {
+  tx: Prisma.TransactionClient;
+  teamId: string;
+}): Promise<string | null> {
+  const team = await tx.team.findUnique({
+    where: { id: teamId },
+    select: { name: true },
+  });
+  return team?.name ?? null;
+}
 
 export class PrismaOrganizationRepository implements OrganizationRepository {
   constructor(private readonly prisma: PrismaClient) {}
@@ -603,8 +626,15 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
     }
   }
 
-  async updateMemberRole(input: UpdateMemberRoleInput): Promise<void> {
+  async updateMemberRole(
+    input: UpdateMemberRoleInput,
+  ): Promise<UpdateMemberRoleResult> {
     const { organizationId, userId, role, effectiveTeamRoleUpdates } = input;
+
+    // Teams whose only team-scoped admin this seat change corrected away. Not a
+    // failure, and not silent either: the caller reports them to whoever made
+    // the decision.
+    const teamsLeftWithoutAdmin: Array<{ id: string; name: string }> = [];
 
     await this.prisma.$transaction(async (tx) => {
       const currentMember = await tx.organizationUser.findUnique({
@@ -731,13 +761,23 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
             teamRole: teamRoleUpdate.role as TeamRoleValue,
           })
         ) {
-          throw new ValidationError(LITE_MEMBER_VIEWER_ONLY_ERROR);
+          throw new LiteMemberViewerOnlyError(
+            await teamNameFor({ tx, teamId }),
+          );
         }
 
         const updateIsCustomRole = isCustomRole(teamRoleUpdate.role);
         if (updateIsCustomRole && !teamRoleUpdate.customRoleId) {
           throw new ValidationError(
             "Custom role ID is required for custom role updates",
+            {
+              meta: {
+                fieldErrors: {
+                  customRoleId: ["Pick which custom role to use."],
+                },
+                formErrors: ["Pick which custom role to use."],
+              },
+            },
           );
         }
 
@@ -777,9 +817,23 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
             },
           });
           if (teamAdminCount <= 1) {
-            throw new ValidationError(
-              "Cannot remove or demote the last admin from this team",
-            );
+            // A caller who named this team asked for a team-local change, and a
+            // team needs an admin. A seat correction did not name it: the
+            // decision was about one person's seat, every shared team is still
+            // administered through any ORGANIZATION-scoped ADMIN binding, and
+            // refusing here used to roll back the organization role change too,
+            // so the seat could not be changed at all while the member was
+            // somebody's only team admin. It goes through, and the team is
+            // reported so the admin who did it is not left to discover this.
+            if (teamRoleUpdate.origin === "requested") {
+              throw new TeamLastAdminRequiredError(
+                await teamNameFor({ tx, teamId }),
+              );
+            }
+            teamsLeftWithoutAdmin.push({
+              id: teamId,
+              name: (await teamNameFor({ tx, teamId })) ?? teamId,
+            });
           }
         }
 
@@ -828,6 +882,8 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
         });
       }
     });
+
+    return { teamsLeftWithoutAdmin };
   }
 
   async updateTeamMemberRole(input: UpdateTeamMemberRoleInput): Promise<void> {
@@ -840,7 +896,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
       await this.prisma.$transaction(async (tx) => {
         const team = await tx.team.findUnique({
           where: { id: teamId },
-          select: { organizationId: true },
+          select: { organizationId: true, name: true },
         });
         if (!team) {
           throw new TRPCError({
@@ -872,10 +928,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
         });
 
         if (orgMembership?.role === OrganizationUserRole.EXTERNAL) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: LITE_MEMBER_VIEWER_ONLY_ERROR,
-          });
+          throw new LiteMemberViewerOnlyError(team.name);
         }
 
         const adminCount = await tx.roleBinding.count({
@@ -889,10 +942,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
         });
 
         if (adminCount === 0) {
-          throw new TRPCError({
-            code: "FORBIDDEN",
-            message: "No admin found for this team",
-          });
+          throw new TeamLastAdminRequiredError(team.name);
         }
 
         const targetUserBinding = await tx.roleBinding.findFirst({
@@ -916,17 +966,10 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
 
         if (adminCount === 1 && isTargetUserAdmin) {
           if (userId === currentUserId) {
-            throw new TRPCError({
-              code: "FORBIDDEN",
-              message:
-                "You cannot demote yourself from the last admin position in this team",
-            });
+            throw new CannotRemoveSelfAsLastAdminError(team.name);
           }
 
-          throw new TRPCError({
-            code: "FORBIDDEN",
-            message: "Cannot remove or demote the last admin from this team",
-          });
+          throw new TeamLastAdminRequiredError(team.name);
         }
 
         await tx.roleBinding.deleteMany({
@@ -960,17 +1003,14 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
         });
 
         if (finalAdminCount === 0) {
-          throw new TRPCError({
-            code: "FORBIDDEN",
-            message: "Operation would result in no admins for this team",
-          });
+          throw new TeamLastAdminRequiredError(team.name);
         }
       });
     } else {
       await this.prisma.$transaction(async (tx) => {
         const team = await tx.team.findUnique({
           where: { id: teamId },
-          select: { organizationId: true },
+          select: { organizationId: true, name: true },
         });
         if (!team) {
           throw new TRPCError({
@@ -995,10 +1035,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
               teamRole: role as TeamRoleValue,
             })
           ) {
-            throw new TRPCError({
-              code: "BAD_REQUEST",
-              message: LITE_MEMBER_VIEWER_ONLY_ERROR,
-            });
+            throw new LiteMemberViewerOnlyError(team.name);
           }
         }
 
@@ -1013,10 +1050,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
         });
 
         if (adminCount === 0) {
-          throw new TRPCError({
-            code: "FORBIDDEN",
-            message: "No admin found for this team",
-          });
+          throw new TeamLastAdminRequiredError(team.name);
         }
 
         const targetUserBinding = await tx.roleBinding.findFirst({
@@ -1042,17 +1076,10 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
 
         if (adminCount === 1 && wouldDemoteAdmin) {
           if (userId === currentUserId) {
-            throw new TRPCError({
-              code: "FORBIDDEN",
-              message:
-                "You cannot demote yourself from the last admin position in this team",
-            });
+            throw new CannotRemoveSelfAsLastAdminError(team.name);
           }
 
-          throw new TRPCError({
-            code: "FORBIDDEN",
-            message: "Cannot remove or demote the last admin from this team",
-          });
+          throw new TeamLastAdminRequiredError(team.name);
         }
 
         await tx.roleBinding.deleteMany({
@@ -1086,10 +1113,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
         });
 
         if (finalAdminCount === 0) {
-          throw new TRPCError({
-            code: "FORBIDDEN",
-            message: "Operation would result in no admins for this team",
-          });
+          throw new TeamLastAdminRequiredError(team.name);
         }
       });
     }

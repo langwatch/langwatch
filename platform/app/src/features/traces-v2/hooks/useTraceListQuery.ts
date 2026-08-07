@@ -4,7 +4,7 @@ import { api } from "~/utils/api";
 import { useSamplePreview } from "../onboarding";
 import type { TraceListCursor } from "../stores/filterStore";
 import { useFilterStore } from "../stores/filterStore";
-import { useViewStore } from "../stores/viewStore";
+import { DEFAULT_SORT, useViewStore } from "../stores/viewStore";
 import type { TraceListItem } from "../types/trace";
 import { mapTraceListPayload } from "../utils/mapTraceListPayload";
 
@@ -18,6 +18,12 @@ export interface TraceListQueryResult {
   isFetched: boolean;
   isError: boolean;
   error: unknown;
+  /**
+   * Whether the rows are onboarding fixtures rather than the project's own
+   * traces. Their ids exist nowhere but the fixture file, so anything that
+   * would enrich a row from the backend has to sit the preview out.
+   */
+  isSamplePreview: boolean;
 }
 
 /**
@@ -32,6 +38,40 @@ export interface TraceListQueryResult {
  * the real tRPC query like normal. We don't import any other onboarding
  * internals — `useSamplePreview` is the entire integration seam.
  */
+/** The `tracesV2.list` input for the current filter, sort and page state. */
+function traceListQueryInput({
+  projectId,
+  timeRange,
+  sort,
+  page,
+  pageSize,
+  traceCursor,
+  queryText,
+}: {
+  projectId: string;
+  timeRange: { from: number; to: number; label?: string | null };
+  sort: { columnId: string; direction: "asc" | "desc" };
+  page: number;
+  pageSize: number;
+  traceCursor: TraceListCursor | undefined;
+  queryText: string;
+}) {
+  const cursor = page > 1 ? traceCursor : undefined;
+  return {
+    projectId,
+    timeRange: {
+      from: timeRange.from,
+      to: timeRange.to,
+      live: !!timeRange.label,
+    },
+    sort: { columnId: sort.columnId, direction: sort.direction },
+    page,
+    pageSize,
+    ...(cursor ? { cursor } : {}),
+    query: queryText || undefined,
+  };
+}
+
 export function useTraceListQuery(): TraceListQueryResult {
   const { project } = useOrganizationTeamProject();
   const timeRange = useFilterStore((s) => s.debouncedTimeRange);
@@ -41,37 +81,51 @@ export function useTraceListQuery(): TraceListQueryResult {
   const setPage = useFilterStore((s) => s.setPage);
   const queryText = useFilterStore((s) => s.debouncedQueryText);
   const sort = useViewStore((s) => s.sort);
+  const grouping = useViewStore((s) => s.grouping);
   const samplePreview = useSamplePreview();
+
+  // The sessions lens paginates with its own opaque string cursors through
+  // the SAME shared page number (see useSessionGroups). While it is active,
+  // this hook pins itself to the first batch and leaves the page state
+  // alone, otherwise the two hooks would fight over `page`, each resetting
+  // the other's cursor space.
+  const ownsPagination = grouping !== "by-conversation";
+  // The sessions lens sorts by dimensions only a session has (`lastTurn`,
+  // `turns`), and forwarding one of those here would ask the flat list to
+  // order by a column it does not have. It still runs while that lens is
+  // active because FindBar reads its rows, so it asks for its own default
+  // order rather than the session's.
+  const listSort = ownsPagination ? sort : DEFAULT_SORT;
+  const traceCursor =
+    pageCursor && typeof pageCursor === "object" ? pageCursor : undefined;
+  const effectivePage = ownsPagination ? page : 1;
 
   // Offset page numbers cannot be restored honestly after a reload because a
   // keyset cursor is intentionally opaque session state. Old `#?page=N` links
   // therefore fall back to the first batch instead of issuing an offset read.
+  // A string cursor left behind by the sessions lens is equally unusable here.
   useEffect(() => {
-    if (page > 1 && pageCursor === undefined) setPage(1);
-  }, [page, pageCursor, setPage]);
+    if (ownsPagination && page > 1 && traceCursor === undefined) setPage(1);
+  }, [ownsPagination, page, traceCursor, setPage]);
 
   // Skip the tRPC request entirely while sample preview is active —
   // saves a roundtrip per page nav for users who're going to see
   // fixtures anyway.
   const query = api.tracesV2.list.useQuery(
-    {
+    traceListQueryInput({
       projectId: project?.id ?? "",
-      timeRange: {
-        from: timeRange.from,
-        to: timeRange.to,
-        live: !!timeRange.label,
-      },
-      sort: { columnId: sort.columnId, direction: sort.direction },
-      page,
+      timeRange,
+      sort: listSort,
+      page: effectivePage,
       pageSize,
-      ...(page > 1 && pageCursor ? { cursor: pageCursor } : {}),
-      query: queryText || undefined,
-    },
+      traceCursor,
+      queryText,
+    }),
     {
       enabled:
         !!project?.id &&
         samplePreview === null &&
-        (page === 1 || pageCursor !== undefined),
+        (effectivePage === 1 || traceCursor !== undefined),
       staleTime: 60_000,
       keepPreviousData: true,
     },
@@ -93,6 +147,7 @@ export function useTraceListQuery(): TraceListQueryResult {
       isFetched: true,
       isError: false,
       error: null,
+      isSamplePreview: true,
     };
   }
 
@@ -106,5 +161,6 @@ export function useTraceListQuery(): TraceListQueryResult {
     isFetched: query.isFetched,
     isError: query.isError,
     error: query.error,
+    isSamplePreview: false,
   };
 }

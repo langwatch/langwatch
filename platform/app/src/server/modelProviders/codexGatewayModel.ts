@@ -4,6 +4,7 @@ import { env } from "../../env.mjs";
 import { ensureGatewayV1BaseUrl } from "../app-layer/langy/LangyCredentialService";
 import { provisionLangyVirtualKey } from "../app-layer/langy/langyVirtualKey";
 import { prisma } from "../db";
+import { CODING_ASSISTANT_SURFACES_ONLY_NEEDLE } from "./codexRefusalMessage";
 import { isModelAllowedForFeature } from "./codexRestrictions";
 
 /**
@@ -30,7 +31,7 @@ export async function getCodexVercelAIModel({
 }) {
   if (!isModelAllowedForFeature({ modelId: model, featureKey })) {
     throw new Error(
-      `"${model}" serves the coding-assistant surfaces only and cannot run "${featureKey}".`,
+      `"${model}" ${CODING_ASSISTANT_SURFACES_ONLY_NEEDLE} and cannot run "${featureKey}".`,
     );
   }
 

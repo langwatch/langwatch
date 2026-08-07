@@ -592,4 +592,122 @@ describe("getEvalChipDisplay", () => {
       expect(d.statusLabel).toBe(getStatusLabel(d.status));
     }
   });
+
+  describe("given a categorising evaluator that answered with a label only", () => {
+    // A categorising evaluator classifies rather than judges. Its runs reach
+    // the UI with a `processed`/`pass` status and, from some adapters, a
+    // score of 0 — both stand-ins for fields it never filled.
+    describe("when getEvalChipDisplay formats the result", () => {
+      /** @scenario A category verdict leads the card header */
+      it("reports the category as the verdict when the caller knows its scoreType", () => {
+        const d = getEvalChipDisplay({
+          name: "Max conversation outcome",
+          status: "processed",
+          scoreType: "categorical",
+          score: 0,
+          label: "resolved",
+          passed: null,
+        });
+
+        expect(d.categoryLabel).toBe("resolved");
+        // The zero is a stand-in, so it must not reach the chip as a score.
+        expect(d.scoreText).toBeNull();
+        expect(d.passLabel).toBeNull();
+      });
+
+      /** @scenario A category verdict leads the card header */
+      it("infers the category for a caller that carries no scoreType", () => {
+        // The trace-list payload has no scoreType; an absent score and an
+        // absent verdict beside a label say the same thing.
+        const d = getEvalChipDisplay({
+          evaluatorName: "Max conversation outcome",
+          status: "processed",
+          score: null,
+          label: "resolved",
+          passed: null,
+        });
+
+        expect(d.categoryLabel).toBe("resolved");
+        expect(d.passLabel).toBeNull();
+      });
+    });
+  });
+
+  describe("given an evaluator that produced a real verdict", () => {
+    describe("when getEvalChipDisplay formats the result", () => {
+      /** @scenario A label alongside a real verdict rides next to the badge */
+      it("keeps the score and reports no category when a label accompanies it", () => {
+        const d = getEvalChipDisplay({
+          name: "Toxicity",
+          status: "processed",
+          scoreType: "numeric",
+          score: 0.9,
+          label: "safe",
+          passed: true,
+        });
+
+        expect(d.categoryLabel).toBeNull();
+        expect(d.scoreText).toBe("0.90");
+      });
+
+      /** @scenario A label alongside a real verdict rides next to the badge */
+      it("keeps the Pass label when a boolean verdict carries a label", () => {
+        const d = getEvalChipDisplay({
+          name: "Guardrail",
+          status: "processed",
+          score: null,
+          label: "safe",
+          passed: true,
+        });
+
+        expect(d.categoryLabel).toBeNull();
+        expect(d.passLabel).toEqual({ text: "Pass", color: "green.fg" });
+      });
+
+      /** @scenario A label alongside a real verdict rides next to the badge */
+      it("reads a labelled boolean score as a verdict rather than a category", () => {
+        // A boolean IS the verdict, whatever it is labelled, so the label
+        // rides beside a Pass rather than replacing it.
+        const d = getEvalChipDisplay({
+          name: "Guardrail",
+          status: "passed",
+          score: true,
+          label: "safe",
+        });
+
+        expect(d.categoryLabel).toBeNull();
+        expect(d.passLabel).toEqual({ text: "Pass", color: "green.fg" });
+      });
+
+      /** @scenario An evaluator with no label is unchanged */
+      it("reports no category for an evaluator that produced none", () => {
+        const d = getEvalChipDisplay({
+          name: "Topic Adherence",
+          status: "processed",
+          scoreType: "numeric",
+          score: 8.2,
+        });
+
+        expect(d.categoryLabel).toBeNull();
+        expect(d.scoreText).toBe("8.2");
+      });
+    });
+  });
+
+  describe("given a categorising evaluator that never ran", () => {
+    describe("when getEvalChipDisplay formats the result", () => {
+      it("reports no category for a skipped run, whose label is not a verdict", () => {
+        const d = getEvalChipDisplay({
+          name: "Max conversation outcome",
+          status: "skipped",
+          scoreType: "categorical",
+          label: "resolved",
+          passed: null,
+        });
+
+        expect(d.categoryLabel).toBeNull();
+        expect(d.noVerdict).toBe(true);
+      });
+    });
+  });
 });

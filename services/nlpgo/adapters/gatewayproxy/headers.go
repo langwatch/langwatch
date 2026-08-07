@@ -47,6 +47,13 @@ const (
 	headerVertexProject     = "x-litellm-vertex_project"
 	headerVertexLocation    = "x-litellm-vertex_location"
 
+	// Gemini's second door: present together, they mark an Agent Platform
+	// credential and the gateway dispatches to aiplatform.googleapis.com
+	// at the path they name. See
+	// specs/model-providers/google-agent-platform.feature.
+	headerGeminiProject  = "x-litellm-project_id"
+	headerGeminiLocation = "x-litellm-region"
+
 	headerExtraHeaders = "x-litellm-extra_headers"
 	headerUseAzureGW   = "x-litellm-use_azure_gateway"
 )
@@ -85,6 +92,16 @@ func ParseCredentialFromHeaders(h http.Header) (domain.Credential, error) {
 		if provider == domain.ProviderOpenAI {
 			if org := h.Get(headerOrganization); org != "" {
 				cred.Extra["organization"] = org
+			}
+		}
+		if provider == domain.ProviderGemini {
+			// Both or neither — one without the other names no door, and
+			// the gateway's agent-platform detection requires the pair.
+			project := h.Get(headerGeminiProject)
+			location := h.Get(headerGeminiLocation)
+			if project != "" && location != "" {
+				cred.Extra["project_id"] = project
+				cred.Extra["region"] = location
 			}
 		}
 	case domain.ProviderAzure:

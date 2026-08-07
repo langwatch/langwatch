@@ -18,6 +18,8 @@
  * @see specs/scenarios/scenario-infra-error-surfacing.feature
  */
 
+import { CODING_ASSISTANT_SURFACES_ONLY_NEEDLE } from "../modelProviders/codexRefusalMessage";
+
 export const ScenarioInfraErrorCode = {
   /** The runner couldn't establish TLS because the certificate isn't trusted. */
   UntrustedCertificate: "scenario_untrusted_certificate",
@@ -25,6 +27,8 @@ export const ScenarioInfraErrorCode = {
   PlatformUnreachable: "scenario_platform_unreachable",
   /** The model provider rejected the request (bad key, unknown model, …). */
   ModelProviderError: "scenario_model_provider_error",
+  /** The resolved model is licensed for the coding-assistant surfaces only and can't run this simulation. */
+  ModelNotAllowedForSurface: "scenario_model_not_allowed_for_surface",
   /** The judge combined a forced function tool with incompatible reasoning. */
   ModelToolReasoningConflict: "scenario_model_tool_reasoning_conflict",
   /** The run exceeded its time budget. */
@@ -135,6 +139,21 @@ const CLASSIFICATION_RULES: ClassificationRule[] = [
       message:
         "The selected judge model cannot use its current reasoning mode with the judge's function tool.",
       hint: "Choose a different judge model. If you manage this model request directly, use the Responses API or disable reasoning for Chat Completions.",
+    }),
+  },
+  {
+    // A terms-restricted model (codex) ran outside the coding-assistant
+    // surfaces its plan licenses — the resolver only lets a saved value
+    // reach execution when it predates the restriction (see
+    // resolveModelForFeature.ts's restricted-model skip). Kept ahead of the
+    // generic model-provider rule below since this is the more specific,
+    // more actionable failure.
+    needles: [CODING_ASSISTANT_SURFACES_ONLY_NEEDLE],
+    build: () => ({
+      code: ScenarioInfraErrorCode.ModelNotAllowedForSurface,
+      message:
+        "The configured model is only licensed for coding-assistant features and can't run this simulation.",
+      hint: "Choose a different default model in Settings > Model Providers.",
     }),
   },
   {
@@ -308,6 +327,8 @@ export function scenarioErrorTitle(code: ScenarioInfraErrorCode): string {
       return "Couldn't reach the endpoint";
     case ScenarioInfraErrorCode.ModelProviderError:
       return "Model provider error";
+    case ScenarioInfraErrorCode.ModelNotAllowedForSurface:
+      return "Model not allowed for this simulation";
     case ScenarioInfraErrorCode.ModelToolReasoningConflict:
       return "Judge model configuration conflict";
     case ScenarioInfraErrorCode.ExecutionTimeout:

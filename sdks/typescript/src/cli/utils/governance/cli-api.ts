@@ -675,7 +675,7 @@ export async function cloneIngestionTemplateFromPlatform(
   const body = await requestREST<{ ingestion_template: IngestionTemplateRow }>(
     cfg,
     "POST",
-    "/api/governance/ingestion-templates/clone-from-platform",
+    "/api/governance/ingestion-templates/clone",
     {
       ...options,
       body: { source_template_id: sourceTemplateId },

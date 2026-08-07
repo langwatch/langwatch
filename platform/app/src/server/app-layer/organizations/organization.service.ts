@@ -25,6 +25,7 @@ import type {
   OrganizationRepository,
   OrganizationWithAdmins,
   OrganizationWithMembersAndTheirTeams,
+  UpdateMemberRoleResult,
   UpdateOrganizationInput,
 } from "./repositories/organization.repository";
 
@@ -311,7 +312,7 @@ export class OrganizationService {
     currentMemberships: Array<{ teamId: string; role: TeamUserRole }>;
     organizationTeamIds: string[];
     currentUserId: string;
-  }): Promise<void> {
+  }): Promise<UpdateMemberRoleResult> {
     const {
       organizationId,
       userId,
@@ -353,7 +354,7 @@ export class OrganizationService {
       newOrganizationRole: role,
     });
 
-    await this.repo.updateMemberRole({
+    return await this.repo.updateMemberRole({
       organizationId,
       userId,
       role,

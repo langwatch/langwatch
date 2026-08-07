@@ -5,10 +5,13 @@ import path from "path";
 
 import { app as agentsApp } from "../app/api/agents/[[...route]]/app";
 import { app as analyticsApp } from "../app/api/analytics/[...route]/app";
+import { app as apiKeysApp } from "../app/api/api-keys/[[...route]]/app";
+import { app as codingAgentApp } from "../app/api/coding-agent/[[...route]]/app";
 import { app as dashboardsApp } from "../app/api/dashboards/[[...route]]/app";
 import { app as datasetApp } from "../app/api/dataset/[[...route]]/app";
 import { app as evaluatorsApp } from "../app/api/evaluators/[[...route]]/app";
 import { app as eventsApp } from "../app/api/events/[[...route]]/app";
+import { app as experimentsApp } from "../app/api/experiments/[[...route]]/app";
 import { app as gatewayPlatformApp } from "../app/api/gateway-platform/[[...route]]/app";
 import { app as gatewaySpendApp } from "../app/api/gateway-spend/[[...route]]/app";
 import { app as governanceApp } from "../app/api/governance/[[...route]]/app";
@@ -19,6 +22,15 @@ import { app as modelDefaultsApp } from "../app/api/model-defaults/[[...route]]/
 import { app as modelProvidersApp } from "../app/api/model-providers/[[...route]]/app";
 import { app as monitorsApp } from "../app/api/monitors/[[...route]]/app";
 import rawCurrentSpec from "../app/api/openapiLangWatch.json";
+import { app as projectsApp } from "../app/api/projects/[[...route]]/app";
+// The two legacy route files below are wired in for the routes they describe
+// and nothing else: `generateSpecs` skips any handler without `describeRoute`,
+// so the unannotated siblings sharing these files (the stripe webhook, the demo
+// bot, the MCP authorize step) cannot reach a public document merely by living
+// next to something that is published.
+import { app as evaluationsLegacyApp } from "../server/routes/evaluations-legacy";
+import { app as experimentsV3App } from "../server/routes/experiments-v3";
+import { app as miscApp } from "../server/routes/misc";
 
 // Surfaces whose routes come straight from their Hono apps. Their paths
 // REPLACE on merge, and any path the apps no longer serve is pruned from
@@ -26,15 +38,30 @@ import rawCurrentSpec from "../app/api/openapiLangWatch.json";
 // the merge union forever.
 const APP_DERIVED_PREFIXES = [
   "/api/agents",
+  "/api/api-keys",
   "/api/analytics",
+  "/api/coding-agent",
   "/api/dashboards",
   "/api/evaluators",
   "/api/events",
+  // Singular and plural are two surfaces, not one: `/api/experiment/init` lives
+  // in `misc.ts`, the rest under `/api/experiments`. Both used to be
+  // hand-maintained entries in the JSON; they are generated now, so the
+  // hand-written copies are pruned here.
+  "/api/experiment",
+  "/api/experiments",
+  "/api/guardrails",
+  "/api/evaluations",
+  "/api/dspy",
+  "/api/optimization",
+  "/api/track_event",
+  "/api/trigger",
   "/api/webhooks",
   "/api/gateway/v1",
   "/api/governance",
   "/api/graphs",
   "/api/me",
+  "/api/projects",
   "/api/prompts",
   "/api/dataset",
   "/api/model-providers",
@@ -47,16 +74,30 @@ const APP_DERIVED_PREFIXES = [
   "/api/traces",
   "/api/triggers",
   "/api/workflows",
-];
+] as const;
+
+/**
+ * Whether a path is owned by one of the apps above — the prefix itself, or
+ * anything below it.
+ *
+ * The boundary is a whole path segment, which rules out both directions of
+ * accident: a bare `startsWith` would let `/api/experiment` claim a future
+ * `/api/experimental-runs`, and a substring test would match the prefix
+ * anywhere in the key, including keys that are not paths at all. `customMerge`
+ * runs at every level of the merge, so it is asked about `paths`, `components`
+ * and every operation field too.
+ */
+const isAppDerivedPath = (key: string): boolean =>
+  APP_DERIVED_PREFIXES.some(
+    (prefix) => key === prefix || key.startsWith(`${prefix}/`),
+  );
 
 const currentSpec = {
   ...rawCurrentSpec,
   paths: Object.fromEntries(
     Object.entries(
       (rawCurrentSpec as { paths?: Record<string, unknown> }).paths ?? {},
-    ).filter(
-      ([route]) => !APP_DERIVED_PREFIXES.some((p) => route.startsWith(p)),
-    ),
+    ).filter(([route]) => !isAppDerivedPath(route)),
   ),
 };
 
@@ -95,8 +136,12 @@ export default async function execute() {
   console.log("Generating OpenAPI spec...");
   console.log("Building agents spec...");
   const agentsSpec = await generateSpecs(agentsApp);
+  console.log("Building api keys spec...");
+  const apiKeysSpec = await generateSpecs(apiKeysApp);
   console.log("Building analytics spec...");
   const analyticsSpec = await generateSpecs(analyticsApp);
+  console.log("Building coding agent spec...");
+  const codingAgentSpec = await generateSpecs(codingAgentApp);
   console.log("Building dashboards spec...");
   const dashboardsSpec = await generateSpecs(dashboardsApp);
   console.log("Building dataset spec...");
@@ -105,6 +150,14 @@ export default async function execute() {
   const evaluatorsSpec = await generateSpecs(evaluatorsApp);
   console.log("Building events spec...");
   const eventsSpec = await generateSpecs(eventsApp);
+  console.log("Building experiments spec...");
+  const experimentsSpec = await generateSpecs(experimentsApp);
+  console.log("Building legacy evaluations spec...");
+  const evaluationsLegacySpec = await generateSpecs(evaluationsLegacyApp);
+  console.log("Building experiment runs spec...");
+  const experimentsV3Spec = await generateSpecs(experimentsV3App);
+  console.log("Building experiment init spec...");
+  const miscSpec = await generateSpecs(miscApp);
   console.log("Building gateway-platform spec...");
   const gatewayPlatformSpec = await generateSpecs(gatewayPlatformApp);
   console.log("Building governance spec...");
@@ -123,6 +176,8 @@ export default async function execute() {
   const modelDefaultsSpec = await generateSpecs(modelDefaultsApp);
   console.log("Building model providers spec...");
   const modelProvidersSpec = await generateSpecs(modelProvidersApp);
+  console.log("Building projects spec...");
+  const projectsSpec = await generateSpecs(projectsApp);
   console.log("Building secrets spec...");
   const secretsSpec = await generateSpecs(secretsApp);
   console.log("Building scenarios spec...");
@@ -149,11 +204,17 @@ export default async function execute() {
     [
       currentSpec,
       agentsSpec,
+      apiKeysSpec,
       analyticsSpec,
+      codingAgentSpec,
       dashboardsSpec,
       datasetSpec,
       evaluatorsSpec,
       eventsSpec,
+      experimentsSpec,
+      evaluationsLegacySpec,
+      experimentsV3Spec,
+      miscSpec,
       gatewayPlatformSpec,
       governanceSpec,
       graphsSpec,
@@ -164,6 +225,7 @@ export default async function execute() {
       monitorsSpec,
       scenarioEventsSpec,
       scenariosSpec,
+      projectsSpec,
       secretsSpec,
       simulationRunsSpec,
       suitesSpec,
@@ -181,7 +243,7 @@ export default async function execute() {
       customMerge(key) {
         // Since we get these routes from the app directly,
         // we don't want to merge, we just want to replace.
-        if (APP_DERIVED_PREFIXES.some((p) => key.includes(p))) {
+        if (isAppDerivedPath(key)) {
           // Replace with new
           return (_target, source) => {
             return source;
@@ -193,6 +255,43 @@ export default async function execute() {
 
   fs.writeFileSync(
     path.join(__dirname, "../app/api/openapiLangWatch.json"),
-    JSON.stringify(mergedSpec, null, 2),
+    JSON.stringify(withoutEmptyPaths(mergedSpec), null, 2),
   );
+}
+
+const OPENAPI_METHODS = [
+  "get",
+  "post",
+  "put",
+  "patch",
+  "delete",
+  "head",
+  "options",
+  "trace",
+] as const;
+
+/**
+ * Drops path entries left holding no operation.
+ *
+ * `describeRoute({ hide: true })` removes the operation but keeps its path key,
+ * so a hidden route leaves `"/api/experiments/execute": {}` behind — an entry
+ * that documents nothing and reads, to anything scanning the document, as a
+ * path we publish.
+ */
+function withoutEmptyPaths<T extends { paths?: Record<string, unknown> }>(
+  spec: T,
+): T {
+  const paths = spec.paths;
+  if (!paths) return spec;
+
+  return {
+    ...spec,
+    paths: Object.fromEntries(
+      Object.entries(paths).filter(([, item]) =>
+        OPENAPI_METHODS.some(
+          (method) => (item as Record<string, unknown>)?.[method] !== undefined,
+        ),
+      ),
+    ),
+  };
 }

@@ -268,7 +268,10 @@ registry, and dashboard stay the same.
   `--yes` skips the picker and applies only the safe categories. Agents (and
   any non-TTY) get the read-only report and delete nothing.
 - **`haven typecheck`.** Run `pnpm typecheck` under a machine-wide slot so parallel
-  tsgo runs across worktrees don't exhaust RAM (bounded by memory / CPU).
+  tsgo runs across worktrees don't exhaust RAM (bounded by memory / CPU). The
+  `typecheck` script slots itself too (`dev/scripts/check-queue.mjs`,
+  `CHECK_SLOTS`), so this command passes `CHECK_SLOTS=0` to the run it
+  spawns and stays the only thing counting it.
 - **AI-gated HMR.** `haven hmr on [--ttl 30s] | off` defers Vite reloads while an
   agent edits, then fires one catch-up reload — a human's browser isn't thrashed
   through broken intermediate states. Opt-in and always time-bounded.

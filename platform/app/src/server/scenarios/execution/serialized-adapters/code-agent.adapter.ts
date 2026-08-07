@@ -63,7 +63,15 @@ export class SerializedCodeAgentAdapter extends AgentAdapter {
   constructor(
     private readonly config: CodeAgentData,
     private readonly nlpServiceUrl: string,
-    private readonly apiKey: string,
+    /**
+     * The LangWatch platform API key (project.apiKey), sent as
+     * workflow.api_key on the synthesized entry->code->end workflow. nlpgo
+     * forwards it verbatim as the X-Auth-Token header on its callbacks into
+     * the platform (agentblock/workflow_runner.go, evaluatorblock/executor.go,
+     * engine.go) — never an LLM provider credential, so it must not be
+     * sourced from litellm params (issue #6634).
+     */
+    private readonly projectApiKey: string,
   ) {
     super();
     this.name = "SerializedCodeAgentAdapter";
@@ -107,7 +115,7 @@ export class SerializedCodeAgentAdapter extends AgentAdapter {
         : [{ identifier: "output", type: "str" }];
 
     return {
-      api_key: this.apiKey,
+      api_key: this.projectApiKey,
       workflow_id: `scenario-code-${this.config.agentId}`,
       spec_version: LATEST_SPEC_VERSION,
       name: "Scenario Code Execution",

@@ -26,7 +26,10 @@ import {
 } from "~/server/app-layer/traces/coding-agent-transcript.derivation";
 import { deriveTraceStatus } from "~/server/app-layer/traces/derive-trace-status";
 import { TraceNotFoundError } from "~/server/app-layer/traces/errors";
-import { translateFilterToClickHouse } from "~/server/app-layer/traces/filter-to-clickhouse";
+import {
+  extractFreeTextTerms,
+  translateFilterToClickHouse,
+} from "~/server/app-layer/traces/filter-to-clickhouse";
 import {
   DERIVED_INPUT_ATTR_PREFIX,
   DERIVED_OUTPUT_ATTR_PREFIX,
@@ -35,6 +38,7 @@ import { deriveUnmappedCostSuggestion } from "~/server/app-layer/traces/model-co
 import type {
   SpanSummaryPage,
   SpanSummaryRow,
+  TraceEventRollup,
 } from "~/server/app-layer/traces/repositories/span-storage.repository";
 import {
   traceMetadataUpdateSchema,
@@ -85,7 +89,13 @@ import {
 } from "~/shared/traces/media-refs";
 import { checkProjectPermission } from "../rbac";
 import { getUserProtectionsForProject } from "../utils";
-import { gateHeaderCost, gateResources, gateTreeCost } from "./tracesV2.gates";
+import {
+  gateHeaderCost,
+  gateResources,
+  gateSessionCost,
+  gateSessionTitle,
+  gateTreeCost,
+} from "./tracesV2.gates";
 import { withoutHiddenResourceAttrs } from "./tracesV2.resourceAttrs";
 import type {
   ContentPrivacy,
@@ -591,6 +601,50 @@ function turnsHiddenForViewer(protections: V2Protections): {
 }
 
 /**
+ * The free-text terms the session search is allowed to match against
+ * transcript bodies, for this viewer.
+ *
+ * These compile into `positionCaseInsensitive` predicates over `log_records`,
+ * against BOTH `BodyText` (captured prompts, tool content, raw request
+ * bodies) and `AttributesFlatJson` (every attribute on the record, flattened
+ * to one JSON blob). Whether a session matches a term IS that content: a
+ * viewer who cannot read it must not be able to probe it either, one guess at
+ * a time, through which rows come back and what the total says. Redacting the
+ * previews afterwards does not help, because the answer already rode out in
+ * the row list.
+ *
+ * So a viewer under ANY content protection searches the trace-level columns
+ * only, the same ones the filter translator already applies to them, and the
+ * transcript reach is dropped rather than narrowed: the body is one blob, it
+ * cannot be matched per category or per attribute key. This covers three
+ * independent protection dimensions, and any one of them drops the whole
+ * search: whole-category visibility (`canSeeCapturedInput`/`Output`),
+ * per-turn-role visibility (`contentCategories`, system/tools), and custom
+ * attribute restrict rules (`hiddenAttributes`) — a rule can hide one
+ * attribute's value while leaving input/output and every category fully
+ * visible, and `AttributesFlatJson` carries that value the same as any other.
+ */
+export function contentSearchTermsForViewer({
+  terms,
+  protections,
+}: {
+  terms: string[];
+  protections: V2Protections;
+}): string[] {
+  if (terms.length === 0) return terms;
+  if (
+    protections.canSeeCapturedInput !== true ||
+    protections.canSeeCapturedOutput !== true
+  ) {
+    return [];
+  }
+  const { roles, stripToolCalls } = turnsHiddenForViewer(protections);
+  if (roles.size > 0 || stripToolCalls) return [];
+  if ((protections.hiddenAttributes?.length ?? 0) > 0) return [];
+  return terms;
+}
+
+/**
  * Synthetic hidden-attribute rules for the standalone system/tools attribute
  * keys (`gen_ai.system_instructions`, `gen_ai.tool.call.*`, …) when those
  * categories are hidden from the viewer, so their values are replaced by the
@@ -864,6 +918,13 @@ const timeRangeSchema = z.object({
   live: z.boolean().optional(),
 });
 
+/**
+ * Ceiling on one `listEvents` call, matching the list's largest page size.
+ * The read is a primary-key `IN` over `(TenantId, TraceId, SpanId)`, so it
+ * scales with the page rather than the project — but only if the page does.
+ */
+const MAX_LIST_EVENT_TRACE_IDS = 1000;
+
 const sortSchema = z.object({
   columnId: z.string(),
   direction: z.enum(["asc", "desc"]),
@@ -1122,6 +1183,90 @@ export const tracesV2Router = createTRPCRouter({
         items: page.items.map((it) => redactV2Content(it, protections)),
       };
     }),
+
+  /**
+   * The Sessions lens read (specs/traces-v2/sessions-lens.feature): one row
+   * per `gen_ai.conversation.id` with TRUE rollups computed in ClickHouse
+   * over every trace of the session in range, unlike the client grouping it
+   * replaces, which could only sum the fetched page. The free-text query
+   * ALSO matches session transcript content in `log_records`, so searching
+   * "#6418" finds the session whose transcript mentions it, for a viewer
+   * allowed to read that content: see `contentSearchTermsForViewer`.
+   */
+  sessions: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        timeRange: timeRangeSchema,
+        sort: sortSchema.optional(),
+        pageSize: z.number().int().min(1).max(100).default(50),
+        cursor: z.string().optional(),
+        query: z.string().nullish(),
+      }),
+    )
+    .use(checkProjectPermission("traces:view"))
+    .query(async ({ input, ctx }) => {
+      const app = getApp();
+      const protections = await getUserProtectionsForProject(ctx, {
+        projectId: input.projectId,
+      });
+      const result = await app.traces.sessionGroups.getSessionGroups({
+        tenantId: input.projectId,
+        timeRange: input.timeRange,
+        sort: input.sort,
+        pageSize: input.pageSize,
+        cursor: input.cursor,
+        filterWhere: buildFilterWhere(input),
+        contentTerms: contentSearchTermsForViewer({
+          terms: extractFreeTextTerms(input.query ?? ""),
+          protections,
+        }),
+        visibilityCutoffMs: await getVisibilityCutoffMsForProject(
+          input.projectId,
+        ),
+      });
+      return {
+        ...result,
+        // Previews and the generated session title are captured content,
+        // spend follows cost:view. The same viewer gates the trace header
+        // applies (ADR-057).
+        sessions: gateSessionCost({
+          sessions: gateSessionTitle({
+            sessions: result.sessions.map((session) =>
+              redactV2Content(session, protections),
+            ),
+            protections,
+          }),
+          protections,
+        }),
+      };
+    }),
+
+  /**
+   * Event rollups for the trace list's Events column, keyed by trace id.
+   *
+   * Its own query rather than part of `list`: events live in `stored_spans`,
+   * not on the summary fold, so bundling them would put a second table's read
+   * in front of the paint that every user waits on — including the ones whose
+   * columns and grouping never ask for events.
+   */
+  listEvents: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        traceIds: z.array(z.string().min(1)).max(MAX_LIST_EVENT_TRACE_IDS),
+        timeRange: timeRangeSchema,
+      }),
+    )
+    .use(checkProjectPermission("traces:view"))
+    .query(
+      async ({ input }): Promise<Record<string, TraceEventRollup>> =>
+        getApp().traces.spans.getTraceEventRollupsByTraceIds({
+          tenantId: input.projectId,
+          traceIds: input.traceIds,
+          timeRange: input.timeRange,
+        }),
+    ),
 
   facets: protectedProcedure
     .input(

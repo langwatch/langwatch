@@ -346,7 +346,7 @@ export type SimpleMappingValidationResult = {
 
 /**
  * Core validation logic for evaluator mappings.
- * Used by both validateEvaluatorMappings and validateEvaluatorMappingsWithFields.
+ * Used by validateEvaluatorMappingsWithFields.
  */
 const validateMappingsCore = (
   requiredFields: string[],
@@ -390,32 +390,6 @@ const validateMappingsCore = (
 };
 
 /**
- * Check if mappings are valid for an evaluator type.
- * This is a simpler version that works with just mappings and evaluator type,
- * without needing the full EvaluatorConfig.
- *
- * Validation rules:
- * 1. ALL required fields MUST have mappings
- * 2. Optional fields MAY have mappings
- * 3. BUT if ALL fields (required + optional) are empty, that's also invalid
- *    (at least one field must be mapped)
- *
- * @param evaluatorType - The evaluator type (e.g., "langevals/exact_match")
- * @param mappings - The current mappings (field -> mapping)
- * @returns Validation result
- */
-export const validateEvaluatorMappings = (
-  evaluatorType: string,
-  mappings: Record<string, { type: string; path?: string[] } | undefined>,
-): SimpleMappingValidationResult => {
-  const evaluatorDef = AVAILABLE_EVALUATORS[evaluatorType as EvaluatorTypes];
-  const requiredFields = evaluatorDef?.requiredFields ?? [];
-  const optionalFields = evaluatorDef?.optionalFields ?? [];
-
-  return validateMappingsCore(requiredFields, optionalFields, mappings);
-};
-
-/**
  * Check if mappings are valid given explicit field definitions.
  * Use this when you already have the field definitions and don't need to look them up.
  *
@@ -431,6 +405,34 @@ export const validateEvaluatorMappingsWithFields = (
 ): SimpleMappingValidationResult => {
   return validateMappingsCore(requiredFields, optionalFields, mappings);
 };
+
+/**
+ * Whether the evaluator's fields come from somewhere other than the built-in
+ * catalog, so a missing catalog entry says nothing about it.
+ */
+const isDefinedOutsideTheCatalog = (evaluatorType: string): boolean =>
+  evaluatorType.startsWith("custom/") ||
+  evaluatorType.startsWith("code/") ||
+  evaluatorType === "workflow";
+
+/**
+ * What to report for a built-in evaluator with no catalog entry: it cannot run
+ * whatever the mappings say, so the evaluator itself is the finding. Calling
+ * the mappings complete would let the row be queued against an evaluator that
+ * is not there.
+ */
+const unavailableEvaluatorResult = (
+  evaluatorType: string,
+): EvaluatorValidationResult => ({
+  isValid: false,
+  missingMappings: [
+    {
+      fieldId: "evaluatorType",
+      fieldName: `${evaluatorType} is not available`,
+      isRequired: true,
+    },
+  ],
+});
 
 /**
  * Check if an evaluator has all required mappings for a specific target and dataset.
@@ -491,6 +493,11 @@ export const getEvaluatorMissingMappings = (
   // Get the evaluator definition to know which fields are required vs optional
   const evaluatorDef =
     AVAILABLE_EVALUATORS[evaluator.evaluatorType as EvaluatorTypes];
+
+  if (!evaluatorDef && !isDefinedOutsideTheCatalog(evaluator.evaluatorType)) {
+    return unavailableEvaluatorResult(evaluator.evaluatorType);
+  }
+
   const requiredFieldsArr = evaluatorDef?.requiredFields ?? [];
   const optionalFieldsArr = evaluatorDef?.optionalFields ?? [];
 

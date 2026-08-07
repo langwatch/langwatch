@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import {
   featureEnv,
   LANGY_ENV_KEY,
-  LEGACY_EVALUATORS_ENV_KEY,
   LINGUA_ENV_KEY,
   PRESIDIO_ENV_KEY,
   resolveFeatures,
@@ -15,7 +14,6 @@ describe("optional install pieces", () => {
       expect(f.isLangyEnabled).toBe(true);
       expect(f.isPresidioEnabled).toBe(false);
       expect(f.isLinguaEnabled).toBe(false);
-      expect(f.isLegacyEvaluatorsEnabled).toBe(false);
     });
   });
 
@@ -28,11 +26,8 @@ describe("optional install pieces", () => {
       expect(resolveFeatures({ [LANGY_ENV_KEY]: "false" }).isLangyEnabled).toBe(false);
     });
 
-    it("honours opting into language detection and legacy evaluators", () => {
+    it("honours opting into language detection", () => {
       expect(resolveFeatures({ [LINGUA_ENV_KEY]: "true" }).isLinguaEnabled).toBe(true);
-      expect(
-        resolveFeatures({ [LEGACY_EVALUATORS_ENV_KEY]: "true" }).isLegacyEvaluatorsEnabled,
-      ).toBe(true);
     });
 
     it("accepts the spellings people actually type", () => {
@@ -65,7 +60,6 @@ describe("optional install pieces", () => {
         [LANGY_ENV_KEY]: "true",
         [PRESIDIO_ENV_KEY]: "true",
         [LINGUA_ENV_KEY]: "false",
-        [LEGACY_EVALUATORS_ENV_KEY]: "false",
       });
     });
   });

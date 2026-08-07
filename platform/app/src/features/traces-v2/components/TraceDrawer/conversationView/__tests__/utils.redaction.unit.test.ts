@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { TraceListItem } from "../../../../types/trace";
+import { NO_TRACE_EVENTS } from "../../../../types/trace";
 import type { ParsedTurn } from "../types";
 import { buildConversationMarkdownChunks } from "../utils";
 
@@ -27,7 +28,7 @@ const trace = (overrides: Partial<TraceListItem> = {}): TraceListItem => ({
   input: null,
   output: null,
   evaluations: [],
-  events: [],
+  events: NO_TRACE_EVENTS,
   origin: "application",
   ...overrides,
 });

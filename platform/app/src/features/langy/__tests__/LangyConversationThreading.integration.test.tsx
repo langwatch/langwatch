@@ -105,8 +105,8 @@ vi.mock("~/utils/api", () => ({
       langy: {
         list: { invalidate: () => Promise.resolve() },
       },
-      langyGithub: {
-        getInstallStatus: { invalidate: () => Promise.resolve() },
+      github: {
+        getConnectionStatus: { invalidate: () => Promise.resolve() },
       },
     }),
     useContext: () => ({
@@ -121,8 +121,8 @@ vi.mock("~/utils/api", () => ({
         detail: { setData: () => undefined },
       },
     }),
-    langyGithub: {
-      getInstallStatus: {
+    github: {
+      getConnectionStatus: {
         useQuery: () => ({ data: undefined, isLoading: false, isError: true }),
       },
       disconnect: {

@@ -242,11 +242,6 @@
           "type": "toml",
           "path": "evaluators/presidio/pyproject.toml",
           "jsonpath": "$.project.version"
-        },
-        {
-          "type": "toml",
-          "path": "evaluators/legacy/pyproject.toml",
-          "jsonpath": "$.project.version"
         }
       ]
     },

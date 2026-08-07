@@ -1,6 +1,5 @@
 import crypto from "node:crypto";
 import { createLogger } from "@langwatch/observability";
-import { bodyLimit } from "hono/body-limit";
 import type { ZodError } from "zod";
 import { fromZodError } from "zod-validation-error";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
@@ -37,6 +36,7 @@ import {
   spanValidatorSchema,
 } from "../tracer/types";
 import { CollectorSpanUtils } from "../traces/collectorSpan.utils";
+import { bodyLimit } from "./_lib/body-limit";
 
 const logger = createLogger("langwatch.collector");
 const tokenResolver = TokenResolver.create(prisma);
@@ -660,7 +660,7 @@ secured
       }
 
       // Total ingestion failure: every dispatched span failed (e.g. Redis /
-      // group-queue outage). With the BullMQ fallback stack gone, a 200 here
+      // group-queue outage). There is no fallback stack, so a 200 here
       // would tell the SDK the trace landed and it would never retry —
       // permanent trace loss. Return 500 so clients retry; the dedup gate
       // releases failed spans via tryReleaseOnFailure, so a retry is safe.
