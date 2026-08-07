@@ -335,8 +335,12 @@ describe("Feature: Object storage provider parity and migration", () => {
       },
     ]);
 
+    // The message must name the row: this aborts the entire run, and the
+    // two addresses differ only in the bucket/account, which redaction masks
+    // — so the id is the operator's only way to tell a mis-set destination
+    // endpoint from real corruption.
     await expect(state.migration.copy()).rejects.toThrow(
-      /destination scheme.*configured destination address/,
+      new RegExp(`Stored object ${row.id} \\(project project-1\\)`),
     );
   });
 

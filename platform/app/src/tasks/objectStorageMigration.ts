@@ -226,8 +226,14 @@ export class ObjectStorageMigration {
       );
       if (row.storage_uri.startsWith(`${this.deps.destination.scheme}://`)) {
         if (row.storage_uri !== destinationUri) {
+          // This aborts the whole run, so it has to say WHICH row. The two
+          // addresses themselves cannot go in the message: they differ only
+          // in the bucket / storage account, which is exactly what
+          // redactStorageUri masks, so quoting them would print two identical
+          // strings. The id is what lets the operator look the row up and
+          // tell a mis-set destination endpoint from real corruption.
           throw new MigrationBlockedError(
-            "A stored object already uses the destination scheme but not the configured destination address",
+            `Stored object ${row.id} (project ${row.project_id}) already uses the ${this.deps.destination.scheme} scheme, but its recorded bucket/account is not the one configured as this migration's destination`,
           );
         }
         await assertUriDigest(
