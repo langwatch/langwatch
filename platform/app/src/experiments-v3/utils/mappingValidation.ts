@@ -407,6 +407,34 @@ export const validateEvaluatorMappingsWithFields = (
 };
 
 /**
+ * Whether the evaluator's fields come from somewhere other than the built-in
+ * catalog, so a missing catalog entry says nothing about it.
+ */
+const isDefinedOutsideTheCatalog = (evaluatorType: string): boolean =>
+  evaluatorType.startsWith("custom/") ||
+  evaluatorType.startsWith("code/") ||
+  evaluatorType === "workflow";
+
+/**
+ * What to report for a built-in evaluator with no catalog entry: it cannot run
+ * whatever the mappings say, so the evaluator itself is the finding. Calling
+ * the mappings complete would let the row be queued against an evaluator that
+ * is not there.
+ */
+const unavailableEvaluatorResult = (
+  evaluatorType: string,
+): EvaluatorValidationResult => ({
+  isValid: false,
+  missingMappings: [
+    {
+      fieldId: "evaluatorType",
+      fieldName: `${evaluatorType} is not available`,
+      isRequired: true,
+    },
+  ],
+});
+
+/**
  * Check if an evaluator has all required mappings for a specific target and dataset.
  *
  * Validation rules:
@@ -466,28 +494,8 @@ export const getEvaluatorMissingMappings = (
   const evaluatorDef =
     AVAILABLE_EVALUATORS[evaluator.evaluatorType as EvaluatorTypes];
 
-  // A built-in evaluator with no catalog entry cannot run, whatever the
-  // mappings say. Reporting the mappings as complete would let the row be
-  // queued for an evaluator that is not there, so the evaluator itself is the
-  // finding. Custom, code and workflow evaluators are defined elsewhere and are
-  // never expected in the catalog.
-  const evaluatorType: string = evaluator.evaluatorType;
-  const isDefinedOutsideTheCatalog =
-    evaluatorType.startsWith("custom/") ||
-    evaluatorType.startsWith("code/") ||
-    evaluatorType === "workflow";
-
-  if (!evaluatorDef && !isDefinedOutsideTheCatalog) {
-    return {
-      isValid: false,
-      missingMappings: [
-        {
-          fieldId: "evaluatorType",
-          fieldName: `${evaluator.evaluatorType} is not available`,
-          isRequired: true,
-        },
-      ],
-    };
+  if (!evaluatorDef && !isDefinedOutsideTheCatalog(evaluator.evaluatorType)) {
+    return unavailableEvaluatorResult(evaluator.evaluatorType);
   }
 
   const requiredFieldsArr = evaluatorDef?.requiredFields ?? [];
