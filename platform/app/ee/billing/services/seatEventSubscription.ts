@@ -39,10 +39,17 @@ export type SeatEventSubscriptionFns = ReturnType<
 >;
 
 /**
+ * The two fields a seat quote is allowed to read, and the only invoice they
+ * mean anything on: an `always_invoice` preview, where the invoice IS the
+ * immediate one — only the proration lines, not next cycle's recurring and
+ * metered usage. On any other invoice `total` includes those, and the
+ * arithmetic below quotes a number the card is never charged. The narrow type
+ * is what keeps a future caller from handing it one.
+ */
+type AlwaysInvoicePreview = Pick<Stripe.Invoice, "total" | "amount_due">;
+
+/**
  * The two money figures a seat quote reports, read off a previewed invoice.
- *
- * For an `always_invoice` preview the invoice IS the immediate one: it carries
- * only the proration lines, not next cycle's recurring and metered usage.
  *
  * **`total`, never a sum over `lines.data`.** Line amounts are pre-tax, so a
  * customer billed in a tax-exclusive currency was quoted a fifth under what
@@ -66,7 +73,7 @@ export type SeatEventSubscriptionFns = ReturnType<
  * branch: a credit is described by the signed total, a charge by the amount
  * actually due.
  */
-const quotedAmounts = (preview: Stripe.Invoice) => {
+const quotedAmounts = (preview: AlwaysInvoicePreview) => {
   const invoiceTotalCents = preview.total;
   const isCredit = invoiceTotalCents < 0;
 
