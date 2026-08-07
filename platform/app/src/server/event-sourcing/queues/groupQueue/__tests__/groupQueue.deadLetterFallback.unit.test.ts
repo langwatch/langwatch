@@ -66,8 +66,21 @@ function makeDefinition(): EventSourcedQueueDefinition<TestPayload> {
   };
 }
 
+/**
+ * A score the re-stage guard accepts unchanged (Nov 2023 — above
+ * `MIN_PLAUSIBLE_EPOCH_MS`). It has to be a real timestamp: `restageScore` heals
+ * anything below that floor to the staging clock, so an arbitrary small number
+ * here would assert that an implausible score is written back verbatim, which is
+ * the defect the guard exists to prevent.
+ */
+const PLAUSIBLE_SCORE = 1_700_000_000_000;
+
 function makeSibling(): DrainedJob {
-  return { stagedJobId: "sib-1", jobDataJson: RAW_VALUE, originalScore: 4242 };
+  return {
+    stagedJobId: "sib-1",
+    jobDataJson: RAW_VALUE,
+    originalScore: PLAUSIBLE_SCORE,
+  };
 }
 
 /**
@@ -165,7 +178,7 @@ describe("GroupQueueProcessor drained-sibling dead-letter durability — write f
           stagedJobId: "sib-1",
           jobDataJson: RAW_VALUE,
           reason: "sibling_restage_failed",
-          originalScore: 4242,
+          originalScore: PLAUSIBLE_SCORE,
         });
 
         // Falsifiability: drop the fallback (call preserveForDlq/writeJobToDlq
@@ -176,9 +189,48 @@ describe("GroupQueueProcessor drained-sibling dead-letter durability — write f
             stagedJobId: "sib-1",
             groupId: GROUP_ID,
             jobDataJson: RAW_VALUE,
-            dispatchAfterMs: 4242,
+            dispatchAfterMs: PLAUSIBLE_SCORE,
           }),
         );
+        // The hold is re-renewed after a confirmed re-stage (CodeRabbit RcrOU).
+        // Asserted because nothing else in this file covers THIS call site — the
+        // renewLease assertions further down belong to restageDrainedSiblings's
+        // own loop, so without this the line could be deleted and stay green.
+        expect(h.blobLifecycle.renewLease).toHaveBeenCalledWith(RAW_VALUE);
+      });
+    });
+
+    describe("when the value carries an implausible score", () => {
+      /** @scenario a re-staged drained value is never put back at an implausible score */
+      it("heals the score instead of writing it back unchanged", async () => {
+        h.blobLifecycle.preserveForDlq.mockResolvedValue(undefined);
+        h.scripts.writeJobToDlq.mockRejectedValue(new Error("redis down"));
+        h.scripts.stage.mockResolvedValue(undefined);
+        const before = Date.now();
+
+        await (h.processor as any).deadLetterDrainedValue({
+          groupId: GROUP_ID,
+          stagedJobId: "sib-1",
+          jobDataJson: RAW_VALUE,
+          reason: "sibling_restage_failed",
+          // A legacy row staged before the score guard existed. Unhealed, this
+          // is rewritten as 0 on EVERY failed dead-letter write and never
+          // recovers, sorting the value ahead of the job it was drained behind.
+          originalScore: 0,
+        });
+
+        // Asserted before indexing: a fallback that never re-staged at all would
+        // otherwise fail on an undefined read rather than on the score.
+        expect(h.scripts.stage).toHaveBeenCalledTimes(1);
+        const staged = h.scripts.stage.mock.calls[0]![0] as {
+          dispatchAfterMs: number;
+        };
+        expect(staged.dispatchAfterMs).not.toBe(0);
+        // Healed to the staging clock, the same way every other re-stage in this
+        // class does it — asserted as a range, not a frozen constant, so this
+        // pins the property rather than one reading of the clock.
+        expect(staged.dispatchAfterMs).toBeGreaterThanOrEqual(before);
+        expect(staged.dispatchAfterMs).toBeLessThanOrEqual(Date.now());
       });
     });
   });
@@ -195,7 +247,7 @@ describe("GroupQueueProcessor drained-sibling dead-letter durability — write f
           stagedJobId: "sib-1",
           jobDataJson: RAW_VALUE,
           reason: "sibling_restage_failed",
-          originalScore: 4242,
+          originalScore: PLAUSIBLE_SCORE,
         });
 
         expect(h.scripts.writeJobToDlq).toHaveBeenCalledTimes(1);
@@ -221,7 +273,7 @@ describe("GroupQueueProcessor drained-sibling dead-letter durability — write f
             stagedJobId: "sib-1",
             jobDataJson: RAW_VALUE,
             reason: "sibling_restage_failed",
-            originalScore: 4242,
+            originalScore: PLAUSIBLE_SCORE,
           }),
         ).resolves.toEqual({ branch: "lost" });
       });

@@ -279,9 +279,22 @@ export class EnvelopeBlobLifecycle {
   async releaseLease({
     values,
     groupId,
+    retainOffloadedBody = false,
   }: {
     values: string[];
     groupId: string;
+    /**
+     * Skip the GQ1 blob delete because something outside staging still points at
+     * the body — today, a dead-letter entry {@link preserveForDlq} just extended.
+     *
+     * GQ2 needs no such flag: `holdForDlq` leaves a `gq:dlq` member in the lease
+     * set, so `release`'s `ZCARD == 0` grace simply never fires and the blob
+     * outlives this call on its own. GQ1 has no lease set — its release is an
+     * unconditional `UNLINK` — so without this the drop path would stamp a
+     * dead-letter "extended" and then destroy the very body it promised, which is
+     * the #720 failure this PR exists to close.
+     */
+    retainOffloadedBody?: boolean;
   }): Promise<void> {
     const expected = this.projectIdFor(groupId);
     await Promise.all(
@@ -334,7 +347,7 @@ export class EnvelopeBlobLifecycle {
           }
           return;
         }
-        if (blobId) {
+        if (blobId && !retainOffloadedBody) {
           try {
             await this.blobs.delete({ id: blobId });
           } catch {

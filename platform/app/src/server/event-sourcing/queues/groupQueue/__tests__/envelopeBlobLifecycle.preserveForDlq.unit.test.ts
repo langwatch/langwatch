@@ -255,3 +255,83 @@ describe("EnvelopeBlobLifecycle.preserveForDlq — the branch that used to be si
     });
   });
 });
+
+/**
+ * The release that FOLLOWS the preserve, for the one tier where it is destructive.
+ *
+ * `dropStagedJob` runs preserve → writeJobToDlq → releaseLease. GQ2 needs nothing
+ * from this test: `holdForDlq` leaves a `gq:dlq` member in the lease set, so
+ * `release`'s `ZCARD == 0` grace never fires and the blob outlives the call. GQ1
+ * has no lease set and its release is an unconditional `UNLINK`, so preserve
+ * reported `extended`, the entry was stamped with it, and the next line deleted
+ * the body — the #720 failure this PR exists to close, inverted into a promise.
+ *
+ * Asserted as the round trip rather than on the flag, because the flag being
+ * forwarded is not the property that matters; the blob still being there is.
+ */
+describe("EnvelopeBlobLifecycle.releaseLease — a GQ1 body the dead-letter still references", () => {
+  const GQ1_BLOB_ID = "b7c1f0e2-0000-4000-8000-0000000000aa";
+
+  /** A real GQ1 envelope: `e:"ref"` names a standalone randomUUID blob. */
+  function gq1Envelope(): string {
+    const headerJson = JSON.stringify({ e: "ref", r: GQ1_BLOB_ID });
+    return `GQ1|${Buffer.byteLength(headerJson)}|${headerJson}`;
+  }
+
+  function makeGq1Lifecycle() {
+    const blobs = { refreshTtl: vi.fn(), delete: vi.fn() };
+    const lifecycle = new EnvelopeBlobLifecycle({
+      redis: unreachableRedis,
+      queueName: QUEUE,
+    });
+    (lifecycle as any).blobs = blobs;
+    return { lifecycle, blobs };
+  }
+
+  describe("given a GQ1 job whose body was preserved for the quarantine window", () => {
+    describe("when the drop path releases its lease straight afterwards", () => {
+      /** @scenario a dead-lettered GQ1 job's blob outlives the dead-letter window */
+      it("keeps the blob, so the entry's extended promise still holds", async () => {
+        const { lifecycle, blobs } = makeGq1Lifecycle();
+        const value = gq1Envelope();
+
+        await expect(
+          lifecycle.preserveForDlq({
+            value,
+            groupId: GROUP_ID,
+            ttlSeconds: DLQ_WINDOW_SECONDS,
+          }),
+        ).resolves.toBe("extended");
+        expect(blobs.refreshTtl).toHaveBeenCalledWith({
+          id: GQ1_BLOB_ID,
+          ttlSeconds: DLQ_WINDOW_SECONDS,
+        });
+
+        await lifecycle.releaseLease({
+          values: [value],
+          groupId: GROUP_ID,
+          retainOffloadedBody: true,
+        });
+
+        expect(blobs.delete).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("given a GQ1 job that was not dead-lettered", () => {
+    describe("when its lease is released on ordinary retirement", () => {
+      it("still deletes the blob, because nothing else points at it", async () => {
+        const { lifecycle, blobs } = makeGq1Lifecycle();
+
+        await lifecycle.releaseLease({
+          values: [gq1Envelope()],
+          groupId: GROUP_ID,
+        });
+
+        // The default has to stay destructive: a GQ1 blob is private to its job,
+        // so retaining every one of them would leak a blob per completed job.
+        expect(blobs.delete).toHaveBeenCalledWith({ id: GQ1_BLOB_ID });
+      });
+    });
+  });
+});

@@ -40,17 +40,22 @@ Feature: GroupQueue drop recoverability — preserve, name, keep the blob
       | GQ1  |
       | GQ2  |
 
-  @integration
-  # AC-718.6 — the theme's end-to-end wire, through the REAL reactor facade. The one
-  # seam where a mis-wire (fold extractor on the reactor facade) silently nulls the
-  # key for every reactor job — a reactor payload has no top-level .id.
+  @unit
+  # AC-718.6 — the one seam where a mis-wire (fold extractor on the reactor facade)
+  # silently nulls the key for every reactor job — a reactor payload has no
+  # top-level .id. @unit, not @integration: the bound test drives the REAL
+  # createFacade wiring but hands it a mocked shared queue, so it never reaches
+  # Redis (test review, PR #5853 — it was tagged @integration and read as
+  # end-to-end coverage it does not provide). A genuine end-to-end case would have
+  # to dispatch through initializeReactorQueues into a real GroupQueueProcessor.
   Scenario: a reactor job staged through its facade carries its event id in the header
     Given a reactor registered on its pipeline
     When an event "evt-1" is dispatched to the reactor
     Then the staged envelope's recovery key is "evt-1"
 
-  @integration
+  @unit
   # AC-718.6 companion — a fold job's recovery key is the bare event's own id.
+  # @unit for the same reason as its sibling above: mocked shared queue, no Redis.
   Scenario: a fold job staged through its facade carries its event id in the header
     Given a fold projection registered on its pipeline
     When an event "f-1" is dispatched to the fold
@@ -187,6 +192,16 @@ Feature: GroupQueue drop recoverability — preserve, name, keep the blob
     Given a drained sibling being dead-lettered with its body present
     When the dead-letter write fails
     Then the raw value is re-staged into the live group
+
+  @unit
+  # AC-719.7c — the re-stage fallback above was the one re-stage in this class that
+  # wrote the drained row's score back unguarded (review #5853). A legacy row scored
+  # 0 was therefore rewritten at 0 on EVERY failed dead-letter write and never
+  # healed, ordering it ahead of the job it was drained behind.
+  Scenario: a re-staged drained value is never put back at an implausible score
+    Given a drained sibling whose stored score is not a plausible timestamp
+    When its dead-letter write fails and the raw value is re-staged
+    Then the value is put back at the staging clock rather than its stored score
 
   @integration
   # AC-719.8 — a body-present drained sibling is dead-lettered with its blob kept alive
@@ -379,14 +394,17 @@ Feature: GroupQueue drop recoverability — preserve, name, keep the blob
     When the sibling renews its ordinary lease
     Then the quarantine window is left intact rather than pulled back to the routine backstop
 
-  @integration @unimplemented
-  # AC-720.1b — UNBOUND: the GQ1 blob-TTL extend is the same preserveForDlq code path
-  # (the blobId branch), but staging a GQ1 (non-tiered) job needs a GQ1-forcing queue
-  # the GQ2-only harness does not build. Tracked with the #720 follow-ups.
+  @unit
+  # AC-720.1b — bound at unit level (review #5853). Staging a real GQ1 job still needs
+  # a GQ1-forcing queue the GQ2-only integration harness does not build, but the branch
+  # this AC exists for turned out to be a live defect rather than a coverage gap: the
+  # drop path extended the GQ1 blob, stamped the entry `extended`, and then released
+  # the lease — which for GQ1 is an unconditional delete. Bound to the preserve→release
+  # round trip against a stubbed blob store, which is where that contradiction lives.
   Scenario: a dead-lettered GQ1 job's blob outlives the dead-letter window
     Given a body-present GQ1 job whose blob was staged earlier
-    When the job is dead-lettered
-    Then the blob's remaining lifetime is at least the dead-letter window
+    When the job is dead-lettered and its lease is released
+    Then the blob is still there for the dead-letter that references it
 
   # ================= #721 — the replay-premise guard =================
 
@@ -427,7 +445,8 @@ Feature: GroupQueue drop recoverability — preserve, name, keep the blob
 #       cannot shorten a dead-letter hold — the ORDINARY path, found in review; falsifiability-proven).
 #       AC-720.3/.4 bound (the entry states whether its body is still expected to be there, and the one path that
 #       could not hold a claimed body in total silence now warns — while a never-offloaded body stays quiet).
-#       AC-720.1b (@unimplemented, GQ1-forcing harness).
+#       AC-720.1b bound at unit level (the GQ1 preserve->release round trip; a real GQ1 staging
+#       harness is still absent, but the branch it guards is now covered where the defect lived).
 # #721: AC-721.6 bound (both guard directions). AC-721.1-.5 are documentation ACs (ADR-081 + site corrections
 #       + the 00026 OCSF replay-coverage correction migration), verified by diff/review,
 #       not scenario-mapped.

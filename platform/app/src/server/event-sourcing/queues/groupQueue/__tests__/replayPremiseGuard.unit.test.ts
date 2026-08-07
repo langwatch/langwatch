@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -15,6 +15,39 @@ const MODULE_DIR = path.join(
   path.dirname(fileURLToPath(import.meta.url)),
   "..",
 );
+/** Repo root: `__tests__` → groupQueue → queues → event-sourcing → server → src → app → platform. */
+const REPO_ROOT = path.join(
+  MODULE_DIR,
+  "..",
+  "..",
+  "..",
+  "..",
+  "..",
+  "..",
+  "..",
+);
+
+/**
+ * The corrected sites that live OUTSIDE this module, named one by one.
+ *
+ * ADR-081 says the false premise was asserted in six places; scanning only
+ * `groupQueue/` protected the two that happen to sit there and left the rest
+ * un-guarded, so a future edit stripping the caveat from the OCSF repository or
+ * either ADR shipped green (review #5853 — found independently by three
+ * reviewers, which is what made the gap worth closing rather than documenting).
+ *
+ * Explicit paths, not a recursive walk: the walk would also sweep in ADR-081
+ * itself and migration `00026`, both of which quote the false claim in order to
+ * refute or supersede it, and a guard that has to special-case its own evidence
+ * is one bad regex away from silencing a real violation. A missing file fails
+ * loudly below rather than silently shrinking the guard.
+ */
+const GUARDED_SITES_OUTSIDE_MODULE = [
+  "platform/app/src/server/event-sourcing/ARCHITECTURE.md",
+  "platform/app/ee/governance/services/governanceOcsfEvents.clickhouse.repository.ts",
+  "dev/docs/adr/029-groupqueue-content-addressed-payload-store.md",
+  "dev/docs/adr/030-groupqueue-blob-handling-hardening.md",
+];
 
 /** The false premise, in any of its phrasings. */
 const CLAIM =
@@ -67,14 +100,27 @@ describe("replay-recovery premise guard (#721 / ADR-081)", () => {
     it("contains no un-caveated replay-recovery claim", () => {
       // Scan .md too: groupQueue/ARCHITECTURE.md is one of ADR-081's corrected
       // sites and lives in this exact directory — the guard must protect it.
-      const files = readdirSync(MODULE_DIR).filter(
-        (f) =>
-          (f.endsWith(".ts") || f.endsWith(".md")) && !f.includes(".test."),
+      const inModule = readdirSync(MODULE_DIR)
+        .filter(
+          (f) =>
+            (f.endsWith(".ts") || f.endsWith(".md")) && !f.includes(".test."),
+        )
+        .map((f) => path.join(MODULE_DIR, f));
+      const outsideModule = GUARDED_SITES_OUTSIDE_MODULE.map((rel) =>
+        path.join(REPO_ROOT, rel),
       );
-      const violations = files.flatMap((f) =>
-        replayClaimViolations(
-          readFileSync(path.join(MODULE_DIR, f), "utf8"),
-        ).map((line) => `${f}: ${line}`),
+
+      // A path that stops resolving must fail here, not quietly leave the guard
+      // narrower than ADR-081 claims — the silent-shrink failure this list exists
+      // to close in the first place.
+      for (const file of outsideModule) {
+        expect(existsSync(file), `guarded site missing: ${file}`).toBe(true);
+      }
+
+      const violations = [...inModule, ...outsideModule].flatMap((file) =>
+        replayClaimViolations(readFileSync(file, "utf8")).map(
+          (line) => `${path.relative(REPO_ROOT, file)}: ${line}`,
+        ),
       );
       expect(violations).toEqual([]);
     });

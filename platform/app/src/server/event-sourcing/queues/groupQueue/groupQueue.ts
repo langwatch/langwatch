@@ -2228,7 +2228,12 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
      */
     err: unknown;
     reason: DropReason;
-    originalScore: number;
+    /**
+     * `unknown`, matching {@link restageScore}: this came off a drained Redis row,
+     * so a legacy or corrupted score reaches here as a number the type system
+     * cannot vouch for. Narrowing it to `number` would be a false assurance.
+     */
+    originalScore: unknown;
   }): Promise<DrainedDlqOutcome> {
     try {
       // Push the referenced blob's TTL out to the quarantine window first (#720),
@@ -2264,7 +2269,11 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
         await this.scripts.stage({
           stagedJobId,
           groupId,
-          dispatchAfterMs: originalScore,
+          // Guarded like every other re-stage in this class. Unguarded, a legacy
+          // row scored 0 is rewritten at 0 on every failed dead-letter write and
+          // never heals, ordering it ahead of the job it was drained behind —
+          // the same defect restageDrainedSiblings documents at its own call.
+          dispatchAfterMs: this.restageScore(originalScore),
           dedupId: "",
           dedupTtlMs: 0,
           jobDataJson,
@@ -2612,7 +2621,15 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     // `dropped: true` keeps the group advancing WITHOUT counting a thrown-away
     // job as a completion or clearing the group's stored error (#5538).
     await this.scripts.complete({ groupId, stagedJobId, dropped: true });
-    await this.blobLifecycle.releaseLease({ values: [jobDataJson], groupId });
+    // A dead-lettered body must survive this release. GQ2 does so by itself (the
+    // `gq:dlq` lease holder keeps the ZCARD non-zero), but a GQ1 release is an
+    // unconditional blob delete — so without this flag the preserve above would
+    // extend a blob, record the entry as `extended`, and then destroy it here.
+    await this.blobLifecycle.releaseLease({
+      values: [jobDataJson],
+      groupId,
+      retainOffloadedBody: dlqBodyPreservation === "extended",
+    });
   }
 
   /**
