@@ -16,10 +16,9 @@ import { Tooltip } from "../../../../../components/ui/tooltip";
 import { InlineCopyButton } from "../shared/InlineCopyButton";
 
 /**
- * The header copy control. With `copyText` it renders the shared
- * InlineCopyButton feeding the clipboard that exact value; without it, the
- * default CodeBlock trigger, which copies the rendered (possibly masked)
- * string.
+ * An explicit `copyText` must bypass the CodeBlock copy path entirely: that
+ * trigger copies whatever string is rendered, which is the masked form while
+ * a sensitive snippet is hidden — a credential that fails only when pasted.
  */
 function SnippetCopyControl({
   copyText,

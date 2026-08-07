@@ -120,8 +120,6 @@ describe("given a token has just been minted", () => {
       const blob = btoa(`project-abc:${TOKEN}`);
       expect(screen.queryByText(new RegExp(blob))).toBeNull();
 
-      // The other half of the scenario: revealing shows the full encoded
-      // credential.
       const label = await screen.findByText("HTTP headers");
       const box = label.closest(".code-block__root") as HTMLElement;
       fireEvent.click(
