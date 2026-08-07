@@ -511,6 +511,7 @@ export class QueueManager<EventType extends Event = Event> {
                 await onEventBatch(projectionName, events, {
                   tenantId: events[0]?.tenantId,
                   deliveryAttempt: delivery?.attempt,
+                  isDeliveryContinuation: delivery?.isContinuation,
                 });
               }
             : undefined,

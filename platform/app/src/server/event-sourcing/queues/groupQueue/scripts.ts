@@ -1720,6 +1720,32 @@ export const DEFAULT_GROUP_QUARANTINE_THRESHOLD = 500;
 export const GROUP_QUARANTINE_TTL_SECONDS = 15 * 60;
 
 /**
+ * Splits one dispatch may perform before bisection gives up and hands the
+ * remainder to the normal retry/backoff path.
+ *
+ * Sized to cover every useful descent (isolating one unprocessable payload in a
+ * 256 batch costs 8 splits; converging to sub-batches of 8 costs 31) while
+ * cutting off the pathological singleton-degradation walk (~2N calls) that
+ * would otherwise run under the group lock for the whole tree.
+ */
+export const DEFAULT_BISECTION_SPLITS_PER_DISPATCH = 32;
+
+/**
+ * Read the bisection split budget from the environment. Mirrors
+ * {@link readGroupQuarantineThreshold}:
+ *   - unset / empty / non-numeric / negative → DEFAULT_BISECTION_SPLITS_PER_DISPATCH
+ *   - "0" → 0 (explicit kill switch — a failing batch is never split, which is
+ *     exactly the pre-bisection behaviour, recoverable without a deploy)
+ *   - positive integer → that integer
+ */
+export function readBisectionSplitBudget(): number {
+  return readNonNegativeIntEnv({
+    name: "LANGWATCH_GQ_BISECTION_SPLIT_BUDGET",
+    fallback: DEFAULT_BISECTION_SPLITS_PER_DISPATCH,
+  });
+}
+
+/**
  * Read the group-quarantine failure-streak threshold from the environment.
  * Mirrors {@link readClaimStrikeThreshold}:
  *   - unset / empty / non-numeric / negative → DEFAULT_GROUP_QUARANTINE_THRESHOLD

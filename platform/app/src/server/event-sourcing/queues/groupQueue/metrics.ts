@@ -41,6 +41,7 @@ export const metricNames = [
   // ADR-066 pillar 2 mixed-command isolation
   "gq_foreign_siblings_restaged_total",
   "gq_jobs_unroutable_total",
+  "gq_batch_bisections_total",
   // #718/#719 drained-sibling outcome reporting
   "gq_drained_dlq_restaged_total",
 ] as const;
@@ -446,4 +447,36 @@ export const gqForeignSiblingsRestagedTotal = new Counter({
   name: "gq_foreign_siblings_restaged_total",
   help: "Drained siblings restaged untouched because their __jobName differed from the dispatched job (ADR-066 mixed-command isolation) — excludes the batch-failure restage paths",
   labelNames: ["queue_name"] as const,
+});
+
+/**
+ * A coalesced batch failed retryably and was split in half to isolate the
+ * cause.
+ *
+ * Increments ONCE PER SPLIT, not once per batch, so one failing batch produces
+ * a burst rather than a single event. Read it as a rate, not a total, and do
+ * not infer a batch count from it — how many splits a batch costs depends on
+ * why it failed:
+ * - a single unprocessable payload costs one split per level of the descent to
+ *   it, so roughly `log2(batchSize)` — but the exact count moves with the
+ *   payload's position (a batch of 5 costs 2 or 3, not 2.32).
+ * - a batch that fails purely on size keeps splitting until every part fits, so
+ *   the cost is driven by how far the working size is below the batch bound and
+ *   approaches `batchSize - 1` in the worst case, far above `log2(batchSize)`.
+ *
+ * A steady non-zero rate is the signal worth acting on, and it means one of two
+ * things — both real:
+ * - the batch bound is too generous for what the handler can process in one
+ *   pass (size-driven; the fix is a tighter budget, not more bisection), or
+ * - a payload in this pipeline is persistently unprocessable (poison; bisection
+ *   is containing the blast radius but something still needs to look at it).
+ *
+ * Zero means batches either succeed whole or fail non-retryably. Correlate with
+ * `gq_jobs_retried_total` to tell "we recovered inside the dispatch" from "we
+ * gave the whole batch back to the queue".
+ */
+export const gqBatchBisectionsTotal = new Counter({
+  name: "gq_batch_bisections_total",
+  help: "Retryable coalesced-batch failures that were split in half to isolate the cause — increments once per split, so one failing batch costs several",
+  labelNames: ["queue_name", "pipeline_name", "job_type", "job_name"] as const,
 });
