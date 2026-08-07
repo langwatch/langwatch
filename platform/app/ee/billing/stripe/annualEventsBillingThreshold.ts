@@ -40,13 +40,15 @@ export type ThresholdResult =
  * the subscription exists, from the checkout-completed webhook. That is
  * the only caller in this repo, and it covers new subscriptions only.
  *
- * `isDryRun` therefore has no caller here on purpose: the one-time
- * backfill over pre-existing subscriptions walks live Stripe billing
- * data for current customers, so it is SaaS-only operational work and
- * lives in the langwatch-saas task runner, which imports this function.
- * Its safety story is a dry-run preview of the blast radius, so the flag
- * stays part of this contract — it is a seam for that caller, not dead
- * code to delete.
+ * `isDryRun` therefore has no caller here, and that is deliberate rather
+ * than leftover. The one-time backfill over pre-existing subscriptions
+ * walks live Stripe billing data for current customers — SaaS-only
+ * operational work that does not belong in this repo — and is not
+ * written yet: it is sequenced after this merge, because it imports this
+ * function and the langwatch submodule in langwatch-saas has to be
+ * bumped past that merge before the import resolves. Its safety story is
+ * a dry-run preview of the blast radius, so the flag is the seam that
+ * caller will use. Do not delete it as dead code.
  *
  * Note on `items`: Stripe returns it as a paginated list (default 10).
  * A Growth subscription carries exactly two items (seat + events, see
