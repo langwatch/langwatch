@@ -250,6 +250,7 @@ describe("AzureBlobDriver against a real Azurite emulator (path-style addressing
 
 describe("StoredObjectsService against a real Azurite emulator", () => {
   describe("given STORED_OBJECTS_BACKEND=azure is the resolved destination", () => {
+    /** @scenario "An Azure-only installation supports every shared object-storage workload" */
     it("persists an azure-blob storage_uri and streams the bytes back through the StorageRegistry on read", async () => {
       const registry = new StorageRegistry({
         // s3/file are mandatory on the registry but unused by this test —

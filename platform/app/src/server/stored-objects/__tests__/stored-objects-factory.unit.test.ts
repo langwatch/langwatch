@@ -109,7 +109,15 @@ async function evaluateAzureUsability(): Promise<{
   } catch {
     isDestinationAzure = false;
   }
-  const isDriverRegistered = maybeAzureDriver() !== undefined;
+  // When azure IS the selected backend, a misconfiguration is raised rather
+  // than swallowed — otherwise every read reports the scheme as unconfigured,
+  // contradicting the operator's own setting. Either way, no usable driver.
+  let isDriverRegistered = false;
+  try {
+    isDriverRegistered = maybeAzureDriver() !== undefined;
+  } catch {
+    isDriverRegistered = false;
+  }
   return { isDestinationAzure, isDriverRegistered };
 }
 

@@ -144,8 +144,12 @@ describe("resolveProjectStorageDestination", () => {
   });
 
   describe("given no S3 bucket and no Azure config are present", () => {
-    it("falls back to a file destination", async () => {
+    /** @scenario "The legacy S3 selector keeps its existing fallback behavior" */
+    it("falls back to a file destination when the legacy s3 selector has no bucket", async () => {
+      mockEnv.STORED_OBJECTS_BACKEND = "s3";
+
       const destination = await resolveProjectStorageDestination("proj_x");
+
       expect(destination.kind).toBe("file");
     });
   });

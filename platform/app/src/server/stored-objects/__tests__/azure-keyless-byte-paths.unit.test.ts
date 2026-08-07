@@ -72,7 +72,7 @@ afterEach(() => {
 
 describe("Azure byte paths without an account key", () => {
   describe("given the backend is azure in workload-identity mode", () => {
-    /** @scenario "Stored-objects writes succeed in a token-based mode" */
+    /** @scenario "A token-mode write path resolves without consulting a shared key" */
     it("resolves an azure destination without consulting a shared key", async () => {
       const destination = await resolveProjectStorageDestination("proj-1");
 
@@ -88,7 +88,7 @@ describe("Azure byte paths without an account key", () => {
      * The regression that motivated this file: a resolvable destination with
      * no registered driver means every write throws on scheme dispatch.
      */
-    /** @scenario "Stored-objects writes succeed in a token-based mode" */
+    /** @scenario "A token-mode write path resolves without consulting a shared key" */
     it("registers an azure driver so writes are not rejected as an unregistered scheme", () => {
       expect(maybeAzureDriver()).toBeDefined();
     });
@@ -103,7 +103,7 @@ describe("Azure byte paths without an account key", () => {
       expect(typeof driver?.get).toBe("function");
     });
 
-    /** @scenario "Dataset uploads work in a token-based mode" */
+    /** @scenario "Dataset storage is selected without dereferencing an absent account key" */
     it("selects the Azure dataset storage rather than crashing on an absent key", async () => {
       // Previously this path dereferenced env.AZURE_BLOB_ACCOUNT_KEY! and
       // died inside Buffer.from(undefined) — a crash, not a config error.

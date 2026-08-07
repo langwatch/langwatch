@@ -135,6 +135,44 @@ jobs:
       - name: "assert rendered email configuration"
         run: ./tests/email-gateway.sh
 
+  # The render matrix above proves the chart PARSES; these vitest suites
+  # assert on what it EMITS (env selection per provider, identity guards,
+  # migration postures, validation failures). They normally run inside the
+  # app CI's integration shards, but that workflow deliberately does not
+  # trigger on charts/** — so without this job a chart-only edit could break
+  # every behavioral guarantee while CI stays green.
+  behavioral:
+    name: "behavioral (rendered-output assertions)"
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: platform/app
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5
+        with:
+          version: v3.12.0
+      - run: helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+      - run: helm repo add langwatch https://langwatch.github.io/langwatch
+      - uses: ./.github/actions/setup-pnpm-node
+        with:
+          install: "@langwatch/web..."
+      - name: Generate required files
+        run: pnpm start:prepare:files
+      # The integration config's globalSetup runs ClickHouse migrations via
+      # goose before any test file executes, helm-backed or not.
+      - name: Install Goose migration tool
+        working-directory: .
+        run: bash .github/scripts/install-goose.sh
+      - name: Run helm behavioral suites
+        env:
+          # Turns a silent helm-unavailable skip into a hard failure — this
+          # job exists precisely so these suites cannot quietly not run.
+          REQUIRE_HELM_TESTS: "1"
+        run: |
+          pnpm test:unit run src/server/stored-objects/__tests__/helm-and-docs-shape.unit.test.ts
+          pnpm test:integration run src/server/stored-objects/__tests__/helm-azure-identity.integration.test.ts
+
   e2e:
     name: "e2e: ${{ matrix.name }}"
     runs-on: ubuntu-latest

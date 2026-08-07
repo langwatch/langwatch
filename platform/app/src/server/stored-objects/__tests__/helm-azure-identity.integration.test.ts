@@ -67,11 +67,31 @@ function chartDepsReady(): boolean {
     });
     return true;
   } catch {
+    // Only a genuinely unavailable dependency (no network, no repo definition)
+    // may skip. Everything else — a stale Chart.lock, a mistyped dependency
+    // repo — is a real chart bug, and swallowing it here would let the chart
+    // switch off its own alarm.
     return false;
   }
 }
 
 const canRenderChart = hasHelm() && chartDepsReady();
+
+/**
+ * CI must never report these as skipped: the suite is the only enforcement of
+ * the workload-identity label and ServiceAccount guards, so a silent skip
+ * turns a green job into no coverage at all. Locally (no helm, no network) the
+ * skip stays, which is what keeps it usable on a laptop.
+ */
+if (process.env.REQUIRE_HELM_TESTS === "1" && !canRenderChart) {
+  throw new Error(
+    "REQUIRE_HELM_TESTS=1 but the chart cannot be rendered here: helm is " +
+      `${hasHelm() ? "present" : "MISSING"} and the chart dependencies are ` +
+      "unavailable. Install helm and run `helm repo add` for the chart's " +
+      "dependency repositories — do not let this suite skip in CI.",
+  );
+}
+
 const describeHelm = canRenderChart ? describe : describe.skip;
 
 /** Renders the chart, returning stdout. Throws on a failed render. */
@@ -135,6 +155,43 @@ const IDENTITY_SERVICE_ACCOUNT = [
   String.raw`global.serviceAccount.annotations.azure\.workload\.identity/client-id=00000000-1111-2222-3333-444444444444`,
 ];
 
+describeHelm("Helm object-storage provider selection", () => {
+  /** @scenario "Helm selects S3 and Azure symmetrically without breaking legacy S3 configuration" */
+  it("renders an explicit backend selector for both providers and keeps S3_BUCKET_NAME", () => {
+    const s3 = render([
+      "--set",
+      "app.dataplane.enabled=true",
+      "--set",
+      "app.dataplane.provider=awsS3",
+      "--set",
+      "app.dataplane.bucket=existing-bucket",
+      "--set",
+      "app.storedObjects.localFilesystem.enabled=false",
+    ]);
+    const azure = render([
+      "--set",
+      "app.dataplane.enabled=true",
+      "--set",
+      "app.dataplane.provider=azureBlob",
+      "--set",
+      "app.dataplane.providers.azureBlob.accountName.value=acct",
+      "--set",
+      "app.dataplane.providers.azureBlob.accountKey.value=key",
+      "--set",
+      "app.dataplane.providers.azureBlob.container.value=container",
+      "--set",
+      "app.storedObjects.localFilesystem.enabled=false",
+    ]);
+
+    expect(s3).toContain("name: STORED_OBJECTS_BACKEND");
+    expect(s3).toContain('value: "s3"');
+    expect(s3).toContain("name: S3_BUCKET_NAME");
+    expect(s3).toContain('value: "existing-bucket"');
+    expect(azure).toContain("name: STORED_OBJECTS_BACKEND");
+    expect(azure).toContain('value: "azure"');
+  });
+});
+
 describeHelm("Helm ServiceAccount surface for cloud identity", () => {
   describe("given an install that does not opt in", () => {
     /** @scenario "Installs that do not use Azure render exactly as they did before" */
@@ -168,17 +225,66 @@ describeHelm("Helm ServiceAccount surface for cloud identity", () => {
 
     /** @scenario "The chart binds every storage-touching workload to one federated service account" */
     it("carries the identity client-id annotation on the rendered account", () => {
-      const out = render([
-        ...ALL_WORKLOADS,
-        ...IDENTITY_SERVICE_ACCOUNT,
-        "--set",
-        String.raw`global.serviceAccount.annotations.azure\.workload\.identity/client-id=00000000-1111-2222-3333-444444444444`,
-      ]);
+      const out = render([...ALL_WORKLOADS, ...IDENTITY_SERVICE_ACCOUNT]);
 
       expect(out).toContain("kind: ServiceAccount");
       expect(out).toContain(
         "azure.workload.identity/client-id: 00000000-1111-2222-3333-444444444444",
       );
+    });
+
+    /**
+     * A created ServiceAccount with no client-id annotation is the same class
+     * of failure as a pod with no label: the chart renders, the pods come up
+     * healthy, and the webhook has nothing to bind them to, so the first byte
+     * fails blaming the operator's cluster. Only enforced when the chart
+     * creates the account — a pre-existing account named by the operator lives
+     * outside this chart and its annotations are not ours to inspect.
+     */
+    /** @scenario "The chart refuses a created service account with no identity annotation" */
+    it("refuses to render workload identity with a created account carrying no client-id", () => {
+      expect(
+        renderExpectingFailure([
+          ...ALL_WORKLOADS,
+          "--set",
+          "global.serviceAccount.create=true",
+          "--set",
+          "app.dataplane.enabled=true",
+          "--set",
+          "app.dataplane.provider=azureBlob",
+          "--set",
+          "app.dataplane.providers.azureBlob.authMode=workloadIdentity",
+          "--set",
+          "app.dataplane.providers.azureBlob.accountName.value=acct",
+          "--set",
+          "app.dataplane.providers.azureBlob.container.value=cont",
+          "--set",
+          "app.storedObjects.localFilesystem.enabled=false",
+        ]),
+      ).toMatch(/azure\.workload\.identity\/client-id/);
+    });
+
+    /** @scenario "The chart refuses a created service account with no identity annotation" */
+    it("still renders when the operator names a pre-existing account instead", () => {
+      const out = render([
+        ...ALL_WORKLOADS,
+        "--set",
+        "global.serviceAccount.name=external-identity",
+        "--set",
+        "app.dataplane.enabled=true",
+        "--set",
+        "app.dataplane.provider=azureBlob",
+        "--set",
+        "app.dataplane.providers.azureBlob.authMode=workloadIdentity",
+        "--set",
+        "app.dataplane.providers.azureBlob.accountName.value=acct",
+        "--set",
+        "app.dataplane.providers.azureBlob.container.value=cont",
+        "--set",
+        "app.storedObjects.localFilesystem.enabled=false",
+      ]);
+
+      expect(out).toContain("serviceAccountName: external-identity");
     });
 
     /**
@@ -374,6 +480,23 @@ describeHelm("Helm ServiceAccount surface for cloud identity", () => {
       expect(out).toContain("name: AZURE_BLOB_TOKEN_AUDIENCE");
       expect(out).toContain('value: "https://storage.azure.us"');
     });
+
+    /**
+     * Hostnames are case-insensitive and the app's runtime check lowercases
+     * before classifying — an uppercase public-cloud endpoint must not be
+     * mistaken for sovereign and rejected for a missing authority.
+     */
+    it("classifies an uppercase public-cloud endpoint as public, not sovereign", () => {
+      const out = render(
+        SOVEREIGN.map((arg) =>
+          arg.includes("endpoint.value=")
+            ? "app.dataplane.providers.azureBlob.endpoint.value=https://ACCT.BLOB.CORE.WINDOWS.NET"
+            : arg,
+        ),
+      );
+
+      expect(out).toContain("name: AZURE_BLOB_ENDPOINT");
+    });
   });
 
   describe("given workloadIdentity with a service account the chart creates", () => {
@@ -534,9 +657,7 @@ describeHelm("Helm ServiceAccount surface for cloud identity", () => {
       "--set",
       "app.dataplane.provider=awsS3",
       "--set",
-      "app.dataplane.providers.awsS3.bucket.value=bucket",
-      "--set",
-      "app.dataplane.providers.awsS3.region=us-east-1",
+      "app.dataplane.bucket=bucket",
       "--set",
       "app.dataplane.legacyAzureRead=true",
       "--set",
@@ -558,12 +679,21 @@ describeHelm("Helm ServiceAccount surface for cloud identity", () => {
     it("writes to S3 while keeping the Azure read settings", () => {
       const out = render(MIGRATION);
 
-      // The write toggle is what selects the backend; it must be gone.
-      expect(out).not.toContain("STORED_OBJECTS_BACKEND");
-      // ...but the connection settings the read path resolves must remain.
+      // The S3 WRITE configuration must render exactly as on a plain S3
+      // install — an earlier version of the chart dropped it whenever
+      // legacyAzureRead was set, so new writes silently fell back to local
+      // storage while the operator believed S3 was live.
+      expect(out).toContain("name: STORED_OBJECTS_BACKEND");
+      expect(out).toContain('value: "s3"');
+      expect(out).toContain("name: USE_S3_STORAGE");
+      expect(out).toContain("name: S3_BUCKET_NAME");
+      expect(out).toContain('value: "bucket"');
+      // ...and the connection settings the read path resolves must remain.
       expect(out).toContain("name: AZURE_BLOB_ACCOUNT_NAME");
       expect(out).toContain("name: AZURE_BLOB_CONTAINER");
       expect(out).toContain('value: "workloadIdentity"');
+      // The write toggle must never say azure here.
+      expect(out).not.toContain('value: "azure"');
     });
 
     /** @scenario "Historical Azure objects stay readable after moving writes to S3" */
@@ -590,6 +720,60 @@ describeHelm("Helm ServiceAccount surface for cloud identity", () => {
       expect(renderExpectingFailure(MIGRATION_WITHOUT_SERVICE_ACCOUNT)).toMatch(
         /ServiceAccount to bind to/,
       );
+    });
+  });
+
+  describe("given a legacy read flag contradicting the active provider", () => {
+    /** @scenario "The chart rejects a legacy read flag aimed at the active provider" */
+    it("rejects legacyAzureRead while azureBlob is already active", () => {
+      expect(
+        renderExpectingFailure([
+          "--set",
+          "app.dataplane.enabled=true",
+          "--set",
+          "app.dataplane.provider=azureBlob",
+          "--set",
+          "app.dataplane.providers.azureBlob.accountName.value=acct",
+          "--set",
+          "app.dataplane.providers.azureBlob.accountKey.value=key",
+          "--set",
+          "app.dataplane.providers.azureBlob.container.value=cont",
+          "--set",
+          "app.dataplane.legacyAzureRead=true",
+        ]),
+      ).toMatch(
+        /legacyAzureRead is set but azureBlob is already the active provider/,
+      );
+    });
+
+    /** @scenario "The chart rejects a legacy read flag aimed at the active provider" */
+    it("rejects legacyS3ReadBucket while awsS3 is already active", () => {
+      expect(
+        renderExpectingFailure([
+          "--set",
+          "app.dataplane.enabled=true",
+          "--set",
+          "app.dataplane.provider=awsS3",
+          "--set",
+          "app.dataplane.legacyS3ReadBucket=old-bucket",
+        ]),
+      ).toMatch(
+        /legacyS3ReadBucket is set but awsS3 is already the active provider/,
+      );
+    });
+
+    /** @scenario "The chart rejects a legacy read flag aimed at the active provider" */
+    it("rejects an awsS3 install whose bucket is empty", () => {
+      expect(
+        renderExpectingFailure([
+          "--set",
+          "app.dataplane.enabled=true",
+          "--set",
+          "app.dataplane.provider=awsS3",
+          "--set",
+          "app.dataplane.bucket=",
+        ]),
+      ).toMatch(/app\.dataplane\.bucket is empty/);
     });
   });
 

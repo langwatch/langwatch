@@ -144,7 +144,57 @@ Precedence, evaluated in this order: a per-project BYOC S3 bucket (if configured
 | `AZURE_BLOB_ENDPOINT` | Blob endpoint base URL. Optional on the Azure public cloud; required for sovereign clouds (`*.usgovcloudapi.net`, `*.chinacloudapi.cn`), private endpoints, and the Azurite emulator | `https://{accountName}.blob.core.windows.net` |
 
 <Warning>
-When `STORED_OBJECTS_BACKEND=azure` is set, `AZURE_BLOB_ACCOUNT_NAME` and `AZURE_BLOB_CONTAINER` are required, plus `AZURE_BLOB_ACCOUNT_KEY` when `AZURE_BLOB_AUTH_MODE` is `sharedKey` (the default). Under an identity mode the key must be absent — see below. An incomplete config fails loud when the destination is resolved, naming the missing variable — it never silently falls back to S3 or the local filesystem. During an S3→Azure migration, keep `S3_BUCKET_NAME` set: legacy S3 surfaces (persisted `s3://` objects, the trace spool, staged payloads) continue to read from and write to the S3 bucket, while new stored-objects and dataset writes target Azure. On an azure-only install (no `S3_BUCKET_NAME`), those legacy S3 surfaces are unavailable and fail with a clear error instead of writing to a bucket nobody reads. In the Helm chart, set `app.dataplane.legacyS3ReadBucket` to the pre-migration bucket (keeping the `awsS3` credential fields populated) to get exactly this state; leave it empty on a greenfield Azure install. Set `AZURE_BLOB_ENDPOINT` (chart: `app.dataplane.providers.azureBlob.endpoint`) for sovereign clouds or private endpoints; it defaults to `https://{accountName}.blob.core.windows.net`. Per-project Azure BYOC is tracked separately (issue #6088).
+When `STORED_OBJECTS_BACKEND=azure` is set, `AZURE_BLOB_ACCOUNT_NAME` and `AZURE_BLOB_CONTAINER` are required, plus `AZURE_BLOB_ACCOUNT_KEY` when `AZURE_BLOB_AUTH_MODE` is `sharedKey` (the default). Under an identity mode the key must be absent — see below. An incomplete active Azure configuration fails loudly and never falls back to S3 or the local filesystem. Inactive Azure settings are validated only when an `azure-blob://` address is used, so they cannot break global or private-bucket S3 traffic. Set `AZURE_BLOB_ENDPOINT` (chart: `app.dataplane.providers.azureBlob.endpoint`) for sovereign clouds or private endpoints; it defaults to `https://{accountName}.blob.core.windows.net`. Per-project Azure BYOC is tracked separately (issue #6088).
+</Warning>
+
+### Migrating an existing installation
+
+Do not switch `STORED_OBJECTS_BACKEND` before copying existing data. The migration task uses its own `OBJECT_STORAGE_MIGRATION_*` credentials, so source reads and destination writes do not depend on the app's active provider:
+
+```bash
+pnpm run task migrateObjectStorage plan
+pnpm run task migrateObjectStorage copy
+
+# Stop all app and worker read/write traffic, drain GroupQueue, then:
+OBJECT_STORAGE_MIGRATION_WRITES_PAUSED=1 \
+OBJECT_STORAGE_MIGRATION_READS_PAUSED=1 \
+  pnpm run task migrateObjectStorage finalize
+
+# Switch STORED_OBJECTS_BACKEND and active credentials, then deploy while
+# traffic remains paused.
+pnpm run task migrateObjectStorage verify
+```
+
+`plan` is read-only. `copy` is resumable, verifies SHA-256 at the destination, and repairs a mismatched destination object. `finalize` refuses to run unless both reads and writes are explicitly paused, dataset uploads are idle, and GroupQueue has no pending, delayed, active, blocked, or staged durable references. Reads must remain paused because finalization publishes destination storage addresses before the target-provider deployment is active. It publishes newer ClickHouse stored-object rows only after the final verified copy; it does not rewrite or delete history. No phase deletes source bytes.
+
+After `finalize` succeeds, update `STORED_OBJECTS_BACKEND` and the active provider credentials while traffic remains paused, deploy that configuration, run `verify`, then resume traffic. A global migration excludes projects with private S3 buckets; they remain on their tenant-owned S3 destination.
+
+**Keep the source provider's read credentials configured through the rollback window.** Finalization rewrites stored-object addresses to the destination scheme, so a rollback that reverts `STORED_OBJECTS_BACKEND` *and* removes the destination provider's credentials leaves every rewritten address unreadable — the bytes still exist on both providers (no phase deletes them), but the deployment can no longer serve that scheme. Concretely:
+
+- **S3 → Azure**: after cutover, keep `S3_BUCKET_NAME` + S3 credentials configured (Helm: `app.dataplane.legacyS3ReadBucket`) so pre-migration `s3://` history stays readable. If you roll back to S3, keep the `AZURE_BLOB_*` settings configured (Helm: `app.dataplane.legacyAzureRead: true`) so the finalized `azure-blob://` addresses stay readable.
+- **Azure → S3**: the mirror image — keep `AZURE_BLOB_*` (Helm: `legacyAzureRead`) after cutover, and keep the S3 settings if you roll back.
+
+A rollback with the flag set is fully non-destructive: reads resolve per address scheme, and a reverse migration can later re-home the bytes. Also note: the plan reports rows addressed by a scheme outside both providers (for example `file://` from a local-storage era) — those rows are out of the migration's scope, stay on their current addresses, and remain readable as long as that scheme's backend stays configured.
+
+| Migration variable | Description |
+|---|---|
+| `OBJECT_STORAGE_MIGRATION_SOURCE_PROVIDER` | `s3` or `azure` |
+| `OBJECT_STORAGE_MIGRATION_TARGET_PROVIDER` | The other provider |
+| `OBJECT_STORAGE_MIGRATION_WRITES_PAUSED` | Must be `1` for `finalize` |
+| `OBJECT_STORAGE_MIGRATION_READS_PAUSED` | Must be `1` for `finalize` |
+| `OBJECT_STORAGE_MIGRATION_S3_BUCKET` | Global S3 source or destination bucket |
+| `OBJECT_STORAGE_MIGRATION_S3_ENDPOINT` | Optional custom S3 endpoint |
+| `OBJECT_STORAGE_MIGRATION_S3_REGION` | Optional S3 region. AWS uses its normal SDK region chain when omitted; custom endpoints default to `auto` |
+| `OBJECT_STORAGE_MIGRATION_S3_ACCESS_KEY_ID` | Optional explicit migration access key |
+| `OBJECT_STORAGE_MIGRATION_S3_SECRET_ACCESS_KEY` | Optional explicit migration secret key |
+| `OBJECT_STORAGE_MIGRATION_S3_SESSION_TOKEN` | Optional temporary-session token |
+| `OBJECT_STORAGE_MIGRATION_AZURE_ACCOUNT_NAME` | Azure source or destination account |
+| `OBJECT_STORAGE_MIGRATION_AZURE_CONTAINER` | Azure source or destination container |
+| `OBJECT_STORAGE_MIGRATION_AZURE_ENDPOINT` | Optional sovereign/private endpoint |
+| `OBJECT_STORAGE_MIGRATION_AZURE_AUTH_MODE` | `sharedKey`, `workloadIdentity`, `managedIdentity`, or `azureCli` |
+| `OBJECT_STORAGE_MIGRATION_AZURE_ACCOUNT_KEY` | Required only for `sharedKey` |
+| `OBJECT_STORAGE_MIGRATION_AZURE_AUTHORITY_HOST` | Optional sovereign authority host |
+| `OBJECT_STORAGE_MIGRATION_AZURE_TOKEN_AUDIENCE` | Optional sovereign token audience |
 
 ### Authenticating without an account key
 
@@ -180,7 +230,6 @@ The pod label and the ServiceAccount annotation are both emitted by the chart; t
 The ServiceAccount and the workload-identity label are applied to the app and the workers only. Cron pods call the app over HTTP and never touch storage themselves, so giving them a Blob-capable token would grant every cron image storage access it has no use for.
 
 The same identity must be available to any out-of-band job that writes bytes, such as the dataset backfill task; run it with the same ServiceAccount as the app and workers.
-</Warning>
 
 ## Email
 
@@ -303,7 +352,7 @@ When using the Helm chart, configuration is set in `values.yaml` rather than env
 | `app.evaluators.google.enabled` | `GOOGLE_EVALUATOR_ENABLED` |
 | `app.evaluators.google.credentials.value` | `GOOGLE_CREDENTIALS_JSON` |
 | `app.telemetry.usage.enabled` | Inverse of `DISABLE_USAGE_STATS` |
-| `app.dataplane.enabled` | `USE_S3_STORAGE` (provider: `awsS3`) or `STORED_OBJECTS_BACKEND=azure` (provider: `azureBlob`) |
+| `app.dataplane.enabled` | `STORED_OBJECTS_BACKEND=s3` + `USE_S3_STORAGE` (provider: `awsS3`) or `STORED_OBJECTS_BACKEND=azure` (provider: `azureBlob`) |
 | `app.dataplane.bucket` | `S3_BUCKET_NAME` |
 | `app.dataplane.providers.azureBlob.accountName.value` | `AZURE_BLOB_ACCOUNT_NAME` |
 | `app.dataplane.providers.azureBlob.accountKey.value` | `AZURE_BLOB_ACCOUNT_KEY` (sharedKey mode only) |
@@ -313,8 +362,8 @@ When using the Helm chart, configuration is set in `values.yaml` rather than env
 | `app.dataplane.providers.azureBlob.endpoint.value` | `AZURE_BLOB_ENDPOINT` (sovereign clouds, private endpoints, emulator) |
 | `app.dataplane.providers.azureBlob.authorityHost.value` | `AZURE_BLOB_AUTHORITY_HOST` — required alongside a sovereign endpoint in a token-based mode |
 | `app.dataplane.providers.azureBlob.tokenAudience.value` | `AZURE_BLOB_TOKEN_AUDIENCE` — sovereign storage audience override |
-| `app.dataplane.legacyS3ReadBucket` | `S3_BUCKET_NAME` — set during an S3→Azure migration so pre-migration objects stay readable; leave empty on a greenfield Azure install |
-| `app.dataplane.legacyAzureRead` | Keeps the `AZURE_BLOB_*` settings emitted after moving writes back to S3, so **stored objects** already written to Azure stay readable (they carry an `azure-blob://` URI, so a read re-derives its own provider). The write toggle is not emitted, so new writes go to S3. **Does not cover dataset chunks** — those are addressed by index with no provider on the row, so they follow the current toggle and become unreachable after the switch. Do not set this on an install that already has datasets (see issue #6323) |
+| `app.dataplane.legacyS3ReadBucket` | Keeps persisted `s3://` stored-object URIs and true legacy bucket/key consumers readable after moving writes to Azure. It does not route provider-derived dataset chunks or GroupQueue durable payloads; run the migration and drain GroupQueue before switching |
+| `app.dataplane.legacyAzureRead` | Keeps `AZURE_BLOB_*` settings emitted after moving writes to S3 so persisted `azure-blob://` stored objects remain readable. It is not a dataset migration mechanism: dataset chunks require a verified copy before switching providers |
 | `postgresql.external.connectionString.value` | `DATABASE_URL` |
 | `redis.external.connectionString.value` | `REDIS_URL` |
 | `workers.enabled` | Inverse of `START_WORKERS` |

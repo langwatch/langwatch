@@ -267,11 +267,16 @@ Feature: Azure Blob stored-objects authenticate without a shared account key
   # Byte paths beyond the driver
   # ---------------------------------------------------------------
 
+  # Scoped to what a unit test can actually prove: no shared key is consulted
+  # anywhere on the write path, and the destination and driver agree so a write
+  # is never rejected as an unregistered scheme. The byte-level round-trip in a
+  # token mode is proven against a real Entra-authenticated account further
+  # down — no emulator offers OAuth, so it cannot be proven here.
   @unit
-  Scenario: Stored-objects writes succeed in a token-based mode
+  Scenario: A token-mode write path resolves without consulting a shared key
     Given STORED_OBJECTS_BACKEND is azure in a token-based auth mode
-    When byte content is externalized for a project
-    Then the object is written and an azure-blob URI is persisted
+    When the write destination for a project is resolved
+    Then it resolves to Azure and a matching Azure driver is registered
     And no shared-key configuration is consulted
 
   @unit
@@ -304,16 +309,34 @@ Feature: Azure Blob stored-objects authenticate without a shared account key
     When the write destination and the driver registration are both resolved
     Then the write destination is S3 while the Azure driver stays registered
 
+  # What a unit test can prove today: the selector reaches Azure dataset
+  # storage without touching the account key. It used to dereference
+  # `env.AZURE_BLOB_ACCOUNT_KEY!` and die inside Buffer.from(undefined) — a
+  # crash rather than a config error.
+  @unit
+  Scenario: Dataset storage is selected without dereferencing an absent account key
+    Given STORED_OBJECTS_BACKEND is azure in a token-based auth mode
+    When dataset storage is resolved for a project
+    Then it selects the Azure dataset storage
+    And no code path dereferences an absent account key
+
+  # The chunked round-trip itself stays unproven in a token mode: the emulator
+  # is shared-key only, so there is nowhere to run it outside a real
+  # Entra-authenticated account. Deliberately carries NO binding — the tag and
+  # an annotation claiming coverage cannot both be true.
   @integration @unimplemented
-  Scenario: Dataset uploads work in a token-based mode
+  Scenario: Dataset uploads round-trip in a token-based mode
     Given STORED_OBJECTS_BACKEND is azure in a token-based auth mode
     When a dataset is created, appended to, and read back
     Then the chunked content round-trips through Azure Blob
-    And no code path dereferences an absent account key
 
+  # The concern here is provider routing, not authentication: the durable tier
+  # is labelled `tier: "s3"`, so this proves it still reaches Azure on an
+  # install with no S3 at all. It runs against the emulator, which is shared-key
+  # only, so it deliberately does NOT claim to exercise a token mode.
   @integration
-  Scenario: The groupQueue durable blob tier works in a token-based mode
-    Given the durable blob tier resolves an azure destination in a token-based mode
+  Scenario: The groupQueue durable blob tier works on an Azure-only install
+    Given the durable blob tier resolves an azure destination and no S3 is configured
     When an oversized envelope is offloaded and later read back
     Then the bytes round-trip through Azure Blob
 
@@ -345,6 +368,18 @@ Feature: Azure Blob stored-objects authenticate without a shared account key
     Then the cron pods name no service account
     And the cron pods do not carry the workload-identity webhook label
 
+  # An annotation-less account the chart created is the same failure as a pod
+  # with no label, one layer down: it renders, the pods are healthy, and the
+  # webhook has nothing to bind them to.
+  @integration
+  Scenario: The chart refuses a created service account with no identity annotation
+    Given workloadIdentity auth is selected
+    And the chart is asked to create the service account
+    And no identity client-id annotation is configured on it
+    When the chart renders
+    Then rendering fails with an error naming the client-id annotation
+    But naming a pre-existing service account instead still renders
+
   @integration
   Scenario: The chart refuses a workload-identity install with no service account
     Given workloadIdentity auth is selected
@@ -366,18 +401,6 @@ Feature: Azure Blob stored-objects authenticate without a shared account key
     When the chart renders
     Then it renders successfully
     And no account-key environment variable is emitted
-
-  # An annotation-less account the chart created fails exactly like a pod with
-  # no webhook label, one layer down: it renders, the pods are healthy, and the
-  # webhook has no identity to bind them to.
-  @integration
-  Scenario: The chart refuses a created service account with no identity annotation
-    Given a token-based auth mode requiring a federated identity
-    And the chart is asked to create the service account
-    And no identity client-id annotation is configured on it
-    When the chart renders
-    Then rendering fails with an error naming the client-id annotation
-    But naming a pre-existing service account instead still renders
 
   # The chart cannot read a Secret, so an endpoint supplied that way has an
   # unknowable hostname. Assuming the public cloud is the one guess that fails
@@ -408,10 +431,23 @@ Feature: Azure Blob stored-objects authenticate without a shared account key
     Given the active provider is awsS3 with legacy Azure reads kept enabled
     And the Azure auth mode is workloadIdentity
     When the chart renders
-    Then no stored-objects backend toggle selects Azure for writes
+    Then the S3 write configuration renders exactly as on a plain S3 install
+    And no stored-objects backend toggle selects Azure for writes
     And the Azure connection settings are still emitted for reads
     And the app and workers pods still carry the workload-identity webhook label
     And the cron pods still do not carry it
+
+  # Each legacy read flag belongs to one migration direction. Set alongside
+  # the provider it migrates away from it configures nothing — the chart
+  # rejects the contradiction instead of rendering a silent no-op. An awsS3
+  # install with an empty bucket is rejected for the same reason: it would
+  # render S3_BUCKET_NAME blank and every write would fall back to local
+  # storage while the operator believes S3 is live.
+  @integration
+  Scenario: The chart rejects a legacy read flag aimed at the active provider
+    Given a chart configuration whose legacy read flag targets the provider that is already active
+    When the chart renders
+    Then rendering fails naming the contradictory flag
 
   @integration
   Scenario: Installs that do not use Azure render exactly as they did before
@@ -434,9 +470,9 @@ Feature: Azure Blob stored-objects authenticate without a shared account key
   # VERIFIED 2026-07-26 against a real Azure account with
   # allowSharedKeyAccess=false: shared key returned 403
   # KeyBasedAuthenticationNotPermitted, the same operations succeeded on a
-  # bearer token. Stays @manual because it needs a subscription and cannot
-  # run in CI; bound to a test that self-skips without credentials.
-  @manual
+  # bearer token. Needs a real subscription, so the bound test self-skips
+  # in CI and runs only where LANGWATCH_TEST_AZURE_* credentials are set.
+  @integration
   Scenario: Blobs round-trip against a real storage account with shared-key access disabled
     Given a real Azure storage account that forbids shared-key access
     And an identity holding the blob data role on that account

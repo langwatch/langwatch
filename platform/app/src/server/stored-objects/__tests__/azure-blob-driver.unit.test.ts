@@ -623,6 +623,59 @@ describe("AzureBlobDriver", () => {
     }
   });
 
+  /**
+   * The headline contract of issue #6087 is that there is NO credential
+   * fallback: a token-mode driver that cannot get a token must fail, never
+   * quietly downgrade to shared-key or send the request unsigned. Every other
+   * token test here stubs a SUCCESSFUL acquisition, so adding a `catch` around
+   * the token call that fell back to shared-key signing would leave this whole
+   * suite green. These pin the failure path itself.
+   */
+  describe("given a token-based auth mode where the token exchange fails", () => {
+    const tokenFailure = new Error(
+      "AADSTS70021: No matching federated identity record found",
+    );
+
+    beforeEach(() => {
+      getAzureBlobTokenMock.mockRejectedValue(tokenFailure);
+    });
+
+    /** @scenario "A failed token exchange surfaces as a configuration error, not a storage error" */
+    it.each([
+      ["get" as const, () => newTokenModeDriver().get(URI)],
+      [
+        "put" as const,
+        () =>
+          newTokenModeDriver().put(
+            URI,
+            Buffer.from("x"),
+            "application/octet-stream",
+          ),
+      ],
+      ["delete" as const, () => newTokenModeDriver().delete(URI)],
+      ["exists" as const, () => newTokenModeDriver().exists(URI)],
+      ["head" as const, () => newTokenModeDriver().head(URI)],
+    ])("%s rejects without ever reaching the network or building a shared-key signature", async (_op, run) => {
+      await expect(run()).rejects.toThrow(tokenFailure);
+
+      // No fallback: nothing was sent at all, signed or unsigned.
+      expect(fetchSpy).not.toHaveBeenCalled();
+    });
+
+    it("never constructs a SharedKey Authorization header as a fallback", async () => {
+      await expect(newTokenModeDriver().get(URI)).rejects.toThrow();
+
+      const sentAuthorizations = fetchSpy.mock.calls.map(
+        ([, init]) =>
+          (init?.headers as Record<string, string> | undefined)?.Authorization,
+      );
+      expect(sentAuthorizations).toHaveLength(0);
+      expect(sentAuthorizations.some((a) => a?.startsWith("SharedKey"))).toBe(
+        false,
+      );
+    });
+  });
+
   describe("given a token-based auth mode signing the same operation against different endpoint addressing styles", () => {
     /** @scenario "Bearer authorization is identical regardless of endpoint addressing style" */
     it("produces the same Authorization header for a host-style and a path-style endpoint, neither carrying a SharedKey signature", async () => {
