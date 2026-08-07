@@ -19,7 +19,6 @@ import type { JsonArray } from "@prisma/client/runtime/library";
 import { TRPCError } from "@trpc/server";
 import type { Edge, Node } from "@xyflow/react";
 import type { Context } from "hono";
-import { bodyLimit } from "hono/body-limit";
 import { describeRoute } from "hono-openapi";
 import { resolver } from "hono-openapi/zod";
 import { nanoid } from "nanoid";
@@ -39,6 +38,7 @@ import {
   handlerManagedAuth,
   publicEndpoint,
 } from "~/server/api/security";
+import { wireBodyLimit } from "~/server/api/wire-body-limit";
 import {
   apiKeyCeilingDenialResponse,
   enforceApiKeyCeiling,
@@ -302,7 +302,7 @@ secured.access(legacyEvaluationAuth).post(
       },
     },
   }),
-  bodyLimit({ maxSize: 20 * 1024 * 1024 }),
+  wireBodyLimit({ maxSize: 20 * 1024 * 1024 }),
   async (c) => {
     const auth = await authenticateRequest(c, "evaluations:manage");
     if ("error" in auth) {
@@ -492,7 +492,7 @@ secured.access(legacyEvaluationAuth).post(
     requestBody: evaluateRequestBody,
     responses: evaluateResponses,
   }),
-  bodyLimit({ maxSize: 30 * 1024 * 1024 }),
+  wireBodyLimit({ maxSize: 30 * 1024 * 1024 }),
   async (c) => {
     const evaluatorSlug = c.req.param("evaluator");
     return handleEvaluatorCall(c, evaluatorSlug, false);
@@ -527,7 +527,7 @@ secured.access(legacyEvaluationAuth).post(
     requestBody: evaluateRequestBody,
     responses: evaluateResponses,
   }),
-  bodyLimit({ maxSize: 30 * 1024 * 1024 }),
+  wireBodyLimit({ maxSize: 30 * 1024 * 1024 }),
   async (c) => {
     const evaluatorSlug = `${c.req.param("evaluator")}/${c.req.param("subpath")}`;
     return handleEvaluatorCall(c, evaluatorSlug, false);
@@ -554,7 +554,7 @@ secured.access(legacyEvaluationAuth).post(
     requestBody: evaluateRequestBody,
     responses: evaluateResponses,
   }),
-  bodyLimit({ maxSize: 30 * 1024 * 1024 }),
+  wireBodyLimit({ maxSize: 30 * 1024 * 1024 }),
   async (c) => {
     const evaluatorSlug = c.req.param("evaluator");
     return handleEvaluatorCall(c, evaluatorSlug, true);

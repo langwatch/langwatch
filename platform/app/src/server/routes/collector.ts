@@ -1,9 +1,9 @@
 import crypto from "node:crypto";
 import { createLogger } from "@langwatch/observability";
-import { bodyLimit } from "hono/body-limit";
 import type { ZodError } from "zod";
 import { fromZodError } from "zod-validation-error";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
+import { wireBodyLimit } from "~/server/api/wire-body-limit";
 import { DEFAULT_PII_REDACTION_LEVEL } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
 import {
   captureException,
@@ -57,7 +57,7 @@ secured
   )
   .post(
     "/collector",
-    bodyLimit({ maxSize: 10 * 1024 * 1024 }), // 10MB
+    wireBodyLimit({ maxSize: 10 * 1024 * 1024 }), // 10MB
     async (c) => {
       const credentials = extractCredentials((name) => c.req.header(name));
 
