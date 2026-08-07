@@ -12,6 +12,7 @@ import {
 } from "~/server/app-layer/permissions/errors";
 import type { Session } from "~/server/auth";
 import { isAdmin } from "../../../ee/admin/isAdmin";
+import { CUSTOM_ROLE_KIND } from "../role/repositories/role.repository";
 
 // ============================================================================
 // PERMISSION DEFINITIONS
@@ -857,12 +858,16 @@ async function checkPermissionFromBindings({
     if (!bindingScopeCanGrant(RoleBindingScopeType.TEAM, permission)) {
       return false;
     }
-    return resolveBindingPermission(
-      { role: teamUser.role, customRoleId: teamUser.assignedRoleId ?? null },
+    return resolveBindingPermission({
+      binding: {
+        role: teamUser.role,
+        customRoleId: teamUser.assignedRoleId ?? null,
+      },
+      organizationId,
       organizationRole,
       permission,
       prisma,
-    );
+    });
   }
 
   // Union permissions across ALL matching bindings — permitted if any grants it
@@ -890,12 +895,13 @@ async function checkPermissionFromBindings({
       continue;
     }
 
-    const permitted = await resolveBindingPermission(
+    const permitted = await resolveBindingPermission({
       binding,
+      organizationId,
       organizationRole,
       permission,
       prisma,
-    );
+    });
     if (permitted) return true;
   }
 
@@ -910,15 +916,32 @@ async function checkPermissionFromBindings({
  * implements parallel CUSTOM-role logic for API key resolution and must
  * stay in sync with the non-empty/empty fallthrough semantics here.
  */
-async function resolveBindingPermission(
-  binding: { role: TeamUserRole; customRoleId: string | null },
-  organizationRole: OrganizationUserRole | null,
-  permission: Permission,
-  prisma: PrismaClient,
-): Promise<boolean> {
+async function resolveBindingPermission({
+  binding,
+  organizationId,
+  organizationRole,
+  permission,
+  prisma,
+}: {
+  binding: { role: TeamUserRole; customRoleId: string | null };
+  organizationId: string;
+  organizationRole: OrganizationUserRole | null;
+  permission: Permission;
+  prisma: PrismaClient;
+}): Promise<boolean> {
   if (binding.customRoleId) {
-    const customRole = await prisma.customRole.findUnique({
-      where: { id: binding.customRoleId },
+    // Defense in depth, same two axes as the API-key resolver: the lookup is
+    // scoped to the organization being checked, so a poisoned binding pointing
+    // at another organization's role grants nothing of that role; and this
+    // path resolves session users and groups only, so an API key's private
+    // permission role (kind system_api_key) never backs it. Either mismatch
+    // resolves exactly like a missing role: the built-in fallthrough below.
+    const customRole = await prisma.customRole.findFirst({
+      where: {
+        id: binding.customRoleId,
+        organizationId,
+        kind: { not: CUSTOM_ROLE_KIND.SYSTEM_API_KEY },
+      },
     });
     if (customRole) {
       const perms = Array.isArray(customRole.permissions)
@@ -1206,12 +1229,13 @@ export async function hasOrganizationPermission(
     select: { role: true, assignedRoleId: true },
   });
   for (const tu of teamMemberships) {
-    const permitted = await resolveBindingPermission(
-      { role: tu.role, customRoleId: tu.assignedRoleId ?? null },
-      orgMember.role,
+    const permitted = await resolveBindingPermission({
+      binding: { role: tu.role, customRoleId: tu.assignedRoleId ?? null },
+      organizationId,
+      organizationRole: orgMember.role,
       permission,
-      ctx.prisma,
-    );
+      prisma: ctx.prisma,
+    });
     if (permitted) return true;
   }
   return false;
@@ -1341,7 +1365,15 @@ async function loadScopeResolution(
   const customRoles =
     customRoleIds.length > 0
       ? await ctx.prisma.customRole.findMany({
-          where: { id: { in: customRoleIds } },
+          // Same organization- and kind-scoping as resolveBindingPermission:
+          // a poisoned binding referencing another organization's role, or an
+          // API key's system_api_key role, must resolve like a missing role.
+          // This loader only ever backs session-user and group resolution.
+          where: {
+            id: { in: customRoleIds },
+            organizationId: args.organizationId,
+            kind: { not: CUSTOM_ROLE_KIND.SYSTEM_API_KEY },
+          },
           select: { id: true, permissions: true },
         })
       : [];
