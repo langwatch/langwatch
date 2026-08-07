@@ -16,6 +16,24 @@ export interface CurrentTeamMembership {
 }
 
 /**
+ * Who asked for this update: the caller, naming the team and the role outright,
+ * or the seat change, correcting a role the new organization role no longer
+ * allows.
+ *
+ * The difference decides what happens when the update would take away a team's
+ * only admin. A caller who named the team is refused, because they asked for a
+ * team-local change and a team needs an admin. A seat correction goes through
+ * and is reported back: it is the organization deciding what one person's seat
+ * is, an ORGANIZATION-scoped ADMIN binding still administers every shared team,
+ * and refusing used to take the whole seat change down with it.
+ */
+export type TeamRoleUpdateOrigin = "requested" | "seat-correction";
+
+export type EffectiveTeamRoleUpdate = TeamRoleUpdate & {
+  origin: TeamRoleUpdateOrigin;
+};
+
+/**
  * Computes the effective set of team role updates to apply when changing a
  * member's organization role.
  *
@@ -33,47 +51,59 @@ export function computeEffectiveTeamRoleUpdates(params: {
   requestedTeamRoleUpdates: TeamRoleUpdate[];
   currentMemberships: CurrentTeamMembership[];
   newOrganizationRole: OrganizationUserRole;
-}): TeamRoleUpdate[] {
+}): EffectiveTeamRoleUpdate[] {
   const { requestedTeamRoleUpdates, currentMemberships, newOrganizationRole } =
     params;
 
-  if (requestedTeamRoleUpdates.length > 0) {
+  const requested = requestedTeamRoleUpdates.map(
+    (update): EffectiveTeamRoleUpdate => ({ ...update, origin: "requested" }),
+  );
+  const correctTo = (
+    memberships: CurrentTeamMembership[],
+    role: TeamUserRole,
+  ): EffectiveTeamRoleUpdate[] =>
+    memberships.map((membership) => ({
+      teamId: membership.teamId,
+      role,
+      customRoleId: undefined,
+      origin: "seat-correction",
+    }));
+
+  if (requested.length > 0) {
     if (newOrganizationRole !== OrganizationUserRole.EXTERNAL) {
-      return requestedTeamRoleUpdates;
+      return requested;
     }
 
     const requestedTeamIdSet = new Set(
-      requestedTeamRoleUpdates.map((update) => update.teamId),
+      requested.map((update) => update.teamId),
     );
-    const externalFallbackUpdates = currentMemberships
-      .filter((membership) => !requestedTeamIdSet.has(membership.teamId))
-      .map((membership) => ({
-        teamId: membership.teamId,
-        role: TeamUserRole.VIEWER,
-        customRoleId: undefined,
-      }));
-
-    return [...requestedTeamRoleUpdates, ...externalFallbackUpdates];
+    return [
+      ...requested,
+      ...correctTo(
+        currentMemberships.filter(
+          (membership) => !requestedTeamIdSet.has(membership.teamId),
+        ),
+        TeamUserRole.VIEWER,
+      ),
+    ];
   }
 
   if (newOrganizationRole === OrganizationUserRole.EXTERNAL) {
-    return currentMemberships
-      .filter((membership) => membership.role !== TeamUserRole.VIEWER)
-      .map((membership) => ({
-        teamId: membership.teamId,
-        role: TeamUserRole.VIEWER,
-        customRoleId: undefined,
-      }));
+    return correctTo(
+      currentMemberships.filter(
+        (membership) => membership.role !== TeamUserRole.VIEWER,
+      ),
+      TeamUserRole.VIEWER,
+    );
   }
 
   if (newOrganizationRole === OrganizationUserRole.MEMBER) {
-    return currentMemberships
-      .filter((membership) => membership.role === TeamUserRole.VIEWER)
-      .map((membership) => ({
-        teamId: membership.teamId,
-        role: TeamUserRole.MEMBER,
-        customRoleId: undefined,
-      }));
+    return correctTo(
+      currentMemberships.filter(
+        (membership) => membership.role === TeamUserRole.VIEWER,
+      ),
+      TeamUserRole.MEMBER,
+    );
   }
 
   return [];

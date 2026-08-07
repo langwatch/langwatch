@@ -100,8 +100,29 @@ const secured = createProjectApp({
 secured.access(requires("experiments:view")).get(
   "/",
   describeRoute({
+    summary: "List experiments for the project",
     description:
       "List experiments for the project. Includes a runs count and last-run timestamp per experiment.",
+    parameters: [
+      {
+        in: "query",
+        name: "page",
+        required: false,
+        schema: { type: "integer", default: 1 },
+        description: "1-based page number",
+      },
+      {
+        in: "query",
+        name: "pageSize",
+        required: false,
+        schema: {
+          type: "integer",
+          default: DEFAULT_PAGE_SIZE,
+          maximum: MAX_PAGE_SIZE,
+        },
+        description: `Experiments per page, capped at ${MAX_PAGE_SIZE}`,
+      },
+    ],
     responses: {
       ...baseResponses,
       200: {

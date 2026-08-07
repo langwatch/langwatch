@@ -1,5 +1,5 @@
 import { timeseriesInput } from "../../../analytics/registry";
-import { getAnalyticsService } from "../../../app-layer/analytics";
+import { getApp } from "../../../app-layer/app";
 import { checkProjectPermission } from "../../rbac";
 import { protectedProcedure } from "../../trpc";
 
@@ -7,6 +7,6 @@ export const getTimeseries = protectedProcedure
   .input(timeseriesInput)
   .use(checkProjectPermission("analytics:view"))
   .query(async ({ input }) => {
-    const analyticsService = getAnalyticsService();
+    const analyticsService = getApp().analytics.service;
     return analyticsService.getTimeseries(input);
   });

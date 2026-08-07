@@ -1,4 +1,5 @@
 import type { TraceListItem } from "../../types/trace";
+import { NO_TRACE_EVENTS } from "../../types/trace";
 import type { ConversationGroup } from "./conversationGroups";
 import type { TraceGroup } from "./registry";
 
@@ -35,7 +36,7 @@ export function buildTracePlaceholderRows(count: number): TraceListItem[] {
     output: "",
     origin: "application",
     evaluations: [],
-    events: [],
+    events: NO_TRACE_EVENTS,
   }));
 }
 

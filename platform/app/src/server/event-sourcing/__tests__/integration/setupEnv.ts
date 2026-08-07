@@ -74,7 +74,7 @@ if (process.env.CI && process.env.CI_CLICKHOUSE_URL) {
 // Give each worker its own Redis logical database.
 //
 // The integration suite runs one file at a time, and Redis is one of the
-// reasons: BullMQ derives its keys from the queue name alone, so two workers
+// reasons: the queue derives its keys from the queue name alone, so two workers
 // building the same pipeline share a queue and consume each other's jobs. The
 // ClickHouse fixtures carry per-suite tenant ids, which keeps their rows
 // apart, though not the schema they share.

@@ -305,9 +305,16 @@ export async function prefetchScenarioData(
     };
   }
 
-  // Resolve the three model roles a run needs:
-  //   - the target adapter (prompt / workflow under test): the prompt's own
-  //     model when set, else the project's scenarios.generator default.
+  // Resolve the model roles a run needs:
+  //   - the target adapter, ONLY for a prompt target: the prompt's own
+  //     model when set, else the project's scenarios.agent_under_test
+  //     DEFAULT-role default. workflow / code / http targets never consume
+  //     an LLM key for the agent under test — the workflow/code adapters
+  //     send the project's platform API key instead (see
+  //     serialized-adapter.registry.ts) and http needs neither — so
+  //     resolving and preparing one for them is skipped entirely rather
+  //     than risking a project whose FAST/coding default is a
+  //     terms-restricted model (issue #6634).
   //   - the user-simulator and the judge: a run-plan override, else the
   //     scenario's own override, else the DEFAULT-role scenarios.user_simulator
   //     / scenarios.judge model. The split lets the role-play and evaluation
@@ -331,17 +338,18 @@ export async function prefetchScenarioData(
     )?.scenarioMappings;
   }
 
-  let modelForParams: string;
+  let modelForParams: string | undefined;
   let simulatorModel: string;
   let judgeModel: string;
   try {
-    modelForParams =
-      adapterData.type === "prompt" && adapterData.model
+    if (adapterData.type === "prompt") {
+      modelForParams = adapterData.model
         ? adapterData.model
         : await deps.modelResolver.resolve(
-            "scenarios.generator",
+            "scenarios.agent_under_test",
             context.projectId,
           );
+    }
     simulatorModel =
       suiteOverrides?.simulatorModel ??
       scenarioResult.simulatorModel ??
@@ -363,39 +371,60 @@ export async function prefetchScenarioData(
 
   const [modelParamsResult, simulatorParamsResult, judgeParamsResult] =
     await Promise.all([
-      deps.modelParamsProvider.prepare(context.projectId, modelForParams),
+      modelForParams !== undefined
+        ? deps.modelParamsProvider.prepare(context.projectId, modelForParams)
+        : Promise.resolve(undefined),
       deps.modelParamsProvider.prepare(context.projectId, simulatorModel),
       deps.modelParamsProvider.prepare(context.projectId, judgeModel),
     ]);
-  for (const { label, model, result } of [
-    { label: "adapter", model: modelForParams, result: modelParamsResult },
-    {
-      label: "user-simulator",
-      model: simulatorModel,
-      result: simulatorParamsResult,
-    },
-    { label: "judge", model: judgeModel, result: judgeParamsResult },
-  ]) {
-    if (!result.success) {
-      logger.warn(
-        {
-          projectId: context.projectId,
-          role: label,
-          model,
-          reason: result.reason,
-        },
-        `Failed to prepare model params: ${result.message}`,
-      );
-      return { success: false, error: result.message, reason: result.reason };
-    }
+
+  if (modelParamsResult && !modelParamsResult.success) {
+    logger.warn(
+      {
+        projectId: context.projectId,
+        role: "adapter",
+        model: modelForParams,
+        reason: modelParamsResult.reason,
+      },
+      `Failed to prepare model params: ${modelParamsResult.message}`,
+    );
+    return {
+      success: false,
+      error: modelParamsResult.message,
+      reason: modelParamsResult.reason,
+    };
   }
-  // Narrowing: the loop above returns on any failure, so all three succeeded.
-  if (
-    !modelParamsResult.success ||
-    !simulatorParamsResult.success ||
-    !judgeParamsResult.success
-  ) {
-    return { success: false, error: "Failed to prepare model params" };
+  if (!simulatorParamsResult.success) {
+    logger.warn(
+      {
+        projectId: context.projectId,
+        role: "user-simulator",
+        model: simulatorModel,
+        reason: simulatorParamsResult.reason,
+      },
+      `Failed to prepare model params: ${simulatorParamsResult.message}`,
+    );
+    return {
+      success: false,
+      error: simulatorParamsResult.message,
+      reason: simulatorParamsResult.reason,
+    };
+  }
+  if (!judgeParamsResult.success) {
+    logger.warn(
+      {
+        projectId: context.projectId,
+        role: "judge",
+        model: judgeModel,
+        reason: judgeParamsResult.reason,
+      },
+      `Failed to prepare model params: ${judgeParamsResult.message}`,
+    );
+    return {
+      success: false,
+      error: judgeParamsResult.message,
+      reason: judgeParamsResult.reason,
+    };
   }
 
   logger.debug(
@@ -407,13 +436,17 @@ export async function prefetchScenarioData(
     "Prefetch complete",
   );
 
+  const modelParams = modelParamsResult?.success
+    ? modelParamsResult.params
+    : undefined;
+
   return {
     success: true,
     data: {
       context,
       scenario,
       adapterData,
-      modelParams: modelParamsResult.params,
+      modelParams,
       simulatorModelParams: simulatorParamsResult.params,
       judgeModelParams: judgeParamsResult.params,
       nlpServiceUrl: env.LANGWATCH_NLP_SERVICE,

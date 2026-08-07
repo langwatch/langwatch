@@ -7,24 +7,11 @@
  */
 import { z } from "zod";
 
-import {
-  getClickHouseClientForProject,
-  isClickHouseEnabled,
-} from "~/server/clickhouse/clickhouseClient";
-import { GatewaySpendEventsRepository } from "~/server/gateway/spendEvents.clickhouse.repository";
+import { getApp } from "~/server/app-layer/app";
+import { GatewaySpendEventsService } from "~/server/gateway/spendEvents.service";
 
 import { checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
-
-async function resolveClient(projectId: string) {
-  const client = await getClickHouseClientForProject(projectId);
-  if (!client) {
-    throw new Error(
-      `ClickHouse enabled but no client for project ${projectId}`,
-    );
-  }
-  return client;
-}
 
 export const gatewaySpendEventsRouter = createTRPCRouter({
   list: protectedProcedure
@@ -57,7 +44,8 @@ export const gatewaySpendEventsRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("gatewayUsage:view"))
     .query(async ({ ctx, input }) => {
-      if (!isClickHouseEnabled()) {
+      const repository = getApp().gateway.spendEvents;
+      if (!repository) {
         return {
           rows: [],
           nextCursor: null,
@@ -65,8 +53,8 @@ export const gatewaySpendEventsRouter = createTRPCRouter({
           clickHouseDisabled: true,
         };
       }
-      const repository = new GatewaySpendEventsRepository(resolveClient);
-      const { rows, nextCursor } = await repository.readSpendEventsPage({
+      const service = new GatewaySpendEventsService(repository);
+      const { rows, nextCursor } = await service.getSpendEventsPage({
         tenantId: input.projectId,
         fromMs: input.fromMs,
         toMs: input.toMs,

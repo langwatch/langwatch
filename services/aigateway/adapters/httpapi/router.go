@@ -51,11 +51,10 @@ type RouterDeps struct {
 	// Required when OTTLServer is set.
 	InternalSecret string
 	// MaxRequestBodyBytes caps the per-request body size. 0 falls back to
-	// config.DefaultMaxRequestBodyBytes (128 MiB) — sized for large-context
-	// LLM workloads where legitimate requests run tens of MB (a 10M-token
-	// text context alone is ~40-50 MB). Set higher on enterprise deployments
-	// that send full-context multi-image / media payloads; lower on public
-	// edge deployments to tighten DDoS protection.
+	// config.DefaultMaxRequestBodyBytes (32 MiB), which fits a 1M-context
+	// multimodal payload. Raise it on a deployment that legitimately sends
+	// more, lower it on a public edge deployment to tighten DDoS
+	// protection.
 	MaxRequestBodyBytes int64
 	// HeartbeatInterval sets how often a non-streaming response writes a
 	// keep-alive byte while dispatch is still in flight, so a large-context
@@ -952,6 +951,10 @@ func writeJSONResponse(w http.ResponseWriter, resp *domain.Response) {
 		w.Header().Set(k, v)
 	}
 	w.Header().Set("Content-Type", ct)
+	// A provider must not be able to make its body look LangWatch-authored —
+	// same rule as writeUpstreamError. This lane forwards resp.Headers
+	// wholesale, so an upstream echoing this header must not survive.
+	w.Header().Del(herr.HandledErrorHeader)
 	if resp.StatusCode > 0 {
 		w.WriteHeader(resp.StatusCode)
 	}
@@ -1147,6 +1150,9 @@ func writeUpstreamError(w http.ResponseWriter, ue *domain.UpstreamError) {
 	for k, v := range ue.Headers {
 		w.Header().Set(k, v)
 	}
+	// A provider must not be able to make its body look LangWatch-authored.
+	// herr.WriteHTTP sets this marker only for our handled envelopes.
+	w.Header().Del(herr.HandledErrorHeader)
 	if ue.Provider != "" {
 		w.Header().Set("X-LangWatch-Provider", ue.Provider)
 	}
@@ -1203,6 +1209,7 @@ func registerErrorStatuses() {
 	herr.RegisterStatus(domain.ErrProviderError, http.StatusBadGateway)
 	herr.RegisterStatus(domain.ErrProviderTimeout, http.StatusGatewayTimeout)
 	herr.RegisterStatus(domain.ErrBadRequest, http.StatusBadRequest)
+	herr.RegisterStatus(domain.ErrMissingModel, http.StatusBadRequest)
 	// Fail-closed attribution: the request is missing a required field
 	// (the end-user id) while a per-end-user template is active. A
 	// request-shape error like the two around it, so 400 per the house
@@ -1219,6 +1226,7 @@ func registerErrorStatuses() {
 	herr.RegisterStatus(domain.ErrNotFound, http.StatusNotFound)
 	herr.RegisterStatus(domain.ErrInternal, http.StatusInternalServerError)
 	herr.RegisterStatus(domain.ErrNoProviderConfigured, http.StatusBadRequest)
+	herr.RegisterStatus(domain.ErrCodexSessionExpired, http.StatusUnauthorized)
 	// Retryable by contract: the control plane failed us, not the caller.
 	// A 5xx keeps client SDKs retrying instead of bubbling a config error.
 	herr.RegisterStatus(domain.ErrAuthUpstream, http.StatusServiceUnavailable)

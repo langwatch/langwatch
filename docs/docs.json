@@ -903,6 +903,7 @@
               "api-reference/datasets/list-dataset",
               "api-reference/datasets/create-dataset",
               "api-reference/datasets/create-direct-upload",
+              "api-reference/datasets/evaluate-a-dataset",
               "api-reference/datasets/create-upload",
               "api-reference/datasets/get-dataset",
               "api-reference/datasets/get-records",
@@ -998,6 +999,30 @@
                   "api-reference/evaluators/competitor-llm-check"
                 ]
               }
+            ]
+          },
+          {
+            "group": "Evaluations",
+            "pages": [
+              "api-reference/evaluations/overview",
+              "api-reference/evaluations/list-the-built-in-evaluators",
+              "api-reference/evaluations/run-an-evaluator",
+              "api-reference/evaluations/run-a-namespaced-evaluator",
+              "api-reference/evaluations/run-an-evaluator-as-a-guardrail",
+              "api-reference/evaluations/report-batch-evaluation-results"
+            ]
+          },
+          {
+            "group": "Experiments",
+            "pages": [
+              "api-reference/experiments/overview",
+              "api-reference/experiments/create-an-experiment",
+              "api-reference/experiments/list-experiments-for-the-project",
+              "api-reference/experiments/run-an-experiment",
+              "api-reference/experiments/list-runs-of-an-experiment",
+              "api-reference/experiments/poll-a-run",
+              "api-reference/experiments/read-run-results",
+              "api-reference/experiments/report-dspy-optimizer-steps"
             ]
           },
           {
@@ -1101,10 +1126,19 @@
             "pages": [
               "api-reference/triggers/overview",
               "api-reference/triggers/list-triggers",
+              "api-reference/triggers/create-a-slack-alert-trigger",
               "api-reference/triggers/create-triggers",
               "api-reference/triggers/get-triggers",
               "api-reference/triggers/update-triggers",
               "api-reference/triggers/delete-triggers"
+            ]
+          },
+          {
+            "group": "Events",
+            "pages": [
+              "api-reference/events/overview",
+              "api-reference/events/create-track",
+              "api-reference/events/track-an-event-legacy-path"
             ]
           },
           {
@@ -1114,7 +1148,10 @@
               "api-reference/workflows/list-workflows",
               "api-reference/workflows/get-workflows",
               "api-reference/workflows/update-workflows",
+              "api-reference/workflows/run-a-workflow-version-legacy-path",
               "api-reference/workflows/action-evaluate",
+              "api-reference/workflows/run-a-specific-workflow-version",
+              "api-reference/workflows/run-a-workflow",
               "api-reference/workflows/delete-workflows"
             ]
           },
@@ -1145,6 +1182,7 @@
             "group": "Analytics",
             "pages": [
               "api-reference/analytics/overview",
+              "api-reference/analytics/query-analytics-timeseries-legacy-path",
               "api-reference/analytics/create-timeseries"
             ]
           },
@@ -1174,7 +1212,9 @@
               "api-reference/projects/list-projects",
               "api-reference/projects/create-project",
               "api-reference/projects/get-project",
+              "api-reference/projects/get-api-key",
               "api-reference/projects/update-project",
+              "api-reference/projects/regenerate-api-key",
               "api-reference/projects/archive-project"
             ]
           },
@@ -1351,7 +1391,7 @@
   },
   "redirects": [
     {
-      "source": "/ci/cache/busted/1785933370",
+      "source": "/ci/cache/busted/1786109835",
       "destination": "/"
     },
     {

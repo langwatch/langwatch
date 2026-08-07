@@ -60,6 +60,35 @@ const str = (
   return typeof value === "string" && value.length > 0 ? value : fallback;
 };
 
+type MissingModelRequestType =
+  | "chat"
+  | "messages"
+  | "responses"
+  | "embeddings"
+  | "speech"
+  | "transcription"
+  | "passthrough";
+
+const missingModelDescriptions = {
+  chat: 'Add a top-level "model" field to POST /v1/chat/completions, then try again.',
+  messages:
+    'Add a top-level "model" field to POST /v1/messages, then try again.',
+  responses:
+    'Add a top-level "model" field to POST /v1/responses, then try again.',
+  embeddings:
+    'Add a top-level "model" field to POST /v1/embeddings, then try again.',
+  speech:
+    'Add a top-level "model" field to POST /v1/audio/speech, then try again.',
+  transcription:
+    'Add a "model" field to the multipart form for POST /v1/audio/transcriptions, then try again.',
+  passthrough: "Put the model in the Gemini request URL, then try again.",
+} as const satisfies Record<MissingModelRequestType, string>;
+
+const describeMissingModel = (error: HandledErrorShape): string =>
+  (missingModelDescriptions as Record<string, string>)[
+    str(error, "request_type", "")
+  ] ?? "Set the model where this endpoint expects it, then try again.";
+
 /**
  * The two plan allowances an admin meets while reconciling seats, in words that
  * read inside a sentence. Not taken from the license-enforcement labels, which
@@ -107,6 +136,26 @@ const PROVIDER_ALLOWANCE_REASONS: ReadonlySet<string> = new Set([
   "codex_plan_limit",
   "insufficient_quota",
   "billing_hard_limit_reached",
+]);
+
+/**
+ * The upstream-HTTP-status fallback reasons (llmproxy.go's
+ * upstreamReasonCodes), used when the provider's own body carried no
+ * discriminant of its own. Grouped the same way PROVIDER_ALLOWANCE_REASONS
+ * is: one remediation, one sentence.
+ */
+const PROVIDER_CREDENTIAL_REASONS: ReadonlySet<string> = new Set([
+  "upstream_unauthorized",
+  "upstream_forbidden",
+]);
+
+const PROVIDER_RATE_LIMIT_REASONS: ReadonlySet<string> = new Set([
+  "upstream_rate_limited",
+]);
+
+const PROVIDER_OUTAGE_REASONS: ReadonlySet<string> = new Set([
+  "upstream_unavailable",
+  "upstream_timeout",
 ]);
 
 /**
@@ -430,6 +479,21 @@ const presentations = {
     describe: () =>
       "Nothing has a model set yet. Pick one in your project's model settings, then try again.",
   },
+  model_restricted_for_feature: {
+    // Distinct from `model_not_configured`: a model IS set, but it's
+    // licensed for Langy and the quick assists only (see
+    // codex-account-provider.feature) and this feature needs full
+    // inference.
+    title: "This model can't be used here",
+    describe: (error) => {
+      const featureDisplayName = str(
+        error,
+        "featureDisplayName",
+        "this feature",
+      );
+      return `Pick a different default model for ${featureDisplayName} in your project's model settings.`;
+    },
+  },
   model_provider_disabled: {
     title: "This model provider is turned off",
     describe: () =>
@@ -581,6 +645,38 @@ const presentations = {
         ? `"${ownerName}" is that member's own workspace`
         : "A personal workspace belongs to one member";
       return `${workspace}, so its access isn't managed from here. Their organization role already decides what they can do in it. To work together, use a shared team.`;
+    },
+  },
+  team_last_admin_required: {
+    // Names the team, because this is raised while editing one member who may
+    // be an admin of several, and it offers the one step that clears it. The
+    // reader holds the permission to promote somebody, so telling them to
+    // contact support or an admin would be sending them to themselves.
+    title: "That team would be left without an admin",
+    describe: (error) => {
+      const teamName = str(error, "teamName", "");
+      const team = teamName ? `"${teamName}"` : "This team";
+      return `${team} has no other admin, and a team needs at least one. Give somebody else the Admin role there first, then make this change.`;
+    },
+  },
+  cannot_remove_self_as_last_admin: {
+    // The same wall from the inside. Nobody else can promote a replacement for
+    // them, so the remedy is theirs to do in this order and the copy says so.
+    title: "You are the only admin of that team",
+    describe: (error) => {
+      const teamName = str(error, "teamName", "");
+      const team = teamName ? `"${teamName}"` : "that team";
+      return `You cannot give up the Admin role in ${team} while you are the only one holding it. Make somebody else an admin there first.`;
+    },
+  },
+  lite_member_viewer_only: {
+    // Not a field to correct: the seat sets the ceiling, so the two ways out
+    // are the two named here.
+    title: "A Lite Member can only view a team",
+    describe: (error) => {
+      const teamName = str(error, "teamName", "");
+      const team = teamName ? ` in "${teamName}"` : "";
+      return `A Lite Member seat allows the Viewer role only${team}. Leave the team role as Viewer, or move them to a full member seat to give them more.`;
     },
   },
   already_organization_member: {
@@ -1429,6 +1525,10 @@ const presentations = {
     // in the registry of a code whose meta must never be rendered.
     describe: () => "We've been notified. Try again in a moment.",
   },
+  missing_model: {
+    title: "Choose a model",
+    describe: describeMissingModel,
+  },
 
   // ---- Langy agent ----
   llm_upstream_error: {
@@ -1454,10 +1554,21 @@ const presentations = {
     // cannot name is exactly the ADR-045 "unknown" case, and a trace id serves
     // the customer better than a sentence we cannot vouch for.
     title: "The model provider rejected that",
-    describe: (error) =>
-      hasReasonCode(error.reasons, PROVIDER_ALLOWANCE_REASONS)
-        ? "Your account with this model provider has no allowance left. Check its billing or usage limits, or pick a model from a different provider."
-        : "Try again, or pick a different model.",
+    describe: (error) => {
+      if (hasReasonCode(error.reasons, PROVIDER_ALLOWANCE_REASONS)) {
+        return "Your account with this model provider has no allowance left. Check its billing or usage limits, or pick a model from a different provider.";
+      }
+      if (hasReasonCode(error.reasons, PROVIDER_CREDENTIAL_REASONS)) {
+        return "The model provider refused this key or its permissions. Check the credential configured for this model.";
+      }
+      if (hasReasonCode(error.reasons, PROVIDER_RATE_LIMIT_REASONS)) {
+        return "The model provider is rate-limiting these calls. Wait a moment and try again.";
+      }
+      if (hasReasonCode(error.reasons, PROVIDER_OUTAGE_REASONS)) {
+        return "The model provider is temporarily unavailable. Try again shortly, or pick a different model.";
+      }
+      return "Try again, or pick a different model.";
+    },
   },
   agent_error: {
     title: "Something went wrong mid-answer",

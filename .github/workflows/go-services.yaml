@@ -26,7 +26,7 @@ jobs:
       chart: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.chart }}
       langyagent: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.langyagent }}
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           # The gate reads no working-tree content: on pull_request events
           # dorny/paths-filter takes the changed-file list from the API, and
@@ -49,6 +49,12 @@ jobs:
             chart:
               - 'charts/gateway/**'
               - '.github/workflows/go-services.yaml'
+              # The `helm` job's ConfigMap/env-var assertions encode a
+              # contract with these two Go files — a rename here that
+              # doesn't touch charts/gateway/** would otherwise skip the
+              # job that's supposed to catch exactly that regression.
+              - 'pkg/config/server.go'
+              - 'services/aigateway/config.go'
             langyagent:
               # The langyagent image bakes in the langwatch CLI, and that CLI is
               # generated AT IMAGE-BUILD TIME from inputs OUTSIDE the Go tree:
@@ -84,7 +90,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8 # v3
@@ -98,7 +104,7 @@ jobs:
 
       - name: Login to GHCR
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v3
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -132,7 +138,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
@@ -165,7 +171,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install helm
         uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v4
@@ -191,6 +197,28 @@ jobs:
           fi
           if grep -q "kind: NetworkPolicy" /tmp/defaults.yaml; then
             echo "NetworkPolicy should NOT render by default"; exit 1
+          fi
+
+      # The drain-timing suite: the two values reaching the container as the
+      # env vars serve.go reads, the retired duration-string keys being
+      # refused, and a drain budget wider than the pod's grace period being
+      # refused. It lives beside the chart, as a shell suite, so its cases
+      # can carry `@scenario` bindings that specs/ai-gateway feature files
+      # resolve against; inline YAML steps bind nothing.
+      - name: Assert shutdown values render as the pod needs them
+        run: ./charts/gateway/tests/shutdown-values.sh
+
+      # The chart's graceful window has to stay above the gateway's 45s
+      # non-streaming heartbeat interval (pkg/config.DefaultNonStreamingHeartbeatInterval),
+      # or a stock install boots straight into the
+      # graceful_shutdown_shorter_than_heartbeat_interval warning and every
+      # slow-but-legitimate request is one a rolling deploy cuts off.
+      - name: Assert the graceful window outlasts the heartbeat interval
+        run: |
+          graceful=$(grep -oP 'SERVER_GRACEFUL_SECONDS: "\K[0-9]+' /tmp/defaults.yaml)
+          heartbeat=$(grep -oP 'DefaultNonStreamingHeartbeatInterval = \K[0-9]+' pkg/config/server.go)
+          if [ "$graceful" -le "$heartbeat" ]; then
+            echo "shutdown.timeoutSeconds ($graceful) must exceed the ${heartbeat}s non-streaming heartbeat interval"; exit 1
           fi
 
       - name: helm dependency update (umbrella)

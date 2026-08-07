@@ -29,6 +29,13 @@ import {
 } from "./GroupBindingInputRow";
 import { OrganizationUserRoleField } from "./OrganizationUserRoleField";
 
+/** Team names as a reader would say them: "A", "A and B", "A, B and C". */
+function listTeamNames(names: string[]): string {
+  const quoted = names.map((name) => `"${name}"`);
+  if (quoted.length <= 1) return quoted[0] ?? "";
+  return `${quoted.slice(0, -1).join(", ")} and ${quoted[quoted.length - 1]}`;
+}
+
 type MemberSummary = {
   userId: string;
   role: OrganizationUserRole;
@@ -107,12 +114,19 @@ export function MemberDetailDialog({
       // Apply org role first — it has license/plan checks that should block the
       // whole save if they fail. Bindings then run as a single transactional
       // batch so they cannot leave a partial state behind.
+      let teamsLeftWithoutAdmin: Array<{ id: string; name: string }> = [];
       if (roleChanged) {
-        await updateOrgRole.mutateAsync({
+        const roleResult = await updateOrgRole.mutateAsync({
           organizationId,
           userId: member.userId,
           role: pendingRole,
         });
+        // Defaulted rather than read straight off: during a rollout this code
+        // can reach a server that answers without the field, and the save has
+        // already succeeded by then. Losing the disclosure line is a worse
+        // outcome than nothing only in theory; telling somebody their
+        // successful save failed is one in practice.
+        teamsLeftWithoutAdmin = roleResult?.teamsLeftWithoutAdmin ?? [];
       }
 
       if (hasBindingChangesNow) {
@@ -139,7 +153,20 @@ export function MemberDetailDialog({
         // with this save.
         queryClient.limits.getUsage.invalidate(),
       ]);
-      toaster.create({ title: "Member updated", type: "success" });
+      toaster.create({
+        title: "Member updated",
+        // A seat correction is allowed to take away a team's only team-scoped
+        // admin, so this is the one place the admin who did it finds out. It
+        // reads as a consequence rather than a warning, because organization
+        // admins can still manage those teams and nothing needs repairing.
+        description:
+          teamsLeftWithoutAdmin.length > 0
+            ? `${listTeamNames(teamsLeftWithoutAdmin.map((team) => team.name))} no longer ${teamsLeftWithoutAdmin.length === 1 ? "has" : "have"} a team admin. Organization admins can still manage ${teamsLeftWithoutAdmin.length === 1 ? "it" : "them"}.`
+            : undefined,
+        type: "success",
+        duration: teamsLeftWithoutAdmin.length > 0 ? 10000 : undefined,
+        meta: { closable: true },
+      });
       onClose();
     } catch (e) {
       showErrorToast({

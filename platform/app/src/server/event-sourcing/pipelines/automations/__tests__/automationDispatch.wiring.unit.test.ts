@@ -90,6 +90,9 @@ describe("automation dispatch wiring smoke", () => {
         evaluations: { runs: {} as never },
         traces: { spans: {} as never },
         traceSummaryRepository: {} as never,
+        resolveClickHouseClient: async () => {
+          throw new Error("no ClickHouse in this test");
+        },
       });
 
       expect(ports.settlementDeps).toEqual(

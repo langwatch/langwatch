@@ -39,7 +39,13 @@ func (o *Orchestrator) Typecheck(ctx context.Context, lwDir string, extraArgs []
 	if maxRSSOverrideMB > 0 {
 		rl.MaxRSSBytes = int64(maxRSSOverrideMB) << 20
 	}
-	return o.sup.RunOnceBounded(ctx, "typecheck", lwDir, shell, nil, ReapLimits(rl))
+	// The `typecheck` script takes a machine-wide slot of its own
+	// (dev/scripts/check-queue.mjs). We already hold one here, so turn that
+	// gate off for this run: counting it twice would queue it behind itself, and
+	// the reaper's duration ceiling would then be spent waiting rather than
+	// typechecking.
+	env := []string{"CHECK_SLOTS=0"}
+	return o.sup.RunOnceBounded(ctx, "typecheck", lwDir, shell, env, ReapLimits(rl))
 }
 
 // shellQuote single-quotes s for safe interpolation into a `bash -lc` string,

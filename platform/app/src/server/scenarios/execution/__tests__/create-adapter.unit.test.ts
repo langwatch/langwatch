@@ -34,6 +34,7 @@ describe("createAdapter", () => {
       const adapter = createAdapter({
         adapterData,
         modelParams: defaultModelParams,
+        projectApiKey: "lw-project-key",
         nlpServiceUrl,
       });
 
@@ -54,6 +55,7 @@ describe("createAdapter", () => {
       const adapter = createAdapter({
         adapterData,
         modelParams: defaultModelParams,
+        projectApiKey: "lw-project-key",
         nlpServiceUrl,
       });
 
@@ -75,6 +77,7 @@ describe("createAdapter", () => {
       const adapter = createAdapter({
         adapterData,
         modelParams: defaultModelParams,
+        projectApiKey: "lw-project-key",
         nlpServiceUrl,
       });
 
@@ -92,6 +95,7 @@ describe("createAdapter", () => {
         createAdapter({
           adapterData,
           modelParams: defaultModelParams,
+          projectApiKey: "lw-project-key",
           nlpServiceUrl,
         }),
       ).toThrow("Unknown adapter type: unknown-type");

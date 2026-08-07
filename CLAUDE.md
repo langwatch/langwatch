@@ -176,6 +176,23 @@ pnpm test:integration # Integration tests
 pnpm test:e2e         # E2E tests
 ```
 
+**Whole-repo checks take a machine-wide slot.** A tsgo run peaks around 3 to 4
+GiB and uses every core; a biome run over 6,800 files spends 38 CPU-seconds in 4
+seconds of wall clock. That is fine once and ruinous four times over, so
+`typecheck`, `typecheck:tests`, `typecheck:legacy`, `lint`, `lint:fix`,
+`lint:plugins` and `format` all go through `dev/scripts/check-queue.mjs`. It
+counts the runs live across every worktree, terminal and agent on the machine
+against **one** counter (they compete for the same cores), and a run past the
+limit waits its turn instead of piling on. With a slot free it prints nothing
+and is otherwise transparent (same stdio, same exit code). Queued, it says so on
+stderr, which is what tells you a slow run was waiting rather than hung.
+`CHECK_SLOTS=N` overrides the limit and `CHECK_SLOTS=0` turns the queue off;
+unset, the limit comes from the machine (one per 6 GiB of RAM, capped at one per
+4 cores) and CI does not queue at all. `node dev/scripts/check-queue.mjs
+--explain` shows the limit and who currently holds a slot. Don't cap the tools'
+own threads instead (`RAYON_NUM_THREADS` does work on biome): it spends the same
+CPU over 5x the wall clock. See `specs/setup/check-slots.feature`.
+
 When debugging locally, **prefer the observability stack over the log file if it is up** (haven starts it by default; `make haven status` confirms). Query the real logs/traces/metrics by attribute with `gcx` — Grafana's CLI, wired by `make observability-connect` — instead of grepping the giant `platform/app/server.log`: indexed attribute search finds the failure far faster, and with the stack up the console is muted to warn+ anyway so the detail only lives in Grafana. Filter to your own worktree with the `langwatch_worktree` structured-metadata field (a pipe filter, not a stream label), e.g. `gcx logs query '{service_name="langwatch-app"} | langwatch_worktree="<slug>"' --since 15m` and `gcx traces query '{ resource.service.name = "langwatch-service-langyagent" }' --since 15m`. See `dev/docs/best_practices/local-observability.md` ("Reading the data as an agent"). `pnpm dev` still tees to `platform/app/server.log`; grep it as the fallback when the stack is down.
 
 ## Structure
@@ -250,7 +267,7 @@ specs/               # BDD feature specs
 | Asserting on error message prose in tests | Assert on `code` — the message is copy and will change. Use `code` equality rather than `instanceof` anywhere the error may have crossed a process, worker, or serialisation boundary |
 | Hono routes calling repositories directly | Routes must go through a service layer — never instantiate or import from repositories. Business logic (validation, guards) belongs in the service, not the route |
 | Using `list` or `get` for repository methods | Repositories use `findAll`/`findById`. Services use `getAll`/`getById`. Routes call services only |
-| Setting up a Monitor / sleep that *can* take more than 5 minutes | Anthropic's prompt cache TTL is 5min, so any wait that crosses it forces an uncached re-read of the full conversation on wake-up (slower + double-pays for tokens). Cap each poll cycle at **4.5 min (270s)** — re-check, then re-arm. If the work is obviously hours away (long deploy, overnight run), don't sit on a Monitor at all — drop it and hand control back to the user |
+| Setting up a Monitor / sleep that *can* cross the prompt-cache TTL | A wait that crosses the TTL forces an uncached re-read of the full conversation on wake-up (slower + double-pays for tokens). **The TTL depends on where you are running: main sessions get 1h, subagents get 5min.** In a main session cap each poll cycle at ~15 min; inside a subagent cap it at **4.5 min (270s)** — re-check, then re-arm either way. If the work is obviously hours away (long deploy, overnight run), don't sit on a Monitor at all — drop it and hand control back to the user |
 | Using inline `import("...")` anywhere | Never use inline `import()` — always use top-level `import` / `import type` statements. **One exception: the CLI startup path** (`sdks/typescript/src/cli/**` and `sdks/typescript/tsup.config.ts`), where lazy `import()` is load-bearing — it is what keeps commander, chalk, zod, js-yaml, the command modules and the command catalog off the boot graph and the cold start at ~30ms. There, defer at the seam (command actions, format branches) and keep the boot graph pinned by `src/cli/__tests__/index-boot.unit.test.ts`. Everywhere else the ban stands |
 | Running `pnpm typecheck` and assuming the TypeScript is checked | `tsconfig.tsgo.json` excludes `**/*.test.ts`, `**/*.test.tsx` and `**/__tests__/**`, so `pnpm typecheck` never looks at a test file. CI runs `pnpm typecheck` **and** `pnpm typecheck:tests` as separate steps in the same job. Use `pnpm typecheck:all`, which is both, or a change confined to a test file will typecheck clean locally and fail CI |
 | Assuming `go build`, `go test` and `gofmt` are enough before pushing Go | Run `golangci-lint run ./services/aigateway/... ./services/nlpgo/... ./pkg/... ./cmd/... ./tools/migrationorder/...`, which is exactly what `go-ci / lint` runs. It catches a class the other three never will, most often `misspell` (it enforces US spelling, so `behaviour`, `unrecognised`, `labelled` and `funnelled` all fail even though the repo's prose uses British forms), `nolintlint` (a `//nolint` for a code already in the global `gosec.excludes` is flagged as unused) and `testifylint`. The pinned version is in `.golangci.yml`; `golangci-lint run --fix` handles misspell and nolintlint automatically |

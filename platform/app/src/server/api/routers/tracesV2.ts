@@ -35,6 +35,7 @@ import { deriveUnmappedCostSuggestion } from "~/server/app-layer/traces/model-co
 import type {
   SpanSummaryPage,
   SpanSummaryRow,
+  TraceEventRollup,
 } from "~/server/app-layer/traces/repositories/span-storage.repository";
 import {
   traceMetadataUpdateSchema,
@@ -864,6 +865,13 @@ const timeRangeSchema = z.object({
   live: z.boolean().optional(),
 });
 
+/**
+ * Ceiling on one `listEvents` call, matching the list's largest page size.
+ * The read is a primary-key `IN` over `(TenantId, TraceId, SpanId)`, so it
+ * scales with the page rather than the project — but only if the page does.
+ */
+const MAX_LIST_EVENT_TRACE_IDS = 1000;
+
 const sortSchema = z.object({
   columnId: z.string(),
   direction: z.enum(["asc", "desc"]),
@@ -1122,6 +1130,32 @@ export const tracesV2Router = createTRPCRouter({
         items: page.items.map((it) => redactV2Content(it, protections)),
       };
     }),
+
+  /**
+   * Event rollups for the trace list's Events column, keyed by trace id.
+   *
+   * Its own query rather than part of `list`: events live in `stored_spans`,
+   * not on the summary fold, so bundling them would put a second table's read
+   * in front of the paint that every user waits on — including the ones whose
+   * columns and grouping never ask for events.
+   */
+  listEvents: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        traceIds: z.array(z.string().min(1)).max(MAX_LIST_EVENT_TRACE_IDS),
+        timeRange: timeRangeSchema,
+      }),
+    )
+    .use(checkProjectPermission("traces:view"))
+    .query(
+      async ({ input }): Promise<Record<string, TraceEventRollup>> =>
+        getApp().traces.spans.getTraceEventRollupsByTraceIds({
+          tenantId: input.projectId,
+          traceIds: input.traceIds,
+          timeRange: input.timeRange,
+        }),
+    ),
 
   facets: protectedProcedure
     .input(

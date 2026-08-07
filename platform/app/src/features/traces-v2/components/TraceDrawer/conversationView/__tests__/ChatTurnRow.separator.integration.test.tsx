@@ -55,6 +55,7 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
 }));
 
 import type { TraceListItem } from "../../../../types/trace";
+import { NO_TRACE_EVENTS } from "../../../../types/trace";
 import { ChatTurnRow } from "../ChatTurnRow";
 
 const ONE_HOUR_MS = 60 * 60 * 1000;
@@ -78,7 +79,7 @@ function turn(over: Partial<TraceListItem>): TraceListItem {
     output: null,
     origin: "application",
     evaluations: [],
-    events: [],
+    events: NO_TRACE_EVENTS,
     ...over,
   };
 }

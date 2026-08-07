@@ -470,13 +470,13 @@ const generateOpenAPISpec = async (): Promise<void> => {
         },
         responses: {
           "200": {
+            // A single result, not an array. LangEvals' own FastAPI returns a
+            // list because it evaluates a batch; the LangWatch endpoint these
+            // pages document evaluates one input and answers one result.
             description: "Successful evaluation",
             content: {
               "application/json": {
-                schema: {
-                  type: "array",
-                  items: { $ref: "#/components/schemas/EvaluationResult" },
-                },
+                schema: { $ref: "#/components/schemas/EvaluationResult" },
               },
             },
           },

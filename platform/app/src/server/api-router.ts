@@ -5,6 +5,7 @@
 
 import { app as scimApp } from "@ee/scim/routes";
 import { app as webhooksApp } from "@ee/scim/webhooks";
+import { LEGACY_CALLBACK_PROVIDER_IDS } from "@ee/sso/providers";
 import { type Context, Hono } from "hono";
 import { createServiceApp, publicEndpoint } from "~/server/api/security";
 import { app as adminApp } from "../../ee/admin/routes/admin";
@@ -88,20 +89,20 @@ export function createApiRouter() {
     url.pathname = `/api/auth/oauth2/callback/${provider}`;
     return api.fetch(new Request(url.toString(), c.req.raw));
   };
-  legacyOAuthCallbacks
-    .access(
-      publicEndpoint(
-        "legacy IdP callback URL; rewrites to /api/auth/oauth2/callback/* and re-dispatches",
-      ),
-    )
-    .all("/auth0", rewriteCallback("auth0"));
-  legacyOAuthCallbacks
-    .access(
-      publicEndpoint(
-        "legacy IdP callback URL; rewrites to /api/auth/oauth2/callback/* and re-dispatches",
-      ),
-    )
-    .all("/okta", rewriteCallback("okta"));
+  // Driven off the same list the providers pin their `redirectURI` to, so a
+  // provider cannot be added on one side and forgotten on the other. Without a
+  // rewrite the round-trip still lands on the `/api/auth/*` catch-all, but it
+  // reaches better-auth's core social callback rather than the genericOAuth
+  // plugin's own, which is a second code path nobody chose.
+  for (const provider of LEGACY_CALLBACK_PROVIDER_IDS) {
+    legacyOAuthCallbacks
+      .access(
+        publicEndpoint(
+          "legacy IdP callback URL; rewrites to /api/auth/oauth2/callback/* and re-dispatches",
+        ),
+      )
+      .all(`/${provider}`, rewriteCallback(provider));
+  }
   api.route("/", legacyOAuthCallbacks.hono);
 
   // ORDERING: specific paths before catch-all siblings with same basePath
