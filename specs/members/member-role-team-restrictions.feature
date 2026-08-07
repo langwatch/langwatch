@@ -275,8 +275,9 @@ Feature: Member Role Team Restrictions
   @integration
   Scenario: A team already without a team admin stays editable
     Given a seat correction left a team with no team admin
-    When the team is saved with a membership change
-    Then the save goes through
+    When its members are changed, from the team form or one member at a time
+    Then the changes are saved
+    And promoting a member back to Admin repairs the team
 
   @integration
   Scenario: Editing one team's members still refuses to remove its last admin
@@ -285,12 +286,10 @@ Feature: Member Role Team Restrictions
     Then the change is refused
     And the refusal names the team
 
-  # "Has an admin" counts people, not binding rows. A group holding the Admin
-  # role on a team administers it through every one of its members, which is
-  # how SCIM-provisioned organizations grant access, so a guard that counts
-  # only directly assigned admins refuses changes the team can absorb, and
-  # treats a team administered entirely through a group as having no admin
-  # at all.
+  # "Has an admin" counts people. A group given the Admin role on a team
+  # administers it through every one of its members, so a change the group can
+  # absorb is not taking the team's last admin away, and a team administered
+  # entirely through a group is not a team without an admin.
 
   @integration
   Scenario: A group that administers the team counts as its admin

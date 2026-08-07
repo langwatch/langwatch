@@ -13,10 +13,7 @@ import {
 } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { findSharedTeamIds } from "~/server/role-bindings/personal-team-scope";
-import {
-  computeEffectiveAdminUserIds,
-  projectAdminUserIdsWithoutDirectRole,
-} from "~/server/teams/effective-team-admins";
+import { projectAdminUserIdsWithoutDirectRole } from "~/server/teams/effective-team-admins";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { encrypt } from "~/utils/encryption";
 import {
@@ -858,11 +855,11 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
           ? TeamUserRole.CUSTOM
           : (teamRoleUpdate.role as TeamUserRole);
         const shouldClearCustomRole = !updateIsCustomRole;
-        const demotesAnAdmin =
+        const wouldDemoteAdmin =
           currentMembership.role === TeamUserRole.ADMIN &&
           nextRole !== TeamUserRole.ADMIN;
 
-        if (demotesAnAdmin) {
+        if (wouldDemoteAdmin) {
           const adminsAfter = await projectAdminUserIdsWithoutDirectRole({
             tx,
             organizationId,
@@ -973,16 +970,6 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
           throw new LiteMemberViewerOnlyError(team.name);
         }
 
-        const effectiveAdminUserIds = await computeEffectiveAdminUserIds({
-          tx,
-          organizationId: team.organizationId,
-          teamId,
-        });
-
-        if (effectiveAdminUserIds.size === 0) {
-          throw new TeamLastAdminRequiredError(team.name);
-        }
-
         const targetUserBinding = await tx.roleBinding.findFirst({
           where: {
             organizationId: team.organizationId,
@@ -1002,6 +989,12 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
 
         const isTargetUserAdmin = targetUserBinding.role === TeamUserRole.ADMIN;
 
+        // The projection is the whole guard: a save that does not demote an
+        // admin cannot shrink the admin set, and one that does is checked
+        // against its exact post-state. A team already without an admin stays
+        // editable from here — this is one of the places somebody gets
+        // promoted back, so the team form's carve-out holds for the member
+        // dialog too.
         if (isTargetUserAdmin) {
           const adminsAfter = await projectAdminUserIdsWithoutDirectRole({
             tx,
@@ -1027,16 +1020,6 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
           role: TeamUserRole.CUSTOM,
           customRoleId: storedCustomRoleId,
         });
-
-        const finalAdminUserIds = await computeEffectiveAdminUserIds({
-          tx,
-          organizationId: team.organizationId,
-          teamId,
-        });
-
-        if (finalAdminUserIds.size === 0) {
-          throw new TeamLastAdminRequiredError(team.name);
-        }
       });
     } else {
       await this.prisma.$transaction(async (tx) => {
@@ -1071,16 +1054,6 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
           }
         }
 
-        const effectiveAdminUserIds = await computeEffectiveAdminUserIds({
-          tx,
-          organizationId: team.organizationId,
-          teamId,
-        });
-
-        if (effectiveAdminUserIds.size === 0) {
-          throw new TeamLastAdminRequiredError(team.name);
-        }
-
         const targetUserBinding = await tx.roleBinding.findFirst({
           where: {
             organizationId: team.organizationId,
@@ -1102,6 +1075,9 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
         const wouldDemoteAdmin =
           isTargetUserAdmin && role !== TeamUserRole.ADMIN;
 
+        // Same rule as the custom-role branch above: only a save that demotes
+        // an admin can shrink the admin set, so the projection is the whole
+        // guard and an orphaned team stays editable and repairable.
         if (wouldDemoteAdmin) {
           const adminsAfter = await projectAdminUserIdsWithoutDirectRole({
             tx,
@@ -1127,16 +1103,6 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
           role: role as TeamUserRole,
           customRoleId: null,
         });
-
-        const finalAdminUserIds = await computeEffectiveAdminUserIds({
-          tx,
-          organizationId: team.organizationId,
-          teamId,
-        });
-
-        if (finalAdminUserIds.size === 0) {
-          throw new TeamLastAdminRequiredError(team.name);
-        }
       });
     }
   }
