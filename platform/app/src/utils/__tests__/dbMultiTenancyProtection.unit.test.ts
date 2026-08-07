@@ -1,5 +1,6 @@
-import { Prisma } from "~/generated/prisma/client";
 import { describe, expect, it, vi } from "vitest";
+import { parsePrismaDatamodel } from "~/test-utils/prismaDatamodel";
+import type { GuardParams } from "../dbGuardMiddleware";
 import {
   guardProjectId,
   PROJECT_TENANCY_REGIMES,
@@ -19,22 +20,9 @@ import { ORG_BEARING_MODEL_NAMES } from "../dbOrganizationIdProtection";
  * These tests lock that in.
  */
 
-async function runGuard(
-  params: Partial<Prisma.MiddlewareParams> & {
-    model: string;
-    action: Prisma.MiddlewareParams["action"];
-    args: Prisma.MiddlewareParams["args"];
-  },
-): Promise<unknown> {
+async function runGuard(params: GuardParams): Promise<unknown> {
   const next = vi.fn(async () => "ok");
-  return guardProjectId(
-    {
-      dataPath: [],
-      runInTransaction: false,
-      ...params,
-    } as Prisma.MiddlewareParams,
-    next,
-  );
+  return guardProjectId(params, next);
 }
 
 describe("guardProjectId — exempt org-scoped gateway models", () => {
@@ -724,7 +712,7 @@ describe("guardProjectId — raw queries (queryRaw / executeRaw)", () => {
     it("does NOT throw — projectId in the SQL is the tenancy proof", async () => {
       await expect(
         runGuard({
-          model: undefined as unknown as Prisma.ModelName,
+          model: undefined,
           action: "queryRaw",
           args: {
             query: `SELECT id FROM "Trace" WHERE "projectId" = $1`,
@@ -736,7 +724,7 @@ describe("guardProjectId — raw queries (queryRaw / executeRaw)", () => {
     it("does NOT throw — TemplateStringsArray shape (strings) is also recognised", async () => {
       await expect(
         runGuard({
-          model: undefined as unknown as Prisma.ModelName,
+          model: undefined,
           action: "executeRaw",
           args: {
             strings: [
@@ -753,7 +741,7 @@ describe("guardProjectId — raw queries (queryRaw / executeRaw)", () => {
     it("THROWS — a scope-less raw query must not walk every tenant", async () => {
       await expect(
         runGuard({
-          model: undefined as unknown as Prisma.ModelName,
+          model: undefined,
           action: "queryRaw",
           args: { query: `SELECT id FROM "Trace" WHERE "deletedAt" IS NULL` },
         }),
@@ -763,7 +751,7 @@ describe("guardProjectId — raw queries (queryRaw / executeRaw)", () => {
     it("THROWS on executeRaw too — writes are guarded the same way", async () => {
       await expect(
         runGuard({
-          model: undefined as unknown as Prisma.ModelName,
+          model: undefined,
           action: "executeRaw",
           args: { query: `DELETE FROM "Trace"` },
         }),
@@ -775,7 +763,7 @@ describe("guardProjectId — raw queries (queryRaw / executeRaw)", () => {
     it("does NOT throw — explicit grep-able marker bypasses the predicate check", async () => {
       await expect(
         runGuard({
-          model: undefined as unknown as Prisma.ModelName,
+          model: undefined,
           action: "queryRaw",
           args: {
             query: `-- @tenancy: global recovery sweep\nSELECT id FROM "Outbox" WHERE "status" = 'stuck'`,
@@ -789,7 +777,7 @@ describe("guardProjectId — raw queries (queryRaw / executeRaw)", () => {
     it("falls through without throwing — unknown args shape is not the guard's job", async () => {
       await expect(
         runGuard({
-          model: undefined as unknown as Prisma.ModelName,
+          model: undefined,
           action: "queryRaw",
           args: { somethingElse: true },
         }),
@@ -799,7 +787,7 @@ describe("guardProjectId — raw queries (queryRaw / executeRaw)", () => {
     it("falls through when args is undefined", async () => {
       await expect(
         runGuard({
-          model: undefined as unknown as Prisma.ModelName,
+          model: undefined,
           action: "executeRaw",
           args: undefined,
         }),
@@ -824,11 +812,10 @@ describe("project-tenancy regime partition", () => {
     RELATIONAL_PARENT_SCOPED,
     LICENSE_COUNTED_PROJECT_MODELS,
   } = PROJECT_TENANCY_REGIMES;
-  const allModelNames = Prisma.dmmf.datamodel.models.map((m) => m.name);
+  const datamodel = parsePrismaDatamodel();
+  const allModelNames = datamodel.map((m) => m.name);
   const modelHasField = (model: string, field: string) =>
-    Prisma.dmmf.datamodel.models
-      .find((m) => m.name === model)
-      ?.fields.some((f) => f.name === field) ?? false;
+    datamodel.find((m) => m.name === model)?.fields.includes(field) ?? false;
   const noProjectIdModels = allModelNames.filter(
     (name) => !modelHasField(name, "projectId"),
   );
