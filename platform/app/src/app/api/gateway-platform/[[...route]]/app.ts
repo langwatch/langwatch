@@ -36,6 +36,7 @@ import {
 } from "~/server/api/idempotency";
 import { apiKeyPermission, createProjectApp } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
+import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
 import { toBudgetDto } from "~/server/gateway/budget.dto";
 import {
@@ -45,10 +46,6 @@ import {
 import { resolveScopeReach } from "~/server/gateway/budgetScopeReach";
 import type { CacheRuleCursor } from "~/server/gateway/cacheRule.service";
 import { GatewayCacheRuleService } from "~/server/gateway/cacheRule.service";
-import {
-  chRepoOrUndefined,
-  spendRepoOrUndefined,
-} from "~/server/gateway/clickhouseRepos";
 import {
   EXTERNAL_ID_MAX_LENGTH,
   externalIdSchema,
@@ -1141,7 +1138,7 @@ secured.access(apiKeyPermission("gatewayUsage:view")).get(
     // Same failure the tRPC spend column raises (spend_source_unavailable):
     // without the ClickHouse spend source there is no number to report, and
     // a confident zero would be indistinguishable from a zero-spend key.
-    const spendRepo = spendRepoOrUndefined();
+    const spendRepo = getApp().gateway.virtualKeySpend;
     if (!spendRepo) {
       return errorResponse(c, {
         status: 412,
@@ -1569,7 +1566,10 @@ secured.access(apiKeyPermission("gatewayBudgets:view")).get(
       scopeTypes = new Set(parsed.data);
     }
     const organizationId = await orgIdForProject(project.id);
-    const service = GatewayBudgetService.create(prisma, chRepoOrUndefined());
+    const service = GatewayBudgetService.create(
+      prisma,
+      getApp().gateway.budgets,
+    );
     const {
       budgets: rows,
       spendAvailable,
@@ -1641,7 +1641,10 @@ secured.access(apiKeyPermission("gatewayBudgets:view")).get(
     const project = c.get("project");
     const id = c.req.param("id");
     const organizationId = await orgIdForProject(project.id);
-    const service = GatewayBudgetService.create(prisma, chRepoOrUndefined());
+    const service = GatewayBudgetService.create(
+      prisma,
+      getApp().gateway.budgets,
+    );
     const found = await service.getWithHealth(id, organizationId);
     if (!found) {
       return errorResponse(c, {
@@ -1704,7 +1707,10 @@ secured.access(apiKeyPermission("gatewayBudgets:create")).post(
     );
     const organizationId = await orgIdForProject(project.id);
     const { actorUserId } = actorForRequest(c);
-    const service = GatewayBudgetService.create(prisma, chRepoOrUndefined());
+    const service = GatewayBudgetService.create(
+      prisma,
+      getApp().gateway.budgets,
+    );
     try {
       const outcome = await withIdempotency({
         prisma,
@@ -1784,7 +1790,10 @@ secured.access(apiKeyPermission("gatewayBudgets:update")).patch(
     const body = { data: c.req.valid("json") };
     const organizationId = await orgIdForProject(project.id);
     const { actorUserId } = actorForRequest(c);
-    const service = GatewayBudgetService.create(prisma, chRepoOrUndefined());
+    const service = GatewayBudgetService.create(
+      prisma,
+      getApp().gateway.budgets,
+    );
     try {
       const row = await service.update({
         id,
@@ -1835,7 +1844,10 @@ secured.access(apiKeyPermission("gatewayBudgets:delete")).delete(
     const id = c.req.param("id");
     const organizationId = await orgIdForProject(project.id);
     const { actorUserId } = actorForRequest(c);
-    const service = GatewayBudgetService.create(prisma, chRepoOrUndefined());
+    const service = GatewayBudgetService.create(
+      prisma,
+      getApp().gateway.budgets,
+    );
     try {
       const row = await service.archive({
         id,
@@ -1905,7 +1917,10 @@ secured.access(apiKeyPermission("gatewayBudgets:update")).post(
     if (!body.success) return validationErrorResponse(c, body.error);
     const organizationId = await orgIdForProject(project.id);
     const { actorUserId } = actorForRequest(c);
-    const service = GatewayBudgetService.create(prisma, chRepoOrUndefined());
+    const service = GatewayBudgetService.create(
+      prisma,
+      getApp().gateway.budgets,
+    );
     try {
       const row = await service.reset({
         id,

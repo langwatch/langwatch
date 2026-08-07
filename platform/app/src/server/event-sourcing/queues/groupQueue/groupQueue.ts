@@ -422,7 +422,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       featureFlagService,
     );
 
-    // fastq promise-based queue — replaces BullMQ Queue + Worker
+    // fastq promise-based queue: bounds concurrency on this node
     this.processingQueue = fastq.promise(
       this.processWithRetries.bind(this),
       this.globalConcurrency,

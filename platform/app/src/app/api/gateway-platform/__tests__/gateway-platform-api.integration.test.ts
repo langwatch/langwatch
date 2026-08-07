@@ -48,6 +48,10 @@ import {
 import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
 import { currentPeriodStart } from "~/server/gateway/budgetPeriod";
 import { nextAnchoredResetAt } from "~/server/gateway/budgetWindow";
+import {
+  clearClickHouseTestApp,
+  installClickHouseTestApp,
+} from "~/test-utils/clickhouseTestApp";
 import { expectCanonicalError } from "~/test-utils/expectCanonicalError";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { app } from "../[[...route]]/app";
@@ -347,6 +351,12 @@ describe("gateway platform REST API (real PG + real CH)", () => {
   beforeAll(async () => {
     await startTestContainers();
 
+    // The routes and workers under test take their ClickHouse repositories
+    // from the App rather than resolving a client, so the fixture has to
+    // provide one or they fail with "App not initialized".
+    installClickHouseTestApp({
+      resolveClient: async () => getTestClickHouseClient(),
+    });
     await seedTenant({
       orgId: ORG_ID,
       teamId: TEAM_ID,
@@ -470,6 +480,7 @@ describe("gateway platform REST API (real PG + real CH)", () => {
   });
 
   afterAll(async () => {
+    await clearClickHouseTestApp();
     // Every filter names module-level constants (or `in` lists built from
     // them), so a failed setup can never widen a delete (see the
     // undefined-collapse footgun: prisma drops undefined keys entirely).

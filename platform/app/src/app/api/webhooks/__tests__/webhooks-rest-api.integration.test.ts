@@ -1,4 +1,5 @@
 import { createServer, type Server } from "node:http";
+import { WebhookEventsClickHouseRepository } from "@ee/webhooks/webhookEvents.clickhouse.repository";
 import { generate } from "@langwatch/ksuid";
 import {
   type Organization,
@@ -9,6 +10,7 @@ import {
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { ApiKeyService } from "~/server/api-key/api-key.service";
+import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
 import { prisma } from "~/server/db";
 import {
   verifyWebhookSignature,
@@ -18,13 +20,24 @@ import { expectCanonicalError } from "~/test-utils/expectCanonicalError";
 import { KSUID_RESOURCES } from "~/utils/constants";
 
 // The enterprise gate reads the org's active plan through the app layer;
-// tests flip this flag per scenario instead of booting the whole app.
+// tests flip this flag per scenario instead of booting the whole app. The
+// route takes its events-log repository from `getApp().gateway` too, at
+// whatever ClickHouse this environment's own `~/server/clickhouse/clickhouseClient`
+// resolves (unmocked here, same as before this repository moved off the
+// route's own inline resolver).
 let planHasWebhookEndpoints = true;
 vi.mock("~/server/app-layer/app", () => ({
   getApp: () => ({
     planProvider: {
       getActivePlan: async () => ({
         webhookEndpointsEnabled: planHasWebhookEndpoints,
+      }),
+    },
+    gateway: {
+      webhookEvents: new WebhookEventsClickHouseRepository(async (tenantId) => {
+        const client = await getClickHouseClientForProject(tenantId);
+        if (!client) throw new Error("ClickHouse is not configured");
+        return client;
       }),
     },
   }),

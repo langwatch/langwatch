@@ -8,9 +8,10 @@ import {
 } from "../instrumentation.redis";
 
 /**
- * The flag exists because instrumenting ioredis in a process that owns a BullMQ
- * queue traces the queue's own bookkeeping: measured in production at ~32 Redis
- * spans per job, 93% of every span the platform emitted. A regression that
+ * The flag exists because instrumenting ioredis in a process that owns a
+ * groupQueue worker traces the queue's own bookkeeping: measured in production
+ * at ~32 Redis spans per job, 93% of every span the platform emitted. A
+ * regression that
  * turns this back on is silent and is only noticed on a bill, so the default
  * and the exact-match parsing are pinned here rather than left to a comment.
  */

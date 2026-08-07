@@ -55,14 +55,10 @@ import {
   hasProjectPermission,
 } from "~/server/api/rbac";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
+import { getApp } from "~/server/app-layer/app";
 import { getServerAuthSession } from "~/server/auth";
-import {
-  getClickHouseClientForProject,
-  isClickHouseEnabled,
-} from "~/server/clickhouse/clickhouseClient";
 import { prisma } from "~/server/db";
 import { featureFlagService } from "~/server/featureFlag";
-import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
 import { GatewayBudgetService } from "~/server/gateway/budget.service";
 import { resolveSupportContact } from "~/server/organizations/resolveSupportContact";
 import { connection as redisConnection } from "~/server/redis";
@@ -1105,19 +1101,6 @@ secured.access(CLI_POLICY).post("/refresh", async (c: Context) => {
 // 200 because we have no spend data; the gateway itself will surface
 // the actual block at request time via the same code path.
 // ---------------------------------------------------------------------------
-function chRepoOrUndefined(): GatewayBudgetClickHouseRepository | undefined {
-  if (!isClickHouseEnabled()) return undefined;
-  return new GatewayBudgetClickHouseRepository(async (projectId) => {
-    const client = await getClickHouseClientForProject(projectId);
-    if (!client) {
-      throw new Error(
-        `ClickHouse enabled but no client for project ${projectId}`,
-      );
-    }
-    return client;
-  });
-}
-
 function requestIncreaseUrl(opts: {
   scope: string;
   scopeId: string;
@@ -1169,7 +1152,7 @@ secured.access(CLI_POLICY).get("/budget/status", async (c: Context) => {
 
   const budgetService = GatewayBudgetService.create(
     prisma,
-    chRepoOrUndefined(),
+    getApp().gateway.budgets,
   );
   const decision = await budgetService.check({
     organizationId: tokenRecord.organization_id,
@@ -1233,7 +1216,10 @@ secured.access(CLI_POLICY).get("/bootstrap", async (c: Context) => {
       401,
     );
   }
-  const service = CliBootstrapService.create(prisma);
+  const service = CliBootstrapService.create({
+    prisma,
+    budgetRepository: getApp().gateway.budgets,
+  });
   const result = await service.resolve({
     userId: tokenRecord.user_id,
     organizationId: tokenRecord.organization_id,
@@ -1652,7 +1638,10 @@ secured.access(CLI_POLICY).get("/governance/status", async (c: Context) => {
     ENTERPRISE_FEATURE_ERRORS.INGESTION_SOURCES,
   );
   if (gate) return gate;
-  const setupService = GovernanceSetupStateService.create(prisma);
+  const setupService = GovernanceSetupStateService.create({
+    prisma,
+    traceActivity: getApp().governance.traceActivity,
+  });
   const setup = await setupService.resolve(tokenRecord.organization_id);
   return c.json({ setup });
 });

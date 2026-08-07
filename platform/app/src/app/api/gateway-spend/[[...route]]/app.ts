@@ -13,7 +13,6 @@ import {
   WebhookEndpointService,
   type WebhookEndpointView,
 } from "@ee/webhooks/webhookEndpoint.service";
-import { WebhookEventsClickHouseRepository } from "@ee/webhooks/webhookEvents.clickhouse.repository";
 import { WebhookEventsService } from "@ee/webhooks/webhookEvents.service";
 import type { Organization } from "@prisma/client";
 import type { Context, Next } from "hono";
@@ -24,15 +23,15 @@ import { z } from "zod";
 import { createOrgApp, requires } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
 import { getApp } from "~/server/app-layer/app";
-import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
+import { ClickHouseUnavailableError } from "~/server/app-layer/traces/errors";
 import { prisma } from "~/server/db";
 import { PrismaProcessStore } from "~/server/event-sourcing/process-manager/stores/prismaProcessStore";
 import { applicableEndUserCaps } from "~/server/gateway/endUserCaps.service";
 import {
   decodeSpendEventsCursor,
   decodeSpendSummariesCursor,
-  GatewaySpendEventsRepository,
 } from "~/server/gateway/spendEvents.clickhouse.repository";
+import { GatewaySpendEventsService } from "~/server/gateway/spendEvents.service";
 import {
   spendFilterQueryShape,
   spendFiltersFromQuery,
@@ -59,11 +58,18 @@ import { handleGatewaySpendApiError } from "./error-handler";
 
 patchZodOpenapi();
 
-const spendEvents = new GatewaySpendEventsRepository(async (tenantId) => {
-  const client = await getClickHouseClientForProject(tenantId);
-  if (!client) throw new Error("ClickHouse is not configured");
-  return client;
-});
+/**
+ * The App's spend-events repository, undefined on a deployment without
+ * ClickHouse — the ledger is the only store spend accrues in, so a route
+ * that reaches this surface with no repository has no figures to report.
+ * Resolved per call, not at module scope, so every route shares the one
+ * instance `getApp()` hands out instead of each minting its own (#6248).
+ */
+function requireSpendEventsService(): GatewaySpendEventsService {
+  const repository = getApp().gateway.spendEvents;
+  if (!repository) throw new ClickHouseUnavailableError();
+  return new GatewaySpendEventsService(repository);
+}
 
 /**
  * The billing reconciliation surface rides the webhook platform's plan flag
@@ -372,7 +378,7 @@ secured.access(requires("gatewaySpend:view")).get(
       teamIds: query.team_id,
       externalIds: query.external_id,
     });
-    const page = await spendEvents.readSpendSummaries({
+    const page = await requireSpendEventsService().getSpendSummaries({
       tenantIds: scope.tenantIds,
       groupBy: query.group_by,
       bucket: query.bucket,
@@ -437,7 +443,7 @@ secured.access(requires("gatewaySpend:view")).get(
       teamIds: query.team_id,
       externalIds: query.external_id,
     });
-    const page = await spendEvents.walkSpendEvents({
+    const page = await requireSpendEventsService().walkSpendEvents({
       tenantIds: scope.tenantIds,
       fromMs: query.from,
       toMs: query.to,
@@ -478,15 +484,22 @@ secured.access(requires("gatewaySpend:view")).get(
     const { tenantIds } = await resolveSpendScope({
       organizationId: organization.id,
     });
-    const rollup = await spendEvents.readEndUserSpend({
+    const rollup = await requireSpendEventsService().getEndUserSpend({
       tenantIds,
       endUserId,
       fromMs,
       toMs,
       virtualKeyId: query.virtual_key_id,
     });
+    const budgetRepository = getApp().gateway.budgets;
+    if (!budgetRepository) {
+      // The ledger is the only store spend accrues in, so without ClickHouse
+      // there are no figures to report against these caps.
+      throw new ClickHouseUnavailableError();
+    }
     const caps = await applicableEndUserCaps({
       prisma,
+      budgetRepository,
       organizationId: organization.id,
       endUserId,
       tenantIds,
@@ -668,13 +681,13 @@ secured.access(requires("gatewaySpend:manage")).post(
       );
     }
 
+    const webhookEventsRepository = getApp().gateway.webhookEvents;
+    if (!webhookEventsRepository) {
+      throw new ClickHouseUnavailableError();
+    }
     const events = new WebhookEventsService({
       prisma,
-      repository: new WebhookEventsClickHouseRepository(async (tenantId) => {
-        const client = await getClickHouseClientForProject(tenantId);
-        if (!client) throw new Error("ClickHouse is not configured");
-        return client;
-      }),
+      repository: webhookEventsRepository,
     });
     const deliveryDeps: WebhookDeliveryProcessDeps = {
       processStore: new PrismaProcessStore(prisma),
