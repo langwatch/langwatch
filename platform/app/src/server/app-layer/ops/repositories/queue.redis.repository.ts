@@ -1839,8 +1839,14 @@ export class QueueRedisRepository implements QueueRepository {
       // Surfacing that difference needs a signal beside the total, which the
       // dashboard does not have a place for yet.
       if (value === null) continue;
-      const drift = parseInt(value, 10);
-      if (Number.isNaN(drift)) continue;
+      // Whole value or nothing. A lenient parse stops at the first character it
+      // cannot use, so "7oops" reads as 7 and "1.5" as 1, and the result lands
+      // in the total looking exactly like a real measurement. A value that is
+      // only partly a number is not a measurement, so it is skipped like any
+      // other unusable one rather than half-believed.
+      if (!/^-?\d+$/.test(value)) continue;
+      const drift = Number(value);
+      if (!Number.isSafeInteger(drift)) continue;
       total += Math.abs(drift);
     }
     return total;

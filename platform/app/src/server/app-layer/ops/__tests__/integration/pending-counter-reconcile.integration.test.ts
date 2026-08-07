@@ -580,6 +580,20 @@ describe("QueueRedisRepository.reconcileTotalPending", () => {
           7,
         );
       });
+
+      it("survives a figure that is only partly a number", async () => {
+        // The dangerous shape is not the one that fails to parse, it is the one
+        // that half parses: a lenient read takes "7oops" as 7 and adds it, so a
+        // value nobody measured is indistinguishable in the total from one
+        // somebody did. Skipping it keeps "unusable" meaning the same thing.
+        const partial = `${queueName}-partial`;
+        await redis.set(`${partial}:gq:stats:pending-drift`, "7oops");
+        await reconcileWithDrift({ queue: queueName, jobs: 2, drift: 7 });
+
+        expect(await repo.readPublishedPendingDrift([partial, queueName])).toBe(
+          7,
+        );
+      });
     });
   });
 
