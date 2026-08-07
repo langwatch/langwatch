@@ -45,14 +45,33 @@ const JUDGE_MODELS_REQUIRING_DISABLED_REASONING = new Set<string>([
  */
 const REASONING_OFF = "none";
 
+/** The parameter a provider names when the reasoning setting is what it refused. */
+const REASONING_EFFORT_PARAM = "reasoning_effort";
+
+/**
+ * How a provider spells the value it is asking for. The quotes are what
+ * separate a remediation ("set reasoning_effort to 'none'") from prose that
+ * merely contains the word.
+ */
+const REQUESTED_REASONING_OFF = [
+  `'${REASONING_OFF}'`,
+  `"${REASONING_OFF}"`,
+] as const;
+
 interface ProviderErrorBody {
   error?: { message?: unknown; param?: unknown };
 }
 
 /**
  * Whether a 400 is the provider telling us to turn reasoning off to use tools.
- * Keyed on the structured `param` field, with the remediation phrase as the
- * fallback for providers that omit it.
+ *
+ * Two signals, and both are required: the rejection has to be about the
+ * reasoning setting (the structured `param`, or the parameter named in the
+ * prose), AND its remediation has to ask for reasoning off by quoting the value
+ * to send. `param` alone is not that signal — a provider reports a missing,
+ * invalid or unsupported reasoning setting under the same `param`, and
+ * answering any of those by re-sending the request with a value nobody asked
+ * for rewrites the caller's request on a guess.
  */
 function rejectionAsksForReasoningOff(body: string): boolean {
   let parsed: ProviderErrorBody;
@@ -63,12 +82,16 @@ function rejectionAsksForReasoningOff(body: string): boolean {
   }
   // JSON.parse happily returns null or a primitive for bodies like "null".
   if (typeof parsed !== "object" || parsed === null) return false;
-  if (parsed.error?.param === "reasoning_effort") return true;
-  const message = parsed.error?.message;
+
+  const message =
+    typeof parsed.error?.message === "string" ? parsed.error.message : "";
+  const isAboutReasoningEffort =
+    parsed.error?.param === REASONING_EFFORT_PARAM ||
+    message.includes(REASONING_EFFORT_PARAM);
+
   return (
-    typeof message === "string" &&
-    message.includes("reasoning_effort") &&
-    message.includes("'none'")
+    isAboutReasoningEffort &&
+    REQUESTED_REASONING_OFF.some((quoted) => message.includes(quoted))
   );
 }
 

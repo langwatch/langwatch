@@ -408,7 +408,6 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
                   )}
                 </VStack>
 
-                {/* Scenario mappings for prompt targets */}
                 <PromptTargetMappingSection
                   selectedTargets={suiteForm.selectedTargets}
                   prompts={prompts}

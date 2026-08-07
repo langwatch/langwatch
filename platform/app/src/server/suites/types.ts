@@ -8,8 +8,7 @@
 import { z } from "zod";
 import { FieldMappingSchema } from "../scenarios/execution/types";
 
-/** Target reference in a suite configuration */
-export const suiteTargetSchema = z.object({
+const suiteTargetFields = z.object({
   type: z.enum(["prompt", "http", "code", "workflow"]),
   referenceId: z.string(),
   /**
@@ -23,6 +22,26 @@ export const suiteTargetSchema = z.object({
    */
   scenarioMappings: z.record(z.string(), FieldMappingSchema).optional(),
 });
+
+/**
+ * Target reference in a suite configuration.
+ *
+ * ⚠ The refinement is what keeps `scenarioMappings` a prompt-only field: a run
+ * reads it from prompt targets and nowhere else, so accepting it on an agent
+ * target would persist a binding the run silently ignores.
+ */
+export const suiteTargetSchema = suiteTargetFields.superRefine(
+  (target, ctx) => {
+    if (target.type === "prompt" || target.scenarioMappings === undefined) {
+      return;
+    }
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["scenarioMappings"],
+      message: `A ${target.type} target cannot carry scenarioMappings — an agent's mappings belong on the agent record.`,
+    });
+  },
+);
 
 export type SuiteTarget = z.infer<typeof suiteTargetSchema>;
 

@@ -5,24 +5,15 @@ Feature: Prompt agent input binding under simulation
 
   # Background (#6590, #6594)
   #
-  # A prompt agent under simulation was rendered against a context holding
-  # exactly two names, `input` and `messages`. Its own declared inputs were
-  # never bound, so they rendered as empty strings, and `messages` was a raw
-  # JSON.stringify of the conversation — including the `id` and `traceId` the
-  # scenario runner stamps on every message. The model was shown a serialised
-  # payload with blank fields and answered with one.
+  # A prompt under simulation received none of the variables it declares: they
+  # rendered blank, and the conversation it was meant to discuss arrived as a
+  # payload carrying the bookkeeping the runner attaches to every message.
+  # Shown a payload, the model answered with one — and that answer became the
+  # next turn's history, so an instrumented four-turn run grew its prompt ×14.5
+  # while the conversation itself grew ×3.6.
   #
-  # An instrumented four-turn run against `main` (a09e7c72f) measured what
-  # followed: when the model reproduced the payload it was shown, that reply
-  # became the next turn's history and was serialised again, so turn N's
-  # rendered prompt embedded turn N-1's verbatim and the request grew 319 →
-  # 4630 bytes (×14.5). The same adapter over the same four turns with a model
-  # that answered normally grew 319 → 1141 bytes with no embedding, so the
-  # compounding is the re-serialisation meeting an echoed reply — not ordinary
-  # conversation growth.
-  #
-  # Declared inputs bind through the same field-mapping machinery the code,
-  # HTTP and workflow adapters already use.
+  # A prompt now binds its declared inputs the same way every other kind of
+  # target does.
 
   Background:
     Given a prompt is the agent under test in a simulation
@@ -88,55 +79,59 @@ Feature: Prompt agent input binding under simulation
     Then the run records that "customer_tier" was unbound
     And the value of no input is recorded
 
-  # --- Internal fields ---
+  # --- What the prompt is shown ---
 
   @unit
   Scenario: Internal message fields never reach prompt text
-    Given the conversation messages carry the runner's "id" and "traceId"
-    When the template context is built for a turn
-    Then neither "id" nor "traceId" appears in any bound value
+    Given the conversation carries the bookkeeping the runner attaches to every message
+    When the prompt is prepared for a turn
+    Then none of that bookkeeping appears in anything the prompt is given
 
   @unit
   Scenario: A mapping that resolves to the conversation is sanitised too
     Given the prompt declares an input "history" mapped to the conversation
-    When the template context is built for a turn
-    Then "history" contains the roles and contents and neither "id" nor "traceId"
+    When the prompt is prepared for a turn
+    Then "history" holds who said what, and none of the runner's bookkeeping
 
   @unit
-  Scenario: The conversation reaches prompt text as prose, not as JSON
+  Scenario: The conversation reads as a transcript, not as a payload
     Given a conversation of a user turn and an assistant turn
-    When the template context is built for a turn
-    Then "messages" holds one "role: content" line per turn
-    And "messages" is not a JSON array
+    When the prompt is prepared for a turn
+    Then the conversation reads as one line per turn, naming who said what
 
   @unit
-  Scenario: A JSON-consuming template keeps a structured conversation via messagesJson
-    Given a template that parses the conversation as JSON
-    When the template context is built for a turn
-    Then "messagesJson" parses to the role and content of every turn
-    And "messagesJson" carries neither "id" nor "traceId"
+  Scenario: A template that needs the conversation structured can still get it
+    Given a prompt written to read the conversation in structured form
+    When the prompt is prepared for a turn
+    Then it receives every turn's speaker and words
+    And none of the runner's bookkeeping comes with them
 
   # --- Compounding ---
 
-  # The payload is the serialised conversation. A model that reproduces what it
-  # was shown will always put its last reply into the next turn's history — that
-  # is the conversation, not a defect. What the adapter controls, and what made
-  # the reported run compound, is whether the thing being reproduced is a JSON
-  # array that gets re-serialised and re-escaped one level deeper every turn.
+  # A model that reproduces what it was shown will always put its last reply
+  # into the next turn's history — that is the conversation, not a defect. What
+  # the prompt controls is whether the thing being reproduced is a payload that
+  # nests one level deeper every turn.
 
   @integration
   Scenario: Turn N's request does not embed turn N-1's rendered payload
-    Given a prompt whose template reads the conversation history
+    Given a prompt that reads the conversation history
     And a model that replies with whatever it was shown
     When the agent takes four turns
-    Then no turn's request contains a serialised message array
-    And no turn's request contains an escaped payload nested inside another
+    Then no turn shows the model a payload in place of the conversation
+    And no turn nests an earlier turn's prompt inside its own
 
   # --- Conversation history placement ---
 
   @unit
   Scenario: A template that reads the conversation places it itself
     Given a system prompt containing "{{messages}}"
+    When the request is built
+    Then the conversation is not appended a second time
+
+  @unit
+  Scenario: A template that reads the conversation in structured form places it too
+    Given a prompt written to read the conversation in structured form
     When the request is built
     Then the conversation is not appended a second time
 

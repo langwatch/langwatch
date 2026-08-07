@@ -121,27 +121,36 @@ Feature: Scenario Input Mapping
     Then "input" is resolved to the last user message
     And "messages" is resolved to the messages array
 
-  # --- Prompt Adapter ---
+  # --- Prompts as targets ---
   #
-  # Prompt targets used to be the exception: they took no mappings at all, so a
-  # prompt's declared inputs were never bound under simulation (#6590). They now
-  # use the same machinery, with one difference in where the mappings live — an
-  # agent is configured, so its mappings sit on the agent record; a prompt is
-  # authored elsewhere and pointed at, so the binding sits on the suite target
-  # that made the pairing. See specs/scenarios/prompt-agent-input-binding.feature.
+  # A prompt used to be the exception: it took no mappings at all, so its
+  # declared inputs were never bound under simulation (#6590). It binds them the
+  # same way an agent does now, and only the place the bindings are configured
+  # differs — an agent is configured, so its bindings belong to the agent; a
+  # prompt is authored in the library and pointed at, so its bindings belong to
+  # the run plan that paired it with the simulation. See
+  # specs/scenarios/prompt-agent-input-binding.feature.
 
   @unit
-  Scenario: Prompt targets carry their mappings on the suite target
-    Given a suite target of type "prompt" with scenarioMappings
-    When the suite target schema validates
-    Then the scenarioMappings are preserved in the parsed output
+  Scenario: A run plan keeps the bindings configured for its prompt
+    Given a run plan pairing a prompt with a simulation
+    And bindings configured for that prompt's declared inputs
+    When the run plan is saved
+    Then the run uses those bindings
 
   @unit
-  Scenario: A prompt's declared inputs are bound through the shared resolver
+  Scenario: An agent target cannot carry a prompt's bindings
+    Given a run plan pairing an agent with a simulation
+    When bindings for that agent are submitted with the run plan
+    Then the run plan is rejected
+    And the rejection names the bindings
+
+  @unit
+  Scenario: A prompt receives the value its binding names
     Given a prompt declaring inputs "query" and "context"
-    And fieldMappings maps "query" to source "scenario" path ["input"]
-    When the prompt template context is built from an agent input
-    Then "query" receives the scenario message content
+    And "query" is bound to what the simulated user said
+    When the prompt takes a turn in a simulation
+    Then "query" holds what the simulated user said
 
   # --- Default Mappings ---
 

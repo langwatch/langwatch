@@ -200,3 +200,22 @@ export function templateReferencesVariable(
     reference.test(expression),
   );
 }
+
+/**
+ * Every context name `buildPromptTemplateContext` binds the conversation to.
+ *
+ * ⚠ Both spellings must stay listed: a caller uses this to decide whether the
+ * template already places the history, and a name missing here is history
+ * appended a second time.
+ */
+const CONVERSATION_VARIABLES = ["messages", "messagesJson"] as const;
+
+/**
+ * Whether a template places the conversation history itself, in either the
+ * prose or the structured form.
+ */
+export function templateReferencesConversation(template: string): boolean {
+  return CONVERSATION_VARIABLES.some((variable) =>
+    templateReferencesVariable(template, variable),
+  );
+}

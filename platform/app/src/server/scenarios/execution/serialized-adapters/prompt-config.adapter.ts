@@ -15,15 +15,12 @@ import { createChildProcessLogger } from "../child-logger";
 import { createModelFromParams } from "../model.factory";
 import {
   buildPromptTemplateContext,
-  templateReferencesVariable,
+  templateReferencesConversation,
 } from "../prompt-template-context";
 import type { LiteLLMParams, PromptConfigData } from "../types";
 
 // Shared Liquid engine instance for template interpolation
 const liquid = new Liquid();
-
-/** The context name a template reads to place conversation history itself. */
-const MESSAGES_VARIABLE = "messages";
 
 /**
  * Serialized prompt config adapter that uses pre-fetched configuration.
@@ -66,9 +63,9 @@ export class SerializedPromptConfigAdapter extends AgentAdapter {
       this.reportUnboundInputs(unboundInputs);
     }
 
-    // A template that reads `messages` places the conversation history itself,
-    // so appending it again would show the model the same turns twice.
-    const templateUsesMessages = this.templateReadsMessages();
+    // A template that reads the conversation places the history itself, so
+    // appending it again would show the model the same turns twice.
+    const templateUsesConversation = this.templateReadsConversation();
 
     // Interpolate template variables using Liquid
     const systemPrompt = await liquid.parseAndRender(
@@ -88,7 +85,7 @@ export class SerializedPromptConfigAdapter extends AgentAdapter {
       { role: "system" as const, content: systemPrompt },
       ...promptMessages,
       // Only append input.messages if the template doesn't place them itself
-      ...(templateUsesMessages ? [] : input.messages),
+      ...(templateUsesConversation ? [] : input.messages),
     ];
 
     const model = createModelFromParams({
@@ -108,17 +105,18 @@ export class SerializedPromptConfigAdapter extends AgentAdapter {
 
   /**
    * Whether the template (system prompt or any message) reads the conversation
-   * history itself.
+   * history itself, in either the prose or the structured form.
    *
    * ⚠ This used to test `/\bmessages\b/` against the raw template text, so a
    * system prompt containing the ordinary word "messages" in prose dropped the
-   * conversation history from the request entirely.
+   * conversation history from the request entirely; and it knew only the prose
+   * binding, so a template reading the structured one was shown every prior
+   * turn twice.
    */
-  private templateReadsMessages(): boolean {
-    if (templateReferencesVariable(this.config.systemPrompt, MESSAGES_VARIABLE))
-      return true;
+  private templateReadsConversation(): boolean {
+    if (templateReferencesConversation(this.config.systemPrompt)) return true;
     return this.config.messages.some((m) =>
-      templateReferencesVariable(m.content, MESSAGES_VARIABLE),
+      templateReferencesConversation(m.content),
     );
   }
 

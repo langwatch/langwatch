@@ -368,6 +368,37 @@ describe("SerializedPromptConfigAdapter", () => {
       expect(messages[1]!.content).toContain("How are you?");
     });
 
+    describe("given a template that reads the conversation in structured form", () => {
+      /** @scenario "A template that reads the conversation in structured form places it too" */
+      it("does not send the conversation a second time", async () => {
+        const config: PromptConfigData = {
+          ...defaultConfig,
+          systemPrompt: "Conversation so far: {{messagesJson}}",
+          messages: [],
+        };
+        const adapter = new SerializedPromptConfigAdapter({
+          config: config,
+          litellmParams: defaultLitellmParams,
+          nlpServiceUrl: "http://localhost:8080",
+        });
+
+        await adapter.call(defaultInput);
+
+        const callArgs = mockGenerateText.mock.calls[0]![0];
+        const messages = callArgs.messages as Array<{
+          role: string;
+          content: string;
+        }>;
+
+        // Only the system message. The template already carries the turn, so an
+        // appended input.messages would show the model the same turn twice —
+        // and every prior turn twice on turn three.
+        expect(messages).toHaveLength(1);
+        expect(messages[0]!.role).toBe("system");
+        expect(messages[0]!.content).toContain("How are you?");
+      });
+    });
+
     it("appends input.messages when no {{messages}} in template", async () => {
       const adapter = new SerializedPromptConfigAdapter({
         config: defaultConfig,

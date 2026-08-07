@@ -1,69 +1,68 @@
-Feature: Scenario judge transport — function tools and reasoning effort
+Feature: Scenario judge verdicts on reasoning models
   As someone running a criteria-graded simulation,
   I want the judge to reach a verdict on a reasoning model,
   so that a run reports what the agent actually did instead of an infrastructure error.
 
   # Background (#6369, langwatch/scenario#864)
   #
-  # The judge forces a finish_test / continue_test function-tool call. On
-  # /v1/chat/completions some reasoning models reject function tools unless
-  # reasoning_effort is explicitly "none":
+  # Some models refuse to return the structured verdict the judge asks for while
+  # their own reasoning is on, and name the setting they would accept instead.
+  # Others refuse to work with their reasoning off at all. Which of the two a
+  # model is cannot be known before it is asked, so a request goes out as the run
+  # configured it and changes only in answer to what the provider actually said.
+  # A model already known to need its reasoning off is configured that way up
+  # front — see specs/scenarios/judge-reasoning-tool-compatibility.feature.
   #
-  #   Function tools with reasoning_effort are not supported for <model> in
-  #   /v1/chat/completions. To use function tools, use /v1/responses or set
-  #   reasoning_effort to 'none'.
-  #
-  # Nothing on the platform path sets reasoning_effort, so every criteria-graded
-  # run on such a model died before a verdict. The rule belongs to the transport,
-  # not to the judge: any chat-completions caller that sends function tools to
-  # such a model hits it.
-  #
-  # Reasoning is disabled by RETRY, never preemptively. Whether a model accepts
-  # reasoning off is not knowable up front — Gemini 2.5 Pro rejects it with
-  # "Budget 0 is invalid. This model only works in thinking mode." — so the
-  # request goes out untouched, and is re-sent with reasoning off only when the
-  # provider's rejection asks for exactly that. Models that work today are never
-  # sent anything new.
+  # The rule belongs to the transport rather than to the judge: anything that
+  # asks such a model for a structured answer meets it.
 
   Background:
     Given a scenario run dispatched to a worker
 
   @integration
-  Scenario: A rejected tool-carrying request is retried with reasoning off
-    Given an endpoint that rejects function tools unless reasoning_effort is "none"
-    When a chat-completions request carrying function tools is sent
-    Then the request is retried with reasoning_effort "none"
-    And the retried request succeeds
+  Scenario: A refusal that names reasoning is answered by asking again without it
+    Given a model that refuses a verdict while its reasoning is on, and says so
+    When the judge grades a conversation against its criteria
+    Then the judge asks again with the model's reasoning switched off
+    And the second attempt is accepted
 
   @integration
-  Scenario: A model that accepts the request is never sent anything new
-    Given an endpoint that accepts tool-carrying requests as they are
-    When a chat-completions request carrying function tools is sent
-    Then exactly one request reaches the endpoint
-    And the request body has no reasoning_effort
+  Scenario: A criteria-graded run reports the verdict its criteria produced
+    Given a model that refuses a verdict while its reasoning is on, and says so
+    When the judge grades a conversation against its criteria
+    Then the run reports that verdict rather than an infrastructure error
+
+  @integration
+  Scenario: A model that accepts the first attempt is never asked anything new
+    Given a model that returns a verdict as the judge is configured
+    When the judge grades a conversation against its criteria
+    Then the model is asked exactly once
+    And the judge leaves the model's reasoning as configured
 
   @integration
   Scenario: A model whose reasoning cannot be disabled is never asked to disable it
-    Given an endpoint that requires reasoning to stay on
-    When a chat-completions request carrying function tools is sent and accepted
-    Then the request body has no reasoning_effort
+    Given a model that only works with its reasoning on
+    When the judge grades a conversation against its criteria
+    Then the judge leaves the model's reasoning as configured
+
+  @integration
+  Scenario: A reasoning refusal that names no remedy is surfaced, not retried
+    Given a model that refuses the reasoning it was given without naming one it accepts
+    When the judge grades a conversation against its criteria
+    Then the refusal is reported as it stands
+    And the judge does not ask again
 
   @integration
   Scenario: An unrelated rejection is surfaced, not retried
-    Given an endpoint that rejects the request for a reason other than reasoning
-    When a chat-completions request carrying function tools is sent
-    Then the rejection is surfaced to the caller
-    And no retry is attempted
-
-  @integration
-  Scenario: An explicitly requested reasoning effort is preserved
-    Given the caller has already set reasoning_effort to "high"
-    When a chat-completions request carrying function tools is rejected
-    Then the rejection is surfaced with reasoning_effort still "high"
-
-  @integration
-  Scenario: The judge reaches a verdict against an endpoint that enforces the rule
-    Given an endpoint that rejects function tools unless reasoning_effort is "none"
+    Given a model that refuses the request for a reason unrelated to reasoning
     When the judge grades a conversation against its criteria
-    Then the endpoint accepts the retried call
-    And the run returns a verdict rather than an infrastructure error
+    Then the refusal is reported as it stands
+    And the judge does not ask again
+
+  @integration
+  Scenario: A run that pins the judge's reasoning keeps it
+    Given a run that has pinned how hard the judge should think
+    And a model that refuses a verdict while its reasoning is on
+    When the judge grades a conversation against its criteria
+    Then the refusal is reported as it stands
+    And the pinned setting is left as the run asked for it

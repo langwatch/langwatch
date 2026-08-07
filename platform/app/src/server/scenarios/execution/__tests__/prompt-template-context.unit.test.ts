@@ -112,7 +112,7 @@ describe("buildPromptTemplateContext", () => {
   });
 
   describe("given a mapping expressed in the shared resolver's terms", () => {
-    /** @scenario "A prompt's declared inputs are bound through the shared resolver" */
+    /** @scenario "A prompt receives the value its binding names" */
     it("resolves a scenario-source mapping the way every other adapter does", () => {
       const { context } = buildPromptTemplateContext({
         input: turn(),
@@ -176,7 +176,7 @@ describe("buildPromptTemplateContext", () => {
       expect(context.messages).toContain("Sure, let me help");
     });
 
-    /** @scenario "The conversation reaches prompt text as prose, not as JSON" */
+    /** @scenario "The conversation reads as a transcript, not as a payload" */
     it("renders the conversation as prose rather than JSON", () => {
       const { context } = buildPromptTemplateContext({
         input: turn([
@@ -191,7 +191,7 @@ describe("buildPromptTemplateContext", () => {
       expect(context.messages).not.toMatch(/"role"\s*:/);
     });
 
-    /** @scenario "A JSON-consuming template keeps a structured conversation via messagesJson" */
+    /** @scenario "A template that needs the conversation structured can still get it" */
     it("keeps a sanitised structured conversation available as messagesJson", () => {
       const { context } = buildPromptTemplateContext({
         input: turn([

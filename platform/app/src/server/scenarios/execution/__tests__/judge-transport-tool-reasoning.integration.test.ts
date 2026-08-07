@@ -15,7 +15,8 @@
  * accepts reasoning off is not knowable up front (Gemini 2.5 Pro answers
  * "Budget 0 is invalid. This model only works in thinking mode."), so the
  * request goes out untouched and is re-sent with reasoning off only when the
- * provider's rejection asks for exactly that. (`createJudgeModelFromParams`
+ * provider's rejection asks for exactly that — naming the parameter is not
+ * enough, the remediation has to name the value. (`createJudgeModelFromParams`
  * additionally defaults reasoning off preemptively for the exact models
  * already observed to require it — #6620, covered by model.factory.unit.test.)
  *
@@ -52,6 +53,7 @@ const finishTest = tool({
 type EndpointRule =
   | "accept"
   | "reject-tools-without-reasoning-off"
+  | "reject-reasoning-without-remedy"
   | "reject-unrelated";
 
 interface StubEndpoint {
@@ -65,6 +67,20 @@ const UNRELATED_REJECTION = {
     type: "invalid_request_error",
     message: "Unsupported value for parameter 'temperature'.",
     param: "temperature",
+  },
+};
+
+/**
+ * A rejection carrying the same structured `param` as the one the retry answers,
+ * but asking for nothing: the provider refused the reasoning setting without
+ * saying what it would accept. Keying the retry on `param` alone would answer
+ * this by re-sending the request with a value nobody requested.
+ */
+const UNSPECIFIC_REASONING_REJECTION = {
+  error: {
+    type: "invalid_request_error",
+    message: "Unsupported value for parameter 'reasoning_effort'.",
+    param: "reasoning_effort",
   },
 };
 
@@ -127,6 +143,9 @@ function responseFor(
   if (rule === "reject-unrelated") {
     return { status: 400, payload: UNRELATED_REJECTION };
   }
+  if (rule === "reject-reasoning-without-remedy") {
+    return { status: 400, payload: UNSPECIFIC_REASONING_REJECTION };
+  }
   if (
     rule === "reject-tools-without-reasoning-off" &&
     carriesTools &&
@@ -141,6 +160,8 @@ function responseFor(
  * Stands in for the chat-completions endpoint behind the gateway proxy.
  *
  * "reject-tools-without-reasoning-off" enforces the upstream rule.
+ * "reject-reasoning-without-remedy" refuses the reasoning setting without
+ * naming a value it would accept.
  * "reject-unrelated" answers a 400 that has nothing to do with reasoning.
  * "accept" takes anything and exists only to record the wire body.
  */
@@ -204,7 +225,7 @@ afterEach(async () => {
 describe("judge transport: function tools and reasoning effort", () => {
   describe("given an endpoint that rejects tools unless reasoning is off", () => {
     describe("when the request carries function tools", () => {
-      /** @scenario "A rejected tool-carrying request is retried with reasoning off" */
+      /** @scenario "A refusal that names reasoning is answered by asking again without it" */
       it("retries with reasoning declared off and succeeds", async () => {
         endpoint = await startEndpoint("reject-tools-without-reasoning-off");
         const model = createModelFromParams({
@@ -228,7 +249,7 @@ describe("judge transport: function tools and reasoning effort", () => {
     });
 
     describe("when the judge grades a conversation against its criteria", () => {
-      /** @scenario "The judge reaches a verdict against an endpoint that enforces the rule" */
+      /** @scenario "A criteria-graded run reports the verdict its criteria produced" */
       it("reaches a verdict instead of an infrastructure error", async () => {
         endpoint = await startEndpoint("reject-tools-without-reasoning-off");
         const model = createModelFromParams({
@@ -251,7 +272,7 @@ describe("judge transport: function tools and reasoning effort", () => {
     });
 
     describe("when the caller already asked for a specific effort", () => {
-      /** @scenario "An explicitly requested reasoning effort is preserved" */
+      /** @scenario "A run that pins the judge's reasoning keeps it" */
       it("surfaces the rejection rather than rewriting the caller's intent", async () => {
         endpoint = await startEndpoint("reject-tools-without-reasoning-off");
         const model = createModelFromParams({
@@ -288,7 +309,7 @@ describe("judge transport: function tools and reasoning effort", () => {
 
   describe("given an endpoint that accepts tool-carrying requests as they are", () => {
     describe("when the request carries function tools", () => {
-      /** @scenario "A model that accepts the request is never sent anything new" */
+      /** @scenario "A model that accepts the first attempt is never asked anything new" */
       it("sends exactly one request with no reasoning_effort", async () => {
         endpoint = await startEndpoint("accept");
         const model = createModelFromParams({
@@ -335,6 +356,37 @@ describe("judge transport: function tools and reasoning effort", () => {
         const bodies = endpoint.bodies();
         expect(bodies).toHaveLength(1);
         expect(bodies[0]).not.toHaveProperty("reasoning_effort");
+      });
+    });
+  });
+
+  describe("given an endpoint that refuses reasoning without naming a remedy", () => {
+    describe("when the request carries function tools", () => {
+      /** @scenario "A reasoning refusal that names no remedy is surfaced, not retried" */
+      it("surfaces the rejection without guessing a value", async () => {
+        endpoint = await startEndpoint("reject-reasoning-without-remedy");
+        const model = createModelFromParams({
+          litellmParams: JUDGE_PARAMS,
+          nlpServiceUrl: endpoint.url,
+        });
+
+        const rejection = await surfacedRejection(
+          generateText({
+            model,
+            messages: [{ role: "user", content: "grade this" }],
+            tools: { finishTest },
+            toolChoice: "required",
+          }),
+        );
+        expect(rejection).toEqual({
+          statusCode: 400,
+          param: "reasoning_effort",
+        });
+
+        // The structured `param` matches the one the retry answers, so keying
+        // on it alone would send a second request carrying a value the provider
+        // never asked for.
+        expect(endpoint.bodies()).toHaveLength(1);
       });
     });
   });
