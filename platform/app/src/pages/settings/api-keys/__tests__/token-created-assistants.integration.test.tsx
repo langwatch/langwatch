@@ -97,43 +97,59 @@ describe("given a token has just been minted", () => {
   });
 
   describe("when an assistant that installs from the terminal is selected", () => {
-    /** @scenario An assistant with an install command shows a terminal snippet */
-    it("shows the terminal heading for it", () => {
-      renderDialog();
-      selectAssistant("Codex");
-
-      expect(
-        within(assistantSection()).getByText("Run in your terminal"),
-      ).toBeTruthy();
-    });
+    // The command STRING itself cannot be asserted here: ShikiCommandBox is
+    // loaded via `dynamic(..., { ssr: false })` and renders nothing in jsdom,
+    // so no `codex mcp add …` text ever reaches the DOM. Each assistant's
+    // exact command is pinned in token-created-snippets.unit.test.ts instead;
+    // these prove the tab switches which of the two treatments is shown.
 
     /** @scenario An assistant with an install command shows a terminal snippet */
-    it("offers no config-file pointer in its place", () => {
+    it("brings the terminal treatment back when moving off a config-only tab", () => {
       renderDialog();
-      selectAssistant("Claude Code");
 
+      // Claude Code is the default tab and also has a command, so starting
+      // from a config-only assistant is what makes the selection measurable.
+      selectAssistant("Cursor");
       expect(
-        within(assistantSection()).queryByText(/has no install command/),
+        within(assistantSection()).queryByText("Run in your terminal"),
       ).toBeNull();
+
+      selectAssistant("Codex");
+      const codex = assistantSection().textContent ?? "";
+      expect(codex).toContain("Run in your terminal");
+      expect(codex).not.toContain("has no install command");
     });
   });
 
   describe("when an assistant with no terminal installer is selected", () => {
     /** @scenario An assistant without an install command points at its config file */
-    it("names the config file it reads instead", () => {
+    it("names the config file it reads instead, per assistant", () => {
       renderDialog();
-      selectAssistant("Cursor");
 
-      const section = assistantSection();
-      expect(section.textContent).toContain("has no install command");
-      expect(section.textContent).toContain(".cursor/mcp.json");
+      selectAssistant("Cursor");
+      const cursor = assistantSection().textContent ?? "";
+      expect(cursor).toContain("Cursor has no install command");
+      expect(cursor).toContain(".cursor/mcp.json");
+
+      // A second config-only assistant, so the message is shown to follow the
+      // selection rather than being the same static string either way.
+      selectAssistant("Windsurf");
+      const windsurf = assistantSection().textContent ?? "";
+      expect(windsurf).toContain("Windsurf has no install command");
+      expect(windsurf).toContain("~/.codeium/windsurf/mcp_config.json");
+      expect(windsurf).not.toContain(".cursor/mcp.json");
     });
 
     /** @scenario An assistant without an install command points at its config file */
     it("drops the terminal heading for it", () => {
       renderDialog();
-      selectAssistant("Windsurf");
+      // The default tab has a command, so confirm the heading is there first —
+      // otherwise its absence proves nothing about the selection.
+      expect(
+        within(assistantSection()).getByText("Run in your terminal"),
+      ).toBeTruthy();
 
+      selectAssistant("Windsurf");
       expect(
         within(assistantSection()).queryByText("Run in your terminal"),
       ).toBeNull();

@@ -25,25 +25,29 @@ const toConditional = ({ light, dark }: ColorModePair) => ({
   _dark: dark,
 });
 
-/** Background of a card the user has picked. */
+/**
+ * The picked-card surface. Its dark side is a 30% wash rather than solid
+ * `orange.950` so the card still reads as lifted off the panel behind it.
+ */
 export const SELECTED_SURFACE_BG = {
   light: "orange.50",
   dark: "orange.950/30",
 } as const satisfies ColorModePair;
 
-/** Border of a card the user has picked. */
 export const SELECTED_SURFACE_BORDER = {
   light: "orange.400",
   dark: "orange.800",
 } as const satisfies ColorModePair;
 
-/** Background of the small rounded box an accent icon sits in. */
+/**
+ * The icon chip. Slightly denser than the card wash above because it is a
+ * small shape and needs the extra contrast to hold its edge.
+ */
 export const ACCENT_CHIP_BG = {
   light: "orange.50",
   dark: "orange.950/40",
 } as const satisfies ColorModePair;
 
-/** Hairline around that same box. */
 export const ACCENT_CHIP_BORDER = {
   light: "orange.100",
   dark: "orange.900",

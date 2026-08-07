@@ -58,7 +58,7 @@ interface CommandContext {
   isSelfHosted: boolean;
 }
 
-interface CodeAssistant {
+export interface CodeAssistant {
   key: string;
   label: string;
   /**

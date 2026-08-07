@@ -9,7 +9,7 @@
 import fs from "fs";
 import path from "path";
 import { describe, expect, it } from "vitest";
-import { CODE_ASSISTANTS } from "../TokenCreatedDialog";
+import { CODE_ASSISTANTS, type CodeAssistant } from "../TokenCreatedDialog";
 
 const LANGWATCH_ROOT = path.resolve(__dirname, "../../../../../");
 
@@ -131,23 +131,84 @@ describe("given the token-created-snippets feature is implemented", () => {
   });
 
   describe("when checking what each assistant entry builds", () => {
-    /** @scenario An assistant with an install command shows a terminal snippet */
-    it("builds each installer command around the minted token", () => {
-      const withCommand = CODE_ASSISTANTS.filter(
-        (assistant) => assistant.buildCommand,
-      );
-      expect(withCommand.length).toBeGreaterThan(0);
-
-      for (const assistant of withCommand) {
-        const command = assistant.buildCommand!({
+    // Full expected strings, not substrings. The assistants deliberately
+    // differ in where each flag goes — Claude Code puts the project id before
+    // the `--` and its key after, Codex puts everything before — and a
+    // substring check passes happily while those are wrong. A Gemini entry
+    // whose flags sat on the wrong side of the server name shipped and was
+    // pulled for exactly that reason (#6654).
+    const CASES: Array<{
+      key: string;
+      context: Parameters<NonNullable<CodeAssistant["buildCommand"]>>[0];
+      expected: string;
+    }> = [
+      {
+        key: "claude-code",
+        context: {
           apiKey: "sk-lw-real",
           projectId: "project-abc",
           endpoint: "https://app.langwatch.ai",
           isSelfHosted: false,
-        });
-        expect(command).toContain("sk-lw-real");
-        expect(command).toContain("@langwatch/mcp-server");
-      }
+        },
+        expected:
+          "claude mcp add langwatch --env LANGWATCH_PROJECT_ID=project-abc -- npx -y @langwatch/mcp-server --api-key sk-lw-real",
+      },
+      {
+        key: "claude-code",
+        context: {
+          apiKey: "sk-lw-real",
+          projectId: undefined,
+          endpoint: "https://self.host",
+          isSelfHosted: true,
+        },
+        expected:
+          "claude mcp add langwatch -- npx -y @langwatch/mcp-server --api-key sk-lw-real --endpoint https://self.host",
+      },
+      {
+        key: "codex",
+        context: {
+          apiKey: "sk-lw-real",
+          projectId: "project-abc",
+          endpoint: "https://app.langwatch.ai",
+          isSelfHosted: false,
+        },
+        expected:
+          "codex mcp add langwatch --env LANGWATCH_API_KEY=sk-lw-real --env LANGWATCH_PROJECT_ID=project-abc -- npx -y @langwatch/mcp-server",
+      },
+      {
+        key: "codex",
+        context: {
+          apiKey: "sk-lw-real",
+          projectId: undefined,
+          endpoint: "https://self.host",
+          isSelfHosted: true,
+        },
+        expected:
+          "codex mcp add langwatch --env LANGWATCH_API_KEY=sk-lw-real --env LANGWATCH_ENDPOINT=https://self.host -- npx -y @langwatch/mcp-server",
+      },
+    ];
+
+    for (const { key, context, expected } of CASES) {
+      /** @scenario An assistant with an install command shows a terminal snippet */
+      it(`builds ${key}'s command exactly, ${
+        context.isSelfHosted ? "self-hosted" : "cloud"
+      }, ${context.projectId ? "with" : "without"} a project id`, () => {
+        const assistant = CODE_ASSISTANTS.find((a) => a.key === key);
+        expect(assistant?.buildCommand).toBeDefined();
+        expect(assistant!.buildCommand!(context)).toBe(expected);
+      });
+    }
+
+    /** @scenario An assistant with an install command shows a terminal snippet */
+    it("covers every installer in the registry", () => {
+      const withCommand = CODE_ASSISTANTS.filter((a) => a.buildCommand).map(
+        (a) => a.key,
+      );
+      // If someone adds an installer, this fails until its exact command is
+      // pinned above — which is the whole point.
+      expect([...new Set(CASES.map((c) => c.key))].sort()).toEqual(
+        withCommand.sort(),
+      );
     });
 
     /** @scenario An assistant without an install command points at its config file */
