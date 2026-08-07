@@ -46,7 +46,9 @@ afterAll(async () => {
 });
 
 describe("given the production-metered table list", () => {
-  it("is not empty, so a passing suite means something", () => {
+  // Guards the suite itself: every table-driven case below is an it.each over
+  // this list, so an empty list would make them all vacuously pass.
+  it("names at least one table to meter", () => {
     expect(PRODUCTION_STORAGE_METER_TABLES.length).toBeGreaterThan(0);
   });
 
@@ -110,7 +112,7 @@ describe("given the analytics projections that never declared _size_bytes", () =
 
   it.each(
     tablesWithoutSizeColumn,
-  )("%s stays retention-managed but out of metering", (table) => {
+  )("keeps %s retention-managed while excluding it from metering", (table) => {
     expect(RETENTION_MANAGED_TABLES).toContain(table);
     expect(PRODUCTION_STORAGE_METER_TABLES).not.toContain(table);
   });
