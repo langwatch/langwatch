@@ -1386,30 +1386,42 @@ const PULL_CONFIG_OWNED_FIELDS: Partial<Record<SourceType, readonly string[]>> =
     databricks_genie: ["workspaceUrl", "spaceIds"],
   };
 
+// Skip sentinel for a parserConfig entry that must not be persisted, kept
+// distinct from a legitimately-falsy value an admin typed.
+const DROP_PARSER_FIELD = Symbol("drop");
+
+// The persisted value for one parserConfig entry, or DROP_PARSER_FIELD to omit
+// it. Pulling the per-key decision out of the loop keeps `buildParserConfig`
+// flat instead of a five-deep branch ladder.
+function parserFieldValue(
+  key: string,
+  value: unknown,
+): unknown | typeof DROP_PARSER_FIELD {
+  if (value == null || value === "") return DROP_PARSER_FIELD;
+  // Secrets travel in exactly one place: `pullConfig.credentials`, which is
+  // the only subtree `encryptParserConfigCredentials` wraps before the row
+  // reaches Postgres. A `credentials*` field copied to the top level of
+  // parserConfig would be persisted as plaintext JSONB — so it never is.
+  if (key.startsWith("credentials")) return DROP_PARSER_FIELD;
+  if (key === "pollEverySec") {
+    const n = Number(value);
+    return Number.isNaN(n) ? DROP_PARSER_FIELD : n;
+  }
+  return value;
+}
+
 function buildParserConfig(c: ComposerState): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   const adapterOwned = new Set(PULL_CONFIG_OWNED_FIELDS[c.sourceType] ?? []);
   for (const [k, v] of Object.entries(c.parserConfig)) {
-    if (v == null || v === "") continue;
     if (adapterOwned.has(k)) continue;
-    // Secrets travel in exactly one place: `pullConfig.credentials`, which is
-    // the only subtree `encryptParserConfigCredentials` wraps before the row
-    // reaches Postgres. A `credentials*` field copied to the top level of
-    // parserConfig would be persisted as plaintext JSONB — so it never is.
-    if (k.startsWith("credentials")) continue;
-    if (k === "pollEverySec") {
-      const n = Number(v);
-      if (!Number.isNaN(n)) out[k] = n;
-      continue;
-    }
-    out[k] = v;
+    const resolved = parserFieldValue(k, v);
+    if (resolved !== DROP_PARSER_FIELD) out[k] = resolved;
   }
   // Strip empty rows from the OTTL statement list - admins may leave a
   // blank trailing row from clicking "Add statement"; persisting it
   // would force the gateway parser to handle empty input as an error.
-  const ottl = c.ottlStatements
-    .map((s) => s)
-    .filter((s) => s.trim().length > 0);
+  const ottl = c.ottlStatements.filter((s) => s.trim().length > 0);
   if (ottl.length > 0) {
     out.ottlStatements = ottl;
   }

@@ -296,6 +296,25 @@ const UNKNOWN_IDENTITY: GenieIdentity = {
 };
 
 /**
+ * The identity for a parsed SCIM user. Key precedence: the IdP object id when
+ * the directory carries one, else the login email, else the raw numeric id —
+ * see the `GenieIdentity.key` note for why `externalId` cannot stand alone.
+ */
+function genieIdentityFromScimUser(
+  user: z.infer<typeof scimUserSchema>,
+  userId: number,
+): GenieIdentity {
+  const email = user.userName ?? "";
+  const externalId = user.externalId ?? "";
+  return {
+    key: externalId || email || String(userId),
+    email,
+    externalId,
+    displayName: user.displayName ?? "",
+  };
+}
+
+/**
  * Budgets one run's HTTP calls and its deadline in one place.
  *
  * Both limits mean the same thing to the caller — stop sweeping, keep what you
@@ -856,14 +875,7 @@ export class DatabricksGeniePuller
           path: `/api/2.0/preview/scim/v2/Users/${encodeURIComponent(String(userId))}`,
         }),
       );
-      const email = user.userName ?? "";
-      const externalId = user.externalId ?? "";
-      const identity: GenieIdentity = {
-        key: externalId || email || String(userId),
-        email,
-        externalId,
-        displayName: user.displayName ?? "",
-      };
+      const identity = genieIdentityFromScimUser(user, userId);
       identities.set(userId, identity);
       return identity;
     } catch (error) {
