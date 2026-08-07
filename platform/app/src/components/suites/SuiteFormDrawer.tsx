@@ -23,7 +23,6 @@ import {
   Textarea,
   VStack,
 } from "@chakra-ui/react";
-import type { SimulationSuite } from "~/generated/prisma/client";
 import { ChevronDown, ChevronRight, Play } from "lucide-react";
 import { useCallback, useRef, useState } from "react";
 import {
@@ -33,6 +32,7 @@ import {
   readHandledError,
   showErrorToast,
 } from "~/features/errors";
+import type { SimulationSuite } from "~/generated/prisma/client";
 import {
   getFlowCallbacks,
   useDrawer,
@@ -84,7 +84,7 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
    *  close/toast behavior — the per-call onSuccess handles it. */
   const saveAndRunRef = useRef(false);
   const params = useDrawerParams();
-  const utils = api.useContext();
+  const utils = api.useUtils();
 
   const isOpen = drawerOpen("suiteEditor");
   const suiteId = params.suiteId;

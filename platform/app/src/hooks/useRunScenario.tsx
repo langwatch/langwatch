@@ -34,7 +34,7 @@ export function useRunScenario({
   onRunComplete,
   onRunFailed,
 }: UseRunScenarioOptions) {
-  const utils = api.useContext();
+  const utils = api.useUtils();
   const runMutation = api.scenarios.run.useMutation();
   const [isPolling, setIsPolling] = useState(false);
 

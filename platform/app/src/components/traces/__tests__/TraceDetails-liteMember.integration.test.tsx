@@ -6,9 +6,9 @@
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { OrganizationUserRole } from "~/generated/prisma/client";
 import { render } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { OrganizationUserRole } from "~/generated/prisma/client";
 
 // ---------------------------------------------------------------------------
 // Stubs — child components that aren't under test
@@ -74,7 +74,7 @@ vi.mock("~/utils/api", () => ({
         useQuery: () => ({ data: null, isLoading: false, isSuccess: false }),
       },
     },
-    useContext: () => ({
+    useUtils: () => ({
       annotation: {
         getPendingItemsCount: { invalidate: vi.fn() },
         getAssignedItemsCount: { invalidate: vi.fn() },

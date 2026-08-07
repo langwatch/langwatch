@@ -13,7 +13,6 @@ import {
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
-import type { AnnotationScoreDataType } from "~/generated/prisma/client";
 import { useEffect, useState } from "react";
 import { ChevronDown, MoreVertical, Trash2 } from "react-feather";
 import {
@@ -21,6 +20,7 @@ import {
   type UseFormWatch,
   useForm,
 } from "react-hook-form";
+import type { AnnotationScoreDataType } from "~/generated/prisma/client";
 import { useAnnotationCommentStore } from "~/hooks/useAnnotationCommentStore";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
@@ -48,7 +48,7 @@ export function AnnotationComment({ key = "" }: { key: string }) {
   const commentState = useAnnotationCommentStore();
   const { traceId, action, annotationId, expectedOutput } = commentState;
 
-  const queryClient = api.useContext();
+  const queryClient = api.useUtils();
 
   const session = useSession();
 
@@ -303,7 +303,7 @@ export function AnnotationComment({ key = "" }: { key: string }) {
                             handleDelete();
                           }}
                         >
-                          {deleteAnnotation.isLoading ||
+                          {deleteAnnotation.isPending ||
                           getAnnotation.isLoading ? (
                             <Spinner size="sm" />
                           ) : (
@@ -362,8 +362,8 @@ export function AnnotationComment({ key = "" }: { key: string }) {
                     minWidth="fit-content"
                     size="sm"
                     loading={
-                      createAnnotation.isLoading ||
-                      updateAnnotation.isLoading ||
+                      createAnnotation.isPending ||
+                      updateAnnotation.isPending ||
                       getAnnotation.isLoading
                     }
                   >

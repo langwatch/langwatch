@@ -1,4 +1,8 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  keepPreviousData,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
 import type { SpanTreeNode } from "~/server/api/routers/tracesV2.schemas";
 import { api } from "~/utils/api";
@@ -45,8 +49,8 @@ export function useSpanTree() {
     // authenticated endpoint to walk it with.
     enabled: isReady && !shared,
     staleTime: 300_000,
-    cacheTime: 1_800_000,
-    keepPreviousData: true,
+    gcTime: 1_800_000,
+    placeholderData: keepPreviousData,
     refetchOnWindowFocus: true,
   });
 
@@ -59,8 +63,8 @@ export function useSpanTree() {
   // `keepPreviousData` means `data` can briefly be the PREVIOUS trace's tree
   // right after a trace switch — its high-water mark would make the delta
   // poll skip this trace's spans, so wait for current data.
-  const tree = treeQuery.isPreviousData ? undefined : treeQuery.data;
-  api.tracesV2.spanTreeDelta.useQuery(
+  const tree = treeQuery.isPlaceholderData ? undefined : treeQuery.data;
+  const deltaQuery = api.tracesV2.spanTreeDelta.useQuery(
     {
       ...queryArgs,
       sinceUpdatedAtMs: tree !== undefined ? spanTreeDeltaSinceMs(tree) : 0,
@@ -84,16 +88,22 @@ export function useSpanTree() {
       refetchInterval: sseConnected ? false : LIVE_REFETCH_MS,
       // Deltas are throwaway transport into the spanTree cache entry —
       // don't retain per-poll entries of their own.
-      cacheTime: 0,
-      onSuccess: (delta) => {
-        const queryKey = spanTreeQueryKey(queryArgs);
-        const existing = queryClient.getQueryData<SpanTreeNode[]>(queryKey);
-        if (!existing) return;
-        const merged = mergeSpanTreeDelta(existing, delta);
-        if (merged !== existing) queryClient.setQueryData(queryKey, merged);
-      },
+      gcTime: 0,
     },
   );
+
+  // Merge each delta response into the spanTree cache entry. Runs per
+  // successful fetch (a poll returning identical data keeps its identity via
+  // structural sharing, and the merge no-ops on `merged === existing` anyway).
+  const delta = deltaQuery.data;
+  useEffect(() => {
+    if (!delta) return;
+    const queryKey = spanTreeQueryKey(queryArgs);
+    const existing = queryClient.getQueryData<SpanTreeNode[]>(queryKey);
+    if (!existing) return;
+    const merged = mergeSpanTreeDelta(existing, delta);
+    if (merged !== existing) queryClient.setQueryData(queryKey, merged);
+  }, [delta, queryClient, queryArgs]);
 
   // One catch-up delta when SSE comes back. While it was down the interval
   // was doing the polling; once it reconnects the interval stops and updates

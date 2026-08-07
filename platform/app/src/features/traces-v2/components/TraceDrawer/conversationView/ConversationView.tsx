@@ -8,6 +8,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { keepPreviousData } from "@tanstack/react-query";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { Check, ChevronsDownUp, ChevronsUpDown, Copy } from "lucide-react";
 import {
@@ -97,7 +98,7 @@ export const ConversationView = memo(function ConversationView({
     projectId: project?.id ?? "",
     traceIds,
     enabled: !!project?.id && hasPermission("annotations:view"),
-    keepPreviousData: true,
+    placeholderData: keepPreviousData,
   });
   const annotationsByTrace = useMemo<AnnotationsByTrace>(() => {
     const map: AnnotationsByTrace = new Map();

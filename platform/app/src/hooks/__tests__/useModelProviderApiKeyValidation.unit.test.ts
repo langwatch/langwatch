@@ -26,7 +26,7 @@ vi.mock("../../utils/api", () => ({
         useMutation: () => ({ mutateAsync: mockMutateAsync }),
       },
     },
-    useContext: () => ({
+    useUtils: () => ({
       modelProvider: {
         // Present so a regression back to the query transport would be
         // silently satisfied rather than throwing — the test has to catch

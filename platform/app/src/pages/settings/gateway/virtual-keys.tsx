@@ -77,7 +77,7 @@ function VirtualKeysPage() {
   const canRevoke = hasPermission("virtualKeys:delete");
   const canUpdate = hasPermission("virtualKeys:update");
 
-  const utils = api.useContext();
+  const utils = api.useUtils();
   const orgId = organization?.id ?? "";
   const listQuery = api.virtualKeys.list.useQuery(
     { organizationId: orgId },

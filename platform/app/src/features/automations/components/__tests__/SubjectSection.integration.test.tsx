@@ -42,7 +42,7 @@ vi.mock("~/utils/api", () => ({
     dashboards: {
       getAll: { useQuery: () => ({ data: [], isLoading: false }) },
     },
-    useContext: () => ({}),
+    useUtils: () => ({}),
   },
 }));
 

@@ -213,7 +213,7 @@ vi.mock("~/utils/api", () => ({
         })),
       },
     },
-    useContext: vi.fn(() => ({
+    useUtils: vi.fn(() => ({
       agents: {
         getAll: { invalidate: vi.fn() },
         getById: { invalidate: vi.fn() },

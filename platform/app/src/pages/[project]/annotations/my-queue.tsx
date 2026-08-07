@@ -1,8 +1,8 @@
 import { Box, Button, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
-import type { AnnotationQueueItem } from "~/generated/prisma/client";
 import { useEffect, useMemo, useState } from "react";
 import { Check, ChevronLeft, ChevronRight } from "react-feather";
 import AnnotationsLayout from "~/components/AnnotationsLayout";
+import type { AnnotationQueueItem } from "~/generated/prisma/client";
 import { useAnnotationQueues } from "~/hooks/useAnnotationQueues";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
@@ -19,7 +19,7 @@ export default function TraceAnnotations() {
     allQueueItems: true,
   });
   const { project } = useOrganizationTeamProject();
-  const queryClient = api.useContext();
+  const queryClient = api.useUtils();
 
   const allQueueItems = useMemo(() => {
     const items = [...(assignedQueueItems ?? [])];
@@ -247,7 +247,7 @@ const AnnotationQueuePicker = ({
             colorPalette="blue"
             disabled={
               currentQueueItem.doneAt !== null ||
-              markQueueItemDone.isLoading ||
+              markQueueItemDone.isPending ||
               isNavigating
             }
             onClick={() => {

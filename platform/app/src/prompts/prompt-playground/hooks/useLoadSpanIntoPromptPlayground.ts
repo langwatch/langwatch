@@ -346,7 +346,7 @@ export function useLoadSpanIntoPromptPlayground() {
   const loadedRef = useRef(false);
   const { project } = useOrganizationTeamProject();
   const { spanId, action, clearParamsFromUrl } = useSpanIdFromUrl();
-  const trpc = api.useContext();
+  const trpc = api.useUtils();
   const { addTab, updateTabData, removeTab } = useDraggableTabsBrowserStore(
     ({ addTab, updateTabData, removeTab }) => ({
       addTab,

@@ -45,7 +45,7 @@ export function CreateProjectDrawer({
 
   const effectiveOrganizationId = organizationIdProp ?? currentOrganization?.id;
   const { closeDrawer } = useDrawer();
-  const queryClient = api.useContext();
+  const queryClient = api.useUtils();
 
   const createProject = api.project.create.useMutation();
 
@@ -133,7 +133,7 @@ export function CreateProjectDrawer({
         <Drawer.Body>
           <ProjectForm
             onSubmit={handleSubmit}
-            isLoading={createProject.isLoading}
+            isLoading={createProject.isPending}
             error={createProject.error}
             defaultTeamId={defaultTeamId}
             organizationId={effectiveOrganizationId}

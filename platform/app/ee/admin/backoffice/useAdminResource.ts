@@ -1,4 +1,5 @@
 import {
+  keepPreviousData,
   type UseMutationOptions,
   type UseQueryOptions,
   useMutation,
@@ -37,7 +38,7 @@ export function useAdminList<T>(
   return useQuery<ListResult<T>, Error>({
     queryKey: listKey(resource, params),
     queryFn: () => adminClient.getList<T>(resource, params),
-    keepPreviousData: true,
+    placeholderData: keepPreviousData,
     ...options,
   });
 }

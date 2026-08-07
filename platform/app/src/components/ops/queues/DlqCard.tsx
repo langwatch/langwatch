@@ -22,7 +22,7 @@ const DLQ_ROW_HEIGHT = 36;
 
 export function DlqCard({ queueNames }: { queueNames: string[] }) {
   const { hasAccess } = useOpsPermission();
-  const utils = api.useContext();
+  const utils = api.useUtils();
 
   const dlqQuery = api.ops.listAllDlqGroups.useQuery(undefined, {
     refetchInterval: 10000,

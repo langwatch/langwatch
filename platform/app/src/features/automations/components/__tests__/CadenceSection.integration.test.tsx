@@ -11,7 +11,7 @@ import { CadenceSection } from "../CadenceSection";
 
 // Transitive: the store pulls in provider clients, which import ~/utils/api.
 vi.mock("~/utils/api", () => ({
-  api: { useContext: () => ({}) },
+  api: { useUtils: () => ({}) },
 }));
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (

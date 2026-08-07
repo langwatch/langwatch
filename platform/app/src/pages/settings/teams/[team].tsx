@@ -8,7 +8,6 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import type { TeamUserRole } from "~/generated/prisma/client";
 import { TRPCClientError } from "@trpc/client";
 import isEqual from "lodash-es/isEqual";
 import { useCallback, useEffect, useState } from "react";
@@ -17,6 +16,7 @@ import { useDebouncedCallback } from "use-debounce";
 import { PermissionAlert } from "~/components/PermissionAlert";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { showErrorToast } from "~/features/errors";
+import type { TeamUserRole } from "~/generated/prisma/client";
 import { useRouter } from "~/utils/compat/next-router";
 import { ConfirmDialog } from "../../../components/gateway/ConfirmDialog";
 import SettingsLayout from "../../../components/SettingsLayout";
@@ -192,7 +192,7 @@ function EditTeam({ team }: { team: TeamWithProjectsAndMembersAndUsers }) {
   const formWatch = useWatch({ control });
   const updateTeam = api.team.update.useMutation();
   const archiveTeam = api.team.archiveById.useMutation();
-  const apiContext = api.useContext();
+  const apiContext = api.useUtils();
   const router = useRouter();
 
   /** The status code of a tRPC failure, when it carries one. */
@@ -332,7 +332,7 @@ function EditTeam({ team }: { team: TeamWithProjectsAndMembersAndUsers }) {
           team={team}
           form={form}
           onSubmit={onSubmit}
-          isLoading={updateTeam.isLoading}
+          isLoading={updateTeam.isPending}
         />
         <Separator />
         <VStack align="start" gap={3} width="full">
@@ -354,7 +354,7 @@ function EditTeam({ team }: { team: TeamWithProjectsAndMembersAndUsers }) {
                   variant="outline"
                   size="sm"
                   onClick={() => setShowArchiveDialog(true)}
-                  disabled={archiveTeam.isLoading}
+                  disabled={archiveTeam.isPending}
                 >
                   Archive team
                 </Button>
@@ -372,7 +372,7 @@ function EditTeam({ team }: { team: TeamWithProjectsAndMembersAndUsers }) {
         message={`Are you sure you want to archive "${team.name}"? This will hide the team and all its projects. Contact LangWatch support to restore it.`}
         confirmLabel="Archive"
         tone="danger"
-        loading={archiveTeam.isLoading}
+        loading={archiveTeam.isPending}
         onConfirm={handleArchive}
       />
     </SettingsLayout>

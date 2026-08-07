@@ -4,7 +4,7 @@ import { useOrganizationTeamProject } from "../useOrganizationTeamProject";
 
 export const usePromptHandleCheck = () => {
   const { project } = useOrganizationTeamProject();
-  const trpc = api.useContext();
+  const trpc = api.useUtils();
 
   const checkHandleUniqueness = async (params: {
     handle: string;

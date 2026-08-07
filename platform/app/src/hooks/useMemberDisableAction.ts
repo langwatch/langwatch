@@ -49,5 +49,5 @@ export function useMemberDisableAction({
     );
   };
 
-  return { setMemberDisabled, isSettingDisabled: mutation.isLoading };
+  return { setMemberDisabled, isSettingDisabled: mutation.isPending };
 }

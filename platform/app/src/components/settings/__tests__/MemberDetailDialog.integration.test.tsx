@@ -13,10 +13,13 @@
  * when the page was replaced by this dialog.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { OrganizationUserRole, RoleBindingScopeType } from "~/generated/prisma/client";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  OrganizationUserRole,
+  RoleBindingScopeType,
+} from "~/generated/prisma/client";
 import type { PendingBinding } from "../GroupBindingInputRow";
 
 const {
@@ -56,7 +59,7 @@ const {
 
 vi.mock("~/utils/api", () => ({
   api: {
-    useContext: () => ({
+    useUtils: () => ({
       roleBinding: {
         listForUser: { invalidate: mockInvalidateListForUser },
         listForOrg: { invalidate: mockInvalidateListForOrg },

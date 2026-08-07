@@ -91,7 +91,7 @@ export default function EditTraceCheck() {
         message="Are you sure you want to delete this check?"
         confirmLabel="Delete"
         tone="danger"
-        loading={deleteCheck.isLoading}
+        loading={deleteCheck.isPending}
         onConfirm={() => {
           if (!project) return;
           deleteCheck.mutate(
@@ -169,7 +169,7 @@ export default function EditTraceCheck() {
               checkId={checkId}
               defaultValues={defaultValues}
               onSubmit={onSubmit}
-              loading={updateCheck.isLoading}
+              loading={updateCheck.isPending}
             />
           )}
         </VStack>

@@ -47,7 +47,7 @@ vi.mock("~/utils/api", () => ({
         }),
       },
     },
-    useContext: () => ({
+    useUtils: () => ({
       prompts: {
         getTagsForConfig: {
           invalidate: mockInvalidate,

@@ -11,7 +11,7 @@ export interface TraceListResult {
   nextCursor: TraceListCursor | null;
   isLoading: boolean;
   isFetching: boolean;
-  isPreviousData: boolean;
+  isPlaceholderData: boolean;
   isError: boolean;
   error: unknown;
   newIds: Set<string>;
@@ -34,7 +34,7 @@ export function useTraceList(): TraceListResult {
   useViewSwitchingDim({
     isFetching: query.isFetching,
     isFetched: query.isFetched,
-    isPreviousData: query.isPreviousData,
+    isPlaceholderData: query.isPlaceholderData,
   });
 
   return {
@@ -43,7 +43,7 @@ export function useTraceList(): TraceListResult {
     nextCursor: query.nextCursor,
     isLoading: query.isLoading,
     isFetching: query.isFetching,
-    isPreviousData: query.isPreviousData,
+    isPlaceholderData: query.isPlaceholderData,
     isError: query.isError,
     error: query.error,
     newIds,

@@ -121,7 +121,7 @@ vi.mock("~/hooks/useDrawer", () => ({
 // Mock api
 vi.mock("~/utils/api", () => ({
   api: {
-    useContext: () => ({
+    useUtils: () => ({
       agents: {
         getById: {
           fetch: vi.fn(),

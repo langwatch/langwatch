@@ -8,7 +8,6 @@ import {
   Textarea,
   VStack,
 } from "@chakra-ui/react";
-import type { AnnotationScoreDataType } from "~/generated/prisma/client";
 import { diffWordsWithSpace } from "diff";
 import { Check, MessageSquareText, RotateCcw, Trash2 } from "lucide-react";
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
@@ -16,6 +15,7 @@ import { Popover } from "~/components/ui/popover";
 import { TriggerAnchor } from "~/components/ui/TriggerAnchor";
 import { toaster } from "~/components/ui/toaster";
 import { Tooltip } from "~/components/ui/tooltip";
+import type { AnnotationScoreDataType } from "~/generated/prisma/client";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api, type RouterOutputs } from "~/utils/api";
 
@@ -137,7 +137,7 @@ interface AnnotationFormState {
 
 function useAnnotationForm(props: AnnotationPopoverProps): AnnotationFormState {
   const { project } = useOrganizationTeamProject();
-  const trpc = api.useContext();
+  const trpc = api.useUtils();
 
   const annotationsForTrace = api.annotation.getByTraceId.useQuery(
     { projectId: project?.id ?? "", traceId: props.traceId },
@@ -246,8 +246,8 @@ function useAnnotationForm(props: AnnotationPopoverProps): AnnotationFormState {
     setScoreOptions,
     scores,
     isEdit,
-    isSaving: create.isLoading || update.isLoading,
-    isDeleting: remove.isLoading,
+    isSaving: create.isPending || update.isPending,
+    isDeleting: remove.isPending,
     hasExisting: !!existing,
     handleSave,
     handleDelete,

@@ -10,7 +10,6 @@ import {
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
-import type { Dataset, DatasetRecord, Project } from "~/generated/prisma/client";
 import type { Edge } from "@xyflow/react";
 import { useCallback, useState } from "react";
 import {
@@ -23,6 +22,11 @@ import {
 } from "react-feather";
 import { FormProvider, useForm } from "react-hook-form";
 import { RenderCode } from "~/components/code/RenderCode";
+import type {
+  Dataset,
+  DatasetRecord,
+  Project,
+} from "~/generated/prisma/client";
 import { langwatchEndpoint } from "../../components/code/langwatchEndpointEnv";
 import { SmallLabel } from "../../components/SmallLabel";
 import { Dialog } from "../../components/ui/dialog";
@@ -72,7 +76,7 @@ export function Publish({ isDisabled }: { isDisabled: boolean }) {
   const { workflowId } = useWorkflowStore(({ workflow_id: workflowId }) => ({
     workflowId,
   }));
-  const trpc = api.useContext();
+  const trpc = api.useUtils();
 
   const toggleSaveAsComponentMutation =
     api.optimization.toggleSaveAsComponent.useMutation({
@@ -233,7 +237,7 @@ function PublishMenu({
     project,
     allowSaveIfAutoSaveIsCurrentButNotLatest: false,
   });
-  const trpc = api.useContext();
+  const trpc = api.useUtils();
 
   const publishedWorkflow = api.optimization.getPublishedWorkflow.useQuery(
     {
@@ -642,7 +646,7 @@ function PublishModalContent({
                     variant="outline"
                     type="submit"
                     loading={
-                      commitVersion.isLoading || publishWorkflow.isLoading
+                      commitVersion.isPending || publishWorkflow.isPending
                     }
                     disabled={!!isDisabled}
                   >

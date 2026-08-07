@@ -2,16 +2,16 @@
  * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { TriggerAction } from "~/generated/prisma/client";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { TriggerAction } from "~/generated/prisma/client";
 import { DeliveryPicker } from "../DeliveryPicker";
 
 // Transitive: provider ConfigForms import ~/utils/api at module scope.
 // DeliveryPicker itself never touches tRPC, so an empty shape suffices.
 vi.mock("~/utils/api", () => ({
-  api: { useContext: () => ({}) },
+  api: { useUtils: () => ({}) },
 }));
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (

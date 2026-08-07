@@ -138,7 +138,7 @@ function AddToTeamDialog({
   const [customRoleId, setCustomRoleId] = useState<string | undefined>(
     undefined,
   );
-  const queryClient = api.useContext();
+  const queryClient = api.useUtils();
 
   const orgMembers =
     api.organization.getOrganizationWithMembersAndTheirTeams.useQuery(
@@ -302,7 +302,7 @@ function AddToProjectDialog({
   const [customRoleId, setCustomRoleId] = useState<string | undefined>(
     undefined,
   );
-  const queryClient = api.useContext();
+  const queryClient = api.useUtils();
 
   const orgMembers =
     api.organization.getOrganizationWithMembersAndTheirTeams.useQuery(
@@ -451,7 +451,7 @@ function ProjectSection({
   const [expanded, setExpanded] = useState(false);
   const [addingPerson, setAddingPerson] = useState(false);
   const { openDrawer } = useDrawer();
-  const queryClient = api.useContext();
+  const queryClient = api.useUtils();
 
   const deleteBinding = api.roleBinding.delete.useMutation({
     onSuccess: () => {
@@ -726,7 +726,7 @@ function TeamCard({
   const [addingMember, setAddingMember] = useState(false);
   const { openDrawer } = useDrawer();
   const { hasPermission } = useOrganizationTeamProject();
-  const queryClient = api.useContext();
+  const queryClient = api.useUtils();
   const department = useDepartmentColumn(organizationId);
 
   const deleteBinding = api.roleBinding.delete.useMutation({

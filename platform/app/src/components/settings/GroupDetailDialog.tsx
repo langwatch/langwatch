@@ -10,7 +10,6 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import type { TeamUserRole } from "~/generated/prisma/client";
 import { Search, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { RandomColorAvatar } from "~/components/RandomColorAvatar";
@@ -19,6 +18,7 @@ import { InputGroup } from "~/components/ui/input-group";
 import { Select } from "~/components/ui/select";
 import { toaster } from "~/components/ui/toaster";
 import { showErrorToast } from "~/features/errors";
+import type { TeamUserRole } from "~/generated/prisma/client";
 import type { RouterOutputs } from "~/utils/api";
 import { api } from "~/utils/api";
 import {
@@ -46,7 +46,7 @@ export function GroupDetailDialog({
   open: boolean;
   onClose: () => void;
 }) {
-  const queryClient = api.useContext();
+  const queryClient = api.useUtils();
 
   // ── staged state ────────────────────────────────────────────────────────────
   const [pendingName, setPendingName] = useState(group.name);

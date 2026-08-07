@@ -79,7 +79,7 @@ vi.mock("~/components/WithPermissionGuard", () => ({
 
 vi.mock("~/utils/api", () => ({
   api: {
-    useContext: () => ({}),
+    useUtils: () => ({}),
     experiments: {
       getAllForEvaluationsList: {
         useQuery: () => ({

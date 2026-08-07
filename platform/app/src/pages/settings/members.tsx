@@ -14,15 +14,15 @@ import {
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
-import {
-  type OrganizationUserRole,
-  RoleBindingScopeType,
-} from "~/generated/prisma/client";
 import { Ban, MoreVertical, Pencil, Plus, Trash2, Undo2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { OverflownTextWithTooltip } from "~/components/OverflownText";
 import { RandomColorAvatar } from "~/components/RandomColorAvatar";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
+import {
+  type OrganizationUserRole,
+  RoleBindingScopeType,
+} from "~/generated/prisma/client";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useMemberDisableAction } from "~/hooks/useMemberDisableAction";
 import { captureException } from "~/utils/posthogErrorCapture";
@@ -104,7 +104,7 @@ function MembersList({
   const department = useDepartmentColumn(organization.id);
   const showDepartment = department.show && hasOrganizationManagePermission;
 
-  const queryClient = api.useContext();
+  const queryClient = api.useUtils();
 
   const [selectedMember, setSelectedMember] = useState<{
     userId: string;

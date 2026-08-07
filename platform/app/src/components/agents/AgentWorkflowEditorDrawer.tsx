@@ -99,7 +99,7 @@ export function AgentWorkflowEditorDrawer(
   const { project } = useOrganizationTeamProject();
   const { closeDrawer, canGoBack, goBack } = useDrawer();
   const drawerParams = useDrawerParams();
-  const utils = api.useContext();
+  const utils = api.useUtils();
 
   const onClose = props.onClose ?? closeDrawer;
   const onSave = props.onSave;

@@ -17,11 +17,11 @@
  * set would be non-discriminating; this asserts the behaviour they buy.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { OrganizationUserRole } from "~/generated/prisma/client";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { OrganizationUserRole } from "~/generated/prisma/client";
 
 const { Stub, NullStub } = vi.hoisted(() => ({
   Stub: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
@@ -82,7 +82,7 @@ vi.mock("~/utils/api", () => ({
         useQuery: () => ({ data: null, isLoading: false, isSuccess: false }),
       },
     },
-    useContext: () => ({
+    useUtils: () => ({
       annotation: {
         getPendingItemsCount: { invalidate: vi.fn() },
         getAssignedItemsCount: { invalidate: vi.fn() },

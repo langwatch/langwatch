@@ -1,3 +1,4 @@
+import { keepPreviousData } from "@tanstack/react-query";
 import { useEffect, useMemo } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
@@ -14,7 +15,7 @@ export interface TraceListQueryResult {
   nextCursor: TraceListCursor | null;
   isLoading: boolean;
   isFetching: boolean;
-  isPreviousData: boolean;
+  isPlaceholderData: boolean;
   isFetched: boolean;
   isError: boolean;
   error: unknown;
@@ -79,7 +80,7 @@ export function useTraceListQuery(): TraceListQueryResult {
         samplePreview === null &&
         (page === 1 || pageCursor !== undefined),
       staleTime: 60_000,
-      keepPreviousData: true,
+      placeholderData: keepPreviousData,
     },
   );
 
@@ -95,7 +96,7 @@ export function useTraceListQuery(): TraceListQueryResult {
       nextCursor: null,
       isLoading: false,
       isFetching: false,
-      isPreviousData: false,
+      isPlaceholderData: false,
       isFetched: true,
       isError: false,
       error: null,
@@ -109,7 +110,7 @@ export function useTraceListQuery(): TraceListQueryResult {
     nextCursor: query.data?.nextCursor ?? null,
     isLoading: query.isLoading,
     isFetching: query.isFetching,
-    isPreviousData: query.isPreviousData,
+    isPlaceholderData: query.isPlaceholderData,
     isFetched: query.isFetched,
     isError: query.isError,
     error: query.error,

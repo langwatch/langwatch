@@ -377,7 +377,7 @@ function LLMModelCostForm({
           colorPalette="orange"
           type="submit"
           minWidth="fit-content"
-          loading={createOrUpdate.isLoading}
+          loading={createOrUpdate.isPending}
         >
           Save
         </Button>
