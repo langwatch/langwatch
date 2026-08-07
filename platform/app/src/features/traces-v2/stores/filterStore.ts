@@ -191,7 +191,8 @@ interface FilterState {
   /** Roll forward an existing preset range without resetting page. */
   rollTimeRange: (range: TimeRange) => void;
   setPage: (page: number) => void;
-  setPageCursor: (page: number, cursor: PageCursor | null) => void;
+  /** File the cursor that enters a page under that page's number. */
+  setPageCursor: (args: { page: number; cursor: PageCursor | null }) => void;
   resetPagination: () => void;
   setPageSize: (size: number) => void;
   clearAll: () => void;
@@ -511,7 +512,7 @@ export const useFilterStore = create<FilterState>((set, get) => ({
     set({ timeRange: range, page: 1, pageCursors: { 1: null } }),
   rollTimeRange: (range) => set({ timeRange: range }),
   setPage: (page) => set({ page }),
-  setPageCursor: (page, cursor) =>
+  setPageCursor: ({ page, cursor }) =>
     set((state) => ({
       pageCursors: { ...state.pageCursors, [page]: cursor },
     })),

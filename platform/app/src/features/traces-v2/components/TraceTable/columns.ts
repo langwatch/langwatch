@@ -390,7 +390,10 @@ const conversationColumnDefs: Record<
       enableSorting: false,
     },
   ),
-  pullRequest: convCol.accessor((row) => row.pullRequest?.number ?? 0, {
+  // `null` when the session has no mapped pull request, never `0`: zero is a
+  // number a reader would take for a pull request. The cell renders the
+  // missing case as a dash.
+  pullRequest: convCol.accessor((row) => row.pullRequest?.number ?? null, {
     id: "pullRequest",
     header: "Pull Request",
     size: 115,

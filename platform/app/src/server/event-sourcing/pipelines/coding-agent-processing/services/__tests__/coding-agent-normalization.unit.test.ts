@@ -248,7 +248,7 @@ describe("liftCodingAgentLogFacts", () => {
     /** @scenario A langwatch session context event passes the log lift without a vendor scope */
     it("required no vendor instrumentation scope to be admitted", () => {
       // The proof that the admission is the event name and nothing else: the
-      // same scope and name name no agent at all.
+      // same scope and event name identify no agent at all.
       expect(
         detectCodingAgent({
           scopeName: "langwatch.coding_agent.hook",

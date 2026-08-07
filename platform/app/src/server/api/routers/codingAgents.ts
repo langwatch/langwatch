@@ -93,17 +93,24 @@ export const codingAgentsRouter = createTRPCRouter({
  * Whether the project's organization has GitHub connected, and where to start
  * an install. Mirrors `github.getConnectionStatus`'s install link so a page
  * that has this answer never needs the organization-scoped query too.
+ *
+ * The link is null on an instance with no GitHub App configured: the install
+ * route answers 503 there, and a link that cannot start its flow is worse than
+ * no link at all. It is the only availability signal in this payload, so its
+ * absence is what tells the page not to offer connecting.
  */
 async function connectionFor(projectId: string): Promise<{
   connected: boolean;
   installUrl: string | null;
 }> {
+  const installations = getApp().github.installations;
   const organizationId = await resolveOrganizationId(projectId);
   if (!organizationId) return { connected: false, installUrl: null };
-  const installations =
-    await getApp().github.installations.getAllForOrganization(organizationId);
+  const existing = await installations.getAllForOrganization(organizationId);
   return {
-    connected: installations.length > 0,
-    installUrl: `/api/github/install?organizationId=${encodeURIComponent(organizationId)}`,
+    connected: existing.length > 0,
+    installUrl: installations.configured
+      ? `/api/github/install?organizationId=${encodeURIComponent(organizationId)}`
+      : null,
   };
 }

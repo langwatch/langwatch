@@ -43,7 +43,7 @@ export interface MapProjectionDefinition<Record, E extends Event = Event> {
   store: AppendStore<Record>;
 
   /** Optional processing behavior configuration. */
-  options?: MapProjectionOptions;
+  options?: MapProjectionOptions<E>;
 
   /**
    * Loads the aggregate's events up to AND INCLUDING `upToEvent` in log
@@ -91,8 +91,14 @@ export type MapEnqueueDispatchOptions<E extends Event = Event> = Pick<
 
 /**
  * Options for configuring map projection processing behavior.
+ *
+ * Generic in the projection's own event type so `enqueue.filter` is typed
+ * against the events this projection actually declares. Under strict function
+ * parameter checking a predicate over a narrower event is not assignable to
+ * one over `Event`, so without the parameter a projection could only ever
+ * supply a filter that widened its own type back out.
  */
-export interface MapProjectionOptions {
+export interface MapProjectionOptions<E extends Event = Event> {
   /** Kill switch configuration. When enabled, the projection is disabled. */
   killSwitch?: KillSwitchOptions;
 
@@ -110,7 +116,7 @@ export interface MapProjectionOptions {
    * mints a job. Evaluated at fan-out, after the event-type match and after the
    * kill switch, so a killed projection still does no work at all.
    */
-  enqueue?: MapEnqueueDispatchOptions;
+  enqueue?: MapEnqueueDispatchOptions<E>;
 
   /**
    * Maximum same-group events to persist through one `bulkAppend` call.

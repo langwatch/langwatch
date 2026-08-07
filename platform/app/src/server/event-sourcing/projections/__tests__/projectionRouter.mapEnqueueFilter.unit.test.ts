@@ -256,19 +256,23 @@ describe("map projection enqueue-time contract", () => {
   });
 
   describe("given a map projection with no enqueue filter", () => {
-    it("queues every event of its declared types, unchanged", async () => {
-      const appended: SeamRecord[] = [];
-      const { router, queued } = makeQueuedRouter(makeProjection({ appended }));
+    describe("when declared event types are dispatched", () => {
+      it("queues every event of its declared types, unchanged", async () => {
+        const appended: SeamRecord[] = [];
+        const { router, queued } = makeQueuedRouter(
+          makeProjection({ appended }),
+        );
 
-      await router.dispatch(
-        [makeEvent("keep-1"), makeEvent("drop-1")],
-        readContext,
-      );
+        await router.dispatch(
+          [makeEvent("keep-1"), makeEvent("drop-1")],
+          readContext,
+        );
 
-      expect(queued().map((event) => event.id)).toEqual([
-        "evt-keep-1",
-        "evt-drop-1",
-      ]);
+        expect(queued().map((event) => event.id)).toEqual([
+          "evt-keep-1",
+          "evt-drop-1",
+        ]);
+      });
     });
   });
 });

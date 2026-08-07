@@ -102,7 +102,7 @@ export const Pagination: React.FC<PaginationProps> = ({
 
   const goToNext = () => {
     if (busy || !nextCursor) return;
-    setPageCursor(safePage + 1, nextCursor);
+    setPageCursor({ page: safePage + 1, cursor: nextCursor });
     setPage(safePage + 1);
     scrollElement?.scrollTo({ top: 0, behavior: "auto" });
   };
