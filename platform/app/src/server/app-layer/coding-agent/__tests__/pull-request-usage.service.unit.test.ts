@@ -13,6 +13,7 @@ import { traced } from "../../tracing";
 import type { PersonalSessionLookup } from "../pull-request-usage.service";
 import { PullRequestUsageService } from "../pull-request-usage.service";
 import type { CodingAgentBranchSessionRow } from "../repositories/coding-agent-session.repository";
+import type { SessionModelTotalsRow } from "../repositories/coding-agent-session-events.repository";
 
 const HOUR = 60 * 60 * 1000;
 const NOW = Date.UTC(2026, 5, 1);
@@ -69,6 +70,7 @@ function personalSessionRow(
   return {
     sessionId: "session-a",
     startedAtMs: NOW - 5 * HOUR,
+    agent: "claude_code",
     repositoryHost: "github.com",
     repositoryOwner: "acme",
     repositoryName: "widgets",
@@ -81,6 +83,26 @@ function personalSessionRow(
     ...over,
   };
 }
+
+/** One (session, model) total, as the per-call fact table returns it. */
+function modelTotalsRow(
+  over: Partial<SessionModelTotalsRow> = {},
+): SessionModelTotalsRow {
+  return {
+    tenantId: "project-1",
+    sessionId: "session-a",
+    model: "claude-fable-5",
+    inputTokens: 100,
+    outputTokens: 50,
+    cacheReadTokens: 20,
+    cacheCreationTokens: 10,
+    costUsd: 1.5,
+    ...over,
+  };
+}
+
+/** Nothing is bundled unless a case says so. */
+const allBilled = async () => false;
 
 /**
  * The mapping lookup answering only for the spelling it was asked about, so a
@@ -113,11 +135,19 @@ function findAllByBranchesLike(rows: GithubPullRequestRow[]) {
 function serviceWith({
   pullRequests,
   sessions,
+  modelTotals = [],
+  isSourceNonBillable = allBilled,
 }: {
   pullRequests: GithubPullRequestRow[];
   sessions: CodingAgentBranchSessionRow[];
+  modelTotals?: SessionModelTotalsRow[];
+  isSourceNonBillable?: (params: {
+    organizationId: string;
+    sourceType: string;
+  }) => Promise<boolean>;
 }) {
   const listByRepositoryBranch = vi.fn().mockResolvedValue(sessions);
+  const sumTokensByModelPerSession = vi.fn().mockResolvedValue(modelTotals);
   const service = new PullRequestUsageService({
     pullRequests: {
       findByNumber: vi.fn().mockResolvedValue(pullRequests[0] ?? null),
@@ -125,11 +155,13 @@ function serviceWith({
     } as never,
     sessions: { listByRepositoryBranch } as never,
     personalSessions: { listRecent: vi.fn().mockResolvedValue([]) },
+    sessionEvents: { sumTokensByModelPerSession },
     installations: { coversRepository: vi.fn().mockResolvedValue(true) },
     resolveOrganizationId: async () => "org-1",
+    isSourceNonBillable,
     now: () => NOW,
   });
-  return { service, listByRepositoryBranch };
+  return { service, listByRepositoryBranch, sumTokensByModelPerSession };
 }
 
 const QUERY = {
@@ -140,6 +172,58 @@ const QUERY = {
   permittedProjectIds: ["project-1"],
   costProjectIds: ["project-1"],
 };
+
+const DETAIL_QUERY = { ...QUERY, projectNames: { "project-1": "Personal" } };
+
+const PERSONAL_QUERY = {
+  projectId: "project-1",
+  permittedProjectIds: ["project-1"],
+  costProjectIds: ["project-1"],
+  projectNames: { "project-1": "Personal" },
+};
+
+/**
+ * The personal page's two reads wired separately: `personalSessions` is what
+ * DISCOVERS the pull requests, `sessions` is the organization-wide read that
+ * PRICES them. Keeping them distinct is the whole point of the split.
+ */
+function personalServiceWith({
+  pullRequests,
+  personalSessions,
+  organizationSessions = [],
+  modelTotals = [],
+  isSourceNonBillable = allBilled,
+  findAllByBranches = vi.fn().mockResolvedValue(pullRequests),
+}: {
+  pullRequests: GithubPullRequestRow[];
+  personalSessions: Awaited<ReturnType<PersonalSessionLookup["listRecent"]>>;
+  organizationSessions?: CodingAgentBranchSessionRow[];
+  modelTotals?: SessionModelTotalsRow[];
+  isSourceNonBillable?: (params: {
+    organizationId: string;
+    sourceType: string;
+  }) => Promise<boolean>;
+  findAllByBranches?: ReturnType<typeof vi.fn>;
+}) {
+  const listByRepositoryBranch = vi
+    .fn()
+    .mockResolvedValue(organizationSessions);
+  const service = new PullRequestUsageService({
+    pullRequests: { findByNumber: vi.fn(), findAllByBranches } as never,
+    sessions: { listByRepositoryBranch } as never,
+    personalSessions: {
+      listRecent: vi.fn().mockResolvedValue(personalSessions),
+    },
+    sessionEvents: {
+      sumTokensByModelPerSession: vi.fn().mockResolvedValue(modelTotals),
+    },
+    installations: { coversRepository: vi.fn().mockResolvedValue(true) },
+    resolveOrganizationId: async () => "org-1",
+    isSourceNonBillable,
+    now: () => NOW,
+  });
+  return { service, listByRepositoryBranch, findAllByBranches };
+}
 
 describe("PullRequestUsageService", () => {
   describe("given a pull request with sessions that have titles and transcripts", () => {
@@ -155,6 +239,7 @@ describe("PullRequestUsageService", () => {
       // The response's own key set, pinned. A field added here without being
       // added to this list is a field nobody decided to disclose.
       expect(Object.keys(usage).sort()).toEqual([
+        "modelBreakdown",
         "pullRequest",
         "rows",
         "totals",
@@ -174,11 +259,13 @@ describe("PullRequestUsageService", () => {
       ]);
       expect(Object.keys(usage.rows[0]!).sort()).toEqual([
         "agent",
+        "billedCostUsd",
         "cacheCreationTokens",
         "cacheReadTokens",
         "costUsd",
         "inputTokens",
         "models",
+        "nonBilledCostUsd",
         "outputTokens",
         "projectId",
         "sessionsCount",
@@ -186,10 +273,12 @@ describe("PullRequestUsageService", () => {
         "userLabel",
       ]);
       expect(Object.keys(usage.totals).sort()).toEqual([
+        "billedCostUsd",
         "cacheCreationTokens",
         "cacheReadTokens",
         "costUsd",
         "inputTokens",
+        "nonBilledCostUsd",
         "outputTokens",
         "sessionsCount",
         "totalTokens",
@@ -295,29 +384,25 @@ describe("PullRequestUsageService", () => {
   describe("given one repository whose sessions report the host with different casing", () => {
     /** @scenario "One repository reported with two host spellings stays one repository" */
     it("lists it once, with every session, under the mapping's own spelling", async () => {
-      const findAllByBranches = findAllByBranchesLike([pullRequestRow()]);
-      const service = new PullRequestUsageService({
-        pullRequests: { findByNumber: vi.fn(), findAllByBranches } as never,
-        sessions: { listByRepositoryBranch: vi.fn() } as never,
-        personalSessions: {
-          listRecent: vi.fn().mockResolvedValue([
-            personalSessionRow({ sessionId: "s1" }),
-            personalSessionRow({
-              sessionId: "s2",
-              repositoryHost: "GitHub.com",
-              repositoryOwner: "ACME",
-              repositoryName: "Widgets",
-            }),
-          ]),
-        },
-        installations: { coversRepository: vi.fn().mockResolvedValue(true) },
-        resolveOrganizationId: async () => "org-1",
-        now: () => NOW,
+      const { service, findAllByBranches } = personalServiceWith({
+        pullRequests: [pullRequestRow()],
+        findAllByBranches: findAllByBranchesLike([pullRequestRow()]),
+        personalSessions: [
+          personalSessionRow({ sessionId: "s1" }),
+          personalSessionRow({
+            sessionId: "s2",
+            repositoryHost: "GitHub.com",
+            repositoryOwner: "ACME",
+            repositoryName: "Widgets",
+          }),
+        ],
+        organizationSessions: [
+          sessionRow({ sessionId: "s1" }),
+          sessionRow({ sessionId: "s2" }),
+        ],
       });
 
-      const usage = await service.getForPersonalProject({
-        projectId: "project-1",
-      });
+      const usage = await service.getForPersonalProject(PERSONAL_QUERY);
 
       expect(findAllByBranches).toHaveBeenCalledTimes(1);
       expect(findAllByBranches).toHaveBeenCalledWith(
@@ -375,13 +460,17 @@ describe("PullRequestUsageService", () => {
           } as never,
           sessions: { listByRepositoryBranch: vi.fn() } as never,
           personalSessions: { listRecent },
+          sessionEvents: {
+            sumTokensByModelPerSession: vi.fn().mockResolvedValue([]),
+          },
           installations: { coversRepository: vi.fn().mockResolvedValue(true) },
           resolveOrganizationId: async () => "org-1",
+          isSourceNonBillable: allBilled,
         }),
         "PullRequestUsageService",
       );
 
-      await service.getForPersonalProject({ projectId: "project-1" });
+      await service.getForPersonalProject(PERSONAL_QUERY);
 
       const call = listRecent.mock.calls[0]![0] as {
         fromMs: number;
@@ -402,8 +491,12 @@ describe("PullRequestUsageService", () => {
           } as never,
           sessions: { listByRepositoryBranch } as never,
           personalSessions: { listRecent: vi.fn().mockResolvedValue([]) },
+          sessionEvents: {
+            sumTokensByModelPerSession: vi.fn().mockResolvedValue([]),
+          },
           installations: { coversRepository: vi.fn().mockResolvedValue(true) },
           resolveOrganizationId: async () => "org-1",
+          isSourceNonBillable: allBilled,
         }),
         "PullRequestUsageService",
       );
@@ -414,6 +507,329 @@ describe("PullRequestUsageService", () => {
         startedAtFromMs: number;
       };
       expect(Number.isFinite(call.startedAtFromMs)).toBe(true);
+    });
+  });
+
+  describe("given a pull request whose sessions ran in two projects", () => {
+    /** @scenario "A listed pull request counts every project the viewer may read" */
+    it("counts every project the viewer may read on the personal row", async () => {
+      const { service, listByRepositoryBranch } = personalServiceWith({
+        pullRequests: [pullRequestRow()],
+        personalSessions: [personalSessionRow({ sessionId: "mine" })],
+        organizationSessions: [
+          sessionRow({ sessionId: "mine", tenantId: "project-1" }),
+          sessionRow({ sessionId: "theirs", tenantId: "project-2" }),
+        ],
+      });
+
+      const usage = await service.getForPersonalProject({
+        ...PERSONAL_QUERY,
+        permittedProjectIds: ["project-1", "project-2"],
+        costProjectIds: ["project-1", "project-2"],
+        projectNames: { "project-1": "Personal", "project-2": "Gateway" },
+      });
+
+      expect(listByRepositoryBranch).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tenantIds: ["project-1", "project-2"],
+        }),
+      );
+      expect(usage.rows[0]?.sessionsCount).toBe(2);
+      expect(usage.rows[0]?.totalTokens).toBe(2 * 180);
+      expect(usage.rows[0]?.costUsd).toBeCloseTo(3.0);
+    });
+
+    /** @scenario "A project the viewer may not read is absent from the row and its totals" */
+    it("leaves a project the viewer may not read out of the row and its totals", async () => {
+      const { service, listByRepositoryBranch } = personalServiceWith({
+        pullRequests: [pullRequestRow()],
+        personalSessions: [personalSessionRow({ sessionId: "mine" })],
+        // The read is scoped to the permitted projects, so a hidden project's
+        // sessions never come back at all.
+        organizationSessions: [
+          sessionRow({ sessionId: "mine", tenantId: "project-1" }),
+        ],
+      });
+
+      const usage = await service.getForPersonalProject(PERSONAL_QUERY);
+
+      expect(listByRepositoryBranch).toHaveBeenCalledWith(
+        expect.objectContaining({ tenantIds: ["project-1"] }),
+      );
+      expect(usage.rows[0]?.sessionsCount).toBe(1);
+      expect(usage.rows[0]?.costUsd).toBeCloseTo(1.5);
+    });
+
+    /** @scenario "A row names who worked on the pull request and where" */
+    it("names each contributor, their project and how many sessions they ran", async () => {
+      const { service } = personalServiceWith({
+        pullRequests: [pullRequestRow()],
+        personalSessions: [personalSessionRow({ sessionId: "mine" })],
+        organizationSessions: [
+          sessionRow({
+            sessionId: "s1",
+            tenantId: "project-1",
+            userId: "riley",
+          }),
+          sessionRow({
+            sessionId: "s2",
+            tenantId: "project-1",
+            userId: "riley",
+          }),
+          sessionRow({
+            sessionId: "s3",
+            tenantId: "project-2",
+            userId: "reviewer",
+          }),
+        ],
+      });
+
+      const usage = await service.getForPersonalProject({
+        ...PERSONAL_QUERY,
+        permittedProjectIds: ["project-1", "project-2"],
+        costProjectIds: ["project-1", "project-2"],
+        projectNames: { "project-1": "Personal", "project-2": "Gateway" },
+      });
+
+      expect(usage.rows[0]?.contributorsSummary).toEqual([
+        { userLabel: "riley", projectName: "Personal", sessionsCount: 2 },
+        { userLabel: "reviewer", projectName: "Gateway", sessionsCount: 1 },
+      ]);
+    });
+  });
+
+  describe("given a branch with no pull request", () => {
+    /** @scenario "Branches with no pull request stay the viewer's own work" */
+    it("reports only the viewer's own sessions", async () => {
+      const { service } = personalServiceWith({
+        pullRequests: [],
+        personalSessions: [
+          personalSessionRow({ sessionId: "mine", gitBranch: "feat/orphan" }),
+        ],
+        // Would be counted if the branch rollup went organization-wide.
+        organizationSessions: [
+          sessionRow({ sessionId: "theirs", tenantId: "project-2" }),
+        ],
+      });
+
+      const usage = await service.getForPersonalProject({
+        ...PERSONAL_QUERY,
+        permittedProjectIds: ["project-1", "project-2"],
+        costProjectIds: ["project-1", "project-2"],
+      });
+
+      expect(usage.unlinked).toHaveLength(1);
+      expect(usage.unlinked[0]?.sessionsCount).toBe(1);
+      expect(usage.unlinked[0]?.costUsd).toBeCloseTo(1.5);
+    });
+  });
+
+  describe("when the read resolves which projects to count", () => {
+    /** @scenario "The viewer never chooses which projects are counted" */
+    it("counts the projects it was handed and never a repository name from the request", async () => {
+      const { service, listByRepositoryBranch } = serviceWith({
+        pullRequests: [pullRequestRow()],
+        sessions: [sessionRow()],
+      });
+
+      await service.getPullRequestUsage({
+        ...QUERY,
+        permittedProjectIds: ["project-1"],
+        costProjectIds: [],
+      });
+
+      // The query object carries no project list of its own: `tenantIds` is
+      // exactly the resolved permission cut, so a caller cannot widen it.
+      const call = listByRepositoryBranch.mock.calls[0]![0] as {
+        tenantIds: string[];
+      };
+      expect(call.tenantIds).toEqual(["project-1"]);
+    });
+  });
+
+  describe("given an assistant covered by a bundled plan", () => {
+    /** @scenario "A bundled assistant's cost is reported as not billed" */
+    it("reports the whole cost as not billed and still totals the list price", async () => {
+      const { service } = serviceWith({
+        pullRequests: [pullRequestRow()],
+        sessions: [sessionRow()],
+        isSourceNonBillable: async () => true,
+      });
+
+      const usage = await service.getPullRequestUsage(QUERY);
+
+      expect(usage.totals.nonBilledCostUsd).toBeCloseTo(1.5);
+      expect(usage.totals.billedCostUsd).toBe(0);
+      expect(usage.totals.costUsd).toBeCloseTo(1.5);
+    });
+
+    /** @scenario "An assistant billed per token reports its cost as billed" */
+    it("reports a per-token assistant's cost as billed", async () => {
+      const { service } = serviceWith({
+        pullRequests: [pullRequestRow()],
+        sessions: [sessionRow()],
+      });
+
+      const usage = await service.getPullRequestUsage(QUERY);
+
+      expect(usage.totals.billedCostUsd).toBeCloseTo(1.5);
+      expect(usage.totals.nonBilledCostUsd).toBe(0);
+    });
+
+    /** @scenario "Two assistants on one pull request split its cost between them" */
+    it("splits the cost between a bundled assistant and a per-token one", async () => {
+      const { service } = serviceWith({
+        pullRequests: [pullRequestRow()],
+        sessions: [
+          sessionRow({ sessionId: "s1", agent: "claude_code", costUsd: 2 }),
+          sessionRow({ sessionId: "s2", agent: "gemini_cli", costUsd: 3 }),
+        ],
+        isSourceNonBillable: async ({ sourceType }) => sourceType === "gemini",
+      });
+
+      const usage = await service.getPullRequestUsage(QUERY);
+
+      expect(usage.totals.billedCostUsd).toBeCloseTo(2);
+      expect(usage.totals.nonBilledCostUsd).toBeCloseTo(3);
+      expect(usage.totals.costUsd).toBeCloseTo(5);
+    });
+
+    /** @scenario "A viewer who may not price a project sees neither half of its cost" */
+    it("leaves every half of the cost absent for a project the viewer may not price", async () => {
+      const { service } = serviceWith({
+        pullRequests: [pullRequestRow()],
+        sessions: [sessionRow()],
+        isSourceNonBillable: async () => true,
+      });
+
+      const usage = await service.getPullRequestUsage({
+        ...QUERY,
+        costProjectIds: [],
+      });
+
+      expect(usage.rows[0]?.costUsd).toBeNull();
+      expect(usage.rows[0]?.billedCostUsd).toBeNull();
+      expect(usage.rows[0]?.nonBilledCostUsd).toBeNull();
+      expect(usage.totals.billedCostUsd).toBeNull();
+      expect(usage.totals.nonBilledCostUsd).toBeNull();
+    });
+  });
+
+  describe("given a pull request whose sessions called two models", () => {
+    /** @scenario "The row reports each model's tokens and cost" */
+    it("reports each model's own tokens and cost", async () => {
+      const { service, sumTokensByModelPerSession } = serviceWith({
+        pullRequests: [pullRequestRow()],
+        sessions: [sessionRow({ sessionId: "s1" })],
+        modelTotals: [
+          modelTotalsRow({ sessionId: "s1", model: "claude-fable-5" }),
+          modelTotalsRow({
+            sessionId: "s1",
+            model: "gpt-5-mini",
+            inputTokens: 1,
+            outputTokens: 1,
+            cacheReadTokens: 1,
+            cacheCreationTokens: 1,
+            costUsd: 0.25,
+          }),
+          // Another pull request's session: never counted here.
+          modelTotalsRow({ sessionId: "elsewhere", model: "claude-fable-5" }),
+        ],
+      });
+
+      const usage = await service.getPullRequestUsage(QUERY);
+
+      expect(sumTokensByModelPerSession).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tenantIds: ["project-1"],
+          sessionIds: ["s1"],
+          fromMs: expect.any(Number),
+        }),
+      );
+      expect(usage.modelBreakdown).toEqual([
+        {
+          model: "claude-fable-5",
+          inputTokens: 100,
+          outputTokens: 50,
+          cacheReadTokens: 20,
+          cacheCreationTokens: 10,
+          totalTokens: 180,
+          costUsd: 1.5,
+        },
+        {
+          model: "gpt-5-mini",
+          inputTokens: 1,
+          outputTokens: 1,
+          cacheReadTokens: 1,
+          cacheCreationTokens: 1,
+          totalTokens: 4,
+          costUsd: 0.25,
+        },
+      ]);
+    });
+
+    /** @scenario "A model's cost is absent when no permitted project may be priced" */
+    it("reports a model's tokens with no cost when nothing may be priced", async () => {
+      const { service } = serviceWith({
+        pullRequests: [pullRequestRow()],
+        sessions: [sessionRow({ sessionId: "s1" })],
+        modelTotals: [modelTotalsRow({ sessionId: "s1" })],
+      });
+
+      const usage = await service.getPullRequestUsage({
+        ...QUERY,
+        costProjectIds: [],
+      });
+
+      expect(usage.modelBreakdown[0]?.totalTokens).toBe(180);
+      expect(usage.modelBreakdown[0]?.costUsd).toBeNull();
+    });
+  });
+
+  describe("when the pull request detail is read", () => {
+    /** @scenario "The detail carries its contributors, models and sessions" */
+    it("carries the totals, the contributors, the models and the sessions newest first", async () => {
+      const { service } = serviceWith({
+        pullRequests: [pullRequestRow()],
+        sessions: [
+          sessionRow({ sessionId: "older", startedAtMs: NOW - 8 * HOUR }),
+          sessionRow({ sessionId: "newer", startedAtMs: NOW - 2 * HOUR }),
+        ],
+        modelTotals: [modelTotalsRow({ sessionId: "newer" })],
+      });
+
+      const detail = await service.getPullRequestDetail(DETAIL_QUERY);
+
+      expect(detail.pullRequest.title).toBe("Link sessions to pull requests");
+      expect(detail.totals.sessionsCount).toBe(2);
+      expect(detail.contributors[0]?.projectName).toBe("Personal");
+      expect(detail.modelBreakdown[0]?.model).toBe("claude-fable-5");
+      expect(detail.sessions.map((session) => session.sessionId)).toEqual([
+        "newer",
+        "older",
+      ]);
+    });
+
+    /** @scenario "The sessions list never carries a session title" */
+    it("carries facts about each session and nothing else", async () => {
+      const { service } = serviceWith({
+        pullRequests: [pullRequestRow()],
+        sessions: [sessionRow()],
+      });
+
+      const detail = await service.getPullRequestDetail(DETAIL_QUERY);
+
+      // The session row's own key set, pinned. A title added here would be a
+      // disclosure nobody decided on.
+      expect(Object.keys(detail.sessions[0]!).sort()).toEqual([
+        "agent",
+        "costUsd",
+        "projectName",
+        "sessionId",
+        "startedAtMs",
+        "totalTokens",
+        "userLabel",
+      ]);
     });
   });
 });

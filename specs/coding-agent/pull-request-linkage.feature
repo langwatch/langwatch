@@ -6,8 +6,13 @@
 #   platform/app/src/server/event-sourcing/pipelines/coding-agent-processing/reactors/pullRequestMapping.reactor.ts (fold trigger)
 #   platform/app/src/server/app-layer/coding-agent/pull-request-assignment.ts          (session-to-PR tenure rule)
 #   platform/app/src/server/app-layer/coding-agent/pull-request-usage.service.ts       (org-first usage rollup)
+#   platform/app/src/server/app-layer/coding-agent/coding-agent-source-type.ts         (agent id to ingestion source type)
+#   platform/app/src/server/app-layer/coding-agent/repositories/coding-agent-session-events.repository.ts (per-model totals)
+#   platform/app/src/server/organizations/resolveCallerProjectScope.ts                 (the caller's permission cut, shared by both read surfaces)
 #   platform/app/src/app/api/coding-agent/[[...route]]/                                (the usage REST endpoint)
 #   platform/app/src/pages/me/pull-requests.tsx                                        (the personal Pull Requests page)
+#   platform/app/src/components/me/PullRequestsTable.tsx                               (the table)
+#   platform/app/src/components/me/PullRequestDetailDrawer.tsx                          (one pull request in full)
 #
 # Related specs:
 #   specs/coding-agent/session-git-context.feature   , where the repo+branch identity comes from
@@ -171,6 +176,182 @@ Rule: The Pull Requests page prices each pull request's lifetime
     Then the repository appears once carrying all of its sessions
     And its pull requests are found under the mapping's own spelling
 
+Rule: A personal row asks a personal question and answers with the organization's numbers
+
+  # Which pull requests a person sees is a personal question: the ones their own
+  # work touched. What each one COST is not, because a pull request is worked on
+  # by whoever the organization put on it. Splitting the two is what stops the
+  # page from reporting a fraction of a pull request as its whole price.
+
+  @unit
+  Scenario: A listed pull request counts every project the viewer may read
+    Given a pull request whose sessions ran in the viewer's own project and a teammate's
+    When the Pull Requests page lists it
+    Then its sessions, tokens and cost cover both projects
+
+  @unit
+  Scenario: A project the viewer may not read is absent from the row and its totals
+    Given a pull request with sessions in a project the viewer may not read
+    When the Pull Requests page lists it
+    Then that project's sessions are missing from the row
+    And the row's totals equal the permitted sessions alone
+
+  @unit
+  Scenario: The viewer never chooses which projects are counted
+    Given a caller asking for the pull request usage
+    When the read resolves which projects to count
+    Then the projects come from the caller's own permissions, never from the request
+
+  @unit
+  Scenario: Branches with no pull request stay the viewer's own work
+    Given a branch with no pull request whose sessions ran in two projects
+    When the Pull Requests page lists it
+    Then the branch reports only the viewer's own sessions
+
+  @unit
+  Scenario: A row names who worked on the pull request and where
+    Given a pull request worked on by two people in different projects
+    When the Pull Requests page lists it
+    Then the row names each contributor, their project and how many sessions they ran
+
+Rule: Token cost is split into what was billed and what was only theoretical
+
+  # A coding assistant on a flat plan reports a list price its owner never paid.
+  # The stored session carries one flat number, so the split is resolved at read
+  # time from the same bundled-plan policy the receiver applies on ingestion.
+
+  @unit
+  Scenario: A bundled assistant's cost is reported as not billed
+    Given a pull request whose sessions ran on an assistant covered by a bundled plan
+    When the pull request usage is read
+    Then the whole cost is reported as not billed
+    And the grand total still reports the list price
+
+  @unit
+  Scenario: An assistant billed per token reports its cost as billed
+    Given a pull request whose sessions ran on an assistant billed per token
+    When the pull request usage is read
+    Then the whole cost is reported as billed
+
+  @unit
+  Scenario: Two assistants on one pull request split its cost between them
+    Given a pull request worked on by a bundled assistant and a per-token one
+    When the pull request usage is read
+    Then the bundled assistant's cost is not billed
+    And the per-token assistant's cost is billed
+
+  @unit
+  Scenario: A viewer who may not price a project sees neither half of its cost
+    Given a project the viewer may read but not price
+    When the pull request usage is read
+    Then the billed, not billed and grand totals are all absent for it
+
+Rule: Each pull request reports what every model consumed
+
+  @unit
+  Scenario: The row reports each model's tokens and cost
+    Given a pull request whose sessions called two models
+    When the pull request usage is read
+    Then each model reports its own input, output and cache tokens
+    And each model reports what it cost
+
+  @unit
+  Scenario: A model's cost is absent when no permitted project may be priced
+    Given a pull request in a project the viewer may read but not price
+    When the pull request usage is read
+    Then each model reports its tokens with no cost
+
+  @integration
+  Scenario: The per-model read is scoped to the tenant and to a bounded period
+    Given per-call rows for two organizations sharing one session id
+    When the per-model totals are read for one of them
+    Then only that tenant's rows are counted
+    And the read is bounded on the partition key
+
+  @unit
+  Scenario: Only model calls count toward the per-model totals
+    Given a session whose events include tool runs and compactions
+    When the per-model totals are read
+    Then only the model calls contribute tokens
+
+Rule: The pull request detail answers with facts and never with content
+
+  @unit
+  Scenario: The detail carries its contributors, models and sessions
+    Given a pull request with sessions from several people
+    When its detail is read
+    Then it carries the totals, one row per contributor, the per-model totals and the sessions
+    And the sessions are the most recent first
+
+  @unit
+  Scenario: The sessions list never carries a session title
+    Given sessions with titles and transcripts
+    When the pull request detail is read
+    Then each session carries its start time, contributor, project, agent, tokens and cost only
+
+Rule: The Pull Requests table compares a row against the page it is on
+
+  @unit
+  Scenario: Tokens and token cost each scale against their own p95
+    Given visible rows whose token and cost ranks differ
+    When the table draws its comparison bars
+    Then each column scales against the p95 of its own values
+
+  @unit
+  Scenario: A row past the p95 is drawn as an outlier
+    Given a row whose tokens exceed the visible p95
+    When the table draws its comparison bar
+    Then the bar fills completely and reads as an outlier
+
+  @unit
+  Scenario: Too few rows to compare draws no bars
+    Given fewer than three rows carrying a value
+    When the table draws its comparison bars
+    Then no bar is drawn
+
+  @unit
+  Scenario: Millions of tokens read as millions
+    Given a row of several million tokens
+    When the count is formatted
+    Then it reads in millions rather than thousands
+
+  @integration
+  Scenario: A bundled token cost reads as bundled money
+    Given a row whose cost is partly not billed
+    When the table draws its token cost
+    Then the value is drawn in the bundled colour
+    And its tooltip carries the billed and not billed split beside the page comparison
+
+  @integration
+  Scenario: Opening a pull request row opens its detail
+    Given a listed pull request
+    When the row is clicked
+    Then the pull request detail opens for that pull request
+
+  @integration
+  Scenario: A branch with no pull request opens nothing
+    Given a listed branch with no pull request
+    When the row is clicked
+    Then no detail opens
+
+  @integration
+  Scenario: A detail opened from its own address still finds its pull request
+    Given a detail address carrying the pull request number as text
+    When the detail is opened from that address
+    Then the pull request is read by its number rather than refused
+
+  @integration
+  Scenario: A contributor named by a long identity keeps the whole of it
+    Given a contributor whose agent reported a long identity
+    When the detail lists the contributors
+    Then the identity is cut to fit its column and stays available in full
+
+  @integration
+  Scenario: The table shows one page of pull requests at a time
+    Given more pull requests than fit on a page
+    When the page is changed
+    Then the next pull requests are listed
+
 Rule: The organization-wide usage read is RBAC-scoped and numbers only
 
   @integration
@@ -193,6 +374,14 @@ Rule: The organization-wide usage read is RBAC-scoped and numbers only
     Given a pull request with sessions that have titles and transcripts
     When the pull request usage is read
     Then the response carries numbers, names and branch names only
+
+  @integration
+  Scenario: The organization-wide read carries the cost split and the per-model totals
+    Given a pull request with sessions on more than one model
+    When the pull request usage is read for the organization
+    Then every row and the totals carry the billed and not billed halves
+    And the response carries the per-model totals
+    And the pull request's own title stays out of the response
 
   @integration
   Scenario: An unmapped pull request returns the named failure

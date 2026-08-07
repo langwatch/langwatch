@@ -175,4 +175,117 @@ describe("CodingAgentSessionEventsClickHouseRepository", () => {
       ).rejects.toThrow(/spans multiple tenants/);
     });
   });
+
+  describe("given two tenants whose sessions share one id", () => {
+    const sharedSession = `${tag}-shared`;
+    const otherTenantId = `${tag}-other-project`;
+
+    beforeAll(async () => {
+      await repository.ensure([
+        eventRecord({
+          sessionId: sharedSession,
+          recordId: `f0`.padEnd(64, "0"),
+          model: "claude-fable-5",
+          inputTokens: 10,
+          outputTokens: 20,
+          cacheReadTokens: 30,
+          cacheCreationTokens: 40,
+          costUsd: 1.5,
+        }),
+        eventRecord({
+          sessionId: sharedSession,
+          recordId: `f1`.padEnd(64, "0"),
+          timeUnixMs: baseMs + 1000,
+          model: "claude-fable-5",
+          inputTokens: 1,
+          outputTokens: 2,
+          cacheReadTokens: 3,
+          cacheCreationTokens: 4,
+          costUsd: 0.5,
+        }),
+        eventRecord({
+          sessionId: sharedSession,
+          recordId: `f2`.padEnd(64, "0"),
+          timeUnixMs: baseMs + 2000,
+          model: "gpt-5-mini",
+          inputTokens: 5,
+          outputTokens: 5,
+          cacheReadTokens: 0,
+          cacheCreationTokens: 0,
+          costUsd: 0.25,
+        }),
+        // Not a model call: no tokens of this may reach a model's total.
+        eventRecord({
+          sessionId: sharedSession,
+          recordId: `f3`.padEnd(64, "0"),
+          timeUnixMs: baseMs + 3000,
+          eventKind: "tool_result",
+          model: "",
+          inputTokens: 999,
+          outputTokens: 999,
+          cacheReadTokens: 999,
+          cacheCreationTokens: 999,
+          costUsd: 99,
+        }),
+      ]);
+      await repository.ensure([
+        eventRecord({
+          tenantId: otherTenantId,
+          sessionId: sharedSession,
+          recordId: `f4`.padEnd(64, "0"),
+          model: "claude-fable-5",
+          inputTokens: 7777,
+          outputTokens: 7777,
+          cacheReadTokens: 7777,
+          cacheCreationTokens: 7777,
+          costUsd: 77,
+        }),
+      ]);
+    });
+
+    /** @scenario "The per-model read is scoped to the tenant and to a bounded period" */
+    it("counts only the asked tenant's rows", async () => {
+      const totals = await repository.sumTokensByModelPerSession({
+        tenantIds: [tenantId],
+        sessionIds: [sharedSession],
+        fromMs: baseMs - 60_000,
+      });
+
+      const fable = totals.find((row) => row.model === "claude-fable-5");
+      expect(fable?.tenantId).toBe(tenantId);
+      expect(fable?.inputTokens).toBe(11);
+      expect(fable?.outputTokens).toBe(22);
+      expect(fable?.cacheReadTokens).toBe(33);
+      expect(fable?.cacheCreationTokens).toBe(44);
+      expect(fable?.costUsd).toBeCloseTo(2.0);
+      expect(totals.every((row) => row.tenantId === tenantId)).toBe(true);
+    });
+
+    it("returns nothing for a period that starts after the events", async () => {
+      const totals = await repository.sumTokensByModelPerSession({
+        tenantIds: [tenantId],
+        sessionIds: [sharedSession],
+        fromMs: baseMs + 60_000,
+      });
+
+      expect(totals).toEqual([]);
+    });
+
+    /** @scenario "Only model calls count toward the per-model totals" */
+    it("leaves tool runs and compactions out of the totals", async () => {
+      const totals = await repository.sumTokensByModelPerSession({
+        tenantIds: [tenantId],
+        sessionIds: [sharedSession],
+        fromMs: baseMs - 60_000,
+      });
+
+      expect(totals.map((row) => row.model).sort()).toEqual([
+        "claude-fable-5",
+        "gpt-5-mini",
+      ]);
+      expect(
+        totals.every((row) => row.inputTokens < 999 && row.costUsd < 99),
+      ).toBe(true);
+    });
+  });
 });

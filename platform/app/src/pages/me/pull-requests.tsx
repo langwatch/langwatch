@@ -9,7 +9,9 @@ import Head from "~/utils/compat/next-head";
 
 /**
  * The personal Pull Requests page: what each pull request cost in assistant
- * usage. Routing and the layout only, the table owns its own reads.
+ * usage. Which pull requests are listed is personal; what each one cost spans
+ * every project the viewer may read. Routing and the layout only, the table
+ * owns its own reads.
  *
  * Spec: specs/coding-agent/pull-request-linkage.feature.
  */
@@ -26,9 +28,10 @@ function MyPullRequestsPage() {
         <VStack align="start" gap={0}>
           <PageLayout.Heading>Pull requests</PageLayout.Heading>
           <Text color="fg.muted" fontSize="sm">
-            What each pull request cost in assistant usage. Every row counts the
-            pull request's whole life, from its first session to its last, not a
-            selected period.
+            What each pull request cost in assistant usage. These are the pull
+            requests your own work touched, priced across everyone who worked on
+            them, over the pull request's whole life from its first session to
+            its last rather than a selected period.
           </Text>
         </VStack>
 

@@ -10,6 +10,17 @@
  * with a null cost rather than being dropped, because the work happened and
  * hiding it would understate the pull request.
  *
+ * The personal page asks a personal question, which pull requests did MY work
+ * touch, and answers it with the organization's numbers. Discovery is the
+ * caller's own project; the figures on each discovered row come from every
+ * project the caller may read. Branch rollups with no pull request stay
+ * personal: an unopened branch is one person's work in progress.
+ *
+ * Cost arrives as one flat list price per session and is split at read time
+ * into what was actually billed and what a bundled plan already covered, from
+ * the same policy the ingestion receiver applies. The split is per agent and
+ * all or nothing: a session's cost is either real spend or theoretical.
+ *
  * Numbers and names only. The rows carry counts, token buckets, an agent name,
  * a model list and the agent-reported user id — no session title, no prompt,
  * no file list. That is enforced by the ClickHouse read selecting only those
@@ -22,11 +33,13 @@ import type {
   GithubPullRequestRow,
   GithubPullRequestsRepository,
 } from "../github/repositories/github-pull-requests.repository";
+import { ingestSourceTypeOfAgent } from "./coding-agent-source-type";
 import { assignSessionsToPullRequests } from "./pull-request-assignment";
 import type {
   CodingAgentBranchSessionRow,
   CodingAgentSessionRepository,
 } from "./repositories/coding-agent-session.repository";
+import type { SessionModelTotalsRow } from "./repositories/coding-agent-session-events.repository";
 
 /**
  * How far back the session read looks.
@@ -44,6 +57,9 @@ export const USAGE_SESSION_WINDOW_MS = 180 * 24 * 60 * 60 * 1000;
 export const PERSONAL_SESSION_WINDOW_MS = 90 * 24 * 60 * 60 * 1000;
 /** Sessions read for the personal page. */
 const PERSONAL_SESSION_LIMIT = 1000;
+
+/** Sessions listed on a pull request's detail, most recent first. */
+export const DETAIL_SESSIONS_LIMIT = 50;
 
 /**
  * Wall clock in milliseconds, read off the injected deps.
@@ -75,8 +91,37 @@ export interface PullRequestIdentity {
   prMergedAtMs: number | null;
 }
 
+/**
+ * Cost as three numbers rather than one: what a bundled plan already covered,
+ * what was genuinely billed per token, and the list-price total of both.
+ *
+ * All three are null together, for a project the caller may read but not
+ * price. Reporting a zero there would read as "this cost nothing", which is a
+ * different and wrong claim.
+ */
+export interface CostSplit {
+  /** The grand list-price total: billed plus not billed. */
+  costUsd: number | null;
+  /** Cost actually billed per token. */
+  billedCostUsd: number | null;
+  /** Cost a bundled subscription already covered. */
+  nonBilledCostUsd: number | null;
+}
+
+/** What one model consumed and cost, within one pull request. */
+export interface ModelUsage {
+  model: string;
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheCreationTokens: number;
+  totalTokens: number;
+  /** Null when no project contributing this model may be priced. */
+  costUsd: number | null;
+}
+
 /** One (project, user, agent) group's contribution to a pull request. */
-export interface PullRequestUsageRow {
+export interface PullRequestUsageRow extends CostSplit {
   projectId: string;
   /** The agent's reported identity, blank when the agent reported none. */
   userLabel: string;
@@ -88,46 +133,53 @@ export interface PullRequestUsageRow {
   cacheReadTokens: number;
   cacheCreationTokens: number;
   totalTokens: number;
-  /** Null for a project the caller may read but not price. */
-  costUsd: number | null;
 }
 
-export interface PullRequestUsageTotals {
+export interface PullRequestUsageTotals extends CostSplit {
   sessionsCount: number;
   inputTokens: number;
   outputTokens: number;
   cacheReadTokens: number;
   cacheCreationTokens: number;
   totalTokens: number;
-  /** Null when no included row carried a cost the caller may see. */
-  costUsd: number | null;
 }
 
 export interface PullRequestUsage {
   pullRequest: PullRequestIdentity;
   rows: PullRequestUsageRow[];
   totals: PullRequestUsageTotals;
+  modelBreakdown: ModelUsage[];
+}
+
+/** Who worked on a pull request, as a row's compact summary line. */
+export interface ContributorSummary {
+  /** The agent's reported identity, blank when the agent reported none. */
+  userLabel: string;
+  projectName: string;
+  sessionsCount: number;
 }
 
 /** One mapped pull request as the personal page lists it. */
-export interface PersonalPullRequestRow extends PullRequestIdentity {
+export interface PersonalPullRequestRow extends PullRequestIdentity, CostSplit {
+  /** The pull request's own GitHub title, from the stored snapshot. */
+  title: string;
   sessionsCount: number;
   inputTokens: number;
   outputTokens: number;
   cacheReadTokens: number;
   cacheCreationTokens: number;
   totalTokens: number;
-  costUsd: number | null;
+  modelBreakdown: ModelUsage[];
+  contributorsSummary: ContributorSummary[];
 }
 
 /** A branch whose sessions attach to no pull request. */
-export interface UnlinkedBranchRollup {
+export interface UnlinkedBranchRollup extends CostSplit {
   repositoryHost: string;
   repositoryFullName: string;
   headBranch: string;
   sessionsCount: number;
   totalTokens: number;
-  costUsd: number | null;
   /** Whether the organization's connection reaches this repository at all. */
   repoCovered: boolean;
 }
@@ -135,6 +187,39 @@ export interface UnlinkedBranchRollup {
 export interface PersonalPullRequestUsage {
   rows: PersonalPullRequestRow[];
   unlinked: UnlinkedBranchRollup[];
+}
+
+/** One contributor's line on the pull request detail. */
+export interface PullRequestContributorRow extends PullRequestUsageRow {
+  projectName: string;
+}
+
+/**
+ * One session as the detail lists it: FACTS ONLY.
+ *
+ * There is deliberately no title and no content here. A session's title is
+ * derived content and is gated behind the content permissions on the session
+ * surfaces; this payload answers "what did this pull request consume", which
+ * needs none of it. A test pins this row's key set so a title cannot be added
+ * without somebody deciding to disclose it.
+ */
+export interface PullRequestSessionFact {
+  sessionId: string;
+  startedAtMs: number;
+  /** The agent's reported identity, blank when the agent reported none. */
+  userLabel: string;
+  projectName: string;
+  agent: string;
+  totalTokens: number;
+  costUsd: number | null;
+}
+
+export interface PullRequestDetail {
+  pullRequest: PullRequestIdentity & { title: string };
+  totals: PullRequestUsageTotals;
+  contributors: PullRequestContributorRow[];
+  modelBreakdown: ModelUsage[];
+  sessions: PullRequestSessionFact[];
 }
 
 /** Whether the organization's connection covers a repository. */
@@ -156,6 +241,7 @@ export interface PersonalSessionLookup {
     Array<{
       sessionId: string;
       startedAtMs: number;
+      agent: string;
       repositoryHost: string;
       repositoryOwner: string;
       repositoryName: string;
@@ -169,24 +255,59 @@ export interface PersonalSessionLookup {
   >;
 }
 
+/** What each model consumed, per session, across the permitted projects. */
+export interface SessionModelTotalsLookup {
+  sumTokensByModelPerSession(params: {
+    tenantIds: string[];
+    sessionIds: string[];
+    fromMs: number;
+  }): Promise<SessionModelTotalsRow[]>;
+}
+
 export interface PullRequestUsageServiceDeps {
   pullRequests: GithubPullRequestsRepository;
   sessions: Pick<CodingAgentSessionRepository, "listByRepositoryBranch">;
   personalSessions: PersonalSessionLookup;
+  sessionEvents: SessionModelTotalsLookup;
   installations: RepositoryCoverageLookup;
   resolveOrganizationId(projectId: string): Promise<string | undefined>;
+  /**
+   * Whether a tool's usage rides a bundled subscription rather than being
+   * billed per token. Injected because the policy behind it is an enterprise
+   * concern; the composition root supplies the real one and a preset without
+   * it answers "billed", which is the conservative reading of a cost.
+   */
+  isSourceNonBillable(params: {
+    organizationId: string;
+    sourceType: string;
+  }): Promise<boolean>;
   now?: () => number;
 }
 
-export interface PullRequestUsageQuery {
-  organizationId: string;
-  repositoryHost: string;
-  repositoryFullName: string;
-  prNumber: number;
+/** The caller's permission cut, resolved server-side, never from the request. */
+export interface CallerScope {
   /** Projects the caller may read. Rows outside it never appear. */
   permittedProjectIds: string[];
   /** The subset of those the caller may also price. */
   costProjectIds: string[];
+}
+
+export interface PullRequestUsageQuery extends CallerScope {
+  organizationId: string;
+  repositoryHost: string;
+  repositoryFullName: string;
+  prNumber: number;
+}
+
+export interface PullRequestDetailQuery extends PullRequestUsageQuery {
+  /** Display names of the permitted projects, keyed by project id. */
+  projectNames: Record<string, string>;
+}
+
+export interface PersonalPullRequestUsageQuery extends CallerScope {
+  projectId: string;
+  /** Display names of the permitted projects, keyed by project id. */
+  projectNames: Record<string, string>;
 }
 
 export class PullRequestUsageService {
@@ -206,81 +327,83 @@ export class PullRequestUsageService {
   async getPullRequestUsage(
     query: PullRequestUsageQuery,
   ): Promise<PullRequestUsage> {
-    const target = await this.deps.pullRequests.findByNumber({
-      organizationId: query.organizationId,
-      repositoryHost: query.repositoryHost,
-      repositoryFullName: query.repositoryFullName,
-      prNumber: query.prNumber,
-    });
-    if (!target) {
-      throw new GithubPullRequestNotMappedError({
-        repositoryFullName: query.repositoryFullName,
-        prNumber: query.prNumber,
-      });
-    }
-
-    const identity = toIdentity(target);
-    if (query.permittedProjectIds.length === 0) {
-      return { pullRequest: identity, rows: [], totals: emptyTotals() };
-    }
-
-    // Every pull request the branch ever hosted, because the tenure rule needs
-    // the neighbours to know where this one's era ends.
-    const siblings = await this.deps.pullRequests.findAllByBranches({
-      organizationId: query.organizationId,
-      repositoryHost: target.repositoryHost,
-      repositoryFullName: target.repositoryFullName,
-      headBranches: [target.headBranch],
-    });
-
-    const [owner, name] = target.repositoryFullName.split("/");
-    if (!owner || !name) {
-      return { pullRequest: identity, rows: [], totals: emptyTotals() };
-    }
-
-    const sessions = await this.deps.sessions.listByRepositoryBranch({
-      tenantIds: query.permittedProjectIds,
-      repositoryHost: target.repositoryHost,
-      repositoryOwner: owner,
-      repositoryName: name,
-      branches: [target.headBranch],
-      startedAtFromMs: nowMs(this.deps) - USAGE_SESSION_WINDOW_MS,
-    });
-
-    const attached = attachedToPullRequest({
-      sessions,
-      pullRequests: siblings,
-      prNumber: target.prNumber,
-    });
-    const costProjects = new Set(query.costProjectIds);
-    const rows = groupRows({ sessions: attached, costProjects });
-
-    return { pullRequest: identity, rows, totals: totalsOf(rows) };
+    const gathered = await this.gatherPullRequest(query);
+    return {
+      pullRequest: toIdentity(gathered.target),
+      rows: gathered.rows,
+      totals: totalsOf(gathered.rows),
+      modelBreakdown: gathered.modelBreakdown,
+    };
   }
 
   /**
-   * The personal page's projection: this project's own pull requests, and the
+   * The same pull request, plus who worked on it and which sessions ran, for
+   * the detail surface. Facts only: see {@link PullRequestSessionFact}.
+   */
+  async getPullRequestDetail(
+    query: PullRequestDetailQuery,
+  ): Promise<PullRequestDetail> {
+    const gathered = await this.gatherPullRequest(query);
+    const nameOf = (projectId: string) =>
+      query.projectNames[projectId] ?? projectId;
+    const costProjects = new Set(query.costProjectIds);
+
+    return {
+      pullRequest: {
+        ...toIdentity(gathered.target),
+        title: gathered.target.title,
+      },
+      totals: totalsOf(gathered.rows),
+      contributors: gathered.rows.map((row) => ({
+        ...row,
+        projectName: nameOf(row.projectId),
+      })),
+      modelBreakdown: gathered.modelBreakdown,
+      sessions: [...gathered.sessions]
+        .sort((a, b) => b.startedAtMs - a.startedAtMs)
+        .slice(0, DETAIL_SESSIONS_LIMIT)
+        .map((session) => ({
+          sessionId: session.sessionId,
+          startedAtMs: session.startedAtMs,
+          userLabel: session.userId,
+          projectName: nameOf(session.tenantId),
+          agent: session.agent,
+          totalTokens: tokensOf(session),
+          costUsd: costProjects.has(session.tenantId) ? session.costUsd : null,
+        })),
+    };
+  }
+
+  /**
+   * The personal page's projection: the pull requests this project's own
+   * sessions touched, priced across every project the caller may read, and the
    * branches of its sessions that have no pull request yet.
    */
   async getForPersonalProject({
     projectId,
-  }: {
-    projectId: string;
-  }): Promise<PersonalPullRequestUsage> {
+    permittedProjectIds,
+    costProjectIds,
+    projectNames,
+  }: PersonalPullRequestUsageQuery): Promise<PersonalPullRequestUsage> {
     const organizationId = await this.deps.resolveOrganizationId(projectId);
     if (!organizationId) return { rows: [], unlinked: [] };
 
     const toMs = nowMs(this.deps);
-    const sessions = await this.deps.personalSessions.listRecent({
+    const personalSessions = await this.deps.personalSessions.listRecent({
       projectId,
       fromMs: toMs - PERSONAL_SESSION_WINDOW_MS,
       toMs,
       limit: PERSONAL_SESSION_LIMIT,
     });
 
-    const byRepository = groupSessionsByRepository(sessions);
+    const byRepository = groupSessionsByRepository(personalSessions);
     const rows: PersonalPullRequestRow[] = [];
     const unlinked: UnlinkedBranchRollup[] = [];
+    const nonBillableAgents = await resolveNonBillableAgents({
+      deps: this.deps,
+      organizationId,
+      agents: personalSessions.map((session) => session.agent),
+    });
 
     for (const group of byRepository) {
       const pullRequests = await this.deps.pullRequests.findAllByBranches({
@@ -294,7 +417,31 @@ export class PullRequestUsageService {
         pullRequests: toAssignable(pullRequests),
       });
 
-      rows.push(...personalRowsFor({ group, pullRequests, assignments }));
+      // Discovery is personal: only the pull requests this project's own work
+      // touched become rows. Their NUMBERS then come from every project the
+      // caller may read, which is what makes a row the pull request's price
+      // rather than one person's share of it.
+      const discovered = pullRequests.filter((pullRequest) =>
+        group.sessions.some(
+          (session) =>
+            assignments.get(session.sessionId) === pullRequest.prNumber,
+        ),
+      );
+      if (discovered.length > 0) {
+        rows.push(
+          ...(await this.organizationRowsFor({
+            group,
+            discovered,
+            pullRequests,
+            permittedProjectIds,
+            costProjectIds,
+            projectNames,
+            organizationId,
+            toMs,
+          })),
+        );
+      }
+
       const unmapped = group.sessions.filter(
         (session) => !assignments.has(session.sessionId),
       );
@@ -304,12 +451,222 @@ export class PullRequestUsageService {
         repositoryFullName: group.repositoryFullName,
       });
       unlinked.push(
-        ...unlinkedRollupsFor({ group, sessions: unmapped, repoCovered }),
+        ...unlinkedRollupsFor({
+          group,
+          sessions: unmapped,
+          repoCovered,
+          nonBillableAgents,
+        }),
       );
     }
 
     return { rows, unlinked };
   }
+
+  /**
+   * The organization-wide figures for the pull requests one repository group
+   * discovered: one cross-project session read and one per-model read for the
+   * whole group, rather than a pair per pull request.
+   */
+  private async organizationRowsFor({
+    group,
+    discovered,
+    pullRequests,
+    permittedProjectIds,
+    costProjectIds,
+    projectNames,
+    organizationId,
+    toMs,
+  }: {
+    group: PersonalRepositoryGroup;
+    discovered: GithubPullRequestRow[];
+    pullRequests: GithubPullRequestRow[];
+    permittedProjectIds: string[];
+    costProjectIds: string[];
+    projectNames: Record<string, string>;
+    organizationId: string;
+    toMs: number;
+  }): Promise<PersonalPullRequestRow[]> {
+    if (permittedProjectIds.length === 0) return [];
+
+    const [owner, name] = group.repositoryFullName.split("/");
+    if (!owner || !name) return [];
+
+    const sessions = await this.deps.sessions.listByRepositoryBranch({
+      tenantIds: permittedProjectIds,
+      repositoryHost: group.repositoryHost,
+      repositoryOwner: owner,
+      repositoryName: name,
+      branches: [...new Set(discovered.map((row) => row.headBranch))],
+      startedAtFromMs: toMs - USAGE_SESSION_WINDOW_MS,
+    });
+    const assignments = assignSessionsToPullRequests({
+      sessions: sessions.map((session) => ({
+        sessionId: session.sessionId,
+        startedAtMs: session.startedAtMs,
+        headBranch: session.gitBranch,
+      })),
+      pullRequests: toAssignable(pullRequests),
+    });
+
+    const nonBillableAgents = await resolveNonBillableAgents({
+      deps: this.deps,
+      organizationId,
+      agents: sessions.map((session) => session.agent),
+    });
+    const modelTotals =
+      await this.deps.sessionEvents.sumTokensByModelPerSession({
+        tenantIds: permittedProjectIds,
+        sessionIds: sessions.map((session) => session.sessionId),
+        fromMs: toMs - USAGE_SESSION_WINDOW_MS,
+      });
+    const costProjects = new Set(costProjectIds);
+
+    return discovered.map((pullRequest) => {
+      const attached = sessions.filter(
+        (session) =>
+          assignments.get(session.sessionId) === pullRequest.prNumber,
+      );
+      const rows = groupRows({
+        sessions: attached,
+        costProjects,
+        nonBillableAgents,
+      });
+      const totals = totalsOf(rows);
+      return {
+        ...toIdentity(pullRequest),
+        title: pullRequest.title,
+        sessionsCount: totals.sessionsCount,
+        inputTokens: totals.inputTokens,
+        outputTokens: totals.outputTokens,
+        cacheReadTokens: totals.cacheReadTokens,
+        cacheCreationTokens: totals.cacheCreationTokens,
+        totalTokens: totals.totalTokens,
+        costUsd: totals.costUsd,
+        billedCostUsd: totals.billedCostUsd,
+        nonBilledCostUsd: totals.nonBilledCostUsd,
+        modelBreakdown: modelBreakdownFor({
+          sessions: attached,
+          modelTotals,
+          costProjects,
+        }),
+        contributorsSummary: contributorsSummaryFor({
+          sessions: attached,
+          projectNames,
+        }),
+      };
+    });
+  }
+
+  /** The shared body of the two organization-wide reads. */
+  private async gatherPullRequest(query: PullRequestUsageQuery): Promise<{
+    target: GithubPullRequestRow;
+    sessions: CodingAgentBranchSessionRow[];
+    rows: PullRequestUsageRow[];
+    modelBreakdown: ModelUsage[];
+  }> {
+    const target = await this.deps.pullRequests.findByNumber({
+      organizationId: query.organizationId,
+      repositoryHost: query.repositoryHost,
+      repositoryFullName: query.repositoryFullName,
+      prNumber: query.prNumber,
+    });
+    if (!target) {
+      throw new GithubPullRequestNotMappedError({
+        repositoryFullName: query.repositoryFullName,
+        prNumber: query.prNumber,
+      });
+    }
+
+    const empty = { target, sessions: [], rows: [], modelBreakdown: [] };
+    if (query.permittedProjectIds.length === 0) return empty;
+
+    // Every pull request the branch ever hosted, because the tenure rule needs
+    // the neighbours to know where this one's era ends.
+    const siblings = await this.deps.pullRequests.findAllByBranches({
+      organizationId: query.organizationId,
+      repositoryHost: target.repositoryHost,
+      repositoryFullName: target.repositoryFullName,
+      headBranches: [target.headBranch],
+    });
+
+    const [owner, name] = target.repositoryFullName.split("/");
+    if (!owner || !name) return empty;
+
+    const toMs = nowMs(this.deps);
+    const sessions = await this.deps.sessions.listByRepositoryBranch({
+      tenantIds: query.permittedProjectIds,
+      repositoryHost: target.repositoryHost,
+      repositoryOwner: owner,
+      repositoryName: name,
+      branches: [target.headBranch],
+      startedAtFromMs: toMs - USAGE_SESSION_WINDOW_MS,
+    });
+
+    const attached = attachedToPullRequest({
+      sessions,
+      pullRequests: siblings,
+      prNumber: target.prNumber,
+    });
+    const costProjects = new Set(query.costProjectIds);
+    const nonBillableAgents = await resolveNonBillableAgents({
+      deps: this.deps,
+      organizationId: query.organizationId,
+      agents: attached.map((session) => session.agent),
+    });
+    const modelTotals =
+      await this.deps.sessionEvents.sumTokensByModelPerSession({
+        tenantIds: query.permittedProjectIds,
+        sessionIds: attached.map((session) => session.sessionId),
+        fromMs: toMs - USAGE_SESSION_WINDOW_MS,
+      });
+
+    return {
+      target,
+      sessions: attached,
+      rows: groupRows({
+        sessions: attached,
+        costProjects,
+        nonBillableAgents,
+      }),
+      modelBreakdown: modelBreakdownFor({
+        sessions: attached,
+        modelTotals,
+        costProjects,
+      }),
+    };
+  }
+}
+
+/**
+ * The agents on this pull request whose usage a bundled plan already covers.
+ *
+ * Resolved once per distinct agent rather than per session: the policy is
+ * cached per (organization, source type) behind the dep, and a pull request
+ * worked on by one agent should ask about it once.
+ */
+async function resolveNonBillableAgents({
+  deps,
+  organizationId,
+  agents,
+}: {
+  deps: Pick<PullRequestUsageServiceDeps, "isSourceNonBillable">;
+  organizationId: string;
+  agents: string[];
+}): Promise<ReadonlySet<string>> {
+  const distinct = [...new Set(agents.filter((agent) => agent !== ""))];
+  const answers = await Promise.all(
+    distinct.map(async (agent) => ({
+      agent,
+      nonBillable: await deps.isSourceNonBillable({
+        organizationId,
+        sourceType: ingestSourceTypeOfAgent(agent),
+      }),
+    })),
+  );
+  return new Set(
+    answers.filter((answer) => answer.nonBillable).map((a) => a.agent),
+  );
 }
 
 /** Keep only the sessions the tenure rule attaches to THIS pull request. */
@@ -365,9 +722,11 @@ function toIdentity(row: GithubPullRequestRow): PullRequestIdentity {
 function groupRows({
   sessions,
   costProjects,
+  nonBillableAgents,
 }: {
   sessions: CodingAgentBranchSessionRow[];
   costProjects: ReadonlySet<string>;
+  nonBillableAgents: ReadonlySet<string>;
 }): PullRequestUsageRow[] {
   const grouped = new Map<string, GroupedUsageRow>();
 
@@ -376,9 +735,13 @@ function groupRows({
     // A project carrying no cost data contributes tokens but leaves cost null,
     // rather than reporting an unpriced session as one that cost nothing.
     const priced = costProjects.has(session.tenantId);
+    const nonBilled = nonBillableAgents.has(session.agent);
     const existing = grouped.get(key);
-    if (existing) addSessionToGroup({ group: existing, session, priced });
-    else grouped.set(key, startGroup({ session, priced }));
+    if (existing) {
+      addSessionToGroup({ group: existing, session, priced, nonBilled });
+    } else {
+      grouped.set(key, startGroup({ session, priced, nonBilled }));
+    }
   }
 
   return [...grouped.values()].map(({ modelSet, ...row }) => ({
@@ -396,9 +759,11 @@ type GroupedUsageRow = PullRequestUsageRow & { modelSet: Set<string> };
 function startGroup({
   session,
   priced,
+  nonBilled,
 }: {
   session: CodingAgentBranchSessionRow;
   priced: boolean;
+  nonBilled: boolean;
 }): GroupedUsageRow {
   return {
     projectId: session.tenantId,
@@ -412,7 +777,13 @@ function startGroup({
     cacheReadTokens: session.cacheReadTokens,
     cacheCreationTokens: session.cacheCreationTokens,
     totalTokens: tokensOf(session),
-    costUsd: priced ? session.costUsd : null,
+    ...(priced
+      ? {
+          costUsd: session.costUsd,
+          billedCostUsd: nonBilled ? 0 : session.costUsd,
+          nonBilledCostUsd: nonBilled ? session.costUsd : 0,
+        }
+      : { costUsd: null, billedCostUsd: null, nonBilledCostUsd: null }),
   };
 }
 
@@ -420,10 +791,12 @@ function addSessionToGroup({
   group,
   session,
   priced,
+  nonBilled,
 }: {
   group: GroupedUsageRow;
   session: CodingAgentBranchSessionRow;
   priced: boolean;
+  nonBilled: boolean;
 }): void {
   group.sessionsCount += 1;
   group.inputTokens += session.inputTokens;
@@ -431,12 +804,18 @@ function addSessionToGroup({
   group.cacheReadTokens += session.cacheReadTokens;
   group.cacheCreationTokens += session.cacheCreationTokens;
   group.totalTokens += tokensOf(session);
-  if (priced) group.costUsd = (group.costUsd ?? 0) + session.costUsd;
+  if (priced) {
+    group.costUsd = (group.costUsd ?? 0) + session.costUsd;
+    group.billedCostUsd =
+      (group.billedCostUsd ?? 0) + (nonBilled ? 0 : session.costUsd);
+    group.nonBilledCostUsd =
+      (group.nonBilledCostUsd ?? 0) + (nonBilled ? session.costUsd : 0);
+  }
   for (const model of session.models) group.modelSet.add(model);
 }
 
 function totalsOf(rows: PullRequestUsageRow[]): PullRequestUsageTotals {
-  const totals = rows.reduce<PullRequestUsageTotals>(
+  return rows.reduce<PullRequestUsageTotals>(
     (acc, row) => ({
       sessionsCount: acc.sessionsCount + row.sessionsCount,
       inputTokens: acc.inputTokens + row.inputTokens,
@@ -444,12 +823,17 @@ function totalsOf(rows: PullRequestUsageRow[]): PullRequestUsageTotals {
       cacheReadTokens: acc.cacheReadTokens + row.cacheReadTokens,
       cacheCreationTokens: acc.cacheCreationTokens + row.cacheCreationTokens,
       totalTokens: acc.totalTokens + row.totalTokens,
-      costUsd:
-        row.costUsd === null ? acc.costUsd : (acc.costUsd ?? 0) + row.costUsd,
+      costUsd: addNullable(acc.costUsd, row.costUsd),
+      billedCostUsd: addNullable(acc.billedCostUsd, row.billedCostUsd),
+      nonBilledCostUsd: addNullable(acc.nonBilledCostUsd, row.nonBilledCostUsd),
     }),
     emptyTotals(),
   );
-  return totals;
+}
+
+/** Sum that keeps "nobody could price this" distinct from "this cost zero". */
+function addNullable(acc: number | null, value: number | null): number | null {
+  return value === null ? acc : (acc ?? 0) + value;
 }
 
 function emptyTotals(): PullRequestUsageTotals {
@@ -461,7 +845,80 @@ function emptyTotals(): PullRequestUsageTotals {
     cacheCreationTokens: 0,
     totalTokens: 0,
     costUsd: null,
+    billedCostUsd: null,
+    nonBilledCostUsd: null,
   };
+}
+
+/**
+ * Roll the per-call model totals up to the pull request, over the sessions the
+ * tenure rule attached to it. Cost is summed only across the projects the
+ * caller may price, and stays null when none of them is.
+ */
+function modelBreakdownFor({
+  sessions,
+  modelTotals,
+  costProjects,
+}: {
+  sessions: CodingAgentBranchSessionRow[];
+  modelTotals: SessionModelTotalsRow[];
+  costProjects: ReadonlySet<string>;
+}): ModelUsage[] {
+  const attached = new Set(
+    sessions.map((session) => `${session.tenantId}\0${session.sessionId}`),
+  );
+  const byModel = new Map<string, ModelUsage>();
+
+  for (const row of modelTotals) {
+    if (!attached.has(`${row.tenantId}\0${row.sessionId}`)) continue;
+    if (row.model === "") continue;
+    const priced = costProjects.has(row.tenantId);
+    const usage = byModel.get(row.model) ?? {
+      model: row.model,
+      inputTokens: 0,
+      outputTokens: 0,
+      cacheReadTokens: 0,
+      cacheCreationTokens: 0,
+      totalTokens: 0,
+      costUsd: null,
+    };
+    usage.inputTokens += row.inputTokens;
+    usage.outputTokens += row.outputTokens;
+    usage.cacheReadTokens += row.cacheReadTokens;
+    usage.cacheCreationTokens += row.cacheCreationTokens;
+    usage.totalTokens += tokensOf(row);
+    if (priced) usage.costUsd = (usage.costUsd ?? 0) + row.costUsd;
+    byModel.set(row.model, usage);
+  }
+
+  return [...byModel.values()].sort((a, b) => b.totalTokens - a.totalTokens);
+}
+
+/** Who worked on a pull request, largest contribution first. */
+function contributorsSummaryFor({
+  sessions,
+  projectNames,
+}: {
+  sessions: CodingAgentBranchSessionRow[];
+  projectNames: Record<string, string>;
+}): ContributorSummary[] {
+  const grouped = new Map<string, ContributorSummary>();
+  for (const session of sessions) {
+    const key = `${session.tenantId}\0${session.userId}`;
+    const existing = grouped.get(key);
+    if (existing) {
+      existing.sessionsCount += 1;
+      continue;
+    }
+    grouped.set(key, {
+      userLabel: session.userId,
+      projectName: projectNames[session.tenantId] ?? session.tenantId,
+      sessionsCount: 1,
+    });
+  }
+  return [...grouped.values()].sort(
+    (a, b) => b.sessionsCount - a.sessionsCount,
+  );
 }
 
 function tokensOf(session: {
@@ -485,6 +942,7 @@ interface PersonalRepositoryGroup {
   sessions: Array<{
     sessionId: string;
     startedAtMs: number;
+    agent: string;
     headBranch: string;
     inputTokens: number;
     outputTokens: number;
@@ -526,6 +984,7 @@ function groupSessionsByRepository(
     group.sessions.push({
       sessionId: session.sessionId,
       startedAtMs: session.startedAtMs,
+      agent: session.agent,
       headBranch: session.gitBranch,
       inputTokens: session.inputTokens,
       outputTokens: session.outputTokens,
@@ -538,43 +997,16 @@ function groupSessionsByRepository(
   return [...groups.values()];
 }
 
-function personalRowsFor({
-  group,
-  pullRequests,
-  assignments,
-}: {
-  group: PersonalRepositoryGroup;
-  pullRequests: GithubPullRequestRow[];
-  assignments: Map<string, number>;
-}): PersonalPullRequestRow[] {
-  const rows: PersonalPullRequestRow[] = [];
-  for (const pullRequest of pullRequests) {
-    const attached = group.sessions.filter(
-      (session) => assignments.get(session.sessionId) === pullRequest.prNumber,
-    );
-    if (attached.length === 0) continue;
-    rows.push({
-      ...toIdentity(pullRequest),
-      sessionsCount: attached.length,
-      inputTokens: sumOf(attached, "inputTokens"),
-      outputTokens: sumOf(attached, "outputTokens"),
-      cacheReadTokens: sumOf(attached, "cacheReadTokens"),
-      cacheCreationTokens: sumOf(attached, "cacheCreationTokens"),
-      totalTokens: attached.reduce((sum, s) => sum + tokensOf(s), 0),
-      costUsd: sumOf(attached, "costUsd"),
-    });
-  }
-  return rows;
-}
-
 function unlinkedRollupsFor({
   group,
   sessions,
   repoCovered,
+  nonBillableAgents,
 }: {
   group: PersonalRepositoryGroup;
   sessions: PersonalRepositoryGroup["sessions"];
   repoCovered: boolean;
+  nonBillableAgents: ReadonlySet<string>;
 }): UnlinkedBranchRollup[] {
   const byBranch = new Map<string, PersonalRepositoryGroup["sessions"]>();
   for (const session of sessions) {
@@ -589,6 +1021,12 @@ function unlinkedRollupsFor({
     sessionsCount: branchSessions.length,
     totalTokens: branchSessions.reduce((sum, s) => sum + tokensOf(s), 0),
     costUsd: sumOf(branchSessions, "costUsd"),
+    billedCostUsd: branchSessions
+      .filter((session) => !nonBillableAgents.has(session.agent))
+      .reduce((sum, session) => sum + session.costUsd, 0),
+    nonBilledCostUsd: branchSessions
+      .filter((session) => nonBillableAgents.has(session.agent))
+      .reduce((sum, session) => sum + session.costUsd, 0),
     repoCovered,
   }));
 }

@@ -41,7 +41,38 @@ export interface CodingAgentSessionEventsRepository {
     events: CodingAgentSessionEventRow[];
     nextCursor: SessionEventsCursor | null;
   }>;
+
+  /**
+   * What each model consumed, per session, across several tenants: the read
+   * behind a pull request's per-model breakdown.
+   *
+   * Restricted to `model_call` rows, the one event kind that carries tokens and
+   * cost; every other kind would contribute zeros under a model name of `""`.
+   *
+   * `fromMs` is required, because `TimeUnixMs` is the partition key and without
+   * a bound this read opens every partition the retention holds.
+   */
+  sumTokensByModelPerSession(params: {
+    tenantIds: string[];
+    sessionIds: string[];
+    fromMs: number;
+  }): Promise<SessionModelTotalsRow[]>;
 }
+
+/** One (session, model) pair's totals. */
+export interface SessionModelTotalsRow {
+  tenantId: string;
+  sessionId: string;
+  model: string;
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheCreationTokens: number;
+  costUsd: number;
+}
+
+/** The event kind that carries a model, its tokens and its cost. */
+export const MODEL_CALL_EVENT_KIND = "model_call";
 
 export interface SessionEventsCursor {
   timeUnixMs: number;
@@ -71,6 +102,10 @@ export class NullCodingAgentSessionEventsRepository
     nextCursor: SessionEventsCursor | null;
   }> {
     return { events: [], nextCursor: null };
+  }
+
+  async sumTokensByModelPerSession(): Promise<SessionModelTotalsRow[]> {
+    return [];
   }
 }
 
@@ -355,6 +390,98 @@ export class CodingAgentSessionEventsClickHouseRepository
           : null,
     };
   }
+
+  async sumTokensByModelPerSession({
+    tenantIds,
+    sessionIds,
+    fromMs,
+  }: {
+    tenantIds: string[];
+    sessionIds: string[];
+    fromMs: number;
+  }): Promise<SessionModelTotalsRow[]> {
+    if (tenantIds.length === 0 || sessionIds.length === 0) return [];
+    for (const tenantId of tenantIds) {
+      EventUtils.validateTenantId(
+        { tenantId },
+        "CodingAgentSessionEventsClickHouseRepository.sumTokensByModelPerSession",
+      );
+    }
+    const client = await this.resolveClient(tenantIds[0]!);
+
+    // The inner scope dedups un-merged versions of one row before anything is
+    // summed, so a redelivered call cannot be counted twice. `LIMIT 1 BY` is
+    // safe here for the same reason it is in `findBySessionId`: every column
+    // this table holds is a small scalar.
+    //
+    // `TimeUnixMs` is bounded in BOTH scopes on purpose. The rule against
+    // range-filtering a dedup scope guards columns a fold can move after the
+    // fact; this table is a map projection whose row time is the record's own
+    // and never changes, so bounding it inside prunes partitions without ever
+    // dropping the true latest version out of its group.
+    const result = await client.query({
+      query: `
+        SELECT
+          TenantId,
+          SessionId,
+          Model,
+          sum(InputTokens) AS InputTokens,
+          sum(OutputTokens) AS OutputTokens,
+          sum(CacheReadTokens) AS CacheReadTokens,
+          sum(CacheCreationTokens) AS CacheCreationTokens,
+          sum(CostUsd) AS CostUsd
+        FROM (
+          SELECT
+            TenantId,
+            SessionId,
+            Model,
+            InputTokens,
+            OutputTokens,
+            CacheReadTokens,
+            CacheCreationTokens,
+            CostUsd
+          FROM ${TABLE_NAME}
+          WHERE TenantId IN {tenantIds:Array(String)}
+            AND TimeUnixMs >= fromUnixTimestamp64Milli({fromMs:Int64})
+            AND SessionId IN {sessionIds:Array(String)}
+            AND EventKind = {eventKind:String}
+          ORDER BY TenantId, SessionId, TimeUnixMs, RecordId, UpdatedAt DESC
+          LIMIT 1 BY TenantId, SessionId, TimeUnixMs, RecordId
+        )
+        GROUP BY TenantId, SessionId, Model
+      `,
+      query_params: {
+        tenantIds,
+        sessionIds,
+        fromMs,
+        eventKind: MODEL_CALL_EVENT_KIND,
+      },
+      format: "JSONEachRow",
+    });
+
+    const rows = await result.json<ClickHouseModelTotalsRow>();
+    return rows.map((row) => ({
+      tenantId: row.TenantId,
+      sessionId: row.SessionId,
+      model: row.Model,
+      inputTokens: Number(row.InputTokens),
+      outputTokens: Number(row.OutputTokens),
+      cacheReadTokens: Number(row.CacheReadTokens),
+      cacheCreationTokens: Number(row.CacheCreationTokens),
+      costUsd: Number(row.CostUsd),
+    }));
+  }
+}
+
+interface ClickHouseModelTotalsRow {
+  TenantId: string;
+  SessionId: string;
+  Model: string;
+  InputTokens: string;
+  OutputTokens: string;
+  CacheReadTokens: string;
+  CacheCreationTokens: string;
+  CostUsd: number;
 }
 
 function mapRow(row: ClickHouseReadRow): CodingAgentSessionEventRow {

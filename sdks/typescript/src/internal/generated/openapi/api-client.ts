@@ -1003,7 +1003,7 @@ export interface paths {
         };
         /**
          * Get pull request coding agent usage
-         * @description Assistant usage for one pull request: sessions, tokens and cost, grouped by project, reported user and agent, over the pull request's whole lifetime rather than a time window. Requires a personal-project API key; rows appear only for projects the calling user may view, and cost only for those they may price.
+         * @description Assistant usage for one pull request: sessions, tokens and cost, grouped by project, reported user and agent, plus per-model totals, over the pull request's whole lifetime rather than a time window. Cost is reported three ways: what was billed per token, what a bundled subscription already covered, and the list-price total of both. Requires a personal-project API key; rows appear only for projects the calling user may view, and cost only for those they may price.
          */
         get: operations["getApiCoding-agentPull-request-usage"];
         put?: never;
@@ -5127,6 +5127,8 @@ export interface operations {
                             cacheCreationTokens: number;
                             totalTokens: number;
                             costUsd: number | null;
+                            billedCostUsd: number | null;
+                            nonBilledCostUsd: number | null;
                         }[];
                         totals: {
                             sessionsCount: number;
@@ -5136,7 +5138,18 @@ export interface operations {
                             cacheCreationTokens: number;
                             totalTokens: number;
                             costUsd: number | null;
+                            billedCostUsd: number | null;
+                            nonBilledCostUsd: number | null;
                         };
+                        modelBreakdown: {
+                            model: string;
+                            inputTokens: number;
+                            outputTokens: number;
+                            cacheReadTokens: number;
+                            cacheCreationTokens: number;
+                            totalTokens: number;
+                            costUsd: number | null;
+                        }[];
                     };
                 };
             };

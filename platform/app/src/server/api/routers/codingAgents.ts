@@ -1,6 +1,11 @@
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
+import { GithubPullRequestNotMappedError } from "~/server/app-layer/github/errors";
+import {
+  type CallerProjectScope,
+  resolveCallerProjectScope,
+} from "~/server/organizations/resolveCallerProjectScope";
 import { resolveOrganizationId } from "~/server/organizations/resolveOrganizationId";
 import { checkProjectPermission } from "../rbac";
 
@@ -75,19 +80,83 @@ export const codingAgentsRouter = createTRPCRouter({
    * pull request has not been opened (or mapped) yet, plus whether GitHub is
    * connected at all, in one query, because the page needs all three to decide
    * what to render, and three round trips would show it in three stages.
+   *
+   * The rows the caller's own project discovers are priced across every
+   * project the caller may read, so a shared pull request reports its whole
+   * price rather than one person's share of it.
    */
   pullRequestUsage: protectedProcedure
     .input(z.object({ projectId: z.string() }))
     .use(checkProjectPermission("traces:view"))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
       const app = getApp();
+      const scope = await scopeFor({
+        userId: ctx.session.user.id,
+        projectId: input.projectId,
+      });
       const usage =
         await app.codingAgents.pullRequestUsage.getForPersonalProject({
           projectId: input.projectId,
+          ...scope,
         });
       return { ...usage, connection: await connectionFor(input.projectId) };
     }),
+
+  /**
+   * One pull request in full: its totals, who worked on it, what each model
+   * consumed, and the sessions that ran. Same permission cut as the list, and
+   * the same numbers-only contract: the sessions carry facts, never titles.
+   */
+  pullRequestDetail: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        repositoryHost: z.string(),
+        repositoryFullName: z.string(),
+        prNumber: z.number().int().positive(),
+      }),
+    )
+    .use(checkProjectPermission("traces:view"))
+    .query(async ({ ctx, input }) => {
+      const organizationId = await resolveOrganizationId(input.projectId);
+      if (!organizationId) {
+        throw new GithubPullRequestNotMappedError({
+          repositoryFullName: input.repositoryFullName,
+          prNumber: input.prNumber,
+        });
+      }
+      const scope = await resolveCallerProjectScope({
+        userId: ctx.session.user.id,
+        organizationId,
+      });
+      return getApp().codingAgents.pullRequestUsage.getPullRequestDetail({
+        organizationId,
+        repositoryHost: input.repositoryHost,
+        repositoryFullName: input.repositoryFullName,
+        prNumber: input.prNumber,
+        ...scope,
+      });
+    }),
 });
+
+/**
+ * The caller's permission cut over the project's organization. An empty cut
+ * when the project belongs to no organization: nothing is readable, which is
+ * the same answer the rest of this surface gives.
+ */
+async function scopeFor({
+  userId,
+  projectId,
+}: {
+  userId: string;
+  projectId: string;
+}): Promise<CallerProjectScope> {
+  const organizationId = await resolveOrganizationId(projectId);
+  if (!organizationId) {
+    return { permittedProjectIds: [], costProjectIds: [], projectNames: {} };
+  }
+  return resolveCallerProjectScope({ userId, organizationId });
+}
 
 /**
  * Whether the project's organization has GitHub connected, and where to start

@@ -1,6 +1,7 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { BillableEventsClickHouseRepository } from "@ee/billing/services/billableEvents.clickhouse.repository";
 import { createNoopEnterprisePipelineCommands } from "@ee/event-sourcing/pipelineSet";
+import { resolveSourceNonBillable } from "@ee/governance/services/costAttributionPolicy.service";
 import { GovernanceKpisClickHouseRepository } from "@ee/governance/services/governanceKpis.clickhouse.repository";
 import { GovernanceOcsfEventsClickHouseRepository } from "@ee/governance/services/governanceOcsfEvents.clickhouse.repository";
 import { GovernanceTraceActivityClickHouseRepository } from "@ee/governance/services/governanceTraceActivity.clickhouse.repository";
@@ -1402,8 +1403,13 @@ export function initializeDefaultApp(options?: {
     pullRequests: githubPullRequestsRepository,
     sessions: repositories.codingAgentSession,
     personalSessions: codingAgentSessions,
+    sessionEvents: repositories.codingAgentSessionEvents,
     installations: githubInstallations,
     resolveOrganizationId,
+    // The one place the bundled-plan policy is reached: the service takes the
+    // answer as a dep so the read stays free of the enterprise module, and the
+    // receiver and this rollup resolve bundled-ness the same way.
+    isSourceNonBillable: resolveSourceNonBillable,
   });
 
   const sessionGroups = traced(
@@ -1726,8 +1732,12 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
     pullRequests: testPullRequestsRepository,
     sessions: new NullCodingAgentSessionRepository(),
     personalSessions: testCodingAgentSessions,
+    sessionEvents: new NullCodingAgentSessionEventsRepository(),
     installations: testGithubInstallations,
     resolveOrganizationId: async () => undefined,
+    // No enterprise policy in the test app: everything reads as billed, the
+    // conservative answer for a cost.
+    isSourceNonBillable: async () => false,
   });
   return new App({
     config,

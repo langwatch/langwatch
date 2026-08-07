@@ -124,7 +124,7 @@ describe("sessions lens cells", () => {
       expect(screen.getByText("traces")).toBeInTheDocument();
 
       renderCell({ cellId: "tokens", row });
-      expect(screen.getByText("2400.0K")).toBeInTheDocument();
+      expect(screen.getByText("2.4M")).toBeInTheDocument();
 
       renderCell({ cellId: "cost", row });
       expect(screen.getByText("$42.50")).toBeInTheDocument();

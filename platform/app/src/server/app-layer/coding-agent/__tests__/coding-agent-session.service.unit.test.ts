@@ -194,6 +194,7 @@ function makeService({
           ensure: async () => {},
           findBySessionId: async ({ occurredAt }) =>
             onEventsRead({ occurredAt }),
+          sumTokensByModelPerSession: async () => [],
         }
       : new NullCodingAgentSessionEventsRepository(),
   });
@@ -225,6 +226,7 @@ describe("CodingAgentSessionService", () => {
             seen.push(limit);
             return { events: [], nextCursor: null };
           },
+          sumTokensByModelPerSession: async () => [],
         },
       });
 

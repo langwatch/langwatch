@@ -25,6 +25,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { batchScopePermissions, type Permission } from "~/server/api/rbac";
 import type { Session } from "~/server/auth";
 import { prisma } from "~/server/db";
+import type { CodingAgentSessionEventRecord } from "~/server/event-sourcing/pipelines/coding-agent-processing/projections/codingAgentSessionEvents.mapProjection";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import {
   startTestContainers,
@@ -34,6 +35,7 @@ import { codingAgentSessionRow } from "../../github/__tests__/codingAgentSession
 import { PrismaGithubPullRequestsRepository } from "../../github/repositories/github-pull-requests.prisma.repository";
 import { PullRequestUsageService } from "../pull-request-usage.service";
 import { CodingAgentSessionClickHouseRepository } from "../repositories/coding-agent-session.clickhouse.repository";
+import { CodingAgentSessionEventsClickHouseRepository } from "../repositories/coding-agent-session-events.repository";
 
 const tag = nanoid(8);
 const OWNER = `acme-${tag}`;
@@ -56,6 +58,7 @@ let mixedCaseProjectId: string;
 
 const pullRequests = new PrismaGithubPullRequestsRepository(prisma);
 let sessions: CodingAgentSessionClickHouseRepository;
+let sessionEvents: CodingAgentSessionEventsClickHouseRepository;
 let service: PullRequestUsageService;
 
 async function makeProject(name: string): Promise<string> {
@@ -175,10 +178,72 @@ async function seedSession({
   );
 }
 
+/** One model call on the per-call fact table, filled in around the essentials. */
+function modelCallEvent({
+  tenantId,
+  sessionId,
+  recordId,
+  model,
+  costUsd,
+}: {
+  tenantId: string;
+  sessionId: string;
+  recordId: string;
+  model: string;
+  costUsd: number;
+}): CodingAgentSessionEventRecord {
+  return {
+    tenantId,
+    sessionId,
+    timeUnixMs: Date.now() - HOUR,
+    recordId,
+    eventKind: "model_call",
+    agent: "claude_code",
+    sessionKeySource: "provider",
+    traceId: "",
+    spanId: "",
+    promptId: "",
+    querySource: "repl_main_thread",
+    agentType: "",
+    eventSequence: 1,
+    requestId: recordId.slice(0, 8),
+    model,
+    inputTokens: 100,
+    outputTokens: 50,
+    cacheReadTokens: 20,
+    cacheCreationTokens: 10,
+    costUsd,
+    durationMs: 100,
+    ttftMs: 0,
+    attempt: 0,
+    speed: "standard",
+    stopReason: "end_turn",
+    preTokens: 0,
+    postTokens: 0,
+    compactionTrigger: "",
+    precomputeReuse: "",
+    statusCode: "",
+    errorType: "",
+    rateLimitCarrier: "",
+    retryDurationMs: 0,
+    toolName: "",
+    success: "",
+    decision: "",
+    decisionSource: "",
+    toolInputBytes: 0,
+    toolResultBytes: 0,
+    promptChars: 0,
+    totalTokens: 0,
+  };
+}
+
 beforeAll(async () => {
   const containers = await startTestContainers();
   ch = containers.clickHouseClient;
   sessions = new CodingAgentSessionClickHouseRepository(async () => ch);
+  sessionEvents = new CodingAgentSessionEventsClickHouseRepository(
+    async () => ch,
+  );
 
   const organization = await prisma.organization.create({
     data: { name: `pr-usage-${tag}`, slug: `pr-usage-${tag}` },
@@ -273,14 +338,38 @@ beforeAll(async () => {
     repositoryName: "Widgets",
   });
 
+  // Per-call rows for the two visible sessions: two models, so the breakdown
+  // has something to split.
+  await sessionEvents.ensure([
+    modelCallEvent({
+      tenantId: visibleProjectId,
+      sessionId: `${tag}-visible-1`,
+      recordId: "1".repeat(64),
+      model: "claude-fable-5",
+      costUsd: 1.5,
+    }),
+    modelCallEvent({
+      tenantId: visibleProjectId,
+      sessionId: `${tag}-visible-2`,
+      recordId: "2".repeat(64),
+      model: "gpt-5-mini",
+      costUsd: 2.5,
+    }),
+  ]);
+
   service = new PullRequestUsageService({
     pullRequests,
     sessions,
     personalSessions: {
       listRecent: async () => [],
     },
+    sessionEvents,
     installations: { coversRepository: async () => true },
     resolveOrganizationId: async () => organizationId,
+    // Claude Code on a bundled plan; everything else is billed per token. The
+    // real policy reads the organization's catalog, which this suite does not
+    // seed; what matters here is that the split reaches rows and totals.
+    isSourceNonBillable: async ({ sourceType }) => sourceType === "claude_code",
   });
 }, 60_000);
 
@@ -296,6 +385,11 @@ afterAll(async () => {
       await ch.exec({
         query:
           "ALTER TABLE coding_agent_sessions DELETE WHERE TenantId = {tenantId:String}",
+        query_params: { tenantId: projectId },
+      });
+      await ch.exec({
+        query:
+          "ALTER TABLE coding_agent_session_events DELETE WHERE TenantId = {tenantId:String}",
         query_params: { tenantId: projectId },
       });
     }
@@ -345,6 +439,36 @@ describe("pull request usage", () => {
       expect(usage.rows[0]?.models).toEqual(["claude-fable-5"]);
       // Seeded with a title on every session; none of it reaches the reader.
       expect(JSON.stringify(usage)).not.toContain("a title the response");
+    });
+
+    /** @scenario "The organization-wide read carries the cost split and the per-model totals" */
+    it("carries the billed and not billed halves, the per-model totals, and no title", async () => {
+      const usage = await service.getPullRequestUsage({
+        ...query(),
+        permittedProjectIds: [visibleProjectId],
+        costProjectIds: [visibleProjectId],
+      });
+
+      // Claude Code is the bundled assistant here, so the whole list price is
+      // theoretical rather than spend.
+      expect(usage.totals.nonBilledCostUsd).toBeCloseTo(4.0);
+      expect(usage.totals.billedCostUsd).toBe(0);
+      expect(usage.rows[0]?.nonBilledCostUsd).toBeCloseTo(4.0);
+      expect(usage.rows[0]?.billedCostUsd).toBe(0);
+
+      expect(usage.modelBreakdown.map((model) => model.model).sort()).toEqual([
+        "claude-fable-5",
+        "gpt-5-mini",
+      ]);
+      expect(
+        usage.modelBreakdown.every((model) => model.totalTokens === 180),
+      ).toBe(true);
+
+      // The mapping stores the pull request's own GitHub title; this response
+      // never carries it.
+      expect(JSON.stringify(usage)).not.toContain(
+        "Link sessions to pull requests",
+      );
     });
   });
 

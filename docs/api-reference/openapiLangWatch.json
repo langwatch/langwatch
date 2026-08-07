@@ -5430,6 +5430,18 @@
                               "number",
                               "null"
                             ]
+                          },
+                          "billedCostUsd": {
+                            "type": [
+                              "number",
+                              "null"
+                            ]
+                          },
+                          "nonBilledCostUsd": {
+                            "type": [
+                              "number",
+                              "null"
+                            ]
                           }
                         },
                         "required": [
@@ -5443,7 +5455,9 @@
                           "cacheReadTokens",
                           "cacheCreationTokens",
                           "totalTokens",
-                          "costUsd"
+                          "costUsd",
+                          "billedCostUsd",
+                          "nonBilledCostUsd"
                         ]
                       }
                     },
@@ -5473,6 +5487,18 @@
                             "number",
                             "null"
                           ]
+                        },
+                        "billedCostUsd": {
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        },
+                        "nonBilledCostUsd": {
+                          "type": [
+                            "number",
+                            "null"
+                          ]
                         }
                       },
                       "required": [
@@ -5482,14 +5508,58 @@
                         "cacheReadTokens",
                         "cacheCreationTokens",
                         "totalTokens",
-                        "costUsd"
+                        "costUsd",
+                        "billedCostUsd",
+                        "nonBilledCostUsd"
                       ]
+                    },
+                    "modelBreakdown": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "model": {
+                            "type": "string"
+                          },
+                          "inputTokens": {
+                            "type": "number"
+                          },
+                          "outputTokens": {
+                            "type": "number"
+                          },
+                          "cacheReadTokens": {
+                            "type": "number"
+                          },
+                          "cacheCreationTokens": {
+                            "type": "number"
+                          },
+                          "totalTokens": {
+                            "type": "number"
+                          },
+                          "costUsd": {
+                            "type": [
+                              "number",
+                              "null"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "model",
+                          "inputTokens",
+                          "outputTokens",
+                          "cacheReadTokens",
+                          "cacheCreationTokens",
+                          "totalTokens",
+                          "costUsd"
+                        ]
+                      }
                     }
                   },
                   "required": [
                     "pullRequest",
                     "rows",
-                    "totals"
+                    "totals",
+                    "modelBreakdown"
                   ]
                 }
               }
@@ -5611,7 +5681,7 @@
           }
         ],
         "summary": "Get pull request coding agent usage",
-        "description": "Assistant usage for one pull request: sessions, tokens and cost, grouped by project, reported user and agent, over the pull request's whole lifetime rather than a time window. Requires a personal-project API key; rows appear only for projects the calling user may view, and cost only for those they may price."
+        "description": "Assistant usage for one pull request: sessions, tokens and cost, grouped by project, reported user and agent, plus per-model totals, over the pull request's whole lifetime rather than a time window. Cost is reported three ways: what was billed per token, what a bundled subscription already covered, and the list-price total of both. Requires a personal-project API key; rows appear only for projects the calling user may view, and cost only for those they may price."
       }
     },
     "/api/dashboards": {

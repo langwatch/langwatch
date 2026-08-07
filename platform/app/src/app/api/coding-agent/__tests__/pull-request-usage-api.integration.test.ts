@@ -4,11 +4,13 @@
  *
  * The two refusals the pull-request usage read answers with before it reads
  * anything: a workspace that is not one person's, and a key that does not own
- * the personal workspace it is pointed at.
+ * the personal workspace it is pointed at. Plus the shape the endpoint
+ * publishes, checked against the generated document rather than the source, so
+ * a schema change that was never regenerated is caught here.
  *
- * Both are asserted on their code rather than their sentence. The code is the
- * contract a CLI or an agent branches on; the sentence beside it is copy and
- * will change.
+ * Both refusals are asserted on their code rather than their sentence. The code
+ * is the contract a CLI or an agent branches on; the sentence beside it is copy
+ * and will change.
  *
  * @see specs/coding-agent/pull-request-linkage.feature
  */
@@ -26,6 +28,7 @@ import { ApiKeyService } from "~/server/api-key/api-key.service";
 import { prisma } from "~/server/db";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { KSUID_RESOURCES } from "~/utils/constants";
+import publishedSpec from "../../openapiLangWatch.json";
 import { app } from "../[[...route]]/app";
 
 const ns = nanoid(8);
@@ -202,6 +205,48 @@ describe("Feature: Pull request usage REST API", () => {
         // question the refusal exists to withhold.
         expect(JSON.stringify(body)).not.toContain(otherUsersPersonalProjectId);
       });
+    });
+  });
+
+  describe("given the published API document", () => {
+    /** The 200 answer's own property map, as the generated document holds it. */
+    const answer = (): Record<
+      string,
+      {
+        properties?: Record<string, unknown>;
+        required?: string[];
+        items?: { required?: string[] };
+      }
+    > => {
+      const paths = (publishedSpec as unknown as { paths: Record<string, any> })
+        .paths;
+      return paths["/api/coding-agent/pull-request-usage"].get.responses["200"]
+        .content["application/json"].schema.properties;
+    };
+
+    it("publishes the billed and not billed halves on every row and on the totals", () => {
+      expect(answer().rows?.items?.required).toEqual(
+        expect.arrayContaining(["billedCostUsd", "nonBilledCostUsd"]),
+      );
+      expect(answer().totals?.required).toEqual(
+        expect.arrayContaining([
+          "costUsd",
+          "billedCostUsd",
+          "nonBilledCostUsd",
+        ]),
+      );
+    });
+
+    it("publishes the per-model totals", () => {
+      expect(answer().modelBreakdown?.items?.required).toEqual(
+        expect.arrayContaining(["model", "totalTokens", "costUsd"]),
+      );
+    });
+
+    it("keeps the pull request's own title out of the answer", () => {
+      expect(Object.keys(answer().pullRequest?.properties ?? {})).not.toContain(
+        "title",
+      );
     });
   });
 });
