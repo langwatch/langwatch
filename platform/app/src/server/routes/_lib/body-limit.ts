@@ -39,18 +39,34 @@ async function drainWithinCap(
   return drained;
 }
 
+/** RFC 9110: a `Content-Length` is a run of decimal digits and nothing else. */
+const CONTENT_LENGTH = /^\d+$/;
+
 /**
  * The size the wire states authoritatively, or null when it states none.
  *
  * A chunked upload declares no length at all, and a request carrying both
- * headers is only honest about the transfer encoding. In either case the size
- * is knowable only by reading the body.
+ * headers is only honest about the transfer encoding. A header that is not a
+ * non-negative integer states nothing usable either: an unparsable or negative
+ * value, and the `"a, b"` a repeated header collapses into, all read as
+ * "unknown" rather than as zero, so the size is measured by draining instead of
+ * trusted. Reading them as a number is what makes the comparison against the
+ * cap false and lets the body through uncapped, and a strict HTTP parser is not
+ * the only thing in front of this: behind the route adapter the header arrives
+ * unvalidated.
+ *
+ * In every one of those cases the size is knowable only by reading the body.
  */
 function declaredSize(headers: Headers): number | null {
-  if (!headers.has("content-length") || headers.has("transfer-encoding")) {
-    return null;
-  }
-  return parseInt(headers.get("content-length") ?? "0", 10);
+  if (headers.has("transfer-encoding")) return null;
+
+  const header = headers.get("content-length");
+  if (header === null || !CONTENT_LENGTH.test(header)) return null;
+
+  // A length past the safe-integer range cannot be compared against the cap
+  // meaningfully, so it drains and gets refused at the cap like any other body.
+  const declared = Number(header);
+  return Number.isSafeInteger(declared) ? declared : null;
 }
 
 /**
