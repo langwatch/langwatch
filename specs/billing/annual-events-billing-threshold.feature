@@ -44,6 +44,17 @@ Feature: Annual subscriptions collect event overage during the year
     Then the subscription is still linked and activated
     And the failure is logged for manual follow-up
 
+  # Checkout completion answers Stripe with a success either way, so Stripe's
+  # own redelivery never retries this failure. Without an alert the customer
+  # silently keeps the single-large-invoice behaviour the threshold removes.
+  @unit
+  Scenario: A threshold failure raises an alert for manual follow-up
+    Given a customer completes checkout for an annual Growth plan
+    And the Stripe threshold update fails
+    When the checkout completion webhook is processed
+    Then the billing team is alerted with the subscription and the reason
+    And checkout still completes even when the alert cannot be delivered
+
   @unit
   Scenario: Applying the threshold twice is a no-op
     Given an annual subscription that already carries the billing threshold

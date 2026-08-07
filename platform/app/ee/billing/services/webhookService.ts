@@ -547,6 +547,14 @@ export class EEWebhookService implements WebhookService {
    * so it is applied right after the subscription exists. Best-effort: a
    * failure leaves the subscription behaving as before (single renewal
    * invoice) and must never fail checkout completion.
+   *
+   * Because we answer Stripe 200 regardless — a non-2xx would make Stripe
+   * redeliver the whole checkout webhook, which must not happen — Stripe's own
+   * retry never covers this failure. A log line alone would leave the
+   * subscription quietly exposed to the single-large-invoice risk this exists
+   * to remove, so the failure also raises a Slack alert for manual follow-up.
+   * The alert is itself best-effort and separately guarded: a broken Slack
+   * webhook must never be what fails a checkout that otherwise succeeded.
    */
   private async trySetAnnualEventsBillingThreshold(
     subscriptionId: string,
@@ -565,6 +573,17 @@ export class EEWebhookService implements WebhookService {
         { subscriptionId, err },
         "[stripeWebhook] Failed to set annual events billing threshold — re-run the backfill script or apply manually",
       );
+      try {
+        await getApp().notifications.sendSlackBillingThresholdFailureAlert({
+          stripeSubscriptionId: subscriptionId,
+          reason: err instanceof Error ? err.message : String(err),
+        });
+      } catch (alertErr) {
+        logger.error(
+          { subscriptionId, err: alertErr },
+          "[stripeWebhook] Failed to alert on billing-threshold failure",
+        );
+      }
     }
   }
 
