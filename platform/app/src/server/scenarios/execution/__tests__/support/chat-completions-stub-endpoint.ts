@@ -94,7 +94,6 @@ function completionFor(body: Record<string, unknown>, hasTools: boolean) {
   };
 }
 
-/** What the endpoint answers for one request under the given rule. */
 function responseFor(
   rule: EndpointRule,
   body: Record<string, unknown>,
