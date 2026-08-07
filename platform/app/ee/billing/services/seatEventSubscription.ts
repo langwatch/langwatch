@@ -79,6 +79,69 @@ const quotedAmounts = (preview: Stripe.Invoice) => {
   };
 };
 
+/**
+ * The seat change itself — read by BOTH the preview and the update, so the
+ * quote cannot describe a different operation from the one performed.
+ *
+ * They diverged before: the update reverses a scheduled cancellation (the
+ * customer buying a seat is choosing to keep the plan), while the preview
+ * modelled the subscription as still cancelling. On an annual plan billed
+ * alongside a monthly meter, cancellation truncates the seat line to the
+ * monthly boundary, so the same 6→8 seat change quoted €54.25 and charged
+ * €639.91. `always_invoice` matters for the same reason: it bills every
+ * pending proration immediately, including any the subscription already
+ * carried, so the preview must count those rather than net them out.
+ */
+const seatChangeParams = ({
+  stripeSubscription,
+  seatItem,
+  quantity,
+  prorationDate,
+}: {
+  stripeSubscription: Stripe.Subscription;
+  seatItem: Stripe.SubscriptionItem;
+  quantity: number;
+  prorationDate: number;
+}) => ({
+  ...(stripeSubscription.canceled_at ? { cancel_at_period_end: false } : {}),
+  items: [{ id: seatItem.id, quantity }],
+  proration_behavior: "always_invoice" as const,
+  // Prorations are priced by the moment they are applied, so a quote issued
+  // at one instant and confirmed at another are two different amounts. The
+  // quote issues this timestamp and the confirmation sends it back, which
+  // makes the charge reproduce the number the customer read rather than
+  // merely resemble it.
+  proration_date: prorationDate,
+});
+
+/**
+ * How long a quote may be confirmed against the instant it priced.
+ *
+ * Long enough to read a dialog and decide; short enough that the pinned
+ * instant is still a fair description of "now". Past this the confirmation
+ * is refused and the customer gets a fresh quote — see {@link QuoteExpiredError}.
+ */
+const QUOTE_VALIDITY_SECONDS = 15 * 60;
+
+/**
+ * The instant to price a seat change at.
+ *
+ * With no quote to honour (the background seat sync, which nobody is
+ * watching a number for) this is simply now. With one, it is the instant the
+ * quote priced — unless that is stale or in the future, which no quote we
+ * issued can be.
+ */
+const resolveProrationDate = (quotedAt: number | undefined) => {
+  const now = Math.floor(Date.now() / 1000);
+  if (quotedAt === undefined) return now;
+
+  const age = now - quotedAt;
+  if (age < 0 || age > QUOTE_VALIDITY_SECONDS) {
+    throw new QuoteExpiredError();
+  }
+  return quotedAt;
+};
+
 export const createSeatEventSubscriptionFns = ({
   stripe,
   db,
@@ -193,69 +256,6 @@ export const createSeatEventSubscriptionFns = ({
     }
 
     return { subscription, stripeSubscription, seatItem };
-  };
-
-  /**
-   * The seat change itself — read by BOTH the preview and the update, so the
-   * quote cannot describe a different operation from the one performed.
-   *
-   * They diverged before: the update reverses a scheduled cancellation (the
-   * customer buying a seat is choosing to keep the plan), while the preview
-   * modelled the subscription as still cancelling. On an annual plan billed
-   * alongside a monthly meter, cancellation truncates the seat line to the
-   * monthly boundary, so the same 6→8 seat change quoted €54.25 and charged
-   * €639.91. `always_invoice` matters for the same reason: it bills every
-   * pending proration immediately, including any the subscription already
-   * carried, so the preview must count those rather than net them out.
-   */
-  const seatChangeParams = ({
-    stripeSubscription,
-    seatItem,
-    quantity,
-    prorationDate,
-  }: {
-    stripeSubscription: Stripe.Subscription;
-    seatItem: Stripe.SubscriptionItem;
-    quantity: number;
-    prorationDate: number;
-  }) => ({
-    ...(stripeSubscription.canceled_at ? { cancel_at_period_end: false } : {}),
-    items: [{ id: seatItem.id, quantity }],
-    proration_behavior: "always_invoice" as const,
-    // Prorations are priced by the moment they are applied, so a quote issued
-    // at one instant and confirmed at another are two different amounts. The
-    // quote issues this timestamp and the confirmation sends it back, which
-    // makes the charge reproduce the number the customer read rather than
-    // merely resemble it.
-    proration_date: prorationDate,
-  });
-
-  /**
-   * How long a quote may be confirmed against the instant it priced.
-   *
-   * Long enough to read a dialog and decide; short enough that the pinned
-   * instant is still a fair description of "now". Past this the confirmation
-   * is refused and the customer gets a fresh quote — see {@link QuoteExpiredError}.
-   */
-  const QUOTE_VALIDITY_SECONDS = 15 * 60;
-
-  /**
-   * The instant to price a seat change at.
-   *
-   * With no quote to honour (the background seat sync, which nobody is
-   * watching a number for) this is simply now. With one, it is the instant the
-   * quote priced — unless that is stale or in the future, which no quote we
-   * issued can be.
-   */
-  const resolveProrationDate = (quotedAt: number | undefined) => {
-    const now = Math.floor(Date.now() / 1000);
-    if (quotedAt === undefined) return now;
-
-    const age = now - quotedAt;
-    if (age < 0 || age > QUOTE_VALIDITY_SECONDS) {
-      throw new QuoteExpiredError();
-    }
-    return quotedAt;
   };
 
   return {
