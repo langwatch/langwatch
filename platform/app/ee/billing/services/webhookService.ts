@@ -14,6 +14,7 @@ import {
   PLATFORM_DEFAULT_RETENTION_DAYS,
   RETENTION_CATEGORIES,
 } from "../../../src/server/data-retention/retentionPolicy.schema";
+import { bestEffort } from "../bestEffort";
 import { SubscriptionRecordNotFoundError } from "../errors";
 import { fireSubscriptionSyncNurturing } from "../nurturing/hooks/subscriptionSync";
 import { SubscriptionStatus } from "../planTypes";
@@ -393,10 +394,15 @@ export class EEWebhookService implements WebhookService {
     }
 
     if (organizationId) {
-      this.emitCheckoutAnalytics({
-        checkoutSession,
-        subscriptionId,
-        organizationId,
+      await bestEffort({
+        label: "checkout analytics",
+        context: { eventId: event.id, organizationId },
+        run: () =>
+          this.emitCheckoutAnalytics({
+            checkoutSession,
+            subscriptionId,
+            organizationId,
+          }),
       });
     }
   }
@@ -600,25 +606,23 @@ export class EEWebhookService implements WebhookService {
 
     await this.subscriptionRepository.cancel({ id: existingSubscription.id });
 
-    // Send "Subscription cancelled" Slack notification
-    try {
-      const org = await this.organizationRepository.findNameById(
-        existingSubscription.organizationId,
-      );
-      await getApp().notifications.sendSlackSubscriptionEvent({
-        type: "cancelled",
-        organizationId: existingSubscription.organizationId,
-        organizationName: org?.name ?? "Unknown",
-        plan: existingSubscription.plan,
-        subscriptionId: existingSubscription.id,
-        cancellationDate: new Date(),
-      });
-    } catch (err) {
-      logger.error(
-        { stripeSubscriptionId, err },
-        "[stripeWebhook] Failed to send cancellation notification",
-      );
-    }
+    await bestEffort({
+      label: "cancellation notification",
+      context: { stripeSubscriptionId },
+      run: async () => {
+        const org = await this.organizationRepository.findNameById(
+          existingSubscription.organizationId,
+        );
+        await getApp().notifications.sendSlackSubscriptionEvent({
+          type: "cancelled",
+          organizationId: existingSubscription.organizationId,
+          organizationName: org?.name ?? "Unknown",
+          plan: existingSubscription.plan,
+          subscriptionId: existingSubscription.id,
+          cancellationDate: new Date(),
+        });
+      },
+    });
 
     const remainingActive =
       await this.subscriptionRepository.findLastNonCancelled(
@@ -730,15 +734,20 @@ export class EEWebhookService implements WebhookService {
       );
 
       if (shouldNotify) {
-        await getApp().notifications.sendSlackSubscriptionEvent({
-          type: "confirmed",
-          organizationId: updatedSubscription.organizationId,
-          organizationName: updatedSubscription.organization.name,
-          plan: updatedSubscription.plan,
-          subscriptionId: updatedSubscription.id,
-          startDate: updatedSubscription.startDate,
-          maxMembers: updatedSubscription.maxMembers,
-          maxMessagesPerMonth: updatedSubscription.maxMessagesPerMonth,
+        await bestEffort({
+          label: "subscription confirmed notification",
+          context: { subscriptionId: updatedSubscription.id },
+          run: () =>
+            getApp().notifications.sendSlackSubscriptionEvent({
+              type: "confirmed",
+              organizationId: updatedSubscription.organizationId,
+              organizationName: updatedSubscription.organization.name,
+              plan: updatedSubscription.plan,
+              subscriptionId: updatedSubscription.id,
+              startDate: updatedSubscription.startDate,
+              maxMembers: updatedSubscription.maxMembers,
+              maxMessagesPerMonth: updatedSubscription.maxMessagesPerMonth,
+            }),
         });
       }
     }
@@ -843,15 +852,20 @@ export class EEWebhookService implements WebhookService {
         await this.applySeatRetentionPolicy(updatedSubscription.organizationId);
       }
 
-      await getApp().notifications.sendSlackSubscriptionEvent({
-        type: "confirmed",
-        organizationId: updatedSubscription.organizationId,
-        organizationName: updatedSubscription.organization.name,
-        plan: updatedSubscription.plan,
-        subscriptionId: updatedSubscription.id,
-        startDate: updatedSubscription.startDate,
-        maxMembers: updatedSubscription.maxMembers,
-        maxMessagesPerMonth: updatedSubscription.maxMessagesPerMonth,
+      await bestEffort({
+        label: "subscription confirmed notification",
+        context: { subscriptionId: updatedSubscription.id },
+        run: () =>
+          getApp().notifications.sendSlackSubscriptionEvent({
+            type: "confirmed",
+            organizationId: updatedSubscription.organizationId,
+            organizationName: updatedSubscription.organization.name,
+            plan: updatedSubscription.plan,
+            subscriptionId: updatedSubscription.id,
+            startDate: updatedSubscription.startDate,
+            maxMembers: updatedSubscription.maxMembers,
+            maxMessagesPerMonth: updatedSubscription.maxMessagesPerMonth,
+          }),
       });
 
       fireSubscriptionSyncNurturing({
