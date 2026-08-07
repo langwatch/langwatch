@@ -85,6 +85,7 @@ describe("emitted request-log records", () => {
       expect(warnRecord()?.[REQUEST_CAUSE_FIELD]).toBeDefined();
     });
 
+    /** @scenario A re-keyed cause is still serialised */
     it("keeps the message a bare Error would have dropped", () => {
       expect(warnRecord()?.[REQUEST_CAUSE_FIELD]?.message).toContain(
         "Free limit of 50000 events reached",
@@ -129,6 +130,7 @@ describe("emitted request-log records", () => {
       return record;
     }
 
+    /** @scenario A cause on the error field is serialised as it always was */
     it("still writes the cause under error, serialised as before", () => {
       expect(errorRecord()?.error?.message).toBe("boom");
       expect(errorRecord()?.error?.stack).toBeTruthy();

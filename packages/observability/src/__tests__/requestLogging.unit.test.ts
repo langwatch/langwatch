@@ -1,11 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
+import { REQUEST_CAUSE_FIELD } from "../constants";
 import {
   getLogLevelFromStatusCode,
   getStatusCodeFromError,
   hasAuthorizationToken,
   logHttpRequest,
 } from "../request/requestLogging";
-import { REQUEST_CAUSE_FIELD } from "../constants";
 
 describe("requestLogging", () => {
   describe("getStatusCodeFromError", () => {
@@ -154,6 +154,7 @@ describe("requestLogging", () => {
           fault,
         });
 
+      /** @scenario A handled customer failure is logged below error */
       it("logs customer-fault at warn even for 5xx, with code and fault in the data", () => {
         const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() } as any;
 
@@ -177,6 +178,7 @@ describe("requestLogging", () => {
         expect(logger.error).not.toHaveBeenCalled();
       });
 
+      /** @scenario A platform fault is logged at error */
       it("logs platform-fault at error", () => {
         const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() } as any;
 
@@ -222,6 +224,7 @@ describe("requestLogging", () => {
         return logger.warn.mock.calls[0][0];
       }
 
+      /** @scenario A record below error level does not carry a field named error */
       it("does not attach the cause under a field named error", () => {
         expect(warnData()).not.toHaveProperty("error");
       });
@@ -230,6 +233,7 @@ describe("requestLogging", () => {
         expect(warnData()[REQUEST_CAUSE_FIELD]).toBe(handledCustomer);
       });
 
+      /** @scenario The error type stays groupable after the cause is re-keyed */
       it("keeps the error type groupable after the move", () => {
         expect(warnData().errorType).toBe("PlanLimitExceededError");
       });
@@ -257,6 +261,7 @@ describe("requestLogging", () => {
     });
 
     describe("when the record is logged at error level", () => {
+      /** @scenario A record at error level keeps its cause on the error field */
       it("keeps the cause under error so 5xx dashboards are unchanged", () => {
         const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() } as any;
         const boom = new Error("boom");
