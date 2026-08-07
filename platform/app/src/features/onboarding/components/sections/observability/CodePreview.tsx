@@ -13,6 +13,7 @@ import type { HighlighterGeneric } from "shiki";
 import { useColorMode } from "../../../../../components/ui/color-mode";
 import { toaster } from "../../../../../components/ui/toaster";
 import { Tooltip } from "../../../../../components/ui/tooltip";
+import { InlineCopyButton } from "../shared/InlineCopyButton";
 
 interface CodePreviewProps {
   code: string;
@@ -25,6 +26,15 @@ interface CodePreviewProps {
   isVisible?: boolean;
   onToggleVisibility?: () => void;
   llmPrompt?: string;
+  /**
+   * When set, the copy button always writes THIS value to the clipboard,
+   * regardless of reveal state. The default CodeBlock copy trigger copies
+   * the rendered string — the masked form while the snippet is hidden —
+   * which hands the user a broken credential they only discover when their
+   * SDK rejects it. Surfaces whose snippet carries a secret pass the real
+   * text here.
+   */
+  copyText?: string;
   /**
    * When true, the header action buttons (copy / eye / llm-prompt) are
    * suppressed. Used by empty-state surfaces where the rendered code
@@ -47,6 +57,7 @@ export function CodePreview({
   isVisible: controlledIsVisible,
   onToggleVisibility,
   llmPrompt,
+  copyText,
   disableActions,
 }: CodePreviewProps): React.ReactElement | null {
   const { colorMode } = useColorMode();
@@ -60,7 +71,16 @@ export function CodePreview({
       async load() {
         const { createHighlighter } = await import("shiki");
         return createHighlighter({
-          langs: ["typescript", "python", "go", "yaml", "bash", "json"],
+          langs: [
+            "typescript",
+            "python",
+            "go",
+            "yaml",
+            "bash",
+            "json",
+            "ini",
+            "shellscript",
+          ],
           themes: ["github-dark", "github-light"],
         });
       },
@@ -196,15 +216,18 @@ export function CodePreview({
                     </IconButton>
                   </Tooltip>
                 )}
-                {!disableActions && (
-                  <CodeBlock.CopyTrigger asChild>
-                    <IconButton variant="ghost" size="2xs" aria-label="Copy">
-                      <CodeBlock.CopyIndicator copied={<Check size={14} />}>
-                        <Copy size={14} />
-                      </CodeBlock.CopyIndicator>
-                    </IconButton>
-                  </CodeBlock.CopyTrigger>
-                )}
+                {!disableActions &&
+                  (copyText !== undefined ? (
+                    <InlineCopyButton text={copyText} label={filename} />
+                  ) : (
+                    <CodeBlock.CopyTrigger asChild>
+                      <IconButton variant="ghost" size="2xs" aria-label="Copy">
+                        <CodeBlock.CopyIndicator copied={<Check size={14} />}>
+                          <Copy size={14} />
+                        </CodeBlock.CopyIndicator>
+                      </IconButton>
+                    </CodeBlock.CopyTrigger>
+                  ))}
               </HStack>
             </CodeBlock.Header>
             <CodeBlock.Content

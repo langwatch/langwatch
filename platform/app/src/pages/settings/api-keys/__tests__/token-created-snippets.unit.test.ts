@@ -17,30 +17,36 @@ function readFile(rel: string): string {
   return fs.readFileSync(path.join(LANGWATCH_ROOT, rel), "utf8");
 }
 
+const CODE_PREVIEW_PATH =
+  "src/features/onboarding/components/sections/observability/CodePreview.tsx";
+
 describe("given the token-created-snippets feature is implemented", () => {
-  describe("when checking that Shiki languages are registered up-front in shikiAdapter", () => {
-    /** @scenario Highlight engine wiring — Shiki singleton with the required languages registered */
-    it("shikiAdapter registers 'ini' for the .env tab", () => {
-      const adapter = readFile(
-        "src/features/traces-v2/components/TraceDrawer/markdownView/shikiAdapter.ts",
-      );
-      expect(adapter).toContain('"ini"');
+  describe("when checking that CodePreview registers the languages the dialog needs", () => {
+    /** @scenario Highlight engine wiring — CodePreview registers the languages the dialog needs */
+    it("CodePreview's adapter registers 'ini' for the .env tab", () => {
+      expect(readFile(CODE_PREVIEW_PATH)).toContain('"ini"');
     });
 
-    /** @scenario Highlight engine wiring — Shiki singleton with the required languages registered */
-    it("shikiAdapter registers 'bash' for terminal commands", () => {
-      const adapter = readFile(
-        "src/features/traces-v2/components/TraceDrawer/markdownView/shikiAdapter.ts",
-      );
-      expect(adapter).toContain('"bash"');
+    /** @scenario Highlight engine wiring — CodePreview registers the languages the dialog needs */
+    it("CodePreview's adapter registers 'shellscript' for the auth-header tabs", () => {
+      expect(readFile(CODE_PREVIEW_PATH)).toContain('"shellscript"');
     });
 
-    /** @scenario Highlight engine wiring — Shiki singleton with the required languages registered */
-    it("shikiAdapter registers 'json' for the config block", () => {
-      const adapter = readFile(
-        "src/features/traces-v2/components/TraceDrawer/markdownView/shikiAdapter.ts",
+    /** @scenario Highlight engine wiring — CodePreview registers the languages the dialog needs */
+    it("CodePreview's adapter registers 'bash' and 'json'", () => {
+      const preview = readFile(CODE_PREVIEW_PATH);
+      expect(preview).toContain('"bash"');
+      expect(preview).toContain('"json"');
+    });
+
+    /** @scenario Highlight engine wiring — CodePreview registers the languages the dialog needs */
+    it("the dialog declares one concrete language per block, at the call site", () => {
+      const dialog = readFile(
+        "src/pages/settings/api-keys/TokenCreatedDialog.tsx",
       );
-      expect(adapter).toContain('"json"');
+      expect(dialog).toContain('codeLanguage="ini"');
+      expect(dialog).toContain('codeLanguage="shellscript"');
+      expect(dialog).toContain('codeLanguage="bash"');
     });
   });
 
@@ -62,40 +68,32 @@ describe("given the token-created-snippets feature is implemented", () => {
     });
   });
 
-  describe("when checking that a single shared command-box replaces CodeBlock and QuickCommand", () => {
-    /** @scenario A single shared command-box component replaces CodeBlock and QuickCommand inside TokenCreatedDialog */
-    it("TokenCreatedDialog imports one shared command-box component for snippet rendering", () => {
+  describe("when checking that the dialog renders through the shared snippet surface", () => {
+    /** @scenario The dialog renders snippets through the same component as the traces empty state */
+    it("TokenCreatedDialog imports the shared CodePreview for snippet rendering", () => {
       const dialog = readFile(
         "src/pages/settings/api-keys/TokenCreatedDialog.tsx",
       );
-      // Must import ShikiCommandBox (or equivalent single component)
-      expect(dialog).toContain("ShikiCommandBox");
+      expect(dialog).toContain("CodePreview");
+      expect(dialog).not.toContain("ShikiCommandBox");
     });
 
-    /** @scenario A single shared command-box component replaces CodeBlock and QuickCommand inside TokenCreatedDialog */
+    /** @scenario The dialog renders snippets through the same component as the traces empty state */
+    it("the dialog-local ShikiCommandBox component is deleted from the codebase", () => {
+      expect(
+        fs.existsSync(
+          path.join(LANGWATCH_ROOT, "src/components/code/ShikiCommandBox.tsx"),
+        ),
+      ).toBe(false);
+    });
+
+    /** @scenario The dialog renders snippets through the same component as the traces empty state */
     it("TokenCreatedDialog does not directly import CodeBlock for snippet rendering", () => {
       const dialog = readFile(
         "src/pages/settings/api-keys/TokenCreatedDialog.tsx",
       );
       // The old CodeBlock.tsx must no longer be imported
       expect(dialog).not.toMatch(/import.*CodeBlock.*from.*['"]\./);
-    });
-
-    /** @scenario A single shared command-box component replaces CodeBlock and QuickCommand inside TokenCreatedDialog */
-    it("TokenCreatedDialog does not directly define or import QuickCommand for snippet rendering", () => {
-      const dialog = readFile(
-        "src/pages/settings/api-keys/TokenCreatedDialog.tsx",
-      );
-      // QuickCommand must not be defined inline in the dialog
-      expect(dialog).not.toContain("function QuickCommand(");
-    });
-
-    /** @scenario A single shared command-box component replaces CodeBlock and QuickCommand inside TokenCreatedDialog */
-    it("ShikiCommandBox does not export accentCredentialSegments (decoration handled by Shiki grammar)", () => {
-      const commandBox = readFile("src/components/code/ShikiCommandBox.tsx");
-      // Visual distinction is achieved by Shiki's bash tokenization, not a regex pass
-      expect(commandBox).not.toContain("function accentCredentialSegments(");
-      expect(commandBox).not.toContain("CREDENTIAL_RE");
     });
 
     /** @scenario JSON config block keeps the existing JsonHighlight wiring */
@@ -245,24 +243,30 @@ describe("given the token-created-snippets feature is implemented", () => {
     });
   });
 
-  describe("when checking that ShikiCommandBox is lazy-loaded via dynamic()", () => {
-    /** @scenario TokenCreatedDialog lazy-loads the Shiki-backed command box on dialog open */
-    it("TokenCreatedDialog imports ShikiCommandBox via dynamic() (ssr:false)", () => {
+  describe("when checking that the Shiki engine stays out of the settings page bundle", () => {
+    /** @scenario The Shiki engine loads only when a code block renders */
+    it("CodePreview loads the engine inside its adapter, not statically", () => {
+      // `await import("shiki")` inside load() is what keeps a static import
+      // of CodePreview from pulling the engine into the page bundle.
+      expect(readFile(CODE_PREVIEW_PATH)).toContain('await import("shiki")');
+    });
+
+    /** @scenario The Shiki engine loads only when a code block renders */
+    it("TokenCreatedDialog has no value import of the shiki package", () => {
       const dialog = readFile(
         "src/pages/settings/api-keys/TokenCreatedDialog.tsx",
       );
-      // Must use dynamic() with ssr: false for the command box
-      expect(dialog).toMatch(/dynamic\s*\(/);
-      expect(dialog).toContain("ssr: false");
+      expect(dialog).not.toMatch(/^import (?!type ).*from "shiki"/m);
+      expect(dialog).not.toContain("shikiAdapter");
     });
 
-    /** @scenario TokenCreatedDialog lazy-loads the Shiki-backed command box on dialog open */
+    /** @scenario The Shiki engine loads only when a code block renders */
     it("api-keys/index.tsx does not statically import shikiAdapter", () => {
       const indexPage = readFile("src/pages/settings/api-keys/index.tsx");
       expect(indexPage).not.toContain("shikiAdapter");
     });
 
-    /** @scenario TokenCreatedDialog lazy-loads the Shiki-backed command box on dialog open */
+    /** @scenario The Shiki engine loads only when a code block renders */
     it("ApiKeysSection.tsx does not statically import shikiAdapter", () => {
       const section = readFile(
         "src/pages/settings/api-keys/ApiKeysSection.tsx",
