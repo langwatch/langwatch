@@ -238,13 +238,25 @@ function assertNoRedundantAccountKey({
   }
 }
 
-/** Names every missing required variable at once, rather than one per retry. */
+/**
+ * Names every missing required variable at once, rather than one per retry.
+ *
+ * AZURE_BLOB_CONTAINER is required for WRITES only. It names where new objects
+ * go, and reads never consult it — an `azure-blob://{account}/{container}/{key}`
+ * URI already carries the container it was written to. Requiring it to build a
+ * read driver stranded exactly the migration this resolver's `purpose: "read"`
+ * arm exists to serve: an operator who moves writes back to S3 and drops the
+ * now-unused container variable would find every historical azure-blob:// object
+ * failing with "unregistered scheme".
+ */
 function assertRequiredVariablesPresent({
+  purpose,
   mode,
   accountName,
   container,
   accountKey,
 }: {
+  purpose: "read" | "write";
   mode: AzureCredentials["mode"];
   accountName: string | undefined;
   container: string | undefined;
@@ -252,7 +264,9 @@ function assertRequiredVariablesPresent({
 }): void {
   const missingVariables: string[] = [];
   if (!accountName) missingVariables.push("AZURE_BLOB_ACCOUNT_NAME");
-  if (!container) missingVariables.push("AZURE_BLOB_CONTAINER");
+  if (purpose === "write" && !container) {
+    missingVariables.push("AZURE_BLOB_CONTAINER");
+  }
   if (mode === "sharedKey" && !accountKey) {
     missingVariables.push("AZURE_BLOB_ACCOUNT_KEY");
   }
@@ -288,7 +302,13 @@ export function resolveAzureCredentials({
   const audience = env.AZURE_BLOB_TOKEN_AUDIENCE?.trim() || undefined;
 
   assertNoRedundantAccountKey({ mode, accountKey });
-  assertRequiredVariablesPresent({ mode, accountName, container, accountKey });
+  assertRequiredVariablesPresent({
+    purpose,
+    mode,
+    accountName,
+    container,
+    accountKey,
+  });
 
   if (mode === "sharedKey") {
     return {

@@ -59,6 +59,7 @@ vi.mock("~/server/dataplane-s3", () => ({
   getS3ConfigForProject: vi.fn().mockResolvedValue(null),
 }));
 
+import { resolveAzureCredentials } from "../azure-credentials";
 import { resolveProjectStorageDestination } from "../project-storage-destination";
 import { maybeAzureDriver } from "../stored-objects-factory";
 
@@ -107,6 +108,28 @@ async function evaluateAzureUsability(): Promise<{
   }
   const isDriverRegistered = maybeAzureDriver() !== undefined;
   return { isDestinationAzure, isDriverRegistered };
+}
+
+/**
+ * The invariant, stated in the one direction that encodes the bug: a write
+ * resolving to azure MUST come with a registered driver, or every write is an
+ * outage. The converse is not an invariant — a registered driver with no azure
+ * write destination is the supported legacy-read configuration, so asserting
+ * the two answers are always equal would forbid a path the code deliberately
+ * supports.
+ *
+ * Returned rather than asserted so the `expect` stays inside the `it` that
+ * owns it: an assertion buried in a helper reports the helper's line, not the
+ * case that failed.
+ */
+function isWriteOutage({
+  isDestinationAzure,
+  isDriverRegistered,
+}: {
+  isDestinationAzure: boolean;
+  isDriverRegistered: boolean;
+}): boolean {
+  return isDestinationAzure && !isDriverRegistered;
 }
 
 describe("maybeAzureDriver / resolveProjectStorageDestination parity", () => {
@@ -161,15 +184,6 @@ describe("maybeAzureDriver / resolveProjectStorageDestination parity", () => {
       },
       false,
     ],
-    [
-      "azure backend, managedIdentity missing the container",
-      {
-        STORED_OBJECTS_BACKEND: "azure",
-        AZURE_BLOB_AUTH_MODE: "managedIdentity",
-        AZURE_BLOB_ACCOUNT_NAME: "lwacct",
-      },
-      false,
-    ],
     ["backend not azure at all", {}, false],
   ] as const)("given %s", (_label, env, expectedUsable) => {
     /** @scenario "A resolvable Azure destination always comes with a usable Azure driver" */
@@ -181,8 +195,57 @@ describe("maybeAzureDriver / resolveProjectStorageDestination parity", () => {
 
       expect(isDestinationAzure).toBe(expectedUsable);
       expect(isDriverRegistered).toBe(expectedUsable);
-      // The invariant itself: never one true and the other false.
-      expect(isDestinationAzure).toBe(isDriverRegistered);
+      expect(isWriteOutage({ isDestinationAzure, isDriverRegistered })).toBe(
+        false,
+      );
+    });
+  });
+
+  describe("given azure backend in a token mode with no container configured", () => {
+    /** @scenario "Reads survive an operator dropping the now-unused container variable" */
+    it("refuses to resolve a write destination while still registering the read driver", async () => {
+      // Asymmetric on purpose, which is why it cannot ride the table above.
+      // A container is what a WRITE needs; a read carries its own inside the
+      // stored URI. So this install cannot write — loudly, naming the variable
+      // — and can still serve every object written before the container was
+      // dropped.
+      mockEnv.STORED_OBJECTS_BACKEND = "azure";
+      mockEnv.AZURE_BLOB_AUTH_MODE = "managedIdentity";
+      mockEnv.AZURE_BLOB_ACCOUNT_NAME = "lwacct";
+
+      const { isDestinationAzure, isDriverRegistered } =
+        await evaluateAzureUsability();
+
+      expect(isDestinationAzure).toBe(false);
+      expect(isDriverRegistered).toBe(true);
+      expect(() => resolveAzureCredentials({ purpose: "write" })).toThrow(
+        /AZURE_BLOB_CONTAINER/,
+      );
+    });
+  });
+
+  describe("given writes moved to S3 while the Azure settings stay for legacy reads", () => {
+    /** @scenario "Historical Azure objects stay readable after moving writes to S3" */
+    it("registers the read driver even though no write resolves to azure", async () => {
+      // The row the table above cannot hold, because the two answers
+      // legitimately differ here. Registration is deliberately NOT gated on the
+      // write toggle (see maybeAzureDriver): an operator migrating off Azure
+      // keeps the connection settings so already-written azure-blob:// objects
+      // stay readable. Asserting a symmetric invariant would forbid exactly the
+      // migration path this code exists to support.
+      mockEnv.STORED_OBJECTS_BACKEND = "s3";
+      mockEnv.AZURE_BLOB_ACCOUNT_NAME = "lwacct";
+      mockEnv.AZURE_BLOB_ACCOUNT_KEY = "a2V5";
+      mockEnv.AZURE_BLOB_CONTAINER = "lw-container";
+
+      const { isDestinationAzure, isDriverRegistered } =
+        await evaluateAzureUsability();
+
+      expect(isDestinationAzure).toBe(false);
+      expect(isDriverRegistered).toBe(true);
+      expect(isWriteOutage({ isDestinationAzure, isDriverRegistered })).toBe(
+        false,
+      );
     });
   });
 
@@ -221,6 +284,20 @@ describe("maybeAzureDriver / resolveProjectStorageDestination parity", () => {
 
       expect(isDestinationAzure).toBe(false);
       expect(isDriverRegistered).toBe(false);
+    });
+  });
+
+  describe("given writes moved back to S3 and the now-unused container dropped", () => {
+    /** @scenario "Reads survive an operator dropping the now-unused container variable" */
+    it("still registers the read driver so historical URIs resolve", async () => {
+      // The migration case in full: nothing is written to Azure any more, so
+      // the operator drops the variable that named where writes went. Every
+      // object already in Azure must stay readable.
+      mockEnv.STORED_OBJECTS_BACKEND = "s3";
+      mockEnv.AZURE_BLOB_ACCOUNT_NAME = "lwacct";
+      mockEnv.AZURE_BLOB_ACCOUNT_KEY = "a2V5";
+
+      expect(maybeAzureDriver()).toBeDefined();
     });
   });
 });
