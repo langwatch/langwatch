@@ -8,7 +8,7 @@ import { PrismaPg } from "@prisma/adapter-pg";
  * named schema. Parse it out and hand it to the adapter explicitly.
  */
 export function createPrismaPgAdapter(databaseUrl: string): PrismaPg {
-  const schema = new URL(databaseUrl).searchParams.get("schema") ?? undefined;
+  const schema = schemaParam(databaseUrl);
   return new PrismaPg(
     {
       connectionString: databaseUrl,
@@ -21,4 +21,18 @@ export function createPrismaPgAdapter(databaseUrl: string): PrismaPg {
     },
     { schema },
   );
+}
+
+/**
+ * An empty or malformed URL must not throw HERE: the plain connectionString
+ * pass-through never parsed it, so construction stayed lazy and unit suites
+ * that import the client without a database (env validation skipped) only
+ * fail if they actually connect. Parsing failure = no schema override.
+ */
+function schemaParam(databaseUrl: string): string | undefined {
+  try {
+    return new URL(databaseUrl).searchParams.get("schema") ?? undefined;
+  } catch {
+    return undefined;
+  }
 }

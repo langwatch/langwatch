@@ -27,7 +27,12 @@ const withGuards = (
 
 const createGuardedPrismaClient = (): PrismaClient => {
   const client = new PrismaClient({
-    adapter: createPrismaPgAdapter(env.DATABASE_URL),
+    // The process-env fallback mirrors the classic engine, which resolved the
+    // schema's `env("DATABASE_URL")` from process.env itself — test suites
+    // that mock `~/env.mjs` with a partial env relied on that.
+    adapter: createPrismaPgAdapter(
+      env.DATABASE_URL ?? process.env.DATABASE_URL ?? "",
+    ),
     log: env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],
   });
 
