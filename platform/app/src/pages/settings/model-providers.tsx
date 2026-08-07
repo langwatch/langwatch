@@ -195,6 +195,12 @@ export default function ModelsPage() {
       // Refetch both providers and organization data when drawer closes
       void refetch();
       void utils.organization.getAll.invalidate();
+      // And forget every connection verdict. A row's id does not change when
+      // its credential does, so a verdict left standing here is a statement
+      // about a key that may have just been replaced — including a green one,
+      // which is the single thing this feature must never show without having
+      // asked. See clearResults for the full argument.
+      connectionTests.clearResults();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isProviderDrawerOpen]);

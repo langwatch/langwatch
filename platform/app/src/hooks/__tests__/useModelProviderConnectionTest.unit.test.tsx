@@ -141,6 +141,50 @@ describe("useModelProviderConnectionTest", () => {
     });
   });
 
+  describe("when the credential may have changed underneath the verdict", () => {
+    /** @scenario "A verdict does not outlive the credential it was about" */
+    it("forgets a green verdict rather than letting it stand over a new key", async () => {
+      // The failure this exists to stop: test a provider, see "Connection
+      // works", then edit the row and paste a bad key. The row's id does not
+      // change, so without this the green verdict survives the save and makes
+      // a success claim about a credential nothing ever checked.
+      testConnectionMock.mockResolvedValue({ outcome: "verified" });
+
+      const { result } = renderTest();
+      await act(async () => {
+        await result.current.test(PROVIDER_ROW);
+      });
+      await waitFor(() => {
+        expect(result.current.results[PROVIDER_ROW]?.status).toBe("works");
+      });
+
+      act(() => {
+        result.current.clearResults();
+      });
+
+      expect(result.current.results[PROVIDER_ROW]).toBeUndefined();
+    });
+
+    /** @scenario "A verdict does not outlive the credential it was about" */
+    it("forgets every row at once, not only the one just tested", async () => {
+      testConnectionMock.mockResolvedValue({ outcome: "verified" });
+
+      const { result } = renderTest();
+      await act(async () => {
+        await result.current.test("mp_a");
+      });
+      await act(async () => {
+        await result.current.test("mp_b");
+      });
+
+      act(() => {
+        result.current.clearResults();
+      });
+
+      expect(result.current.results).toEqual({});
+    });
+  });
+
   describe("when several rows are tested", () => {
     it("keeps each row's verdict to itself", async () => {
       testConnectionMock.mockResolvedValueOnce({ outcome: "verified" });

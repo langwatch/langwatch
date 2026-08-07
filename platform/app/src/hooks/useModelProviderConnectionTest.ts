@@ -49,7 +49,12 @@ export type ConnectionTestState =
  */
 const uncheckedMessage = (reason: string): string => {
   if (reason === "no_credential" || reason === "credential_masked") {
-    return "No credential is stored for this provider yet.";
+    // Not "nothing is stored": a credential written before the encryption
+    // secret was rotated is unreadable rather than absent, and the two are
+    // indistinguishable by the time they reach here (the repository drops an
+    // undecryptable value to null). Telling that customer to enter a key they
+    // already entered is the misdiagnosis this whole area exists to avoid.
+    return "No credential could be read for this provider.";
   }
   return "This provider can't be tested automatically — its settings are checked when you first use it.";
 };
@@ -72,6 +77,23 @@ export function useModelProviderConnectionTest({
       setResults((current) => ({ ...current, [modelProviderId]: state })),
     [],
   );
+
+  /**
+   * Forget every verdict.
+   *
+   * A verdict is about the credential that was in the row when it was asked,
+   * and nothing about the row's identity changes when its key does. Left
+   * alone, a green "Connection works" survives the customer pasting a bad key
+   * and saving — which is a success verdict about a credential that was never
+   * checked, the one thing this feature must not produce. The drawer closing
+   * is the moment a row may have changed underneath us, and re-asking is one
+   * click, so the cheap and correct move is to drop them all rather than
+   * reason about which row was touched.
+   *
+   * `useCredentialProbeGate` makes the same argument for the save-time probe:
+   * a refusal must not outlive the credential it was about.
+   */
+  const clearResults = useCallback(() => setResults({}), []);
 
   const test = useCallback(
     async (modelProviderId: string) => {
@@ -127,5 +149,5 @@ export function useModelProviderConnectionTest({
     [organizationId, projectId, setResult, testConnection],
   );
 
-  return { results, test };
+  return { results, test, clearResults };
 }

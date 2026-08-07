@@ -151,6 +151,14 @@ function assertRowCarriesScopes(row: { id: string; scopes: unknown[] }): void {
  * reasonable each from adding up to something that is not. Both are generous
  * against real use — a person checking their providers clicks a handful of
  * times — and tight against a loop.
+ *
+ * How hard a ceiling this is depends on the deployment. `rateLimit` counts in
+ * Redis when one is configured and in a process-local map otherwise, so an
+ * installation running several replicas without Redis gets these numbers per
+ * replica rather than per fleet. That is worth knowing before reading either
+ * figure as a guarantee; it is a property of the shared limiter, not of this
+ * budget, and it bounds a handful of listing requests rather than anything
+ * expensive.
  */
 const TEST_CONNECTION_WINDOW_SECONDS = 60;
 const TEST_CONNECTION_PER_ORGANIZATION = 20;

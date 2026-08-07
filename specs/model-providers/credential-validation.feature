@@ -447,6 +447,18 @@ Feature: Credential Validation
     Then the row is reported as not found
     And the credential is never sent anywhere
 
+  # A verdict is about the credential that was in the row when it was asked,
+  # and nothing about a row's identity changes when its key does. A green
+  # result left standing across an edit is a success claim about a credential
+  # nothing ever checked, which is the one thing this must never produce.
+
+  @unit
+  Scenario: A verdict does not outlive the credential it was about
+    Given I have tested a provider and been told the connection works
+    When I edit that provider and save a different credential
+    Then the earlier verdict is no longer shown
+    And I am not told the connection works until I test again
+
   @unit
   Scenario: Repeated tests are limited per organization
     Given I have tested connections many times in quick succession
