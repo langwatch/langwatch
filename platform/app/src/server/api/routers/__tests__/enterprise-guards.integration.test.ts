@@ -19,11 +19,14 @@ import {
   vi,
 } from "vitest";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
+import { OrganizationService } from "~/server/app-layer/organizations/organization.service";
+import { PrismaOrganizationRepository } from "~/server/app-layer/organizations/repositories/organization.prisma.repository";
 import { createTestApp } from "~/server/app-layer/presets";
 import {
   type PlanProvider,
   PlanProviderService,
 } from "~/server/app-layer/subscription/plan-provider";
+import { PromptTagRepository } from "~/server/prompt-config/repositories/prompt-tag.repository";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { FREE_PLAN } from "../../../../../ee/licensing/constants";
 import type { PlanInfo } from "../../../../../ee/licensing/planInfo";
@@ -127,6 +130,14 @@ describe("enterprise feature guards", () => {
       planProvider: PlanProviderService.create({
         getActivePlan: mockGetActivePlan as PlanProvider["getActivePlan"],
       }),
+      // organization.updateMemberRole delegates its orchestration to
+      // getApp().organizations, which needs the Prisma-backed repository:
+      // createTestApp's default organizations service sits on the null
+      // repository and refuses those operations.
+      organizations: new OrganizationService(
+        new PrismaOrganizationRepository(prisma),
+        new PromptTagRepository(prisma),
+      ),
     });
   });
 
