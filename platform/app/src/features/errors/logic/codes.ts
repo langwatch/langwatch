@@ -152,6 +152,7 @@ export const APP_ERROR_CODES = [
   "project_not_found",
   "project_permission_denied",
   "prompt_not_found",
+  "provider_endpoint_redirected",
   "provider_key_invalid",
   "provider_key_missing",
   "provider_key_restricted",

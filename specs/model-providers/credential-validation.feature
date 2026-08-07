@@ -305,6 +305,17 @@ Feature: Credential Validation
     When validation runs
     Then the credential is not sent to the second host
 
+  # An endpoint that redirects is reachable — something answered, it just
+  # wants us elsewhere. Calling that unreachable sends the customer off to
+  # check their network when what they need to change is a URL.
+
+  @unit
+  Scenario: A redirect is reported as a redirect, not as unreachable
+    Given the endpoint answers with a redirect
+    When validation runs
+    Then I am told the endpoint redirects somewhere else
+    And I am not told the provider could not be reached
+
   @unit
   Scenario: The API key is never sent in a URL
     Given a key to check

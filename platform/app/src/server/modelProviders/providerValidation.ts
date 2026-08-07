@@ -314,6 +314,34 @@ export class ProviderKeyMissingError extends HandledError {
  * The one failure here that is thrown rather than returned: a refused key is
  * an answer, an unreachable provider is the absence of one.
  */
+/**
+ * The endpoint answered with a redirect, and we will not follow it.
+ *
+ * `fault: "customer"` because the fix is theirs and it is a small one: point
+ * the base URL at the address the endpoint actually serves. Following the hop
+ * is not an option — it would carry the credential to a host the SSRF
+ * validator never saw, and a cross-origin hop keeps the provider-specific auth
+ * headers even where it drops `Authorization`.
+ */
+export class ProviderEndpointRedirectedError extends HandledError {
+  constructor({ provider }: { provider: string }) {
+    super(
+      "provider_endpoint_redirected",
+      `The endpoint configured for ${provider} redirects elsewhere`,
+      {
+        fault: "customer",
+        httpStatus: 400,
+        meta: { provider },
+        tips: [
+          "Point the base URL at the address the provider actually serves.",
+          "An http:// URL that redirects to https:// is the usual cause.",
+        ],
+      },
+    );
+    this.name = "ProviderEndpointRedirectedError";
+  }
+}
+
 export class ProviderUnreachableError extends HandledError {
   constructor({
     provider,
@@ -839,6 +867,35 @@ function unreachableFailure(context: ProbeContext): RankedFailure {
 }
 
 /**
+ * The endpoint answered — with a redirect we will not follow.
+ *
+ * Worth telling apart from "never answered". The endpoint is reachable and
+ * something is listening; it just wants us somewhere else, and we decline
+ * because a hop carries the credential to a host the validator has not seen.
+ * Reporting that as unreachable sends the customer to check their network
+ * when what they need to change is a URL — the misdiagnosis this module
+ * exists to remove, and one three previous fixes were about.
+ *
+ * Detected by message because the helper raises a plain `Error`; the test
+ * below pins the coupling so a reworded message fails loudly rather than
+ * silently folding back into "unreachable".
+ */
+const REDIRECT_REFUSED_MARKER = "Redirects are not followed";
+
+function isRefusedRedirect(err: unknown): boolean {
+  return err instanceof Error && err.message.includes(REDIRECT_REFUSED_MARKER);
+}
+
+function redirectedFailure(context: ProbeContext): RankedFailure {
+  return refusal(
+    new ProviderEndpointRedirectedError({ provider: context.provider }),
+    // Explained rather than unreachable: this says something actionable about
+    // the endpoint, so it should win over a bare timeout from another shape.
+    FAILURE_RANK.explained,
+  );
+}
+
+/**
  * One auth shape, asked once: accepted, refused, or never answered.
  *
  * Only the request is guarded. Reading the refusal happens outside the
@@ -887,8 +944,13 @@ async function probeOnce({
       signal: deadline,
       followRedirects: false,
     });
-  } catch {
-    return { accepted: false, failure: unreachableFailure(context) };
+  } catch (err) {
+    return {
+      accepted: false,
+      failure: isRefusedRedirect(err)
+        ? redirectedFailure(context)
+        : unreachableFailure(context),
+    };
   }
 
   if (response.ok) return { accepted: true };
@@ -971,12 +1033,17 @@ async function runProbeChain({
  * @param prisma - Prisma client instance
  * @returns Promise resolving to validation result
  */
-export async function validateKeyWithCustomUrl(
-  projectId: string,
-  provider: string,
-  customBaseUrl: string | undefined,
-  prisma: PrismaClient,
-): Promise<ValidationResult> {
+export async function validateKeyWithCustomUrl({
+  projectId,
+  provider,
+  customBaseUrl,
+  prisma,
+}: {
+  projectId: string;
+  provider: string;
+  customBaseUrl: string | undefined;
+  prisma: PrismaClient;
+}): Promise<ValidationResult> {
   const providerDef = modelProviders[provider as keyof typeof modelProviders];
   if (!providerDef) {
     return unchecked("unknown_provider");

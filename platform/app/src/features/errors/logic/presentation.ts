@@ -572,6 +572,14 @@ const presentations = {
     describe: () =>
       "The provider didn't recognise it. Check you copied the whole key, and that it belongs to the right account.",
   },
+  provider_endpoint_redirected: {
+    // Not "we couldn't reach it" — something answered, and it wants us
+    // somewhere else. Saying so is the difference between the customer
+    // checking their network and the customer fixing a URL.
+    title: "That endpoint redirects somewhere else",
+    describe: () =>
+      "We don't follow redirects when sending a credential. Point the base URL at the address the provider actually serves — an http:// URL redirecting to https:// is the usual cause.",
+  },
   provider_key_missing: {
     title: "No API key to check",
     describe: () =>

@@ -1086,6 +1086,27 @@ describe("given a check that never reached the provider", () => {
       }
     });
 
+    /** @scenario "A redirect is reported as a redirect, not as unreachable" */
+    it("says the endpoint redirected rather than that it could not be reached", async () => {
+      // What the SSRF helper raises when it declines a hop. Matching on the
+      // message is a coupling, so this test is where it is pinned: reword the
+      // helper and this fails loudly instead of silently folding the case back
+      // into "check your network connection".
+      mockFetch.mockRejectedValueOnce(
+        new Error(
+          "Redirects are not followed for this destination — the endpoint must answer directly.",
+        ),
+      );
+
+      const result = await validateProviderApiKey("custom", {
+        CUSTOM_API_KEY: "sk-test",
+        CUSTOM_BASE_URL: "http://redirects.example.com/v1",
+      });
+
+      expect(codeOf(result)).toBe("provider_endpoint_redirected");
+      expect(codeOf(result)).not.toBe("provider_unreachable");
+    });
+
     /** @scenario "A redirect never carries the credential onward" */
     it("refuses to follow a redirect", async () => {
       mockFetch.mockResolvedValueOnce({ ok: true, status: 200 });

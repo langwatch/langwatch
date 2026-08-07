@@ -517,12 +517,12 @@ export const modelProviderRouter = createTRPCRouter({
     .use(checkProjectPermission("project:update"))
     .query(async ({ input, ctx }) => {
       const { projectId, provider, customBaseUrl } = input;
-      return validateKeyWithCustomUrl(
+      return validateKeyWithCustomUrl({
         projectId,
         provider,
         customBaseUrl,
-        ctx.prisma,
-      );
+        prisma: ctx.prisma,
+      });
     }),
 
   // ────────────────────────────────────────────────────────────────────────
