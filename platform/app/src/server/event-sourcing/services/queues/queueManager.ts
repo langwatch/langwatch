@@ -220,11 +220,26 @@ export class QueueManager<EventType extends Event = Event> {
    * Registers the entry into the global job registry so the global queue's
    * process/groupKey/score callbacks can dispatch to the right handler.
    */
-  private createFacade<P extends Record<string, unknown>>(
-    jobType: string,
-    jobName: string,
-    entry: JobRegistryEntry,
-  ): EventSourcedQueueProcessor<P> {
+  private createFacade<P extends Record<string, unknown>>({
+    jobType,
+    jobName,
+    entry,
+    recoveryKeyFn,
+  }: {
+    jobType: string;
+    jobName: string;
+    entry: JobRegistryEntry;
+    /**
+     * Extracts the recovery key (the event id) from a payload of this facade's
+     * shape (#718). Injected as `__recoveryKey` and lifted into the envelope
+     * header so a dropped job — whose blob may be gone — is still nameable back
+     * to its event. The extractor is per-shape because it is the ONE seam that
+     * silently breaks: a reactor payload is `{event, foldState}` (id at
+     * `event.id`), a fold/map payload is the bare event (id at `id`). Wire the
+     * wrong one and every reactor drop is un-addressable.
+     */
+    recoveryKeyFn?: (payload: P) => string | undefined;
+  }): EventSourcedQueueProcessor<P> {
     if (!this.globalQueue || !this.globalJobRegistry) {
       throw new ConfigurationError(
         "QueueManager",
@@ -243,9 +258,25 @@ export class QueueManager<EventType extends Event = Event> {
         __pipelineName: _p,
         __jobType: _t,
         __jobName: _n,
+        __recoveryKey: _k,
         ...clean
       } = payload;
       return clean;
+    };
+
+    // Inject the queue machinery every send stamps: the routing trio and — when
+    // this facade knows how to extract it — the recovery key (#718).
+    const withMachinery = (payload: P): Record<string, unknown> => {
+      const recoveryKey = recoveryKeyFn?.(payload);
+      return {
+        ...payload,
+        __pipelineName: pipelineName,
+        __jobType: jobType,
+        __jobName: jobName,
+        ...(typeof recoveryKey === "string" && recoveryKey.length > 0
+          ? { __recoveryKey: recoveryKey }
+          : {}),
+      };
     };
 
     // Namespace dedup IDs to avoid cross-pipeline/cross-type collisions
@@ -266,36 +297,20 @@ export class QueueManager<EventType extends Event = Event> {
           ? namespaceDedup(options.deduplication as DeduplicationConfig<any>)
           : namespacedEntryDedup;
 
-        await globalQueue.send(
-          {
-            ...payload,
-            __pipelineName: pipelineName,
-            __jobType: jobType,
-            __jobName: jobName,
-          },
-          {
-            delay: options?.delay ?? entry.delay,
-            deduplication: effectiveDedup,
-          },
-        );
+        await globalQueue.send(withMachinery(payload), {
+          delay: options?.delay ?? entry.delay,
+          deduplication: effectiveDedup,
+        });
       },
       sendBatch: async (payloads: P[], options?: QueueSendOptions<P>) => {
         const effectiveDedup = options?.deduplication
           ? namespaceDedup(options.deduplication as DeduplicationConfig<any>)
           : namespacedEntryDedup;
 
-        await globalQueue.sendBatch(
-          payloads.map((p) => ({
-            ...p,
-            __pipelineName: pipelineName,
-            __jobType: jobType,
-            __jobName: jobName,
-          })),
-          {
-            delay: options?.delay ?? entry.delay,
-            deduplication: effectiveDedup,
-          },
-        );
+        await globalQueue.sendBatch(payloads.map(withMachinery), {
+          delay: options?.delay ?? entry.delay,
+          deduplication: effectiveDedup,
+        });
       },
       // Global queue lifecycle is owned by EventSourcing — facade close is a no-op
       close: async () => undefined,
@@ -415,7 +430,14 @@ export class QueueManager<EventType extends Event = Event> {
         spanAttributes: handlerDef.options.spanAttributes,
       };
 
-      const facade = this.createFacade<EventType>(jobType, handlerName, entry);
+      const facade = this.createFacade<EventType>({
+        jobType,
+        jobName: handlerName,
+        entry,
+        // Both handler (fold) and subscriber facades stage the bare event; the
+        // recovery key is its id (#718).
+        recoveryKeyFn: (event) => (event as { id?: string }).id,
+      });
       this.queues.set(this.key(jobType, handlerName), facade);
       incrementCount();
     }
@@ -502,11 +524,13 @@ export class QueueManager<EventType extends Event = Event> {
         }),
       };
 
-      const facade = this.createFacade<EventType>(
-        lane.queueType,
-        projectionName,
+      const facade = this.createFacade<EventType>({
+        jobType: lane.queueType,
+        jobName: projectionName,
         entry,
-      );
+        // A projection (map) stages the bare event; the recovery key is its id.
+        recoveryKeyFn: (event) => (event as { id?: string }).id,
+      });
       this.queues.set(this.key(lane.queueType, projectionName), facade);
       if (lane.queueType === "stateProjection") {
         this.stateProjectionCount++;
@@ -707,11 +731,11 @@ export class QueueManager<EventType extends Event = Event> {
         spanAttributes: cmdEntry.spanAttributes,
       };
 
-      const baseFacade = this.createFacade<Record<string, unknown>>(
-        "command",
-        cmdName,
-        jobEntry,
-      );
+      const baseFacade = this.createFacade<Record<string, unknown>>({
+        jobType: "command",
+        jobName: cmdName,
+        entry: jobEntry,
+      });
 
       // Wrap with pre-send validation
       const validatingFacade: EventSourcedQueueProcessor<any> = {
@@ -829,7 +853,16 @@ export class QueueManager<EventType extends Event = Event> {
       const facade = this.createFacade<{
         event: EventType;
         foldState: unknown;
-      }>("reactor", reactorName, entry);
+      }>({
+        jobType: "reactor",
+        jobName: reactorName,
+        entry,
+        // A reactor stages { event, foldState } — no top-level id — so the
+        // recovery key is event.id. This is THE seam #718 exists to get right:
+        // wire the fold extractor (p => p.id) here and every reactor drop loses
+        // its name (a reactor payload has no p.id).
+        recoveryKeyFn: (payload) => (payload.event as { id?: string })?.id,
+      });
       this.queues.set(this.key("reactor", reactorName), facade);
       this.reactorCount++;
     }
@@ -981,7 +1014,11 @@ export class QueueManager<EventType extends Event = Event> {
       spanAttributes: spanAttributes as any,
     };
 
-    const facade = this.createFacade<P>("job", name, entry);
+    const facade = this.createFacade<P>({
+      jobType: "job",
+      jobName: name,
+      entry,
+    });
     this.queues.set(this.key("job", name), facade);
     return facade;
   }

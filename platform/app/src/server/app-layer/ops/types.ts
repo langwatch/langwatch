@@ -26,6 +26,10 @@ export interface QueueInfo {
   blockedGroupCount: number;
   activeGroupCount: number;
   totalPendingJobs: number;
+  // Groups the dead-letter still HOLDS something for — not the size of its index.
+  // Members whose payload aged out of the 7-day quarantine window are swept as
+  // they are read, so this returns to zero once there is nothing left to act on
+  // (see SWEEP_DLQ_INDEX_LUA in queue.redis.repository.ts).
   dlqCount: number;
   // Groups a tenant soft-cap parked OUT of the ready scan because the tenant is
   // at its in-flight cap. Surfaced so a parking spike (the over-cap ZADD storm

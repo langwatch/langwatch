@@ -1,0 +1,39 @@
+-- +goose Up
+-- +goose ENVSUB ON
+
+-- CORRECTION to 00026_create_governance_ocsf_events.sql. Deployed migrations are
+-- immutable history (CLAUDE.md), so this correction lands in a NEW migration
+-- rather than editing 00026. Documentation only — no schema change.
+--
+-- 00026 calls governance_ocsf_events a fold of DERIVED data, and asserts the
+-- rebuild claim TWICE. Its header (00026:37-38): "The fold can be dropped +
+-- rebuilt at any time from event_log without data loss (per ADR-018)." Its Down
+-- note (00026:112-114), more weakly: "dropping governance_ocsf_events is
+-- supported (the fold is derived data, rebuildable from event_log)". BOTH ARE
+-- FALSE, and acting on EITHER PERMANENTLY DESTROYS SOC2 / ISO27001 audit
+-- evidence:
+--
+--   1. As of 2026-07 (PR #5853) the table is REACTOR-populated
+--      (governanceOcsfEventsSync, registered via
+--      builder.withReactor("traceSummary", …)), NOT a fold projection. Event
+--      replay rebuilds fold/map projections and NEVER invokes reactors
+--      (projections/projectionRouter.ts; ADR-081), so a rebuild from event_log
+--      produces ZERO OCSF rows for event-sourced audit events. Should that
+--      writer later be converted to a replay-covered projection, reason 2 below
+--      still makes a rebuild lossy — this instruction does not expire with
+--      reason 1.
+--   2. Two of its three writers never touch event_log at all —
+--      adminWorkspaceViewAudit.service.ts (admin drill-in audit) and
+--      pullerWorker.ts (external governance pull). Those rows have NO event_log
+--      representation, so no replay however capable could reconstruct them.
+--
+-- DO NOT drop + rebuild governance_ocsf_events from event_log. It is a durable
+-- audit sink, not derived data. Full decision record — ADR-081, at
+-- dev/docs/adr/081-drop-to-replay-not-recovery-for-reactors.md
+-- +goose StatementBegin
+SELECT 1;
+-- +goose StatementEnd
+
+-- +goose Down
+-- IRREVERSIBLE: documentation-only correction (a SELECT 1 no-op) — there is no
+-- schema or data change for a down migration to undo.

@@ -33,6 +33,7 @@ import {
   type ProjectStorageDestination,
   redactStorageUrisInText,
 } from "../../../stored-objects/project-storage-destination";
+import { errText } from "../../parseErrorText";
 import type {
   DeduplicationConfig,
   EventSourcedQueueDefinition,
@@ -58,12 +59,14 @@ import {
   readEnvelopeDescriptor,
   readJobAttempt,
   readJobPayloadBytes,
+  readJobRecoveryKey,
   readJobRoutingMeta,
   withJobAttempt,
 } from "./jobEnvelope";
 import { legacyStagedJobAttempt } from "./legacyStagedJobAttempt";
 import {
   gqBatchBisectionsTotal,
+  gqDrainedDlqRestagedTotal,
   gqForeignSiblingsRestagedTotal,
   gqGroupAttemptReadFailuresTotal,
   gqGroupsBlockedTotal,
@@ -91,7 +94,9 @@ import {
 } from "./readyScore";
 import {
   type DispatchResult,
+  type DlqBodyPreservation,
   type DrainedJob,
+  GROUP_QUEUE_DLQ_TTL_SECONDS,
   GroupStagingScripts,
   readBisectionSplitBudget,
   readClaimStrikeThreshold,
@@ -209,6 +214,10 @@ const CALLER_RESERVED_KEYS = new Set([
   "__pipelineName",
   "__jobType",
   "__jobName",
+  // Facade-set like the routing trio (#718): the QueueManager reactor/fold facade
+  // stamps the event id here so a dropped job stays nameable. Stripped before the
+  // handler runs — see INTERNAL_FIELDS.
+  "__recoveryKey",
 ]);
 
 function assertNoReservedKeys(
@@ -221,7 +230,7 @@ function assertNoReservedKeys(
       throw new QueueError(
         queueName,
         method,
-        `Payload key "${key}" is in the reserved __* namespace (queue machinery). User payloads must not start with "__" except __pipelineName / __jobType / __jobName.`,
+        `Payload key "${key}" is in the reserved __* namespace (queue machinery). User payloads must not start with "__" except ${[...CALLER_RESERVED_KEYS].join(" / ")}.`,
       );
     }
   }
@@ -234,6 +243,10 @@ const INTERNAL_FIELDS = [
   "__stagedJobId",
   "__dispatchScore",
   "__attempt",
+  // #718: queue machinery, never the handler's concern. For GQ1 (which does not
+  // lift machinery into the header) this list is the ONLY strip that keeps
+  // __recoveryKey out of the decoded payload the handler sees.
+  "__recoveryKey",
 ] as const;
 
 /**
@@ -260,6 +273,21 @@ type DropReason =
  */
 const dropReasonOf = (err: unknown): DecodeFailureReason | "unknown" =>
   err instanceof DecodeFailureError ? err.reason : "unknown";
+
+/**
+ * What actually became of a drained value handed to
+ * {@link GroupQueueProcessor.deadLetterDrainedValue} — the three branches it can
+ * take, reported rather than assumed.
+ *
+ * `restaged` is the one that matters most: it means the value is back in the LIVE
+ * group, so it is not a discard and must not touch `gq_jobs_dropped_total`. It is
+ * a designed durability fallback, not an edge case (see
+ * {@link GroupQueueProcessor.recordDrainedOutcome}).
+ */
+type DrainedDlqOutcome =
+  | { branch: "dead_lettered"; bodyPreservation: DlqBodyPreservation }
+  | { branch: "restaged" }
+  | { branch: "lost" };
 
 /**
  * Group Queue Processor that provides per-group FIFO with cross-group parallelism.
@@ -1092,6 +1120,13 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
           const siblingPayloads = parsedSiblings.filter(
             (parsed) => parsed !== null,
           ) as Payload[];
+          // Only siblings that PARSED are folded + processed, so only those are
+          // released on success. Dropped siblings (null) were already retired by
+          // parseDrainedPayload — a body-present one preserved (blob kept alive),
+          // a missing_blob one released there — so narrowing drainedSiblings to
+          // the live ones here excludes them from every downstream use,
+          // including the eventual release on the dispatched job's success
+          // (adversarial review #5853).
           drainedSiblings = liveSiblings;
           if (siblingPayloads.length > 0) {
             batchPayloads = [payload, ...siblingPayloads];
@@ -1332,6 +1367,14 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
                 // The chain is over: anything it recorded is no longer live.
                 await this.clearGroupAttempt(groupId);
 
+                // `drainedSiblings` was narrowed to the live/folded siblings
+                // right after the drain parse above, so a DROPPED sibling
+                // (dead-lettered or already released by parseDrainedPayload) is
+                // never included here — releasing it would otherwise dangle a
+                // preserved DLQ entry / re-staged copy's lease bookkeeping
+                // (adversarial review #5853). Non-destructive lease release
+                // means this is bookkeeping, not a data-loss risk either way,
+                // but the exclusion still matters for lease hygiene.
                 await this.blobLifecycle.releaseLease({
                   values: [
                     jobDataJson,
@@ -1730,32 +1773,61 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       }
       // Already out of staging, so there is no slot to complete — but the loss is
       // real and is counted like any other (#5538).
-      this.recordDrop({
-        groupId,
-        stagedJobId: sibling.stagedJobId,
-        jobDataJson: sibling.jobDataJson,
-        err,
-        reason: dropReasonOf(err),
-        message: "Failed to parse drained sibling job data — dropping",
-        // Lease release is non-destructive; bytes remain until lazy reclaim.
-        bodyPreserved: !(err instanceof DecodeFailureError
-          ? err.reason === "missing_blob"
-          : false),
-      });
-      await this.blobLifecycle.releaseLease({
-        values: [sibling.jobDataJson],
-        groupId,
-      });
+      const reason = dropReasonOf(err);
+      // We do not release a sibling's value, so the body outlives the drop
+      // unless it was already gone.
+      const bodyIsGone = reason === "missing_blob";
+      const message = "Failed to parse drained sibling job data — dropping";
+      if (!bodyIsGone) {
+        // No slot to complete (already drained) — preserve the value so the
+        // operator drain can recover it (#719). Unlike the dispatch site there is
+        // no complete() to withhold here (touching the live slot would corrupt a
+        // group this job already left), so the value has ALREADY left staging: if
+        // the dead-letter write rejects, deadLetterDrainedValue re-stages the raw
+        // value rather than losing it.
+        const outcome = await this.deadLetterDrainedValue({
+          groupId,
+          stagedJobId: sibling.stagedJobId,
+          jobDataJson: sibling.jobDataJson,
+          err,
+          reason,
+          originalScore: sibling.originalScore,
+        });
+        this.recordDrainedOutcome({
+          outcome,
+          groupId,
+          stagedJobId: sibling.stagedJobId,
+          jobDataJson: sibling.jobDataJson,
+          err,
+          reason,
+          message,
+        });
+      } else {
+        this.recordDrop({
+          groupId,
+          stagedJobId: sibling.stagedJobId,
+          jobDataJson: sibling.jobDataJson,
+          err,
+          reason,
+          message,
+          bodyPreserved: false,
+        });
+        // Body genuinely gone (missing_blob) — nothing to preserve. Release the
+        // stale lease NOW, mirroring the dispatch site's bodyIsGone release: the
+        // success-path release no longer covers dropped siblings, so without this
+        // the stale lease would leak to the TTL backstop (adversarial review
+        // #5853). Lease release is non-destructive (bytes remain until lazy
+        // reclaim) — the blob is already gone anyway, so this just drops the
+        // dead lease-set entry.
+        await this.blobLifecycle.releaseLease({
+          values: [sibling.jobDataJson],
+          groupId,
+        });
+      }
       return null;
     }
   }
 
-  /**
-   * Re-stages siblings drained for a batch that ultimately failed, so they are
-   * re-dispatched instead of lost. Each is staged with its original score and
-   * raw job data (context metadata preserved). Best-effort: a re-stage failure
-   * is logged, not thrown, so it never masks the original processing error.
-   */
   /**
    * Per-group retry-chain counter.
    *
@@ -2050,6 +2122,12 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     span.setAttribute("queue.batch_offending_job_id", entry.stagedJobId);
   }
 
+  /**
+   * Re-stages siblings drained for a batch that ultimately failed, so they are
+   * re-dispatched instead of lost. Each is staged with its original score and
+   * raw job data (context metadata preserved). Best-effort: a re-stage failure
+   * is logged, not thrown, so it never masks the original processing error.
+   */
   private async restageDrainedSiblings(
     groupId: string,
     siblings: DrainedJob[],
@@ -2070,20 +2148,246 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
           jobDataJson: sibling.jobDataJson,
         });
       } catch (err) {
-        // The sibling never made it back into staging, so nothing will dispatch
-        // it again — that is a discard, whatever the re-stage intended (#5538).
-        this.recordDrop({
+        // stage() itself failed: the sibling never made it back into staging, so
+        // nothing will dispatch it again — that is a discard, whatever the
+        // re-stage intended (#5538).
+        //
+        // Body intact and out of staging: dead-letter it (with the re-stage
+        // fallback) so a re-stage failure becomes recoverable, not a silent
+        // discard (#719). Counted AFTER, on the outcome it reports — see
+        // recordDrainedOutcome.
+        const outcome = await this.deadLetterDrainedValue({
+          groupId,
+          stagedJobId: sibling.stagedJobId,
+          jobDataJson: sibling.jobDataJson,
+          err,
+          reason: "sibling_restage_failed",
+          originalScore: sibling.originalScore,
+        });
+        this.recordDrainedOutcome({
+          outcome,
           groupId,
           stagedJobId: sibling.stagedJobId,
           jobDataJson: sibling.jobDataJson,
           err,
           reason: "sibling_restage_failed",
           message: "Failed to re-stage drained sibling after batch failure",
-          // Not released — the value is intact, it simply never got re-staged.
-          bodyPreserved: true,
         });
+        continue;
+      }
+      // Renew the sibling's lease AFTER a confirmed re-stage (idempotent: it
+      // kept its lease through the drain, and its value — hence holder id — is
+      // unchanged). Deliberately OUTSIDE the try/catch above: renewLease()
+      // degrades to the TTL backstop and never throws
+      // (envelopeBlobLifecycle.renewLease), so a lease hiccup must NOT
+      // dead-letter a sibling that is already back in live staging — that would
+      // duplicate a live job into the dead-letter and let it double-process
+      // after a drain.
+      await this.blobLifecycle.renewLease(sibling.jobDataJson);
+    }
+  }
+
+  /**
+   * Persist a discarded DRAINED value into the job-scoped dead-letter, with a
+   * re-stage durability fallback, and report which of the three branches it
+   * actually took.
+   *
+   * A drained value has already left live staging, so — unlike the dispatch and
+   * transient-exhaustion sites, which withhold `complete()` until AFTER the DLQ
+   * write (copy-before-complete: the value is never absent from both places) —
+   * there is no slot to hold open here. If dead-letter persistence rejects, the
+   * value would simply vanish. So on failure we re-stage the RAW value: it
+   * re-enters the live group (recoverable, and a later drain retries the DLQ
+   * write) rather than being lost. If the re-stage ALSO fails (Redis genuinely
+   * unreachable), the value is genuinely lost — `recordDrop` deliberately omits
+   * the body, so nothing reconstructs it — and we surface that loudly.
+   *
+   * **Why it returns the branch.** Those three outcomes are three different
+   * events, and only two of them are drops. The caller cannot honestly count or
+   * log one until this resolves, so the outcome is reported rather than assumed;
+   * {@link recordDrainedOutcome} is the single place that turns it into a metric.
+   */
+  private async deadLetterDrainedValue({
+    groupId,
+    stagedJobId,
+    jobDataJson,
+    err,
+    reason,
+    originalScore,
+  }: {
+    groupId: string;
+    stagedJobId: string;
+    jobDataJson: string;
+    /**
+     * The failure that made this value a discard in the first place.
+     *
+     * Carried in so the `restaged` branch can log it: that branch returns before
+     * {@link recordDrop}, which is the only other place this error text is
+     * written, and it is the branch that repeats every drain for a stuck job — so
+     * it is the one where losing the original cause hurts most.
+     */
+    err: unknown;
+    reason: DropReason;
+    /**
+     * `unknown`, matching {@link restageScore}: this came off a drained Redis row,
+     * so a legacy or corrupted score reaches here as a number the type system
+     * cannot vouch for. Narrowing it to `number` would be a false assurance.
+     */
+    originalScore: unknown;
+  }): Promise<DrainedDlqOutcome> {
+    try {
+      // Push the referenced blob's TTL out to the quarantine window first (#720),
+      // then write the dead-letter entry — same order the dispatch site uses.
+      // `preserveForDlq` never throws; it REPORTS whether the body will still be
+      // there, and that is stamped on the entry so an operator can tell a
+      // recoverable entry from one that will drain as missing_blob (#720, review).
+      //
+      // `releasesLeaseAfter: false` is load-bearing, not boilerplate: this value
+      // already left staging and nothing here releases its lease, so an
+      // unextended body keeps the routine blob backstop rather than falling to
+      // the release grace window. It is what makes the failure warn quote the
+      // window an operator actually has at THIS site.
+      const bodyPreservation = await this.blobLifecycle.preserveForDlq({
+        value: jobDataJson,
+        groupId,
+        ttlSeconds: GROUP_QUEUE_DLQ_TTL_SECONDS,
+        releasesLeaseAfter: false,
+      });
+      await this.scripts.writeJobToDlq({
+        groupId,
+        stagedJobId,
+        jobDataJson,
+        reason,
+        bodyPreservation,
+      });
+      return { branch: "dead_lettered", bodyPreservation };
+    } catch (dlqErr) {
+      // The dead-letter write failed and the value is already out of staging.
+      // Re-stage the raw value so the drop stays recoverable instead of
+      // vanishing — a later drain retries the dead-letter write.
+      try {
+        await this.scripts.stage({
+          stagedJobId,
+          groupId,
+          // Guarded like every other re-stage in this class. Unguarded, a legacy
+          // row scored 0 is rewritten at 0 on every failed dead-letter write and
+          // never heals, ordering it ahead of the job it was drained behind —
+          // the same defect restageDrainedSiblings documents at its own call.
+          dispatchAfterMs: this.restageScore(originalScore),
+          dedupId: "",
+          dedupTtlMs: 0,
+          jobDataJson,
+        });
+        // Mirror restageDrainedSiblings: renew the lease after a confirmed
+        // re-stage. Idempotent today (the lease survives the drop attempt
+        // unreleased), but keeps this path from silently diverging if a future
+        // refactor ever releases first — and renewLease() never throws (it
+        // degrades to the TTL backstop), so it adds no failure surface here.
+        await this.blobLifecycle.renewLease(jobDataJson);
+        this.logger.warn(
+          {
+            queueName: this.queueName,
+            groupId,
+            stagedJobId,
+            reason,
+            // BOTH errors, on the one line. `dlqError` is why the dead-letter
+            // write rejected; `dropError` is why the value was being discarded at
+            // all, and this branch is the only one that never reaches recordDrop,
+            // so without it that text reaches no log anywhere — for the branch
+            // that repeats on every drain of a stuck job. Redacted exactly as
+            // recordDrop redacts the same value: a decode failure's message can
+            // echo bytes of the body, which is the one thing never logged.
+            dlqError: errText(dlqErr),
+            dropError: redactStorageUrisInText(errText(err)),
+          },
+          "Dead-letter write failed for a drained value — re-staged the raw value as a durability fallback",
+        );
+        return { branch: "restaged" };
+      } catch (restageErr) {
+        // Both the dead-letter write AND the re-stage fallback failed (Redis
+        // unreachable). The raw value is lost: recordDrop deliberately omits
+        // the body (it may carry tenant PII, and the whole point is that we
+        // could not read it anyway), so nothing here can reconstruct it.
+        this.logger.error(
+          {
+            queueName: this.queueName,
+            groupId,
+            stagedJobId,
+            reason,
+            dlqError: errText(dlqErr),
+            restageError: errText(restageErr),
+          },
+          "Dead-letter write AND re-stage fallback failed for a drained value — raw value lost",
+        );
+        return { branch: "lost" };
       }
     }
+  }
+
+  /**
+   * Turn a {@link deadLetterDrainedValue} outcome into the counter and log line it
+   * actually earns.
+   *
+   * ⚠️ THE ORDER MATTERS, AND SO DOES THE CARVE-OUT. Both drained-sibling sites
+   * used to call `recordDrop({ bodyPreserved: true })` BEFORE the dead-letter
+   * attempt — the inverse of the ordering {@link dropStagedJob} adopted, whose
+   * comment spells out why: firing early lets a rejected write "masquerade as a
+   * successful, counted, 'preserved' drop while nothing was actually persisted
+   * yet". Here it was worse than at that site, because the bad outcome is not a
+   * crash but a DESIGNED path:
+   *
+   * - `restaged` is not a drop at all. The fallback put the value back in the live
+   *   group, so counting it made `gq_jobs_dropped_total` count jobs this queue did
+   *   NOT throw away — falsifying the invariant in {@link recordDrop}'s own
+   *   docstring. And since the re-stage hands the same value to the next drain, a
+   *   job whose dead-letter write keeps failing was re-counted once per drain
+   *   cycle: one stuck job inflating the drop counter without bound. It gets
+   *   `gq_drained_dlq_restaged_total` instead — a different event, told apart.
+   *   Counting differently must not mean saying less: the branch returns before
+   *   {@link recordDrop}, so the original failure is logged by
+   *   {@link deadLetterDrainedValue}'s own warn (`dropError`, beside the write
+   *   failure that triggered the fallback) rather than nowhere.
+   * - `lost` IS a drop, and a body-gone one: both the write and the fallback
+   *   failed, so `bodyPreserved` is false, not true.
+   * - `dead_lettered` is the preserved drop the old code assumed every time.
+   *
+   * So: never move a `recordDrop` back above the write it is claiming, and never
+   * fold `restaged` back into it.
+   */
+  private recordDrainedOutcome({
+    outcome,
+    groupId,
+    stagedJobId,
+    jobDataJson,
+    err,
+    reason,
+    message,
+  }: {
+    outcome: DrainedDlqOutcome;
+    groupId: string;
+    stagedJobId: string;
+    jobDataJson: string;
+    err: unknown;
+    reason: DropReason;
+    message: string;
+  }): void {
+    if (outcome.branch === "restaged") {
+      gqDrainedDlqRestagedTotal.inc({ queue_name: this.queueName, reason });
+      return;
+    }
+    // Only a written entry has a body-preservation state; `lost` has no entry.
+    const dlqBodyPreservation =
+      outcome.branch === "dead_lettered" ? outcome.bodyPreservation : undefined;
+    this.recordDrop({
+      groupId,
+      stagedJobId,
+      jobDataJson,
+      err,
+      reason,
+      message,
+      bodyPreserved: outcome.branch === "dead_lettered",
+      dlqBodyPreservation,
+    });
   }
 
   /**
@@ -2263,7 +2567,46 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     message: string;
   }): Promise<void> {
     const bodyIsGone = reason === "missing_blob";
+    let dlqBodyPreservation: DlqBodyPreservation | undefined;
 
+    if (!bodyIsGone) {
+      // Body present but unreadable to THIS worker (codec skew, malformed frame):
+      // preserve it in the job-scoped dead-letter BEFORE freeing the slot, so an
+      // operator drain — or a newer worker after a rollout — can still recover it
+      // (#719). Writing first means the value is never absent from both the live
+      // group and the dead-letter, even if we crash between the two calls.
+      // Push the referenced blob's TTL out to the quarantine window first (#720):
+      // the dead-letter outlives the blob's own backstop, so without this a drain
+      // would recover an envelope pointing at a gone blob. preserveForDlq never
+      // throws — it REPORTS whether that worked, and the entry records it, so an
+      // operator can tell a recoverable entry from one that will drain as
+      // missing_blob without draining it to find out (review #5853).
+      // `releasesLeaseAfter: true` — this method releases the lease at its end, so
+      // a body it fails to hold is heading for the release grace window, not the
+      // routine backstop. Stated rather than left to the default so the warn's
+      // window and the release below can only ever be read together.
+      dlqBodyPreservation = await this.blobLifecycle.preserveForDlq({
+        value: jobDataJson,
+        groupId,
+        ttlSeconds: GROUP_QUEUE_DLQ_TTL_SECONDS,
+        releasesLeaseAfter: true,
+      });
+      await this.scripts.writeJobToDlq({
+        groupId,
+        stagedJobId,
+        jobDataJson,
+        reason,
+        bodyPreservation: dlqBodyPreservation,
+      });
+    }
+
+    // Recorded AFTER the dead-letter write succeeds (not before): recordDrop is
+    // the metric/log's claim that the drop happened and, when bodyPreserved is
+    // true, that the value actually landed in the dead-letter. Firing it before
+    // the write above completes would let a rejected preserveForDlq/writeJobToDlq
+    // — which throws and skips complete() below, leaving the job live for a
+    // retry — masquerade as a successful, counted, "preserved" drop while
+    // nothing was actually persisted yet (review #5853, Minor).
     this.recordDrop({
       groupId,
       stagedJobId,
@@ -2272,12 +2615,21 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       reason,
       message,
       bodyPreserved: !bodyIsGone,
+      dlqBodyPreservation,
     });
 
     // `dropped: true` keeps the group advancing WITHOUT counting a thrown-away
     // job as a completion or clearing the group's stored error (#5538).
     await this.scripts.complete({ groupId, stagedJobId, dropped: true });
-    await this.blobLifecycle.releaseLease({ values: [jobDataJson], groupId });
+    // A dead-lettered body must survive this release. GQ2 does so by itself (the
+    // `gq:dlq` lease holder keeps the ZCARD non-zero), but a GQ1 release is an
+    // unconditional blob delete — so without this flag the preserve above would
+    // extend a blob, record the entry as `extended`, and then destroy it here.
+    await this.blobLifecycle.releaseLease({
+      values: [jobDataJson],
+      groupId,
+      retainOffloadedBody: dlqBodyPreservation === "extended",
+    });
   }
 
   /**
@@ -2288,6 +2640,13 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
    * counter and the log but no `complete()`. Every path in this module that
    * discards a job routes through here, so `gq_jobs_dropped_total` is the whole
    * truth about what this queue throws away.
+   *
+   * Which cuts both ways, and the second direction is the one that got broken: a
+   * path that does NOT throw a job away must not route through here either. The
+   * drained-sibling sites called this before attempting the dead-letter, so the
+   * re-stage fallback — which puts the value back in the live group — was counted
+   * as a drop, once per drain cycle for as long as the write kept failing. They go
+   * through {@link recordDrainedOutcome} now, which counts what actually happened.
    */
   private recordDrop({
     groupId,
@@ -2297,6 +2656,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     reason,
     message,
     bodyPreserved,
+    dlqBodyPreservation,
   }: {
     groupId: string;
     stagedJobId: string;
@@ -2316,9 +2676,27 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
      * structured field oncall filters on.
      */
     bodyPreserved: boolean;
+    /**
+     * Whether draining this drop's dead-letter entry will still find the BODY it
+     * references — the second half of the same question, for the entry rather than
+     * the value.
+     *
+     * Distinct from `bodyPreserved`, which says only that we did not release the
+     * value we could not read. An entry can be preserved and still point at bytes
+     * nothing is holding: `preserveForDlq` never throws and returns quietly on a
+     * tenant-mismatched ref, a rejected extend, or an envelope claiming an
+     * offloaded body it cannot reference. Undefined when there is no entry (a
+     * body-gone drop) or when the caller cannot say.
+     */
+    dlqBodyPreservation?: DlqBodyPreservation;
   }): void {
     const { pipelineName, jobType, jobName } = readJobRoutingMeta(jobDataJson);
     const descriptor = readEnvelopeDescriptor(jobDataJson);
+    // #718: the event id, read from the header so it survives a gone blob. This is
+    // the ONLY durable name a dropped reactor job has — its staged-job id is a
+    // random UUID (reactor payloads have no top-level .id). Deliberately NOT a
+    // counter label: event ids are unbounded-cardinality, they belong in the log.
+    const recoveryKey = readJobRecoveryKey(jobDataJson);
 
     gqJobsDroppedTotal.inc({
       queue_name: this.queueName,
@@ -2345,7 +2723,10 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
         envelopeFormat: descriptor.format,
         envelopeVersion: descriptor.version,
         blobId: descriptor.blobId,
+        // #718: names the exact event this drop lost, even when the blob is gone.
+        recoveryKey,
         bodyPreserved,
+        dlqBodyPreservation,
         // Redacted text, not the raw Error: drop errors can quote storage
         // URIs, and the stack's first line repeats the message — so both go
         // through the same redaction.
