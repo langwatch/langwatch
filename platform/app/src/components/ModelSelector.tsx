@@ -315,7 +315,7 @@ export const ModelSelector = React.memo(function ModelSelector({
           positioning={{ placement: "top" }}
           showArrow
         >
-          <HStack gap={1} color="red.600" flexShrink={0}>
+          <HStack gap={1} color="red.fg" flexShrink={0}>
             <AlertTriangle size={size === "sm" ? 12 : 14} aria-hidden />
             <Text
               fontSize={size === "sm" ? "2xs" : "xs"}

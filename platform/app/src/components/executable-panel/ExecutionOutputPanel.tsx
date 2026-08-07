@@ -187,7 +187,7 @@ const renderExecutionError = (executionState: ExecutionState) => {
         Error
       </Text>
       <OutputBox
-        color="red.700"
+        color="red.fg"
         value={executionState.error ?? "No error message captured"}
       />
     </VStack>

@@ -120,7 +120,7 @@ function PlanCardActions({
             asChild
             width="full"
             color="bg.emphasized"
-            backgroundColor="orange.600"
+            backgroundColor="orange.solid"
             variant="solid"
           >
             <Link href="/settings/members">Add Members</Link>
@@ -355,20 +355,20 @@ export function PlansComparisonPage({
       {showTieredNotice && (
         <Box
           data-testid="tiered-discontinued-notice"
-          backgroundColor="orange.50"
+          backgroundColor="orange.subtle"
           borderWidth={1}
-          borderColor="orange.200"
+          borderColor="orange.muted"
           borderRadius="md"
           padding={4}
         >
           <HStack gap={2} alignItems="start">
             <Info size={16} color="var(--chakra-colors-orange-500)" />
-            <Text fontSize="sm" color="orange.900">
+            <Text fontSize="sm" color="orange.fg">
               Your current pricing model has been discontinued.{" "}
               <Link
                 href="/settings/subscription"
                 fontWeight="semibold"
-                color="orange.700"
+                color="orange.fg"
                 _hover={{ color: "orange.900" }}
               >
                 Update your plan

@@ -511,10 +511,10 @@ function ApiKeyRow({
           gap={2}
           paddingY={2}
           paddingX={3}
-          backgroundColor="red.50"
+          backgroundColor="red.subtle"
           borderRadius="sm"
         >
-          <Text fontSize="xs" color="red.700" flex={1}>
+          <Text fontSize="xs" color="red.fg" flex={1}>
             Revoke this key? Any tool using it will start failing immediately.
           </Text>
           <Button
@@ -549,15 +549,15 @@ function RevealedSecretBanner({
   return (
     <Box
       borderWidth="1px"
-      borderColor="green.300"
-      backgroundColor="green.50"
+      borderColor="green.emphasized"
+      backgroundColor="green.subtle"
       borderRadius="md"
       padding={3}
       marginBottom={3}
     >
       <VStack align="stretch" gap={2}>
         <HStack>
-          <Text fontWeight="semibold" color="green.800">
+          <Text fontWeight="semibold" color="green.fg">
             New key '{secret.label}' created
           </Text>
           <Spacer />
@@ -565,7 +565,7 @@ function RevealedSecretBanner({
             Dismiss
           </Button>
         </HStack>
-        <Text fontSize="xs" color="green.800">
+        <Text fontSize="xs" color="green.fg">
           Copy the secret now — you won't be able to see it again.
         </Text>
         <HStack
@@ -594,7 +594,7 @@ function RevealedSecretBanner({
             <Copy size={14} /> Copy
           </Button>
         </HStack>
-        <Text fontSize="xs" color="green.800">
+        <Text fontSize="xs" color="green.fg">
           Gateway base URL: <code>{secret.baseUrl}</code>
         </Text>
       </VStack>

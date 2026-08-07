@@ -352,7 +352,7 @@ export default function CheckConfigForm({
                         })}
                       />
                       {isNameAlreadyInUse && (
-                        <Text color="red.500" fontSize="13px">
+                        <Text color="red.solid" fontSize="13px">
                           An evaluation with the same name already exists,
                           please choose a different name to have a different
                           slug identifier as well

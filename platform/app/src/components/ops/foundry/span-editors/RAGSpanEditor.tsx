@@ -22,7 +22,7 @@ export function RAGSpanEditor({ span }: { span: SpanConfig }) {
       bg="teal.500/5"
       p={4}
     >
-      <Text fontSize="sm" fontWeight="semibold" color="teal.400" mb={3}>
+      <Text fontSize="sm" fontWeight="semibold" color="teal.solid" mb={3}>
         RAG Contexts
       </Text>
       <Flex direction="column" gap={3}>

@@ -27,7 +27,7 @@ export function HintsSection() {
       fontSize="12px"
       color="fg.muted"
     >
-      <Box color="yellow.500" flexShrink={0}>
+      <Box color="yellow.solid" flexShrink={0}>
         <Lightbulb size={14} />
       </Box>
       <Text>

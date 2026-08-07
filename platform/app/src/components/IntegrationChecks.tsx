@@ -82,7 +82,7 @@ export const IntegrationChecks = () => {
       <List.Root gap={4}>
         <List.Item className="group" display="block" asChild>
           <Link href={`/settings/teams`}>
-            <List.Indicator asChild color="green.500">
+            <List.Indicator asChild color="green.solid">
               <CheckCircle />
             </List.Indicator>
             Create first project

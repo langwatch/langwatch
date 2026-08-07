@@ -431,7 +431,7 @@ function FlagRowView({
                   variant="plain"
                   size="xs"
                   fontSize="xs"
-                  color="blue.500"
+                  color="blue.solid"
                   textDecoration="underline"
                   paddingX={0}
                   height="auto"

@@ -107,7 +107,7 @@ export function SecretsIndicator({
                     target="_blank"
                     rel="noopener noreferrer"
                     fontSize="xs"
-                    color="blue.500"
+                    color="blue.solid"
                   >
                     Add secrets in Settings{" "}
                     <LuExternalLink

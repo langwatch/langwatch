@@ -360,13 +360,13 @@ function RoutingPoliciesPage() {
         {!policiesQuery.isLoading && !hasAnyDefault && (
           <Box
             borderWidth="1px"
-            borderColor="orange.300"
+            borderColor="orange.emphasized"
             borderRadius="md"
-            backgroundColor="orange.50"
+            backgroundColor="orange.subtle"
             padding={4}
           >
             <HStack alignItems="start" gap={3}>
-              <Box color="orange.600" paddingTop="2px">
+              <Box color="orange.fg" paddingTop="2px">
                 <Lightbulb size={18} />
               </Box>
               <VStack align="start" gap={1}>
@@ -399,7 +399,7 @@ function RoutingPoliciesPage() {
                   <Link
                     href={docsUrl("/ai-gateway/governance/routing-policies")}
                     isExternal
-                    color="orange.700"
+                    color="orange.fg"
                     fontSize="xs"
                     fontWeight="medium"
                   >
@@ -968,9 +968,9 @@ function ProviderCredentialPicker({
     return (
       <Box
         borderWidth="1px"
-        borderColor="orange.300"
+        borderColor="orange.emphasized"
         borderRadius="md"
-        backgroundColor="orange.50"
+        backgroundColor="orange.subtle"
         padding={3}
       >
         <VStack align="start" gap={1}>
@@ -984,7 +984,7 @@ function ProviderCredentialPicker({
           {modelProvidersAdminPath && (
             <Link
               href={modelProvidersAdminPath}
-              color="orange.700"
+              color="orange.fg"
               fontSize="xs"
               fontWeight="medium"
             >
@@ -1000,9 +1000,9 @@ function ProviderCredentialPicker({
     return (
       <Box
         borderWidth="1px"
-        borderColor="orange.300"
+        borderColor="orange.emphasized"
         borderRadius="md"
-        backgroundColor="orange.50"
+        backgroundColor="orange.subtle"
         padding={3}
       >
         <VStack align="start" gap={1}>
@@ -1019,7 +1019,7 @@ function ProviderCredentialPicker({
           {modelProvidersAdminPath && (
             <Link
               href={modelProvidersAdminPath}
-              color="orange.700"
+              color="orange.fg"
               fontSize="xs"
               fontWeight="medium"
             >
@@ -1060,7 +1060,7 @@ function ProviderCredentialPicker({
                     {id}
                   </Text>
                   {option?.disabledAt && (
-                    <Text fontSize="xs" color="orange.600">
+                    <Text fontSize="xs" color="orange.fg">
                       Disabled - requests will skip this credential
                     </Text>
                   )}
@@ -1469,22 +1469,22 @@ function RoutingPolicyDrawer({
             {errorMessage && (
               <Box
                 borderWidth="1px"
-                borderColor="red.300"
+                borderColor="red.emphasized"
                 borderRadius="md"
-                backgroundColor="red.50"
+                backgroundColor="red.subtle"
                 padding={3}
               >
                 <HStack alignItems="start" gap={2}>
-                  <Box color="red.600" paddingTop="2px">
+                  <Box color="red.fg" paddingTop="2px">
                     <X size={14} />
                   </Box>
                   <VStack align="start" gap={0} flex={1} minWidth={0}>
-                    <Text fontSize="xs" fontWeight="semibold" color="red.700">
+                    <Text fontSize="xs" fontWeight="semibold" color="red.fg">
                       {mode === "create"
                         ? "Couldn't create the policy"
                         : "Couldn't save the policy"}
                     </Text>
-                    <Text fontSize="xs" color="red.700">
+                    <Text fontSize="xs" color="red.fg">
                       {errorMessage}
                     </Text>
                   </VStack>

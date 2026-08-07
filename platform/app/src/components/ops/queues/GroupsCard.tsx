@@ -463,7 +463,7 @@ export function GroupsCard({ queueNames }: { queueNames: string[] }) {
                               <Text
                                 textStyle="xs"
                                 fontFamily="mono"
-                                color="orange.500"
+                                color="orange.solid"
                               >
                                 {group.retryCount}
                               </Text>

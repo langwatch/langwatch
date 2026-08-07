@@ -123,7 +123,7 @@ function GovernanceUsersListPage() {
         <HStack alignItems="end">
           <VStack align="start" gap={1}>
             <Text fontSize="xs" color="fg.muted">
-              <Link href="/settings/governance" color="blue.600">
+              <Link href="/settings/governance" color="blue.fg">
                 ← AI Governance
               </Link>{" "}
               · All users

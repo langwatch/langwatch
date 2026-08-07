@@ -88,7 +88,7 @@ export function LLMModelDisplay({
         )}
       </VStack>
       {isProviderMissing && (
-        <HStack gap={1} color="red.600" flexShrink={0}>
+        <HStack gap={1} color="red.fg" flexShrink={0}>
           <AlertTriangle size={14} aria-hidden />
           <Text
             fontSize="xs"

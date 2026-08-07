@@ -419,7 +419,7 @@ function BudgetDetailPage() {
                           <Table.Cell>
                             <Link
                               href={`/settings/gateway/virtual-keys/${line.virtualKeyId}`}
-                              color="orange.600"
+                              color="orange.fg"
                             >
                               <Text fontSize="sm">{line.virtualKeyName}</Text>
                             </Link>
@@ -562,7 +562,7 @@ function ScopeBadge({
     <HStack gap={2} align="baseline">
       <Badge colorPalette="gray">{kindLabel}</Badge>
       {vkHref ? (
-        <Link href={vkHref} color="orange.600">
+        <Link href={vkHref} color="orange.fg">
           <Text fontSize="sm" fontWeight="medium">
             {target.name}
           </Text>

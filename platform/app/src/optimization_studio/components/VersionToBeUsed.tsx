@@ -250,7 +250,7 @@ export function NewVersionFields({
                 <IconButton
                   size="xs"
                   variant="ghost"
-                  color="blue.400"
+                  color="blue.solid"
                   aria-label="Generate description"
                   data-testid="generate-commit-message-button"
                   onClick={() => {

@@ -72,7 +72,7 @@ export function BlobRow({
             <Menu.Content>
               <Menu.Item
                 value="delete"
-                color="red.500"
+                color="red.solid"
                 onClick={() => onDelete(blob)}
               >
                 Delete payload

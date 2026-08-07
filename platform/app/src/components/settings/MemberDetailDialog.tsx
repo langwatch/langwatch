@@ -370,7 +370,7 @@ export function MemberDetailDialog({
                         <Link
                           href="/settings/groups"
                           fontSize="xs"
-                          color="blue.400"
+                          color="blue.solid"
                         >
                           No access configured
                         </Link>

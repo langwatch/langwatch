@@ -281,7 +281,7 @@ function EvaluatorCard({
             size="xs"
             height="auto"
             padding={0}
-            color="orange.600"
+            color="orange.fg"
             fontSize="xs"
             fontWeight="500"
             onClick={(e) => {

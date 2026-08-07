@@ -17,7 +17,12 @@ export function EventsCounter({
     <>
       {addDot && <Text>·</Text>}
       <HStack>
-        <Box width="6px" height="6px" borderRadius="100%" bg="green.500"></Box>
+        <Box
+          width="6px"
+          height="6px"
+          borderRadius="100%"
+          bg="green.solid"
+        ></Box>
         <Text>{trace.events.length} events</Text>
       </HStack>
       <ThumbsUpDown trace={trace} />

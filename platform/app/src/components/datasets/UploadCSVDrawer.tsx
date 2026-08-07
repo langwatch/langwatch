@@ -848,7 +848,7 @@ export function UploadCSVForm({
             variant="plain"
             colorPalette="gray"
             fontWeight="normal"
-            color="blue.700"
+            color="blue.fg"
             onClick={onCreateFromScratch}
             disabled={isUploading}
           >
@@ -1150,16 +1150,16 @@ function jsonToCSV(jsonContents: object[]): string {
 type DatasetFileStatus = "selected" | "uploading" | "ready" | "error";
 
 function DatasetFileStatusIcon({ status }: { status: DatasetFileStatus }) {
-  if (status === "uploading") return <Spinner size="sm" color="blue.500" />;
+  if (status === "uploading") return <Spinner size="sm" color="blue.solid" />;
   if (status === "ready")
     return (
-      <Box color="green.500" display="flex">
+      <Box color="green.solid" display="flex">
         <CheckCircle size={20} />
       </Box>
     );
   if (status === "error")
     return (
-      <Box color="red.500" display="flex">
+      <Box color="red.solid" display="flex">
         <XCircle size={20} />
       </Box>
     );

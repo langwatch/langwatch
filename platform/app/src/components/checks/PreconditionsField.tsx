@@ -234,7 +234,7 @@ export const PreconditionsField = ({
                 </HStack>
               </VStack>
               {(formState.errors.preconditions as any)?.[index]?.value && (
-                <Text color="red.500" fontSize="12px" paddingLeft={4}>
+                <Text color="red.solid" fontSize="12px" paddingLeft={4}>
                   {
                     (formState.errors.preconditions as any)?.[index]?.value
                       .message

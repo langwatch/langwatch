@@ -49,7 +49,7 @@ function SpanTreeNode({ span, depth }: { span: SpanConfig; depth: number }) {
           {span.type}
         </Text>
         {span.status === "error" && (
-          <Text color="red.400" fontWeight="bold">
+          <Text color="red.solid" fontWeight="bold">
             !
           </Text>
         )}

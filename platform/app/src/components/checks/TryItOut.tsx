@@ -504,7 +504,7 @@ export function TryItOut({
                                 lineClamp={1}
                                 maxWidth="250px"
                                 display="block"
-                                color="red.400"
+                                color="red.solid"
                               >
                                 Error
                                 {trace.error.message ? ": " : ""}

@@ -394,7 +394,7 @@ export function DataPrivacyPage({ projectId }: { projectId: string }) {
                                     </Menu.Item>
                                     <Menu.Item
                                       value="delete"
-                                      color="red.500"
+                                      color="red.solid"
                                       onClick={() => void removeRule(rule)}
                                     >
                                       Delete
@@ -985,7 +985,7 @@ export function PrivacyRuleDrawer({
                       </Button>
                     </HStack>
                     {error && (
-                      <Text fontSize="xs" color="red.500">
+                      <Text fontSize="xs" color="red.solid">
                         {error}
                       </Text>
                     )}
@@ -1169,7 +1169,7 @@ export function PrivacyRuleDrawer({
                           </Button>
                         </HStack>
                         {error && (
-                          <Text fontSize="xs" color="red.500">
+                          <Text fontSize="xs" color="red.solid">
                             {error}
                           </Text>
                         )}
@@ -1282,7 +1282,7 @@ export function PrivacyRuleDrawer({
                           </Button>
                         </HStack>
                         {error && (
-                          <Text fontSize="xs" color="red.500">
+                          <Text fontSize="xs" color="red.solid">
                             {error}
                           </Text>
                         )}

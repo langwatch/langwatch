@@ -21,7 +21,7 @@ export function HttpMethodSelector({
         value={value}
         onChange={(e) => onChange(e.target.value as HttpMethod)}
         fontWeight="medium"
-        color="blue.600"
+        color="blue.fg"
       >
         {HTTP_METHODS.map((method) => (
           <option key={method} value={method}>

@@ -55,7 +55,7 @@ export function AnomaliesCard() {
           {query.isFetching && <Spinner size="xs" />}
         </HStack>
         {hasError && (
-          <Text paddingX={4} paddingBottom={3} color="red.500" textStyle="xs">
+          <Text paddingX={4} paddingBottom={3} color="red.solid" textStyle="xs">
             Could not load anomalies — Redis may be unavailable. Retrying every
             30s. Do NOT interpret this as &ldquo;all clear&rdquo;.
           </Text>

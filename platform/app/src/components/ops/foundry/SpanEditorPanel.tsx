@@ -190,7 +190,7 @@ export function SpanEditorPanel() {
           bg="red.500/5"
           p={3}
         >
-          <Text fontSize="xs" fontWeight="medium" color="red.400" mb={1}>
+          <Text fontSize="xs" fontWeight="medium" color="red.solid" mb={1}>
             Exception
           </Text>
           <Input

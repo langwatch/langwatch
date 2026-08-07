@@ -255,7 +255,7 @@ export function ModelProviderAdvancedSection({
                   }
                 />
                 {jsonError ? (
-                  <Text fontSize="xs" color="red.500">
+                  <Text fontSize="xs" color="red.solid">
                     {jsonError}
                   </Text>
                 ) : (
@@ -282,7 +282,7 @@ export function ModelProviderAdvancedSection({
                     Circuit opened: {formatDate(initial.circuitOpenedAt)}
                   </Text>
                   {initial.disabledAt && (
-                    <Text color="red.500">
+                    <Text color="red.solid">
                       Disabled at: {formatDate(initial.disabledAt)}
                     </Text>
                   )}

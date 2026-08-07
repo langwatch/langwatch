@@ -212,7 +212,7 @@ export function EvaluatorSelection({
                             position="absolute"
                             right="-12px"
                             top="-12px"
-                            background="blue.100"
+                            background="blue.muted"
                             borderRadius="100%"
                             padding="4px"
                           >
@@ -315,8 +315,8 @@ export function EvaluatorSelection({
                               >
                                 <Badge
                                   colorPalette="blue"
-                                  backgroundColor="blue.50"
-                                  color="blue.700"
+                                  backgroundColor="blue.subtle"
+                                  color="blue.fg"
                                   whiteSpace="nowrap"
                                 >
                                   Requires Expected Output
@@ -341,8 +341,8 @@ export function EvaluatorSelection({
                               >
                                 <Badge
                                   colorPalette="purple"
-                                  backgroundColor="purple.50"
-                                  color="purple.700"
+                                  backgroundColor="purple.subtle"
+                                  color="purple.fg"
                                   whiteSpace="nowrap"
                                 >
                                   Requires Expected Contexts

@@ -240,13 +240,13 @@ export function ToolCatalogEditor({
       {(isCatalogEmpty || showImport) && (
         <Box
           borderWidth="1px"
-          borderColor="orange.300"
+          borderColor="orange.emphasized"
           borderRadius="md"
-          backgroundColor="orange.50"
+          backgroundColor="orange.subtle"
           padding={4}
         >
           <HStack alignItems="start" gap={3}>
-            <Box color="orange.600" paddingTop="2px">
+            <Box color="orange.fg" paddingTop="2px">
               <PackageOpen size={20} />
             </Box>
             <VStack align="start" gap={2} flex={1} minWidth={0}>

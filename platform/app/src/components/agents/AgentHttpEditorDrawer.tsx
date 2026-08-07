@@ -632,7 +632,7 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
                         {!hasAtLeastOneMapping && (
                           <Text
                             data-testid="at-least-one-mapping-error"
-                            color="red.500"
+                            color="red.solid"
                             fontSize="sm"
                           >
                             At least one variable must be mapped

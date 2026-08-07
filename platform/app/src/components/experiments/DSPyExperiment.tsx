@@ -799,7 +799,7 @@ export const RunDetails = React.memo(
                     ))
                   ) : dspyStep.error ? (
                     <Table.Row>
-                      <Table.Cell colSpan={5} color="red.600">
+                      <Table.Cell colSpan={5} color="red.fg">
                         Error loading step data
                       </Table.Cell>
                     </Table.Row>
@@ -912,7 +912,7 @@ export const RunDetails = React.memo(
                     ))
                   ) : dspyStep.error ? (
                     <Table.Row>
-                      <Table.Cell colSpan={4} color="red.600">
+                      <Table.Cell colSpan={4} color="red.fg">
                         Error loading step data
                       </Table.Cell>
                     </Table.Row>
@@ -1013,7 +1013,7 @@ export const RunDetails = React.memo(
                   ))
                 ) : dspyStep.error ? (
                   <Table.Row>
-                    <Table.Cell colSpan={6} color="red.600">
+                    <Table.Cell colSpan={6} color="red.fg">
                       Error loading step data
                     </Table.Cell>
                   </Table.Row>

@@ -390,7 +390,7 @@ EOF
                 your API key.{" "}
                 <Link
                   href={apiKeyLink}
-                  color="blue.500"
+                  color="blue.solid"
                   display="inline-flex"
                   alignItems="center"
                   gap={1}
@@ -406,7 +406,7 @@ EOF
                 in our{" "}
                 <Link
                   href={docsLink}
-                  color="blue.500"
+                  color="blue.solid"
                   display="inline-flex"
                   alignItems="center"
                   gap={1}

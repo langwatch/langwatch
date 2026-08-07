@@ -77,7 +77,7 @@ export const TargetSummary = memo(function TargetSummary({
           <Text fontWeight="medium">
             {aggregates.completedRows}/{aggregates.totalRows}
             {aggregates.errorRows > 0 && (
-              <Text as="span" color="red.300" marginLeft={1}>
+              <Text as="span" color="red.solid" marginLeft={1}>
                 ({aggregates.errorRows}{" "}
                 {aggregates.errorRows === 1 ? "error" : "errors"})
               </Text>
@@ -216,7 +216,7 @@ export const TargetSummary = memo(function TargetSummary({
                     </Text>
                   )}
                   {evaluator.errors > 0 && (
-                    <Text fontSize="11px" color="red.300">
+                    <Text fontSize="11px" color="red.solid">
                       {evaluator.errors}{" "}
                       {evaluator.errors === 1 ? "error" : "errors"}
                     </Text>

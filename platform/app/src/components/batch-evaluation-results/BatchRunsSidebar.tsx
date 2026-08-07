@@ -413,7 +413,7 @@ export function BatchRunsSidebar({
                       </Text>
                     )}
                     {!isFinished && (
-                      <Spinner size="xs" color="blue.500" flexShrink={0} />
+                      <Spinner size="xs" color="blue.solid" flexShrink={0} />
                     )}
                   </HStack>
 

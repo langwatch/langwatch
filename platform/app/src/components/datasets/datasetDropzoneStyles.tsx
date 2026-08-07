@@ -72,7 +72,7 @@ export function DropzonePrompt({ multiple = false }: { multiple?: boolean }) {
     <VStack gap={2}>
       <Box
         className="lw-dropzone-icon"
-        color="blue.400"
+        color="blue.solid"
         transition="transform 0.2s ease"
         transformOrigin="center"
       >
@@ -80,7 +80,7 @@ export function DropzonePrompt({ multiple = false }: { multiple?: boolean }) {
       </Box>
       <Text fontSize="md" color="fg">
         {multiple ? "Drag and drop files, or " : "Drag and drop file, or "}
-        <Text as="span" color="blue.500" fontWeight="medium">
+        <Text as="span" color="blue.solid" fontWeight="medium">
           click to browse
         </Text>
       </Text>

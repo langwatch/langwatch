@@ -45,7 +45,7 @@ export function EvaluatorSelectionBox({
       >
         <HStack justify="space-between" width="full">
           <HStack gap={3}>
-            <Box color="green.500">
+            <Box color="green.solid">
               <CheckCircle size={20} />
             </Box>
             <VStack width="full" align="start" lineHeight={1} textAlign="left">

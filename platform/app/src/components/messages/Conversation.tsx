@@ -104,7 +104,7 @@ export function Conversation({
                   ))
               ) : threadTraces.error && !isPublicRoute ? (
                 <Box maxWidth="800px" paddingTop={8} paddingBottom={4}>
-                  <Text color="red.500">
+                  <Text color="red.solid">
                     Something went wrong trying to load previous messages
                   </Text>
                 </Box>

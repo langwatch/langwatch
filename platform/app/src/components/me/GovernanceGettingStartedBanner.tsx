@@ -119,7 +119,7 @@ export function GovernanceGettingStartedBanner() {
               asChild
               size="sm"
               bg="white"
-              color="orange.700"
+              color="orange.fg"
               fontWeight="600"
               paddingX={4}
               boxShadow="0 1px 2px rgba(0,0,0,0.12)"

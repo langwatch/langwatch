@@ -22,7 +22,7 @@ export function PromptSpanEditor({ span }: { span: SpanConfig }) {
       bg="yellow.500/5"
       p={4}
     >
-      <Text fontSize="sm" fontWeight="semibold" color="yellow.400" mb={3}>
+      <Text fontSize="sm" fontWeight="semibold" color="yellow.solid" mb={3}>
         Prompt Configuration
       </Text>
       <Flex gap={3} mb={3}>

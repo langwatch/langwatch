@@ -107,7 +107,7 @@ function DocumentsMetrics() {
               <Tabs.Indicator
                 mt="-1.5px"
                 height="4px"
-                bg="orange.400"
+                bg="orange.solid"
                 borderRadius="1px"
                 bottom={0}
               />

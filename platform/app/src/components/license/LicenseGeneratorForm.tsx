@@ -310,16 +310,16 @@ export const LicenseGeneratorForm = forwardRef<
     return (
       <VStack align="start" gap={4} width="full" paddingX={6} paddingY={4}>
         <Box
-          backgroundColor="green.50"
+          backgroundColor="green.subtle"
           padding={4}
           borderRadius="md"
           width="full"
         >
           <VStack align="start" gap={2}>
-            <Text fontSize="sm" fontWeight="medium" color="green.700">
+            <Text fontSize="sm" fontWeight="medium" color="green.fg">
               License generated and downloaded!
             </Text>
-            <Text fontSize="sm" color="green.600">
+            <Text fontSize="sm" color="green.fg">
               The license file has been saved as{" "}
               <Text as="span" fontFamily="mono" fontWeight="medium">
                 {sanitizedName}.langwatch-license

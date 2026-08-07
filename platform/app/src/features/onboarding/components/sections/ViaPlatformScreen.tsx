@@ -98,7 +98,7 @@ function CapabilityCard({
           p={2.5}
           borderRadius="xl"
           bg={accentChipBg}
-          color="orange.500"
+          color="orange.solid"
           display="flex"
           alignItems="center"
           justifyContent="center"

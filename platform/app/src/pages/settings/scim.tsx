@@ -263,7 +263,7 @@ function ScimSettingsContent({ organizationId }: { organizationId: string }) {
           <Dialog.CloseTrigger />
           <Dialog.Body paddingBottom={6}>
             <VStack gap={4} align="start">
-              <Text color="orange.500" fontWeight="600">
+              <Text color="orange.solid" fontWeight="600">
                 Copy this token now. You won&apos;t be able to see it again.
               </Text>
               {newToken && <CopyInput value={newToken} label="SCIM Token" />}

@@ -120,9 +120,9 @@ export function EligibleModelProvidersPreview({
         align="stretch"
         gap={2}
         borderWidth="1px"
-        borderColor="orange.200"
+        borderColor="orange.muted"
         borderRadius="md"
-        background="orange.50"
+        background="orange.subtle"
         padding={3}
       >
         <Text fontSize="sm" fontWeight="medium">
@@ -312,7 +312,7 @@ export function ConfigureModelProvidersLink({
       href={href}
       target="_blank"
       rel="noopener noreferrer"
-      color="blue.600"
+      color="blue.fg"
       fontSize="xs"
     >
       <HStack gap={1} alignItems="center">

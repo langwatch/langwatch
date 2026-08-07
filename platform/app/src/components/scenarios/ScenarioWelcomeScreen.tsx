@@ -49,8 +49,8 @@ function ScenarioWelcomeContent({ onProceed }: { onProceed: () => void }) {
             <Box
               p={2}
               borderRadius="md"
-              bg="blue.50"
-              color="blue.600"
+              bg="blue.subtle"
+              color="blue.fg"
               _dark={{ bg: "blue.900", color: "blue.200" }}
               flexShrink={0}
             >

@@ -336,10 +336,10 @@ function EditTeam({ team }: { team: TeamWithProjectsAndMembersAndUsers }) {
         />
         <Separator />
         <VStack align="start" gap={3} width="full">
-          <Heading size="sm" color="red.500">
+          <Heading size="sm" color="red.solid">
             Danger Zone
           </Heading>
-          <Card.Root width="full" borderColor="red.200">
+          <Card.Root width="full" borderColor="red.muted">
             <Card.Body>
               <HStack justify="space-between">
                 <VStack align="start" gap={0}>

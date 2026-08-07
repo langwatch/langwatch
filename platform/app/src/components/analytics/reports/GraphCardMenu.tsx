@@ -85,7 +85,7 @@ export function GraphCardMenu({
           </Menu.Content>
         </Menu.Root>
 
-        <Menu.Item value="delete" color="red.600" onClick={onDelete}>
+        <Menu.Item value="delete" color="red.fg" onClick={onDelete}>
           <Trash2 /> Delete Graph
         </Menu.Item>
       </Menu.Content>

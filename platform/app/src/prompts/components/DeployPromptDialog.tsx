@@ -289,7 +289,7 @@ export function DeployPromptDialog({
                       width="10px"
                       height="10px"
                       borderRadius="full"
-                      bg="green.400"
+                      bg="green.solid"
                       flexShrink={0}
                     />
                     <Text fontWeight="medium" fontSize="sm">
@@ -518,7 +518,7 @@ export function DeployPromptDialog({
               )}
 
               {addTagError && (
-                <Text fontSize="sm" color="red.500">
+                <Text fontSize="sm" color="red.solid">
                   {addTagError}
                 </Text>
               )}

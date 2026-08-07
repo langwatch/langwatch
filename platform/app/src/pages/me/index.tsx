@@ -209,14 +209,14 @@ function MyUsagePage() {
                           width="full"
                           height="2px"
                           borderRadius="full"
-                          backgroundColor="blue.200"
+                          backgroundColor="blue.muted"
                         />
                         {showTheoretical && d.usd > 0 && (
                           <Box
                             position="absolute"
                             bottom={0}
                             width="full"
-                            backgroundColor="blue.200"
+                            backgroundColor="blue.muted"
                             borderRadius="sm"
                             height={`${Math.max(2, theoreticalPct)}%`}
                           />
@@ -226,7 +226,7 @@ function MyUsagePage() {
                             position="absolute"
                             bottom={0}
                             width="full"
-                            backgroundColor="blue.400"
+                            backgroundColor="blue.solid"
                             borderRadius="sm"
                             height={`${Math.max(2, billedPct)}%`}
                           />
@@ -512,7 +512,7 @@ function CostSeriesLegend({
       />
       <LegendChip
         label="Billed"
-        color="blue.400"
+        color="blue.solid"
         active={showBilled}
         onClick={onToggleBilled}
       />

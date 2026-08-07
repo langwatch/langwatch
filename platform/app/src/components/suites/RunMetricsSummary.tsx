@@ -68,7 +68,7 @@ function TooltipContent({ summary }: { summary: RunGroupSummary }) {
           <Text fontWeight="medium">
             {summary.completedCount}/{summary.totalCount}
             {detail && (
-              <Text as="span" color="red.300" marginLeft={1}>
+              <Text as="span" color="red.solid" marginLeft={1}>
                 {detail}
               </Text>
             )}

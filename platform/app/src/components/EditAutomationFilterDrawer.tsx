@@ -345,7 +345,7 @@ export function EditAutomationFilterDrawer({
                   />
                 </Box>
                 {codeError && (
-                  <Text fontSize="sm" color="red.500">
+                  <Text fontSize="sm" color="red.solid">
                     {codeError}
                   </Text>
                 )}

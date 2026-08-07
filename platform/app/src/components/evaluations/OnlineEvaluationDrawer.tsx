@@ -1110,7 +1110,7 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
                         <br />
                         <Text
                           as="span"
-                          color="blue.500"
+                          color="blue.solid"
                           cursor="pointer"
                           textDecoration="underline"
                           _hover={{ color: "blue.600" }}

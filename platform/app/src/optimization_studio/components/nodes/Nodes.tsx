@@ -111,7 +111,7 @@ function NodeInputs({
           gap={1}
           paddingX={2}
           paddingY={1}
-          background="green.50"
+          background="green.subtle"
           borderRadius="8px"
           width="full"
           position="relative"
@@ -545,7 +545,7 @@ export function ComponentExecutionButton({
             node?.data.execution_state?.status === "success" &&
             (node?.data.execution_state?.outputs?.status === "error" ||
               node?.data.execution_state?.outputs?.passed === false)) ? (
-            <Box color="red.500">
+            <Box color="red.solid">
               <X size={iconSize} />
             </Box>
           ) : node?.data.execution_state?.status === "success" ? (

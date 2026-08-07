@@ -505,7 +505,7 @@ export function BatchEvaluationV2RunList({
                       <Box
                         width="6px"
                         height="6px"
-                        background="red.300"
+                        background="red.muted"
                         borderRadius="full"
                       />
                     )}

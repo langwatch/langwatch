@@ -88,7 +88,7 @@ export const IntentSelectionScreen: React.FC = () => {
                 border="1px solid"
                 borderColor={accentChipBorder}
               >
-                <Icon color="orange.500" boxSize={6}>
+                <Icon color="orange.solid" boxSize={6}>
                   <opt.icon strokeWidth={1.5} />
                 </Icon>
               </Box>

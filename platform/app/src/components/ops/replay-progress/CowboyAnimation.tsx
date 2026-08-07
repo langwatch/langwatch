@@ -202,7 +202,7 @@ export function CowboyAnimation({ phase }: { phase: string | null }) {
       lineHeight="1.3"
       whiteSpace="pre"
       textAlign="center"
-      color="orange.400"
+      color="orange.solid"
       userSelect="none"
     >
       {frame.map((line, i) => (

@@ -291,7 +291,7 @@ EOF
                     with your API key.{" "}
                     <Link
                       href={apiKeyLink}
-                      color="blue.500"
+                      color="blue.solid"
                       display="inline-flex"
                       alignItems="center"
                       gap={1}
@@ -303,7 +303,7 @@ EOF
                     Learn more about running guardrails in our{" "}
                     <Link
                       href="https://langwatch.ai/docs/evaluations/guardrails/overview"
-                      color="blue.500"
+                      color="blue.solid"
                       display="inline-flex"
                       alignItems="center"
                       gap={1}

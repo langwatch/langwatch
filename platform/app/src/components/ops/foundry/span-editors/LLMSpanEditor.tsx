@@ -36,7 +36,7 @@ export function LLMSpanEditor({ span }: { span: SpanConfig }) {
       bg="blue.500/5"
       p={4}
     >
-      <Text fontSize="sm" fontWeight="semibold" color="blue.400" mb={3}>
+      <Text fontSize="sm" fontWeight="semibold" color="blue.solid" mb={3}>
         LLM Configuration
       </Text>
 

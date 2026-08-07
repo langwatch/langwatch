@@ -144,7 +144,7 @@ export function ExperimentsPage() {
         </Box>
       ) : experiments.isError ? (
         <Box padding={6}>
-          <Text color="red.500">Error loading experiments</Text>
+          <Text color="red.solid">Error loading experiments</Text>
         </Box>
       ) : experiments.data?.experiments.length === 0 ? (
         <PageLayout.Container>
@@ -454,7 +454,7 @@ export function ExperimentsPage() {
                                       {hasPermission("workflows:delete") && (
                                         <Menu.Item
                                           value="delete"
-                                          color="red.500"
+                                          color="red.solid"
                                           onClick={(e) => {
                                             e.stopPropagation();
                                             handleDeleteExperiment(

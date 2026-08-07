@@ -107,7 +107,7 @@ export function AddCustomEmbeddingsModelDialog({
                 aria-label="Model ID"
               />
               {errors.modelId && (
-                <SmallLabel color="red.500">{errors.modelId}</SmallLabel>
+                <SmallLabel color="red.solid">{errors.modelId}</SmallLabel>
               )}
             </VStack>
             <VStack gap={1} align="stretch">
@@ -119,7 +119,7 @@ export function AddCustomEmbeddingsModelDialog({
                 aria-label="Display Name"
               />
               {errors.displayName && (
-                <SmallLabel color="red.500">{errors.displayName}</SmallLabel>
+                <SmallLabel color="red.solid">{errors.displayName}</SmallLabel>
               )}
             </VStack>
           </VStack>

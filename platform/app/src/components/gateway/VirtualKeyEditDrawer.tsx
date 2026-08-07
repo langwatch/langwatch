@@ -353,7 +353,7 @@ export function VirtualKeyEditDrawer({
                 maxLength={TAGS_CSV_MAX_LENGTH}
               />
               {tagsNotice && (
-                <Field.HelperText color="orange.600">
+                <Field.HelperText color="orange.fg">
                   {tagsNotice}
                 </Field.HelperText>
               )}

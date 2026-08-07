@@ -94,7 +94,7 @@ export function DlqCard({ queueNames }: { queueNames: string[] }) {
             gap={2}
             flexWrap="wrap"
           >
-            <Text textStyle="sm" fontWeight="medium" color="orange.500">
+            <Text textStyle="sm" fontWeight="medium" color="orange.solid">
               Dead Letter Queue — {groups.length} group
               {groups.length !== 1 ? "s" : ""}
             </Text>
@@ -214,7 +214,7 @@ export function DlqCard({ queueNames }: { queueNames: string[] }) {
                         <Table.Cell>
                           <Text
                             textStyle="xs"
-                            color="red.500"
+                            color="red.solid"
                             truncate
                             maxWidth="220px"
                             title={group.error ?? undefined}

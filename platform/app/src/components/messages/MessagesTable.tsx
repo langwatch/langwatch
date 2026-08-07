@@ -290,7 +290,7 @@ export function MessagesTable({
               width="13px"
               height="13px"
               borderRadius="12px"
-              background="green.500"
+              background="green.solid"
               position="absolute"
               top="10px"
               left="0px"
@@ -521,7 +521,7 @@ export function MessagesTable({
               })
             }
           >
-            <OverflownTextWithTooltip color="red.400">
+            <OverflownTextWithTooltip color="red.solid">
               {trace.error.message}
             </OverflownTextWithTooltip>
           </Table.Cell>
@@ -905,7 +905,7 @@ export function MessagesTable({
         <Icon
           width={4}
           height={4}
-          color="blue.500"
+          color="blue.solid"
           cursor="pointer"
           onClick={() => sortBy(columnKey)}
           marginTop="-5px"
@@ -916,7 +916,7 @@ export function MessagesTable({
         <Icon
           width={4}
           height={4}
-          color="blue.400"
+          color="blue.solid"
           cursor="pointer"
           onClick={() => sortBy(columnKey)}
           marginTop="5px"

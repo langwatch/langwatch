@@ -105,25 +105,25 @@ export function BudgetExceededBanner({
       role="alert"
       aria-live="assertive"
       borderWidth="1px"
-      borderColor="red.300"
-      backgroundColor="red.50"
+      borderColor="red.emphasized"
+      backgroundColor="red.subtle"
       borderRadius="md"
       padding={4}
       _dark={{ borderColor: "red.700", backgroundColor: "red.900" }}
     >
       <HStack gap={3} alignItems="start">
-        <Box color="red.600" paddingTop="2px" _dark={{ color: "red.300" }}>
+        <Box color="red.fg" paddingTop="2px" _dark={{ color: "red.300" }}>
           <AlertTriangle size={20} aria-hidden="true" />
         </Box>
         <VStack align="start" gap={2} flex={1}>
           <Text
             fontWeight="semibold"
-            color="red.700"
+            color="red.fg"
             _dark={{ color: "red.200" }}
           >
             Budget limit reached
           </Text>
-          <Text fontSize="sm" color="red.700" _dark={{ color: "red.200" }}>
+          <Text fontSize="sm" color="red.fg" _dark={{ color: "red.200" }}>
             You&rsquo;ve used <strong>{fmtUsd(spentUsd)}</strong> of your{" "}
             <strong>{fmtUsd(limitUsd)}</strong> {periodLabel} {scopeLabel}{" "}
             budget. New requests are being blocked until the limit resets or
@@ -134,7 +134,7 @@ export function BudgetExceededBanner({
               {requestIncreaseUrl && (
                 <Link
                   href={requestIncreaseUrl}
-                  color="red.700"
+                  color="red.fg"
                   fontWeight="medium"
                   _dark={{ color: "red.200" }}
                 >
@@ -146,12 +146,12 @@ export function BudgetExceededBanner({
                 </Link>
               )}
               {adminEmail && (
-                <Text color="red.700" _dark={{ color: "red.200" }}>
+                <Text color="red.fg" _dark={{ color: "red.200" }}>
                   Admin:{" "}
                   {isUrlContact(adminEmail) || isEmailContact(adminEmail) ? (
                     <Link
                       href={contactHref(adminEmail)}
-                      color="red.700"
+                      color="red.fg"
                       _dark={{ color: "red.200" }}
                       {...(isUrlContact(adminEmail) && {
                         target: "_blank",

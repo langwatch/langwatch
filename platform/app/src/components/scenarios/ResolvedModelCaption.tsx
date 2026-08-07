@@ -28,7 +28,7 @@ export function ResolvedModelCaption({
         href="/settings/model-providers"
         target="_blank"
         rel="noopener noreferrer"
-        color="blue.500"
+        color="blue.solid"
         fontWeight="medium"
       >
         Change

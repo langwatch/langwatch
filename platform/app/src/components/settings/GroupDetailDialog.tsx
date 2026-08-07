@@ -413,7 +413,7 @@ export function GroupDetailDialog({
                           image={a.image}
                           size="xs"
                         />
-                        <Text flex={1} color="green.600">
+                        <Text flex={1} color="green.fg">
                           {a.label}
                         </Text>
                         <Button

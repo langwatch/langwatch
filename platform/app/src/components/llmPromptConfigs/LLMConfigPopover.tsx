@@ -274,12 +274,12 @@ export function LLMConfigPopover({
 
         {/* Error messages */}
         {errors?.temperature?.message && (
-          <Text color="red.500" fontSize="12px">
+          <Text color="red.solid" fontSize="12px">
             {errors.temperature.message}
           </Text>
         )}
         {errors?.maxTokens?.message && (
-          <Text color="red.500" fontSize="12px">
+          <Text color="red.solid" fontSize="12px">
             {errors.maxTokens.message}
           </Text>
         )}

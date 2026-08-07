@@ -232,8 +232,8 @@ export function MessageCard({
                   >
                     <HStack>
                       <Box
-                        color="blue.700"
-                        background="blue.100"
+                        color="blue.fg"
+                        background="blue.muted"
                         borderRadius="100%"
                         padding="6px"
                       >
@@ -372,7 +372,7 @@ export function MessageCard({
                   <Box
                     width={2}
                     height={2}
-                    background="red.400"
+                    background="red.solid"
                     borderRadius="100%"
                   ></Box>
                   <Text>Exception ocurred</Text>

@@ -144,7 +144,7 @@ export const ProductSelectionScreen: React.FC<ProductSelectionScreenProps> = ({
                 },
               }}
             >
-              <Icon color="orange.500" boxSize={6}>
+              <Icon color="orange.solid" boxSize={6}>
                 <opt.icon strokeWidth={1.5} />
               </Icon>
             </Box>

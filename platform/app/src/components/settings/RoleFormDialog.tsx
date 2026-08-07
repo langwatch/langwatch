@@ -102,7 +102,7 @@ export function RoleFormDialog({
               <Field.Root invalid={!!errors.name}>
                 <Field.Label>
                   Role Name{" "}
-                  <Text as="span" color="red.500">
+                  <Text as="span" color="red.solid">
                     *
                   </Text>
                 </Field.Label>

@@ -158,7 +158,7 @@ function OnlineEvaluationsPage() {
         </Box>
       ) : monitors.isError ? (
         <Box padding={6}>
-          <Text color="red.500">Error loading online evaluations</Text>
+          <Text color="red.solid">Error loading online evaluations</Text>
         </Box>
       ) : rows.length === 0 ? (
         <PageLayout.Container>

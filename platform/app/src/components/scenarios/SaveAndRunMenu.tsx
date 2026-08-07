@@ -201,7 +201,7 @@ export function SaveAndRunMenu({
                 _hover={{ bg: "bg.muted" }}
                 borderTopWidth="1px"
                 borderColor="border.muted"
-                color="blue.500"
+                color="blue.solid"
                 onClick={handleCreateAgent}
               >
                 <Plus size={14} />
@@ -263,7 +263,7 @@ export function SaveAndRunMenu({
                 _hover={{ bg: "bg.muted" }}
                 borderTopWidth="1px"
                 borderColor="border.muted"
-                color="blue.500"
+                color="blue.solid"
                 onClick={handleCreatePrompt}
               >
                 <Plus size={14} />

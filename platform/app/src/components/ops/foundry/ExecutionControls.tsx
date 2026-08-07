@@ -199,7 +199,7 @@ function LogEntry({
         </Text>
       )}
       {entry.error && (
-        <Text color="red.400" title={entry.error} flexShrink={0}>
+        <Text color="red.solid" title={entry.error} flexShrink={0}>
           Failed
         </Text>
       )}

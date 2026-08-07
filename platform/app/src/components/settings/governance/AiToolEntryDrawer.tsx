@@ -471,10 +471,7 @@ export function AiToolEntryDrawer({ organizationId, state, onClose }: Props) {
                 <Text fontSize="xs" color="fg.muted">
                   No departments yet. The tile stays visible to every member.
                   Create departments under{" "}
-                  <Link
-                    href="/settings/governance/departments"
-                    color="blue.600"
-                  >
+                  <Link href="/settings/governance/departments" color="blue.fg">
                     Governance → Departments
                   </Link>{" "}
                   to scope tiles to a group of people.
@@ -936,7 +933,7 @@ function ModelProviderFields({
               <Alert.Description fontSize="xs">
                 This provider has no enabled credential yet. Tiles will publish
                 but VK issuance will 502 until you{" "}
-                <Link href="/settings/model-providers" color="orange.600">
+                <Link href="/settings/model-providers" color="orange.fg">
                   configure it
                 </Link>
                 .

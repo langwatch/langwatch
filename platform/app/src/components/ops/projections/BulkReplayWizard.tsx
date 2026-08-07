@@ -227,7 +227,7 @@ export function BulkReplayWizard({
             />
           </Box>
           {!hasTenants && !allTenants && (
-            <Text textStyle="xs" color="orange.500" marginTop={2}>
+            <Text textStyle="xs" color="orange.solid" marginTop={2}>
               At least 1 tenant is required to proceed
             </Text>
           )}
@@ -467,7 +467,7 @@ export function BulkReplayWizard({
                         Dry Run (5 aggregates)
                       </Button>
                       {isReplayRunning && (
-                        <Text textStyle="xs" color="orange.500">
+                        <Text textStyle="xs" color="orange.solid">
                           A replay is already running
                         </Text>
                       )}
@@ -479,12 +479,12 @@ export function BulkReplayWizard({
                     </Text>
 
                     {dryRunResult && (
-                      <Card.Root borderColor="blue.200" borderWidth="1px">
+                      <Card.Root borderColor="blue.muted" borderWidth="1px">
                         <Card.Body padding={3}>
                           <Text
                             textStyle="xs"
                             fontWeight="medium"
-                            color="blue.500"
+                            color="blue.solid"
                             marginBottom={1}
                           >
                             Dry Run Result

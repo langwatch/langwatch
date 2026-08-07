@@ -326,7 +326,7 @@ function GovernanceOverviewPage() {
             teams.length > 0 ? (
               <Link
                 href="/settings/governance/teams"
-                color="blue.600"
+                color="blue.fg"
                 fontSize="sm"
               >
                 View all teams →
@@ -355,7 +355,7 @@ function GovernanceOverviewPage() {
             users.length > 0 ? (
               <Link
                 href="/settings/governance/users"
-                color="blue.600"
+                color="blue.fg"
                 fontSize="sm"
               >
                 View all users →
@@ -383,7 +383,7 @@ function GovernanceOverviewPage() {
           actions={
             <Link
               href="/settings/governance/departments"
-              color="blue.600"
+              color="blue.fg"
               fontSize="sm"
             >
               Manage departments →
@@ -439,7 +439,7 @@ function GovernanceOverviewPage() {
               </Text>
               <Link
                 href="/settings/governance/ingestion-sources"
-                color="blue.600"
+                color="blue.fg"
               >
                 + Add a source
               </Link>
@@ -540,7 +540,7 @@ function SessionPolicySection({ organizationId }: { organizationId: string }) {
           expiry.
         </Text>
         {isInvalid && (
-          <Text fontSize="xs" color="red.600">
+          <Text fontSize="xs" color="red.fg">
             Enter an integer between 0 and 365.
           </Text>
         )}
@@ -592,7 +592,7 @@ function SetupItem({
           {description}
         </Text>
       </VStack>
-      <Link href={href} color="blue.600">
+      <Link href={href} color="blue.fg">
         {ctaLabel}
       </Link>
     </HStack>
