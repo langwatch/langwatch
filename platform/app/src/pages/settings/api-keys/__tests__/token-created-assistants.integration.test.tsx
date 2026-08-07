@@ -57,12 +57,12 @@ describe("given a token has just been minted", () => {
       );
     });
 
-    /** @scenario An assistant without an install command points at its config file */
-    it("ships no assistant whose command has not been verified", () => {
+    // Deliberately carries no @scenario annotation: this guards a temporary
+    // exclusion, not a behaviour the spec describes. Delete it with #6654.
+    it("does not offer Gemini until its command is verified (#6654)", () => {
       // Gemini's `mcp add` takes its options before the server name and does
       // not use `--` to introduce the command, so the Codex-shaped builder
-      // written for it emitted a line that does not run. It stays out until
-      // that is verified against a real CLI — #6654.
+      // written for it emitted a line that does not run.
       expect(
         CODE_ASSISTANTS.some((assistant) => assistant.key === "gemini"),
       ).toBe(false);
