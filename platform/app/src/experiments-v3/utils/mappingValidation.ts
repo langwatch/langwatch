@@ -471,10 +471,11 @@ export const getEvaluatorMissingMappings = (
   // queued for an evaluator that is not there, so the evaluator itself is the
   // finding. Custom, code and workflow evaluators are defined elsewhere and are
   // never expected in the catalog.
+  const evaluatorType: string = evaluator.evaluatorType;
   const isDefinedOutsideTheCatalog =
-    evaluator.evaluatorType.startsWith("custom/") ||
-    evaluator.evaluatorType.startsWith("code/") ||
-    evaluator.evaluatorType === "workflow";
+    evaluatorType.startsWith("custom/") ||
+    evaluatorType.startsWith("code/") ||
+    evaluatorType === "workflow";
 
   if (!evaluatorDef && !isDefinedOutsideTheCatalog) {
     return {
