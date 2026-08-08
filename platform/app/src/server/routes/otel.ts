@@ -44,6 +44,7 @@ import {
 } from "~/server/otel/parseOtlpBody";
 import { decodeBase64OpenTelemetryId } from "~/server/tracer/utils";
 import { captureException } from "~/utils/posthogErrorCapture";
+import { bodyLimit } from "./_lib/body-limit";
 
 const traceRequestType = (root as any).opentelemetry.proto.collector.trace.v1
   .ExportTraceServiceRequest;

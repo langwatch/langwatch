@@ -85,6 +85,24 @@ describe("the real command tree", () => {
     });
   });
 
+  describe("when a command deliberately emits nothing at all", () => {
+    /**
+     * The session context hook runs as a coding agent's own hook, where stdout
+     * is injected into the user's session context, so it prints nothing in any
+     * format. That honours every format, and the registration is what keeps the
+     * auto-detected agent mode (Claude Code sets CLAUDECODE in its children)
+     * from annotating every session start and stop with a note about a table
+     * that does not exist.
+     */
+    it("marks `ingest hook` as speaking the output contract", async () => {
+      const { buildProgram } = await import("../../program.js");
+      const command = findCommand(buildProgram(), ["ingest", "hook"]);
+
+      expect(command).toBeDefined();
+      expect(isOutputAware(command!)).toBe(true);
+    });
+  });
+
   /**
    * The exhaustive counterpart to the per-command lists above: EVERY leaf in
    * the real tree is either wired to the port or named here as a deliberate

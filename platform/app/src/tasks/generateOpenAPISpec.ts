@@ -5,6 +5,7 @@ import path from "path";
 import { app as agentsApp } from "../app/api/agents/[[...route]]/app";
 import { app as analyticsApp } from "../app/api/analytics/[...route]/app";
 import { app as apiKeysApp } from "../app/api/api-keys/[[...route]]/app";
+import { app as codingAgentApp } from "../app/api/coding-agent/[[...route]]/app";
 import { app as dashboardsApp } from "../app/api/dashboards/[[...route]]/app";
 import { app as datasetApp } from "../app/api/dataset/[[...route]]/app";
 import { app as evaluatorsApp } from "../app/api/evaluators/[[...route]]/app";
@@ -44,6 +45,7 @@ const APP_DERIVED_PREFIXES = [
   "/api/agents",
   "/api/api-keys",
   "/api/analytics",
+  "/api/coding-agent",
   "/api/dashboards",
   "/api/evaluators",
   "/api/events",
@@ -77,7 +79,7 @@ const APP_DERIVED_PREFIXES = [
   "/api/traces",
   "/api/triggers",
   "/api/workflows",
-];
+] as const;
 
 /**
  * Whether a path is owned by one of the apps above — the prefix itself, or
@@ -143,6 +145,8 @@ export default async function execute() {
   const apiKeysSpec = await generateSpecs(apiKeysApp);
   console.log("Building analytics spec...");
   const analyticsSpec = await generateSpecs(analyticsApp);
+  console.log("Building coding agent spec...");
+  const codingAgentSpec = await generateSpecs(codingAgentApp);
   console.log("Building dashboards spec...");
   const dashboardsSpec = await generateSpecs(dashboardsApp);
   console.log("Building dataset spec...");
@@ -207,6 +211,7 @@ export default async function execute() {
       agentsSpec,
       apiKeysSpec,
       analyticsSpec,
+      codingAgentSpec,
       dashboardsSpec,
       datasetSpec,
       evaluatorsSpec,
@@ -367,7 +372,7 @@ const OPENAPI_METHODS = [
   "head",
   "options",
   "trace",
-];
+] as const;
 
 /**
  * Drops path entries left holding no operation.

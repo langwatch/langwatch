@@ -66,57 +66,23 @@ export const modelProviderRegistry: ModelProviderRegistry = [
     fieldMetadata: {
       GEMINI_API_KEY: {
         label: "Gemini API Key",
-        // Naming the API restriction is the whole point: a Google Cloud key
-        // is commonly scoped to one API, and a customer told only "Gemini
-        // API key" has no way to know this is the Generative Language API.
+        // One field for either kind of Google key. An Agent Platform key is
+        // detected when Google refuses it on the Gemini API with a
+        // restriction naming another service; the customer is then asked
+        // for the two extra fields below rather than being told the key is
+        // invalid. See specs/model-providers/google-agent-platform.feature.
         description:
-          "Your Google AI Studio key, or a Google Cloud key allowed to call the Generative Language API. On Google Cloud, Vertex AI is usually the better fit.",
+          "Your Google AI Studio key, or a Google Cloud key for Gemini — including one restricted to Gemini Enterprise Agent Platform.",
       },
-    },
-  },
-  {
-    key: "google_agent_platform",
-    backendModelProviderKey: "google_agent_platform",
-    label: "Google Agent Platform",
-    // No `defaultModel`: this provider has no catalog entries (like
-    // `vertex_ai`), and `resolveProviderDefaultModel` in
-    // `components/gateway/eligibleModelProviders.ts` reads a registry
-    // default BEFORE falling back to whatever the customer actually
-    // configured. Naming a model here that isn't in the catalog would make
-    // the gateway's eligible-providers surface hand out a model string the
-    // customer never chose, unconditionally, instead of deferring to their
-    // custom models the way `vertex_ai` correctly does by omitting this.
-    //
-    // `defaultBaseUrl` is this host, static; the full request path also
-    // names the project and location, assembled per credential in
-    // `providerValidation.ts`'s `google_agent_platform` probe branch, which
-    // reads `apiRoot` below for the host rather than repeating this string.
-    defaultBaseUrl: "https://aiplatform.googleapis.com",
-    apiRoot: "https://aiplatform.googleapis.com",
-    icon: singleIcon(
-      "/images/external-icons/gcloud.svg",
-      "Google Agent Platform",
-    ),
-    externalDocsUrl:
-      "https://docs.cloud.google.com/gemini-enterprise-agent-platform",
-    fieldMetadata: {
-      GOOGLE_AGENT_PLATFORM_API_KEY: {
-        label: "Agent Platform API Key",
-        // Says where the key comes from, because this is the distinction that
-        // sent a customer round in circles: an Agent Platform key and an AI
-        // Studio key look alike and are not interchangeable.
+      GEMINI_PROJECT: {
+        label: "Google Cloud Project",
         description:
-          "A Google Cloud API key for Gemini Enterprise Agent Platform, created under APIs & Services > Credentials. An AI Studio key belongs on the Google Gemini provider instead.",
+          "Only for Agent Platform keys: the project the key belongs to. Its number appears in the error Google returns if the key is used against the wrong service.",
       },
-      GOOGLE_AGENT_PLATFORM_PROJECT: {
-        label: "Google Cloud Project ID",
-        description:
-          "The project the key belongs to. Its number appears in the error Google returns if the key is used against the wrong service.",
-      },
-      GOOGLE_AGENT_PLATFORM_LOCATION: {
+      GEMINI_LOCATION: {
         label: "Location",
         description:
-          "Where to serve the model from — 'global', or a region such as us-central1.",
+          "Only for Agent Platform keys: where to serve the model from — 'global', or a region such as us-central1.",
       },
     },
   },

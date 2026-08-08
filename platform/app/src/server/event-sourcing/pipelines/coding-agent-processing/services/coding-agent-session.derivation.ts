@@ -3,6 +3,7 @@ import {
   normalizeEventName,
   normalizeMetricName,
   parseMcpToolName,
+  SESSION_TITLE_FACT_KEY,
 } from "./coding-agent-normalization";
 import type {
   CodingAgentSessionData,
@@ -73,10 +74,12 @@ const CLAUDE = {
     USER_PROMPT: "user_prompt",
     ASSISTANT_RESPONSE: "assistant_response",
     API_REQUEST: "api_request",
+    API_RESPONSE: "api_response",
     TOOL_RESULT: "tool_result",
     TOOL_DECISION: "tool_decision",
     API_ERROR: "api_error",
     RETRIES_EXHAUSTED: "retries_exhausted",
+    RATE_LIMIT: "rate_limit",
     REFUSAL: "api_refusal",
     COMPACTION: "compaction",
     PERMISSION_MODE: "permission_mode_changed",
@@ -85,6 +88,27 @@ const CLAUDE = {
     HOOK_COMPLETE: "hook_execution_complete",
     AT_MENTION: "at_mention",
     INTERNAL_ERROR: "internal_error",
+  },
+} as const;
+
+/**
+ * The LangWatch vocabulary, the sibling of the {@link CLAUDE} adapter for the
+ * facts no vendor emits: the companion event carrying the session's git
+ * identity, and the keys it and the derived title ride on. Agent-generic by
+ * construction: every agent that installs the hook sends these exact
+ * spellings, so this is one table rather than one per agent.
+ */
+const LANGWATCH = {
+  EVENT: {
+    SESSION_CONTEXT: "session_context",
+  },
+  ATTR: {
+    REPOSITORY_HOST: "vcs.repository.host",
+    REPOSITORY_OWNER: "vcs.repository.owner",
+    REPOSITORY_NAME: "vcs.repository.name",
+    BRANCH: "vcs.ref.head.name",
+    WORKTREE: "vcs.worktree.name",
+    TITLE: SESSION_TITLE_FACT_KEY,
   },
 } as const;
 
@@ -136,6 +160,14 @@ export function createInitCodingAgentSession(): CodingAgentSessionData {
     entrypoint: null,
     finalRequestId: null,
     userId: null,
+    parentSessionId: null,
+    isFork: false,
+    repositoryHost: null,
+    repositoryOwner: null,
+    repositoryName: null,
+    gitBranch: null,
+    gitWorktree: null,
+    title: null,
 
     modelCalls: 0,
     toolCalls: 0,
@@ -175,6 +207,7 @@ export function createInitCodingAgentSession(): CodingAgentSessionData {
     compactions: 0,
     compactionTokensBefore: 0,
     compactionTokensAfter: 0,
+    compactionTriggers: {},
     peakContextTokens: 0,
     cacheRebuildCount: 0,
     largestCacheRebuildTokens: 0,
@@ -184,6 +217,7 @@ export function createInitCodingAgentSession(): CodingAgentSessionData {
     errorTypes: {},
     apiErrors: 0,
     rateLimited: 0,
+    rateLimitEvents: 0,
     retriesExhausted: 0,
     retryMs: 0,
     attempts: 0,
@@ -379,6 +413,16 @@ function withIdentity(
       str(attrs["user.id"]) ??
       str(attrs["user.account_uuid"]) ??
       str(attrs["user.account_id"]),
+    // Spawn lineage, for agents that stamp it. Once-set like the rest of the
+    // identity: a session has ONE parent, and a fork stays a fork.
+    //
+    // Nothing observed so far stamps it. A session that spawned a sub-agent
+    // with every enhanced-telemetry knob on carried neither key, while that
+    // sub-agent's own `agent_id` does arrive and is counted by `seenSubAgent`.
+    // So empty reads as "no lineage was reported", never as "this is a root
+    // session": the two are indistinguishable from here.
+    parentSessionId: state.parentSessionId ?? str(attrs.parent_session_id),
+    isFork: state.isFork || scalarStr(attrs.is_fork) === "true",
   };
 }
 
@@ -690,6 +734,33 @@ export function applyLogToCodingAgentSession({
       return isLogsOnly ? foldModelCall(withCost, attrs, 0) : withCost;
     }
 
+    case CLAUDE.EVENT.API_RESPONSE: {
+      // The generated conversation title, already parsed out of the response
+      // body by the dispatcher. Last non-empty wins: the agent regenerates
+      // the title as the conversation turns, and the newest one describes it.
+      const title = str(attrs[LANGWATCH.ATTR.TITLE]);
+      return title !== null ? { ...base, title } : base;
+    }
+
+    case LANGWATCH.EVENT.SESSION_CONTEXT: {
+      // Repository identity and worktree are once-set: a session is one
+      // checkout, so the first answer stands. The branch is the exception:
+      // it moves during a session, and the branch a session ENDS on is the
+      // one its pull request comes from.
+      const branch = str(attrs[LANGWATCH.ATTR.BRANCH]);
+      return {
+        ...base,
+        repositoryHost:
+          base.repositoryHost ?? str(attrs[LANGWATCH.ATTR.REPOSITORY_HOST]),
+        repositoryOwner:
+          base.repositoryOwner ?? str(attrs[LANGWATCH.ATTR.REPOSITORY_OWNER]),
+        repositoryName:
+          base.repositoryName ?? str(attrs[LANGWATCH.ATTR.REPOSITORY_NAME]),
+        gitWorktree: base.gitWorktree ?? str(attrs[LANGWATCH.ATTR.WORKTREE]),
+        gitBranch: branch ?? base.gitBranch,
+      };
+    }
+
     case CLAUDE.EVENT.TOOL_RESULT: {
       const errorType = str(attrs.error_type);
       const withBytes = {
@@ -744,6 +815,12 @@ export function applyLogToCodingAgentSession({
         retryMs: base.retryMs + num(attrs.total_retry_duration_ms),
       };
 
+    case CLAUDE.EVENT.RATE_LIMIT:
+      // The agent SAYING it was throttled, kept apart from `rateLimited`
+      // (inferred from 429 api_errors): this event also fires on warnings and
+      // status updates, so the two counters answer different questions.
+      return { ...base, rateLimitEvents: base.rateLimitEvents + 1 };
+
     case CLAUDE.EVENT.REFUSAL: {
       // A server-side fallback hop already retried on another model, so the user
       // never saw that refusal. Counting it would overstate how often the agent
@@ -768,6 +845,13 @@ export function applyLogToCodingAgentSession({
           base.compactionTokensBefore + num(attrs.pre_tokens),
         compactionTokensAfter:
           base.compactionTokensAfter + num(attrs.post_tokens),
+        // A manual /compact and an auto-compaction tell different stories
+        // about the session; "unknown" is the honest bucket for telemetry
+        // that predates the trigger attribute.
+        compactionTriggers: bump(
+          base.compactionTriggers,
+          str(attrs.trigger) ?? "unknown",
+        ),
       };
 
     case CLAUDE.EVENT.PERMISSION_MODE: {

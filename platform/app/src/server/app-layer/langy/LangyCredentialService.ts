@@ -404,7 +404,7 @@ export class LangyCredentialService {
     let githubRepoScopeKey: string | undefined;
     if (LANGY_GITHUB_ENABLED) {
       try {
-        const minted = await getApp().langy.githubInstallations.mintTurnToken({
+        const minted = await getApp().github.installations.mintTurnToken({
           organizationId: project.organizationId,
           ...(repositoryFullName ? { repositoryFullName } : {}),
         });

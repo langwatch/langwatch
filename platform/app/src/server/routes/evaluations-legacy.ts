@@ -95,6 +95,7 @@ import { KSUID_RESOURCES } from "~/utils/constants";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { mapZodIssuesToLogContext } from "~/utils/zod";
+import { bodyLimit } from "./_lib/body-limit";
 import {
   datasetEvaluateRequestSchema,
   evaluateErrorSchema,
@@ -340,7 +341,7 @@ secured.access(legacyEvaluationAuth).post(
       params = eSBatchEvaluationRESTParamsSchema.parse(body);
     } catch (error) {
       logger.error(
-        { error, body, projectId: project.id },
+        { error, payloadSize, projectId: project.id },
         "invalid log_results data received",
       );
       captureException(toError(error), { extra: { projectId: project.id } });
@@ -377,11 +378,11 @@ secured.access(legacyEvaluationAuth).post(
     } catch (error) {
       if (error instanceof z.ZodError) {
         logger.error(
-          { error, body: params, projectId: project.id },
+          { error, runId: params.run_id, projectId: project.id },
           "failed to validate data for batch evaluation",
         );
         captureException(toError(error), {
-          extra: { projectId: project.id, param: params },
+          extra: { projectId: project.id, runId: params.run_id },
         });
         const validationError = fromZodError(error);
         return c.json({ error: validationError.message }, 400);
@@ -396,11 +397,11 @@ secured.access(legacyEvaluationAuth).post(
         );
       } else {
         logger.error(
-          { error, body: params, projectId: project.id },
+          { error, runId: params.run_id, projectId: project.id },
           "internal server error processing batch evaluation",
         );
         captureException(toError(error), {
-          extra: { projectId: project.id, param: params },
+          extra: { projectId: project.id, runId: params.run_id },
         });
         return c.json(
           {
@@ -567,7 +568,7 @@ secured.access(legacyEvaluationAuth).post(
   describeRoute({
     summary: "Evaluate a dataset",
     description:
-      "Run one evaluator across a saved dataset and record the result against an experiment. Name the dataset by slug and the evaluator the same way the evaluate endpoints do; results are grouped under `experimentSlug`, or under a generated batch id when you omit it.",
+      "Run one evaluator across a saved dataset and record the result against an experiment. Name the dataset by slug and the evaluator the same way the evaluate endpoints do; results are grouped under `experimentSlug`, or under a generated batch id when you omit it. Bodies up to 30MB are accepted.",
     tags: ["Datasets"],
     requestBody: {
       required: true,
@@ -609,8 +610,16 @@ secured.access(legacyEvaluationAuth).post(
           "application/json": { schema: resolver(evaluateErrorSchema) },
         },
       },
+      413: {
+        description:
+          "The body is larger than 30MB. Refused before it is read, so the response is the plain sentence `Payload Too Large` rather than a JSON error",
+        content: {
+          "text/plain": { schema: { type: "string" } },
+        },
+      },
     },
   }),
+  bodyLimit({ maxSize: 30 * 1024 * 1024 }),
   async (c) => {
     const auth = await authenticateRequest(c, "evaluations:manage");
     if ("error" in auth) {
@@ -638,7 +647,7 @@ secured.access(legacyEvaluationAuth).post(
       params = batchEvaluationInputSchema.parse(body);
     } catch (error) {
       logger.error(
-        { error, body, projectId: project.id },
+        { error, projectId: project.id },
         "invalid evaluation params received",
       );
       captureException(toError(error), { extra: { projectId: project.id } });

@@ -34,12 +34,30 @@ const NLP_FETCH_TIMEOUT_MS = 120_000;
 export class SerializedWorkflowAgentAdapter extends AgentAdapter {
   role = AgentRole.AGENT;
 
-  constructor(
-    private readonly config: WorkflowAgentData,
-    private readonly nlpServiceUrl: string,
-    private readonly apiKey: string,
-  ) {
+  private readonly config: WorkflowAgentData;
+  private readonly nlpServiceUrl: string;
+  /**
+   * The LangWatch platform API key (project.apiKey), sent as
+   * workflow.api_key. nlpgo forwards it verbatim as the X-Auth-Token header
+   * on its callbacks into the platform (agentblock/workflow_runner.go,
+   * evaluatorblock/executor.go, engine.go) — never an LLM provider
+   * credential, so it must not be sourced from litellm params (issue #6634).
+   */
+  private readonly projectApiKey: string;
+
+  constructor({
+    config,
+    nlpServiceUrl,
+    projectApiKey,
+  }: {
+    config: WorkflowAgentData;
+    nlpServiceUrl: string;
+    projectApiKey: string;
+  }) {
     super();
+    this.config = config;
+    this.nlpServiceUrl = nlpServiceUrl;
+    this.projectApiKey = projectApiKey;
     this.name = "SerializedWorkflowAgentAdapter";
   }
 
@@ -112,7 +130,7 @@ export class SerializedWorkflowAgentAdapter extends AgentAdapter {
       {};
     const workflow = {
       ...this.config.workflow,
-      api_key: this.apiKey,
+      api_key: this.projectApiKey,
       secrets: { ...existingSecrets, ...this.config.secrets },
     };
 

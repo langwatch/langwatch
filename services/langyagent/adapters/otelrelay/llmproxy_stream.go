@@ -115,7 +115,7 @@ func (s *llmStreamSniffer) inspectLine(line []byte) {
 	// there is no envelope to find here — and OpenAI's quota body would satisfy
 	// that test by coincidence and carry its prose through as though we had
 	// written it.
-	e := decodeProviderErrorBody(payload)
+	e := decodeProviderErrorBody(payload, 0, "text/event-stream")
 	s.entry.setLLMError(e)
 
 	hard := hasHardLimitReason(e)

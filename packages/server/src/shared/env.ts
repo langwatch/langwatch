@@ -188,10 +188,6 @@ export function buildEnv({
 	set("LANGWATCH_ENABLE_PRESIDIO", "false");
 	// The language detection evaluator: ~95MB of language models, same deal.
 	set("LANGWATCH_ENABLE_LINGUA", "false");
-	// The deprecated legacy evaluators (old Ragas API), kept only so
-	// evaluations saved years ago keep running. When off they are hidden from
-	// the product entirely, not just disabled.
-	set("LANGWATCH_ENABLE_LEGACY_EVALUATORS", "false");
 
 	sectionBreak("ENVIRONMENT");
 	set("ENVIRONMENT", "local");

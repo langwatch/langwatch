@@ -62,6 +62,19 @@ describe("summarizeLogEvent", () => {
       );
       expect(summary).toBe("Rate limited by the provider");
     });
+
+    // The rollup counts an agent-reported rate limit apart from a 429 inferred
+    // from a failed call, so the same sentence twice in two tones would hide
+    // the distinction the data keeps.
+    it("tells the agent's own report apart from the inferred 429", () => {
+      const reported = summarizeLogEvent(log({ "event.name": "rate_limit" }));
+      const inferred = summarizeLogEvent(
+        log({ "event.name": "api_error", status_code: "429" }),
+      );
+
+      expect(reported).toBe("Rate limit reported by the agent");
+      expect(reported).not.toBe(inferred);
+    });
   });
 
   describe("given an event name we don't recognise", () => {

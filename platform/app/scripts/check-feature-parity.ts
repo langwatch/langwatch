@@ -104,6 +104,11 @@ const DEFAULT_BATS_TEST_ROOTS: string[] = [
  * comments may sit between the two.
  */
 const DEFAULT_SHELL_TEST_ROOTS: string[] = [
+  // CI's own shell steps. The secrets gate is scoped by a shell script and
+  // proved correct by running the real scanners against fixture repositories,
+  // which is neither a vitest nor a bats suite — without this root, scenarios
+  // about which commits a blocking gate examines could only be @unimplemented.
+  ".github/scripts/__tests__",
   "charts/langwatch/tests",
   // The gateway subchart carries its own drain-timing suite, run by the
   // `helm` job in go-services.yaml rather than by the umbrella chart's
@@ -189,7 +194,6 @@ const LEGACY_UNBOUND: string[] = [
   "specs/langy/langy-feedback.feature",
   "specs/langy/langy-followup-suggestions.feature",
   "specs/langy/langy-frontend-realtime.feature",
-  "specs/langy/langy-github-install.feature",
   "specs/langy/langy-github-prs.feature",
   "specs/langy/langy-plan-progress.feature",
   "specs/langy/langy-projection-independent-reactions.feature",
@@ -346,7 +350,6 @@ const LEGACY_INERT: string[] = [
   "specs/ci/migration-order.feature",
   "specs/ci/no-committed-screenshots.feature",
   "specs/ci/no-docker-integration-tests.feature",
-  "specs/ci/path-filters.feature",
   "specs/ci/pr-impact-map.feature",
   "specs/claude/drive-pr.feature",
   "specs/claude/telemetry-turn-bounding.feature",
@@ -480,7 +483,6 @@ const LEGACY_INERT: string[] = [
   "specs/model-config/model-parameter-display.feature",
   "specs/model-config/model-selector-ux.feature",
   "specs/model-config/unified-reasoning-ui.feature",
-  "specs/model-providers/codex-account-provider.feature",
   "specs/model-providers/custom-model-max-tokens.feature",
   "specs/model-providers/default-provider.feature",
   "specs/model-providers/provider-list.feature",
@@ -512,7 +514,6 @@ const LEGACY_INERT: string[] = [
   "specs/npx-installer/04-validation.feature",
   "specs/npx-installer/05-publish.feature",
   "specs/npx-installer/06-langy.feature",
-  "specs/npx-installer/07-lean-install.feature",
   "specs/observability/browser-rum-trace-correlation.feature",
   "specs/observability/process-substrate-alerting.feature",
   "specs/ops/clickhouse-backup-metrics.feature",

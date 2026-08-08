@@ -37,6 +37,7 @@ import {
   spanValidatorSchema,
 } from "../tracer/types";
 import { CollectorSpanUtils } from "../traces/collectorSpan.utils";
+import { bodyLimit } from "./_lib/body-limit";
 
 const logger = createLogger("langwatch.collector");
 const tokenResolver = TokenResolver.create(prisma);
