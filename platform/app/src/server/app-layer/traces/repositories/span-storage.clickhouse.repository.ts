@@ -260,12 +260,14 @@ const SUMMARY_SPAN_SELECT = `
   SpanAttributes['gen_ai.usage.output_tokens'] AS OutputTokens,
   SpanAttributes['gen_ai.usage.cache_read.input_tokens'] AS CacheReadTokens,
   SpanAttributes['gen_ai.usage.cache_creation.input_tokens'] AS CacheCreationTokens,
+  SpanAttributes['gen_ai.usage.cache_creation_1h.input_tokens'] AS CacheCreation1hTokens,
   SpanAttributes['gen_ai.usage.input_chars'] AS InputChars,
   SpanAttributes['gen_ai.usage.audio_seconds'] AS AudioSeconds,
   SpanAttributes['langwatch.model.inputCostPerToken'] AS CustomInputRate,
   SpanAttributes['langwatch.model.outputCostPerToken'] AS CustomOutputRate,
   SpanAttributes['langwatch.model.cacheReadCostPerToken'] AS CustomCacheReadRate,
   SpanAttributes['langwatch.model.cacheCreationCostPerToken'] AS CustomCacheCreationRate,
+  SpanAttributes['langwatch.model.cacheCreation1hCostPerToken'] AS CustomCacheCreation1hRate,
   SpanAttributes['langwatch.span.cost'] AS LwSpanCost,
   toUnixTimestamp64Milli(StartTime) AS StartTimeMs,
   toUnixTimestamp64Milli(UpdatedAt) AS UpdatedAtMs
@@ -301,6 +303,7 @@ interface ModelSpanSampleQueryRow {
   CompletionTokensRaw: string;
   CacheReadTokensRaw: string;
   CacheCreationTokensRaw: string;
+  CacheCreation1hTokensRaw: string;
   StartTimeMs: number | string;
 }
 
@@ -328,6 +331,7 @@ function mapModelSpanSampleRow(
     outputTokens: tokenCount(row.OutputTokensRaw, row.CompletionTokensRaw),
     cacheReadTokens: tokenCount(row.CacheReadTokensRaw),
     cacheCreationTokens: tokenCount(row.CacheCreationTokensRaw),
+    cacheCreation1hTokens: tokenCount(row.CacheCreation1hTokensRaw),
     startTimeMs: Number(row.StartTimeMs),
   };
 }
@@ -493,12 +497,14 @@ export interface SpanSummaryQueryRow {
   OutputTokens: string;
   CacheReadTokens: string;
   CacheCreationTokens: string;
+  CacheCreation1hTokens: string;
   InputChars: string;
   AudioSeconds: string;
   CustomInputRate: string;
   CustomOutputRate: string;
   CustomCacheReadRate: string;
   CustomCacheCreationRate: string;
+  CustomCacheCreation1hRate: string;
   LwSpanCost: string;
   StartTimeMs: number;
   UpdatedAtMs: number;
@@ -547,6 +553,8 @@ export function mapSpanSummaryRow(row: SpanSummaryQueryRow): SpanSummaryRow {
           row.CacheReadTokens || undefined,
         [ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS]:
           row.CacheCreationTokens || undefined,
+        [ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_1H_INPUT_TOKENS]:
+          row.CacheCreation1hTokens || undefined,
         [ATTR_KEYS.GEN_AI_USAGE_INPUT_CHARS]: row.InputChars || undefined,
         [ATTR_KEYS.GEN_AI_USAGE_AUDIO_SECONDS]: row.AudioSeconds || undefined,
         [ATTR_KEYS.LANGWATCH_MODEL_INPUT_COST_PER_TOKEN]:
@@ -557,6 +565,8 @@ export function mapSpanSummaryRow(row: SpanSummaryQueryRow): SpanSummaryRow {
           row.CustomCacheReadRate || undefined,
         [ATTR_KEYS.LANGWATCH_MODEL_CACHE_CREATION_COST_PER_TOKEN]:
           row.CustomCacheCreationRate || undefined,
+        [ATTR_KEYS.LANGWATCH_MODEL_CACHE_CREATION_1H_COST_PER_TOKEN]:
+          row.CustomCacheCreation1hRate || undefined,
         [ATTR_KEYS.LANGWATCH_SPAN_COST]: row.LwSpanCost || undefined,
       } as NormalizedAttributes,
       model: row.ResponseModel || row.Model || undefined,
@@ -2354,6 +2364,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
           argMax(SpanAttributes['gen_ai.usage.completion_tokens'], UpdatedAt) AS CompletionTokensRaw,
           argMax(SpanAttributes['gen_ai.usage.cache_read.input_tokens'], UpdatedAt) AS CacheReadTokensRaw,
           argMax(SpanAttributes['gen_ai.usage.cache_creation.input_tokens'], UpdatedAt) AS CacheCreationTokensRaw,
+          argMax(SpanAttributes['gen_ai.usage.cache_creation_1h.input_tokens'], UpdatedAt) AS CacheCreation1hTokensRaw,
           argMax(toUnixTimestamp64Milli(StartTime), UpdatedAt) AS StartTimeMs,
           (InputTokensRaw != '' OR PromptTokensRaw != ''
             OR OutputTokensRaw != '' OR CompletionTokensRaw != '') AS HasTokens

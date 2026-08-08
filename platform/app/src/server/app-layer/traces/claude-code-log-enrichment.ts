@@ -2,15 +2,20 @@
  * Read-time Claude Code log→span content enrichment.
  *
  * Claude Code's real OTLP `llm_request` spans carry tokens / `request_id` but NO
- * message content and NO cost — those live only in the trace's OTLP LOG records
+ * message content. That lives only in the trace's OTLP LOG records
  * (`user_prompt` / `assistant_response` on the LIGHT path; `api_*_body` when
- * `OTEL_LOG_RAW_API_BODIES=1`; `cost_usd` on the `api_request` anchor). Every
- * read path that wants whole spans — the traces-v2 drawer, the legacy
- * trace/span API, exports, evals — must join the two server-side.
+ * `OTEL_LOG_RAW_API_BODIES=1`), so every read path that wants whole spans (the
+ * traces-v2 drawer, the legacy trace/span API, exports, evals) must join the
+ * two server-side.
+ *
+ * Cost is NOT joined here. It is computed from the span's own tokens at ingest
+ * and stored alongside every other cost in the product, so the drawer header,
+ * the analytics graphs and the terminal footer are all reading one number
+ * rather than two that can drift apart.
  *
  * This module adapts the stored log rows and the legacy {@link Span} shape into
  * the pure {@link computeClaudeSpanEnrichment} join, then attaches the (already
- * capped) `input` / `output` and authoritative `cost` back onto the spans.
+ * capped) `input` / `output` back onto the spans.
  *
  * {@link enrichSpansWithClaudeLogContent} is pure (no IO); the caller supplies
  * the log rows. {@link enrichCodingAgentSpansFromLogs} is the IO wrapper both
@@ -57,7 +62,6 @@ const EVENT_NAME_ATTR = "event.name";
 const REQUEST_ID_ATTR = "request_id";
 const QUERY_SOURCE_ATTR = "query_source";
 const BODY_ATTR = "body";
-const COST_USD_ATTR = "cost_usd";
 const PROMPT_ATTR = "prompt";
 const RESPONSE_ATTR = "response";
 const USER_PROMPT_EVENT = "user_prompt";
@@ -246,8 +250,7 @@ export function enrichClaudeInteractionInputs(spans: Span[]): Span[] {
 /**
  * Map stored log rows to {@link ClaudeContentLog}. The event payload rides the
  * `body` attribute (not the OTLP Body column) for the `api_*_body` events;
- * `user_prompt` carries its text on `prompt` instead. `cost_usd` is parsed off
- * the `api_request` anchor.
+ * `user_prompt` carries its text on `prompt` instead.
  */
 export function mapLogRowsToClaudeContentLogs(
   rows: StoredLogRecordRow[],
@@ -255,8 +258,6 @@ export function mapLogRowsToClaudeContentLogs(
   return rows.map((row) => {
     const attrs = row.attributes;
     const eventName = attrs[EVENT_NAME_ATTR] ?? "";
-    const costRaw = attrs[COST_USD_ATTR];
-    const cost = costRaw !== undefined ? Number(costRaw) : null;
     const toolCallCount = Number(attrs[DERIVED_ATTRS.OUTPUT_TOOL_CALL_COUNT]);
     return {
       eventName,
@@ -264,7 +265,6 @@ export function mapLogRowsToClaudeContentLogs(
       querySource: nonEmptyOrNull(attrs[QUERY_SOURCE_ATTR]),
       timeUnixMs: row.timeUnixMs,
       body: readContentBody(eventName, attrs),
-      costUsd: cost !== null && Number.isFinite(cost) ? cost : null,
       // Parsed out of the raw body once, at ingest, so the read path can skip
       // re-parsing it. Absent on records ingested before that existed, which is
       // why every consumer keeps its parse as a fallback.
@@ -277,12 +277,11 @@ export function mapLogRowsToClaudeContentLogs(
 }
 
 /**
- * Attach the joined `input` / `output` / `cost` onto the trace's spans —
- * model calls (request_id join), tool calls (tool_use_id join), and the
- * interaction root (own attr + windowed reply). Returns a new spans array
- * (spans are shallow-cloned only where enriched); untouched spans are
- * returned as-is. The attribute-only interaction input applies even with
- * zero logs.
+ * Attach the joined `input` / `output` onto the trace's spans: model calls
+ * (request_id join), tool calls (tool_use_id join), and the interaction root
+ * (own attr + windowed reply). Returns a new spans array (spans are
+ * shallow-cloned only where enriched); untouched spans are returned as-is. The
+ * attribute-only interaction input applies even with zero logs.
  */
 export function enrichSpansWithClaudeLogContent({
   spans,
@@ -326,9 +325,6 @@ export function enrichSpansWithClaudeLogContent({
       enrichment?.output ?? toolEnrichment?.output ?? interactionOutput;
     if (input !== null && next.input == null) next.input = input;
     if (output !== null && next.output == null) next.output = output;
-    if (enrichment?.cost != null) {
-      next.metrics = { ...(span.metrics ?? {}), cost: enrichment.cost };
-    }
     return next;
   });
 }
@@ -478,7 +474,7 @@ export function enrichSingleSpanWithClaudeLogContent({
   // not: positional pairing needs the whole trace's call order, and a
   // one-span array degenerates to "this is the group's first call" — so for
   // model calls that input is discarded and the full-refs join below is the
-  // only input source. Output and cost are exact request_id joins either way.
+  // only input source. Output is an exact request_id join either way.
   if (isModelCall) {
     if (next !== span && next.input !== span.input) {
       next = { ...next, input: span.input };
@@ -495,9 +491,6 @@ export function enrichSingleSpanWithClaudeLogContent({
         }
         if (enrichment.output !== null && clone.output == null) {
           clone.output = enrichment.output;
-        }
-        if (enrichment.cost !== null) {
-          clone.metrics = { ...(clone.metrics ?? {}), cost: enrichment.cost };
         }
         next = clone;
       }

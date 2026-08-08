@@ -24,6 +24,8 @@
  * first-run prompt similar to shell-rc.ts on top.
  */
 
+import * as os from "node:os";
+
 import {
 	codexTraceEndpoint,
 	writeCodexGatewayBlock,
@@ -39,6 +41,7 @@ import { saveConfig } from "./config";
 import { warnIfGeminiOAuthSelected } from "./gemini-settings-preflight";
 import { buildOtelEnvBlock, SOURCE_TYPE_BY_TOOL } from "./otel-env-block";
 import { resolvePlatformToolPolicy } from "./platform-tool-policy";
+import { SHELL_FUNCTION_TOOLS } from "./shell-rc";
 import {
 	type ClaudeProjectPinResult,
 	ensureClaudeProjectTelemetryPin,
@@ -47,8 +50,35 @@ import {
 	removeClaudeProjectTelemetryPin,
 	resolveLiveIngestionKey,
 } from "./telemetry-refresh";
+import { clearVscodeTerminalOtelEnv } from "./vscode-settings";
 
 export type WrapperMode = "gateway" | "ingestion";
+
+/**
+ * Copilot is the one tool where landing on the gateway changes WHO PAYS:
+ * BYOK routing bills the org's provider keys while the user's Copilot
+ * seat sits idle (ADR-039 Decision 3). Every mid-run fallback ONTO the
+ * gateway (policy downgrade here, mint-failure fallback in wrapper.ts)
+ * appends this so the shift is named, never silent. Empty for every
+ * other tool — their gateway swap is billing-neutral.
+ */
+export function copilotSeatBypassSuffix(tool: string): string {
+	if (tool !== "copilot") return "";
+	return " NOTE: gateway usage bills your org's provider keys, not your Copilot seat.";
+}
+
+/**
+ * Whether an env value expresses an explicit content-capture opt-out.
+ * OTel booleans are parsed case-insensitively, and this repo's sibling
+ * parsers also honour "0"/"no"/"off", so `FALSE`, `False`, `0`, `no`,
+ * `off` must all count — otherwise a user who disabled capture is
+ * silently overridden into exporting full prompt/response content
+ * (privacy regression). Unset means "not opted out" (default-on).
+ */
+function isCaptureOptOut(raw: string | undefined): boolean {
+	if (raw === undefined) return false;
+	return ["false", "0", "no", "off"].includes(raw.trim().toLowerCase());
+}
 
 /**
  * Run a synchronous telemetry-wiring refresh or removal, catching any
@@ -221,14 +251,44 @@ export async function resolveWrapperMode(
 	// guaranteed true here, since the both-disabled case threw above).
 	if (mode === "gateway" && !policy.allowVk) {
 		mode = "ingestion";
-		notice = `${lwTag()} gateway path is disabled for ${tool} by your org admin; using direct OTLP ingestion instead.`;
+		// Blame accurately: a hardcoded platform policy (no org row — e.g.
+		// `code`, which is ingestion-only by design) is a product fact, not
+		// an admin decision.
+		notice =
+			cfg.tool_policies?.[tool] !== undefined
+				? `${lwTag()} gateway path is disabled for ${tool} by your org admin; using direct OTLP ingestion instead.`
+				: `${lwTag()} ${tool} supports direct OTLP ingestion only; using it.`;
+		// Self-heal a pinned gateway preference that can never be honored —
+		// otherwise the notice prints on every run forever (the gateway-side
+		// pin-forgetting in wrapper.ts only runs on runs that STAY gateway).
+		if (cfg.tool_mode?.[tool] === "gateway") {
+			const { [tool]: _dropped, ...rest } = cfg.tool_mode;
+			try {
+				saveConfig({ ...cfg, tool_mode: rest });
+				cfg.tool_mode = rest;
+			} catch {
+				// best-effort — a persist failure just re-prints next run.
+			}
+		}
 	}
 	if (mode === "ingestion" && !policy.allowOtelDirect) {
 		mode = "gateway";
-		notice = `${lwTag()} direct OTLP ingestion is disabled for ${tool} by your org admin; routing through the gateway instead.`;
+		notice = `${lwTag()} direct OTLP ingestion is disabled for ${tool} by your org admin; routing through the gateway instead.${copilotSeatBypassSuffix(tool)}`;
 	}
 
 	if (mode === "gateway") {
+		// Structural guard: a tool with no gateway env shape (envForTool has
+		// no case for it — `code` is the current example) must fail loudly
+		// here, not launch with empty vars and no capture, no explanation.
+		// Reachable via a hand-edited config or a future policy row whose
+		// allowVk defaults true.
+		if (Object.keys(gatewayVars).length === 0) {
+			throw new GovernanceCliError(
+				501,
+				"gateway_unsupported",
+				`The gateway path isn't implemented for '${tool}'. Run it with --tool-mode=otlp to use direct OTLP ingestion instead.`,
+			);
+		}
 		if (tool === "gemini") {
 			warnIfGeminiOAuthSelected();
 		}
@@ -320,6 +380,23 @@ export async function resolveWrapperMode(
 
 	const vars = buildOtelEnvBlock(tool, endpoint, token);
 
+	// Copilot content-capture opt-out: the capture flag is a STANDARD OTel
+	// GenAI env var, so a user (or enterprise policy) that exported it as
+	// "false" expressed explicit intent — never override it (same semantics
+	// as the opencode experimental-flag respect below). Dropping our "true"
+	// lets the inherited "false" win in the spawn merge; the notice makes
+	// the tokens-only consequence visible instead of silent (ADR-039 D5).
+	if (
+		(tool === "copilot" || tool === "code") &&
+		isCaptureOptOut(
+			process.env.OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT,
+		)
+	) {
+		delete vars.OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT;
+		const optOutNotice = `${lwTag()} content capture is disabled in your environment (OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT is falsey); ${tool} traces will carry tokens only.`;
+		notice = notice ? `${notice}\n${optOutNotice}` : optOutNotice;
+	}
+
 	// Latest login wins (#6202): a previous install may have persisted this
 	// tool's telemetry wiring with the OLD login's endpoint + key. Claude
 	// applies its settings.json env block ON TOP of the child env, and the
@@ -342,7 +419,13 @@ export async function resolveWrapperMode(
 			() => ensureClaudeProjectTelemetryPin({ vars, cwd: process.cwd() }),
 			undefined,
 		);
-	} else if (tool === "gemini" || tool === "opencode") {
+	} else if (SHELL_FUNCTION_TOOLS.includes(tool)) {
+		// Every scoped-function tool (gemini/opencode/copilot) needs its
+		// persisted rc function re-synced per run: after a key re-mint the
+		// wrapped run gets the fresh token but the rc function would keep
+		// serving the old one to bare `<tool>` invocations — silent 401s
+		// forever (the #6202 class). Login-time refresh only fires on
+		// endpoint drift, not key drift.
 		refreshedWiring.push(
 			...tryRefresh(
 				`the ${tool} scoped shell function`,
@@ -350,6 +433,41 @@ export async function resolveWrapperMode(
 				[] as string[],
 			),
 		);
+	}
+
+	// VS Code hardening, coupled to the env INJECTION (not to the shell-rc
+	// persistence consent): every `code` ingestion run injects the bearer
+	// into a long-lived editor whose integrated terminals inherit it, so the
+	// terminal clear must be (re)applied on every run — declining or later
+	// removing the persisted function must not leave terminals inheriting
+	// the token. ADR-039 §Extension #2.
+	if (tool === "code") {
+		const vscodePlatform = process.platform;
+		if (
+			vscodePlatform === "darwin" ||
+			vscodePlatform === "linux" ||
+			vscodePlatform === "win32"
+		) {
+			tryRefresh(
+				"the VS Code terminal telemetry clear",
+				() => {
+					const written = clearVscodeTerminalOtelEnv({
+						platform: vscodePlatform,
+						home: os.homedir(),
+						keys: Object.keys(vars),
+					});
+					if (written === null) {
+						// The writer refuses to touch a settings.json it cannot
+						// round-trip — say so loudly instead of leaking silently.
+						process.stderr.write(
+							`${lwTag()} could not apply the VS Code terminal telemetry clear (settings.json did not parse); integrated terminals will inherit the telemetry env until it is fixed.\n`,
+						);
+					}
+					return written;
+				},
+				null,
+			);
+		}
 	}
 
 	let codexConfigPath: string | undefined;
@@ -377,28 +495,37 @@ export async function resolveWrapperMode(
 		setOpencodeOpenTelemetryFlag();
 	}
 
-	// Persist mode + (when freshly minted) the ingest key so the next
-	// invocation skips re-deriving the mode and reuses the cached key
-	// instead of minting again.
-	const next: GovernanceConfig = {
-		...cfg,
-		tool_mode: { ...(cfg.tool_mode ?? {}), [tool]: "ingestion" },
-	};
+	// Persist (when freshly minted) the ingest key so the next invocation
+	// reuses the cached key instead of minting again. The tool_mode PIN is
+	// written only on the legacy state-only derivation (no forcedMode):
+	// when the path-selection UX upstream forced the mode, IT owns
+	// persistence — the interactive prompt saves an explicit answer, and
+	// silent defaults (non-TTY, prompt abort, copilot ingestion-first)
+	// deliberately do NOT persist so the user is asked again next run.
+	// Pinning here unconditionally turned one aborted prompt / CI run
+	// into a permanent silent pin that suppressed the prompt forever.
+	const next: GovernanceConfig = { ...cfg };
+	if (forcedMode === undefined) {
+		next.tool_mode = { ...(cfg.tool_mode ?? {}), [tool]: "ingestion" };
+	}
 	if (minted) {
 		next.default_personal_ingest_keys = {
 			...(cfg.default_personal_ingest_keys ?? {}),
 			[sourceType]: { secret: token, prefix },
 		};
 	}
-	try {
-		saveConfig(next);
-	} catch {
-		// Best-effort cache - failure to persist doesn't block this run.
+	if (forcedMode === undefined || minted) {
+		try {
+			saveConfig(next);
+		} catch {
+			// Best-effort cache - failure to persist doesn't block this run.
+		}
 	}
 
 	return {
 		mode,
 		vars,
+		clears: ingestionClears(tool),
 		codexConfigPath,
 		newKeyMinted: minted,
 		notice,
@@ -407,4 +534,33 @@ export async function resolveWrapperMode(
 		refreshedWiring,
 		claudeProjectPin,
 	};
+}
+
+/**
+ * Env vars to scrub from the child in ingestion (Path B) mode. Copilot's
+ * BYOK provider vars — if the user hand-exported them in their shell —
+ * would otherwise survive into the child and keep BYOK active, routing LLM
+ * traffic OFF the Copilot seat (defeating seat-preserving ingestion) and,
+ * when the inherited base URL is itself a LangWatch gateway, double-capturing
+ * against the OTLP lane. Gateway mode already scrubs its conflicting twins;
+ * this is the ingestion-side counterpart. Non-copilot tools have no such
+ * activation var, so the set is empty.
+ */
+function ingestionClears(tool: string): string[] {
+	if (tool === "copilot") {
+		return [
+			"COPILOT_PROVIDER_TYPE",
+			"COPILOT_PROVIDER_BASE_URL",
+			"COPILOT_PROVIDER_API_KEY",
+		];
+	}
+	if (tool === "code") {
+		// An inherited `COPILOT_OTEL_EXPORTER_TYPE=file` (the ccusage setup)
+		// redirects the copilot OTel family to a local file. Whether the VS
+		// Code Chat extension reads this var is unverified, so we SCRUB the
+		// inherited value rather than assert one of our own — neutral if the
+		// extension ignores it, protective if it doesn't.
+		return ["COPILOT_OTEL_EXPORTER_TYPE"];
+	}
+	return [];
 }

@@ -619,3 +619,69 @@ describe("salvageTruncatedRequestBody (claude's 60KB inline cap)", () => {
     ).toBeNull();
   });
 });
+
+/**
+ * Anthropic bills an hour-long cache entry at twice the input rate against the
+ * 1.25x a five-minute entry costs, and states which is which only in the
+ * response body. That body reaches us on the log stream, never on the span, so
+ * the span side records how much was written and leaves the lifetime to the
+ * log side rather than asserting one it cannot see.
+ */
+describe("ClaudeCodeExtractor.apply cache lifetime", () => {
+  describe("given a claude code model call that wrote to its cache", () => {
+    /** @scenario "A call that does not say how long its cache lives is priced as before" */
+    it("records what was written without qualifying how long it lives", () => {
+      const ctx = createExtractorContext(
+        { model: "claude-opus-5", cache_creation_tokens: 17854 },
+        { name: "claude_code.llm_request" },
+      );
+
+      new ClaudeCodeExtractor().apply(ctx);
+
+      expect(ctx.out["gen_ai.usage.cache_creation.input_tokens"]).toBe(17854);
+      expect(
+        ctx.out["gen_ai.usage.cache_creation_1h.input_tokens"],
+      ).toBeUndefined();
+    });
+
+    /** @scenario "An hour-long cache write is recorded only where the provider states it" */
+    it("keeps a lifetime the emitter put on the span itself", () => {
+      const ctx = createExtractorContext(
+        {
+          model: "claude-opus-5",
+          cache_creation_tokens: 17854,
+          "gen_ai.usage.cache_creation_1h.input_tokens": 4000,
+        },
+        { name: "claude_code.llm_request" },
+      );
+
+      new ClaudeCodeExtractor().apply(ctx);
+
+      // Gateway-emitted spans carry the split already. Canonical output merges
+      // over the span rather than replacing it, so writing nothing here is
+      // what leaves the emitter's own 4000 standing.
+      expect(
+        ctx.out["gen_ai.usage.cache_creation_1h.input_tokens"],
+      ).toBeUndefined();
+      expect(
+        ctx.bag.attrs.get("gen_ai.usage.cache_creation_1h.input_tokens"),
+      ).toBe(4000);
+    });
+  });
+
+  describe("given a claude code model call that wrote nothing to its cache", () => {
+    /** @scenario "A call that does not say how long its cache lives is priced as before" */
+    it("records no cache lifetime", () => {
+      const ctx = createExtractorContext(
+        { model: "claude-opus-5", input_tokens: 100 },
+        { name: "claude_code.llm_request" },
+      );
+
+      new ClaudeCodeExtractor().apply(ctx);
+
+      expect(
+        ctx.out["gen_ai.usage.cache_creation_1h.input_tokens"],
+      ).toBeUndefined();
+    });
+  });
+});

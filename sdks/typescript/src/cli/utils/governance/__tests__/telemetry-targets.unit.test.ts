@@ -177,6 +177,36 @@ describe("scanTelemetryTargets", () => {
 		});
 	});
 
+	describe("when a scoped code() function is installed (VS Code)", () => {
+		beforeEach(() => {
+			persistBlockToRc(
+				"zsh",
+				buildScopedToolFunction(
+					"code",
+					{
+						COPILOT_OTEL_ENABLED: "true",
+						OTEL_EXPORTER_OTLP_ENDPOINT: "http://app/api/otel",
+					},
+					"zsh",
+				),
+				toolMarkers("code"),
+			);
+		});
+
+		/** @scenario Logout removes the scoped code() function */
+		it("reports the code function target and removes it on logout, leaving the rc clean", () => {
+			expect(
+				presentLabels().some((l) => l.startsWith("code shell function")),
+			).toBe(true);
+
+			for (const t of scanTelemetryTargets().filter((t) => t.present)) {
+				expect(t.remove()).toBe(true);
+			}
+
+			expect(presentLabels()).toEqual([]);
+		});
+	});
+
 	describe("when settings.json carries the langwatch hooks and a user's own", () => {
 		const userEntry = {
 			hooks: [{ type: "command", command: "./scripts/session-log.sh" }],

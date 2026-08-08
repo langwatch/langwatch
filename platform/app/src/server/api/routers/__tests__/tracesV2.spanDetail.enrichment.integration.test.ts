@@ -18,6 +18,8 @@ const TRACE_ID = "a3c6656cf433e97549f654034be02955";
 const REQUEST_ID = "req_011CcuGBf1aBcDeFgHiJkLmN";
 const TOOL_USE_ID = "toolu_01AbCdEfGhIjKlMnOpQrStUv";
 const REPL = "repl_main_thread";
+/** What ingest computed from the span's own tokens, and what every read shows. */
+const STORED_COST = 0.193022;
 
 function storedSpan(over: Record<string, unknown>) {
   return {
@@ -33,7 +35,7 @@ function storedSpan(over: Record<string, unknown>) {
       started_at: 1_700_000_000_000,
       finished_at: 1_700_000_001_000,
     },
-    metrics: { prompt_tokens: 120, completion_tokens: 8 },
+    metrics: { prompt_tokens: 120, completion_tokens: 8, cost: STORED_COST },
     params: { request_id: REQUEST_ID, query_source: REPL },
     model: "claude-sonnet-5",
     vendor: "anthropic",
@@ -146,7 +148,7 @@ describe("tracesV2.spanDetail coding-agent enrichment", () => {
   });
 
   describe("given a claude llm_request span whose content lives in logs", () => {
-    it("joins prompt, reply, and authoritative cost onto the detail", async () => {
+    it("joins prompt and reply onto the detail without touching its cost", async () => {
       protectionsMock.current = FULL_VISIBILITY;
       mocks.getSpanById.mockResolvedValue(storedSpan({}));
       mocks.getLogsByTraceId.mockResolvedValue(CLAUDE_LOGS);
@@ -167,7 +169,10 @@ describe("tracesV2.spanDetail coding-agent enrichment", () => {
 
       expect(detail.input).toContain("hello claudinho");
       expect(detail.output).toContain("E aí! Tudo bem?");
-      expect(detail.metrics?.cost).toBe(0.16);
+      // The log's own cost_usd (0.16) is deliberately different: the detail
+      // shows the stored cost, the same number the drawer header and the
+      // analytics graphs read.
+      expect(detail.metrics?.cost).toBe(STORED_COST);
     });
   });
 

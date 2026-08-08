@@ -61,6 +61,7 @@ vi.mock("../config", async () => {
 });
 
 let tmpHome: string;
+let logSpy: ReturnType<typeof vi.spyOn>;
 const origHome = process.env.HOME;
 const origUserprofile = process.env.USERPROFILE;
 const origShell = process.env.SHELL;
@@ -76,6 +77,9 @@ const otelVars: Record<string, string> = {
   OTEL_EXPORTER_OTLP_HEADERS: "Authorization=Bearer sk-lw-token",
 };
 
+/** Opening marker of the block asking codex to run the harvest after a turn. */
+const NOTIFY_MARKER = "# >>> langwatch codex notify begin >>>";
+
 function cfg(overrides: Partial<GovernanceConfig> = {}): GovernanceConfig {
   return {
     gateway_url: "http://gw.example.com",
@@ -86,6 +90,11 @@ function cfg(overrides: Partial<GovernanceConfig> = {}): GovernanceConfig {
 
 function claudeSettingsPath(): string {
   return path.join(tmpHome, ".claude", "settings.json");
+}
+
+/** Everything the offer printed this run, as one blob to assert against. */
+function logged(): string {
+  return logSpy.mock.calls.map((call: unknown[]) => String(call[0])).join("\n");
 }
 
 beforeEach(() => {
@@ -101,6 +110,7 @@ beforeEach(() => {
   answers.length = 0;
   lastPrompts.length = 0;
   saveConfigMock.mockReset();
+  logSpy = vi.spyOn(console, "log").mockImplementation(() => undefined);
 });
 
 afterEach(() => {
@@ -335,6 +345,55 @@ describe("maybeOfferIngestionShellRcPersist", () => {
         expect(lastPrompts[0]).toContain("~/.codex/config.toml");
         expect(lastPrompts[0]).not.toContain(".zshrc");
       });
+
+      it("asks codex to record each turn's conversation as it completes", async () => {
+        answers.push("y");
+        const { maybeOfferIngestionShellRcPersist } = await import(
+          "../shell-rc.js"
+        );
+        await maybeOfferIngestionShellRcPersist({
+          cfg: cfg(),
+          tool: "codex",
+          vars: otelVars,
+        });
+        expect(fs.readFileSync(codexConfigPath(), "utf8")).toContain(
+          NOTIFY_MARKER,
+        );
+      });
+    });
+
+    describe("and the question is put to the user", () => {
+      /** @scenario "Consent names the program that will run after every turn" */
+      it("names the program that runs after every turn before defaulting to yes", async () => {
+        answers.push("y");
+        const { maybeOfferIngestionShellRcPersist } = await import(
+          "../shell-rc.js"
+        );
+        await maybeOfferIngestionShellRcPersist({
+          cfg: cfg(),
+          tool: "codex",
+          vars: otelVars,
+        });
+        expect(lastPrompts).toHaveLength(1);
+        expect(lastPrompts[0]).toContain("after every completed turn");
+        expect(lastPrompts[0]).toContain("langwatch ingest codex");
+        // The default is yes, so it has to say all of this first.
+        expect(lastPrompts[0]!.indexOf("after every completed turn")).
+          toBeLessThan(lastPrompts[0]!.indexOf("[Y/n/never]"));
+      });
+
+      it("says nothing about displacing a program the user does not have", async () => {
+        answers.push("y");
+        const { maybeOfferIngestionShellRcPersist } = await import(
+          "../shell-rc.js"
+        );
+        await maybeOfferIngestionShellRcPersist({
+          cfg: cfg(),
+          tool: "codex",
+          vars: otelVars,
+        });
+        expect(lastPrompts[0]).not.toContain("started by this one");
+      });
     });
 
     describe("and the user answers 'never'", () => {
@@ -356,22 +415,26 @@ describe("maybeOfferIngestionShellRcPersist", () => {
     });
 
     describe("and config.toml already carries the Authorization header", () => {
-      it("stays quiet — no prompt, no rewrite", async () => {
+      const installed = [
+        "# >>> langwatch otel begin >>>",
+        "[otel]",
+        `environment = "langwatch"`,
+        "",
+        "[otel.trace_exporter.otlp-http]",
+        `endpoint = "http://app.example.com/api/otel/v1/traces"`,
+        `protocol = "json"`,
+        `headers = { "Authorization" = "Bearer sk-lw-token" }`,
+        "# <<< langwatch otel end <<<",
+        "",
+      ].join("\n");
+
+      beforeEach(() => {
         const configFile = codexConfigPath();
         fs.mkdirSync(path.dirname(configFile), { recursive: true });
-        const installed = [
-          "# >>> langwatch otel begin >>>",
-          "[otel]",
-          `environment = "langwatch"`,
-          "",
-          "[otel.trace_exporter.otlp-http]",
-          `endpoint = "http://app.example.com/api/otel/v1/traces"`,
-          `protocol = "json"`,
-          `headers = { "Authorization" = "Bearer sk-lw-token" }`,
-          "# <<< langwatch otel end <<<",
-          "",
-        ].join("\n");
         fs.writeFileSync(configFile, installed);
+      });
+
+      it("does not prompt again or rewrite the exports", async () => {
         // No answer queued: a fired prompt would read "" → "yes" → rewrite.
         const { maybeOfferIngestionShellRcPersist } = await import(
           "../shell-rc.js"
@@ -383,7 +446,93 @@ describe("maybeOfferIngestionShellRcPersist", () => {
         });
         expect(lastPrompts).toHaveLength(0);
         expect(saveConfigMock).not.toHaveBeenCalled();
-        expect(fs.readFileSync(configFile, "utf8")).toBe(installed);
+        expect(fs.readFileSync(codexConfigPath(), "utf8")).toContain(installed);
+      });
+
+      /** @scenario "A device that already persisted its capture settings still gets the turn harvest" */
+      it("installs the turn harvest those settings were persisted without", async () => {
+        const { maybeOfferIngestionShellRcPersist } = await import(
+          "../shell-rc.js"
+        );
+        await maybeOfferIngestionShellRcPersist({
+          cfg: cfg(),
+          tool: "codex",
+          vars: otelVars,
+        });
+        expect(fs.readFileSync(codexConfigPath(), "utf8")).toContain(
+          NOTIFY_MARKER,
+        );
+        expect(lastPrompts).toHaveLength(0);
+      });
+    });
+
+    describe("and the offer runs a second time", () => {
+      it("leaves exactly one harvest hook behind", async () => {
+        const { maybeOfferIngestionShellRcPersist } = await import(
+          "../shell-rc.js"
+        );
+        const run = () =>
+          maybeOfferIngestionShellRcPersist({
+            cfg: cfg(),
+            tool: "codex",
+            vars: otelVars,
+          });
+        answers.push("y");
+        await run();
+        await run();
+        const toml = fs.readFileSync(codexConfigPath(), "utf8");
+        expect((toml.match(/langwatch codex notify begin/g) ?? []).length).toBe(
+          1,
+        );
+      });
+    });
+
+    describe("and the user has a turn-completion program of their own", () => {
+      /** @scenario "Consent says an existing turn-completion program will be started by ours" */
+      it("says their program will be started by ours before defaulting to yes", async () => {
+        const configFile = codexConfigPath();
+        fs.mkdirSync(path.dirname(configFile), { recursive: true });
+        fs.writeFileSync(configFile, 'notify = ["/usr/bin/say", "done"]\n');
+        answers.push("y");
+        const { maybeOfferIngestionShellRcPersist } = await import(
+          "../shell-rc.js"
+        );
+        await maybeOfferIngestionShellRcPersist({
+          cfg: cfg(),
+          tool: "codex",
+          vars: otelVars,
+        });
+        expect(lastPrompts[0]).toContain("started by this one");
+      });
+    });
+
+    describe("and the configuration binds a turn-completion program that cannot be moved", () => {
+      /** @scenario "A configuration the harvest cannot be merged into says so" */
+      it("tells the user the conversation will not be recorded", async () => {
+        const configFile = codexConfigPath();
+        fs.mkdirSync(path.dirname(configFile), { recursive: true });
+        // Two top-level assignments: moving one aside still leaves the other,
+        // and a duplicate key stops codex from starting at all.
+        fs.writeFileSync(
+          configFile,
+          'notify = ["/one"]\nnotify = ["/two"]\n',
+        );
+        answers.push("y");
+        const { maybeOfferIngestionShellRcPersist } = await import(
+          "../shell-rc.js"
+        );
+
+        await maybeOfferIngestionShellRcPersist({
+          cfg: cfg(),
+          tool: "codex",
+          vars: otelVars,
+        });
+
+        expect(logged()).toContain("will not be recorded");
+        // The exports still landed: only content recovery is blocked.
+        expect(fs.readFileSync(configFile, "utf8")).toContain(
+          `headers = { "Authorization" = "Bearer sk-lw-token" }`,
+        );
       });
     });
 
