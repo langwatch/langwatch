@@ -54,6 +54,7 @@
     "pnpm-workspace.yaml",
     "pnpm-lock.yaml",
     "packages/server/package.json",
+    "plugins/langwatch/package.json",
     "tests/agentic-e2e/package.json"
   ],
   "scripts": {
