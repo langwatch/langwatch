@@ -28,6 +28,7 @@ import {
   computeClaudeSpanEnrichment,
   computeClaudeToolSpanEnrichment,
 } from "./claude-code-span-enrichment";
+import { contentAttrKeys } from "./coding-agent-log-content";
 import { DERIVED_ATTRS } from "./log-content-derivation";
 import type { LogRecordStorageService } from "./log-record-storage.service";
 import type { StoredLogRecordRow } from "./repositories/log-record-storage.repository";
@@ -41,27 +42,15 @@ import type { SpanSummaryRow } from "./repositories/span-storage.repository";
 export const CODING_AGENT_ORIGIN = "coding_agent";
 
 /**
- * OTLP log attribute keys the content events carry (all string-valued in CH).
- *
- * Each event carries its payload under a DIFFERENT key — there is no shared
- * `body` convention, and assuming one silently yields no content:
- *   - `api_request_body` / `api_response_body` → `body` (the raw Messages JSON)
- *   - `user_prompt`                            → `prompt`  (`OTEL_LOG_USER_PROMPTS=1`)
- *   - `assistant_response`                     → `response` (`OTEL_LOG_ASSISTANT_RESPONSES`,
- *     which falls back to `OTEL_LOG_USER_PROMPTS` when unset)
- * See https://code.claude.com/docs/en/monitoring-usage. Reading only `body` for
- * all four left the LIGHT path (no `api_*_body` events to pair with) with no
- * span input AND no span output at all.
+ * OTLP log attribute keys the metadata (non-content) attributes carry — all
+ * string-valued in ClickHouse. The CONTENT keys live in
+ * `coding-agent-log-content.ts`, which the API's redaction reads from the same
+ * table, so a key surfaced here can never be one the gate does not know.
  */
 const EVENT_NAME_ATTR = "event.name";
 const REQUEST_ID_ATTR = "request_id";
 const QUERY_SOURCE_ATTR = "query_source";
-const BODY_ATTR = "body";
 const COST_USD_ATTR = "cost_usd";
-const PROMPT_ATTR = "prompt";
-const RESPONSE_ATTR = "response";
-const USER_PROMPT_EVENT = "user_prompt";
-const ASSISTANT_RESPONSE_EVENT = "assistant_response";
 const TOOL_DECISION_EVENT = "tool_decision";
 const TOOL_RESULT_EVENT = "tool_result";
 const TOOL_USE_ID_ATTR = "tool_use_id";
@@ -74,29 +63,6 @@ const RESULT_DECISION_SOURCE_ATTR = "decision_source";
 const SUCCESS_ATTR = "success";
 const DURATION_MS_ATTR = "duration_ms";
 const RESULT_SIZE_ATTR = "tool_result_size_bytes";
-
-/**
- * The attribute keys that can carry the event's content payload, in the order
- * {@link readContentBody} probes them (`body` is always the trailing
- * fallback). Exported for the API's log redaction: it must withhold EXACTLY
- * the keys a reader would surface, from this one mapping — a key listed here
- * but missed there leaks captured content through the raw-log and transcript
- * reads to viewers the data-privacy policy hides it from.
- */
-export function contentAttrKeys(eventName: string): readonly string[] {
-  if (eventName === USER_PROMPT_EVENT) return [PROMPT_ATTR, BODY_ATTR];
-  if (eventName === ASSISTANT_RESPONSE_EVENT) return [RESPONSE_ATTR, BODY_ATTR];
-  // Tool events: the span surface now shows tool_input / tool_parameters as
-  // the tool span's INPUT, so the raw-log read must withhold the same keys —
-  // anything surfaced-as-content but not listed here is a policy bypass.
-  if (eventName === TOOL_RESULT_EVENT) {
-    return [TOOL_INPUT_ATTR, TOOL_PARAMETERS_ATTR, BODY_ATTR];
-  }
-  if (eventName === TOOL_DECISION_EVENT) {
-    return [TOOL_PARAMETERS_ATTR, BODY_ATTR];
-  }
-  return [BODY_ATTR];
-}
 
 /** The attribute carrying the event's content payload, per event name. */
 function readContentBody(

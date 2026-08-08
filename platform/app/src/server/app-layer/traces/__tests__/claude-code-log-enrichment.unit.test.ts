@@ -10,7 +10,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { Span } from "~/server/tracer/types";
 import {
-  contentAttrKeys,
   enrichCodingAgentSpansFromLogs,
   enrichSingleSpanWithClaudeLogContent,
 } from "../claude-code-log-enrichment";
@@ -367,22 +366,5 @@ describe("enrichSingleSpanWithClaudeLogContent", () => {
       // Exact request_id joins (output / cost) still apply when they match.
       expect(enriched.output).toBeNull();
     });
-  });
-});
-
-describe("contentAttrKeys — tool events", () => {
-  it("withholds tool_input and tool_parameters for tool_result (policy parity with the span surface)", () => {
-    expect(contentAttrKeys("tool_result")).toEqual([
-      "tool_input",
-      "tool_parameters",
-      "body",
-    ]);
-  });
-
-  it("withholds tool_parameters for tool_decision", () => {
-    expect(contentAttrKeys("tool_decision")).toEqual([
-      "tool_parameters",
-      "body",
-    ]);
   });
 });
