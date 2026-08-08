@@ -523,7 +523,9 @@ function canonicalBlockContent(block: ContentBlock): string {
     case "thinking":
       return block.text;
     case "tool_use":
-      return [block.id ?? "", block.name, describeValue(block.input)].join(FIELD_SEPARATOR);
+      return [block.id ?? "", block.name, describeValue(block.input)].join(
+        FIELD_SEPARATOR,
+      );
     case "tool_result":
       return [
         block.toolUseId ?? "",
