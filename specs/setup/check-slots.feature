@@ -237,7 +237,7 @@ Feature: Machine-wide slots for whole-repo checks
 
   @unit
   Scenario: CI installs are left alone
-    Given CI is set
+    Given CI is set to anything but "0" or "false"
     When the postinstall step runs
     Then it changes nothing, and says which environment it stood down for
 

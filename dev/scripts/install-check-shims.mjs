@@ -36,7 +36,8 @@
  * shim is left alone, and one that pnpm has overwritten is re-shimmed. It
  * never fails an install. A missing shim only costs the queue its accounting.
  *
- * CI and production installs are left alone entirely, see `skipReason`.
+ * Installs on CI (`CI` set to anything but `0` or `false`) and in production
+ * are left alone entirely, see `skipReason`.
  *
  *   node dev/scripts/install-check-shims.mjs [binDir...]
  */

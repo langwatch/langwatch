@@ -202,8 +202,8 @@ no path argument at all. Naming files (`tsgo --noEmit src/foo.ts`) stays instant
 and unqueued, and `--watch` / `--lsp` never queue, since they would hold a slot
 for the session. A run that already holds a slot exports `CHECK_SLOTS=0` to
 everything it spawns, so it can't queue behind itself. The installer stands
-down entirely when `CI` is set or `NODE_ENV=production`, so an image build or a
-server install keeps pnpm's own bin entries.
+down entirely when `NODE_ENV=production` or `CI` is set to anything but `0` or
+`false`, so an image build or a server install keeps pnpm's own bin entries.
 
 One catch on targeted tsgo runs: with a `tsconfig.json` present, `tsgo --noEmit
 <file>` fails with `TS5112` unless you add `--ignoreConfig`. That error is what
