@@ -187,6 +187,20 @@ describe("check queue", () => {
       expect(startOrder(readEvents())).toEqual(["solo"]);
     });
 
+    /** @scenario "A check does not queue behind itself" */
+    it("tells everything below it that the slot is already held", async () => {
+      // The bin shims mean a queued `pnpm typecheck` spawns another gated
+      // entry point. Without this, it queues behind the slot it is holding and
+      // waits out the entire maximum wait before starting.
+      const run = startRun("nested", {
+        argv: ["node", "-e", "process.stdout.write(process.env.CHECK_SLOTS)"],
+        env: { CHECK_SLOTS: "3" },
+      });
+      const result = await run.done;
+
+      expect(result.stdout).toBe("0");
+    });
+
     /** @scenario "The wrapper is transparent to the command it runs" */
     it("passes the command's exit code and output straight through", async () => {
       const run = startRun("passthrough", {
