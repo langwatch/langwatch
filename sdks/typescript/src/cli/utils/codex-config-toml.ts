@@ -244,7 +244,7 @@ export function writeCodexOtelBlock(
 		"m",
 	);
 	if (re.test(prior)) {
-		const next = prior.replace(re, block);
+		const next = replaceVerbatim(prior, re, block);
 		if (next === prior) return { action: "unchanged", path: filePath };
 		writeFile0600(filePath, next);
 		return { action: "updated", path: filePath };
@@ -257,6 +257,24 @@ export function writeCodexOtelBlock(
 
 function escapeRe(s: string): string {
 	return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * Replace the span `re` matches with `replacement` exactly as written.
+ *
+ * A string replacement is not inserted literally: `$&`, `` $` ``, `$'` and `$n`
+ * are directives that splice the match and the text around it back into the
+ * result. Every replacement in this file is built from values the user
+ * authored, and a config holding a shell one-liner reaches for all of them, so
+ * expanding them duplicates the surrounding config until codex refuses to parse
+ * the file. A replacer function is inserted as-is and has no such reading.
+ */
+function replaceVerbatim(
+	content: string,
+	re: RegExp,
+	replacement: string,
+): string {
+	return content.replace(re, () => replacement);
 }
 
 /**
@@ -297,6 +315,52 @@ const DISPLACED_NOTE =
  */
 const DISPLACED_BEGIN = "# >>> langwatch displaced notify begin >>>";
 const DISPLACED_END = "# <<< langwatch displaced notify end <<<";
+
+/** The whole displaced region, capturing the commented-out lines it stores. */
+function displacedRegionRe(): RegExp {
+	return new RegExp(
+		`${escapeRe(DISPLACED_BEGIN)}\\n${escapeRe(DISPLACED_NOTE)}\\n([\\s\\S]*?)\\n${escapeRe(DISPLACED_END)}\\n?`,
+		"m",
+	);
+}
+
+/** Comment out the lines an assignment occupied, bracketed for exact recovery. */
+function buildDisplacedRegion(raw: string): string {
+	return [
+		DISPLACED_BEGIN,
+		DISPLACED_NOTE,
+		...raw.split("\n").map((line) => `# ${line}`),
+		DISPLACED_END,
+	].join("\n");
+}
+
+/** Give the stored lines back exactly as the user wrote them. */
+function uncommentDisplaced(commented: string): string {
+	return commented
+		.split("\n")
+		.map((line) => line.replace(/^[ \t]*# ?/, ""))
+		.join("\n");
+}
+
+/**
+ * The user's own notify argv as a prior install stored it, or null when the
+ * file carries no displaced region.
+ *
+ * Once the region is written, the argv it holds is a comment: no scan for a
+ * live `notify` will ever see it again. Reading it back from here is what keeps
+ * the chain alive across repeat installs, where otherwise the second write
+ * would find nothing to chain and quietly stop running the user's program while
+ * the note left in their file still says we run it.
+ */
+function findDisplacedNotify(
+	content: string,
+): { start: number; end: number; argv: string[] } | null {
+	const match = displacedRegionRe().exec(content);
+	if (!match) return null;
+	const argv = findNotifyAssignment(uncommentDisplaced(match[1] ?? ""))?.argv;
+	if (!argv?.length) return null;
+	return { start: match.index, end: match.index + match[0].length, argv };
+}
 
 export interface CodexNotifyBlockInputs {
 	/**
@@ -507,8 +571,12 @@ function topLevelNotifyMatch(content: string): { index: number } | null {
 
 /**
  * The value of codex's own top-level `notify` key in `content`, or null when
- * absent. Returns the raw matched text alongside the parsed argv so a caller
- * can move the exact lines it occupied.
+ * absent. Returns the span the assignment occupies alongside the raw text and
+ * the parsed argv, so a caller moves those exact bytes. The span is what makes
+ * it the live assignment that moves: an identical spelling quoted in a comment
+ * or inside a `"""` block is prose, and searching for the text would find that
+ * copy first and comment out someone's documentation instead of the key codex
+ * reads.
  *
  * "Top-level" is enforced, not assumed. TOML binds a bare key to the table
  * above it, so `[integrations.slack]` followed by `notify = [...]` is
@@ -526,9 +594,16 @@ function topLevelNotifyMatch(content: string): { index: number } | null {
  */
 const TOML_ARRAY_ELEMENT = /"((?:[^"\\]|\\.)*)"|'([^']*)'/g;
 
-function findNotifyAssignment(
-	content: string,
-): { raw: string; argv: string[] } | null {
+interface NotifyAssignment {
+	/** Offset of the assignment's first character. */
+	start: number;
+	/** Offset just past its closing `]`. */
+	end: number;
+	raw: string;
+	argv: string[];
+}
+
+function findNotifyAssignment(content: string): NotifyAssignment | null {
 	const start = topLevelNotifyMatch(content);
 	if (!start) return null;
 	const openIndex = content.indexOf("[", start.index);
@@ -568,12 +643,13 @@ function findNotifyAssignment(
 			if (depth === 0) {
 				// `raw` stays the verbatim source span: the caller moves exactly
 				// the lines the assignment occupied, comments included.
-				const raw = content.slice(start.index, i + 1);
+				const end = i + 1;
+				const raw = content.slice(start.index, end);
 				const argv = Array.from(elements.matchAll(TOML_ARRAY_ELEMENT)).map(
 					(m) =>
 						m[1] !== undefined ? m[1].replace(/\\(.)/g, "$1") : (m[2] ?? ""),
 				);
-				return { raw, argv };
+				return { start: start.index, end, raw, argv };
 			}
 		}
 	}
@@ -618,7 +694,9 @@ export interface CodexNotifyWriteResult {
  *
  * A user-authored `notify` is moved aside rather than left in place: TOML
  * forbids a duplicate key, so keeping both would stop codex from starting. The
- * displaced argv is commented out where it stood and re-run from our block.
+ * displaced argv is commented out where it stood and re-run from our block, and
+ * a repeat install reads it back out of that region so their program stays on
+ * the chain instead of being dropped the second time capture is enabled.
  */
 export function writeCodexNotifyBlock(
 	inputs: CodexNotifyBlockInputs,
@@ -640,17 +718,21 @@ export function writeCodexNotifyBlock(
 		stripMarkerBlock(prior, NOTIFY_BEGIN, NOTIFY_END) ?? prior;
 
 	const existing = findNotifyAssignment(withoutOurs);
-	const chained = existing?.argv.length ? existing.argv : null;
+	// With no live `notify` the user may still have one: an earlier install
+	// already moved it into the displaced region, where it is a comment rather
+	// than a key. That region is the only surviving record of it.
+	const displaced = existing ? null : findDisplacedNotify(withoutOurs);
+	const chained = existing?.argv.length
+		? existing.argv
+		: (displaced?.argv ?? null);
+	// Splice by the offsets the scanner resolved. Searching the file for the
+	// assignment's text would land on the first copy of that spelling, and a
+	// `notify` quoted in a comment or a `"""` block reads the same as the live
+	// one, so the comment would be commented out and the real key left standing.
 	const body = existing
-		? withoutOurs.replace(
-				existing.raw,
-				[
-					DISPLACED_BEGIN,
-					DISPLACED_NOTE,
-					...existing.raw.split("\n").map((line) => `# ${line}`),
-					DISPLACED_END,
-				].join("\n"),
-			)
+		? withoutOurs.slice(0, existing.start) +
+			buildDisplacedRegion(existing.raw) +
+			withoutOurs.slice(existing.end)
 		: withoutOurs;
 
 	const block = buildCodexNotifyBlock({ ...inputs, chained });
@@ -698,15 +780,8 @@ export function removeCodexNotifyBlock(
 	// written below their own notify and uncomment it, turning their prose into
 	// bare TOML that codex then refuses to parse.
 	const restored = stripped.replace(
-		new RegExp(
-			`${escapeRe(DISPLACED_BEGIN)}\\n${escapeRe(DISPLACED_NOTE)}\\n([\\s\\S]*?)\\n${escapeRe(DISPLACED_END)}\\n?`,
-			"m",
-		),
-		(_match, commented: string) =>
-			`${commented
-				.split("\n")
-				.map((line) => line.replace(/^[ \t]*# ?/, ""))
-				.join("\n")}\n`,
+		displacedRegionRe(),
+		(_match, commented: string) => `${uncommentDisplaced(commented)}\n`,
 	);
 	fs.writeFileSync(filePath, restored);
 	return true;
@@ -866,7 +941,7 @@ export function writeCodexGatewayBlock(
 			"m",
 		);
 		if (re.test(prior)) {
-			const next = prior.replace(re, block);
+			const next = replaceVerbatim(prior, re, block);
 			if (next === prior) {
 				action = "unchanged";
 			} else {

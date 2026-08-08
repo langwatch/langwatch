@@ -29,6 +29,17 @@ import {
 
 const HARVEST = ["/usr/bin/node", "/opt/langwatch/cli.js", "ingest", "codex"];
 
+const NOTIFY_BEGIN_MARKER = "# >>> langwatch codex notify begin >>>";
+const DISPLACED_BEGIN_MARKER = "# >>> langwatch displaced notify begin >>>";
+
+/**
+ * Every character `String.prototype.replace` gives a second meaning to in a
+ * replacement: the match, the text before it, the text after it, and a capture
+ * group. A shell one-liner reaches for all of them, and a `notify` argv is a
+ * shell one-liner as often as it is a path.
+ */
+const DOLLAR_ARGV = ["/bin/sh", "-c", "echo $'hi' $& $1 $` done"];
+
 let tmp: string;
 let configPath: string;
 
@@ -246,6 +257,142 @@ describe("writeCodexNotifyBlock", () => {
 					.split("\n")
 					.filter((line) => /^[ \t]*notify[ \t]*=/.test(line));
 				expect(live).toHaveLength(1);
+			});
+		});
+	});
+
+	describe("given the user's notify argv holds dollar signs", () => {
+		describe("when the block is written", () => {
+			/** @scenario "A turn-completion program written with shell quoting is moved aside verbatim" */
+			it("moves their command aside character for character, leaving the rest of the file alone", () => {
+				fs.writeFileSync(
+					configPath,
+					[
+						'model = "gpt-5-mini"',
+						"",
+						`notify = ${JSON.stringify(DOLLAR_ARGV)}`,
+						"",
+						"[otel]",
+						'environment = "mine"',
+						"",
+					].join("\n"),
+				);
+
+				const result = writeCodexNotifyBlock(
+					{ command: HARVEST },
+					{ filePath: configPath },
+				);
+
+				const content = fs.readFileSync(configPath, "utf8");
+				expect(result.chained).toEqual(DOLLAR_ARGV);
+				expect(content).toContain(`# notify = ${JSON.stringify(DOLLAR_ARGV)}`);
+				// Every one of these appears once in the user's file, and a
+				// dollar sign expanded into the replacement duplicates the
+				// surrounding config, which codex then refuses to parse.
+				expect(content.match(/^\[otel\]$/gm)).toHaveLength(1);
+				expect(content.match(/^model = /gm)).toHaveLength(1);
+				expect(content.match(/^environment = /gm)).toHaveLength(1);
+			});
+		});
+	});
+
+	describe("given the file quotes a notify example spelled like the live one", () => {
+		describe("when the block is written", () => {
+			/** @scenario "A documented turn-completion example is not mistaken for the live one" */
+			it("moves the live assignment aside and leaves the quoted example as prose", () => {
+				fs.writeFileSync(
+					configPath,
+					[
+						'instructions = """',
+						"Wire your own hook like this:",
+						'notify = ["/usr/bin/terminal-notifier"]',
+						'"""',
+						'notify = ["/usr/bin/terminal-notifier"]',
+						"",
+						"[otel]",
+						'environment = "mine"',
+						"",
+					].join("\n"),
+				);
+
+				const result = writeCodexNotifyBlock(
+					{ command: HARVEST },
+					{ filePath: configPath },
+				);
+
+				const content = fs.readFileSync(configPath, "utf8");
+				expect(result.chained).toEqual(["/usr/bin/terminal-notifier"]);
+				expect(content).toContain(
+					'Wire your own hook like this:\nnotify = ["/usr/bin/terminal-notifier"]\n"""',
+				);
+				// Below the prose only the langwatch block assigns notify: the
+				// user's own assignment was the one moved aside.
+				const belowProse = content.slice(content.lastIndexOf('"""') + 3);
+				expect(belowProse).not.toMatch(/^[ \t]*notify[ \t]*=/m);
+				expect(belowProse).toContain(DISPLACED_BEGIN_MARKER);
+			});
+		});
+	});
+
+	describe("given capture already moved the user's own notify aside", () => {
+		describe("when capture is enabled again", () => {
+			/** @scenario "Enabling capture again keeps the user's own program running" */
+			it("still chains their program exactly once", () => {
+				const userArgv = ["/usr/bin/terminal-notifier", "-title", "Codex"];
+				fs.writeFileSync(
+					configPath,
+					[
+						`notify = ${JSON.stringify(userArgv)}`,
+						"",
+						"[otel]",
+						'environment = "mine"',
+						"",
+					].join("\n"),
+				);
+
+				writeCodexNotifyBlock({ command: HARVEST }, { filePath: configPath });
+				const result = writeCodexNotifyBlock(
+					{ command: HARVEST },
+					{ filePath: configPath },
+				);
+
+				const content = fs.readFileSync(configPath, "utf8");
+				expect(result.chained).toEqual(userArgv);
+				expect(codexNotifyCommand(configPath)).toEqual([
+					...HARVEST,
+					"--chain",
+					JSON.stringify(userArgv),
+					"--notify",
+				]);
+				expect(result.action).toBe("unchanged");
+				expect(content.match(/langwatch displaced notify begin/g)).toHaveLength(
+					1,
+				);
+				expect(content.match(/langwatch codex notify begin/g)).toHaveLength(1);
+			});
+
+			/** @scenario "Enabling capture again keeps the user's own program running" */
+			it("gives their notify back live when capture is then turned off", () => {
+				const original =
+					'notify = ["/usr/bin/terminal-notifier", "-title", "Codex"]';
+				fs.writeFileSync(
+					configPath,
+					[original, "", "[otel]", 'environment = "mine"', ""].join("\n"),
+				);
+
+				writeCodexNotifyBlock({ command: HARVEST }, { filePath: configPath });
+				writeCodexNotifyBlock({ command: HARVEST }, { filePath: configPath });
+				removeCodexNotifyBlock(configPath);
+
+				const content = fs.readFileSync(configPath, "utf8");
+				expect(content).toContain(original);
+				expect(content).not.toContain("langwatch displaced notify");
+				expect(content).not.toContain(NOTIFY_BEGIN_MARKER);
+				expect(codexNotifyCommand(configPath)).toEqual([
+					"/usr/bin/terminal-notifier",
+					"-title",
+					"Codex",
+				]);
 			});
 		});
 	});
