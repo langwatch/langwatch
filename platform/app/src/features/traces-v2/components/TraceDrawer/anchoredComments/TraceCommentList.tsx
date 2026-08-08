@@ -6,7 +6,7 @@ import {
   canJumpToAnnotationAnchor,
   useJumpToAnnotationAnchor,
 } from "../../../hooks/useJumpToAnnotationAnchor";
-import { describeAnnotationAnchor } from "../../../utils/annotationAnchorLabel";
+import { describeAnnotationAnchor } from "~/server/annotations/annotationAnchorLabel";
 
 /** What a comment reads as when the part it was left on is gone. */
 const ORPHANED_ANCHOR = "On a part of the trace that is no longer there";

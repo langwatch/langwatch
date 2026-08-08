@@ -20,7 +20,7 @@ import { Tooltip } from "~/components/ui/tooltip";
 import type { AnnotationByTrace } from "~/hooks/useAnnotationsByTraceIds";
 import { useJumpToAnnotationAnchor } from "../../../hooks/useJumpToAnnotationAnchor";
 import { useDrawerStore } from "../../../stores/drawerStore";
-import { describeAnnotationAnchor } from "../../../utils/annotationAnchorLabel";
+import { describeAnnotationAnchor } from "~/server/annotations/annotationAnchorLabel";
 
 interface ScoreEntry {
   name: string;
