@@ -10,12 +10,22 @@
  * convention as `telemetry-refresh-test-helpers.ts` beside it).
  */
 import * as fs from "node:fs";
+import * as os from "node:os";
 import * as path from "node:path";
+
+import { afterEach, beforeEach, type Mock, vi } from "vitest";
+
+import type * as ClaudePluginModuleType from "../claude-plugin";
 
 /** The repository the marketplace we publish from lives in. */
 export const OWNED_MARKETPLACE_REPO = "langwatch/agent-plugin";
 
-/** Write a JSON file under the temp home's `.claude` directory. */
+/**
+ * Where every fixture writes. Claude Code keeps all of this under one directory
+ * in the user's home, so the suites point HOME at a temp tree and let the module
+ * under test resolve the rest for itself, rather than injecting paths it would
+ * never be given in production.
+ */
 export const writeClaudeJson = ({
 	home,
 	segments,
@@ -70,3 +80,154 @@ export const seedMarketplace = ({
 			},
 		},
 	});
+
+export type ClaudePluginModule = typeof ClaudePluginModuleType;
+
+/** The statuses a programmed `claude` answers each plugin subcommand with. */
+export interface ClaudeAnswers {
+	pluginHelp?: number;
+	marketplaceAdd?: number;
+	install?: number;
+	uninstall?: number;
+	marketplaceRemove?: number;
+}
+
+export interface ClaudePluginHarness {
+	home: () => string;
+	settingsPath: () => string;
+	/** Only for the cases that write bytes which are deliberately not JSON. */
+	pluginsDir: () => string;
+	writeJson: (args: { segments: string[]; value: unknown }) => void;
+	readSettings: <T>() => T;
+	seedInstalledPlugin: () => void;
+	seedMarketplace: (args?: { repo?: string }) => void;
+	/** Program the `claude` binary's answers. Anything unset succeeds. */
+	answerClaude: (answers: ClaudeAnswers) => void;
+	commandsRun: () => string[];
+	lastSpawnOptions: () => { stdio: unknown };
+	readConfig: () => Record<string, unknown>;
+	writeConfig: (extra?: Record<string, unknown>) => void;
+	/** A fresh module graph, so the availability probe is memoized once. */
+	loadModule: () => Promise<ClaudePluginModule>;
+}
+
+const OK = { status: 0, stdout: "", stderr: "" };
+
+/**
+ * Everything the plugin suites need around the module under test: a temp HOME
+ * that is torn down per test, a CLI config beside it, and a programmable
+ * `claude`. Registers its own `beforeEach` / `afterEach`.
+ *
+ * The `spawnSync` mock itself stays in the calling file, because `vi.mock` is
+ * hoisted per module and cannot be registered from here.
+ */
+export function installClaudePluginHarness({
+	spawnSyncMock,
+	prefix,
+}: {
+	spawnSyncMock: Mock;
+	prefix: string;
+}): ClaudePluginHarness {
+	const state = { home: "" };
+	const origHome = process.env.HOME;
+	const origUserprofile = process.env.USERPROFILE;
+	const origConfig = process.env.LANGWATCH_CLI_CONFIG;
+
+	const writeConfig = (extra: Record<string, unknown> = {}): void => {
+		fs.writeFileSync(
+			process.env.LANGWATCH_CLI_CONFIG!,
+			JSON.stringify({
+				gateway_url: "http://gw.example.com",
+				control_plane_url: "http://app.example.com",
+				...extra,
+			}),
+		);
+	};
+
+	// A refusal reason belongs to a refusal: a zero status carrying "rejected"
+	// on stderr would let a future assertion about WHY something failed pass
+	// against a run that succeeded.
+	const answerClaude = ({
+		pluginHelp = 0,
+		marketplaceAdd = 0,
+		install = 0,
+		uninstall = 0,
+		marketplaceRemove = 0,
+	}: ClaudeAnswers): void => {
+		const answer = (status: number, refusal: string) => ({
+			...OK,
+			status,
+			stderr: status === 0 ? "" : refusal,
+		});
+		spawnSyncMock.mockImplementation((_bin: string, args: string[]) => {
+			const joined = args.join(" ");
+			if (joined === "plugin --help") return { ...OK, status: pluginHelp };
+			if (joined.startsWith("plugin marketplace add")) {
+				return answer(marketplaceAdd, "add rejected");
+			}
+			if (joined.startsWith("plugin marketplace remove")) {
+				return { ...OK, status: marketplaceRemove };
+			}
+			if (joined.startsWith("plugin install")) {
+				return answer(install, "install rejected");
+			}
+			if (joined.startsWith("plugin uninstall")) {
+				return answer(uninstall, "uninstall rejected");
+			}
+			return OK;
+		});
+	};
+
+	beforeEach(() => {
+		state.home = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
+		process.env.HOME = state.home;
+		process.env.USERPROFILE = state.home;
+		process.env.LANGWATCH_CLI_CONFIG = path.join(state.home, "config.json");
+		writeConfig();
+		spawnSyncMock.mockReset();
+		answerClaude({});
+	});
+
+	afterEach(() => {
+		if (origHome === undefined) delete process.env.HOME;
+		else process.env.HOME = origHome;
+		if (origUserprofile === undefined) delete process.env.USERPROFILE;
+		else process.env.USERPROFILE = origUserprofile;
+		if (origConfig === undefined) delete process.env.LANGWATCH_CLI_CONFIG;
+		else process.env.LANGWATCH_CLI_CONFIG = origConfig;
+		fs.rmSync(state.home, { recursive: true, force: true });
+	});
+
+	const settingsPath = (): string =>
+		path.join(state.home, ".claude", "settings.json");
+
+	return {
+		home: () => state.home,
+		settingsPath,
+		pluginsDir: () => path.join(state.home, ".claude", "plugins"),
+		writeJson: ({ segments, value }) =>
+			writeClaudeJson({ home: state.home, segments, value }),
+		readSettings: <T,>() => JSON.parse(fs.readFileSync(settingsPath(), "utf8")) as T,
+		seedInstalledPlugin: () => seedInstalledPlugin({ home: state.home }),
+		seedMarketplace: ({ repo }: { repo?: string } = {}) =>
+			seedMarketplace({ home: state.home, repo }),
+		answerClaude,
+		commandsRun: () =>
+			spawnSyncMock.mock.calls.map((call: unknown[]) =>
+				(call[1] as string[]).join(" "),
+			),
+		lastSpawnOptions: () => {
+			const calls = spawnSyncMock.mock.calls as unknown[][];
+			return calls[calls.length - 1]![2] as { stdio: unknown };
+		},
+		readConfig: () =>
+			JSON.parse(
+				fs.readFileSync(process.env.LANGWATCH_CLI_CONFIG!, "utf8"),
+			) as Record<string, unknown>,
+		writeConfig,
+		loadModule: async () => {
+			vi.resetModules();
+			return await import("../claude-plugin.js");
+		},
+	};
+}

@@ -72,8 +72,13 @@ const claudeCommandsRun = (): string[] =>
 	);
 
 /** Write a plugin state file under the temp home's claude directory. */
-const writeClaudeJson = (segments: string[], value: unknown): void =>
-	writeClaudeJsonFixture({ home: tmpHome, segments, value });
+const writeClaudeJson = ({
+	segments,
+	value,
+}: {
+	segments: string[];
+	value: unknown;
+}): void => writeClaudeJsonFixture({ home: tmpHome, segments, value });
 
 const seedLangwatchPlugin = (): void => seedInstalledPlugin({ home: tmpHome });
 
@@ -313,9 +318,12 @@ describe("scanTelemetryTargets", () => {
 		/** @scenario "A plugin the uninstall subcommand cannot remove is disabled instead" */
 		it("switches the plugin off in the settings file instead", () => {
 			seedLangwatchPlugin();
-			writeClaudeJson(["settings.json"], {
-				model: "claude-sonnet-5",
-				enabledPlugins: { "langwatch@langwatch": true },
+			writeClaudeJson({
+				segments: ["settings.json"],
+				value: {
+					model: "claude-sonnet-5",
+					enabledPlugins: { "langwatch@langwatch": true },
+				},
 			});
 			spawnSyncMock.mockImplementation((_bin: string, args: string[]) =>
 				args.join(" ").startsWith("plugin uninstall")

@@ -77,8 +77,13 @@ const cfg = (overrides: Partial<GovernanceConfig> = {}): GovernanceConfig => ({
 const settingsPath = (): string =>
   path.join(tmpHome, ".claude", "settings.json");
 
-const writeJson = (segments: string[], value: unknown): void =>
-  writeClaudeJson({ home: tmpHome, segments, value });
+const writeJson = ({
+  segments,
+  value,
+}: {
+  segments: string[];
+  value: unknown;
+}): void => writeClaudeJson({ home: tmpHome, segments, value });
 
 const seedInstalledPlugin = (): void =>
   seedInstalledPluginFixture({ home: tmpHome });
@@ -201,7 +206,10 @@ describe("the claude persist offer", () => {
 
     /** @scenario "Installing the plugin removes the raw hook entries it replaces" */
     it("clears raw hook entries a previous CLI left behind", async () => {
-      writeJson(["settings.json"], { hooks: { SessionStart: [rawHookEntry] } });
+      writeJson({
+        segments: ["settings.json"],
+        value: { hooks: { SessionStart: [rawHookEntry] } },
+      });
 
       await runOffer();
 
@@ -292,7 +300,7 @@ describe("the silent re-assert of an already-configured device", () => {
   beforeEach(() => {
     // The env block is already current, which is what sends the offer down the
     // re-assert path instead of prompting.
-    writeJson(["settings.json"], { env: otelVars });
+    writeJson({ segments: ["settings.json"], value: { env: otelVars } });
   });
 
   describe("when the plugin is already installed", () => {
@@ -310,9 +318,12 @@ describe("the silent re-assert of an already-configured device", () => {
     /** @scenario "The silent re-assert removes raw hook entries the plugin replaced" */
     it("clears raw hook entries the plugin replaced", async () => {
       seedInstalledPlugin();
-      writeJson(["settings.json"], {
-        env: otelVars,
-        hooks: { SessionStart: [rawHookEntry], Stop: [rawHookEntry] },
+      writeJson({
+        segments: ["settings.json"],
+        value: {
+          env: otelVars,
+          hooks: { SessionStart: [rawHookEntry], Stop: [rawHookEntry] },
+        },
       });
 
       await runOffer();
@@ -327,9 +338,12 @@ describe("the silent re-assert of an already-configured device", () => {
       const userEntry = {
         hooks: [{ type: "command", command: "./scripts/mine.sh" }],
       };
-      writeJson(["settings.json"], {
-        env: otelVars,
-        hooks: { SessionStart: [userEntry, rawHookEntry] },
+      writeJson({
+        segments: ["settings.json"],
+        value: {
+          env: otelVars,
+          hooks: { SessionStart: [userEntry, rawHookEntry] },
+        },
       });
 
       await runOffer();

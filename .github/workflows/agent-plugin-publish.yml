@@ -121,20 +121,43 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add -A
+          tag="v${VERSION}"
+          # What the remote's own tag resolves to, peeled to a commit, or empty
+          # when there is no such tag. ls-remote prints the peeled `^{}` line
+          # last for an annotated tag, so the last field is the commit either
+          # way.
+          published_tag_commit="$(
+            git ls-remote --tags origin "refs/tags/${tag}" "refs/tags/${tag}^{}" \
+              | awk 'END { print $1 }'
+          )"
+
+          # Nothing to commit is not automatically success. The branch push and
+          # the tag push are two operations, so a previous run can have landed
+          # the content and then failed on the tag, leaving a release nobody can
+          # pin. Reconcile the tag before reporting success.
           if git diff --cached --quiet; then
-            echo "No changes to publish"
+            if [ -z "$published_tag_commit" ]; then
+              echo "Mirror is already current but ${tag} is missing. Creating it."
+              git tag "$tag"
+              git push origin "refs/tags/${tag}"
+              exit 0
+            fi
+            if [ "$published_tag_commit" != "$(git rev-parse HEAD)" ]; then
+              echo "::error::${tag} exists in langwatch/agent-plugin but resolves to ${published_tag_commit}, not to the published commit $(git rev-parse HEAD)."
+              exit 1
+            fi
+            echo "No changes to publish, and ${tag} already resolves to them."
             exit 0
           fi
-          # Checked only once there is something to publish, so re-running a
-          # publish that changed nothing stays green. With changes in hand, a
-          # tag that already exists means this version would ship new content
-          # while `v${VERSION}` still resolves the old, which is worse than a
+
+          # With changes in hand, a tag that already exists would ship new
+          # content while `${tag}` still resolves the old, which is worse than a
           # failed publish: users pin against that tag.
-          if git ls-remote --exit-code --tags origin "refs/tags/v${VERSION}" >/dev/null 2>&1; then
-            echo "::error::langwatch/agent-plugin already has tag v${VERSION}. Bump the plugin version and release again."
+          if [ -n "$published_tag_commit" ]; then
+            echo "::error::langwatch/agent-plugin already has tag ${tag}. Bump the plugin version and release again."
             exit 1
           fi
-          git commit -m "chore: sync agent plugin v${VERSION} from langwatch/langwatch"
-          git tag "v${VERSION}"
+          git commit -m "chore: sync agent plugin ${tag} from langwatch/langwatch"
+          git tag "$tag"
           git push
-          git push origin "refs/tags/v${VERSION}"
+          git push origin "refs/tags/${tag}"
