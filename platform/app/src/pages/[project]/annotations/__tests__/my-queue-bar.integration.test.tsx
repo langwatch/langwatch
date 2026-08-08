@@ -17,6 +17,8 @@ type TestQueueItem = {
   id: string;
   traceId: string;
   doneAt: Date | null;
+  /** The server answers `trace: null` for an item whose trace never resolves. */
+  traceMissing?: boolean;
 };
 
 type TestMark = {
@@ -38,6 +40,7 @@ const mocks = vi.hoisted(() => ({
   markForDataset: vi.fn(),
   markDone: vi.fn(),
   clearMarks: vi.fn(),
+  deleteQueueItems: vi.fn(),
   invalidateQueues: vi.fn(),
   invalidateMarks: vi.fn(),
 }));
@@ -127,6 +130,11 @@ vi.mock("~/utils/api", () => ({
     traces: {
       getById: { useQuery: () => ({ data: undefined }) },
     },
+    // The conversation the page reads to tell "this thread has no turns in the
+    // window" apart from "this thread has not answered yet".
+    tracesV2: {
+      list: { useQuery: () => ({ data: undefined, isLoading: false }) },
+    },
     annotation: {
       getMarkedForDatasetItems: {
         useQuery: () => ({ data: mocks.marks, isLoading: false }),
@@ -140,6 +148,12 @@ vi.mock("~/utils/api", () => ({
       clearDatasetMarks: {
         useMutation: () => ({ mutate: mocks.clearMarks, isLoading: false }),
       },
+      deleteQueueItems: {
+        useMutation: () => ({
+          mutate: mocks.deleteQueueItems,
+          isLoading: false,
+        }),
+      },
     },
   },
 }));
@@ -151,17 +165,19 @@ const { default: MyQueuePage, ROUTE_SETTLE_MS } = await import(
 const TRACE_STARTED_AT = 1_700_000_000_000;
 
 const setItems = (items: TestQueueItem[]) => {
-  mocks.items = items.map((item) => ({
+  mocks.items = items.map(({ traceMissing, ...item }) => ({
     ...item,
     projectId: "project-1",
     annotationQueueId: "queue-1",
     userId: null,
     createdAt: new Date("2026-08-01T10:00:00Z"),
-    trace: {
-      trace_id: item.traceId,
-      timestamps: { started_at: TRACE_STARTED_AT },
-      metadata: {},
-    },
+    trace: traceMissing
+      ? null
+      : {
+          trace_id: item.traceId,
+          timestamps: { started_at: TRACE_STARTED_AT },
+          metadata: {},
+        },
     annotations: [],
   }));
 };
@@ -470,6 +486,142 @@ describe("given a reviewer walking their annotation queue", () => {
       rerender(page());
 
       await waitFor(() => expect(mocks.openDrawer).toHaveBeenCalledTimes(2));
+    });
+  });
+
+  describe("given the trace behind the open item no longer resolves", () => {
+    beforeEach(() => {
+      setItems([
+        {
+          id: "item-1",
+          traceId: "trace-gone",
+          doneAt: null,
+          traceMissing: true,
+        },
+        { id: "item-2", traceId: "trace-2", doneAt: null },
+      ]);
+    });
+
+    /** @scenario "An item whose trace is gone says so and offers a way on" */
+    it("says the trace is no longer available and offers a way on", () => {
+      renderPage();
+
+      expect(
+        screen.getByText("This trace is no longer available"),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: "Remove from queue" }),
+      ).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Skip" })).toBeInTheDocument();
+    });
+
+    /** @scenario "An item whose trace is gone says so and offers a way on" */
+    it("keeps the queue navigation and drops everything that acts on the trace", () => {
+      renderPage();
+
+      expect(
+        screen.getByRole("button", { name: /Previous/ }),
+      ).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /Next/ })).toBeInTheDocument();
+      expect(screen.getByText("1 of 2")).toBeInTheDocument();
+
+      expect(
+        screen.queryByRole("button", { name: /Done/ }),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: /Edit trace/ }),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("checkbox", { name: "Add to dataset at the end" }),
+      ).not.toBeInTheDocument();
+    });
+
+    /** @scenario "Removing an item whose trace is gone takes it out of the queue" */
+    it("removes the item and moves on to the next one", async () => {
+      const user = userEvent.setup();
+      mocks.deleteQueueItems.mockImplementation(
+        (
+          _input: unknown,
+          options?: { onSuccess?: () => Promise<void> | void },
+        ) => void options?.onSuccess?.(),
+      );
+      renderPage();
+
+      await user.click(
+        screen.getByRole("button", { name: "Remove from queue" }),
+      );
+
+      expect(mocks.deleteQueueItems).toHaveBeenCalledWith(
+        { projectId: "project-1", queueItemIds: ["item-1"] },
+        expect.anything(),
+      );
+      await waitFor(() =>
+        expect(mocks.push).toHaveBeenCalledWith(
+          "/acme/annotations/my-queue?queue-item=item-2",
+        ),
+      );
+      await waitFor(() => expect(mocks.invalidateQueues).toHaveBeenCalled());
+    });
+
+    /** @scenario "Skipping an item whose trace is gone leaves it in the queue" */
+    it("moves on without taking the item out of the queue", async () => {
+      const user = userEvent.setup();
+      renderPage();
+
+      await user.click(screen.getByRole("button", { name: "Skip" }));
+
+      await waitFor(() =>
+        expect(mocks.push).toHaveBeenCalledWith(
+          "/acme/annotations/my-queue?queue-item=item-2",
+        ),
+      );
+      expect(mocks.deleteQueueItems).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "An item whose trace is gone says so and offers a way on" */
+    it("offers no removal to a reviewer who may not update annotations", () => {
+      mocks.canUpdateAnnotations = false;
+      renderPage();
+
+      expect(
+        screen.queryByRole("button", { name: "Remove from queue" }),
+      ).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Skip" })).toBeInTheDocument();
+    });
+  });
+
+  describe("given the only item left is one whose trace no longer resolves", () => {
+    beforeEach(() => {
+      setItems([
+        {
+          id: "item-1",
+          traceId: "trace-gone",
+          doneAt: null,
+          traceMissing: true,
+        },
+      ]);
+    });
+
+    /** @scenario "An item whose trace is gone does not hold the finished queue back" */
+    it("reads as a finished queue", () => {
+      renderPage();
+
+      expect(screen.getByTestId("tasks-done")).toBeInTheDocument();
+    });
+
+    /** @scenario "An item whose trace is gone does not hold the dataset hand-off back" */
+    it("still offers the dataset hand-off for the marks left behind", async () => {
+      setMarks([
+        { id: "item-8", traceId: "trace-8" },
+        { id: "item-9", traceId: "trace-9" },
+      ]);
+      renderPage();
+
+      await waitFor(() => {
+        expect(mocks.openDrawer).toHaveBeenCalledWith("addDatasetRecord", {
+          selectedTraceIds: ["trace-8", "trace-9"],
+        });
+      });
     });
   });
 

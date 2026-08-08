@@ -77,6 +77,23 @@ Rule: Selection checkbox column
     And no traces match the current filters
     Then `SelectHeaderCheckbox` short-circuits to null when `traceIds` is empty
 
+  # The loading table renders placeholder rows so the layout does not jump.
+  # Those rows carry no trace, so selecting them hands the bulk actions ids
+  # that address nothing, and a later deselect-all cannot take them back out.
+  @integration
+  Scenario: Selecting all while the page is still loading selects nothing
+    Given the trace table is still loading its first page
+    And placeholder rows stand in for the traces that have not landed
+    When the user clicks where the header checkbox sits
+    Then nothing becomes selected
+    And the header shows a placeholder, the same way the row checkboxes do
+
+  @unit
+  Scenario: The selection never holds a blank or placeholder id
+    Given the selection is empty
+    When blank, whitespace and table-placeholder ids are selected alongside real ones
+    Then only the real ids enter the selection
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # SELECTION STATE
@@ -380,6 +397,31 @@ Rule: Send selected traces to an annotation queue
   Scenario: A shared trace never offers the action
     Given the trace drawer is rendered read-only on a share page
     Then no annotation queue action is offered
+
+  # A queue item pointing at a trace that never existed is a dead end for the
+  # reviewer who picks it up, so an id that resolves to nothing never becomes
+  # one. The guard sits where the traces are queued, so the automations that
+  # queue traces on their own are held to it too.
+  @integration
+  Scenario: Sending traces for annotation skips ids that resolve to no trace
+    Given the traces sent carry an id that resolves to no trace
+    When the traces are sent for annotation
+    Then only the ids that resolve to a trace become queue items
+    And the send reports how many were queued and how many were skipped
+
+  @integration
+  Scenario: Blank ids are dropped before anything is queued
+    Given the traces sent carry an empty id and one made of whitespace
+    When the traces are sent for annotation
+    Then neither becomes a queue item
+    And neither is counted as queued
+
+  @integration
+  Scenario: The same trace sent twice in one send is queued once
+    Given the traces sent carry the same trace id twice
+    When the traces are sent for annotation
+    Then the trace holds one queue item
+    And the send counts it once
 
 
 # ─────────────────────────────────────────────────────────────────────────────

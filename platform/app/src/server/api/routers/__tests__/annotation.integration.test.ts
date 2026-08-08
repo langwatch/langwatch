@@ -12,10 +12,19 @@ import {
   TeamUserRole,
 } from "@prisma/client";
 import { nanoid } from "nanoid";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 import { getAnnotatedTraceIds } from "~/server/filters/annotations";
 import { mapTraceToDatasetEntry } from "~/server/tracer/tracesMapping";
 import type { Trace } from "~/server/tracer/types";
+import { ClickHouseTraceService } from "~/server/traces/clickhouse-trace.service";
 import { applyOverlayToTrace } from "~/server/traces/edit-overlay/applyTraceEditOverlay";
 import type { TraceEditOverlayPatch } from "~/server/traces/edit-overlay/traceEditOverlay.schemas";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
@@ -62,6 +71,14 @@ vi.mock("~/server/app-layer/app", () => ({
  */
 const TRACE_ID_PREFIX = "test-trace-annotation";
 
+/**
+ * Which trace ids the project holds a trace for. Queueing a trace checks this
+ * against ClickHouse before it writes anything, and the traces here only ever
+ * exist in Postgres, so `null` stands for "every id sent resolves" and a set
+ * narrows it for the tests that are about the guard itself.
+ */
+let resolvableTraceIds: Set<string> | null = null;
+
 describe("Annotation CRUD", () => {
   const projectId = "test-project-id";
   const traceId = `${TRACE_ID_PREFIX}-integration`;
@@ -76,6 +93,13 @@ describe("Annotation CRUD", () => {
     await prisma.annotation.deleteMany({ where: { projectId } });
     await sweepOverlays();
 
+    vi.spyOn(
+      ClickHouseTraceService.prototype,
+      "findExistingTraceIds",
+    ).mockImplementation(async ({ traceIds }) =>
+      traceIds.filter((id) => resolvableTraceIds?.has(id) ?? true),
+    );
+
     const user = await getTestUser();
     const ctx = createInnerTRPCContext({
       session: {
@@ -89,6 +113,7 @@ describe("Annotation CRUD", () => {
   afterAll(async () => {
     await prisma.annotation.deleteMany({ where: { projectId } });
     await sweepOverlays();
+    vi.restoreAllMocks();
   });
 
   describe("when creating an annotation", () => {
@@ -1225,6 +1250,101 @@ describe("Annotation CRUD", () => {
     });
   });
 
+  describe("given traces sent to an annotation queue", () => {
+    const sendTracePrefix = "test-trace-annotation-send";
+    let annotatorId: string;
+
+    const queuedTraceIds = async () =>
+      (
+        await prisma.annotationQueueItem.findMany({
+          where: { projectId, traceId: { startsWith: sendTracePrefix } },
+          select: { traceId: true },
+          orderBy: { traceId: "asc" },
+        })
+      ).map((row) => row.traceId);
+
+    beforeAll(async () => {
+      annotatorId = (await getTestUser()).id;
+    });
+
+    beforeEach(async () => {
+      resolvableTraceIds = null;
+      await prisma.annotationQueueItem.deleteMany({
+        where: { projectId, traceId: { startsWith: sendTracePrefix } },
+      });
+    });
+
+    afterAll(async () => {
+      resolvableTraceIds = null;
+      await cleanupTestRows(prisma, [
+        [
+          "annotationQueueItem",
+          { projectId, traceId: { startsWith: sendTracePrefix } },
+        ],
+      ]);
+    });
+
+    /** @scenario "Sending traces for annotation skips ids that resolve to no trace" */
+    it("queues the ids that resolve to a trace and skips the rest", async () => {
+      const live = `${sendTracePrefix}-live`;
+      const gone = `${sendTracePrefix}-gone`;
+      resolvableTraceIds = new Set([live]);
+
+      const result = await caller.annotation.createQueueItem({
+        projectId,
+        traceIds: [live, gone],
+        annotators: [`user-${annotatorId}`],
+      });
+
+      expect(result).toEqual({ created: 1, skipped: 1 });
+      expect(await queuedTraceIds()).toEqual([live]);
+    });
+
+    /** @scenario "Blank ids are dropped before anything is queued" */
+    it("drops an empty id and one made of whitespace", async () => {
+      const live = `${sendTracePrefix}-blank`;
+      resolvableTraceIds = new Set([live]);
+
+      const result = await caller.annotation.createQueueItem({
+        projectId,
+        traceIds: ["", "   ", live],
+        annotators: [`user-${annotatorId}`],
+      });
+
+      expect(result).toEqual({ created: 1, skipped: 2 });
+      expect(await queuedTraceIds()).toEqual([live]);
+    });
+
+    /** @scenario "The same trace sent twice in one send is queued once" */
+    it("queues a repeated id once", async () => {
+      const live = `${sendTracePrefix}-twice`;
+      resolvableTraceIds = new Set([live]);
+
+      const result = await caller.annotation.createQueueItem({
+        projectId,
+        traceIds: [live, live],
+        annotators: [`user-${annotatorId}`],
+      });
+
+      expect(result).toEqual({ created: 1, skipped: 1 });
+      expect(await queuedTraceIds()).toEqual([live]);
+    });
+
+    /** @scenario "Sending traces for annotation skips ids that resolve to no trace" */
+    it("writes nothing when none of the ids resolves", async () => {
+      resolvableTraceIds = new Set<string>();
+
+      const result = await caller.annotation.createQueueItem({
+        projectId,
+        traceIds: [`${sendTracePrefix}-none-1`, `${sendTracePrefix}-none-2`],
+        annotators: [`user-${annotatorId}`],
+      });
+
+      expect(result).toEqual({ created: 0, skipped: 2 });
+      expect(await queuedTraceIds()).toEqual([]);
+    });
+  });
+
   describe("given queue items marked for the dataset hand-off", () => {
     const queueTracePrefix = "test-trace-annotation-queue-mark";
     let viewerCaller: ReturnType<typeof appRouter.createCaller>;
@@ -1509,6 +1629,61 @@ describe("Annotation CRUD", () => {
       );
       expect(marked[mine.id]).toBe(false);
       expect(marked[theirs.id]).toBe(true);
+    });
+
+    describe("when an item is removed from the queue", () => {
+      /** @scenario "Removing an item whose trace is gone takes it out of the queue" */
+      it("takes the caller's own item out of the queue", async () => {
+        const mine = await createQueueItem("delete-mine");
+
+        const result = await caller.annotation.deleteQueueItems({
+          projectId,
+          queueItemIds: [mine.id],
+        });
+
+        expect(result.deleted).toBe(1);
+        expect(
+          await prisma.annotationQueueItem.findFirst({
+            where: { id: mine.id, projectId },
+          }),
+        ).toBeNull();
+      });
+
+      /** @scenario "Removing a teammate's queue item is refused" */
+      it("leaves an item on someone else's queue where it is", async () => {
+        const mine = await createQueueItem("delete-batch-mine");
+        const theirs = await createQueueItem("delete-theirs", viewerUserId);
+
+        const result = await caller.annotation.deleteQueueItems({
+          projectId,
+          queueItemIds: [mine.id, theirs.id],
+        });
+
+        expect(result.deleted).toBe(1);
+        expect(
+          await prisma.annotationQueueItem.findFirst({
+            where: { id: theirs.id, projectId },
+          }),
+        ).not.toBeNull();
+      });
+
+      /** @scenario "Removing a teammate's queue item is refused" */
+      it("refuses a reviewer who may only view the project", async () => {
+        const item = await createQueueItem("delete-unauthorized");
+
+        await expect(
+          viewerCaller.annotation.deleteQueueItems({
+            projectId,
+            queueItemIds: [item.id],
+          }),
+        ).rejects.toThrow();
+
+        expect(
+          await prisma.annotationQueueItem.findFirst({
+            where: { id: item.id, projectId },
+          }),
+        ).not.toBeNull();
+      });
     });
   });
 });

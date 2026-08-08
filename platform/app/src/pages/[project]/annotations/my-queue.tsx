@@ -19,6 +19,7 @@ import { Link } from "~/components/ui/link";
 import { showErrorToast } from "~/features/errors";
 import { ConversationView } from "~/features/traces-v2/components/TraceDrawer/conversationView";
 import { useShikiAdapter } from "~/features/traces-v2/components/TraceDrawer/markdownView/shikiAdapter";
+import { useConversationTurns } from "~/features/traces-v2/hooks/useConversationTurns";
 import { legacyTraceToTurn } from "~/features/traces-v2/utils/legacyTraceToTurn";
 import { useAnnotationQueues } from "~/hooks/useAnnotationQueues";
 import { useDrawer } from "~/hooks/useDrawer";
@@ -40,6 +41,18 @@ const partitionHint = (startedAt: unknown): number | null =>
     ? startedAt
     : null;
 
+/** Where a queue item is read. One shape, so every way in agrees. */
+const queueItemHref = ({
+  projectSlug,
+  queueItemId,
+}: {
+  projectSlug: string | undefined;
+  queueItemId?: string;
+}) =>
+  queueItemId
+    ? `/${projectSlug}/annotations/my-queue?queue-item=${queueItemId}`
+    : `/${projectSlug}/annotations/my-queue`;
+
 export default function TraceAnnotations() {
   const router = useRouter();
   const { "queue-item": queueItem } = router.query;
@@ -50,13 +63,22 @@ export default function TraceAnnotations() {
     showQueueAndUser: true,
     allQueueItems: true,
   });
-  const { project } = useOrganizationTeamProject();
+  const { project, hasPermission } = useOrganizationTeamProject();
   const queryClient = api.useContext();
   const { openDrawer, setFlowCallbacks } = useDrawer();
 
   const pendingQueueItems = useMemo(
     () => (assignedQueueItems ?? []).filter((item) => !item.doneAt),
     [assignedQueueItems],
+  );
+
+  // An item whose trace no longer resolves carries nothing to read, annotate or
+  // finish. It stays walkable so the reviewer can clear it, but it is not work:
+  // what is left to review is what decides whether the queue is finished, so one
+  // unreadable item cannot hold the end of the queue hostage forever.
+  const resolvablePendingItems = useMemo(
+    () => pendingQueueItems.filter((item) => !!item.trace),
+    [pendingQueueItems],
   );
 
   // Force re-render when items change by creating a key
@@ -103,15 +125,32 @@ export default function TraceAnnotations() {
     currentQueueItem?.trace?.trace_id ?? currentQueueItem?.traceId ?? "";
   const conversationId = currentQueueItem?.trace?.metadata?.thread_id ?? null;
 
+  // The conversation only reads back 90 days, so a thread older than that
+  // answers with no turns even though the item's own trace loaded. Reading it
+  // as an empty conversation would hide the very turn the reviewer was sent
+  // here for, so once the read has settled on nothing the trace is handed over
+  // as the single turn instead.
+  // The read keeps the previous thread's turns while the next one loads, so
+  // `isPreviousData` is what tells "this thread holds nothing" apart from
+  // "these turns belong to the item before this one".
+  const conversationTurns = useConversationTurns(conversationId);
+  const threadResolvedEmpty =
+    !!conversationId &&
+    !conversationTurns.isLoading &&
+    !conversationTurns.isPreviousData &&
+    (conversationTurns.data?.items.length ?? 0) === 0;
+
   // A trace that belongs to no thread has no conversation to query, so it is
   // handed over as the conversation's only turn.
   const fallbackTrace = traceDetails.data ?? currentQueueItem?.trace ?? null;
+  const renderedConversationId =
+    threadResolvedEmpty && fallbackTrace ? null : conversationId;
   const fallbackTurns = useMemo(
     () =>
-      conversationId || !fallbackTrace
+      renderedConversationId || !fallbackTrace
         ? undefined
         : [legacyTraceToTurn(fallbackTrace)],
-    [conversationId, fallbackTrace],
+    [renderedConversationId, fallbackTrace],
   );
 
   // Picking another turn opens it over the queue, the same way the bar's
@@ -169,7 +208,7 @@ export default function TraceAnnotations() {
   const isHandoffDue =
     !queuesLoading &&
     !markedItemsQuery.isLoading &&
-    pendingQueueItems.length === 0 &&
+    resolvablePendingItems.length === 0 &&
     markedTraceIds.length > 0;
 
   useEffect(() => {
@@ -199,11 +238,57 @@ export default function TraceAnnotations() {
     refetchQueueItems,
   ]);
 
+  // Where "Skip" and a removal land: the next item still waiting, or the bare
+  // queue when there is nothing after this one.
+  const currentQueueItemId = currentQueueItem?.id;
+  const nextPendingItemId = useMemo(() => {
+    if (!currentQueueItemId) return undefined;
+    const index = pendingQueueItems.findIndex(
+      (item) => item.id === currentQueueItemId,
+    );
+    return pendingQueueItems[index + 1]?.id;
+  }, [pendingQueueItems, currentQueueItemId]);
+
+  const projectSlug = project?.slug;
+  const advanceToNextItem = useCallback(
+    () =>
+      router.push(
+        queueItemHref({ projectSlug, queueItemId: nextPendingItemId }),
+      ),
+    [router, projectSlug, nextPendingItemId],
+  );
+
+  const deleteQueueItems = api.annotation.deleteQueueItems.useMutation();
+  const removeQueueItems = deleteQueueItems.mutate;
+  const removeCurrentItemFromQueue = useCallback(() => {
+    if (!projectId || !currentQueueItemId) return;
+    removeQueueItems(
+      { projectId, queueItemIds: [currentQueueItemId] },
+      {
+        onSuccess: async () => {
+          await advanceToNextItem();
+          await refetchQueueItems();
+        },
+        onError: (error) =>
+          showErrorToast({
+            error,
+            fallbackTitle: "Couldn't remove this item from your queue",
+          }),
+      },
+    );
+  }, [
+    projectId,
+    currentQueueItemId,
+    removeQueueItems,
+    advanceToNextItem,
+    refetchQueueItems,
+  ]);
+
   if (queuesLoading) {
     return <AnnotationsLayout />;
   }
 
-  if (pendingQueueItems.length === 0 && !queuesLoading) {
+  if (resolvablePendingItems.length === 0 && !queuesLoading) {
     return (
       <AnnotationsLayout>
         <VStack
@@ -247,52 +332,62 @@ export default function TraceAnnotations() {
           flexDirection="column"
           overflow="hidden"
           position="relative"
-          paddingBottom={currentQueueItem?.trace ? "100px" : 0}
+          paddingBottom={currentQueueItem ? "100px" : 0}
         >
-          <CodeBlock.AdapterProvider value={shikiAdapter}>
-            <Box flex="1" minHeight={0} display="flex" flexDirection="column">
-              <IsolatedErrorBoundary
-                scope="Couldn't render this conversation"
-                resetKeys={[currentQueueItem?.trace?.trace_id ?? ""]}
-              >
-                <ConversationView
-                  key={
-                    currentQueueItem?.trace?.trace_id ?? currentQueueItem?.id
-                  }
-                  conversationId={conversationId}
-                  currentTraceId={currentTraceId}
-                  fallbackTurns={fallbackTurns}
-                  onSelectTurn={openTurn}
-                  // Reviewers read whole outputs, so nothing arrives folded.
-                  defaultExpandAll
-                />
-              </IsolatedErrorBoundary>
-            </Box>
-            {!conversationId && !!currentQueueItem?.trace && (
-              <Box flexShrink={0} paddingX={4} paddingY={6}>
-                <Text
-                  fontStyle="italic"
-                  color="fg.muted"
-                  textAlign="center"
-                  width="full"
+          {currentQueueItem && !currentQueueItem.trace ? (
+            <UnavailableTraceCard
+              canRemove={hasPermission("annotations:update")}
+              canSkip={!!nextPendingItemId}
+              isRemoving={deleteQueueItems.isLoading}
+              onRemove={removeCurrentItemFromQueue}
+              onSkip={() => void advanceToNextItem()}
+            />
+          ) : (
+            <CodeBlock.AdapterProvider value={shikiAdapter}>
+              <Box flex="1" minHeight={0} display="flex" flexDirection="column">
+                <IsolatedErrorBoundary
+                  scope="Couldn't render this conversation"
+                  resetKeys={[currentQueueItem?.trace?.trace_id ?? ""]}
                 >
-                  Pass the thread_id on your integration to capture and
-                  visualize the whole conversation or associated actions. Read
-                  more on our{" "}
-                  <Link
-                    isExternal
-                    href="https://docs.langwatch.ai/integration/python/guide#adding-metadata"
-                    textDecoration="underline"
-                  >
-                    docs
-                  </Link>
-                  .
-                </Text>
+                  <ConversationView
+                    key={
+                      currentQueueItem?.trace?.trace_id ?? currentQueueItem?.id
+                    }
+                    conversationId={renderedConversationId}
+                    currentTraceId={currentTraceId}
+                    fallbackTurns={fallbackTurns}
+                    onSelectTurn={openTurn}
+                    // Reviewers read whole outputs, so nothing arrives folded.
+                    defaultExpandAll
+                  />
+                </IsolatedErrorBoundary>
               </Box>
-            )}
-          </CodeBlock.AdapterProvider>
+              {!conversationId && !!currentQueueItem?.trace && (
+                <Box flexShrink={0} paddingX={4} paddingY={6}>
+                  <Text
+                    fontStyle="italic"
+                    color="fg.muted"
+                    textAlign="center"
+                    width="full"
+                  >
+                    Pass the thread_id on your integration to capture and
+                    visualize the whole conversation or associated actions. Read
+                    more on our{" "}
+                    <Link
+                      isExternal
+                      href="https://docs.langwatch.ai/integration/python/guide#adding-metadata"
+                      textDecoration="underline"
+                    >
+                      docs
+                    </Link>
+                    .
+                  </Text>
+                </Box>
+              )}
+            </CodeBlock.AdapterProvider>
+          )}
         </Box>
-        {currentQueueItem?.trace && (
+        {currentQueueItem && (
           <Box
             position="absolute"
             bottom={0}
@@ -310,6 +405,7 @@ export default function TraceAnnotations() {
               currentQueueItem={currentQueueItem}
               markedItemIds={markedItemIds}
               refetchQueueItems={refetchQueueItems}
+              isTraceAvailable={!!currentQueueItem.trace}
             />
           </Box>
         )}
@@ -318,16 +414,62 @@ export default function TraceAnnotations() {
   );
 }
 
+/**
+ * What the reviewer meets instead of a conversation when the queued trace does
+ * not resolve. Its job is to say so plainly and hand back a way on, since there
+ * is nothing here to read, annotate or finish.
+ */
+const UnavailableTraceCard = ({
+  canRemove,
+  canSkip,
+  isRemoving,
+  onRemove,
+  onSkip,
+}: {
+  canRemove: boolean;
+  canSkip: boolean;
+  isRemoving: boolean;
+  onRemove: () => void;
+  onSkip: () => void;
+}) => (
+  <VStack flex="1" justify="center" gap={4} paddingX={6} textAlign="center">
+    <Text fontSize="lg" fontWeight="500">
+      This trace is no longer available
+    </Text>
+    <Text color="fg.muted" maxWidth="480px">
+      The trace behind this queue item cannot be found in this project, so there
+      is nothing here to review.
+    </Text>
+    <HStack gap={3}>
+      {canRemove && (
+        <Button variant="outline" disabled={isRemoving} onClick={onRemove}>
+          Remove from queue
+        </Button>
+      )}
+      <Button colorPalette="blue" disabled={!canSkip} onClick={onSkip}>
+        Skip
+      </Button>
+    </HStack>
+  </VStack>
+);
+
 const AnnotationQueuePicker = ({
   queueItems,
   currentQueueItem,
   markedItemIds,
   refetchQueueItems,
+  isTraceAvailable,
 }: {
   queueItems: AssignedQueueItem[];
   currentQueueItem: AssignedQueueItem;
   markedItemIds: string[];
   refetchQueueItems: () => Promise<void>;
+  /**
+   * Whether the item's trace resolved. When it did not, the bar keeps its
+   * navigation and drops everything that acts on the trace: there is nothing to
+   * correct, mark or finish.
+   */
+  isTraceAvailable: boolean;
 }) => {
   const router = useRouter();
   const { project, hasPermission } = useOrganizationTeamProject();
@@ -361,13 +503,11 @@ const AnnotationQueuePicker = ({
     }, ROUTE_SETTLE_MS);
   }, []);
 
-  const navigateToQueue = async (queueId: string, traceId?: string) => {
+  const navigateToQueue = async (queueItemId: string) => {
     setIsNavigating(true);
-    const url = traceId
-      ? `/${project?.slug}/annotations/my-queue?queue-item=${queueId}&trace=${traceId}`
-      : `/${project?.slug}/annotations/my-queue?queue-item=${queueId}`;
-
-    await router.push(url);
+    await router.push(
+      queueItemHref({ projectSlug: project?.slug, queueItemId }),
+    );
     releaseNavigatingWhenSettled();
   };
 
@@ -509,30 +649,38 @@ const AnnotationQueuePicker = ({
           {currentQueueItemIndex + 1} of {queueItems.length}
         </Text>
         <Spacer />
-        <Checkbox
-          checked={isMarkedForDataset}
-          onCheckedChange={(event) => toggleDatasetMark(!!event.checked)}
-        >
-          Add to dataset at the end
-        </Checkbox>
-        {canEditTrace && (
-          <Button variant="outline" disabled={isNavigating} onClick={editTrace}>
-            <LuPencil /> Edit trace
-          </Button>
+        {isTraceAvailable && (
+          <>
+            <Checkbox
+              checked={isMarkedForDataset}
+              onCheckedChange={(event) => toggleDatasetMark(!!event.checked)}
+            >
+              Add to dataset at the end
+            </Checkbox>
+            {canEditTrace && (
+              <Button
+                variant="outline"
+                disabled={isNavigating}
+                onClick={editTrace}
+              >
+                <LuPencil /> Edit trace
+              </Button>
+            )}
+            <Button
+              colorPalette="blue"
+              disabled={
+                currentQueueItem.doneAt !== null ||
+                markQueueItemDone.isLoading ||
+                isNavigating
+              }
+              onClick={() => {
+                void markQueueItemDoneMoveToNext();
+              }}
+            >
+              <Check /> Done
+            </Button>
+          </>
         )}
-        <Button
-          colorPalette="blue"
-          disabled={
-            currentQueueItem.doneAt !== null ||
-            markQueueItemDone.isLoading ||
-            isNavigating
-          }
-          onClick={() => {
-            void markQueueItemDoneMoveToNext();
-          }}
-        >
-          <Check /> Done
-        </Button>
       </HStack>
     </Box>
   );

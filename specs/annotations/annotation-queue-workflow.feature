@@ -159,6 +159,54 @@ Feature: Walking an annotation queue into a dataset
       When the marked items are read
       Then that item is not among them
 
+  Rule: An item whose trace is gone is walked past, not stared at
+
+    # A queued trace can stop resolving: it was queued from a selection that
+    # held ids no trace ever answered to, or it aged out of what the project
+    # keeps. There is nothing to annotate on such an item, so the reviewer is
+    # told so and given a way on instead of an empty conversation and no bar.
+
+    @integration
+    Scenario: An item whose trace is gone says so and offers a way on
+      Given the trace behind the open queue item no longer resolves
+      When I open that queue item
+      Then I am told the queued trace is no longer available
+      And I am offered "Remove from queue" and "Skip"
+      And the bar still reads my position and offers "Previous" and "Next"
+      And nothing is offered for annotating or correcting it
+
+    @integration
+    Scenario: Removing an item whose trace is gone takes it out of the queue
+      Given the trace behind the open queue item no longer resolves
+      When I choose "Remove from queue"
+      Then that item is removed from my queue
+      And the queue moves on to the next item
+
+    @integration
+    Scenario: Skipping an item whose trace is gone leaves it in the queue
+      Given the trace behind the open queue item no longer resolves
+      When I choose "Skip"
+      Then the queue moves on to the next item
+      And that item is still in my queue
+
+    @integration
+    Scenario: Removing a teammate's queue item is refused
+      Given an item assigned to a teammate alone
+      When I remove it from my queue
+      Then nothing is removed
+
+    @integration
+    Scenario: An item whose trace is gone does not hold the finished queue back
+      Given every item I can read is done and one item's trace no longer resolves
+      When I open my queue
+      Then I am told all tasks are complete
+
+    @integration
+    Scenario: An item whose trace is gone does not hold the dataset hand-off back
+      Given every item I can read is done, two are marked, and one item's trace no longer resolves
+      When I open my queue
+      Then the add-to-dataset drawer opens with those two traces
+
   Rule: The queue reads its trace as a conversation
 
     @integration
@@ -180,6 +228,16 @@ Feature: Walking an annotation queue into a dataset
       When I open that queue item
       Then that trace alone is rendered as a single-turn conversation
       And I am told to pass the thread_id to capture the whole conversation
+
+    # The conversation reads a 90-day window, so a thread older than that comes
+    # back empty even though the item's own trace loaded fine. Reading it as an
+    # empty conversation would hide the very turn the reviewer was sent here for.
+    @integration
+    Scenario: A trace whose thread is older than the conversation window is read on its own
+      Given the trace behind the open queue item carries a thread id
+      And the conversation has settled with no turns in it
+      When I open that queue item
+      Then that trace alone is rendered as the turn under review
 
     @integration
     Scenario: Picking another turn opens that turn's trace in the drawer

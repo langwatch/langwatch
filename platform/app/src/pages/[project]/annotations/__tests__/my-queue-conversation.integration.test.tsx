@@ -30,6 +30,9 @@ const mocks = vi.hoisted(() => ({
   openDrawer: vi.fn(),
   setFlowCallbacks: vi.fn(),
   conversationProps: null as unknown,
+  // What the conversation read answers with. `undefined` is "not answered yet".
+  conversationTurns: undefined as { items: unknown[] } | undefined,
+  conversationTurnsLoading: false,
 }));
 
 const conversationProps = () =>
@@ -118,6 +121,14 @@ vi.mock("~/utils/api", () => ({
     traces: {
       getById: { useQuery: () => ({ data: mocks.traceDetails }) },
     },
+    tracesV2: {
+      list: {
+        useQuery: () => ({
+          data: mocks.conversationTurns,
+          isLoading: mocks.conversationTurnsLoading,
+        }),
+      },
+    },
     annotation: {
       getMarkedForDatasetItems: {
         useQuery: () => ({ data: [], isLoading: false }),
@@ -129,6 +140,9 @@ vi.mock("~/utils/api", () => ({
         useMutation: () => ({ mutate: vi.fn(), isLoading: false }),
       },
       clearDatasetMarks: {
+        useMutation: () => ({ mutate: vi.fn(), isLoading: false }),
+      },
+      deleteQueueItems: {
         useMutation: () => ({ mutate: vi.fn(), isLoading: false }),
       },
     },
@@ -184,6 +198,10 @@ const renderPage = () =>
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.conversationProps = null;
+  // The thread reads back inside the conversation's window unless a test says
+  // otherwise, so the turns are the thread's own.
+  mocks.conversationTurns = { items: [{ traceId: "trace-1" }] };
+  mocks.conversationTurnsLoading = false;
   setQueue({ threadId: "thread-7" });
 });
 
@@ -232,6 +250,39 @@ describe("given a reviewer walking their annotation queue", () => {
 
     /** @scenario "A trace with no thread is still read as a conversation" */
     it("says nothing about thread_id", () => {
+      renderPage();
+
+      expect(
+        screen.queryByText(/Pass the thread_id on your integration/),
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  describe("given the thread is older than the window the conversation reads", () => {
+    /** @scenario "A trace whose thread is older than the conversation window is read on its own" */
+    it("renders the item's own trace as the turn under review", () => {
+      mocks.conversationTurns = { items: [] };
+      renderPage();
+
+      expect(conversationProps().conversationId).toBeNull();
+      expect(conversationProps().fallbackTurns).toEqual([
+        expect.objectContaining({ traceId: "trace-1" }),
+      ]);
+    });
+
+    /** @scenario "A trace whose thread is older than the conversation window is read on its own" */
+    it("waits for the conversation to answer before standing in for it", () => {
+      mocks.conversationTurns = undefined;
+      mocks.conversationTurnsLoading = true;
+      renderPage();
+
+      expect(conversationProps().conversationId).toBe("thread-7");
+      expect(conversationProps().fallbackTurns).toBeUndefined();
+    });
+
+    /** @scenario "A trace with no thread is still read as a conversation" */
+    it("says nothing about thread_id, since the trace carries one", () => {
+      mocks.conversationTurns = { items: [] };
       renderPage();
 
       expect(

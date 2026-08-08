@@ -14,6 +14,7 @@ import {
 } from "~/server/annotations/annotationAnchor";
 import { getApp } from "~/server/app-layer/app";
 import type { Session } from "~/server/auth";
+import { ClickHouseTraceService } from "~/server/traces/clickhouse-trace.service";
 import { TraceEditOverlayService } from "~/server/traces/edit-overlay/traceEditOverlay.service";
 import { TraceService } from "~/server/traces/trace.service";
 import { buildTraceBlobResolutionDeps } from "~/server/traces/trace-blob-resolution.deps";
@@ -844,13 +845,49 @@ export const annotationRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("annotations:create"))
     .mutation(async ({ ctx, input }) => {
-      await createOrUpdateQueueItems({
+      return await createOrUpdateQueueItems({
         traceIds: input.traceIds,
         projectId: input.projectId,
         annotators: input.annotators,
         userId: ctx.session.user.id,
         prisma: ctx.prisma,
       });
+    }),
+  /**
+   * Takes queue items out of the reviewer's queue for good. What it is for is
+   * an item there is nothing to review on: its trace no longer resolves, so it
+   * can neither be read nor annotated nor finished, and leaving it there keeps
+   * the queue from ever reading as complete.
+   *
+   * Scoped to the items the caller is responsible for, the same reach as
+   * marking and clearing marks: removing a teammate's item would take work off
+   * a queue that is not the caller's to empty.
+   */
+  deleteQueueItems: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        queueItemIds: z.array(z.string()).min(1),
+      }),
+    )
+    .use(checkProjectPermission("annotations:update"))
+    .mutation(async ({ ctx, input }) => {
+      const service = AnnotationService.create({ prisma: ctx.prisma });
+      const organizationId = await service.getProjectOrganizationId({
+        projectId: input.projectId,
+      });
+
+      const result = await ctx.prisma.annotationQueueItem.deleteMany({
+        where: {
+          ...callerQueueItemsFilter({
+            projectId: input.projectId,
+            organizationId,
+            userId: ctx.session.user.id,
+          }),
+          id: { in: input.queueItemIds },
+        },
+      });
+      return { deleted: result.count };
     }),
   markQueueItemDone: protectedProcedure
     .input(z.object({ queueItemId: z.string(), projectId: z.string() }))
@@ -1220,19 +1257,76 @@ export const annotationRouter = createTRPCRouter({
     }),
 });
 
+/** Which of these ids the project holds a trace for. */
+type FindExistingTraceIds = (args: {
+  projectId: string;
+  traceIds: string[];
+}) => Promise<string[]>;
+
+/**
+ * The ids worth writing a queue item for, out of what a caller sent. A queue
+ * item is a promise that there is something to review, so:
+ *   - blank ids address no trace and are dropped;
+ *   - a repeated id survives once. The upsert reopens a finished item
+ *     (`doneAt: null`), so running it twice for one id in one call would
+ *     un-finish work the reviewer had already completed;
+ *   - an id no trace answers to is skipped. It would otherwise become an item
+ *     the reviewer cannot read, cannot annotate, and cannot get past.
+ */
+const resolveQueueableTraceIds = async ({
+  traceIds,
+  projectId,
+  findExistingTraceIds,
+}: {
+  traceIds: string[];
+  projectId: string;
+  findExistingTraceIds: FindExistingTraceIds;
+}): Promise<string[]> => {
+  const candidates = [
+    ...new Set(traceIds.map((traceId) => traceId.trim()).filter(Boolean)),
+  ];
+  const resolvable = new Set(
+    await findExistingTraceIds({ projectId, traceIds: candidates }),
+  );
+  const queueable = candidates.filter((traceId) => resolvable.has(traceId));
+
+  if (queueable.length < traceIds.length) {
+    logger.info(
+      { projectId, sent: traceIds.length, queued: queueable.length },
+      "Dropped trace ids that resolve to no trace when queueing for annotation",
+    );
+  }
+  return queueable;
+};
+
+/**
+ * Queues traces for annotation, for everything that can queue one: the trace
+ * table's selection bar, the trace drawer, and the automations that hand traces
+ * over on their own.
+ *
+ * @returns how many ids were queued and how many were skipped (everything sent
+ *   that did not become work), so the surface that sent them can say what
+ *   actually happened.
+ */
 export async function createOrUpdateQueueItems({
   traceIds,
   projectId,
   annotators,
   userId,
   prisma,
+  findExistingTraceIds = ({ projectId: forProject, traceIds: candidates }) =>
+    ClickHouseTraceService.create(prisma).findExistingTraceIds({
+      projectId: forProject,
+      traceIds: candidates,
+    }),
 }: {
   traceIds: string[];
   projectId: string;
   annotators: string[];
   userId: string;
   prisma: PrismaClient;
-}) {
+  findExistingTraceIds?: FindExistingTraceIds;
+}): Promise<{ created: number; skipped: number }> {
   const parsedAnnotators: AnnotatorReference[] = annotators.map((annotator) => {
     const parsed = annotatorReferenceSchema.safeParse(annotator);
     if (!parsed.success) {
@@ -1253,7 +1347,13 @@ export async function createOrUpdateQueueItems({
   const service = AnnotationService.create({ prisma });
   await service.assertAnnotatorReferences({ projectId, queueIds, userIds });
 
-  for (const traceId of traceIds) {
+  const queueableTraceIds = await resolveQueueableTraceIds({
+    traceIds,
+    projectId,
+    findExistingTraceIds,
+  });
+
+  for (const traceId of queueableTraceIds) {
     for (const annotator of parsedAnnotators) {
       if (annotator.type === "queue") {
         await prisma.annotationQueueItem.upsert({
@@ -1300,4 +1400,9 @@ export async function createOrUpdateQueueItems({
       }
     }
   }
+
+  return {
+    created: queueableTraceIds.length,
+    skipped: traceIds.length - queueableTraceIds.length,
+  };
 }

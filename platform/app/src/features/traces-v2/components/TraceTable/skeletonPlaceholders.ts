@@ -4,6 +4,21 @@ import type { ConversationGroup } from "./conversationGroups";
 import type { TraceGroup } from "./registry";
 
 /**
+ * What a placeholder row's `traceId` starts with. Placeholder ids address no
+ * trace, so anything that collects ids off the rendered rows and hands them to
+ * a bulk action filters them out first with {@link withoutPlaceholderTraceIds}.
+ */
+export const SKELETON_TRACE_ID_PREFIX = "__skeleton_trace_";
+
+/** Whether this id belongs to a loading placeholder rather than a real trace. */
+export const isPlaceholderTraceId = (traceId: string): boolean =>
+  traceId.startsWith(SKELETON_TRACE_ID_PREFIX);
+
+/** The ids that address a real trace, in their original order. */
+export const withoutPlaceholderTraceIds = (traceIds: string[]): string[] =>
+  traceIds.filter((traceId) => !isPlaceholderTraceId(traceId));
+
+/**
  * Synthetic `TraceListItem` rows that drive the loading skeleton via
  * the real `TraceLensBody`. The goal is to render the exact same row /
  * cell / addon tree the user will see once data lands so the column
@@ -18,7 +33,7 @@ import type { TraceGroup } from "./registry";
  */
 export function buildTracePlaceholderRows(count: number): TraceListItem[] {
   return Array.from({ length: count }, (_, i) => ({
-    traceId: `__skeleton_trace_${i}`,
+    traceId: `${SKELETON_TRACE_ID_PREFIX}${i}`,
     timestamp: Date.now(),
     name: "",
     serviceName: "",
