@@ -144,6 +144,77 @@ Feature: Machine-wide slots for whole-repo checks
     When a check runs
     Then the gate is off, because a CI runner runs one check at a time anyway
 
+  # --- The bin shims: the package scripts are not the only way in ---
+
+  # Wrapping the scripts left every other route to the binary uncounted, and
+  # they get used: `pnpm exec tsgo --noEmit -p tsconfig.tsgo.json`,
+  # `./node_modules/.bin/tsgo`, and the standing advice to iterate with
+  # targeted checks, widened to the whole project. Observed in the wild as
+  # three tsgo processes on an 18 GB laptop with the limit set to 2, one of
+  # them started from the same worktree as a properly queued run.
+  #
+  # dev/scripts/install-check-shims.mjs moves pnpm's generated launcher to
+  # `<tool>.real` and takes its place, so the bin entry itself decides. Only
+  # platform/app's bins: sdks/typescript's build runs `tsc --noEmit` on the way
+  # to `pnpm dev`, and a dev server that waits for a typecheck slot before it
+  # boots is not an improvement.
+
+  @unit
+  Scenario: A whole-project run through the binary takes a slot
+    Given a check is invoked as "pnpm exec tsgo --noEmit -p tsconfig.tsgo.json"
+    When the shim inspects the arguments
+    Then it runs the tool under the queue, because the run walks the whole project
+
+  @unit
+  Scenario: A directory argument counts as whole-project
+    Given a check is invoked as "biome check ./src ./ee"
+    When the shim inspects the arguments
+    Then it runs the tool under the queue
+
+  @unit
+  Scenario: A run with no path argument counts as whole-project
+    Given a check is invoked with flags only
+    When the shim inspects the arguments
+    Then it runs the tool under the queue, because the tool walks the project from the cwd
+
+  @unit
+  Scenario: A targeted run stays instant
+    Given a check names only files, as in "tsgo --noEmit src/foo.ts"
+    When the shim inspects the arguments
+    Then it runs the tool directly, so the iterate-fast loop never waits behind a full run
+
+  @unit
+  Scenario: A watch or language server never takes a slot
+    Given a check is invoked with "--watch" or "--lsp"
+    When the shim inspects the arguments
+    Then it runs the tool directly, because it would hold its slot for the whole session
+
+  @unit
+  Scenario: A run that holds a slot does not queue again inside itself
+    Given "pnpm typecheck" holds the only slot
+    And the tsgo it spawns is a shimmed bin entry that would queue a project run
+    When the shim decides
+    Then it runs directly, because the run above it is already the slot
+    And the check does not wait out the maximum wait before starting
+
+  @unit
+  Scenario: The tool's own behavior is untouched
+    Given a shimmed tool
+    When it runs either way
+    Then its arguments, exit code and output reach it unchanged
+
+  @unit
+  Scenario: Installing the shims is idempotent
+    Given the bin entries have already been shimmed
+    When the installer runs again
+    Then it leaves them alone and the original launcher is still there
+
+  @unit
+  Scenario: A reinstall re-shims what pnpm regenerated
+    Given pnpm has overwritten a shimmed bin entry with its own launcher
+    When the installer runs from postinstall
+    Then the entry is shimmed again over the regenerated launcher
+
   # --- Interaction with haven ---
 
   @unit

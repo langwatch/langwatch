@@ -193,6 +193,22 @@ unset, the limit comes from the machine (one per 6 GiB of RAM, capped at one per
 own threads instead (`RAYON_NUM_THREADS` does work on biome): it spends the same
 CPU over 5x the wall clock. See `specs/setup/check-slots.feature`.
 
+**Going around the scripts does not go around the queue.** `platform/app`'s
+`node_modules/.bin/{tsgo,tsc,biome}` are shims installed by
+`dev/scripts/install-check-shims.mjs` from postinstall, so `pnpm exec tsgo
+--noEmit -p tsconfig.tsgo.json` and `./node_modules/.bin/biome check ./src` take
+a slot too. Only whole-tree runs do: a `-p`/`--project`, a directory argument, or
+no path argument at all. Naming files (`tsgo --noEmit src/foo.ts`) stays instant
+and unqueued, and `--watch` / `--lsp` never queue, since they would hold a slot
+for the session. A run that already holds a slot exports `CHECK_SLOTS=0` to
+everything it spawns, so it can't queue behind itself.
+
+One catch on targeted tsgo runs: with a `tsconfig.json` present, `tsgo --noEmit
+<file>` fails with `TS5112` unless you add `--ignoreConfig`. That error is what
+pushes people to widen the command to `-p tsconfig.tsgo.json`, which is a full
+3 to 4 GiB run. Prefer `pnpm typecheck` for a whole-project check now that it
+queues, and keep `--ignoreConfig` for the single-file case.
+
 When debugging locally, **prefer the observability stack over the log file if it is up** (haven starts it by default; `make haven status` confirms). Query the real logs/traces/metrics by attribute with `gcx` — Grafana's CLI, wired by `make observability-connect` — instead of grepping the giant `platform/app/server.log`: indexed attribute search finds the failure far faster, and with the stack up the console is muted to warn+ anyway so the detail only lives in Grafana. Filter to your own worktree with the `langwatch_worktree` structured-metadata field (a pipe filter, not a stream label), e.g. `gcx logs query '{service_name="langwatch-app"} | langwatch_worktree="<slug>"' --since 15m` and `gcx traces query '{ resource.service.name = "langwatch-service-langyagent" }' --since 15m`. See `dev/docs/best_practices/local-observability.md` ("Reading the data as an agent"). `pnpm dev` still tees to `platform/app/server.log`; grep it as the fallback when the stack is down.
 
 ## Structure
