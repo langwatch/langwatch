@@ -22,6 +22,13 @@ type fakeStore struct {
 	dbActivity map[string]time.Time
 	selection  map[string]domain.Selection
 	touched    []string
+
+	pressure        domain.PressureRecord
+	pressureWritten bool
+	heavyRuns       int
+	observed        time.Duration
+	hookRoot        string
+	hookCommand     string
 }
 
 func (f *fakeStore) SaveStack(domain.Stack) error { return nil }
@@ -79,6 +86,24 @@ func (f *fakeStore) WriteSelection(worktreeDir string, sel domain.Selection) err
 func (f *fakeStore) ClaimDaemon(DaemonInfo) (bool, error) { return true, nil }
 func (f *fakeStore) Daemon() (DaemonInfo, bool)           { return DaemonInfo{}, false }
 func (f *fakeStore) ClearDaemon()                         {}
+func (f *fakeStore) WritePressure(rec domain.PressureRecord) error {
+	f.pressure, f.pressureWritten = rec, true
+	return nil
+}
+func (f *fakeStore) ReadPressure() (domain.PressureRecord, bool) {
+	return f.pressure, f.pressureWritten
+}
+func (f *fakeStore) HeavyRuns() int { return f.heavyRuns }
+func (f *fakeStore) ClaimHeavyRun(int, string) (func(), error) {
+	f.heavyRuns++
+	return func() { f.heavyRuns-- }, nil
+}
+func (f *fakeStore) EnsureClaudeHook(repoRoot, command string) (bool, error) {
+	f.hookRoot, f.hookCommand = repoRoot, command
+	return true, nil
+}
+func (f *fakeStore) ObservedDuration(string) time.Duration        { return f.observed }
+func (f *fakeStore) ObserveDuration(_ string, took time.Duration) { f.observed = took }
 
 type fakeSystem struct {
 	alive           map[int]bool
@@ -87,6 +112,10 @@ type fakeSystem struct {
 	groupKilled     []int
 	pidsByPort      map[int][]int
 	now             time.Time
+	memStat         domain.MemStat
+	demoted         []int
+	restored        []int
+	orphans         []int
 }
 
 func (f *fakeSystem) FreePorts(n int) ([]int, error) { return make([]int, n), nil }
@@ -113,6 +142,10 @@ func (f *fakeSystem) Now() time.Time                               { return f.no
 func (f *fakeSystem) Getpid() int                                  { return 1 }
 func (f *fakeSystem) TotalMemory() uint64                          { return 0 }
 func (f *fakeSystem) GroupRSS(int) uint64                          { return 0 }
+func (f *fakeSystem) MemStat() domain.MemStat                      { return f.memStat }
+func (f *fakeSystem) DemoteGroup(pid int)                          { f.demoted = append(f.demoted, pid) }
+func (f *fakeSystem) RestoreGroup(pid int)                         { f.restored = append(f.restored, pid) }
+func (f *fakeSystem) OrphanedWorkers(string) []int                 { return f.orphans }
 
 type fakeProxy struct{ removed []string }
 

@@ -69,6 +69,34 @@ type Store interface {
 	ClaimDaemon(DaemonInfo) (bool, error)
 	Daemon() (DaemonInfo, bool)
 	ClearDaemon()
+	// WritePressure publishes the daemon's current reading of the machine, and
+	// ReadPressure is how every other process on the box consults it. Absent,
+	// unparseable, stale or written by an unknown version all read as "no
+	// record", which callers treat as green — it disables narrowing and refusal
+	// and nothing else, so slot counting never depends on the daemon running.
+	WritePressure(domain.PressureRecord) error
+	ReadPressure() (domain.PressureRecord, bool)
+	// HeavyRuns counts the heavy runs live on this machine right now, across
+	// every worktree and terminal. Occupancy is derived from whether each
+	// recorded pid is still alive, so a killed run frees its place with no
+	// bookkeeping — the same property #6598's queue relies on.
+	HeavyRuns() int
+	// ClaimHeavyRun records this process as holding a heavy slot and returns the
+	// release. The claim is what makes a rewrapped run visible to every other
+	// caller on the machine.
+	ClaimHeavyRun(pid int, command string) (release func(), err error)
+	// ObservedDuration is how long this command has taken before, or zero when
+	// it has never been timed. Zero is load-bearing: an unobserved command is
+	// treated as long, so it queues rather than being narrowed on a guess.
+	ObservedDuration(command string) time.Duration
+	// ObserveDuration records how long a run actually took, so the next one can
+	// be decided on evidence rather than a default.
+	ObserveDuration(command string, took time.Duration)
+	// EnsureClaudeHook registers command as a PreToolUse hook in repoRoot's
+	// .claude/settings.local.json — untracked and per worktree. It merges: an
+	// existing hooks block survives and an entry already present is left alone,
+	// so it reports whether anything actually changed.
+	EnsureClaudeHook(repoRoot, command string) (installed bool, err error)
 }
 
 // Supervisor runs child processes: one-shot prepare/seed steps and the
@@ -127,6 +155,19 @@ type System interface {
 	// GroupRSS is the resident set of a process group (keyed by any member pid),
 	// in bytes — a stack's real memory footprint (0 if undetectable).
 	GroupRSS(pid int) uint64
+	// MemStat samples the machine's memory-pressure signals: compressor
+	// occupancy and swap, which unlike summed RSS do not double-count shared
+	// pages. An unreadable signal stays zero and classifies green (ADR-090).
+	MemStat() domain.MemStat
+	// DemoteGroup moves a process group into the throttled background band, and
+	// RestoreGroup moves it back. The group, not the launcher: the policy is
+	// inherited only by processes forked after it is set, so a tree that is
+	// already running has to be walked.
+	DemoteGroup(pid int)
+	RestoreGroup(pid int)
+	// OrphanedWorkers lists processes matching marker whose parent is PID 1 —
+	// test workers an interrupted run left behind, owned by nobody.
+	OrphanedWorkers(marker string) []int
 }
 
 // ClickHouse manages one shared, memory-capped Altinity ClickHouse container (on

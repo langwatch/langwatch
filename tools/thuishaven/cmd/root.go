@@ -73,7 +73,12 @@ func runMetaCommand(args []string, version string) bool {
 	}
 	switch args[0] {
 	case "help", "-h", "--help":
-		fmt.Print(helpText)
+		// `haven help <topic>` drills in; bare help stays short enough to read.
+		topic := ""
+		if len(args) > 1 {
+			topic = args[1]
+		}
+		fmt.Print(helpTopic(topic))
 		return true
 	case "version", "-v", "--version":
 		fmt.Println(version)
