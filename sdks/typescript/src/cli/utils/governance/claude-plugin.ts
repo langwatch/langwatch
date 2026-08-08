@@ -20,19 +20,28 @@
  * else, and a plugin cannot set a session's environment, so the env block stays
  * CLI-managed (see app-settings.ts) whichever seam carries the hooks.
  *
+ * Shipping the hook inside the plugin only solves the drift it was built to
+ * solve while the installed copy keeps up with what we publish, and Claude Code
+ * will not see to that: it auto-updates its own marketplaces and leaves
+ * third-party ones like ours switched off by default. So the plugin is also
+ * updated from here, once a day, from whichever wrapped run comes first.
+ *
  * Everything in this file is best-effort by construction. A `claude` too old to
  * take a plugin, a network that is down, a marketplace that will not clone: none
  * of them may fail the coding session the user actually asked for. Every entry
  * point reports what happened and leaves the caller free to fall back to the raw
  * hook entries in session-context-hooks.ts.
  *
- * Spec: specs/ai-governance/cli-wrappers/claude-plugin-install.feature
+ * Specs:
+ *   specs/ai-governance/cli-wrappers/claude-plugin-install.feature
+ *   specs/ai-governance/cli-wrappers/claude-plugin-update.feature
  */
 
 import { spawnSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
+import { compareVersions } from "../compare-versions";
 import {
   appSettingsTargetFor,
   readAppSettingsFileForUpdate,
@@ -79,6 +88,29 @@ const INSTALL_TIMEOUT_MS = 120_000;
  * subprocess and a clone each time to learn it again.
  */
 const RETRY_AFTER_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * How long a completed update check suppresses the next one. The plugin moves
+ * when we cut a release, which is nowhere near often enough to be worth a
+ * repository fetch per wrapped launch, and a day is short enough that a fix
+ * reaches a machine the day after it ships.
+ */
+const UPDATE_CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Refreshing the listing and applying an update are each a fetch of a small
+ * repository. Well clear of a slow network, and far below the install timeout,
+ * because unlike an install this can happen on a run the user never asked to
+ * involve Claude Code at all.
+ */
+const UPDATE_TIMEOUT_MS = 60_000;
+
+/**
+ * A version we are willing to reason about. Anything else (absent, a git sha, a
+ * shape we do not recognise) means we do not know what is installed, and the
+ * safe answer to that is to leave it alone rather than update it blindly.
+ */
+const VERSION_PATTERN = /^\d+\.\d+\.\d+/;
 
 /**
  * `DEBUG=langwatch:claude-plugin` (or any DEBUG containing "langwatch") turns
@@ -144,8 +176,8 @@ function claudeSettingsPath(): string {
 }
 
 /** Where Claude Code keeps its plugin bookkeeping, beside the settings file. */
-function claudeHomeDir(): string {
-  return path.dirname(claudeSettingsPath());
+function claudePluginsDir(): string {
+  return path.join(path.dirname(claudeSettingsPath()), "plugins");
 }
 
 /**
@@ -155,7 +187,7 @@ function claudeHomeDir(): string {
  * coding session.
  */
 export function readClaudePluginState(): ClaudePluginState {
-  const pluginsDir = path.join(claudeHomeDir(), "plugins");
+  const pluginsDir = claudePluginsDir();
   const installed = readJsonObject(path.join(pluginsDir, "installed_plugins.json"));
   const marketplaces = readJsonObject(path.join(pluginsDir, "known_marketplaces.json"));
   const settings = readJsonObject(claudeSettingsPath());
@@ -304,6 +336,219 @@ export function ensureLangwatchClaudePlugin({
     return { action: "installed" };
   } catch (err) {
     return recordFailure((err as Error).message);
+  }
+}
+
+export type ClaudePluginUpdateAction =
+  /** The installed copy was behind the listing and has been moved forward. */
+  | "updated"
+  /** The installed copy is the published one. */
+  | "up_to_date"
+  /** Nothing of ours is installed, so there is nothing to keep current. */
+  | "absent"
+  /** A check inside the last day already answered this. */
+  | "checked_recently"
+  /** This `claude` cannot manage plugins, or the marketplace is not ours. */
+  | "unavailable"
+  /** One of the two versions could not be read, so neither is trusted. */
+  | "unknown_version"
+  /** The listing could not be refreshed, or the update would not apply. */
+  | "failed";
+
+export interface ClaudePluginUpdateResult {
+  action: ClaudePluginUpdateAction;
+  /** The version that was installed before this ran. */
+  from?: string;
+  /** The version now installed, on an update. */
+  to?: string;
+  /** What went wrong, for the caller's warning. */
+  reason?: string;
+}
+
+/**
+ * Bring the installed plugin up to the version the marketplace publishes, at
+ * most once a day. Never throws: this runs on the way into a coding session
+ * that has nothing to do with plugin housekeeping, so every failure here is a
+ * warning the caller prints and then gets on with the launch.
+ *
+ * Ordered so the cheap answers come first. A machine without the plugin and a
+ * machine already checked today both return without spawning anything, which is
+ * what the overwhelming majority of wrapped runs do.
+ *
+ * The check is stamped BEFORE the work rather than after it, so a fetch that
+ * hangs until the timeout, or a process killed in the middle of one, costs the
+ * next launch nothing. The price is that a transient failure waits a day for
+ * its retry, which is the right trade for housekeeping: the plugin that is
+ * installed keeps working, it is only a version behind.
+ */
+export function updateLangwatchClaudePlugin(): ClaudePluginUpdateResult {
+  try {
+    const state = readClaudePluginState();
+    if (!state.pluginInstalled) return { action: "absent" };
+    if (checkedRecently()) return { action: "checked_recently" };
+
+    // A marketplace of our name that points somewhere else is somebody else's
+    // registration, and updating what it serves is not ours to do.
+    if (!state.marketplaceOwnedByLangwatch) {
+      stampUpdateCheck();
+      return {
+        action: "unavailable",
+        reason: "the langwatch marketplace on this machine is not ours",
+      };
+    }
+    if (!claudePluginCliAvailable()) {
+      stampUpdateCheck();
+      return { action: "unavailable", reason: "this claude has no plugin subcommand" };
+    }
+
+    stampUpdateCheck();
+
+    // The listing on disk is a clone, and it is as old as the last time
+    // something refreshed it. Refresh first so the version we compare against
+    // is what we publish today rather than what we published when the user
+    // installed.
+    const refresh = runClaude({
+      args: ["plugin", "marketplace", "update", CLAUDE_PLUGIN_MARKETPLACE],
+      timeoutMs: UPDATE_TIMEOUT_MS,
+    });
+    const refreshFailure =
+      refresh.status === 0 ? null : `the marketplace listing could not be refreshed: ${refresh.detail}`;
+    if (refreshFailure) debugLog(refreshFailure);
+
+    const installed = readInstalledPluginVersion();
+    const published = readPublishedPluginVersion();
+    if (!installed || !published) {
+      // Not a failed operation, so it stays off the user's terminal: there is
+      // no action for them in it, and a daily line about a state they cannot
+      // influence is noise. It is the shape a Claude Code layout change would
+      // take, though, so make it findable.
+      debugLog(
+        `left the plugin alone, versions unread (installed=${installed ?? "?"}, published=${published ?? "?"})`,
+      );
+      return {
+        action: "unknown_version",
+        reason: refreshFailure ?? undefined,
+        from: installed ?? undefined,
+      };
+    }
+
+    // Equal is the common case. Ahead of the listing happens on a machine that
+    // installed from a local checkout, and dragging that backwards to what we
+    // published would undo somebody's testing.
+    if (compareVersions(installed, published) >= 0) {
+      // A refresh that failed leaves this unproven: the listing we just
+      // compared against is whatever was already on disk, which may be older
+      // than the release we are trying to deliver.
+      return refreshFailure
+        ? { action: "failed", from: installed, reason: refreshFailure }
+        : { action: "up_to_date", from: installed };
+    }
+
+    const update = runClaude({
+      args: ["plugin", "update", CLAUDE_PLUGIN_REF, "--scope", "user"],
+      timeoutMs: UPDATE_TIMEOUT_MS,
+    });
+    // What is on disk afterwards decides, not the exit status: a non-zero exit
+    // that still moved the version did the job, and a zero exit that moved
+    // nothing did not.
+    const after = readInstalledPluginVersion();
+    if (!after || compareVersions(after, installed) <= 0) {
+      return {
+        action: "failed",
+        from: installed,
+        to: published,
+        reason: `the update to ${published} could not be applied: ${update.detail}`,
+      };
+    }
+    return { action: "updated", from: installed, to: after };
+  } catch (err) {
+    return { action: "failed", reason: (err as Error).message };
+  }
+}
+
+/**
+ * The version of the user-scope install record, which is the one this CLI put
+ * there. A project or local record belongs to a checkout somebody else pinned
+ * and is not ours to move, so a machine carrying only those reads as unknown
+ * and is left alone.
+ */
+function readInstalledPluginVersion(): string | null {
+  const document = readJsonObject(
+    path.join(claudePluginsDir(), "installed_plugins.json"),
+  );
+  const plugins = isPlainObject(document.plugins) ? document.plugins : document;
+  const records = plugins[CLAUDE_PLUGIN_REF];
+  if (!Array.isArray(records)) return null;
+  const userScoped = records.find(
+    (record) => isPlainObject(record) && record.scope === "user",
+  );
+  return isPlainObject(userScoped) ? versionOf(userScoped) : null;
+}
+
+/**
+ * The version the marketplace listing on disk publishes. Both manifests are
+ * read because both ship and the publish workflow refuses to release them
+ * disagreeing: whichever one this Claude Code wrote into its clone answers.
+ */
+function readPublishedPluginVersion(): string | null {
+  const listing = marketplaceListingDir();
+  for (const manifest of [
+    path.join(listing, ".claude-plugin", "plugin.json"),
+    path.join(listing, "plugin.json"),
+  ]) {
+    const version = versionOf(readJsonObject(manifest));
+    if (version) return version;
+  }
+  return null;
+}
+
+/**
+ * Where Claude Code cloned the listing. It records the location itself, so read
+ * that; the conventional path is the fallback for an entry that does not carry
+ * one, and a wrong guess only costs an unreadable manifest.
+ */
+function marketplaceListingDir(): string {
+  const marketplaces = readJsonObject(
+    path.join(claudePluginsDir(), "known_marketplaces.json"),
+  );
+  const entry = marketplaces[CLAUDE_PLUGIN_MARKETPLACE];
+  if (isPlainObject(entry) && typeof entry.installLocation === "string" && entry.installLocation) {
+    return entry.installLocation;
+  }
+  return path.join(claudePluginsDir(), "marketplaces", CLAUDE_PLUGIN_MARKETPLACE);
+}
+
+function versionOf(document: Record<string, unknown>): string | null {
+  const version = document.version;
+  return typeof version === "string" && VERSION_PATTERN.test(version) ? version : null;
+}
+
+/**
+ * Whether a check inside the last day already answered this. Bounded at both
+ * ends for the same reason the install suppression is: a stamp in the future is
+ * a clock that went backwards or a config copied from another machine, and
+ * reading it as recent would suppress every check until time caught up.
+ */
+function checkedRecently(): boolean {
+  try {
+    const checkedAt = loadConfig().claude_plugin_last_update_check;
+    if (typeof checkedAt !== "number") return false;
+    const sinceCheck = Date.now() - checkedAt * 1000;
+    return sinceCheck >= 0 && sinceCheck < UPDATE_CHECK_INTERVAL_MS;
+  } catch {
+    // A config we cannot read is a check we have no record of.
+    return false;
+  }
+}
+
+/** Best-effort: a stamp that does not land only costs an extra check. */
+function stampUpdateCheck(): void {
+  try {
+    const cfg = loadConfig();
+    cfg.claude_plugin_last_update_check = Math.floor(Date.now() / 1000);
+    saveConfig(cfg);
+  } catch {
+    // The check still ran; only its suppression window went unwritten.
   }
 }
 

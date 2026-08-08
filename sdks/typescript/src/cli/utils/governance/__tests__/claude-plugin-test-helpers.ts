@@ -41,45 +41,80 @@ export const writeClaudeJson = ({
 };
 
 /**
- * `installed_plugins.json` with the LangWatch plugin recorded at user scope,
- * carrying the bookkeeping fields Claude Code writes beside the scope.
+ * `installed_plugins.json` with the LangWatch plugin recorded, carrying the
+ * bookkeeping fields Claude Code writes beside the scope. `scope` is settable
+ * because the update path only manages the user-scope record.
  */
-export const seedInstalledPlugin = ({ home }: { home: string }): void =>
+export const seedInstalledPlugin = ({
+	home,
+	version = "0.1.0",
+	scope = "user",
+}: {
+	home: string;
+	version?: string;
+	scope?: string;
+}): void =>
 	writeClaudeJson({
 		home,
 		segments: ["plugins", "installed_plugins.json"],
 		value: {
 			version: 2,
 			plugins: {
-				"langwatch@langwatch": [
-					{ scope: "user", installPath: "/somewhere", version: "0.1.0" },
-				],
+				"langwatch@langwatch": [{ scope, installPath: "/somewhere", version }],
 			},
 		},
 	});
 
 /**
  * `known_marketplaces.json` with a marketplace named `langwatch` sourced from
- * `repo`. The default is the one we publish; pass another to stand in for
- * somebody else's registration under the same name.
+ * `repo`, and the clone it points at. The default repo is the one we publish;
+ * pass another to stand in for somebody else's registration under the same
+ * name.
+ *
+ * `publishedVersion` writes the plugin manifest inside that clone, which is
+ * what the update path compares the installed version against. Leaving it out
+ * gives a listing whose manifest cannot be read, which is a case of its own.
  */
 export const seedMarketplace = ({
 	home,
 	repo = OWNED_MARKETPLACE_REPO,
+	publishedVersion,
 }: {
 	home: string;
 	repo?: string;
-}): void =>
+	publishedVersion?: string;
+}): void => {
+	const installLocation = path.join(
+		home,
+		".claude",
+		"plugins",
+		"marketplaces",
+		"langwatch",
+	);
+	if (publishedVersion !== undefined) {
+		writeClaudeJson({
+			home,
+			segments: [
+				"plugins",
+				"marketplaces",
+				"langwatch",
+				".claude-plugin",
+				"plugin.json",
+			],
+			value: { name: "langwatch", version: publishedVersion },
+		});
+	}
 	writeClaudeJson({
 		home,
 		segments: ["plugins", "known_marketplaces.json"],
 		value: {
 			langwatch: {
 				source: { source: "github", repo },
-				installLocation: "/somewhere",
+				installLocation,
 			},
 		},
 	});
+};
 
 export type ClaudePluginModule = typeof ClaudePluginModuleType;
 
@@ -87,7 +122,9 @@ export type ClaudePluginModule = typeof ClaudePluginModuleType;
 export interface ClaudeAnswers {
 	pluginHelp?: number;
 	marketplaceAdd?: number;
+	marketplaceUpdate?: number;
 	install?: number;
+	update?: number;
 	uninstall?: number;
 	marketplaceRemove?: number;
 }
@@ -99,8 +136,11 @@ export interface ClaudePluginHarness {
 	pluginsDir: () => string;
 	writeJson: (args: { segments: string[]; value: unknown }) => void;
 	readSettings: <T>() => T;
-	seedInstalledPlugin: () => void;
-	seedMarketplace: (args?: { repo?: string }) => void;
+	seedInstalledPlugin: (args?: { version?: string; scope?: string }) => void;
+	seedMarketplace: (args?: {
+		repo?: string;
+		publishedVersion?: string;
+	}) => void;
 	/** Program the `claude` binary's answers. Anything unset succeeds. */
 	answerClaude: (answers: ClaudeAnswers) => void;
 	commandsRun: () => string[];
@@ -118,7 +158,9 @@ function claudeAnswerer(spawnSyncMock: Mock) {
 	return ({
 		pluginHelp = 0,
 		marketplaceAdd = 0,
+		marketplaceUpdate = 0,
 		install = 0,
+		update = 0,
 		uninstall = 0,
 		marketplaceRemove = 0,
 	}: ClaudeAnswers): void => {
@@ -139,8 +181,14 @@ function claudeAnswerer(spawnSyncMock: Mock) {
 			if (joined.startsWith("plugin marketplace remove")) {
 				return { ...OK, status: marketplaceRemove };
 			}
+			if (joined.startsWith("plugin marketplace update")) {
+				return answer(marketplaceUpdate, "listing refresh rejected");
+			}
 			if (joined.startsWith("plugin install")) {
 				return answer(install, "install rejected");
+			}
+			if (joined.startsWith("plugin update")) {
+				return answer(update, "update rejected");
 			}
 			if (joined.startsWith("plugin uninstall")) {
 				return answer(uninstall, "uninstall rejected");
@@ -262,9 +310,16 @@ export function installClaudePluginHarness({
 			writeClaudeJson({ home: state.home, segments, value }),
 		readSettings: <T,>() =>
 			JSON.parse(fs.readFileSync(settingsPath(), "utf8")) as T,
-		seedInstalledPlugin: () => seedInstalledPlugin({ home: state.home }),
-		seedMarketplace: ({ repo }: { repo?: string } = {}) =>
-			seedMarketplace({ home: state.home, repo }),
+		seedInstalledPlugin: ({
+			version,
+			scope,
+		}: { version?: string; scope?: string } = {}) =>
+			seedInstalledPlugin({ home: state.home, version, scope }),
+		seedMarketplace: ({
+			repo,
+			publishedVersion,
+		}: { repo?: string; publishedVersion?: string } = {}) =>
+			seedMarketplace({ home: state.home, repo, publishedVersion }),
 		answerClaude,
 		commandsRun,
 		lastSpawnOptions,
