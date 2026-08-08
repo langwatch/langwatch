@@ -1036,4 +1036,132 @@ describe("Feature: Gateway spend reconciliation REST surface", () => {
     expect(body.data.cost.total_usd).toBe("0.01");
     expect(body.data.request_count).toBe(1);
   });
+
+  // Through the route, because the guard has two halves and only one of them
+  // is the grouping rule. The other is reading `allow_unstable` off a query
+  // string, and that half shipped inverted: `z.coerce.boolean()` is
+  // JavaScript `Boolean()`, so `allow_unstable=false` served the unstable read
+  // it asked not to have. A test that calls the grouping check directly with a
+  // boolean argument cannot see that, and the three scenarios below used to be
+  // bound to exactly such a test.
+  describe("when the grouping's key can move under the walk", () => {
+    /** A window whose end is far enough back that outcomes can no longer arrive. */
+    const settled = () => ({
+      from: baseTime,
+      to: baseTime + 60_000,
+    });
+
+    /** A window reaching now, so the fold can still rewrite model and provider. */
+    const live = () => {
+      const to = Date.now();
+      return { from: to - 60_000, to };
+    };
+
+    const summaries = async (query: Record<string, string | number>) =>
+      await app.request(
+        `/api/gateway/v1/spend-summaries?${new URLSearchParams(
+          Object.entries(query).map(([k, v]) => [k, String(v)]),
+        ).toString()}`,
+        { headers: headers() },
+      );
+
+    /** @scenario "Grouping on a movable key is refused while the window is still settling" */
+    it("refuses a model grouping over a live window, naming which grouping moved", async () => {
+      const res = await summaries({ group_by: "model", ...live() });
+
+      const error = await expectCanonicalError(res, {
+        status: 400,
+        code: "gateway_spend_group_by_unstable",
+      });
+      // The dimension and the moment it settles, so a caller can retry
+      // deliberately rather than guess how long to wait.
+      expect(error.meta?.group_by).toEqual(["model"]);
+      expect(Date.parse(String(error.meta?.settles_at))).toBeGreaterThan(
+        Date.now(),
+      );
+    });
+
+    /** @scenario "The same grouping is served once the window has settled" */
+    it("serves the same grouping over a settled window", async () => {
+      const res = await summaries({ group_by: "model", ...settled() });
+
+      expect(res.status).toBe(200);
+    });
+
+    /** @scenario "Grouping on a key that cannot move is never refused" */
+    it("never refuses a grouping whose key is fixed at admission", async () => {
+      const res = await summaries({ group_by: "end_user", ...live() });
+
+      expect(res.status).toBe(200);
+    });
+
+    /** @scenario "A caller who accepts the risk can ask for it anyway" */
+    it("serves the movable grouping when the caller opts out", async () => {
+      const res = await summaries({
+        group_by: "model",
+        allow_unstable: "true",
+        ...live(),
+      });
+
+      expect(res.status).toBe(200);
+    });
+
+    /** @scenario "Declining an unstable read is not the same as accepting one" */
+    it("still refuses when the caller spells the opt-out as false", async () => {
+      const res = await summaries({
+        group_by: "model",
+        allow_unstable: "false",
+        ...live(),
+      });
+
+      await expectCanonicalError(res, {
+        status: 400,
+        code: "gateway_spend_group_by_unstable",
+      });
+    });
+
+    /** @scenario "The opt-out is read however the caller's HTTP library spells a boolean" */
+    it("accepts the capitalised boolean a Python client sends", async () => {
+      // `requests` renders a Python `True` as the string `True`, and the
+      // documentation for this parameter is written for Python callers.
+      for (const spelling of ["True", "TRUE", "Yes", "1"]) {
+        const res = await summaries({
+          group_by: "model",
+          allow_unstable: spelling,
+          ...live(),
+        });
+
+        expect(res.status, `allow_unstable=${spelling}`).toBe(200);
+      }
+
+      // And `False` still means no, which is the whole point of folding case
+      // rather than accepting anything non-empty.
+      const declined = await summaries({
+        group_by: "model",
+        allow_unstable: "False",
+        ...live(),
+      });
+      await expectCanonicalError(declined, {
+        status: 400,
+        code: "gateway_spend_group_by_unstable",
+      });
+    });
+
+    /** @scenario "A spelling the surface does not know is refused by name" */
+    it("refuses a spelling it cannot read rather than guessing", async () => {
+      const res = await summaries({
+        group_by: "model",
+        allow_unstable: "maybe",
+        ...live(),
+      });
+
+      const error = await expectCanonicalError(res, {
+        status: 400,
+        code: "validation_error",
+      });
+      // Named, so a client can put the message on the field the caller got
+      // wrong instead of on a toast that says something failed.
+      expect(error.meta?.fields).toEqual(["allow_unstable"]);
+    });
+  });
 });

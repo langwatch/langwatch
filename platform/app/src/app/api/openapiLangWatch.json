@@ -49165,16 +49165,9 @@
             "name": "allow_unstable",
             "schema": {
               "type": "string",
-              "enum": [
-                "",
-                "true",
-                "false",
-                "1",
-                "0",
-                "yes",
-                "no"
-              ],
-              "default": "false"
+              "default": "false",
+              "description": "true, 1, yes for yes; false, 0, no or omitted for no. Case does not matter, so a Python True is accepted as sent.",
+              "example": "true"
             },
             "required": false
           },

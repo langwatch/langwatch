@@ -292,6 +292,10 @@ const groupBySchema = z
     example: "model,end_user",
   });
 
+/** What a query string may say for yes and for no. Compared case-folded. */
+const QUERY_BOOLEAN_TRUE = ["true", "1", "yes"];
+const QUERY_BOOLEAN_FALSE = ["false", "0", "no", ""];
+
 /**
  * A boolean spelled in a query string.
  *
@@ -299,12 +303,34 @@ const groupBySchema = z
  * true and `allow_unstable=false` would turn the guard OFF. The most obvious
  * way to spell "off" must not mean "on", and a spelling this does not know is
  * refused by name rather than guessed at.
+ *
+ * Case is folded because the caller's HTTP library picks it, not the caller:
+ * `requests` renders a Python `True` as `True`, `httpx` renders it as `true`.
+ * This parameter is documented for Python, so refusing `True` would reject the
+ * exact request our own documentation asks that caller to make.
  */
 const queryBoolean = z
-  .enum(["", "true", "false", "1", "0", "yes", "no"])
+  .string()
   .optional()
   .default("false")
-  .transform((raw) => raw === "true" || raw === "1" || raw === "yes");
+  .transform((raw, ctx): boolean | typeof z.NEVER => {
+    const spelling = raw.toLowerCase();
+    if (QUERY_BOOLEAN_TRUE.includes(spelling)) return true;
+    if (QUERY_BOOLEAN_FALSE.includes(spelling)) return false;
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: `must be one of ${[...QUERY_BOOLEAN_TRUE, ...QUERY_BOOLEAN_FALSE.filter(Boolean)].join(", ")}`,
+    });
+    return z.NEVER;
+  })
+  .openapi({
+    description: [
+      `${QUERY_BOOLEAN_TRUE.join(", ")} for yes;`,
+      `${QUERY_BOOLEAN_FALSE.filter(Boolean).join(", ")} or omitted for no.`,
+      "Case does not matter, so a Python True is accepted as sent.",
+    ].join(" "),
+    example: "true",
+  });
 
 const spendSummariesQuerySchema = z
   .object({

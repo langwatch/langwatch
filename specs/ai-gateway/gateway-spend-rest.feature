@@ -144,6 +144,25 @@ Feature: Gateway spend reconciliation REST surface
       When the caller groups by end user over a window reaching the present
       Then the rollup is served
 
+    # The opt-out arrives as a query string, so how it is read is part of the
+    # guard rather than a detail beneath it. Read as JavaScript truthiness,
+    # every non-empty value means yes and the clearest way to say no turns the
+    # guard off.
+    @integration @regression
+    Scenario: Declining an unstable read is not the same as accepting one
+      When the caller groups by model over a live window and explicitly declines an unstable read
+      Then the request is refused as an unstable grouping
+
+    @integration
+    Scenario: The opt-out is read however the caller's HTTP library spells a boolean
+      When the caller groups by model over a live window and accepts an unstable read in any casing
+      Then the rollup is served
+
+    @integration
+    Scenario: A spelling the surface does not know is refused by name
+      When the caller groups by model over a live window and spells the opt-out in a way the surface does not know
+      Then the request is refused and the refusal names the parameter
+
   Rule: An organization running a project per customer still reads its spend
 
     @integration
