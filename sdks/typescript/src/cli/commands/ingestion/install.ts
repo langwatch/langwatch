@@ -2,6 +2,10 @@ import chalk from "chalk";
 
 import { mintIngestionKey } from "@/cli/utils/governance/cli-api";
 import {
+  type ClaudePluginEnsureAction,
+  ensureLangwatchClaudePlugin,
+} from "@/cli/utils/governance/claude-plugin";
+import {
   isLoggedIn,
   loadConfig,
   saveConfig,
@@ -82,10 +86,21 @@ interface InstallReport {
   codex_turn_harvest_action?: CodexTurnHarvestOutcome["status"];
   /**
    * How the tool's session context seam was left: the hook entries for
-   * claude_code and codex, the plugin file for opencode.
+   * claude_code and codex, the plugin file for opencode. Absent for a
+   * claude_code install the Claude Code plugin took, which carries the same
+   * hooks and so leaves nothing in the settings file to report.
    */
   session_hooks_action?: "created" | "updated" | "unchanged";
   session_hooks_path?: string;
+  /**
+   * What became of the LangWatch Claude Code plugin, for claude_code only, and
+   * only when the run wired something: `--env-only` prints the exports and
+   * installs no seam at all, so the field is absent rather than any action.
+   * When it is present, anything other than `installed` / `already_installed`
+   * means the raw hook entries ran as the fallback, and `session_hooks_action`
+   * says what they did.
+   */
+  claude_plugin_action?: ClaudePluginEnsureAction;
   env_block: string[];
 }
 
@@ -199,7 +214,19 @@ async function runInstall(
   // and exports none of it over telemetry. The session context seam is what
   // reports it, so activating capture installs it alongside the export block.
   if (!options.envOnly) {
-    if (tool === "claude_code" || tool === "codex") {
+    // Claude Code takes the seam as a plugin, which carries its own copy of the
+    // hook command and so never breaks when the CLI on PATH is older than the
+    // subcommand a raw entry names. The entries stay as the fallback for a
+    // `claude` that cannot take a plugin, and the report says which one ran.
+    let isClaudePluginHandlingHooks = false;
+    if (tool === "claude_code") {
+      const plugin = ensureLangwatchClaudePlugin({ interactive: true });
+      report.claude_plugin_action = plugin.action;
+      isClaudePluginHandlingHooks =
+        plugin.action === "installed" || plugin.action === "already_installed";
+    }
+
+    if ((tool === "claude_code" && !isClaudePluginHandlingHooks) || tool === "codex") {
       const result = installSessionContextHooks({
         tool,
         filePath: options.hooksPath,
@@ -321,6 +348,19 @@ function renderHumanReport(report: InstallReport): void {
     );
   }
 
+  if (
+    report.claude_plugin_action === "installed" ||
+    report.claude_plugin_action === "already_installed"
+  ) {
+    const pluginVerb =
+      report.claude_plugin_action === "installed"
+        ? "installed"
+        : "already up to date";
+    process.stdout.write(
+      `${chalk.green("✓")} LangWatch Claude Code plugin ${pluginVerb}\n`,
+    );
+  }
+
   if (report.codex_turn_harvest_action === "installed") {
     process.stdout.write(
       `${chalk.green("✓")} Codex will record each turn's conversation as it completes\n`,
@@ -359,11 +399,18 @@ function renderHumanReport(report: InstallReport): void {
           `will not run until you do.\n`,
       );
     }
-  } else if (report.tool === "claude_code" && report.session_hooks_action) {
-    process.stdout.write(
-      `\nSession hooks were added to your Claude Code settings, so every session reports\n` +
-        `the repository, branch and worktree it ran in. Your own hooks are untouched.\n`,
-    );
+  } else if (report.tool === "claude_code") {
+    if (report.claude_plugin_action === "installed") {
+      process.stdout.write(
+        `\nThe LangWatch plugin was added to Claude Code, so every session reports the\n` +
+          `repository, branch and worktree it ran in. Run \`langwatch logout\` to remove it.\n`,
+      );
+    } else if (report.session_hooks_action) {
+      process.stdout.write(
+        `\nSession hooks were added to your Claude Code settings, so every session reports\n` +
+          `the repository, branch and worktree it ran in. Your own hooks are untouched.\n`,
+      );
+    }
   } else if (report.tool === "opencode") {
     if (report.session_hooks_action) {
       process.stdout.write(
