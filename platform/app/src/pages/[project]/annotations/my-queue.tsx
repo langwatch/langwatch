@@ -253,7 +253,9 @@ export default function TraceAnnotations() {
                 resetKeys={[currentQueueItem?.trace?.trace_id ?? ""]}
               >
                 <ConversationView
-                  key={currentQueueItem?.trace?.trace_id ?? currentQueueItem?.id}
+                  key={
+                    currentQueueItem?.trace?.trace_id ?? currentQueueItem?.id
+                  }
                   conversationId={conversationId}
                   currentTraceId={currentTraceId}
                   fallbackTurns={fallbackTurns}
