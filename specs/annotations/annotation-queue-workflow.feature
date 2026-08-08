@@ -46,7 +46,7 @@ Feature: Walking an annotation queue into a dataset
     @integration
     Scenario: The queue bar labels its navigation and actions in words
       When I open a queue item
-      Then the bar offers "Previous", "Next", "Edit trace" and "Done"
+      Then the bar offers "Previous", "Next", "Annotate trace" and "Done"
       And none of them is an unlabelled icon
 
     @integration
@@ -67,10 +67,10 @@ Feature: Walking an annotation queue into a dataset
   Rule: The trace behind a queue item is corrected in the trace drawer
 
     @integration
-    Scenario: Edit trace opens the trace drawer already in edit mode
-      When I choose "Edit trace" on a queue item
+    Scenario: Annotate trace opens the trace drawer already in annotation mode
+      When I choose "Annotate trace" on a queue item
       Then the trace drawer opens on that item's trace
-      And it is already in edit mode, so I can correct the trace without a second click
+      And it is already in annotation mode, so I can correct the trace without a second click
 
     @integration
     Scenario: A reviewer who cannot update annotations is offered no correction

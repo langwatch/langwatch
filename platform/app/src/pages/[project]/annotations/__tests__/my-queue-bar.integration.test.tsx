@@ -237,7 +237,7 @@ describe("given a reviewer walking their annotation queue", () => {
       ).toBeInTheDocument();
       expect(screen.getByRole("button", { name: /Next/ })).toBeInTheDocument();
       expect(
-        screen.getByRole("button", { name: /Edit trace/ }),
+        screen.getByRole("button", { name: /Annotate trace/ }),
       ).toBeInTheDocument();
       expect(screen.getByRole("button", { name: /Done/ })).toBeInTheDocument();
       expect(datasetCheckbox()).toBeInTheDocument();
@@ -261,20 +261,20 @@ describe("given a reviewer walking their annotation queue", () => {
       renderPage();
 
       expect(
-        screen.queryByRole("button", { name: /Edit trace/ }),
+        screen.queryByRole("button", { name: /Annotate trace/ }),
       ).not.toBeInTheDocument();
       expect(screen.getByRole("button", { name: /Done/ })).toBeInTheDocument();
       expect(datasetCheckbox()).toBeInTheDocument();
     });
   });
 
-  describe("when the reviewer chooses Edit trace", () => {
-    /** @scenario "Edit trace opens the trace drawer already in edit mode" */
+  describe("when the reviewer chooses Annotate trace", () => {
+    /** @scenario "Annotate trace opens the trace drawer already in annotation mode" */
     it("opens the trace drawer on that trace, already editing", async () => {
       const user = userEvent.setup();
       renderPage();
 
-      await user.click(screen.getByRole("button", { name: /Edit trace/ }));
+      await user.click(screen.getByRole("button", { name: /Annotate trace/ }));
 
       expect(mocks.openDrawer).toHaveBeenCalledWith("traceV2Details", {
         traceId: "trace-1",
@@ -283,12 +283,12 @@ describe("given a reviewer walking their annotation queue", () => {
       });
     });
 
-    /** @scenario "Edit trace opens the trace drawer already in edit mode" */
+    /** @scenario "Annotate trace opens the trace drawer already in annotation mode" */
     it("leaves the drawer state to the link, so the two cannot disagree", async () => {
       const user = userEvent.setup();
       renderPage();
 
-      await user.click(screen.getByRole("button", { name: /Edit trace/ }));
+      await user.click(screen.getByRole("button", { name: /Annotate trace/ }));
 
       // Seeding the store here would mount the drawer a frame before the URL
       // names it, and the drawer's URL hydrator reads that frame as "no drawer
@@ -529,7 +529,7 @@ describe("given a reviewer walking their annotation queue", () => {
         screen.queryByRole("button", { name: /Done/ }),
       ).not.toBeInTheDocument();
       expect(
-        screen.queryByRole("button", { name: /Edit trace/ }),
+        screen.queryByRole("button", { name: /Annotate trace/ }),
       ).not.toBeInTheDocument();
       expect(
         screen.queryByRole("checkbox", { name: "Add to dataset at the end" }),

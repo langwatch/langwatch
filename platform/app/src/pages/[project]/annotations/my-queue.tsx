@@ -154,7 +154,7 @@ export default function TraceAnnotations() {
   );
 
   // Picking another turn opens it over the queue, the same way the bar's
-  // "Edit trace" does: the link states the whole intent and the drawer's URL
+  // "Annotate trace" does: the link states the whole intent and the drawer's URL
   // hydrator opens it, so the page never writes the drawer's own store.
   const openTurn = useCallback(
     ({ traceId, timestamp }: { traceId: string; timestamp: number }) => {
@@ -663,7 +663,7 @@ const AnnotationQueuePicker = ({
                 disabled={isNavigating}
                 onClick={editTrace}
               >
-                <LuPencil /> Edit trace
+                <LuPencil /> Annotate trace
               </Button>
             )}
             <Button
