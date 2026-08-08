@@ -22,6 +22,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { GovernanceConfig } from "../config";
 import type * as ConfigModule from "../config";
+import {
+  seedInstalledPlugin as seedInstalledPluginFixture,
+  writeClaudeJson,
+} from "./claude-plugin-test-helpers";
 
 const answers: string[] = [];
 const lastPrompts: string[] = [];
@@ -72,18 +76,12 @@ const cfg = (overrides: Partial<GovernanceConfig> = {}): GovernanceConfig => ({
 
 const settingsPath = (): string =>
   path.join(tmpHome, ".claude", "settings.json");
-const pluginsDir = (): string => path.join(tmpHome, ".claude", "plugins");
 
-const writeJson = (file: string, value: unknown): void => {
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.writeFileSync(file, JSON.stringify(value, null, 2));
-};
+const writeJson = (segments: string[], value: unknown): void =>
+  writeClaudeJson({ home: tmpHome, segments, value });
 
 const seedInstalledPlugin = (): void =>
-  writeJson(path.join(pluginsDir(), "installed_plugins.json"), {
-    version: 2,
-    plugins: { "langwatch@langwatch": [{ scope: "user" }] },
-  });
+  seedInstalledPluginFixture({ home: tmpHome });
 
 const rawHookEntry = {
   hooks: [
@@ -156,9 +154,12 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  process.env.HOME = origHome;
-  process.env.USERPROFILE = origUserprofile;
-  process.env.SHELL = origShell;
+  if (origHome === undefined) delete process.env.HOME;
+  else process.env.HOME = origHome;
+  if (origUserprofile === undefined) delete process.env.USERPROFILE;
+  else process.env.USERPROFILE = origUserprofile;
+  if (origShell === undefined) delete process.env.SHELL;
+  else process.env.SHELL = origShell;
   if (origConfig === undefined) delete process.env.LANGWATCH_CLI_CONFIG;
   else process.env.LANGWATCH_CLI_CONFIG = origConfig;
   if (origEndpoint === undefined) {
@@ -166,8 +167,13 @@ afterEach(() => {
   } else {
     process.env.OTEL_EXPORTER_OTLP_ENDPOINT = origEndpoint;
   }
+  // A non-TTY runner has no own `isTTY` descriptor to put back, so restoring
+  // only when there was one leaves this suite's forced `true` on process.stdin
+  // for every file that runs after it in the same worker.
   if (origTtyDescriptor) {
     Object.defineProperty(process.stdin, "isTTY", origTtyDescriptor);
+  } else {
+    delete (process.stdin as { isTTY?: boolean }).isTTY;
   }
   fs.rmSync(tmpHome, { recursive: true, force: true });
   vi.restoreAllMocks();
@@ -195,7 +201,7 @@ describe("the claude persist offer", () => {
 
     /** @scenario "Installing the plugin removes the raw hook entries it replaces" */
     it("clears raw hook entries a previous CLI left behind", async () => {
-      writeJson(settingsPath(), { hooks: { SessionStart: [rawHookEntry] } });
+      writeJson(["settings.json"], { hooks: { SessionStart: [rawHookEntry] } });
 
       await runOffer();
 
@@ -286,7 +292,7 @@ describe("the silent re-assert of an already-configured device", () => {
   beforeEach(() => {
     // The env block is already current, which is what sends the offer down the
     // re-assert path instead of prompting.
-    writeJson(settingsPath(), { env: otelVars });
+    writeJson(["settings.json"], { env: otelVars });
   });
 
   describe("when the plugin is already installed", () => {
@@ -304,7 +310,7 @@ describe("the silent re-assert of an already-configured device", () => {
     /** @scenario "The silent re-assert removes raw hook entries the plugin replaced" */
     it("clears raw hook entries the plugin replaced", async () => {
       seedInstalledPlugin();
-      writeJson(settingsPath(), {
+      writeJson(["settings.json"], {
         env: otelVars,
         hooks: { SessionStart: [rawHookEntry], Stop: [rawHookEntry] },
       });
@@ -321,7 +327,7 @@ describe("the silent re-assert of an already-configured device", () => {
       const userEntry = {
         hooks: [{ type: "command", command: "./scripts/mine.sh" }],
       };
-      writeJson(settingsPath(), {
+      writeJson(["settings.json"], {
         env: otelVars,
         hooks: { SessionStart: [userEntry, rawHookEntry] },
       });

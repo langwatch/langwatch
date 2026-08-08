@@ -99,6 +99,12 @@ Rule: The raw hook entries stay as the fallback for a claude that cannot take a 
     When the user consents to capture for claude again
     Then the plugin install is attempted
 
+  @unit
+  Scenario: A failure recorded ahead of this machine's clock suppresses nothing
+    Given a plugin install failure stamped in the future
+    When the user consents to capture for claude again
+    Then the plugin install is attempted
+
 Rule: Re-asserting a device's wiring costs no network and no subprocess
 
   @unit
@@ -171,6 +177,13 @@ Rule: Logout removes the plugin and the marketplace LangWatch registered
     And the user's other settings are preserved
 
   @unit
+  Scenario: A logout that finds the plugin already switched off reports it removed
+    Given a claude binary whose plugin uninstall fails
+    And the LangWatch plugin an earlier logout already switched off
+    When logout removes the telemetry targets
+    Then the plugin is reported as disabled rather than as a failure
+
+  @unit
   Scenario: A marketplace LangWatch did not register is left alone
     Given a marketplace of the same name pointing at somebody else's repository
     When logout scans for telemetry targets
@@ -184,3 +197,10 @@ Rule: Plugin state is read defensively
     Given plugin state files that are missing or hold malformed JSON
     When the plugin state is read
     Then nothing is reported as installed and nothing is thrown
+
+  @unit
+  Scenario: A marketplace that only mentions our repository is not ours
+    Given a marketplace of the same name sourced from somebody else's
+      repository, mentioning ours in the notes beside it
+    When the plugin state is read
+    Then the marketplace is not claimed as ours

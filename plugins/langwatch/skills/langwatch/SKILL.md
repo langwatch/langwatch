@@ -6,7 +6,9 @@ description: Read LLM traces back from LangWatch with the langwatch CLI. Use whe
 # LangWatch from a coding session
 
 LangWatch stores the traces your application and your coding agent emit. The
-`langwatch` CLI reads them back. Everything below is read-only.
+`langwatch` CLI reads them back. Every lookup below is read-only; the one
+command that writes anything is `langwatch login`, which stores credentials on
+this machine.
 
 ## Check the CLI is there and signed in
 

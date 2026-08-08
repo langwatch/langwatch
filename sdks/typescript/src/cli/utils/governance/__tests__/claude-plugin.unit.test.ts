@@ -18,6 +18,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type * as ChildProcessModule from "node:child_process";
 
 import type * as ClaudePluginModuleType from "../claude-plugin";
+import {
+  OWNED_MARKETPLACE_REPO,
+  seedInstalledPlugin as seedInstalledPluginFixture,
+  seedMarketplace as seedMarketplaceFixture,
+  writeClaudeJson,
+} from "./claude-plugin-test-helpers";
 
 const { spawnSyncMock } = vi.hoisted(() => ({ spawnSyncMock: vi.fn() }));
 
@@ -56,51 +62,46 @@ const claudeWhere = ({
   uninstall?: number;
   marketplaceRemove?: number;
 }): void => {
+  // A refusal reason belongs to a refusal: a zero status carrying "rejected"
+  // on stderr would let a future assertion about WHY something failed pass
+  // against a run that succeeded.
+  const answer = (status: number, refusal: string) => ({
+    ...ok,
+    status,
+    stderr: status === 0 ? "" : refusal,
+  });
   spawnSyncMock.mockImplementation((_bin: string, args: string[]) => {
     const joined = args.join(" ");
     if (joined === "plugin --help") return { ...ok, status: pluginHelp };
     if (joined.startsWith("plugin marketplace add")) {
-      return { ...ok, status: marketplaceAdd, stderr: "add rejected" };
+      return answer(marketplaceAdd, "add rejected");
     }
     if (joined.startsWith("plugin marketplace remove")) {
       return { ...ok, status: marketplaceRemove };
     }
     if (joined.startsWith("plugin install")) {
-      return { ...ok, status: install, stderr: "install rejected" };
+      return answer(install, "install rejected");
     }
     if (joined.startsWith("plugin uninstall")) {
-      return { ...ok, status: uninstall, stderr: "uninstall rejected" };
+      return answer(uninstall, "uninstall rejected");
     }
     return ok;
   });
 };
 
-const pluginsDir = (): string => path.join(tmpHome, ".claude", "plugins");
 const settingsPath = (): string =>
   path.join(tmpHome, ".claude", "settings.json");
+/** Only for the cases that write bytes which are deliberately not JSON. */
+const pluginsDir = (): string => path.join(tmpHome, ".claude", "plugins");
 
-const writeJson = (file: string, value: unknown): void => {
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.writeFileSync(file, JSON.stringify(value, null, 2));
-};
+const writeJson = (segments: string[], value: unknown): void =>
+  writeClaudeJson({ home: tmpHome, segments, value });
 
 const seedInstalledPlugin = (): void =>
-  writeJson(path.join(pluginsDir(), "installed_plugins.json"), {
-    version: 2,
-    plugins: {
-      "langwatch@langwatch": [
-        { scope: "user", installPath: "/somewhere", version: "0.1.0" },
-      ],
-    },
-  });
+  seedInstalledPluginFixture({ home: tmpHome });
 
-const seedMarketplace = (repo = "langwatch/agent-plugin"): void =>
-  writeJson(path.join(pluginsDir(), "known_marketplaces.json"), {
-    langwatch: {
-      source: { source: "github", repo },
-      installLocation: "/somewhere",
-    },
-  });
+const seedMarketplace = (repo = OWNED_MARKETPLACE_REPO): void =>
+  seedMarketplaceFixture({ home: tmpHome, repo });
 
 const readConfig = (): Record<string, unknown> =>
   JSON.parse(
@@ -138,8 +139,10 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  process.env.HOME = origHome;
-  process.env.USERPROFILE = origUserprofile;
+  if (origHome === undefined) delete process.env.HOME;
+  else process.env.HOME = origHome;
+  if (origUserprofile === undefined) delete process.env.USERPROFILE;
+  else process.env.USERPROFILE = origUserprofile;
   if (origConfig === undefined) delete process.env.LANGWATCH_CLI_CONFIG;
   else process.env.LANGWATCH_CLI_CONFIG = origConfig;
   fs.rmSync(tmpHome, { recursive: true, force: true });
@@ -220,7 +223,7 @@ describe("readClaudePluginState", () => {
     });
 
     it("reads an empty record array as not installed", async () => {
-      writeJson(path.join(pluginsDir(), "installed_plugins.json"), {
+      writeJson(["plugins", "installed_plugins.json"], {
         version: 2,
         plugins: { "langwatch@langwatch": [] },
       });
@@ -229,7 +232,7 @@ describe("readClaudePluginState", () => {
     });
 
     it("ignores install records belonging to other plugins", async () => {
-      writeJson(path.join(pluginsDir(), "installed_plugins.json"), {
+      writeJson(["plugins", "installed_plugins.json"], {
         version: 2,
         plugins: { "somebody-else@theirs": [{ scope: "user" }] },
       });
@@ -248,7 +251,7 @@ describe("readClaudePluginState", () => {
     });
 
     it("claims ownership of a full repository URL source", async () => {
-      writeJson(path.join(pluginsDir(), "known_marketplaces.json"), {
+      writeJson(["plugins", "known_marketplaces.json"], {
         langwatch: {
           source: { source: "git", url: "https://github.com/langwatch/agent-plugin.git" },
         },
@@ -276,11 +279,27 @@ describe("readClaudePluginState", () => {
       const { readClaudePluginState } = await loadModule();
       expect(readClaudePluginState().marketplaceOwnedByLangwatch).toBe(false);
     });
+
+    /** @scenario "A marketplace that only mentions our repository is not ours" */
+    it("disclaims a source that only mentions us outside its identifying fields", async () => {
+      writeJson(["plugins", "known_marketplaces.json"], {
+        langwatch: {
+          source: {
+            source: "github",
+            repo: "somebody-else/their-plugins",
+            description: "a fork of langwatch/agent-plugin",
+            commit: "sync with langwatch/agent-plugin",
+          },
+        },
+      });
+      const { readClaudePluginState } = await loadModule();
+      expect(readClaudePluginState().marketplaceOwnedByLangwatch).toBe(false);
+    });
   });
 
   describe("given the plugin switched on in the settings file", () => {
     it("reports it enabled", async () => {
-      writeJson(settingsPath(), {
+      writeJson(["settings.json"], {
         enabledPlugins: { "langwatch@langwatch": true },
       });
       const { readClaudePluginState } = await loadModule();
@@ -288,7 +307,7 @@ describe("readClaudePluginState", () => {
     });
 
     it("reports it disabled when the flag is false", async () => {
-      writeJson(settingsPath(), {
+      writeJson(["settings.json"], {
         enabledPlugins: { "langwatch@langwatch": false },
       });
       const { readClaudePluginState } = await loadModule();
@@ -329,7 +348,7 @@ describe("ensureLangwatchClaudePlugin", () => {
       const userEntry = {
         hooks: [{ type: "command", command: "./scripts/mine.sh" }],
       };
-      writeJson(settingsPath(), {
+      writeJson(["settings.json"], {
         model: "claude-sonnet-5",
         hooks: {
           SessionStart: [
@@ -372,7 +391,7 @@ describe("ensureLangwatchClaudePlugin", () => {
 
     it("still clears raw hook entries the plugin replaced", async () => {
       seedInstalledPlugin();
-      writeJson(settingsPath(), {
+      writeJson(["settings.json"], {
         hooks: {
           Stop: [
             {
@@ -505,6 +524,21 @@ describe("ensureLangwatchClaudePlugin", () => {
       expect(readConfig().claude_plugin_last_failure).toBeUndefined();
     });
   });
+
+  describe("given a failure stamped in the future", () => {
+    /** @scenario "A failure recorded ahead of this machine's clock suppresses nothing" */
+    it("attempts the install rather than waiting for the clock to catch up", async () => {
+      writeConfig({
+        claude_plugin_last_failure:
+          Math.floor(Date.now() / 1000) + 365 * 24 * 60 * 60,
+      });
+      const { ensureLangwatchClaudePlugin } = await loadModule();
+
+      expect(ensureLangwatchClaudePlugin({ interactive: true }).action).toBe(
+        "installed",
+      );
+    });
+  });
 });
 
 describe("uninstallLangwatchClaudePlugin", () => {
@@ -535,7 +569,7 @@ describe("uninstallLangwatchClaudePlugin", () => {
     /** @scenario "A plugin the uninstall subcommand cannot remove is disabled instead" */
     it("switches the plugin off in the settings file, preserving the rest", async () => {
       seedInstalledPlugin();
-      writeJson(settingsPath(), {
+      writeJson(["settings.json"], {
         model: "claude-sonnet-5",
         enabledPlugins: { "langwatch@langwatch": true, "other@theirs": true },
       });
@@ -551,6 +585,18 @@ describe("uninstallLangwatchClaudePlugin", () => {
       expect(after.enabledPlugins["langwatch@langwatch"]).toBe(false);
       expect(after.enabledPlugins["other@theirs"]).toBe(true);
       expect(after.model).toBe("claude-sonnet-5");
+    });
+
+    /** @scenario "A logout that finds the plugin already switched off reports it removed" */
+    it("reports the plugin disabled when a previous logout already switched it off", async () => {
+      seedInstalledPlugin();
+      writeJson(["settings.json"], {
+        enabledPlugins: { "langwatch@langwatch": false },
+      });
+      claudeWhere({ uninstall: 1 });
+      const { uninstallLangwatchClaudePlugin } = await loadModule();
+
+      expect(uninstallLangwatchClaudePlugin()).toEqual({ action: "disabled" });
     });
   });
 });

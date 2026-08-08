@@ -37,6 +37,12 @@ import {
 	toolMarkers,
 } from "../shell-rc";
 import { scanTelemetryTargets } from "../telemetry-targets";
+import {
+	OWNED_MARKETPLACE_REPO,
+	seedInstalledPlugin,
+	seedMarketplace as seedMarketplaceFixture,
+	writeClaudeJson as writeClaudeJsonFixture,
+} from "./claude-plugin-test-helpers";
 
 // The plugin targets shell out to `claude`, and no test may reach a real one.
 // This claude supports plugins and succeeds by default; a scenario that needs a
@@ -66,22 +72,13 @@ const claudeCommandsRun = (): string[] =>
 	);
 
 /** Write a plugin state file under the temp home's claude directory. */
-const writeClaudeJson = (segments: string[], value: unknown): void => {
-	const file = path.join(tmpHome, ".claude", ...segments);
-	fs.mkdirSync(path.dirname(file), { recursive: true });
-	fs.writeFileSync(file, JSON.stringify(value, null, 2));
-};
+const writeClaudeJson = (segments: string[], value: unknown): void =>
+	writeClaudeJsonFixture({ home: tmpHome, segments, value });
 
-const seedLangwatchPlugin = (): void =>
-	writeClaudeJson(["plugins", "installed_plugins.json"], {
-		version: 2,
-		plugins: { "langwatch@langwatch": [{ scope: "user" }] },
-	});
+const seedLangwatchPlugin = (): void => seedInstalledPlugin({ home: tmpHome });
 
-const seedMarketplace = (repo = "langwatch/agent-plugin"): void =>
-	writeClaudeJson(["plugins", "known_marketplaces.json"], {
-		langwatch: { source: { source: "github", repo } },
-	});
+const seedMarketplace = (repo = OWNED_MARKETPLACE_REPO): void =>
+	seedMarketplaceFixture({ home: tmpHome, repo });
 
 beforeEach(() => {
 	tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), "lw-telemetry-targets-"));
@@ -97,8 +94,10 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-	process.env.HOME = origHome;
-	process.env.USERPROFILE = origUserprofile;
+	if (origHome === undefined) delete process.env.HOME;
+	else process.env.HOME = origHome;
+	if (origUserprofile === undefined) delete process.env.USERPROFILE;
+	else process.env.USERPROFILE = origUserprofile;
 	if (origCodexHome === undefined) delete process.env.CODEX_HOME;
 	else process.env.CODEX_HOME = origCodexHome;
 	if (origXdgConfigHome === undefined) delete process.env.XDG_CONFIG_HOME;

@@ -62,6 +62,9 @@ jobs:
               - '.npmrc'
               - '.github/workflows/agent-plugin-ci.yml'
               - '.github/actions/setup-pnpm-node/**'
+              # The gate itself: a change here decides whether any of the
+              # filters above are ever consulted, so it has to match too.
+              - '.github/actions/detect-changes/**'
 
   build_and_test:
     needs: changes

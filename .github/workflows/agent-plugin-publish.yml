@@ -35,6 +35,14 @@ jobs:
         run: |
           set -euo pipefail
           declared="$(node -p "require('./plugins/langwatch/plugin.json').version")"
+          claude_declared="$(node -p "require('./plugins/langwatch/.claude-plugin/plugin.json').version")"
+          # Both manifests ship, and a client reads whichever one its ecosystem
+          # knows about, so two versions in one publish means the same plugin
+          # answers a version query differently depending on who asks.
+          if [ "$claude_declared" != "$declared" ]; then
+            echo "::error::plugins/langwatch/plugin.json says $declared but plugins/langwatch/.claude-plugin/plugin.json says $claude_declared."
+            exit 1
+          fi
           if [ "$EVENT_NAME" = "push" ]; then
             tagged="${REF_NAME#agent-plugin@v}"
             if [ "$tagged" = "$REF_NAME" ]; then
@@ -117,7 +125,16 @@ jobs:
             echo "No changes to publish"
             exit 0
           fi
+          # Checked only once there is something to publish, so re-running a
+          # publish that changed nothing stays green. With changes in hand, a
+          # tag that already exists means this version would ship new content
+          # while `v${VERSION}` still resolves the old, which is worse than a
+          # failed publish: users pin against that tag.
+          if git ls-remote --exit-code --tags origin "refs/tags/v${VERSION}" >/dev/null 2>&1; then
+            echo "::error::langwatch/agent-plugin already has tag v${VERSION}. Bump the plugin version and release again."
+            exit 1
+          fi
           git commit -m "chore: sync agent plugin v${VERSION} from langwatch/langwatch"
-          git tag "v${VERSION}" || true
+          git tag "v${VERSION}"
           git push
-          git push --tags || true
+          git push origin "refs/tags/v${VERSION}"

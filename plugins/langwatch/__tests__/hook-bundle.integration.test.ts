@@ -8,8 +8,9 @@
  * (specs/ai-governance/cli-wrappers/session-context-hook.feature). What has no
  * coverage anywhere else is the bundle: whether a single minified file, cut
  * loose from node_modules and executed by whatever `node` the user has, still
- * finds the config, still shells out to git, still posts, and still leaves the
- * session's stdout untouched. Nothing short of spawning it observes that.
+ * finds the config, still shells out to git, still posts, and still leaves both
+ * of the session's output streams untouched. Nothing short of spawning it
+ * observes that.
  *
  * Every case runs with an explicitly constructed environment rather than an
  * extension of this process's own. These tests are frequently run FROM a coding
@@ -204,6 +205,7 @@ describe("the bundled session context hook", () => {
 
       expect(run.exitCode).toBe(0);
       expect(run.stdout).toBe("");
+      expect(run.stderr).toBe("");
       expect(received).toHaveLength(1);
 
       const request = received[0]!;
@@ -252,6 +254,7 @@ describe("the bundled session context hook", () => {
 
       expect(run.exitCode).toBe(0);
       expect(run.stdout).toBe("");
+      expect(run.stderr).toBe("");
       expect(received).toEqual([]);
     });
   });
@@ -275,6 +278,7 @@ describe("the bundled session context hook", () => {
 
       expect(run.exitCode).toBe(0);
       expect(run.stdout).toBe("");
+      expect(run.stderr).toBe("");
       expect(received).toEqual([]);
     });
   });
@@ -297,6 +301,7 @@ describe("the bundled session context hook", () => {
 
       expect(run.exitCode).toBe(0);
       expect(run.stdout).toBe("");
+      expect(run.stderr).toBe("");
       expect(received).toEqual([]);
     });
   });

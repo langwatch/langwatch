@@ -114,8 +114,10 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  process.env.HOME = origHome;
-  process.env.USERPROFILE = origUserprofile;
+  if (origHome === undefined) delete process.env.HOME;
+  else process.env.HOME = origHome;
+  if (origUserprofile === undefined) delete process.env.USERPROFILE;
+  else process.env.USERPROFILE = origUserprofile;
   process.env.SHELL = origShell;
   if (origEndpoint === undefined) {
     delete process.env.OTEL_EXPORTER_OTLP_ENDPOINT;

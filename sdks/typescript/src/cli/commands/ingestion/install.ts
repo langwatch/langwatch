@@ -93,9 +93,12 @@ interface InstallReport {
   session_hooks_action?: "created" | "updated" | "unchanged";
   session_hooks_path?: string;
   /**
-   * What became of the LangWatch Claude Code plugin, for claude_code only.
-   * Anything other than `installed` / `already_installed` means the raw hook
-   * entries ran as the fallback, and `session_hooks_action` says what they did.
+   * What became of the LangWatch Claude Code plugin, for claude_code only, and
+   * only when the run wired something: `--env-only` prints the exports and
+   * installs no seam at all, so the field is absent rather than any action.
+   * When it is present, anything other than `installed` / `already_installed`
+   * means the raw hook entries ran as the fallback, and `session_hooks_action`
+   * says what they did.
    */
   claude_plugin_action?: ClaudePluginEnsureAction;
   env_block: string[];
@@ -215,15 +218,15 @@ async function runInstall(
     // hook command and so never breaks when the CLI on PATH is older than the
     // subcommand a raw entry names. The entries stay as the fallback for a
     // `claude` that cannot take a plugin, and the report says which one ran.
-    let claudePluginTookTheHooks = false;
+    let isClaudePluginHandlingHooks = false;
     if (tool === "claude_code") {
       const plugin = ensureLangwatchClaudePlugin({ interactive: true });
       report.claude_plugin_action = plugin.action;
-      claudePluginTookTheHooks =
+      isClaudePluginHandlingHooks =
         plugin.action === "installed" || plugin.action === "already_installed";
     }
 
-    if ((tool === "claude_code" && !claudePluginTookTheHooks) || tool === "codex") {
+    if ((tool === "claude_code" && !isClaudePluginHandlingHooks) || tool === "codex") {
       const result = installSessionContextHooks({
         tool,
         filePath: options.hooksPath,

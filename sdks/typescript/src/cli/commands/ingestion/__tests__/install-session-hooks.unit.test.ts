@@ -133,8 +133,10 @@ afterEach(() => {
   stdoutSpy.mockRestore();
   if (origConfig === undefined) delete process.env.LANGWATCH_CLI_CONFIG;
   else process.env.LANGWATCH_CLI_CONFIG = origConfig;
-  process.env.HOME = origHome;
-  process.env.USERPROFILE = origUserprofile;
+  if (origHome === undefined) delete process.env.HOME;
+  else process.env.HOME = origHome;
+  if (origUserprofile === undefined) delete process.env.USERPROFILE;
+  else process.env.USERPROFILE = origUserprofile;
   fs.rmSync(tmpDir, { recursive: true, force: true });
   vi.clearAllMocks();
 });

@@ -33,7 +33,11 @@ import { spawnSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
-import { appSettingsTargetFor, readAppSettingsFileForUpdate } from "./app-settings";
+import {
+  appSettingsTargetFor,
+  readAppSettingsFileForUpdate,
+  writeAppSettingsFile,
+} from "./app-settings";
 import { loadConfig, saveConfig } from "./config";
 import { removeSessionContextHooks } from "./session-context-hooks";
 
@@ -203,12 +207,23 @@ const OWNED_REPO_PATTERN = new RegExp(
   `(?<![\\w-])${CLAUDE_PLUGIN_MARKETPLACE_REPO.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![\\w-])`,
 );
 
+/**
+ * The fields that say WHERE a marketplace comes from, across the shapes Claude
+ * Code writes. Only these decide ownership: a description, a commit message or
+ * any other metadata that happens to mention the repository says nothing about
+ * who published the marketplace, and reading the whole entry would hand
+ * somebody else's registration to our logout.
+ */
+const SOURCE_IDENTITY_KEYS = ["source", "repo", "url", "path"] as const;
+
+function pointsAtOwnedRepo(value: unknown): boolean {
+  return typeof value === "string" && OWNED_REPO_PATTERN.test(value.toLowerCase());
+}
+
 function sourcePointsAtLangwatch(source: unknown): boolean {
-  if (source === undefined || source === null) return false;
-  const haystack = (
-    typeof source === "string" ? source : safeStringify(source)
-  ).toLowerCase();
-  return OWNED_REPO_PATTERN.test(haystack);
+  if (typeof source === "string") return pointsAtOwnedRepo(source);
+  if (!isPlainObject(source)) return false;
+  return SOURCE_IDENTITY_KEYS.some((key) => pointsAtOwnedRepo(source[key]));
 }
 
 export type ClaudePluginEnsureAction =
@@ -249,8 +264,15 @@ export function ensureLangwatchClaudePlugin({
     }
 
     const failedAt = loadConfig().claude_plugin_last_failure;
-    if (typeof failedAt === "number" && Date.now() - failedAt * 1000 < RETRY_AFTER_MS) {
-      return { action: "skipped_recent_failure" };
+    if (typeof failedAt === "number") {
+      // Bounded at both ends. A stamp in the future is not a recent failure,
+      // it is a clock that went backwards or a config copied from a machine
+      // ahead of this one, and reading it as recent suppresses every install
+      // until wall-clock time catches up.
+      const sinceFailure = Date.now() - failedAt * 1000;
+      if (sinceFailure >= 0 && sinceFailure < RETRY_AFTER_MS) {
+        return { action: "skipped_recent_failure" };
+      }
     }
 
     if (!claudePluginCliAvailable()) {
@@ -368,7 +390,13 @@ function migrateAwayFromRawHooks(): void {
   }
 }
 
-/** Switch the plugin off in the settings file, preserving everything else. */
+/**
+ * Switch the plugin off in the settings file, preserving everything else.
+ *
+ * Reports the END STATE, not whether a write happened: a plugin that is already
+ * switched off is the outcome the caller wanted, and a second logout finding it
+ * that way is a success. Only a state we could not reach is false.
+ */
 function disableInSettings(): boolean {
   const filePath = claudeSettingsPath();
   try {
@@ -376,11 +404,10 @@ function disableInSettings(): boolean {
     const enabled = isPlainObject(settings.enabledPlugins)
       ? { ...settings.enabledPlugins }
       : {};
-    if (enabled[CLAUDE_PLUGIN_REF] === false) return false;
+    if (enabled[CLAUDE_PLUGIN_REF] === false) return true;
     enabled[CLAUDE_PLUGIN_REF] = false;
     settings.enabledPlugins = enabled;
-    fs.mkdirSync(path.dirname(filePath), { recursive: true });
-    fs.writeFileSync(filePath, JSON.stringify(settings, null, 2) + "\n");
+    writeAppSettingsFile({ filePath, settings });
     return true;
   } catch (err) {
     debugLog(`could not disable the plugin in the settings file: ${(err as Error).message}`);
@@ -464,14 +491,6 @@ function readJsonObject(filePath: string): Record<string, unknown> {
     return isPlainObject(parsed) ? parsed : {};
   } catch {
     return {};
-  }
-}
-
-function safeStringify(value: unknown): string {
-  try {
-    return JSON.stringify(value) ?? "";
-  } catch {
-    return "";
   }
 }
 
