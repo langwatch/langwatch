@@ -41,16 +41,17 @@ interface TurnAnnotationProps {
   };
   /**
    * Write annotations in the rail beside the turn rather than in a popover
-   * over it. Set by the thread layout, which has a rail; the bubbles layout
-   * has none and keeps its popovers.
+   * over it. Set by the conversation, whose message layouts both have a rail;
+   * a host without one keeps the popover.
    */
   shouldUseRailComposer?: boolean;
 }
 
 /**
- * Inline action row that sits in each turn separator. Each action button is
- * its own popover trigger — clicking opens the form anchored to that button
- * rather than dropping a heavy panel into the conversation flow.
+ * Inline action row that sits in each turn separator. Annotating and suggesting
+ * write in the rail beside the turn; a host with no rail gets a popover
+ * anchored to the button instead, rather than a heavy panel dropped into the
+ * conversation flow. Each action asks for the permission its own work needs.
  */
 export function TurnActionRow({
   traceId,
@@ -58,7 +59,7 @@ export function TurnActionRow({
   translation,
   shouldUseRailComposer = false,
 }: TurnAnnotationProps) {
-  const { hasPermission } = useOrganizationTeamProject();
+  const { project, hasPermission } = useOrganizationTeamProject();
   const { openDrawer } = useDrawer();
   const openDraft = useAnnotationDraftStore((s) => s.openDraft);
   const [openPopover, setOpenPopover] = useState<"annotate" | "suggest" | null>(
@@ -66,13 +67,18 @@ export function TurnActionRow({
   );
 
   const canManage = hasPermission("annotations:manage");
+  // Capturing a turn into a dataset is dataset work, and the drawer's own
+  // add-to-dataset action asks for nothing beyond being signed in to the
+  // project. Sitting beside the annotation actions is not a reason to demand
+  // the annotation permission for it.
+  const canAddToDataset = !!project;
 
   const stop = (e: React.SyntheticEvent) => e.stopPropagation();
 
   const annotationsGate = usePersonalFeatureGate("annotations");
   const datasetsGate = usePersonalFeatureGate("datasets");
 
-  if (!canManage && !translation) return null;
+  if (!canManage && !canAddToDataset && !translation) return null;
 
   // Kept out of the way until the turn is hovered: ~180px of chrome on every
   // separator adds a lot of weight to a view whose job is "read the
@@ -207,28 +213,30 @@ export function TurnActionRow({
               />
             </>
           )}
-          <Tooltip
-            content="Add this turn to a dataset"
-            positioning={{ placement: "top" }}
-          >
-            <Button
-              size="2xs"
-              variant="ghost"
-              color="fg.muted"
-              gap={1}
-              paddingX={2}
-              onClick={async (e) => {
-                e.stopPropagation();
-                const allowed = await datasetsGate.requestEnable();
-                if (!allowed) return;
-                openDrawer("addDatasetRecord", { traceId });
-              }}
-            >
-              <Icon as={Database} boxSize={3} />
-              <Text textStyle="2xs">Dataset</Text>
-            </Button>
-          </Tooltip>
         </>
+      )}
+      {canAddToDataset && (
+        <Tooltip
+          content="Add this turn to a dataset"
+          positioning={{ placement: "top" }}
+        >
+          <Button
+            size="2xs"
+            variant="ghost"
+            color="fg.muted"
+            gap={1}
+            paddingX={2}
+            onClick={async (e) => {
+              e.stopPropagation();
+              const allowed = await datasetsGate.requestEnable();
+              if (!allowed) return;
+              openDrawer("addDatasetRecord", { traceId });
+            }}
+          >
+            <Icon as={Database} boxSize={3} />
+            <Text textStyle="2xs">Dataset</Text>
+          </Button>
+        </Tooltip>
       )}
       <PersonalFeatureGateDialog state={annotationsGate.dialogState} />
       <PersonalFeatureGateDialog state={datasetsGate.dialogState} />

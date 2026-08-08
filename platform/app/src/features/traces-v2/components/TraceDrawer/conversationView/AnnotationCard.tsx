@@ -18,9 +18,9 @@ import {
 import { UserAvatar } from "~/components/UserAvatar";
 import { Tooltip } from "~/components/ui/tooltip";
 import type { AnnotationByTrace } from "~/hooks/useAnnotationsByTraceIds";
+import { describeAnnotationAnchor } from "~/server/annotations/annotationAnchorLabel";
 import { useJumpToAnnotationAnchor } from "../../../hooks/useJumpToAnnotationAnchor";
 import { useDrawerStore } from "../../../stores/drawerStore";
-import { describeAnnotationAnchor } from "~/server/annotations/annotationAnchorLabel";
 
 interface ScoreEntry {
   name: string;
@@ -32,6 +32,11 @@ interface AnnotationCardProps {
   annotation: AnnotationByTrace;
   /** Score key names by id, so a card never falls back to a raw id. */
   scoreNamesById: Map<string, string>;
+  /**
+   * The trace the reader is already looking at, when the card sits inside it.
+   * A comment on that trace's own field then names the field alone.
+   */
+  contextTraceId?: string;
   /** Whether the reader wrote this annotation and may change it. */
   isOwn: boolean;
   onEdit: () => void;
@@ -46,6 +51,7 @@ interface AnnotationCardProps {
 export function AnnotationCard({
   annotation,
   scoreNamesById,
+  contextTraceId,
   isOwn,
   onEdit,
 }: AnnotationCardProps) {
@@ -80,7 +86,10 @@ export function AnnotationCard({
       <VStack align="stretch" gap={2}>
         <CardHeader annotation={annotation} isOwn={isOwn} />
 
-        <AnchorBreadcrumb annotation={annotation} />
+        <AnchorBreadcrumb
+          annotation={annotation}
+          contextTraceId={contextTraceId}
+        />
 
         {annotation.comment && (
           <Text textStyle="xs" whiteSpace="pre-wrap">
@@ -108,12 +117,21 @@ export function AnnotationCard({
  * view. That only works for the turn the drawer has open, so a comment on
  * another turn's span names its part and leaves the reader to open that turn.
  */
-function AnchorBreadcrumb({ annotation }: { annotation: AnnotationByTrace }) {
+function AnchorBreadcrumb({
+  annotation,
+  contextTraceId,
+}: {
+  annotation: AnnotationByTrace;
+  contextTraceId?: string;
+}) {
   const jump = useJumpToAnnotationAnchor();
   const openTraceId = useDrawerStore((s) => s.traceId);
   const label = describeAnnotationAnchor({
     anchor: annotation,
     traceId: annotation.traceId,
+    // Inside the trace the comment is on, naming the trace again says nothing
+    // the reader cannot already see.
+    selfLabel: contextTraceId === annotation.traceId ? null : "Trace",
   });
   if (!label) return null;
 

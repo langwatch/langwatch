@@ -28,7 +28,10 @@ import { useConversationTurnEvents } from "../../../hooks/useConversationTurnEve
 import { useConversationTurns } from "../../../hooks/useConversationTurns";
 import { useCopyToClipboard } from "../../../hooks/useCopyToClipboard";
 import { useTraceDrawerNavigation } from "../../../hooks/useTraceDrawerNavigation";
-import { useAnnotationDraftStore } from "../../../stores/annotationDraftStore";
+import {
+  isTurnRailDraft,
+  useAnnotationDraftStore,
+} from "../../../stores/annotationDraftStore";
 import type { TraceListItem } from "../../../types/trace";
 import { RenderedMarkdown } from "../markdownView";
 import { SegmentedToggle } from "../SegmentedToggle";
@@ -126,10 +129,10 @@ export const ConversationView = memo(function ConversationView({
   // The rail belongs to this conversation only when the composer that opened
   // it did: the queue page and the trace drawer can each be showing one at the
   // same time, and only the annotated one should change shape. A composer for
-  // one part of a turn opens where that part is read, not in the rail, so it
-  // is not what opens one.
+  // a part read elsewhere in the trace opens there rather than in the rail, so
+  // it is not what opens one.
   const draftTraceId = useAnnotationDraftStore((s) =>
-    s.draft && !s.draft.anchorKind ? s.draft.traceId : null,
+    s.draft && isTurnRailDraft(s.draft) ? s.draft.traceId : null,
   );
   const turnTraceIds = useMemo(() => new Set(traceIds), [traceIds]);
   const isRailActive = resolveIsRailActive({

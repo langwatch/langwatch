@@ -373,13 +373,11 @@ function readInitialFromURL(): InitialFromURL {
 
 /**
  * Views that replay an agent run rather than showing the trace's own spans.
- * There is nothing to correct in them, so edit mode never renders one.
+ * There is nothing in them to correct and nothing to point a comment at, so
+ * annotation mode never renders one. The conversation is not one of them: a
+ * turn is a trace, and it is where commenting on one reads best.
  */
-const UNEDITABLE_VIEW_MODES = new Set<DrawerViewMode>([
-  "conversation",
-  "terminal",
-  "session",
-]);
+const UNEDITABLE_VIEW_MODES = new Set<DrawerViewMode>(["terminal", "session"]);
 
 export function isUneditableViewMode(mode: DrawerViewMode): boolean {
   return UNEDITABLE_VIEW_MODES.has(mode);

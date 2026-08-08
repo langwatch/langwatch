@@ -20,7 +20,7 @@ Feature: Annotation rail beside each conversation turn
 
   Background:
     Given the user is authenticated with "annotations:view" permission
-    And the conversation is shown in thread layout
+    And the conversation is shown in one of its message layouts
 
   Rule: The rail only exists when there is something to put in it
 
@@ -55,10 +55,28 @@ Feature: Annotation rail beside each conversation turn
       # at once, and only the one being annotated should change shape.
 
     @unit
-    Scenario: Bubbles layout keeps its inline annotation actions
+    Scenario: Bubbles layout has the rail as well
       Given the conversation is shown in bubbles layout
       And one turn in the conversation carries an annotation
+      Then the rail opens for the conversation
+      # Both message layouts read the same annotations, and a reviewer who
+      # prefers side bubbles was the only one left writing into a popover.
+
+    @unit
+    Scenario: The markdown layout has no rail
+      Given the conversation is shown as markdown
+      And one turn in the conversation carries an annotation
       Then no rail is opened
+      # There are no turns to put a rail beside: the whole thread is one
+      # document.
+
+    @unit
+    Scenario: Bubbles keep the full pane width when the rail opens
+      Given the conversation is shown in bubbles layout
+      Then the message column takes whatever room is left beside the rail
+      # Thread layout caps itself at a reading width, so it can reserve the
+      # rail's room up front. Bubbles span the pane, so a fixed message column
+      # would make the conversation jump width the moment the rail opened.
 
     @integration
     Scenario: A turn renders unchanged while the rail is closed
@@ -114,8 +132,6 @@ Feature: Annotation rail beside each conversation turn
     Scenario: The turn's own annotate action writes in the rail
       When the reviewer uses the turn's annotate action
       Then the composer opens in the rail rather than over the conversation
-      # Bubbles layout has no rail and keeps its popover, which is specified in
-      # specs/traces-v2/annotations.feature.
 
     @unit
     Scenario: Only one annotation is composed at a time

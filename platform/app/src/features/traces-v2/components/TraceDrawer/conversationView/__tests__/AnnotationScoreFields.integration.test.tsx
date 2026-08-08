@@ -54,6 +54,7 @@ function makeState(over: Partial<AnnotationFormState>): AnnotationFormState {
     scoreOptions: {},
     setScoreOptions: vi.fn(),
     scores: { data: [], isLoading: false },
+    anchorLabel: null,
     isEdit: false,
     isSaving: false,
     isDeleting: false,

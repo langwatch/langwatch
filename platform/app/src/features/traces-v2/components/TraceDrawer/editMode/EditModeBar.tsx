@@ -1,11 +1,12 @@
 import { Button, HStack, Icon, Spinner, Text } from "@chakra-ui/react";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { LuFileOutput, LuPencil } from "react-icons/lu";
 import { Dialog } from "~/components/ui/dialog";
 import { toaster } from "~/components/ui/toaster";
 import { showErrorToast } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
+import { useAnnotationSessionStore } from "../../../stores/annotationSessionStore";
 import { useDrawerStore } from "../../../stores/drawerStore";
 import { useFocusSectionStore } from "../../../stores/focusSectionStore";
 import {
@@ -33,6 +34,21 @@ function describeEdit({
     parts.push(`${deletedSpans} span${deletedSpans === 1 ? "" : "s"} deleted`);
   }
   return parts.length > 0 ? parts.join(", ") : "No changes yet";
+}
+
+/**
+ * The comments written in this pass, reported apart from the correction because
+ * they are on a different clock: each one was saved as it was written, so none
+ * of them is waiting on Save and none of them is at risk from Discard. A pass
+ * that has produced none says nothing rather than reporting a zero.
+ */
+function CommentsWritten({ count }: { count: number }) {
+  if (count === 0) return null;
+  return (
+    <Text textStyle="xs" color="fg.subtle">
+      {count} comment{count === 1 ? "" : "s"} saved
+    </Text>
+  );
 }
 
 /** The draft the bar summarizes and, on Save, writes as the correction. */
@@ -96,11 +112,14 @@ function useSaveTraceEdit({ traceId }: { traceId: string }) {
           traceId,
         });
       }
-      toaster.create({ title: "Trace edits saved", type: "success" });
+      toaster.create({ title: "Trace corrections saved", type: "success" });
       exitTraceEditMode();
     },
     onError: (error) =>
-      showErrorToast({ error, fallbackTitle: "Couldn't save trace edits" }),
+      showErrorToast({
+        error,
+        fallbackTitle: "Couldn't save trace corrections",
+      }),
   });
 
   /**
@@ -128,7 +147,10 @@ function useSaveTraceEdit({ traceId }: { traceId: string }) {
         }
         return true;
       } catch (error) {
-        showErrorToast({ error, fallbackTitle: "Couldn't save trace edits" });
+        showErrorToast({
+          error,
+          fallbackTitle: "Couldn't save trace corrections",
+        });
         return false;
       } finally {
         setIsRebasing(false);
@@ -156,12 +178,21 @@ function useSaveTraceEdit({ traceId }: { traceId: string }) {
 }
 
 /**
- * The strip that says the drawer is being edited, what the correction changes
+ * The strip that says the trace is being annotated, what the pass has produced
  * so far, and how to finish. Rendered between the header and the panes for as
- * long as edit mode is on.
+ * long as annotation mode is on.
+ *
+ * The two halves of the pass are reported apart because they are saved apart:
+ * the correction is a draft this bar writes, and every comment is already
+ * stored.
  */
 export function EditModeBar({ traceId }: { traceId: string }) {
   const [cancelConfirmOpen, setCancelConfirmOpen] = useState(false);
+  const commentsSaved = useAnnotationSessionStore((s) => s.savedCount);
+  // The count belongs to this pass, so it starts over each time one does.
+  useEffect(() => {
+    useAnnotationSessionStore.getState().start();
+  }, []);
   // Something else already asked to leave the trace (closing the drawer,
   // opening another one) and is waiting on the same decision, so both use one
   // dialog and one set of words.
@@ -220,11 +251,12 @@ export function EditModeBar({ traceId }: { traceId: string }) {
       >
         <Icon as={LuPencil} boxSize={3.5} color="blue.fg" />
         <Text textStyle="sm" fontWeight="semibold" color="blue.fg">
-          Editing trace
+          Annotation mode
         </Text>
         <Text textStyle="xs" color="fg.muted">
           {describeEdit(summary)}
         </Text>
+        <CommentsWritten count={commentsSaved} />
         <Button
           size="xs"
           variant="ghost"
@@ -260,7 +292,13 @@ export function EditModeBar({ traceId }: { traceId: string }) {
   );
 }
 
-/** The one question asked for every way of leaving an unsaved correction. */
+/**
+ * The one question asked for every way of leaving an unsaved correction.
+ *
+ * It names the corrections outright. A reviewer who has just left eight
+ * comments and reads "discard your changes" has no way of knowing the comments
+ * are not what is at risk, so the prompt says so.
+ */
 function DiscardTraceEditsDialog({
   open,
   onKeepEditing,
@@ -281,19 +319,20 @@ function DiscardTraceEditsDialog({
     >
       <Dialog.Content>
         <Dialog.Header>
-          <Dialog.Title>Discard trace edits?</Dialog.Title>
+          <Dialog.Title>Discard trace corrections?</Dialog.Title>
         </Dialog.Header>
         <Dialog.Body>
           <Text textStyle="sm" color="fg.muted">
-            Your changes to this trace have not been saved.
+            Your corrections to this trace have not been saved. Comments are
+            saved as you write them and are not discarded.
           </Text>
         </Dialog.Body>
         <Dialog.Footer>
           <Button size="sm" variant="outline" onClick={onKeepEditing}>
-            Keep editing
+            Keep annotating
           </Button>
           <Button size="sm" colorPalette="red" onClick={onDiscard}>
-            Discard changes
+            Discard corrections
           </Button>
         </Dialog.Footer>
         <Dialog.CloseTrigger />

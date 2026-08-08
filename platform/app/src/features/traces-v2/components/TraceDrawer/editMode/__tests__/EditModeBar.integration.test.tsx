@@ -3,6 +3,7 @@
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -53,6 +54,7 @@ vi.mock("~/features/errors", () => ({
   showErrorToast: (...args: unknown[]) => showErrorToast(...args),
 }));
 
+import { useAnnotationSessionStore } from "../../../../stores/annotationSessionStore";
 import { useDrawerStore } from "../../../../stores/drawerStore";
 import { useTraceEditStore } from "../../../../stores/traceEditStore";
 import { EditModeBar } from "../EditModeBar";
@@ -98,16 +100,64 @@ describe("EditModeBar", () => {
 
     describe("when the reviewer cancels", () => {
       /** @scenario "Cancelling without changes leaves edit mode straight away" */
-      it("leaves edit mode without asking", () => {
+      it("leaves annotation mode without asking", () => {
         renderBar();
 
         fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
 
         expect(
-          screen.queryByText("Discard trace edits?"),
+          screen.queryByText("Discard trace corrections?"),
         ).not.toBeInTheDocument();
         expect(useDrawerStore.getState().isEditing).toBe(false);
         expect(useTraceEditStore.getState().editingTraceId).toBeNull();
+      });
+    });
+
+    describe("when the reviewer has only left comments", () => {
+      /** @scenario "Comments left in the pass are nothing to discard" */
+      it("leaves annotation mode without asking", () => {
+        renderBar();
+        useAnnotationSessionStore.getState().recordSaved();
+
+        fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+        expect(
+          screen.queryByText("Discard trace corrections?"),
+        ).not.toBeInTheDocument();
+        expect(useDrawerStore.getState().isEditing).toBe(false);
+      });
+    });
+  });
+
+  describe("given a pass that has named the mode", () => {
+    describe("when the bar renders", () => {
+      /** @scenario "The bar names the mode and counts corrections and comments apart" */
+      it("names the mode as annotation mode", () => {
+        renderBar();
+
+        expect(screen.getByText("Annotation mode")).toBeInTheDocument();
+      });
+
+      /** @scenario "The bar names the mode and counts corrections and comments apart" */
+      it("reports the comments written apart from the correction", () => {
+        useTraceEditStore.getState().setSpanName({
+          spanId: "span-1",
+          name: "search the web",
+          baselineName: "handler",
+        });
+        renderBar();
+
+        act(() => useAnnotationSessionStore.getState().recordSaved());
+
+        expect(screen.getByText("1 field changed")).toBeInTheDocument();
+        expect(screen.getByText("1 comment saved")).toBeInTheDocument();
+      });
+
+      /** @scenario "The bar names the mode and counts corrections and comments apart" */
+      it("says nothing about comments before any are written", () => {
+        renderBar();
+
+        expect(screen.queryByText(/comment/)).not.toBeInTheDocument();
       });
     });
   });
@@ -169,7 +219,7 @@ describe("EditModeBar", () => {
         mutationOptions.onSuccess?.();
 
         expect(toasterCreate).toHaveBeenCalledWith({
-          title: "Trace edits saved",
+          title: "Trace corrections saved",
           type: "success",
         });
         expect(invalidate).toHaveBeenCalledWith({
@@ -287,7 +337,7 @@ describe("EditModeBar", () => {
 
         expect(showErrorToast).toHaveBeenCalledWith(
           expect.objectContaining({
-            fallbackTitle: "Couldn't save trace edits",
+            fallbackTitle: "Couldn't save trace corrections",
           }),
         );
         expect(useDrawerStore.getState().isEditing).toBe(true);
@@ -298,17 +348,19 @@ describe("EditModeBar", () => {
     });
 
     describe("when the reviewer cancels", () => {
-      /** @scenario "Cancelling with unsaved changes asks first" */
-      it("asks before discarding", async () => {
+      /** @scenario "The discard prompt says it discards the corrections" */
+      it("asks before discarding, and says the comments are safe", async () => {
         renderBar();
 
         fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
 
         expect(
-          await screen.findByText("Discard trace edits?"),
+          await screen.findByText("Discard trace corrections?"),
         ).toBeInTheDocument();
         expect(
-          screen.getByText("Your changes to this trace have not been saved."),
+          screen.getByText(
+            "Your corrections to this trace have not been saved. Comments are saved as you write them and are not discarded.",
+          ),
         ).toBeInTheDocument();
         expect(useDrawerStore.getState().isEditing).toBe(true);
       });
@@ -319,7 +371,7 @@ describe("EditModeBar", () => {
         fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
 
         fireEvent.click(
-          await screen.findByRole("button", { name: "Keep editing" }),
+          await screen.findByRole("button", { name: "Keep annotating" }),
         );
 
         expect(useDrawerStore.getState().isEditing).toBe(true);
@@ -334,7 +386,7 @@ describe("EditModeBar", () => {
         fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
 
         fireEvent.click(
-          await screen.findByRole("button", { name: "Discard changes" }),
+          await screen.findByRole("button", { name: "Discard corrections" }),
         );
 
         expect(useDrawerStore.getState().isEditing).toBe(false);

@@ -119,11 +119,12 @@ import { useAnnotationDraftStore } from "../../../../stores/annotationDraftStore
 import { NO_TRACE_EVENTS, type TraceListItem } from "../../../../types/trace";
 import { AnnotatedTurnRow } from "../AnnotatedTurnRow";
 import { TurnActionRow } from "../TurnAnnotations";
-import type { ParsedTurn } from "../types";
+import type { ParsedTurn, TurnLayout } from "../types";
 import {
   RAIL_WIDTH_SLIM_PX,
   RAIL_WIDTH_WIDE_PX,
   type RailLayout,
+  THREAD_COLUMN_MAX_WIDTH_PX,
 } from "../useRailLayout";
 
 const TRACE_ID = "trace-1";
@@ -193,6 +194,7 @@ function annotation(over: Partial<AnnotationByTrace> = {}): AnnotationByTrace {
 function renderRow({
   isRailActive = true,
   railLayout = SIDE_LAYOUT,
+  layout = "thread" as TurnLayout,
   annotations = [] as AnnotationByTrace[],
   anchoredAnnotations = [] as AnnotationByTrace[],
 } = {}) {
@@ -201,7 +203,7 @@ function renderRow({
       <AnnotatedTurnRow
         parsed={parsedTurn()}
         index={1}
-        layout="thread"
+        layout={layout}
         isCurrent={false}
         onSelectTurn={vi.fn()}
         annotations={annotations}
@@ -359,6 +361,85 @@ describe("given a turn in thread layout, where the rail lives", () => {
         }),
       );
     });
+  });
+});
+
+/**
+ * Thread caps itself at a reading width and reserves the rail beside it.
+ * Bubbles span whatever the pane gives them, so a fixed message column would
+ * make the conversation jump width the moment the rail opened.
+ */
+describe("given the rail open beside a turn in each message layout", () => {
+  const columns = (layout: TurnLayout) => {
+    renderRow({ layout });
+    const grid = screen.getByTestId("chat-turn-row").parentElement
+      ?.parentElement as HTMLElement;
+    return getComputedStyle(grid).gridTemplateColumns;
+  };
+
+  it("gives thread its reading width beside the rail", () => {
+    expect(columns("thread")).toBe(
+      `minmax(0, ${THREAD_COLUMN_MAX_WIDTH_PX}px) ${RAIL_WIDTH_WIDE_PX}px`,
+    );
+  });
+
+  /** @scenario "Bubbles keep the full pane width when the rail opens" */
+  it("gives bubbles whatever room is left beside the rail", () => {
+    expect(columns("bubbles")).toBe(`minmax(0, 1fr) ${RAIL_WIDTH_WIDE_PX}px`);
+  });
+});
+
+describe("given a turn commented on its own output", () => {
+  const onTheOutput = annotation({
+    id: "annotation-on-output",
+    comment: "the answer contradicts the policy",
+    anchorKind: "field",
+    anchorId: TRACE_ID,
+    anchorPath: "output",
+  } as Partial<AnnotationByTrace>);
+
+  /** @scenario "A card about the turn's own input or output names only the field" */
+  it("names the field without repeating the turn it sits beside", () => {
+    renderRow({ anchoredAnnotations: [onTheOutput] });
+
+    expect(screen.getByTestId("annotation-anchor")).toHaveTextContent("Output");
+    expect(screen.getByTestId("annotation-anchor")).not.toHaveTextContent(
+      "Trace",
+    );
+  });
+});
+
+describe("given a comment being written about one side of a turn", () => {
+  /** @scenario "Commenting on a side of a turn writes in that turn's rail" */
+  it("opens the composer in that turn's rail", () => {
+    useAnnotationDraftStore.getState().openDraft({
+      traceId: TRACE_ID,
+      mode: "annotate",
+      anchorKind: "field",
+      anchorId: TRACE_ID,
+      anchorPath: "output",
+    });
+
+    renderRow();
+
+    expect(screen.getByLabelText("Annotation composer")).toBeInTheDocument();
+  });
+
+  /** @scenario "Commenting on a side of a turn writes in that turn's rail" */
+  it("names the part the comment is about", () => {
+    useAnnotationDraftStore.getState().openDraft({
+      traceId: TRACE_ID,
+      mode: "annotate",
+      anchorKind: "field",
+      anchorId: TRACE_ID,
+      anchorPath: "output",
+    });
+
+    renderRow();
+
+    expect(screen.getByTestId("annotation-composer-anchor")).toHaveTextContent(
+      "Output",
+    );
   });
 });
 

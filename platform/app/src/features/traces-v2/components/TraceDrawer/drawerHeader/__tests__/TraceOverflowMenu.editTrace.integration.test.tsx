@@ -1,11 +1,11 @@
 /**
  * @vitest-environment jsdom
  *
- * Who is offered the correction. The overflow menu is where a reviewer reaches
- * for "Edit trace", and it is the only place the action is offered on a trace
- * that is being read, so the permission and the share view are gated here.
- * The header hands the menu its own `readOnly`, which is what a public share
- * page renders with.
+ * Who is offered the annotation pass. The overflow menu is where a reviewer
+ * reaches for "Annotate trace", and it is the only place the action is offered
+ * on a trace that is being read, so the permission and the share view are gated
+ * here. The header hands the menu its own `readOnly`, which is what a public
+ * share page renders with.
  * See specs/traces-v2/trace-edit-mode.feature.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
@@ -101,7 +101,7 @@ const openMenu = async (user: ReturnType<typeof userEvent.setup>) => {
   await screen.findByText("Copy trace ID");
 };
 
-const editTraceItem = () => screen.queryByText("Edit trace");
+const editTraceItem = () => screen.queryByText("Annotate trace");
 
 const annotationQueueItem = () => screen.queryByText("Add to annotation queue");
 
@@ -119,8 +119,8 @@ afterEach(() => {
 
 describe("given a reviewer reading a trace in the drawer", () => {
   describe("when they open the trace actions menu", () => {
-    /** @scenario "The overflow menu offers to edit the trace" */
-    it("offers an action to edit the trace", async () => {
+    /** @scenario "The overflow menu offers to annotate the trace" */
+    it("offers an action to annotate the trace", async () => {
       const user = userEvent.setup();
       renderMenu();
 
@@ -129,12 +129,13 @@ describe("given a reviewer reading a trace in the drawer", () => {
       expect(editTraceItem()).toBeInTheDocument();
     });
 
-    it("starts editing that trace when the action is chosen", async () => {
+    /** @scenario "The overflow menu offers to annotate the trace" */
+    it("starts annotating that trace when the action is chosen", async () => {
       const user = userEvent.setup();
       renderMenu();
       await openMenu(user);
 
-      await user.click(screen.getByText("Edit trace"));
+      await user.click(screen.getByText("Annotate trace"));
 
       expect(useTraceEditStore.getState().editingTraceId).toBe("trace-1");
       expect(useDrawerStore.getState().isEditing).toBe(true);
@@ -146,22 +147,22 @@ describe("given a reviewer reading a trace in the drawer", () => {
       useDrawerStore.getState().setViewModeTransient("conversation");
     });
 
-    /** @scenario "Entering edit mode from the conversation view moves to the trace view" */
-    it("moves them to the trace view to make the correction", async () => {
+    /** @scenario "Starting to annotate from the conversation leaves the reader there" */
+    it("leaves them on the conversation, where they were commenting", async () => {
       const user = userEvent.setup();
       renderMenu();
       await openMenu(user);
 
-      await user.click(screen.getByText("Edit trace"));
+      await user.click(screen.getByText("Annotate trace"));
 
-      expect(useDrawerStore.getState().viewMode).toBe("trace");
+      expect(useDrawerStore.getState().viewMode).toBe("conversation");
       expect(useDrawerStore.getState().isEditing).toBe(true);
     });
   });
 
   describe("when the trace is a sample preview trace", () => {
-    /** @scenario "A sample preview trace is never offered for editing" */
-    it("offers no action to edit the trace", async () => {
+    /** @scenario "A sample preview trace is never offered for annotation" */
+    it("offers no action to annotate the trace", async () => {
       const user = userEvent.setup();
       renderMenu({ traceId: "lw-preview-chat" });
 
@@ -176,8 +177,8 @@ describe("given a reviewer reading a trace in the drawer", () => {
       mocks.canUpdateAnnotations = false;
     });
 
-    /** @scenario "A reviewer without permission to update annotations cannot edit" */
-    it("offers no action to edit the trace", async () => {
+    /** @scenario "A reviewer without permission to update annotations cannot annotate" */
+    it("offers no action to annotate the trace", async () => {
       const user = userEvent.setup();
       renderMenu();
 
@@ -189,7 +190,7 @@ describe("given a reviewer reading a trace in the drawer", () => {
 
   describe("when the trace is being read on its public share page", () => {
     /** @scenario "A shared trace is never editable" */
-    it("offers no action to edit the trace, however permitted the reader is", async () => {
+    it("offers no action to annotate the trace, however permitted the reader is", async () => {
       const user = userEvent.setup();
       renderMenu({ readOnly: true });
 

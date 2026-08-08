@@ -64,9 +64,11 @@ export const AnnotatedTurnRow = memo(function AnnotatedTurnRow({
       isCurrent={isCurrent}
       onSelect={onSelectTurn}
       annotationItems={annotations}
-      // Thread layout writes annotations in the rail, so its actions open the
-      // composer there instead of a popover over the conversation.
-      shouldUseRailComposer={layout === "thread"}
+      anchoredAnnotationItems={anchoredAnnotations}
+      // Both message layouts write annotations in the rail, so the turn's
+      // actions open the composer there instead of a popover over the
+      // conversation.
+      shouldUseRailComposer
     />
   );
 
@@ -92,7 +94,7 @@ export const AnnotatedTurnRow = memo(function AnnotatedTurnRow({
 
   return (
     <Grid
-      templateColumns={`minmax(0, ${THREAD_COLUMN_MAX_WIDTH_PX}px) ${railLayout.railWidth}px`}
+      templateColumns={`${messageColumnWidth(layout)} ${railLayout.railWidth}px`}
       gap={3}
       alignItems="start"
       width="full"
@@ -102,3 +104,17 @@ export const AnnotatedTurnRow = memo(function AnnotatedTurnRow({
     </Grid>
   );
 });
+
+/**
+ * How much of the row the messages take beside the rail.
+ *
+ * Thread caps itself at a reading width and the conversation reserves the rail
+ * beside it, so the column is that width whether the rail is open or not.
+ * Bubbles span whatever the pane gives them, so a fixed column would make the
+ * whole conversation jump width the moment the rail opened.
+ */
+function messageColumnWidth(layout: TurnLayout): string {
+  return layout === "thread"
+    ? `minmax(0, ${THREAD_COLUMN_MAX_WIDTH_PX}px)`
+    : "minmax(0, 1fr)";
+}

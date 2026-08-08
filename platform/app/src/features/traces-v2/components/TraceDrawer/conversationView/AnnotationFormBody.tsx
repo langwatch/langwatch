@@ -7,7 +7,7 @@ import {
   Textarea,
   VStack,
 } from "@chakra-ui/react";
-import { RotateCcw, Trash2 } from "lucide-react";
+import { Crosshair, RotateCcw, Trash2 } from "lucide-react";
 import { DiffCounts, DiffPanel, useOutputDiff } from "./AnnotationOutputDiff";
 import { ScoreFields } from "./AnnotationScoreFields";
 import type { AnnotationFormState } from "./annotationForm.types";
@@ -15,13 +15,16 @@ import type { AnnotationFormState } from "./annotationForm.types";
 export function AnnotateBody({ state }: { state: AnnotationFormState }) {
   return (
     <VStack align="stretch" gap={3}>
-      <HStack>
-        <Text textStyle="sm" fontWeight="600">
-          {state.isEdit ? "Edit annotation" : "Add annotation"}
-        </Text>
-        <Spacer />
-        <DeleteAnnotationButton state={state} />
-      </HStack>
+      <VStack align="stretch" gap={0.5}>
+        <HStack>
+          <Text textStyle="sm" fontWeight="600">
+            {state.isEdit ? "Edit annotation" : "Add annotation"}
+          </Text>
+          <Spacer />
+          <DeleteAnnotationButton state={state} />
+        </HStack>
+        <AnchorLine label={state.anchorLabel} />
+      </VStack>
 
       <CommentField
         value={state.comment}
@@ -31,6 +34,29 @@ export function AnnotateBody({ state }: { state: AnnotationFormState }) {
 
       <ScoreFields state={state} />
     </VStack>
+  );
+}
+
+/**
+ * What the comment being written is about, when it is about one part of the
+ * trace. A comment about the trace as a whole names nothing: the form is
+ * already on that trace and there is no narrower target to report.
+ */
+function AnchorLine({ label }: { label: string | null }) {
+  if (!label) return null;
+  return (
+    <HStack gap={1} maxWidth="full">
+      <Icon as={Crosshair} boxSize={3} color="purple.fg" flexShrink={0} />
+      <Text
+        textStyle="2xs"
+        color="purple.fg"
+        truncate
+        title={label}
+        data-testid="annotation-composer-anchor"
+      >
+        {label}
+      </Text>
+    </HStack>
   );
 }
 
@@ -53,24 +79,27 @@ export function SuggestBody({
 
   return (
     <VStack align="stretch" gap={3}>
-      <HStack>
-        <Text textStyle="sm" fontWeight="600">
-          {state.isEdit ? "Edit suggestion" : "Suggest correction"}
-        </Text>
-        <Spacer />
-        {originalOutput !== state.expectedOutput && (
-          <Button
-            size="2xs"
-            variant="ghost"
-            color="fg.muted"
-            onClick={() => state.setExpectedOutput(originalOutput)}
-          >
-            <Icon as={RotateCcw} boxSize={3} />
-            Reset
-          </Button>
-        )}
-        <DeleteAnnotationButton state={state} />
-      </HStack>
+      <VStack align="stretch" gap={0.5}>
+        <HStack>
+          <Text textStyle="sm" fontWeight="600">
+            {state.isEdit ? "Edit suggestion" : "Suggest correction"}
+          </Text>
+          <Spacer />
+          {originalOutput !== state.expectedOutput && (
+            <Button
+              size="2xs"
+              variant="ghost"
+              color="fg.muted"
+              onClick={() => state.setExpectedOutput(originalOutput)}
+            >
+              <Icon as={RotateCcw} boxSize={3} />
+              Reset
+            </Button>
+          )}
+          <DeleteAnnotationButton state={state} />
+        </HStack>
+        <AnchorLine label={state.anchorLabel} />
+      </VStack>
 
       <SectionLabel>Expected output</SectionLabel>
       <Textarea

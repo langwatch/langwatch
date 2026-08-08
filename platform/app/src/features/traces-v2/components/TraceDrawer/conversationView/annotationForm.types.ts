@@ -54,6 +54,13 @@ export interface AnnotationFormState {
    * column for the trace, so an anchored comment is not offered any.
    */
   isAnchored: boolean;
+  /**
+   * The part of the trace the comment is about, in words. Null for a comment
+   * about the trace as a whole, which has no part to name. The composer says it
+   * out loud so a reviewer typing into a form that floats over the trace, or
+   * docks in a column beside it, never has to remember what they clicked.
+   */
+  anchorLabel: string | null;
   handleSave: () => void;
   handleDelete: () => void;
   onCancel: () => void;

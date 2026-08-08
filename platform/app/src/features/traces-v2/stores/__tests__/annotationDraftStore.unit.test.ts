@@ -6,6 +6,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import {
   isSameAnnotationTarget,
+  isTurnRailDraft,
   useAnnotationDraftStore,
 } from "../annotationDraftStore";
 
@@ -160,5 +161,46 @@ describe("given a comment about one part of a trace", () => {
         true,
       );
     });
+  });
+});
+
+/**
+ * A turn is a trace, so a comment about the turn as a whole and a comment about
+ * one of its two sides both read in the column beside it. Anything narrower is
+ * read where it lives. See specs/traces-v2/anchored-comments.feature.
+ */
+describe("given a comment being written somewhere in a conversation turn", () => {
+  const onTheTurn = { traceId: "trace-1" };
+  const onTheTurnsOutput = {
+    traceId: "trace-1",
+    anchorKind: "field" as const,
+    anchorId: "trace-1",
+  };
+  const onASpan = {
+    traceId: "trace-1",
+    anchorKind: "span" as const,
+    anchorId: "span-1",
+  };
+  const onASpansOutput = {
+    traceId: "trace-1",
+    anchorKind: "field" as const,
+    anchorId: "span-1",
+  };
+  const onAMessage = {
+    traceId: "trace-1",
+    anchorKind: "message" as const,
+    anchorId: "trace-1",
+  };
+
+  it("writes a comment about the turn or one of its sides in the rail", () => {
+    expect(isTurnRailDraft(onTheTurn)).toBe(true);
+    expect(isTurnRailDraft(onTheTurnsOutput)).toBe(true);
+  });
+
+  /** @scenario "A comment about a span of a turn is not written in that turn's rail" */
+  it("leaves a comment about anything narrower to the surface reading it", () => {
+    expect(isTurnRailDraft(onASpan)).toBe(false);
+    expect(isTurnRailDraft(onASpansOutput)).toBe(false);
+    expect(isTurnRailDraft(onAMessage)).toBe(false);
   });
 });

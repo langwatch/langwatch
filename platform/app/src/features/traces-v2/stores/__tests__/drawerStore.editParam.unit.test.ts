@@ -12,17 +12,17 @@ describe("drawer.edit URL parameter", () => {
     useDrawerStore.getState().setIsEditing(false);
   });
 
-  describe("given a link that asks for edit mode", () => {
+  describe("given a link that asks for annotation mode", () => {
     describe("when the drawer reads it", () => {
-      /** @scenario "A deep link into edit mode starts the drawer editing" */
-      it("opens the trace in edit mode", () => {
+      /** @scenario "A deep link into annotation mode starts the drawer in it" */
+      it("opens the trace in annotation mode", () => {
         expect(parseEditParam({ raw: "1", traceId: "trace-1" })).toBe(true);
       });
     });
 
     describe("when it points at a sample preview trace", () => {
-      /** @scenario "Edit mode is dropped from a link to a preview trace" */
-      it("opens the trace without edit mode", () => {
+      /** @scenario "Annotation mode is dropped from a link to a preview trace" */
+      it("opens the trace without annotation mode", () => {
         expect(parseEditParam({ raw: "1", traceId: "lw-preview-chat" })).toBe(
           false,
         );
@@ -30,9 +30,9 @@ describe("drawer.edit URL parameter", () => {
     });
   });
 
-  describe("given a link that does not ask for edit mode", () => {
+  describe("given a link that does not ask for annotation mode", () => {
     describe("when the drawer reads it", () => {
-      /** @scenario "A deep link into edit mode starts the drawer editing" */
+      /** @scenario "A deep link into annotation mode starts the drawer in it" */
       it("opens the trace for reading", () => {
         expect(parseEditParam({ raw: undefined, traceId: "trace-1" })).toBe(
           false,
@@ -43,34 +43,41 @@ describe("drawer.edit URL parameter", () => {
     });
   });
 
-  describe("given a link that asks for edit mode and a view that cannot be edited", () => {
+  describe("given a link that asks for annotation mode and a view the pass cannot act on", () => {
     describe("when the drawer reads it", () => {
-      /** @scenario "A link naming edit mode and a view that cannot be edited opens on the trace" */
+      /** @scenario "A link naming annotation mode and a view the pass cannot act on opens on the trace" */
       it("opens on the trace view", () => {
-        for (const viewMode of [
-          "conversation",
-          "terminal",
-          "session",
-        ] as const) {
+        for (const viewMode of ["terminal", "session"] as const) {
           expect(viewModeForEditState({ viewMode, isEditing: true })).toBe(
             "trace",
           );
         }
       });
 
-      it("keeps the view the link names when it is not editing", () => {
+      it("keeps the view the link names when it is not annotating", () => {
         expect(
           viewModeForEditState({
-            viewMode: "conversation",
+            viewMode: "session",
             isEditing: false,
           }),
-        ).toBe("conversation");
+        ).toBe("session");
       });
 
-      it("keeps a view that can be edited", () => {
+      it("keeps a view the pass can act on", () => {
         expect(
           viewModeForEditState({ viewMode: "summary", isEditing: true }),
         ).toBe("summary");
+      });
+    });
+  });
+
+  describe("given a link that asks to annotate the trace on its conversation", () => {
+    describe("when the drawer reads it", () => {
+      /** @scenario "A link asking to annotate on the conversation view opens on the conversation" */
+      it("opens on the conversation view", () => {
+        expect(
+          viewModeForEditState({ viewMode: "conversation", isEditing: true }),
+        ).toBe("conversation");
       });
     });
   });

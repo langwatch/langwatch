@@ -5,7 +5,7 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useRequiredSession } from "~/hooks/useRequiredSession";
 import {
   type AnnotationDraft,
-  isSameAnnotationTarget,
+  isTurnRailDraft,
   useAnnotationDraftStore,
 } from "../../../stores/annotationDraftStore";
 import { AnnotationCard } from "./AnnotationCard";
@@ -89,6 +89,9 @@ export function TurnAnnotationRail({
             key={annotation.id}
             annotation={annotation}
             scoreNamesById={scoreNamesById}
+            // The card is already beside this turn, so it names the part
+            // without repeating the turn it is sitting next to.
+            contextTraceId={traceId}
             isOwn={!!userId && annotation.user?.id === userId}
             onEdit={() =>
               openDraft({
@@ -124,10 +127,11 @@ export function TurnAnnotationRail({
 /**
  * The draft this rail holds the composer for.
  *
- * A new comment written here is about the turn as a whole, so an anchored draft
- * belongs to the part it points at rather than to the rail. The one exception
- * is a card in this rail being edited: that composer takes the card's place,
- * and the card is here because the comment is about this turn.
+ * A comment written here is about the turn as a whole or about one of its two
+ * sides, which are the turn's own input and output. A comment about anything
+ * narrower belongs to the surface where that part is read. The one exception is
+ * a card in this rail being edited: that composer takes the card's place, and
+ * the card is here because the comment is on this turn.
  */
 function resolveRailDraft({
   draft,
@@ -138,11 +142,9 @@ function resolveRailDraft({
   traceId: string;
   cards: AnnotationByTrace[];
 }): AnnotationDraft | null {
-  if (!draft) return null;
-  if (isSameAnnotationTarget(draft, { traceId })) return draft;
-  return draft.traceId === traceId &&
-    draft.annotationId &&
-    cards.some((a) => a.id === draft.annotationId)
+  if (!draft || draft.traceId !== traceId) return null;
+  if (isTurnRailDraft(draft)) return draft;
+  return draft.annotationId && cards.some((a) => a.id === draft.annotationId)
     ? draft
     : null;
 }

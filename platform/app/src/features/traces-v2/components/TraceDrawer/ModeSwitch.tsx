@@ -38,10 +38,11 @@ interface ModeSwitchProps {
    */
   showTerminal?: boolean;
   /**
-   * True while the reviewer is correcting the trace. Conversation, Usage and
-   * Terminal replay an agent run rather than showing the trace's own spans, so
-   * there is nothing in them to correct and they stay unavailable until the
-   * reviewer finishes.
+   * True while the reviewer is annotating the trace. Usage and Terminal replay
+   * an agent run rather than showing the trace's own spans, so there is nothing
+   * in them to correct or comment on and they stay unavailable until the
+   * reviewer finishes. The Conversation stays open: a turn is a trace, and it
+   * is where commenting on one reads best.
    */
   isEditing?: boolean;
   /**
@@ -52,8 +53,8 @@ interface ModeSwitchProps {
   endSlot?: ReactNode;
 }
 
-/** Shown on every tab edit mode makes unavailable. */
-const EDITING_DISABLED_REASON = "Finish editing to switch views";
+/** Shown on every tab annotation mode makes unavailable. */
+const EDITING_DISABLED_REASON = "Finish annotating to switch views";
 
 interface TabProps {
   label: string;
@@ -151,18 +152,16 @@ function ModeTab({
 /**
  * Tristate gate on the Conversation tab: no conversation id → permanently
  * disabled; has an id but its turns are still in flight → disabled with loading
- * copy; id plus turns → enabled. Editing takes precedence over all of it.
+ * copy; id plus turns → enabled. Annotating the trace does not close it, since
+ * a turn is a trace and commenting on one happens here.
  */
 function conversationTabState({
-  isEditing,
   hasConversation,
   isConversationLoading,
 }: {
-  isEditing: boolean;
   hasConversation: boolean;
   isConversationLoading: boolean;
 }): { disabled: boolean; reason?: string } {
-  if (isEditing) return { disabled: true, reason: EDITING_DISABLED_REASON };
   if (!hasConversation) {
     return {
       disabled: true,
@@ -247,7 +246,6 @@ export function ModeSwitch({
   endSlot,
 }: ModeSwitchProps) {
   const conversationTab = conversationTabState({
-    isEditing,
     hasConversation,
     isConversationLoading,
   });

@@ -27,11 +27,14 @@
 #     somebody else's unsaved work.
 #   - Editing needs permission to update annotations, matching the correction
 #     write itself. The public share surface never offers it.
-#   - Editing happens in the Trace and Summary views. The terminal and usage
-#     views are read-only replays of an agent run, so entering the mode moves
-#     the reader to the Trace view and those tabs stay unavailable until they
-#     finish. The conversation is the exception: it is where commenting on a
-#     turn reads best, so it stays reachable inside the mode.
+#   - The mode is reachable from the Trace, Summary and Conversation views. The
+#     terminal and usage views are read-only replays of an agent run, so
+#     entering the mode from one of them moves the reader to the Trace view and
+#     those tabs stay unavailable until they finish. The conversation stays
+#     reachable, because it is where commenting on a turn reads best.
+#   - The URL says `drawer.edit=1` and keeps saying it. The mode's name is what
+#     the reviewer reads, not what a link carries, and changing the parameter
+#     would break every link already shared.
 #   - The mode is one mode, and it is named after the whole job: annotating a
 #     trace covers correcting it and commenting on it in the same pass, the way
 #     a document review holds suggestions and comments at once. A reviewer does
@@ -71,67 +74,55 @@ Feature: Editing a trace in the drawer
     Given I am signed in to a project with permission to update annotations
     And I have a trace open in the trace drawer
 
-  Rule: Entering edit mode is a deliberate, permitted action
+  Rule: Entering annotation mode is a deliberate, permitted action
 
     @integration
-    Scenario: The overflow menu offers to edit the trace
-      When I open the trace actions menu
-      Then I see an action to edit the trace
-
-    @integration
-    Scenario: A reviewer without permission to update annotations cannot edit
+    Scenario: A reviewer without permission to update annotations cannot annotate
       Given I do not have permission to update annotations
       When I open the trace actions menu
-      Then I do not see an action to edit the trace
+      Then I do not see an action to annotate the trace
 
     @integration
     Scenario: A shared trace is never editable
       Given I am reading the trace on its public share page
-      Then I do not see an action to edit the trace
+      Then I do not see an action to annotate the trace
 
     @unit
-    Scenario: A deep link into edit mode starts the drawer editing
-      Given a drawer link that asks for edit mode
+    Scenario: A deep link into annotation mode starts the drawer in it
+      Given a drawer link that asks for annotation mode
       When the drawer hydrates from that link
-      Then the trace opens with edit mode already started
+      Then the trace opens with annotation mode already started
 
     @unit
-    Scenario: Edit mode is dropped from a link to a preview trace
-      Given a drawer link that asks for edit mode on a sample preview trace
+    Scenario: Annotation mode is dropped from a link to a preview trace
+      Given a drawer link that asks for annotation mode on a sample preview trace
       When the drawer hydrates from that link
-      Then the trace opens without edit mode
+      Then the trace opens without annotation mode
 
     @integration
-    Scenario: A sample preview trace is never offered for editing
+    Scenario: A sample preview trace is never offered for annotation
       Given I am reading a sample preview trace
       When I open the trace actions menu
-      Then I do not see an action to edit the trace
+      Then I do not see an action to annotate the trace
 
-  Rule: While editing, the reader stays on a view that can be edited
+  Rule: While annotating, the reader stays on a view the pass can act on
 
-    The three scenarios below describe the conversation as a view that cannot be
-    edited, which is what ships today. The rule "Annotating a trace is one pass
-    over corrections and comments" below supersedes that part of them: once the
-    mode carries commenting, the conversation is reachable inside it and only
-    usage and terminal stay closed. Everything else in this rule stands.
+    Usage and terminal replay an agent run rather than showing the trace's own
+    spans, so there is nothing in them to correct and nothing in them to point a
+    comment at. The conversation is not one of them: it is where commenting on a
+    turn reads best, so it stays reachable.
 
     @unit
-    Scenario: A link naming edit mode and a view that cannot be edited opens on the trace
-      Given a link that asks for edit mode and for the conversation view
+    Scenario: A link naming annotation mode and a view the pass cannot act on opens on the trace
+      Given a link that asks for annotation mode and for the usage view
       When the drawer opens from it
       Then it opens on the trace view
 
     @integration
-    Scenario: Entering edit mode from the conversation view moves to the trace view
-      Given I am reading the conversation view
-      When I start editing the trace
-      Then the trace view is shown
-
-    @integration
-    Scenario: Views that cannot be edited are unavailable while editing
-      Given I am editing the trace
-      Then the conversation, usage and terminal tabs cannot be opened
-      And each explains that I need to finish editing to switch views
+    Scenario: Views the pass cannot act on are unavailable while annotating
+      Given I am annotating the trace
+      Then the usage and terminal tabs cannot be opened
+      And each explains that I need to finish annotating to switch views
 
   Rule: Annotating a trace is one pass over corrections and comments
 
@@ -144,17 +135,17 @@ Feature: Editing a trace in the drawer
     specified in specs/traces-v2/anchored-comments.feature. This rule is only
     about the mode the reviewer is in while doing it.
 
-    @integration @unimplemented
+    @integration
     Scenario: The overflow menu offers to annotate the trace
       When I open the trace actions menu
       Then I see an action to annotate the trace
       And it needs the same permission to write annotations as correcting does
 
-    @integration @unimplemented
+    @integration
     Scenario: The bar names the mode and counts corrections and comments apart
       Given I am annotating the trace
       When I rename a span and leave a comment on another
-      Then the bar names the mode as annotating the trace
+      Then the bar names the mode as annotation mode
       And the bar reports one changed field
       And it reports the comment separately from the correction
 
@@ -165,21 +156,19 @@ Feature: Editing a trace in the drawer
       Then both are accepted in the same pass
       And I was never asked to choose between correcting and commenting
 
-    @integration @unimplemented
+    @integration
     Scenario: The conversation stays reachable while annotating
       Given I am annotating the trace
       Then the conversation tab can be opened
       And the usage and terminal tabs still cannot
-      And each of those explains that I need to finish first
 
-    @integration @unimplemented
+    @integration
     Scenario: Starting to annotate from the conversation leaves the reader there
       Given I am reading the conversation view
       When I start annotating the trace
       Then the conversation view is still shown
-      And I can comment on a turn without switching views
 
-    @unit @unimplemented
+    @unit
     Scenario: A link asking to annotate on the conversation view opens on the conversation
       Given a link that asks to annotate the trace and for the conversation view
       When the drawer opens from it
@@ -200,19 +189,18 @@ Feature: Editing a trace in the drawer
       Then the correction is stored with that rename
       And the comment is untouched by the save
 
-    @integration @unimplemented
+    @integration
     Scenario: The discard prompt says it discards the corrections
       Given I am annotating the trace
-      And I have left a comment on a span
-      And I have renamed another span
+      And I have renamed a span
       When I cancel
       Then I am asked whether to discard the trace corrections
-      And the prompt does not put the comments at risk
+      And the prompt says the comments are already saved
 
-    @unit @unimplemented
+    @unit
     Scenario: Comments left in the pass are nothing to discard
       Given I am annotating the trace
-      And I have left a comment on a span and corrected nothing
+      And I have left a comment and corrected nothing
       When I cancel
       Then I am not asked whether to discard anything
       And the drawer leaves the mode straight away

@@ -8,16 +8,19 @@ function describe_({
   anchorId,
   anchorPath,
   spanName,
+  selfLabel,
 }: {
   anchorKind: "span" | "field" | "message" | null;
   anchorId: string | null;
   anchorPath?: string | null;
   spanName?: string | null;
+  selfLabel?: string | null;
 }) {
   return describeAnnotationAnchor({
     anchor: { anchorKind, anchorId, anchorPath: anchorPath ?? null },
     traceId: TRACE_ID,
     spanName,
+    ...(selfLabel === undefined ? {} : { selfLabel }),
   });
 }
 
@@ -89,6 +92,43 @@ describe("describeAnnotationAnchor", () => {
           anchorPath: "metadata.customer.tier",
         }),
       ).toBe("Trace · Metadata · customer.tier");
+    });
+  });
+
+  describe("given a caller already reading the trace the comment is on", () => {
+    /** @scenario "A card about the turn's own input or output names only the field" */
+    it("names the field alone rather than repeating the trace", () => {
+      expect(
+        describe_({
+          anchorKind: "field",
+          anchorId: TRACE_ID,
+          anchorPath: "output",
+          selfLabel: null,
+        }),
+      ).toBe("Output");
+    });
+
+    /** @scenario "A card about the turn's own input or output names only the field" */
+    it("still names a span, which is not the trace the caller is reading", () => {
+      expect(
+        describe_({
+          anchorKind: "field",
+          anchorId: "span-7",
+          anchorPath: "output",
+          spanName: "web_search",
+          selfLabel: null,
+        }),
+      ).toBe("Span web_search · Output");
+    });
+
+    it("names nothing for a comment on the trace itself", () => {
+      expect(
+        describe_({
+          anchorKind: "span",
+          anchorId: TRACE_ID,
+          selfLabel: null,
+        }),
+      ).toBeNull();
     });
   });
 

@@ -95,6 +95,23 @@ export const useAnnotationDraftStore = create<AnnotationDraftState>((set) => ({
 }));
 
 /**
+ * Whether a draft belongs in the rail beside a conversation turn.
+ *
+ * A turn is a trace, so a comment about the turn as a whole and a comment about
+ * one of its two sides are both read in the same column: the sides are the
+ * trace's own input and output, and there is nowhere else in the conversation
+ * for them to go. Everything narrower is read where it lives — a span and its
+ * fields in the trace view, a message inside the transcript holding it — so
+ * those composers open there instead.
+ */
+export function isTurnRailDraft(
+  draft: Pick<AnnotationDraftTarget, "traceId" | "anchorKind" | "anchorId">,
+): boolean {
+  if (!draft.anchorKind) return true;
+  return draft.anchorKind === "field" && draft.anchorId === draft.traceId;
+}
+
+/**
  * Whether two comments are about the same part of the trace.
  *
  * A draft is identified by everything it points at rather than by its trace

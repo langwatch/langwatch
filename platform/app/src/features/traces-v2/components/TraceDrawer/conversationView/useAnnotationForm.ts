@@ -3,7 +3,9 @@ import { toaster } from "~/components/ui/toaster";
 import { useAnnotationInvalidation } from "~/hooks/useAnnotationInvalidation";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { AnnotationAnchorColumns } from "~/server/annotations/annotationAnchor";
+import { describeAnnotationAnchor } from "~/server/annotations/annotationAnchorLabel";
 import { api } from "~/utils/api";
+import { useAnnotationSessionStore } from "../../../stores/annotationSessionStore";
 import type {
   AnnotationDraftValues,
   AnnotationFormState,
@@ -99,7 +101,13 @@ export function useAnnotationMutations({
     } else {
       create.mutate(
         { ...payload, anchorKind, anchorId, anchorPath },
-        { onSuccess, onError },
+        {
+          onSuccess: () => {
+            useAnnotationSessionStore.getState().recordSaved();
+            onSuccess();
+          },
+          onError,
+        },
       );
     }
   };
@@ -230,6 +238,14 @@ export function usePopoverAnnotationForm(
     hasExisting: mutations.hasExisting,
     isSaveBlocked: mutations.isSaveBlocked,
     isAnchored: !!props.anchorKind,
+    anchorLabel: describeAnnotationAnchor({
+      anchor: {
+        anchorKind: props.anchorKind ?? null,
+        anchorId: props.anchorId ?? null,
+        anchorPath: props.anchorPath ?? null,
+      },
+      traceId: props.traceId,
+    }),
     handleSave: () => mutations.save({ comment, expectedOutput, scoreOptions }),
     handleDelete: mutations.remove,
     onCancel: () => props.onOpenChange(false),

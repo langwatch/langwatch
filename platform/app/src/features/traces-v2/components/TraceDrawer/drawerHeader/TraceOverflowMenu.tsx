@@ -77,10 +77,10 @@ export function TraceOverflowMenu({
   // reader happening to hold no permission on the project.
   const canQueueForAnnotation =
     !readOnly && hasPermission("annotations:create");
-  // Correcting a trace is review work, which is the permission external
+  // Annotating a trace is review work, which is the permission external
   // reviewers hold, and it is the same one the correction write itself checks.
   // A sample preview trace is left out: it exists only to show an empty project
-  // what a trace looks like, so an edit session on one could never be saved.
+  // what a trace looks like, so a pass over one could never be saved.
   const canEditTrace =
     !readOnly &&
     !isPreviewTraceId(traceId) &&
@@ -215,7 +215,7 @@ export function TraceOverflowMenu({
           <Menu.Item value="edit-trace" onClick={handleEditTrace}>
             <HStack gap={2}>
               <Icon as={LuPencil} boxSize={3.5} />
-              <Text>Edit trace</Text>
+              <Text>Annotate trace</Text>
             </HStack>
           </Menu.Item>
         )}

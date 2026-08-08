@@ -27,19 +27,23 @@ Feature: Per-turn actions in ConversationView
     Given a turn is collapsed
     Then its action row is not rendered until the turn is expanded
 
-  Scenario: Action row is hidden for users without "annotations:manage"
+  @integration
+  Scenario: Each action asks for the permission its own work needs
     Given the user only has "annotations:view" permission
-    Then no `TurnActionRow` is rendered on any turn
-    # The annotations:manage gate is checked by `TurnActionRow`; the
-    # `Dataset` button is part of the same row and is hidden together.
+    Then the turn offers no way to annotate or suggest
+    And the turn still offers to be captured into a dataset
+    And translating the turn is offered to every reader
+    # Capturing a turn into a dataset is dataset work and is offered wherever
+    # add-to-dataset is offered, rather than behind the annotation permission
+    # it happens to sit beside.
 
   # ─── Annotate ───────────────────────────────────────────────────────────
 
-  Scenario: Annotate opens the annotation popover anchored to the second turn
+  @integration
+  Scenario: Annotate opens the composer in the rail beside the turn
     When the user clicks "Annotate" on the second turn
-    Then an `AnnotationPopover` opens in `mode="annotate"` anchored to that button
+    Then the composer opens in that turn's rail
     And the form is pre-scoped to the second turn's traceId
-    And the comment textarea is autofocused
 
   @integration
   Scenario: In bubbles layout, existing annotations are edited via the badge popover

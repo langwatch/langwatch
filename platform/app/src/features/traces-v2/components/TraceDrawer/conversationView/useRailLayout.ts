@@ -64,6 +64,9 @@ export function resolveRailLayout(paneWidth: number): RailLayout {
  * until there is a card or a composer to hold, which is what keeps an
  * un-annotated conversation reading exactly as it did before the rail existed.
  *
+ * Both message layouts get one. Markdown does not: it renders the whole thread
+ * as one document, so there are no turns for a rail to sit beside.
+ *
  * The composer is checked against this conversation's turns rather than just
  * "some composer is open": the queue page and the trace drawer can each be
  * showing a conversation at the same time, and only the one being annotated
@@ -80,7 +83,7 @@ export function isRailActive({
   draftTraceId: string | null;
   turnTraceIds: ReadonlySet<string>;
 }): boolean {
-  if (layout !== "thread") return false;
+  if (layout === "markdown") return false;
   if (hasAnnotations) return true;
   return !!draftTraceId && turnTraceIds.has(draftTraceId);
 }

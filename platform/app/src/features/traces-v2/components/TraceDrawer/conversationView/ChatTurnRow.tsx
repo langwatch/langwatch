@@ -4,6 +4,7 @@ import {
   Flex,
   HStack,
   Icon,
+  Spacer,
   Text,
   VStack,
 } from "@chakra-ui/react";
@@ -39,6 +40,10 @@ import {
 import { getDisplayRoleVisuals, useIsScenarioRole } from "../scenarioRoles";
 import { getRolePalette, ReasoningBlock } from "../transcript";
 import { useConversationExpand } from "./expandContext";
+import {
+  MessageAnnotateCluster,
+  type MessageAnnotateTarget,
+} from "./MessageAnnotateCluster";
 import { MessageExpandToggle } from "./MessageExpandToggle";
 import { TurnActionRow, TurnAnnotationBadges } from "./TurnAnnotations";
 import { TurnSteps } from "./TurnSteps";
@@ -48,6 +53,58 @@ import { formatGap } from "./utils";
 type AnnotationItem = RouterOutputs["annotation"]["getByTraceIds"][number];
 const EMPTY_ANNOTATIONS: AnnotationItem[] = [];
 const EMPTY_MEDIA: MediaPartData[] = [];
+
+interface MessageAnnotationSummary {
+  count: number;
+  hasCorrection: boolean;
+}
+
+/**
+ * Which of a turn's comments read on which of its two messages.
+ *
+ * A comment about the turn as a whole is a judgement on the answer it gave, so
+ * it counts on the reply, beside the comments left on the reply itself. A
+ * comment on the turn's input counts on the message the user sent. Anything
+ * narrower belongs to the surface where that part is read and counts on
+ * neither.
+ */
+function splitAnnotationsBySide({
+  traceId,
+  turnAnnotations,
+  anchoredAnnotations,
+}: {
+  traceId: string;
+  turnAnnotations: AnnotationItem[];
+  anchoredAnnotations: AnnotationItem[];
+}): {
+  userAnnotations: MessageAnnotationSummary | undefined;
+  assistantAnnotations: MessageAnnotationSummary | undefined;
+} {
+  const onField = (path: "input" | "output") =>
+    anchoredAnnotations.filter(
+      (a) =>
+        a.anchorKind === "field" &&
+        a.anchorId === traceId &&
+        a.anchorPath === path,
+    );
+  return {
+    userAnnotations: summarizeAnnotations(onField("input")),
+    assistantAnnotations: summarizeAnnotations([
+      ...turnAnnotations,
+      ...onField("output"),
+    ]),
+  };
+}
+
+function summarizeAnnotations(
+  items: AnnotationItem[],
+): MessageAnnotationSummary | undefined {
+  if (items.length === 0) return undefined;
+  return {
+    count: items.length,
+    hasCorrection: items.some((a) => !!a.expectedOutput),
+  };
+}
 
 interface ChatTurnRowProps {
   turn: TraceListItem;
@@ -76,6 +133,12 @@ interface ChatTurnRowProps {
    * marker and seeds the inline badge popover.
    */
   annotationItems?: AnnotationItem[];
+  /**
+   * Comments about the parts inside this turn. Only the ones left on the turn's
+   * own input and output read here, on the message they were left on; the rest
+   * belong to the surfaces those parts are read from.
+   */
+  anchoredAnnotationItems?: AnnotationItem[];
   /** Route Annotate and Suggest to the rail composer instead of a popover. */
   shouldUseRailComposer?: boolean;
 }
@@ -94,6 +157,7 @@ export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
   onSelect,
   layout = "bubbles",
   annotationItems = EMPTY_ANNOTATIONS,
+  anchoredAnnotationItems = EMPTY_ANNOTATIONS,
   shouldUseRailComposer = false,
 }) {
   const handleSelect = useCallback(
@@ -119,13 +183,15 @@ export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
   const assistantText =
     translation.displayTexts.assistant ?? originalAssistantText;
 
-  const annotationSummary = useMemo(() => {
-    if (annotationItems.length === 0) return undefined;
-    return {
-      count: annotationItems.length,
-      hasCorrection: annotationItems.some((a) => !!a.expectedOutput),
-    };
-  }, [annotationItems]);
+  const { userAnnotations, assistantAnnotations } = useMemo(
+    () =>
+      splitAnnotationsBySide({
+        traceId: turn.traceId,
+        turnAnnotations: annotationItems,
+        anchoredAnnotations: anchoredAnnotationItems,
+      }),
+    [turn.traceId, annotationItems, anchoredAnnotationItems],
+  );
 
   // Scenario-aware visual mapping. The text fields stay role-faithful
   // (`userText` is whatever the source `user` message said), but the
@@ -159,6 +225,18 @@ export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
   const hasUserMedia = layout === "thread" && visibleUserMedia.length > 0;
   const hasAssistantMedia =
     layout === "thread" && visibleAssistantMedia.length > 0;
+
+  // A comment on the reply is about the turn's own output, which is the one
+  // field of a trace a correction can replace, so it may carry a suggestion.
+  const assistantAnnotateTarget = useMemo(
+    () => ({
+      traceId: turn.traceId,
+      anchorPath: "output" as const,
+      canSuggest: true,
+      output: turn.output,
+    }),
+    [turn.traceId, turn.output],
+  );
 
   return (
     <VStack align="stretch" gap={layout === "thread" ? 1 : 2}>
@@ -200,6 +278,14 @@ export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
           media={visibleUserMedia}
           isSelected={isCurrent}
           onClick={handleSelect}
+          annotation={userAnnotations}
+          // A comment here is about the turn's own input. A correction cannot
+          // replace what the user said, so none is offered.
+          annotate={{
+            traceId: turn.traceId,
+            anchorPath: "input",
+            canSuggest: false,
+          }}
         />
       ) : turn.inputRedacted ? (
         // Input hidden by a privacy rule — show the shared "Redacted" marker on
@@ -247,7 +333,8 @@ export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
           media={visibleAssistantMedia}
           isSelected={isCurrent}
           onClick={handleSelect}
-          annotation={annotationSummary}
+          annotation={assistantAnnotations}
+          annotate={assistantAnnotateTarget}
         />
       ) : turn.error ? (
         <TurnMessage
@@ -261,7 +348,8 @@ export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
           media={visibleAssistantMedia}
           isSelected={isCurrent}
           onClick={handleSelect}
-          annotation={annotationSummary}
+          annotation={assistantAnnotations}
+          annotate={assistantAnnotateTarget}
         />
       ) : assistantReasoning || hasAssistantMedia ? (
         <TurnMessage
@@ -275,7 +363,8 @@ export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
           media={visibleAssistantMedia}
           isSelected={isCurrent}
           onClick={handleSelect}
-          annotation={annotationSummary}
+          annotation={assistantAnnotations}
+          annotate={assistantAnnotateTarget}
         />
       ) : turn.outputRedacted ? (
         // Output hidden by a privacy rule — the shared "Redacted" marker on the
@@ -381,7 +470,9 @@ interface TurnMessageProps {
   media?: MediaPartData[];
   isSelected?: boolean;
   onClick?: () => void;
-  annotation?: { count: number; hasCorrection: boolean };
+  annotation?: MessageAnnotationSummary;
+  /** What a comment left on this message is about. */
+  annotate?: MessageAnnotateTarget;
 }
 
 /**
@@ -416,6 +507,7 @@ function ThreadMessage({
   media = EMPTY_MEDIA,
   onClick,
   annotation,
+  annotate,
 }: Omit<TurnMessageProps, "layout" | "side">) {
   const palette = getRolePalette(TONE_ROLE[tone]);
   const isError = tone === "error";
@@ -451,6 +543,12 @@ function ThreadMessage({
       cursor={onClick ? "pointer" : "default"}
       transition="background 0.15s ease"
       _hover={onClick ? { bg: "bg.subtle" } : undefined}
+      // `className="group"` is what the comment cluster's `_groupHover`
+      // resolves against; the role is what tells a reader the message and its
+      // actions are one thing. The turn separator's own group sits on a
+      // sibling, so the two scopes never nest.
+      className="group"
+      role="group"
       onClick={(e: React.MouseEvent) => {
         if (!onClick) return;
         e.stopPropagation();
@@ -498,6 +596,12 @@ function ThreadMessage({
                 <Icon as={Lightbulb} boxSize="10px" color="yellow.fg" />
               )}
             </HStack>
+          )}
+          {annotate && (
+            <>
+              <Spacer />
+              <MessageAnnotateCluster target={annotate} />
+            </>
           )}
         </HStack>
 

@@ -37,12 +37,19 @@ export function describeAnnotationAnchor({
   anchor,
   traceId,
   spanName,
+  selfLabel = "Trace",
 }: {
   anchor: AnnotationAnchorRef;
   /** The trace the comment is on, which tells its own fields from a span's. */
   traceId: string;
   /** The name of the span the comment is on, when the caller knows it. */
   spanName?: string | null;
+  /**
+   * What the trace itself is called in front of its own fields. `null` leaves
+   * it out, for a caller already reading that trace: a card beside a turn says
+   * "Output", because "Trace · Output" repeats the turn it is sitting next to.
+   */
+  selfLabel?: string | null;
 }): string | null {
   const { anchorKind, anchorId, anchorPath } = anchor;
   if (!anchorKind || !anchorId) return null;
@@ -50,11 +57,12 @@ export function describeAnnotationAnchor({
   if (anchorKind === "message") return "Message";
 
   const isTraceItself = anchorId === traceId;
-  const owner = isTraceItself ? "Trace" : `Span ${spanName ?? anchorId}`;
+  const owner = isTraceItself ? selfLabel : `Span ${spanName ?? anchorId}`;
 
   if (anchorKind === "span") return owner;
 
   const path = describeFieldPath(anchorPath);
+  if (!owner) return path;
   return path ? `${owner}${SEPARATOR}${path}` : owner;
 }
 

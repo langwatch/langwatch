@@ -117,7 +117,7 @@ function browserLeavesTheDrawer(followUrl: () => void) {
   });
 }
 
-const discardDialog = () => screen.queryByText("Discard trace edits?");
+const discardDialog = () => screen.queryByText("Discard trace corrections?");
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -147,7 +147,9 @@ describe("given a correction with unsaved changes", () => {
         guardTraceEditExit(close);
       });
 
-      expect(await screen.findByText("Discard trace edits?")).toBeVisible();
+      expect(
+        await screen.findByText("Discard trace corrections?"),
+      ).toBeVisible();
       expect(close).not.toHaveBeenCalled();
     });
 
@@ -160,7 +162,7 @@ describe("given a correction with unsaved changes", () => {
       });
 
       fireEvent.click(
-        await screen.findByRole("button", { name: "Discard changes" }),
+        await screen.findByRole("button", { name: "Discard corrections" }),
       );
 
       expect(close).toHaveBeenCalledTimes(1);
@@ -181,7 +183,9 @@ describe("given a correction with unsaved changes", () => {
         });
       });
 
-      expect(await screen.findByText("Discard trace edits?")).toBeVisible();
+      expect(
+        await screen.findByText("Discard trace corrections?"),
+      ).toBeVisible();
       expect(mocks.openDrawer).not.toHaveBeenCalled();
       expect(useDrawerStore.getState().traceId).toBe(TRACE);
     });
@@ -200,7 +204,9 @@ describe("given a correction with unsaved changes", () => {
 
       act(() => navigation.goBack());
 
-      expect(await screen.findByText("Discard trace edits?")).toBeVisible();
+      expect(
+        await screen.findByText("Discard trace corrections?"),
+      ).toBeVisible();
       expect(mocks.openDrawer).not.toHaveBeenCalled();
       expect(useDrawerStore.getState().traceId).toBe(TRACE);
       // The history entry is still there for the reviewer to come back to.
@@ -213,7 +219,7 @@ describe("given a correction with unsaved changes", () => {
       act(() => navigation.goBack());
 
       fireEvent.click(
-        await screen.findByRole("button", { name: "Discard changes" }),
+        await screen.findByRole("button", { name: "Discard corrections" }),
       );
 
       expect(mocks.openDrawer).toHaveBeenCalledWith(
@@ -228,7 +234,9 @@ describe("given a correction with unsaved changes", () => {
 
       act(() => navigation.goBackTo(0));
 
-      expect(await screen.findByText("Discard trace edits?")).toBeVisible();
+      expect(
+        await screen.findByText("Discard trace corrections?"),
+      ).toBeVisible();
       expect(mocks.openDrawer).not.toHaveBeenCalled();
       expect(useDrawerStore.getState().traceBackStack).toHaveLength(1);
     });
@@ -246,7 +254,9 @@ describe("given a correction with unsaved changes", () => {
         "search the web",
       );
       expect(useDrawerStore.getState().traceId).toBe(TRACE);
-      expect(await screen.findByText("Discard trace edits?")).toBeVisible();
+      expect(
+        await screen.findByText("Discard trace corrections?"),
+      ).toBeVisible();
     });
 
     /** @scenario "Browser back with unsaved changes keeps the correction" */
@@ -267,7 +277,7 @@ describe("given a correction with unsaved changes", () => {
       browserLeavesTheDrawer(followUrl);
 
       fireEvent.click(
-        await screen.findByRole("button", { name: "Discard changes" }),
+        await screen.findByRole("button", { name: "Discard corrections" }),
       );
 
       expect(useDrawerStore.getState().traceId).toBeNull();

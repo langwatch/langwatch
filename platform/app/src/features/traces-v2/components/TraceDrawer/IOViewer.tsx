@@ -39,6 +39,7 @@ import {
   tryParseJSON,
   VIRTUALIZE_AT,
 } from "./transcript";
+import { MessageCommentScope } from "./transcript/messageComments";
 import {
   type MarkdownSubmode,
   useIOViewerState,
@@ -636,22 +637,27 @@ export const IOViewer = memo(function IOViewer({
               transition="opacity 120ms ease-out"
             >
               <Box padding={innerPadding}>
-                <IOViewerBody
-                  format={format}
-                  isChat={isChat}
-                  canJson={canJson}
-                  prettyJsonContent={prettyJsonContent}
-                  markdownBody={markdownBody}
-                  markdownSubmode={markdownSubmode}
-                  conversationTurns={conversationTurns}
-                  chatLayout={chatLayout}
-                  inlineBlocks={inlineBlocks}
-                  hasInlineRichContent={hasInlineRichContent}
-                  displayContent={displayContent}
-                  isLong={isLong}
-                  expanded={expanded}
-                  mode={mode}
-                />
+                {/* A message inside the transcript is a part of the trace a
+                    comment can point at, and the transcript components are
+                    handed messages rather than the trace they came out of. */}
+                <MessageCommentScope traceId={traceId}>
+                  <IOViewerBody
+                    format={format}
+                    isChat={isChat}
+                    canJson={canJson}
+                    prettyJsonContent={prettyJsonContent}
+                    markdownBody={markdownBody}
+                    markdownSubmode={markdownSubmode}
+                    conversationTurns={conversationTurns}
+                    chatLayout={chatLayout}
+                    inlineBlocks={inlineBlocks}
+                    hasInlineRichContent={hasInlineRichContent}
+                    displayContent={displayContent}
+                    isLong={isLong}
+                    expanded={expanded}
+                    mode={mode}
+                  />
+                </MessageCommentScope>
               </Box>
             </Box>
             {/*

@@ -9,6 +9,7 @@ import {
 import { TraceMediaPart } from "~/components/traces/TraceMediaPart";
 import { splitLeadingContextBlocks } from "../../../utils/leadingContext";
 import { RenderedMarkdown } from "../markdownView";
+import { CommentableBlock } from "./messageComments";
 import { asMarkdownBody, parseContentBlocks, withBlockKeys } from "./parsing";
 import { ReasoningBlock } from "./ReasoningBlock";
 import { OpenAIToolCallCard, ToolPairCard } from "./ToolBlocks";
@@ -52,6 +53,16 @@ type StackItem =
       kind: "orphan_result";
       result: KeyedBlock<"tool_result">;
     };
+
+/**
+ * The key a comment on this item is stored against. A tool call and the result
+ * it was paired with read as one card, so the call's key is what identifies it.
+ */
+function itemBlockKey(item: StackItem): string {
+  if (item.kind === "tool_pair") return item.use.blockKey;
+  if (item.kind === "orphan_result") return item.result.blockKey;
+  return item.block.blockKey;
+}
 
 export function pairToolBlocks(blocks: KeyedContentBlock[]): StackItem[] {
   const out: StackItem[] = [];
@@ -139,6 +150,15 @@ export function BlockStack({
   const shouldCollapseTools = collapseTools && toolItemCount > 0;
 
   const renderItem = (item: StackItem) => {
+    const blockKey = itemBlockKey(item);
+    return (
+      <CommentableBlock key={blockKey} blockKey={blockKey}>
+        {renderBlockContent(item)}
+      </CommentableBlock>
+    );
+  };
+
+  const renderBlockContent = (item: StackItem) => {
     if (item.kind === "tool_pair") {
       return (
         <ToolPairCard

@@ -1,4 +1,4 @@
-import { Button, Icon, Text } from "@chakra-ui/react";
+import { Button, Icon, type SystemStyleObject, Text } from "@chakra-ui/react";
 import { forwardRef, useState } from "react";
 import { LuMessageSquare } from "react-icons/lu";
 import { PersonalFeatureGateDialog } from "~/components/me/PersonalFeatureGateDialog";
@@ -18,8 +18,15 @@ import { AnchorCommentThread } from "./AnchorCommentThread";
  * - `on-row-hover`: revealed by the attribute row around it, the way the copy
  *   action beside it already behaves. A glyph on every row at rest would make
  *   a dense table noisier to read, which is the one thing that table is for.
+ * - `on-block-hover`: revealed by the message block around it, for the same
+ *   reason: a transcript is prose, and a glyph beside every paragraph of it
+ *   competes with the words.
  */
-export type AnchorCommentReveal = "always" | "hidden" | "on-row-hover";
+export type AnchorCommentReveal =
+  | "always"
+  | "hidden"
+  | "on-row-hover"
+  | "on-block-hover";
 
 interface AnchorCommentButtonProps {
   traceId: string;
@@ -177,6 +184,20 @@ const LabelledTrigger = forwardRef<
 });
 
 /**
+ * Which surface's hover brings the control back, for the modes that leave it to
+ * CSS. `always` and `hidden` are decided in JavaScript and need no rule.
+ */
+const REVEAL_ON_HOVER_CSS: Record<
+  AnchorCommentReveal,
+  SystemStyleObject | undefined
+> = {
+  always: undefined,
+  hidden: undefined,
+  "on-row-hover": { ".attr-row:hover &": { opacity: 1 } },
+  "on-block-hover": { ".msg-block:hover &": { opacity: 1 } },
+};
+
+/**
  * The control on a row too dense for a label. The count rides beside the glyph
  * so a commented row reads as commented while scanning, and the accessible name
  * says which row it acts on.
@@ -228,11 +249,7 @@ const DenseTrigger = forwardRef<
         opacity: 1,
       }}
       _focusVisible={{ opacity: 1, bg: "bg.emphasized" }}
-      css={
-        reveal === "on-row-hover"
-          ? { ".attr-row:hover &": { opacity: 1 } }
-          : undefined
-      }
+      css={REVEAL_ON_HOVER_CSS[reveal]}
       {...triggerProps}
       // The row underneath selects a span when it is clicked, so the gesture
       // stops here and then opens the popover the trigger wired up.

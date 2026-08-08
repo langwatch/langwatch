@@ -72,11 +72,37 @@ describe("given a conversation in thread layout", () => {
 });
 
 describe("given a conversation in bubbles layout", () => {
-  /** @scenario "Bubbles layout keeps its inline annotation actions" */
-  it("opens no rail even when its turns carry annotations", () => {
+  /** @scenario "Bubbles layout has the rail as well" */
+  it("opens the rail when its turns carry annotations", () => {
     expect(
       isRailActive({
         layout: "bubbles",
+        hasAnnotations: true,
+        draftTraceId: null,
+        turnTraceIds: TURNS,
+      }),
+    ).toBe(true);
+  });
+
+  /** @scenario "Bubbles layout has the rail as well" */
+  it("opens the rail once one of its turns is being annotated", () => {
+    expect(
+      isRailActive({
+        layout: "bubbles",
+        hasAnnotations: false,
+        draftTraceId: "trace-1",
+        turnTraceIds: TURNS,
+      }),
+    ).toBe(true);
+  });
+});
+
+describe("given a conversation rendered as markdown", () => {
+  /** @scenario "The markdown layout has no rail" */
+  it("opens no rail even when its turns carry annotations", () => {
+    expect(
+      isRailActive({
+        layout: "markdown",
         hasAnnotations: true,
         draftTraceId: "trace-1",
         turnTraceIds: TURNS,

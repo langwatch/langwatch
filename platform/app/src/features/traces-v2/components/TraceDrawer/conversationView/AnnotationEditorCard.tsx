@@ -1,5 +1,6 @@
 import { Box, VStack } from "@chakra-ui/react";
 import { useEffect } from "react";
+import { describeAnnotationAnchor } from "~/server/annotations/annotationAnchorLabel";
 import {
   type AnnotationDraft,
   useAnnotationDraftStore,
@@ -70,6 +71,17 @@ export function AnnotationEditorCard({
     hasExisting: mutations.hasExisting,
     isSaveBlocked: mutations.isSaveBlocked,
     isAnchored: !!draft.anchorKind,
+    anchorLabel: describeAnnotationAnchor({
+      anchor: {
+        anchorKind: draft.anchorKind ?? null,
+        anchorId: draft.anchorId ?? null,
+        anchorPath: draft.anchorPath ?? null,
+      },
+      traceId: draft.traceId,
+      // The composer docks beside the turn it is about, so it names the part
+      // rather than the turn the reader is already looking at.
+      selfLabel: null,
+    }),
     handleSave: () =>
       mutations.save({
         comment: draft.comment,

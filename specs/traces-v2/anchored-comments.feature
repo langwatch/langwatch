@@ -14,6 +14,10 @@
 #   platform/app/src/features/traces-v2/components/TraceDrawer/traceAccordions/AccordionShell.tsx (comment on a section)
 #   platform/app/src/features/traces-v2/components/TraceDrawer/transcript/parsing.ts              (stable identity for a message)
 #   platform/app/src/features/traces-v2/components/TraceDrawer/transcript/BlockStack.tsx          (comment on a message)
+#   platform/app/src/features/traces-v2/components/TraceDrawer/transcript/messageComments.tsx     (which trace a transcript belongs to)
+#   platform/app/src/features/traces-v2/components/TraceDrawer/conversationView/ChatTurnRow.tsx            (comment on one side of a turn)
+#   platform/app/src/features/traces-v2/components/TraceDrawer/conversationView/MessageAnnotateCluster.tsx (the affordance on a message)
+#   platform/app/src/features/traces-v2/components/TraceTable/registry/addons/conversation/Bubble.tsx      (the same affordance in bubbles layout)
 #   platform/app/src/features/traces-v2/components/TraceDrawer/conversationView/AnnotationCard.tsx        (what a card is about)
 #   platform/app/src/features/traces-v2/components/TraceDrawer/conversationView/AnnotationScoreFields.tsx (scores stay trace-level)
 #   platform/app/src/features/traces-v2/components/TraceDrawer/TraceHeaderChips.tsx               (every comment on the trace, with its anchor)
@@ -46,6 +50,15 @@
 #     correction becomes the trace's correction for exactly that field. An
 #     attribute row and a message take a comment only, because there is nothing
 #     for a suggestion on them to correct.
+#   - A turn in the conversation is a trace, so its two sides are the trace's own
+#     input and output. Commenting on one of them is commenting on a field, and
+#     it reads in the turn's rail rather than in a popover: that is the same
+#     column the remark about the whole turn reads in, and the two belong
+#     together. Only the reply carries a correction, because the trace's input is
+#     not something a correction can replace.
+#   - A card in a turn's rail names the part without repeating the turn: it is
+#     already beside the turn it belongs to, so "Input" is the whole of what the
+#     reader needs and "Trace · Input" is one word of noise on every card.
 #   - Every surface that reads whole traces reads only the comments about whole
 #     traces: the annotations list and its export, the annotation queue, the
 #     trace projections that feed the table and the dataset columns, the REST
@@ -133,6 +146,24 @@ Feature: Commenting on one part of a trace
       When I annotate a turn the way I already could
       Then the comment is saved as being about that turn's trace and nothing narrower
       And it reads in the turn's rail exactly as it did before
+
+    @integration
+    Scenario: Commenting on one side of a turn records which side it was left on
+      Given I am reading the conversation
+      When I comment on the message the user sent
+      Then the comment is saved as being about that turn's input
+      And a comment left on the reply is saved as being about its output
+
+    @integration
+    Scenario: The message a user sent takes a comment and no correction
+      Given I am reading the conversation
+      Then the user's message offers only to be commented on
+      And the reply offers to be corrected as well
+
+    @integration
+    Scenario: A side of a turn a privacy rule hid offers nothing to comment on
+      Given I am reading a conversation whose turn had its input hidden from me
+      Then that side of the turn carries no comment action
 
     @integration
     Scenario: Commenting on one message in a transcript records that message
@@ -225,6 +256,34 @@ Feature: Commenting on one part of a trace
       When I read the conversation in thread layout
       Then that comment is listed in the rail beside that turn
       And it names the span it is about
+
+    @integration
+    Scenario: A card about the turn's own input or output names only the field
+      Given a turn carries a comment about its output
+      When I read that comment in the turn's rail
+      Then the card names the output and does not repeat the turn
+
+    @integration
+    Scenario: Commenting on a side of a turn writes in that turn's rail
+      Given I am reading the conversation
+      When I comment on the reply
+      Then the composer opens in the rail beside that turn
+      And the composer names the part the comment is about
+
+    @unit
+    Scenario: A comment about a span of a turn is not written in that turn's rail
+      Given a comment is being written about one span of a turn
+      Then the turn's rail holds no composer for it
+      # The composer belongs where the part is read. A span is read in the trace
+      # view, so its composer opens there and the rail stays free to start a
+      # comment about the turn.
+
+    @integration
+    Scenario: Each side of a turn shows the comments left on it
+      Given a turn carries a comment about its input and two about its output
+      When I read the conversation
+      Then the message the user sent shows one comment
+      And the reply shows the two left on it
 
     @integration
     Scenario: Comments are readable without starting to annotate
@@ -335,7 +394,7 @@ Feature: Commenting on one part of a trace
       Given I am commenting on an attribute row
       Then I am not offered a correction to go with the comment
 
-    @integration @unimplemented
+    @integration
     Scenario: A comment on a message offers no suggestion
       Given I am commenting on a message in a transcript
       Then I am not offered a correction to go with the comment

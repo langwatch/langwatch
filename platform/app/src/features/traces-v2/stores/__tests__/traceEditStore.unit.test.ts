@@ -115,7 +115,7 @@ describe("traceEditStore", () => {
 
   describe("given a draft left over from an earlier trace", () => {
     describe("when editing starts on another trace", () => {
-      /** @scenario "A deep link into edit mode starts the drawer editing" */
+      /** @scenario "A deep link into annotation mode starts the drawer in it" */
       it("starts from a clean slate", () => {
         state().startEditing({ traceId: "trace-1" });
         state().setSpanName({
