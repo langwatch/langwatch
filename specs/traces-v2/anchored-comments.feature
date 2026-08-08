@@ -106,7 +106,7 @@ Feature: Commenting on one part of a trace
       Then the comment is saved as being about that span's output
       And a comment left on its input is saved as being about the input instead
 
-    @integration @unimplemented
+    @integration
     Scenario: Commenting on an attribute row records that attribute
       Given I am reading a span with attributes
       When I comment on one attribute row
@@ -127,7 +127,7 @@ Feature: Commenting on one part of a trace
       Then the comment is saved as being about that section
       And the header shows how many comments that section carries
 
-    @integration @unimplemented
+    @integration
     Scenario: Commenting on a conversation turn stays a comment about the whole turn
       Given I am reading the conversation
       When I annotate a turn the way I already could
@@ -147,19 +147,19 @@ Feature: Commenting on one part of a trace
       Then each message is recognised as the same message
       And a message whose content changed is not recognised as the one before it
 
-    @integration @unimplemented
+    @integration
     Scenario: A field hidden from the reader carries no comment action
       Given I am reading a span whose input is hidden from me
       Then that input cannot be commented on
       And an attribute I am not allowed to read cannot be commented on either
 
-    @integration @unimplemented
+    @integration
     Scenario: A reviewer who may only read annotations is offered no comment action
       Given I may read annotations but not write them
       Then no span, field, attribute, section or message offers to be commented on
       And the comments already on the trace are still readable
 
-    @integration @unimplemented
+    @integration
     Scenario: A comment action with no room for a label names the row it acts on
       Given I am reading a span with attributes
       Then the comment action on a waterfall row names the span it comments on
@@ -170,7 +170,7 @@ Feature: Commenting on one part of a trace
       # drawer, so the actions on them stay one click, and pay for it by naming
       # what they act on.
 
-    @integration @unimplemented
+    @integration
     Scenario: A comment action with room for a label carries one
       Given I am reading a span's output and the section headers around it
       Then the comment action reads as a comment action in words
@@ -189,7 +189,7 @@ Feature: Commenting on one part of a trace
       When I read that comment
       Then the card names no part of the trace
 
-    @integration @unimplemented
+    @integration
     Scenario: The trace's whole comment list names what each comment is about
       Given the trace carries comments on a span, on an attribute and on the trace itself
       When I open the trace's comments from the header
@@ -205,14 +205,14 @@ Feature: Commenting on one part of a trace
 
   Rule: Comments read where the thing they are about is
 
-    @integration @unimplemented
+    @integration
     Scenario: A commented span carries a count on its row and opens its thread there
       Given a span carries two comments
       When I read the waterfall
       Then that span's row shows it carries two comments
       And opening the count shows both comments and offers to add another
 
-    @integration @unimplemented
+    @integration
     Scenario: The trace view grows no rail for comments
       Given several spans of the trace carry comments
       When I read the trace view
@@ -226,7 +226,7 @@ Feature: Commenting on one part of a trace
       Then that comment is listed in the rail beside that turn
       And it names the span it is about
 
-    @integration @unimplemented
+    @integration
     Scenario: Comments are readable without starting to annotate
       Given spans and fields of the trace carry comments
       When I read the trace without entering annotation mode
@@ -238,7 +238,7 @@ Feature: Commenting on one part of a trace
     there. Selecting the span is not enough on its own: a long trace can leave
     the selected row hundreds of rows off screen.
 
-    @integration @unimplemented
+    @integration
     Scenario: Jumping to a span comment selects that span and brings its row into view
       Given the trace has more spans than the waterfall shows at once
       And a span far down the trace carries a comment
@@ -246,7 +246,7 @@ Feature: Commenting on one part of a trace
       Then that span is selected
       And the waterfall has scrolled far enough to show its row
 
-    @integration @unimplemented
+    @integration
     Scenario: Jumping to a comment on a field opens the part of the detail holding it
       Given a span carries a comment about its output
       And that span's output section is collapsed
@@ -254,7 +254,7 @@ Feature: Commenting on one part of a trace
       Then the section holding the output is open
       And it is briefly highlighted so the reader can see where they landed
 
-    @integration @unimplemented
+    @integration
     Scenario: Jumping to a span comment from the conversation moves to the trace view
       Given I am reading the conversation
       And a turn's trace carries a comment about one of its spans
@@ -269,7 +269,7 @@ Feature: Commenting on one part of a trace
 
   Rule: A comment whose anchor is gone says so rather than pointing somewhere wrong
 
-    @integration @unimplemented
+    @integration
     Scenario: A comment on a span a correction deleted reads as being on a part that is no longer there
       Given a span carries a comment
       And a correction deletes that span
@@ -284,14 +284,14 @@ Feature: Commenting on one part of a trace
       When I open the trace's comments from the header
       Then the comment reads as being about a part of the trace that is no longer there
 
-    @integration @unimplemented
+    @integration
     Scenario: A comment whose anchor is gone puts no count anywhere in the trace
       Given a comment about a part of the trace that is no longer there
       When I read the trace
       Then no row, section or attribute shows a count for it
       And nothing else is marked as commented in its place
 
-    @integration @unimplemented
+    @integration
     Scenario: A comment whose anchor is gone offers nowhere to jump to
       Given a comment about a part of the trace that is no longer there
       When I read it in the trace's comment list
@@ -330,7 +330,7 @@ Feature: Commenting on one part of a trace
       When the trace is mapped into a dataset row
       Then the row carries the suggested output rather than the captured one
 
-    @integration @unimplemented
+    @integration
     Scenario: A comment on an attribute row offers no suggestion
       Given I am commenting on an attribute row
       Then I am not offered a correction to go with the comment

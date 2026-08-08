@@ -9,6 +9,7 @@ import {
   LuPinOff,
 } from "react-icons/lu";
 import { Tooltip } from "~/components/ui/tooltip";
+import type { AnnotationByTrace } from "~/hooks/useAnnotationsByTraceIds";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { RestrictedAttribute } from "~/server/api/routers/tracesV2.schemas";
 import { compileAttributePattern } from "~/server/data-privacy/attributePatternMatcher";
@@ -21,6 +22,7 @@ import {
   ApiKeyAttributeValue,
 } from "./ApiKeyAttribute";
 import { AttributeValue } from "./AttributeValue";
+import { AnchorCommentButton } from "./anchoredComments/AnchorCommentButton";
 import { PinnedAwareJsonView } from "./JsonHighlight";
 import { SegmentedToggle } from "./SegmentedToggle";
 
@@ -205,6 +207,23 @@ export function parseAttributeInput({
   }
 }
 
+/**
+ * What a reader can comment on in this table, and what they already said.
+ *
+ * Only the element's own attributes take comments. Resource attributes describe
+ * the process that emitted the span rather than what the span did, which is the
+ * same reason a correction never touches them.
+ */
+export interface AttributeComments {
+  traceId: string;
+  /** The span the attributes belong to, or the trace id for its own metadata. */
+  anchorId: string;
+  /** `params` for a span's attributes, `metadata` for the trace's own. */
+  pathPrefix: "params" | "metadata";
+  /** What was said about one attribute, by the path recorded against it. */
+  commentsFor: (anchorPath: string) => AnnotationByTrace[];
+}
+
 interface AttributeTableProps {
   attributes: Record<string, unknown>;
   resourceAttributes?: Record<string, unknown>;
@@ -229,6 +248,8 @@ interface AttributeTableProps {
    * hover each one for what the trace originally carried.
    */
   correctedFrom?: Record<string, unknown>;
+  /** When set, each of the element's own attribute rows can be commented on. */
+  comments?: AttributeComments;
 }
 
 /** How one row differs from what was captured. */
@@ -753,6 +774,7 @@ function FlatRow({
   restriction,
   editing,
   correction,
+  comments,
 }: {
   attrKey: string;
   value: unknown;
@@ -766,11 +788,20 @@ function FlatRow({
   restriction?: AttributeRestriction | null;
   editing?: RowEditing;
   correction?: AttributeCorrection | null;
+  /** Present when this row can be commented on. */
+  comments?: AttributeComments;
 }) {
   const display = formatValue(value);
   // A value already hidden from this viewer has nothing on screen to correct,
   // so it keeps its read-only cell.
   const rowEditing = restriction?.canSee === false ? undefined : editing;
+  // A value the reader is not allowed to read is not something they can say
+  // anything about, and a row open for correction has the reviewer's attention
+  // on what it should say instead. Both drop the comment action, the way the
+  // row's copy action already drops out while it is being edited.
+  const anchorPath = `${comments?.pathPrefix}.${attrKey}`;
+  const rowComments =
+    comments && !rowEditing && restriction?.canSee !== false ? comments : null;
   return (
     <HStack
       borderBottomWidth={isLast ? "0px" : "1px"}
@@ -808,6 +839,20 @@ function FlatRow({
         correction={correction}
         editing={rowEditing}
       />
+      {rowComments && (
+        <AnchorCommentButton
+          traceId={rowComments.traceId}
+          anchor={{
+            anchorKind: "field",
+            anchorId: rowComments.anchorId,
+            anchorPath,
+          }}
+          comments={rowComments.commentsFor(anchorPath)}
+          name={attrKey}
+          dense
+          reveal="on-row-hover"
+        />
+      )}
       {!rowEditing && (
         <Button
           size="xs"
@@ -904,6 +949,7 @@ function AttrSection({
   allKeys,
   correctionFor,
   baselineFor,
+  comments,
 }: {
   title: string;
   attributes: Record<string, unknown>;
@@ -927,6 +973,8 @@ function AttrSection({
   correctionFor?: (key: string) => AttributeCorrection | null;
   /** Resolves what the trace recorded at a key, before this session's edits. */
   baselineFor?: (key: string) => unknown;
+  /** When set, each row of this section offers to be commented on. */
+  comments?: AttributeComments;
 }) {
   const { project } = useOrganizationTeamProject();
   const { pins, isPinned, togglePin } = usePinnedAttributes(project?.id);
@@ -992,6 +1040,7 @@ function AttrSection({
                 onTogglePin={() => togglePin({ source, key })}
                 labelWidth={labelWidth}
                 onLabelResize={onLabelResize}
+                comments={isLeading ? undefined : comments}
                 {...rowMarkersFor({
                   key,
                   isLeading,
@@ -1140,6 +1189,7 @@ export function AttributeTable({
   spanId,
   editing,
   correctedFrom,
+  comments,
 }: AttributeTableProps) {
   const [viewMode, setViewMode] = useState<AttrViewMode>("flat");
   // The JSON view is a read-only rendering of the same rows, so while the
@@ -1288,6 +1338,7 @@ export function AttributeTable({
         allKeys={allAttributeKeys}
         correctionFor={correctionFor}
         baselineFor={baselineFor}
+        comments={comments}
       />
       {filterResAttrs && (
         <AttrSection

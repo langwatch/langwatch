@@ -34,6 +34,12 @@ vi.mock("../../../hooks/useConversationAnnotations", () => ({
   }),
 }));
 
+// The trace as the reader sees it, which is what tells a comment left on a
+// span the trace still has from one left on a span a correction removed.
+vi.mock("../../../hooks/useSpanTree", () => ({
+  useSpanTree: () => ({ data: [{ spanId: "span-7", name: "web_search" }] }),
+}));
+
 vi.mock("../../../stores/drawerStore", () => ({
   useDrawerStore: (selector: (state: unknown) => unknown) =>
     selector({ setViewMode: mocks.setViewMode }),

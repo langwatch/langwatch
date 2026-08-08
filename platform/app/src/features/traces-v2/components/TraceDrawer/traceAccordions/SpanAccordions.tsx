@@ -15,11 +15,13 @@ import {
 } from "~/components/ui/ContentPrivacyMarkers";
 import { RedactedField } from "~/components/ui/RedactedField";
 import type { SpanTreeNode } from "~/server/api/routers/tracesV2.schemas";
+import { useAnchoredAnnotations } from "../../../hooks/useAnchoredAnnotations";
 import { useSpanDetail } from "../../../hooks/useSpanDetail";
 import { useSpanLogs } from "../../../hooks/useSpanLogs";
 import { useTraceResources } from "../../../hooks/useTraceResources";
 import { useDrawerStore } from "../../../stores/drawerStore";
-import { AttributeTable } from "../AttributeTable";
+import { type AttributeComments, AttributeTable } from "../AttributeTable";
+import { commentCountsBySection } from "../anchoredComments/sectionComments";
 import { CorrectedFieldFrame } from "../editMode/CorrectedField";
 import { CorrectedSpanScalars } from "../editMode/CorrectedSpanScalars";
 import { SpanEditableIO } from "../editMode/SpanEditableIO";
@@ -88,6 +90,31 @@ export function SpanAccordions({
   const spanScope = spanResource?.scope ?? null;
   const { logsBySpanId, isLoading: logsLoading } = useSpanLogs();
   const spanLogs = logsBySpanId.get(span.spanId) ?? [];
+  // What has been said about the parts of this span: a count on each section
+  // header, and the comments each attribute row carries.
+  const annotations = useAnchoredAnnotations();
+  const sectionComments = useMemo(
+    () =>
+      commentCountsBySection({
+        comments: annotations.all,
+        anchorId: span.spanId,
+      }),
+    [annotations.all, span.spanId],
+  );
+  const attributeComments = useMemo<AttributeComments>(
+    () => ({
+      traceId,
+      anchorId: span.spanId,
+      pathPrefix: "params",
+      commentsFor: (anchorPath) =>
+        annotations.commentsAt({
+          anchorKind: "field",
+          anchorId: span.spanId,
+          anchorPath,
+        }),
+    }),
+    [traceId, span.spanId, annotations],
+  );
 
   // Null checks rather than truthiness: a correction can set a field to the
   // empty string, and that is content the section holds, not an absence.
@@ -227,6 +254,7 @@ export function SpanAccordions({
                   key="io"
                   value="io"
                   title="Input and Output"
+                  commentCount={sectionComments.io}
                   empty={!detailQuery.isLoading && !hasIO && !hasPrivacyMarkers}
                   isFirst={isFirst}
                   open={isOpen}
@@ -273,6 +301,7 @@ export function SpanAccordions({
                               label="Input"
                               content={detail.input}
                               mode="input"
+                              traceId={traceId}
                               spanId={detail.spanId}
                               spanType={detail.type}
                             />
@@ -301,6 +330,7 @@ export function SpanAccordions({
                               label="Output"
                               content={detail.output}
                               mode="output"
+                              traceId={traceId}
                               spanId={detail.spanId}
                               spanType={detail.type}
                             />
@@ -319,6 +349,7 @@ export function SpanAccordions({
                   value="logs"
                   title="Logs"
                   count={spanLogs.length}
+                  commentCount={sectionComments.logs}
                   empty={!logsLoading && spanLogs.length === 0}
                   isFirst={isFirst}
                   open={isOpen}
@@ -392,6 +423,7 @@ export function SpanAccordions({
                   value="attributes"
                   title="Attributes"
                   count={attrCount}
+                  commentCount={sectionComments.attributes}
                   empty={
                     !hasAttributes &&
                     !isEditing &&
@@ -425,6 +457,7 @@ export function SpanAccordions({
                               | undefined) ?? {})
                           : undefined
                       }
+                      comments={attributeComments}
                     />
                   ) : resources.isLoading || detailQuery.isLoading ? (
                     <EmptyHint>Loading attributes…</EmptyHint>

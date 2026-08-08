@@ -10,6 +10,12 @@ interface AnnotationPopoverProps extends PopoverAnnotationFormInput {
   trigger: React.ReactNode;
   /** Hover hint for the trigger. */
   triggerTooltip?: string;
+  /**
+   * What has already been said about this part of the trace, read above the
+   * composer. A count that opens onto an empty form would hide the very
+   * comments the count was advertising.
+   */
+  thread?: React.ReactNode;
 }
 
 /**
@@ -75,6 +81,7 @@ export function AnnotationPopover(props: AnnotationPopoverProps) {
           overflowX="hidden"
           minHeight={0}
         >
+          {props.thread}
           {isSuggest ? (
             <SuggestBody
               state={formState}

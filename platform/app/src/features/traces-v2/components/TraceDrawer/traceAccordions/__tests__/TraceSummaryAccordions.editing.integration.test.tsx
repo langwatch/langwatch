@@ -27,6 +27,23 @@ vi.mock("~/features/traces-v2/hooks/useTraceEditOverlay", () => ({
   useAppliedTraceEditPatch: () => null,
 }));
 
+// The trace's comments are read once per surface. This suite is about the
+// correction, so the surface reads none.
+vi.mock("~/features/traces-v2/hooks/useAnchoredAnnotations", () => ({
+  useAnchoredAnnotations: () => ({
+    commentsAt: () => [],
+    all: [],
+    isLoading: false,
+  }),
+}));
+
+// The comment action on each row carries its own composer, which reads over
+// tRPC. It has its own tests; this suite is about the correction.
+vi.mock(
+  "~/features/traces-v2/components/TraceDrawer/anchoredComments/AnchorCommentButton",
+  () => ({ AnchorCommentButton: () => null }),
+);
+
 vi.mock("~/features/traces-v2/hooks/useTraceHeader", () => ({
   useTraceHeaderCanonical: () => ({ data: undefined }),
 }));

@@ -18,6 +18,7 @@ import {
   type TraceMediaSide,
 } from "~/shared/traces/media-refs";
 import { mediaRefToMediaData } from "~/shared/traces/mediaParts";
+import { useAnchoredAnnotations } from "../../../hooks/useAnchoredAnnotations";
 import { useAppliedTraceEditPatch } from "../../../hooks/useTraceEditOverlay";
 import { useTraceEvaluations } from "../../../hooks/useTraceEvaluations";
 import { useTraceEvents } from "../../../hooks/useTraceEvents";
@@ -26,7 +27,8 @@ import { useTraceResources } from "../../../hooks/useTraceResources";
 import { useDrawerStore } from "../../../stores/drawerStore";
 import { useFocusSectionStore } from "../../../stores/focusSectionStore";
 import { rankedErrorSpans } from "../../../utils/errorSpans";
-import { AttributeTable } from "../AttributeTable";
+import { type AttributeComments, AttributeTable } from "../AttributeTable";
+import { commentCountsBySection } from "../anchoredComments/sectionComments";
 import { ExceptionsContent } from "../ExceptionsContent";
 import { CorrectedFieldFrame } from "../editMode/CorrectedField";
 import { TraceEditableInput } from "../editMode/TraceEditableInput";
@@ -114,6 +116,32 @@ export function TraceSummaryAccordions({
     pendingCount,
     isLoading: evalsLoading,
   } = useTraceEvaluations();
+
+  // What has been said about the trace's own parts: a count on each section
+  // header, and the comments each metadata row carries.
+  const annotations = useAnchoredAnnotations();
+  const sectionComments = useMemo(
+    () =>
+      commentCountsBySection({
+        comments: annotations.all,
+        anchorId: trace.traceId,
+      }),
+    [annotations.all, trace.traceId],
+  );
+  const metadataComments = useMemo<AttributeComments>(
+    () => ({
+      traceId: trace.traceId,
+      anchorId: trace.traceId,
+      pathPrefix: "metadata",
+      commentsFor: (anchorPath) =>
+        annotations.commentsAt({
+          anchorKind: "field",
+          anchorId: trace.traceId,
+          anchorPath,
+        }),
+    }),
+    [trace.traceId, annotations],
+  );
 
   const evalsForList = useMemo(
     () =>
@@ -259,6 +287,7 @@ export function TraceSummaryAccordions({
                 key="io"
                 value="io"
                 title="Input and Output"
+                commentCount={sectionComments.io}
                 // Redacted content is hidden, not absent — don't tag the section
                 // "empty" when a privacy rule nulled the I/O.
                 empty={!hasIO && !hasRedactedIO}
@@ -379,6 +408,7 @@ export function TraceSummaryAccordions({
                 value="attributes"
                 title="Metadata"
                 count={attrCount}
+                commentCount={sectionComments.attributes}
                 empty={!hasAttributes && !isEditing && !resources.isLoading}
                 isFirst={isFirst}
                 open={isOpen}
@@ -396,6 +426,7 @@ export function TraceSummaryAccordions({
                     correctedFrom={
                       metadataCorrected ? capturedAttributes : undefined
                     }
+                    comments={metadataComments}
                   />
                 ) : resources.isLoading ? (
                   <EmptyHint>Loading metadata…</EmptyHint>

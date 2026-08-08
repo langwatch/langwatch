@@ -59,13 +59,18 @@ export function describeAnnotationAnchor({
 }
 
 /**
- * A field path as its segments read: the ones this build names get their name,
- * and a key inside one of them reads as the reader wrote it.
+ * A field path as it reads: the field this build names gets its name, and the
+ * key inside it reads exactly as the reader wrote it. Only the first segment is
+ * a field of ours, so `params.gen_ai.request.model` is the reader's own
+ * `gen_ai.request.model` under Parameters, not four separate steps.
  */
 function describeFieldPath(anchorPath: string | null): string | null {
   if (!anchorPath) return null;
-  return anchorPath
-    .split(".")
-    .map((segment) => FIELD_LABELS[segment] ?? segment)
-    .join(SEPARATOR);
+  const separatorAt = anchorPath.indexOf(".");
+  if (separatorAt === -1) {
+    return FIELD_LABELS[anchorPath] ?? anchorPath;
+  }
+  const field = anchorPath.slice(0, separatorAt);
+  const key = anchorPath.slice(separatorAt + 1);
+  return `${FIELD_LABELS[field] ?? field}${SEPARATOR}${key}`;
 }

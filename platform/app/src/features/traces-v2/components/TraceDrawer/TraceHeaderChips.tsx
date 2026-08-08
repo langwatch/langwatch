@@ -1,5 +1,4 @@
-import { Box, Circle, HStack, Icon, Text, VStack } from "@chakra-ui/react";
-import { Lightbulb } from "lucide-react";
+import { Circle, HStack, Icon, Text, VStack } from "@chakra-ui/react";
 import { useMemo } from "react";
 import {
   LuBookMarked,
@@ -13,12 +12,12 @@ import {
   LuSparkles,
   LuTriangleAlert,
 } from "react-icons/lu";
-import { UserAvatar } from "~/components/UserAvatar";
 import type { TraceHeader } from "~/server/api/routers/tracesV2.schemas";
 import type { EvalChipDisplay } from "~/utils/evaluationResults";
 import { getEvalChipDisplay } from "~/utils/evaluationResults";
 import { useConversationAnnotations } from "../../hooks/useConversationAnnotations";
 import { useConversationTurns } from "../../hooks/useConversationTurns";
+import { useSpanTree } from "../../hooks/useSpanTree";
 import type { RichEval } from "../../hooks/useTraceEvaluations";
 import {
   type PromptChipState,
@@ -27,6 +26,7 @@ import {
   useTraceHeaderChips,
 } from "../../hooks/useTraceHeaderChips";
 import { useDrawerStore } from "../../stores/drawerStore";
+import { TraceCommentList } from "./anchoredComments/TraceCommentList";
 import type { ChipDef } from "./ChipBar";
 import { ChipBar } from "./ChipBar";
 import { buildScenarioChipDef } from "./ScenarioChip";
@@ -108,10 +108,25 @@ function useAnnotationsChip(trace: TraceHeader): ChipDef | null {
   );
 
   const annotations = useConversationAnnotations(traceIds);
+  // The trace as the reader sees it, corrections applied: a span a correction
+  // removed is not a part of it any more, which is what makes a comment left on
+  // that span read as being about a part that is no longer there.
+  const spans = useSpanTree().data;
+  const spanNames = useMemo(
+    () => new Map((spans ?? []).map((span) => [span.spanId, span.name])),
+    [spans],
+  );
+  const resolvable = useMemo(
+    () =>
+      new Set<string>([
+        trace.traceId,
+        ...(spans ?? []).map((span) => span.spanId),
+      ]),
+    [trace.traceId, spans],
+  );
 
   const items = annotations.all;
   if (items.length === 0) return null;
-  const hasCorrection = items.some((a) => a.expectedOutput);
 
   return {
     id: "annotations",
@@ -126,63 +141,12 @@ function useAnnotationsChip(trace: TraceHeader): ChipDef | null {
       ? () => setViewMode("conversation")
       : undefined,
     popover: (
-      <VStack
-        align="stretch"
-        gap={3}
-        minWidth="300px"
-        maxWidth="380px"
-        paddingX={3}
-        paddingY={2.5}
-      >
-        <HStack gap={2}>
-          <Text textStyle="xs" fontWeight="600">
-            {items.length} annotation{items.length === 1 ? "" : "s"}
-          </Text>
-          {hasCorrection && (
-            <HStack gap={1} color="yellow.fg">
-              <Icon as={Lightbulb} boxSize={3} />
-              <Text textStyle="2xs">includes corrections</Text>
-            </HStack>
-          )}
-        </HStack>
-        <Box height="1px" bg="border.muted" marginX={-3} />
-        <VStack align="stretch" gap={3} maxHeight="280px" overflowY="auto">
-          {items.map((a) => (
-            <HStack key={a.id} gap={2.5} align="start">
-              <UserAvatar
-                size="xs"
-                background="gray.solid"
-                color="white"
-                name={a.user?.name ?? a.email ?? "?"}
-                image={a.user?.image}
-              />
-              <VStack align="start" gap={0.5} flex={1} minWidth={0}>
-                <HStack gap={1.5} width="full">
-                  <Text textStyle="2xs" fontWeight="600">
-                    {a.user?.name ?? a.email ?? "anonymous"}
-                  </Text>
-                  {a.expectedOutput && (
-                    <Icon as={Lightbulb} boxSize={2.5} color="yellow.fg" />
-                  )}
-                  <Box flex={1} />
-                  <Text textStyle="2xs" color="fg.subtle">
-                    {new Date(a.createdAt).toLocaleDateString()}
-                  </Text>
-                </HStack>
-                {a.comment && (
-                  <Text textStyle="2xs" color="fg.muted" lineClamp={3}>
-                    {a.comment}
-                  </Text>
-                )}
-              </VStack>
-            </HStack>
-          ))}
-        </VStack>
-        <Box height="1px" bg="border.muted" marginX={-3} />
-        <Text textStyle="2xs" color="fg.subtle">
-          Annotations appear beside each turn in the Conversation view.
-        </Text>
-      </VStack>
+      <TraceCommentList
+        traceId={trace.traceId}
+        comments={items}
+        spanNames={spanNames}
+        resolvable={resolvable}
+      />
     ),
   };
 }

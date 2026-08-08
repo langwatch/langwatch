@@ -1,4 +1,12 @@
-import { Box, HStack, Icon, Spacer, Text, VStack } from "@chakra-ui/react";
+import {
+  Box,
+  Button,
+  HStack,
+  Icon,
+  Spacer,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
 import {
   Crosshair,
   Lightbulb,
@@ -10,6 +18,8 @@ import {
 import { UserAvatar } from "~/components/UserAvatar";
 import { Tooltip } from "~/components/ui/tooltip";
 import type { AnnotationByTrace } from "~/hooks/useAnnotationsByTraceIds";
+import { useJumpToAnnotationAnchor } from "../../../hooks/useJumpToAnnotationAnchor";
+import { useDrawerStore } from "../../../stores/drawerStore";
 import { describeAnnotationAnchor } from "../../../utils/annotationAnchorLabel";
 
 interface ScoreEntry {
@@ -92,20 +102,63 @@ export function AnnotationCard({
  * The part of the trace the comment is about, when it is about one. A comment
  * about the trace as a whole names nothing: the card is already beside the turn
  * it belongs to, so a chip saying so would be noise on every card.
+ *
+ * Naming the part is only half of it: the chip takes the reader there, which
+ * means the trace view with that span selected and its row brought into
+ * view. That only works for the turn the drawer has open, so a comment on
+ * another turn's span names its part and leaves the reader to open that turn.
  */
 function AnchorBreadcrumb({ annotation }: { annotation: AnnotationByTrace }) {
+  const jump = useJumpToAnnotationAnchor();
+  const openTraceId = useDrawerStore((s) => s.traceId);
   const label = describeAnnotationAnchor({
     anchor: annotation,
     traceId: annotation.traceId,
   });
   if (!label) return null;
+
+  const canJump =
+    annotation.traceId === openTraceId &&
+    (annotation.anchorKind === "span" || annotation.anchorKind === "field");
+  if (!canJump) {
+    return (
+      <HStack gap={1} maxWidth="full" data-testid="annotation-anchor">
+        <Icon as={Crosshair} boxSize={3} color="purple.fg" flexShrink={0} />
+        <Text textStyle="2xs" color="purple.fg" truncate title={label}>
+          {label}
+        </Text>
+      </HStack>
+    );
+  }
+
   return (
-    <HStack gap={1} maxWidth="full" data-testid="annotation-anchor">
-      <Icon as={Crosshair} boxSize={3} color="purple.fg" flexShrink={0} />
-      <Text textStyle="2xs" color="purple.fg" truncate title={label}>
-        {label}
+    <Button
+      size="2xs"
+      variant="ghost"
+      color="purple.fg"
+      gap={1}
+      paddingX={1}
+      height="18px"
+      maxWidth="full"
+      alignSelf="flex-start"
+      justifyContent="flex-start"
+      data-testid="annotation-anchor"
+      title={label}
+      onClick={(e) => {
+        e.stopPropagation();
+        jump({
+          traceId: annotation.traceId,
+          anchorKind: annotation.anchorKind,
+          anchorId: annotation.anchorId,
+          anchorPath: annotation.anchorPath,
+        });
+      }}
+    >
+      <Icon as={Crosshair} boxSize={3} flexShrink={0} />
+      <Text textStyle="2xs" truncate>
+        Go to {label}
       </Text>
-    </HStack>
+    </Button>
   );
 }
 

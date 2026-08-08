@@ -51,6 +51,16 @@ vi.mock("../../../../hooks/useTraceResources", () => ({
   useTraceResources: () => ({ bySpanId: {}, isLoading: false }),
 }));
 
+// SpanAccordions reads the trace's comments to count them on each section;
+// this test renders without a tRPC provider and no comment is in play here.
+vi.mock("../../../../hooks/useAnchoredAnnotations", () => ({
+  useAnchoredAnnotations: () => ({
+    commentsAt: () => [],
+    all: [],
+    isLoading: false,
+  }),
+}));
+
 // SpanAccordions joins log content onto spans via a tRPC query; this test
 // renders without that provider, so stub the hook to the no-logs state.
 // Log enrichment is out of scope for the cost suggestion.

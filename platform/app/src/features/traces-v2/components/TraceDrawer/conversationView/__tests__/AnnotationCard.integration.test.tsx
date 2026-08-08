@@ -8,10 +8,11 @@
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
 import type { AnnotationByTrace } from "~/hooks/useAnnotationsByTraceIds";
+import { useDrawerStore } from "../../../../stores/drawerStore";
 import { AnnotationCard } from "../AnnotationCard";
 
 const SCORE_NAMES = new Map([
@@ -344,5 +345,46 @@ describe("given an annotation somebody else wrote, reached with the keyboard", (
     fireEvent.keyDown(container.firstElementChild!, { key: "Enter" });
 
     expect(onEdit).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * Naming the part a comment is about is only half of it: from the conversation,
+ * the card has to take the reader to that part in the trace view.
+ * See specs/traces-v2/anchored-comments.feature.
+ */
+describe("given a turn's trace carries a comment about one of its spans", () => {
+  beforeEach(() => {
+    useDrawerStore.setState({ traceId: "trace-1" });
+    useDrawerStore.getState().clearSpan();
+    useDrawerStore.getState().setViewModeTransient("conversation");
+  });
+
+  /** @scenario "Jumping to a span comment from the conversation moves to the trace view" */
+  it("shows the trace view with that span selected", () => {
+    renderCard({
+      item: annotation({ anchorKind: "span", anchorId: "span-7" }),
+    });
+
+    fireEvent.click(screen.getByTestId("annotation-anchor"));
+
+    expect(useDrawerStore.getState().viewMode).toBe("trace");
+    expect(useDrawerStore.getState().selectedSpanId).toBe("span-7");
+  });
+
+  /** @scenario "Jumping to a span comment from the conversation moves to the trace view" */
+  it("offers no jump on a comment about another turn's trace", () => {
+    renderCard({
+      item: annotation({
+        traceId: "trace-2",
+        anchorKind: "span",
+        anchorId: "span-9",
+      }),
+    });
+
+    expect(screen.getByTestId("annotation-anchor")).not.toHaveAttribute(
+      "type",
+      "button",
+    );
   });
 });

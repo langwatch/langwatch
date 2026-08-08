@@ -11,16 +11,16 @@ import {
   LuLightbulb,
   LuList,
   LuMessageSquare,
-  LuPencil,
+  type LuPencil,
   LuPlay,
 } from "react-icons/lu";
-import { PersonalFeatureGateDialog } from "~/components/me/PersonalFeatureGateDialog";
-import { usePersonalFeatureGate } from "~/components/me/usePersonalFeatureGate";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useGoToSpanInPlaygroundTabUrlBuilder } from "~/prompts/prompt-playground/hooks/useLoadSpanIntoPromptPlayground";
 import { TRANSLATE_TEXT_MAX_CHARS } from "~/utils/constants";
+import type { TraceAnchor } from "../../hooks/useAnchoredAnnotations";
 import { useCopyToClipboard } from "../../hooks/useCopyToClipboard";
 import { useTextTranslation } from "../../hooks/useTextTranslation";
+import { FieldCommentButton } from "./anchoredComments/FieldCommentButton";
 import { AnnotationPopover } from "./conversationView/AnnotationPopover";
 import { IOViewerBody } from "./IOViewerBody";
 import { safePrettyJson } from "./JsonHighlight";
@@ -111,10 +111,10 @@ interface IOViewerProps {
    */
   mode?: "input" | "output";
   /**
-   * When provided, the panel header shows Annotate + Suggest-correction
-   * actions wired to the annotation comment store. These belong on the
-   * trace's input/output specifically (annotations target a trace, not a
-   * span), so per-span IOViewers leave this undefined.
+   * When provided, the panel header offers to comment on this field and, where
+   * a suggestion can correct it, to suggest what it should have said. The
+   * comment is recorded against the field this viewer is rendering: the span's
+   * when the viewer has a span, the trace's own otherwise.
    */
   traceId?: string;
   /**
@@ -183,37 +183,15 @@ function PlaygroundButton({ spanId }: { spanId: string }) {
   );
 }
 
-function AnnotateButton({ traceId }: { traceId: string }) {
-  const { hasPermission } = useOrganizationTeamProject();
-  const [open, setOpen] = useState(false);
-  const annotationsGate = usePersonalFeatureGate("annotations");
-  if (!hasPermission("annotations:manage")) return null;
-  return (
-    <>
-      <AnnotationPopover
-        traceId={traceId}
-        mode="annotate"
-        open={open}
-        onOpenChange={async (next) => {
-          if (next) {
-            const allowed = await annotationsGate.requestEnable();
-            if (!allowed) return;
-          }
-          setOpen(next);
-        }}
-        trigger={<ActionButton icon={LuPencil} label="Annotate" />}
-      />
-      <PersonalFeatureGateDialog state={annotationsGate.dialogState} />
-    </>
-  );
-}
-
 function SuggestCorrectionButton({
   traceId,
   output,
+  anchor,
 }: {
   traceId: string;
   output: string;
+  /** The field the suggestion corrects. */
+  anchor: TraceAnchor;
 }) {
   const { hasPermission } = useOrganizationTeamProject();
   const [open, setOpen] = useState(false);
@@ -223,6 +201,9 @@ function SuggestCorrectionButton({
       traceId={traceId}
       output={output}
       mode="suggest"
+      anchorKind={anchor.anchorKind}
+      anchorId={anchor.anchorId}
+      anchorPath={anchor.anchorPath}
       open={open}
       onOpenChange={setOpen}
       trigger={<ActionButton icon={LuLightbulb} label="Suggest edit" />}
@@ -337,6 +318,21 @@ export const IOViewer = memo(function IOViewer({
     chatLeaves,
     originalContent,
   ]);
+
+  // Which part of the trace a comment left on this panel is about: the span's
+  // field when the viewer is rendering a span, the trace's own field otherwise.
+  const fieldAnchor = useMemo<TraceAnchor | null>(
+    () =>
+      traceId
+        ? { anchorKind: "field", anchorId: spanId ?? traceId, anchorPath: mode }
+        : null,
+    [traceId, spanId, mode],
+  );
+  // A suggestion has to land somewhere in the correction. A span's input and
+  // output are both fields a correction can replace; the trace's own output is
+  // the correction the suggestion flow has always written, and its input is not
+  // something a correction carries.
+  const canSuggestField = spanId != null || mode === "output";
 
   const parsed = useMemo(() => tryParseJSON(content), [content]);
   // Coerce parsed into a chat message array — handles top-level arrays,
@@ -600,11 +596,17 @@ export const IOViewer = memo(function IOViewer({
             onToggle={translation.toggle}
           />
         )}
-        {!collapsed && traceId && <AnnotateButton traceId={traceId} />}
-        {!collapsed && traceId && mode === "output" && (
+        {!collapsed && traceId && fieldAnchor && (
+          <FieldCommentButton traceId={traceId} anchor={fieldAnchor} />
+        )}
+        {!collapsed && traceId && fieldAnchor && canSuggestField && (
           // Corrections must be stored against the REAL output — never the
           // translated variant the viewer happens to be showing.
-          <SuggestCorrectionButton traceId={traceId} output={originalContent} />
+          <SuggestCorrectionButton
+            traceId={traceId}
+            output={originalContent}
+            anchor={fieldAnchor}
+          />
         )}
         {!collapsed && spanType === "llm" && spanId && mode === "input" && (
           <PlaygroundButton spanId={spanId} />

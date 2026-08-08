@@ -12,10 +12,12 @@ import {
   LuTriangleAlert,
 } from "react-icons/lu";
 import { Tooltip } from "~/components/ui/tooltip";
+import type { AnnotationByTrace } from "~/hooks/useAnnotationsByTraceIds";
 import type { LangwatchSignalBucket } from "~/server/api/routers/tracesV2.schemas";
 import { useSpanHoverStore } from "../../../stores/spanHoverStore";
 import { useSpanPulseStore } from "../../../stores/spanPulseStore";
 import { formatCost, formatDuration } from "../../../utils/formatters";
+import { AnchorCommentButton } from "../anchoredComments/AnchorCommentButton";
 import { LangwatchSignalBadges } from "../LangwatchSignalBadges";
 import { isSkillSpan } from "../transcript/skillInvocation";
 import { TipCell } from "./TipCell";
@@ -28,6 +30,9 @@ import {
   SPAN_TYPE_ICONS,
   type WaterfallTreeNode,
 } from "./types";
+
+/** Shared empty list so a row with no comments keeps a stable prop identity. */
+const NO_COMMENTS: AnnotationByTrace[] = [];
 
 export const TreeRow = memo(function TreeRow({
   node,
@@ -42,6 +47,8 @@ export const TreeRow = memo(function TreeRow({
   hiddenDescendantCount,
   isDimmed,
   signals,
+  traceId,
+  comments = NO_COMMENTS,
   isEditing = false,
   isDraftDeleted = false,
   isCorrected = false,
@@ -75,6 +82,13 @@ export const TreeRow = memo(function TreeRow({
   hiddenDescendantCount: number;
   isDimmed: boolean;
   signals: readonly LangwatchSignalBucket[];
+  /**
+   * The trace this row belongs to. Absent on a surface with no comments to
+   * offer, which is what leaves the row's comment action off.
+   */
+  traceId?: string;
+  /** What was said about this span, which the row's count opens onto. */
+  comments?: AnnotationByTrace[];
   /** True while the reviewer is correcting this trace. */
   isEditing?: boolean;
   /** True when the correction removes this span (or an ancestor of it). */
@@ -635,6 +649,22 @@ export const TreeRow = memo(function TreeRow({
                 />
               </Flex>
             </Tooltip>
+          )}
+
+          {/* Comment on this span. Icon-only: the row has no width for a
+              label, so the action names the span it acts on the way the row's
+              delete already does. A span that carries comments shows the count
+              at rest, because a comment nobody can see is a comment nobody
+              reads. */}
+          {traceId && (
+            <AnchorCommentButton
+              traceId={traceId}
+              anchor={{ anchorKind: "span", anchorId: span.spanId }}
+              comments={comments}
+              name={displayName}
+              dense
+              reveal={isHovered ? "always" : "hidden"}
+            />
           )}
 
           {/* Pin toggle — hover-revealed on the row (or always shown when

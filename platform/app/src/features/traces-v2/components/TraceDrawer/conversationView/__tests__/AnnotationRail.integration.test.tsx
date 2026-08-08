@@ -319,6 +319,26 @@ describe("given a turn in thread layout, where the rail lives", () => {
       expect(screen.queryByPlaceholderText("Optional")).not.toBeInTheDocument();
     });
 
+    /** @scenario "Commenting on a conversation turn stays a comment about the whole turn" */
+    it("writes about the turn's trace and nothing narrower", async () => {
+      render(
+        <ChakraProvider value={defaultSystem}>
+          <TurnActionRow
+            traceId={TRACE_ID}
+            output="the original answer"
+            shouldUseRailComposer
+          />
+        </ChakraProvider>,
+      );
+
+      fireEvent.click(screen.getByRole("button", { name: "Annotate" }));
+
+      await vi.waitFor(() => expect(draft()).not.toBeNull());
+      expect(draft()?.anchorKind).toBeUndefined();
+      expect(draft()?.anchorId).toBeUndefined();
+      expect(draft()?.anchorPath).toBeUndefined();
+    });
+
     it("starts a suggestion from the turn's output", async () => {
       render(
         <ChakraProvider value={defaultSystem}>
