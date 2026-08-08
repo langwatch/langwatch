@@ -23,99 +23,93 @@
 # an update applied before the spawn is picked up by the session about to start
 # rather than the one after it.
 #
-# Two properties this must keep. It cannot become a tax on startup, so the check
-# is stamped and runs at most once a day; every run in between reads one config
-# field and stops. And it cannot fail a launch, because a coding session the
-# user asked for must not depend on our housekeeping: a `claude` that cannot be
-# reached, a marketplace that will not refresh and an update that will not apply
-# all warn and get out of the way.
+# Two properties this must keep. It cannot become a tax on startup, so it looks
+# at most once a day and every launch in between starts the tool immediately.
+# And it cannot cost anyone the session they asked for, so every way it can go
+# wrong ends with the tool starting anyway.
 
 Feature: Keeping the LangWatch Claude Code plugin up to date
 
 Rule: A wrapped run brings the installed plugin up to the published version
 
   @unit
-  Scenario: A plugin the marketplace has moved past is updated before the tool starts
+  Scenario: A plugin the marketplace has moved past is brought up to date
     Given the LangWatch plugin is installed at an older version than the marketplace publishes
     When the user runs a wrapped tool
-    Then the marketplace listing is refreshed
-    And the plugin is updated
+    Then the plugin on the machine is the version the marketplace publishes
     And the user is told which version it moved to
 
   @unit
   Scenario: A plugin already at the published version is left alone
     Given the LangWatch plugin is installed at the version the marketplace publishes
     When the user runs a wrapped tool
-    Then the plugin is not updated
-    And nothing is reported to the user
+    Then the plugin on the machine is left as it is
+    And the user is told nothing about the plugin
 
   @unit
   Scenario: The plugin is kept current from a machine that wraps another tool
     Given the LangWatch plugin is installed at an older version than the marketplace publishes
     And a machine whose only wrapped tool is codex
     When the user runs a wrapped tool
-    Then the plugin is updated
+    Then the plugin on the machine is the version the marketplace publishes
+
+Rule: A launch with nothing to keep current starts the tool immediately
 
   @unit
-  Scenario: A marketplace of our name that somebody else registered is left alone
-    Given a marketplace named langwatch that points at another repository
-    And the LangWatch plugin is installed
-    When the user runs a wrapped tool
-    Then the plugin is not updated
-
-Rule: A check that has nothing to do costs nothing
-
-  @unit
-  Scenario: A machine without the plugin is not asked about it
+  Scenario: A machine without the plugin is not held up by it
     Given the LangWatch plugin is not installed
     When the user runs a wrapped tool
-    Then no claude subprocess runs
+    Then the tool starts without looking for a plugin update
 
   @unit
-  Scenario: A plugin checked today is not checked again
+  Scenario: A plugin somebody installed for one repository only is not touched
+    Given the LangWatch plugin is installed for a single repository rather than for the user
+    When the user runs a wrapped tool
+    Then the tool starts without looking for a plugin update
+
+  @unit
+  Scenario: A plugin looked at today is not looked at again
     Given the plugin was checked for updates an hour ago
     When the user runs a wrapped tool
-    Then no claude subprocess runs
+    Then the tool starts without looking for a plugin update
+    And the user is told nothing about the plugin
 
   @unit
-  Scenario: A day after the last check the plugin is checked again
+  Scenario: A day after the last check the plugin is looked at again
     Given the plugin was checked for updates two days ago
+    And the LangWatch plugin is installed at an older version than the marketplace publishes
     When the user runs a wrapped tool
-    Then the marketplace listing is refreshed
+    Then the plugin on the machine is the version the marketplace publishes
 
   @unit
   Scenario: A check stamped in the future does not suppress the next one
     Given the plugin was checked for updates at a time in the future
-    When the user runs a wrapped tool
-    Then the marketplace listing is refreshed
-
-  @unit
-  Scenario: A claude that cannot manage plugins is left alone
-    Given a claude binary with no plugin subcommand
     And the LangWatch plugin is installed at an older version than the marketplace publishes
     When the user runs a wrapped tool
-    Then the plugin is not updated
+    Then the plugin on the machine is the version the marketplace publishes
 
   @unit
-  Scenario: A config that cannot be read stops the check rather than repeating it
-    Given a CLI config file that cannot be parsed
-    And the LangWatch plugin is installed
+  Scenario: A machine that cannot remember the check does not repeat it every launch
+    Given a machine whose LangWatch settings cannot be saved
+    And the LangWatch plugin is installed at an older version than the marketplace publishes
     When the user runs a wrapped tool
-    Then no claude subprocess runs
+    Then the tool starts without looking for a plugin update
 
-Rule: Nothing here may stop the session the user asked for
+Rule: Nothing here may cost the user the session they asked for
 
   @unit
   Scenario: A run that waits on the network says what it is waiting for
     Given the LangWatch plugin is installed at an older version than the marketplace publishes
     When the user runs a wrapped tool
-    Then the user is told the check is running before it reaches the network
+    Then the user is told the plugin is being checked before the waiting starts
 
   @unit
-  Scenario: A run that answers from disk says nothing at all
-    Given the plugin was checked for updates an hour ago
+  Scenario: A claude that cannot manage plugins leaves the plugin as it is
+    Given a claude binary with no plugin subcommand
+    And the LangWatch plugin is installed at an older version than the marketplace publishes
     When the user runs a wrapped tool
-    Then the user is told nothing about the check
+    Then the plugin on the machine is left as it is
+    And the tool starts
 
   @unit
   Scenario: A marketplace listing that will not refresh warns and gives up for the day
@@ -123,7 +117,7 @@ Rule: Nothing here may stop the session the user asked for
     And the LangWatch plugin is installed at the version its stale listing publishes
     When the user runs a wrapped tool
     Then the user is warned that the plugin could not be checked
-    And the check is not attempted again until tomorrow
+    And the plugin is not checked again until tomorrow
 
   @unit
   Scenario: An update that will not apply warns
@@ -131,10 +125,18 @@ Rule: Nothing here may stop the session the user asked for
     And a claude binary whose plugin update reports failure
     When the user runs a wrapped tool
     Then the user is warned that the plugin could not be updated
+    And the user is not told a version they do not have
 
   @unit
-  Scenario: A version that cannot be read is left alone rather than blindly updated
-    Given a marketplace listing whose plugin manifest cannot be read
+  Scenario: A version that cannot be read leaves the plugin alone rather than replacing it blindly
+    Given a marketplace listing that does not say which version it publishes
     And the LangWatch plugin is installed
     When the user runs a wrapped tool
-    Then the plugin is not updated
+    Then the plugin on the machine is left as it is
+
+  @unit
+  Scenario: A marketplace of our name that somebody else registered is left alone
+    Given a marketplace named langwatch that points at another repository
+    And the LangWatch plugin is installed
+    When the user runs a wrapped tool
+    Then the plugin on the machine is left as it is

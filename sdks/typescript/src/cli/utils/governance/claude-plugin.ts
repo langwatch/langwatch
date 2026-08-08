@@ -232,15 +232,26 @@ function hasInstallRecord(document: Record<string, unknown>): boolean {
  * `langwatch`, and removing theirs on our logout would be taking something that
  * is not ours.
  *
- * Read liberally, because Claude Code records a source several ways: github
- * shorthand (`{ source: "github", repo: "langwatch/agent-plugin" }`), a git URL,
- * or a local path. Any of them naming the repository is ours. The boundaries
- * matter, though: `evil-langwatch/agent-plugin` and `langwatch/agent-plugin-fork`
- * both contain the name and belong to somebody else.
+ * Claude Code records a source several ways: github shorthand
+ * (`{ source: "github", repo: "langwatch/agent-plugin" }`), a git URL, or a
+ * local path. Only an exact, canonical GitHub identity counts. Everything else
+ * belongs to whoever registered it, including the near misses built to read
+ * like us: `evil-langwatch/agent-plugin`, `langwatch/agent-plugin-fork`,
+ * `github.com/langwatch/agent-plugin.evil`, and any host that is not GitHub.
  */
-const OWNED_REPO_PATTERN = new RegExp(
-  `(?<![\\w-])${CLAUDE_PLUGIN_MARKETPLACE_REPO.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![\\w-])`,
-);
+/**
+ * The hosts a canonical registration can name. Nothing else qualifies: the
+ * plugin is published to GitHub and only to GitHub, so a source anywhere else
+ * is by definition not the one we publish, whatever it is called.
+ */
+const OWNED_HOSTS = new Set(["github.com", "www.github.com"]);
+
+/**
+ * The protocols git registrations use. A `file:` source is deliberately absent:
+ * a local checkout is somebody's working copy, and it is not something we
+ * should be pulling new code into a user's agent from on a timer.
+ */
+const OWNED_PROTOCOLS = new Set(["https:", "http:", "ssh:", "git:"]);
 
 /**
  * The fields that say WHERE a marketplace comes from, across the shapes Claude
@@ -251,8 +262,52 @@ const OWNED_REPO_PATTERN = new RegExp(
  */
 const SOURCE_IDENTITY_KEYS = ["source", "repo", "url", "path"] as const;
 
+/**
+ * Whether one source field names the repository we publish from, and names it
+ * exactly. Parsed rather than pattern-matched, because the interesting inputs
+ * are the ones built to look right: `github.com/langwatch/agent-plugin.evil`,
+ * `evil.example/?repo=langwatch/agent-plugin` and a local directory that
+ * happens to sit at that path all contain our repository name and none of them
+ * are us.
+ *
+ * The stakes are what make exactness worth the parser. This gate decides both
+ * what logout may deregister and, now, what a wrapped run may pull new code
+ * into the user's agent from without asking.
+ */
 function pointsAtOwnedRepo(value: unknown): boolean {
-  return typeof value === "string" && OWNED_REPO_PATTERN.test(value.toLowerCase());
+  if (typeof value !== "string") return false;
+  const raw = value.trim();
+  if (raw === "") return false;
+  const lowered = raw.toLowerCase();
+
+  // The shorthand `claude plugin marketplace add` takes, which is how the CLI
+  // registers it and therefore the case that matters most.
+  if (lowered === CLAUDE_PLUGIN_MARKETPLACE_REPO) return true;
+
+  const scp = /^git@([^:]+):(.+)$/.exec(lowered);
+  if (scp) {
+    return (
+      OWNED_HOSTS.has(scp[1]!) && stripRepoPath(scp[2]!) === CLAUDE_PLUGIN_MARKETPLACE_REPO
+    );
+  }
+
+  try {
+    const url = new URL(raw);
+    if (!OWNED_PROTOCOLS.has(url.protocol)) return false;
+    if (!OWNED_HOSTS.has(url.hostname.toLowerCase())) return false;
+    // A query or a fragment means the path is not the whole address, and we do
+    // not know what the rest of it does.
+    if (url.search !== "" || url.hash !== "") return false;
+    return stripRepoPath(url.pathname.toLowerCase()) === CLAUDE_PLUGIN_MARKETPLACE_REPO;
+  } catch {
+    // Not a URL. A bare path is a local checkout, which is never ours.
+    return false;
+  }
+}
+
+/** `/langwatch/agent-plugin.git/` and friends down to `langwatch/agent-plugin`. */
+function stripRepoPath(value: string): string {
+  return value.replace(/^\/+/, "").replace(/\/+$/, "").replace(/\.git$/, "");
 }
 
 function sourcePointsAtLangwatch(source: unknown): boolean {
@@ -399,7 +454,6 @@ export function updateLangwatchClaudePlugin({
     const ineligible = updateEligibility();
     if (ineligible) return ineligible;
 
-    stampUpdateCheck();
     onCheckStart?.();
 
     // The listing on disk is a clone, and it is as old as the last time
@@ -460,29 +514,32 @@ export function updateLangwatchClaudePlugin({
  * the same thing.
  */
 function updateEligibility(): ClaudePluginUpdateResult | null {
-  const state = readClaudePluginState();
-  if (!state.pluginInstalled) return { action: "absent" };
+  // The user scope is the one this CLI installs into and the only one it may
+  // move: a project or local record is a pin somebody chose for a checkout.
+  // Reading it here rather than `pluginInstalled` keeps a project-only machine
+  // from spending a probe and a fetch every day to reach the same conclusion.
+  if (!readUserScopeInstall()) return { action: "absent" };
 
-  const stamp = readCheckStamp();
-  // A config that cannot be read is a stamp that cannot be written, and a
-  // check that cannot be recorded would repeat on every single launch forever.
-  // Unreadable therefore reads as "checked", not as "never checked".
-  if (!stamp.readable) {
-    return { action: "unavailable", reason: "the CLI config could not be read" };
+  if (checkedRecently(lastCheckedAt())) return { action: "checked_recently" };
+
+  // Record the check BEFORE running it, and give up when that cannot be done.
+  // A stamp that does not land is a check with no memory, and a check with no
+  // memory runs on every launch for as long as the machine stays that way. It
+  // also means a fetch that hangs to its timeout, or a Ctrl-C in the middle of
+  // one, costs the next launch nothing.
+  if (!stampUpdateCheck()) {
+    return { action: "unavailable", reason: "the check could not be recorded" };
   }
-  if (checkedRecently(stamp.at)) return { action: "checked_recently" };
 
   // A marketplace of our name that points somewhere else is somebody else's
   // registration, and updating what it serves is not ours to do.
-  if (!state.marketplaceOwnedByLangwatch) {
-    stampUpdateCheck();
+  if (!readClaudePluginState().marketplaceOwnedByLangwatch) {
     return {
       action: "unavailable",
       reason: "the langwatch marketplace on this machine is not ours",
     };
   }
   if (!claudePluginCliAvailable()) {
-    stampUpdateCheck();
     return { action: "unavailable", reason: "this claude has no plugin subcommand" };
   }
   return null;
@@ -520,12 +577,12 @@ function applyUpdate({
 }
 
 /**
- * The version of the user-scope install record, which is the one this CLI put
- * there. A project or local record belongs to a checkout somebody else pinned
- * and is not ours to move, so a machine carrying only those reads as unknown
- * and is left alone.
+ * The install record this CLI put there, or null when the machine has none.
+ * Only the user scope qualifies: a project or local record belongs to a
+ * checkout somebody else pinned, and moving it would be taking that decision
+ * off them.
  */
-function readInstalledPluginVersion(): string | null {
+function readUserScopeInstall(): Record<string, unknown> | null {
   const document = readJsonObject(
     path.join(claudePluginsDir(), "installed_plugins.json"),
   );
@@ -535,7 +592,13 @@ function readInstalledPluginVersion(): string | null {
   const userScoped = records.find(
     (record) => isPlainObject(record) && record.scope === "user",
   );
-  return isPlainObject(userScoped) ? versionOf(userScoped) : null;
+  return isPlainObject(userScoped) ? userScoped : null;
+}
+
+/** The version of that record, when it carries one we can reason about. */
+function readInstalledPluginVersion(): string | null {
+  const record = readUserScopeInstall();
+  return record ? versionOf(record) : null;
 }
 
 /**
@@ -577,19 +640,16 @@ function versionOf(document: Record<string, unknown>): string | null {
 }
 
 /**
- * When the last check ran, and whether that question could be answered at all.
- * The two are different: a config with no stamp has never been checked, and a
- * config that will not parse cannot record that a check happened either.
+ * When the last check ran, as far as the config knows. A config we cannot read
+ * answers "never", which is safe here because the write that follows reads it
+ * too and stops the run when it cannot.
  */
-function readCheckStamp(): { readable: boolean; at?: number } {
+function lastCheckedAt(): number | undefined {
   try {
     const checkedAt = loadConfig().claude_plugin_last_update_check;
-    return {
-      readable: true,
-      at: typeof checkedAt === "number" ? checkedAt : undefined,
-    };
+    return typeof checkedAt === "number" ? checkedAt : undefined;
   } catch {
-    return { readable: false };
+    return undefined;
   }
 }
 
@@ -605,14 +665,20 @@ function checkedRecently(checkedAt: number | undefined): boolean {
   return sinceCheck >= 0 && sinceCheck < UPDATE_CHECK_INTERVAL_MS;
 }
 
-/** Best-effort: a stamp that does not land only costs an extra check. */
-function stampUpdateCheck(): void {
+/**
+ * Record that the check is happening. Reports whether it landed, because the
+ * caller uses that to decide whether to check at all: this is the one thing
+ * here that is not best-effort.
+ */
+function stampUpdateCheck(): boolean {
   try {
     const cfg = loadConfig();
     cfg.claude_plugin_last_update_check = Math.floor(Date.now() / 1000);
     saveConfig(cfg);
-  } catch {
-    // The check still ran; only its suppression window went unwritten.
+    return true;
+  } catch (err) {
+    debugLog(`the update check could not be recorded: ${(err as Error).message}`);
+    return false;
   }
 }
 

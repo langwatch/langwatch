@@ -11,7 +11,7 @@
  * Feature: specs/ai-governance/cli-wrappers/claude-plugin-update.feature
  */
 
-import { writeFileSync } from "node:fs";
+import { mkdirSync } from "node:fs";
 
 import { describe, expect, it, vi } from "vitest";
 
@@ -70,7 +70,7 @@ const seedOutdatedInstall = (): void => {
 
 describe("updateLangwatchClaudePlugin", () => {
   describe("given a plugin the marketplace has moved past", () => {
-    /** @scenario "A plugin the marketplace has moved past is updated before the tool starts" */
+    /** @scenario "A plugin the marketplace has moved past is brought up to date" */
     it("refreshes the listing, then updates the plugin", async () => {
       seedOutdatedInstall();
       claudeThatUpdatesTo("0.2.0");
@@ -136,7 +136,7 @@ describe("updateLangwatchClaudePlugin", () => {
       expect(spawnsWhenAnnounced).toEqual([1]);
     });
 
-    /** @scenario "A claude that cannot manage plugins is left alone" */
+    /** @scenario "A claude that cannot manage plugins leaves the plugin as it is" */
     it("does not try to update through a claude with no plugin subcommand", async () => {
       seedOutdatedInstall();
       answerClaude({ pluginHelp: 1 });
@@ -173,7 +173,7 @@ describe("updateLangwatchClaudePlugin", () => {
   });
 
   describe("given nothing of ours to keep current", () => {
-    /** @scenario "A machine without the plugin is not asked about it" */
+    /** @scenario "A machine without the plugin is not held up by it" */
     it("spends no subprocess when the plugin is not installed", async () => {
       seedMarketplace({ publishedVersion: "0.2.0" });
       const { updateLangwatchClaudePlugin } = await loadModule();
@@ -192,27 +192,36 @@ describe("updateLangwatchClaudePlugin", () => {
       expect(commandsRun()).toEqual([]);
     });
 
-    /** @scenario "A config that cannot be read stops the check rather than repeating it" */
-    it("does not check at all when the config will not parse", async () => {
+    /** @scenario "A machine that cannot remember the check does not repeat it every launch" */
+    it("does not check at all when the check cannot be recorded", async () => {
       seedOutdatedInstall();
-      writeFileSync(process.env.LANGWATCH_CLI_CONFIG!, "{ not json");
+      // The config still reads. What fails is saving it: `saveConfig` writes a
+      // sibling `.tmp` and renames it, so a DIRECTORY sitting on that name
+      // fails the write for any user, root included, which a read-only file
+      // would not.
+      mkdirSync(`${process.env.LANGWATCH_CLI_CONFIG!}.tmp`, { recursive: true });
       const { updateLangwatchClaudePlugin } = await loadModule();
 
-      // A stamp that cannot be written is a check that would otherwise repeat
-      // on every single launch, forever.
+      // A stamp that cannot land is a check with no memory, and a check with
+      // no memory would run on every single launch, forever.
       expect(updateLangwatchClaudePlugin().action).toBe("unavailable");
       expect(commandsRun()).toEqual([]);
     });
 
+    /** @scenario "A plugin somebody installed for one repository only is not touched" */
     it("leaves a plugin installed only for a project alone", async () => {
       seedInstalledPlugin({ version: "0.1.0", scope: "project" });
       seedMarketplace({ publishedVersion: "0.2.0" });
       const { updateLangwatchClaudePlugin } = await loadModule();
 
-      expect(updateLangwatchClaudePlugin().action).toBe("unknown_version");
+      // Not ours to move, and cheap to learn: no probe, no fetch, and no stamp
+      // that would hold up a real user-scope install later the same day.
+      expect(updateLangwatchClaudePlugin()).toEqual({ action: "absent" });
+      expect(commandsRun()).toEqual([]);
+      expect(readConfig().claude_plugin_last_update_check).toBeUndefined();
     });
 
-    /** @scenario "A version that cannot be read is left alone rather than blindly updated" */
+    /** @scenario "A version that cannot be read leaves the plugin alone rather than replacing it blindly" */
     it("does not update against a listing whose manifest cannot be read", async () => {
       seedInstalledPlugin({ version: "0.1.0" });
       seedMarketplace();
@@ -246,7 +255,7 @@ describe("updateLangwatchClaudePlugin", () => {
   });
 
   describe("given a check that already ran", () => {
-    /** @scenario "A plugin checked today is not checked again" */
+    /** @scenario "A plugin looked at today is not looked at again" */
     it("spends no subprocess an hour later", async () => {
       seedOutdatedInstall();
       writeConfig({ claude_plugin_last_update_check: secondsAgo(HOUR_MS) });
@@ -258,7 +267,7 @@ describe("updateLangwatchClaudePlugin", () => {
       expect(commandsRun()).toEqual([]);
     });
 
-    /** @scenario "A run that answers from disk says nothing at all" */
+    /** @scenario "A plugin looked at today is not looked at again" */
     it("announces nothing on a run that does no work", async () => {
       seedOutdatedInstall();
       writeConfig({ claude_plugin_last_update_check: secondsAgo(HOUR_MS) });
@@ -270,7 +279,7 @@ describe("updateLangwatchClaudePlugin", () => {
       expect(onCheckStart).not.toHaveBeenCalled();
     });
 
-    /** @scenario "A day after the last check the plugin is checked again" */
+    /** @scenario "A day after the last check the plugin is looked at again" */
     it("checks again two days later", async () => {
       seedOutdatedInstall();
       writeConfig({
