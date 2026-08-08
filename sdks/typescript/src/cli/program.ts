@@ -297,6 +297,63 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     });
 
   program
+    .command("copilot", { hidden: true })
+    .description("Run `copilot` (GitHub Copilot CLI) with LangWatch telemetry (direct OTLP by default; gateway via --tool-mode=gateway).")
+    .allowUnknownOption(true)
+    .allowExcessArguments(true)
+    .helpOption(false)
+    .action(async (_opts, cmd: { args?: string[] }) => {
+      try {
+        const { wrapCopilot } = await import("./commands/wrap.js");
+        await wrapCopilot(cmd.args ?? []);
+      } catch (error) {
+        const { reportCommandError } = await import("./utils/errorOutput.js");
+        reportCommandError({ error });
+        process.exit(1);
+      }
+    });
+
+  program
+    .command("code", { hidden: true })
+    .description("Run `code` (VS Code) with LangWatch telemetry for GitHub Copilot Chat (direct OTLP).")
+    .allowUnknownOption(true)
+    .allowExcessArguments(true)
+    .helpOption(false)
+    .action(async (_opts, cmd: { args?: string[] }) => {
+      try {
+        const { wrapCode } = await import("./commands/wrap.js");
+        await wrapCode(cmd.args ?? []);
+      } catch (error) {
+        const { reportCommandError } = await import("./utils/errorOutput.js");
+        reportCommandError({ error });
+        process.exit(1);
+      }
+    });
+
+  const copilotAppCmd = program
+    .command("copilot-app")
+    .description(
+      "Manage LangWatch capture for the standalone GitHub Copilot app (ADR-039).",
+    );
+
+  copilotAppCmd
+    .command("connect")
+    .description(
+      "Connect the GitHub Copilot app: mint an ingest key and install a login agent that captures every session automatically.",
+    )
+    .option("--tokens-only", "Capture usage without prompt/response content")
+    .action(async (options: { tokensOnly?: boolean }) => {
+      try {
+        const { copilotAppConnectCommand } = await import("./commands/copilot-app.js");
+        await copilotAppConnectCommand(options);
+      } catch (error) {
+        const { reportCommandError } = await import("./utils/errorOutput.js");
+        reportCommandError({ error });
+        process.exit(1);
+      }
+    });
+
+  program
     .command("cursor", { hidden: true })
     .description("Run `cursor` routed through the LangWatch gateway.")
     .allowUnknownOption(true)
@@ -356,6 +413,8 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       "Coding assistants:",
       "  claude          Run `claude` (Claude Code) routed through the gateway",
       "  codex           Run `codex` (OpenAI Codex CLI) routed through the gateway",
+      "  copilot         Run `copilot` (GitHub Copilot CLI) with LangWatch telemetry",
+      "  code            Run `code` (VS Code) with LangWatch telemetry for GitHub Copilot Chat",
       "  cursor          Run `cursor` routed through the gateway",
       "  gemini          Run `gemini` (Gemini CLI) routed through the gateway",
       "  opencode        Run `opencode` (multi-provider) routed through the gateway",
@@ -463,7 +522,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
 
   program
     .command("logout")
-    .description("Log out: revoke + clear the device session AND remove the telemetry wiring `langwatch <tool>` installed (claude settings.json, codex config.toml, gemini/opencode shell functions). Only langwatch-authored blocks are removed; the project API key in .env is left alone. Idempotent.")
+    .description("Log out: revoke + clear the device session AND remove the telemetry wiring `langwatch <tool>` installed (claude settings.json, codex config.toml, gemini/opencode/copilot shell functions). Only langwatch-authored blocks are removed; the project API key in .env is left alone. Idempotent.")
     .option("-y, --yes", "skip the confirmation prompt")
     .option("--keep-credentials", "remove the telemetry wiring but stay logged in")
     .action(async (options: { yes?: boolean; keepCredentials?: boolean }) => {

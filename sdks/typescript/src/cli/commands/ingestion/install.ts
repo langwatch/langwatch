@@ -1,9 +1,6 @@
 import chalk from "chalk";
 
-import {
-  GovernanceCliError,
-  mintIngestionKey,
-} from "@/cli/utils/governance/cli-api";
+import { mintIngestionKey } from "@/cli/utils/governance/cli-api";
 import {
   isLoggedIn,
   loadConfig,
@@ -17,6 +14,7 @@ import {
   installCodexTurnHarvest,
 } from "@/cli/utils/governance/shell-rc";
 import { writeCodexOtelBlock } from "@/cli/utils/codex-config-toml";
+import { reportCommandError } from "@/cli/utils/errorOutput";
 
 /**
  * `langwatch ingest install <tool>` — Path B activation flow.
@@ -121,8 +119,7 @@ export async function installCommand(
     }
     renderHumanReport(report);
   } catch (err) {
-    const msg = err instanceof GovernanceCliError ? err.message : String(err);
-    process.stderr.write(`Error: ${msg}\n`);
+    reportCommandError({ error: err, format: options.json ? "json" : undefined });
     process.exit(1);
   }
 }

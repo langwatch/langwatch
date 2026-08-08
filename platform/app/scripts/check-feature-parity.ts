@@ -307,7 +307,6 @@ const LEGACY_INERT: string[] = [
   "specs/ai-governance/cli-wrappers/latest-login-wins.feature",
   "specs/ai-governance/cli-wrappers/logout.feature",
   "specs/ai-governance/cli-wrappers/request-increase.feature",
-  "specs/ai-governance/cli-wrappers/shell-rc-persistence.feature",
   "specs/ai-governance/cli-wrappers/wrap-login-routing.feature",
   "specs/ai-governance/dogfood-seed/scope-runner.feature",
   "specs/ai-governance/ingestion-sources/claude-code-otlp.feature",

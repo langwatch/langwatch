@@ -22,8 +22,15 @@ import { getCliBootstrap } from "./cli-api";
 import { createCodexIOStreamer } from "./codex-rollout-otlp";
 import type { GovernanceConfig } from "./config";
 import { isLoggedIn, loadConfig, saveConfig } from "./config";
+import {
+	copilotGatewayModelPreflight,
+	copilotPrespawnWarnings,
+} from "./copilot-prespawn";
 import { runDeviceFlowLogin } from "./login-flow";
-import { maybeOfferIngestionShellRcPersist } from "./shell-rc";
+import {
+	maybeOfferIngestionShellRcPersist,
+	SHELL_FUNCTION_TOOLS,
+} from "./shell-rc";
 import { envForTool } from "./tool-env";
 import { resolveWrapperMode } from "./wrapper-mode";
 import { parseToolModeFlag, resolveWrapperPath } from "./wrapper-path-choice";
@@ -37,6 +44,9 @@ import {
  * runs, streaming each completed turn's I/O instead of one burst on exit.
  */
 const CODEX_IO_POLL_MS = 2_500;
+
+/** Single-quote a string for safe interpolation into a `sh -c` command. */
+const shellQuote = (s: string): string => `'${s.replace(/'/g, "'\\''")}'`;
 
 /**
  * Provider families the tool needs upstream. Used by `preflightWrapper`
@@ -52,6 +62,12 @@ const TOOL_PROVIDER_FAMILIES: Record<string, string[]> = {
 	cursor: ["anthropic", "openai"],
 	gemini: ["google", "gemini"],
 	opencode: ["anthropic", "openai"],
+	// copilot always speaks the OpenAI wire format to the gateway
+	// (ADR-039 Decision 4), but the gateway can translate to either
+	// upstream, so both families satisfy preflight. Model-level
+	// servability (a Claude-family model against an openai-only org)
+	// cannot be validated here — see ADR-039 open questions.
+	copilot: ["openai", "anthropic"],
 };
 
 export interface PreflightResult {
@@ -252,6 +268,42 @@ function shouldAutoLogin(): boolean {
 }
 
 /**
+ * The env re-application prefix for the interactive-shell spawn. Runs
+ * INSIDE `$SHELL -i -c` after the rc has been sourced, so the wrapper's
+ * mode vars win over anything the rc exported.
+ *
+ * For scoped-function tools (gemini / opencode / copilot) the prefix
+ * additionally `unset -f`s the tool in EVERY mode: a previously
+ * persisted Path-B rc function re-applies its frozen env AT INVOCATION
+ * TIME — after these exports — so leaving it in place lets stale state
+ * win over this run's resolution. Concretely: on gateway runs the
+ * function re-injects OTel exporter env on top of gateway capture
+ * (double trace, double cost); on ingestion runs it overrides a
+ * freshly-minted token with a stale one (silent 401s) and re-enables
+ * content capture the user explicitly opted out of. `unset -f` removes
+ * only the function FROM THIS SHELL SESSION — user aliases survive
+ * (the whole reason for the interactive shell) and the rc file is
+ * never touched, so bare `<tool>` runs keep capturing.
+ */
+export function buildShellReapply(args: {
+	tool: string;
+	clears: string[];
+	vars: Record<string, string>;
+}): string {
+	const parts: string[] = [];
+	if (SHELL_FUNCTION_TOOLS.includes(args.tool)) {
+		parts.push(`unset -f ${args.tool} 2>/dev/null`);
+	}
+	parts.push(...args.clears.map((k) => `unset ${k}`));
+	parts.push(
+		...Object.entries(args.vars).map(
+			([k, v]) => `export ${k}=${shellQuote(v)}`,
+		),
+	);
+	return parts.join("; ");
+}
+
+/**
  * Run the named tool routed through the gateway. Inherits stdio so
  * the user gets the same interactive UX they'd have invoking the
  * tool directly. Exits the parent process with the child's exit
@@ -427,6 +479,29 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
 		);
 	}
 
+	// Copilot-only pre-spawn warnings (enterprise managed-settings OTel
+	// pin + version gate). Deliberately OUTSIDE the gateway-only preflight
+	// below — copilot defaults to ingestion, and both conditions make
+	// capture silently incomplete on either path (ADR-039 D8/D9).
+	if (tool === "copilot") {
+		for (const warning of copilotPrespawnWarnings()) {
+			process.stderr.write(`${warning}\n`);
+		}
+	}
+
+	// Copilot BYOK (gateway) requires a model; fail fast with an actionable
+	// message instead of copilot's opaque downstream error.
+	if (modeResult.mode === "gateway" && tool === "copilot") {
+		const modelError = copilotGatewayModelPreflight({
+			args: toolArgs,
+			env: process.env,
+		});
+		if (modelError) {
+			process.stderr.write(`${lwTag()} ${modelError}\n`);
+			process.exit(1);
+		}
+	}
+
 	if (modeResult.mode === "gateway") {
 		const probe = await preflightWrapper(cfg, tool);
 		if (!probe.ok) {
@@ -516,7 +591,7 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
 	// live; the wrapper's env (mode vars + clears) is re-applied *after* that
 	// so a user's rc can't clobber the gateway / OTLP wiring. Args ride
 	// positional params ("$@") and are never re-quoted. `tool` is whitelisted
-	// (claude/codex/cursor/gemini/opencode) so the command string is safe.
+	// (claude/codex/copilot/cursor/gemini/opencode) so the command string is safe.
 	const shellName = (process.env.SHELL ?? "").split("/").pop() ?? "";
 	const aliasShell =
 		process.platform !== "win32" &&
@@ -570,16 +645,16 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
 
 	let child;
 	if (aliasShell) {
-		const q = (s: string) => `'${s.replace(/'/g, "'\\''")}'`;
-		const reapply = [
-			...(modeResult.clears ?? []).map((k) => `unset ${k}`),
-			...Object.entries(modeResult.vars).map(([k, v]) => `export ${k}=${q(v)}`),
-		].join("; ");
+		const reapply = buildShellReapply({
+			tool,
+			clears: modeResult.clears ?? [],
+			vars: modeResult.vars,
+		});
 		// Resolve the tool inside the same login shell before handing over so a
 		// missing tool surfaces our actionable message rather than a bare
 		// `command not found`. `command -v` honors the aliases/functions/PATH the
 		// spawn below would use. The direct-spawn branch relies on ENOENT instead.
-		const guard = `command -v -- ${q(tool)} >/dev/null 2>&1 || { printf '%s\\n' ${q(notFoundMessage)} >&2; exit 127; }`;
+		const guard = `command -v -- ${shellQuote(tool)} >/dev/null 2>&1 || { printf '%s\\n' ${shellQuote(notFoundMessage)} >&2; exit 127; }`;
 		const command = `${reapply ? `${reapply}; ` : ""}${guard}; ${tool} "$@"`;
 		child = spawn(aliasShell, ["-i", "-c", command, tool, ...finalArgs], {
 			stdio: "inherit",

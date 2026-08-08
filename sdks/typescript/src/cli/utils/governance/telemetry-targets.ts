@@ -25,6 +25,8 @@
  * session — the user asked it to "go and find it".
  */
 
+import * as os from "node:os";
+
 import {
 	codexHasGatewayBlock,
 	codexHasNotifyBlock,
@@ -46,6 +48,11 @@ import {
 	removeAppEnvVars,
 } from "./app-settings";
 import {
+	copilotAppAgentPath,
+	isCopilotAppAgentInstalled,
+	removeCopilotAppAgent,
+} from "./copilot-app-agent";
+import {
 	hasOpencodeSessionContextPlugin,
 	opencodePluginTarget,
 	removeOpencodeSessionContextPlugin,
@@ -62,6 +69,7 @@ import {
 	rcHasLangwatchBlock,
 	rcPath,
 	removeBlockFromRc,
+	SHELL_FUNCTION_TOOLS,
 	tildify,
 	toolMarkers,
 } from "./shell-rc";
@@ -69,6 +77,13 @@ import {
 	otelWiringLooksLangwatchAuthored,
 	removeClaudeProjectTelemetryPin,
 } from "./telemetry-refresh";
+import {
+	removeVscodeTerminalOtelEnv,
+	VSCODE_TELEMETRY_ENV_KEYS,
+	type VscodePlatform,
+	vscodeTerminalEnvHasAnyClear,
+	vscodeUserSettingsPath,
+} from "./vscode-settings";
 
 export interface TelemetryTarget {
 	/** Human label for the confirm list + removal summary. */
@@ -80,9 +95,6 @@ export interface TelemetryTarget {
 }
 
 const SHELLS: DetectedShell[] = ["zsh", "bash", "fish"];
-
-/** Tools whose Path B telemetry rides on a scoped shell function. */
-const SHELL_FUNCTION_TOOLS = ["gemini", "opencode"];
 
 /**
  * Enumerate every telemetry-persist target with a present flag and a
@@ -139,6 +151,27 @@ export function scanTelemetryTargets(): TelemetryTarget[] {
 			otelWiringLooksLangwatchAuthored(appEnvValues(claudePin)),
 		remove: () => removeClaudeProjectTelemetryPin({ cwd }),
 	});
+
+	// copilot app — the login agent that owns the app launch (ADR-039
+	// §Extension). Present when its descriptor is on disk; removing it
+	// unregisters from the OS service manager and deletes the descriptor.
+	{
+		const appPlatform = os.platform();
+		if (
+			appPlatform === "darwin" ||
+			appPlatform === "linux" ||
+			appPlatform === "win32"
+		) {
+			const home = os.homedir();
+			targets.push({
+				label: `copilot app capture agent (${tildify(
+					copilotAppAgentPath(appPlatform, home),
+				)})`,
+				present: isCopilotAppAgentInstalled(appPlatform, home),
+				remove: () => removeCopilotAppAgent(appPlatform, home),
+			});
+		}
+	}
 
 	// codex — [otel] + gateway marker blocks in config.toml + the profile file.
 	const codexConfig = defaultCodexConfigPath();
@@ -203,6 +236,32 @@ export function scanTelemetryTargets(): TelemetryTarget[] {
 				remove: () => removeBlockFromRc(shell, markers),
 			});
 		}
+	}
+
+	// VS Code integrated-terminal telemetry clear (the `code` hardening).
+	const vscodePlatform = process.platform;
+	if (
+		vscodePlatform === "darwin" ||
+		vscodePlatform === "linux" ||
+		vscodePlatform === "win32"
+	) {
+		const home = os.homedir();
+		const vscodeArgs = {
+			platform: vscodePlatform as VscodePlatform,
+			home,
+			keys: [...VSCODE_TELEMETRY_ENV_KEYS],
+		};
+		const settingsPath = vscodeUserSettingsPath(
+			vscodePlatform as VscodePlatform,
+			home,
+		);
+		targets.push({
+			label: `VS Code terminal telemetry clear (${tildify(
+				settingsPath ?? "settings.json",
+			)})`,
+			present: vscodeTerminalEnvHasAnyClear(vscodeArgs),
+			remove: () => removeVscodeTerminalOtelEnv(vscodeArgs),
+		});
 	}
 
 	return targets;

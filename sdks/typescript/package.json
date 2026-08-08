@@ -120,6 +120,7 @@
     "commander": "^15.0.0",
     "dotenv": "^17.3.1",
     "js-yaml": "^5.2.0",
+    "jsonc-parser": "^3.3.1",
     "liquidjs": "^10.27.0",
     "open": "^11.0.0",
     "openapi-fetch": "^0.17.0",
