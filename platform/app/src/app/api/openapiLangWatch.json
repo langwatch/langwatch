@@ -5464,7 +5464,12 @@
           }
         ],
         "summary": "List coding agent session events",
-        "description": "List a coding-agent session's events (model calls, compactions, rate limits, tool runs, prompts) in time order, keyset-paginated. Pass the previous response's nextCursor to continue; filter with kinds (comma-separated)."
+        "description": "List a coding-agent session's events (model calls, compactions, rate limits, tool runs, prompts) in time order, keyset-paginated. Pass the previous response's nextCursor to continue; filter with kinds (comma-separated).",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/coding-agent/pull-request-usage": {
@@ -5839,7 +5844,12 @@
           }
         ],
         "summary": "Get pull request coding agent usage",
-        "description": "Assistant usage for one pull request: sessions, tokens and cost, grouped by contributor and agent, plus per-model totals, over the pull request's whole lifetime rather than a time window. Every row and the totals split cost three ways: the part priced per token, the part a bundled subscription already covers, and the list-price total of both. Per-model totals carry the list price only. Cost is calculated from the tokens the agent reported and LangWatch's model prices, so it estimates spend rather than restating a provider invoice. Requires a personal-project API key; rows appear only for projects the calling user may view, and cost only for those they may price."
+        "description": "Assistant usage for one pull request: sessions, tokens and cost, grouped by contributor and agent, plus per-model totals, over the pull request's whole lifetime rather than a time window. Every row and the totals split cost three ways: the part priced per token, the part a bundled subscription already covers, and the list-price total of both. Per-model totals carry the list price only. Cost is calculated from the tokens the agent reported and LangWatch's model prices, so it estimates spend rather than restating a provider invoice. Requires a personal-project API key; rows appear only for projects the calling user may view, and cost only for those they may price.",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/dashboards": {
@@ -7479,7 +7489,12 @@
             "required": true
           }
         ],
-        "description": "Get a specific evaluator by ID or slug"
+        "description": "Get a specific evaluator by ID or slug",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/evaluators/{id}": {
@@ -29528,7 +29543,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/prompts/tags": {
@@ -30637,7 +30657,12 @@
             "required": true
           }
         ],
-        "description": "Get all versions for a prompt. Does not include base prompt data, only versioned data."
+        "description": "Get all versions for a prompt. Does not include base prompt data, only versioned data.",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/prompts/{id}/versions/{versionId}/restore": {
@@ -31227,7 +31252,12 @@
             "required": true
           }
         ],
-        "description": "Restore a prompt to a previous version. Creates a new version with the same config data as the specified version."
+        "description": "Restore a prompt to a previous version. Creates a new version with the same config data as the specified version.",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/prompts/{id}": {
@@ -31829,7 +31859,12 @@
             }
           }
         ],
-        "description": "Get a specific prompt by slug, with optional shorthand syntax for tags and versions. Pass a bare slug like \"pizza-prompt\" to get the latest version, \"pizza-prompt:production\" to resolve a tagged version, or \"pizza-prompt:2\" to fetch version 2. Alternatively, use the tag or version query parameters with a bare slug."
+        "description": "Get a specific prompt by slug, with optional shorthand syntax for tags and versions. Pass a bare slug like \"pizza-prompt\" to get the latest version, \"pizza-prompt:production\" to resolve a tagged version, or \"pizza-prompt:2\" to fetch version 2. Alternatively, use the tag or version query parameters with a bare slug.",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       },
       "put": {
         "responses": {
@@ -32588,7 +32623,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       },
       "delete": {
         "responses": {
@@ -32727,7 +32767,12 @@
             "required": true
           }
         ],
-        "description": "Delete a prompt"
+        "description": "Delete a prompt",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/prompts/{id}/sync": {
@@ -34157,7 +34202,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/model-providers": {

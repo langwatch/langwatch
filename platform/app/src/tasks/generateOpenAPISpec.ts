@@ -25,6 +25,7 @@ import { app as projectsApp } from "../app/api/projects/[[...route]]/app";
 import {
   allRegisteredRoutes,
   type CredentialClass,
+  documentedPathOf,
   isHttpMethod,
   securityForCredentialClass,
 } from "../server/api/security";
@@ -285,7 +286,7 @@ type SpecShape = {
  * cannot publish a credential class nothing enforces, and a route added
  * tomorrow is stamped without anyone remembering to.
  */
-function stampSecurityFromRegistry(spec: SpecShape): void {
+export function stampSecurityFromRegistry(spec: SpecShape): void {
   const registry = indexRegistryByOperation();
 
   for (const { routePath, operationKey, operation } of documentedOperations(
@@ -294,12 +295,41 @@ function stampSecurityFromRegistry(spec: SpecShape): void {
     const credentialClass =
       registry.byOperation.get(operationKey) ??
       registry.byAnyMethodPath.get(routePath);
-    if (!credentialClass) continue;
+    if (!credentialClass) {
+      assertMayInheritTheDefault(operationKey, routePath);
+      continue;
+    }
     operation.security = securityForCredentialClass({
       operationKey,
       credentialClass,
     });
   }
+}
+
+/**
+ * Refuse to leave an app-derived operation on the document default.
+ *
+ * Paths under an app prefix are generated from the same Hono apps the registry
+ * walks, so every one of them has a route and a credential class. No match
+ * means the two spellings disagree, and the operation then publishes whatever
+ * the document happens to default to. That was survivable while every affected
+ * route sat on a project app and the default was already right; the first one
+ * on an org app would publish `project_api_key` for a route only an admin key
+ * can reach, which is the precise bug this stamping exists to prevent.
+ *
+ * Hand-maintained entries in the JSON have no route by design and are left
+ * alone.
+ */
+function assertMayInheritTheDefault(
+  operationKey: string,
+  routePath: string,
+): void {
+  if (!isAppDerivedPath(routePath)) return;
+  throw new Error(
+    `${operationKey} is generated from a Hono app but matches no registered route, ` +
+      `so it would inherit the document-wide security default. The documented path and ` +
+      `the route path have to agree — check how the route spells its parameters.`,
+  );
 }
 
 /** Every operation object in the document, with the key the registry uses. */
@@ -352,8 +382,7 @@ function indexRegistryByOperation(): {
   const byOperation = new Map<string, CredentialClass>();
   const byAnyMethodPath = new Map<string, CredentialClass>();
   for (const route of allRegisteredRoutes()) {
-    // Hono spells params `:id`, the document spells them `{id}`.
-    const documented = route.path.replace(/:([A-Za-z0-9_]+)/g, "{$1}");
+    const documented = documentedPathOf(route.path);
     if (route.method === "ALL") {
       byAnyMethodPath.set(documented, route.credentialClass);
       continue;

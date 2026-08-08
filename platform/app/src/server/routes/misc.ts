@@ -35,7 +35,6 @@ import {
   timeseriesSeriesInput,
 } from "~/server/analytics/registry";
 import { sharedFiltersInputSchema } from "~/server/analytics/types";
-import { bodyLimit } from "~/server/api/bodyLimit";
 import { hasProjectPermission, isDemoProject } from "~/server/api/rbac";
 import {
   createServiceApp,

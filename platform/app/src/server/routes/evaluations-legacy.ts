@@ -31,7 +31,6 @@ import type { Workflow } from "~/optimization_studio/types/dsl";
 import { getInputsOutputs } from "~/optimization_studio/utils/nodeUtils";
 import { getWorkflowEntryOutputs } from "~/optimization_studio/utils/workflowFields";
 import { findOrCreateExperiment } from "~/pages/api/experiment/init";
-import { bodyLimit } from "~/server/api/bodyLimit";
 import type { Permission } from "~/server/api/rbac";
 import { getCustomEvaluators } from "~/server/api/routers/evaluations";
 import {

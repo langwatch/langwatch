@@ -19,6 +19,7 @@ import {
   anyAuthenticated,
   apiKeyPermission,
   credentialClassFor,
+  documentedPathOf,
   handlerManagedAuth,
   internalSecret,
   isHttpMethod,
@@ -49,6 +50,13 @@ const PUBLIC_SURFACES = [
   { prefix: "/api/gateway/v1/spend-events", scheme: "admin_api_key" },
   { prefix: "/api/gateway/v1/end-users", scheme: "admin_api_key" },
   { prefix: "/api/gateway/v1", scheme: "project_api_key" },
+  // Both mount on a project app, and both register some of their routes with a
+  // Hono pattern (`/:id{.+}`), which is the spelling the stamping used to fail
+  // to translate. Listing them here is what makes that failure visible: the
+  // operations kept the document default, which happens to be the right answer
+  // for a project app, so nothing else in the document looked wrong.
+  { prefix: "/api/prompts", scheme: "project_api_key" },
+  { prefix: "/api/evaluators", scheme: "project_api_key" },
 ] as const;
 
 /** The first surface whose prefix the path starts with; order is longest-first. */
@@ -221,6 +229,49 @@ describe("isHttpMethod", () => {
       ]) {
         expect(isHttpMethod(member)).toBe(false);
       }
+    });
+  });
+});
+
+describe("documentedPathOf", () => {
+  describe("given a route path Hono can register", () => {
+    it("renames a plain parameter to the document's spelling", () => {
+      expect(documentedPathOf("/api/prompts/:id")).toBe("/api/prompts/{id}");
+      expect(documentedPathOf("/api/prompts/:id/versions/:versionId")).toBe(
+        "/api/prompts/{id}/versions/{versionId}",
+      );
+    });
+
+    it("drops the pattern a parameter is pinned to", () => {
+      // The whole reason the eight prompt and evaluator operations went
+      // unstamped: `{.+}` is matcher syntax, and carrying it through produced
+      // a path no documented operation is keyed by.
+      expect(documentedPathOf("/api/prompts/:id{.+}")).toBe(
+        "/api/prompts/{id}",
+      );
+      expect(documentedPathOf("/api/prompts/:id{.+?}/versions")).toBe(
+        "/api/prompts/{id}/versions",
+      );
+      expect(
+        documentedPathOf("/api/prompts/:id{.+?}/versions/:versionId/restore"),
+      ).toBe("/api/prompts/{id}/versions/{versionId}/restore");
+      expect(documentedPathOf("/api/evaluators/:idOrSlug{.+}")).toBe(
+        "/api/evaluators/{idOrSlug}",
+      );
+    });
+
+    it("consumes a quantifier inside the pattern rather than stopping at it", () => {
+      // A pattern may carry braces of its own. Stopping at the first `}` would
+      // leave the remainder in the path and reintroduce the same mismatch.
+      expect(documentedPathOf("/api/things/:code{[0-9]{3}}")).toBe(
+        "/api/things/{code}",
+      );
+    });
+
+    it("leaves a path without parameters alone", () => {
+      expect(documentedPathOf("/api/gateway/v1/spend-summaries")).toBe(
+        "/api/gateway/v1/spend-summaries",
+      );
     });
   });
 });

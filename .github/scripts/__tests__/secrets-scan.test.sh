@@ -26,6 +26,16 @@ FAIL=0
 readonly PLANTED_SECRET='AWS_ACCESS_KEY_ID=AKIAQYLPMN5HHHFPZAM2
 AWS_SECRET_ACCESS_KEY=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'
 
+# Two shell function names, and nothing else. Both are `test_` plus exactly 35
+# characters of [A-Za-z0-9_], which is the shape TruffleHog's Lob detector
+# matches — and its verifier accepts them, so they arrive as VERIFIED findings
+# that --only-verified cannot filter. Both are real names lifted from
+# charts/langwatch/tests, where they blocked pull requests that had not touched
+# them. A gate that fails on a function name teaches everyone to ignore it.
+readonly PLANTED_SHELL_FUNCTIONS='#!/usr/bin/env bash
+test_scaling_one_deployment_resizes_both() { :; }
+test_unconfigured_providers_emit_nothing() { :; }'
+
 WORKSPACE="$(mktemp -d)"
 trap 'rm -rf "$WORKSPACE"' EXIT
 
@@ -79,6 +89,9 @@ build_checkout() {
     pr | pr-then-deleted)
       printf '%s\n' "$PLANTED_SECRET" >"$origin/pr-leak.env"
       ;;
+    pr-shell-functions)
+      printf '%s\n' "$PLANTED_SHELL_FUNCTIONS" >"$origin/pr-chart-test.sh"
+      ;;
   esac
   commit_at "$origin" "2026-08-06T00:00:00Z" "pull request commit"
   if [ "$secret_at" = "pr-then-deleted" ]; then
@@ -105,7 +118,14 @@ build_checkout() {
 
 # Runs the gate the way the workflow does. Echoes nothing; returns the exit
 # code and leaves the combined output in $LAST_OUTPUT.
+#
+# $SCAN_MODE selects TruffleHog's mode. `offline` is the default and what the
+# scoping cases need, since a planted secret has to be reportable without being
+# real. Set it empty to run the gate exactly as CI does, verification included
+# — the only way to observe a detector whose matches appear solely as verified
+# results.
 LAST_OUTPUT=""
+SCAN_MODE="offline"
 run_scan() {
   local scanner="$1" work="$2"
   local rc=0
@@ -113,7 +133,7 @@ run_scan() {
   LAST_OUTPUT="$(
     EVENT_NAME=pull_request \
       BASE_REF=main \
-      SECRETS_SCAN_TRUFFLEHOG_MODE=offline \
+      SECRETS_SCAN_TRUFFLEHOG_MODE="$SCAN_MODE" \
       bash "$SCAN" "$scanner" "$work" 2>&1
   )"
   rc=$?
@@ -194,6 +214,25 @@ test_secret_added_then_deleted_within_the_pull_request_still_fails() {
   work="$(build_checkout pr-adds-then-deletes pr-then-deleted)"
   assert_scan_fails trufflehog "$work" \
     "trufflehog fails on a secret that is added and removed inside the same pull request"
+}
+
+# @scenario "A shell function name is not a credential"
+#
+# The one case that runs with verification on, because the Lob detector reports
+# nothing without it: offline, the match is suppressed, and the assertion would
+# hold with or without the exclusion. Running the gate as CI runs it is what
+# makes this observable at all.
+#
+# It reaches Lob's API to do so. With no network the detector cannot confirm
+# anything and the case degrades to passing vacuously rather than to a red
+# check, which is the right way round for a test that is not itself the gate.
+test_shell_function_names_do_not_fail_the_check() {
+  local work
+  work="$(build_checkout pr-shell-functions pr-shell-functions)"
+  SCAN_MODE=""
+  assert_scan_passes trufflehog "$work" \
+    "trufflehog does not report a test_* shell function as a Lob key"
+  SCAN_MODE="offline"
 }
 
 # Runs the gate with a stubbed scanner that reports a clean, entirely empty
@@ -281,6 +320,7 @@ test_secret_on_an_unrelated_branch_does_not_fail_the_pull_request
 test_secret_on_the_base_branch_does_not_fail_the_pull_request
 test_secret_added_by_the_pull_request_fails_the_check
 test_secret_added_then_deleted_within_the_pull_request_still_fails
+test_shell_function_names_do_not_fail_the_check
 test_scan_that_examines_no_content_fails_loudly
 test_pattern_scanner_ignores_a_secret_on_an_unrelated_branch
 test_pattern_scanner_fails_on_a_secret_the_pull_request_adds

@@ -2,7 +2,6 @@ import { createLogger } from "@langwatch/observability";
 import { describeRoute } from "hono-openapi";
 import { resolver } from "hono-openapi/zod";
 import { z } from "zod";
-import { bodyLimit } from "~/server/api/bodyLimit";
 import { createProjectApp, requires } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
 import { getApp } from "~/server/app-layer/app";

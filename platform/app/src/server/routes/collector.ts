@@ -2,7 +2,6 @@ import crypto from "node:crypto";
 import { createLogger } from "@langwatch/observability";
 import type { ZodError } from "zod";
 import { fromZodError } from "zod-validation-error";
-import { bodyLimit } from "~/server/api/bodyLimit";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import { DEFAULT_PII_REDACTION_LEVEL } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
 import {
