@@ -70,9 +70,21 @@ function writeLauncher(name: string, source = LAUNCHER): void {
   chmodSync(file, 0o755);
 }
 
-function install(): { stderr: string; status: number | null } {
+function install(env: Record<string, string> = {}): {
+  stderr: string;
+  status: number | null;
+} {
   const result = spawnSync(process.execPath, [INSTALLER, binDir], {
     encoding: "utf8",
+    env: {
+      ...process.env,
+      // The installer stands down on CI and in production, and this suite runs
+      // on both a laptop and a CI runner. Every test but the two about that
+      // guard is asking for the developer-machine case.
+      CI: "",
+      NODE_ENV: "",
+      ...env,
+    },
   });
   return { stderr: result.stderr, status: result.status };
 }
@@ -200,6 +212,38 @@ describe("check-queue bin shims", () => {
       );
       expect(existsSync(path.join(binDir, "tsgo.real"))).toBe(true);
       expect(runShim("tsgo", ["--noEmit"]).stdout).toBe("real --noEmit\n");
+    });
+  });
+
+  describe("given an environment the shims are not for", () => {
+    beforeEach(() => {
+      writeLauncher("tsgo");
+    });
+
+    /** @scenario "CI installs are left alone" */
+    it("stands down on CI, and only for a CI that means it", () => {
+      const skipped = install({ CI: "true" });
+
+      expect(skipped.status).toBe(0);
+      expect(skipped.stderr).toContain("CI");
+      expect(readFileSync(path.join(binDir, "tsgo"), "utf8")).toBe(LAUNCHER);
+      expect(existsSync(path.join(binDir, "tsgo.real"))).toBe(false);
+
+      // The values a shell leaves behind when it means the opposite.
+      install({ CI: "false" });
+      expect(readFileSync(path.join(binDir, "tsgo"), "utf8")).toContain(
+        "langwatch-check-queue-shim",
+      );
+    });
+
+    /** @scenario "Production installs are left alone" */
+    it("stands down on a production install", () => {
+      const result = install({ NODE_ENV: "production" });
+
+      expect(result.status).toBe(0);
+      expect(result.stderr).toContain("production");
+      expect(readFileSync(path.join(binDir, "tsgo"), "utf8")).toBe(LAUNCHER);
+      expect(existsSync(path.join(binDir, "tsgo.real"))).toBe(false);
     });
   });
 

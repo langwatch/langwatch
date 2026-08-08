@@ -32,6 +32,8 @@
  * shim is left alone, and one that pnpm has overwritten is re-shimmed. It
  * never fails an install. A missing shim only costs the queue its accounting.
  *
+ * CI and production installs are left alone entirely, see `skipReason`.
+ *
  *   node dev/scripts/install-check-shims.mjs [binDir...]
  */
 
@@ -102,6 +104,26 @@ exec "$real" "$@"
 `;
 }
 
+/**
+ * Why this environment keeps pnpm's own bin entries, or null to shim them.
+ *
+ * The shims are a laptop concern. On CI the queue is off anyway (a job runs
+ * one check at a time, so `resolveSlots` reads CI the same way and returns 0),
+ * which leaves the shim adding a node process in front of every tsc and biome
+ * to decide nothing. A production install has less business still: rewriting
+ * bin entries in an image or on a server buys no laptop any RAM, and the
+ * shim's queue path is absolute, so a stage that copies node_modules without
+ * `dev/` gets an indirection that only ever prints that it found no queue.
+ */
+function skipReason(env) {
+  const ci = (env.CI ?? "").trim().toLowerCase();
+  if (ci !== "" && ci !== "0" && ci !== "false") return "CI";
+  if ((env.NODE_ENV ?? "").trim().toLowerCase() === "production") {
+    return "NODE_ENV=production";
+  }
+  return null;
+}
+
 /** Whether this path is already one of our shims. */
 function isShim(file) {
   try {
@@ -129,9 +151,8 @@ function installOne(binDir, name) {
   return true;
 }
 
-function main(argv) {
-  if (process.platform === "win32") return 0;
-  const binDirs = argv.length > 0 ? argv : DEFAULT_BIN_DIRS;
+/** Shims every tool present in each directory, and names the ones it changed. */
+function installAll(binDirs) {
   const installed = [];
   for (const binDir of binDirs) {
     for (const name of TOOLS) {
@@ -146,6 +167,21 @@ function main(argv) {
       }
     }
   }
+  return installed;
+}
+
+function main(argv, env) {
+  if (process.platform === "win32") return 0;
+
+  const skip = skipReason(env);
+  if (skip !== null) {
+    // Said out loud rather than skipped quietly: a hand-run that does nothing
+    // is otherwise indistinguishable from one that worked.
+    process.stderr.write(`check-queue: leaving bin entries alone (${skip})\n`);
+    return 0;
+  }
+
+  const installed = installAll(argv.length > 0 ? argv : DEFAULT_BIN_DIRS);
   if (installed.length > 0) {
     process.stderr.write(
       `check-queue: whole-project ${installed.join(", ")} runs now take a slot (CHECK_SLOTS)\n`,
@@ -154,4 +190,4 @@ function main(argv) {
   return 0;
 }
 
-process.exitCode = main(process.argv.slice(2));
+process.exitCode = main(process.argv.slice(2), process.env);

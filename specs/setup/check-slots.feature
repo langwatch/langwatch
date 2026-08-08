@@ -215,6 +215,25 @@ Feature: Machine-wide slots for whole-repo checks
     When the installer runs from postinstall
     Then the entry is shimmed again over the regenerated launcher
 
+  # The shims exist to keep a laptop usable. Neither environment below has that
+  # problem, and both have something to lose: CI turns the queue off anyway, so
+  # a shim there only puts a node process in front of every tsc and biome to
+  # decide nothing, and an install in an image or on a server should not be
+  # rewriting bin entries at all.
+
+  @unit
+  Scenario: CI installs are left alone
+    Given CI is set
+    When the installer runs from postinstall
+    Then the bin entries keep pnpm's own launchers
+    And it says which environment it stood down for
+
+  @unit
+  Scenario: Production installs are left alone
+    Given NODE_ENV is production
+    When the installer runs from postinstall
+    Then the bin entries keep pnpm's own launchers
+
   # --- Interaction with haven ---
 
   @unit
