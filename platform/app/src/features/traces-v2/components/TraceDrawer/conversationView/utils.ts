@@ -1,6 +1,55 @@
+import {
+  mediaRefBelongsToSide,
+  mediaRoleBelongsToSide,
+  type TraceMediaRef,
+  type TraceMediaSide,
+} from "~/shared/traces/media-refs";
+import {
+  collectAnnotatedMediaParts,
+  type MediaPartData,
+  mediaRefToMediaData,
+} from "~/shared/traces/mediaParts";
 import { formatDuration, formatRelativeTime } from "../../../utils/formatters";
 import { extractSystemText } from "../transcript/parsing";
 import type { ParsedTurn } from "./types";
+
+/** Shared empty list so a media-free turn keeps a stable identity per parse. */
+const NO_MEDIA: MediaPartData[] = [];
+
+/**
+ * The media that hangs off one side of a turn's messages.
+ *
+ * Two sources, in the order the trace table already reads them. A turn's
+ * input and output text is flattened at fold time, so the fold-derived
+ * references are the only record of what the winning span payload carried and
+ * they win whenever they exist. A turn handed over with its raw payload (a
+ * threadless trace the host fetched itself) has no references, so its value
+ * is walked for parts instead.
+ *
+ * Either way the same side rule applies as on the summary strips: the caller's
+ * media stays on the input side, the agent's reply on the output side, and
+ * media recorded without a role stays wherever it was recorded.
+ */
+export function turnMediaForSide({
+  refs,
+  value,
+  side,
+}: {
+  refs: TraceMediaRef[] | undefined;
+  value: string | null | undefined;
+  side: TraceMediaSide;
+}): MediaPartData[] {
+  if (refs && refs.length > 0) {
+    const fromRefs = refs
+      .filter((ref) => mediaRefBelongsToSide(ref, side))
+      .map(mediaRefToMediaData);
+    return fromRefs.length > 0 ? fromRefs : NO_MEDIA;
+  }
+  const collected = collectAnnotatedMediaParts(value)
+    .filter((part) => mediaRoleBelongsToSide(part.role, side))
+    .map((part) => part.media);
+  return collected.length > 0 ? collected : NO_MEDIA;
+}
 
 export interface ConversationMarkdownChunk {
   /** Stable key for the virtualizer. */
@@ -27,7 +76,12 @@ export function buildConversationMarkdownChunks(
 ): ConversationMarkdownChunk[] {
   const chunks: ConversationMarkdownChunk[] = [];
 
-  const headerLines: string[] = [`# Conversation \`${conversationId}\``, ""];
+  // A threadless trace has no conversation id to name; the heading stands on
+  // its own rather than trailing an empty pair of backticks.
+  const headerLines: string[] = [
+    conversationId ? `# Conversation \`${conversationId}\`` : "# Conversation",
+    "",
+  ];
   headerLines.push(`- **Turns:** ${parsedTurns.length}`);
   if (parsedTurns.length > 0) {
     const first = parsedTurns[0]!.turn;

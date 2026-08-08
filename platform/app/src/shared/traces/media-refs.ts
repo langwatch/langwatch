@@ -16,7 +16,11 @@
  * side — enough for a preview, never a payload.
  */
 
-import { collectMediaParts } from "~/shared/traces/mediaParts";
+import {
+  collectAnnotatedMediaParts,
+  isMediaPartRole,
+  type MediaPartRole,
+} from "~/shared/traces/mediaParts";
 
 export interface TraceMediaRef {
   kind: "audio" | "image" | "video" | "file";
@@ -24,6 +28,46 @@ export interface TraceMediaRef {
   filename?: string;
   /** Carried for `file` refs so the attachment chip can pick its icon. */
   mimeType?: string;
+  /**
+   * Role of the chat message the part was found under. A voice turn puts the
+   * caller's recording and the agent's reply in the same span payload, so the
+   * summary strips need this to show each side its own media. Absent for parts
+   * outside a message envelope and for traces ingested before roles were
+   * recorded, which every consumer treats as "belongs wherever it used to".
+   */
+  role?: MediaPartRole;
+}
+
+/** Which summary strip a ref belongs on. */
+export type TraceMediaSide = "input" | "output";
+
+/**
+ * Whether media found under the given chat role belongs on the given side.
+ *
+ * The agent's reply is the only side we can place with certainty, so it is the
+ * only one excluded from the input side: everything the caller sent (user,
+ * system, tool results, roleless) stays on INPUT, and OUTPUT takes the
+ * assistant plus anything with no role recorded. Media is therefore never
+ * dropped from both sides.
+ *
+ * The rule lives here once for every surface that splits a payload by side:
+ * the summary strips read it off compact refs, the conversation thread reads
+ * it off the parts it collected from the turn.
+ */
+export function mediaRoleBelongsToSide(
+  role: MediaPartRole | undefined,
+  side: TraceMediaSide,
+): boolean {
+  if (side === "output") return role === undefined || role === "assistant";
+  return role !== "assistant";
+}
+
+/** Whether a ref belongs on the given summary strip. */
+export function mediaRefBelongsToSide(
+  ref: TraceMediaRef,
+  side: TraceMediaSide,
+): boolean {
+  return mediaRoleBelongsToSide(ref.role, side);
 }
 
 export const MAX_TRACE_MEDIA_REFS = 4;
@@ -58,22 +102,24 @@ function isStoredObjectRefUrl(url: string): boolean {
  */
 export function collectMediaRefs(value: unknown): TraceMediaRef[] {
   const refs: TraceMediaRef[] = [];
-  for (const part of collectMediaParts(value)) {
+  for (const { media, role } of collectAnnotatedMediaParts(value)) {
     if (refs.length >= MAX_TRACE_MEDIA_REFS) break;
-    if (part.type === "binary") {
-      if (!part.url || !isStoredObjectRefUrl(part.url)) continue;
-      const kind = kindFromMime(part.mimeType);
+    const withRole = role ? { role } : {};
+    if (media.type === "binary") {
+      if (!media.url || !isStoredObjectRefUrl(media.url)) continue;
+      const kind = kindFromMime(media.mimeType);
       refs.push({
         kind,
-        url: part.url,
-        ...(part.filename ? { filename: part.filename } : {}),
-        ...(kind === "file" ? { mimeType: part.mimeType } : {}),
+        url: media.url,
+        ...(media.filename ? { filename: media.filename } : {}),
+        ...(kind === "file" ? { mimeType: media.mimeType } : {}),
+        ...withRole,
       });
     } else if (
-      part.source.type === "url" &&
-      isStoredObjectRefUrl(part.source.value)
+      media.source.type === "url" &&
+      isStoredObjectRefUrl(media.source.value)
     ) {
-      refs.push({ kind: part.type, url: part.source.value });
+      refs.push({ kind: media.type, url: media.source.value, ...withRole });
     }
   }
   return refs;
@@ -112,6 +158,9 @@ function parseMediaRefEntry(entry: unknown): TraceMediaRef | null {
     ...(typeof candidate.mimeType === "string"
       ? { mimeType: candidate.mimeType }
       : {}),
+    // Same allowlist the walk applies, so an unrecognized role read back from
+    // the attribute lands on "no role" rather than hiding the ref everywhere.
+    ...(isMediaPartRole(candidate.role) ? { role: candidate.role } : {}),
   };
 }
 

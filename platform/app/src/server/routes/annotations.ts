@@ -7,9 +7,16 @@
  * - src/pages/api/annotations/trace/[trace].ts
  */
 
+import { ValidationError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import type { Context } from "hono";
 import { nanoid } from "nanoid";
+import {
+  ANNOTATION_ANCHOR_SCOPES,
+  type AnnotationAnchorScope,
+  annotationAnchorScopeSchema,
+  annotationAnchorScopeWhere,
+} from "~/server/annotations/annotationAnchor";
 import type { Permission } from "~/server/api/rbac";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import {
@@ -92,6 +99,25 @@ async function authenticateRequest(c: Context, permission: Permission) {
   return { project: resolved.project, markUsed };
 }
 
+/**
+ * Which comments a list endpoint returns. Absent means the comments about whole
+ * traces, which is every annotation that existed before a comment could be left
+ * on part of a trace, so a caller written against the old endpoint keeps
+ * receiving exactly what it did. `?anchor=all` asks for the anchored ones too.
+ */
+function anchorScopeFromQuery(c: Context): AnnotationAnchorScope {
+  const requested = c.req.query("anchor");
+  if (requested === undefined) return "trace";
+
+  const parsed = annotationAnchorScopeSchema.safeParse(requested);
+  if (!parsed.success) {
+    throw new ValidationError(
+      `[anchor] must be one of: ${ANNOTATION_ANCHOR_SCOPES.join(", ")}.`,
+    );
+  }
+  return parsed.data;
+}
+
 // ---------- GET /api/annotations ----------
 secured.access(annotationsViewAuth).get("/annotations", async (c) => {
   const auth = await authenticateRequest(c, "annotations:view");
@@ -99,10 +125,14 @@ secured.access(annotationsViewAuth).get("/annotations", async (c) => {
     return c.json(auth.body, auth.status);
   }
   const { project, markUsed } = auth;
+  const anchorScope = anchorScopeFromQuery(c);
 
   try {
     const annotations = await prisma.annotation.findMany({
-      where: { projectId: project.id },
+      where: {
+        projectId: project.id,
+        ...annotationAnchorScopeWhere(anchorScope),
+      },
     });
 
     markUsed();
@@ -252,11 +282,16 @@ secured.access(annotationsViewAuth).get("/annotations/trace/:id", async (c) => {
     return c.json(auth.body, auth.status);
   }
   const { project, markUsed } = auth;
+  const anchorScope = anchorScopeFromQuery(c);
 
   try {
     const trace = c.req.param("id");
     const annotationsByTrace = await prisma.annotation.findMany({
-      where: { traceId: trace, projectId: project.id },
+      where: {
+        traceId: trace,
+        projectId: project.id,
+        ...annotationAnchorScopeWhere(anchorScope),
+      },
     });
 
     markUsed();

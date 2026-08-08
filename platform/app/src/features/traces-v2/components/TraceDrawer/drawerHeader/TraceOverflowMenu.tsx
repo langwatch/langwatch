@@ -7,9 +7,11 @@ import {
   LuDatabase,
   LuExternalLink,
   LuKeyboard,
+  LuListPlus,
   LuLock,
   LuLockOpen,
   LuMessagesSquare,
+  LuPencil,
   LuPin,
   LuPinOff,
   LuScanSearch,
@@ -22,6 +24,8 @@ import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { useConversationTurns } from "../../../hooks/useConversationTurns";
+import { isPreviewTraceId } from "../../../onboarding/data/samplePreviewTraces";
+import { enterTraceEditMode } from "../../../utils/traceEditMode";
 
 interface TraceOverflowMenuProps {
   traceId: string;
@@ -33,9 +37,16 @@ interface TraceOverflowMenuProps {
   onShowShortcuts: () => void;
   /** Opens the share dialog. Rendered by the header so the menu returns no JSX. */
   onShare: () => void;
+  /** Sends this trace to a person or an annotation queue. Dialog owned by the header. */
+  onAddToAnnotationQueue: () => void;
   /** Current dock state. When true the drawer stays open on outside clicks. */
   pinned: boolean;
   onTogglePinned: () => void;
+  /**
+   * Public share view. Correcting a trace is authenticated review work, so the
+   * action is absent rather than shown and refused.
+   */
+  readOnly?: boolean;
 }
 
 /**
@@ -53,12 +64,32 @@ export function TraceOverflowMenu({
   onOpenRawJson,
   onShowShortcuts,
   onShare,
+  onAddToAnnotationQueue,
   pinned,
   onTogglePinned,
+  readOnly = false,
 }: TraceOverflowMenuProps) {
   const { openDrawer } = useDrawer();
   const { project, hasPermission } = useOrganizationTeamProject();
   const canShare = hasPermission("traces:share");
+  // Queueing a trace for annotation is the same authenticated review work the
+  // correction is, so the share view leaves it out rather than relying on the
+  // reader happening to hold no permission on the project.
+  const canQueueForAnnotation =
+    !readOnly && hasPermission("annotations:create");
+  // Correcting a trace is review work, which is the permission external
+  // reviewers hold, and it is the same one the correction write itself checks.
+  // A sample preview trace is left out: it exists only to show an empty project
+  // what a trace looks like, so an edit session on one could never be saved.
+  const canEditTrace =
+    !readOnly &&
+    !isPreviewTraceId(traceId) &&
+    hasPermission("annotations:update");
+
+  const handleEditTrace = useCallback(
+    () => enterTraceEditMode(traceId),
+    [traceId],
+  );
 
   const utils = api.useUtils();
   const pinQuery = api.pinnedTrace.getPin.useQuery(
@@ -165,6 +196,27 @@ export function TraceOverflowMenu({
             <Menu.ItemCommand>
               {conversationTraceIds.length} turns
             </Menu.ItemCommand>
+          </Menu.Item>
+        )}
+
+        {canQueueForAnnotation && (
+          <Menu.Item
+            value="add-to-annotation-queue"
+            onClick={onAddToAnnotationQueue}
+          >
+            <HStack gap={2}>
+              <Icon as={LuListPlus} boxSize={3.5} />
+              <Text>Add to annotation queue</Text>
+            </HStack>
+          </Menu.Item>
+        )}
+
+        {canEditTrace && (
+          <Menu.Item value="edit-trace" onClick={handleEditTrace}>
+            <HStack gap={2}>
+              <Icon as={LuPencil} boxSize={3.5} />
+              <Text>Edit trace</Text>
+            </HStack>
           </Menu.Item>
         )}
 

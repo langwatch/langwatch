@@ -92,11 +92,13 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
     [props.selectedTraceIds, props.traceId],
   );
 
-  // Fetch traces with spans data
+  // Fetch traces with spans data. Reviewer corrections apply here so a dataset
+  // record carries exactly what the reviewer corrected.
   const tracesWithSpans = api.traces.getTracesWithSpans.useQuery(
     {
       projectId: project?.id ?? "",
       traceIds: traceIds,
+      withEditOverlay: true,
     },
     {
       enabled: !!project,
@@ -179,6 +181,10 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
         onSuccess: () => {
           trpc.dataset.getAll.invalidate();
           trpc.datasetRecord.getAll.invalidate();
+          // Whoever opened the drawer gets told the records landed, so a flow
+          // that led here can finish itself off (the annotation queue clears
+          // the marks it handed over).
+          props.onSuccess?.();
           closeDrawer();
           toaster.create({
             title: "Succesfully added to dataset",

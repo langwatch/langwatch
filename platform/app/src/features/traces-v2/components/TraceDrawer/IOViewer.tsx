@@ -45,7 +45,13 @@ import {
   type ViewFormat,
 } from "./useIOViewerState";
 
-const TRUNCATE_AT = 100_000;
+/**
+ * How much of a captured value this viewer renders before offering an
+ * expander. Exported because the inline editor refuses anything past it: an
+ * editor seeded with a truncated value would silently save the truncation.
+ */
+export const IO_DISPLAY_TRUNCATE_AT = 100_000;
+const TRUNCATE_AT = IO_DISPLAY_TRUNCATE_AT;
 // Require a meaningful tail before offering an expander — otherwise we
 // render "Show remaining 0K chars" on borderline content right at the cap.
 const TRUNCATE_TAIL_MIN = 1_000;

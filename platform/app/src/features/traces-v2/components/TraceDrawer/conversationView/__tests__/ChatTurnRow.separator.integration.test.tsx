@@ -38,9 +38,13 @@ vi.mock("../../../../hooks/useTextTranslation", () => ({
   }),
 }));
 
+/**
+ * The badge stands in as an empty marker: the tests read the ledger's text, so
+ * anything with words of its own would show up in those assertions.
+ */
 vi.mock("../TurnAnnotations", () => ({
-  TurnActionRow: () => null,
-  TurnAnnotationBadges: () => null,
+  TurnActionRow: () => <div data-testid="turn-action-row" />,
+  TurnAnnotationBadges: () => <div data-testid="turn-annotation-badges" />,
 }));
 
 vi.mock("~/components/Markdown", () => ({
@@ -84,7 +88,22 @@ function turn(over: Partial<TraceListItem>): TraceListItem {
   };
 }
 
-function renderRow(gap?: { gapSecs: number; showGap: boolean }) {
+function events(count: number): TraceListItem["events"] {
+  if (count === 0) return NO_TRACE_EVENTS;
+  return {
+    groups: [{ name: "thumbs_up", count, firstTimestamp: 1 }],
+    totalCount: count,
+    distinctCount: 1,
+  };
+}
+
+function renderRow({
+  gap,
+  eventCount = 0,
+}: {
+  gap?: { gapSecs: number; showGap: boolean };
+  eventCount?: number;
+} = {}) {
   return render(
     <ChakraProvider value={defaultSystem}>
       <ChatTurnRow
@@ -96,6 +115,7 @@ function renderRow(gap?: { gapSecs: number; showGap: boolean }) {
           outputTokens: 538,
           models: ["openai/gpt-4o"],
           timestamp: Date.now() - ONE_HOUR_MS,
+          events: events(eventCount),
         })}
         userText="a question"
         assistantText="an answer"
@@ -110,11 +130,13 @@ function renderRow(gap?: { gapSecs: number; showGap: boolean }) {
   );
 }
 
-/** The ledger row is the group wrapping the "Turn N" label. */
+/** The separator row is the group wrapping the "Turn N" label. */
+function separatorRow(): HTMLElement {
+  return screen.getByText("Turn 3").closest('[role="group"]') as HTMLElement;
+}
+
 function separatorText(): string {
-  const label = screen.getByText("Turn 3");
-  const group = label.closest('[role="group"]');
-  return group?.textContent ?? "";
+  return separatorRow()?.textContent ?? "";
 }
 
 afterEach(cleanup);
@@ -143,15 +165,88 @@ describe("ChatTurnRow separator ledger", () => {
 
   describe("given a turn preceded by a long pause", () => {
     it("renders the inter-turn gap divider", () => {
-      const { container } = renderRow({ gapSecs: 12.5, showGap: true });
+      const { container } = renderRow({
+        gap: { gapSecs: 12.5, showGap: true },
+      });
       expect(container.textContent ?? "").toMatch(/12\.5s gap/);
     });
   });
 
   describe("given the first turn, with no preceding pause", () => {
     it("does not render a gap divider", () => {
-      const { container } = renderRow({ gapSecs: 0, showGap: false });
+      const { container } = renderRow({ gap: { gapSecs: 0, showGap: false } });
       expect(container.textContent ?? "").not.toMatch(/gap/i);
+    });
+  });
+
+  describe("given a turn that recorded events", () => {
+    /** @scenario "A turn with events shows how many it recorded" */
+    it("counts them in the ledger", () => {
+      renderRow({ eventCount: 2 });
+      expect(separatorText()).toContain("2 events");
+    });
+
+    /** @scenario "A single event reads in the singular" */
+    it("reads a single event in the singular", () => {
+      renderRow({ eventCount: 1 });
+      const text = separatorText();
+      expect(text).toContain("1 event");
+      expect(text).not.toContain("1 events");
+    });
+  });
+
+  describe("given a turn that recorded no events", () => {
+    /** @scenario "A turn with no events shows no events segment" */
+    it("says nothing about events", () => {
+      renderRow({ eventCount: 0 });
+      expect(separatorText()).not.toMatch(/event/i);
+    });
+  });
+
+  describe("given a turn that carries an annotation", () => {
+    /** @scenario "The annotation badge takes its own room on the separator" */
+    it("puts the badge in the separator row rather than over it", () => {
+      renderRow();
+
+      const separator = separatorRow();
+      const badgeSlot = screen.getByTestId("turn-annotation-badges")
+        .parentElement!;
+
+      // In flow: the slot holding the badge is a child of the separator, so the
+      // badge takes its own room instead of being drawn over the ledger.
+      expect(badgeSlot.parentElement).toBe(separator);
+      expect(getComputedStyle(badgeSlot).position).not.toBe("absolute");
+    });
+
+    /** @scenario "The annotation badge takes its own room on the separator" */
+    it("keeps the hover actions floating over the end of the line", () => {
+      renderRow();
+
+      const floating = screen.getByTestId("turn-action-row").parentElement!;
+
+      expect(floating).not.toBe(separatorRow());
+      expect(getComputedStyle(floating).position).toBe("absolute");
+    });
+
+    /**
+     * A hidden action row is still a click target. Anchored to the separator's
+     * own edge it lay across the badge, and clicking the badge activated the
+     * last action under it ("Dataset") instead of opening the annotation list.
+     *
+     * @scenario "The annotation badge takes its own room on the separator"
+     */
+    it("floats the hover actions clear of the badge, not across it", () => {
+      renderRow();
+
+      const badgeSlot = screen.getByTestId("turn-annotation-badges")
+        .parentElement!;
+      const floating = screen.getByTestId("turn-action-row").parentElement!;
+
+      // Anchored to the badge's own slot, and past its far edge, so no part of
+      // the action row can ever sit on top of the badge.
+      expect(floating.parentElement).toBe(badgeSlot);
+      expect(getComputedStyle(badgeSlot).position).toBe("relative");
+      expect(getComputedStyle(floating).right).toBe("100%");
     });
   });
 });

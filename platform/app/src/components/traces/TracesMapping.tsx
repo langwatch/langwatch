@@ -134,6 +134,7 @@ export const TracesMapping = ({
   setTraceMapping,
   disableExpansions,
   skipSettingDefaultEdges,
+  shouldApplyCorrections = false,
 }: {
   titles?: string[];
   traces: Trace[];
@@ -160,6 +161,14 @@ export const TracesMapping = ({
    * @Author: @drewdrewthis
    */
   skipSettingDefaultEdges?: boolean;
+  /**
+   * Whether the traces handed in already carry the reviewer's corrections.
+   * The thread this mapping reads for its `thread_*` columns then has to be
+   * read the same way, or one column would quote the corrected conversation
+   * while the next quotes the captured one. Only the dataset path asks for
+   * corrections, so this stays off everywhere else.
+   */
+  shouldApplyCorrections?: boolean;
 }) => {
   const { project } = useOrganizationTeamProject();
 
@@ -184,11 +193,14 @@ export const TracesMapping = ({
     return Array.from(new Set(ids));
   }, [traces]);
 
-  // Fetch all traces for these thread_ids
+  // Fetch all traces for these thread_ids, read the same way the traces being
+  // mapped were: a thread_* column and a trace column filled from the same
+  // surface must not disagree about what the conversation said.
   const allThreadTraces = api.traces.getTracesWithSpansByThreadIds.useQuery(
     {
       projectId: project?.id ?? "",
       threadIds,
+      withEditOverlay: shouldApplyCorrections,
     },
     {
       enabled: !!project?.id && threadIds.length > 0,

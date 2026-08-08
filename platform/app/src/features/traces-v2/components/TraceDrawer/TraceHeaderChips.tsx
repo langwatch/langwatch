@@ -1,5 +1,6 @@
 import { Box, Circle, HStack, Icon, Text, VStack } from "@chakra-ui/react";
 import { Lightbulb } from "lucide-react";
+import { useMemo } from "react";
 import {
   LuBookMarked,
   LuCircleAlert,
@@ -13,11 +14,10 @@ import {
   LuTriangleAlert,
 } from "react-icons/lu";
 import { UserAvatar } from "~/components/UserAvatar";
-import { useAnnotationsByTraceIds } from "~/hooks/useAnnotationsByTraceIds";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { TraceHeader } from "~/server/api/routers/tracesV2.schemas";
 import type { EvalChipDisplay } from "~/utils/evaluationResults";
 import { getEvalChipDisplay } from "~/utils/evaluationResults";
+import { useConversationAnnotations } from "../../hooks/useConversationAnnotations";
 import { useConversationTurns } from "../../hooks/useConversationTurns";
 import type { RichEval } from "../../hooks/useTraceEvaluations";
 import {
@@ -26,6 +26,7 @@ import {
   type TraceHeaderChipData,
   useTraceHeaderChips,
 } from "../../hooks/useTraceHeaderChips";
+import { useDrawerStore } from "../../stores/drawerStore";
 import type { ChipDef } from "./ChipBar";
 import { ChipBar } from "./ChipBar";
 import { buildScenarioChipDef } from "./ScenarioChip";
@@ -89,27 +90,26 @@ export function useTraceHeaderChipDefs(
 
 /**
  * Header chip listing annotations on this trace + every other turn in the
- * same conversation. Hidden when there are zero. Click to peek at the list;
- * clicking an entry doesn't edit (kept lightweight) — the conversation
- * view's Annotations mode is the place for editing the rollup.
+ * same conversation. Hidden when there are zero. Click to peek at the list and
+ * land in the Conversation view, where each annotation reads beside the turn
+ * it is about and can be edited there.
  */
 function useAnnotationsChip(trace: TraceHeader): ChipDef | null {
-  const { project, hasPermission } = useOrganizationTeamProject();
   const conversation = useConversationTurns(trace.conversationId ?? null);
-  const traceIds = [
-    trace.traceId,
-    ...(conversation.data?.items ?? [])
-      .map((t) => t.traceId)
-      .filter((id) => id !== trace.traceId),
-  ];
+  const setViewMode = useDrawerStore((s) => s.setViewMode);
+  const traceIds = useMemo(
+    () => [
+      trace.traceId,
+      ...(conversation.data?.items ?? [])
+        .map((t) => t.traceId)
+        .filter((id) => id !== trace.traceId),
+    ],
+    [trace.traceId, conversation.data?.items],
+  );
 
-  const annotations = useAnnotationsByTraceIds({
-    projectId: project?.id ?? "",
-    traceIds,
-    enabled: !!project?.id && hasPermission("annotations:view"),
-  });
+  const annotations = useConversationAnnotations(traceIds);
 
-  const items = annotations.data ?? [];
+  const items = annotations.all;
   if (items.length === 0) return null;
   const hasCorrection = items.some((a) => a.expectedOutput);
 
@@ -120,6 +120,11 @@ function useAnnotationsChip(trace: TraceHeader): ChipDef | null {
     icon: LuMessageSquare,
     tone: "yellow",
     priority: 1,
+    // A threadless trace has no conversation to switch to; the popover list
+    // is all there is.
+    onClick: trace.conversationId
+      ? () => setViewMode("conversation")
+      : undefined,
     popover: (
       <VStack
         align="stretch"
@@ -175,7 +180,7 @@ function useAnnotationsChip(trace: TraceHeader): ChipDef | null {
         </VStack>
         <Box height="1px" bg="border.muted" marginX={-3} />
         <Text textStyle="2xs" color="fg.subtle">
-          Open Conversation → Annotations to edit.
+          Annotations appear beside each turn in the Conversation view.
         </Text>
       </VStack>
     ),

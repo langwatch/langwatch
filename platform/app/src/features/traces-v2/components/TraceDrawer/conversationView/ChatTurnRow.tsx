@@ -8,9 +8,18 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { AlertTriangle, Lightbulb, MessageSquare } from "lucide-react";
-import { memo, useCallback, useEffect, useMemo, useState } from "react";
+import {
+  Fragment,
+  memo,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import { Markdown } from "~/components/Markdown";
+import { TraceMediaStrip } from "~/components/traces/TraceMediaStrip";
 import { RedactedInline } from "~/components/ui/RedactedField";
+import type { MediaPartData } from "~/shared/traces/mediaParts";
 import type { RouterOutputs } from "~/utils/api";
 import { TRANSLATE_TEXT_MAX_CHARS } from "~/utils/constants";
 import { useTextTranslation } from "../../../hooks/useTextTranslation";
@@ -38,12 +47,20 @@ import { formatGap } from "./utils";
 
 type AnnotationItem = RouterOutputs["annotation"]["getByTraceIds"][number];
 const EMPTY_ANNOTATIONS: AnnotationItem[] = [];
+const EMPTY_MEDIA: MediaPartData[] = [];
 
 interface ChatTurnRowProps {
   turn: TraceListItem;
   userText: string;
   assistantText: string;
   assistantReasoning: string;
+  /**
+   * Media recorded on the turn's input side, rendered under the user message
+   * in thread layout. The side bubbles render no media yet.
+   */
+  userMedia?: MediaPartData[];
+  /** Media recorded on the turn's output side, rendered under the reply. */
+  assistantMedia?: MediaPartData[];
   /** Wall-clock seconds between the previous turn's end and this turn's start. */
   gapSecs: number;
   /** Whether the inter-turn gap is long enough to surface as a divider. */
@@ -59,6 +76,8 @@ interface ChatTurnRowProps {
    * marker and seeds the inline badge popover.
    */
   annotationItems?: AnnotationItem[];
+  /** Route Annotate and Suggest to the rail composer instead of a popover. */
+  shouldUseRailComposer?: boolean;
 }
 
 export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
@@ -66,6 +85,8 @@ export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
   userText: originalUserText,
   assistantText: originalAssistantText,
   assistantReasoning,
+  userMedia = EMPTY_MEDIA,
+  assistantMedia = EMPTY_MEDIA,
   gapSecs,
   showGap,
   index,
@@ -73,6 +94,7 @@ export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
   onSelect,
   layout = "bubbles",
   annotationItems = EMPTY_ANNOTATIONS,
+  shouldUseRailComposer = false,
 }) {
   const handleSelect = useCallback(
     () => onSelect(turn.traceId),
@@ -123,6 +145,21 @@ export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
   // reads "Assistant" normally and "Agent" in scenario mode.
   const assistantLabel = turn.models[0] || assistantVisuals.bubbleLabel;
 
+  // A field a privacy rule hid never renders the media that was hidden with
+  // it. The server drops the references alongside the text; this is the
+  // render-side half of the same rule, so a reference that outlives its
+  // content still shows nothing.
+  const visibleUserMedia = turn.inputRedacted ? EMPTY_MEDIA : userMedia;
+  const visibleAssistantMedia = turn.outputRedacted
+    ? EMPTY_MEDIA
+    : assistantMedia;
+  // Only the thread layout has a message body to hang media off, so it is the
+  // only one where media on its own is reason enough to draw a message: a
+  // voice turn that recorded no transcript would otherwise lose its recording.
+  const hasUserMedia = layout === "thread" && visibleUserMedia.length > 0;
+  const hasAssistantMedia =
+    layout === "thread" && visibleAssistantMedia.length > 0;
+
   return (
     <VStack align="stretch" gap={layout === "thread" ? 1 : 2}>
       {showGap && (
@@ -144,6 +181,7 @@ export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
         // no "opposite side" to anchor the inline actions to — pin them right.
         assistantSide={layout === "thread" ? "right" : assistantSide}
         annotationItems={annotationItems}
+        shouldUseRailComposer={shouldUseRailComposer}
         translation={{
           isActive: translation.isActive,
           isLoading: translation.isLoading,
@@ -151,7 +189,7 @@ export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
         }}
       />
 
-      {userText ? (
+      {userText || hasUserMedia ? (
         <TurnMessage
           layout={layout}
           side={userSide}
@@ -159,6 +197,7 @@ export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
           label={userVisuals.bubbleLabel}
           icon={<UserIcon />}
           text={userText}
+          media={visibleUserMedia}
           isSelected={isCurrent}
           onClick={handleSelect}
         />
@@ -205,6 +244,7 @@ export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
           icon={<AssistantIcon />}
           text={assistantText}
           reasoning={assistantReasoning}
+          media={visibleAssistantMedia}
           isSelected={isCurrent}
           onClick={handleSelect}
           annotation={annotationSummary}
@@ -218,11 +258,12 @@ export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
           icon={<AlertTriangle />}
           text={turn.error}
           reasoning={assistantReasoning}
+          media={visibleAssistantMedia}
           isSelected={isCurrent}
           onClick={handleSelect}
           annotation={annotationSummary}
         />
-      ) : assistantReasoning ? (
+      ) : assistantReasoning || hasAssistantMedia ? (
         <TurnMessage
           layout={layout}
           side={assistantSide}
@@ -231,6 +272,7 @@ export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
           icon={<AssistantIcon />}
           text=""
           reasoning={assistantReasoning}
+          media={visibleAssistantMedia}
           isSelected={isCurrent}
           onClick={handleSelect}
           annotation={annotationSummary}
@@ -335,6 +377,8 @@ interface TurnMessageProps {
   icon: React.ReactNode;
   text: string;
   reasoning?: string;
+  /** Media recorded on this message's side of the turn. Thread layout only. */
+  media?: MediaPartData[];
   isSelected?: boolean;
   onClick?: () => void;
   annotation?: { count: number; hasCorrection: boolean };
@@ -346,9 +390,9 @@ interface TurnMessageProps {
  * same tone / label / annotation inputs so toggling the layout never changes
  * what's shown, only how it's arranged.
  */
-function TurnMessage({ layout, side, ...rest }: TurnMessageProps) {
+function TurnMessage({ layout, side, media, ...rest }: TurnMessageProps) {
   if (layout === "thread") {
-    return <ThreadMessage {...rest} />;
+    return <ThreadMessage media={media} {...rest} />;
   }
   return <Bubble side={side} size="compact" maxChars={500} {...rest} />;
 }
@@ -369,6 +413,7 @@ function ThreadMessage({
   icon,
   text,
   reasoning,
+  media = EMPTY_MEDIA,
   onClick,
   annotation,
 }: Omit<TurnMessageProps, "layout" | "side">) {
@@ -489,8 +534,110 @@ function ThreadMessage({
             onToggle={() => setExpanded((v) => !v)}
           />
         )}
+
+        {/* Recordings, images and attachments sit under the prose they came
+            with, the way attachments sit under an email body. Clicks stay on
+            the widget so scrubbing a player doesn't navigate to the turn. */}
+        {media.length > 0 && (
+          <Box
+            paddingTop={2}
+            onClick={(e: React.MouseEvent) => e.stopPropagation()}
+          >
+            <TraceMediaStrip parts={media} />
+          </Box>
+        )}
       </Box>
     </Flex>
+  );
+}
+
+interface LedgerSegment {
+  id: string;
+  text: string;
+}
+
+/**
+ * The scannable few fields a separator carries, in reading order: duration,
+ * latency, cost, how many events the turn recorded, and how long ago it ran. A
+ * field the turn has nothing to say about is left out rather than shown as
+ * zero. The model abbreviation and the raw input→output token count read as
+ * cryptic here, and live in the trace header and metrics instead.
+ */
+function turnLedgerSegments(turn: TraceListItem): LedgerSegment[] {
+  const segments: LedgerSegment[] = [
+    { id: "duration", text: formatDuration(turn.durationMs) },
+  ];
+  if (turn.ttft != null && turn.ttft > 0) {
+    segments.push({ id: "ttft", text: `ttft ${formatDuration(turn.ttft)}` });
+  }
+  if ((turn.totalCost ?? 0) > 0) {
+    segments.push({ id: "cost", text: formatCost(turn.totalCost) });
+  }
+  // The count only: the legacy thread view also drew the vote an event
+  // carried, and the conversation's turn data has no event metrics for it.
+  const eventCount = turn.events.totalCount;
+  if (eventCount > 0) {
+    segments.push({
+      id: "events",
+      text: `${eventCount} ${eventCount === 1 ? "event" : "events"}`,
+    });
+  }
+  segments.push({ id: "age", text: formatRelativeTimeAgo(turn.timestamp) });
+  return segments;
+}
+
+function Sep() {
+  return (
+    <Text textStyle="2xs" color="fg.subtle">
+      ·
+    </Text>
+  );
+}
+
+/** Which turn this is, what it cost to run, and whether it failed. */
+function TurnLedger({
+  index,
+  turn,
+  isCurrent,
+}: {
+  index: number;
+  turn: TraceListItem;
+  isCurrent: boolean;
+}) {
+  return (
+    <HStack gap={1.5} flexShrink={0} flexWrap="wrap" justify="center">
+      <Text
+        textStyle="2xs"
+        color={isCurrent ? "blue.fg" : "fg.subtle"}
+        fontWeight="600"
+        textTransform="uppercase"
+        letterSpacing="0.06em"
+      >
+        Turn {index}
+      </Text>
+      {turnLedgerSegments(turn).map((segment) => (
+        <Fragment key={segment.id}>
+          <Sep />
+          <Text textStyle="2xs" color="fg.subtle">
+            {segment.text}
+          </Text>
+        </Fragment>
+      ))}
+      {turn.status === "error" && (
+        <>
+          <Sep />
+          <Text
+            textStyle="2xs"
+            color="red.fg"
+            fontWeight="600"
+            textTransform="uppercase"
+            letterSpacing="0.06em"
+          >
+            error
+          </Text>
+        </>
+      )}
+    </HStack>
   );
 }
 
@@ -501,6 +648,7 @@ const TurnSeparator: React.FC<{
   onSelect: () => void;
   assistantSide: "left" | "right";
   annotationItems: AnnotationItem[];
+  shouldUseRailComposer: boolean;
   translation: {
     isActive: boolean;
     isLoading: boolean;
@@ -513,22 +661,54 @@ const TurnSeparator: React.FC<{
   onSelect,
   assistantSide,
   annotationItems,
+  shouldUseRailComposer,
   translation,
 }) => {
-  // Keep the separator to a scannable few fields: duration, latency, cost,
-  // relative time, error state. The model abbreviation and the raw
-  // input→output token count read as cryptic here (they live in the trace
-  // header / metrics), so they're intentionally left off.
-  const hasCost = (turn.totalCost ?? 0) > 0;
-  const isError = turn.status === "error";
-
-  const Sep = () => (
-    <Text textStyle="2xs" color="fg.subtle">
-      ·
-    </Text>
-  );
-
   const annotationsOnLeft = assistantSide === "left";
+  /*
+   * Hover actions float over one end of the separator instead of sitting in
+   * flow: the hidden chrome used to reserve ~180px of width, stopping the
+   * divider line short of the edge. Absolutely positioned, the lines span the
+   * full width and the actions overlay the end while the pointer is on the
+   * turn.
+   *
+   * The badge stays in flow, because it is on screen the whole time a turn
+   * carries an annotation and overlaying it would cover the ledger. That puts
+   * it at the same end as the actions, so the actions anchor to the badge
+   * rather than to the separator: a hidden action row is still a click target,
+   * and one lying across the badge swallows the click that opens the
+   * annotation list.
+   */
+  const badgeAnchor = annotationsOnLeft
+    ? { left: "100%", marginLeft: 2 }
+    : { right: "100%", marginRight: 2 };
+  const badgesWithActions = (
+    <Box position="relative" display="flex" alignItems="center" flexShrink={0}>
+      <TurnAnnotationBadges
+        traceId={turn.traceId}
+        output={turn.output}
+        prefetchedItems={annotationItems}
+      />
+      <HStack
+        position="absolute"
+        top="50%"
+        transform="translateY(-50%)"
+        gap={1}
+        // Shrink-to-fit would size the actions against the badge slot they are
+        // anchored to and let them wrap, or spill back over the badge.
+        width="max-content"
+        {...badgeAnchor}
+        onClick={(e: React.MouseEvent) => e.stopPropagation()}
+      >
+        <TurnActionRow
+          traceId={turn.traceId}
+          output={turn.output}
+          translation={translation}
+          shouldUseRailComposer={shouldUseRailComposer}
+        />
+      </HStack>
+    </Box>
+  );
   return (
     <Flex
       position="relative"
@@ -536,9 +716,14 @@ const TurnSeparator: React.FC<{
       gap={2}
       cursor="pointer"
       onClick={onSelect}
+      // `className="group"` is what `_groupHover` on the action row resolves
+      // against; the role is what tells a reader the separator and its actions
+      // are one thing.
+      className="group"
       role="group"
       _hover={{ "& > .turn-line": { bg: "border.emphasized" } }}
     >
+      {annotationsOnLeft && badgesWithActions}
       <Box
         className="turn-line"
         height="1px"
@@ -546,55 +731,7 @@ const TurnSeparator: React.FC<{
         bg={isCurrent ? "blue.solid" : "border.muted"}
         transition="background 0.12s ease"
       />
-      <HStack gap={1.5} flexShrink={0} flexWrap="wrap" justify="center">
-        <Text
-          textStyle="2xs"
-          color={isCurrent ? "blue.fg" : "fg.subtle"}
-          fontWeight="600"
-          textTransform="uppercase"
-          letterSpacing="0.06em"
-        >
-          Turn {index}
-        </Text>
-        <Sep />
-        <Text textStyle="2xs" color="fg.subtle">
-          {formatDuration(turn.durationMs)}
-        </Text>
-        {turn.ttft != null && turn.ttft > 0 && (
-          <>
-            <Sep />
-            <Text textStyle="2xs" color="fg.subtle">
-              ttft {formatDuration(turn.ttft)}
-            </Text>
-          </>
-        )}
-        {hasCost && (
-          <>
-            <Sep />
-            <Text textStyle="2xs" color="fg.subtle">
-              {formatCost(turn.totalCost)}
-            </Text>
-          </>
-        )}
-        <Sep />
-        <Text textStyle="2xs" color="fg.subtle">
-          {formatRelativeTimeAgo(turn.timestamp)}
-        </Text>
-        {isError && (
-          <>
-            <Sep />
-            <Text
-              textStyle="2xs"
-              color="red.fg"
-              fontWeight="600"
-              textTransform="uppercase"
-              letterSpacing="0.06em"
-            >
-              error
-            </Text>
-          </>
-        )}
-      </HStack>
+      <TurnLedger index={index} turn={turn} isCurrent={isCurrent} />
       <Box
         className="turn-line"
         height="1px"
@@ -602,30 +739,7 @@ const TurnSeparator: React.FC<{
         bg={isCurrent ? "blue.solid" : "border.muted"}
         transition="background 0.12s ease"
       />
-      {/* Inline actions float over one end of the separator instead of
-          sitting in flow — the hidden hover chrome used to reserve ~180px of
-          width, stopping the divider line short of the edge. Absolutely
-          positioned, the lines now span the full width and the badge/actions
-          overlay the end (badges only when present, actions on hover). */}
-      <HStack
-        position="absolute"
-        top="50%"
-        transform="translateY(-50%)"
-        gap={1}
-        {...(annotationsOnLeft ? { left: 0 } : { right: 0 })}
-        onClick={(e: React.MouseEvent) => e.stopPropagation()}
-      >
-        <TurnAnnotationBadges
-          traceId={turn.traceId}
-          output={turn.output}
-          prefetchedItems={annotationItems}
-        />
-        <TurnActionRow
-          traceId={turn.traceId}
-          output={turn.output}
-          translation={translation}
-        />
-      </HStack>
+      {!annotationsOnLeft && badgesWithActions}
     </Flex>
   );
 };

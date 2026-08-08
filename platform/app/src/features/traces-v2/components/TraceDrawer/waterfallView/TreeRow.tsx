@@ -6,7 +6,9 @@ import {
   LuChevronRight,
   LuPin,
   LuPinOff,
+  LuRotateCcw,
   LuSparkles,
+  LuTrash2,
   LuTriangleAlert,
 } from "react-icons/lu";
 import { Tooltip } from "~/components/ui/tooltip";
@@ -40,6 +42,12 @@ export const TreeRow = memo(function TreeRow({
   hiddenDescendantCount,
   isDimmed,
   signals,
+  isEditing = false,
+  isDraftDeleted = false,
+  isCorrected = false,
+  isDeletedByCorrection = false,
+  draftName,
+  onToggleDelete,
   onToggleCollapse,
   onSelect,
   onTogglePin,
@@ -67,6 +75,25 @@ export const TreeRow = memo(function TreeRow({
   hiddenDescendantCount: number;
   isDimmed: boolean;
   signals: readonly LangwatchSignalBucket[];
+  /** True while the reviewer is correcting this trace. */
+  isEditing?: boolean;
+  /** True when the correction removes this span (or an ancestor of it). */
+  isDraftDeleted?: boolean;
+  /** True when a stored correction changes this span. Tints the row green. */
+  isCorrected?: boolean;
+  /**
+   * True when a stored correction removes this span and the reader is looking
+   * at the captured trace, where it is still listed.
+   */
+  isDeletedByCorrection?: boolean;
+  /**
+   * The name an unsaved rename gives this span. The row reads with it while the
+   * reviewer is editing, so a rename lands where they can see it instead of
+   * only appearing once the correction is saved.
+   */
+  draftName?: string;
+  /** Removes or brings back this span. Only wired while editing. */
+  onToggleDelete?: (spanId: string) => void;
   onToggleCollapse: (spanId: string) => void;
   onSelect: (spanId: string) => void;
   /** Toggle pin state for this span — fired by the hover-revealed icon. */
@@ -94,6 +121,16 @@ export const TreeRow = memo(function TreeRow({
   // boolean so only the row whose pulse flips actually re-renders, the
   // rest of the virtualized list stays untouched.
   const isPulsing = useSpanPulseStore((s) => s.pulsingIds.has(span.spanId));
+  // What the span is called right now: the pending rename while the reviewer is
+  // editing, the captured name otherwise.
+  const displayName = draftName ?? span.name;
+  // A pending rename reads the same way a saved correction does, so an edit
+  // looks like an edit before it is saved.
+  const isEdited = isCorrected || draftName !== undefined;
+  // Removal is the whole of the change for a span the correction deletes, and
+  // the red marker is what says it. The green "changed" wash would only argue
+  // with it, so it stays off those rows.
+  const showsCorrectedTint = isEdited && !isDeletedByCorrection;
   const isError = span.status === "error";
   const isLlm = span.type === "llm" && span.model != null;
   // A named tool span gets the same two-line treatment as an LLM span: the
@@ -131,7 +168,7 @@ export const TreeRow = memo(function TreeRow({
         color="fg"
         wordBreak="break-word"
       >
-        {span.name}
+        {displayName}
       </Text>
       <HStack gap={1.5} marginTop={1} flexWrap="wrap">
         <Text
@@ -311,17 +348,33 @@ export const TreeRow = memo(function TreeRow({
               ? { base: "bg.emphasized", _dark: "blue.subtle" }
               : isHovered
                 ? "colorPalette.subtle/40"
-                : undefined
+                : showsCorrectedTint
+                  ? "green.subtle"
+                  : undefined
+          }
+          // Edge tick on a corrected row so a change is spottable while
+          // scanning the tree, not only once the row is read.
+          boxShadow={
+            showsCorrectedTint
+              ? "inset 2px 0 0 var(--chakra-colors-green-solid)"
+              : undefined
           }
           // Dark mode keeps the pre-PR behaviour of fading non-selected
           // rows when one is picked — the dark theme depends on that
           // contrast to keep the focus row "popping". Light mode stays
           // at full opacity (the neutral grey selection bg already
           // pulls the eye there without help).
-          opacity={{
-            base: 1,
-            _dark: isDimmed && !isSelected && !isHovered ? 0.4 : 1,
-          }}
+          // A span the correction removes stays visible but reads as gone, so
+          // the reviewer can see the shape of what they are cutting (and undo
+          // it) rather than watching rows disappear one at a time.
+          opacity={
+            isDraftDeleted
+              ? 0.45
+              : {
+                  base: 1,
+                  _dark: isDimmed && !isSelected && !isHovered ? 0.4 : 1,
+                }
+          }
           _hover={{
             bg: isSelected
               ? { base: "bg.emphasized", _dark: "blue.subtle" }
@@ -401,11 +454,15 @@ export const TreeRow = memo(function TreeRow({
               <Text
                 textStyle="xs"
                 color={isError ? "red.fg" : "fg"}
+                textDecoration={isDraftDeleted ? "line-through" : undefined}
                 truncate
                 minWidth={0}
                 lineHeight={1.2}
+                // The badges beside it can squeeze the name down to a few
+                // characters, so the name carries the whole of itself.
+                title={displayName}
               >
-                {span.name}
+                {displayName}
               </Text>
               {/* Book icon (the Prompts nav glyph) flags spans that used a
                   managed prompt, so prompt-bearing spans are spottable in
@@ -433,6 +490,40 @@ export const TreeRow = memo(function TreeRow({
                 >
                   <ScrollText />
                 </Icon>
+              )}
+              {/* The row's green wash and edge tick are colour, which a reader
+                  who cannot separate the hues has nothing to read. The badge
+                  says the same thing in words, the way the deleted one does. */}
+              {showsCorrectedTint && (
+                <Text
+                  textStyle="2xs"
+                  color="green.fg"
+                  bg="green.subtle"
+                  paddingX={1.5}
+                  borderRadius="sm"
+                  fontWeight="semibold"
+                  flexShrink={0}
+                  lineHeight={1.4}
+                >
+                  Edited
+                </Text>
+              )}
+              {/* A span the stored correction removes is still listed while
+                  the reader is on the captured trace, and the badge is what
+                  tells them the corrected trace does not have it. */}
+              {isDeletedByCorrection && (
+                <Text
+                  textStyle="2xs"
+                  color="red.fg"
+                  bg="red.subtle"
+                  paddingX={1.5}
+                  borderRadius="sm"
+                  fontWeight="semibold"
+                  flexShrink={0}
+                  lineHeight={1.4}
+                >
+                  Deleted
+                </Text>
               )}
               {/* Hidden-descendant count — a collapsed parent says how
                   much it's hiding, so plain collapse reads differently
@@ -496,6 +587,54 @@ export const TreeRow = memo(function TreeRow({
               flexShrink={0}
               marginLeft={1}
             />
+          )}
+
+          {/* Delete and restore, only while the trace is being corrected.
+              Shown for a span the correction already removes so bringing it
+              back never depends on finding the right row to hover. */}
+          {isEditing && onToggleDelete && (
+            <Tooltip
+              content={isDraftDeleted ? "Restore span" : "Delete span"}
+              positioning={{ placement: "top" }}
+              openDelay={400}
+            >
+              <Flex
+                as="button"
+                width="20px"
+                height="20px"
+                align="center"
+                justify="center"
+                flexShrink={0}
+                marginLeft={1}
+                borderRadius="xs"
+                color={isDraftDeleted ? "fg" : "red.fg"}
+                opacity={isDraftDeleted || isHovered ? 1 : 0}
+                pointerEvents={isDraftDeleted || isHovered ? "auto" : "none"}
+                tabIndex={isDraftDeleted || isHovered ? 0 : -1}
+                aria-hidden={!isDraftDeleted && !isHovered}
+                _hover={{ bg: "bg.emphasized" }}
+                _focusVisible={{ opacity: 1, bg: "bg.emphasized" }}
+                transition="opacity 0.1s ease"
+                cursor="pointer"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onToggleDelete(span.spanId);
+                }}
+                // Named after the span it acts on: every row carries one of
+                // these, and "Delete span" on all of them tells a screen reader
+                // user nothing about which one they are on.
+                aria-label={
+                  isDraftDeleted
+                    ? `Restore span ${displayName}`
+                    : `Delete span ${displayName}`
+                }
+              >
+                <Icon
+                  as={isDraftDeleted ? LuRotateCcw : LuTrash2}
+                  boxSize={3}
+                />
+              </Flex>
+            </Tooltip>
           )}
 
           {/* Pin toggle — hover-revealed on the row (or always shown when

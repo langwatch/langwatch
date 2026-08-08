@@ -159,6 +159,52 @@ function LabelResizeHandle({
   );
 }
 
+/**
+ * Turns the span attributes section into an editor. Resource attributes are
+ * never editable: they describe the process that emitted the span, not what the
+ * span did, so there is nothing about them a reviewer would be correcting.
+ */
+export interface AttributeEditing {
+  /** Per-key overrides on the captured attributes. `null` marks it removed. */
+  edits: Record<string, unknown>;
+  onEditAttribute: (params: { key: string; value: unknown }) => void;
+  /** Drops the override for a key, returning it to what was captured. */
+  onResetAttribute: (key: string) => void;
+  /**
+   * Whether this key can be corrected at all. Absent means every key can,
+   * which is the span case; the trace's own metadata carries keys that decide
+   * where the trace belongs and are read-only.
+   */
+  isKeyEditable?: (key: string) => boolean;
+}
+
+/**
+ * Reads an attribute value out of a text field. Numbers, booleans and JSON keep
+ * their shape; anything else stays the string the reviewer typed.
+ *
+ * A value the trace recorded as text stays text however JSON-shaped it looks.
+ * Reading it back as a structure would rewrite what the trace says into
+ * something it never carried, and every leaf of that structure would then read
+ * as an attribute the correction added.
+ */
+export function parseAttributeInput({
+  text,
+  baseline,
+}: {
+  text: string;
+  /** What the trace recorded here, when it recorded anything. */
+  baseline?: unknown;
+}): unknown {
+  if (typeof baseline === "string") return text;
+  const trimmed = text.trim();
+  if (trimmed.length === 0) return text;
+  try {
+    return JSON.parse(trimmed);
+  } catch {
+    return text;
+  }
+}
+
 interface AttributeTableProps {
   attributes: Record<string, unknown>;
   resourceAttributes?: Record<string, unknown>;
@@ -175,6 +221,41 @@ interface AttributeTableProps {
    * first regardless of search / pinning and can't be pinned to the header.
    */
   spanId?: string;
+  /** Present while the reviewer is correcting this span's attributes. */
+  editing?: AttributeEditing;
+  /**
+   * The attributes as captured, when a stored correction replaced them. Rows
+   * that differ are marked so a reader can see which values are corrections and
+   * hover each one for what the trace originally carried.
+   */
+  correctedFrom?: Record<string, unknown>;
+}
+
+/** How one row differs from what was captured. */
+interface AttributeCorrection {
+  /** The captured value rendered for the tooltip, or null when it is new. */
+  original: string | null;
+}
+
+/**
+ * The captured key one flat key sits underneath, when the capture had one.
+ * Walks the dotted path from the longest prefix down, so the nearest captured
+ * ancestor wins.
+ */
+function capturedAncestorKey({
+  key,
+  capturedFlat,
+}: {
+  key: string;
+  capturedFlat: Record<string, unknown>;
+}): string | null {
+  let cut = key.lastIndexOf(".");
+  while (cut > 0) {
+    const prefix = key.slice(0, cut);
+    if (prefix in capturedFlat) return prefix;
+    cut = key.lastIndexOf(".", cut - 1);
+  }
+  return null;
 }
 
 /** Synthetic, always-first row key for the injected span id. */
@@ -378,6 +459,47 @@ function RestrictionMarker({ visibleTo, canSee }: AttributeRestriction) {
   );
 }
 
+/**
+ * Marks one attribute a correction replaced or added, with the captured value
+ * in the tooltip. An attribute value is a scalar, so the whole of it fits
+ * there and the reader never has to open anything to compare.
+ */
+function CorrectionMarker({
+  attrKey,
+  original,
+}: {
+  attrKey: string;
+  original: string | null;
+}) {
+  const label =
+    original === null
+      ? `${attrKey}, added by an edit`
+      : `${attrKey}, edited. Original: ${original}`;
+  return (
+    <Tooltip
+      content={original === null ? "Added by an edit" : `Original: ${original}`}
+      positioning={{ placement: "top" }}
+    >
+      <Text
+        as="span"
+        textStyle="2xs"
+        fontWeight="semibold"
+        color="green.fg"
+        bg="green.subtle"
+        borderWidth="1px"
+        borderColor="green.muted"
+        borderRadius="sm"
+        paddingX={1.5}
+        flexShrink={0}
+        cursor="help"
+        aria-label={label}
+      >
+        Edited
+      </Text>
+    </Tooltip>
+  );
+}
+
 function CopyAllButton({ payload }: { payload: string }) {
   const { copied, copy } = useCopyToClipboard();
   const handleClick = () => copy(payload);
@@ -419,6 +541,205 @@ function isApiKeyIdRow(attrKey: string, value: unknown): value is string {
   );
 }
 
+/** How one row behaves while the reviewer is correcting the span. */
+interface RowEditing {
+  /** True when the correction removes this key. */
+  isRemoved: boolean;
+  /** True when the correction replaces this key's value. */
+  isChanged: boolean;
+  /** What the trace recorded here, so an edit keeps the shape it had. */
+  baseline: unknown;
+  onChangeValue: (value: unknown) => void;
+  onRemove: () => void;
+  onRestore: () => void;
+}
+
+/**
+ * The value cell while editing: a text field for the value, plus remove and
+ * restore. A removed key stays on screen struck through rather than vanishing,
+ * so the reviewer can see (and undo) what the correction takes away.
+ */
+function EditableValueCell({
+  attrKey,
+  value,
+  editing,
+}: {
+  attrKey: string;
+  value: unknown;
+  editing: RowEditing;
+}) {
+  const display = formatValue(value);
+  // `formatValue` is the read-only renderer and answers an em dash for an
+  // empty value, which must never become text the reviewer is editing.
+  const editorText =
+    value === undefined || value === null
+      ? ""
+      : typeof value === "object"
+        ? JSON.stringify(value)
+        : String(value);
+
+  if (editing.isRemoved) {
+    return (
+      <HStack flex={1} minWidth={0} gap={2} paddingY={1}>
+        <Text
+          flex={1}
+          minWidth={0}
+          textStyle="xs"
+          fontFamily="mono"
+          color="fg.subtle"
+          textDecoration="line-through"
+          truncate
+        >
+          {display}
+        </Text>
+        <Button
+          size="xs"
+          variant="ghost"
+          onClick={editing.onRestore}
+          aria-label={`Restore ${attrKey}`}
+        >
+          <Text textStyle="2xs">Restore</Text>
+        </Button>
+      </HStack>
+    );
+  }
+
+  return (
+    <HStack flex={1} minWidth={0} gap={2} paddingY={1}>
+      <Input
+        size="xs"
+        aria-label={`Edit ${attrKey}`}
+        value={editorText}
+        onChange={(e) =>
+          editing.onChangeValue(
+            parseAttributeInput({
+              text: e.target.value,
+              baseline: editing.baseline,
+            }),
+          )
+        }
+        fontFamily="mono"
+        bg={editing.isChanged ? "green.subtle" : undefined}
+        borderColor={editing.isChanged ? "green.muted" : "border.muted"}
+      />
+      <Button
+        size="xs"
+        variant="ghost"
+        onClick={editing.onRemove}
+        aria-label={`Remove ${attrKey}`}
+      >
+        <Text textStyle="2xs">Remove</Text>
+      </Button>
+    </HStack>
+  );
+}
+
+/** A corrected row is tinted and ticked; a pinned one is only tinted. */
+function rowHighlight({
+  isCorrected,
+  isPinned,
+}: {
+  isCorrected: boolean;
+  isPinned: boolean;
+}): { bg?: string; boxShadow?: string } {
+  if (isCorrected) {
+    return {
+      bg: "green.subtle",
+      boxShadow: "inset 2px 0 0 var(--chakra-colors-green-solid)",
+    };
+  }
+  if (isPinned) return { bg: "bg.subtle" };
+  return {};
+}
+
+function RowLabelCell({
+  attrKey,
+  labelWidth,
+  isPinned,
+  isRemoved,
+}: {
+  attrKey: string;
+  labelWidth: number;
+  isPinned: boolean;
+  /** The correction removes this attribute, so the name is struck through. */
+  isRemoved: boolean;
+}) {
+  return (
+    <Tooltip
+      content={attrKey}
+      openDelay={250}
+      positioning={{ placement: "top-start" }}
+    >
+      <Text
+        width={`${labelWidth}px`}
+        flexShrink={0}
+        textStyle="xs"
+        fontFamily="mono"
+        color={isPinned ? "fg" : "fg.muted"}
+        fontWeight={isPinned ? "semibold" : "normal"}
+        textDecoration={isRemoved ? "line-through" : undefined}
+        truncate
+        paddingX={3}
+        paddingY={1.5}
+        bg="bg.subtle"
+        transition="color 0.12s ease, font-weight 0.12s ease"
+        css={{
+          // Strengthen the key column when the row is hovered so the
+          // attribute name reads as the focus, not just a tint change.
+          ".attr-row:hover &": { color: "fg", fontWeight: "semibold" },
+        }}
+      >
+        {attributeRowLabel(attrKey)}
+      </Text>
+    </Tooltip>
+  );
+}
+
+/**
+ * The value column: what is restricted or corrected about this attribute, and
+ * then the value itself, editable or read-only.
+ *
+ * Pretty-print column. Heuristic format detection picks chat / json / text /
+ * leaf; non-leaf values render a `📋 format` pill that opens a popover with the
+ * prettified payload + an override row. The same component is wired into
+ * table-cell expanders so the same payload reads identically wherever it
+ * surfaces.
+ */
+function RowValueCell({
+  attrKey,
+  value,
+  restriction,
+  correction,
+  editing,
+}: {
+  attrKey: string;
+  value: unknown;
+  restriction?: AttributeRestriction | null;
+  correction?: AttributeCorrection | null;
+  /** Present only when this row is editable. */
+  editing?: RowEditing;
+}) {
+  return (
+    <HStack flex={1} minWidth={0} gap={1.5}>
+      {restriction ? <RestrictionMarker {...restriction} /> : null}
+      {correction ? (
+        <CorrectionMarker attrKey={attrKey} original={correction.original} />
+      ) : null}
+      {editing ? (
+        <EditableValueCell attrKey={attrKey} value={value} editing={editing} />
+      ) : (
+        <Box flex={1} minWidth={0}>
+          {isApiKeyIdRow(attrKey, value) ? (
+            <ApiKeyAttributeValue apiKeyId={value} />
+          ) : (
+            <AttributeValue attrKey={attrKey} value={value} />
+          )}
+        </Box>
+      )}
+    </HStack>
+  );
+}
+
 function FlatRow({
   attrKey,
   value,
@@ -430,6 +751,8 @@ function FlatRow({
   labelWidth,
   onLabelResize,
   restriction,
+  editing,
+  correction,
 }: {
   attrKey: string;
   value: unknown;
@@ -441,8 +764,13 @@ function FlatRow({
   labelWidth: number;
   onLabelResize: (deltaPx: number) => void;
   restriction?: AttributeRestriction | null;
+  editing?: RowEditing;
+  correction?: AttributeCorrection | null;
 }) {
   const display = formatValue(value);
+  // A value already hidden from this viewer has nothing on screen to correct,
+  // so it keeps its read-only cell.
+  const rowEditing = restriction?.canSee === false ? undefined : editing;
   return (
     <HStack
       borderBottomWidth={isLast ? "0px" : "1px"}
@@ -451,7 +779,7 @@ function FlatRow({
       gap={0}
       paddingRight={2}
       className="attr-row"
-      bg={pinned ? "bg.subtle" : undefined}
+      {...rowHighlight({ isCorrected: !!correction, isPinned: pinned })}
     >
       {pinnable ? (
         <PinToggle
@@ -466,63 +794,101 @@ function FlatRow({
         // (matching the PinToggle footprint) instead of a blank gap.
         <DisabledPin attrKey={attrKey} />
       )}
-      <Tooltip
-        content={attrKey}
-        openDelay={250}
-        positioning={{ placement: "top-start" }}
-      >
-        <Text
-          width={`${labelWidth}px`}
-          flexShrink={0}
-          textStyle="xs"
-          fontFamily="mono"
-          color={pinned ? "fg" : "fg.muted"}
-          fontWeight={pinned ? "semibold" : "normal"}
-          truncate
-          paddingX={3}
-          paddingY={1.5}
-          bg="bg.subtle"
-          transition="color 0.12s ease, font-weight 0.12s ease"
-          css={{
-            // Strengthen the key column when the row is hovered so the
-            // attribute name reads as the focus, not just a tint change.
-            ".attr-row:hover &": { color: "fg", fontWeight: "semibold" },
-          }}
-        >
-          {attributeRowLabel(attrKey)}
-        </Text>
-      </Tooltip>
+      <RowLabelCell
+        attrKey={attrKey}
+        labelWidth={labelWidth}
+        isPinned={pinned}
+        isRemoved={editing?.isRemoved === true}
+      />
       <LabelResizeHandle onResize={onLabelResize} />
-      {/* Pretty-print column. Heuristic format detection picks chat / json
-          / text / leaf; non-leaf values render a `📋 format` pill that
-          opens a popover with the prettified payload + an override row.
-          Same component is wired into table-cell expanders so the same
-          payload reads identically wherever it surfaces. */}
-      <HStack flex={1} minWidth={0} gap={1.5}>
-        {restriction ? <RestrictionMarker {...restriction} /> : null}
-        <Box flex={1} minWidth={0}>
-          {isApiKeyIdRow(attrKey, value) ? (
-            <ApiKeyAttributeValue apiKeyId={value} />
-          ) : (
-            <AttributeValue attrKey={attrKey} value={value} />
-          )}
-        </Box>
-      </HStack>
-      <Button
-        size="xs"
-        variant="ghost"
-        onClick={() => void navigator.clipboard.writeText(display)}
-        aria-label={`Copy ${attrKey}`}
-        padding={0}
-        minWidth="auto"
-        height="auto"
-        opacity={0}
-        css={{ ".attr-row:hover &": { opacity: 1 } }}
-      >
-        <Icon as={LuCopy} boxSize={2.5} color="fg.subtle" />
-      </Button>
+      <RowValueCell
+        attrKey={attrKey}
+        value={value}
+        restriction={restriction}
+        correction={correction}
+        editing={rowEditing}
+      />
+      {!rowEditing && (
+        <Button
+          size="xs"
+          variant="ghost"
+          onClick={() => void navigator.clipboard.writeText(display)}
+          aria-label={`Copy ${attrKey}`}
+          padding={0}
+          minWidth="auto"
+          height="auto"
+          opacity={0}
+          css={{ ".attr-row:hover &": { opacity: 1 } }}
+        >
+          <Icon as={LuCopy} boxSize={2.5} color="fg.subtle" />
+        </Button>
+      )}
     </HStack>
   );
+}
+
+/**
+ * What one row offers a reviewer who is correcting the attributes. A synthetic
+ * leading row (span_id) is not a real attribute, so it stays read-only.
+ */
+function rowEditingFor({
+  editing,
+  key,
+  isLeading,
+  baseline,
+}: {
+  editing?: AttributeEditing;
+  key: string;
+  isLeading: boolean;
+  baseline: unknown;
+}): RowEditing | undefined {
+  if (!editing || isLeading) return undefined;
+  if (editing.isKeyEditable?.(key) === false) return undefined;
+  return {
+    isRemoved: editing.edits[key] === null,
+    isChanged: key in editing.edits && editing.edits[key] !== null,
+    baseline,
+    onChangeValue: (value) => editing.onEditAttribute({ key, value }),
+    onRemove: () => editing.onEditAttribute({ key, value: null }),
+    onRestore: () => editing.onResetAttribute(key),
+  };
+}
+
+/**
+ * What one row shows on top of its value: whether the viewer's restrict rules
+ * cover it, what a stored correction replaced there, and what it offers a
+ * reviewer who is correcting the span. Each comes from a resolver the section
+ * may not have been given, in which case the row carries none of that marker.
+ */
+function rowMarkersFor({
+  key,
+  isLeading,
+  restrictionFor,
+  correctionFor,
+  baselineFor,
+  editing,
+}: {
+  key: string;
+  isLeading: boolean;
+  restrictionFor?: (key: string) => AttributeRestriction | null;
+  correctionFor?: (key: string) => AttributeCorrection | null;
+  baselineFor?: (key: string) => unknown;
+  editing?: AttributeEditing;
+}): {
+  restriction: AttributeRestriction | null;
+  correction: AttributeCorrection | null;
+  editing: RowEditing | undefined;
+} {
+  return {
+    restriction: restrictionFor ? restrictionFor(key) : null,
+    correction: correctionFor && !isLeading ? correctionFor(key) : null,
+    editing: rowEditingFor({
+      editing,
+      key,
+      isLeading,
+      baseline: baselineFor ? baselineFor(key) : undefined,
+    }),
+  };
 }
 
 function AttrSection({
@@ -534,6 +900,10 @@ function AttrSection({
   onLabelResize,
   leadingKeys,
   restrictionFor,
+  editing,
+  allKeys,
+  correctionFor,
+  baselineFor,
 }: {
   title: string;
   attributes: Record<string, unknown>;
@@ -545,6 +915,18 @@ function AttrSection({
   leadingKeys?: readonly string[];
   /** Resolves a custom-attribute restrict marker for a row, when one applies. */
   restrictionFor?: (key: string) => AttributeRestriction | null;
+  /** Present while this section's attributes are being corrected. */
+  editing?: AttributeEditing;
+  /**
+   * Every key the span carries, not only the rows the filter left on screen. A
+   * new attribute has to be checked against all of them: a key hidden by the
+   * filter still collides, and the correction would quietly overwrite it.
+   */
+  allKeys?: Set<string>;
+  /** Resolves the captured value a stored correction replaced, when it did. */
+  correctionFor?: (key: string) => AttributeCorrection | null;
+  /** Resolves what the trace recorded at a key, before this session's edits. */
+  baselineFor?: (key: string) => unknown;
 }) {
   const { project } = useOrganizationTeamProject();
   const { pins, isPinned, togglePin } = usePinnedAttributes(project?.id);
@@ -569,7 +951,7 @@ function AttrSection({
     [flat, pinnedKeys, leading],
   );
 
-  if (sortedEntries.length === 0) return null;
+  if (sortedEntries.length === 0 && !editing) return null;
 
   return (
     <Box marginBottom={3}>
@@ -610,7 +992,14 @@ function AttrSection({
                 onTogglePin={() => togglePin({ source, key })}
                 labelWidth={labelWidth}
                 onLabelResize={onLabelResize}
-                restriction={restrictionFor ? restrictionFor(key) : null}
+                {...rowMarkersFor({
+                  key,
+                  isLeading,
+                  restrictionFor,
+                  correctionFor,
+                  baselineFor,
+                  editing,
+                })}
               />
             );
           })}
@@ -631,6 +1020,114 @@ function AttrSection({
           />
         </Box>
       )}
+      {editing && (
+        <AddAttributeRow
+          existingKeys={allKeys ?? new Set(Object.keys(flat))}
+          {...editing}
+        />
+      )}
+    </Box>
+  );
+}
+
+/**
+ * The attribute a new key would collide with in the nested tree, if any.
+ *
+ * Keys are dotted paths, so `gen_ai.operation` and `gen_ai.operation.name`
+ * cannot both hold a value: one is a branch of the other, and rebuilding the
+ * tree keeps whichever came last. Exact duplicates are caught before this.
+ */
+function findNestedKeyConflict({
+  key,
+  existingKeys,
+}: {
+  key: string;
+  existingKeys: Set<string>;
+}): string | undefined {
+  for (const existingKey of existingKeys) {
+    if (
+      existingKey.startsWith(`${key}.`) ||
+      key.startsWith(`${existingKey}.`)
+    ) {
+      return existingKey;
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Adds an attribute the trace never recorded. The key check is here rather
+ * than on save because a duplicate key would silently overwrite the row above
+ * it, and the reviewer would only find out by reading the saved correction.
+ */
+function AddAttributeRow({
+  existingKeys,
+  onEditAttribute,
+  isKeyEditable,
+}: AttributeEditing & { existingKeys: Set<string> }) {
+  const [key, setKey] = useState("");
+  const [value, setValue] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
+  const handleAdd = () => {
+    const trimmedKey = key.trim();
+    if (trimmedKey.length === 0) return;
+    if (existingKeys.has(trimmedKey)) {
+      setError("This key already exists");
+      return;
+    }
+    const nested = findNestedKeyConflict({ key: trimmedKey, existingKeys });
+    if (nested) {
+      setError(`This key conflicts with ${nested}`);
+      return;
+    }
+    if (isKeyEditable?.(trimmedKey) === false) {
+      setError("This key can't be edited");
+      return;
+    }
+    onEditAttribute({
+      key: trimmedKey,
+      value: parseAttributeInput({ text: value }),
+    });
+    setKey("");
+    setValue("");
+    setError(null);
+  };
+
+  return (
+    <Box marginTop={2}>
+      <HStack gap={2} align="center">
+        <Input
+          size="xs"
+          aria-label="New attribute name"
+          placeholder="Attribute name"
+          value={key}
+          onChange={(e) => {
+            setKey(e.target.value);
+            setError(null);
+          }}
+          fontFamily="mono"
+          width="220px"
+          flexShrink={0}
+        />
+        <Input
+          size="xs"
+          aria-label="New attribute value"
+          placeholder="Value"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          fontFamily="mono"
+          flex={1}
+        />
+        <Button size="xs" variant="outline" onClick={handleAdd}>
+          Add attribute
+        </Button>
+      </HStack>
+      {error && (
+        <Text textStyle="2xs" color="red.fg" marginTop={1}>
+          {error}
+        </Text>
+      )}
     </Box>
   );
 }
@@ -641,8 +1138,13 @@ export function AttributeTable({
   restrictedAttributes,
   title,
   spanId,
+  editing,
+  correctedFrom,
 }: AttributeTableProps) {
   const [viewMode, setViewMode] = useState<AttrViewMode>("flat");
+  // The JSON view is a read-only rendering of the same rows, so while the
+  // attributes are being corrected the table stays on the editable one.
+  const effectiveViewMode: AttrViewMode = editing ? "flat" : viewMode;
   // Compile the viewer's restrict rules once; a row is marked when its flat key
   // matches a rule. Same wildcard matcher the server redaction uses, so the
   // marker lines up with what is actually redacted.
@@ -664,21 +1166,68 @@ export function AttributeTable({
   const [labelWidth, , applyLabelDelta] = useLabelColumnWidth();
   const handleLabelResize = applyLabelDelta;
 
+  // What the rows read before this session touched them, which is what an edit
+  // is measured against and what keeps an edited value in the shape the trace
+  // recorded it in.
+  const baselineFlat = useMemo(
+    () => flattenAttributes(attributes),
+    [attributes],
+  );
+  const baselineFor = useCallback(
+    (key: string) => baselineFlat[key],
+    [baselineFlat],
+  );
+
   const flatAttrs = useMemo(() => {
     const flat = flattenAttributes(attributes);
+    // Attributes the correction adds are rows in their own right; ones it
+    // removes keep their captured value so the struck-through row still shows
+    // what is being taken away.
+    for (const [key, value] of Object.entries(editing?.edits ?? {})) {
+      if (value === null) continue;
+      flat[key] = value;
+    }
     // Prepend the span id as a synthetic, copyable first row. A real
     // `span_id` attribute (vanishingly unlikely) still wins via the spread.
     return spanId ? { [SPAN_ID_KEY]: spanId, ...flat } : flat;
-  }, [attributes, spanId]);
+  }, [attributes, spanId, editing?.edits]);
   const flatResAttrs = useMemo(
     () =>
       resourceAttributes ? flattenAttributes(resourceAttributes) : undefined,
     [resourceAttributes],
   );
 
+  // A row is marked when the correction gave it a different value than the one
+  // captured, or added it outright. The comparison is per row, on the rendered
+  // value, which is what the reader is looking at: a correction may replace a
+  // whole attribute record and leave most of it saying exactly what it said.
+  const correctionFor = useMemo(() => {
+    if (!correctedFrom) return undefined;
+    const capturedFlat = flattenAttributes(correctedFrom);
+    return (key: string): AttributeCorrection | null => {
+      if (key in capturedFlat) {
+        const captured = formatValue(capturedFlat[key]);
+        return captured === formatValue(flatAttrs[key])
+          ? null
+          : { original: captured };
+      }
+      // A correction that turned a value the trace recorded as one string into
+      // a structure gives every leaf under it a row the capture never had.
+      // Those rows correct the value above them rather than adding anything.
+      const ancestor = capturedAncestorKey({ key, capturedFlat });
+      return ancestor === null
+        ? { original: null }
+        : { original: formatValue(capturedFlat[ancestor]) };
+    };
+  }, [correctedFrom, flatAttrs]);
+
   const filterAttrs = useMemo(
     () => filterAttributesBySearch(flatAttrs, searchTerm),
     [flatAttrs, searchTerm],
+  );
+  const allAttributeKeys = useMemo(
+    () => new Set(Object.keys(flatAttrs)),
+    [flatAttrs],
   );
   const filterResAttrs = useMemo(() => {
     if (!flatResAttrs) return undefined;
@@ -716,29 +1265,35 @@ export function AttributeTable({
           borderColor="border.muted"
           _focus={{ borderColor: "border.emphasized" }}
         />
-        <SegmentedToggle
-          value={viewMode}
-          onChange={(m) => setViewMode(m as AttrViewMode)}
-          options={VIEW_MODE_OPTIONS}
-        />
+        {!editing && (
+          <SegmentedToggle
+            value={viewMode}
+            onChange={(m) => setViewMode(m as AttrViewMode)}
+            options={VIEW_MODE_OPTIONS}
+          />
+        )}
         <CopyAllButton payload={copyPayload} />
       </HStack>
 
       <AttrSection
         title={spanAttrTitle}
         attributes={filterAttrs}
-        viewMode={viewMode}
+        viewMode={effectiveViewMode}
         source="attribute"
         labelWidth={labelWidth}
         onLabelResize={handleLabelResize}
         leadingKeys={spanId ? SPAN_ID_LEADING_KEYS : undefined}
         restrictionFor={restrictionFor}
+        editing={editing}
+        allKeys={allAttributeKeys}
+        correctionFor={correctionFor}
+        baselineFor={baselineFor}
       />
       {filterResAttrs && (
         <AttrSection
           title="Resource Attributes"
           attributes={filterResAttrs}
-          viewMode={viewMode}
+          viewMode={effectiveViewMode}
           source="resource"
           labelWidth={labelWidth}
           onLabelResize={handleLabelResize}

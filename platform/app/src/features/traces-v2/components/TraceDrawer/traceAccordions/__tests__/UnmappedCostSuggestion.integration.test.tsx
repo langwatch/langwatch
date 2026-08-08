@@ -34,6 +34,17 @@ vi.mock("../../../../hooks/useSpanDetail", () => ({
     data: mockDetailState.current,
     isLoading: false,
   }),
+  useSpanDetailCanonical: () => ({
+    data: mockDetailState.current,
+    isLoading: false,
+  }),
+}));
+
+// SpanAccordions marks the fields a stored correction changed; this test
+// renders without a tRPC provider and no correction is in play here.
+vi.mock("../../../../hooks/useTraceEditOverlay", () => ({
+  useTraceEditOverlay: () => ({ data: null }),
+  useAppliedTraceEditPatch: () => null,
 }));
 
 vi.mock("../../../../hooks/useTraceResources", () => ({

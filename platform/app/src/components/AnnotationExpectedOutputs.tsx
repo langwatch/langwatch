@@ -1,22 +1,27 @@
-import { Box, HStack, Text, Textarea, VStack } from "@chakra-ui/react";
+import { Box, HStack, Text, VStack } from "@chakra-ui/react";
+import { useState } from "react";
 import { UserAvatar } from "~/components/UserAvatar";
 import { Tooltip } from "~/components/ui/tooltip";
+import { AnnotationPopover } from "~/features/traces-v2/components/TraceDrawer/conversationView/AnnotationPopover";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
-import { useAnnotationCommentStore } from "../hooks/useAnnotationCommentStore";
 
+/**
+ * The corrections already suggested for a trace, listed under the message they
+ * correct. Picking one reopens it in the same correction popover the trace
+ * drawer uses, so a suggestion is written in exactly one place.
+ */
 export const AnnotationExpectedOutputs = ({
   traceId,
+  output,
 }: {
   traceId: string;
-  setHover: (hover: boolean) => void;
   output: string;
 }) => {
   const { project } = useOrganizationTeamProject();
-  const commentState = useAnnotationCommentStore();
-
-  const { annotationId, expectedOutput, setExpectedOutput, setCommentState } =
-    commentState;
+  const [editingAnnotationId, setEditingAnnotationId] = useState<string | null>(
+    null,
+  );
 
   const annotations = api.annotation.getByTraceId.useQuery(
     {
@@ -28,86 +33,50 @@ export const AnnotationExpectedOutputs = ({
     },
   );
 
+  const suggestions = (annotations.data ?? []).filter(
+    (annotation) => annotation.expectedOutput,
+  );
+
+  if (suggestions.length === 0) return null;
+
   return (
     <VStack gap={3} align="start" paddingBottom={4} width="full">
-      {commentState.expectedOutputAction === "new" &&
-        traceId === commentState.traceId && (
-          <>
-            <Text fontWeight="500">Suggest output:</Text>
-            <Textarea
-              width="full"
-              value={expectedOutput ?? ""}
-              placeholder="Enter your expected output here..."
-              onClick={(e) => {
-                e.stopPropagation();
-              }}
-              onChange={(e) => {
-                setExpectedOutput(e.target.value);
-              }}
-            />
-          </>
-        )}
-      {annotations.data?.some(
-        (annotation: { expectedOutput?: string | null }) =>
-          annotation.expectedOutput,
-      ) && (
-        <>
-          <Text fontWeight="bold">Expected Output:</Text>
-          {annotations.data?.map((annotation) => {
-            if (annotation.expectedOutput) {
-              return (
-                <>
-                  <HStack
-                    width="full"
-                    key={annotation.id}
-                    onDoubleClick={() => {
-                      setCommentState({
-                        expectedOutputAction: "edit",
-                        annotationId: annotation.id,
-                        expectedOutput: annotation.expectedOutput,
-                        traceId: traceId,
-                        action: "edit",
-                      });
-                    }}
-                  >
-                    <Tooltip content={annotation.user?.name ?? ""}>
-                      <Box display="inline-flex">
-                        <UserAvatar
-                          size="xs"
-                          name={annotation.user?.name ?? ""}
-                          image={annotation.user?.image}
-                        />
-                      </Box>
-                    </Tooltip>
-
-                    {commentState.expectedOutputAction === "edit" &&
-                    annotationId === annotation.id ? (
-                      <Textarea
-                        value={
-                          commentState.expectedOutputAction === "edit"
-                            ? (expectedOutput ?? "")
-                            : (annotation.expectedOutput ?? "")
-                        }
-                        placeholder="Enter your expected output here..."
-                        onClick={(e) => {
-                          e.stopPropagation();
-                        }}
-                        onChange={(e) => {
-                          setExpectedOutput(e.target.value);
-                        }}
-                      />
-                    ) : (
-                      <Text>{annotation.expectedOutput}</Text>
-                    )}
-                  </HStack>
-                </>
-              );
+      <Text fontWeight="bold">Suggested output</Text>
+      {suggestions.map((annotation) => (
+        <HStack width="full" key={annotation.id} align="start" gap={2}>
+          <Tooltip content={annotation.user?.name ?? ""}>
+            <Box display="inline-flex">
+              <UserAvatar
+                size="xs"
+                name={annotation.user?.name ?? ""}
+                image={annotation.user?.image}
+              />
+            </Box>
+          </Tooltip>
+          {/* The suggestion itself opens the popover, so closing it hands the
+              keyboard back to the line the reviewer came from. */}
+          <AnnotationPopover
+            traceId={traceId}
+            output={output}
+            mode="suggest"
+            annotationId={annotation.id}
+            open={editingAnnotationId === annotation.id}
+            onOpenChange={(open) =>
+              setEditingAnnotationId(open ? annotation.id : null)
             }
-
-            return null;
-          })}
-        </>
-      )}
+            trigger={
+              <Box
+                as="button"
+                textAlign="left"
+                cursor="pointer"
+                onClick={(event: React.MouseEvent) => event.stopPropagation()}
+              >
+                <Text>{annotation.expectedOutput}</Text>
+              </Box>
+            }
+          />
+        </HStack>
+      ))}
     </VStack>
   );
 };

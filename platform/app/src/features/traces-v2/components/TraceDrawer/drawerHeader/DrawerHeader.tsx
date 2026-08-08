@@ -18,6 +18,8 @@ import {
   LuRefreshCw,
   LuX,
 } from "react-icons/lu";
+import { PersonalFeatureGateDialog } from "~/components/me/PersonalFeatureGateDialog";
+import { usePersonalFeatureGate } from "~/components/me/usePersonalFeatureGate";
 import { Kbd } from "~/components/ops/shared/Kbd";
 import {
   MenuContent,
@@ -52,12 +54,15 @@ import {
   STATUS_COLORS,
 } from "../../../utils/formatters";
 import { isTerminalOrigin } from "../../../utils/terminalOrigin";
+import { guardTraceEditExit } from "../../../utils/traceEditMode";
+import { AddToAnnotationQueueDialog } from "../../AddToAnnotationQueueDialog";
 import { CostBreakdownTooltipContent } from "../../shared/CostBreakdownTooltip";
 import { TokenBreakdownTooltipContent } from "../../shared/TokenBreakdownTooltip";
 import { ModelsTooltip } from "../../TraceTable/registry/cells/trace/ModelCell";
 import { Chip } from "../Chip";
 import { splitChipsForOverflow } from "../ChipBar";
 import { ExceptionsContent } from "../ExceptionsContent";
+import { EditedOriginalToggle } from "../editMode/EditedOriginalToggle";
 import { ModeSwitch } from "../ModeSwitch";
 import { RawJsonDialog } from "../RawJsonDialog";
 import { useTraceHeaderChipDefs } from "../TraceHeaderChips";
@@ -486,6 +491,7 @@ export const DrawerHeader = memo(function DrawerHeader({
   const pinned = useDrawerStore((s) => s.pinned);
   const togglePinned = useDrawerStore((s) => s.togglePinned);
   const viewMode = useDrawerStore((s) => s.viewMode);
+  const isEditing = useDrawerStore((s) => s.isEditing);
   const setViewMode = useDrawerStore((s) => s.setViewMode);
   const selectSpan = useDrawerStore((s) => s.selectSpan);
   const toggleMaximized = useDrawerStore((s) => s.toggleMaximized);
@@ -683,10 +689,11 @@ export const DrawerHeader = memo(function DrawerHeader({
         auto: true,
         category: def.category,
         onFilter: filterField
-          ? () => {
-              toggleFacet(filterField, value);
-              closeDrawer();
-            }
+          ? () =>
+              guardTraceEditExit(() => {
+                toggleFacet(filterField, value);
+                closeDrawer();
+              })
           : undefined,
         onNavigate: navigate?.onNavigate,
         navigateLabel: navigate?.navigateLabel,
@@ -732,10 +739,11 @@ export const DrawerHeader = memo(function DrawerHeader({
         auto: true,
         category: "custom",
         onFilter: filterQuery
-          ? () => {
-              applyQueryTextFromPin(filterQuery);
-              closeDrawer();
-            }
+          ? () =>
+              guardTraceEditExit(() => {
+                applyQueryTextFromPin(filterQuery);
+                closeDrawer();
+              })
           : undefined,
       });
     }
@@ -758,10 +766,11 @@ export const DrawerHeader = memo(function DrawerHeader({
         category: "custom",
         onFilter:
           filterField && value
-            ? () => {
-                toggleFacet(filterField, value);
-                closeDrawer();
-              }
+            ? () =>
+                guardTraceEditExit(() => {
+                  toggleFacet(filterField, value);
+                  closeDrawer();
+                })
             : undefined,
         onNavigate: navigate?.onNavigate,
         navigateLabel: navigate?.navigateLabel,
@@ -786,6 +795,14 @@ export const DrawerHeader = memo(function DrawerHeader({
 
   const [rawOpen, setRawOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
+  const [annotationQueueOpen, setAnnotationQueueOpen] = useState(false);
+  const annotationGate = usePersonalFeatureGate("annotations");
+
+  const handleAddToAnnotationQueue = useCallback(async () => {
+    const allowed = await annotationGate.requestEnable();
+    if (!allowed) return;
+    setAnnotationQueueOpen(true);
+  }, [annotationGate]);
 
   // Local listener for the `\` shortcut. Lives here (rather than in
   // TraceDrawerShell) because the raw-JSON dialog's open state is also
@@ -828,8 +845,10 @@ export const DrawerHeader = memo(function DrawerHeader({
   }, [trace.serviceName, trace.status, trace.traceName]);
   const handleFindSimilar = useCallback(() => {
     if (!findSimilarQuery) return;
-    applyQueryText(findSimilarQuery);
-    closeDrawer();
+    guardTraceEditExit(() => {
+      applyQueryText(findSimilarQuery);
+      closeDrawer();
+    });
   }, [applyQueryText, closeDrawer, findSimilarQuery]);
 
   const { refresh: handleRefresh, isRefreshing } = useTraceRefresh(
@@ -1067,8 +1086,10 @@ export const DrawerHeader = memo(function DrawerHeader({
               onOpenRawJson={() => setRawOpen(true)}
               onShowShortcuts={() => setShortcutsOpen(true)}
               onShare={() => setShareOpen(true)}
+              onAddToAnnotationQueue={handleAddToAnnotationQueue}
               pinned={pinned}
               onTogglePinned={togglePinned}
+              readOnly={readOnly}
             />
             <Box
               width="1px"
@@ -1293,8 +1314,13 @@ export const DrawerHeader = memo(function DrawerHeader({
               origin: trace.origin,
             })
           }
+          isEditing={isEditing}
           endSlot={
             <HStack gap={2}>
+              {/* Switching between the corrected and the captured trace, and
+                  the full difference between them. Renders nothing until the
+                  trace actually has a correction. */}
+              {!readOnly && <EditedOriginalToggle />}
               {/* Presence avatars sit at the trailing edge of the mode-tab
                   row — out of the way of the title and not crowding the
                   action cluster. Copy trace ID lives in the overflow
@@ -1341,12 +1367,20 @@ export const DrawerHeader = memo(function DrawerHeader({
         trace={trace}
       />
       {!readOnly && (
-        <ShareTraceDialog
-          open={shareOpen}
-          onClose={() => setShareOpen(false)}
-          projectId={project?.id}
-          traceId={trace.traceId}
-        />
+        <>
+          <ShareTraceDialog
+            open={shareOpen}
+            onClose={() => setShareOpen(false)}
+            projectId={project?.id}
+            traceId={trace.traceId}
+          />
+          <AddToAnnotationQueueDialog
+            open={annotationQueueOpen}
+            onClose={() => setAnnotationQueueOpen(false)}
+            traceIds={[trace.traceId]}
+          />
+          <PersonalFeatureGateDialog state={annotationGate.dialogState} />
+        </>
       )}
     </VStack>
   );
