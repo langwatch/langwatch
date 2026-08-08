@@ -151,3 +151,10 @@ Feature: A dev stack does not outlive whoever started it
   Scenario: Clearing ports that nothing holds is not an error
     When I clear ports nothing is listening on
     Then it says so and exits cleanly
+
+  @unit
+  Scenario: A port held by something we did not start is reported, not claimed
+    Given one of the ports is held by a process that is not a dev stack of ours
+    When the ports are cleared
+    Then our own stack is stopped and that process is left running
+    And the ports are not reported free, because one of them is not

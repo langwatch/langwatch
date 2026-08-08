@@ -39,6 +39,21 @@ if ! command -v lsof >/dev/null 2>&1 && ! command -v ss >/dev/null 2>&1; then
   exit 69
 fi
 
+SS_FILTER=""
+for _port in ${PORTS//,/ }; do
+  SS_FILTER="${SS_FILTER}${SS_FILTER:+ or }sport = :${_port}"
+done
+
+# Is anything at all listening there, pid or no pid. Kept separate from
+# resolving pids so "I cannot see who owns this" never reads as "it is free".
+port_busy() {
+  if command -v lsof >/dev/null 2>&1; then
+    [ -n "$(lsof -t -a -iTCP:"$PORTS" -sTCP:LISTEN 2>/dev/null)" ]
+    return
+  fi
+  [ -n "$(ss -ltnH "( ${SS_FILTER} )" 2>/dev/null)" ]
+}
+
 # Whatever is listening on those ports. lsof is what the rest of the dev
 # scripts use; ss covers the Linux hosts that ship iproute2 and not lsof.
 listening_pids() {
@@ -46,12 +61,7 @@ listening_pids() {
     lsof -t -a -iTCP:"$PORTS" -sTCP:LISTEN 2>/dev/null
     return
   fi
-  local filter=""
-  local port
-  for port in ${PORTS//,/ }; do
-    filter="${filter}${filter:+ or }sport = :${port}"
-  done
-  ss -ltnpH "( ${filter} )" 2>/dev/null | grep -o 'pid=[0-9]*' | cut -d= -f2
+  ss -ltnpH "( ${SS_FILTER} )" 2>/dev/null | grep -o 'pid=[0-9]*' | cut -d= -f2
 }
 
 # The process groups behind those listeners, node ones only, so a port that
@@ -71,9 +81,13 @@ listening_groups() {
   done | sort -u
 }
 
-# Signal 0 succeeds while ANY member of the group is still alive.
+# Whether any member of the group is still running, asked of the process table
+# rather than through `kill -0 -pgid`, whose answer for a group is not portable.
+# Zombies deliberately do not count: they hold no port and no memory, and a
+# leader whose parent has not reaped it yet would otherwise read as alive.
 group_alive() {
-  kill -0 "-$1" 2>/dev/null
+  ps -Ao pgid=,stat= 2>/dev/null |
+    awk -v want="$1" '$1 == want && $2 !~ /^Z/ { alive = 1 } END { exit !alive }'
 }
 
 still_alive() {
@@ -97,6 +111,13 @@ signal_groups() {
 
 targets=$(listening_groups)
 if [ -z "$targets" ]; then
+  # Nothing to signal, but that is two different situations and only one of
+  # them is good news. Saying "free" over a port we simply could not attribute
+  # is how a takedown reports success and leaves the stack running.
+  if port_busy; then
+    echo "something is listening on ${PORTS} that is not a node process of ours, leaving it alone" >&2
+    exit 1
+  fi
   echo "nothing of ours is listening on ${PORTS}"
   exit 0
 fi
@@ -131,8 +152,7 @@ fi
 
 # The stack is gone. Anything still on the port belongs to someone else, and
 # saying so beats claiming a port we did not actually free.
-remaining=$(listening_groups)
-if [ -n "$remaining" ]; then
+if port_busy; then
   echo "stack stopped, but ${PORTS} still has a listener we did not start" >&2
   exit 1
 fi

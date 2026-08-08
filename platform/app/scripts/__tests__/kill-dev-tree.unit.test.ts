@@ -13,7 +13,15 @@
  */
 
 import { type ChildProcess, spawn, spawnSync } from "node:child_process";
-import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import net from "node:net";
 import os from "node:os";
 import path from "node:path";
@@ -43,19 +51,35 @@ afterEach(async () => {
   rmSync(scratch, { recursive: true, force: true });
 });
 
-/** A port nothing is listening on right now. */
-function freePort(): Promise<number> {
-  return new Promise((resolve, reject) => {
+function bindable(port: number): Promise<boolean> {
+  return new Promise((resolve) => {
     const probe = net.createServer();
-    probe.on("error", reject);
-    probe.listen(0, "127.0.0.1", () => {
-      const { port } = probe.address() as net.AddressInfo;
-      probe.close(() => resolve(port));
-    });
+    probe.on("error", () => resolve(false));
+    probe.listen(port, "127.0.0.1", () => probe.close(() => resolve(true)));
   });
 }
 
-/** Whatever is listening on the port, asked the same two ways the script does. */
+/**
+ * A port nothing is listening on, picked from BELOW the ephemeral range that
+ * both Linux (32768+) and macOS (49152+) allocate from. Asking the kernel for
+ * an ephemeral port instead would leave a window where it hands that same port
+ * to an unrelated process before the stack binds it, and the script under test
+ * takes down the process group holding the port it is given. A busy CI runner
+ * is exactly where that would land on someone else.
+ */
+async function freePort(): Promise<number> {
+  for (let attempt = 0; attempt < 50; attempt += 1) {
+    const candidate = 20000 + Math.floor(Math.random() * 9000);
+    if (await bindable(candidate)) return candidate;
+  }
+  throw new Error("no free port in the test range");
+}
+
+/**
+ * Whatever is listening on the port, asked the same two ways the script does.
+ * Throws rather than reporting "free" when it has no way to look, so a host
+ * missing both tools fails the suite instead of passing it vacuously.
+ */
 function listening(port: number): boolean {
   const viaLsof = spawnSync(
     "lsof",
@@ -67,6 +91,9 @@ function listening(port: number): boolean {
   const viaSs = spawnSync("ss", ["-ltnH", `( sport = :${port} )`], {
     encoding: "utf8",
   });
+  if (viaSs.error !== undefined) {
+    throw new Error("neither lsof nor ss is available to inspect ports");
+  }
   return (viaSs.stdout ?? "").trim() !== "";
 }
 
@@ -87,7 +114,49 @@ function liveMembers(pgid: number): number {
     ).length;
 }
 
-const LANE = `require("net").createServer().listen(PORT,"127.0.0.1",()=>{});setInterval(()=>{},1e9)`;
+/**
+ * A lane that touches a file once its listen has actually succeeded. That file
+ * is how these tests know the port is held by THIS stack rather than by
+ * whatever else the machine may have raced them to it: the script takes down
+ * the group behind the listener, so proceeding on "something is listening"
+ * would be enough to take down a stranger.
+ */
+const lane = (port: number, ready: string) =>
+  `require("net").createServer().listen(${port},"127.0.0.1",()=>{require("fs").writeFileSync(${JSON.stringify(
+    ready,
+  )},String(process.pid))});setInterval(()=>{},1e9)`;
+
+const readyFile = () => path.join(scratch, "lane-is-up");
+
+/**
+ * A PATH holding a stand-in `ss` and no `lsof` at all, which is the shape of a
+ * Linux CI runner: the image ships iproute2 and not lsof, so the `ss` branch is
+ * the only one that ever runs there and the branch this laptop never exercises.
+ * The stand-in reports the live lane in the format iproute2 prints, so what is
+ * under test is the script reading it.
+ */
+function pathWithOnlySs(port: number): string {
+  const stub = path.join(scratch, "stub");
+  mkdirSync(stub, { recursive: true });
+  writeFileSync(
+    path.join(stub, "ss"),
+    [
+      "#!/bin/bash",
+      `pid=$(cat ${readyFile()} 2>/dev/null)`,
+      // Only while that lane is actually alive, so the script sees the port go
+      // quiet exactly when it does rather than a line that outlives the stack.
+      'if [ -z "$pid" ] || ! kill -0 "$pid" 2>/dev/null; then exit 0; fi',
+      `echo 'LISTEN 0 511 127.0.0.1:${port} 0.0.0.0:* users:(("node",pid='"$pid"',fd=20))'`,
+      "",
+    ].join("\n"),
+    "utf8",
+  );
+  chmodSync(path.join(stub, "ss"), 0o755);
+  // Everything the script needs (ps, awk, grep, cut, sort, seq) lives in these
+  // two on both platforms. lsof does not: it is /usr/sbin/lsof on macOS and
+  // absent on the runner, so leaving them out is what hides it.
+  return `/usr/bin:/bin:${stub}`;
+}
 
 /**
  * A stand-in for `start.sh`: it survives being asked to stop and answers a
@@ -102,7 +171,7 @@ function writeRestartingStack(port: number): string {
       "#!/bin/bash",
       "trap '' TERM",
       "while true; do",
-      `  ${process.execPath} -e '${LANE.replace("PORT", String(port))}' &`,
+      `  ${process.execPath} -e '${lane(port, readyFile())}' &`,
       "  wait $! 2>/dev/null",
       "done",
       "",
@@ -120,6 +189,21 @@ function startInOwnGroup(command: string, args: string[]): number {
   return child.pid as number;
 }
 
+/**
+ * A listener that is emphatically not one of ours: the same node binary,
+ * reached through a symlink under another name, so `ps -o comm=` reports
+ * something without "node" in it and the script must leave it where it is.
+ * Cheaper and more portable than reaching for a second language runtime.
+ */
+function startStranger(port: number): number {
+  const asAnother = path.join(scratch, "dev-listener");
+  symlinkSync(process.execPath, asAnother);
+  return startInOwnGroup(asAnother, [
+    "-e",
+    lane(port, path.join(scratch, "stranger-is-up")),
+  ]);
+}
+
 async function waitUntil(
   predicate: () => boolean,
   { timeoutMs = 15000 } = {},
@@ -131,6 +215,9 @@ async function waitUntil(
   }
   return predicate();
 }
+
+/** Resolves once this test's own lane holds the port. */
+const laneIsUp = () => waitUntil(() => existsSync(readyFile()));
 
 function clearPorts(
   ports: string,
@@ -154,17 +241,45 @@ describe("clearing the dev ports", () => {
       it("stops the stack and the port stays free", async () => {
         const port = await freePort();
         const stack = startInOwnGroup("bash", [writeRestartingStack(port)]);
-        expect(await waitUntil(() => listening(port))).toBe(true);
+        expect(await laneIsUp()).toBe(true);
 
         const result = clearPorts(String(port), { KILL_DEV_TREE_GRACE: "2" });
 
-        expect(result.status).toBe(0);
-        expect(liveMembers(stack)).toBe(0);
-        // The stack replaced a lane within a second, so a port that is free
-        // now and free after that is a stopped stack rather than a gap
-        // between two lanes.
+        // The script's own account of what it did, so a failure here says what
+        // it found rather than only a number.
+        const said = `${result.stdout}${result.stderr}`;
+        expect(result.status, said).toBe(0);
+        expect(liveMembers(stack), said).toBe(0);
+
+        // Cleared only now: a replacement lane coming up DURING the takedown
+        // is the behaviour under test, not a failure. What must not happen is
+        // one coming up after it. The stack replaced a lane within a second of
+        // losing one, so a file that stays absent for three is a stopped stack
+        // rather than the gap between two lanes.
+        rmSync(readyFile(), { force: true });
         await sleep(3000);
-        expect(listening(port)).toBe(false);
+        expect(existsSync(readyFile()), said).toBe(false);
+        expect(listening(port), said).toBe(false);
+      }, 30000);
+    });
+  });
+
+  describe("given a host with no lsof, as the Linux runner is", () => {
+    describe("when the port it holds is cleared", () => {
+      /** @scenario "The port a stack holds is actually free afterwards" */
+      it("resolves the listener through ss and still stops the stack", async () => {
+        const port = await freePort();
+        const stack = startInOwnGroup("bash", [writeRestartingStack(port)]);
+        expect(await laneIsUp()).toBe(true);
+
+        const result = clearPorts(String(port), {
+          KILL_DEV_TREE_GRACE: "2",
+          PATH: pathWithOnlySs(port),
+        });
+
+        const said = `${result.stdout}${result.stderr}`;
+        expect(result.status, said).toBe(0);
+        expect(liveMembers(stack), said).toBe(0);
       }, 30000);
     });
   });
@@ -174,7 +289,7 @@ describe("clearing the dev ports", () => {
       /** @scenario "Clearing a port leaves the shell that asked alone" */
       it("leaves its own group alone", async () => {
         const port = await freePort();
-        const marker = path.join(scratch, "still-here");
+        const survived = path.join(scratch, "still-here");
         // The listener and the script run in ONE group of their own, so the
         // script's own group is the one holding the port. If the guard fails
         // the damage is confined to this group rather than the test runner.
@@ -183,11 +298,11 @@ describe("clearing the dev ports", () => {
           caller,
           [
             "#!/bin/bash",
-            `${process.execPath} -e '${LANE.replace("PORT", String(port))}' &`,
+            `${process.execPath} -e '${lane(port, readyFile())}' &`,
             "sleep 2",
             `bash ${SCRIPT} ${port} > ${path.join(scratch, "out")} 2>&1`,
             "sleep 3",
-            `touch ${marker}`,
+            `touch ${survived}`,
             "sleep 30",
             "",
           ].join("\n"),
@@ -196,14 +311,40 @@ describe("clearing the dev ports", () => {
         chmodSync(caller, 0o755);
 
         const group = startInOwnGroup("bash", [caller]);
-        expect(await waitUntil(() => listening(port))).toBe(true);
+        expect(await laneIsUp()).toBe(true);
 
-        // It survived long enough to write the marker after running the script.
-        expect(
-          await waitUntil(() => spawnSync("test", ["-f", marker]).status === 0),
-        ).toBe(true);
+        // It got past running the script and stayed up long enough to say so.
+        expect(await waitUntil(() => existsSync(survived))).toBe(true);
         expect(liveMembers(group)).toBeGreaterThan(0);
         expect(listening(port)).toBe(true);
+      }, 30000);
+    });
+  });
+
+  describe("given a port held by something we did not start", () => {
+    describe("when the ports are cleared", () => {
+      /** @scenario "A port held by something we did not start is reported, not claimed" */
+      it("stops our stack, leaves it alone, and does not claim the ports", async () => {
+        const ours = await freePort();
+        const theirs = await freePort();
+        const stack = startInOwnGroup("bash", [writeRestartingStack(ours)]);
+        expect(await laneIsUp()).toBe(true);
+        const stranger = startStranger(theirs);
+        expect(
+          await waitUntil(() =>
+            existsSync(path.join(scratch, "stranger-is-up")),
+          ),
+        ).toBe(true);
+
+        const result = clearPorts(`${ours},${theirs}`, {
+          KILL_DEV_TREE_GRACE: "2",
+        });
+
+        const said = `${result.stdout}${result.stderr}`;
+        expect(result.status, said).toBe(1);
+        expect(result.stdout).not.toContain("ports free");
+        expect(liveMembers(stack), said).toBe(0);
+        expect(liveMembers(stranger), said).toBeGreaterThan(0);
       }, 30000);
     });
   });
@@ -216,7 +357,7 @@ describe("clearing the dev ports", () => {
 
         const result = clearPorts(String(port));
 
-        expect(result.status).toBe(0);
+        expect(result.status, result.stderr).toBe(0);
         expect(result.stdout).toContain("nothing of ours is listening");
       });
 
