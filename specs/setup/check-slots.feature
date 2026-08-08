@@ -153,86 +153,91 @@ Feature: Machine-wide slots for whole-repo checks
   # three tsgo processes on an 18 GB laptop with the limit set to 2, one of
   # them started from the same worktree as a properly queued run.
   #
-  # dev/scripts/install-check-shims.mjs moves pnpm's generated launcher to
-  # `<tool>.real` and takes its place, so the bin entry itself decides. Only
-  # platform/app's bins: sdks/typescript's build runs `tsc --noEmit` on the way
-  # to `pnpm dev`, and a dev server that waits for a typecheck slot before it
+  # dev/scripts/install-check-shims.mjs makes platform/app's bin entries
+  # themselves the boundary, so the route into the tool stops mattering. Only
+  # platform/app's: sdks/typescript's build runs `tsc --noEmit` on the way to
+  # `pnpm dev`, and a dev server that waits for a typecheck slot before it
   # boots is not an improvement.
 
   @unit
-  Scenario: A whole-project run through the binary takes a slot
-    Given a check is invoked as "pnpm exec tsgo --noEmit -p tsconfig.tsgo.json"
-    When the shim inspects the arguments
-    Then it runs the tool under the queue, because the run walks the whole project
+  Scenario: A whole-project run counts however it was started
+    When I run "pnpm exec tsgo --noEmit -p tsconfig.tsgo.json" instead of "pnpm typecheck"
+    Then the run counts against the limit, exactly as the script would have
 
   @unit
-  Scenario: A directory argument counts as whole-project
-    Given a check is invoked as "biome check ./src ./ee"
-    When the shim inspects the arguments
-    Then it runs the tool under the queue
+  Scenario: A run over a directory counts
+    When I run "biome check ./src ./ee"
+    Then the run counts against the limit
 
   @unit
-  Scenario: A run with no path argument counts as whole-project
-    Given a check is invoked with flags only
-    When the shim inspects the arguments
-    Then it runs the tool under the queue, because the tool walks the project from the cwd
+  Scenario: A run that names no target counts
+    When I run a check with flags only, which walks the project from the cwd
+    Then the run counts against the limit
+
+  # A subcommand and a flag's value are positional too, and reading either as a
+  # file to check is what turns a whole-project run into one nothing waits for.
+  @unit
+  Scenario: A subcommand or a flag's value is not a target
+    When I run "biome check" with no paths, or "tsgo --pretty false"
+    Then the run counts against the limit, because neither names a file and both walk the project
 
   @unit
-  Scenario: A targeted run stays instant
-    Given a check names only files, as in "tsgo --noEmit src/foo.ts"
-    When the shim inspects the arguments
-    Then it runs the tool directly, so the iterate-fast loop never waits behind a full run
+  Scenario: A run that names files starts immediately
+    When I run "tsgo --noEmit src/foo.ts"
+    Then it starts without waiting, so the iterate-fast loop never sits behind a full run
 
   @unit
-  Scenario: A watch or language server never takes a slot
-    Given a check is invoked with "--watch" or "--lsp"
-    When the shim inspects the arguments
-    Then it runs the tool directly, because it would hold its slot for the whole session
+  Scenario: A watch or a language server starts immediately
+    When I start a check with "--watch" or "--lsp"
+    Then it starts without waiting, because it would hold its slot for the whole session
 
   @unit
-  Scenario: A run that holds a slot does not queue again inside itself
+  Scenario: A check does not queue behind itself
     Given "pnpm typecheck" holds the only slot
-    And the tsgo it spawns is a shimmed bin entry that would queue a project run
-    When the shim decides
-    Then it runs directly, because the run above it is already the slot
-    And the check does not wait out the maximum wait before starting
+    When the tsgo it runs would otherwise ask for a slot of its own
+    Then it starts without waiting
+    And the check does not sit out the maximum wait before starting
 
   @unit
-  Scenario: The tool's own behavior is untouched
-    Given a shimmed tool
-    When it runs either way
-    Then its arguments, exit code and output reach it unchanged
+  Scenario: The tool behaves the same either way
+    Given one check that counts and one that does not
+    When each runs
+    Then its arguments, output and exit code are what they would be without the queue
 
   @unit
-  Scenario: Installing the shims is idempotent
-    Given the bin entries have already been shimmed
-    When the installer runs again
-    Then it leaves them alone and the original launcher is still there
+  Scenario: Reinstalling leaves the tools working
+    Given the bin entries already route whole-project runs through the queue
+    When "pnpm install" runs again
+    Then the tools still run, and still count the same runs
 
   @unit
-  Scenario: A reinstall re-shims what pnpm regenerated
-    Given pnpm has overwritten a shimmed bin entry with its own launcher
-    When the installer runs from postinstall
-    Then the entry is shimmed again over the regenerated launcher
+  Scenario: A fresh install restores the counting pnpm overwrote
+    Given "pnpm install" has replaced the bin entries with its own
+    When the postinstall step runs
+    Then whole-project runs count again
 
-  # The shims exist to keep a laptop usable. Neither environment below has that
-  # problem, and both have something to lose: CI turns the queue off anyway, so
-  # a shim there only puts a node process in front of every tsc and biome to
-  # decide nothing, and an install in an image or on a server should not be
-  # rewriting bin entries at all.
+  @unit
+  Scenario: An install that cannot write leaves the tool working
+    Given the bin directory cannot be written to
+    When the postinstall step runs
+    Then the tool still runs, because losing the count is survivable and losing the tool is not
+
+  # The shims are a laptop concern, and neither environment below is a laptop.
+  # CI turns the queue off anyway, so a shim there only puts a node process in
+  # front of every tsc and biome to decide nothing, and an install in an image
+  # or on a server has no bin entries worth rewriting.
 
   @unit
   Scenario: CI installs are left alone
     Given CI is set
-    When the installer runs from postinstall
-    Then the bin entries keep pnpm's own launchers
-    And it says which environment it stood down for
+    When the postinstall step runs
+    Then it changes nothing, and says which environment it stood down for
 
   @unit
   Scenario: Production installs are left alone
     Given NODE_ENV is production
-    When the installer runs from postinstall
-    Then the bin entries keep pnpm's own launchers
+    When the postinstall step runs
+    Then it changes nothing
 
   # --- Interaction with haven ---
 

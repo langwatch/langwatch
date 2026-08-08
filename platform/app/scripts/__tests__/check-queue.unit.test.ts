@@ -187,7 +187,7 @@ describe("check queue", () => {
       expect(startOrder(readEvents())).toEqual(["solo"]);
     });
 
-    /** @scenario "A run that holds a slot does not queue again inside itself" */
+    /** @scenario "A check does not queue behind itself" */
     it("tells everything below it that the slot is already held", async () => {
       // The bin shims mean a queued `pnpm typecheck` spawns another gated
       // entry point. Without this, it queues behind the slot it is holding and

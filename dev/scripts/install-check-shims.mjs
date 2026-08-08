@@ -74,7 +74,7 @@ if [ ! -x "$real" ]; then
 fi
 
 whole_tree=0
-has_path=0
+named_a_target=0
 for arg in "$@"; do
   case "$arg" in
     # A watch or a language server holds its slot for the whole session.
@@ -83,13 +83,19 @@ for arg in "$@"; do
     -p|--project|--project=*) whole_tree=1 ;;
     -*) ;;
     *)
-      has_path=1
-      if [ -d "$arg" ]; then whole_tree=1; fi
+      # Only something that exists is a target. A subcommand (\`biome check\`)
+      # and a flag's value (\`--pretty false\`, \`--max-diagnostics 1000\`) are
+      # positional too, and counting either as a named file is what turns a
+      # whole-tree run into one nothing waits behind.
+      if [ -e "$arg" ]; then
+        named_a_target=1
+        if [ -d "$arg" ]; then whole_tree=1; fi
+      fi
       ;;
   esac
 done
-# No path at all means the tool walks the whole project from the cwd.
-if [ "$has_path" -eq 0 ]; then whole_tree=1; fi
+# Naming nothing means the tool walks the whole project from the cwd.
+if [ "$named_a_target" -eq 0 ]; then whole_tree=1; fi
 
 if [ "$whole_tree" -eq 1 ]; then
   if [ -f "$queue" ]; then
@@ -145,9 +151,25 @@ function installOne(binDir, name) {
     return false;
   }
 
-  fs.renameSync(entry, real);
-  fs.writeFileSync(entry, shimSource({ name, queuePath: QUEUE }), "utf8");
-  fs.chmodSync(entry, 0o755);
+  // The shim is written and made executable before the launcher moves, and
+  // both renames are within one directory, so no failure can leave the bin
+  // entry empty. Losing the queue's accounting is an acceptable outcome here.
+  // Leaving a developer without `tsgo` on their PATH is not.
+  const staged = `${entry}.shim-staging`;
+  fs.writeFileSync(staged, shimSource({ name, queuePath: QUEUE }), "utf8");
+  fs.chmodSync(staged, 0o755);
+  try {
+    fs.renameSync(entry, real);
+    try {
+      fs.renameSync(staged, entry);
+    } catch (err) {
+      fs.renameSync(real, entry);
+      throw err;
+    }
+  } catch (err) {
+    fs.rmSync(staged, { force: true });
+    throw err;
+  }
   return true;
 }
 

@@ -6,10 +6,10 @@
  * cannot start a fourth 4 GiB run behind the counter's back.
  *
  * Driven as real processes: the installer runs against a scratch bin directory
- * holding a stand-in launcher, and the resulting shim is executed with the arg
- * shapes that matter. The stand-in reports whether a queue entry exists while
- * it runs, so "took a slot" is an observation of the mechanism rather than an
- * assertion about the shim's text.
+ * holding a stand-in launcher, and the resulting bin entry is executed with the
+ * arg shapes that matter. The stand-in reports whether a queue entry exists
+ * while it runs, so "counts against the limit" is an observation of the
+ * mechanism rather than an assertion about the shim's text.
  *
  * Corresponds to specs/setup/check-slots.feature.
  */
@@ -39,7 +39,7 @@ echo "real $*"
 /**
  * A launcher that reports whether it is holding a slot. The queue writes its
  * entry before spawning the command and removes it after, so an entry in the
- * directory while this runs means this run took a slot.
+ * directory while this runs means this run counted against the limit.
  */
 const SLOT_REPORTING_LAUNCHER = `#!/bin/sh
 if ls "$CHECK_QUEUE_DIR"/*.json >/dev/null 2>&1; then
@@ -61,6 +61,9 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  // A test that made the bin directory unwritable has to hand it back, or the
+  // cleanup fails and takes the scratch tree with it.
+  chmodSync(binDir, 0o755);
   rmSync(scratch, { recursive: true, force: true });
 });
 
@@ -89,7 +92,7 @@ function install(env: Record<string, string> = {}): {
   return { stderr: result.stderr, status: result.status };
 }
 
-function runShim(
+function runCheck(
   name: string,
   args: string[],
 ): { stdout: string; status: number | null } {
@@ -99,7 +102,7 @@ function runShim(
     env: {
       ...process.env,
       CHECK_QUEUE_DIR: queueDir,
-      // A slot the run can always take, so taking one shows up as an entry
+      // A slot the run can always take, so counting shows up as an entry
       // rather than as a wait.
       CHECK_SLOTS: "1",
     },
@@ -107,111 +110,146 @@ function runShim(
   return { stdout: result.stdout, status: result.status };
 }
 
-const tookASlot = (name: string, args: string[]) =>
-  runShim(name, args).stdout.startsWith("queued");
+const counted = (name: string, args: string[]) =>
+  runCheck(name, args).stdout.startsWith("queued");
 
 describe("check-queue bin shims", () => {
-  describe("given a shimmed launcher that reports its slot", () => {
+  describe("given a tool whose runs report whether they counted", () => {
     beforeEach(() => {
       writeLauncher("tsgo", SLOT_REPORTING_LAUNCHER);
       install();
     });
 
-    /** @scenario "A whole-project run through the binary takes a slot" */
-    it("queues a --project run", () => {
-      expect(tookASlot("tsgo", ["--noEmit", "-p", "tsconfig.json"])).toBe(true);
-      expect(tookASlot("tsgo", ["--noEmit", "--project=tsconfig.json"])).toBe(
-        true,
-      );
+    describe("when the run walks the whole project", () => {
+      /** @scenario "A whole-project run counts however it was started" */
+      it("counts a --project run", () => {
+        expect(counted("tsgo", ["--noEmit", "-p", "tsconfig.json"])).toBe(true);
+        expect(counted("tsgo", ["--noEmit", "--project=tsconfig.json"])).toBe(
+          true,
+        );
+      });
+
+      /** @scenario "A run over a directory counts" */
+      it("counts a run whose target is a directory", () => {
+        mkdirSync(path.join(scratch, "src"));
+        expect(counted("tsgo", ["check", "./src"])).toBe(true);
+      });
+
+      /** @scenario "A run that names no target counts" */
+      it("counts a run with flags only", () => {
+        expect(counted("tsgo", ["--noEmit"])).toBe(true);
+        expect(counted("tsgo", [])).toBe(true);
+      });
+
+      /** @scenario "A subcommand or a flag's value is not a target" */
+      it("counts a run whose only operands are a subcommand or a flag value", () => {
+        // `biome check --write` checks everything under the cwd; reading
+        // `check` as the file to check would let it run uncounted.
+        expect(counted("tsgo", ["check", "--write"])).toBe(true);
+        expect(counted("tsgo", ["--pretty", "false"])).toBe(true);
+        expect(counted("tsgo", ["--max-diagnostics", "1000"])).toBe(true);
+      });
     });
 
-    /** @scenario "A directory argument counts as whole-project" */
-    it("queues a run whose path argument is a directory", () => {
-      mkdirSync(path.join(scratch, "src"));
-      expect(tookASlot("tsgo", ["check", "./src"])).toBe(true);
-    });
+    describe("when the run is targeted or long-lived", () => {
+      /** @scenario "A run that names files starts immediately" */
+      it("does not count a run that names files", () => {
+        writeFileSync(path.join(scratch, "foo.ts"), "export {};", "utf8");
+        writeFileSync(path.join(scratch, "bar.ts"), "export {};", "utf8");
+        expect(counted("tsgo", ["--noEmit", "foo.ts"])).toBe(false);
+        expect(counted("tsgo", ["check", "--write", "foo.ts", "bar.ts"])).toBe(
+          false,
+        );
+      });
 
-    /** @scenario "A run with no path argument counts as whole-project" */
-    it("queues a run with flags only", () => {
-      expect(tookASlot("tsgo", ["--noEmit"])).toBe(true);
-      expect(tookASlot("tsgo", [])).toBe(true);
-    });
-
-    /** @scenario "A targeted run stays instant" */
-    it("runs named files directly", () => {
-      writeFileSync(path.join(scratch, "foo.ts"), "export {};", "utf8");
-      writeFileSync(path.join(scratch, "bar.ts"), "export {};", "utf8");
-      expect(tookASlot("tsgo", ["--noEmit", "foo.ts"])).toBe(false);
-      expect(tookASlot("tsgo", ["check", "--write", "foo.ts", "bar.ts"])).toBe(
-        false,
-      );
-    });
-
-    /** @scenario "A watch or language server never takes a slot" */
-    it("runs a watch and a language server directly", () => {
-      expect(tookASlot("tsgo", ["--watch"])).toBe(false);
-      expect(tookASlot("tsgo", ["--lsp"])).toBe(false);
-      expect(tookASlot("tsgo", ["-p", "tsconfig.json", "--watch"])).toBe(false);
+      /** @scenario "A watch or a language server starts immediately" */
+      it("does not count a watch or a language server", () => {
+        expect(counted("tsgo", ["--watch"])).toBe(false);
+        expect(counted("tsgo", ["--lsp"])).toBe(false);
+        expect(counted("tsgo", ["-p", "tsconfig.json", "--watch"])).toBe(false);
+      });
     });
   });
 
-  describe("given a shimmed launcher", () => {
+  describe("given a tool that echoes how it was called", () => {
     beforeEach(() => {
       writeLauncher("tsgo");
       install();
     });
 
-    /** @scenario "The tool's own behavior is untouched" */
-    it("passes arguments through unchanged on both routes", () => {
-      expect(runShim("tsgo", ["--noEmit", "-p", "tsconfig.json"]).stdout).toBe(
-        "real --noEmit -p tsconfig.json\n",
-      );
-      writeFileSync(path.join(scratch, "foo.ts"), "export {};", "utf8");
-      expect(runShim("tsgo", ["--noEmit", "foo.ts"]).stdout).toBe(
-        "real --noEmit foo.ts\n",
-      );
+    describe("when it runs on either route", () => {
+      /** @scenario "The tool behaves the same either way" */
+      it("passes arguments through unchanged", () => {
+        expect(
+          runCheck("tsgo", ["--noEmit", "-p", "tsconfig.json"]).stdout,
+        ).toBe("real --noEmit -p tsconfig.json\n");
+        writeFileSync(path.join(scratch, "foo.ts"), "export {};", "utf8");
+        expect(runCheck("tsgo", ["--noEmit", "foo.ts"]).stdout).toBe(
+          "real --noEmit foo.ts\n",
+        );
+      });
+
+      /** @scenario "The tool behaves the same either way" */
+      it("passes the tool's exit code back through the queue", () => {
+        writeFileSync(
+          path.join(binDir, "tsgo.real"),
+          "#!/bin/sh\nexit 7\n",
+          "utf8",
+        );
+        chmodSync(path.join(binDir, "tsgo.real"), 0o755);
+        expect(runCheck("tsgo", ["--noEmit"]).status).toBe(7);
+      });
     });
 
-    /** @scenario "The tool's own behavior is untouched" */
-    it("passes the tool's exit code through the queue", () => {
-      writeFileSync(
-        path.join(binDir, "tsgo.real"),
-        "#!/bin/sh\nexit 7\n",
-        "utf8",
-      );
-      chmodSync(path.join(binDir, "tsgo.real"), 0o755);
-      expect(runShim("tsgo", ["--noEmit"]).status).toBe(7);
+    describe("when the install runs again", () => {
+      /** @scenario "Reinstalling leaves the tools working" */
+      it("leaves an entry it already owns alone", () => {
+        const shimmed = readFileSync(path.join(binDir, "tsgo"), "utf8");
+        const second = install();
+
+        expect(second.status).toBe(0);
+        expect(second.stderr).toBe("");
+        expect(readFileSync(path.join(binDir, "tsgo"), "utf8")).toBe(shimmed);
+        // The launcher was not swallowed by a second round of renaming.
+        expect(readFileSync(path.join(binDir, "tsgo.real"), "utf8")).toBe(
+          LAUNCHER,
+        );
+        expect(runCheck("tsgo", ["--noEmit"]).stdout).toBe("real --noEmit\n");
+      });
+
+      /** @scenario "A fresh install restores the counting pnpm overwrote" */
+      it("restores counting on an entry pnpm overwrote", () => {
+        // What `pnpm install` does: the bin entry is replaced by a fresh
+        // launcher, leaving the previous .real behind.
+        writeLauncher("tsgo");
+        expect(runCheck("tsgo", ["--noEmit"]).stdout).toBe("real --noEmit\n");
+
+        install();
+
+        expect(readFileSync(path.join(binDir, "tsgo"), "utf8")).toContain(
+          "langwatch-check-queue-shim",
+        );
+        expect(existsSync(path.join(binDir, "tsgo.real"))).toBe(true);
+        expect(runCheck("tsgo", ["--noEmit"]).stdout).toBe("real --noEmit\n");
+      });
     });
+  });
 
-    /** @scenario "Installing the shims is idempotent" */
-    it("leaves an already-shimmed entry alone", () => {
-      const shimmed = readFileSync(path.join(binDir, "tsgo"), "utf8");
-      const second = install();
-
-      expect(second.status).toBe(0);
-      expect(second.stderr).toBe("");
-      expect(readFileSync(path.join(binDir, "tsgo"), "utf8")).toBe(shimmed);
-      // The launcher was not swallowed by a second round of renaming.
-      expect(readFileSync(path.join(binDir, "tsgo.real"), "utf8")).toBe(
-        LAUNCHER,
-      );
-      expect(runShim("tsgo", ["--noEmit"]).stdout).toBe("real --noEmit\n");
-    });
-
-    /** @scenario "A reinstall re-shims what pnpm regenerated" */
-    it("re-shims an entry pnpm has overwritten", () => {
-      // What `pnpm install` does: the bin entry is replaced by a fresh
-      // launcher, leaving the previous .real behind.
+  describe("given an install that cannot finish", () => {
+    /** @scenario "An install that cannot write leaves the tool working" */
+    it("leaves the tool runnable when the bin directory is read-only", () => {
       writeLauncher("tsgo");
-      expect(runShim("tsgo", ["--noEmit"]).stdout).toBe("real --noEmit\n");
+      chmodSync(binDir, 0o555);
 
-      install();
+      const result = install();
 
-      expect(readFileSync(path.join(binDir, "tsgo"), "utf8")).toContain(
-        "langwatch-check-queue-shim",
-      );
-      expect(existsSync(path.join(binDir, "tsgo.real"))).toBe(true);
-      expect(runShim("tsgo", ["--noEmit"]).stdout).toBe("real --noEmit\n");
+      // It reports the failure and still exits 0: an install must not fail
+      // over this.
+      expect(result.status).toBe(0);
+      expect(result.stderr).toContain("could not shim tsgo");
+      // The bin entry is the thing that must survive.
+      expect(runCheck("tsgo", ["--noEmit"]).stdout).toBe("real --noEmit\n");
+      expect(existsSync(path.join(binDir, "tsgo.shim-staging"))).toBe(false);
     });
   });
 
@@ -220,35 +258,37 @@ describe("check-queue bin shims", () => {
       writeLauncher("tsgo");
     });
 
-    /** @scenario "CI installs are left alone" */
-    it("stands down on CI, and only for a CI that means it", () => {
-      const skipped = install({ CI: "true" });
+    describe("when the install runs there", () => {
+      /** @scenario "CI installs are left alone" */
+      it("stands down on CI, and only for a CI that means it", () => {
+        const skipped = install({ CI: "true" });
 
-      expect(skipped.status).toBe(0);
-      expect(skipped.stderr).toContain("CI");
-      expect(readFileSync(path.join(binDir, "tsgo"), "utf8")).toBe(LAUNCHER);
-      expect(existsSync(path.join(binDir, "tsgo.real"))).toBe(false);
+        expect(skipped.status).toBe(0);
+        expect(skipped.stderr).toContain("CI");
+        expect(readFileSync(path.join(binDir, "tsgo"), "utf8")).toBe(LAUNCHER);
+        expect(existsSync(path.join(binDir, "tsgo.real"))).toBe(false);
 
-      // The values a shell leaves behind when it means the opposite.
-      install({ CI: "false" });
-      expect(readFileSync(path.join(binDir, "tsgo"), "utf8")).toContain(
-        "langwatch-check-queue-shim",
-      );
-    });
+        // The value a shell leaves behind when it means the opposite.
+        install({ CI: "false" });
+        expect(readFileSync(path.join(binDir, "tsgo"), "utf8")).toContain(
+          "langwatch-check-queue-shim",
+        );
+      });
 
-    /** @scenario "Production installs are left alone" */
-    it("stands down on a production install", () => {
-      const result = install({ NODE_ENV: "production" });
+      /** @scenario "Production installs are left alone" */
+      it("stands down on a production install", () => {
+        const result = install({ NODE_ENV: "production" });
 
-      expect(result.status).toBe(0);
-      expect(result.stderr).toContain("production");
-      expect(readFileSync(path.join(binDir, "tsgo"), "utf8")).toBe(LAUNCHER);
-      expect(existsSync(path.join(binDir, "tsgo.real"))).toBe(false);
+        expect(result.status).toBe(0);
+        expect(result.stderr).toContain("production");
+        expect(readFileSync(path.join(binDir, "tsgo"), "utf8")).toBe(LAUNCHER);
+        expect(existsSync(path.join(binDir, "tsgo.real"))).toBe(false);
+      });
     });
   });
 
   describe("given nothing to shim", () => {
-    /** @scenario "Installing the shims is idempotent" */
+    /** @scenario "Reinstalling leaves the tools working" */
     it("says nothing and succeeds", () => {
       const result = install();
       expect(result.status).toBe(0);
