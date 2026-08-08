@@ -16,8 +16,8 @@ import { type ChildProcess, spawn, spawnSync } from "node:child_process";
 import {
   chmodSync,
   existsSync,
-  mkdirSync,
   mkdtempSync,
+  readdirSync,
   rmSync,
   symlinkSync,
   writeFileSync,
@@ -145,47 +145,67 @@ function writeLane(): string {
 
 const readyFile = () => path.join(scratch, "lane-is-up");
 
-/**
- * A PATH holding a stand-in `ss` and no `lsof` at all, which is the shape of a
- * Linux CI runner: the image ships iproute2 and not lsof, so the `ss` branch is
- * the only one that ever runs there and the branch this laptop never exercises.
- * The stand-in reports the live lane in the format iproute2 prints, so what is
- * under test is the script reading it.
- */
-function pathWithOnlySs(port: number): string {
-  const stub = path.join(scratch, "stub");
-  mkdirSync(stub, { recursive: true });
-  writeFileSync(
-    path.join(stub, "ss"),
-    [
-      "#!/bin/bash",
-      `pid=$(cat ${readyFile()} 2>/dev/null)`,
-      // Only while that lane is actually alive, so the script sees the port go
-      // quiet exactly when it does rather than a line that outlives the stack.
-      'if [ -z "$pid" ] || ! kill -0 "$pid" 2>/dev/null; then exit 0; fi',
-      `echo 'LISTEN 0 511 127.0.0.1:${port} 0.0.0.0:* users:(("node",pid='"$pid"',fd=20))'`,
-      "",
-    ].join("\n"),
-    "utf8",
-  );
-  chmodSync(path.join(stub, "ss"), 0o755);
-  // Everything the script needs (ps, awk, grep, cut, sort, seq) lives in these
-  // two on both platforms. lsof does not: it is /usr/sbin/lsof on macOS and
-  // absent on the runner, so leaving them out is what hides it.
-  return `/usr/bin:/bin:${stub}`;
+/** Everything kill-dev-tree.sh shells out to, minus the port lookups. */
+const SCRIPT_NEEDS = [
+  "bash",
+  "awk",
+  "cat",
+  "cut",
+  "grep",
+  "ps",
+  "seq",
+  "sleep",
+  "sort",
+  "tr",
+];
+
+function realPathOf(tool: string): string {
+  for (const dir of ["/usr/bin", "/bin", "/usr/sbin", "/sbin"]) {
+    const candidate = path.join(dir, tool);
+    if (existsSync(candidate)) return candidate;
+  }
+  throw new Error(`this suite needs ${tool} and cannot find it`);
 }
 
 /**
- * A PATH whose `ss` refuses to answer, the way a too-old or broken iproute2
- * would. An empty answer and a failed lookup are not the same thing, and only
- * one of them means the port is free.
+ * A PATH built from nothing but the utilities the script needs plus a stand-in
+ * `ss`, which is how the Linux-only branch gets exercised on a laptop that has
+ * no `ss` and how it stays exercised on a runner that does.
+ *
+ * Assembled rather than prepended for both reasons at once. iproute2 puts a
+ * real `ss` in /usr/bin, which would shadow the stand-in and quietly turn these
+ * into tests of the host's tools; and lsof lives in /usr/bin on Linux, which
+ * would send the script down the lsof branch and never reach `ss` at all.
+ */
+function pathWithStubbedSs(stub: string[]): string {
+  const bin = mkdtempSync(path.join(scratch, "bin-"));
+  for (const tool of SCRIPT_NEEDS) {
+    symlinkSync(realPathOf(tool), path.join(bin, tool));
+  }
+  writeFileSync(path.join(bin, "ss"), `${stub.join("\n")}\n`, "utf8");
+  chmodSync(path.join(bin, "ss"), 0o755);
+  return bin;
+}
+
+/** Reports the live lane in the format iproute2 prints. */
+function pathWithOnlySs(port: number): string {
+  return pathWithStubbedSs([
+    "#!/bin/bash",
+    `pid=$(cat ${readyFile()} 2>/dev/null)`,
+    // Only while that lane is actually alive, so the script sees the port go
+    // quiet exactly when it does rather than a line that outlives the stack.
+    'if [ -z "$pid" ] || ! kill -0 "$pid" 2>/dev/null; then exit 0; fi',
+    `echo 'LISTEN 0 511 127.0.0.1:${port} 0.0.0.0:* users:(("node",pid='"$pid"',fd=20))'`,
+  ]);
+}
+
+/**
+ * An `ss` that refuses to answer, the way a too-old or broken iproute2 would.
+ * An empty answer and a failed lookup are not the same thing, and only one of
+ * them means the port is free.
  */
 function pathWithBrokenSs(): string {
-  const stub = path.join(scratch, "broken-stub");
-  mkdirSync(stub, { recursive: true });
-  writeFileSync(path.join(stub, "ss"), "#!/bin/bash\nexit 1\n", "utf8");
-  chmodSync(path.join(stub, "ss"), 0o755);
-  return `/usr/bin:/bin:${stub}`;
+  return pathWithStubbedSs(["#!/bin/bash", "exit 1"]);
 }
 
 /**
@@ -395,8 +415,15 @@ describe("clearing the dev ports", () => {
       /** @scenario "A port that cannot be inspected is never called free" */
       it("refuses to call a port free when it cannot be inspected", async () => {
         const port = await freePort();
+        const isolated = pathWithBrokenSs();
+        // The stand-in has to be the thing that runs. One directory on PATH,
+        // holding an `ss` and no `lsof`, is what makes that true no matter what
+        // the host has in /usr/bin. Without it this passes by testing nothing.
+        expect(isolated).not.toContain(path.delimiter);
+        expect(readdirSync(isolated)).toContain("ss");
+        expect(readdirSync(isolated)).not.toContain("lsof");
 
-        const result = clearPorts(String(port), { PATH: pathWithBrokenSs() });
+        const result = clearPorts(String(port), { PATH: isolated });
 
         expect(result.status).not.toBe(0);
         expect(result.stdout).not.toContain("ports free");
