@@ -1,5 +1,36 @@
 # Changelog
 
+## [3.11.0](https://github.com/langwatch/langwatch/compare/langwatch@v3.10.0...langwatch@v3.11.0) (2026-08-08)
+
+
+### ⚠ BREAKING CHANGES
+
+* **evaluators:** evaluations, monitors and experiments referencing a legacy/ragas_* evaluator type stop working. Their current equivalents in the ragas/* family remain available.
+* **mcp-server:** three behaviors change for callers of the HTTP server. A client that authenticated once at initialize and then sent only the session id must now send Authorization: Bearer <key> on every request. GET /sse?apiKey=<key> no longer authenticates; use the Authorization header. A deployment relying on the implicit 0.0.0.0 bind must pass --host 0.0.0.0, which the published container image already does.
+
+### Features
+
+* **codex:** capture the conversation for a plain codex, not just the wrapper ([#6433](https://github.com/langwatch/langwatch/issues/6433)) ([38931b4](https://github.com/langwatch/langwatch/commit/38931b4392837c4a011dbde44ec7b80c80b19720))
+* **coding-agent:** session economics, and the repositories and pull requests behind them ([#6435](https://github.com/langwatch/langwatch/issues/6435)) ([6430813](https://github.com/langwatch/langwatch/commit/6430813056cda513241a8389a2136fac2d63591e))
+* **evaluators:** remove the legacy Ragas evaluators ([#6600](https://github.com/langwatch/langwatch/issues/6600)) ([ef9ea90](https://github.com/langwatch/langwatch/commit/ef9ea90e22bc2adb92bacf5c732cc996c9782bfe))
+* **governance:** copilot capture across three surfaces — CLI wrapper, app login agent, VS Code Chat (ADR-039) ([#5605](https://github.com/langwatch/langwatch/issues/5605)) ([fd6a3b3](https://github.com/langwatch/langwatch/commit/fd6a3b304176137433ad645d718ec1411097c60f))
+* **model-providers:** test a credential you have already saved ([#6657](https://github.com/langwatch/langwatch/issues/6657)) ([223f6f4](https://github.com/langwatch/langwatch/commit/223f6f4f30d973735f6917bfe19a67fb8e541469))
+
+
+### Bug Fixes
+
+* **charts:** unpin the clickhouse-serverless subchart and resync the lock ([#6745](https://github.com/langwatch/langwatch/issues/6745)) ([0e2c9c7](https://github.com/langwatch/langwatch/commit/0e2c9c7a6521725c0c4cfcb363d0a866aae45936))
+* **cli:** survive orphaned member rows when resolving the bootstrap admin email ([#6738](https://github.com/langwatch/langwatch/issues/6738)) ([f2149eb](https://github.com/langwatch/langwatch/commit/f2149eb4c648ccffab6151eff05b2d28d4d78f65))
+* **dev:** count the checks that go around the package scripts ([#6733](https://github.com/langwatch/langwatch/issues/6733)) ([824a297](https://github.com/langwatch/langwatch/commit/824a297757875829702a9339dbf80947e6581a90))
+* **mcp-server:** authorize every request to the standalone HTTP server ([#6641](https://github.com/langwatch/langwatch/issues/6641)) ([af324de](https://github.com/langwatch/langwatch/commit/af324deeb3700f2745783a46e6fd5e8625ef868e))
+* **traces:** default the oversized-span S3 spool on so configured storage means no truncation ([#6729](https://github.com/langwatch/langwatch/issues/6729)) ([6bf9ec8](https://github.com/langwatch/langwatch/commit/6bf9ec80ad5982cb9a422145b608c6ea1a8d2823))
+* **traces:** gate coding-agent log content by canonical event and per key ([#6743](https://github.com/langwatch/langwatch/issues/6743)) ([157eb0e](https://github.com/langwatch/langwatch/commit/157eb0e772232a52be22d1cd2a5336842dc06def))
+
+
+### Miscellaneous
+
+* **release:** single-footer shadow Release-As 3.11.0 ([#6744](https://github.com/langwatch/langwatch/issues/6744)) ([54885bd](https://github.com/langwatch/langwatch/commit/54885bd6a06aa4e57791eba470a7771c6d02c9ff))
+
 ## [3.10.0](https://github.com/langwatch/langwatch/compare/langwatch@v3.9.0...langwatch@v3.10.0) (2026-08-07)
 
 
