@@ -16,6 +16,34 @@ import type {
   TraceAnnotation,
 } from "./annotationForm.types";
 
+/** The toast-and-invalidate pair every annotation write ends on. */
+function saveCallbacks({
+  isEdit,
+  invalidateTraceReads,
+  onDone,
+}: {
+  isEdit: boolean;
+  invalidateTraceReads: () => void;
+  onDone: () => void;
+}) {
+  return {
+    onSuccess: () => {
+      invalidateTraceReads();
+      toaster.create({
+        title: isEdit ? "Annotation updated" : "Annotation saved",
+        type: "success",
+      });
+      onDone();
+    },
+    onError: () => {
+      toaster.create({
+        title: "Could not save annotation",
+        type: "error",
+      });
+    },
+  };
+}
+
 /**
  * Reads and writes for one turn's annotation: the annotation being edited,
  * the project's active score keys, and the create / update / delete calls
@@ -79,20 +107,11 @@ export function useAnnotationMutations({
       // left out rather than sent empty, which would withdraw the suggestion.
       expectedOutput: mode === "suggest" ? values.expectedOutput : undefined,
     };
-    const onSuccess = () => {
-      invalidateTraceReads();
-      toaster.create({
-        title: isEdit ? "Annotation updated" : "Annotation saved",
-        type: "success",
-      });
-      onDone();
-    };
-    const onError = () => {
-      toaster.create({
-        title: "Could not save annotation",
-        type: "error",
-      });
-    };
+    const { onSuccess, onError } = saveCallbacks({
+      isEdit,
+      invalidateTraceReads,
+      onDone,
+    });
     if (existing) {
       // The anchor is not sent back: editing a comment changes what it says,
       // never what it is about, so pointing it somewhere else is a delete and

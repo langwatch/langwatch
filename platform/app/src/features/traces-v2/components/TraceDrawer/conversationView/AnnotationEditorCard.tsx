@@ -15,45 +15,19 @@ interface AnnotationEditorCardProps {
   output?: string | null;
 }
 
-/**
- * The annotation composer, docked in the rail where the annotation itself
- * sits. Same form body as the popover; the difference is where the values live
- * (the draft store, so they survive the turn scrolling out of view) and that it
- * takes its place in the column rather than floating over the conversation.
- */
-export function AnnotationEditorCard({
+/** The form contract, built from the draft store instead of local state. */
+function buildComposerFormState({
   draft,
-  output,
-}: AnnotationEditorCardProps) {
-  const patchDraft = useAnnotationDraftStore((s) => s.patchDraft);
-  const closeDraft = useAnnotationDraftStore((s) => s.closeDraft);
-
-  const mutations = useAnnotationMutations({
-    traceId: draft.traceId,
-    mode: draft.mode,
-    annotationId: draft.annotationId,
-    enabled: true,
-    onDone: closeDraft,
-    anchorKind: draft.anchorKind,
-    anchorId: draft.anchorId,
-    anchorPath: draft.anchorPath,
-  });
-  const { existing } = mutations;
-
-  // An edit starts from the annotation as it stands, once. The annotation is
-  // read asynchronously, so re-seeding on every render of it would overwrite
-  // whatever the reviewer had typed since.
-  useEffect(() => {
-    if (!draft.annotationId || draft.seededFromExisting || !existing) return;
-    patchDraft({
-      comment: existing.comment ?? "",
-      expectedOutput: existing.expectedOutput ?? "",
-      scoreOptions: (existing.scoreOptions as unknown as ScoreOptions) ?? {},
-      seededFromExisting: true,
-    });
-  }, [draft.annotationId, draft.seededFromExisting, existing, patchDraft]);
-
-  const state: AnnotationFormState = {
+  mutations,
+  patchDraft,
+  closeDraft,
+}: {
+  draft: AnnotationDraft;
+  mutations: ReturnType<typeof useAnnotationMutations>;
+  patchDraft: (patch: Partial<AnnotationDraft>) => void;
+  closeDraft: () => void;
+}): AnnotationFormState {
+  return {
     comment: draft.comment,
     setComment: (comment) => patchDraft({ comment }),
     expectedOutput: draft.expectedOutput,
@@ -92,6 +66,52 @@ export function AnnotationEditorCard({
     onCancel: closeDraft,
     mode: draft.mode,
   };
+}
+
+/**
+ * The annotation composer, docked in the rail where the annotation itself
+ * sits. Same form body as the popover; the difference is where the values live
+ * (the draft store, so they survive the turn scrolling out of view) and that it
+ * takes its place in the column rather than floating over the conversation.
+ */
+export function AnnotationEditorCard({
+  draft,
+  output,
+}: AnnotationEditorCardProps) {
+  const patchDraft = useAnnotationDraftStore((s) => s.patchDraft);
+  const closeDraft = useAnnotationDraftStore((s) => s.closeDraft);
+
+  const mutations = useAnnotationMutations({
+    traceId: draft.traceId,
+    mode: draft.mode,
+    annotationId: draft.annotationId,
+    enabled: true,
+    onDone: closeDraft,
+    anchorKind: draft.anchorKind,
+    anchorId: draft.anchorId,
+    anchorPath: draft.anchorPath,
+  });
+  const { existing } = mutations;
+
+  // An edit starts from the annotation as it stands, once. The annotation is
+  // read asynchronously, so re-seeding on every render of it would overwrite
+  // whatever the reviewer had typed since.
+  useEffect(() => {
+    if (!draft.annotationId || draft.seededFromExisting || !existing) return;
+    patchDraft({
+      comment: existing.comment ?? "",
+      expectedOutput: existing.expectedOutput ?? "",
+      scoreOptions: (existing.scoreOptions as unknown as ScoreOptions) ?? {},
+      seededFromExisting: true,
+    });
+  }, [draft.annotationId, draft.seededFromExisting, existing, patchDraft]);
+
+  const state = buildComposerFormState({
+    draft,
+    mutations,
+    patchDraft,
+    closeDraft,
+  });
 
   return (
     <Box
