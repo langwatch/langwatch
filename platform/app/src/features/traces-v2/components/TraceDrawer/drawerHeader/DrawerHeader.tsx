@@ -478,6 +478,19 @@ const HOISTED_AUTO_PINS: HoistedPinDef[] = [
   { key: "langwatch.labels", label: "Labels", category: "tag" },
 ];
 
+/**
+ * Metadata keys the auto-pin sweep leaves alone, because the metrics row one
+ * line above already states them: the Model / Models pill is built from
+ * `trace.models` and folds the rest behind a "+N" with the full list on hover.
+ * `metadata.models` also arrives as a raw JSON array, which reads worse than
+ * the pill it duplicates. A key the reviewer pins explicitly is still theirs
+ * and still renders, because the user-pin check runs first.
+ */
+const AUTO_PIN_SUPPRESSED_METADATA_KEYS = new Set([
+  "metadata.model",
+  "metadata.models",
+]);
+
 export const DrawerHeader = memo(function DrawerHeader({
   trace: traceProp,
   onClose,
@@ -717,6 +730,7 @@ export const DrawerHeader = memo(function DrawerHeader({
     for (const [key, rawValue] of Object.entries(trace.attributes)) {
       if (!key.startsWith("metadata.")) continue;
       if (userKeys.has(`attribute:${key}`)) continue;
+      if (AUTO_PIN_SUPPRESSED_METADATA_KEYS.has(key)) continue;
       if (seenMetadataKeys.has(key)) continue;
       seenMetadataKeys.add(key);
       const value = formatPinValue({ key, value: rawValue ?? null });

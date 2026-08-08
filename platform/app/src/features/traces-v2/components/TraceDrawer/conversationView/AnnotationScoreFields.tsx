@@ -7,9 +7,11 @@ import {
   Textarea,
   VStack,
 } from "@chakra-ui/react";
-import { Check, MessageSquareText } from "lucide-react";
+import { MessageSquareText } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { Checkbox, CheckboxGroup } from "~/components/ui/checkbox";
 import { Popover } from "~/components/ui/popover";
+import { Radio, RadioGroup } from "~/components/ui/radio";
 import type {
   AnnotationFormState,
   AnnotationScoreOption,
@@ -73,35 +75,23 @@ function describeScoreValue(
 }
 
 /**
- * The rating that picking an option leaves behind. A multi-value key collects
- * a set, so picking toggles membership; a single-value key holds one option,
- * so picking the one already held clears it.
+ * A rating as the editor holds it: a list of picked options either way, so
+ * single-value and multi-value keys share one buffer. A single-value key gives
+ * that list back as its one option, or as nothing when it has none.
  */
-function nextScoreValue({
-  current,
-  optValue,
-  isMulti,
-}: {
-  current: string | string[] | undefined;
-  optValue: string;
-  isMulti: boolean;
-}): string | string[] {
-  if (!isMulti) return optValue === current ? "" : optValue;
-  const selected = Array.isArray(current)
-    ? current
-    : current
-      ? [String(current)]
-      : [];
-  return selected.includes(optValue)
-    ? selected.filter((v) => v !== optValue)
-    : [...selected, optValue];
+function toSelection(value: string | string[] | undefined): string[] {
+  if (value == null || value === "") return [];
+  const list = Array.isArray(value) ? value : [String(value)];
+  return list.filter((v) => v !== "");
 }
 
 /**
- * One score key as a chip + popover picker. Multi-value (CHECKBOX) keys
- * collect a set; single-value keys are toggle buttons. Optional reason
- * textarea sits below the options so reviewers can capture *why* in the
- * same flow as the rating itself.
+ * One score key as a chip with an editor behind it. The editor buffers: picking
+ * an option, ticking several, and typing a reason all stay local until the
+ * reviewer confirms with OK, which commits the rating and the reason together
+ * and closes. Clear commits an empty rating, returning the key to unrated.
+ * Leaving any other way (Escape, a click outside, opening another chip) keeps
+ * what was already committed, so the chip only ever reads what was confirmed.
  */
 export function ScoreChip({
   name,
@@ -114,41 +104,30 @@ export function ScoreChip({
 }: ScoreChipProps) {
   const isMulti = dataType === "CHECKBOX";
   const [open, setOpen] = useState(false);
+  const [draftSelection, setDraftSelection] = useState<string[]>(() =>
+    toSelection(value),
+  );
   const [draftReason, setDraftReason] = useState(reason);
 
+  // The editor starts from what is committed every time it opens, so a session
+  // the reviewer walked away from leaves nothing behind for the next one.
   useEffect(() => {
-    if (open) setDraftReason(reason);
-  }, [open, reason]);
+    if (!open) return;
+    setDraftSelection(toSelection(value));
+    setDraftReason(reason);
+  }, [open, value, reason]);
 
   const display = useMemo(() => describeScoreValue(value), [value]);
 
-  const toggle = (optValue: string) => {
-    const next = nextScoreValue({ current: value, optValue, isMulti });
-    onChange(next, draftReason);
-    // Single-select keys close the popover on pick: there is nothing more to
-    // do unless the reviewer wants to add a reason, which re-opening the chip
-    // gets them back to.
-    if (typeof next === "string" && next !== "") setOpen(false);
-  };
-
-  const isSelected = (optValue: string) => {
-    if (isMulti && Array.isArray(value)) return value.includes(optValue);
-    return value === optValue;
-  };
-
-  // Only fire onChange when the reason actually changed, which saves a no-op
-  // mutation in the quick-rate path each time the popover closes.
-  const commitReason = () => {
-    if (draftReason !== reason) onChange(value ?? "", draftReason);
+  const commit = (selection: string[], nextReason: string) => {
+    onChange(isMulti ? selection : (selection[0] ?? ""), nextReason);
+    setOpen(false);
   };
 
   return (
     <Popover.Root
       open={open}
-      onOpenChange={(e) => {
-        setOpen(e.open);
-        if (!e.open) commitReason();
-      }}
+      onOpenChange={(e) => setOpen(e.open)}
       // Multiple of these popovers can render per annotation form (one
       // per score field). Drop them from DOM when closed so the form
       // stays cheap to keep mounted.
@@ -171,8 +150,9 @@ export function ScoreChip({
             )}
             <ScoreOptionList
               options={options}
-              isSelected={isSelected}
-              onPick={toggle}
+              isMulti={isMulti}
+              selection={draftSelection}
+              onSelectionChange={setDraftSelection}
             />
             <Box height="1px" bg="border.muted" />
             <Textarea
@@ -184,20 +164,29 @@ export function ScoreChip({
               fontSize="xs"
               resize="none"
             />
-            {value && (
+            <HStack justify="space-between">
               <Button
                 size="2xs"
                 variant="ghost"
                 color="fg.muted"
                 onClick={(e) => {
                   e.stopPropagation();
-                  onChange(isMulti ? [] : "", "");
-                  setDraftReason("");
+                  commit([], "");
                 }}
               >
                 Clear
               </Button>
-            )}
+              <Button
+                size="2xs"
+                colorPalette="blue"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  commit(draftSelection, draftReason);
+                }}
+              >
+                OK
+              </Button>
+            </HStack>
           </VStack>
         </Popover.Body>
       </Popover.Content>
@@ -229,47 +218,68 @@ function ScoreChipTrigger({
           {display ? `: ${display}` : ""}
         </Text>
         {hasReason && (
-          <Icon as={MessageSquareText} boxSize={2.5} marginLeft={1} />
+          <Icon
+            as={MessageSquareText}
+            boxSize={2.5}
+            marginLeft={1}
+            aria-label={`${name} has a reason`}
+          />
         )}
       </Button>
     </Popover.Trigger>
   );
 }
 
-/** The key's options, with the ones the reviewer picked marked as chosen. */
+/**
+ * The key's options as the control the key actually is: checkboxes for a key
+ * that takes several answers, radios for one that takes a single answer.
+ */
 function ScoreOptionList({
   options,
-  isSelected,
-  onPick,
+  isMulti,
+  selection,
+  onSelectionChange,
 }: {
   options: AnnotationScoreOption[];
-  isSelected: (optValue: string) => boolean;
-  onPick: (optValue: string) => void;
+  isMulti: boolean;
+  selection: string[];
+  onSelectionChange: (selection: string[]) => void;
 }) {
+  if (isMulti) {
+    return (
+      <CheckboxGroup
+        value={selection}
+        onValueChange={(next: string[]) => onSelectionChange(next)}
+      >
+        <VStack align="start" gap={1.5}>
+          {options.map((opt) => (
+            <Checkbox
+              key={String(opt.value)}
+              value={String(opt.value)}
+              size="sm"
+            >
+              {opt.label}
+            </Checkbox>
+          ))}
+        </VStack>
+      </CheckboxGroup>
+    );
+  }
   return (
-    <VStack align="stretch" gap={0.5}>
-      {options.map((opt) => {
-        const optValue = String(opt.value);
-        const selected = isSelected(optValue);
-        return (
-          <Button
-            key={optValue}
-            size="xs"
-            variant={selected ? "solid" : "ghost"}
-            colorPalette={selected ? "blue" : "gray"}
-            justifyContent="flex-start"
-            onClick={(e) => {
-              e.stopPropagation();
-              onPick(optValue);
-            }}
-          >
-            <Box width="14px">
-              {selected && <Icon as={Check} boxSize={3} />}
-            </Box>
-            <Text textStyle="xs">{opt.label}</Text>
-          </Button>
-        );
-      })}
-    </VStack>
+    <RadioGroup
+      size="sm"
+      value={selection[0] ?? ""}
+      onValueChange={({ value }: { value: string | null }) =>
+        onSelectionChange(value ? [value] : [])
+      }
+    >
+      <VStack align="start" gap={1.5}>
+        {options.map((opt) => (
+          <Radio key={String(opt.value)} value={String(opt.value)}>
+            {opt.label}
+          </Radio>
+        ))}
+      </VStack>
+    </RadioGroup>
   );
 }

@@ -81,15 +81,44 @@ Feature: Per-turn actions in ConversationView
     When the annotation popover is open
     Then a "Scores" section renders one `ScoreChip` per active key (LIKERT, OPTION, CHECKBOX)
 
-  Scenario: Picking a value via a ScoreChip stages it on the popover form
-    When the user opens a score chip and clicks an option
-    Then `scoreOptions[scoreId].value` updates locally
-    And on save the annotation is persisted with the staged scoreOptions
+  # A score chip opens a small form, not a menu. The rating and the reason
+  # behind it are given together and land together, so a reviewer who wants to
+  # say why is never sent back into a chip that closed itself the moment they
+  # picked. Nothing the reviewer does inside the chip counts until they confirm,
+  # which is what makes closing it any other way a way out.
+  @integration
+  Scenario: Picking a rating keeps the editor open until it is confirmed
+    Given the reviewer opened a score chip
+    When they pick one of its options
+    Then the editor stays open with that option selected
+    And the chip reads as unrated until they confirm
 
-  Scenario: Score-chip popover dismisses without saving
-    When the user opens a score chip, then presses Escape or clicks outside
-    Then the chip popover closes
-    And the staged value is preserved on the form (until the parent popover saves or cancels)
+  @integration
+  Scenario: Confirming keeps the rating and the reason given with it
+    Given the reviewer opened a score chip and picked an option
+    When they type a reason and confirm
+    Then the editor closes
+    And the chip reads with that rating on it and says it carries a reason
+    And saving the annotation persists the rating and the reason together
+
+  @integration
+  Scenario: Leaving the editor any other way keeps the rating it had
+    When the reviewer picks an option, then presses Escape or clicks outside
+    Then the editor closes
+    And the score keeps whatever rating it had before the editor opened
+
+  @integration
+  Scenario: Clearing a score returns it to unrated
+    Given a score the reviewer already rated, with a reason
+    When they open its chip and clear it
+    Then the editor closes
+    And the chip reads as unrated, carrying neither rating nor reason
+
+  @integration
+  Scenario: A multiple-choice score takes several options at once
+    Given a score key whose options are multiple-choice
+    When the reviewer ticks two of them and confirms
+    Then the chip reads as carrying both
 
   Scenario: No active score keys hides the Scores section
     Given the project has zero active annotation score keys
