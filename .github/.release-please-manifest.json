@@ -4,7 +4,7 @@
   "sdks/typescript": "1.2.0",
   "sdks/python": "1.2.0",
   "mcp/typescript": "2.0.0",
-  "services/langevals": "2.2.0",
+  "services/langevals": "3.0.0",
   ".": "3.10.0",
   "skills": "1.1.0"
 }
