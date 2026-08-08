@@ -25,6 +25,8 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
+import { asBashWord } from "./shell-quote";
+
 const REPO_ROOT = path.resolve(__dirname, "../../../..");
 const SUPERVISOR = path.join(REPO_ROOT, "dev/scripts/dev-supervisor.mjs");
 
@@ -74,7 +76,11 @@ const readyFile = () => path.join(scratch, "stack-is-up");
  */
 function writeStack(body: string): string {
   const file = path.join(scratch, `${marker}-stack.sh`);
-  writeFileSync(file, `#!/bin/bash\ntouch ${readyFile()}\n${body}\n`, "utf8");
+  writeFileSync(
+    file,
+    `#!/bin/bash\ntouch ${asBashWord(readyFile())}\n${body}\n`,
+    "utf8",
+  );
   chmodSync(file, 0o755);
   return file;
 }
@@ -225,7 +231,9 @@ describe("dev stack supervisor", () => {
       /** @scenario "Every lane goes down, not just the direct child" */
       it("takes down every lane, however deep", async () => {
         const stack = writeStack(DEEP_STACK);
-        const launcher = launchFrom(`node ${SUPERVISOR} ${stack}`);
+        const launcher = launchFrom(
+          `node ${asBashWord(SUPERVISOR)} ${asBashWord(stack)}`,
+        );
 
         expect(await stackIsUp()).toBe(true);
         const before = stackPids().length;
@@ -239,7 +247,9 @@ describe("dev stack supervisor", () => {
       /** @scenario "A stack that restarts its own lanes is still taken down" */
       it("takes down lanes that are restarted while it is stopping them", async () => {
         const stack = writeStack(RESTARTING_STACK);
-        const launcher = launchFrom(`node ${SUPERVISOR} ${stack}`);
+        const launcher = launchFrom(
+          `node ${asBashWord(SUPERVISOR)} ${asBashWord(stack)}`,
+        );
 
         expect(await stackIsUp()).toBe(true);
         process.kill(launcher, "SIGKILL");
@@ -252,7 +262,9 @@ describe("dev stack supervisor", () => {
       /** @scenario "A command that outlives its supervisor is still supervised" */
       it("kills outright what ignores the first signal", async () => {
         const stack = writeStack(`trap '' TERM\nsleep 120 &\necho up\nwait`);
-        const launcher = launchFrom(`node ${SUPERVISOR} ${stack}`);
+        const launcher = launchFrom(
+          `node ${asBashWord(SUPERVISOR)} ${asBashWord(stack)}`,
+        );
 
         expect(await stackIsUp()).toBe(true);
         process.kill(launcher, "SIGKILL");
@@ -270,7 +282,7 @@ describe("dev stack supervisor", () => {
         chmodSync(bystanderFile, 0o755);
 
         const launcher = launchFrom(
-          `${bystanderFile} & node ${SUPERVISOR} ${stack}`,
+          `${asBashWord(bystanderFile)} & node ${asBashWord(SUPERVISOR)} ${asBashWord(stack)}`,
         );
         expect(await stackIsUp()).toBe(true);
 

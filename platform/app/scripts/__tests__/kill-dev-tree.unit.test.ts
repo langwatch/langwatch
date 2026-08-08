@@ -27,6 +27,8 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
+import { asBashWord } from "./shell-quote";
+
 const SCRIPT = path.resolve(__dirname, "../kill-dev-tree.sh");
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -191,7 +193,7 @@ function pathWithStubbedSs(stub: string[]): string {
 function pathWithOnlySs(port: number): string {
   return pathWithStubbedSs([
     "#!/bin/bash",
-    `pid=$(cat ${readyFile()} 2>/dev/null)`,
+    `pid=$(cat ${asBashWord(readyFile())} 2>/dev/null)`,
     // Only while that lane is actually alive, so the script sees the port go
     // quiet exactly when it does rather than a line that outlives the stack.
     'if [ -z "$pid" ] || ! kill -0 "$pid" 2>/dev/null; then exit 0; fi',
@@ -221,7 +223,7 @@ function writeRestartingStack(port: number): string {
       "#!/bin/bash",
       "trap '' TERM",
       "while true; do",
-      `  ${process.execPath} ${writeLane()} ${port} ${readyFile()} &`,
+      `  ${asBashWord(process.execPath)} ${asBashWord(writeLane())} ${port} ${asBashWord(readyFile())} &`,
       "  wait $! 2>/dev/null",
       "done",
       "",
@@ -349,11 +351,11 @@ describe("clearing the dev ports", () => {
           caller,
           [
             "#!/bin/bash",
-            `${process.execPath} ${writeLane()} ${port} ${readyFile()} &`,
+            `${asBashWord(process.execPath)} ${asBashWord(writeLane())} ${port} ${asBashWord(readyFile())} &`,
             "sleep 2",
-            `bash ${SCRIPT} ${port} > ${path.join(scratch, "out")} 2>&1`,
+            `bash ${asBashWord(SCRIPT)} ${port} > ${asBashWord(path.join(scratch, "out"))} 2>&1`,
             "sleep 3",
-            `touch ${survived}`,
+            `touch ${asBashWord(survived)}`,
             "sleep 30",
             "",
           ].join("\n"),
