@@ -166,10 +166,19 @@ export class FeatureFlagStorePostgres {
   }
 
   /**
-   * Operator write of the targeting rules for a flag. Creates a row
-   * with rule-only semantics (no row-level true) when one doesn't
-   * already exist so an org-scoped enable doesn't accidentally flip
-   * the flag on cluster-wide.
+   * Operator write of the targeting rules for a flag.
+   *
+   * A rule is an override for the targets it names, and for nobody else.
+   * When no row exists yet, the row this creates seeds its row-level
+   * `enabled` from the registry default so unmatched callers keep resolving
+   * to exactly what they resolved to before the rule was written. Seeding
+   * `false` unconditionally would make a single per-project opt-out rule
+   * switch a default-on flag off for the whole fleet, since the new row
+   * shadows the registry default for every non-matching context.
+   *
+   * For a default-off flag the seed is `false`, so an org-scoped enable
+   * still cannot flip the flag on cluster-wide. Unregistered keys seed
+   * `false` for the same reason.
    */
   async setRules(
     key: string,
@@ -180,7 +189,7 @@ export class FeatureFlagStorePostgres {
       where: { key },
       create: {
         key,
-        enabled: false,
+        enabled: resolveFlagDefinition(key)?.defaultValue ?? false,
         rules: rules as unknown as object,
         lastEditedBy,
       },

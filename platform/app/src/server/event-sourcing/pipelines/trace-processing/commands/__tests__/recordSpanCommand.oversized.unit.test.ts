@@ -6,9 +6,9 @@
  *   2. Reconstitute the full span and process it normally.
  *   3. After event_log INSERT succeeds, best-effort delete the spool.
  *
- * These tests FAIL at unit runtime because RecordSpanCommand does not yet
- * fetch from spool or call deleteSpool (Step 5). They pass typecheck,
- * serving as the TDD contract.
+ * And the other side of that branch: when no `spoolRef` is present, because
+ * the payload fit inline or because the edge spool failed open, the worker
+ * caps oversized attribute values before the span becomes an event.
  *
  * BDD structure: describe("given X") → describe("when Y") → it("…").
  * No "should" in it() names (project convention).
@@ -16,9 +16,11 @@
 
 import { describe, expect, it, vi } from "vitest";
 import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
+import { maybeSpool } from "~/server/app-layer/traces/edge-spool";
 import { type Command, createTenantId } from "../../../../";
 import type { RecordSpanCommandData } from "../../schemas/commands";
 import { RECORD_SPAN_COMMAND_TYPE } from "../../schemas/constants";
+import { DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES } from "../../utils/capOversizedAttributes";
 import {
   RecordSpanCommand,
   type RecordSpanCommandDependencies,
@@ -317,6 +319,98 @@ describe("given a RecordSpanCommand that carries a spoolRef (oversized path)", (
       expect(
         Buffer.byteLength(outputAttr?.value?.stringValue ?? "", "utf-8"),
       ).toBe(300 * 1024);
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Fail-open consequence: what the worker does with the command the edge hands
+// back when the spool is unavailable
+// ---------------------------------------------------------------------------
+
+/**
+ * Starts from the real edge decision rather than a hand-built command: a
+ * failing spool PUT is what produces the inline command, and the worker is
+ * what applies the cap. Asserting the cap helper directly would stay green if
+ * the worker stopped calling it, applied it before spool rehydration, or
+ * skipped it on the inline path.
+ */
+describe("given the edge spool PUT failed and the command fell back to inline", () => {
+  const OVERSIZED_BYTES = 300 * 1024;
+
+  function makeFailingBlobStore(): BlobStore {
+    return {
+      putSpool: vi.fn().mockRejectedValue(new Error("S3 PUT failed")),
+      getSpool: vi.fn(),
+      deleteSpool: vi.fn(),
+    } as unknown as BlobStore;
+  }
+
+  /** The command the edge actually forwards after its spool attempt fails. */
+  async function inlineCommandAfterFailedSpool(): Promise<
+    Command<RecordSpanCommandData>
+  > {
+    const blobStore = makeFailingBlobStore();
+    const data = await maybeSpool({
+      data: {
+        tenantId: TENANT_ID,
+        occurredAt: 1700000000000,
+        span: {
+          traceId: TRACE_ID,
+          spanId: SPAN_ID,
+          name: "test-span",
+          kind: 1,
+          startTimeUnixNano: { low: 0, high: 0 },
+          endTimeUnixNano: { low: 1000000, high: 0 },
+          attributes: [
+            {
+              key: "langwatch.output",
+              value: { stringValue: "z".repeat(OVERSIZED_BYTES) },
+            },
+          ],
+          events: [],
+          links: [],
+          status: {},
+          droppedAttributesCount: 0,
+          droppedEventsCount: 0,
+          droppedLinksCount: 0,
+        },
+        resource: null,
+        instrumentationScope: null,
+      },
+      blobStore,
+      logger: { warn: vi.fn() },
+    });
+
+    return {
+      type: RECORD_SPAN_COMMAND_TYPE,
+      aggregateId: TRACE_ID,
+      tenantId: createTenantId(TENANT_ID),
+      data,
+    };
+  }
+
+  describe("when the command worker handles that command", () => {
+    /** @scenario When edge S3 spool PUT fails, ingestion falls back to inline (fail-open) */
+    it("emits a span whose oversized value carries the truncation marker and fits the cap", async () => {
+      const handler = new RecordSpanCommand({
+        ...makeDeps(),
+        blobStore: makeFailingBlobStore(),
+      });
+      const command = await inlineCommandAfterFailedSpool();
+
+      // Fail-open contract: the edge forwarded the full payload inline.
+      expect(command.data.spoolRef).toBeUndefined();
+
+      const events = await handler.handle(command);
+
+      const outputValue = events[0]?.data.span?.attributes?.find(
+        (a: { key: string }) => a.key === "langwatch.output",
+      )?.value?.stringValue;
+      expect(outputValue).toContain("[truncated:");
+      expect(Buffer.byteLength(outputValue ?? "", "utf-8")).toBeLessThanOrEqual(
+        DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES,
+      );
     });
   });
 });

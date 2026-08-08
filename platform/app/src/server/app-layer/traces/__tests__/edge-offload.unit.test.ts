@@ -6,7 +6,10 @@
  *   - payload > 256 KB + PUT succeeds → oversized command with spoolRef only; payload NOT in command
  *   - payload > 256 KB + PUT fails → fail-open: regular command with full inline; warn log emitted
  *   - warn message contains "oversize protection skipped"
- *   - fail-open payload is then bounded by capOversizedAttributes(256 KB)
+ *
+ * What the fail-open payload then costs the deployment is pinned where the
+ * cap actually runs: recordSpanCommand.oversized.unit.test.ts drives the
+ * command worker over the command this module hands back.
  *
  * BDD structure: describe("given X") → describe("when Y") → it("…").
  * No "should" in it() names (project convention).
@@ -14,10 +17,6 @@
 
 import { describe, expect, it, vi } from "vitest";
 import type { RecordSpanCommandData } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
-import {
-  capOversizedAttributes,
-  DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES,
-} from "~/server/event-sourcing/pipelines/trace-processing/utils/capOversizedAttributes";
 import type { BlobStore } from "../blob-store.service";
 import { maybeSpool, type SpoolLogger } from "../edge-spool";
 import { COMMAND_INLINE_THRESHOLD } from "../lean-for-projection";
@@ -189,31 +188,6 @@ describe("given a command payload > COMMAND_INLINE_THRESHOLD and the S3 spool PU
       const warnArg: unknown = logger.warn.mock.calls[0]?.[0];
       expect(typeof warnArg === "string" ? warnArg : "").toContain(
         "oversize protection skipped",
-      );
-    });
-  });
-
-  // What the deployment actually loses when the spool is unavailable: the
-  // span keeps flowing, and the value it carries is bounded downstream by
-  // the same cap that existed before ADR-022. This is the consequence the
-  // fail-open warn tells operators about, exercised rather than described.
-  describe("when the fallen-back command reaches the command worker", () => {
-    /** @scenario When edge S3 spool PUT fails, ingestion falls back to inline (fail-open) */
-    it("has its oversized attribute value replaced by the 256 KB cap's truncation marker", async () => {
-      const data = makeCommandData({ outputSize: 300 * 1024 });
-      const blobStore = makeBlobStore({ putSpoolResult: "fail" });
-      const logger = makeLogger();
-
-      const result = await maybeSpool({ data, blobStore, logger });
-      const capped = capOversizedAttributes(result.span, result.resource);
-
-      expect(capped).toBe(1);
-      const outputValue = result.span.attributes?.find(
-        (a) => a.key === "langwatch.output",
-      )?.value?.stringValue;
-      expect(outputValue).toContain("[truncated:");
-      expect(Buffer.byteLength(outputValue ?? "", "utf-8")).toBeLessThanOrEqual(
-        DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES,
       );
     });
   });
