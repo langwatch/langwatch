@@ -11,6 +11,8 @@
  * Feature: specs/ai-governance/cli-wrappers/claude-plugin-update.feature
  */
 
+import { writeFileSync } from "node:fs";
+
 import { describe, expect, it, vi } from "vitest";
 
 import type * as ChildProcessModule from "node:child_process";
@@ -107,6 +109,33 @@ describe("updateLangwatchClaudePlugin", () => {
       expect(result.reason).toContain("update rejected");
     });
 
+    it("claims no new version when the update did not apply", async () => {
+      seedOutdatedInstall();
+      answerClaude({ update: 1 });
+      const { updateLangwatchClaudePlugin } = await loadModule();
+
+      // `to` means "the version now installed", and nothing was installed.
+      expect(updateLangwatchClaudePlugin().to).toBeUndefined();
+    });
+
+    /** @scenario "A run that waits on the network says what it is waiting for" */
+    it("announces the check before the first subprocess", async () => {
+      seedOutdatedInstall();
+      const spawnsWhenAnnounced: number[] = [];
+      claudeThatUpdatesTo("0.2.0");
+      const { updateLangwatchClaudePlugin } = await loadModule();
+
+      updateLangwatchClaudePlugin({
+        onCheckStart: () =>
+          spawnsWhenAnnounced.push(spawnSyncMock.mock.calls.length),
+      });
+
+      // Announced once, and before anything reached the network. The probe is
+      // the only spawn allowed to precede it: it decides whether there is a
+      // check to announce at all.
+      expect(spawnsWhenAnnounced).toEqual([1]);
+    });
+
     /** @scenario "A claude that cannot manage plugins is left alone" */
     it("does not try to update through a claude with no plugin subcommand", async () => {
       seedOutdatedInstall();
@@ -163,6 +192,18 @@ describe("updateLangwatchClaudePlugin", () => {
       expect(commandsRun()).toEqual([]);
     });
 
+    /** @scenario "A config that cannot be read stops the check rather than repeating it" */
+    it("does not check at all when the config will not parse", async () => {
+      seedOutdatedInstall();
+      writeFileSync(process.env.LANGWATCH_CLI_CONFIG!, "{ not json");
+      const { updateLangwatchClaudePlugin } = await loadModule();
+
+      // A stamp that cannot be written is a check that would otherwise repeat
+      // on every single launch, forever.
+      expect(updateLangwatchClaudePlugin().action).toBe("unavailable");
+      expect(commandsRun()).toEqual([]);
+    });
+
     it("leaves a plugin installed only for a project alone", async () => {
       seedInstalledPlugin({ version: "0.1.0", scope: "project" });
       seedMarketplace({ publishedVersion: "0.2.0" });
@@ -215,6 +256,18 @@ describe("updateLangwatchClaudePlugin", () => {
         action: "checked_recently",
       });
       expect(commandsRun()).toEqual([]);
+    });
+
+    /** @scenario "A run that answers from disk says nothing at all" */
+    it("announces nothing on a run that does no work", async () => {
+      seedOutdatedInstall();
+      writeConfig({ claude_plugin_last_update_check: secondsAgo(HOUR_MS) });
+      const onCheckStart = vi.fn();
+      const { updateLangwatchClaudePlugin } = await loadModule();
+
+      updateLangwatchClaudePlugin({ onCheckStart });
+
+      expect(onCheckStart).not.toHaveBeenCalled();
     });
 
     /** @scenario "A day after the last check the plugin is checked again" */

@@ -99,11 +99,14 @@ const UPDATE_CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000;
 
 /**
  * Refreshing the listing and applying an update are each a fetch of a small
- * repository. Well clear of a slow network, and far below the install timeout,
- * because unlike an install this can happen on a run the user never asked to
- * involve Claude Code at all.
+ * repository, so this is generous for the work and deliberately far below the
+ * install timeout. Both can run on the way into a launch the user never asked
+ * to involve Claude Code in, and they run back to back, so the number that
+ * matters is the two of them plus the probe: a wrapped run waits at most a
+ * bit over a minute on a network that has stopped answering, having said so
+ * first, rather than the two minutes a matching install timeout would cost.
  */
-const UPDATE_TIMEOUT_MS = 60_000;
+const UPDATE_TIMEOUT_MS = 30_000;
 
 /**
  * A version we are willing to reason about. Anything else (absent, a git sha, a
@@ -381,27 +384,23 @@ export interface ClaudePluginUpdateResult {
  * its retry, which is the right trade for housekeeping: the plugin that is
  * installed keeps working, it is only a version behind.
  */
-export function updateLangwatchClaudePlugin(): ClaudePluginUpdateResult {
+export function updateLangwatchClaudePlugin({
+  onCheckStart,
+}: {
+  /**
+   * Called once, immediately before the first subprocess, and not at all on
+   * the runs that answer from disk. The work behind it is a network fetch on
+   * somebody's way into a coding session, so the caller gets the chance to say
+   * what the pause is for rather than leaving a silent terminal.
+   */
+  onCheckStart?: () => void;
+} = {}): ClaudePluginUpdateResult {
   try {
-    const state = readClaudePluginState();
-    if (!state.pluginInstalled) return { action: "absent" };
-    if (checkedRecently()) return { action: "checked_recently" };
-
-    // A marketplace of our name that points somewhere else is somebody else's
-    // registration, and updating what it serves is not ours to do.
-    if (!state.marketplaceOwnedByLangwatch) {
-      stampUpdateCheck();
-      return {
-        action: "unavailable",
-        reason: "the langwatch marketplace on this machine is not ours",
-      };
-    }
-    if (!claudePluginCliAvailable()) {
-      stampUpdateCheck();
-      return { action: "unavailable", reason: "this claude has no plugin subcommand" };
-    }
+    const ineligible = updateEligibility();
+    if (ineligible) return ineligible;
 
     stampUpdateCheck();
+    onCheckStart?.();
 
     // The listing on disk is a clone, and it is as old as the last time
     // something refreshed it. Refresh first so the version we compare against
@@ -435,7 +434,7 @@ export function updateLangwatchClaudePlugin(): ClaudePluginUpdateResult {
     // Equal is the common case. Ahead of the listing happens on a machine that
     // installed from a local checkout, and dragging that backwards to what we
     // published would undo somebody's testing.
-    if (compareVersions(installed, published) >= 0) {
+    if (compareVersions({ version: installed, against: published }) >= 0) {
       // A refresh that failed leaves this unproven: the listing we just
       // compared against is whatever was already on disk, which may be older
       // than the release we are trying to deliver.
@@ -444,26 +443,80 @@ export function updateLangwatchClaudePlugin(): ClaudePluginUpdateResult {
         : { action: "up_to_date", from: installed };
     }
 
-    const update = runClaude({
-      args: ["plugin", "update", CLAUDE_PLUGIN_REF, "--scope", "user"],
-      timeoutMs: UPDATE_TIMEOUT_MS,
-    });
-    // What is on disk afterwards decides, not the exit status: a non-zero exit
-    // that still moved the version did the job, and a zero exit that moved
-    // nothing did not.
-    const after = readInstalledPluginVersion();
-    if (!after || compareVersions(after, installed) <= 0) {
-      return {
-        action: "failed",
-        from: installed,
-        to: published,
-        reason: `the update to ${published} could not be applied: ${update.detail}`,
-      };
-    }
-    return { action: "updated", from: installed, to: after };
+    return applyUpdate({ installed, published });
   } catch (err) {
     return { action: "failed", reason: (err as Error).message };
   }
+}
+
+/**
+ * Why this run should not go looking, or null when it should. Everything here
+ * answers from disk, which is what keeps the runs that have nothing to do from
+ * costing a subprocess.
+ *
+ * The paths that DID reach a conclusion about this machine stamp the check on
+ * their way out. A `claude` that cannot manage plugins will not learn to before
+ * tomorrow, and asking it again on every launch spends a subprocess to be told
+ * the same thing.
+ */
+function updateEligibility(): ClaudePluginUpdateResult | null {
+  const state = readClaudePluginState();
+  if (!state.pluginInstalled) return { action: "absent" };
+
+  const stamp = readCheckStamp();
+  // A config that cannot be read is a stamp that cannot be written, and a
+  // check that cannot be recorded would repeat on every single launch forever.
+  // Unreadable therefore reads as "checked", not as "never checked".
+  if (!stamp.readable) {
+    return { action: "unavailable", reason: "the CLI config could not be read" };
+  }
+  if (checkedRecently(stamp.at)) return { action: "checked_recently" };
+
+  // A marketplace of our name that points somewhere else is somebody else's
+  // registration, and updating what it serves is not ours to do.
+  if (!state.marketplaceOwnedByLangwatch) {
+    stampUpdateCheck();
+    return {
+      action: "unavailable",
+      reason: "the langwatch marketplace on this machine is not ours",
+    };
+  }
+  if (!claudePluginCliAvailable()) {
+    stampUpdateCheck();
+    return { action: "unavailable", reason: "this claude has no plugin subcommand" };
+  }
+  return null;
+}
+
+/**
+ * Move the installed copy to what the listing publishes, and report on what is
+ * on disk afterwards rather than on the exit status: a non-zero exit that still
+ * moved the version did the job, and a zero exit that moved nothing did not.
+ *
+ * A failure carries no `to`, because nothing was installed. The version it was
+ * reaching for is in the reason, where it reads as an intention rather than as
+ * a version the machine has.
+ */
+function applyUpdate({
+  installed,
+  published,
+}: {
+  installed: string;
+  published: string;
+}): ClaudePluginUpdateResult {
+  const update = runClaude({
+    args: ["plugin", "update", CLAUDE_PLUGIN_REF, "--scope", "user"],
+    timeoutMs: UPDATE_TIMEOUT_MS,
+  });
+  const after = readInstalledPluginVersion();
+  if (!after || compareVersions({ version: after, against: installed }) <= 0) {
+    return {
+      action: "failed",
+      from: installed,
+      reason: `the update to ${published} could not be applied: ${update.detail}`,
+    };
+  }
+  return { action: "updated", from: installed, to: after };
 }
 
 /**
@@ -524,21 +577,32 @@ function versionOf(document: Record<string, unknown>): string | null {
 }
 
 /**
+ * When the last check ran, and whether that question could be answered at all.
+ * The two are different: a config with no stamp has never been checked, and a
+ * config that will not parse cannot record that a check happened either.
+ */
+function readCheckStamp(): { readable: boolean; at?: number } {
+  try {
+    const checkedAt = loadConfig().claude_plugin_last_update_check;
+    return {
+      readable: true,
+      at: typeof checkedAt === "number" ? checkedAt : undefined,
+    };
+  } catch {
+    return { readable: false };
+  }
+}
+
+/**
  * Whether a check inside the last day already answered this. Bounded at both
  * ends for the same reason the install suppression is: a stamp in the future is
  * a clock that went backwards or a config copied from another machine, and
  * reading it as recent would suppress every check until time caught up.
  */
-function checkedRecently(): boolean {
-  try {
-    const checkedAt = loadConfig().claude_plugin_last_update_check;
-    if (typeof checkedAt !== "number") return false;
-    const sinceCheck = Date.now() - checkedAt * 1000;
-    return sinceCheck >= 0 && sinceCheck < UPDATE_CHECK_INTERVAL_MS;
-  } catch {
-    // A config we cannot read is a check we have no record of.
-    return false;
-  }
+function checkedRecently(checkedAt: number | undefined): boolean {
+  if (checkedAt === undefined) return false;
+  const sinceCheck = Date.now() - checkedAt * 1000;
+  return sinceCheck >= 0 && sinceCheck < UPDATE_CHECK_INTERVAL_MS;
 }
 
 /** Best-effort: a stamp that does not land only costs an extra check. */

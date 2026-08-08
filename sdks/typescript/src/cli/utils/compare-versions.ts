@@ -1,6 +1,6 @@
 /**
- * Compare two dotted version strings, oldest first: negative when `a` is older
- * than `b`, zero when they name the same release, positive when `a` is newer.
+ * Compare two dotted version strings: negative when `version` is older than
+ * `against`, zero when they name the same release, positive when it is newer.
  *
  * A numeric triple comparison, which is what both callers need and no more. The
  * versions come from our own release tags and from a tool's `--version` output,
@@ -11,9 +11,15 @@
  * cannot understand check its shape before comparing; this returns an ordering
  * for whatever it is given.
  */
-export function compareVersions(a: string, b: string): number {
-  const left = a.split(".");
-  const right = b.split(".");
+export function compareVersions({
+  version,
+  against,
+}: {
+  version: string;
+  against: string;
+}): number {
+  const left = version.split(".");
+  const right = against.split(".");
   for (let index = 0; index < 3; index++) {
     const difference = component(left[index]) - component(right[index]);
     if (difference !== 0) return difference;

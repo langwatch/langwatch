@@ -93,9 +93,29 @@ Rule: A check that has nothing to do costs nothing
   Scenario: A claude that cannot manage plugins is left alone
     Given a claude binary with no plugin subcommand
     And the LangWatch plugin is installed at an older version than the marketplace publishes
+    When the user runs a wrapped tool
     Then the plugin is not updated
 
+  @unit
+  Scenario: A config that cannot be read stops the check rather than repeating it
+    Given a CLI config file that cannot be parsed
+    And the LangWatch plugin is installed
+    When the user runs a wrapped tool
+    Then no claude subprocess runs
+
 Rule: Nothing here may stop the session the user asked for
+
+  @unit
+  Scenario: A run that waits on the network says what it is waiting for
+    Given the LangWatch plugin is installed at an older version than the marketplace publishes
+    When the user runs a wrapped tool
+    Then the user is told the check is running before it reaches the network
+
+  @unit
+  Scenario: A run that answers from disk says nothing at all
+    Given the plugin was checked for updates an hour ago
+    When the user runs a wrapped tool
+    Then the user is told nothing about the check
 
   @unit
   Scenario: A marketplace listing that will not refresh warns and gives up for the day

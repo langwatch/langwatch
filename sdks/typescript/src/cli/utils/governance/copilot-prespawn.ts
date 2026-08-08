@@ -163,7 +163,10 @@ export function copilotPrespawnWarnings(
   }
 
   const version = (opts.readVersionImpl ?? readInstalledVersion)();
-  if (version && compareVersions(version, COPILOT_MIN_OTEL_VERSION) < 0) {
+  if (
+    version &&
+    compareVersions({ version, against: COPILOT_MIN_OTEL_VERSION }) < 0
+  ) {
     warnings.push(
       `${lwTag()} copilot ${version} exports incomplete telemetry attributes; upgrade to ${COPILOT_MIN_OTEL_VERSION}+ (\`copilot update\`) for full capture.`,
     );

@@ -574,7 +574,16 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
 	// every run reads one config field and moves on, and it runs BEFORE the
 	// spawn so a new version reaches the session this launch is about to start
 	// rather than the one after it. Housekeeping, so it warns and continues.
-	const pluginUpdate = updateLangwatchClaudePlugin();
+	const pluginUpdate = updateLangwatchClaudePlugin({
+		// Said before the work, not after it: the check fetches from a network
+		// that may be slow or half-open, and a launch that pauses without
+		// explanation reads as the wrapper having hung.
+		onCheckStart: () =>
+			process.stderr.write(
+				`${lwTag()} checking whether the LangWatch plugin for Claude Code ` +
+					`is up to date (once a day).\n`,
+			),
+	});
 	if (pluginUpdate.action === "updated") {
 		process.stderr.write(
 			`${lwTag()} updated the LangWatch plugin for Claude Code, ` +
