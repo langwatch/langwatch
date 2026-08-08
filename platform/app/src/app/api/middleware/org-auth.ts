@@ -113,7 +113,13 @@ async function orgPermissionAllowed(
 ): Promise<boolean> {
   const apiKeyId = c.get("apiKeyId") as string;
   const userId = c.get("apiKeyUserId") as string | null;
-  const organizationId = (c.get("organization") as Organization).id;
+  const organization = c.get("organization") as Organization | undefined;
+  if (!organization) {
+    throw new Error(
+      "org permission middleware ran without an organization on context; mount it after the org auth middleware",
+    );
+  }
+  const organizationId = organization.id;
 
   return resolveApiKeyPermission({
     prisma,

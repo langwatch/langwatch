@@ -286,18 +286,18 @@ describe("Feature: API keys management REST API", () => {
 
   afterAll(async () => {
     await cleanupTestRows(prisma, [
-      ["roleBinding", { organizationId: testOrganization.id }],
-      ["apiKey", { organizationId: testOrganization.id }],
-      ["customRole", { organizationId: testOrganization.id }],
-      ["project", { teamId: personalTeam.id }],
-      ["team", { organizationId: testOrganization.id }],
-      ["organizationUser", { organizationId: testOrganization.id }],
+      ["roleBinding", { organizationId: testOrganization?.id }],
+      ["apiKey", { organizationId: testOrganization?.id }],
+      ["customRole", { organizationId: testOrganization?.id }],
+      ["project", { teamId: personalTeam?.id }],
+      ["team", { organizationId: testOrganization?.id }],
+      ["organizationUser", { organizationId: testOrganization?.id }],
       ["user", { id: { in: [adminUserId, managerUserId, ownerUserId] } }],
-      ["organization", { id: testOrganization.id }],
+      ["organization", { id: testOrganization?.id }],
     ]);
   });
 
-  describe("POST /api/api-keys with keyType service", () => {
+  describe("when a service key is minted", () => {
     /** @scenario A manage-permission holder cannot mint an unbound service key */
     it("refuses a manage-holder who is not an organization admin", async () => {
       const name = `svc-escalation-${ns}`;
@@ -352,7 +352,7 @@ describe("Feature: API keys management REST API", () => {
     });
   });
 
-  describe("DELETE /api/api-keys/:id", () => {
+  describe("when a key is revoked", () => {
     /** @scenario Deleting another user's key requires organization admin rights */
     it("refuses a manage-holder who does not own the key and is not an admin", async () => {
       const { apiKey } = await createOwnedKey({
@@ -408,7 +408,7 @@ describe("Feature: API keys management REST API", () => {
     });
   });
 
-  describe("GET /api/api-keys with a service credential", () => {
+  describe("when a service credential lists keys", () => {
     /** @scenario A view-only service credential cannot list every key in the organization */
     it("refuses the org-wide listing for a view-only service credential", async () => {
       const res = await list(serviceViewerToken);
@@ -431,7 +431,7 @@ describe("Feature: API keys management REST API", () => {
   // Regression tests for issue #6338 (api-key half): role bindings written by
   // the API key service must not reach into a personal workspace the
   // credential does not own.
-  describe("personal workspace bindings", () => {
+  describe("when a binding names a personal workspace", () => {
     /** @scenario An API key cannot be bound into a personal workspace */
     it("refuses binding a key into another user's personal workspace", async () => {
       const name = `personal-bound-${ns}`;

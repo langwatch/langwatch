@@ -11,7 +11,7 @@ import { app } from "@ee/scim/routes";
 import { describe, expect, it } from "vitest";
 
 describe("Feature: SCIM API reference", () => {
-  describe("GET /api/scim/v2/Schemas", () => {
+  describe("when an identity provider requests GET /api/scim/v2/Schemas", () => {
     /** @scenario The SCIM schema describes groups as access groups */
     it("describes the Group resource as a LangWatch access group", async () => {
       const res = await app.request("/api/scim/v2/Schemas");

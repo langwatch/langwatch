@@ -304,8 +304,10 @@ export function createEnvConfig() {
       // Instance-wide bearer credential for the self-hosted organization
       // provisioning API (/api/organizations). Absent (the default) the
       // family answers 404; it is also absent-by-construction on SaaS, where
-      // the route gate ignores the variable entirely.
-      LANGWATCH_INSTANCE_ADMIN_API_KEY: z.string().min(1).optional(),
+      // the route gate ignores the variable entirely. 32 characters minimum,
+      // the same floor as the gateway secrets: one value provisions
+      // organizations across the whole instance.
+      LANGWATCH_INSTANCE_ADMIN_API_KEY: z.string().min(32).optional(),
       // Browser tracing (ADR-058). Off unless explicitly enabled: it adds
       // frontend telemetry volume, and the ingest route it exports to is
       // inert without OTEL_EXPORTER_OTLP_ENDPOINT anyway.

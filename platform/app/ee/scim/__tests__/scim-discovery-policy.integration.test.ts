@@ -47,7 +47,7 @@ describe("Feature: SCIM 2.0 is published in the API reference", () => {
       );
     });
 
-    it("leaves the provisioning routes refusing an anonymous caller", () => {
+    it("keeps the provisioning routes declared internal in the registry", () => {
       // The counterpart the public declaration is only safe next to: opening
       // discovery says nothing about Users and Groups, and this is what keeps
       // a future edit from widening the policy to the whole family.

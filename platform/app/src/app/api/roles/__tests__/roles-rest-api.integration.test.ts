@@ -80,17 +80,22 @@ describe("Feature: Custom roles REST API", () => {
   });
 
   afterAll(async () => {
-    await cleanupTestRows(prisma, [
-      ["roleBinding", { organizationId: seeded.organization.id }],
-      ["apiKey", { organizationId: seeded.organization.id }],
-      ["customRole", { organizationId: seeded.organization.id }],
-      ["customRole", { organizationId: otherOrgId }],
-      ["organizationUser", { organizationId: seeded.organization.id }],
-      ["user", { id: seeded.adminUserId }],
-      ["organization", { id: seeded.organization.id }],
-      ["organization", { id: otherOrgId }],
-    ]);
-    await resetApp();
+    try {
+      await cleanupTestRows(prisma, [
+        ["roleBinding", { organizationId: seeded?.organization.id }],
+        ["apiKey", { organizationId: seeded?.organization.id }],
+        ["customRole", { organizationId: seeded?.organization.id }],
+        ["customRole", { organizationId: otherOrgId }],
+        ["organizationUser", { organizationId: seeded?.organization.id }],
+        ["user", { id: seeded?.adminUserId }],
+        ["organization", { id: seeded?.organization.id }],
+        ["organization", { id: otherOrgId }],
+      ]);
+    } finally {
+      // The suite swapped the global app; leaving its mocked plan provider
+      // installed would cascade into every later suite of the serial run.
+      await resetApp();
+    }
   });
 
   describe("given custom roles in two organizations", () => {

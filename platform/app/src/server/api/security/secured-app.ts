@@ -57,8 +57,12 @@ type HttpVerb = (typeof HTTP_VERBS)[number];
  * Derive the family label (tracer span name + registry grouping) from the
  * basePath so it can never typo or drift from the mount path: `/api/agents`
  * becomes `agents`, `/api/gateway/v1` becomes `gateway-v1`.
+ *
+ * Exported because the management-service factory registers route policies
+ * against the same registry: two derivations would let one family be labelled
+ * two ways and split its authorization audit in half.
  */
-function familyFromBasePath(basePath: string): string {
+export function familyFromBasePath(basePath: string): string {
   return (
     basePath
       .replace(/^\/+/, "")

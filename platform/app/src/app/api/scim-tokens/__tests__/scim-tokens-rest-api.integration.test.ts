@@ -58,15 +58,20 @@ describe("Feature: SCIM tokens REST API", () => {
   });
 
   afterAll(async () => {
-    await cleanupTestRows(prisma, [
-      ["scimToken", { organizationId: seeded.organization.id }],
-      ["roleBinding", { organizationId: seeded.organization.id }],
-      ["apiKey", { organizationId: seeded.organization.id }],
-      ["organizationUser", { organizationId: seeded.organization.id }],
-      ["user", { id: seeded.adminUserId }],
-      ["organization", { id: seeded.organization.id }],
-    ]);
-    await resetApp();
+    try {
+      await cleanupTestRows(prisma, [
+        ["scimToken", { organizationId: seeded?.organization.id }],
+        ["roleBinding", { organizationId: seeded?.organization.id }],
+        ["apiKey", { organizationId: seeded?.organization.id }],
+        ["organizationUser", { organizationId: seeded?.organization.id }],
+        ["user", { id: seeded?.adminUserId }],
+        ["organization", { id: seeded?.organization.id }],
+      ]);
+    } finally {
+      // The suite swapped the global app; leaving its mocked plan provider
+      // installed would cascade into every later suite of the serial run.
+      await resetApp();
+    }
   });
 
   describe("given SCIM tokens managed over REST", () => {

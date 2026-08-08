@@ -33,6 +33,7 @@ import { OrganizationService } from "~/server/app-layer/organizations/organizati
 import { PrismaOrganizationRepository } from "~/server/app-layer/organizations/repositories/organization.prisma.repository";
 import { prisma } from "~/server/db";
 import { PromptTagRepository } from "~/server/prompt-config/repositories/prompt-tag.repository";
+import { captureException, toError } from "~/utils/posthogErrorCapture";
 import {
   CREATE_ORGANIZATION,
   GET_ORGANIZATION,
@@ -149,6 +150,9 @@ secured
         ],
       });
 
+      // Fire-and-forget like every other management audit, but with the
+      // rejection handled: `void` alone silences the lint rule and leaves an
+      // unhandled rejection when the audit insert fails.
       void auditLog({
         userId: "instance-admin",
         organizationId: created.organization.id,
@@ -157,18 +161,25 @@ secured
           name: body.name,
           adminApiKeyId: adminKey.apiKey.id,
         },
-      });
+      }).catch((error) => captureException(toError(error)));
 
       const summary = await organizationService().getProvisioningSummary(
         created.organization.id,
       );
+      if (!summary) {
+        // The slug is the natural key an infrastructure-as-code caller stores;
+        // answering 201 with a blank one moves the failure far from its cause.
+        throw new Error(
+          `provisioned organization ${created.organization.id} could not be read back`,
+        );
+      }
 
       return c.json(
         {
           organization: {
             id: created.organization.id,
             name: created.organization.name,
-            slug: summary?.slug ?? "",
+            slug: summary.slug,
           },
           team: created.team,
           adminApiKey: { id: adminKey.apiKey.id, token: adminKey.token },

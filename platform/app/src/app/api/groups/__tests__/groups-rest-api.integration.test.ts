@@ -14,8 +14,8 @@ import { createTestApp } from "~/server/app-layer/presets";
 import { PlanProviderService } from "~/server/app-layer/subscription/plan-provider";
 import { prisma } from "~/server/db";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
+import { ENTERPRISE_TEST_PLAN } from "~/test-utils/managementApiOrg";
 import { KSUID_RESOURCES } from "~/utils/constants";
-import { FREE_PLAN } from "../../../../../ee/licensing/constants";
 import { app } from "../[[...route]]/app";
 
 describe("Feature: Groups REST API", () => {
@@ -61,11 +61,7 @@ describe("Feature: Groups REST API", () => {
     await resetApp();
     globalForApp.__langwatch_app = createTestApp({
       planProvider: PlanProviderService.create({
-        getActivePlan: async () => ({
-          ...FREE_PLAN,
-          type: "ENTERPRISE",
-          free: false,
-        }),
+        getActivePlan: async () => ENTERPRISE_TEST_PLAN,
       }),
     });
 
@@ -525,7 +521,7 @@ describe("Feature: Groups REST API", () => {
     });
   });
 
-  describe("Binding role validation", () => {
+  describe("given a foreign custom role and an API-key system role exist", () => {
     let validationGroupId: string;
     let foreignOrgId: string;
     let foreignRoleId: string;

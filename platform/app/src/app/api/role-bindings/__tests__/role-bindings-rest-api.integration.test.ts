@@ -179,29 +179,34 @@ describe("Feature: Role bindings REST API", () => {
   });
 
   afterAll(async () => {
-    await cleanupTestRows(prisma, [
-      [
-        "groupMembership",
-        { group: { organizationId: seeded.organization.id } },
-      ],
-      ["roleBinding", { organizationId: seeded.organization.id }],
-      ["teamUser", { team: { organizationId: seeded.organization.id } }],
-      ["apiKey", { organizationId: seeded.organization.id }],
-      ["customRole", { organizationId: seeded.organization.id }],
-      ["group", { organizationId: seeded.organization.id }],
-      ["project", { team: { organizationId: seeded.organization.id } }],
-      ["team", { organizationId: seeded.organization.id }],
-      ...(foreignOrgId
-        ? ([["team", { organizationId: foreignOrgId }]] as const)
-        : []),
-      ["organizationUser", { organizationId: seeded.organization.id }],
-      ["user", { email: { endsWith: `-${ns}@example.com` } }],
-      ["organization", { id: seeded.organization.id }],
-      ...(foreignOrgId
-        ? ([["organization", { id: foreignOrgId }]] as const)
-        : []),
-    ]);
-    await resetApp();
+    try {
+      await cleanupTestRows(prisma, [
+        [
+          "groupMembership",
+          { group: { organizationId: seeded?.organization.id } },
+        ],
+        ["roleBinding", { organizationId: seeded?.organization.id }],
+        ["teamUser", { team: { organizationId: seeded?.organization.id } }],
+        ["apiKey", { organizationId: seeded?.organization.id }],
+        ["customRole", { organizationId: seeded?.organization.id }],
+        ["group", { organizationId: seeded?.organization.id }],
+        ["project", { team: { organizationId: seeded?.organization.id } }],
+        ["team", { organizationId: seeded?.organization.id }],
+        ...(foreignOrgId
+          ? ([["team", { organizationId: foreignOrgId }]] as const)
+          : []),
+        ["organizationUser", { organizationId: seeded?.organization.id }],
+        ["user", { email: { endsWith: `-${ns}@example.com` } }],
+        ["organization", { id: seeded?.organization.id }],
+        ...(foreignOrgId
+          ? ([["organization", { id: foreignOrgId }]] as const)
+          : []),
+      ]);
+    } finally {
+      // The suite swapped the global app; leaving its mocked plan provider
+      // installed would cascade into every later suite of the serial run.
+      await resetApp();
+    }
   });
 
   describe("given principals of all three kinds", () => {

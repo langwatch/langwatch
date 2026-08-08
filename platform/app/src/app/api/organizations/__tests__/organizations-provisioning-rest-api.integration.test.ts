@@ -93,17 +93,22 @@ describe("Feature: Organization provisioning REST API for self-hosted deployment
       process.env.LANGWATCH_INSTANCE_ADMIN_API_KEY = previousInstanceKey;
     }
 
-    for (const organizationId of createdOrganizationIds) {
-      await cleanupTestRows(prisma, [
-        ["roleBinding", { organizationId }],
-        ["apiKey", { organizationId }],
-        ["customRole", { organizationId }],
-        ["promptTag", { organizationId }],
-        ["team", { organizationId }],
-        ["organization", { id: organizationId }],
-      ]);
+    try {
+      for (const organizationId of createdOrganizationIds) {
+        await cleanupTestRows(prisma, [
+          ["roleBinding", { organizationId }],
+          ["apiKey", { organizationId }],
+          ["customRole", { organizationId }],
+          ["promptTag", { organizationId }],
+          ["team", { organizationId }],
+          ["organization", { id: organizationId }],
+        ]);
+      }
+    } finally {
+      // The suite swapped the global app and the instance credential; leaving
+      // either installed would cascade into every later suite of the run.
+      await resetApp();
     }
-    await resetApp();
   });
 
   describe("given a self-hosted deployment with the instance credential configured", () => {
@@ -132,6 +137,23 @@ describe("Feature: Organization provisioning REST API for self-hosted deployment
       const organization = await managed.json();
       expect(organization.id).toBe(body.organization.id);
       expect(organization.slug).toBe(`prov-acme-${ns}`);
+    });
+
+    /** @scenario A slug outside the documented shape is refused */
+    it("answers 422 for a slug that is not lowercase-and-hyphens, and writes nothing", async () => {
+      const invalidSlug = `Prov_Invalid ${ns}`;
+
+      const response = await provision({
+        name: "Acme Invalid Slug",
+        slug: invalidSlug,
+      });
+
+      expect(response.status).toBe(422);
+      expect(
+        await prisma.organization.count({
+          where: { name: "Acme Invalid Slug" },
+        }),
+      ).toBe(0);
     });
 
     /** @scenario A duplicate organization slug is refused */

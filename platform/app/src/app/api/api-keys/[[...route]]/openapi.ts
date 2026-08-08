@@ -234,7 +234,7 @@ export const UPDATE_API_KEY: DescribeRouteOptions = {
     },
     "403": {
       description:
-        "Requested binding exceeds the key owner's own permissions, or the scope does not belong to this organization (api_key_scope_violation)",
+        "Insufficient permissions (requires organization:manage), the requested binding exceeds the key owner's own permissions, or the scope does not belong to this organization (api_key_scope_violation)",
     },
     "404": {
       description:

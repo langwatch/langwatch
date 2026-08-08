@@ -128,20 +128,13 @@ export class ScimTokenService {
   }: {
     token: string;
   }): Promise<{ organizationId: string } | null> {
-    const hashedToken = this.hashToken(token);
-
-    const scimToken = await this.prisma.scimToken.findFirst({
-      where: { hashedToken },
-    });
+    const scimToken = await this.findByToken(token);
 
     if (!scimToken) {
       return null;
     }
 
-    await this.prisma.scimToken.update({
-      where: { id: scimToken.id },
-      data: { lastUsedAt: new Date() },
-    });
+    await this.recordUse(scimToken.id);
 
     return { organizationId: scimToken.organizationId };
   }
@@ -155,29 +148,44 @@ export class ScimTokenService {
    * quietly outliving the entitlement it was sold under. The SCIM boundary
    * calls this instead of `verify` and turns `plan_not_entitled` into a
    * SCIM-shaped 403.
+   *
+   * `lastUsedAt` is written only once the plan entitles the call, so the token
+   * list an administrator reads during a plan lapse does not show a refused
+   * credential as recently used.
    */
   async verifyEntitled({
     token,
   }: {
     token: string;
   }): Promise<ScimTokenEntitlement> {
-    const verified = await this.verify({ token });
-    if (!verified) {
+    const scimToken = await this.findByToken(token);
+    if (!scimToken) {
       return { status: "invalid_token" };
     }
 
-    const plan = await this.planProvider.getActivePlan({
-      organizationId: verified.organizationId,
-    });
+    const { id, organizationId } = scimToken;
+    const plan = await this.planProvider.getActivePlan({ organizationId });
 
     if (!isEnterpriseTier(plan.type)) {
-      return {
-        status: "plan_not_entitled",
-        organizationId: verified.organizationId,
-      };
+      return { status: "plan_not_entitled", organizationId };
     }
 
-    return { status: "ok", organizationId: verified.organizationId };
+    await this.recordUse(id);
+
+    return { status: "ok", organizationId };
+  }
+
+  private findByToken(token: string) {
+    return this.prisma.scimToken.findFirst({
+      where: { hashedToken: this.hashToken(token) },
+    });
+  }
+
+  private async recordUse(tokenId: string): Promise<void> {
+    await this.prisma.scimToken.update({
+      where: { id: tokenId },
+      data: { lastUsedAt: new Date() },
+    });
   }
 
   private hashToken(token: string): string {

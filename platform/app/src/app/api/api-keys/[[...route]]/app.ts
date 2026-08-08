@@ -2,6 +2,7 @@ import type { Organization } from "@prisma/client";
 import type { Context } from "hono";
 import { describeRoute } from "hono-openapi";
 import { z } from "zod";
+import { emitManagementAudit } from "~/server/api/management/audit";
 import { createOrgApp, requires } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
 import type {
@@ -269,13 +270,33 @@ const requestedBindings = ({
   })),
 ];
 
+/** The 403 sentence for the privilege the mint asked for and did not hold. */
+const privilegedMintRefusal = ({
+  isService,
+  isAssignedToAnother,
+}: {
+  isService: boolean;
+  isAssignedToAnother: boolean;
+}): string => {
+  if (isService) return "Only organization admins can create service API keys";
+  if (isAssignedToAnother) {
+    return "Only organization admins can create API keys for other users";
+  }
+  return "Only organization admins can create API keys that no member owns";
+};
+
 /**
- * Service keys have no user ceiling, and an unbound one defaults to org-wide
- * ADMIN; a key minted for somebody else is capped by THEIR access rather than
- * the caller's. Both are mints the tRPC path reserves for real organization
- * admins, so the REST path sets the same bar. Returns the 403 to send, or null
- * when the mint may proceed (a personal key for yourself always may, since
- * your own ceiling caps it).
+ * A key nobody owns has no user ceiling, and an unbound one defaults to
+ * org-wide ADMIN; a key minted for somebody else is capped by THEIR access
+ * rather than the caller's. Both are mints the tRPC path reserves for real
+ * organization admins, so the REST path sets the same bar. Returns the 403 to
+ * send, or null when the mint may proceed (a personal key for yourself always
+ * may, since your own ceiling caps it).
+ *
+ * Ownerlessness is decided by {@link resolveKeyOwner}, not by `keyType`: a
+ * service credential acts as nobody, so `keyType: "personal"` with no
+ * assignment resolves to the same unowned, org-wide-ADMIN key a service key
+ * would, and asking about `keyType` alone would wave it through.
  */
 const refuseNonAdminPrivilegedMint = async ({
   c,
@@ -292,9 +313,10 @@ const refuseNonAdminPrivilegedMint = async ({
   isService: boolean;
   assignedToUserId?: string;
 }): Promise<Response | null> => {
-  const assignsToAnother =
+  const isAssignedToAnother =
     !isService && !!assignedToUserId && assignedToUserId !== callerUserId;
-  if (!isService && !assignsToAnother) return null;
+  const owner = resolveKeyOwner({ isService, assignedToUserId, callerUserId });
+  if (owner !== null && !isAssignedToAnother) return null;
   const callerIsAdmin = await resolveCallerIsAdmin({
     service,
     organizationId,
@@ -305,9 +327,7 @@ const refuseNonAdminPrivilegedMint = async ({
   return c.json(
     {
       error: "Forbidden",
-      message: isService
-        ? "Only organization admins can create service API keys"
-        : "Only organization admins can create API keys for other users",
+      message: privilegedMintRefusal({ isService, isAssignedToAnother }),
     },
     403,
   );
@@ -467,6 +487,16 @@ secured
         }),
       });
 
+      // The detail response names the member the key acts as and the member
+      // who minted it, so an admin can walk the organization's credentials one
+      // id at a time. That disclosure is auditable like the writes are.
+      emitManagementAudit({
+        c,
+        organizationId: organization.id,
+        action: "management.apiKey.read",
+        args: { apiKeyId: id },
+      });
+
       return c.json(apiKeyDetailResponse(apiKey));
     },
   );
@@ -513,6 +543,13 @@ secured
         }
         throw error;
       }
+
+      emitManagementAudit({
+        c,
+        organizationId: organization.id,
+        action: "management.apiKey.update",
+        args: { apiKeyId: id },
+      });
 
       // Read back through the same path GET serves, so the two can never
       // describe the key differently. The route already demanded

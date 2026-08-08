@@ -24,8 +24,8 @@ describe("ScimTokenService", () => {
     service = ScimTokenService.create(prisma);
   });
 
-  describe("generate()", () => {
-    describe("when called with an organization ID", () => {
+  describe("when generating a token", () => {
+    describe("given an organization id", () => {
       it("creates a token record with a hashed value", async () => {
         const mockToken = { id: "token-1", organizationId: "org-1" };
         (prisma.scimToken.create as ReturnType<typeof vi.fn>).mockResolvedValue(
@@ -64,7 +64,7 @@ describe("ScimTokenService", () => {
     });
   });
 
-  describe("verifyEntitled()", () => {
+  describe("when verifying a token against the plan", () => {
     const getActivePlan = vi.fn();
     const planProvider = { getActivePlan };
     const hashedToken = crypto
@@ -133,11 +133,12 @@ describe("ScimTokenService", () => {
           status: "plan_not_entitled",
           organizationId: "org-1",
         });
+        expect(prisma.scimToken.update).not.toHaveBeenCalled();
       });
     });
   });
 
-  describe("list()", () => {
+  describe("when listing an organization's tokens", () => {
     it("selects only the safe fields, never the stored hash", async () => {
       (prisma.scimToken.findMany as ReturnType<typeof vi.fn>).mockResolvedValue(
         [],
@@ -158,8 +159,8 @@ describe("ScimTokenService", () => {
     });
   });
 
-  describe("revoke()", () => {
-    describe("when the token belongs to the organization", () => {
+  describe("when revoking a token", () => {
+    describe("given the token belongs to the organization", () => {
       it("deletes it in a single scoped statement", async () => {
         (
           prisma.scimToken.deleteMany as ReturnType<typeof vi.fn>
@@ -177,7 +178,7 @@ describe("ScimTokenService", () => {
       });
     });
 
-    describe("when the token id is unknown or from another organization", () => {
+    describe("given the token id is unknown or from another organization", () => {
       it("answers not found", async () => {
         (
           prisma.scimToken.deleteMany as ReturnType<typeof vi.fn>
@@ -190,8 +191,8 @@ describe("ScimTokenService", () => {
     });
   });
 
-  describe("verify()", () => {
-    describe("when the token exists", () => {
+  describe("when verifying a token", () => {
+    describe("given the token exists", () => {
       it("returns the organization ID and updates lastUsedAt", async () => {
         const hashedToken = crypto
           .createHash("sha256")
@@ -222,7 +223,7 @@ describe("ScimTokenService", () => {
       });
     });
 
-    describe("when the token does not exist", () => {
+    describe("given the token does not exist", () => {
       it("returns null", async () => {
         (
           prisma.scimToken.findFirst as ReturnType<typeof vi.fn>

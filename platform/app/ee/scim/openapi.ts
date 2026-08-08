@@ -14,9 +14,12 @@
  * derived from the URL, which turns `GET /api/scim/v2/Users/{id}` into a
  * Python SDK function named after the path shape rather than the action.
  *
- * Request bodies are deliberately absent: the routes validate with zod and the
- * generator builds the body from those schemas, so a hand-written copy could
- * only drift from the thing being enforced.
+ * Request bodies are absent from these operations. The write routes parse the
+ * body with `safeParse` inside the handler rather than through a hono-openapi
+ * `validator("json", ...)`, and the generator only derives a `requestBody`
+ * from that middleware, so the document declares none. The body shapes an
+ * identity provider sends are RFC 7643 core `User` and `Group` resources, and
+ * each operation's `description` says which one it takes.
  */
 
 import type { DescribeRouteOptions, OpenApiSpecsOptions } from "hono-openapi";

@@ -25,8 +25,8 @@ import { createTestApp } from "~/server/app-layer/presets";
 import { PlanProviderService } from "~/server/app-layer/subscription/plan-provider";
 import { prisma } from "~/server/db";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
+import { ENTERPRISE_TEST_PLAN } from "~/test-utils/managementApiOrg";
 import { KSUID_RESOURCES } from "~/utils/constants";
-import { FREE_PLAN } from "../../../../../ee/licensing/constants";
 
 describe("Feature: Groups REST API through the composed router", () => {
   const ns = `groups-mount-${nanoid(8)}`;
@@ -42,11 +42,7 @@ describe("Feature: Groups REST API through the composed router", () => {
     await resetApp();
     globalForApp.__langwatch_app = createTestApp({
       planProvider: PlanProviderService.create({
-        getActivePlan: async () => ({
-          ...FREE_PLAN,
-          type: "ENTERPRISE",
-          free: false,
-        }),
+        getActivePlan: async () => ENTERPRISE_TEST_PLAN,
       }),
     });
 
@@ -96,15 +92,20 @@ describe("Feature: Groups REST API through the composed router", () => {
   });
 
   afterAll(async () => {
-    await cleanupTestRows(prisma, [
-      ["roleBinding", { organizationId: testOrganization.id }],
-      ["apiKey", { organizationId: testOrganization.id }],
-      ["customRole", { organizationId: testOrganization.id }],
-      ["organizationUser", { organizationId: testOrganization.id }],
-      ["user", { id: userId }],
-      ["organization", { id: testOrganization.id }],
-    ]);
-    await resetApp();
+    try {
+      await cleanupTestRows(prisma, [
+        ["roleBinding", { organizationId: testOrganization?.id }],
+        ["apiKey", { organizationId: testOrganization?.id }],
+        ["customRole", { organizationId: testOrganization?.id }],
+        ["organizationUser", { organizationId: testOrganization?.id }],
+        ["user", { id: userId }],
+        ["organization", { id: testOrganization?.id }],
+      ]);
+    } finally {
+      // The suite swapped the global app; leaving its mocked plan provider
+      // installed would cascade into every later suite of the serial run.
+      await resetApp();
+    }
   });
 
   /** @scenario The groups API is reachable through the composed router */

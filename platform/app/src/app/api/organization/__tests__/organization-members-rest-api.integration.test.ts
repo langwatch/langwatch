@@ -16,7 +16,15 @@ import {
   TeamUserRole,
 } from "@prisma/client";
 import { nanoid } from "nanoid";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { PrismaOrganizationRepository } from "~/server/app-layer/organizations/repositories/organization.prisma.repository";
 import { createTestApp } from "~/server/app-layer/presets";
@@ -108,19 +116,30 @@ describe("Feature: Organization members and invites REST API", () => {
     teamBId = teamB.id;
   });
 
+  // Failure-safe: a rejecting request would otherwise leave the shrunken
+  // seat plan installed and cascade into every later scenario in this suite.
+  afterEach(() => {
+    mockGetActivePlan.mockResolvedValue(ENTERPRISE_TEST_PLAN);
+  });
+
   afterAll(async () => {
-    await cleanupTestRows(prisma, [
-      ["organizationInvite", { organizationId: seeded.organization.id }],
-      ["roleBinding", { organizationId: seeded.organization.id }],
-      ["apiKey", { organizationId: seeded.organization.id }],
-      ["customRole", { organizationId: seeded.organization.id }],
-      ["project", { team: { organizationId: seeded.organization.id } }],
-      ["team", { organizationId: seeded.organization.id }],
-      ["organizationUser", { organizationId: seeded.organization.id }],
-      ["user", { email: { endsWith: `-${ns}@example.com` } }],
-      ["organization", { id: seeded.organization.id }],
-    ]);
-    await resetApp();
+    try {
+      await cleanupTestRows(prisma, [
+        ["organizationInvite", { organizationId: seeded?.organization.id }],
+        ["roleBinding", { organizationId: seeded?.organization.id }],
+        ["apiKey", { organizationId: seeded?.organization.id }],
+        ["customRole", { organizationId: seeded?.organization.id }],
+        ["project", { team: { organizationId: seeded?.organization.id } }],
+        ["team", { organizationId: seeded?.organization.id }],
+        ["organizationUser", { organizationId: seeded?.organization.id }],
+        ["user", { email: { endsWith: `-${ns}@example.com` } }],
+        ["organization", { id: seeded?.organization.id }],
+      ]);
+    } finally {
+      // The suite swapped the global app; leaving its mocked plan provider
+      // installed would cascade into every later suite of the serial run.
+      await resetApp();
+    }
   });
 
   describe("given an organization with several members", () => {
@@ -317,7 +336,6 @@ describe("Feature: Organization members and invites REST API", () => {
           body: JSON.stringify({ disabled: false }),
         },
       );
-      mockGetActivePlan.mockResolvedValue(ENTERPRISE_TEST_PLAN);
 
       expect(response.status).toBe(403);
       const body = await response.json();
@@ -550,7 +568,9 @@ describe("Feature: Organization members and invites REST API", () => {
             customRoleId: customRole.id,
           }),
         ]);
-        expect(typeof invite.emailNotSent).toBe("boolean");
+        // The mailer mock resolves, so the flag is known, not merely typed:
+        // asserting the type alone cannot catch an inverted flag.
+        expect(invite.emailNotSent).toBe(false);
       }
     });
 
@@ -649,7 +669,6 @@ describe("Feature: Organization members and invites REST API", () => {
           })),
         }),
       });
-      mockGetActivePlan.mockResolvedValue(ENTERPRISE_TEST_PLAN);
 
       expect(response.status).toBe(403);
       expect((await response.json()).code).toBe("member_seat_limit_reached");

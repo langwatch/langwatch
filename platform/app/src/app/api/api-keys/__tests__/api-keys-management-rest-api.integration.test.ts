@@ -235,14 +235,14 @@ describe("Feature: API keys management REST API", () => {
 
   afterAll(async () => {
     await cleanupTestRows(prisma, [
-      ["roleBinding", { organizationId: testOrganization.id }],
-      ["apiKey", { organizationId: testOrganization.id }],
-      ["customRole", { organizationId: testOrganization.id }],
-      ["project", { teamId: testTeam.id }],
-      ["team", { organizationId: testOrganization.id }],
-      ["organizationUser", { organizationId: testOrganization.id }],
+      ["roleBinding", { organizationId: testOrganization?.id }],
+      ["apiKey", { organizationId: testOrganization?.id }],
+      ["customRole", { organizationId: testOrganization?.id }],
+      ["project", { teamId: testTeam?.id }],
+      ["team", { organizationId: testOrganization?.id }],
+      ["organizationUser", { organizationId: testOrganization?.id }],
       ["user", { id: { in: [adminUserId, managerUserId, memberUserId] } }],
-      ["organization", { id: testOrganization.id }],
+      ["organization", { id: testOrganization?.id }],
     ]);
   });
 
@@ -328,7 +328,9 @@ describe("Feature: API keys management REST API", () => {
         const body = await res.json();
         expect(body.error).toBe("api_key_not_found");
       });
+    });
 
+    describe("when the id names a service key the whole organization sees", () => {
       it("returns a service key to a member, matching what the listing shows them", async () => {
         const { apiKey } = await apiKeyService.create({
           name: `service-key-${ns}`,
@@ -357,7 +359,9 @@ describe("Feature: API keys management REST API", () => {
         expect(body.keyType).toBe("service");
         expect(body.assignedToUserId).toBeNull();
       });
+    });
 
+    describe("when an organization admin reads another member's key", () => {
       it("returns another member's key to an organization admin", async () => {
         const { apiKey } = await createKey({
           userId: memberUserId,

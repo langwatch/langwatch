@@ -28,11 +28,10 @@ import {
 } from "~/server/app-layer/subscription/plan-provider";
 import { prisma } from "~/server/db";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
+import { ENTERPRISE_TEST_PLAN } from "~/test-utils/managementApiOrg";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { FREE_PLAN } from "../../../../../ee/licensing/constants";
 import { app } from "../[[...route]]/app";
-
-const enterprisePlan = { ...FREE_PLAN, type: "ENTERPRISE", free: false };
 
 describe("Feature: Group endpoints behind the Enterprise gate", () => {
   const ns = `groups-gate-${nanoid(8)}`;
@@ -50,7 +49,7 @@ describe("Feature: Group endpoints behind the Enterprise gate", () => {
 
   beforeAll(async () => {
     await resetApp();
-    mockGetActivePlan = vi.fn().mockResolvedValue(enterprisePlan);
+    mockGetActivePlan = vi.fn().mockResolvedValue(ENTERPRISE_TEST_PLAN);
     globalForApp.__langwatch_app = createTestApp({
       planProvider: PlanProviderService.create({
         getActivePlan: mockGetActivePlan as PlanProvider["getActivePlan"],
@@ -113,16 +112,24 @@ describe("Feature: Group endpoints behind the Enterprise gate", () => {
   });
 
   afterAll(async () => {
-    await cleanupTestRows(prisma, [
-      ["groupMembership", { group: { organizationId: testOrganization.id } }],
-      ["roleBinding", { organizationId: testOrganization.id }],
-      ["group", { organizationId: testOrganization.id }],
-      ["apiKey", { organizationId: testOrganization.id }],
-      ["organizationUser", { organizationId: testOrganization.id }],
-      ["user", { id: userId }],
-      ["organization", { id: testOrganization.id }],
-    ]);
-    await resetApp();
+    try {
+      await cleanupTestRows(prisma, [
+        [
+          "groupMembership",
+          { group: { organizationId: testOrganization?.id } },
+        ],
+        ["roleBinding", { organizationId: testOrganization?.id }],
+        ["group", { organizationId: testOrganization?.id }],
+        ["apiKey", { organizationId: testOrganization?.id }],
+        ["organizationUser", { organizationId: testOrganization?.id }],
+        ["user", { id: userId }],
+        ["organization", { id: testOrganization?.id }],
+      ]);
+    } finally {
+      // The suite swapped the global app; leaving its mocked plan provider
+      // installed would cascade into every later suite of the serial run.
+      await resetApp();
+    }
   });
 
   describe("given an admin credential holding every permission the routes check", () => {
@@ -171,7 +178,7 @@ describe("Feature: Group endpoints behind the Enterprise gate", () => {
       expect(untouched.name).toBe(`Gate Seeded ${ns}`);
 
       // The same credential passes once the organization is on Enterprise.
-      mockGetActivePlan.mockResolvedValue(enterprisePlan);
+      mockGetActivePlan.mockResolvedValue(ENTERPRISE_TEST_PLAN);
       const entitled = await app.request("/api/groups", {
         headers: authHeaders(),
       });

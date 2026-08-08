@@ -267,8 +267,9 @@ export class OrgAuthRefusedError extends HandledError {
   constructor(refusal: AuthRefusal) {
     super(refusal.code, refusal.message, {
       httpStatus: refusal.status,
-      fault: "customer",
-      ...(refusal.meta ? { meta: refusal.meta } : {}),
+      // A refusal is the credential's problem; anything 5xx reaching here is
+      // not, and must not be logged as routine customer noise.
+      fault: refusal.status >= 500 ? "platform" : "customer",
     });
     this.name = "OrgAuthRefusedError";
   }
@@ -353,23 +354,29 @@ type AuthRefusal = {
   code: string;
   legacyError: string;
   message: string;
-  meta?: Record<string, unknown>;
   /**
-   * The underlying failure when the refusal is an infrastructure error rather
-   * than a credential problem. Only the throwing mode reads it: it rethrows
-   * the original error plain instead of minting a handled one. The responding
-   * mode ignores it, so its bodies are unchanged by this field existing.
+   * Set when the refusal is an infrastructure failure rather than a credential
+   * problem. Only the throwing mode reads it: it rethrows the underlying error
+   * plain instead of minting a handled one. Carried as its own flag rather
+   * than inferred from `cause`, because a rejection whose value is `undefined`
+   * is still an infrastructure failure. The responding mode ignores both, so
+   * its bodies are unchanged by these fields existing.
    */
+  isInfrastructureFailure?: boolean;
   cause?: unknown;
 };
 
 /**
- * Turns a refusal into the exception the throwing mode raises. The
- * infra-failure branch carries the original error; it is rethrown plain so
- * it stays an unhandled 500, not a fake handled one.
+ * Turns a refusal into the exception the throwing mode raises. An
+ * infrastructure failure is rethrown plain so it stays an unhandled 500, not a
+ * fake handled one; a non-Error rejection value is wrapped so the boundary
+ * still receives a stack.
  */
 function raiseOrgAuthRefusal(refusal: AuthRefusal): never {
-  if (refusal.cause !== undefined) throw refusal.cause;
+  if (refusal.isInfrastructureFailure) {
+    if (refusal.cause instanceof Error) throw refusal.cause;
+    throw new Error(refusal.message, { cause: refusal.cause });
+  }
   throw new OrgAuthRefusedError(refusal);
 }
 
@@ -422,6 +429,7 @@ async function resolveOrgPrincipal({
         code: "internal_error",
         legacyError: "Internal Server Error",
         message: "Authentication service error",
+        isInfrastructureFailure: true,
         cause: error,
       },
     };

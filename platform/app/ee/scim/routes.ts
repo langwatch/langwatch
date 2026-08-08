@@ -39,7 +39,7 @@ import {
 } from "@ee/scim/scim.types";
 import { ScimGroupService } from "@ee/scim/scim-group.service";
 import { ScimTokenService } from "@ee/scim/scim-token.service";
-import type { Context } from "hono";
+import type { Context, MiddlewareHandler } from "hono";
 import { describeRoute } from "hono-openapi";
 import { ENTERPRISE_FEATURE_ERRORS } from "~/server/api/enterprise";
 import {
@@ -49,16 +49,16 @@ import {
 } from "~/server/api/security";
 import { prisma } from "~/server/db";
 
-const secured = createServiceApp({ basePath: "/api/scim/v2" });
-
-const SCIM_POLICY = internalSecret("SCIM bearer token validated in-handler");
+/** The organization the bearer credential resolved to, set by {@link scimAuth}. */
+type ScimEnv = { Variables: { scimOrganizationId: string } };
 
 /**
  * Discovery carries no credential, and the policy has to say so. RFC 7644
  * section 2 puts these three endpoints outside authentication precisely so an
  * identity provider can read the capabilities before anyone has minted a
- * token for it, and the handlers below match that: none of them calls
- * `requireAuth`. They answer the same bytes to anyone who asks.
+ * token for it, and the builder matches that: a `public` policy applies no
+ * enforcement chain, so `scimAuth` never runs on them. They answer the same
+ * bytes to anyone who asks.
  */
 const SCIM_DISCOVERY_POLICY = publicEndpoint(
   "SCIM discovery metadata is unauthenticated per RFC 7644 so identity providers can negotiate capabilities before a token exists",
@@ -88,9 +88,14 @@ function scimJson(c: Context, data: unknown, status = 200) {
 }
 
 /**
- * The organization behind the bearer credential, or the SCIM-shaped refusal
- * to answer with (RFC 7644 error format, since the caller is an identity
- * provider speaking SCIM, not our own client).
+ * Resolves the organization behind the bearer credential and puts it on the
+ * context, or answers the SCIM-shaped refusal (RFC 7644 error format, since
+ * the caller is an identity provider speaking SCIM, not our own client).
+ *
+ * It runs as the `verifySecret` chain of the app, so every route declared
+ * `SCIM_POLICY` is authenticated by construction and a new provisioning route
+ * cannot serve traffic by forgetting to call it. The three discovery routes
+ * declare `publicEndpoint` instead and the builder applies no chain to them.
  *
  * Entitlement is checked on every call, not only at mint time: a SCIM token
  * is exercised by directory sync for as long as it lives, so the plan lapsing
@@ -99,7 +104,7 @@ function scimJson(c: Context, data: unknown, status = 200) {
  * a real token on a lapsed plan is 403: the credential is fine, the account
  * is not, and telling the identity provider to retry would be a lie.
  */
-async function requireAuth(c: Context): Promise<string | Response> {
+const scimAuth: MiddlewareHandler<ScimEnv> = async (c, next) => {
   const authHeader = c.req.header("authorization");
 
   if (!authHeader?.startsWith("Bearer ")) {
@@ -111,15 +116,25 @@ async function requireAuth(c: Context): Promise<string | Response> {
   const result = await tokenService.verifyEntitled({ token });
 
   if (result.status === "invalid_token") {
-    return scimError(c, 401, "Bearer token is required");
+    return scimError(c, 401, "Bearer token is not valid");
   }
 
   if (result.status === "plan_not_entitled") {
     return scimError(c, 403, ENTERPRISE_FEATURE_ERRORS.SCIM);
   }
 
-  return result.organizationId;
-}
+  c.set("scimOrganizationId", result.organizationId);
+  await next();
+};
+
+const secured = createServiceApp<ScimEnv>({
+  basePath: "/api/scim/v2",
+  verifySecret: scimAuth,
+});
+
+const SCIM_POLICY = internalSecret(
+  "SCIM bearer token verified by the app's verifySecret chain",
+);
 
 async function parseJsonBody(c: Context): Promise<unknown | null> {
   try {
@@ -127,6 +142,17 @@ async function parseJsonBody(c: Context): Promise<unknown | null> {
   } catch {
     return null;
   }
+}
+
+/**
+ * A SCIM pagination query value. RFC 7644 counts from 1 and the published
+ * reference says anything that is not a positive integer falls back, so a
+ * negative number is a fallback rather than an offset the store would read
+ * backwards from.
+ */
+function positiveIntegerQuery(raw: string | undefined, fallback: number) {
+  const parsed = parseInt(raw ?? "", 10);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
 }
 
 // ── ServiceProviderConfig ────────────────────────────────────────────
@@ -332,16 +358,13 @@ secured
 secured
   .access(SCIM_POLICY)
   .get("/Users", describeRoute(LIST_USERS), async (c) => {
-    const organizationId = await requireAuth(c);
-    if (organizationId instanceof Response) {
-      return organizationId;
-    }
+    const organizationId = c.get("scimOrganizationId");
 
     const scimService = ScimService.create(prisma);
 
     const filter = c.req.query("filter") ?? undefined;
-    const startIndex = parseInt(c.req.query("startIndex") ?? "1", 10) || 1;
-    const count = parseInt(c.req.query("count") ?? "100", 10) || 100;
+    const startIndex = positiveIntegerQuery(c.req.query("startIndex"), 1);
+    const count = positiveIntegerQuery(c.req.query("count"), 100);
 
     const result = await scimService.listUsers({
       organizationId,
@@ -356,10 +379,7 @@ secured
 secured
   .access(SCIM_POLICY)
   .post("/Users", describeRoute(CREATE_USER), async (c) => {
-    const organizationId = await requireAuth(c);
-    if (organizationId instanceof Response) {
-      return organizationId;
-    }
+    const organizationId = c.get("scimOrganizationId");
 
     const scimService = ScimService.create(prisma);
 
@@ -388,10 +408,7 @@ secured
 secured
   .access(SCIM_POLICY)
   .get("/Users/:id", describeRoute(GET_USER), async (c) => {
-    const organizationId = await requireAuth(c);
-    if (organizationId instanceof Response) {
-      return organizationId;
-    }
+    const organizationId = c.get("scimOrganizationId");
 
     const { id } = c.req.param();
     const scimService = ScimService.create(prisma);
@@ -408,10 +425,7 @@ secured
 secured
   .access(SCIM_POLICY)
   .put("/Users/:id", describeRoute(REPLACE_USER), async (c) => {
-    const organizationId = await requireAuth(c);
-    if (organizationId instanceof Response) {
-      return organizationId;
-    }
+    const organizationId = c.get("scimOrganizationId");
 
     const { id } = c.req.param();
     const scimService = ScimService.create(prisma);
@@ -442,10 +456,7 @@ secured
 secured
   .access(SCIM_POLICY)
   .patch("/Users/:id", describeRoute(PATCH_USER), async (c) => {
-    const organizationId = await requireAuth(c);
-    if (organizationId instanceof Response) {
-      return organizationId;
-    }
+    const organizationId = c.get("scimOrganizationId");
 
     const { id } = c.req.param();
     const scimService = ScimService.create(prisma);
@@ -476,10 +487,7 @@ secured
 secured
   .access(SCIM_POLICY)
   .delete("/Users/:id", describeRoute(DELETE_USER), async (c) => {
-    const organizationId = await requireAuth(c);
-    if (organizationId instanceof Response) {
-      return organizationId;
-    }
+    const organizationId = c.get("scimOrganizationId");
 
     const { id } = c.req.param();
     const scimService = ScimService.create(prisma);
@@ -498,10 +506,7 @@ secured
 secured
   .access(SCIM_POLICY)
   .get("/Groups", describeRoute(LIST_GROUPS), async (c) => {
-    const organizationId = await requireAuth(c);
-    if (organizationId instanceof Response) {
-      return organizationId;
-    }
+    const organizationId = c.get("scimOrganizationId");
 
     const service = ScimGroupService.create(prisma);
 
@@ -513,8 +518,8 @@ secured
     const result = await service.listGroups({
       organizationId,
       filter: c.req.query("filter") ?? undefined,
-      startIndex: parseInt(c.req.query("startIndex") ?? "1", 10) || 1,
-      count: parseInt(c.req.query("count") ?? "100", 10) || 100,
+      startIndex: positiveIntegerQuery(c.req.query("startIndex"), 1),
+      count: positiveIntegerQuery(c.req.query("count"), 100),
       excludeMembers: excludedAttributes.includes("members"),
     });
 
@@ -524,10 +529,7 @@ secured
 secured
   .access(SCIM_POLICY)
   .post("/Groups", describeRoute(CREATE_GROUP), async (c) => {
-    const organizationId = await requireAuth(c);
-    if (organizationId instanceof Response) {
-      return organizationId;
-    }
+    const organizationId = c.get("scimOrganizationId");
 
     const service = ScimGroupService.create(prisma);
 
@@ -556,10 +558,7 @@ secured
 secured
   .access(SCIM_POLICY)
   .get("/Groups/:id", describeRoute(GET_GROUP), async (c) => {
-    const organizationId = await requireAuth(c);
-    if (organizationId instanceof Response) {
-      return organizationId;
-    }
+    const organizationId = c.get("scimOrganizationId");
 
     const { id } = c.req.param();
 
@@ -584,10 +583,7 @@ secured
 secured
   .access(SCIM_POLICY)
   .put("/Groups/:id", describeRoute(REPLACE_GROUP), async (c) => {
-    const organizationId = await requireAuth(c);
-    if (organizationId instanceof Response) {
-      return organizationId;
-    }
+    const organizationId = c.get("scimOrganizationId");
 
     const { id } = c.req.param();
 
@@ -617,10 +613,7 @@ secured
 secured
   .access(SCIM_POLICY)
   .patch("/Groups/:id", describeRoute(PATCH_GROUP), async (c) => {
-    const organizationId = await requireAuth(c);
-    if (organizationId instanceof Response) {
-      return organizationId;
-    }
+    const organizationId = c.get("scimOrganizationId");
 
     const { id } = c.req.param();
 
@@ -650,10 +643,7 @@ secured
 secured
   .access(SCIM_POLICY)
   .delete("/Groups/:id", describeRoute(DELETE_GROUP), async (c) => {
-    const organizationId = await requireAuth(c);
-    if (organizationId instanceof Response) {
-      return organizationId;
-    }
+    const organizationId = c.get("scimOrganizationId");
 
     const { id } = c.req.param();
     const result = await ScimGroupService.create(prisma).deleteGroup({

@@ -61,13 +61,18 @@ describe("Feature: SCIM entitlement is checked on every call", () => {
   });
 
   afterAll(async () => {
-    await cleanupTestRows(prisma, [
-      ["scimToken", { organizationId }],
-      ["organizationUser", { organizationId }],
-      ["user", { email: { contains: ns } }],
-      ["organization", { id: organizationId }],
-    ]);
-    await resetApp();
+    try {
+      await cleanupTestRows(prisma, [
+        ["scimToken", { organizationId }],
+        ["organizationUser", { organizationId }],
+        ["user", { email: { contains: ns } }],
+        ["organization", { id: organizationId }],
+      ]);
+    } finally {
+      // The suite swapped the global app; leaving the mocked plan provider
+      // installed would cascade into every later suite of the serial run.
+      await resetApp();
+    }
   });
 
   describe("given a SCIM token minted while the organization was on Enterprise", () => {
@@ -127,7 +132,9 @@ describe("Feature: SCIM entitlement is checked on every call", () => {
       expect(res.status).toBe(401);
       const body = await res.json();
       expect(body.schemas).toEqual([SCIM_ERROR_SCHEMA]);
-      expect(body.detail).toBe("Bearer token is required");
+      // Distinct from the missing-header refusal: an operator debugging a
+      // rotated token must not read "required" for a token they did present.
+      expect(body.detail).toBe("Bearer token is not valid");
     });
   });
 });

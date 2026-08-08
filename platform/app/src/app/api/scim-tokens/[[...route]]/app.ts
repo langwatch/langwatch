@@ -35,6 +35,8 @@ const tokenSummarySchema = z.object({
   lastUsedAt: z.date().nullable(),
 });
 
+const idParamsSchema = z.object({ id: z.string().min(1) });
+
 const createTokenSchema = z.object({
   description: z.string().trim().min(1).max(255).optional(),
 });
@@ -86,7 +88,10 @@ const createTokenHandler = async (
 
 const revokeTokenHandler = async (
   c: Context,
-  { params, app }: { params: { id: string }; app: ScimTokensFamilyApp },
+  {
+    params,
+    app,
+  }: { params: z.infer<typeof idParamsSchema>; app: ScimTokensFamilyApp },
 ) => {
   const organization = organizationOf(c);
   await app.scimTokens.revoke({
@@ -139,7 +144,7 @@ const registerEndpoints = (v: ScimTokensVersion): void => {
     "/:id",
     {
       ...guard("organization:manage"),
-      params: z.object({ id: z.string().min(1) }),
+      params: idParamsSchema,
       output: z.object({ success: z.literal(true) }),
       description:
         "Revoke a SCIM token so it stops verifying immediately. An unknown or already-revoked id answers 404 scim_token_not_found.",

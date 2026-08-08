@@ -41,20 +41,48 @@ export const ORGANIZATIONS_SPEC_OPTIONS: OpenApiSpecsOptions = {
   },
 };
 
-const ORGANIZATION_SUMMARY_SCHEMA = {
-  type: "object" as const,
+type SchemaSpec = NonNullable<
+  NonNullable<
+    Extract<ResponseSpec, { content?: unknown }>["content"]
+  >[string]["schema"]
+>;
+
+const ORGANIZATION_SUMMARY_SCHEMA: SchemaSpec = {
+  type: "object",
   properties: {
-    id: { type: "string" as const },
-    name: { type: "string" as const },
-    slug: { type: "string" as const },
-    createdAt: { type: "string" as const, format: "date-time" },
+    id: { type: "string" },
+    name: { type: "string" },
+    slug: { type: "string" },
+    createdAt: { type: "string", format: "date-time" },
   },
 };
 
-const NOT_AVAILABLE_404: ResponseSpec = {
-  description:
-    "Organization provisioning is not available: the instance administrator key is not configured, this is a cloud deployment, or (on GET /{id}) the organization does not exist",
+/**
+ * The refusal body this family answers with. It is the SecuredApp legacy
+ * envelope rather than the `{ error: { code, ... } }` one the organization-key
+ * management families publish, because this family predates no organization at
+ * all and authenticates against the instance; `error` carries the stable code
+ * a provisioning tool branches on.
+ */
+const ERROR_SCHEMA: SchemaSpec = {
+  type: "object",
+  properties: {
+    error: {
+      type: "string",
+      description: "Stable machine-readable code, e.g. organization_slug_taken",
+    },
+    message: { type: "string" },
+  },
 };
+
+const errorResponse = (description: string): ResponseSpec => ({
+  description,
+  content: { "application/json": { schema: ERROR_SCHEMA } },
+});
+
+const NOT_AVAILABLE_404: ResponseSpec = errorResponse(
+  "Organization provisioning is not available: the instance administrator key is not configured, this is a cloud deployment, or (on GET /{id}) the organization does not exist",
+);
 
 export const CREATE_ORGANIZATION: DescribeRouteOptions = {
   operationId: "provisionOrganization",
@@ -104,13 +132,14 @@ export const CREATE_ORGANIZATION: DescribeRouteOptions = {
         },
       },
     },
-    "401": { description: "Invalid instance administrator credential" },
+    "401": errorResponse("Invalid instance administrator credential"),
     "404": NOT_AVAILABLE_404,
-    "409": {
-      description:
-        "An organization with this slug already exists (organization_slug_taken)",
-    },
-    "422": { description: "Validation error" },
+    "409": errorResponse(
+      "An organization with this slug already exists (organization_slug_taken)",
+    ),
+    "422": errorResponse(
+      "The request body did not match the schema, for example a slug that is not lowercase letters, numbers and single hyphens",
+    ),
   },
 };
 
@@ -138,7 +167,7 @@ export const LIST_ORGANIZATIONS: DescribeRouteOptions = {
         },
       },
     },
-    "401": { description: "Invalid instance administrator credential" },
+    "401": errorResponse("Invalid instance administrator credential"),
     "404": NOT_AVAILABLE_404,
   },
 };
@@ -172,7 +201,7 @@ export const GET_ORGANIZATION: DescribeRouteOptions = {
         },
       },
     },
-    "401": { description: "Invalid instance administrator credential" },
+    "401": errorResponse("Invalid instance administrator credential"),
     "404": NOT_AVAILABLE_404,
   },
 };
