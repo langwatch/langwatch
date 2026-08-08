@@ -126,7 +126,10 @@ describe("NotificationService", () => {
       organizationName: "Acme",
       adminName: "Jane",
       adminEmail: "jane@acme.com",
-      planName: "free",
+      planName: "Free",
+      limitType: "Monthly Traces",
+      current: 12000,
+      max: 10000,
     };
 
     describe("when SLACK_PLAN_LIMIT_CHANNEL is not set", () => {
@@ -140,14 +143,64 @@ describe("NotificationService", () => {
     });
 
     describe("when SLACK_PLAN_LIMIT_CHANNEL is set", () => {
-      it("sends a Slack message with plan limit info", async () => {
+      /** @scenario "Plan limit alert names the monthly trace cap and the numbers" */
+      /** @scenario "Plan limit alert names the monthly event cap and the numbers" */
+      it.each([
+        {
+          limitType: "Monthly Traces",
+          expected:
+            "Plan limit reached: Acme, jane@acme.com, Plan: Free, Monthly Traces: 12000/10000",
+        },
+        {
+          limitType: "Monthly Events",
+          expected:
+            "Plan limit reached: Acme, jane@acme.com, Plan: Free, Monthly Events: 12000/10000",
+        },
+      ])("names the $limitType cap and the numbers behind it", async ({
+        limitType,
+        expected,
+      }) => {
+        config.slackPlanLimitChannel = "https://hooks.slack.com/test";
+
+        await service.sendSlackPlanLimitAlert({ ...context, limitType });
+
+        expect(mockSlackSend).toHaveBeenCalledWith({ text: expected });
+      });
+
+      /** @scenario "Plan limit alert still sends when the organization has no admin email" */
+      it("falls back to unknown when the org has no admin email", async () => {
+        config.slackPlanLimitChannel = "https://hooks.slack.com/test";
+
+        await service.sendSlackPlanLimitAlert({
+          ...context,
+          adminEmail: undefined,
+        });
+
+        expect(mockSlackSend).toHaveBeenCalledWith({
+          text: "Plan limit reached: Acme, unknown, Plan: Free, Monthly Traces: 12000/10000",
+        });
+      });
+
+      /** @scenario "Plan limit alert reads the same way as the resource limit alert" */
+      it("keeps the same field order as the resource limit alert", async () => {
         config.slackPlanLimitChannel = "https://hooks.slack.com/test";
 
         await service.sendSlackPlanLimitAlert(context);
-
-        expect(mockSlackSend).toHaveBeenCalledWith({
-          text: expect.stringContaining("Plan limit reached: Acme"),
+        await service.sendSlackResourceLimitAlert({
+          ...context,
+          limitType: "Team Members",
+          current: 2,
+          max: 2,
         });
+
+        const sentTexts = mockSlackSend.mock.calls.map(
+          (args: unknown[]) => (args[0] as { text: string }).text,
+        );
+
+        expect(sentTexts).toEqual([
+          "Plan limit reached: Acme, jane@acme.com, Plan: Free, Monthly Traces: 12000/10000",
+          "Resource limit reached: Acme, jane@acme.com, Plan: Free, Team Members: 2/2",
+        ]);
       });
     });
 
@@ -463,6 +516,9 @@ describe("NotificationService", () => {
       adminName: "Jane",
       adminEmail: "jane@acme.com",
       planName: "free",
+      limitType: "Monthly Traces",
+      current: 12000,
+      max: 10000,
     };
 
     describe("when HubSpot env vars are not set", () => {
