@@ -131,7 +131,10 @@ describe("BillingEventsPage", () => {
     const lastCall = listQuery.mock.calls.at(-1)?.[0];
     expect(lastCall).toMatchObject({
       projectId: "project_1",
-      endUserId: "enduser-9",
+      // The screen narrows through the same vocabulary the REST reads take,
+      // so what it asks for and what a reconciliation script asks for cannot
+      // drift into meaning different things.
+      filters: { endUserIds: ["enduser-9"] },
     });
     expect(lastCall.cursor).toBeUndefined();
   });

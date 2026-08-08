@@ -64,21 +64,42 @@ permissions:
 concurrency:
   # Serialize runs against the shared matrix-* VKs and budgets so
   # parallel invocations don't double-count spend on the same key.
-  group: gateway-matrix-shared-vks
+  #
+  # Only a run that dials providers needs that lock, so this group
+  # lists exactly the same four exemptions as the job guard below and
+  # the two must be edited together. GitHub cancels whichever run is
+  # already pending in a group when a new one queues, independently of
+  # `cancel-in-progress`, and that happens at queue time rather than
+  # run time: a run parked here evicts a real PR's queued run even
+  # when its own job never executes, so finishing in seconds is no
+  # mitigation. Entering the group at all is the harm.
+  group: ${{ (github.event_name == 'pull_request' && (github.event.pull_request.draft || github.event.pull_request.head.repo.fork || startsWith(github.head_ref, 'release-please--') || startsWith(github.head_ref, 'dependabot/'))) && format('gateway-matrix-idle-{0}', github.head_ref) || 'gateway-matrix-shared-vks' }}
   cancel-in-progress: false
 
 jobs:
   matrix:
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    # Skip on draft PRs (cost discipline) and on fork PRs (GitHub
-    # deliberately strips secrets on `pull_request` from forks, so a
-    # live-credential matrix can never succeed there — running it
-    # would only produce phantom red checks for external contributors).
+    # Four exemptions, mirrored by the concurrency group above.
+    # Drafts, for cost discipline. Forks, because GitHub strips secrets
+    # on `pull_request` from them, so a live-credential matrix can only
+    # produce phantom red checks for external contributors. Release
+    # PRs, because they bump `charts/gateway/Chart.yaml` and nothing
+    # else this workflow watches, so the matrix would spend live
+    # provider calls proving a version string still answers; the branch
+    # prefix carries the double dash release-please actually emits, so
+    # a hand-written `release-please-config-...` branch is not caught
+    # by it. Dependabot, because its PRs bump the action SHAs pinned in
+    # this file and read the Dependabot secret store rather than the
+    # Actions one, so the matrix either bills real provider calls for a
+    # SHA bump or goes green on empty credentials, and neither answers
+    # a question about the gateway.
     if: |
       github.event_name != 'pull_request' ||
       (github.event.pull_request.draft == false &&
-       github.event.pull_request.head.repo.fork == false)
+       github.event.pull_request.head.repo.fork == false &&
+       !startsWith(github.head_ref, 'release-please--') &&
+       !startsWith(github.head_ref, 'dependabot/'))
     env:
       GATEWAY_URL: http://localhost:5563
       LW_BASE_URL: http://localhost:5560

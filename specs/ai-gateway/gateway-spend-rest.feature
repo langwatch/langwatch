@@ -65,6 +65,118 @@ Feature: Gateway spend reconciliation REST surface
       # confident zero. A reconciliation that checksums against that zero
       # decides the books agree.
 
+  Rule: Both spend reads narrow on the same filters
+
+    # A reconciliation that can only be sliced one way on the rollups and
+    # another on the events cannot check its own arithmetic: the caller
+    # cannot ask the two surfaces the same question.
+
+    @unit
+    Scenario: A filter offered on one read is offered on the other
+      Then every filter the events read accepts is accepted by the rollups
+      And every filter the rollups accept is accepted by the events read
+
+    @integration
+    Scenario: A filter repeated in the query matches any of the values it names
+      Given spend across three models
+      When the caller names two of them
+      Then the read covers those two models and no others
+
+    @integration
+    Scenario: A team filter narrows to the projects that team owns
+      Given two teams in the organization, each owning its own projects
+      When the caller filters to one team
+      Then only spend from that team's projects is summed
+
+    @integration
+    Scenario: A filter that matches nothing answers empty rather than everything
+      When the caller filters to a virtual key belonging to another organization
+      Then the read is empty
+      # A filter list that resolves to no ids must not collapse into an
+      # absent predicate. Reading as unfiltered here would hand a caller
+      # the whole organization's spend under a narrowing they asked for.
+
+  Rule: The caller's own metadata is filterable
+
+    @integration
+    Scenario: Filtering on a metadata pair narrows to the requests carrying it
+      Given spend recorded with a customer tier on each request
+      When the caller filters to one tier
+      Then only requests carrying that tier are summed
+
+    @integration
+    Scenario: Metadata recorded before the filter shipped is still matched
+      Given spend recorded before the metadata filter existed
+      When the caller filters on a pair carried by those older requests
+      Then they are matched
+      # The filter reads metadata through a derived column. If the store
+      # served a default for records written before that column was
+      # declared, every historical request would silently drop out of a
+      # filtered reconciliation and the books would agree on a subset.
+
+  Rule: A grouping whose key can move is refused while the window can still change
+
+    # Where a request lands is fixed for its key, its end user and its
+    # project, but the model and the provider it names on admission are
+    # replaced by the ones that actually served it. A walk grouped on
+    # those can serve a request twice, or skip it, when a late outcome
+    # moves it between groups mid-walk. A checksum that silently drops
+    # rows is worse than one that refuses.
+
+    @integration
+    Scenario: Grouping on a movable key is refused while the window is still settling
+      When the caller groups by model over a window reaching the present
+      Then the request is refused as an unstable grouping
+      And the refusal says which grouping moved and how to ask anyway
+
+    @integration
+    Scenario: The same grouping is served once the window has settled
+      When the caller groups by model over a window old enough to have settled
+      Then the rollup is served
+
+    @integration
+    Scenario: A caller who accepts the risk can ask for it anyway
+      When the caller groups by model over a live window and accepts an unstable read
+      Then the rollup is served
+
+    @integration
+    Scenario: Grouping on a key that cannot move is never refused
+      When the caller groups by end user over a window reaching the present
+      Then the rollup is served
+
+    # The opt-out arrives as a query string, so how it is read is part of the
+    # guard rather than a detail beneath it. Read as JavaScript truthiness,
+    # every non-empty value means yes and the clearest way to say no turns the
+    # guard off.
+    @integration @regression
+    Scenario: Declining an unstable read is not the same as accepting one
+      When the caller groups by model over a live window and explicitly declines an unstable read
+      Then the request is refused as an unstable grouping
+
+    @integration
+    Scenario: The opt-out is read however the caller's HTTP library spells a boolean
+      When the caller groups by model over a live window and accepts an unstable read in any casing
+      Then the rollup is served
+
+    @integration
+    Scenario: A spelling the surface does not know is refused by name
+      When the caller groups by model over a live window and spells the opt-out in a way the surface does not know
+      Then the request is refused and the refusal names the parameter
+
+  Rule: An organization running a project per customer still reads its spend
+
+    @integration
+    Scenario: The rollup covers every project without the caller naming them
+      Given an organization with many projects
+      When the caller reads spend without naming a project
+      Then spend from every project is covered
+
+    @integration
+    Scenario: Naming projects narrows the read to them
+      Given an organization with many projects
+      When the caller names two of them
+      Then only those two projects are covered
+
   Rule: The surface is org-authenticated and enterprise-gated
 
     @integration
