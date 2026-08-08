@@ -7,7 +7,6 @@ import {
   getCoreRowModel,
   useReactTable,
 } from "@tanstack/react-table";
-import { nanoid } from "nanoid";
 import {
   useCallback,
   useEffect,
@@ -77,6 +76,7 @@ import {
   convertHttpComponentConfig,
 } from "../utils/httpAgentUtils";
 import { evaluatorHasMissingMappings } from "../utils/mappingValidation";
+import { executeForkAgentDuplicate } from "../utils/executeForkAgentDuplicate";
 import { toComparisonConfig } from "../utils/normalizeComparison";
 import { createPromptEditorCallbacks } from "../utils/promptEditorCallbacks";
 import {
@@ -210,6 +210,24 @@ export function EvaluationsV3Table({
   const drawerParamsKey = JSON.stringify(drawerParams);
   const { project } = useOrganizationTeamProject();
   const trpcUtils = api.useContext();
+  // Forking an agent target (and its workflow, when workflow-type) on duplicate.
+  // Source: same project — the workbench duplicates within the current project,
+  // so `sourceProjectId === projectId` (see #5879). The cross-project replicate
+  // flow (CopyAgentDialog) uses the same mutation with different project ids.
+  const copyAgent = api.agents.copy.useMutation();
+  // `agents.copy` leaves the forked workflow unpublished — the replicate flow
+  // wants to review before publishing, but the workbench duplicate needs a
+  // runnable target immediately. Publish here, in the caller, per #5879.
+  // (Router is `workflow` singular, matching the rest of the codebase —
+  // see api/root.ts.)
+  const publishWorkflow = api.workflow.publish.useMutation();
+  // Best-effort rollback on post-copy failure: if publish or addTarget
+  // throws after `agents.copy` has already created the forked Agent (and,
+  // for workflow-type agents, the forked Workflow/Version), we cascade-archive
+  // the orphaned Agent AND its linked Workflow in a single transaction —
+  // `agents.delete` only soft-deletes the Agent, leaving the forked workflow
+  // rows as orphans that accumulate across transient failures (#5935 P2).
+  const cascadeArchiveAgent = api.agents.cascadeArchive.useMutation();
 
   // Sync saved dataset changes to DB
   useDatasetSync();
@@ -781,20 +799,47 @@ export function EvaluationsV3Table({
     [removeTarget],
   );
 
-  // Handler for duplicating a target
+  // Handler for duplicating a target. Prompt/evaluator targets spread only
+  // (they carry their own per-column draft). Agent targets fork the underlying
+  // Agent row via `agents.copy` so the duplicate is independently editable —
+  // and for workflow-type agents, the copied workflow is published immediately
+  // so the duplicate runs without a "no committed version" error (see #5879).
+  // On fork failure we log and skip adding the column rather than silently
+  // falling back to a shallow copy, which would reintroduce the original bug
+  // (two columns pointing at the same dbAgentId).
+  //
+  // The ordered `agents.copy → workflow.publish → addTarget` sequence and
+  // the best-effort `agents.cascadeArchive` rollback on post-copy failure
+  // live in `utils/executeForkAgentDuplicate.ts` so they can be exercised
+  // by an integration test with mocked mutations (see #5935 P2 review).
   const handleDuplicateTarget = useCallback(
-    (target: TargetConfig) => {
-      const newTarget: TargetConfig = {
-        ...target,
-        id: `target-${nanoid(8)}`,
-      };
-      addTarget(newTarget);
-      // Open the prompt editor for the duplicated target if it's a prompt
-      if (newTarget.type === "prompt") {
-        void openTargetEditor(newTarget);
-      }
+    async (target: TargetConfig) => {
+      // The component only renders inside a project-scoped route, so `project`
+      // is set by the time the user can click Duplicate. Bail silently if not —
+      // there is no project to fork into.
+      const projectId = project?.id;
+      if (!projectId) return;
+
+      await executeForkAgentDuplicate({
+        target,
+        deps: {
+          copyAgent,
+          publishWorkflow,
+          cascadeArchiveAgent,
+          addTarget,
+          openTargetEditor,
+          projectId,
+        },
+      });
     },
-    [addTarget, openTargetEditor],
+    [
+      addTarget,
+      openTargetEditor,
+      copyAgent,
+      publishWorkflow,
+      cascadeArchiveAgent,
+      project?.id,
+    ],
   );
 
   // Extracted so BOTH the Add→Comparison flow and the reload re-hydration
