@@ -817,3 +817,23 @@ func TestResolve_ConfigRefresh_EvictedMidFetch_NotResurrected(t *testing.T) {
 		t.Fatalf("expected exactly one config fetch, got %d", n)
 	}
 }
+
+// @scenario "A change kind this build does not act on is reported, not dropped"
+func TestApplyChange_UnhandledKindIsReported(t *testing.T) {
+	resolver := &fakeResolver{}
+	svc, logs := newService(t, Options{Resolver: resolver, ConfigFetcher: resolver})
+
+	key := hashKey("vk-lw-unhandled-kind")
+	svc.storeL1(key, &domain.Bundle{OrganizationID: "org-1"})
+
+	svc.applyChange("org-1", CacheChange{Kind: "SOMETHING_THIS_BUILD_PREDATES"})
+
+	// Not acting on it is fine and often right. Not saying so is how the
+	// CACHE_RULE_* kinds stayed unhandled from the day they shipped.
+	_, isPresent := svc.l1.Get(key)
+	assert.True(t, isPresent, "an unknown kind must not evict anything")
+
+	warnings := logs.FilterMessage("auth_cache_change_unhandled").All()
+	assert.Len(t, warnings, 1, "an unhandled kind must be reported once")
+	assert.Equal(t, "SOMETHING_THIS_BUILD_PREDATES", warnings[0].ContextMap()["kind"])
+}

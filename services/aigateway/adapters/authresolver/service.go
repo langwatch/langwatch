@@ -711,6 +711,18 @@ func (s *Service) applyChange(organizationID string, ch CacheChange) {
 		s.evictWhere(func(b *domain.Bundle) bool {
 			return b.OrganizationID == organizationID
 		}, "cache_rule_updated", organizationID)
+	default:
+		// The kinds above are the ones this build knows how to act on, and
+		// the control plane is free to emit others. Dropping one is often
+		// correct, but dropping one silently is how CACHE_RULE_* went
+		// unhandled from the day it shipped: the control plane emitted it,
+		// nothing here named it, and the documented behavior simply did not
+		// happen. Saying so leaves the next one an hour of log reading rather
+		// than a bug report about staleness.
+		s.logger.Warn("auth_cache_change_unhandled",
+			zap.String("kind", ch.Kind),
+			zap.String("organization_id", organizationID),
+		)
 	}
 }
 

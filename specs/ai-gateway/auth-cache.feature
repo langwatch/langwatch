@@ -267,6 +267,17 @@ Feature: Gateway auth cache — hot path is zero RTT after first hit
       Then every cached bundle belonging to that organization is evicted
       And the other organization's bundles stay cached
 
+    # The control plane may emit a kind this build predates, and doing
+    # nothing about it is usually right. Doing nothing SILENTLY is not:
+    # that is how the cache-rule kinds above stayed unhandled from the day
+    # the control plane started emitting them.
+    @unit @regression
+    Scenario: A change kind this build does not act on is reported, not dropped
+      Given a bundle is cached
+      When the change feed reports a kind this gateway has no case for
+      Then nothing is evicted
+      And the gateway reports the unhandled kind by name
+
     # The control-plane half of the same path: an edit that never reaches
     # the feed can never be polled off it.
     @integration
