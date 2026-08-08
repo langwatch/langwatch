@@ -250,7 +250,6 @@ const LEGACY_INERT: string[] = [
   "specs/ai-gateway/governance/cli-402-license-gate.feature",
   "specs/ai-gateway/governance/cli-deep-links.feature",
   "specs/ai-gateway/governance/cli-ingest-debug.feature",
-  "specs/ai-gateway/governance/cli-login.feature",
   "specs/ai-gateway/governance/cli-tool-mode-policy.feature",
   "specs/ai-gateway/governance/compliance-baseline.feature",
   "specs/ai-gateway/governance/event-log-durability.feature",
