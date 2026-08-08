@@ -232,6 +232,30 @@ describe("check-queue bin shims", () => {
         expect(existsSync(path.join(binDir, "tsgo.real"))).toBe(true);
         expect(runCheck("tsgo", ["--noEmit"]).stdout).toBe("real --noEmit\n");
       });
+
+      /** @scenario "An earlier version of the routing is brought up to date" */
+      it("replaces routing an earlier installer left behind", () => {
+        // Our marker, different text: what an older version of the installer
+        // would have written.
+        const stale = readFileSync(path.join(binDir, "tsgo"), "utf8").replace(
+          "named_a_target=0",
+          "named_a_target=0 # an older way of deciding",
+        );
+        writeFileSync(path.join(binDir, "tsgo"), stale, "utf8");
+        chmodSync(path.join(binDir, "tsgo"), 0o755);
+
+        install();
+
+        const updated = readFileSync(path.join(binDir, "tsgo"), "utf8");
+        expect(updated).not.toBe(stale);
+        expect(updated).toContain("langwatch-check-queue-shim");
+        // The launcher must not end up buried under the replacement: the old
+        // shim was standing in for it, not holding it.
+        expect(readFileSync(path.join(binDir, "tsgo.real"), "utf8")).toBe(
+          LAUNCHER,
+        );
+        expect(runCheck("tsgo", ["--noEmit"]).stdout).toBe("real --noEmit\n");
+      });
     });
   });
 

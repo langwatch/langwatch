@@ -216,6 +216,14 @@ Feature: Machine-wide slots for whole-repo checks
     When the postinstall step runs
     Then whole-project runs count again
 
+  # Otherwise a fix to how runs are classified would never reach a checkout
+  # that had already been installed once, which is every checkout.
+  @unit
+  Scenario: An earlier version of the routing is brought up to date
+    Given the bin entries were routed through the queue by an earlier version of the installer
+    When the postinstall step runs
+    Then they are replaced with the current one, and the tools still run
+
   @unit
   Scenario: An install that cannot write leaves the tool working
     Given the bin directory cannot be written to
