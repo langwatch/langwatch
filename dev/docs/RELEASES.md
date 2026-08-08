@@ -4,7 +4,7 @@ Releases are cut by [release-please](https://github.com/googleapis/release-pleas
 conventional commits on `main`. Config lives in `.github/release-please-config.json`,
 current versions in `.github/.release-please-manifest.json`.
 
-This repo publishes eight independently versioned components:
+This repo publishes nine independently versioned components:
 
 | component | path | shim |
 | --- | --- | --- |
@@ -16,6 +16,7 @@ This repo publishes eight independently versioned components:
 | `langevals` | `services/langevals` | `services/langevals/.release-please-shim` |
 | `clickhouse-serverless` | `charts/clickhouse-serverless` | `charts/clickhouse-serverless/.release-please-shim` |
 | `skills` | `skills` | `skills/.release-please-shim` |
+| `agent-plugin` | `plugins/langwatch` | `plugins/langwatch/.release-please-shim` |
 
 Each gets its own release PR, its own tag and its own changelog.
 
