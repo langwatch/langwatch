@@ -8,6 +8,10 @@ import { prisma } from "../db";
 import { nlpgoProxyBaseURL } from "../nlpgo/nlpgoFetch";
 import { getCodexVercelAIModel } from "./codexGatewayModel";
 import { isCodexModel } from "./codexRestrictions";
+import {
+  ModelProviderNotConfiguredError,
+  ModelProviderNotEnabledError,
+} from "./errors";
 import { featureByKey } from "./featureRegistry";
 import { ModelNotConfiguredError } from "./modelNotConfiguredError";
 import { ModelProviderDisabledError } from "./modelProviderDisabledError";
@@ -58,14 +62,10 @@ export const getVercelAIModel = async ({
   const modelProvider = modelProviders[providerKey];
 
   if (!modelProvider) {
-    throw new Error(
-      `Model provider "${providerKey}" is not configured for this project. Go to Settings → Model Providers to add it.`,
-    );
+    throw new ModelProviderNotConfiguredError(providerKey);
   }
   if (!modelProvider.enabled) {
-    throw new Error(
-      `Model provider "${providerKey}" is configured but disabled. Go to Settings → Model Providers to enable it.`,
-    );
+    throw new ModelProviderNotEnabledError(providerKey);
   }
 
   // Codex never goes through the nlpgo chat-completions proxy: the codex

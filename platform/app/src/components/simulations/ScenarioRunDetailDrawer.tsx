@@ -31,9 +31,11 @@ import { useTargetNameMap } from "~/hooks/useTargetNameMap";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
+import { FanOutFlow } from "../scenarios/fan-out/FanOutFlow";
 import { TraceDetails } from "../traces/TraceDetails";
 import { Drawer } from "../ui/drawer";
 import { CopyIdChip } from "./CopyIdChip";
+import { fanOutTargetFromRunMetadata } from "./fan-out-target.utils";
 import { RunCriteriaChip } from "./RunCriteriaChip";
 import { RunDetailSection } from "./RunDetailSection";
 import { getRunStatePollInterval } from "./run-state-polling";
@@ -65,6 +67,7 @@ export function ScenarioRunDetailDrawer({
     null,
   );
   const [scenarioEditorOpen, setScenarioEditorOpen] = useState(false);
+  const [fanOutOpen, setFanOutOpen] = useState(false);
 
   const scenarioRunId = params.scenarioRunId;
   const dejaView = useDejaViewLink({
@@ -134,6 +137,13 @@ export function ScenarioRunDetailDrawer({
       iteration: undefined,
     });
   }, [scenarioState?.name, scenarioState?.metadata, targetNameMap]);
+
+  // A run that recorded what it ran against lets a fan-out seeded from it skip
+  // asking for a target; anything else falls through to the target picker.
+  const fanOutTarget = useMemo(
+    () => fanOutTargetFromRunMetadata(scenarioState?.metadata),
+    [scenarioState?.metadata],
+  );
 
   const { onRunComplete, onRunFailed } = useDrawerRunCallbacks();
 
@@ -362,6 +372,16 @@ export function ScenarioRunDetailDrawer({
                           : null
                       }
                       dejaViewHref={dejaView.href ?? null}
+                      onFindRelatedFailures={
+                        // Only meaningful once this run has actually failed:
+                        // there is no blast radius to chase for a pass.
+                        scenarioId &&
+                        scenarioRunId &&
+                        (scenarioState.status === "FAILED" ||
+                          scenarioState.status === "ERROR")
+                          ? () => setFanOutOpen(true)
+                          : null
+                      }
                     />
                     <Drawer.CloseTrigger />
                   </HStack>
@@ -531,6 +551,15 @@ export function ScenarioRunDetailDrawer({
         initialTarget={persistedTarget}
         isLoading={isRunning}
       />
+
+      {scenarioId && scenarioRunId && (
+        <FanOutFlow
+          open={fanOutOpen}
+          onClose={() => setFanOutOpen(false)}
+          knownTarget={fanOutTarget}
+          seed={{ type: "SCENARIO_RUN", scenarioId, scenarioRunId }}
+        />
+      )}
 
       {/* Child drawer: Scenario Editor — managed via local state */}
       <ScenarioFormDrawer

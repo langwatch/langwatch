@@ -163,7 +163,10 @@ export class SuiteRunService {
           scenarioSetId: setId,
           name: scenarioNameMap.get(item.scenarioId),
           metadata: {
-            langwatch: { targetReferenceId: item.target.referenceId },
+            langwatch: {
+              targetReferenceId: item.target.referenceId,
+              targetType: item.target.type,
+            },
           },
           target: {
             type: item.target.type,

@@ -20,6 +20,7 @@ import {
   readHandledError,
 } from "~/features/errors";
 
+import { FanOutGenerationError } from "../services/fanOutGeneration";
 import { ScenarioGenerationError } from "../services/scenarioGeneration";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -76,6 +77,10 @@ function recoveryFor(code: string | undefined): {
     case "no_provider_configured":
     case "model_not_allowed":
     case "llm_model_not_set":
+    case "model_not_configured":
+    // Switched off rather than absent, but the fix is the same trip to
+    // settings and retrying as-is cannot work.
+    case "model_provider_disabled":
       return { tier: "config", cta: "configure" };
 
     // A credential the customer owns was refused. Same destination as `config`,
@@ -96,6 +101,7 @@ function recoveryFor(code: string | undefined): {
 
     case "provider_timeout":
     case "idle_timeout":
+    case "fan_out_generation_timed_out":
       return { tier: "timeout", cta: "retry" };
 
     default:
@@ -106,21 +112,25 @@ function recoveryFor(code: string | undefined): {
 /**
  * The words for a generation failure.
  *
- * `ScenarioGenerationError` is the endpoint's handled payload with the envelope
- * stripped off — `generateScenarioWithAI` parses `code` and `meta` out of
- * `domainError` and hangs them on a plain `Error` — so `readHandledError` can't
- * recognise it. Hand the registry the shape it does read rather than
- * re-deriving the copy here.
+ * `ScenarioGenerationError` and `FanOutGenerationError` are the endpoint's
+ * handled payload with the envelope stripped off — the generation clients parse
+ * `code` and `meta` out of the response and hang them on a plain `Error` — so
+ * `readHandledError` can't recognise them. Hand the registry the shape it does
+ * read rather than re-deriving the copy here.
  */
 function explain(error: unknown): ErrorExplanation {
-  if (error instanceof ScenarioGenerationError) {
+  if (
+    error instanceof ScenarioGenerationError ||
+    error instanceof FanOutGenerationError
+  ) {
     return explainSerializedError({
       code: error.kind,
       kind: error.kind,
       meta: error.meta,
       httpStatus: 0,
       fault: "customer",
-      traceId: undefined,
+      traceId:
+        error instanceof FanOutGenerationError ? error.traceId : undefined,
       spanId: undefined,
       reasons: [],
     });
@@ -133,7 +143,10 @@ export function classifyGenerationError(error: unknown): GenerationErrorClass {
   const handled = readHandledError(error);
   const explanation = explain(error);
   const { tier, cta } = recoveryFor(
-    error instanceof ScenarioGenerationError ? error.kind : handled?.code,
+    error instanceof ScenarioGenerationError ||
+      error instanceof FanOutGenerationError
+      ? error.kind
+      : handled?.code,
   );
 
   return {
@@ -141,6 +154,10 @@ export function classifyGenerationError(error: unknown): GenerationErrorClass {
     cta,
     title: explanation.title,
     copy: explanation.description,
-    traceId: handled?.traceId,
+    // The generation clients strip the envelope, so the handled payload is not
+    // readable off the error; take the id they carried instead.
+    traceId:
+      handled?.traceId ??
+      (error instanceof FanOutGenerationError ? error.traceId : undefined),
   };
 }

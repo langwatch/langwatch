@@ -52,7 +52,7 @@ describe("getVercelAIModel", () => {
   });
 
   describe("when project uses Azure provider", () => {
-    it("throws descriptive error when azure provider is not configured", async () => {
+    it("refuses with missing_provider when the azure provider is not configured", async () => {
       mockGetProjectModelProviders.mockResolvedValue({});
 
       await expect(
@@ -60,12 +60,13 @@ describe("getVercelAIModel", () => {
           projectId: "project-123",
           model: "azure/my-gpt4-deployment",
         }),
-      ).rejects.toThrow(
-        'Model provider "azure" is not configured for this project.',
-      );
+      ).rejects.toMatchObject({
+        code: "missing_provider",
+        meta: { providerKey: "azure" },
+      });
     });
 
-    it("throws descriptive error when azure provider is disabled", async () => {
+    it("refuses with model_provider_disabled when the azure provider is disabled", async () => {
       mockGetProjectModelProviders.mockResolvedValue({
         azure: { provider: "azure", enabled: false, customKeys: null },
       });
@@ -75,7 +76,10 @@ describe("getVercelAIModel", () => {
           projectId: "project-123",
           model: "azure/my-gpt4-deployment",
         }),
-      ).rejects.toThrow('Model provider "azure" is configured but disabled.');
+      ).rejects.toMatchObject({
+        code: "model_provider_disabled",
+        meta: { providerKey: "azure" },
+      });
     });
   });
 
@@ -89,9 +93,10 @@ describe("getVercelAIModel", () => {
           model: "openai_codex/gpt-5.6-terra",
           featureKey: "langy.chat",
         }),
-      ).rejects.toThrow(
-        'Model provider "openai_codex" is not configured for this project.',
-      );
+      ).rejects.toMatchObject({
+        code: "missing_provider",
+        meta: { providerKey: "openai_codex" },
+      });
     });
 
     it("rejects when the codex provider row is disabled", async () => {
@@ -109,9 +114,10 @@ describe("getVercelAIModel", () => {
           model: "openai_codex/gpt-5.6-terra",
           featureKey: "langy.chat",
         }),
-      ).rejects.toThrow(
-        'Model provider "openai_codex" is configured but disabled.',
-      );
+      ).rejects.toMatchObject({
+        code: "model_provider_disabled",
+        meta: { providerKey: "openai_codex" },
+      });
     });
 
     it("returns the gateway handle when the provider is connected and enabled", async () => {

@@ -69,4 +69,6 @@ export const KSUID_RESOURCES = {
   PROCESS_MANAGER_OUTBOX: "pmoutbox",
   WEBHOOK_ENDPOINT: "webhookendpoint",
   EXPORT: "export",
+  FAN_OUT_BATCH: "fanoutbatch",
+  FAN_OUT_VARIANT: "fanoutvariant",
 } as const;

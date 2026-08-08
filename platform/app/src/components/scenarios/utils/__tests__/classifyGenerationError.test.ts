@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { FanOutGenerationError } from "../../services/fanOutGeneration";
 import { ScenarioGenerationError } from "../../services/scenarioGeneration";
 import { classifyGenerationError } from "../classifyGenerationError";
 
@@ -43,6 +44,64 @@ describe("classifyGenerationError", () => {
 
         expect(result.title).toBe("No model provider configured");
         expect(result.copy).toBe("Add a provider in settings to continue.");
+      });
+    });
+
+    describe("when the code names a provider the project never set up", () => {
+      // The fan-out generate endpoint surfaces this through
+      // FanOutGenerationError, which carries the handled code off the wire.
+      it("asks the user to configure rather than retry", () => {
+        const result = classifyGenerationError(
+          new FanOutGenerationError({
+            message: "missing_provider",
+            kind: "missing_provider",
+          }),
+        );
+
+        expect(result.tier).toBe("config");
+        expect(result.cta).toBe("configure");
+      });
+
+      it("takes its words from the registry", () => {
+        const result = classifyGenerationError(
+          new FanOutGenerationError({
+            message: "missing_provider",
+            kind: "missing_provider",
+          }),
+        );
+
+        expect(result.title).toBe("This model's provider can't be used here");
+        expect(result.copy).toBe(
+          "Pick a different default model in your project's model settings, then try again.",
+        );
+      });
+    });
+
+    describe("when the code names a provider that is switched off", () => {
+      it("asks the user to configure, because retrying cannot work", () => {
+        const result = classifyGenerationError(
+          new FanOutGenerationError({
+            message: "model_provider_disabled",
+            kind: "model_provider_disabled",
+          }),
+        );
+
+        expect(result.tier).toBe("config");
+        expect(result.cta).toBe("configure");
+      });
+
+      it("takes its words from the registry", () => {
+        const result = classifyGenerationError(
+          new FanOutGenerationError({
+            message: "model_provider_disabled",
+            kind: "model_provider_disabled",
+          }),
+        );
+
+        expect(result.title).toBe("This model provider is turned off");
+        expect(result.copy).toBe(
+          "Turn it back on in your project's model settings, or pick a different provider.",
+        );
       });
     });
 

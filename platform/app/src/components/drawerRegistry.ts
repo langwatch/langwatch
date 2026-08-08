@@ -206,6 +206,14 @@ const ScenarioRunDetailDrawer = lazyDefault({
   factory: () => import("./simulations/ScenarioRunDetailDrawer"),
   key: "ScenarioRunDetailDrawer",
 });
+const AdjacentScenariosReviewDrawerFromUrl = lazyDefault({
+  factory: () => import("./scenarios/fan-out/AdjacentScenariosReviewDrawer"),
+  key: "AdjacentScenariosReviewDrawerFromUrl",
+});
+const AdjacentScenariosReportDrawerFromUrl = lazyDefault({
+  factory: () => import("./scenarios/fan-out/AdjacentScenariosReportDrawer"),
+  key: "AdjacentScenariosReportDrawerFromUrl",
+});
 const SuiteFormDrawer = lazyDefault({
   factory: () => import("./suites/SuiteFormDrawer"),
   key: "SuiteFormDrawer",
@@ -275,6 +283,8 @@ export const drawers = {
   // Scenarios
   scenarioEditor: ScenarioFormDrawerFromUrl,
   scenarioRunDetail: ScenarioRunDetailDrawer,
+  adjacentScenariosReview: AdjacentScenariosReviewDrawerFromUrl,
+  adjacentScenariosReport: AdjacentScenariosReportDrawerFromUrl,
   // Suites
   suiteEditor: SuiteFormDrawer,
   // Data privacy
