@@ -113,47 +113,18 @@ export interface ClaudePluginHarness {
 
 const OK = { status: 0, stdout: "", stderr: "" };
 
-/**
- * Everything the plugin suites need around the module under test: a temp HOME
- * that is torn down per test, a CLI config beside it, and a programmable
- * `claude`. Registers its own `beforeEach` / `afterEach`.
- *
- * The `spawnSync` mock itself stays in the calling file, because `vi.mock` is
- * hoisted per module and cannot be registered from here.
- */
-export function installClaudePluginHarness({
-	spawnSyncMock,
-	prefix,
-}: {
-	spawnSyncMock: Mock;
-	prefix: string;
-}): ClaudePluginHarness {
-	const state = { home: "" };
-	const origHome = process.env.HOME;
-	const origUserprofile = process.env.USERPROFILE;
-	const origConfig = process.env.LANGWATCH_CLI_CONFIG;
-
-	const writeConfig = (extra: Record<string, unknown> = {}): void => {
-		fs.writeFileSync(
-			process.env.LANGWATCH_CLI_CONFIG!,
-			JSON.stringify({
-				gateway_url: "http://gw.example.com",
-				control_plane_url: "http://app.example.com",
-				...extra,
-			}),
-		);
-	};
-
-	// A refusal reason belongs to a refusal: a zero status carrying "rejected"
-	// on stderr would let a future assertion about WHY something failed pass
-	// against a run that succeeded.
-	const answerClaude = ({
+/** A programmable `claude`, wired into the caller's own `spawnSync` mock. */
+function claudeAnswerer(spawnSyncMock: Mock) {
+	return ({
 		pluginHelp = 0,
 		marketplaceAdd = 0,
 		install = 0,
 		uninstall = 0,
 		marketplaceRemove = 0,
 	}: ClaudeAnswers): void => {
+		// A refusal reason belongs to a refusal: a zero status carrying
+		// "rejected" on stderr would let a future assertion about WHY something
+		// failed pass against a run that succeeded.
 		const answer = (status: number, refusal: string) => ({
 			...OK,
 			status,
@@ -177,15 +148,67 @@ export function installClaudePluginHarness({
 			return OK;
 		});
 	};
+}
+
+/** Read and write the CLI config the suites point `LANGWATCH_CLI_CONFIG` at. */
+function configIo() {
+	return {
+		readConfig: (): Record<string, unknown> =>
+			JSON.parse(
+				fs.readFileSync(process.env.LANGWATCH_CLI_CONFIG!, "utf8"),
+			) as Record<string, unknown>,
+		writeConfig: (extra: Record<string, unknown> = {}): void => {
+			fs.writeFileSync(
+				process.env.LANGWATCH_CLI_CONFIG!,
+				JSON.stringify({
+					gateway_url: "http://gw.example.com",
+					control_plane_url: "http://app.example.com",
+					...extra,
+				}),
+			);
+		},
+	};
+}
+
+/** What the caller's `spawnSync` mock recorded about the `claude` runs. */
+function spawnInspectors(spawnSyncMock: Mock) {
+	return {
+		commandsRun: (): string[] =>
+			spawnSyncMock.mock.calls.map((call: unknown[]) =>
+				(call[1] as string[]).join(" "),
+			),
+		lastSpawnOptions: (): { stdio: unknown } => {
+			const calls = spawnSyncMock.mock.calls as unknown[][];
+			return calls[calls.length - 1]![2] as { stdio: unknown };
+		},
+	};
+}
+
+/**
+ * A temp HOME with a CLI config beside it, per test, and everything the suite
+ * touched put back afterwards. Absent variables are restored by DELETING them:
+ * assigning `undefined` through `process.env` stores the string "undefined",
+ * which the next file's HOME resolution would read as a real path.
+ */
+function registerTempHomeLifecycle({
+	state,
+	prefix,
+	onReady,
+}: {
+	state: { home: string };
+	prefix: string;
+	onReady: () => void;
+}): void {
+	const origHome = process.env.HOME;
+	const origUserprofile = process.env.USERPROFILE;
+	const origConfig = process.env.LANGWATCH_CLI_CONFIG;
 
 	beforeEach(() => {
 		state.home = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
 		process.env.HOME = state.home;
 		process.env.USERPROFILE = state.home;
 		process.env.LANGWATCH_CLI_CONFIG = path.join(state.home, "config.json");
-		writeConfig();
-		spawnSyncMock.mockReset();
-		answerClaude({});
+		onReady();
 	});
 
 	afterEach(() => {
@@ -197,9 +220,39 @@ export function installClaudePluginHarness({
 		else process.env.LANGWATCH_CLI_CONFIG = origConfig;
 		fs.rmSync(state.home, { recursive: true, force: true });
 	});
+}
 
+/**
+ * Everything the plugin suites need around the module under test: a temp HOME
+ * that is torn down per test, a CLI config beside it, and a programmable
+ * `claude`. Registers its own `beforeEach` / `afterEach`.
+ *
+ * The `spawnSync` mock itself stays in the calling file, because `vi.mock` is
+ * hoisted per module and cannot be registered from here.
+ */
+export function installClaudePluginHarness({
+	spawnSyncMock,
+	prefix,
+}: {
+	spawnSyncMock: Mock;
+	prefix: string;
+}): ClaudePluginHarness {
+	const state = { home: "" };
+	const answerClaude = claudeAnswerer(spawnSyncMock);
+	const { readConfig, writeConfig } = configIo();
+	const { commandsRun, lastSpawnOptions } = spawnInspectors(spawnSyncMock);
 	const settingsPath = (): string =>
 		path.join(state.home, ".claude", "settings.json");
+
+	registerTempHomeLifecycle({
+		state,
+		prefix,
+		onReady: () => {
+			writeConfig();
+			spawnSyncMock.mockReset();
+			answerClaude({});
+		},
+	});
 
 	return {
 		home: () => state.home,
@@ -207,23 +260,15 @@ export function installClaudePluginHarness({
 		pluginsDir: () => path.join(state.home, ".claude", "plugins"),
 		writeJson: ({ segments, value }) =>
 			writeClaudeJson({ home: state.home, segments, value }),
-		readSettings: <T,>() => JSON.parse(fs.readFileSync(settingsPath(), "utf8")) as T,
+		readSettings: <T,>() =>
+			JSON.parse(fs.readFileSync(settingsPath(), "utf8")) as T,
 		seedInstalledPlugin: () => seedInstalledPlugin({ home: state.home }),
 		seedMarketplace: ({ repo }: { repo?: string } = {}) =>
 			seedMarketplace({ home: state.home, repo }),
 		answerClaude,
-		commandsRun: () =>
-			spawnSyncMock.mock.calls.map((call: unknown[]) =>
-				(call[1] as string[]).join(" "),
-			),
-		lastSpawnOptions: () => {
-			const calls = spawnSyncMock.mock.calls as unknown[][];
-			return calls[calls.length - 1]![2] as { stdio: unknown };
-		},
-		readConfig: () =>
-			JSON.parse(
-				fs.readFileSync(process.env.LANGWATCH_CLI_CONFIG!, "utf8"),
-			) as Record<string, unknown>,
+		commandsRun,
+		lastSpawnOptions,
+		readConfig,
 		writeConfig,
 		loadModule: async () => {
 			vi.resetModules();

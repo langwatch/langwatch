@@ -178,7 +178,7 @@ Rule: Logout removes the plugin and the marketplace LangWatch registered
 
   @unit
   Scenario: A second logout leaves capture off rather than reporting a failure
-    Given capture an earlier logout already switched off
+    Given an earlier logout already switched capture off
     And a claude that cannot uninstall the plugin
     When logout removes the telemetry targets
     Then logout reports the plugin removed
@@ -200,7 +200,6 @@ Rule: Plugin state is read defensively
 
   @unit
   Scenario: A marketplace that only mentions our repository is not ours
-    Given a marketplace of the same name published by somebody else, whose
-      notes mention our repository
+    Given a marketplace of the same name published by somebody else, mentioning our repository in its notes
     When the plugin state is read
     Then the marketplace is not claimed as ours
