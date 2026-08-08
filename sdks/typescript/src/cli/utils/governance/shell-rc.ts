@@ -32,10 +32,16 @@ import * as readline from "node:readline";
 import chalk from "chalk";
 
 import {
+	codexHasNotifyBlock,
+	type CodexNotifyWriteResult,
+	codexNotifyCommand,
+	codexNotifyCommandIsEphemeral,
 	codexOtelBlockHasAuthHeader,
 	codexTraceEndpoint,
 	defaultCodexConfigPath,
+	defaultCodexNotifyCommand,
 	displayCodexConfigPath,
+	writeCodexNotifyBlock,
 	writeCodexOtelBlock,
 } from "../codex-config-toml";
 import {
@@ -297,21 +303,32 @@ export function removeBlockFromRc(
  */
 export type PersistChoice = "yes" | "no" | "never" | "skip";
 
-export async function askPersistChoice(
-	rcPathHint: string,
-	tool: string,
-): Promise<PersistChoice> {
+/**
+ * `question` replaces the default wording for a tool whose "yes" buys more than
+ * an env block. Whatever it says has to be said BEFORE the answer, because a
+ * bare Enter is a yes, so it is part of the question rather than a line printed
+ * around it.
+ */
+export async function askPersistChoice({
+	target,
+	tool,
+	question,
+}: {
+	target: string;
+	tool: string;
+	question?: string;
+}): Promise<PersistChoice> {
 	if (!process.stdin.isTTY) return "skip";
 
 	const rl = readline.createInterface({
 		input: process.stdin,
 		output: process.stdout,
 	});
+	const asked =
+		question ??
+		`Install env vars to ${target} so that next time the plain \`${tool}\` command keeps capturing telemetry data?`;
 	const ans = await new Promise<string>((resolve) => {
-		rl.question(
-			`Install env vars to ${rcPathHint} so that next time the plain \`${tool}\` command keeps capturing telemetry data? [Y/n/never] `,
-			(a) => resolve(a),
-		);
+		rl.question(`${asked} [Y/n/never] `, (a) => resolve(a));
 	});
 	rl.close();
 
@@ -369,7 +386,10 @@ export async function maybeOfferIngestionShellRcPersist({
 			return;
 		}
 		console.log();
-		const choice = await askPersistChoice(appTarget.displayPath, tool);
+		const choice = await askPersistChoice({
+			target: appTarget.displayPath,
+			tool,
+		});
 		if (choice === "skip" || choice === "no") return;
 		if (choice === "never") {
 			recordNeverChoice(cfg);
@@ -401,15 +421,26 @@ export async function maybeOfferIngestionShellRcPersist({
 	// plain `codex` captures.
 	if (tool === "codex") {
 		const configPath = defaultCodexConfigPath();
-		// Already persisted on a prior run — stay quiet.
-		if (codexOtelBlockHasAuthHeader(configPath)) return;
+		if (codexOtelBlockHasAuthHeader(configPath)) {
+			// The exports are current, but the turn harvest may not be: it is what
+			// recovers the conversation those exports carry none of, and it is a
+			// separate write into the same file under the same grant. Assert it here
+			// rather than leaving content recovery off every device that persisted
+			// the header on an earlier run.
+			assertCodexTurnHarvest();
+			return;
+		}
 
 		const endpointBase = vars.OTEL_EXPORTER_OTLP_ENDPOINT;
 		const token = bearerFromHeaders(vars.OTEL_EXPORTER_OTLP_HEADERS);
 		if (!endpointBase || !token) return;
 
 		console.log();
-		const choice = await askPersistChoice(displayCodexConfigPath(), tool);
+		const choice = await askPersistChoice({
+			target: displayCodexConfigPath(),
+			tool,
+			question: codexConsentQuestion(configPath),
+		});
 		if (choice === "skip" || choice === "no") return;
 		if (choice === "never") {
 			recordNeverChoice(cfg);
@@ -429,6 +460,7 @@ export async function maybeOfferIngestionShellRcPersist({
 					`  ✓ Installed langwatch telemetry exports to ${displayCodexConfigPath()}`,
 				),
 			);
+			assertCodexTurnHarvest();
 		} catch (err) {
 			console.log(
 				chalk.yellow(
@@ -465,7 +497,7 @@ export async function maybeOfferIngestionShellRcPersist({
 	}
 	const target = rcPath(shell);
 	console.log();
-	const choice = await askPersistChoice(target, tool);
+	const choice = await askPersistChoice({ target, tool });
 	if (choice === "skip" || choice === "no") return;
 	if (choice === "never") {
 		recordNeverChoice(cfg);
@@ -486,6 +518,132 @@ export async function maybeOfferIngestionShellRcPersist({
 		console.log(
 			chalk.yellow(
 				`  ! Couldn't write to ${target}: ${(err as Error).message}`,
+			),
+		);
+	}
+}
+
+/**
+ * What asking codex to run the turn harvest left behind.
+ *
+ * `blocked` is an outcome rather than a thrown error because it is the one
+ * failure the user can fix, and every caller wants to say so and carry on
+ * rather than abandon an install that otherwise worked.
+ */
+export type CodexTurnHarvestOutcome =
+	| { status: "installed"; chained: string[] | null; ephemeral: boolean }
+	| { status: "unchanged" }
+	| { status: "skipped" }
+	| { status: "blocked" };
+
+/** What every caller says when the merge was refused. */
+export const CODEX_TURN_HARVEST_BLOCKED_MESSAGE =
+	"Your codex configuration already runs a program of its own after every turn, and it cannot be moved safely, so the conversation will not be recorded. Remove that setting and run this again.";
+
+/**
+ * The merge refuses rather than leave two top-level `notify` keys behind, which
+ * would stop codex from starting at all. It travels as a message because it is
+ * raised where the TOML is read, one module below this one.
+ */
+function isNotifyMergeRefusal(err: unknown): boolean {
+	return err instanceof Error && err.message.startsWith("refusing to write ");
+}
+
+/**
+ * Ask codex to run the turn harvest after every completed turn. Idempotent.
+ *
+ * Codex's telemetry export carries tokens, model and timing but no
+ * conversation: the reply is dropped before export and no codex setting brings
+ * it back. What codex does offer is `notify`, a program it runs after every
+ * completed turn. Pointed at our own harvest, that is what turns a plain
+ * `codex` into traces with something to read.
+ */
+export function installCodexTurnHarvest(
+	options: { filePath?: string } = {},
+): CodexTurnHarvestOutcome {
+	const command = defaultCodexNotifyCommand();
+	if (!command) return { status: "skipped" };
+	let result: CodexNotifyWriteResult;
+	try {
+		result = writeCodexNotifyBlock({ command }, options);
+	} catch (err) {
+		if (isNotifyMergeRefusal(err)) return { status: "blocked" };
+		throw err;
+	}
+	if (result.action === "unchanged") return { status: "unchanged" };
+	return {
+		status: "installed",
+		chained: result.chained,
+		ephemeral: codexNotifyCommandIsEphemeral(command),
+	};
+}
+
+/**
+ * What the user is agreeing to when they keep codex capture on.
+ *
+ * "Keeps capturing" would understate it: this asks codex to RUN a program after
+ * every completed turn, and codex allows exactly one, so a program the user
+ * already set is started by ours from then on. A bare Enter is a yes, so both
+ * facts are in the question rather than printed after the answer. The
+ * displacement is named only when there is something to displace, since our own
+ * block already accounts for one.
+ */
+function codexConsentQuestion(configPath: string): string {
+	const lines = [
+		"LangWatch can keep capturing codex sessions after this one.",
+		`It saves your LangWatch connection details to ${displayCodexConfigPath()}, and asks`,
+		"codex to run `langwatch ingest codex` after every completed turn so the",
+		"conversation is recorded.",
+	];
+	if (codexNotifyCommand(configPath) && !codexHasNotifyBlock(configPath)) {
+		lines.push(
+			"Codex runs a single program after a turn, so the one you have set will be",
+			"started by this one instead of by codex.",
+		);
+	}
+	lines.push("Install it?");
+	return lines.join("\n");
+}
+
+/**
+ * Assert the turn harvest for codex, which belongs to the same "yes" that
+ * persisted the exports: those exports carry no conversation, and this is what
+ * recovers it. Idempotent, and quiet unless it changed something.
+ *
+ * A write that fails is not worth failing the persist over, since the exports
+ * it rides beside are already installed and capturing. The exception is a
+ * config shape the merge refuses, which the user can fix and would otherwise
+ * never hear about.
+ */
+function assertCodexTurnHarvest(): void {
+	let outcome: CodexTurnHarvestOutcome;
+	try {
+		outcome = installCodexTurnHarvest();
+	} catch {
+		return;
+	}
+	if (outcome.status === "blocked") {
+		console.log(chalk.yellow(`  ! ${CODEX_TURN_HARVEST_BLOCKED_MESSAGE}`));
+		return;
+	}
+	if (outcome.status !== "installed") return;
+	console.log(
+		chalk.green(
+			"  ✓ Codex will record each turn's conversation as it completes",
+		),
+	);
+	if (outcome.chained) {
+		console.log(
+			chalk.dim(
+				`    Your existing notify program still runs: ${outcome.chained[0]}`,
+			),
+		);
+	}
+	if (outcome.ephemeral) {
+		console.log(
+			chalk.yellow(
+				"    Heads up: this points at an npx cache that npm may clean up.\n" +
+					"    Install the CLI (npm i -g langwatch) so it keeps working.",
 			),
 		);
 	}

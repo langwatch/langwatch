@@ -15,7 +15,7 @@
  * `index.ts` — this was a move, not a rewrite.
  */
 
-import { Command } from "commander";
+import { Command, Option } from "commander";
 import {
   REDACTION_AUDIT_URL,
   SESSION_REDACTION_SUMMARY,
@@ -546,6 +546,57 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
         process.exit(1);
       }
     });
+
+  // `langwatch ingest codex` — recover codex conversation content. Codex
+  // itself runs this after every completed turn (via its `notify` setting,
+  // wired up when capture is enabled); the no-flag form backfills sessions
+  // that ran before that.
+  ingestCmd
+    .command("codex")
+    .description(
+      "Recover conversation content (prompt, tool calls, reply) from codex session transcripts onto their traces. Codex exports none of it itself.",
+    )
+    .option("--since <hours>", "how far back to look for sessions (default: 24)")
+    .option("--all", "recover every session on disk, not just recent ones")
+    .option("--json", "emit machine-readable JSON")
+    // Codex passes these; a human never does, so they stay out of the help.
+    .addOption(
+      new Option(
+        "--chain <argv>",
+        "JSON argv of a turn-completion program to run after this one",
+      ).hideHelp(),
+    )
+    .addOption(
+      new Option(
+        "--notify <payload>",
+        "the turn payload codex appends after a completed turn",
+      ).hideHelp(),
+    )
+    .action(
+      async (options: {
+        since?: string;
+        all?: boolean;
+        json?: boolean;
+        chain?: string;
+        notify?: string;
+      }) => {
+        try {
+          const { ingestCodexCommand } = await import(
+            "./commands/ingest/codex.js"
+          );
+          await ingestCodexCommand(options);
+        } catch (error) {
+          // The turn-completion path must never fail a coding session, and it
+          // is the only caller that passes these two flags.
+          if (options.notify !== undefined || options.chain !== undefined) {
+            return;
+          }
+          const { reportCommandError } = await import("./utils/errorOutput.js");
+          reportCommandError({ error });
+          process.exit(1);
+        }
+      },
+    );
 
   // `langwatch ingest install <tool>` — hidden primitive used by CI /
   // devcontainer / scripted setups. The user surface is

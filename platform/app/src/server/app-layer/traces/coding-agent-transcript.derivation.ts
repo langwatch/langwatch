@@ -140,6 +140,13 @@ export interface TranscriptLogRecord {
   serviceName?: string | null;
 }
 
+/**
+ * The span the codex harvest writes the recovered conversation onto. Codex's
+ * own telemetry carries no content, so this is the only span in a codex trace
+ * that has anything to read.
+ */
+const CODEX_RECOVERED_CONTENT_SPAN_NAME = "codex.turn.response";
+
 const MODEL_CALL_SPAN_NAMES = new Set([
   "claude_code.llm_request",
   "opencode.llm",
@@ -167,18 +174,21 @@ export function buildCodingAgentTranscript({
   spans: SpanDetail[];
   logs: TranscriptLogRecord[];
 }): CodingAgentTranscript {
-  // A codex tool run is recorded twice: a span carrying the tool's identity
-  // and timing but no content, and a `tool_result` log carrying the
-  // arguments and output under the same `call_id`. Index the logs first so
-  // a tool span can be filled from its log, and so the log pass renders only
-  // the calls no span already represents. Codex tool spans normally never
-  // reach storage (the ingest noise filter drops them, since codex gives them
-  // a parent in another trace), so in practice the log side does the work,
-  // but the join keeps traces stored before that filter, and any run with the
-  // filter's kill-switch set, from rendering every tool call twice.
+  // A codex tool run is recorded three times over: inside the conversation
+  // recovered onto `codex.turn.response`, on a span carrying the tool's
+  // identity and timing but no content, and on a `tool_result` log carrying
+  // the arguments and output. All three name the same `call_id`, which is
+  // what the passes below join on: the first to reach a call renders and
+  // counts it, the later ones only fill in what they alone measured. Index
+  // the logs first so a tool span can be filled from its log. Codex tool
+  // spans normally never reach storage (the ingest noise filter drops them,
+  // since codex gives them a parent in another trace), so in practice the
+  // recovered conversation and the log side do the work, but the join keeps
+  // traces stored before that filter, and any run with the filter's
+  // kill-switch set, from rendering every tool call three times.
   const codexToolLogs = indexCodexToolLogsByCallId(logs);
   const fromSpans = collectSpanEntries(spans, codexToolLogs);
-  const fromLogs = collectLogEntries(logs, fromSpans.claimedToolCallIds);
+  const fromLogs = collectLogEntries(logs, fromSpans.claimedToolCalls);
 
   const entries = [...fromSpans.entries, ...fromLogs.entries];
 
@@ -247,6 +257,31 @@ interface CodexToolLogContent {
   failed: boolean;
 }
 
+/** One tool run, as the pass that reached it first rendered it. */
+type RenderedToolCall = Extract<TranscriptEntry, { kind: "tool" }>;
+
+/**
+ * The tool entry standing for each `call_id` seen so far. Codex describes one
+ * run three times over, so this is what makes the three agree on a single
+ * entry: whichever pass reaches a call first renders and counts it, and the
+ * later ones find it here and fill in what only they carry.
+ */
+type ClaimedToolCalls = Map<string, RenderedToolCall>;
+
+/**
+ * Add to an already-rendered call what a later signal measured and the pass
+ * that rendered it could not know. Gaps only: the recovered conversation
+ * carries a call's arguments and result but never its timing, and a run is
+ * failed the moment any signal says it is.
+ */
+function fillToolCallGaps(
+  entry: RenderedToolCall,
+  measured: { durationMs: number | null; failed: boolean },
+): void {
+  if (entry.durationMs === null) entry.durationMs = measured.durationMs;
+  if (measured.failed) entry.failed = true;
+}
+
 /**
  * codex tool_result logs are recognised by shape, not scope: they carry a
  * `call_id` plus `arguments`/`output`, attributes claude's tool events never
@@ -288,9 +323,17 @@ interface SpanEntryAccumulator {
   spanReplies: SpanReply[];
   totals: CodingAgentTranscript["totals"];
   subAgentToolCounts: Map<string, number>;
-  claimedToolCallIds: Set<string>;
+  claimedToolCalls: ClaimedToolCalls;
   /** The session's system context is emitted once, off the first call carrying one. */
   hasEmittedSystemPrompt: boolean;
+  /**
+   * How many messages of the recovered codex conversation have already been
+   * turned into entries. Each turn re-sends the whole history, so only the
+   * tail past this is new.
+   */
+  recoveredMessageCount: number;
+  /** The previous recovered turn's reply, which opens the next turn's input. */
+  lastRecoveredReply: string | null;
 }
 
 function collectSpanEntries(
@@ -302,8 +345,10 @@ function collectSpanEntries(
     spanReplies: [],
     totals: { modelCalls: 0, toolCalls: 0, tokens: 0, costUsd: 0 },
     subAgentToolCounts: new Map(),
-    claimedToolCallIds: new Set(),
+    claimedToolCalls: new Map(),
     hasEmittedSystemPrompt: false,
+    recoveredMessageCount: 0,
+    lastRecoveredReply: null,
   };
 
   // codex 0.146's exec wire has no `session_task.turn` rollup, its
@@ -314,7 +359,24 @@ function collectSpanEntries(
     (span) => span.name === "session_task.turn",
   );
 
+  // Codex's conversation is recovered from its session transcript and sent
+  // back on the same trace, since its own telemetry carries no content. Each
+  // recovered turn re-sends the whole history, so replaying them means taking
+  // the tail past the previous turn — which only means anything in turn order.
+  // Spans arrive in whatever order their exporter batched them (this function's
+  // caller sorts by time only afterwards), so they are ordered here first.
+  const recovered = spans
+    .filter((span) => span.name === CODEX_RECOVERED_CONTENT_SPAN_NAME)
+    .sort((a, b) => a.startTimeMs - b.startTimeMs);
+  for (const span of recovered) {
+    collectRecoveredCodexTurn(span, acc);
+  }
+
   for (const span of spans) {
+    // Already replayed above, in turn order. It deliberately does NOT count as
+    // a model call: codex's own token-bearing spans already did, and counting
+    // both would double every call in the totals.
+    if (span.name === CODEX_RECOVERED_CONTENT_SPAN_NAME) continue;
     const isCodexResponseCall =
       !hasCodexTurnRollup &&
       span.name === "handle_responses" &&
@@ -327,6 +389,222 @@ function collectSpanEntries(
   }
 
   return acc;
+}
+
+/**
+ * Replay one recovered codex turn into transcript entries.
+ *
+ * Each turn's recovered input is the WHOLE conversation as sent to the model,
+ * so consecutive turns overlap almost entirely. Only the tail past what the
+ * previous turn already contributed is emitted, or a three-turn session would
+ * render its first prompt three times.
+ *
+ * The turn's own final reply is not in that input — the transcript records it
+ * after the snapshot — so it rides `span.output` like every other agent whose
+ * reply lands on the span. That does mean the NEXT turn's input opens with it,
+ * which is why an opening assistant message repeating the previous reply is
+ * dropped rather than emitted twice.
+ */
+function collectRecoveredCodexTurn(
+  span: SpanDetail,
+  acc: SpanEntryAccumulator,
+): void {
+  const messages = parsedChatMessages(span.input);
+
+  const systemText = acc.hasEmittedSystemPrompt
+    ? null
+    : extractedSystemText(span.input);
+  if (systemText !== null) {
+    acc.hasEmittedSystemPrompt = true;
+    acc.entries.push({
+      kind: "system_prompt",
+      atMs: span.startTimeMs,
+      text: systemText,
+      chars: systemText.length,
+    });
+  }
+
+  if (messages !== null) {
+    const fresh = messages.slice(acc.recoveredMessageCount);
+    acc.recoveredMessageCount = messages.length;
+    replayRecoveredMessages({ messages: fresh, span, acc });
+  }
+
+  const replyText = extractedOutputText(span.output);
+  if (replyText === null) return;
+  acc.lastRecoveredReply = replyText;
+  acc.spanReplies.push({
+    entry: {
+      kind: "assistant_message",
+      atMs: span.endTimeMs ?? span.startTimeMs,
+      text: replyText,
+      model: modelOf(span),
+    },
+    windowStartMs: span.startTimeMs,
+    windowEndMs: span.endTimeMs ?? span.startTimeMs,
+  });
+}
+
+/** One chat message off a recovered turn, in the shape the harvest writes. */
+interface RecoveredMessage {
+  role?: unknown;
+  content?: unknown;
+  tool_call_id?: unknown;
+  tool_calls?: {
+    id?: unknown;
+    function?: { name?: unknown; arguments?: unknown };
+  }[];
+}
+
+function replayRecoveredMessages({
+  messages,
+  span,
+  acc,
+}: {
+  messages: unknown[];
+  span: SpanDetail;
+  acc: SpanEntryAccumulator;
+}): void {
+  // A tool call and its result are two separate messages paired by id; the
+  // transcript wants them as one entry, so the call is held until its result
+  // arrives (and still emitted, output-less, if it never does).
+  const pending = new Map<string, Extract<TranscriptEntry, { kind: "tool" }>>();
+
+  for (const raw of messages) {
+    const message = raw as RecoveredMessage | null;
+    if (!message || typeof message !== "object") continue;
+    const content =
+      typeof message.content === "string" ? message.content : null;
+
+    switch (message.role) {
+      case "user":
+        replayUserMessage({ content, span, acc });
+        break;
+      case "tool":
+        attachToolResult({ message, content, pending });
+        break;
+      case "assistant":
+        replayAssistantMessage({ message, content, span, acc, pending });
+        break;
+    }
+  }
+}
+
+function replayUserMessage({
+  content,
+  span,
+  acc,
+}: {
+  content: string | null;
+  span: SpanDetail;
+  acc: SpanEntryAccumulator;
+}): void {
+  if (content === null || content.length === 0) return;
+  // Already folded into the session context by extractedSystemText.
+  if (isInjectedContextOnly(content)) return;
+  acc.entries.push({
+    kind: "user_prompt",
+    atMs: span.startTimeMs,
+    text: content,
+    chars: content.length,
+  });
+}
+
+function attachToolResult({
+  message,
+  content,
+  pending,
+}: {
+  message: RecoveredMessage;
+  content: string | null;
+  pending: Map<string, Extract<TranscriptEntry, { kind: "tool" }>>;
+}): void {
+  const id =
+    typeof message.tool_call_id === "string" ? message.tool_call_id : null;
+  const entry = id === null ? null : pending.get(id);
+  if (entry) entry.output = content;
+}
+
+/**
+ * Render one tool call out of the recovered conversation.
+ *
+ * The ids here are codex's own `call_id`s, the same ones its tool spans and its
+ * tool_result logs carry, so a run another pass already rendered is left to
+ * that pass rather than becoming a second entry and a second tool count. A call
+ * codex sent without an id can be joined on nothing, so it always renders, and
+ * the turn-local key only has to pair it with its result inside this turn.
+ */
+function replayToolCall({
+  call,
+  turnLocalId,
+  span,
+  acc,
+  pending,
+}: {
+  call: NonNullable<RecoveredMessage["tool_calls"]>[number] | undefined;
+  turnLocalId: string;
+  span: SpanDetail;
+  acc: SpanEntryAccumulator;
+  pending: Map<string, RenderedToolCall>;
+}): void {
+  const callId = typeof call?.id === "string" ? call.id : null;
+  if (callId !== null && acc.claimedToolCalls.has(callId)) return;
+  const entry: RenderedToolCall = {
+    kind: "tool",
+    atMs: span.startTimeMs,
+    name:
+      typeof call?.function?.name === "string" ? call.function.name : "tool",
+    mcpServer: null,
+    input: call?.function?.arguments ?? null,
+    output: null,
+    durationMs: null,
+    failed: false,
+    agentId: null,
+    spanId: span.spanId,
+  };
+  if (callId !== null) acc.claimedToolCalls.set(callId, entry);
+  pending.set(callId ?? turnLocalId, entry);
+  acc.totals.toolCalls += 1;
+  acc.entries.push(entry);
+}
+
+function replayAssistantMessage({
+  message,
+  content,
+  span,
+  acc,
+  pending,
+}: {
+  message: RecoveredMessage;
+  content: string | null;
+  span: SpanDetail;
+  acc: SpanEntryAccumulator;
+  pending: Map<string, Extract<TranscriptEntry, { kind: "tool" }>>;
+}): void {
+  const calls = Array.isArray(message.tool_calls) ? message.tool_calls : [];
+  for (const [index, call] of calls.entries()) {
+    replayToolCall({
+      call,
+      turnLocalId: `${span.spanId}-${index}`,
+      span,
+      acc,
+      pending,
+    });
+  }
+
+  // The previous turn's reply opens this turn's input; it was already emitted
+  // off that turn's own output. Compared on a prefix rather than in full: the
+  // producer caps what it writes to the span output but pushes the uncapped
+  // text into the history, so a long reply is two different strings here and
+  // an equality check would render it twice.
+  if (content === null || content.length === 0) return;
+  if (isSameRecoveredReply(content, acc.lastRecoveredReply)) return;
+  acc.entries.push({
+    kind: "assistant_message",
+    atMs: span.startTimeMs,
+    text: content,
+    model: modelOf(span),
+  });
 }
 
 function collectModelCallSpan(
@@ -390,27 +668,31 @@ function collectToolSpan(
   });
   if (toolName === null) return;
 
-  acc.totals.toolCalls += 1;
-
-  // A sub-agent's tools are kept IN the sequence but marked, rather than
-  // hoisted out of it. Dropping them lost the work entirely; flattening them
-  // into the main thread pretended the main thread did it.
-  const agentId = readString(span.params, "agent_id");
-  if (agentId !== null) {
-    acc.subAgentToolCounts.set(
-      agentId,
-      (acc.subAgentToolCounts.get(agentId) ?? 0) + 1,
-    );
-  }
-
   // A codex tool span records the run but not its content, that rides the
-  // tool_result log sharing the span's call_id. Claim the call_id either
-  // way so the log pass never renders the same call twice.
+  // tool_result log sharing the span's call_id. When the recovered
+  // conversation already rendered this call, the span is the only signal that
+  // measured how long it took and whether it failed, so it hands those over
+  // rather than repeating the call.
   const callId = readString(span.params, "call_id");
   const logContent = callId !== null ? codexToolLogs.get(callId) : undefined;
-  if (callId !== null) acc.claimedToolCallIds.add(callId);
+  // All three failure signals, because they are set independently: a span can
+  // carry an error payload, or simply an error STATUS with no payload at all,
+  // and the log reports the tool's own exit separately from either.
+  const failed =
+    span.status === "error" || span.error != null || isFailed(logContent);
+  const claimed =
+    callId !== null ? acc.claimedToolCalls.get(callId) : undefined;
+  if (claimed !== undefined) {
+    fillToolCallGaps(claimed, { durationMs: spanDurationMs(span), failed });
+    return;
+  }
 
-  acc.entries.push({
+  acc.totals.toolCalls += 1;
+
+  const agentId = readString(span.params, "agent_id");
+  countSubAgentTool(agentId, acc);
+
+  const entry: RenderedToolCall = {
     kind: "tool",
     atMs: span.startTimeMs,
     name: toolName,
@@ -418,13 +700,28 @@ function collectToolSpan(
     input: span.input ?? logContent?.input ?? null,
     output: span.output ?? logContent?.output ?? null,
     durationMs: spanDurationMs(span),
-    // Both signals, because they are set independently: a span can carry an
-    // error payload, or simply an error STATUS with no payload at all.
-    failed:
-      span.status === "error" || span.error != null || isFailed(logContent),
+    failed,
     agentId,
     spanId: span.spanId,
-  });
+  };
+  if (callId !== null) acc.claimedToolCalls.set(callId, entry);
+  acc.entries.push(entry);
+}
+
+/**
+ * A sub-agent's tools are kept IN the sequence but marked, rather than hoisted
+ * out of it. Dropping them lost the work entirely; flattening them into the
+ * main thread pretended the main thread did it.
+ */
+function countSubAgentTool(
+  agentId: string | null,
+  acc: SpanEntryAccumulator,
+): void {
+  if (agentId === null) return;
+  acc.subAgentToolCounts.set(
+    agentId,
+    (acc.subAgentToolCounts.get(agentId) ?? 0) + 1,
+  );
 }
 
 function spanDurationMs(span: SpanDetail): number | null {
@@ -502,7 +799,7 @@ function modelOf(span: SpanDetail): string | null {
 
 function collectLogEntries(
   logs: TranscriptLogRecord[],
-  claimedToolCallIds: Set<string>,
+  claimedToolCalls: ClaimedToolCalls,
 ): {
   entries: TranscriptEntry[];
   sessionId: string | null;
@@ -516,7 +813,7 @@ function collectLogEntries(
 
     sessionId ??= resolveConversationKey(log.attributes);
 
-    const entry = logToEntry({ event, log, claimedToolCallIds });
+    const entry = logToEntry({ event, log, claimedToolCalls });
     if (entry !== null) entries.push(entry);
   }
 
@@ -526,11 +823,11 @@ function collectLogEntries(
 function logToEntry({
   event,
   log,
-  claimedToolCallIds,
+  claimedToolCalls,
 }: {
   event: string;
   log: TranscriptLogRecord;
-  claimedToolCallIds: Set<string>;
+  claimedToolCalls: ClaimedToolCalls;
 }): TranscriptEntry | null {
   const attrs = log.attributes;
   const atMs = log.timestampMs;
@@ -575,16 +872,24 @@ function logToEntry({
 
     case "tool_result": {
       // codex tool_result logs (recognised by their call_id + arguments
-      // shape) are the CONTENT record of a codex tool run. When a tool span
-      // claimed the call_id, the span entry already carries this log's
-      // content; unclaimed calls (the model-facing harness call, MCP calls
-      // without spans, span-less wires) render from the log alone.
+      // shape) are the CONTENT record of a codex tool run. When an earlier
+      // pass claimed the call_id, that entry already carries this log's
+      // content and only wants the duration codex measured; unclaimed calls
+      // (the model-facing harness call, MCP calls without spans, span-less
+      // wires) render from the log alone.
       const callId = readString(attrs, "call_id");
       if (
         callId !== null &&
         readString(attrs, "event.name") === "codex.tool_result"
       ) {
-        if (claimedToolCallIds.has(callId)) return null;
+        const claimed = claimedToolCalls.get(callId);
+        if (claimed !== undefined) {
+          fillToolCallGaps(claimed, {
+            durationMs: readNumber(attrs, "duration_ms"),
+            failed: readString(attrs, "success") === "false",
+          });
+          return null;
+        }
         const codexToolName = readString(attrs, "tool_name");
         if (codexToolName === null) return null;
         const mcpServer = readString(attrs, "mcp_server");
@@ -863,7 +1168,11 @@ function extractedSystemText(input: string | null | undefined): string | null {
     const m = message as { role?: unknown; content?: unknown } | null;
     if (typeof m?.content !== "string" || m.content.length === 0) continue;
     if (m.role === "system") parts.push(m.content);
-    else if (m.role === "user" && firstUserReminders === null) {
+    else if (m.role === "user" && isInjectedContextOnly(m.content)) {
+      // Context the agent injected under the user's name. It is part of what
+      // the session pays for, not part of what the human asked.
+      parts.push(m.content);
+    } else if (m.role === "user" && firstUserReminders === null) {
       firstUserReminders = systemReminderText(m.content);
     }
   }
@@ -896,6 +1205,216 @@ function parsedChatMessages(
     return null;
   }
   return wrapper.value;
+}
+
+/**
+ * Longest message still considered for the injected-envelope test. Codex's
+ * plugin and environment listing is a few KB; anything far past that is a human
+ * pasting something, and is treated as their words.
+ */
+const MAX_INJECTED_CONTEXT_CHARS = 64_000;
+
+/**
+ * How much of a reply has to match for it to count as one already emitted. The
+ * producer truncates the span output but not the copy it threads into the next
+ * turn's history, so the two agree only on a prefix.
+ */
+const RECOVERED_REPLY_MATCH_CHARS = 200;
+
+function isSameRecoveredReply(
+  candidate: string,
+  previous: string | null,
+): boolean {
+  if (previous === null) return false;
+  if (candidate === previous) return true;
+  const width = Math.min(
+    RECOVERED_REPLY_MATCH_CHARS,
+    candidate.length,
+    previous.length,
+  );
+  if (width < RECOVERED_REPLY_MATCH_CHARS) return false;
+  return candidate.slice(0, width) === previous.slice(0, width);
+}
+
+/**
+ * Whether a "user" message is entirely context the agent injected, rather than
+ * anything the human typed. Codex opens a session by sending its plugin
+ * inventory and environment description as a user message; rendered as a
+ * prompt, that buries the actual request under a wall of tool names.
+ *
+ * Structural rather than a list of known tag names, so a new envelope does not
+ * silently start showing up as something the user said: strip the top-level
+ * `<tag>…</tag>` blocks and see whether any prose survives. Claude's first user
+ * message is unaffected — it carries `<system-reminder>` blocks AND the real
+ * prompt, so prose remains and it is treated as a prompt, as before.
+ */
+function isInjectedContextOnly(content: string): boolean {
+  const trimmed = content.trim();
+  // An injected envelope always opens with its tag and is never the size of a
+  // pasted file, so both checks fall out of what the shape actually is rather
+  // than being arbitrary limits.
+  if (!trimmed.startsWith("<")) return false;
+  if (trimmed.length > MAX_INJECTED_CONTEXT_CHARS) return false;
+  return strippedOfTagBlocks(trimmed).trim().length === 0;
+}
+
+/** The character classes a tag is spelled with: `<name.with-parts attrs>`. */
+const TAG_NAME_START = /[A-Za-z_]/;
+const TAG_NAME_CHAR = /[\w.-]/;
+const TAG_ATTRIBUTE_LEAD = /\s/;
+
+/** An opening tag: the name it pairs on, and where the block it opens starts. */
+interface OpenTag {
+  name: string;
+  bodyStart: number;
+}
+
+/**
+ * The next `>` at or after a position, remembered between lookups. Every `<`
+ * nested inside an attribute list ends at the same `>` as the tag holding it,
+ * and the scan only ever asks about positions further along, so one remembered
+ * answer serves them all and the stretches actually scanned never overlap.
+ */
+interface TagEndScan {
+  from: number;
+  at: number;
+}
+
+function tagEndAtOrAfter(text: string, scan: TagEndScan, from: number): number {
+  if (from < scan.from || (scan.at !== -1 && from > scan.at)) {
+    scan.from = from;
+    scan.at = text.indexOf(">", from);
+  }
+  return scan.at;
+}
+
+/**
+ * Drop every `<tag>…</tag>` block from a message, in one forward pass.
+ *
+ * The scan walks `<` to `<`. At each one it reads an opening tag and pairs it
+ * with the NEAREST `</name>` starting at or after that tag's body, dropping
+ * everything between and resuming after the close. A `<` that opens nothing,
+ * or opens a tag nothing ever closes, is kept and the scan moves on by one.
+ * Nesting therefore falls out of the pairing rather than being tracked: an
+ * inner block that closes before its parent is swallowed whole, and one that
+ * closes after it is left behind, still visible in what survives.
+ *
+ * Close-tag positions are indexed by name up front and each name's index is
+ * read forward only, so pairing costs nothing per attempt. That is what keeps
+ * the walk linear in the message's length: an opening tag with no close
+ * anywhere is a single lookup, not a scan to the end of the text, and prompts
+ * routinely paste diffs, JSX and heredocs carrying thousands of them.
+ */
+function strippedOfTagBlocks(text: string): string {
+  const closesByName = indexCloseTagPositions(text);
+  const closeCursors = new Map<string, number>();
+  const tagEnds: TagEndScan = { from: 0, at: text.indexOf(">") };
+
+  const kept: string[] = [];
+  let keptFrom = 0;
+  let at = text.indexOf("<");
+  while (at !== -1) {
+    const open = readOpenTag(text, at, tagEnds);
+    const closeAt =
+      open === null
+        ? null
+        : closeTagAtOrAfter({
+            closesByName,
+            closeCursors,
+            name: open.name,
+            from: open.bodyStart,
+          });
+    if (open === null || closeAt === null) {
+      at = text.indexOf("<", at + 1);
+      continue;
+    }
+    kept.push(text.slice(keptFrom, at));
+    keptFrom = closeAt + open.name.length + "</>".length;
+    at = text.indexOf("<", keptFrom);
+  }
+  kept.push(text.slice(keptFrom));
+  return kept.join("");
+}
+
+/**
+ * Where the tag name starting at `from` ends, or `from` itself when no name
+ * starts there. One spelling of the grammar, so an opening tag and the closing
+ * tag it pairs with can never disagree about what a name is.
+ */
+function tagNameEnd(text: string, from: number): number {
+  const first = text[from];
+  if (first === undefined || !TAG_NAME_START.test(first)) return from;
+  let cursor = from + 1;
+  while (cursor < text.length && TAG_NAME_CHAR.test(text[cursor]!)) cursor += 1;
+  return cursor;
+}
+
+/**
+ * Where every `</name>` starts, by name, ascending. A closing tag is exactly
+ * that: no attributes and no spaces, which is why indexing them needs no
+ * forward scan of its own.
+ */
+function indexCloseTagPositions(text: string): Map<string, number[]> {
+  const byName = new Map<string, number[]>();
+  let at = text.indexOf("</");
+  while (at !== -1) {
+    const nameStart = at + "</".length;
+    const nameEnd = tagNameEnd(text, nameStart);
+    if (nameEnd > nameStart && text[nameEnd] === ">") {
+      const name = text.slice(nameStart, nameEnd);
+      const positions = byName.get(name);
+      if (positions) positions.push(at);
+      else byName.set(name, [at]);
+    }
+    at = text.indexOf("</", at + 1);
+  }
+  return byName;
+}
+
+/**
+ * The opening tag at a `<`, if it is one. The name runs to the first character
+ * that cannot be part of one; after it, `>` closes the tag and whitespace opens
+ * an attribute list running to the tag's own `>`. Anything else means this `<`
+ * opens nothing: `<a/>`, `< a>` and `<1a>` are ordinary text.
+ */
+function readOpenTag(
+  text: string,
+  at: number,
+  tagEnds: TagEndScan,
+): OpenTag | null {
+  const nameStart = at + 1;
+  const nameEnd = tagNameEnd(text, nameStart);
+  if (nameEnd === nameStart) return null;
+  const name = text.slice(nameStart, nameEnd);
+  const after = text[nameEnd];
+  if (after === ">") return { name, bodyStart: nameEnd + 1 };
+  if (after === undefined || !TAG_ATTRIBUTE_LEAD.test(after)) return null;
+  const end = tagEndAtOrAfter(text, tagEnds, nameEnd + 1);
+  return end === -1 ? null : { name, bodyStart: end + 1 };
+}
+
+/**
+ * The first `</name>` starting at or after a position. Bodies start further
+ * along with every tag the scan opens, so each name's read head only moves
+ * forward and the whole walk costs one pass over the index.
+ */
+function closeTagAtOrAfter({
+  closesByName,
+  closeCursors,
+  name,
+  from,
+}: {
+  closesByName: Map<string, number[]>;
+  closeCursors: Map<string, number>;
+  name: string;
+  from: number;
+}): number | null {
+  const positions = closesByName.get(name);
+  if (positions === undefined) return null;
+  let cursor = closeCursors.get(name) ?? 0;
+  while (cursor < positions.length && positions[cursor]! < from) cursor += 1;
+  closeCursors.set(name, cursor);
+  return positions[cursor] ?? null;
 }
 
 /**

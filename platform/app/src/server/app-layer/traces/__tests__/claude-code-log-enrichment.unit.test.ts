@@ -3,9 +3,9 @@
  * TraceService) share for Claude Code content enrichment.
  *
  * Claude Code's real `llm_request` spans carry tokens + `request_id` but no
- * message content and no cost; both live in the trace's OTLP log records. This
- * pins the three things the wrapper owns: the gate (a trace with nothing to
- * join never touches the log store), the join, and best-effort degradation.
+ * message content; that lives in the trace's OTLP log records. This pins the
+ * three things the wrapper owns: the gate (a trace with nothing to join never
+ * touches the log store), the join, and best-effort degradation.
  */
 import { describe, expect, it, vi } from "vitest";
 import type { Span } from "~/server/tracer/types";
@@ -101,7 +101,7 @@ function enrich({
 
 describe("enrichCodingAgentSpansFromLogs", () => {
   describe("given spans that carry a request_id and their content logs", () => {
-    it("joins the prompt, the response, and the authoritative cost onto the span", async () => {
+    it("joins the prompt and the response onto the span", async () => {
       const getLogs = vi.fn().mockResolvedValue(LIGHT_LOGS);
 
       const [enriched] = await enrich({
@@ -117,7 +117,6 @@ describe("enrichCodingAgentSpansFromLogs", () => {
         type: "text",
         value: "Here is the summary.",
       });
-      expect(enriched?.metrics?.cost).toBe(0.0421);
     });
 
     it("leaves the span's real token metrics alone", async () => {
@@ -128,6 +127,27 @@ describe("enrichCodingAgentSpansFromLogs", () => {
 
       expect(enriched?.metrics?.prompt_tokens).toBe(120);
       expect(enriched?.metrics?.completion_tokens).toBe(8);
+    });
+
+    // The log's `cost_usd` is the provider's own figure for the same call, and
+    // for a while the read path pasted it over the span. Only this one surface
+    // could see it, so the drawer header (which reads the stored cost) and the
+    // terminal footer (which reads the span) disagreed on the same trace. The
+    // stored cost now stands alone on every surface.
+    /** @scenario "A read never swaps in a cost only that read can see" */
+    it("keeps the span's stored cost even when a log reports one", async () => {
+      const withStoredCost = span({
+        request_id: REQUEST_ID,
+        query_source: REPL,
+      });
+      withStoredCost.metrics = { ...withStoredCost.metrics, cost: 0.193022 };
+
+      const [enriched] = await enrich({
+        spans: [withStoredCost],
+        logRecords: logStore(vi.fn().mockResolvedValue(LIGHT_LOGS)),
+      });
+
+      expect(enriched?.metrics?.cost).toBe(0.193022);
     });
   });
 
@@ -364,7 +384,7 @@ describe("enrichSingleSpanWithClaudeLogContent", () => {
       });
 
       expect(enriched.input).toBeNull();
-      // Exact request_id joins (output / cost) still apply when they match.
+      // The exact request_id join (output) still applies when it matches.
       expect(enriched.output).toBeNull();
     });
   });

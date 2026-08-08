@@ -27,6 +27,7 @@
 
 import {
 	codexHasGatewayBlock,
+	codexHasNotifyBlock,
 	codexHasOtelBlock,
 	codexProfileFileIsLangwatchOwned,
 	defaultCodexConfigPath,
@@ -34,6 +35,7 @@ import {
 	displayCodexConfigPath,
 	removeCodexGatewayBlock,
 	removeCodexGatewayProfileFile,
+	removeCodexNotifyBlock,
 	removeCodexOtelBlock,
 } from "../codex-config-toml";
 import {
@@ -144,6 +146,15 @@ export function scanTelemetryTargets(): TelemetryTarget[] {
 		label: `codex [otel] block (${displayCodexConfigPath()})`,
 		present: codexHasOtelBlock(codexConfig),
 		remove: () => removeCodexOtelBlock(codexConfig),
+	});
+	// The turn-completion hook that recovers codex conversation content. Its own
+	// target rather than a side effect of removing the [otel] block: a user can
+	// have installed one without the other, and removal puts back any notify
+	// program of theirs we moved aside to take the slot.
+	targets.push({
+		label: `codex turn harvest hook (${displayCodexConfigPath()})`,
+		present: codexHasNotifyBlock(codexConfig),
+		remove: () => removeCodexNotifyBlock(codexConfig),
 	});
 	targets.push({
 		label: `codex gateway block (${displayCodexConfigPath()})`,
