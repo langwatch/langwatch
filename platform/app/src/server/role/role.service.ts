@@ -1,5 +1,5 @@
 import {
-  type Prisma,
+  Prisma,
   type PrismaClient,
   RoleBindingScopeType,
 } from "@prisma/client";
@@ -68,10 +68,10 @@ export class RoleService {
     roleId: string;
     organizationId: string;
   }) {
-    const role = await this.repository.findCustomByIdInOrg(
+    const role = await this.repository.findCustomByIdInOrg({
       roleId,
       organizationId,
-    );
+    });
     if (!role) {
       throw new RoleNotFoundError(roleId);
     }
@@ -99,10 +99,10 @@ export class RoleService {
       throw new RoleReservedNameError();
     }
 
-    const existing = await this.repository.findCustomByIdInOrg(
+    const existing = await this.repository.findCustomByIdInOrg({
       roleId,
       organizationId,
-    );
+    });
     if (!existing) {
       throw new RoleNotFoundError(roleId);
     }
@@ -117,12 +117,52 @@ export class RoleService {
       }
     }
 
-    const updated = await this.repository.update(roleId, params);
+    const updated = await this.updateRoleRow(roleId, params);
 
     return {
       ...updated,
       permissions: updated.permissions as string[],
     };
+  }
+
+  /**
+   * The update itself, with the `(organizationId, name)` unique index as the
+   * backstop the pre-check cannot be: two concurrent renames to one name both
+   * pass the read, and the loser must still get the deterministic refusal
+   * rather than a raw constraint failure.
+   */
+  private async updateRoleRow(roleId: string, params: UpdateRoleParams) {
+    try {
+      return await this.repository.update(roleId, params);
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2002"
+      ) {
+        throw new RoleDuplicateNameError();
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * A role is in use when anything still references it: the legacy
+   * `TeamUser.assignedRoleId` rows AND RoleBinding rows. Counting only the
+   * legacy side let a bound role reach the storage layer, where the delete
+   * died as an unnamed constraint failure instead of this refusal.
+   */
+  private async assertRoleNotInUse(role: {
+    id: string;
+    organizationId: string;
+    assignedUsers: unknown[];
+  }) {
+    const bindingCount = await this.repository.countRoleBindings({
+      roleId: role.id,
+      organizationId: role.organizationId,
+    });
+    if (role.assignedUsers.length > 0 || bindingCount > 0) {
+      throw new RoleInUseError(role.assignedUsers.length, bindingCount);
+    }
   }
 
   /**
@@ -136,21 +176,15 @@ export class RoleService {
     roleId: string;
     organizationId: string;
   }) {
-    const role = await this.repository.findByIdWithUsersInOrg(
+    const role = await this.repository.findByIdWithUsersInOrg({
       roleId,
       organizationId,
-    );
+    });
     if (!role || role.kind !== CUSTOM_ROLE_KIND.CUSTOM) {
       throw new RoleNotFoundError(roleId);
     }
 
-    const bindingCount = await this.repository.countRoleBindings({
-      roleId,
-      organizationId,
-    });
-    if (role.assignedUsers.length > 0 || bindingCount > 0) {
-      throw new RoleInUseError(role.assignedUsers.length, bindingCount);
-    }
+    await this.assertRoleNotInUse(role);
 
     await this.repository.delete(roleId);
     return { success: true };
@@ -194,7 +228,7 @@ export class RoleService {
       throw new RoleNotFoundError(roleId);
     }
 
-    const updated = await this.repository.update(roleId, params);
+    const updated = await this.updateRoleRow(roleId, params);
 
     return {
       ...updated,
@@ -209,17 +243,7 @@ export class RoleService {
       throw new RoleNotFoundError(roleId);
     }
 
-    // In-use means referenced anywhere: the legacy TeamUser.assignedRoleId
-    // rows AND RoleBinding rows. Counting only the legacy side let a bound
-    // role reach the storage layer, where the delete died as an unnamed
-    // constraint failure instead of this refusal.
-    const bindingCount = await this.repository.countRoleBindings({
-      roleId,
-      organizationId: role.organizationId,
-    });
-    if (role.assignedUsers.length > 0 || bindingCount > 0) {
-      throw new RoleInUseError(role.assignedUsers.length, bindingCount);
-    }
+    await this.assertRoleNotInUse(role);
 
     await this.repository.delete(roleId);
     return { success: true };

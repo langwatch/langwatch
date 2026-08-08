@@ -12,6 +12,7 @@
  * (or shrink its seats) per scenario.
  */
 import { FREE_PLAN } from "@ee/licensing/constants";
+import type { PlanInfo } from "@ee/licensing/planInfo";
 import { generate } from "@langwatch/ksuid";
 import {
   type Organization,
@@ -35,7 +36,7 @@ export const ENTERPRISE_TEST_PLAN = {
   free: false,
   maxMembers: 100,
   maxMembersLite: 100,
-};
+} satisfies PlanInfo;
 
 export interface ManagementTestOrg {
   organization: Organization;
@@ -111,6 +112,22 @@ export async function seedManagementOrg({
 }
 
 /**
+ * The binding role each organization role carries at ORGANIZATION scope.
+ * `OrganizationUserRole` and `TeamUserRole` are separate enums that happen to
+ * share two names today, so the pairing is written out: a new organization
+ * role then fails to compile here rather than writing a value the
+ * `RoleBinding.role` column rejects at runtime. `EXTERNAL` is absent because
+ * an external member holds no organization-scoped binding at all.
+ */
+const ORGANIZATION_BINDING_ROLE = {
+  [OrganizationUserRole.ADMIN]: TeamUserRole.ADMIN,
+  [OrganizationUserRole.MEMBER]: TeamUserRole.MEMBER,
+} satisfies Record<
+  Exclude<OrganizationUserRole, typeof OrganizationUserRole.EXTERNAL>,
+  TeamUserRole
+>;
+
+/**
  * An additional organization member with the given role, plus (optionally)
  * their own personal org-scoped API key so a test can exercise access AS
  * that member.
@@ -131,7 +148,8 @@ export async function seedOrgMember({
   /**
    * Also write the ORGANIZATION-scoped role binding invite acceptance would
    * have written. Leave false to model a legacy member whose access derives
-   * from TeamUser rows alone.
+   * from TeamUser rows alone. Ignored for `EXTERNAL` members: they never hold
+   * an organization-scoped binding.
    */
   withOrgBinding?: boolean;
 }): Promise<{ userId: string; email: string }> {
@@ -150,7 +168,7 @@ export async function seedOrgMember({
         id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
         organizationId,
         userId: user.id,
-        role: role as unknown as TeamUserRole,
+        role: ORGANIZATION_BINDING_ROLE[role],
         scopeType: RoleBindingScopeType.ORGANIZATION,
         scopeId: organizationId,
       },

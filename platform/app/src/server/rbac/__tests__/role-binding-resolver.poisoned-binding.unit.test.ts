@@ -72,11 +72,13 @@ function makePrisma({
       findMany: vi
         .fn()
         .mockImplementationOnce(async () => bindings)
-        .mockImplementationOnce(async () => []),
+        .mockImplementationOnce(async () => [])
+        // A floor under the two scripted calls: a resolver that reads a third
+        // time must fail on the assertion, not on dereferencing undefined.
+        .mockImplementation(async () => []),
     },
     teamUser: { findFirst: vi.fn().mockResolvedValue(null) },
     customRole: {
-      findUnique: vi.fn().mockImplementation(lookup),
       findFirst: vi.fn().mockImplementation(lookup),
     },
   } as unknown as Parameters<typeof checkRoleBindingPermission>[0]["prisma"];

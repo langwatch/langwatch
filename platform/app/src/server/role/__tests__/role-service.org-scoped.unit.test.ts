@@ -5,6 +5,7 @@
  * organization up front, so these lookups must never return or affect
  * another organization's role.
  */
+import type { PrismaClient } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { RoleService } from "../role.service";
 
@@ -24,7 +25,7 @@ function buildMockPrisma() {
     team: {
       findUnique: vi.fn(),
     },
-  } as any;
+  };
 }
 
 const storedRole = {
@@ -44,10 +45,10 @@ describe("RoleService org-scoped variants", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     prisma = buildMockPrisma();
-    service = new RoleService(prisma);
+    service = new RoleService(prisma as unknown as PrismaClient);
   });
 
-  describe("getRoleForOrg()", () => {
+  describe("when reading a role by organization", () => {
     it("scopes the lookup to the organization and the custom kind", async () => {
       prisma.customRole.findFirst.mockResolvedValue(storedRole);
 
@@ -71,7 +72,7 @@ describe("RoleService org-scoped variants", () => {
     });
   });
 
-  describe("updateRoleForOrg()", () => {
+  describe("when updating a role by organization", () => {
     it("answers not found before writing when the role is foreign", async () => {
       prisma.customRole.findFirst.mockResolvedValue(null);
 
@@ -129,7 +130,7 @@ describe("RoleService org-scoped variants", () => {
     });
   });
 
-  describe("deleteRoleForOrg()", () => {
+  describe("when deleting a role by organization", () => {
     it("answers not found for another organization's role", async () => {
       prisma.customRole.findFirst.mockResolvedValue(null);
 

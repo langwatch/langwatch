@@ -230,7 +230,7 @@ describe("InviteService.createInvites", () => {
     });
   });
 
-  describe("when a team assignment names a team from another organization", () => {
+  describe("when a team assignment names a team outside the organization", () => {
     it("refuses the batch in strict mode with team_not_in_organization", async () => {
       await expect(
         service.createInvites({
@@ -350,6 +350,38 @@ describe("InviteService.createInvites", () => {
     });
   });
 
+  describe("when two invites name the same address in different casing", () => {
+    it("refuses the second as a duplicate", async () => {
+      const result = await service.createInvites({
+        organizationId,
+        invites: [
+          {
+            email: `MixedCase-${ns}@Test.com`,
+            role: OrganizationUserRole.MEMBER,
+            teams: [{ teamId: sharedTeamId, role: TeamUserRole.MEMBER }],
+          },
+        ],
+        validation: "strict",
+      });
+
+      expect(result.invites[0]!.invite.email).toBe(`MixedCase-${ns}@Test.com`);
+
+      await expect(
+        service.createInvites({
+          organizationId,
+          invites: [
+            {
+              email: `mixedcase-${ns}@test.com`,
+              role: OrganizationUserRole.MEMBER,
+              teams: [{ teamId: sharedTeamId, role: TeamUserRole.MEMBER }],
+            },
+          ],
+          validation: "strict",
+        }),
+      ).rejects.toMatchObject({ code: "duplicate_invite" });
+    });
+  });
+
   describe("when the address already belongs to a member", () => {
     it("refuses the batch before writing anything", async () => {
       await expect(
@@ -368,7 +400,7 @@ describe("InviteService.createInvites", () => {
     });
   });
 
-  describe("listInvites", () => {
+  describe("when listing the organization's pending invites", () => {
     it("returns the acceptance link with each pending invite", async () => {
       await service.createInvites({
         organizationId,
@@ -392,7 +424,7 @@ describe("InviteService.createInvites", () => {
     });
   });
 
-  describe("revokeInvite", () => {
+  describe("when revoking an invite by id", () => {
     it("deletes a pending invite and answers not found for an unknown id", async () => {
       const created = await service.createInvites({
         organizationId,

@@ -72,11 +72,15 @@ describe("RoleService.deleteRole, given a role referenced by role bindings", () 
   });
 
   afterAll(async () => {
+    // Setup may have failed before these were assigned; a delete with an
+    // undefined scope is never worth running, and the TypeError would replace
+    // the real setup failure in the report.
+    if (!testOrganization?.id) return;
     await cleanupTestRows(prisma, [
       ["roleBinding", { organizationId: testOrganization.id }],
       ["customRole", { organizationId: testOrganization.id }],
       ["organizationUser", { organizationId: testOrganization.id }],
-      ["user", { id: userId }],
+      ...(userId ? ([["user", { id: userId }]] as const) : []),
       ["organization", { id: testOrganization.id }],
     ]);
   });

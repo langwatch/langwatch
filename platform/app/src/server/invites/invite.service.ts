@@ -13,7 +13,6 @@ import { nanoid } from "nanoid";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { isCustomRole } from "../api/enterprise";
 import { LimitExceededError } from "../license-enforcement/errors";
-import { CUSTOM_ROLE_KIND } from "../role/repositories/role.repository";
 import { RoleService } from "../role/role.service";
 import {
   CustomRoleIdRequiredError,
@@ -218,6 +217,11 @@ export class InviteService {
    * Validates that an invite can be created:
    * - No duplicate invitations across PENDING, WAITING_APPROVAL, and PAYMENT_PENDING statuses
    * - Returns the existing invite if a duplicate is found (null if no duplicate)
+   *
+   * Case-insensitive on the address, like the membership check next door and
+   * like `acceptInvite`'s own comparison: an exact match would let
+   * `Alice@acme.com` and `alice@acme.com` both become pending invites for one
+   * person, who could then accept both.
    */
   async checkDuplicateInvite({
     email,
@@ -228,7 +232,7 @@ export class InviteService {
   }): Promise<OrganizationInvite | null> {
     return this.prisma.organizationInvite.findFirst({
       where: {
-        email,
+        email: { equals: email.trim(), mode: "insensitive" },
         organizationId,
         status: { in: ["PENDING", "WAITING_APPROVAL", "PAYMENT_PENDING"] },
         OR: [{ expiration: { gt: new Date() } }, { expiration: null }],
@@ -440,7 +444,7 @@ export class InviteService {
     invites: Array<{ invite: OrganizationInvite; emailNotSent: boolean }>;
   }> {
     const prisma = this.requireRootClient();
-    const strict = validation === "strict";
+    const isStrict = validation === "strict";
 
     const organization = await prisma.organization.findFirst({
       where: { id: organizationId },
@@ -472,7 +476,7 @@ export class InviteService {
     // Read-only validation outside the transaction.
     const preparedInvites = await Promise.all(
       invites.map((invite) =>
-        this.prepareInvite({ organizationId, invite, strict }),
+        this.prepareInvite({ organizationId, invite, isStrict }),
       ),
     );
     const validInvites = preparedInvites.filter(
@@ -496,31 +500,8 @@ export class InviteService {
     });
 
     // Phase 1: DB operations in a transaction, no side effects.
-    const inviteRecords = await prisma.$transaction(async (tx) => {
-      const txInviteService = InviteService.create(tx, {
-        planProvider: this.planProvider,
-      });
-      return Promise.all(
-        validInvites.map(async (invite) => {
-          const existingInvite = await txInviteService.checkDuplicateInvite({
-            email: invite.email,
-            organizationId: invite.organizationId,
-          });
-
-          if (existingInvite) {
-            if (strict) {
-              throw new DuplicateInviteError(invite.email);
-            }
-            return null;
-          }
-
-          return await txInviteService.createAdminInviteRecord(invite);
-        }),
-      );
-    });
-
-    const createdRecords = inviteRecords.filter(
-      (record): record is NonNullable<typeof record> => record !== null,
+    const createdRecords = await prisma.$transaction((tx) =>
+      this.persistInvites({ tx, invites: validInvites, isStrict }),
     );
 
     // Phase 2: emails outside the transaction, so a provider failure can
@@ -540,6 +521,53 @@ export class InviteService {
   }
 
   /**
+   * Writes the prepared invites inside the caller's transaction, skipping the
+   * ones an existing invite already covers (or refusing them in strict mode).
+   *
+   * One invite at a time: an interactive transaction holds a single
+   * connection, so a parallel fan-out would not run in parallel anyway, and it
+   * would let two invites for the same address in one batch both read "no
+   * duplicate" and both be written.
+   */
+  private async persistInvites({
+    tx,
+    invites,
+    isStrict,
+  }: {
+    tx: Prisma.TransactionClient;
+    invites: CreateAdminInviteInput[];
+    isStrict: boolean;
+  }): Promise<
+    Array<{ invite: OrganizationInvite; organization: Organization }>
+  > {
+    const txInviteService = InviteService.create(tx, {
+      planProvider: this.planProvider,
+    });
+    const records: Array<{
+      invite: OrganizationInvite;
+      organization: Organization;
+    }> = [];
+
+    for (const invite of invites) {
+      const existingInvite = await txInviteService.checkDuplicateInvite({
+        email: invite.email,
+        organizationId: invite.organizationId,
+      });
+
+      if (existingInvite) {
+        if (isStrict) {
+          throw new DuplicateInviteError(invite.email);
+        }
+        continue;
+      }
+
+      records.push(await txInviteService.createAdminInviteRecord(invite));
+    }
+
+    return records;
+  }
+
+  /**
    * Validates and normalizes one requested invite into the record shape
    * `createAdminInviteRecord` persists. Returns null when lenient validation
    * drops the invite entirely (no valid teams, blank email, or an invalid
@@ -548,16 +576,16 @@ export class InviteService {
   private async prepareInvite({
     organizationId,
     invite,
-    strict,
+    isStrict,
   }: {
     organizationId: string;
     invite: CreateInvitesInviteInput;
-    strict: boolean;
+    isStrict: boolean;
   }): Promise<CreateAdminInviteInput | null> {
     const resolvedTeams = await this.resolveInviteTeams({
       organizationId,
       invite,
-      strict,
+      isStrict,
     });
     if (!resolvedTeams) {
       return null;
@@ -588,17 +616,17 @@ export class InviteService {
   private async resolveInviteTeams({
     organizationId,
     invite,
-    strict,
+    isStrict,
   }: {
     organizationId: string;
     invite: CreateInvitesInviteInput;
-    strict: boolean;
+    isStrict: boolean;
   }): Promise<ResolvedInviteTeams | null> {
     if (invite.teams && invite.teams.length > 0) {
       return this.resolveExplicitInviteTeams({
         organizationId,
         teams: invite.teams,
-        strict,
+        isStrict,
       });
     }
     if (invite.teamIds?.trim()) {
@@ -606,7 +634,7 @@ export class InviteService {
         organizationId,
         teamIds: invite.teamIds,
         role: invite.role,
-        strict,
+        isStrict,
       });
     }
     return null;
@@ -621,11 +649,11 @@ export class InviteService {
   private async resolveExplicitInviteTeams({
     organizationId,
     teams,
-    strict,
+    isStrict,
   }: {
     organizationId: string;
     teams: NonNullable<CreateInvitesInviteInput["teams"]>;
-    strict: boolean;
+    isStrict: boolean;
   }): Promise<ResolvedInviteTeams | null> {
     const teamIds = teams.map((team) => team.teamId);
     const validTeamIds = await this.validateTeamIds({
@@ -633,7 +661,7 @@ export class InviteService {
       organizationId,
     });
 
-    if (strict) {
+    if (isStrict) {
       this.assertAllTeamIdsValid({ requestedTeamIds: teamIds, validTeamIds });
     }
     if (validTeamIds.length === 0) {
@@ -643,13 +671,13 @@ export class InviteService {
     const teamAssignments = this.normalizeTeamAssignments({
       teams,
       validTeamIds,
-      strict,
+      isStrict,
     });
 
     const customRolesValid = await this.validateInviteCustomRoles({
       organizationId,
       teamAssignments,
-      strict,
+      isStrict,
     });
     if (!customRolesValid) {
       return null;
@@ -667,12 +695,12 @@ export class InviteService {
     organizationId,
     teamIds,
     role,
-    strict,
+    isStrict,
   }: {
     organizationId: string;
     teamIds: string;
     role: OrganizationUserRole;
-    strict: boolean;
+    isStrict: boolean;
   }): Promise<ResolvedInviteTeams | null> {
     const teamIdArray = teamIds
       .split(",")
@@ -684,7 +712,7 @@ export class InviteService {
       organizationId,
     });
 
-    if (strict) {
+    if (isStrict) {
       this.assertAllTeamIdsValid({
         requestedTeamIds: teamIdArray,
         validTeamIds,
@@ -728,11 +756,11 @@ export class InviteService {
   private normalizeTeamAssignments({
     teams,
     validTeamIds,
-    strict,
+    isStrict,
   }: {
     teams: NonNullable<CreateInvitesInviteInput["teams"]>;
     validTeamIds: string[];
-    strict: boolean;
+    isStrict: boolean;
   }): TeamAssignmentInput[] {
     return teams
       .filter((team) => validTeamIds.includes(team.teamId))
@@ -749,7 +777,7 @@ export class InviteService {
       })
       .filter((team) => {
         if (team.role === TeamUserRole.CUSTOM && !team.customRoleId) {
-          if (strict) {
+          if (isStrict) {
             throw new CustomRoleIdRequiredError();
           }
           return false;
@@ -766,11 +794,11 @@ export class InviteService {
   private async validateInviteCustomRoles({
     organizationId,
     teamAssignments,
-    strict,
+    isStrict,
   }: {
     organizationId: string;
     teamAssignments: TeamAssignmentInput[];
-    strict: boolean;
+    isStrict: boolean;
   }): Promise<boolean> {
     const customRoleIds = teamAssignments
       .filter((team) => team.customRoleId)
@@ -779,20 +807,21 @@ export class InviteService {
       return true;
     }
 
-    const validCustomRoles = await this.prisma.customRole.findMany({
-      where: {
-        id: { in: customRoleIds },
+    // Through the role service, which is where assignability is defined: an
+    // invite validated against a different rule than `applyInvite` applies
+    // would be accepted here and silently dropped on acceptance.
+    const roleService = this.roleService ?? new RoleService(this.prisma);
+    const validCustomRoleIds = new Set(
+      await roleService.filterAssignableRoleIds({
+        roleIds: customRoleIds,
         organizationId,
-        kind: CUSTOM_ROLE_KIND.CUSTOM,
-      },
-      select: { id: true },
-    });
-    const validCustomRoleIds = new Set(validCustomRoles.map((role) => role.id));
+      }),
+    );
     const invalidRoleId = customRoleIds.find(
       (id) => !validCustomRoleIds.has(id),
     );
     if (invalidRoleId) {
-      if (strict) {
+      if (isStrict) {
         throw new CustomRoleNotAssignableError(invalidRoleId);
       }
       return false;
@@ -868,7 +897,7 @@ export class InviteService {
   private requireRootClient(): PrismaClient {
     if (!("$transaction" in this.prisma)) {
       throw new Error(
-        "createInvites requires a root Prisma client, not a transaction client",
+        "This orchestration requires a root Prisma client, not a transaction client",
       );
     }
     return this.prisma;

@@ -71,6 +71,20 @@ describe("PrismaRoleBindingRepository.validateScopeInOrg", () => {
     });
   });
 
+  describe("when the project does not exist", () => {
+    it("refuses with scope_not_in_organization", async () => {
+      projectFindFirst.mockResolvedValue(null);
+
+      await expect(
+        repository.validateScopeInOrg({
+          organizationId: "org_1",
+          scopeType: RoleBindingScopeType.PROJECT,
+          scopeId: "proj_missing",
+        }),
+      ).rejects.toMatchObject({ code: "scope_not_in_organization" });
+    });
+  });
+
   describe("when the scope belongs to the organization", () => {
     it("resolves for a matching team", async () => {
       teamFindFirst.mockResolvedValue({ id: "team_1" });

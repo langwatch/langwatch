@@ -173,8 +173,14 @@ async function collectCustomRolePermissions({
   });
   const allPermissions: string[] = [];
   for (const customRole of customRoles) {
-    if (customRole.permissions) {
-      allPermissions.push(...(customRole.permissions as string[]));
+    // `permissions` is a Json column, so the row decides the shape, not the
+    // type: read it defensively the way every other permission reader does.
+    if (Array.isArray(customRole.permissions)) {
+      allPermissions.push(
+        ...customRole.permissions.filter(
+          (permission): permission is string => typeof permission === "string",
+        ),
+      );
     }
   }
   return allPermissions.length > 0 ? allPermissions : undefined;
@@ -200,7 +206,7 @@ async function assertPlanPermitsRoleChange({
   currentRole: OrganizationUserRole;
   userPermissions: string[] | undefined;
   role: OrganizationUserRole;
-  teamRoleUpdates?: Array<{ role: string }>;
+  teamRoleUpdates?: Array<{ role: string; customRoleId?: string }>;
   planUser?: PlanProviderUser;
 }): Promise<void> {
   const changeType = getRoleChangeType(
@@ -222,8 +228,13 @@ async function assertPlanPermitsRoleChange({
     subscriptionLimits,
   );
 
+  // Both forms of a custom-role assignment count: the `custom:{roleId}` role
+  // string, and a builtin role string carrying a `customRoleId`, which the
+  // cascade persists as a custom binding just the same.
   const hasCustomRoleAssignment = (teamRoleUpdates ?? []).some(
-    (update) => typeof update.role === "string" && isCustomRole(update.role),
+    (update) =>
+      !!update.customRoleId ||
+      (typeof update.role === "string" && isCustomRole(update.role)),
   );
   if (hasCustomRoleAssignment) {
     assertEnterprisePlanType({
@@ -491,11 +502,23 @@ export class OrganizationService {
 
     if (input.traceSharingEnabled === false && wasSharingEnabled) {
       const projectIds = await this.repo.getProjectIds(input.organizationId);
-      await Promise.all(
+      // Settled, not `all`: the setting already reads "sharing off", so a
+      // first rejection that skipped the remaining projects would leave live
+      // share links behind an organization that says it has none. Every
+      // project is attempted, and the caller is told which ones survived.
+      const outcomes = await Promise.allSettled(
         projectIds.map((projectId) =>
           getApp().share.revokeAllTraceShares(projectId),
         ),
       );
+      const unrevoked = projectIds.filter(
+        (_, index) => outcomes[index]?.status === "rejected",
+      );
+      if (unrevoked.length > 0) {
+        throw new Error(
+          `Trace sharing was disabled, but share links survive on ${unrevoked.length} project(s): ${unrevoked.join(", ")}`,
+        );
+      }
     }
   }
 

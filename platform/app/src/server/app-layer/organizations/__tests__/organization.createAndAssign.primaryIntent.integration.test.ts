@@ -111,7 +111,6 @@ describe("PrismaOrganizationRepository.createAndAssign — primaryIntent", () =>
       });
       expect(await readIntent()).toBe("AGENT_GOVERNANCE");
 
-      // a value flips it
       await repository.updateSettings({
         organizationId: orgId,
         name: "Renamed",

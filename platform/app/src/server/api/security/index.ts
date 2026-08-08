@@ -19,6 +19,7 @@ export {
   createOrgApp,
   createProjectApp,
   createServiceApp,
+  familyFromBasePath,
   SecuredApp,
   type SecuredVerbs,
 } from "./secured-app";

@@ -126,6 +126,55 @@ function storageSettingsData(
   };
 }
 
+/**
+ * The organization row of a provisioning run, with a slug race answered as
+ * {@link OrganizationSlugTakenError}.
+ *
+ * Scoped to this one insert because the surrounding transaction also writes
+ * `Team.slug`, `Team.id` and `Organization.id`: a P2002 caught around the
+ * whole transaction would tell a provisioning tool to retry a slug that was
+ * never the problem. Within this insert, `slug` is the only unique column the
+ * caller can collide on twice.
+ */
+async function createProvisionedOrganization(
+  tx: Prisma.TransactionClient,
+  input: CreateForProvisioningInput,
+) {
+  try {
+    return await tx.organization.create({
+      data: {
+        id: input.orgId,
+        name: input.orgName,
+        slug: input.orgSlug,
+        pricingModel: input.pricingModel,
+      },
+    });
+  } catch (error) {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002" &&
+      namesSlug(error.meta?.target)
+    ) {
+      throw new OrganizationSlugTakenError(input.orgSlug);
+    }
+    throw error;
+  }
+}
+
+/**
+ * True when a unique-constraint violation names the slug column. Prisma
+ * reports the target as either the field list or the constraint name, so both
+ * shapes are read.
+ */
+function namesSlug(target: unknown): boolean {
+  if (Array.isArray(target)) {
+    return target.some(
+      (field) => typeof field === "string" && field === "slug",
+    );
+  }
+  return typeof target === "string" && target.includes("slug");
+}
+
 export class PrismaOrganizationRepository implements OrganizationRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
@@ -382,50 +431,34 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
   async createForProvisioning(
     input: CreateForProvisioningInput,
   ): Promise<CreateAndAssignResult> {
-    try {
-      return await this.prisma.$transaction(async (tx) => {
-        // Deterministic answer for the common case; the P2002 catch below
-        // still covers the race where two provisioning runs claim one slug.
-        const taken = await tx.organization.findUnique({
-          where: { slug: input.orgSlug },
-          select: { id: true },
-        });
-        if (taken) {
-          throw new OrganizationSlugTakenError(input.orgSlug);
-        }
-
-        const organization = await tx.organization.create({
-          data: {
-            id: input.orgId,
-            name: input.orgName,
-            slug: input.orgSlug,
-            pricingModel: input.pricingModel,
-          },
-        });
-
-        const team = await tx.team.create({
-          data: {
-            id: input.teamId,
-            name: input.orgName,
-            slug: input.teamSlug,
-            organizationId: organization.id,
-          },
-        });
-
-        return {
-          organization: { id: organization.id, name: organization.name },
-          team: { id: team.id, slug: team.slug, name: team.name },
-        };
+    return await this.prisma.$transaction(async (tx) => {
+      // Deterministic answer for the common case; the catch inside
+      // `createProvisionedOrganization` still covers the race where two
+      // provisioning runs claim one slug.
+      const taken = await tx.organization.findUnique({
+        where: { slug: input.orgSlug },
+        select: { id: true },
       });
-    } catch (error) {
-      if (
-        error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === "P2002"
-      ) {
+      if (taken) {
         throw new OrganizationSlugTakenError(input.orgSlug);
       }
-      throw error;
-    }
+
+      const organization = await createProvisionedOrganization(tx, input);
+
+      const team = await tx.team.create({
+        data: {
+          id: input.teamId,
+          name: input.orgName,
+          slug: input.teamSlug,
+          organizationId: organization.id,
+        },
+      });
+
+      return {
+        organization: { id: organization.id, name: organization.name },
+        team: { id: team.id, slug: team.slug, name: team.name },
+      };
+    });
   }
 
   async listProvisioningSummaries(): Promise<

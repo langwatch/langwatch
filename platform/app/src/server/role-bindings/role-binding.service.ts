@@ -790,19 +790,22 @@ export class RoleBindingService {
     organizationId: string;
     bindingIdsToDelete: string[];
   }): Promise<void> {
+    // De-duplicated first: `findMany` answers one row per id, so a caller who
+    // repeats an id would fail the count comparison with every id present and
+    // be told a binding that exists is missing.
+    const uniqueIds = [...new Set(bindingIdsToDelete)];
     const existing = await tx.roleBinding.findMany({
-      where: { id: { in: bindingIdsToDelete }, organizationId },
+      where: { id: { in: uniqueIds }, organizationId },
       select: { id: true, scopeType: true, scopeId: true },
     });
-    if (existing.length !== bindingIdsToDelete.length) {
+    if (existing.length !== uniqueIds.length) {
       const found = new Set(existing.map((binding) => binding.id));
-      const missing =
-        bindingIdsToDelete.find((id) => !found.has(id)) ?? "unknown";
+      const missing = uniqueIds.find((id) => !found.has(id)) ?? "unknown";
       throw new RoleBindingNotFoundError(missing);
     }
     await assertNoPersonalTeamScope({ client: tx, scopes: existing });
     await tx.roleBinding.deleteMany({
-      where: { id: { in: bindingIdsToDelete }, organizationId },
+      where: { id: { in: uniqueIds }, organizationId },
     });
   }
 
@@ -911,23 +914,26 @@ export class RoleBindingService {
       }
 
       if (bindingIdsToDelete.length > 0) {
+        // De-duplicated for the same reason as the member path: one row per
+        // id comes back, so a repeated id must not read as a missing one.
+        const uniqueBindingIds = [...new Set(bindingIdsToDelete)];
         const existing = await tx.roleBinding.findMany({
           where: {
-            id: { in: bindingIdsToDelete },
+            id: { in: uniqueBindingIds },
             organizationId,
             groupId,
           },
           select: { id: true, scopeType: true, scopeId: true },
         });
-        if (existing.length !== bindingIdsToDelete.length) {
+        if (existing.length !== uniqueBindingIds.length) {
           const found = new Set(existing.map((binding) => binding.id));
           const missing =
-            bindingIdsToDelete.find((id) => !found.has(id)) ?? "unknown";
+            uniqueBindingIds.find((id) => !found.has(id)) ?? "unknown";
           throw new RoleBindingNotFoundError(missing);
         }
         await assertNoPersonalTeamScope({ client: tx, scopes: existing });
         await tx.roleBinding.deleteMany({
-          where: { id: { in: bindingIdsToDelete }, organizationId, groupId },
+          where: { id: { in: uniqueBindingIds }, organizationId, groupId },
         });
       }
 
@@ -975,21 +981,22 @@ export class RoleBindingService {
             message: "Cannot manually add members to a SCIM-managed group",
           });
         }
+        const uniqueMemberIds = [...new Set(memberUserIdsToAdd)];
         const orgMembers = await tx.organizationUser.findMany({
           where: {
             organizationId,
-            userId: { in: memberUserIdsToAdd },
+            userId: { in: uniqueMemberIds },
           },
           select: { userId: true },
         });
-        if (orgMembers.length !== memberUserIdsToAdd.length) {
+        if (orgMembers.length !== uniqueMemberIds.length) {
           const found = new Set(orgMembers.map((member) => member.userId));
           const missing =
-            memberUserIdsToAdd.find((id) => !found.has(id)) ?? "unknown";
+            uniqueMemberIds.find((id) => !found.has(id)) ?? "unknown";
           throw new UserNotInOrganizationError(missing);
         }
         await tx.groupMembership.createMany({
-          data: memberUserIdsToAdd.map((userId) => ({ groupId, userId })),
+          data: uniqueMemberIds.map((userId) => ({ groupId, userId })),
           skipDuplicates: true,
         });
       }

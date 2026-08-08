@@ -11,6 +11,7 @@
  */
 import { auditLog } from "@ee/audit-log/auditLog";
 import type { Context } from "hono";
+import { captureException } from "~/utils/posthogErrorCapture";
 
 /** The audit actor behind an org-authenticated management request. */
 export function managementActor(c: Context): string {
@@ -36,5 +37,7 @@ export function emitManagementAudit({
     organizationId,
     action,
     args,
-  });
+  }).catch((error) =>
+    captureException(error instanceof Error ? error : new Error(String(error))),
+  );
 }

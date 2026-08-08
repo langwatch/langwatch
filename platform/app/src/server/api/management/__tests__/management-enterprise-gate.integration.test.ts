@@ -86,14 +86,22 @@ describe("Feature: Management APIs require an Enterprise plan", () => {
   });
 
   afterAll(async () => {
-    await cleanupTestRows(prisma, [
-      ["roleBinding", { organizationId: seeded.organization.id }],
-      ["apiKey", { organizationId: seeded.organization.id }],
-      ["organizationUser", { organizationId: seeded.organization.id }],
-      ["user", { email: { endsWith: `-${ns}@example.com` } }],
-      ["organization", { id: seeded.organization.id }],
-    ]);
-    await resetApp();
+    try {
+      // Only when setup got far enough to create them: a teardown that
+      // dereferences a missing seed replaces the real setup failure in the
+      // report with a TypeError.
+      if (seeded?.organization?.id) {
+        await cleanupTestRows(prisma, [
+          ["roleBinding", { organizationId: seeded.organization.id }],
+          ["apiKey", { organizationId: seeded.organization.id }],
+          ["organizationUser", { organizationId: seeded.organization.id }],
+          ["user", { email: { endsWith: `-${ns}@example.com` } }],
+          ["organization", { id: seeded.organization.id }],
+        ]);
+      }
+    } finally {
+      await resetApp();
+    }
   });
 
   describe("given a fully-permissioned credential on a plan below Enterprise", () => {

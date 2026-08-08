@@ -11,5 +11,5 @@ import { env } from "~/env.mjs";
  * inside a mocked module disappears with it.
  */
 export function buildInviteAcceptUrl(inviteCode: string): string {
-  return `${env.BASE_HOST}/invite/accept?inviteCode=${inviteCode}`;
+  return `${env.BASE_HOST}/invite/accept?inviteCode=${encodeURIComponent(inviteCode)}`;
 }

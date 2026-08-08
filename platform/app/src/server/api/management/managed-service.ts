@@ -23,6 +23,7 @@ import type { EnterpriseFeature } from "~/server/api/enterprise";
 import type { Permission } from "~/server/api/rbac";
 import {
   type AccessPolicy,
+  familyFromBasePath,
   publicEndpoint,
   registerRoutePolicy,
   requires,
@@ -37,21 +38,6 @@ import { prisma } from "~/server/db";
  */
 export interface ManagementEndpointMeta {
   policy: AccessPolicy;
-}
-
-/**
- * Registry grouping label, derived from the base path exactly like
- * `SecuredApp` derives it so the two builders can never label one family two
- * ways: `/api/role-bindings` becomes `role-bindings`.
- */
-function familyFromBasePath(basePath: string): string {
-  return (
-    basePath
-      .replace(/^\/+/, "")
-      .replace(/^api\//, "")
-      .replace(/\/+$/, "")
-      .replace(/\//g, "-") || "api"
-  );
 }
 
 /**
@@ -86,15 +72,14 @@ export function createManagementService({
 }: {
   name: string;
   /** Spelled out at the call site so the route-coverage gate can read it. */
-  basePath?: string;
+  basePath: string;
   feature: EnterpriseFeature;
 }) {
-  const resolvedBasePath = basePath ?? `/api/${name}`;
-  const family = familyFromBasePath(resolvedBasePath);
+  const family = familyFromBasePath(basePath);
 
   const service = createService({
     name,
-    basePath: resolvedBasePath,
+    basePath,
     auth: createOrgAuthMiddleware({ prisma, refusals: "throw" }),
     onRouteMounted: (route) => {
       if (route.namespaceGuard) {

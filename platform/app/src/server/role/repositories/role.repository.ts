@@ -90,14 +90,25 @@ export class RoleRepository {
    * The org-scoped service paths use this so a foreign role id reads as
    * not found rather than leaking another organization's role.
    */
-  async findCustomByIdInOrg(roleId: string, organizationId: string) {
+  async findCustomByIdInOrg({
+    roleId,
+    organizationId,
+  }: {
+    roleId: string;
+    organizationId: string;
+  }) {
     return this.prisma.customRole.findFirst({
       where: { id: roleId, organizationId, kind: CUSTOM_ROLE_KIND.CUSTOM },
     });
   }
 
-  /** Org-scoped variant of {@link findByIdWithUsers}. */
-  async findByIdWithUsersInOrg(roleId: string, organizationId: string) {
+  async findByIdWithUsersInOrg({
+    roleId,
+    organizationId,
+  }: {
+    roleId: string;
+    organizationId: string;
+  }) {
     return this.prisma.customRole.findFirst({
       where: { id: roleId, organizationId },
       include: { assignedUsers: true },

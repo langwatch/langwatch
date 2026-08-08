@@ -1,4 +1,8 @@
-import { OrganizationUserRole, TeamUserRole } from "@prisma/client";
+import {
+  OrganizationUserRole,
+  type PrismaClient,
+  TeamUserRole,
+} from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PromptTagRepository } from "~/server/prompt-config/repositories/prompt-tag.repository";
@@ -10,8 +14,15 @@ vi.mock("../../tracing", () => ({
   traced: <T>(instance: T) => instance,
 }));
 
-const { mockRevokeAllTraceShares } = vi.hoisted(() => ({
+const { mockRevokeAllTraceShares, mockCheckLimit } = vi.hoisted(() => ({
   mockRevokeAllTraceShares: vi.fn(),
+  mockCheckLimit: vi.fn(),
+}));
+
+// The seat check on re-enabling a membership; the service builds it from the
+// repository's client, which the double answers as a bare object.
+vi.mock("~/server/license-enforcement", () => ({
+  createLicenseEnforcementService: () => ({ checkLimit: mockCheckLimit }),
 }));
 
 // The service reaches the app singleton only for cross-aggregate effects
@@ -24,6 +35,7 @@ vi.mock("../../app", () => ({
 
 describe("OrganizationService", () => {
   const mockRepo: OrganizationRepository = {
+    getClient: vi.fn(),
     getOrganizationIdByTeamId: vi.fn(),
     getUserOrgRole: vi.fn(),
     getUserOrgRoleByTeamId: vi.fn(),
@@ -67,6 +79,11 @@ describe("OrganizationService", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    // The flows that compose raw-client helpers ask the repository for its
+    // client; the double is Prisma-backed as far as they are concerned.
+    vi.mocked(mockRepo.getClient!).mockReturnValue(
+      {} as unknown as PrismaClient,
+    );
     service = new OrganizationService(mockRepo, mockPromptTagRepo);
   });
 
@@ -197,7 +214,7 @@ describe("OrganizationService", () => {
     });
   });
 
-  describe("deleteMember", () => {
+  describe("when removing a member", () => {
     const membership = {
       userId: "user-456",
       organizationId: "org-123",
@@ -270,7 +287,7 @@ describe("OrganizationService", () => {
     });
   });
 
-  describe("setMemberDisabled", () => {
+  describe("when changing a member's disabled state", () => {
     describe("when the acting user disables themselves", () => {
       it("refuses with cannot_disable_self", async () => {
         await expect(
@@ -327,9 +344,73 @@ describe("OrganizationService", () => {
         });
       });
     });
+
+    describe("when re-enabling a member the plan has no seat for", () => {
+      it("refuses with member_seat_limit_reached", async () => {
+        vi.mocked(mockRepo.findMembership).mockResolvedValue({
+          userId: "user-456",
+          organizationId: "org-123",
+          role: OrganizationUserRole.MEMBER,
+          disabledAt: new Date(),
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          user: { id: "user-456", name: null, email: null },
+        });
+        mockCheckLimit.mockResolvedValue({
+          allowed: false,
+          limitType: "members",
+          current: 5,
+          max: 5,
+        });
+
+        await expect(
+          service.setMemberDisabled({
+            organizationId: "org-123",
+            userId: "user-456",
+            disabled: false,
+            actingUser: { id: "admin-789" },
+          }),
+        ).rejects.toMatchObject({ code: "member_seat_limit_reached" });
+
+        expect(mockRepo.setMemberDisabled).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when re-enabling a member the plan has a seat for", () => {
+      it("delegates to the repository", async () => {
+        vi.mocked(mockRepo.findMembership).mockResolvedValue({
+          userId: "user-456",
+          organizationId: "org-123",
+          role: OrganizationUserRole.MEMBER,
+          disabledAt: new Date(),
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          user: { id: "user-456", name: null, email: null },
+        });
+        mockCheckLimit.mockResolvedValue({
+          allowed: true,
+          limitType: "members",
+          current: 1,
+          max: 5,
+        });
+
+        await service.setMemberDisabled({
+          organizationId: "org-123",
+          userId: "user-456",
+          disabled: false,
+          actingUser: { id: "admin-789" },
+        });
+
+        expect(mockRepo.setMemberDisabled).toHaveBeenCalledWith({
+          organizationId: "org-123",
+          userId: "user-456",
+          disabled: false,
+        });
+      });
+    });
   });
 
-  describe("getMember", () => {
+  describe("when reading one member", () => {
     describe("when the user is not a member", () => {
       it("refuses with member_not_found", async () => {
         vi.mocked(mockRepo.findMembership).mockResolvedValue(null);
@@ -380,7 +461,7 @@ describe("OrganizationService", () => {
     });
   });
 
-  describe("updateSettings", () => {
+  describe("when updating organization settings", () => {
     describe("when trace sharing is turned off", () => {
       it("revokes every project's existing trace shares (ADR-057)", async () => {
         vi.mocked(mockRepo.findSettingsById).mockResolvedValue({

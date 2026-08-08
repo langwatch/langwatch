@@ -30,6 +30,12 @@ export class RoleBindingNotFoundError extends NotFoundError {
  * Deterministic 409 on the natural key, so a provisioning tool can treat the
  * conflict as "already done" instead of parsing a database error. The write
  * path maps Prisma's P2002 on the partial unique indexes to this.
+ *
+ * `meta` names the colliding scope on the single-write path only. A batch
+ * write goes through `createMany`, which reports the violation without saying
+ * which row caused it, so batch callers get the conflict without the scope;
+ * those endpoints are all-or-nothing anyway, so there is no per-item decision
+ * for the scope to inform.
  */
 export class RoleBindingAlreadyExistsError extends HandledError {
   declare readonly code: "role_binding_already_exists";

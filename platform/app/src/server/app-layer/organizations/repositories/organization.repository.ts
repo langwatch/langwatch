@@ -454,7 +454,7 @@ export interface OrganizationRepository {
    * Optional on purpose: the null repository has no client, and callers must
    * treat its absence as "this operation is unavailable".
    */
-  getClient?(): PrismaClient;
+  getClient?(): PrismaClient | null;
 
   updateMemberRole(
     input: UpdateMemberRoleInput,
@@ -468,6 +468,10 @@ export interface OrganizationRepository {
 }
 
 export class NullOrganizationRepository implements OrganizationRepository {
+  getClient(): PrismaClient | null {
+    return null;
+  }
+
   async getOrganizationIdByTeamId(_teamId: string): Promise<string | null> {
     return null;
   }
