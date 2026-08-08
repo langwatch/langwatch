@@ -195,30 +195,42 @@ describe("updateLangwatchClaudePlugin", () => {
 
     /** @scenario "A marketplace whose address only looks like ours is never updated from" */
     it("does not update through an address built to look like ours", async () => {
-      seedInstalledPlugin({ version: "0.1.0" });
-      // The listing is real and it publishes something newer, so the only
-      // thing standing between it and the user's agent is the address.
-      seedMarketplace({ publishedVersion: "0.2.0" });
-      writeJson({
-        segments: ["plugins", "known_marketplaces.json"],
-        value: {
-          langwatch: {
-            source: {
-              source: "git",
-              url: "https://github.com/langwatch/agent-plugin.evil",
-            },
-            installLocation: `${home()}/.claude/plugins/marketplaces/langwatch`,
-          },
-        },
-      });
-      const onCheckStart = vi.fn();
-      const { updateLangwatchClaudePlugin } = await loadModule();
+      // Both shapes a real `claude` writes: `marketplace add <owner>/<repo>`
+      // records the shorthand, `marketplace add <url>` records
+      // `{ source: "git", url }`. A lookalike can arrive as either.
+      const lookalikes = [
+        { source: "github", repo: "langwatch/agent-plugin.evil" },
+        { source: "git", url: "https://github.com/langwatch/agent-plugin.evil" },
+      ];
 
-      expect(updateLangwatchClaudePlugin({ onCheckStart }).action).toBe(
-        "unavailable",
-      );
-      expect(commandsRun()).toEqual([]);
-      expect(onCheckStart).not.toHaveBeenCalled();
+      for (const source of lookalikes) {
+        // Each shape starts from an unchecked machine: the pass before it
+        // stamped the check on its way out, which would throttle this one.
+        writeConfig();
+        seedInstalledPlugin({ version: "0.1.0" });
+        // The listing is real and publishes something newer, so the only thing
+        // standing between it and the user's agent is the address.
+        seedMarketplace({ publishedVersion: "0.2.0" });
+        writeJson({
+          segments: ["plugins", "known_marketplaces.json"],
+          value: {
+            langwatch: {
+              source,
+              installLocation: `${home()}/.claude/plugins/marketplaces/langwatch`,
+            },
+          },
+        });
+        const onCheckStart = vi.fn();
+        const { updateLangwatchClaudePlugin } = await loadModule();
+
+        expect(
+          updateLangwatchClaudePlugin({ onCheckStart }).action,
+          `${JSON.stringify(source)} must not be updated from`,
+        ).toBe("unavailable");
+        expect(commandsRun()).toEqual([]);
+        expect(onCheckStart).not.toHaveBeenCalled();
+        spawnSyncMock.mockClear();
+      }
     });
 
     /** @scenario "A machine that cannot remember the check does not repeat it every launch" */
