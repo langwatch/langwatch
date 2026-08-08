@@ -352,6 +352,16 @@ evicted key refetches and enforces against the new totals. The 60s
 bounds staleness when a change event is missed or arrives while the gateway is
 disconnected.
 
+**Routing policies and cache rules take the same route.** A policy edit or
+delete (`ROUTING_POLICY_UPDATED` / `ROUTING_POLICY_DELETED`) and any cache-rule
+mutation (`CACHE_RULE_CREATED` / `CACHE_RULE_UPDATED` / `CACHE_RULE_DELETED`)
+also evict every bundle of the polled organization. Both are folded into the
+bundle by the materialiser and neither leaves an id on it to join back on, so
+the organization is the finest key available, the same position a budget event
+without a `project_id` is in. Deleting a policy also releases the keys that
+pointed at it, in the same transaction: the pointer is cleared and the key's
+routing mode moves off `POLICY`, which cannot exist without one.
+
 **The one read a bundle cannot carry.** A per-end-user budget is a template:
 one budget row governs a separate allowance for every end user it has seen, a
 fan-out the bundle cannot bake without the control plane enumerating every

@@ -348,6 +348,68 @@ func TestApplyChange_VkDisableAndEnableEvictTheKey(t *testing.T) {
 	}
 }
 
+/** @scenario "an edited routing policy evicts the organization's cached bundles" */
+func TestApplyChange_RoutingPolicyUpdatedEvictsOrganization(t *testing.T) {
+	resolver := &fakeResolver{}
+	svc, _ := newService(t, Options{Resolver: resolver, ConfigFetcher: resolver})
+
+	matchingKey := hashKey("vk-lw-policy-matching")
+	otherKey := hashKey("vk-lw-policy-other")
+	svc.storeL1(matchingKey, &domain.Bundle{OrganizationID: "org-1"})
+	svc.storeL1(otherKey, &domain.Bundle{OrganizationID: "org-2"})
+
+	svc.applyChange("org-1", CacheChange{Kind: ChangeKindRoutingPolicyUpdated})
+
+	_, isMatchingPresent := svc.l1.Get(matchingKey)
+	_, isOtherPresent := svc.l1.Get(otherKey)
+	assert.False(t, isMatchingPresent, "a routing-policy edit must evict the polled organization")
+	assert.True(t, isOtherPresent, "other organizations must remain cached")
+}
+
+/** @scenario "a deleted routing policy evicts the organization's cached bundles" */
+func TestApplyChange_RoutingPolicyDeletedEvictsOrganization(t *testing.T) {
+	resolver := &fakeResolver{}
+	svc, _ := newService(t, Options{Resolver: resolver, ConfigFetcher: resolver})
+
+	matchingKey := hashKey("vk-lw-policy-deleted-matching")
+	otherKey := hashKey("vk-lw-policy-deleted-other")
+	svc.storeL1(matchingKey, &domain.Bundle{OrganizationID: "org-1"})
+	svc.storeL1(otherKey, &domain.Bundle{OrganizationID: "org-2"})
+
+	svc.applyChange("org-1", CacheChange{Kind: ChangeKindRoutingPolicyDeleted})
+
+	_, isMatchingPresent := svc.l1.Get(matchingKey)
+	_, isOtherPresent := svc.l1.Get(otherKey)
+	assert.False(t, isMatchingPresent, "a routing-policy deletion must evict the polled organization")
+	assert.True(t, isOtherPresent, "other organizations must remain cached")
+}
+
+/** @scenario "a cache-rule mutation evicts the organization's cached bundles" */
+func TestApplyChange_CacheRuleMutationEvictsOrganization(t *testing.T) {
+	resolver := &fakeResolver{}
+	svc, _ := newService(t, Options{Resolver: resolver, ConfigFetcher: resolver})
+
+	for _, kind := range []string{
+		ChangeKindCacheRuleCreated,
+		ChangeKindCacheRuleUpdated,
+		ChangeKindCacheRuleDeleted,
+	} {
+		t.Run(kind, func(t *testing.T) {
+			matchingKey := hashKey("vk-lw-cache-rule-matching-" + kind)
+			otherKey := hashKey("vk-lw-cache-rule-other-" + kind)
+			svc.storeL1(matchingKey, &domain.Bundle{OrganizationID: "org-1"})
+			svc.storeL1(otherKey, &domain.Bundle{OrganizationID: "org-2"})
+
+			svc.applyChange("org-1", CacheChange{Kind: kind})
+
+			_, isMatchingPresent := svc.l1.Get(matchingKey)
+			_, isOtherPresent := svc.l1.Get(otherKey)
+			assert.False(t, isMatchingPresent, "a cache-rule mutation must evict the polled organization")
+			assert.True(t, isOtherPresent, "other organizations must remain cached")
+		})
+	}
+}
+
 // --- Background refresh classification --------------------------------------
 
 func TestRefreshBackground_TransportFailure_BumpsSoft(t *testing.T) {
@@ -754,4 +816,24 @@ func TestResolve_ConfigRefresh_EvictedMidFetch_NotResurrected(t *testing.T) {
 	if n := fetcher.fetches.Load(); n != 1 {
 		t.Fatalf("expected exactly one config fetch, got %d", n)
 	}
+}
+
+// @scenario "A change kind this build does not act on is reported, not dropped"
+func TestApplyChange_UnhandledKindIsReported(t *testing.T) {
+	resolver := &fakeResolver{}
+	svc, logs := newService(t, Options{Resolver: resolver, ConfigFetcher: resolver})
+
+	key := hashKey("vk-lw-unhandled-kind")
+	svc.storeL1(key, &domain.Bundle{OrganizationID: "org-1"})
+
+	svc.applyChange("org-1", CacheChange{Kind: "SOMETHING_THIS_BUILD_PREDATES"})
+
+	// Not acting on it is fine and often right. Not saying so is how the
+	// CACHE_RULE_* kinds stayed unhandled from the day they shipped.
+	_, isPresent := svc.l1.Get(key)
+	assert.True(t, isPresent, "an unknown kind must not evict anything")
+
+	warnings := logs.FilterMessage("auth_cache_change_unhandled").All()
+	assert.Len(t, warnings, 1, "an unhandled kind must be reported once")
+	assert.Equal(t, "SOMETHING_THIS_BUILD_PREDATES", warnings[0].ContextMap()["kind"])
 }

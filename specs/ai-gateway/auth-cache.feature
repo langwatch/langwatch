@@ -236,6 +236,75 @@ Feature: Gateway auth cache — hot path is zero RTT after first hit
       And the gateway immediately starts the next poll
       And the gateway never sleeps; the long-poll is the only wait
 
+  Rule: A routing-policy or cache-rule edit propagates through the change feed
+    Routing policies and cache rules are org-scoped artifacts that the
+    materialiser folds into every bundle it builds, and a bundle carries no
+    id to join either of them back on. So the organization is the finest
+    invalidation key available, and both kinds evict every cached bundle in
+    the polled organization, exactly like a budget change that carries no
+    project. Without this the only thing that reaches a running gateway is
+    the config TTL, which is a safety net rather than a propagation path.
+
+    @unit
+    Scenario: an edited routing policy evicts the organization's cached bundles
+      Given bundles for two organizations are cached
+      When the change feed for the first organization reports a routing-policy edit
+      Then every cached bundle belonging to that organization is evicted
+      And the other organization's bundles stay cached
+      And the next request for an evicted key re-resolves against the fresh policy
+
+    @unit
+    Scenario: a deleted routing policy evicts the organization's cached bundles
+      Given bundles for two organizations are cached
+      When the change feed for the first organization reports a routing-policy deletion
+      Then every cached bundle belonging to that organization is evicted
+      And the other organization's bundles stay cached
+
+    @unit
+    Scenario: a cache-rule mutation evicts the organization's cached bundles
+      Given bundles for two organizations are cached
+      When the change feed for the first organization reports a cache rule created, updated, or deleted
+      Then every cached bundle belonging to that organization is evicted
+      And the other organization's bundles stay cached
+
+    # The control plane may emit a kind this build predates, and doing
+    # nothing about it is usually right. Doing nothing SILENTLY is not:
+    # that is how the cache-rule kinds above stayed unhandled from the day
+    # the control plane started emitting them.
+    @unit @regression
+    Scenario: A change kind this build does not act on is reported, not dropped
+      Given a bundle is cached
+      When the change feed reports a kind this gateway has no case for
+      Then nothing is evicted
+      And the gateway reports the unhandled kind by name
+
+    # The control-plane half of the same path: an edit that never reaches
+    # the feed can never be polled off it.
+    @integration
+    Scenario: editing a routing policy appends one change event and bumps its keys
+      Given a routing policy that two virtual keys reference and one does not
+      When an admin edits the policy
+      Then exactly one ROUTING_POLICY_UPDATED event is appended for the organization
+      And the revision of both referencing keys is bumped
+      And the revision of the unrelated key is unchanged
+      And an edit that is rejected writes neither the policy change nor the event
+
+    @integration
+    Scenario: deleting a routing policy releases the keys that pointed at it
+      Given a routing policy that a virtual key references in policy routing mode
+      When an admin deletes the policy
+      Then exactly one ROUTING_POLICY_DELETED event is appended for the organization
+      And the key no longer points at the deleted policy
+      And the key's routing mode moves off policy routing, so it is never left naming a policy that is gone
+      And the key's revision is bumped
+
+    @integration
+    Scenario: creating a policy or swapping the default emits nothing
+      Given an organization with an existing default routing policy
+      When an admin creates another policy, then makes it the default
+      Then no change event is appended
+      And already-issued keys keep the policy they were issued against
+
   Rule: L2 Redis cache warms new gateway nodes
 
     @integration @unimplemented
