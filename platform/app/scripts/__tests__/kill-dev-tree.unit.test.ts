@@ -120,11 +120,28 @@ function liveMembers(pgid: number): number {
  * whatever else the machine may have raced them to it: the script takes down
  * the group behind the listener, so proceeding on "something is listening"
  * would be enough to take down a stranger.
+ *
+ * A file taking arguments rather than a `node -e` string, so no JavaScript is
+ * ever built by interpolation.
  */
-const lane = (port: number, ready: string) =>
-  `require("net").createServer().listen(${port},"127.0.0.1",()=>{require("fs").writeFileSync(${JSON.stringify(
-    ready,
-  )},String(process.pid))});setInterval(()=>{},1e9)`;
+function writeLane(): string {
+  const file = path.join(scratch, "lane.js");
+  writeFileSync(
+    file,
+    [
+      'const net = require("node:net");',
+      'const fs = require("node:fs");',
+      "const [, , port, ready] = process.argv;",
+      'net.createServer().listen(Number(port), "127.0.0.1", () => {',
+      "  fs.writeFileSync(ready, String(process.pid));",
+      "});",
+      "setInterval(() => {}, 1e9);",
+      "",
+    ].join("\n"),
+    "utf8",
+  );
+  return file;
+}
 
 const readyFile = () => path.join(scratch, "lane-is-up");
 
@@ -184,7 +201,7 @@ function writeRestartingStack(port: number): string {
       "#!/bin/bash",
       "trap '' TERM",
       "while true; do",
-      `  ${process.execPath} -e '${lane(port, readyFile())}' &`,
+      `  ${process.execPath} ${writeLane()} ${port} ${readyFile()} &`,
       "  wait $! 2>/dev/null",
       "done",
       "",
@@ -212,8 +229,9 @@ function startStranger(port: number): number {
   const asAnother = path.join(scratch, "dev-listener");
   symlinkSync(process.execPath, asAnother);
   return startInOwnGroup(asAnother, [
-    "-e",
-    lane(port, path.join(scratch, "stranger-is-up")),
+    writeLane(),
+    String(port),
+    path.join(scratch, "stranger-is-up"),
   ]);
 }
 
@@ -311,7 +329,7 @@ describe("clearing the dev ports", () => {
           caller,
           [
             "#!/bin/bash",
-            `${process.execPath} -e '${lane(port, readyFile())}' &`,
+            `${process.execPath} ${writeLane()} ${port} ${readyFile()} &`,
             "sleep 2",
             `bash ${SCRIPT} ${port} > ${path.join(scratch, "out")} 2>&1`,
             "sleep 3",
