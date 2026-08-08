@@ -65,6 +65,28 @@ describe("breaking-change scope guard", () => {
       );
       assert.equal(carriesBreakingChange(["feat(api): add a v2 endpoint"]), false);
     });
+
+    it("ignores a release-please changelog that reports past breaks", () => {
+      // A release PR restates every breaking change it ships. Reading it as a
+      // marker would fail release-please's own pull requests, which touch the
+      // manifest, the changelogs and the charts at once.
+      assert.equal(
+        carriesBreakingChange([
+          [
+            "chore(main): release langwatch 4.0.0",
+            "",
+            "### ⚠ BREAKING CHANGES",
+            "",
+            "* **evaluators:** evaluations referencing a legacy/ragas_* type stop working.",
+            "",
+            "### Features",
+            "",
+            "* **model-providers:** test a credential you have already saved",
+          ].join("\n"),
+        ]),
+        false,
+      );
+    });
   });
 
   describe("when mapping changed files onto release components", () => {

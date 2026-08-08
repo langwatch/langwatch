@@ -44,6 +44,11 @@ of its commits carries a breaking marker and the changed files span more than on
 component. If the break really does apply to all of them, add the
 **`multi-component-major`** label and the check passes.
 
+It reads the title and the commits because a squash merge builds the commit from
+exactly those two. It deliberately does not read the PR description, which never
+reaches `main` on its own and which a release PR fills with a changelog restating
+every break it ships.
+
 ## Pinning a version release-please got wrong
 
 `Release-As:` beats every other signal. release-please reads it per commit, so the
