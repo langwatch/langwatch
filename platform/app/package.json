@@ -73,8 +73,8 @@
   },
   "dependencies": {
     "@ag-ui/core": "~0.0.57",
-    "@ai-sdk/openai": "^3.0.79",
-    "@ai-sdk/openai-compatible": "^2.0.55",
+    "@ai-sdk/openai": "^4.0.24",
+    "@ai-sdk/openai-compatible": "^3.0.17",
     "@aws-sdk/client-cloudwatch-logs": "^3.1080.0",
     "@aws-sdk/client-lambda": "^3.1080.0",
     "@aws-sdk/client-s3": "^3.1080.0",
@@ -134,7 +134,7 @@
     "@trpc/client": "^10.45.4",
     "@trpc/react-query": "^10.45.4",
     "@trpc/server": "^10.45.4",
-    "ai": "^6.0.217",
+    "ai": "^7.0.42",
     "bcrypt": "^6.0.0",
     "better-auth": "^1.6.23",
     "chalk": "^5.6.2",
@@ -198,7 +198,7 @@
     "zustand": "^4.5.7"
   },
   "devDependencies": {
-    "@ai-sdk/react": "^3.0.219",
+    "@ai-sdk/react": "^4.0.45",
     "@biomejs/biome": "2.5.1",
     "@chakra-ui/charts": "^3.36.0",
     "@copilotkit/react-core": "~1.8.14",
