@@ -32,11 +32,12 @@ export interface UseAnnotationsByTraceIdsResult {
 /**
  * Annotations for a set of traces.
  *
- * Reads the comments about the traces themselves by default: the surfaces that
- * ask about a page of traces (the annotations list, a dataset's columns) answer
- * per trace, so a reviewer who marked six spans of one trace must not change
- * what they say. A surface that shows a trace's own comments passes
- * `anchor: "all"` and gets the anchored ones too.
+ * Reads the comments about the traces themselves by default: a surface that
+ * answers per trace across a page of them, the annotations list say, must not
+ * change what it says because a reviewer marked six spans of one trace. A
+ * surface that carries everything said about a trace, its own comments or a
+ * dataset's annotations column, passes `anchor: "all"` and gets the anchored
+ * ones too.
  */
 export function useAnnotationsByTraceIds({
   projectId,

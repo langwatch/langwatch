@@ -323,6 +323,91 @@ describe("mapTraceToDatasetEntry span expansion", () => {
   });
 });
 
+describe("mapTraceToDatasetEntry annotations ai_readable column", () => {
+  // See specs/datasets/dataset-annotations-mapping.feature.
+  const reviewedTrace = {
+    trace_id: "trace-1",
+    timestamps: { started_at: Date.now() },
+    spans: [{ span_id: "span-1", name: "web_search", type: "span" }],
+    annotations: [
+      {
+        id: "annotation-1",
+        traceId: "trace-1",
+        comment: "too terse",
+        isThumbsUp: false,
+        user: { name: "Ada" },
+        email: null,
+        scoreOptions: { "score-abc123": { value: "mild", reason: null } },
+        expectedOutput: null,
+        anchorKind: "field",
+        anchorId: "span-1",
+        anchorPath: "output",
+      },
+      {
+        id: "annotation-2",
+        traceId: "trace-1",
+        comment: "reads well",
+        isThumbsUp: true,
+        user: null,
+        email: "grace@example.com",
+        scoreOptions: null,
+        expectedOutput: null,
+        anchorKind: null,
+        anchorId: null,
+        anchorPath: null,
+      },
+    ],
+  };
+  const annotationsMapping = {
+    annotations: { source: "annotations", key: "ai_readable", subkey: "" },
+  };
+  const projectScores = [{ id: "score-abc123", name: "goodness" }] as any;
+
+  describe("when no expansion is enabled", () => {
+    /** @scenario "Every annotation on the trace gets its own readable line" */
+    it("holds one readable line per annotation", () => {
+      const rows = mapTraceToDatasetEntry(
+        reviewedTrace as any,
+        annotationsMapping,
+        new Set() as any,
+        projectScores,
+      );
+
+      expect(rows).toHaveLength(1);
+      expect(JSON.parse(rows[0]!.annotations as string)).toEqual([
+        "Ada (on Span web_search · Output): too terse [thumbs down] [goodness: mild]",
+        "grace@example.com: reads well [thumbs up]",
+      ]);
+    });
+  });
+
+  describe("when the one-row-per-annotation expansion is enabled", () => {
+    it("gives each annotation its own row holding its own line", () => {
+      const rows = mapTraceToDatasetEntry(
+        reviewedTrace as any,
+        annotationsMapping,
+        new Set(["annotations.id"]) as any,
+        projectScores,
+      );
+
+      expect(rows.map((row) => row.annotations)).toEqual([
+        "Ada (on Span web_search · Output): too terse [thumbs down] [goodness: mild]",
+        "grace@example.com: reads well [thumbs up]",
+      ]);
+    });
+  });
+});
+
+describe("TRACE_MAPPINGS.annotations.keys", () => {
+  it("offers ai_readable alongside the single-field annotation keys", () => {
+    const keys = TRACE_MAPPINGS.annotations.keys([]).map((key) => key.key);
+
+    expect(keys).toContain("ai_readable");
+    expect(keys).toContain("comment");
+    expect(keys).toContain("expected_output");
+  });
+});
+
 describe("TRACE_MAPPINGS.metadata.mapping", () => {
   const mockTrace = {
     trace_id: "trace-1",

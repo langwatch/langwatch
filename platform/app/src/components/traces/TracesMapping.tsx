@@ -35,9 +35,18 @@ const THREAD_SUB_FIELD_OPTIONS = Object.keys(TRACE_MAPPINGS)
   .filter((key) => key !== "threads" && key !== "threads_until_current")
   .map((key) => ({ label: key, value: key }));
 
+/**
+ * What a dataset column of a given name is filled from by default: a source on
+ * its own, or a source and one of its fields when the source alone would leave
+ * the column empty.
+ */
+export type DatasetInferredMapping =
+  | keyof typeof TRACE_MAPPINGS
+  | { source: keyof typeof TRACE_MAPPINGS; key: string };
+
 export const DATASET_INFERRED_MAPPINGS_BY_NAME: Record<
   string,
-  keyof typeof TRACE_MAPPINGS
+  DatasetInferredMapping
 > = {
   trace_id: "trace_id",
   timestamp: "timestamp",
@@ -52,11 +61,34 @@ export const DATASET_INFERRED_MAPPINGS_BY_NAME: Record<
   total_cost: "metrics.total_cost",
   contexts: "contexts.string_list",
   spans: "spans",
+  annotations: { source: "annotations", key: "ai_readable" },
 };
+
+/** The source half of an inferred mapping, which is all the workflow edges match on. */
+const inferredMappingSource = (
+  inferred: DatasetInferredMapping,
+): keyof typeof TRACE_MAPPINGS =>
+  typeof inferred === "string" ? inferred : inferred.source;
+
+/** How a column of this name is filled before anyone touches the mapping. */
+const inferredMappingFor = (
+  columnName: string,
+): { source: string; key?: string; selectedFields: string[] } => {
+  const inferred = DATASET_INFERRED_MAPPINGS_BY_NAME[columnName];
+  if (!inferred) {
+    return { source: "", selectedFields: [] };
+  }
+  if (typeof inferred === "string") {
+    return { source: inferred, selectedFields: [] };
+  }
+  return { source: inferred.source, key: inferred.key, selectedFields: [] };
+};
+
 const DATASET_INFERRED_MAPPINGS_BY_NAME_TRANSPOSED = Object.entries(
   DATASET_INFERRED_MAPPINGS_BY_NAME,
 ).reduce(
-  (acc, [key, value]) => {
+  (acc, [key, inferred]) => {
+    const value = inferredMappingSource(inferred);
     if (acc[value]) {
       acc[value]!.push(key);
     } else {
@@ -172,10 +204,15 @@ export const TracesMapping = ({
 }) => {
   const { project } = useOrganizationTeamProject();
 
+  // A dataset row carries what the reviewers said about the trace, and a
+  // reviewer who commented on one span said it about that trace too. Reading
+  // only the trace-level comments would drop the most specific reviews from
+  // both the mapping and its preview.
   const annotationScores = useAnnotationsByTraceIds({
     projectId: project?.id ?? "",
     traceIds: traces.map((trace) => trace.trace_id),
     enabled: !!project,
+    anchor: "all",
   });
   const getAnnotationScoreOptions = api.annotationScore.getAllActive.useQuery(
     { projectId: project?.id ?? "" },
@@ -385,11 +422,8 @@ export const TracesMapping = ({
           name,
           // Prefer existing mapping from traceMappingState, then currentMapping, then default
           traceMappingState.mapping[name] ??
-            (currentMapping.mapping[name] as any) ?? {
-              source: (DATASET_INFERRED_MAPPINGS_BY_NAME[name] ??
-                "") as keyof typeof TRACE_MAPPINGS,
-              selectedFields: [],
-            },
+            (currentMapping.mapping[name] as any) ??
+            inferredMappingFor(name),
         ]) ?? [],
       ),
       expansions:
@@ -442,8 +476,9 @@ export const TracesMapping = ({
             return;
           }
 
+          const inferred = DATASET_INFERRED_MAPPINGS_BY_NAME[targetField];
           const mappingOptions = [
-            DATASET_INFERRED_MAPPINGS_BY_NAME[targetField]!,
+            ...(inferred ? [inferredMappingSource(inferred)] : []),
             ...(DATASET_INFERRED_MAPPINGS_BY_NAME_TRANSPOSED[targetField] ??
               []),
           ].filter((x) => x);

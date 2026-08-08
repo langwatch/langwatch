@@ -1,6 +1,10 @@
 import type { Annotation, AnnotationScore } from "@prisma/client";
 import { z } from "zod";
 import { getSpanNameOrModel } from "../../utils/trace";
+import {
+  type AnnotationAnchorRef,
+  describeAnnotationAnchor,
+} from "../annotations/annotationAnchorLabel";
 import { datasetSpanSchema } from "../datasets/types";
 import {
   type Trace as BaseTrace,
@@ -22,6 +26,17 @@ type TraceWithAnnotations = BaseTrace & {
   annotations?: (Annotation & {
     user?: { name?: string | null } | null;
   })[];
+};
+
+/** One reviewer's annotation as this file reads it. */
+export type TraceAnnotation = NonNullable<
+  TraceWithAnnotations["annotations"]
+>[number];
+
+/** One scoreOptions entry, as the annotation router writes it. */
+type AnnotationScoreOption = {
+  value?: string | string[] | null;
+  reason?: string | null;
 };
 
 /**
@@ -153,6 +168,143 @@ function filterThreadTraces(
   }
 
   return threadTraces;
+}
+
+/** Collapses any run of whitespace, so a value written over several lines still reads as one. */
+const oneLine = (text: string): string => text.replace(/\s+/g, " ").trim();
+
+/** The name each span answers to, by its id, for naming the part a comment is about. */
+const buildSpanNameIndex = (
+  spans: Span[],
+): Map<string, string | null | undefined> =>
+  new Map(spans.map((span) => [span.span_id, getSpanNameOrModel(span)]));
+
+/** A score's value as it reads: a multi-select answers with several, joined. */
+const readableScoreValue = (value: AnnotationScoreOption["value"]): string => {
+  if (Array.isArray(value)) {
+    return value
+      .map((entry) => oneLine(String(entry)))
+      .filter(Boolean)
+      .join(", ");
+  }
+  if (value === null || value === undefined) return "";
+  return oneLine(String(value));
+};
+
+/**
+ * The scores a reviewer answered, each as `[name: value]`, or
+ * `[name: value, reason: why]` when they said why. A score they left blank is
+ * not one of their answers, so it does not read at all.
+ */
+const readableScoreParts = ({
+  scoreOptions,
+  projectScores,
+}: {
+  scoreOptions: TraceAnnotation["scoreOptions"];
+  projectScores?: AnnotationScore[];
+}): string[] => {
+  if (
+    typeof scoreOptions !== "object" ||
+    scoreOptions === null ||
+    Array.isArray(scoreOptions)
+  ) {
+    return [];
+  }
+
+  const parts: string[] = [];
+  for (const [scoreId, score] of Object.entries(
+    scoreOptions as Record<string, AnnotationScoreOption | null>,
+  )) {
+    const value = readableScoreValue(score?.value);
+    if (!value) continue;
+    const name =
+      projectScores?.find((option) => option.id === scoreId)?.name ?? scoreId;
+    const reason = oneLine(score?.reason ?? "");
+    parts.push(
+      reason ? `[${name}: ${value}, reason: ${reason}]` : `[${name}: ${value}]`,
+    );
+  }
+  return parts;
+};
+
+/**
+ * Who left the comment and what it is about: `Ada`, or
+ * `Ada (on Span web_search · Output)` when they left it on a part of the trace.
+ * Someone with no account name reads by their email, and by "Unknown" when we
+ * have neither.
+ */
+const readableAnnotationHead = ({
+  annotation,
+  traceId,
+  spanNamesById,
+}: {
+  annotation: TraceAnnotation;
+  traceId: string;
+  spanNamesById?: Map<string, string | null | undefined>;
+}): string => {
+  const anchor: AnnotationAnchorRef = {
+    anchorKind: annotation.anchorKind as AnnotationAnchorRef["anchorKind"],
+    anchorId: annotation.anchorId,
+    anchorPath: annotation.anchorPath,
+  };
+  const part = describeAnnotationAnchor({
+    anchor,
+    traceId,
+    spanName: annotation.anchorId
+      ? spanNamesById?.get(annotation.anchorId)
+      : undefined,
+  });
+
+  const author =
+    oneLine(annotation.user?.name ?? annotation.email ?? "") || "Unknown";
+  return part ? `${author} (on ${part})` : author;
+};
+
+/**
+ * One reviewer's annotation as a single line anyone can read, a person or an
+ * LLM judge, without knowing how we store annotations:
+ *
+ *   <author>[ (on <part of the trace>)][: <comment>][ [thumbs up|thumbs down]]
+ *   [ [<score name>: <value>[, reason: <reason>]]]...[ [suggested output: <text>]]
+ *
+ * Each part after the author appears only when the reviewer left it, so a bare
+ * comment reads `Ada: too terse` and a bare rating reads `Ada [thumbs down]`.
+ * A reviewer with no account name reads by their email, and by "Unknown" when
+ * we have neither. A score with no value is left out; its name is the one the
+ * project gave it, never its id.
+ */
+export function buildReadableAnnotation({
+  annotation,
+  traceId,
+  spanNamesById,
+  scoreOptions,
+}: {
+  annotation: TraceAnnotation;
+  traceId: string;
+  spanNamesById?: Map<string, string | null | undefined>;
+  scoreOptions?: AnnotationScore[];
+}): string {
+  const head = readableAnnotationHead({ annotation, traceId, spanNamesById });
+  const comment = oneLine(annotation.comment ?? "");
+  const parts: string[] = [comment ? `${head}: ${comment}` : head];
+
+  if (typeof annotation.isThumbsUp === "boolean") {
+    parts.push(`[${annotation.isThumbsUp ? "thumbs up" : "thumbs down"}]`);
+  }
+
+  parts.push(
+    ...readableScoreParts({
+      scoreOptions: annotation.scoreOptions,
+      projectScores: scoreOptions,
+    }),
+  );
+
+  const expectedOutput = oneLine(annotation.expectedOutput ?? "");
+  if (expectedOutput) {
+    parts.push(`[suggested output: ${expectedOutput}]`);
+  }
+
+  return parts.join(" ");
 }
 
 export const TRACE_MAPPINGS = {
@@ -347,6 +499,7 @@ export const TRACE_MAPPINGS = {
   annotations: {
     keys: (_traces: TraceWithAnnotations[]) => {
       return [
+        "ai_readable",
         "comment",
         "is_thumbs_up",
         "author",
@@ -381,6 +534,10 @@ export const TRACE_MAPPINGS = {
       if (!key) {
         return trace.annotations ?? [];
       }
+      const spanNamesById =
+        key === "ai_readable"
+          ? buildSpanNameIndex(trace.spans ?? [])
+          : undefined;
       return (trace.annotations ?? []).map((annotation) => {
         if (
           subkey &&
@@ -406,6 +563,13 @@ export const TRACE_MAPPINGS = {
               .filter(([_, scoreValue]) => scoreValue?.value !== null),
           );
         const keyMap = {
+          ai_readable: () =>
+            buildReadableAnnotation({
+              annotation,
+              traceId: trace.trace_id,
+              spanNamesById,
+              scoreOptions: data.annotationScoreOptions,
+            }),
           comment: () => annotation.comment,
           is_thumbs_up: () => annotation.isThumbsUp,
           author: () => annotation.user?.name ?? annotation.email ?? "",
