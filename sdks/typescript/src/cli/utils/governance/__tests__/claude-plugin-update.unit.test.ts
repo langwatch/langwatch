@@ -201,7 +201,7 @@ describe("updateLangwatchClaudePlugin", () => {
       const lookalikes = [
         { source: "github", repo: "langwatch/agent-plugin.evil" },
         { source: "git", url: "https://github.com/langwatch/agent-plugin.evil" },
-      ];
+      ] as const;
 
       for (const source of lookalikes) {
         // Each shape starts from an unchecked machine: the pass before it
