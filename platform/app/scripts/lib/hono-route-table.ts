@@ -212,6 +212,13 @@ export function apiBasePathsOf(source: string): string[] {
 const CREATE_SERVICE_CALL = /\bcreateService\s*(?:<[^()\n]*>)?\s*\(\s*\{/g;
 
 /**
+ * Any `createService(` call, whatever it is passed. Counted against the
+ * inline-config matches so a form this parser cannot read fails loudly instead
+ * of taking the file's whole route surface out of the gate with it.
+ */
+const ANY_CREATE_SERVICE_CALL = /\bcreateService\s*(?:<[^()\n]*>)?\s*\(/g;
+
+/**
  * Every `/api...` basePath a file declares through `createService`.
  *
  * The framework derives `/api/<name>` from the service name, so a file saying
@@ -251,8 +258,24 @@ function createServiceConfigs(source: string): string[] {
   for (const match of source.matchAll(CREATE_SERVICE_CALL)) {
     const opening = match.index + match[0].length - 1;
     const closing = closingBraceIndex({ source, opening });
-    if (closing === -1) continue;
+    if (closing === -1) {
+      throw new Error(
+        `A createService config at offset ${opening} has no balanced closing brace, ` +
+          `so no base path can be derived from it and every route of that service ` +
+          `would drop out of the coverage gate unseen.`,
+      );
+    }
     configs.push(topLevelOf(source.slice(opening, closing + 1)));
+  }
+
+  const calls = [...source.matchAll(ANY_CREATE_SERVICE_CALL)].length;
+  if (calls !== configs.length) {
+    throw new Error(
+      `${calls - configs.length} createService call(s) pass something other than an ` +
+        `inline config object, which this parser cannot read. Inline the config, or ` +
+        `teach scripts/lib/hono-route-table.ts the new form, or those services serve ` +
+        `routes no gate can see.`,
+    );
   }
 
   return configs;

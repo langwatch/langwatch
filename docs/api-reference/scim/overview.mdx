@@ -31,7 +31,7 @@ Authorization: Bearer <scim-token>
 
 The token identifies the organization, so there is no organization id anywhere in these paths. Organization API keys do not work here, and SCIM tokens do not work anywhere else.
 
-The three discovery endpoints (`/ServiceProviderConfig`, `/ResourceTypes`, `/Schemas`) are unauthenticated, as RFC 7644 requires: a provider reads them before it has anywhere to put a credential.
+The three discovery endpoints (`/ServiceProviderConfig`, `/ResourceTypes`, `/Schemas`) are served without authentication: a provider reads them before it has anywhere to put a credential.
 
 ## Endpoints
 

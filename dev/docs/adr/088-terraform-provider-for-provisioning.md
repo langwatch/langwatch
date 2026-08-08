@@ -61,7 +61,7 @@ These are not aspirations. Each is already in the surface, and each is there bec
 
 A provider has to start somewhere, and the somewhere cannot be a browser. On a self-hosted instance the chain is:
 
-```
+```text
 LANGWATCH_INSTANCE_ADMIN_API_KEY
         |
         v

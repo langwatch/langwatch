@@ -598,6 +598,34 @@ function main() {
     process.exit(1);
   }
 
+  // An `endpointOrder` key that names no operation is invisible: the sort
+  // silently falls back to the default for it. A drifted path parameter name
+  // or a casing slip therefore reshuffles the sidebar with no diagnostic at
+  // all, which is exactly what a hand-written key list is prone to.
+  const specOperations = new Set(
+    Object.entries(spec.paths).flatMap(([apiPath, methods]) =>
+      Object.keys(methods)
+        .filter((method) => METHOD_ORDER.includes(method))
+        .map((method) => `${method.toUpperCase()} ${apiPath}`)
+    )
+  );
+  const unresolvedOrder = ENDPOINT_GROUPS.flatMap((group) =>
+    (group.endpointOrder ?? [])
+      .filter((key) => !specOperations.has(key))
+      .map((key) => `${group.name}: ${key}`)
+  );
+  if (unresolvedOrder.length > 0) {
+    const noun = unresolvedOrder.length === 1 ? "key matches" : "keys match";
+    console.error(
+      `ERROR: ${unresolvedOrder.length} endpointOrder ${noun} no operation in the spec:`
+    );
+    for (const entry of unresolvedOrder.sort()) console.error(`  ${entry}`);
+    console.error(
+      "\nSpell the METHOD and path exactly as the spec does, path parameter names and casing included, or drop the key from endpointOrder in docs/scripts/generate-api-reference-pages.ts."
+    );
+    process.exit(1);
+  }
+
   for (const group of ENDPOINT_GROUPS) {
     const dirPath = path.join(API_REF_DIR, group.dirName);
     fs.mkdirSync(dirPath, { recursive: true });

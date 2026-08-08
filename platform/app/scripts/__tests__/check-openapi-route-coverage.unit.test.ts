@@ -603,6 +603,10 @@ describe("APP_DERIVED_PREFIXES", () => {
     const source = generatorSource();
     const files = importedFiles(source);
 
+    // A renamed or wrapped `generateSpecs(...)` call site would empty this
+    // list, and every check below would then pass against nothing.
+    expect(mergedApps(source).length).toBeGreaterThan(0);
+
     expect(
       mergedApps(source).filter((identifier) => !files.has(identifier)),
     ).toEqual([]);

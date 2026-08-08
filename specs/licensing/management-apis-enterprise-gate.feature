@@ -62,5 +62,5 @@ Feature: Management APIs require an Enterprise plan
   Scenario: A SCIM bearer token stops working when the plan lapses
     Given a SCIM token minted while the organization was on Enterprise
     When the plan lapses and the identity provider makes a SCIM request
-    Then the request is refused in the SCIM error format
+    Then the request is refused with status 403 in the SCIM error format
     And no user or group is provisioned

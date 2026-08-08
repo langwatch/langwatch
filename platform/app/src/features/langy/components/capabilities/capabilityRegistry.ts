@@ -189,9 +189,9 @@ const SURFACE_ROUTE_CONFIG: Record<CapabilitySurface, SurfaceRouteConfig> = {
   apiKeys: { path: "settings/authentication", deepLink: false },
   modelProviders: { path: "settings/model-providers", deepLink: false },
   gateway: { path: "settings", deepLink: false },
-  // The provisioning pages all hang off the members screen, and none of them
-  // are project-scoped, so a card points at the surface and never deep-links
-  // into a specific member, role or binding.
+  // The provisioning pages live at `/settings/...`, outside the project-slug
+  // prefix every href here is built under, so there is no project-relative
+  // path to hand a card. It carries no link at all rather than one that 404s.
   organization: { path: "settings/members", deepLink: false },
   platform: { path: "settings", deepLink: false },
 };

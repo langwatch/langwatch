@@ -218,6 +218,6 @@ Feature: Groups REST API
 
   @integration
   Scenario: The groups API is reachable through the composed router
-    When a request for /api/groups reaches the composed API router
-    Then it is handled by the groups endpoints
-    And it is not answered with 404
+    When I send GET /api/groups with an organization credential
+    Then the response status is 200, not 404
+    And the body is the group list the endpoint documents

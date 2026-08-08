@@ -469,15 +469,13 @@ export function auditCoverage({
 }): CoverageResult {
   const byKey = new Map<string, RegisteredRoute>();
   for (const route of routes) {
-    const seen = byKey.get(route.key);
-    // A key registered more than once takes its withdrawal from the last
-    // registration. Versions are declared in order and the bare alias serves
-    // the last resolution of a path, so the canonical withdrawal reads exactly
-    // this way: an early version registers the route, a later one withdraws it.
-    byKey.set(
-      route.key,
-      seen === undefined ? route : { ...seen, withdrawn: route.withdrawn },
-    );
+    // A key registered more than once resolves to its last registration, as a
+    // whole record. Versions are declared in order and the bare alias serves
+    // the last resolution of a path, so that registration is the one the
+    // document describes: an early version registers the route, a later one
+    // withdraws it or stops describing it, and both the withdrawal and the
+    // diagnostic have to read the later shape.
+    byKey.set(route.key, route);
   }
 
   const missing = [...byKey.values()].filter(

@@ -11,16 +11,18 @@ Feature: SCIM 2.0 is published in the API reference
   # public is published".
   #
   # Three of the fifteen operations are discovery: service provider config,
-  # resource types and schemas. They are unauthenticated by the SCIM standard,
-  # which the declared policy has to say out loud, because a policy claiming an
-  # internal secret guards them is a claim nobody enforces.
+  # resource types and schemas. They are served without authentication, so a
+  # provider can negotiate capabilities before a token exists, which the
+  # declared policy has to say out loud, because a policy claiming an internal
+  # secret guards them is a claim nobody enforces.
 
   @unit
   Scenario: Every SCIM route is documented in the API reference
     When I read the generated OpenAPI document
     Then the discovery, Users and Groups operations are all present
     And each carries an operation id chosen for it rather than derived
-    And each declares the SCIM bearer credential it authenticates with
+    And every provisioning operation declares the SCIM bearer credential it authenticates with
+    And the discovery operations declare no credential at all
     And no SCIM path is listed as a deliberately unpublished route
 
   @integration

@@ -61,7 +61,7 @@ Feature: Custom roles REST API
 
   @integration
   Scenario: Replacing a role's permission set takes effect
-    Given a custom role exists with permissions "project:view" and "prompt:manage"
+    Given a custom role exists with permissions "project:view" and "prompts:manage"
     When I update the role's permissions to "project:view" alone
     Then the response status is 200
     And fetching the role returns only "project:view"

@@ -32,7 +32,14 @@ function summarize(route: MountedRoute): Summary {
 }
 
 function bySummary(a: Summary, b: Summary): number {
-  return JSON.stringify(a).localeCompare(JSON.stringify(b));
+  return (
+    a.path.localeCompare(b.path) ||
+    a.method.localeCompare(b.method) ||
+    (a.version ?? "").localeCompare(b.version ?? "") ||
+    a.status.localeCompare(b.status) ||
+    Number(a.withdrawn) - Number(b.withdrawn) ||
+    Number(a.namespaceGuard) - Number(b.namespaceGuard)
+  );
 }
 
 describe("onRouteMounted", () => {
@@ -182,9 +189,22 @@ describe("onRouteMounted", () => {
       const table = new Set(
         app.routes.map((route) => `${route.method} ${route.path}`),
       );
-      for (const route of mounted) {
-        expect(table).toContain(`${route.method.toUpperCase()} ${route.path}`);
+      const reported = new Set(
+        mounted.map((route) => `${route.method.toUpperCase()} ${route.path}`),
+      );
+
+      for (const entry of reported) {
+        expect(table).toContain(entry);
       }
+
+      // The other direction, which is the one a route policy registry depends
+      // on: a mount Hono holds and the callback never reports lands in
+      // production with no policy. `ALL /api/test/*` is the service's own
+      // middleware layer rather than a route, so it is the single exclusion.
+      const unreported = [...table].filter(
+        (entry) => entry !== "ALL /api/test/*" && !reported.has(entry),
+      );
+      expect(unreported).toEqual([]);
     });
   });
 

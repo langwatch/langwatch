@@ -29,6 +29,12 @@ Feature: Organization provisioning REST API for self-hosted deployments
     And that key can immediately manage the new organization
 
   @integration
+  Scenario: A slug outside the documented shape is refused
+    When I create an organization with a slug that is not lowercase letters, digits and hyphens
+    Then the request is refused with status 422
+    And no organization is created
+
+  @integration
   Scenario: A duplicate organization slug is refused
     Given an organization with slug "acme" already exists
     When I create another organization with slug "acme"

@@ -31,6 +31,7 @@ on:
     paths:
       - "charts/clickhouse-serverless/Chart.yaml"
       - "charts/gateway/Chart.yaml"
+      - "charts/langyagent/Chart.yaml"
       - "charts/langwatch/Chart.yaml"
 
 permissions:

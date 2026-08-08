@@ -18,7 +18,7 @@ Requires an **organization-level API key**. Pass it as a Bearer token:
 Authorization: Bearer sk-lw-<id>_<secret>
 ```
 
-Reading your own keys needs `organization:view`. Creating, updating and revoking need `organization:manage`, and so does reading or listing keys that belong to somebody else.
+Reading your own keys needs `organization:view`. Creating, updating and revoking need `organization:manage`. Reading or listing keys that belong to somebody else needs `organization:manage` **and** organization administrator membership.
 
 ## Endpoints
 
@@ -34,11 +34,11 @@ Reading your own keys needs `organization:view`. Creating, updating and revoking
 
 `GET /api/api-keys/{id}` and `PATCH /api/api-keys/{id}` return the same body, and it contains every field a write accepts. `bindings` comes back in exactly the shape `POST` and `PATCH` take, so comparing what you asked for against what the key has is a comparison rather than a translation. The secret itself is never returned: it exists only in the create response.
 
-A key you do not own is readable only with real organization adminness plus `organization:manage`. Without both, the id answers 404 rather than 403, because a 403 would confirm the key exists.
+A key you do not own is readable only with organization administrator membership plus `organization:manage`. Without both, the id answers 404 rather than 403, because a 403 would confirm the key exists.
 
 ## Updating
 
-`PATCH` is partial at the field level: send `name` alone and only the name changes. `bindings`, when you send them, replace the key's bindings outright, so what you send is what the key has afterwards.
+`PATCH` is partial at the field level: send `name` alone and only the name changes. `bindings`, when you send them, replace the key's bindings outright, so what you send is what the key has afterward.
 
 ```bash
 curl -X PATCH https://app.langwatch.ai/api/api-keys/<api_key_id> \

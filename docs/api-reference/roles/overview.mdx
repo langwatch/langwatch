@@ -62,7 +62,7 @@ Names beginning with `apikey:` are reserved for LangWatch's own use and are refu
 
 ## Updating replaces the permission set
 
-`PATCH` is partial at the field level: send `name` alone and only the name changes. A `permissions` list, when you send one, replaces the whole set rather than adding to it, so what you send is what the role has afterwards. That is what lets a declarative tool converge without reading first.
+`PATCH` is partial at the field level: send `name` alone and only the name changes. A `permissions` list, when you send one, replaces the whole set rather than adding to it, so what you send is what the role has afterward. That is what lets a declarative tool converge without reading first.
 
 ## Deleting a role something still holds
 
