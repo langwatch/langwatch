@@ -45,6 +45,12 @@ const jsonBody = {
   content: { "application/json": { schema: { type: "object" } } },
 };
 
+/**
+ * Every operation declares its own security, because the fixtures below are
+ * each about one other rule. The security rule has its own block.
+ */
+const secured = { security: [{ project_api_key: [] }] } as const;
+
 function rules(violations: Violation[]): string[] {
   return violations.map((v) => `${v.operation} [${v.rule}]`);
 }
@@ -67,10 +73,15 @@ describe("auditSpec", () => {
           paths: {
             "/api/gateway/v1/things": {
               get: {
+                ...secured,
                 parameters: [{ in: "query", name: "limit" }],
                 responses: okResponses,
               },
-              post: { requestBody: jsonBody, responses: okResponses },
+              post: {
+                ...secured,
+                requestBody: jsonBody,
+                responses: okResponses,
+              },
             },
           },
         },
@@ -90,7 +101,9 @@ describe("auditSpec", () => {
       const violations = auditSpec(
         {
           paths: {
-            "/api/gateway/v1/things": { [method]: { responses: okResponses } },
+            "/api/gateway/v1/things": {
+              [method]: { ...secured, responses: okResponses },
+            },
           },
         },
         NO_QUERY_HANDLERS,
@@ -105,9 +118,11 @@ describe("auditSpec", () => {
       const violations = auditSpec(
         {
           paths: {
-            "/api/gateway/v1/things": { get: { responses: okResponses } },
+            "/api/gateway/v1/things": {
+              get: { ...secured, responses: okResponses },
+            },
             "/api/gateway/v1/things/{id}": {
-              delete: { responses: okResponses },
+              delete: { ...secured, responses: okResponses },
             },
           },
         },
@@ -125,6 +140,7 @@ describe("auditSpec", () => {
           paths: {
             "/api/gateway/v1/things": {
               get: {
+                ...secured,
                 parameters: [{ in: "path", name: "id" }],
                 responses: okResponses,
               },
@@ -155,7 +171,7 @@ describe("auditSpec", () => {
   describe("given an operation with no schema-bearing 2xx", () => {
     it("reports one that declares no responses at all", () => {
       const violations = auditSpec(
-        { paths: { "/api/webhooks/v1/things": { get: {} } } },
+        { paths: { "/api/webhooks/v1/things": { get: { ...secured } } } },
         NO_QUERY_HANDLERS,
       );
 
@@ -170,7 +186,10 @@ describe("auditSpec", () => {
         {
           paths: {
             "/api/webhooks/v1/things": {
-              get: { responses: { 200: { content: {} }, 500: {} } },
+              get: {
+                ...secured,
+                responses: { 200: { content: {} }, 500: {} },
+              },
             },
           },
         },
@@ -189,6 +208,7 @@ describe("auditSpec", () => {
           paths: {
             "/api/gateway/v1/things": {
               post: {
+                ...secured,
                 requestBody: jsonBody,
                 responses: {
                   201: {
@@ -196,6 +216,41 @@ describe("auditSpec", () => {
                   },
                 },
               },
+            },
+          },
+        },
+        NO_QUERY_HANDLERS,
+      );
+
+      expect(violations).toEqual([]);
+    });
+  });
+
+  describe("given an operation that declares no security of its own", () => {
+    it("reports it, because the document default answers for it instead", () => {
+      const violations = auditSpec(
+        {
+          paths: {
+            "/api/gateway/v1/things": { get: { responses: okResponses } },
+          },
+        },
+        NO_QUERY_HANDLERS,
+      );
+
+      expect(rules(violations)).toEqual([
+        "GET /api/gateway/v1/things [security]",
+      ]);
+    });
+
+    it("accepts an empty requirement, which is a real answer", () => {
+      // "No credential an integrator can send" is what a public or
+      // internally-authenticated route publishes, and it has to be
+      // distinguishable from having said nothing.
+      const violations = auditSpec(
+        {
+          paths: {
+            "/api/gateway/v1/things": {
+              get: { security: [], responses: okResponses },
             },
           },
         },

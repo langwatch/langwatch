@@ -314,6 +314,23 @@ describe("Feature: Webhook endpoints REST API", () => {
     // The endpoints platform used to ask only for https, so a URL the
     // automations trigger drawer refused saved fine as an endpoint. Both now
     // run the shared policy, which is the union of the two.
+
+    // These cases are about the policy with the escape hatch OFF, so they
+    // pin it off rather than inherit whatever the developer's own .env
+    // happens to say. A local install running the hatch used to turn this
+    // whole block green by admitting everything.
+    const hatchBeforeBlock = process.env.WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS;
+    beforeAll(() => {
+      delete process.env.WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS;
+    });
+    afterAll(() => {
+      if (hatchBeforeBlock === undefined) {
+        delete process.env.WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS;
+      } else {
+        process.env.WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS = hatchBeforeBlock;
+      }
+    });
+
     it("rejects a non-default port, which used to save and then probe it", async () => {
       planHasWebhookEndpoints = true;
       const res = await app.request("/api/webhooks/v1/endpoints", {

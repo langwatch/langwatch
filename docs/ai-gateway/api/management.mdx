@@ -163,6 +163,7 @@ Response:
       "display_prefix": "vk-lw-01HZX9",
       "principal_user_id": null,
       "trace_project_id": null,
+      "trace_project_source": "project_scope",
       "scopes": [{ "scope_type": "project", "scope_id": "proj_01HZ..." }],
       "routing_policy_id": null,
       "routing_mode": "none",
@@ -203,7 +204,8 @@ Body (only `name` is required):
 ```
 
 - `scopes` defaults to the calling project. Team- and org-scoped keys need a scoped API key holding `virtualKeys:manage` at each requested scope; legacy project keys can only mint keys for their own project.
-- An org- or team-scoped key also needs a place for its traces and spend to land: pass `trace_project_id` (requires `virtualKeys:manage` on that project; it is a destination, not a scope, and grants no access to the key), or the organization's governance project is used, and creation refuses with `trace_project_required` when neither exists.
+- An org- or team-scoped key also needs a place for its traces and spend to land, and has to say where: pass `trace_project_id` (requires `virtualKeys:manage` on that project; it is a destination, not a scope, and grants no access to the key). Without it, and without exactly one project scope to take it from, creation refuses with `gateway_trace_project_ambiguous`. The same refusal covers a key scoped to several projects at once. An organization whose only project is the hidden governance one is exempt, because there is nothing else to name; one with no governance project either refuses with `trace_project_required`. A `trace_project_id` that names a project this organization does not have refuses with `gateway_trace_project_unknown` rather than quietly resolving to somewhere else.
+- `trace_project_source` on every key says which rule put its traces where they went: `explicit`, `project_scope`, or `governance_fallback`. Keys created before this rule can carry `governance_fallback`, and their spend is attributed to the governance project rather than to any project you would think to budget. Give them a `trace_project_id` to move them.
 - `budget` creates a budget atomically with the key and manages exactly that row on later updates: the key can never exist without the cap you asked for. Windows: `day`, `week`, `month`.
 - `routing_mode` is one of `none` (default: no silent failover), `fallback_all`, or `policy` (requires `routing_policy_id`).
 

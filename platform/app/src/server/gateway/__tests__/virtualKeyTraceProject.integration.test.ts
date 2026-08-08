@@ -23,6 +23,7 @@ import {
   stopTestContainers,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
 import { resolveTraceProject } from "../scopeResolver";
+import { toVirtualKeySnakeDto } from "../virtualKey.dto";
 import { VirtualKeyRepository } from "../virtualKey.repository";
 import { VirtualKeyService } from "../virtualKey.service";
 
@@ -39,6 +40,14 @@ const PROJECT_BARE_ID = `proj-vktp-bare-${suffix}`;
 const ORG_GOV_ID = `org-vktp-gov-${suffix}`;
 const TEAM_GOV_ID = `team-vktp-gov-${suffix}`;
 const GOV_PROJECT_ID = `proj-vktp-gov-${suffix}`;
+
+// An org with a governance project AND real projects, so a key owned above
+// a project has somewhere it could have named and the fallback is a guess.
+const ORG_CHOICE_ID = `org-vktp-choice-${suffix}`;
+const TEAM_CHOICE_ID = `team-vktp-choice-${suffix}`;
+const CHOICE_GOV_PROJECT_ID = `proj-vktp-choice-gov-${suffix}`;
+const CHOICE_PROJECT_A_ID = `proj-vktp-choice-a-${suffix}`;
+const CHOICE_PROJECT_B_ID = `proj-vktp-choice-b-${suffix}`;
 
 const USER_ID = `usr-vktp-${suffix}`;
 
@@ -101,13 +110,47 @@ describe("virtual keys must have a home for their traces (real PG)", () => {
       },
     });
 
+    await prisma.organization.create({
+      data: {
+        id: ORG_CHOICE_ID,
+        name: `VKTP Choice ${suffix}`,
+        slug: `vktp-choice-${suffix}`,
+      },
+    });
+    await prisma.team.create({
+      data: {
+        id: TEAM_CHOICE_ID,
+        name: `VKTP Choice Team ${suffix}`,
+        slug: `vktp-choice-team-${suffix}`,
+        organizationId: ORG_CHOICE_ID,
+      },
+    });
+    for (const [id, kind] of [
+      [CHOICE_GOV_PROJECT_ID, "internal_governance"],
+      [CHOICE_PROJECT_A_ID, "application"],
+      [CHOICE_PROJECT_B_ID, "application"],
+    ] as const) {
+      await prisma.project.create({
+        data: {
+          id,
+          name: id,
+          slug: id,
+          teamId: TEAM_CHOICE_ID,
+          language: "en",
+          framework: "openai",
+          apiKey: `key-${id}`,
+          kind,
+        },
+      });
+    }
+
     await prisma.user.create({
       data: { id: USER_ID, email: `${suffix}@vktp.local`, name: "VKTP" },
     });
   }, 120_000);
 
   afterAll(async () => {
-    const orgIds = [ORG_BARE_ID, ORG_GOV_ID];
+    const orgIds = [ORG_BARE_ID, ORG_GOV_ID, ORG_CHOICE_ID];
     await prisma.auditLog.deleteMany({
       where: { organizationId: { in: orgIds } },
     });
@@ -121,10 +164,10 @@ describe("virtual keys must have a home for their traces (real PG)", () => {
       where: { organizationId: { in: orgIds } },
     });
     await prisma.project.deleteMany({
-      where: { id: { in: [PROJECT_BARE_ID, GOV_PROJECT_ID] } },
+      where: { teamId: { in: [TEAM_BARE_ID, TEAM_GOV_ID, TEAM_CHOICE_ID] } },
     });
     await prisma.team.deleteMany({
-      where: { id: { in: [TEAM_BARE_ID, TEAM_GOV_ID] } },
+      where: { id: { in: [TEAM_BARE_ID, TEAM_GOV_ID, TEAM_CHOICE_ID] } },
     });
     await prisma.user.deleteMany({ where: { id: USER_ID } });
     await prisma.organization.deleteMany({ where: { id: { in: orgIds } } });
@@ -145,7 +188,7 @@ describe("virtual keys must have a home for their traces (real PG)", () => {
         // rolls back the whole transaction, budget included.
         budget: { limitUsd: "10.00", window: "DAY" },
       }),
-    ).rejects.toThrow(/trace_project_required/);
+    ).rejects.toMatchObject({ code: "trace_project_required" });
 
     await expect(
       service.create({
@@ -154,7 +197,7 @@ describe("virtual keys must have a home for their traces (real PG)", () => {
         actorUserId: USER_ID,
         scopes: [{ scopeType: "TEAM", scopeId: TEAM_BARE_ID }],
       }),
-    ).rejects.toThrow(/trace_project_required/);
+    ).rejects.toMatchObject({ code: "trace_project_required" });
 
     // Neither the keys nor the budget survived the refusal.
     const keys = await prisma.virtualKey.findMany({
@@ -168,6 +211,125 @@ describe("virtual keys must have a home for their traces (real PG)", () => {
       where: { organizationId: ORG_BARE_ID, scopeType: "VIRTUAL_KEY" },
     });
     expect(budgets).toHaveLength(0);
+  });
+
+  describe("when the organization has projects the key could have named", () => {
+    /** @scenario "A shared key must say where its traces land once there is a choice" */
+    it("refuses an org- or team-owned key that names no destination", async () => {
+      const service = VirtualKeyService.create(prisma);
+
+      for (const scope of [
+        { scopeType: "ORGANIZATION" as const, scopeId: ORG_CHOICE_ID },
+        { scopeType: "TEAM" as const, scopeId: TEAM_CHOICE_ID },
+      ]) {
+        const refusal = await service
+          .create({
+            organizationId: ORG_CHOICE_ID,
+            name: `unnamed-${scope.scopeType}-${suffix}`,
+            actorUserId: USER_ID,
+            scopes: [scope],
+          })
+          .catch((error: unknown) => error);
+
+        expect(refusal).toMatchObject({
+          code: "gateway_trace_project_ambiguous",
+          httpStatus: 400,
+          fault: "customer",
+        });
+      }
+
+      // A refusal that left the key behind would be worse than no refusal.
+      const keys = await prisma.virtualKey.findMany({
+        where: { organizationId: ORG_CHOICE_ID },
+      });
+      expect(keys).toHaveLength(0);
+    });
+
+    /** @scenario "A key that reaches several projects must pick one for its traces" */
+    it("refuses a key scoped to two projects with no destination named", async () => {
+      const service = VirtualKeyService.create(prisma);
+
+      const refusal = await service
+        .create({
+          organizationId: ORG_CHOICE_ID,
+          name: `two-projects-${suffix}`,
+          actorUserId: USER_ID,
+          scopes: [
+            { scopeType: "PROJECT", scopeId: CHOICE_PROJECT_A_ID },
+            { scopeType: "PROJECT", scopeId: CHOICE_PROJECT_B_ID },
+          ],
+        })
+        .catch((error: unknown) => error);
+
+      expect(refusal).toMatchObject({
+        code: "gateway_trace_project_ambiguous",
+        meta: { project_scope_count: 2 },
+      });
+    });
+
+    it("accepts the same key once it names where its traces land", async () => {
+      const service = VirtualKeyService.create(prisma);
+
+      const { virtualKey } = await service.create({
+        organizationId: ORG_CHOICE_ID,
+        name: `named-${suffix}`,
+        actorUserId: USER_ID,
+        scopes: [{ scopeType: "ORGANIZATION", scopeId: ORG_CHOICE_ID }],
+        traceProjectId: CHOICE_PROJECT_A_ID,
+      });
+
+      expect(virtualKey.traceProjectId).toBe(CHOICE_PROJECT_A_ID);
+    });
+  });
+
+  describe("when the destination a key names is not one of this organization's", () => {
+    /** @scenario "A destination that is named has to be one that exists" */
+    it("refuses a project belonging to another organization, and writes nothing", async () => {
+      const service = VirtualKeyService.create(prisma);
+      const name = `foreign-destination-${suffix}`;
+
+      const refusal = await service
+        .create({
+          organizationId: ORG_CHOICE_ID,
+          name,
+          actorUserId: USER_ID,
+          // A real project, of a different organization. Resolution would
+          // otherwise fall through to this key's single project scope and
+          // save it attributing traffic to CHOICE_PROJECT_A_ID while the
+          // stored destination went on naming somebody else's project.
+          scopes: [{ scopeType: "PROJECT", scopeId: CHOICE_PROJECT_A_ID }],
+          traceProjectId: PROJECT_BARE_ID,
+        })
+        .catch((error: unknown) => error);
+
+      expect(refusal).toMatchObject({ code: "gateway_trace_project_unknown" });
+      // Scoped to this key's own name rather than to the organization's
+      // count: every other test in the file writes keys into the same
+      // organization, so a count would only hold while this one ran first.
+      expect(
+        await prisma.virtualKey.count({
+          where: { organizationId: ORG_CHOICE_ID, name },
+        }),
+      ).toBe(0);
+    });
+
+    it("refuses a project that does not exist at all", async () => {
+      const service = VirtualKeyService.create(prisma);
+
+      const refusal = await service
+        .create({
+          organizationId: ORG_CHOICE_ID,
+          name: `deleted-destination-${suffix}`,
+          actorUserId: USER_ID,
+          scopes: [{ scopeType: "ORGANIZATION", scopeId: ORG_CHOICE_ID }],
+          traceProjectId: `proj-vktp-gone-${suffix}`,
+        })
+        .catch((error: unknown) => error);
+
+      // Same refusal as a foreign project on purpose: telling the two apart
+      // would confirm which project ids exist somewhere else.
+      expect(refusal).toMatchObject({ code: "gateway_trace_project_unknown" });
+    });
   });
 
   /** @scenario "The governance inbox is a home for a shared key's traces" */
@@ -213,7 +375,7 @@ describe("virtual keys must have a home for their traces (real PG)", () => {
         name: `projected-renamed-${suffix}`,
         scopes: [{ scopeType: "ORGANIZATION", scopeId: ORG_BARE_ID }],
       }),
-    ).rejects.toThrow(/trace_project_required/);
+    ).rejects.toMatchObject({ code: "trace_project_required" });
 
     // The whole update rolled back: scopes untouched, rename included.
     const after = await prisma.virtualKey.findUniqueOrThrow({
@@ -263,7 +425,7 @@ describe("virtual keys must have a home for their traces (real PG)", () => {
         actorUserId: USER_ID,
         name: `legacy-edit-renamed-${suffix}`,
       }),
-    ).rejects.toThrow(/trace_project_required/);
+    ).rejects.toMatchObject({ code: "trace_project_required" });
 
     // The update that gives its traces a home goes through, and carries
     // the rest of the edit with it.
@@ -284,5 +446,52 @@ describe("virtual keys must have a home for their traces (real PG)", () => {
       actorUserId: USER_ID,
     });
     expect(revoked.status).toBe("REVOKED");
+  });
+
+  describe("when keys reach their destination three different ways", () => {
+    /** @scenario "A key says which rule decides where its traces land" */
+    it("reports which rule answered for each", async () => {
+      const service = VirtualKeyService.create(prisma);
+      const repo = new VirtualKeyRepository(prisma);
+
+      const named = await service.create({
+        organizationId: ORG_CHOICE_ID,
+        name: `source-named-${suffix}`,
+        actorUserId: USER_ID,
+        scopes: [{ scopeType: "ORGANIZATION", scopeId: ORG_CHOICE_ID }],
+        traceProjectId: CHOICE_PROJECT_B_ID,
+      });
+      const scoped = await service.create({
+        organizationId: ORG_CHOICE_ID,
+        name: `source-scoped-${suffix}`,
+        actorUserId: USER_ID,
+        scopes: [{ scopeType: "PROJECT", scopeId: CHOICE_PROJECT_A_ID }],
+      });
+      // The third shape can no longer be created, so it is written the way
+      // the keys that carry it were: before the rule existed.
+      const legacy = await service.create({
+        organizationId: ORG_GOV_ID,
+        name: `source-legacy-${suffix}`,
+        actorUserId: USER_ID,
+        scopes: [{ scopeType: "ORGANIZATION", scopeId: ORG_GOV_ID }],
+      });
+
+      const sources = await Promise.all(
+        [
+          [named.virtualKey.id, ORG_CHOICE_ID],
+          [scoped.virtualKey.id, ORG_CHOICE_ID],
+          [legacy.virtualKey.id, ORG_GOV_ID],
+        ].map(async ([id, orgId]) => {
+          const vk = await repo.findById(id!, orgId!);
+          return toVirtualKeySnakeDto(vk!).trace_project_source;
+        }),
+      );
+
+      expect(sources).toEqual([
+        "explicit",
+        "project_scope",
+        "governance_fallback",
+      ]);
+    });
   });
 });

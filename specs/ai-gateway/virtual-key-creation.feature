@@ -50,12 +50,51 @@ Feature: AI Gateway virtual key creation
 
   @integration
   Scenario: The governance inbox is a home for a shared key's traces
-    Given organization "acme" has a governance inbox
+    Given organization "acme" has a governance inbox and no other project
     When I create a key owned by organization "acme"
     Then its traces and costs land in the governance inbox
-    # A shared key does not need a hand-picked project when the organization
-    # has its governance inbox: that is a real destination, spend accrues
-    # from it, and the drawer states it like any other.
+    # A shared key does not need a hand-picked project when there is no
+    # other project to pick: the governance inbox is a real destination and
+    # spend accrues from it.
+
+  @integration
+  Scenario: A shared key must say where its traces land once there is a choice
+    Given organization "acme" has a governance inbox and a project "web-app"
+    When I create a key owned by organization "acme" without saying where its traces land
+    Then the key is refused for not saying where its traces land
+    # Falling back to the inbox keeps the spend visible, and puts it under
+    # a project nobody named. Every budget on the project the creator had
+    # in mind then counts none of this key's traffic while both sides look
+    # correctly configured. The app has always required the destination
+    # here; this is the API agreeing with it.
+
+  @integration
+  Scenario: A key that reaches several projects must pick one for its traces
+    Given organization "acme" has projects "web-app" and "batch"
+    When I create a key scoped to both without saying where its traces land
+    Then the key is refused for not saying where its traces land
+    # The key named two destinations, so attributing its spend to a third
+    # is the one answer that is certainly wrong.
+
+  @integration
+  Scenario: A destination that is named has to be one that exists
+    Given organization "acme" and a project belonging to another organization
+    When I create a key naming that project for its traces
+    Then the key is refused because the project is not in this organization
+    And no key is written
+    # Resolution falls through when the named project does not answer, so
+    # without this the key would be saved with its traffic attributed to
+    # whichever later rule picked up, while its own stated destination said
+    # otherwise. The two would disagree forever and nothing would say so.
+
+  @integration
+  Scenario: A key says which rule decides where its traces land
+    Given keys that name a project, take one from their scope, and name none
+    When each is read back
+    Then each says which of the three put its traces where they went
+    # A key attributed to the governance inbox reads identically to a
+    # correctly scoped one on every other field. This is what tells the
+    # legacy shape apart without opening the app.
 
   @integration
   Scenario: A key cannot be updated into dropping its traces

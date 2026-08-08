@@ -32,6 +32,7 @@ import {
 import {
   type BudgetScopeReach,
   resolveBudgetScopeReach,
+  resolveScopeReach,
 } from "./budgetScopeReach";
 import {
   isCyclicWindow,
@@ -42,6 +43,7 @@ import { ChangeEventRepository } from "./changeEvent.repository";
 import {
   GatewayBudgetCycleAnchorInvalidError,
   GatewayBudgetNotFoundError,
+  GatewayBudgetScopeUnreachableError,
   GatewayGroupBudgetUnsupportedError,
   GatewayScopeOrgMismatchError,
   translateExternalIdConflict,
@@ -133,6 +135,12 @@ export type CreateBudgetInput = {
    * has today. Rejected on TOTAL and MANUAL, which do not cycle.
    */
   cycleAnchorAt?: Date | null;
+  /**
+   * Keeps a budget no active key can reach, instead of refusing it.
+   * Provisioning ahead of the keys that will use it is legitimate; the
+   * refusal is a guardrail, not a prohibition.
+   */
+  allowUnreachable?: boolean;
   actorUserId: string;
 };
 
@@ -587,7 +595,11 @@ export class GatewayBudgetService {
     const [{ budgets, spendAvailable, readAt }, scopeReach] = await Promise.all(
       [
         this.applyClickHouseSpendWithHealth(rows, organizationId),
-        resolveBudgetScopeReach(this.prisma, organizationId, rows),
+        resolveBudgetScopeReach({
+          prisma: this.prisma,
+          organizationId,
+          budgets: rows,
+        }),
       ],
     );
     return { budgets, spendAvailable, readAt, scopeReach };
@@ -608,14 +620,21 @@ export class GatewayBudgetService {
     budget: GatewayBudgetWithSeats;
     spendAvailable: boolean;
     readAt: Date;
+    /** True when no active key can produce traffic this budget matches. */
+    unreachableByAnyKey: boolean;
   } | null> {
     const row = await this.prisma.gatewayBudget.findFirst({
       where: { id, organizationId, archivedAt: null },
     });
     if (!row) return null;
-    const { budgets, spendAvailable, readAt } =
-      await this.applyClickHouseSpendWithHealth([row], organizationId);
-    return { budget: budgets[0] ?? row, spendAvailable, readAt };
+    const { budgets, spendAvailable, readAt, scopeReach } =
+      await this.decorateWithHealth([row], organizationId);
+    return {
+      budget: budgets[0] ?? row,
+      spendAvailable,
+      readAt,
+      unreachableByAnyKey: scopeReach.get(row.id)?.reachable === false,
+    };
   }
 
   async get(
@@ -865,6 +884,55 @@ export class GatewayBudgetService {
     }
   }
 
+  /**
+   * The wire spelling of each reach-checked scope, so the refusal's
+   * `meta.scope_type` can only ever be one of the three the documentation
+   * lists.
+   */
+  private static readonly REACH_CHECKED_SCOPE_NAMES = {
+    TEAM: "team",
+    PROJECT: "project",
+    GROUP: "group",
+  } as const;
+
+  /**
+   * Refuse a budget that no active key could ever spend against.
+   *
+   * Only TEAM, PROJECT and GROUP are checked, because only those three are
+   * matched through the key rather than through something the creator picked
+   * here. An ORGANIZATION budget matches every key by construction, and
+   * VIRTUAL_KEY, PRINCIPAL and ATTRIBUTED_USER already refuse a target that
+   * does not exist in this organization.
+   *
+   * Create only: scope is immutable afterwards, so no update can turn a
+   * reachable budget into an unreachable one.
+   */
+  private async assertScopeIsReachable(
+    input: CreateBudgetInput,
+  ): Promise<void> {
+    if (input.allowUnreachable) return;
+    const kind = input.scope.kind;
+    if (kind !== "TEAM" && kind !== "PROJECT" && kind !== "GROUP") return;
+
+    const reach = await resolveScopeReach({
+      prisma: this.prisma,
+      organizationId: input.organizationId,
+      scope: {
+        scopeType: scopeKindToEnum(kind),
+        scopeId: scopeIdForScope(input.scope),
+      },
+    });
+    // An organization with no keys yet is being set up, and budget first, key
+    // second is the natural order there. Refusing would leave a fresh
+    // organization unable to configure anything at all.
+    if (reach.activeKeyCount === 0 || reach.reachable) return;
+
+    throw new GatewayBudgetScopeUnreachableError({
+      scopeType: GatewayBudgetService.REACH_CHECKED_SCOPE_NAMES[kind],
+      reachableProjectIds: reach.reachableProjectIds,
+    });
+  }
+
   async create(input: CreateBudgetInput): Promise<GatewayBudget> {
     // An anchor only means something on a window that rolls. Checked before
     // any lookup, since it needs nothing but the request.
@@ -1027,6 +1095,8 @@ export class GatewayBudgetService {
         throw new GatewayScopeOrgMismatchError("model provider");
       }
     }
+
+    await this.assertScopeIsReachable(input);
 
     const resetsAt = nextBoundaryFor({
       budget: { window: input.window, cycleAnchorAt },
@@ -1326,12 +1396,15 @@ export class GatewayBudgetService {
     // Same resolver the bundle and the debits process use, so what
     // enforces here is exactly what the key was told applies to it.
     const resolved = (
-      await resolveApplicableBudgets(this.prisma, {
-        organizationId: input.organizationId,
-        teamId: input.teamId,
-        projectId: input.projectId,
-        virtualKeyId: input.virtualKeyId,
-        principalUserId: input.principalUserId,
+      await resolveApplicableBudgets({
+        client: this.prisma,
+        target: {
+          organizationId: input.organizationId,
+          teamId: input.teamId,
+          projectId: input.projectId,
+          virtualKeyId: input.virtualKeyId,
+          principalUserId: input.principalUserId,
+        },
       })
     ).filter((r) => budgetAppliesToProvider(r.budget, input.providerKey));
     const applicable = resolved.map((r) => r.budget);
