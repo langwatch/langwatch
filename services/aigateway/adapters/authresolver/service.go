@@ -56,6 +56,11 @@ const (
 	ChangeKindVirtualKeyRevoked      = "VK_REVOKED"
 	ChangeKindVirtualKeyDisabled     = "VK_DISABLED"
 	ChangeKindVirtualKeyEnabled      = "VK_ENABLED"
+	ChangeKindRoutingPolicyUpdated   = "ROUTING_POLICY_UPDATED"
+	ChangeKindRoutingPolicyDeleted   = "ROUTING_POLICY_DELETED"
+	ChangeKindCacheRuleCreated       = "CACHE_RULE_CREATED"
+	ChangeKindCacheRuleUpdated       = "CACHE_RULE_UPDATED"
+	ChangeKindCacheRuleDeleted       = "CACHE_RULE_DELETED"
 )
 
 // CacheChange is one cache-invalidation hint surfaced by ChangePoller.
@@ -692,17 +697,39 @@ func (s *Service) applyChange(organizationID string, ch CacheChange) {
 		s.evictWhere(func(b *domain.Bundle) bool {
 			return b.VirtualKeyID == ch.VirtualKeyID
 		}, "virtual_key_config_updated", ch.VirtualKeyID)
+	case ChangeKindRoutingPolicyUpdated, ChangeKindRoutingPolicyDeleted:
+		// A bundle carries the resolved routing mode and chain, not the id
+		// of the policy they came from, so there is nothing finer than the
+		// organization to key on. Same shape as a budget change with no
+		// project.
+		s.evictWhere(func(b *domain.Bundle) bool {
+			return b.OrganizationID == organizationID
+		}, "routing_policy_updated", organizationID)
+	case ChangeKindCacheRuleCreated, ChangeKindCacheRuleUpdated, ChangeKindCacheRuleDeleted:
+		// Cache rules are org-scoped and baked into every bundle as a
+		// pre-sorted array, with no rule id left on the bundle to join on.
+		s.evictWhere(func(b *domain.Bundle) bool {
+			return b.OrganizationID == organizationID
+		}, "cache_rule_updated", organizationID)
 	}
 }
 
 // evictWhere walks the L1 LRU once and removes every entry whose bundle
 // matches the predicate. O(N) over LRUSize per call — acceptable for
 // 10k-ish caches and the low frequency of admin mutations.
+//
+// Peek, not Get: the scan reads the whole cache, and Get takes the
+// exclusive lock and promotes what it reads. That queues every in-flight
+// request behind the scan once per entry, and it drags keys the
+// scan merely looked at ahead of keys real traffic touched after the
+// Keys() snapshot, so the next size eviction picks the wrong victim. Peek
+// takes the shared lock and leaves recency to the request path, the same
+// reason refreshConfigBackground uses it.
 func (s *Service) evictWhere(match func(*domain.Bundle) bool, reason, target string) {
 	keys := s.l1.Keys()
 	evicted := 0
 	for _, h := range keys {
-		e, ok := s.l1.Get(h)
+		e, ok := s.l1.Peek(h)
 		if !ok {
 			continue
 		}

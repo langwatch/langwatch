@@ -348,6 +348,68 @@ func TestApplyChange_VkDisableAndEnableEvictTheKey(t *testing.T) {
 	}
 }
 
+/** @scenario "an edited routing policy evicts the organization's cached bundles" */
+func TestApplyChange_RoutingPolicyUpdatedEvictsOrganization(t *testing.T) {
+	resolver := &fakeResolver{}
+	svc, _ := newService(t, Options{Resolver: resolver, ConfigFetcher: resolver})
+
+	matchingKey := hashKey("vk-lw-policy-matching")
+	otherKey := hashKey("vk-lw-policy-other")
+	svc.storeL1(matchingKey, &domain.Bundle{OrganizationID: "org-1"})
+	svc.storeL1(otherKey, &domain.Bundle{OrganizationID: "org-2"})
+
+	svc.applyChange("org-1", CacheChange{Kind: ChangeKindRoutingPolicyUpdated})
+
+	_, isMatchingPresent := svc.l1.Get(matchingKey)
+	_, isOtherPresent := svc.l1.Get(otherKey)
+	assert.False(t, isMatchingPresent, "a routing-policy edit must evict the polled organization")
+	assert.True(t, isOtherPresent, "other organizations must remain cached")
+}
+
+/** @scenario "a deleted routing policy evicts the organization's cached bundles" */
+func TestApplyChange_RoutingPolicyDeletedEvictsOrganization(t *testing.T) {
+	resolver := &fakeResolver{}
+	svc, _ := newService(t, Options{Resolver: resolver, ConfigFetcher: resolver})
+
+	matchingKey := hashKey("vk-lw-policy-deleted-matching")
+	otherKey := hashKey("vk-lw-policy-deleted-other")
+	svc.storeL1(matchingKey, &domain.Bundle{OrganizationID: "org-1"})
+	svc.storeL1(otherKey, &domain.Bundle{OrganizationID: "org-2"})
+
+	svc.applyChange("org-1", CacheChange{Kind: ChangeKindRoutingPolicyDeleted})
+
+	_, isMatchingPresent := svc.l1.Get(matchingKey)
+	_, isOtherPresent := svc.l1.Get(otherKey)
+	assert.False(t, isMatchingPresent, "a routing-policy deletion must evict the polled organization")
+	assert.True(t, isOtherPresent, "other organizations must remain cached")
+}
+
+/** @scenario "a cache-rule mutation evicts the organization's cached bundles" */
+func TestApplyChange_CacheRuleMutationEvictsOrganization(t *testing.T) {
+	resolver := &fakeResolver{}
+	svc, _ := newService(t, Options{Resolver: resolver, ConfigFetcher: resolver})
+
+	for _, kind := range []string{
+		ChangeKindCacheRuleCreated,
+		ChangeKindCacheRuleUpdated,
+		ChangeKindCacheRuleDeleted,
+	} {
+		t.Run(kind, func(t *testing.T) {
+			matchingKey := hashKey("vk-lw-cache-rule-matching-" + kind)
+			otherKey := hashKey("vk-lw-cache-rule-other-" + kind)
+			svc.storeL1(matchingKey, &domain.Bundle{OrganizationID: "org-1"})
+			svc.storeL1(otherKey, &domain.Bundle{OrganizationID: "org-2"})
+
+			svc.applyChange("org-1", CacheChange{Kind: kind})
+
+			_, isMatchingPresent := svc.l1.Get(matchingKey)
+			_, isOtherPresent := svc.l1.Get(otherKey)
+			assert.False(t, isMatchingPresent, "a cache-rule mutation must evict the polled organization")
+			assert.True(t, isOtherPresent, "other organizations must remain cached")
+		})
+	}
+}
+
 // --- Background refresh classification --------------------------------------
 
 func TestRefreshBackground_TransportFailure_BumpsSoft(t *testing.T) {

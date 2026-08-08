@@ -93,7 +93,9 @@ The `/internal/gateway/budget/debit` call forwards all three so budget ledgers r
 
 **Simple match/action rules that let operators set cache behavior for groups of requests without touching client code.** Deliberately narrower than Cloudflare Page Rules, enough to demonstrate enterprise cache governance (force 5-min cache on prod internal-api, disable cache for benchmark VKs, etc.) without the matcher combinatorics that would slow the hot path.
 
-Latency budget: rules are resolved **once per VK bundle refresh** (every 30 s on `/changes`) and baked into the bundle as a pre-sorted array. At request time, the gateway walks the sorted array until a match fires, for the expected low single-digit rule count per VK, this is sub-microsecond. Hot-path total overhead stays at ~700 ns.
+Latency budget: rules are resolved **once per VK bundle refresh** and baked into the bundle as a pre-sorted array. At request time, the gateway walks the sorted array until a match fires, for the expected low single-digit rule count per VK, this is sub-microsecond. Hot-path total overhead stays at ~700 ns.
+
+Editing a rule triggers that refresh rather than waiting for one. Every create, edit and delete appends a change event in the same transaction as the write; the gateway's `/changes` long-poll returns it on the next cycle and drops the organization's cached bundles, so the following request rebuilds against the new rules.
 
 ### Shape
 
