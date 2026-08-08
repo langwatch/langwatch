@@ -55,6 +55,15 @@ Feature: Walking an annotation queue into a dataset
       When I open the second one
       Then the bar reads "2 of 3"
 
+    # Moving on settles a beat after the route resolves, so the bar does not
+    # flicker back before the next item renders. Leaving inside that beat used
+    # to leave the wait running against a page that no longer existed.
+    @integration
+    Scenario: Leaving mid-navigation leaves nothing pending behind
+      Given I have moved on to the next item
+      When I leave the queue before it settles
+      Then nothing is left waiting to settle the page
+
   Rule: The trace behind a queue item is corrected in the trace drawer
 
     @integration

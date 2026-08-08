@@ -144,7 +144,7 @@ vi.mock("~/utils/api", () => ({
   },
 }));
 
-const { default: MyQueuePage } = await import(
+const { default: MyQueuePage, ROUTE_SETTLE_MS } = await import(
   "~/pages/[project]/annotations/my-queue"
 );
 
@@ -470,6 +470,38 @@ describe("given a reviewer walking their annotation queue", () => {
       rerender(page());
 
       await waitFor(() => expect(mocks.openDrawer).toHaveBeenCalledTimes(2));
+    });
+  });
+
+  describe("when the reviewer leaves right after moving to the next item", () => {
+    /** @scenario "Leaving mid-navigation leaves nothing pending behind" */
+    it("clears the settle timer it armed", async () => {
+      const armTimer = vi.spyOn(globalThis, "setTimeout");
+      const cancelTimer = vi.spyOn(globalThis, "clearTimeout");
+
+      try {
+        const user = userEvent.setup();
+        const { unmount } = renderPage();
+
+        await user.click(screen.getByRole("button", { name: /Next/ }));
+        await waitFor(() => expect(mocks.push).toHaveBeenCalled());
+
+        const armed = armTimer.mock.results
+          .filter((_, i) => armTimer.mock.calls[i]?.[1] === ROUTE_SETTLE_MS)
+          .map((result) => result.value);
+        expect(armed.length).toBeGreaterThan(0);
+
+        unmount();
+
+        // Left armed, this fires into an unmounted tree: a stray update under
+        // jsdom, and on a torn-down environment the "window is not defined"
+        // crash that takes the whole run with it.
+        const cancelled = cancelTimer.mock.calls.map(([id]) => id);
+        for (const timer of armed) expect(cancelled).toContain(timer);
+      } finally {
+        armTimer.mockRestore();
+        cancelTimer.mockRestore();
+      }
     });
   });
 });

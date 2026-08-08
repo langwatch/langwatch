@@ -31,6 +31,9 @@ import { TasksDone } from "../../../components/icons/TasksDone";
 type AssignedQueueItem =
   RouterOutputs["annotation"]["getOptimizedAnnotationQueues"]["assignedQueueItems"][number];
 
+/** How long the queue bar waits after a route change before it reads settled. */
+export const ROUTE_SETTLE_MS = 100;
+
 /** A trace timestamp is only useful to the drawer when it is a real number. */
 const partitionHint = (startedAt: unknown): number | null =>
   typeof startedAt === "number" && Number.isFinite(startedAt)
@@ -339,6 +342,25 @@ const AnnotationQueuePicker = ({
     (item) => item.id === currentQueueItem.id,
   );
 
+  // The navigating state is released a beat after the route resolves, so the
+  // bar does not flicker back before the new item renders. The timer is held
+  // rather than fired and forgotten: leaving the queue while it is pending
+  // would otherwise set state on a page that is already gone.
+  const settleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (settleTimer.current) clearTimeout(settleTimer.current);
+    },
+    [],
+  );
+  const releaseNavigatingWhenSettled = useCallback(() => {
+    if (settleTimer.current) clearTimeout(settleTimer.current);
+    settleTimer.current = setTimeout(() => {
+      settleTimer.current = null;
+      setIsNavigating(false);
+    }, ROUTE_SETTLE_MS);
+  }, []);
+
   const navigateToQueue = async (queueId: string, traceId?: string) => {
     setIsNavigating(true);
     const url = traceId
@@ -346,8 +368,7 @@ const AnnotationQueuePicker = ({
       : `/${project?.slug}/annotations/my-queue?queue-item=${queueId}`;
 
     await router.push(url);
-    // Add a small delay to ensure the route has fully updated
-    setTimeout(() => setIsNavigating(false), 100);
+    releaseNavigatingWhenSettled();
   };
 
   const markQueueItemDone = api.annotation.markQueueItemDone.useMutation();
@@ -373,7 +394,7 @@ const AnnotationQueuePicker = ({
             setIsNavigating(true);
             await router.replace(`/${project?.slug}/annotations/my-queue`);
             await refetchQueueItems();
-            setTimeout(() => setIsNavigating(false), 100);
+            releaseNavigatingWhenSettled();
           }
         },
       },
