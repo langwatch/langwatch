@@ -161,7 +161,7 @@ describe("the real command tree", () => {
         (n) => [n, "owns its --json"] as const,
       ),
       ...(
-        ["ingest health", "ingest install", "ingest list", "ingest tail"] as const
+        ["ingest codex", "ingest health", "ingest install", "ingest list", "ingest tail"] as const
       ).map((n) => [n, "owns its --json"] as const),
       ["governance status", "owns its --json"],
       ...(
