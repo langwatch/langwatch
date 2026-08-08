@@ -139,9 +139,7 @@ fi
 PORT_LIST_CSV=$(IFS=,; echo "${PORTS_TO_CHECK[*]}")
 echo "  ${CYA}2)${RST} kill the existing langwatch dev tree (safe — only kills node procs holding our ports, leaves Docker etc alone):"
 echo ""
-echo "       ${BLD}lsof -t -a -iTCP:${PORT_LIST_CSV} -sTCP:LISTEN -c node 2>/dev/null \\"
-echo "         | xargs -I{} ps -o pgid= -p {} 2>/dev/null | tr -d ' ' | sort -u \\"
-echo "         | xargs -I{} kill -TERM -{}${RST}"
+echo "       ${BLD}bash $(dirname "$0")/kill-dev-tree.sh ${PORT_LIST_CSV}${RST}"
 echo ""
 
 exit 1
