@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.4.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v1.3.0...typescript-sdk@v1.4.0) (2026-08-08)
+
+
+### Features
+
+* **codex:** capture the conversation for a plain codex, not just the wrapper ([#6433](https://github.com/langwatch/langwatch/issues/6433)) ([38931b4](https://github.com/langwatch/langwatch/commit/38931b4392837c4a011dbde44ec7b80c80b19720))
+* **governance:** copilot capture across three surfaces — CLI wrapper, app login agent, VS Code Chat (ADR-039) ([#5605](https://github.com/langwatch/langwatch/issues/5605)) ([fd6a3b3](https://github.com/langwatch/langwatch/commit/fd6a3b304176137433ad645d718ec1411097c60f))
+
 ## [1.3.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v1.2.0...typescript-sdk@v1.3.0) (2026-08-08)
 
 
