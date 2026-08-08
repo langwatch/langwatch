@@ -114,6 +114,24 @@ Feature: Codex conversation capture without the LangWatch wrapper
     Then the user's program still runs after every turn
 
   @unit
+  Scenario: A turn-completion program written with shell quoting is moved aside verbatim
+    Given a codex configuration whose turn-completion program is a shell command containing dollar signs
+    When the harvest hook is written into it
+    Then their command is quoted back character for character and the rest of the configuration is untouched
+
+  @unit
+  Scenario: A documented turn-completion example is not mistaken for the live one
+    Given a codex configuration whose prose quotes a turn-completion program spelled exactly like the live one
+    When the harvest hook is written into it
+    Then the live program is the one moved aside and the prose stays prose
+
+  @unit
+  Scenario: Enabling capture again keeps the user's own program running
+    Given a codex configuration where enabling capture already moved the user's program aside
+    When capture is enabled again
+    Then the user's program still runs after every turn, chained exactly once
+
+  @unit
   Scenario: Turning capture off removes the harvest hook
     Given a codex configuration carrying the harvest hook
     When the user turns capture off
@@ -132,3 +150,80 @@ Feature: Codex conversation capture without the LangWatch wrapper
     Given codex sessions that completed before capture was enabled
     When the user backfills them
     Then their conversations are recorded on the traces codex reported at the time
+
+  # --- Installing it, and saying what it does -------------------------------
+
+  @unit
+  Scenario: A device that already persisted its capture settings still gets the turn harvest
+    Given a codex configuration whose capture settings were persisted on an earlier run
+    When capture is enabled again
+    Then the harvest hook is installed without asking the user anything
+
+  @unit
+  Scenario: Consent names the program that will run after every turn
+    Given a user being asked to keep codex capture on
+    When the question is put to them
+    Then it says a program runs after every completed turn, before they answer
+
+  @unit
+  Scenario: Consent says an existing turn-completion program will be started by ours
+    Given a user whose codex configuration already runs a program of their own after each turn
+    When the question is put to them
+    Then it says their program will be started by ours, before they answer
+
+  @unit
+  Scenario: A configuration the harvest cannot be merged into says so
+    Given a codex configuration binding a turn-completion program that cannot be moved
+    When capture is enabled
+    Then the user is told the conversation will not be recorded
+
+  @unit
+  Scenario: Enabling capture from the install command needs no terminal
+    Given a user running the codex capture install command with no terminal attached
+    When the install finishes
+    Then codex is configured to run the harvest after every turn, with no question asked
+
+  # --- Saying so when nothing landed ----------------------------------------
+
+  @integration
+  Scenario: A conversation LangWatch rejects is not reported as recovered
+    Given a backfill whose conversations LangWatch refuses
+    When the user backfills them
+    Then the failure is reported instead of a count of recovered turns
+
+  @integration
+  Scenario: A rejected ingest key reads as an authentication problem
+    Given a codex configuration whose ingest key LangWatch no longer accepts
+    When the user backfills
+    Then the reported failure names the key and how to issue a new one
+
+  @integration
+  Scenario: A rejected turn still leaves the coding session alone
+    Given a harvest whose conversation LangWatch refuses
+    When codex runs it after a completed turn
+    Then the harvest reports success to codex and prints nothing to the session
+
+  # --- Reading a recovered session back without paying twice ------------------
+
+  # A codex tool run is described three times over: inside the recovered
+  # conversation, on codex's own tool span, and on its tool_result log. All
+  # three name the same call, so the transcript owes the reader one entry and
+  # one count for it, carrying whatever each of the three knows.
+
+  @unit
+  Scenario: A tool run recovered from the transcript and reported as a span is shown once
+    Given a codex trace whose recovered conversation and tool spans describe the same tool call
+    When the session transcript is derived
+    Then that call is shown once and counted once
+
+  @unit
+  Scenario: The shown tool call keeps the timing and status only the span measured
+    Given a codex trace whose recovered conversation and tool spans describe the same tool call
+    When the session transcript is derived
+    Then the call shown carries the duration and the failure the span recorded
+
+  @unit
+  Scenario: A prompt full of unclosed tags is read without stalling the server
+    Given a recovered codex turn whose prompt pastes tens of thousands of unclosed tags
+    When the session transcript is derived
+    Then the transcript is derived promptly and the paste is shown as the user's own words

@@ -1238,6 +1238,205 @@ describe("given the two recovered turns arrive newest-first", () => {
   });
 });
 
+/**
+ * One tool run, described three times over: the recovered conversation carries
+ * the arguments and the result, codex's tool span carries the wall time and the
+ * status, its tool_result log carries both. All three name the same call_id.
+ */
+describe("given a codex trace whose recovered conversation and tool spans describe the same call", () => {
+  const callId = "call_papaya";
+
+  const transcriptOfAllThreeSignals = ({
+    spanFailed = false,
+  }: {
+    spanFailed?: boolean;
+  } = {}) =>
+    buildCodingAgentTranscript({
+      spans: [
+        recoveredCodexTurn({
+          atMs: 1_000,
+          messages: [
+            { role: "user", content: "echo papaya" },
+            {
+              role: "assistant",
+              tool_calls: [
+                {
+                  id: callId,
+                  type: "function",
+                  function: {
+                    name: "exec",
+                    arguments: '{"cmd":"echo papaya"}',
+                  },
+                },
+              ],
+            },
+            { role: "tool", tool_call_id: callId, content: "papaya" },
+          ],
+          output: "It printed papaya",
+        }),
+        {
+          spanId: "span-exec-1",
+          name: "exec_command",
+          startTimeMs: 1_100,
+          endTimeMs: 1_600,
+          status: spanFailed ? "error" : "ok",
+          params: { tool_name: "exec", call_id: callId },
+          input: null,
+          output: null,
+        } as unknown as SpanDetail,
+      ],
+      logs: [
+        log(
+          {
+            "event.name": "codex.tool_result",
+            call_id: callId,
+            tool_name: "exec",
+            arguments: '{"cmd":"echo papaya"}',
+            output: "papaya",
+            success: "true",
+            duration_ms: "523",
+          },
+          1_500,
+        ),
+      ],
+    });
+
+  describe("when the session transcript is derived", () => {
+    /** @scenario "A tool run recovered from the transcript and reported as a span is shown once" */
+    it("renders that call once and counts it once", () => {
+      const transcript = transcriptOfAllThreeSignals();
+
+      expect(
+        transcript.entries.filter((entry) => entry.kind === "tool"),
+      ).toHaveLength(1);
+      expect(transcript.totals.toolCalls).toBe(1);
+    });
+
+    /** @scenario "The shown tool call keeps the timing and status only the span measured" */
+    it("fills the one entry with the timing the span measured", () => {
+      const transcript = transcriptOfAllThreeSignals();
+
+      expect(
+        transcript.entries.find((entry) => entry.kind === "tool"),
+      ).toMatchObject({ name: "exec", output: "papaya", durationMs: 500 });
+    });
+
+    /** @scenario "The shown tool call keeps the timing and status only the span measured" */
+    it("marks the call failed when the span is the only signal saying so", () => {
+      const transcript = transcriptOfAllThreeSignals({ spanFailed: true });
+
+      expect(
+        transcript.entries.find((entry) => entry.kind === "tool"),
+      ).toMatchObject({ failed: true });
+    });
+  });
+});
+
+describe("given a prompt pasting tens of thousands of unclosed tags", () => {
+  describe("when the session transcript is derived", () => {
+    /** @scenario "A prompt full of unclosed tags is read without stalling the server" */
+    it("derives the transcript in well under a tenth of a second", () => {
+      // 63,999 characters, every tag unclosed, right at the size the
+      // injected-context test still considers: the shape that costs a
+      // backtracking tag match one scan to end-of-string per tag. The bound is
+      // loose by two orders of magnitude on purpose. What it pins is the
+      // scanner's algorithmic class, not a microbenchmark, so it holds on a
+      // loaded CI box.
+      const pasted = "<a>".repeat(21_333);
+      const span = recoveredCodexTurn({
+        atMs: 1_000,
+        messages: [{ role: "user", content: pasted }],
+        output: "noted",
+      });
+
+      const startedAtMs = performance.now();
+      const transcript = buildCodingAgentTranscript({
+        spans: [span],
+        logs: [],
+      });
+      const elapsedMs = performance.now() - startedAtMs;
+
+      expect(elapsedMs).toBeLessThan(100);
+      expect(
+        transcript.entries.find((entry) => entry.kind === "user_prompt"),
+      ).toMatchObject({ text: pasted });
+    });
+  });
+});
+
+/**
+ * Whether a message is nothing but tags, spelled the way the transcript's tag
+ * strip was first written: a backreference with a lazy body. It stands here as
+ * the oracle the derivation's scanner is held to, and it runs only over the
+ * few-hundred-character shapes below.
+ */
+function isTagsOnlyByBacktrackingStrip(content: string): boolean {
+  const trimmed = content.trim();
+  if (!trimmed.startsWith("<")) return false;
+  if (trimmed.length > 64_000) return false;
+  return (
+    trimmed.replace(/<([A-Za-z_][\w.-]*)(\s[^>]*)?>[\s\S]*?<\/\1>/g, "").trim()
+      .length === 0
+  );
+}
+
+/**
+ * Every tag shape this file already pins, plus the nesting, attribute and
+ * unmatched-tag shapes a prompt routinely pastes: JSX, diffs, generics, and
+ * envelopes that close in the wrong order.
+ */
+const TAG_SHAPES = [
+  "<recommended_plugins>\n- Airtable\n- Asana\n</recommended_plugins>\n<environment_context>\n<shell>zsh</shell>\n</environment_context>",
+  "<environment_context>\n<cwd>/tmp</cwd>\n</environment_context>",
+  "<system-reminder>\n# claudeMd\nContents of CLAUDE.md: always use pnpm.\n</system-reminder>\n\nRead hello.py and explain it",
+  "<system-reminder>MCP tools: grafana</system-reminder>\n\nhi",
+  "echo papaya and tell me the output",
+  "just a question",
+  "<a><a></a></a>",
+  "<a></b></a>",
+  '<a b="1">x</a>',
+  "<a x=<y>z</a>",
+  "<div><p>hi</p></div>",
+  "<a>unclosed <b>deep</b>",
+  "<a><b></a></b>",
+  "<a>x</a>\n<b>y</b>",
+  "<a/>",
+  "< a></a>",
+  "<1a></1a>",
+  "<A></a>",
+  "if (a < b && c < d) return;",
+  "<T>x</T> and Vec<T>",
+  "<a>",
+];
+
+describe("given the tag shapes a recovered prompt can carry", () => {
+  describe("when the session transcript is derived", () => {
+    /** @scenario "Context the agent injected under the user's name is not shown as their prompt" */
+    it("tells context from prose exactly as the tag strip always has", () => {
+      for (const content of TAG_SHAPES) {
+        const transcript = buildCodingAgentTranscript({
+          spans: [
+            recoveredCodexTurn({
+              atMs: 1_000,
+              messages: [{ role: "user", content }],
+              output: "ok",
+            }),
+          ],
+          logs: [],
+        });
+        const prompts = transcript.entries.filter(
+          (entry) => entry.kind === "user_prompt",
+        );
+
+        expect({ content, prompts: prompts.length }).toEqual({
+          content,
+          prompts: isTagsOnlyByBacktrackingStrip(content) ? 0 : 1,
+        });
+      }
+    });
+  });
+});
+
 describe("given a recovered reply longer than the producer writes to the span", () => {
   describe("when the next turn replays", () => {
     it("does not render that reply a second time just because it was truncated", () => {
