@@ -28,8 +28,9 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       relevant: ${{ steps.detect.outputs.relevant }}
+      ingest: ${{ steps.detect.outputs.ingest }}
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
         with:
           # The gate reads no working-tree content: on pull_request events
           # dorny/paths-filter takes the changed-file list from the API, and
@@ -56,6 +57,35 @@ jobs:
               - 'package.json'
               - '.npmrc'
               - '.github/workflows/sdk-javascript-ci.yml'
+            # Gates `e2e` only, never `ci`. The e2e job boots a real server
+            # and posts real SDK telemetry at it, so it is the only check in
+            # the repo that watches the ingest routes answer over a socket,
+            # and app-only changes are exactly what `relevant` misses. It
+            # cannot be folded into `relevant`: `ci` shares that filter and
+            # `ci` spends LLM budget on every match.
+            #
+            # Scoped to the HTTP transport spine the SDK traffic crosses
+            # before any of it becomes business logic. Everything those
+            # handlers go on to call has unit and integration coverage of its
+            # own; what has none is the seam between a socket and a handler,
+            # which only a live request can exercise.
+            ingest:
+              # The Hono route modules the SDK posts to, and the shared
+              # middleware under `_lib/` that the capped ones mount:
+              # /api/otel/v1/{traces,logs,metrics} and /api/collector.
+              - 'platform/app/src/server/routes/**'
+              # Mounts those modules and fixes their order. A route that
+              # resolves in the router but not on the wire is a mount bug,
+              # and mount order has silently swallowed API surfaces before.
+              - 'platform/app/src/server/api-router.ts'
+              # Reads the OTLP request body for those routes and decodes it,
+              # including the byte ceiling they enforce on it.
+              - 'platform/app/src/server/otel/**'
+              # Wires the Node bridge into Hono and decides whether the
+              # process keeps its own global Request/Response. Behaviour that
+              # depends on that seam is invisible to every test that does not
+              # go over a real socket.
+              - 'platform/app/src/start.ts'
 
   ci:
     needs: changes
@@ -70,7 +100,7 @@ jobs:
         working-directory: sdks/typescript
     steps:
       - name: Checkout
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
@@ -119,7 +149,8 @@ jobs:
   e2e:
     needs: changes
     if: >
-      needs.changes.outputs.relevant == 'true'
+      (needs.changes.outputs.relevant == 'true'
+       || needs.changes.outputs.ingest == 'true')
       && (github.event_name != 'pull_request_target'
           || github.event.label.name == 'approved-ci')
     runs-on: ubuntu-latest
@@ -184,12 +215,12 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
         with:
           version: 10.24.0
 
@@ -197,7 +228,7 @@ jobs:
       # e2e job (typescript-sdk, langwatch app, mcp-server). Calling
       # setup-node twice silently discards the first cache config.
       - name: Setup Node
-        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
         with:
           node-version: 24
           cache: "pnpm"

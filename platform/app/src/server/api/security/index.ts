@@ -12,6 +12,7 @@ export {
   requiresOnProject,
 } from "./access-policy";
 export {
+  documentedPathOf,
   isHttpMethod,
   type SecurityRequirement,
   securityForCredentialClass,

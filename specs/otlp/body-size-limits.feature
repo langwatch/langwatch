@@ -13,13 +13,13 @@ Feature: Body size limits on ingestion endpoints
 
   Rule: A body under the cap reaches its handler
 
-    @unit
+    @integration
     Scenario: A sender that declares its length is served
       Given an ingestion route with a body size cap
       When a request arrives declaring a length under the cap
       Then the handler receives the whole body
 
-    @unit
+    @integration
     Scenario: A sender that declares no length is served
       Given an ingestion route with a body size cap
       When a request arrives with no declared length and a body under the cap
@@ -30,13 +30,13 @@ Feature: Body size limits on ingestion endpoints
 
   Rule: A body over the cap is refused
 
-    @unit
+    @integration
     Scenario: A declared length over the cap is refused before the body is read
       Given an ingestion route with a body size cap
       When a request arrives declaring a length over the cap
       Then it is refused as too large
 
-    @unit
+    @integration
     Scenario: An undeclared body is refused once it passes the cap
       Given an ingestion route with a body size cap
       When a request arrives with no declared length and a body over the cap

@@ -35,7 +35,6 @@ import {
   timeseriesSeriesInput,
 } from "~/server/analytics/registry";
 import { sharedFiltersInputSchema } from "~/server/analytics/types";
-import { bodyLimit } from "~/server/api/bodyLimit";
 import { hasProjectPermission, isDemoProject } from "~/server/api/rbac";
 import {
   createServiceApp,
@@ -89,6 +88,7 @@ import { encrypt } from "~/utils/encryption";
 import { getClientIpFromHonoContext } from "~/utils/getClientIp";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { ssrfSafeFetch } from "~/utils/ssrfProtection";
+import { bodyLimit } from "./_lib/body-limit";
 import {
   experimentInitBadRequestSchema,
   experimentInitForbiddenSchema,
@@ -478,7 +478,11 @@ secured.access(experimentsManageAuth).post(
         param.timestamps.created_at.toString().length === 10
       ) {
         logger.error(
-          { param, projectId: project.id },
+          {
+            stepId: param.index,
+            runId: param.run_id,
+            projectId: project.id,
+          },
           "timestamps not in milliseconds for step",
         );
         return c.json(
@@ -511,7 +515,11 @@ secured.access(experimentsManageAuth).post(
             "failed to validate data for DSPy step",
           );
           captureException(toError(error), {
-            extra: { projectId: project.id, param },
+            extra: {
+              projectId: project.id,
+              stepId: param.index,
+              runId: param.run_id,
+            },
           });
           const validationError = fromZodError(error);
           return c.json({ error: validationError.message }, 400);
@@ -526,7 +534,11 @@ secured.access(experimentsManageAuth).post(
             "internal server error processing DSPy step",
           );
           captureException(toError(error), {
-            extra: { projectId: project.id, param },
+            extra: {
+              projectId: project.id,
+              stepId: param.index,
+              runId: param.run_id,
+            },
           });
           return c.json(
             {

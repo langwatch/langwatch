@@ -1,4 +1,4 @@
-import { platformSSOAllowed } from "@ee/sso/sso-gate";
+import { authProviderIsMounted, platformSSOAllowed } from "@ee/sso/sso-gate";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import { TRPCError } from "@trpc/server";
@@ -68,16 +68,23 @@ export const licenseRouter = createTRPCRouter({
     }),
 
   /**
-   * Whether this deployment is configured for single sign-on that the license
-   * gate is refusing to switch on.
+   * Why a deployment configured for single sign-on is not using it: either the
+   * license gate is refusing to switch it on, or the provider never mounted.
    *
    * The public environment cannot answer it: `NEXTAUTH_PROVIDER` there is the
-   * RESOLVED provider, which reports "email" for an unlicensed deployment and
-   * for one that never wanted SSO alike. Telling those apart is the whole point
-   * here, because the first is an operator who configured an IdP, upgraded, and
-   * now watches their company sign in by email with nothing on screen to say
-   * why (ADR-027 decided logs-only telemetry for the gate; this is a settings
-   * page, not telemetry).
+   * RESOLVED provider, which reports "email" for an unlicensed deployment, a
+   * misconfigured one, and one that never wanted SSO alike. Telling them apart
+   * is the whole point here, because the first two are an operator watching
+   * their company sign in by email with nothing on screen to say why (ADR-027
+   * decided logs-only telemetry for the gate; this is a settings page, not
+   * telemetry).
+   *
+   * `mounted` is reported separately from `licensed` because the two are fixed
+   * in different places: one by activating a license, the other by correcting
+   * the provider name or its client credentials. Both land in email mode, which
+   * is the no-lockout guarantee working, but neither is visible on the sign-in
+   * page, and an operator who cannot see them may believe federation is being
+   * enforced when it is not.
    *
    * Deployment-wide rather than per-organization, so there is no organization
    * to check a permission against and it skips that check deliberately. It
@@ -91,12 +98,13 @@ export const licenseRouter = createTRPCRouter({
     .query(async () => {
       const configuredProvider = env.NEXTAUTH_PROVIDER;
       if (!configuredProvider || configuredProvider === "email") {
-        return { configuredProvider: null, licensed: true };
+        return { configuredProvider: null, licensed: true, mounted: true };
       }
 
       return {
         configuredProvider,
         licensed: await platformSSOAllowed(),
+        mounted: authProviderIsMounted(),
       };
     }),
 

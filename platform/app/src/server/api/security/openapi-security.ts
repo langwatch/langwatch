@@ -30,6 +30,27 @@ export function isHttpMethod(member: string): boolean {
 }
 
 /**
+ * A registered route's path, spelled the way the OpenAPI document spells it.
+ *
+ * Hono writes a parameter as `:id` where the document writes `{id}`, and Hono
+ * may additionally pin the parameter to a pattern in braces — `/:id{.+}`,
+ * `/:id{.+?}`, `/:version{v[0-9]+}`. That pattern belongs to the matcher, not
+ * to the parameter's name, so it comes off here. Carrying it through produced
+ * `/api/prompts/{id}{.+}`, which matches no documented path, and every
+ * operation spelled that way kept the document-wide security default instead
+ * of the credential class its route enforces.
+ *
+ * The inner alternation allows one level of nesting so a quantifier inside the
+ * pattern (`{[0-9]{3}}`) is consumed whole rather than ending the match early.
+ */
+export function documentedPathOf(honoPath: string): string {
+  return honoPath.replace(
+    /:([A-Za-z0-9_]+)(\{(?:[^{}]|\{[^{}]*\})*\})?/g,
+    "{$1}",
+  );
+}
+
+/**
  * Which security schemes the published document offers for each credential
  * class.
  *

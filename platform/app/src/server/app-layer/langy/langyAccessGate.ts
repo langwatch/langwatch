@@ -9,9 +9,9 @@ type LangyFlagEvaluator = Pick<typeof featureFlagService, "isEnabled">;
 
 /**
  * The one authoritative answer to "may this user use Langy?", shared by every
- * customer-facing surface: the tRPC routers (`langy`, `langyGithub`,
- * `langyEgress`, via the `enforceLangyAccess` middleware) and the GitHub install
- * REST route. Every caller — staff included — must pass the same
+ * customer-facing surface: the tRPC routers (`langy`, `langyEgress`, via the
+ * `enforceLangyAccess` middleware) and the Langy REST routes. Every caller,
+ * staff included, must pass the same
  * `release_langy_enabled` evaluation; there is no identity-based bypass, so the
  * flag is a true kill switch rather than one with a hole in it.
  *

@@ -1,5 +1,26 @@
 # Changelog
 
+## [2.0.0](https://github.com/langwatch/langwatch/compare/mcp-server@v1.0.0...mcp-server@v2.0.0) (2026-08-07)
+
+
+### ⚠ BREAKING CHANGES
+
+* **mcp-server:** three behaviors change for callers of the HTTP server. A client that authenticated once at initialize and then sent only the session id must now send Authorization: Bearer <key> on every request. GET /sse?apiKey=<key> no longer authenticates; use the Authorization header. A deployment relying on the implicit 0.0.0.0 bind must pass --host 0.0.0.0, which the published container image already does.
+
+### Features
+
+* **api-docs:** publish the REST API the SDKs actually call, and gate route coverage ([#6605](https://github.com/langwatch/langwatch/issues/6605)) ([25884bf](https://github.com/langwatch/langwatch/commit/25884bf3992eb99c00c3c7bafb09b979b02f0013))
+
+
+### Bug Fixes
+
+* **mcp-server:** authorize every request to the standalone HTTP server ([#6641](https://github.com/langwatch/langwatch/issues/6641)) ([af324de](https://github.com/langwatch/langwatch/commit/af324deeb3700f2745783a46e6fd5e8625ef868e))
+
+
+### Code Refactoring
+
+* **build:** single pnpm workspace + restructure into sdks/ platform/ services/ mcp/ infra/ (ADR-076) ([#6405](https://github.com/langwatch/langwatch/issues/6405)) ([2bbeb7d](https://github.com/langwatch/langwatch/commit/2bbeb7dd2e0747e81478f22c3165adb9163c9f99))
+
 ## [1.0.0](https://github.com/langwatch/langwatch/compare/mcp-server@v0.10.1...mcp-server@v1.0.0) (2026-07-24)
 
 

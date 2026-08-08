@@ -50,6 +50,81 @@ export function gateTreeCost({
   );
 }
 
+/**
+ * Strip session spend from Sessions-lens rows for a viewer without cost:view.
+ * A per-session rollup is strictly more revealing than the per-trace cost the
+ * header and waterfall already gate, so it follows the same permission.
+ * Zeroed rather than nulled: the row's cost is a total, and the chips that
+ * render it already treat zero as "nothing to show".
+ */
+export function gateSessionCost<T extends { totalCost: number }>({
+  sessions,
+  protections,
+}: {
+  sessions: T[];
+  protections: Protections;
+}): T[] {
+  if (protections.canSeeCosts === true) return sessions;
+  return sessions.map((session) => ({ ...session, totalCost: 0 }));
+}
+
+/**
+ * Strip the generated session title from Sessions-lens rows for a viewer who
+ * may not read captured content.
+ *
+ * The title is written BY the model FROM the conversation, a one-line summary
+ * of what the human asked for, so it follows content visibility, not the cost
+ * permission, and needs BOTH sides: a title routinely paraphrases the prompt
+ * and the reply together, so a viewer allowed only one could read the other
+ * out of it. The git identity on the same object is operational metadata about
+ * where the session ran and is deliberately untouched.
+ *
+ * `titleRedacted` is set only when there WAS a title, mirroring
+ * `redactV2Content`: an ordinary session that never had one must not render
+ * the redaction placeholder.
+ */
+export function gateSessionTitle<
+  T extends { codingAgent: { title: string | null } | null },
+>({
+  sessions,
+  protections,
+}: {
+  sessions: T[];
+  protections: Protections;
+}): Array<
+  T & {
+    codingAgent:
+      | (NonNullable<T["codingAgent"]> & SessionTitleRedactionFlag)
+      | null;
+  }
+> {
+  const contentVisible =
+    protections.canSeeCapturedInput === true &&
+    protections.canSeeCapturedOutput === true;
+  return sessions.map((session) => {
+    const codingAgent = session.codingAgent as NonNullable<
+      T["codingAgent"]
+    > | null;
+    return {
+      ...session,
+      codingAgent:
+        codingAgent === null
+          ? null
+          : {
+              ...codingAgent,
+              title: contentVisible ? codingAgent.title : null,
+              titleRedacted: !contentVisible && codingAgent.title !== null,
+            },
+    };
+  });
+}
+
+/** What {@link gateSessionTitle} adds to a row's coding-agent enrichment. */
+export interface SessionTitleRedactionFlag {
+  /** True only when a title existed and this viewer may not read it. */
+  titleRedacted: boolean;
+}
+
 /** Redact resource attributes with the viewer's restricted-attribute rules. */
 export function gateResources({
   resources,

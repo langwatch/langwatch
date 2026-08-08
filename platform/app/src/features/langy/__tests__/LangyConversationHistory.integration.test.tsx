@@ -548,8 +548,8 @@ vi.mock("~/utils/api", async () => {
         useQuery: () => ({ data: undefined, isLoading: false }),
       },
     },
-    langyGithub: {
-      getInstallStatus: {
+    github: {
+      getConnectionStatus: {
         // Feature off in these tests — the header GitHub button hides
         // itself (isLoading=false, data=undefined) and stays out of the way.
         useQuery: () => ({

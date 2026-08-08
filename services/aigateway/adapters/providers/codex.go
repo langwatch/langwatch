@@ -11,7 +11,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/bytedance/sonic"
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
 
@@ -237,22 +236,15 @@ func (r *BifrostRouter) refreshCodexCredential(
 }
 
 // codexSessionExpiredError is the terminal 401 clients see when the stored
-// OpenAI session cannot be refreshed. The body carries the typed code so
-// Langy's error explainer renders the re-authenticate card.
+// OpenAI session cannot be refreshed. This is a LangWatch-authored error, not
+// a forwarded provider response, so it goes through herr rather than
+// domain.UpstreamError: that gets it the X-LangWatch-Handled-Error marker
+// (writeUpstreamError never sets it) and Langy's error explainer trusts the
+// marker before rendering the re-authenticate card.
 func codexSessionExpiredError(ctx context.Context) error {
-	_ = ctx
-	body, _ := sonic.Marshal(map[string]any{
-		"error": map[string]any{
-			"type":    string(domain.ErrCodexSessionExpired),
-			"code":    string(domain.ErrCodexSessionExpired),
-			"message": "Your OpenAI session expired. Sign in to Codex again to keep using it.",
-		},
+	return herr.New(ctx, domain.ErrCodexSessionExpired, herr.M{
+		"message": "Your OpenAI session expired. Sign in to Codex again to keep using it.",
 	})
-	return &domain.UpstreamError{
-		StatusCode: http.StatusUnauthorized,
-		Body:       body,
-		Message:    "codex session expired; sign in again",
-	}
 }
 
 // codexRequestBody pins the backend's invariants onto the caller's raw body:

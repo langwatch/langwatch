@@ -203,12 +203,15 @@ describe("maybeOfferIngestionShellRcPersist", () => {
     });
 
     describe("and settings.json already carries every OTEL key", () => {
-      it("does not prompt or write", async () => {
+      beforeEach(() => {
         fs.mkdirSync(path.dirname(claudeSettingsPath()), { recursive: true });
         fs.writeFileSync(
           claudeSettingsPath(),
           JSON.stringify({ env: otelVars }, null, 2),
         );
+      });
+
+      it("does not prompt again or rewrite the exports", async () => {
         // No answer queued: a fired prompt would read "" → "yes".
         const { maybeOfferIngestionShellRcPersist } = await import(
           "../shell-rc.js"
@@ -220,6 +223,22 @@ describe("maybeOfferIngestionShellRcPersist", () => {
         });
         expect(lastPrompts).toHaveLength(0);
         expect(saveConfigMock).not.toHaveBeenCalled();
+        const written = JSON.parse(fs.readFileSync(claudeSettingsPath(), "utf8"));
+        expect(written.env).toEqual(otelVars);
+      });
+
+      /** @scenario "A device whose exports are already current still gets the hooks" */
+      it("installs the session hooks those exports were persisted without", async () => {
+        const { maybeOfferIngestionShellRcPersist } = await import(
+          "../shell-rc.js"
+        );
+        await maybeOfferIngestionShellRcPersist({
+          cfg: cfg(),
+          tool: "claude",
+          vars: otelVars,
+        });
+        const written = JSON.parse(fs.readFileSync(claudeSettingsPath(), "utf8"));
+        expect(Object.keys(written.hooks)).toEqual(["SessionStart", "Stop"]);
       });
     });
 

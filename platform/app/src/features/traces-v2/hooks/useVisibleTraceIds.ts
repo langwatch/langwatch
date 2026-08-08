@@ -34,6 +34,14 @@ export function useVisibleTraceIds(): VisibleTraceIds {
   const pageCursor = useFilterStore((s) => s.pageCursors[s.page]);
   const queryText = useFilterStore((s) => s.debouncedQueryText);
   const sort = useViewStore((s) => s.sort);
+  const grouping = useViewStore((s) => s.grouping);
+
+  // Mirror useTraceListQuery's key EXACTLY or the cache read misses: the
+  // sessions lens pins the trace list to its first batch and stores opaque
+  // string cursors that the list query never consumes.
+  const traceCursor =
+    pageCursor && typeof pageCursor === "object" ? pageCursor : undefined;
+  const effectivePage = grouping !== "by-conversation" ? page : 1;
 
   const cached = trpcUtils.tracesV2.list.getData({
     projectId: project?.id ?? "",
@@ -43,9 +51,9 @@ export function useVisibleTraceIds(): VisibleTraceIds {
       live: !!timeRange.label,
     },
     sort: { columnId: sort.columnId, direction: sort.direction },
-    page,
+    page: effectivePage,
     pageSize,
-    ...(page > 1 && pageCursor ? { cursor: pageCursor } : {}),
+    ...(effectivePage > 1 && traceCursor ? { cursor: traceCursor } : {}),
     query: queryText || undefined,
   });
 

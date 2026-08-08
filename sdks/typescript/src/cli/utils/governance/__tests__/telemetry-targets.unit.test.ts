@@ -20,7 +20,16 @@ import {
 	claudeProjectSettingsTarget,
 	installAppEnv,
 } from "../app-settings";
+import {
+	installOpencodeSessionContextPlugin,
+	OPENCODE_PLUGIN_FILE_NAME,
+	opencodePluginTarget,
+} from "../opencode-plugin";
 import { telemetryEnvVarNames } from "../otel-env-block";
+import {
+	installSessionContextHooks,
+	sessionContextHookCommand,
+} from "../session-context-hooks";
 import {
 	buildScopedToolFunction,
 	persistBlockToRc,
@@ -32,6 +41,7 @@ let tmpHome: string;
 const origHome = process.env.HOME;
 const origUserprofile = process.env.USERPROFILE;
 const origCodexHome = process.env.CODEX_HOME;
+const origXdgConfigHome = process.env.XDG_CONFIG_HOME;
 
 const presentLabels = (): string[] =>
 	scanTelemetryTargets()
@@ -43,8 +53,10 @@ beforeEach(() => {
 	process.env.HOME = tmpHome;
 	process.env.USERPROFILE = tmpHome;
 	// codex resolves its home from CODEX_HOME first; keep it unset so it
-	// falls back to ~/.codex under the temp HOME.
+	// falls back to ~/.codex under the temp HOME. opencode reads
+	// XDG_CONFIG_HOME the same way, for ~/.config/opencode.
 	delete process.env.CODEX_HOME;
+	delete process.env.XDG_CONFIG_HOME;
 });
 
 afterEach(() => {
@@ -52,6 +64,8 @@ afterEach(() => {
 	process.env.USERPROFILE = origUserprofile;
 	if (origCodexHome === undefined) delete process.env.CODEX_HOME;
 	else process.env.CODEX_HOME = origCodexHome;
+	if (origXdgConfigHome === undefined) delete process.env.XDG_CONFIG_HOME;
+	else process.env.XDG_CONFIG_HOME = origXdgConfigHome;
 	fs.rmSync(tmpHome, { recursive: true, force: true });
 });
 
@@ -123,6 +137,79 @@ describe("scanTelemetryTargets", () => {
 			const after = JSON.parse(fs.readFileSync(claude.path, "utf8"));
 			expect(after.env).toEqual({ MY_OWN: "keep" });
 			expect(after.model).toBe("claude-sonnet-5");
+		});
+	});
+
+	describe("when settings.json carries the langwatch hooks and a user's own", () => {
+		const userEntry = {
+			hooks: [{ type: "command", command: "./scripts/session-log.sh" }],
+		};
+
+		/** @scenario "Logout removes exactly the LangWatch hook entries" */
+		it("removes the langwatch entries and leaves the user's hook", () => {
+			const claude = appSettingsTargetFor("claude")!;
+			fs.mkdirSync(path.dirname(claude.path), { recursive: true });
+			fs.writeFileSync(
+				claude.path,
+				JSON.stringify({ hooks: { SessionStart: [userEntry] } }, null, 2),
+			);
+			installSessionContextHooks({ tool: "claude_code" });
+
+			expect(
+				presentLabels().some((l) => l.startsWith("claude session hooks")),
+			).toBe(true);
+
+			for (const t of scanTelemetryTargets().filter((t) => t.present)) {
+				expect(t.remove()).toBe(true);
+			}
+
+			const after = JSON.parse(fs.readFileSync(claude.path, "utf8"));
+			expect(after.hooks).toEqual({ SessionStart: [userEntry] });
+			expect(JSON.stringify(after)).not.toContain(
+				sessionContextHookCommand("claude_code"),
+			);
+			expect(presentLabels()).toEqual([]);
+		});
+	});
+
+	describe("when the codex hooks and the opencode plugin are installed", () => {
+		/** @scenario "Logout removes the codex hooks and the opencode plugin" */
+		it("reports both, then removes both", () => {
+			installSessionContextHooks({ tool: "codex" });
+			installOpencodeSessionContextPlugin();
+
+			const labels = presentLabels();
+			expect(labels.some((l) => l.startsWith("codex session hooks"))).toBe(
+				true,
+			);
+			expect(labels.some((l) => l.startsWith("opencode session plugin"))).toBe(
+				true,
+			);
+
+			for (const t of scanTelemetryTargets().filter((t) => t.present)) {
+				expect(t.remove()).toBe(true);
+			}
+
+			expect(presentLabels()).toEqual([]);
+			expect(fs.existsSync(opencodePluginTarget().path)).toBe(false);
+		});
+
+		/** @scenario "A plugin file LangWatch did not write is never removed" */
+		it("leaves a plugin of the same name somebody else wrote", () => {
+			const target = opencodePluginTarget();
+			fs.mkdirSync(path.dirname(target.path), { recursive: true });
+			fs.writeFileSync(target.path, "export const Mine = async () => ({});\n");
+
+			expect(
+				presentLabels().some((l) => l.startsWith("opencode session plugin")),
+			).toBe(false);
+
+			for (const t of scanTelemetryTargets()) t.remove();
+
+			expect(fs.readFileSync(target.path, "utf8")).toBe(
+				"export const Mine = async () => ({});\n",
+			);
+			expect(path.basename(target.path)).toBe(OPENCODE_PLUGIN_FILE_NAME);
 		});
 	});
 

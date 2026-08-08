@@ -60,6 +60,35 @@ const str = (
   return typeof value === "string" && value.length > 0 ? value : fallback;
 };
 
+type MissingModelRequestType =
+  | "chat"
+  | "messages"
+  | "responses"
+  | "embeddings"
+  | "speech"
+  | "transcription"
+  | "passthrough";
+
+const missingModelDescriptions = {
+  chat: 'Add a top-level "model" field to POST /v1/chat/completions, then try again.',
+  messages:
+    'Add a top-level "model" field to POST /v1/messages, then try again.',
+  responses:
+    'Add a top-level "model" field to POST /v1/responses, then try again.',
+  embeddings:
+    'Add a top-level "model" field to POST /v1/embeddings, then try again.',
+  speech:
+    'Add a top-level "model" field to POST /v1/audio/speech, then try again.',
+  transcription:
+    'Add a "model" field to the multipart form for POST /v1/audio/transcriptions, then try again.',
+  passthrough: "Put the model in the Gemini request URL, then try again.",
+} as const satisfies Record<MissingModelRequestType, string>;
+
+const describeMissingModel = (error: HandledErrorShape): string =>
+  (missingModelDescriptions as Record<string, string>)[
+    str(error, "request_type", "")
+  ] ?? "Set the model where this endpoint expects it, then try again.";
+
 /**
  * Reads a number out of `meta` without trusting it. `meta` crosses a wire,
  * so a value that arrives as a string or NaN has to read as absent rather
@@ -122,6 +151,39 @@ const PROVIDER_ALLOWANCE_REASONS: ReadonlySet<string> = new Set([
   "insufficient_quota",
   "billing_hard_limit_reached",
 ]);
+
+/**
+ * The upstream-HTTP-status fallback reasons (llmproxy.go's
+ * upstreamReasonCodes), used when the provider's own body carried no
+ * discriminant of its own. Grouped the same way PROVIDER_ALLOWANCE_REASONS
+ * is: one remediation, one sentence.
+ */
+const PROVIDER_CREDENTIAL_REASONS: ReadonlySet<string> = new Set([
+  "upstream_unauthorized",
+  "upstream_forbidden",
+]);
+
+const PROVIDER_RATE_LIMIT_REASONS: ReadonlySet<string> = new Set([
+  "upstream_rate_limited",
+]);
+
+const PROVIDER_OUTAGE_REASONS: ReadonlySet<string> = new Set([
+  "upstream_unavailable",
+  "upstream_timeout",
+]);
+
+/**
+ * The provider a retired one was folded into, written the way the product
+ * writes it. Keyed by the registry slug that rides in `meta.replacement`.
+ *
+ * A table rather than a title-cased slug, because provider names are brand
+ * names ("OpenAI", "vLLM") that no casing rule gets right, and because an
+ * unmapped slug should fall back to a sentence that omits the name rather
+ * than print a raw identifier at a customer.
+ */
+const DEPRECATED_PROVIDER_REPLACEMENTS: Record<string, string> = {
+  gemini: "Gemini",
+};
 
 /**
  * Looks a label up in one of the tables below, without trusting the key.
@@ -419,6 +481,23 @@ const presentations = {
         ? "Removing a provider by name needs a project. Pick one and try again."
         : "Choose a project or an organization, then try again.",
   },
+  model_provider_deprecated: {
+    // Reader tried to ADD a provider that has been absorbed into another
+    // one — from the API, an SDK, or a page open since before the change,
+    // since the Add menu no longer offers it. Their stored rows are fine
+    // and the copy says so, because "no longer available" otherwise reads
+    // as "the one I already have just broke".
+    title: "This provider has moved",
+    describe: (error) => {
+      const replacement = label(
+        DEPRECATED_PROVIDER_REPLACEMENTS,
+        str(error, "replacement", ""),
+      );
+      return replacement
+        ? `Add ${replacement} instead — it now covers this. Providers you already set up keep working.`
+        : "It has been merged into another provider. Providers you already set up keep working.";
+    },
+  },
   model_provider_scopes_required: {
     title: "Choose where this provider applies",
     describe: () =>
@@ -444,6 +523,21 @@ const presentations = {
     describe: () =>
       "Nothing has a model set yet. Pick one in your project's model settings, then try again.",
   },
+  model_restricted_for_feature: {
+    // Distinct from `model_not_configured`: a model IS set, but it's
+    // licensed for Langy and the quick assists only (see
+    // codex-account-provider.feature) and this feature needs full
+    // inference.
+    title: "This model can't be used here",
+    describe: (error) => {
+      const featureDisplayName = str(
+        error,
+        "featureDisplayName",
+        "this feature",
+      );
+      return `Pick a different default model for ${featureDisplayName} in your project's model settings.`;
+    },
+  },
   model_provider_disabled: {
     title: "This model provider is turned off",
     describe: () =>
@@ -464,6 +558,25 @@ const presentations = {
     describe: () =>
       "It may have been removed, or it isn't available here. Reload to see the current list.",
   },
+  model_provider_test_rate_limited: {
+    // Nothing is wrong with the credential — we simply stopped asking. Saying
+    // "wait" without saying how long invites the customer to keep clicking,
+    // which is the behaviour the limit exists to stop, so the number rides in
+    // `meta` and gets read back here.
+    title: "Too many connection tests",
+    describe: (error) => {
+      // Rounded up here rather than trusted from the wire. The server sends a
+      // whole number today, but this is a client contract read by whatever
+      // sends the code, and a fraction would print "about 30.427 seconds" and
+      // slip past the `=== 1` singular check. Up, not down: rounding down
+      // invites a retry the limiter is still going to refuse.
+      const raw = Number(error.meta.retryAfterSeconds);
+      const seconds = Number.isFinite(raw) ? Math.ceil(raw) : 0;
+      return seconds > 0
+        ? `Wait about ${seconds} second${seconds === 1 ? "" : "s"} and try again.`
+        : "Wait a moment and try again.";
+    },
+  },
   provider_key_invalid: {
     // The provider positively identified the credential as wrong, which is the
     // one refusal a new key actually fixes. Deliberately says nothing about
@@ -472,6 +585,14 @@ const presentations = {
     title: "That API key was refused",
     describe: () =>
       "The provider didn't recognise it. Check you copied the whole key, and that it belongs to the right account.",
+  },
+  provider_endpoint_redirected: {
+    // Not "we couldn't reach it" — something answered, and it wants us
+    // somewhere else. Saying so is the difference between the customer
+    // checking their network and the customer fixing a URL.
+    title: "That endpoint redirects somewhere else",
+    describe: () =>
+      "We don't follow redirects when sending a credential. Point the base URL at the address the provider actually serves — an http:// URL redirecting to https:// is the usual cause.",
   },
   provider_key_missing: {
     title: "No API key to check",
@@ -483,10 +604,20 @@ const presentations = {
     // what "invalid" would send them off to do. The reason is a discriminant
     // from a set Google enumerates, so branching copy on it is safe.
     title: "This key's restrictions block the request",
-    describe: (error) =>
-      error.meta.reason === "API_KEY_SERVICE_BLOCKED"
-        ? "Its API restrictions exclude the Generative Language API. Allow that API in the Google Cloud console, or set up a Vertex AI provider instead."
-        : "Its application restrictions don't allow a call from our servers. Adjust them in the Google Cloud console, then try again.",
+    // The same refusal reason means opposite remediations on Google's two
+    // doors, so the sentence follows `meta.googleDoor` (set by the
+    // validation walk): a key blocked on the Gemini API likely belongs on
+    // the Agent Platform door and needs the pair filled in, while a key
+    // blocked on Agent Platform likely belongs on the Gemini API and
+    // needs the pair cleared.
+    describe: (error) => {
+      if (error.meta.reason !== "API_KEY_SERVICE_BLOCKED") {
+        return "Its application restrictions don't allow a call from our servers. Adjust them in the Google Cloud console, then try again.";
+      }
+      return error.meta.googleDoor === "agent-platform"
+        ? "This key can't call the Agent Platform service. If it is an AI Studio key, clear the Google Cloud Project and Location fields and save again; otherwise allow the Agent Platform API in the Google Cloud console."
+        : "This key belongs to a different Google service. If it is a Gemini Enterprise Agent Platform key, fill in the Google Cloud Project and Location fields and save again; otherwise allow the Generative Language API in the Google Cloud console.";
+    },
   },
   provider_refused: {
     // fault: provider. It answered and said no, but not in terms we can map —
@@ -582,6 +713,23 @@ const presentations = {
   lite_member_restricted: {
     title: "Your account doesn't include this",
     describe: () => "Ask an admin on your team to upgrade your access.",
+  },
+  personal_project_key_required: {
+    // Reached with a key in hand, so the answer is which key to use instead.
+    // "Personal workspace" is the name the product uses on the page the right
+    // key comes from, which is what makes it findable rather than a rule.
+    title: "That API key isn't for a personal workspace",
+    describe: () =>
+      "This shows one person's own activity, so it needs the API key from your personal workspace. A shared or team workspace key covers everybody in it and can't answer for one person.",
+  },
+  personal_usage_key_mismatch: {
+    // A deliberate denial rather than a mistake to correct: being allowed to
+    // view somebody's workspace is not the same as it being yours, so the copy
+    // has to close the retry rather than invite one. Nothing here names whose
+    // workspace it is, which is the question the refusal exists to withhold.
+    title: "That workspace is somebody else's",
+    describe: () =>
+      "A key only reports on the personal workspace it belongs to, even where you can otherwise view the workspace. Use the API key from your own personal workspace.",
   },
   personal_workspace_not_managed_here: {
     // Whoever reads this was managing somebody's access, so the answer has to
@@ -1352,6 +1500,35 @@ const presentations = {
     title: "You don't have permission to attach guardrails",
     describe: () => "Ask an admin on your team for access to this project.",
   },
+  github_not_connected: {
+    title: "GitHub is not connected",
+    describe: () =>
+      "Connect GitHub for this organization in Settings, Integrations. An organization admin can do it.",
+  },
+  github_installation_suspended: {
+    // Only a person on github.com can lift a suspension, so there is nothing to
+    // retry and nothing to change in LangWatch.
+    title: "The GitHub connection is suspended",
+    describe: () =>
+      "GitHub has suspended the LangWatch app for this account. Resume it from the app's page on GitHub.",
+  },
+  github_repo_not_accessible: {
+    title: "That repository isn't available to LangWatch",
+    describe: () =>
+      "The GitHub app doesn't have access to that repository. Grant it access from Settings, Integrations, Configure, then try again.",
+  },
+  github_rate_limited: {
+    // fault: provider. Nobody did anything wrong, GitHub is simply throttling.
+    title: "GitHub is rate limiting requests",
+    describe: () => "Try again in a few minutes.",
+  },
+  github_pr_not_mapped: {
+    // Two causes, one sentence each: the repository was never connected, or it
+    // was and the mapping has not run yet. Both are waits, not mistakes.
+    title: "That pull request isn't linked yet",
+    describe: () =>
+      "Connect the repository in Settings, Integrations, or wait a few minutes for the linking to catch up.",
+  },
   virtual_key_not_found: {
     title: "Virtual key not found",
     describe: () =>
@@ -1540,6 +1717,10 @@ const presentations = {
     // in the registry of a code whose meta must never be rendered.
     describe: () => "We've been notified. Try again in a moment.",
   },
+  missing_model: {
+    title: "Choose a model",
+    describe: describeMissingModel,
+  },
 
   // ---- Langy agent ----
   llm_upstream_error: {
@@ -1565,10 +1746,21 @@ const presentations = {
     // cannot name is exactly the ADR-045 "unknown" case, and a trace id serves
     // the customer better than a sentence we cannot vouch for.
     title: "The model provider rejected that",
-    describe: (error) =>
-      hasReasonCode(error.reasons, PROVIDER_ALLOWANCE_REASONS)
-        ? "Your account with this model provider has no allowance left. Check its billing or usage limits, or pick a model from a different provider."
-        : "Try again, or pick a different model.",
+    describe: (error) => {
+      if (hasReasonCode(error.reasons, PROVIDER_ALLOWANCE_REASONS)) {
+        return "Your account with this model provider has no allowance left. Check its billing or usage limits, or pick a model from a different provider.";
+      }
+      if (hasReasonCode(error.reasons, PROVIDER_CREDENTIAL_REASONS)) {
+        return "The model provider refused this key or its permissions. Check the credential configured for this model.";
+      }
+      if (hasReasonCode(error.reasons, PROVIDER_RATE_LIMIT_REASONS)) {
+        return "The model provider is rate-limiting these calls. Wait a moment and try again.";
+      }
+      if (hasReasonCode(error.reasons, PROVIDER_OUTAGE_REASONS)) {
+        return "The model provider is temporarily unavailable. Try again shortly, or pick a different model.";
+      }
+      return "Try again, or pick a different model.";
+    },
   },
   agent_error: {
     title: "Something went wrong mid-answer",
