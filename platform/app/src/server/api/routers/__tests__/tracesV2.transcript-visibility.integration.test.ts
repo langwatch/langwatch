@@ -28,6 +28,7 @@ import {
 
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { getTestProject } from "../../../../utils/testUtils";
+import type { DataPrivacyConfig } from "../../../data-privacy/dataPrivacy.types";
 import { getDataPrivacyPolicyService } from "../../../data-privacy/dataPrivacyPolicy.service";
 import { prisma } from "../../../db";
 import { getProtectionsForProject } from "../../utils";
@@ -149,11 +150,11 @@ describe("transcript captured-content matrix for an API-key caller", () => {
     await cleanupTestRows(prisma, [["dataPrivacyPolicy", { organizationId }]]);
   });
 
-  async function setPolicy(config: Record<string, unknown>) {
+  async function setPolicy(config: DataPrivacyConfig) {
     await service.setForScope({
       scope: { scopeType: "PROJECT", scopeId: project.id },
       personalOnly: false,
-      config: config as never,
+      config,
     });
   }
 
@@ -178,14 +179,17 @@ describe("transcript captured-content matrix for an API-key caller", () => {
   describe("when both categories are captured (the permissive default)", () => {
     /** @scenario transcript endpoint serves captured content to an API key caller */
     it("serves the prompt and the reply for every agent wire shape", async () => {
-      expect(await documentFor(CLAUDE_LOGS)).toContain(USER_PROMPT_SECRET);
-      expect(await documentFor(CLAUDE_LOGS)).toContain(ASSISTANT_REPLY_SECRET);
+      const claude = await documentFor(CLAUDE_LOGS);
+      expect(claude).toContain(USER_PROMPT_SECRET);
+      expect(claude).toContain(ASSISTANT_REPLY_SECRET);
 
-      expect(await documentFor(GEMINI_LOGS)).toContain(USER_PROMPT_SECRET);
-      expect(await documentFor(GEMINI_LOGS)).toContain(ASSISTANT_REPLY_SECRET);
+      const gemini = await documentFor(GEMINI_LOGS);
+      expect(gemini).toContain(USER_PROMPT_SECRET);
+      expect(gemini).toContain(ASSISTANT_REPLY_SECRET);
 
-      expect(await documentFor(CODEX_LOGS)).toContain(USER_PROMPT_SECRET);
-      expect(await documentFor(CODEX_LOGS)).toContain(TOOL_OUTPUT_SECRET);
+      const codex = await documentFor(CODEX_LOGS);
+      expect(codex).toContain(USER_PROMPT_SECRET);
+      expect(codex).toContain(TOOL_OUTPUT_SECRET);
     });
   });
 
@@ -206,6 +210,10 @@ describe("transcript captured-content matrix for an API-key caller", () => {
       expect(await documentFor(GEMINI_LOGS)).not.toContain(
         ASSISTANT_REPLY_SECRET,
       );
+    });
+
+    it("still serves tool arguments, which the policy leaves captured", async () => {
+      expect(await documentFor(CODEX_LOGS)).toContain(TOOL_ARGS_SECRET);
     });
 
     /** @scenario transcript endpoint withholds restricted tool output from an API key caller */
@@ -234,6 +242,7 @@ describe("transcript captured-content matrix for an API-key caller", () => {
       expect(await documentFor(CODEX_LOGS)).not.toContain(USER_PROMPT_SECRET);
     });
 
+    /** @scenario transcript endpoint withholds restricted tool arguments from an API key caller */
     it("withholds tool arguments, which carry what the agent was asked to run", async () => {
       expect(await documentFor(CODEX_LOGS)).not.toContain(TOOL_ARGS_SECRET);
     });

@@ -53,7 +53,8 @@ const SESSION_FREE_TEXT: LogContentCategory = "both";
 
 /**
  * Content keys per canonical event, in the order a reader probes them (`body`
- * always trailing). Events absent here fall back to {@link DEFAULT_CONTENT_KEYS}.
+ * always trailing). Events absent here fall back to
+ * {@link UNKNOWN_EVENT_CONTENT_KEYS}.
  */
 const CONTENT_KEYS_BY_EVENT: Readonly<
   Record<string, readonly LogContentKey[]>
@@ -117,6 +118,14 @@ const CONTENT_KEYS_BY_EVENT: Readonly<
  * Wire names with no canonical alias, so `normalizeEventName` cannot place
  * them. `api_request_body` is claude's raw request payload: the request side
  * of a model call, gated on input like the `api_request` it belongs to.
+ *
+ * Looked up on the RAW name, deliberately: these spellings exist precisely
+ * because the canonical vocabulary has no entry for them. A namespaced
+ * variant (`claude_code.api_request_body`) therefore misses this table and
+ * falls to {@link UNKNOWN_EVENT_CONTENT_KEYS}, which over-hides rather than
+ * under-hides. Keep it that way: an entry here with an `output` or `input`
+ * category is only reachable by exact wire spelling, so anything that needs
+ * to survive a namespace belongs in the canonical table above.
  */
 const CONTENT_KEYS_BY_RAW_EVENT: Readonly<
   Record<string, readonly LogContentKey[]>
@@ -124,28 +133,54 @@ const CONTENT_KEYS_BY_RAW_EVENT: Readonly<
   api_request_body: [{ key: BODY_ATTR, category: "input" }],
 };
 
-/**
- * An unrecognised event that still carries a body: the content is real but its
- * side is unknown, so it fails closed and needs BOTH categories.
- */
-const DEFAULT_CONTENT_KEYS: readonly LogContentKey[] = [
-  { key: BODY_ATTR, category: SESSION_FREE_TEXT },
+/** Every content key any known event uses, `body` trailing. */
+const ALL_CONTENT_KEYS: readonly string[] = [
+  ...new Set(
+    Object.values(CONTENT_KEYS_BY_EVENT)
+      .flatMap((entries) => entries.map((entry) => entry.key))
+      .filter((key) => key !== BODY_ATTR),
+  ),
+  BODY_ATTR,
 ];
 
-/** The content keys an event carries, resolved through the canonical vocabulary. */
-export function logContentKeys(eventName: string): readonly LogContentKey[] {
+/**
+ * The gate's fallback for an event in neither table. It withholds EVERY key
+ * the table knows, not just `body`: a new agent adapter, or a new event on an
+ * existing one, would otherwise carry `prompt` or `response_text` straight
+ * through the gate untouched — the same bypass shape a namespaced event had.
+ * The side is unknown, so every one of them needs BOTH categories.
+ */
+const UNKNOWN_EVENT_CONTENT_KEYS: readonly LogContentKey[] =
+  ALL_CONTENT_KEYS.map((key) => ({ key, category: SESSION_FREE_TEXT }));
+
+/** The table entry for an event, or undefined when neither table places it. */
+function knownContentKeys(
+  eventName: string,
+): readonly LogContentKey[] | undefined {
   const canonical = normalizeEventName(eventName);
   if (canonical !== null && CONTENT_KEYS_BY_EVENT[canonical]) {
     return CONTENT_KEYS_BY_EVENT[canonical];
   }
-  return CONTENT_KEYS_BY_RAW_EVENT[eventName] ?? DEFAULT_CONTENT_KEYS;
+  return CONTENT_KEYS_BY_RAW_EVENT[eventName];
 }
 
 /**
- * The attribute keys that can carry an event's content payload, in probe
- * order. The read-path enrichment reads the FIRST one present; the API's log
- * redaction withholds EVERY one present, each behind its own category.
+ * What the API's log redaction withholds: every content key present on the
+ * record, each behind its own category, and for an unrecognised event every
+ * key the table knows. Always a superset of {@link contentAttrKeys}, which is
+ * what makes the gate impossible to walk past.
+ */
+export function logContentKeys(eventName: string): readonly LogContentKey[] {
+  return knownContentKeys(eventName) ?? UNKNOWN_EVENT_CONTENT_KEYS;
+}
+
+/**
+ * What the read-path enrichment probes to find an event's content payload, in
+ * order: it reads the FIRST key present. An unrecognised event keeps the plain
+ * `body` convention here rather than the gate's wide fallback, because guessing
+ * a content key for an event we do not know would surface the wrong attribute
+ * as span content. Hiding too much is safe; showing the wrong thing is not.
  */
 export function contentAttrKeys(eventName: string): readonly string[] {
-  return logContentKeys(eventName).map((entry) => entry.key);
+  return knownContentKeys(eventName)?.map((entry) => entry.key) ?? [BODY_ATTR];
 }

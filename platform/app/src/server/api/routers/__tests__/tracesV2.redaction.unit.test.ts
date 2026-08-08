@@ -661,14 +661,19 @@ describe("redactTraceLogContent", () => {
         '{"command":"cat /etc/private"}',
       );
       expect(hidOutput.attributes.output).toBeUndefined();
+      // The flag is what makes the UI say "content withheld" rather than
+      // render an empty record as "nothing happened here".
+      expect(hidOutput.bodyRedacted).toBe(true);
 
       const hidInput = redactTraceLogContent(codexToolResult, outputOnly);
       expect(hidInput.attributes.arguments).toBeUndefined();
       expect(hidInput.attributes.output).toBe("the secret file contents");
+      expect(hidInput.bodyRedacted).toBe(true);
 
       const hidBoth = redactTraceLogContent(codexToolResult, blind);
       expect(hidBoth.attributes.arguments).toBeUndefined();
       expect(hidBoth.attributes.output).toBeUndefined();
+      expect(hidBoth.bodyRedacted).toBe(true);
       // Metadata survives: which tool ran, and whether it worked.
       expect(hidBoth.attributes.tool_name).toBe("shell");
       expect(hidBoth.attributes.success).toBe("true");

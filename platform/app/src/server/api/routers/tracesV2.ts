@@ -2291,10 +2291,14 @@ export function redactTraceLogContent(
   // event's own `body` category, or fails closed when the event is unknown.
   const bodyCategory: LogContentCategory =
     contentKeys.find((entry) => entry.key === "body")?.category ?? "both";
-  const hideBody =
+  const shouldHideBody =
     row.body.length > 0 && row.body !== eventName && !canSee(bodyCategory);
 
-  if (hiddenKeys.length === 0 && hiddenDerivedKeys.length === 0 && !hideBody) {
+  if (
+    hiddenKeys.length === 0 &&
+    hiddenDerivedKeys.length === 0 &&
+    !shouldHideBody
+  ) {
     return row;
   }
 
@@ -2306,7 +2310,7 @@ export function redactTraceLogContent(
   // a record that shed both sides has no single audience to name.
   const hiddenCategories = new Set<LogContentCategory>([
     ...hiddenKeys.map((entry) => entry.category),
-    ...(hideBody ? [bodyCategory] : []),
+    ...(shouldHideBody ? [bodyCategory] : []),
     ...(hiddenDerivedKeys.some((key) =>
       key.startsWith(DERIVED_INPUT_ATTR_PREFIX),
     )
@@ -2323,7 +2327,7 @@ export function redactTraceLogContent(
 
   return {
     ...row,
-    body: hideBody ? "" : row.body,
+    body: shouldHideBody ? "" : row.body,
     attributes,
     bodyRedacted: true,
     bodyVisibleTo:

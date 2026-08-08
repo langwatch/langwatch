@@ -63,6 +63,54 @@ describe("logContentKeys", () => {
     it("fails closed: its body needs both categories", () => {
       expect(categoryOf("something_new", "body")).toBe("both");
     });
+
+    /**
+     * The bypass this PR closes was "the record matches no known content key,
+     * so nothing is withheld". An unaliased event would reopen it if the
+     * fallback only covered `body`.
+     */
+    it("withholds every content key the table knows, not just the body", () => {
+      const keys = logContentKeys("brand_new_agent.some_event");
+
+      for (const key of ["prompt", "response", "response_text", "output"]) {
+        expect(keys.map((entry) => entry.key)).toContain(key);
+        expect(categoryOf("brand_new_agent.some_event", key)).toBe("both");
+      }
+    });
+
+    it("keeps the enrichment probe on the plain body convention", () => {
+      // Guessing a content key for an unknown event would surface the wrong
+      // attribute as span content. Over-hiding is safe; mis-showing is not.
+      expect(contentAttrKeys("brand_new_agent.some_event")).toEqual(["body"]);
+    });
+  });
+
+  /**
+   * The gate must never withhold less than the enrichment surfaces, or content
+   * reaches a reader through a key the gate does not know about.
+   */
+  describe("given any event", () => {
+    it("gates at least every key the enrichment probe can surface", () => {
+      for (const eventName of [
+        "user_prompt",
+        "assistant_response",
+        "api_request_body",
+        "api_response_body",
+        "codex.tool_result",
+        "gemini_cli.api_response",
+        "gemini_cli.tool_call",
+        "tool_decision",
+        "commit",
+        "brand_new_agent.some_event",
+      ]) {
+        const gated = new Set(
+          logContentKeys(eventName).map((entry) => entry.key),
+        );
+        for (const key of contentAttrKeys(eventName)) {
+          expect(gated).toContain(key);
+        }
+      }
+    });
   });
 
   describe("given free text the agent wrote about the session", () => {
@@ -114,6 +162,14 @@ describe("the derivation cannot read a content attribute the table misses", () =
     const read = [
       ...derivation.matchAll(/read(?:String|Number)\(attrs, "([^"]+)"\)/g),
     ].map((match) => match[1]!);
+    // A guard that matches nothing passes for the wrong reason. These are the
+    // attributes the derivation demonstrably reads today, so if it moves to a
+    // different accessor the count collapses and this fails rather than going
+    // quietly green.
+    expect(read).toContain("prompt");
+    expect(read).toContain("response");
+    expect(read).toContain("response_text");
+    expect(read.length).toBeGreaterThan(15);
 
     const classified = new Set<string>();
     for (const eventName of [

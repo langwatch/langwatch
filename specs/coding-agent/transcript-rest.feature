@@ -51,6 +51,12 @@ Feature: Coding agent transcript over REST and CLI
     Then the user prompt is withheld, whatever the agent
 
   @integration
+  Scenario: transcript endpoint withholds restricted tool arguments from an API key caller
+    Given a project whose captured input is restricted to an audience
+    When GET /api/traces/{traceId}/transcript is called with a project API key
+    Then the instruction a tool was asked to run is withheld
+
+  @integration
   Scenario: transcript endpoint withholds every content category a drop policy covers
     Given a project that drops captured input and output
     When GET /api/traces/{traceId}/transcript is called with a project API key
