@@ -33,6 +33,9 @@ export function AnnotationEditorCard({
     annotationId: draft.annotationId,
     enabled: true,
     onDone: closeDraft,
+    anchorKind: draft.anchorKind,
+    anchorId: draft.anchorId,
+    anchorPath: draft.anchorPath,
   });
   const { existing } = mutations;
 
@@ -66,6 +69,7 @@ export function AnnotationEditorCard({
     isDeleting: mutations.isDeleting,
     hasExisting: mutations.hasExisting,
     isSaveBlocked: mutations.isSaveBlocked,
+    isAnchored: !!draft.anchorKind,
     handleSave: () =>
       mutations.save({
         comment: draft.comment,

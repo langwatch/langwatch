@@ -74,14 +74,11 @@ export function TurnActionRow({
 
   if (!canManage && !translation) return null;
 
-  // The trio used to sit permanently visible on every turn separator —
-  // ~180px of chrome multiplied across N turns adds a lot of visual
-  // weight to a view that's supposed to be "read the conversation".
-  // Default to invisible + reveal on `_groupHover` of the parent
-  // ChatTurnRow Flex (which already declares `role="group"`). Forced
-  // visible while a popover is open so the anchor doesn't vanish under
-  // the user mid-edit — and while a translation is showing/loading so
-  // the way back to the original text stays discoverable.
+  // Kept out of the way until the turn is hovered: ~180px of chrome on every
+  // separator adds a lot of weight to a view whose job is "read the
+  // conversation". Held visible while a popover is open so the anchor does not
+  // vanish under the user mid-edit, and while a translation is showing or
+  // loading so the way back to the original text stays discoverable.
   const isForceVisible =
     openPopover !== null || !!translation?.isActive || !!translation?.isLoading;
 
@@ -92,10 +89,31 @@ export function TurnActionRow({
       flexWrap="wrap"
       justify="flex-end"
       onClick={stop}
+      // An opaque surface of its own, so the revealed actions read as a
+      // toolbar floating over the separator rather than as words printed on
+      // top of the turn ledger underneath.
+      bg="bg.panel"
+      borderWidth="1px"
+      borderColor="border.muted"
+      borderRadius="sm"
+      boxShadow="sm"
+      paddingX={1}
+      paddingY={0.5}
       opacity={isForceVisible ? 1 : 0}
       _groupHover={{ opacity: 1 }}
       _groupFocusWithin={{ opacity: 1 }}
       transition="opacity 120ms ease"
+      // Hover is also what makes the toolbar a click target: while it is not
+      // revealed it lies over the ledger and would swallow the click that
+      // selects the turn. The rule is scoped to pointers that can hover,
+      // because a pointer that cannot has no way to reveal the toolbar and
+      // would be left unable to reach the actions at all.
+      css={{
+        "@media (hover: hover)": {
+          pointerEvents: isForceVisible ? "auto" : "none",
+          ".group:hover &, .group:focus-within &": { pointerEvents: "auto" },
+        },
+      }}
     >
       {translation && (
         <Tooltip
@@ -302,8 +320,11 @@ export function TurnAnnotationBadges({
   const { project, hasPermission } = useOrganizationTeamProject();
   const [listOpen, setListOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  // What the turn carries is what was said about the turn. A comment about one
+  // of its spans reads beside it in the rail and is counted nowhere, so one
+  // reviewer marking up six steps of a turn leaves its count where it was.
   const annotations = api.annotation.getByTraceId.useQuery(
-    { projectId: project?.id ?? "", traceId },
+    { projectId: project?.id ?? "", traceId, anchor: "trace" },
     {
       enabled:
         !!project?.id &&

@@ -4,7 +4,10 @@
  * ever open. See specs/traces-v2/annotation-rail.feature.
  */
 import { beforeEach, describe, expect, it } from "vitest";
-import { useAnnotationDraftStore } from "../annotationDraftStore";
+import {
+  isSameAnnotationTarget,
+  useAnnotationDraftStore,
+} from "../annotationDraftStore";
 
 const store = () => useAnnotationDraftStore.getState();
 
@@ -111,6 +114,51 @@ describe("given no composer is open", () => {
       store().patchDraft({ comment: "typed into nothing" });
 
       expect(store().draft).toBeNull();
+    });
+  });
+});
+
+/**
+ * A comment is about the trace as a whole or about one part of it, and the part
+ * is what the composer belongs to. See specs/traces-v2/anchored-comments.feature.
+ */
+describe("given a comment about one part of a trace", () => {
+  describe("when the reviewer starts it", () => {
+    it("opens a draft about that part", () => {
+      store().openDraft({
+        traceId: "trace-1",
+        mode: "annotate",
+        anchorKind: "field",
+        anchorId: "span-1",
+        anchorPath: "output",
+      });
+
+      expect(store().draft).toMatchObject({
+        traceId: "trace-1",
+        anchorKind: "field",
+        anchorId: "span-1",
+        anchorPath: "output",
+      });
+    });
+  });
+
+  describe("when a comment is started on another part of the same trace", () => {
+    it("is a different composer rather than the same one", () => {
+      const onOutput = {
+        traceId: "trace-1",
+        anchorKind: "field" as const,
+        anchorId: "span-1",
+        anchorPath: "output",
+      };
+      const onInput = { ...onOutput, anchorPath: "input" };
+      const onWholeTrace = { traceId: "trace-1" };
+
+      expect(isSameAnnotationTarget(onOutput, onOutput)).toBe(true);
+      expect(isSameAnnotationTarget(onOutput, onInput)).toBe(false);
+      expect(isSameAnnotationTarget(onOutput, onWholeTrace)).toBe(false);
+      expect(isSameAnnotationTarget(onWholeTrace, { traceId: "trace-1" })).toBe(
+        true,
+      );
     });
   });
 });

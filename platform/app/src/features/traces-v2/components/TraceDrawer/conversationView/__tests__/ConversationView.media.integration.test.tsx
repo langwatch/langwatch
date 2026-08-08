@@ -19,6 +19,7 @@ vi.mock("../../../../hooks/useConversationTurns", () => ({
 vi.mock("../../../../hooks/useConversationAnnotations", () => ({
   useConversationAnnotations: () => ({
     byTrace: new Map(),
+    byAnchor: new Map(),
     all: [],
     hasAny: false,
     isLoading: false,

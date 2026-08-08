@@ -21,7 +21,10 @@ interface AnnotatedTurnRowProps {
   layout: TurnLayout;
   isCurrent: boolean;
   onSelectTurn: (traceId: string) => void;
+  /** What was said about this turn as a whole, which is what its count reads. */
   annotations?: AnnotationByTrace[];
+  /** What was said about the parts inside this turn. Read in the rail only. */
+  anchoredAnnotations?: AnnotationByTrace[];
   /** Whether the conversation has a rail at all right now. */
   isRailActive: boolean;
   railLayout: RailLayout;
@@ -42,6 +45,7 @@ export const AnnotatedTurnRow = memo(function AnnotatedTurnRow({
   isCurrent,
   onSelectTurn,
   annotations = EMPTY_ANNOTATIONS,
+  anchoredAnnotations = EMPTY_ANNOTATIONS,
   isRailActive,
   railLayout,
 }: AnnotatedTurnRowProps) {
@@ -73,6 +77,7 @@ export const AnnotatedTurnRow = memo(function AnnotatedTurnRow({
       traceId={parsed.turn.traceId}
       output={parsed.turn.output}
       annotations={annotations}
+      anchoredAnnotations={anchoredAnnotations}
     />
   );
 

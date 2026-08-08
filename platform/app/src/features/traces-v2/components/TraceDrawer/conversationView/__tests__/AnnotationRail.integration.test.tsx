@@ -20,6 +20,7 @@ const mocks = vi.hoisted(() => ({
   invalidateAnnotationFeed: vi.fn(),
   invalidateOverlay: vi.fn(),
   storedAnnotations: [] as unknown[],
+  activeScores: [] as unknown[],
 }));
 
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
@@ -80,7 +81,9 @@ vi.mock("~/utils/api", () => ({
           isLoading: false,
         }),
       },
-      getAllActive: { useQuery: () => ({ data: [], isLoading: false }) },
+      getAllActive: {
+        useQuery: () => ({ data: mocks.activeScores, isLoading: false }),
+      },
     },
   },
 }));
@@ -94,13 +97,17 @@ vi.mock("../ChatTurnRow", () => ({
   ChatTurnRow: ({
     turn,
     shouldUseRailComposer,
+    annotationItems,
   }: {
     turn: { traceId: string };
     shouldUseRailComposer?: boolean;
+    annotationItems?: unknown[];
   }) => (
     <div
       data-testid="chat-turn-row"
       data-uses-rail-composer={String(!!shouldUseRailComposer)}
+      // What the turn itself counts, which is what its badge reads.
+      data-annotation-count={String(annotationItems?.length ?? 0)}
     >
       {turn.traceId}
     </div>
@@ -187,6 +194,7 @@ function renderRow({
   isRailActive = true,
   railLayout = SIDE_LAYOUT,
   annotations = [] as AnnotationByTrace[],
+  anchoredAnnotations = [] as AnnotationByTrace[],
 } = {}) {
   return render(
     <ChakraProvider value={defaultSystem}>
@@ -197,6 +205,7 @@ function renderRow({
         isCurrent={false}
         onSelectTurn={vi.fn()}
         annotations={annotations}
+        anchoredAnnotations={anchoredAnnotations}
         isRailActive={isRailActive}
         railLayout={railLayout}
       />
@@ -210,6 +219,7 @@ const draft = () => useAnnotationDraftStore.getState().draft;
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.storedAnnotations = [];
+  mocks.activeScores = [];
   useAnnotationDraftStore.setState({ draft: null });
   cleanup();
 });
@@ -445,5 +455,167 @@ describe("given the turn carries an annotation the reviewer wrote", () => {
         screen.getByRole("button", { name: "Delete annotation" }),
       ).toBeInTheDocument();
     });
+  });
+});
+
+/**
+ * A turn's rail holds what was said about the turn and what was said about the
+ * parts inside it, and only the first of the two is what the turn counts.
+ * See specs/traces-v2/anchored-comments.feature.
+ */
+describe("given a turn commented on as a whole and on two of its spans", () => {
+  const onTheTurn = annotation({
+    id: "annotation-on-turn",
+    comment: "the answer contradicts the policy",
+  });
+  const onASpan = annotation({
+    id: "annotation-on-span",
+    comment: "this search returned nothing",
+    anchorKind: "span",
+    anchorId: "span-7",
+  });
+  const onAnotherSpan = annotation({
+    id: "annotation-on-another-span",
+    comment: "and this one timed out",
+    anchorKind: "span",
+    anchorId: "span-9",
+  });
+
+  const renderCommentedTurn = () =>
+    renderRow({
+      annotations: [onTheTurn],
+      anchoredAnnotations: [onASpan, onAnotherSpan],
+    });
+
+  /** @scenario "A commented part of a turn reads beside that turn" */
+  it("lists the comments on its parts in the rail beside it", () => {
+    renderCommentedTurn();
+
+    expect(
+      screen.getByText("this search returned nothing"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("and this one timed out")).toBeInTheDocument();
+  });
+
+  /** @scenario "A commented part of a turn reads beside that turn" */
+  it("names the span each of them is about", () => {
+    renderCommentedTurn();
+
+    expect(
+      screen.getAllByTestId("annotation-anchor").map((el) => el.textContent),
+    ).toEqual(["Span span-7", "Span span-9"]);
+  });
+
+  it("leaves the turn counting only what was said about the turn", () => {
+    renderCommentedTurn();
+
+    expect(screen.getByTestId("chat-turn-row")).toHaveAttribute(
+      "data-annotation-count",
+      "1",
+    );
+  });
+});
+
+/**
+ * A score is a project-wide key with no notion of a target and becomes a column
+ * for the whole trace, so it is a judgement about the trace and nothing
+ * narrower. See specs/traces-v2/anchored-comments.feature.
+ */
+describe("given the project has active annotation score keys", () => {
+  const own = (over: Partial<AnnotationByTrace>) =>
+    annotation({
+      userId: "user-1",
+      user: { id: "user-1", name: "Ada", image: null },
+      ...over,
+    });
+
+  beforeEach(() => {
+    mocks.activeScores = [
+      {
+        id: "score-1",
+        name: "Helpfulness",
+        description: null,
+        dataType: "BOOLEAN",
+        options: [{ label: "Good", value: "good" }],
+      },
+    ];
+  });
+
+  describe("when the reviewer comments on one part of the trace", () => {
+    /** @scenario "A comment on one part of a trace is not offered scores" */
+    it("offers no scores on the comment", () => {
+      const onASpan = own({
+        id: "annotation-on-span",
+        anchorKind: "span",
+        anchorId: "span-7",
+      });
+      mocks.storedAnnotations = [onASpan];
+      renderRow({ anchoredAnnotations: [onASpan] });
+
+      fireEvent.click(screen.getByLabelText("Edit annotation"));
+
+      expect(screen.getByLabelText("Annotation composer")).toBeInTheDocument();
+      expect(screen.queryByText("Scores")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("when the reviewer annotates the trace as a whole", () => {
+    /** @scenario "A comment about the whole trace is still offered scores" */
+    it("offers the scores as it always did", () => {
+      renderRow();
+
+      fireEvent.click(rail());
+
+      expect(screen.getByText("Scores")).toBeInTheDocument();
+      expect(screen.getByText("Helpfulness")).toBeInTheDocument();
+    });
+  });
+});
+
+/**
+ * The composer belongs to the part the comment is about, so two comments on two
+ * parts of one turn are two composers rather than one shared between them.
+ */
+describe("given a comment is being written about one span of a turn", () => {
+  it("leaves the rail free to start a comment about the turn itself", () => {
+    useAnnotationDraftStore.getState().openDraft({
+      traceId: TRACE_ID,
+      mode: "annotate",
+      anchorKind: "span",
+      anchorId: "span-7",
+    });
+
+    renderRow();
+
+    expect(
+      screen.queryByLabelText("Annotation composer"),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /Add annotation/ }),
+    ).toBeInTheDocument();
+  });
+});
+
+describe("given a comment about one span of a turn is being edited from the rail", () => {
+  it("docks the composer in the card's place", () => {
+    const onASpan = annotation({
+      id: "annotation-on-span",
+      userId: "user-1",
+      user: { id: "user-1", name: "Ada", image: null },
+      anchorKind: "span",
+      anchorId: "span-7",
+    });
+    mocks.storedAnnotations = [onASpan];
+    renderRow({ anchoredAnnotations: [onASpan] });
+
+    fireEvent.click(screen.getByLabelText("Edit annotation"));
+
+    expect(draft()).toMatchObject({
+      traceId: TRACE_ID,
+      annotationId: "annotation-on-span",
+      anchorKind: "span",
+      anchorId: "span-7",
+    });
+    expect(screen.getByLabelText("Annotation composer")).toBeInTheDocument();
   });
 });

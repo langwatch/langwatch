@@ -209,6 +209,69 @@ describe("given an annotation with a suggested output", () => {
   });
 });
 
+/**
+ * A rail holds what was said about the turn and what was said about the parts
+ * inside it, so a card has to say which of the two it is.
+ * See specs/traces-v2/anchored-comments.feature.
+ */
+describe("given an annotation about one part of the trace", () => {
+  /** @scenario "A comment card names the part of the trace it is anchored to" */
+  /** @scenario "A card about one part of the turn names that part" */
+  it("names the span and the field the comment is about", () => {
+    renderCard({
+      item: annotation({
+        anchorKind: "field",
+        anchorId: "span-7",
+        anchorPath: "output",
+      }),
+    });
+
+    expect(screen.getByTestId("annotation-anchor")).toHaveTextContent(
+      "Span span-7 · Output",
+    );
+  });
+
+  it("names the trace's own field rather than a span when that is what it is on", () => {
+    renderCard({
+      item: annotation({
+        anchorKind: "field",
+        anchorId: "trace-1",
+        anchorPath: "metadata.environment",
+      }),
+    });
+
+    expect(screen.getByTestId("annotation-anchor")).toHaveTextContent(
+      "Trace · Metadata · environment",
+    );
+  });
+
+  it("reads as a message when it is on one message of a transcript", () => {
+    renderCard({
+      item: annotation({
+        anchorKind: "message",
+        anchorId: "trace-1",
+        anchorPath: "text-1a-3f2b9",
+      }),
+    });
+
+    const anchor = screen.getByTestId("annotation-anchor");
+    expect(anchor).toHaveTextContent("Message");
+    // The key the transcript finds the message by is how it is stored, not
+    // something to put in front of a reader.
+    expect(anchor).not.toHaveTextContent("text-1a-3f2b9");
+  });
+});
+
+describe("given an annotation about the trace as a whole", () => {
+  /** @scenario "A comment about the whole trace names nothing to jump to" */
+  /** @scenario "A card about the whole turn names no part" */
+  it("names no part of the trace", () => {
+    renderCard();
+
+    expect(screen.queryByTestId("annotation-anchor")).not.toBeInTheDocument();
+  });
+});
+
 describe("given an annotation somebody else wrote", () => {
   /** @scenario "Another reviewer's annotation is read-only" */
   it("offers no edit affordance", () => {

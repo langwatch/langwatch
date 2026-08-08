@@ -6,8 +6,18 @@ import {
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 
 export interface ConversationAnnotations {
-  /** Annotations grouped by the turn they were left on. */
+  /**
+   * Comments about a turn as a whole, by the turn they were left on. This is
+   * what a turn's count reads, so a reviewer who marked three spans of one turn
+   * must not change what it says.
+   */
   byTrace: Map<string, AnnotationByTrace[]>;
+  /**
+   * Comments about one part of a turn, by the turn holding that part. They read
+   * beside the turn, each naming the part it is about, and they are counted
+   * nowhere.
+   */
+  byAnchor: Map<string, AnnotationByTrace[]>;
   all: AnnotationByTrace[];
   hasAny: boolean;
   isLoading: boolean;
@@ -20,6 +30,11 @@ export interface ConversationAnnotations {
  * list, and each one asking separately meant the same rows fetched several
  * times over. One subscription here, grouped once, and the query key is stable
  * across callers because the ids are sorted before they become one.
+ *
+ * Asks for every comment on the turns, the ones about their parts included:
+ * this is a reader looking at the trace itself, which is where a comment about
+ * one of its spans belongs. The two groups are kept apart here rather than at
+ * the read, because the same fetch feeds both the count and the rail.
  *
  * `keepPreviousData` keeps annotations on screen while a turn list that grew
  * is re-read, so the rail does not blank between pages. The retained rows are
@@ -37,6 +52,7 @@ export function useConversationAnnotations(
     traceIds,
     enabled: !!project?.id && hasPermission("annotations:view"),
     keepPreviousData: true,
+    anchor: "all",
   });
 
   const requested = useMemo(() => new Set(traceIds), [traceIds]);
@@ -45,18 +61,21 @@ export function useConversationAnnotations(
     [query.data, requested],
   );
 
-  const byTrace = useMemo(() => {
-    const map = new Map<string, AnnotationByTrace[]>();
+  const { byTrace, byAnchor } = useMemo(() => {
+    const byTrace = new Map<string, AnnotationByTrace[]>();
+    const byAnchor = new Map<string, AnnotationByTrace[]>();
     for (const annotation of all) {
-      const list = map.get(annotation.traceId);
+      const group = annotation.anchorKind ? byAnchor : byTrace;
+      const list = group.get(annotation.traceId);
       if (list) list.push(annotation);
-      else map.set(annotation.traceId, [annotation]);
+      else group.set(annotation.traceId, [annotation]);
     }
-    return map;
+    return { byTrace, byAnchor };
   }, [all]);
 
   return {
     byTrace,
+    byAnchor,
     all,
     hasAny: all.length > 0,
     isLoading: query.isLoading,

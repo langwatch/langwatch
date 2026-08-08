@@ -996,6 +996,15 @@ model Experiment {
   @@index([projectId, archivedAt])
 }
 
+// Annotation - a reviewer's comment on a trace, or on one part of it.
+//
+// anchorKind/anchorId/anchorPath record which part the comment is about. All
+// three null means the trace as a whole, which is what every surface that reads
+// whole traces (the annotations list, the queue, the trace projections that
+// feed the table and the dataset columns, the REST list endpoints) reads.
+// Plain strings rather than an enum: a fourth kind of part is then a code
+// change and not a schema migration, and a kind this build does not recognise
+// reads as a comment about the trace rather than failing the list.
 model Annotation {
   id             String   @id @default(nanoid())
   projectId      String
@@ -1010,11 +1019,20 @@ model Annotation {
   email          String?
   scoreOptions   Json?
   expectedOutput String?
+  // "span" | "field" | "message"; null = the trace as a whole
+  anchorKind     String?
+  // The element the comment names: a spanId for span and field anchors, the
+  // turn's traceId for a message anchor
+  anchorId       String?
+  // What inside that element: "output", "params.temperature", or a message's
+  // key; null = the whole element
+  anchorPath     String?
 
   @@index([projectId])
   @@index([traceId])
   @@index([userId])
   @@index([projectId, traceId])
+  @@index([projectId, traceId, anchorKind])
 }
 
 // ModelProvider - org-scoped, multi-scope provider configuration.

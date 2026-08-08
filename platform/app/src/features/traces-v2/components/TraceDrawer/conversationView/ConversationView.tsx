@@ -125,8 +125,12 @@ export const ConversationView = memo(function ConversationView({
 
   // The rail belongs to this conversation only when the composer that opened
   // it did: the queue page and the trace drawer can each be showing one at the
-  // same time, and only the annotated one should change shape.
-  const draftTraceId = useAnnotationDraftStore((s) => s.draft?.traceId ?? null);
+  // same time, and only the annotated one should change shape. A composer for
+  // one part of a turn opens where that part is read, not in the rail, so it
+  // is not what opens one.
+  const draftTraceId = useAnnotationDraftStore((s) =>
+    s.draft && !s.draft.anchorKind ? s.draft.traceId : null,
+  );
   const turnTraceIds = useMemo(() => new Set(traceIds), [traceIds]);
   const isRailActive = resolveIsRailActive({
     layout: mode,
@@ -245,6 +249,7 @@ export const ConversationView = memo(function ConversationView({
             currentTraceId={currentTraceId}
             onSelectTurn={handleSelectTurn}
             annotationsByTrace={annotations.byTrace}
+            annotationsByAnchor={annotations.byAnchor}
             isRailActive={isRailActive}
           />
         </ConversationExpandContext.Provider>
@@ -254,6 +259,29 @@ export const ConversationView = memo(function ConversationView({
     </VStack>
   );
 });
+
+/**
+ * What a turn's rail is handed: what was said about the turn, and what was said
+ * about the parts inside it. The two are kept apart all the way to the rail,
+ * because only the first is what the turn counts.
+ */
+function turnAnnotations({
+  traceId,
+  byTrace,
+  byAnchor,
+}: {
+  traceId: string;
+  byTrace: AnnotationsByTrace;
+  byAnchor: AnnotationsByTrace;
+}): {
+  annotations: AnnotationByTrace[];
+  anchoredAnnotations: AnnotationByTrace[];
+} {
+  return {
+    annotations: byTrace.get(traceId) ?? EMPTY_ANNOTATION_ITEMS,
+    anchoredAnnotations: byAnchor.get(traceId) ?? EMPTY_ANNOTATION_ITEMS,
+  };
+}
 
 /**
  * The turns to render: the queried thread when there is one, otherwise the
@@ -519,6 +547,7 @@ const TurnsView: React.FC<{
   currentTraceId: string;
   onSelectTurn: (traceId: string) => void;
   annotationsByTrace: AnnotationsByTrace;
+  annotationsByAnchor: AnnotationsByTrace;
   isRailActive: boolean;
 }> = ({
   layout,
@@ -528,6 +557,7 @@ const TurnsView: React.FC<{
   currentTraceId,
   onSelectTurn,
   annotationsByTrace,
+  annotationsByAnchor,
   isRailActive,
 }) => {
   const systemPrompt = useMemo(
@@ -554,6 +584,7 @@ const TurnsView: React.FC<{
         currentTraceId={currentTraceId}
         onSelectTurn={onSelectTurn}
         annotationsByTrace={annotationsByTrace}
+        annotationsByAnchor={annotationsByAnchor}
         isRailActive={isRailActive}
       />
     );
@@ -591,10 +622,11 @@ const TurnsView: React.FC<{
                 index={i + 1}
                 isCurrent={isCurrent}
                 onSelectTurn={onSelectTurn}
-                annotations={
-                  annotationsByTrace.get(p.turn.traceId) ??
-                  EMPTY_ANNOTATION_ITEMS
-                }
+                {...turnAnnotations({
+                  traceId: p.turn.traceId,
+                  byTrace: annotationsByTrace,
+                  byAnchor: annotationsByAnchor,
+                })}
                 isRailActive={isRailActive}
                 railLayout={railLayout}
               />
@@ -711,6 +743,7 @@ const VirtualizedTurnsView: React.FC<{
   currentTraceId: string;
   onSelectTurn: (traceId: string) => void;
   annotationsByTrace: AnnotationsByTrace;
+  annotationsByAnchor: AnnotationsByTrace;
   isRailActive: boolean;
 }> = ({
   layout,
@@ -720,6 +753,7 @@ const VirtualizedTurnsView: React.FC<{
   currentTraceId,
   onSelectTurn,
   annotationsByTrace,
+  annotationsByAnchor,
   isRailActive,
 }) => {
   const { layout: railLayout, setScroller } = useRailLayout();
@@ -787,10 +821,11 @@ const VirtualizedTurnsView: React.FC<{
                   index={row.index + 1}
                   isCurrent={p.turn.traceId === currentTraceId}
                   onSelectTurn={onSelectTurn}
-                  annotations={
-                    annotationsByTrace.get(p.turn.traceId) ??
-                    EMPTY_ANNOTATION_ITEMS
-                  }
+                  {...turnAnnotations({
+                    traceId: p.turn.traceId,
+                    byTrace: annotationsByTrace,
+                    byAnchor: annotationsByAnchor,
+                  })}
                   isRailActive={isRailActive}
                   railLayout={railLayout}
                 />

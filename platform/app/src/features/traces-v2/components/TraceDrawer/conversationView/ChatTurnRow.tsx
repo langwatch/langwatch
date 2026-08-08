@@ -665,15 +665,49 @@ const TurnSeparator: React.FC<{
   translation,
 }) => {
   const annotationsOnLeft = assistantSide === "left";
-  // Rendered in flow rather than in the floating cluster, and nothing at all
-  // when the turn carries no annotation, so an unannotated separator keeps the
-  // spacing it had.
-  const badges = (
-    <TurnAnnotationBadges
-      traceId={turn.traceId}
-      output={turn.output}
-      prefetchedItems={annotationItems}
-    />
+  /*
+   * Hover actions float over one end of the separator instead of sitting in
+   * flow: the hidden chrome used to reserve ~180px of width, stopping the
+   * divider line short of the edge. Absolutely positioned, the lines span the
+   * full width and the actions overlay the end while the pointer is on the
+   * turn.
+   *
+   * The badge stays in flow, because it is on screen the whole time a turn
+   * carries an annotation and overlaying it would cover the ledger. That puts
+   * it at the same end as the actions, so the actions anchor to the badge
+   * rather than to the separator: a hidden action row is still a click target,
+   * and one lying across the badge swallows the click that opens the
+   * annotation list.
+   */
+  const badgeAnchor = annotationsOnLeft
+    ? { left: "100%", marginLeft: 2 }
+    : { right: "100%", marginRight: 2 };
+  const badgesWithActions = (
+    <Box position="relative" display="flex" alignItems="center" flexShrink={0}>
+      <TurnAnnotationBadges
+        traceId={turn.traceId}
+        output={turn.output}
+        prefetchedItems={annotationItems}
+      />
+      <HStack
+        position="absolute"
+        top="50%"
+        transform="translateY(-50%)"
+        gap={1}
+        // Shrink-to-fit would size the actions against the badge slot they are
+        // anchored to and let them wrap, or spill back over the badge.
+        width="max-content"
+        {...badgeAnchor}
+        onClick={(e: React.MouseEvent) => e.stopPropagation()}
+      >
+        <TurnActionRow
+          traceId={turn.traceId}
+          output={turn.output}
+          translation={translation}
+          shouldUseRailComposer={shouldUseRailComposer}
+        />
+      </HStack>
+    </Box>
   );
   return (
     <Flex
@@ -682,10 +716,14 @@ const TurnSeparator: React.FC<{
       gap={2}
       cursor="pointer"
       onClick={onSelect}
+      // `className="group"` is what `_groupHover` on the action row resolves
+      // against; the role is what tells a reader the separator and its actions
+      // are one thing.
+      className="group"
       role="group"
       _hover={{ "& > .turn-line": { bg: "border.emphasized" } }}
     >
-      {annotationsOnLeft && badges}
+      {annotationsOnLeft && badgesWithActions}
       <Box
         className="turn-line"
         height="1px"
@@ -701,29 +739,7 @@ const TurnSeparator: React.FC<{
         bg={isCurrent ? "blue.solid" : "border.muted"}
         transition="background 0.12s ease"
       />
-      {!annotationsOnLeft && badges}
-      {/* Hover actions float over one end of the separator instead of sitting
-          in flow: the hidden chrome used to reserve ~180px of width, stopping
-          the divider line short of the edge. Absolutely positioned, the lines
-          span the full width and the actions overlay the end while the pointer
-          is on the turn. The badges stay in flow: they are on screen the whole
-          time a turn carries an annotation, and overlaying them would cover
-          the ledger. */}
-      <HStack
-        position="absolute"
-        top="50%"
-        transform="translateY(-50%)"
-        gap={1}
-        {...(annotationsOnLeft ? { left: 0 } : { right: 0 })}
-        onClick={(e: React.MouseEvent) => e.stopPropagation()}
-      >
-        <TurnActionRow
-          traceId={turn.traceId}
-          output={turn.output}
-          translation={translation}
-          shouldUseRailComposer={shouldUseRailComposer}
-        />
-      </HStack>
+      {!annotationsOnLeft && badgesWithActions}
     </Flex>
   );
 };

@@ -1,11 +1,12 @@
 import { create } from "zustand";
+import type { AnnotationAnchorColumns } from "~/server/annotations/annotationAnchor";
 import type {
   AnnotationMode,
   ScoreOptions,
 } from "../components/TraceDrawer/conversationView/annotationForm.types";
 
-/** What the reviewer is writing, and which turn it belongs to. */
-export interface AnnotationDraft {
+/** What the reviewer is writing, and which part of the trace it is about. */
+export interface AnnotationDraft extends AnnotationAnchorColumns {
   traceId: string;
   mode: AnnotationMode;
   /** Set when the draft edits an annotation that already exists. */
@@ -21,7 +22,7 @@ export interface AnnotationDraft {
   seededFromExisting: boolean;
 }
 
-export interface OpenAnnotationDraftParams {
+export interface OpenAnnotationDraftParams extends AnnotationAnchorColumns {
   traceId: string;
   mode: AnnotationMode;
   /** Opens the composer on an existing annotation instead of a new one. */
@@ -30,11 +31,21 @@ export interface OpenAnnotationDraftParams {
   output?: string | null;
 }
 
+/** What a draft is about: the trace, and the part of it the comment points at. */
+export type AnnotationDraftTarget = AnnotationAnchorColumns & {
+  traceId: string;
+};
+
 interface AnnotationDraftState {
   draft: AnnotationDraft | null;
   openDraft: (params: OpenAnnotationDraftParams) => void;
   patchDraft: (
-    patch: Partial<Omit<AnnotationDraft, "traceId" | "mode" | "annotationId">>,
+    patch: Partial<
+      Omit<
+        AnnotationDraft,
+        "traceId" | "mode" | "annotationId" | keyof AnnotationAnchorColumns
+      >
+    >,
   ) => void;
   closeDraft: () => void;
 }
@@ -50,12 +61,23 @@ interface AnnotationDraftState {
  */
 export const useAnnotationDraftStore = create<AnnotationDraftState>((set) => ({
   draft: null,
-  openDraft: ({ traceId, mode, annotationId, output }) =>
+  openDraft: ({
+    traceId,
+    mode,
+    annotationId,
+    output,
+    anchorKind,
+    anchorId,
+    anchorPath,
+  }) =>
     set({
       draft: {
         traceId,
         mode,
         annotationId,
+        anchorKind,
+        anchorId,
+        anchorPath,
         comment: "",
         // A correction is an edit of what the model actually said, so the
         // field starts as that output rather than empty. Same starting point
@@ -71,3 +93,23 @@ export const useAnnotationDraftStore = create<AnnotationDraftState>((set) => ({
     ),
   closeDraft: () => set({ draft: null }),
 }));
+
+/**
+ * Whether two comments are about the same part of the trace.
+ *
+ * A draft is identified by everything it points at rather than by its trace
+ * alone: one trace holds a span, its output, an attribute of it and a message
+ * inside it, and a reviewer writing about one of them must not find their words
+ * under another.
+ */
+export function isSameAnnotationTarget(
+  a: AnnotationDraftTarget,
+  b: AnnotationDraftTarget,
+): boolean {
+  return (
+    a.traceId === b.traceId &&
+    (a.anchorKind ?? null) === (b.anchorKind ?? null) &&
+    (a.anchorId ?? null) === (b.anchorId ?? null) &&
+    (a.anchorPath ?? null) === (b.anchorPath ?? null)
+  );
+}

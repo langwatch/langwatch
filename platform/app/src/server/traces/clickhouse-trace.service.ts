@@ -5,6 +5,7 @@ import type { PrismaClient } from "@prisma/client";
 import { getLangWatchTracer } from "langwatch";
 import type { TraceWithGuardrail } from "~/components/messages/MessageCard";
 import { LLM_PARAMETER_MAP } from "~/prompts/prompt-playground/llmParameterMap";
+import { AnnotationService } from "~/server/annotations/annotation.service";
 import {
   DEFAULT_PARTITION_WINDOW_MS,
   queryWindowed,
@@ -2245,6 +2246,10 @@ export class ClickHouseTraceService {
    * Annotations are Postgres-only (Prisma), never carried by the ClickHouse
    * read path. Fetched scoped to the page's trace IDs (multitenancy: projectId
    * is the first predicate). Mutates each trace's `annotations` in place.
+   *
+   * Only the comments about the traces themselves: this one read feeds the trace
+   * table, the export and the dataset columns, each of which answers a question
+   * about a whole trace.
    */
   private async enrichTracesWithAnnotationsForProjection({
     projectId,
@@ -2260,20 +2265,9 @@ export class ClickHouseTraceService {
     // name-addressable (annotations.scores.<name>), so fetch the score
     // definitions to remap id -> name. Deleted definitions are included so
     // historical scoreOptions still resolve.
+    const annotations = AnnotationService.create({ prisma: this.prisma });
     const [rows, scoreDefs] = await Promise.all([
-      this.prisma.annotation.findMany({
-        where: { projectId, traceId: { in: traceIds } },
-        select: {
-          id: true,
-          traceId: true,
-          isThumbsUp: true,
-          comment: true,
-          expectedOutput: true,
-          scoreOptions: true,
-          createdAt: true,
-        },
-        orderBy: { createdAt: "asc" },
-      }),
+      annotations.getAllTraceLevelForProjection({ projectId, traceIds }),
       this.prisma.annotationScore.findMany({
         where: { projectId },
         select: { id: true, name: true },

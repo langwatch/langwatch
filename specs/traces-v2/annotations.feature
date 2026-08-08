@@ -204,12 +204,28 @@ Feature: Per-turn actions in ConversationView
   # Annotations read beside the turn they are about, not in a rollup the
   # reviewer has to leave the conversation to open. The rail is specified in
   # specs/traces-v2/annotation-rail.feature.
+  #
+  # Annotation mode does not change this. It is a state the whole drawer enters,
+  # laid over whichever view the reviewer is already reading, and it adds
+  # affordances to what is on screen rather than a place to go and look at
+  # annotations. So there is still no annotations view: thread, bubbles and
+  # markdown remain the whole of the conversation's mode segment, in the mode
+  # and out of it. The mode itself is specified in
+  # specs/traces-v2/trace-edit-mode.feature, and what a comment can be left on
+  # in specs/traces-v2/anchored-comments.feature.
 
   @integration
   Scenario: The conversation offers no separate annotations mode
     Given the trace drawer is open on a conversation
     Then the conversation's mode segment offers thread, bubbles, and markdown only
     And every turn's annotations are read beside that turn in thread layout
+
+  @integration @unimplemented
+  Scenario: Annotating the trace adds no fourth way to view the conversation
+    Given the trace drawer is open on a conversation
+    When the reviewer starts annotating the trace
+    Then the conversation's mode segment still offers thread, bubbles, and markdown only
+    And the layout the reviewer was reading is the one they are still reading
 
   # ─── Legacy parity ─────────────────────────────────────────────────────
 

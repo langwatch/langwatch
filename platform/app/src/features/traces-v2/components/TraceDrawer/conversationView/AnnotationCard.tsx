@@ -1,5 +1,6 @@
 import { Box, HStack, Icon, Spacer, Text, VStack } from "@chakra-ui/react";
 import {
+  Crosshair,
   Lightbulb,
   MessageCircle,
   Pencil,
@@ -9,6 +10,7 @@ import {
 import { UserAvatar } from "~/components/UserAvatar";
 import { Tooltip } from "~/components/ui/tooltip";
 import type { AnnotationByTrace } from "~/hooks/useAnnotationsByTraceIds";
+import { describeAnnotationAnchor } from "../../../utils/annotationAnchorLabel";
 
 interface ScoreEntry {
   name: string;
@@ -68,6 +70,8 @@ export function AnnotationCard({
       <VStack align="stretch" gap={2}>
         <CardHeader annotation={annotation} isOwn={isOwn} />
 
+        <AnchorBreadcrumb annotation={annotation} />
+
         {annotation.comment && (
           <Text textStyle="xs" whiteSpace="pre-wrap">
             {annotation.comment}
@@ -81,6 +85,27 @@ export function AnnotationCard({
         <SuggestedCorrection expectedOutput={annotation.expectedOutput} />
       </VStack>
     </Box>
+  );
+}
+
+/**
+ * The part of the trace the comment is about, when it is about one. A comment
+ * about the trace as a whole names nothing: the card is already beside the turn
+ * it belongs to, so a chip saying so would be noise on every card.
+ */
+function AnchorBreadcrumb({ annotation }: { annotation: AnnotationByTrace }) {
+  const label = describeAnnotationAnchor({
+    anchor: annotation,
+    traceId: annotation.traceId,
+  });
+  if (!label) return null;
+  return (
+    <HStack gap={1} maxWidth="full" data-testid="annotation-anchor">
+      <Icon as={Crosshair} boxSize={3} color="purple.fg" flexShrink={0} />
+      <Text textStyle="2xs" color="purple.fg" truncate title={label}>
+        {label}
+      </Text>
+    </HStack>
   );
 }
 

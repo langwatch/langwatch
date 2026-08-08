@@ -13,6 +13,10 @@ const logger = createLogger("langwatch:tasks:backfillAnnotationsToClickhouse");
  * handleTraceAnnotationsBulkSynced merges via Set (never overwrites).
  * The worst case is a brief window where a just-removed annotation
  * reappears until the next add/remove event corrects it.
+ *
+ * Every comment counts, including one left on a single span: what ClickHouse
+ * carries is whether a human has touched a trace, which the has-annotation
+ * filter in search reads.
  */
 export default async function execute() {
   initializeDefaultApp();

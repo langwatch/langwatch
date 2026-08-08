@@ -1,5 +1,5 @@
 import { mediaPartToMediaData } from "~/shared/traces/mediaParts";
-import type { ChatMessage, ContentBlock } from "./types";
+import type { ChatMessage, ContentBlock, KeyedContentBlock } from "./types";
 
 /**
  * Heuristic: does this string look like an XML/tag-shaped payload (e.g. an
@@ -503,6 +503,92 @@ export function parseContentBlocks(
     }
   }
   return out;
+}
+
+/**
+ * What a block holds, as one string. Two blocks with the same canonical form
+ * are the same block wherever they were read from, and any change to what a
+ * block holds changes it.
+ */
+function canonicalBlockContent(block: ContentBlock): string {
+  switch (block.kind) {
+    case "text":
+    case "thinking":
+      return block.text;
+    case "tool_use":
+      return [block.id ?? "", block.name, describeValue(block.input)].join(" ");
+    case "tool_result":
+      return [
+        block.toolUseId ?? "",
+        block.isError ? "error" : "ok",
+        describeValue(block.content),
+      ].join(" ");
+    case "media":
+      return describeValue(block.part);
+    case "raw":
+      return describeValue(block.data);
+  }
+}
+
+function describeValue(value: unknown): string {
+  if (typeof value === "string") return value;
+  try {
+    return JSON.stringify(value) ?? String(value);
+  } catch {
+    return String(value);
+  }
+}
+
+/**
+ * FNV-1a, 32 bits, base 36. Short enough to read in a URL or a stored anchor,
+ * and the same number for the same string on every platform and every run,
+ * which is the whole point: a key a comment is stored against has to survive
+ * the page being closed and the transcript being read again.
+ */
+function hashContent(value: string): string {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < value.length; i++) {
+    hash ^= value.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return (hash >>> 0).toString(36);
+}
+
+/**
+ * A block's identity, derived from what it holds. The length goes in beside
+ * the hash so two different blocks have to collide on both to read as one.
+ */
+function blockContentKey(block: ContentBlock): string {
+  const content = canonicalBlockContent(block);
+  return `${block.kind}-${content.length.toString(36)}-${hashContent(content)}`;
+}
+
+/**
+ * The blocks of one message stack, each carrying the key a comment on it is
+ * stored against.
+ *
+ * Position is deliberately not part of the key. A transcript read again yields
+ * the same keys, and a message that was rewritten yields a key nothing points
+ * at, so a comment on it reads as being about a part that is no longer there
+ * rather than quietly moving onto whatever took its place.
+ *
+ * Two blocks holding exactly the same thing are told apart by which of them
+ * comes first, because there is nothing else to tell them apart by. `prefix`
+ * namespaces a nested stack under the block it was read out of, so a key is
+ * unique across the whole message however deeply the blocks nest.
+ */
+export function withBlockKeys(
+  blocks: ContentBlock[],
+  prefix = "",
+): KeyedContentBlock[] {
+  const seen = new Map<string, number>();
+  return blocks.map((block) => {
+    const base = blockContentKey(block);
+    const before = seen.get(base) ?? 0;
+    seen.set(base, before + 1);
+    const key = before === 0 ? base : `${base}~${before}`;
+    return { ...block, blockKey: prefix ? `${prefix}/${key}` : key };
+  });
 }
 
 function joinTextBlocks(blocks: ContentBlock[]): string {

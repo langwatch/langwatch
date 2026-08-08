@@ -16,8 +16,16 @@ import type {
   ScoreChipProps,
 } from "./annotationForm.types";
 
-/** The project's active score keys, as chips the reviewer rates on. */
+/**
+ * The project's active score keys, as chips the reviewer rates on.
+ *
+ * A comment about one part of the trace is offered none of them. A score is a
+ * project-wide key with no notion of a target, and it becomes a column for the
+ * whole trace, so a score given while pointing at one attribute would end up
+ * read as a judgement on everything the trace did.
+ */
 export function ScoreFields({ state }: { state: AnnotationFormState }) {
+  if (state.isAnchored) return null;
   if (!state.scores.data || state.scores.data.length === 0) return null;
   return (
     <VStack align="stretch" gap={1.5}>

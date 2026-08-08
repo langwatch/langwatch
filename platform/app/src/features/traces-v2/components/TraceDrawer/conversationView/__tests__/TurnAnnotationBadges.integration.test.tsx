@@ -15,6 +15,7 @@ import "@testing-library/jest-dom/vitest";
 
 const mocks = vi.hoisted(() => ({
   canManage: true,
+  annotationsForTrace: vi.fn(() => ({ data: [], isLoading: false })),
 }));
 
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
@@ -28,7 +29,7 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
 vi.mock("~/utils/api", () => ({
   api: {
     annotation: {
-      getByTraceId: { useQuery: () => ({ data: [], isLoading: false }) },
+      getByTraceId: { useQuery: mocks.annotationsForTrace },
     },
   },
 }));
@@ -199,5 +200,25 @@ describe("given a reviewer who may read annotations but not write them", () => {
         screen.queryByRole("button", { name: /Ada/ }),
       ).not.toBeInTheDocument();
     });
+  });
+});
+
+/**
+ * A comment on one span of a turn reads beside the turn in the rail and is
+ * counted nowhere, so one reviewer marking up six steps leaves the turn's count
+ * where it was. See specs/traces-v2/anchored-comments.feature.
+ */
+describe("given a badge reading a turn's annotations for itself", () => {
+  it("asks only for what was said about the turn", () => {
+    render(
+      <ChakraProvider value={defaultSystem}>
+        <TurnAnnotationBadges traceId="trace-1" output="the original answer" />
+      </ChakraProvider>,
+    );
+
+    expect(mocks.annotationsForTrace).toHaveBeenCalledWith(
+      expect.objectContaining({ traceId: "trace-1", anchor: "trace" }),
+      expect.anything(),
+    );
   });
 });

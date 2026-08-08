@@ -4,6 +4,14 @@ import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import { AnnotationService } from "~/server/annotations/annotation.service";
+import {
+  annotationAnchorColumnsSchema,
+  annotationAnchorScopeSchema,
+  annotationAnchorScopeWhere,
+  refineAnnotationAnchorColumns,
+  resolveAnnotationSuggestionTarget,
+  withReadableAnnotationAnchor,
+} from "~/server/annotations/annotationAnchor";
 import { getApp } from "~/server/app-layer/app";
 import type { Session } from "~/server/auth";
 import { TraceEditOverlayService } from "~/server/traces/edit-overlay/traceEditOverlay.service";
@@ -37,13 +45,16 @@ const enrichQueueItemsWithTracesAndAnnotations = async (
   // Get all unique trace IDs from queue items
   const traceIds = [...new Set(queueItems.map((item) => item.traceId))];
 
-  // Get all annotations for these traces in a single query
+  // Get all annotations for these traces in a single query. A queue item is a
+  // whole trace to review, so it carries the comments about the trace itself;
+  // a comment left on one of its spans is not part of that hand-off.
   const annotations = await ctx.prisma.annotation.findMany({
     where: {
       projectId: projectId,
       traceId: {
         in: traceIds,
       },
+      ...annotationAnchorScopeWhere("trace"),
     },
     include: {
       user: true,
@@ -121,6 +132,12 @@ type AnnotatorReference = z.infer<typeof annotatorReferenceSchema>;
  * annotation row stays the record of who suggested what; the correction is the
  * trace's current corrected truth and is what the dataset flow reads.
  *
+ * Where the suggestion lands is the comment's anchor: a comment about the whole
+ * trace, or about the trace's own output, corrects the trace output; a comment
+ * on a span's input or output corrects that field of that span. An anchor with
+ * nothing for a suggestion to correct (a whole span, an attribute row, a
+ * message) carries none, which is also what the composer offers there.
+ *
  * Only a suggestion that actually CHANGED is carried over, which is what makes
  * the two sides safe to keep in step:
  *   - no suggestion field at all (undefined) leaves the correction alone;
@@ -150,6 +167,9 @@ const carrySuggestedOutputToOverlay = async ({
   expectedOutput,
   previousExpectedOutput,
   userId,
+  anchorKind,
+  anchorId,
+  anchorPath,
 }: {
   ctx: { prisma: PrismaClient; session: Session };
   projectId: string;
@@ -157,17 +177,50 @@ const carrySuggestedOutputToOverlay = async ({
   expectedOutput?: string | null;
   previousExpectedOutput?: string | null;
   userId: string;
+  anchorKind?: string | null;
+  anchorId?: string | null;
+  anchorPath?: string | null;
 }) => {
   if (expectedOutput === undefined) return;
   const next = expectedOutput ?? "";
   const previous = previousExpectedOutput ?? "";
   if (next === previous) return;
 
+  const target = resolveAnnotationSuggestionTarget({
+    traceId,
+    anchorKind,
+    anchorId,
+    anchorPath,
+  });
+  if (!target) return;
+
   if (!(await hasProjectPermission(ctx, projectId, "annotations:update"))) {
     return;
   }
 
   const overlay = TraceEditOverlayService.create(ctx.prisma);
+  if (target.kind === "span") {
+    if (next.length === 0) {
+      await overlay.removeSpanFieldEdit({
+        projectId,
+        traceId,
+        spanId: target.spanId,
+        field: target.field,
+        userId,
+      });
+      return;
+    }
+    await overlay.mergeSpanFieldEdit({
+      projectId,
+      traceId,
+      spanId: target.spanId,
+      field: target.field,
+      text: next,
+      userId,
+    });
+    return;
+  }
+
   if (next.length === 0) {
     await overlay.removeTraceOutputEdit({ projectId, traceId, userId });
     return;
@@ -242,14 +295,17 @@ const callerQueueItemsFilter = ({
 export const annotationRouter = createTRPCRouter({
   create: protectedProcedure
     .input(
-      z.object({
-        projectId: z.string(),
-        comment: z.string().optional().nullable(),
-        isThumbsUp: z.boolean().optional().nullable(),
-        traceId: z.string(),
-        scoreOptions: scoreOptions,
-        expectedOutput: z.string().optional().nullable(),
-      }),
+      z
+        .object({
+          projectId: z.string(),
+          comment: z.string().optional().nullable(),
+          isThumbsUp: z.boolean().optional().nullable(),
+          traceId: z.string(),
+          scoreOptions: scoreOptions,
+          expectedOutput: z.string().optional().nullable(),
+        })
+        .merge(annotationAnchorColumnsSchema)
+        .superRefine(refineAnnotationAnchorColumns),
     )
     .use(checkProjectPermission("annotations:create"))
     .mutation(async ({ ctx, input }) => {
@@ -261,6 +317,9 @@ export const annotationRouter = createTRPCRouter({
         traceId: input.traceId,
         expectedOutput: input.expectedOutput,
         userId: ctx.session.user.id,
+        anchorKind: input.anchorKind,
+        anchorId: input.anchorId,
+        anchorPath: input.anchorPath,
       });
 
       const createdAnnotation = await service.create({
@@ -272,11 +331,18 @@ export const annotationRouter = createTRPCRouter({
         isThumbsUp: input.isThumbsUp ?? null,
         scoreOptions: input.scoreOptions ?? {},
         expectedOutput: input.expectedOutput ?? null,
+        anchorKind: input.anchorKind,
+        anchorId: input.anchorId,
+        anchorPath: input.anchorPath,
       });
 
       // Best-effort ClickHouse sync: Prisma is the source of truth.
       // Failures are logged but don't fail the mutation — the backfill task
       // can reconcile any missed syncs.
+      //
+      // Anchored comments sync too. This is what answers "has a human touched
+      // this trace", which the has-annotation filter in search reads, and a
+      // comment on one of its spans means yes.
       try {
         const app = getApp();
         await app.traces.addAnnotation({
@@ -312,10 +378,17 @@ export const annotationRouter = createTRPCRouter({
 
       // The suggestion the annotation held before this save is what tells a
       // real edit apart from a form re-sending what it loaded, so it is read
-      // before the row moves.
+      // before the row moves. The anchor comes from the same read rather than
+      // from the input: editing a comment changes what it says, never what it
+      // is about, so re-anchoring is a delete and a create.
       const existing = await ctx.prisma.annotation.findFirst({
         where: { id: input.id, projectId: input.projectId },
-        select: { expectedOutput: true },
+        select: {
+          expectedOutput: true,
+          anchorKind: true,
+          anchorId: true,
+          anchorPath: true,
+        },
       });
 
       await carrySuggestedOutputToOverlay({
@@ -325,6 +398,9 @@ export const annotationRouter = createTRPCRouter({
         expectedOutput: input.expectedOutput,
         previousExpectedOutput: existing?.expectedOutput,
         userId: ctx.session.user.id,
+        anchorKind: existing?.anchorKind,
+        anchorId: existing?.anchorId,
+        anchorPath: existing?.anchorPath,
       });
 
       return service.update({
@@ -340,19 +416,27 @@ export const annotationRouter = createTRPCRouter({
         expectedOutput: input.expectedOutput,
       });
     }),
+  /**
+   * The comments on one trace. Defaults to every comment, anchored ones
+   * included: this is the read behind a trace's own comment list, where a
+   * comment about one of its spans belongs. A caller answering a question about
+   * the trace as a whole asks for `anchor: "trace"` instead.
+   */
   getByTraceId: protectedProcedure
     .input(
       z.object({
         traceId: z.string(),
         projectId: z.string(),
+        anchor: annotationAnchorScopeSchema.optional().default("all"),
       }),
     )
     .use(checkProjectPermission("annotations:view"))
     .query(async ({ ctx, input }) => {
-      return ctx.prisma.annotation.findMany({
+      const annotations = await ctx.prisma.annotation.findMany({
         where: {
           traceId: input.traceId,
           projectId: input.projectId,
+          ...annotationAnchorScopeWhere(input.anchor),
         },
         include: {
           user: {
@@ -367,22 +451,27 @@ export const annotationRouter = createTRPCRouter({
           createdAt: "asc",
         },
       });
+
+      return annotations.map(withReadableAnnotationAnchor);
     }),
+  /** Same contract as `getByTraceId`, for a page of traces. */
   getByTraceIds: protectedProcedure
     .input(
       z.object({
         traceIds: z.array(z.string()),
         projectId: z.string(),
+        anchor: annotationAnchorScopeSchema.optional().default("all"),
       }),
     )
     .use(checkProjectPermission("annotations:view"))
     .query(async ({ ctx, input }) => {
-      return ctx.prisma.annotation.findMany({
+      const annotations = await ctx.prisma.annotation.findMany({
         where: {
           traceId: {
             in: input.traceIds,
           },
           projectId: input.projectId,
+          ...annotationAnchorScopeWhere(input.anchor),
         },
         // Only what the UI renders. `include: { user: true }` returned every
         // User column — email, emailVerified, lastLoginAt, deactivatedAt — and
@@ -402,6 +491,8 @@ export const annotationRouter = createTRPCRouter({
           createdAt: "asc",
         },
       });
+
+      return annotations.map(withReadableAnnotationAnchor);
     }),
   getById: protectedProcedure
     .input(z.object({ annotationId: z.string(), projectId: z.string() }))
@@ -447,6 +538,12 @@ export const annotationRouter = createTRPCRouter({
 
       return deletedAnnotation;
     }),
+  /**
+   * The project's annotations list, and the export taken from it. One row per
+   * comment about a whole trace: the list is read trace by trace, so a reviewer
+   * who marked six spans of one trace must not push six rows into everyone
+   * else's list.
+   */
   getAll: protectedProcedure
     .input(
       z.object({
@@ -464,6 +561,7 @@ export const annotationRouter = createTRPCRouter({
             gte: input.startDate,
             lte: input.endDate,
           },
+          ...annotationAnchorScopeWhere("trace"),
         },
         orderBy: {
           createdAt: "desc",

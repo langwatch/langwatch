@@ -211,6 +211,36 @@ Feature: Annotation rail beside each conversation turn
       Given the turn carries an annotation with a suggested output
       Then the card shows the suggested output and marks it as a correction
 
+    # A turn's rail holds what was said about the turn and what was said about
+    # the parts inside it, so a card has to say which of the two it is or the
+    # reader cannot tell a remark about the whole answer from a remark about one
+    # tool call. What can be pointed at, and how the rail is kept from filling
+    # with element comments from elsewhere, is specified in
+    # specs/traces-v2/anchored-comments.feature.
+
+    @integration
+    Scenario: A card about one part of the turn names that part
+      Given the turn carries an annotation about one of its spans
+      Then the card names that span
+      And a card about a field of that span names the field as well
+
+    @integration
+    Scenario: A card about the whole turn names no part
+      Given the turn carries an annotation about the turn as a whole
+      Then the card names no part of the turn
+
+    @integration @unimplemented
+    Scenario: The part a card names is what takes the reader to it
+      Given the turn carries an annotation about one of its spans
+      When the reviewer picks the part the card names
+      Then the reader is taken to that span
+
+    @integration @unimplemented
+    Scenario: A card whose part is no longer there says so instead of naming one
+      Given the turn carries an annotation about a span a correction deleted
+      Then the card reads as being about a part that is no longer there
+      And it offers nowhere to go
+
   Rule: Saving from the rail refreshes what the conversation reads
 
     The conversation reads every turn's annotations through one batched feed.

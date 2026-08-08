@@ -4,6 +4,7 @@ import {
   AnnotationRepository,
   type CreateAnnotationInput,
   type DeleteAnnotationInput,
+  type ProjectionAnnotationRow,
   type UpdateAnnotationInput,
 } from "./annotation.repository";
 
@@ -24,6 +25,26 @@ export class AnnotationService {
 
   async delete(input: DeleteAnnotationInput): Promise<Annotation> {
     return this.repository.delete(input);
+  }
+
+  /**
+   * What a page of traces carries in its `annotations` collection: only the
+   * comments about the traces themselves. A trace row, an export and a dataset
+   * column each answer a question about a whole trace, so a comment left on one
+   * of its spans is not part of the answer.
+   */
+  async getAllTraceLevelForProjection({
+    projectId,
+    traceIds,
+  }: {
+    projectId: string;
+    traceIds: string[];
+  }): Promise<ProjectionAnnotationRow[]> {
+    return this.repository.findAllForProjection({
+      projectId,
+      traceIds,
+      anchorScope: "trace",
+    });
   }
 
   async getProjectOrganizationId({

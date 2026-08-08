@@ -7,11 +7,17 @@ import {
 } from "./traceEditOverlay.repository";
 import {
   emptyTraceEditOverlayPatch,
+  encodeSpanIOFromEditedText,
   parseTraceEditOverlayPatch,
   patchHasAnyEdit,
   type TraceEditOverlayPatch,
+  type TraceEditSpanPatch,
   traceEditOverlayPatchSchema,
 } from "./traceEditOverlay.schemas";
+
+/** The span fields a suggestion can correct: the two that hold a captured value
+ *  a reviewer reads and can rewrite as text. */
+export type TraceEditSpanIOField = "input" | "output";
 
 export interface TraceEditOverlayDto {
   traceId: string;
@@ -120,14 +126,7 @@ export class TraceEditOverlayService {
     output: string;
     userId: string | null;
   }): Promise<TraceEditOverlayDto> {
-    const existing = await this.repository.findByProjectAndTrace({
-      projectId,
-      traceId,
-    });
-    const current = existing
-      ? (parseTraceEditOverlayPatch(existing.patch) ??
-        emptyTraceEditOverlayPatch())
-      : emptyTraceEditOverlayPatch();
+    const current = await this.currentPatch({ projectId, traceId });
 
     const merged: TraceEditOverlayPatch = {
       ...current,
@@ -181,6 +180,104 @@ export class TraceEditOverlayService {
     return this.upsert({ projectId, traceId, patch: next, userId });
   }
 
+  /**
+   * Records a corrected span field without disturbing the rest of the
+   * correction. This is what a suggestion left with a comment on a span's input
+   * or output writes: the comment stays the record of who asked for the change,
+   * the correction is what the dataset reads.
+   *
+   * The text is encoded with the same encoder the drawer uses, so a transcript
+   * typed into the box comes back as a transcript rather than as a string of
+   * JSON. A value the correction already holds for that field is the original
+   * the encoding reads, which keeps a field a reviewer already turned into
+   * plain text from being re-read as structure on the next save.
+   */
+  async mergeSpanFieldEdit({
+    projectId,
+    traceId,
+    spanId,
+    field,
+    text,
+    userId,
+  }: {
+    projectId: string;
+    traceId: string;
+    spanId: string;
+    field: TraceEditSpanIOField;
+    text: string;
+    userId: string | null;
+  }): Promise<TraceEditOverlayDto> {
+    const current = await this.currentPatch({ projectId, traceId });
+    const existingSpan = current.spans.find((span) => span.spanId === spanId);
+
+    const edited: TraceEditSpanPatch = {
+      ...(existingSpan ?? { spanId }),
+      [field]: encodeSpanIOFromEditedText({
+        text,
+        original: existingSpan?.[field] ?? null,
+      }),
+    };
+    const merged: TraceEditOverlayPatch = {
+      ...current,
+      spans: existingSpan
+        ? current.spans.map((span) => (span.spanId === spanId ? edited : span))
+        : [...current.spans, edited],
+    };
+
+    return this.upsert({ projectId, traceId, patch: merged, userId });
+  }
+
+  /**
+   * Takes a corrected span field back off, leaving every other edit in place.
+   * A span left with no corrected field at all goes with it, and a correction
+   * left with no edits returns the trace to uncorrected, so a withdrawn
+   * suggestion never leaves an inert row behind.
+   */
+  async removeSpanFieldEdit({
+    projectId,
+    traceId,
+    spanId,
+    field,
+    userId,
+  }: {
+    projectId: string;
+    traceId: string;
+    spanId: string;
+    field: TraceEditSpanIOField;
+    userId: string | null;
+  }): Promise<TraceEditOverlayDto | null> {
+    const existing = await this.repository.findByProjectAndTrace({
+      projectId,
+      traceId,
+    });
+    if (!existing) return null;
+
+    const current = parseTraceEditOverlayPatch(existing.patch);
+    const existingSpan = current?.spans.find((span) => span.spanId === spanId);
+    if (!current || existingSpan?.[field] === undefined) return null;
+
+    const { [field]: _removed, ...remainingSpanEdits } = existingSpan;
+    const spanKeepsEdits = Object.entries(remainingSpanEdits).some(
+      ([key, value]) => key !== "spanId" && value !== undefined,
+    );
+    const next: TraceEditOverlayPatch = {
+      ...current,
+      spans: spanKeepsEdits
+        ? current.spans.map((span) =>
+            span.spanId === spanId
+              ? (remainingSpanEdits as TraceEditSpanPatch)
+              : span,
+          )
+        : current.spans.filter((span) => span.spanId !== spanId),
+    };
+
+    if (!patchHasAnyEdit(next)) {
+      await this.repository.delete({ projectId, traceId });
+      return null;
+    }
+    return this.upsert({ projectId, traceId, patch: next, userId });
+  }
+
   async delete({
     projectId,
     traceId,
@@ -189,6 +286,28 @@ export class TraceEditOverlayService {
     traceId: string;
   }): Promise<void> {
     await this.repository.delete({ projectId, traceId });
+  }
+
+  /**
+   * The trace's correction as a patch this build can merge onto. A row it
+   * cannot interpret is replaced wholesale rather than merged into, the same way
+   * it reads as no correction everywhere else.
+   */
+  private async currentPatch({
+    projectId,
+    traceId,
+  }: {
+    projectId: string;
+    traceId: string;
+  }): Promise<TraceEditOverlayPatch> {
+    const existing = await this.repository.findByProjectAndTrace({
+      projectId,
+      traceId,
+    });
+    if (!existing) return emptyTraceEditOverlayPatch();
+    return (
+      parseTraceEditOverlayPatch(existing.patch) ?? emptyTraceEditOverlayPatch()
+    );
   }
 }
 

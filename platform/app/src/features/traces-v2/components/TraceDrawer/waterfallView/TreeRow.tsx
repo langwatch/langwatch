@@ -127,6 +127,10 @@ export const TreeRow = memo(function TreeRow({
   // A pending rename reads the same way a saved correction does, so an edit
   // looks like an edit before it is saved.
   const isEdited = isCorrected || draftName !== undefined;
+  // Removal is the whole of the change for a span the correction deletes, and
+  // the red marker is what says it. The green "changed" wash would only argue
+  // with it, so it stays off those rows.
+  const showsCorrectedTint = isEdited && !isDeletedByCorrection;
   const isError = span.status === "error";
   const isLlm = span.type === "llm" && span.model != null;
   // A named tool span gets the same two-line treatment as an LLM span: the
@@ -344,14 +348,14 @@ export const TreeRow = memo(function TreeRow({
               ? { base: "bg.emphasized", _dark: "blue.subtle" }
               : isHovered
                 ? "colorPalette.subtle/40"
-                : isEdited
+                : showsCorrectedTint
                   ? "green.subtle"
                   : undefined
           }
           // Edge tick on a corrected row so a change is spottable while
           // scanning the tree, not only once the row is read.
           boxShadow={
-            isEdited
+            showsCorrectedTint
               ? "inset 2px 0 0 var(--chakra-colors-green-solid)"
               : undefined
           }
@@ -454,6 +458,9 @@ export const TreeRow = memo(function TreeRow({
                 truncate
                 minWidth={0}
                 lineHeight={1.2}
+                // The badges beside it can squeeze the name down to a few
+                // characters, so the name carries the whole of itself.
+                title={displayName}
               >
                 {displayName}
               </Text>
@@ -487,7 +494,7 @@ export const TreeRow = memo(function TreeRow({
               {/* The row's green wash and edge tick are colour, which a reader
                   who cannot separate the hues has nothing to read. The badge
                   says the same thing in words, the way the deleted one does. */}
-              {isEdited && !isDeletedByCorrection && (
+              {showsCorrectedTint && (
                 <Text
                   textStyle="2xs"
                   color="green.fg"

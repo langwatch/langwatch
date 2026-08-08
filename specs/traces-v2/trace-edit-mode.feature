@@ -27,10 +27,23 @@
 #     somebody else's unsaved work.
 #   - Editing needs permission to update annotations, matching the correction
 #     write itself. The public share surface never offers it.
-#   - Editing happens in the Trace and Summary views. The conversation,
-#     terminal and usage views are read-only replays of an agent run, so
-#     entering edit mode moves the reader to the Trace view and the other tabs
-#     stay unavailable until they finish.
+#   - Editing happens in the Trace and Summary views. The terminal and usage
+#     views are read-only replays of an agent run, so entering the mode moves
+#     the reader to the Trace view and those tabs stay unavailable until they
+#     finish. The conversation is the exception: it is where commenting on a
+#     turn reads best, so it stays reachable inside the mode.
+#   - The mode is one mode, and it is named after the whole job: annotating a
+#     trace covers correcting it and commenting on it in the same pass, the way
+#     a document review holds suggestions and comments at once. A reviewer does
+#     not have to decide which of the two they are about to do before starting.
+#   - Corrections and comments are saved on different clocks, on purpose. A
+#     correction is a draft until Save, because it is one patch over the whole
+#     trace and it only makes sense as a whole. A comment is its own record and
+#     is saved as it is written, because it is somebody's remark and nothing
+#     later in the pass can invalidate it. That means Save and the discard
+#     prompt speak about the corrections only, and both have to say so plainly:
+#     a reviewer who reads "discard your changes" after leaving eight comments
+#     has to be certain the comments are not what is at risk.
 #   - A correction is displayed, not hidden: once one exists the reader can
 #     switch between the corrected and the captured trace, sees which fields
 #     changed, and can open a full diff.
@@ -96,6 +109,12 @@ Feature: Editing a trace in the drawer
 
   Rule: While editing, the reader stays on a view that can be edited
 
+    The three scenarios below describe the conversation as a view that cannot be
+    edited, which is what ships today. The rule "Annotating a trace is one pass
+    over corrections and comments" below supersedes that part of them: once the
+    mode carries commenting, the conversation is reachable inside it and only
+    usage and terminal stay closed. Everything else in this rule stands.
+
     @unit
     Scenario: A link naming edit mode and a view that cannot be edited opens on the trace
       Given a link that asks for edit mode and for the conversation view
@@ -113,6 +132,99 @@ Feature: Editing a trace in the drawer
       Given I am editing the trace
       Then the conversation, usage and terminal tabs cannot be opened
       And each explains that I need to finish editing to switch views
+
+  Rule: Annotating a trace is one pass over corrections and comments
+
+    A reviewer reads a trace once. Making them choose between correcting it and
+    commenting on it before they start splits one reading into two, and the
+    second reading is the one nobody does. One mode carries both, and it is
+    named after the job rather than after the half of it that came first.
+
+    What can be commented on, and what the comment is recorded against, is
+    specified in specs/traces-v2/anchored-comments.feature. This rule is only
+    about the mode the reviewer is in while doing it.
+
+    @integration @unimplemented
+    Scenario: The overflow menu offers to annotate the trace
+      When I open the trace actions menu
+      Then I see an action to annotate the trace
+      And it needs the same permission to write annotations as correcting does
+
+    @integration @unimplemented
+    Scenario: The bar names the mode and counts corrections and comments apart
+      Given I am annotating the trace
+      When I rename a span and leave a comment on another
+      Then the bar names the mode as annotating the trace
+      And the bar reports one changed field
+      And it reports the comment separately from the correction
+
+    @integration @unimplemented
+    Scenario: Correcting and commenting happen without leaving the mode
+      Given I am annotating the trace
+      When I correct a span output and comment on another span
+      Then both are accepted in the same pass
+      And I was never asked to choose between correcting and commenting
+
+    @integration @unimplemented
+    Scenario: The conversation stays reachable while annotating
+      Given I am annotating the trace
+      Then the conversation tab can be opened
+      And the usage and terminal tabs still cannot
+      And each of those explains that I need to finish first
+
+    @integration @unimplemented
+    Scenario: Starting to annotate from the conversation leaves the reader there
+      Given I am reading the conversation view
+      When I start annotating the trace
+      Then the conversation view is still shown
+      And I can comment on a turn without switching views
+
+    @unit @unimplemented
+    Scenario: A link asking to annotate on the conversation view opens on the conversation
+      Given a link that asks to annotate the trace and for the conversation view
+      When the drawer opens from it
+      Then it opens on the conversation view
+
+    @integration @unimplemented
+    Scenario: A comment is saved as it is written, not when the correction is saved
+      Given I am annotating the trace
+      When I leave a comment on a span
+      Then the comment is stored straight away
+      And there is still nothing to save on the correction
+
+    @integration @unimplemented
+    Scenario: Saving the correction leaves the comments alone
+      Given I am annotating the trace
+      And I have left a comment on a span
+      When I rename another span and save the correction
+      Then the correction is stored with that rename
+      And the comment is untouched by the save
+
+    @integration @unimplemented
+    Scenario: The discard prompt says it discards the corrections
+      Given I am annotating the trace
+      And I have left a comment on a span
+      And I have renamed another span
+      When I cancel
+      Then I am asked whether to discard the trace corrections
+      And the prompt does not put the comments at risk
+
+    @unit @unimplemented
+    Scenario: Comments left in the pass are nothing to discard
+      Given I am annotating the trace
+      And I have left a comment on a span and corrected nothing
+      When I cancel
+      Then I am not asked whether to discard anything
+      And the drawer leaves the mode straight away
+
+    @integration @unimplemented
+    Scenario: Discarding the corrections keeps the comments
+      Given I am annotating the trace
+      And I have left a comment on a span
+      And I have renamed another span
+      When I cancel and confirm discarding
+      Then the rename is gone
+      And the comment is still on the span
 
   Rule: Saving is offered only once something has changed
 
@@ -561,6 +673,21 @@ Feature: Editing a trace in the drawer
       Given the trace has a correction that deletes a span
       When I switch to the captured trace
       Then that span is listed and marked as deleted
+
+    # Removal is the whole of the change, and the deleted marker says it. The
+    # changed colour on the same row argues with it.
+    @integration
+    Scenario: A deleted span is not also coloured as changed
+      Given the trace has a correction that deletes a span
+      When I switch to the captured trace
+      Then that row does not carry the changed colour
+
+    # The markers a correction adds sit beside the span name and take room from
+    # it, so a renamed span is often the one whose name will not fit.
+    @integration
+    Scenario: A span name too long for its row can still be read in full
+      Given a span whose name the tree is too narrow to spell out
+      Then the name carries the whole of itself for the reader to read
 
     @integration
     Scenario: A corrected field is highlighted and reveals its captured value

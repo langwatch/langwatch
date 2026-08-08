@@ -286,6 +286,251 @@ describe("TraceEditOverlayService", () => {
     });
   });
 
+  describe("given a stored correction that renames one span and deletes another", () => {
+    const storedEdits = {
+      version: 1,
+      spans: [{ spanId: "span-1", name: "cleaned up" }],
+      deletedSpanIds: ["span-noise"],
+    };
+
+    /** @scenario "A suggestion on one field leaves the rest of the correction alone" */
+    it("keeps the rename and the deletion when a third span's output merges in", async () => {
+      const { service, upsert } = buildService(storedEdits);
+
+      const merged = await service.mergeSpanFieldEdit({
+        projectId: "project-1",
+        traceId: "trace-1",
+        spanId: "span-2",
+        field: "output",
+        text: "the right answer",
+        userId: "user-2",
+      });
+
+      expect(merged.patch.spans).toEqual([
+        { spanId: "span-1", name: "cleaned up" },
+        {
+          spanId: "span-2",
+          output: { type: "text", value: "the right answer" },
+        },
+      ]);
+      expect(merged.patch.deletedSpanIds).toEqual(["span-noise"]);
+      expect(merged.patch.trace).toBeUndefined();
+      expect(upsert).toHaveBeenCalledTimes(1);
+    });
+
+    it("leaves the rename in place when the renamed span's output is corrected", async () => {
+      const { service } = buildService(storedEdits);
+
+      const merged = await service.mergeSpanFieldEdit({
+        projectId: "project-1",
+        traceId: "trace-1",
+        spanId: "span-1",
+        field: "output",
+        text: "the right answer",
+        userId: "user-2",
+      });
+
+      expect(merged.patch.spans).toEqual([
+        {
+          spanId: "span-1",
+          name: "cleaned up",
+          output: { type: "text", value: "the right answer" },
+        },
+      ]);
+    });
+  });
+
+  describe("given a trace with no correction yet", () => {
+    describe("when a span's output is suggested", () => {
+      it("starts a correction holding only that field", async () => {
+        const { service } = buildService(null);
+
+        const merged = await service.mergeSpanFieldEdit({
+          projectId: "project-1",
+          traceId: "trace-1",
+          spanId: "span-1",
+          field: "output",
+          text: "the right answer",
+          userId: "user-2",
+        });
+
+        expect(merged.patch).toEqual({
+          version: 1,
+          spans: [
+            {
+              spanId: "span-1",
+              output: { type: "text", value: "the right answer" },
+            },
+          ],
+          deletedSpanIds: [],
+        });
+      });
+
+      it("reads a suggested transcript back as a transcript", async () => {
+        const { service } = buildService(null);
+
+        const merged = await service.mergeSpanFieldEdit({
+          projectId: "project-1",
+          traceId: "trace-1",
+          spanId: "span-1",
+          field: "input",
+          text: '[{"role":"user","content":"what is the capital?"}]',
+          userId: "user-2",
+        });
+
+        expect(merged.patch.spans[0]?.input).toEqual({
+          type: "chat_messages",
+          value: [{ role: "user", content: "what is the capital?" }],
+        });
+      });
+    });
+  });
+
+  describe("given a correction holding a suggested span output", () => {
+    const storedSuggestion = {
+      version: 1,
+      spans: [
+        {
+          spanId: "span-1",
+          name: "cleaned up",
+          output: { type: "text", value: "the right answer" },
+        },
+      ],
+      deletedSpanIds: [],
+    };
+
+    describe("when the suggested field is taken back off", () => {
+      it("keeps the span's other edits", async () => {
+        const { service, deleteRow } = buildService(storedSuggestion);
+
+        const remaining = await service.removeSpanFieldEdit({
+          projectId: "project-1",
+          traceId: "trace-1",
+          spanId: "span-1",
+          field: "output",
+          userId: "user-2",
+        });
+
+        expect(remaining?.patch.spans).toEqual([
+          { spanId: "span-1", name: "cleaned up" },
+        ]);
+        expect(deleteRow).not.toHaveBeenCalled();
+      });
+
+      it("drops the span when the field was all it corrected", async () => {
+        const { service } = buildService({
+          version: 1,
+          spans: [
+            {
+              spanId: "span-1",
+              output: { type: "text", value: "the right answer" },
+            },
+            { spanId: "span-2", name: "cleaned up" },
+          ],
+          deletedSpanIds: [],
+        });
+
+        const remaining = await service.removeSpanFieldEdit({
+          projectId: "project-1",
+          traceId: "trace-1",
+          spanId: "span-1",
+          field: "output",
+          userId: "user-2",
+        });
+
+        expect(remaining?.patch.spans).toEqual([
+          { spanId: "span-2", name: "cleaned up" },
+        ]);
+      });
+
+      it("returns the trace to uncorrected when the field was the whole correction", async () => {
+        const { service, deleteRow, upsert } = buildService({
+          version: 1,
+          spans: [
+            {
+              spanId: "span-1",
+              output: { type: "text", value: "the right answer" },
+            },
+          ],
+          deletedSpanIds: [],
+        });
+
+        expect(
+          await service.removeSpanFieldEdit({
+            projectId: "project-1",
+            traceId: "trace-1",
+            spanId: "span-1",
+            field: "output",
+            userId: "user-2",
+          }),
+        ).toBeNull();
+        expect(deleteRow).toHaveBeenCalledTimes(1);
+        expect(upsert).not.toHaveBeenCalled();
+      });
+
+      it("leaves the corrected trace output alone", async () => {
+        const { service } = buildService({
+          version: 1,
+          trace: { output: { value: "corrected in the drawer" } },
+          spans: [
+            {
+              spanId: "span-1",
+              output: { type: "text", value: "the right answer" },
+            },
+          ],
+          deletedSpanIds: [],
+        });
+
+        const remaining = await service.removeSpanFieldEdit({
+          projectId: "project-1",
+          traceId: "trace-1",
+          spanId: "span-1",
+          field: "output",
+          userId: "user-2",
+        });
+
+        expect(remaining?.patch.trace).toEqual({
+          output: { value: "corrected in the drawer" },
+        });
+        expect(remaining?.patch.spans).toEqual([]);
+      });
+    });
+
+    describe("when a field the correction never held is taken back off", () => {
+      it("writes nothing", async () => {
+        const { service, deleteRow, upsert } = buildService(storedSuggestion);
+
+        expect(
+          await service.removeSpanFieldEdit({
+            projectId: "project-1",
+            traceId: "trace-1",
+            spanId: "span-1",
+            field: "input",
+            userId: "user-2",
+          }),
+        ).toBeNull();
+        expect(deleteRow).not.toHaveBeenCalled();
+        expect(upsert).not.toHaveBeenCalled();
+      });
+
+      it("writes nothing for a span the correction never touched", async () => {
+        const { service, deleteRow, upsert } = buildService(storedSuggestion);
+
+        expect(
+          await service.removeSpanFieldEdit({
+            projectId: "project-1",
+            traceId: "trace-1",
+            spanId: "span-9",
+            field: "output",
+            userId: "user-2",
+          }),
+        ).toBeNull();
+        expect(deleteRow).not.toHaveBeenCalled();
+        expect(upsert).not.toHaveBeenCalled();
+      });
+    });
+  });
+
   describe("when saving a correction that changes nothing", () => {
     it("rejects it and never writes", async () => {
       const { service, upsert } = buildService(null);

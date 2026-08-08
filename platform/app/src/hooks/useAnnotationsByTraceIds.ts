@@ -29,16 +29,27 @@ export interface UseAnnotationsByTraceIdsResult {
   isError: boolean;
 }
 
+/**
+ * Annotations for a set of traces.
+ *
+ * Reads the comments about the traces themselves by default: the surfaces that
+ * ask about a page of traces (the annotations list, a dataset's columns) answer
+ * per trace, so a reviewer who marked six spans of one trace must not change
+ * what they say. A surface that shows a trace's own comments passes
+ * `anchor: "all"` and gets the anchored ones too.
+ */
 export function useAnnotationsByTraceIds({
   projectId,
   traceIds,
   enabled = true,
   keepPreviousData = false,
+  anchor = "trace",
 }: {
   projectId: string;
   traceIds: string[];
   enabled?: boolean;
   keepPreviousData?: boolean;
+  anchor?: "trace" | "all";
 }): UseAnnotationsByTraceIdsResult {
   // Dedupe before chunking: duplicate ids spanning chunks would fetch the
   // same annotations twice and double them in `data` after the flatMap.
@@ -60,7 +71,7 @@ export function useAnnotationsByTraceIds({
   const results = api.useQueries((t) =>
     chunks.map((ids) =>
       t.annotation.getByTraceIds(
-        { projectId, traceIds: ids },
+        { projectId, traceIds: ids, anchor },
         {
           enabled: enabled && !!projectId && ids.length > 0,
           keepPreviousData,

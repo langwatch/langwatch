@@ -1,4 +1,5 @@
 import type { AnnotationScoreDataType } from "@prisma/client";
+import type { AnnotationAnchorColumns } from "~/server/annotations/annotationAnchor";
 import type { RouterOutputs } from "~/utils/api";
 
 export type AnnotationScoreList =
@@ -47,6 +48,12 @@ export interface AnnotationFormState {
   hasExisting: boolean;
   /** Whether saving is off the table right now, and Save says so. */
   isSaveBlocked: boolean;
+  /**
+   * Whether the comment is about one part of the trace rather than the whole of
+   * it. A score is a project-wide key with no notion of a target and becomes a
+   * column for the trace, so an anchored comment is not offered any.
+   */
+  isAnchored: boolean;
   handleSave: () => void;
   handleDelete: () => void;
   onCancel: () => void;
@@ -67,7 +74,7 @@ export interface AnnotationMutations {
 }
 
 /** What a popover host tells the form about the turn it is annotating. */
-export interface PopoverAnnotationFormInput {
+export interface PopoverAnnotationFormInput extends AnnotationAnchorColumns {
   traceId: string;
   /** Current trace output. Pre-filled into the suggest field. */
   output?: string | null;

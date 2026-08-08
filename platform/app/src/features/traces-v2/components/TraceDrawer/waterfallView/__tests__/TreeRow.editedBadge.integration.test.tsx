@@ -55,6 +55,16 @@ function renderRow(over: Partial<Parameters<typeof TreeRow>[0]> = {}) {
   );
 }
 
+/**
+ * The row itself, which is what carries the corrected tint and edge tick.
+ * It is the outermost stack the row renders.
+ */
+function rowTint(container: HTMLElement): string {
+  const row = container.querySelector(".chakra-stack") as HTMLElement;
+  const { backgroundColor, boxShadow } = getComputedStyle(row);
+  return `${backgroundColor} ${boxShadow}`;
+}
+
 describe("TreeRow", () => {
   afterEach(cleanup);
 
@@ -64,6 +74,13 @@ describe("TreeRow", () => {
       const { getByText } = renderRow({ isCorrected: true });
 
       expect(getByText("Edited")).toBeInTheDocument();
+    });
+
+    /** @scenario "A corrected span is marked in the tree" */
+    it("marks the row in the changed colour", () => {
+      const { container } = renderRow({ isCorrected: true });
+
+      expect(rowTint(container)).toContain("green");
     });
   });
 
@@ -88,6 +105,16 @@ describe("TreeRow", () => {
 
       expect(getByText("Deleted")).toBeInTheDocument();
       expect(queryByText("Edited")).not.toBeInTheDocument();
+    });
+
+    /** @scenario "A deleted span is not also coloured as changed" */
+    it("leaves the changed colour off the row for the same reason", () => {
+      const { container } = renderRow({
+        isCorrected: true,
+        isDeletedByCorrection: true,
+      });
+
+      expect(rowTint(container)).not.toContain("green");
     });
   });
 

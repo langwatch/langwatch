@@ -130,11 +130,13 @@ function renderRow({
   );
 }
 
-/** The ledger row is the group wrapping the "Turn N" label. */
+/** The separator row is the group wrapping the "Turn N" label. */
+function separatorRow(): HTMLElement {
+  return screen.getByText("Turn 3").closest('[role="group"]') as HTMLElement;
+}
+
 function separatorText(): string {
-  const label = screen.getByText("Turn 3");
-  const group = label.closest('[role="group"]');
-  return group?.textContent ?? "";
+  return separatorRow()?.textContent ?? "";
 }
 
 afterEach(cleanup);
@@ -206,22 +208,45 @@ describe("ChatTurnRow separator ledger", () => {
     it("puts the badge in the separator row rather than over it", () => {
       renderRow();
 
-      const separator = screen.getByText("Turn 3").parentElement!.parentElement;
+      const separator = separatorRow();
+      const badgeSlot = screen.getByTestId("turn-annotation-badges")
+        .parentElement!;
 
-      expect(screen.getByTestId("turn-annotation-badges").parentElement).toBe(
-        separator,
-      );
+      // In flow: the slot holding the badge is a child of the separator, so the
+      // badge takes its own room instead of being drawn over the ledger.
+      expect(badgeSlot.parentElement).toBe(separator);
+      expect(getComputedStyle(badgeSlot).position).not.toBe("absolute");
     });
 
     /** @scenario "The annotation badge takes its own room on the separator" */
     it("keeps the hover actions floating over the end of the line", () => {
       renderRow();
 
-      const separator = screen.getByText("Turn 3").parentElement!.parentElement;
+      const floating = screen.getByTestId("turn-action-row").parentElement!;
 
-      expect(screen.getByTestId("turn-action-row").parentElement).not.toBe(
-        separator,
-      );
+      expect(floating).not.toBe(separatorRow());
+      expect(getComputedStyle(floating).position).toBe("absolute");
+    });
+
+    /**
+     * A hidden action row is still a click target. Anchored to the separator's
+     * own edge it lay across the badge, and clicking the badge activated the
+     * last action under it ("Dataset") instead of opening the annotation list.
+     *
+     * @scenario "The annotation badge takes its own room on the separator"
+     */
+    it("floats the hover actions clear of the badge, not across it", () => {
+      renderRow();
+
+      const badgeSlot = screen.getByTestId("turn-annotation-badges")
+        .parentElement!;
+      const floating = screen.getByTestId("turn-action-row").parentElement!;
+
+      // Anchored to the badge's own slot, and past its far edge, so no part of
+      // the action row can ever sit on top of the badge.
+      expect(floating.parentElement).toBe(badgeSlot);
+      expect(getComputedStyle(badgeSlot).position).toBe("relative");
+      expect(getComputedStyle(floating).right).toBe("100%");
     });
   });
 });

@@ -86,6 +86,24 @@ Feature: Conversation turn ledger
       Then its badge sits in the separator row rather than over it
       And the hover actions still float over the end of the line
 
+  Rule: The turn's actions arrive with the pointer, on a surface of their own
+
+    Translate, Annotate, Suggest and Dataset stay off the separator while the
+    reader is reading, and arrive when the pointer is on the turn. They land
+    over the end of the ledger, so they arrive on an opaque surface: the ledger
+    keeps its place and sits underneath rather than reading through them.
+
+    @integration
+    Scenario: The turn's actions stay away until the pointer is on the turn
+      Given a turn the reader's pointer is not on
+      Then its actions are not on screen
+
+    @integration
+    Scenario: The turn's actions arrive when the pointer is on the turn
+      Given the reader's pointer is on a turn
+      Then its actions are on screen
+      And they are drawn on a surface of their own, over the ledger
+
   Rule: A long inter-turn pause is surfaced as a gap divider
 
     A noticeable wall-clock gap since the previous turn finished is drawn as an

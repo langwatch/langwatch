@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { toaster } from "~/components/ui/toaster";
 import { useAnnotationInvalidation } from "~/hooks/useAnnotationInvalidation";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import type { AnnotationAnchorColumns } from "~/server/annotations/annotationAnchor";
 import { api } from "~/utils/api";
 import type {
   AnnotationDraftValues,
@@ -27,13 +28,16 @@ export function useAnnotationMutations({
   annotationId,
   enabled,
   onDone,
+  anchorKind,
+  anchorId,
+  anchorPath,
 }: {
   traceId: string;
   mode: AnnotationMode;
   annotationId?: string;
   enabled: boolean;
   onDone: () => void;
-}): AnnotationMutations {
+} & AnnotationAnchorColumns): AnnotationMutations {
   const { project } = useOrganizationTeamProject();
   const invalidateTraceReads = useAnnotationInvalidation({ traceId });
 
@@ -88,9 +92,15 @@ export function useAnnotationMutations({
       });
     };
     if (existing) {
+      // The anchor is not sent back: editing a comment changes what it says,
+      // never what it is about, so pointing it somewhere else is a delete and
+      // a new comment.
       update.mutate({ ...payload, id: existing.id }, { onSuccess, onError });
     } else {
-      create.mutate(payload, { onSuccess, onError });
+      create.mutate(
+        { ...payload, anchorKind, anchorId, anchorPath },
+        { onSuccess, onError },
+      );
     }
   };
 
@@ -183,6 +193,9 @@ export function usePopoverAnnotationForm(
     annotationId: props.annotationId,
     enabled: props.open,
     onDone: () => props.onOpenChange(false),
+    anchorKind: props.anchorKind,
+    anchorId: props.anchorId,
+    anchorPath: props.anchorPath,
   });
   const { isEdit, existing } = mutations;
 
@@ -216,6 +229,7 @@ export function usePopoverAnnotationForm(
     isDeleting: mutations.isDeleting,
     hasExisting: mutations.hasExisting,
     isSaveBlocked: mutations.isSaveBlocked,
+    isAnchored: !!props.anchorKind,
     handleSave: () => mutations.save({ comment, expectedOutput, scoreOptions }),
     handleDelete: mutations.remove,
     onCancel: () => props.onOpenChange(false),

@@ -11,7 +11,13 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "@prisma/client";
+import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { getAnnotatedTraceIds } from "~/server/filters/annotations";
+import { mapTraceToDatasetEntry } from "~/server/tracer/tracesMapping";
+import type { Trace } from "~/server/tracer/types";
+import { applyOverlayToTrace } from "~/server/traces/edit-overlay/applyTraceEditOverlay";
+import type { TraceEditOverlayPatch } from "~/server/traces/edit-overlay/traceEditOverlay.schemas";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { getTestUser } from "../../../../utils/testUtils";
 import { prisma } from "../../../db";
@@ -487,6 +493,595 @@ describe("Annotation CRUD", () => {
         traceId: deletableTraceId,
       });
       expect(await overlayFor(deletableTraceId)).toBeNull();
+    });
+  });
+
+  describe("given comments left on parts of a trace", () => {
+    const anchoredTraceId = `${TRACE_ID_PREFIX}-anchored`;
+
+    const commentOn = async ({
+      traceId: onTraceId,
+      comment,
+      anchorKind,
+      anchorId,
+      anchorPath,
+      expectedOutput,
+    }: {
+      traceId: string;
+      comment: string;
+      anchorKind?: "span" | "field" | "message";
+      anchorId?: string;
+      anchorPath?: string;
+      expectedOutput?: string;
+    }) =>
+      caller.annotation.create({
+        projectId,
+        traceId: onTraceId,
+        comment,
+        scoreOptions: {},
+        anchorKind,
+        anchorId,
+        anchorPath,
+        expectedOutput,
+      });
+
+    /** @scenario "Commenting on a span records the span it was left on" */
+    it("records the span, and copies nothing the span held", async () => {
+      const created = await commentOn({
+        traceId: anchoredTraceId,
+        comment: "this search returned nothing",
+        anchorKind: "span",
+        anchorId: "span-search",
+      });
+
+      const persisted = await prisma.annotation.findFirstOrThrow({
+        where: { id: created.id, projectId },
+      });
+      expect(persisted.anchorKind).toBe("span");
+      expect(persisted.anchorId).toBe("span-search");
+      expect(persisted.anchorPath).toBeNull();
+      expect(persisted.comment).toBe("this search returned nothing");
+      expect(persisted.expectedOutput).toBeNull();
+    });
+
+    /** @scenario "Commenting on a span's output records the field it was left on" */
+    it("records the field, and the input separately from the output", async () => {
+      const onOutput = await commentOn({
+        traceId: anchoredTraceId,
+        comment: "the output is wrong",
+        anchorKind: "field",
+        anchorId: "span-search",
+        anchorPath: "output",
+      });
+      const onInput = await commentOn({
+        traceId: anchoredTraceId,
+        comment: "the query is wrong",
+        anchorKind: "field",
+        anchorId: "span-search",
+        anchorPath: "input",
+      });
+
+      const rows = await prisma.annotation.findMany({
+        where: { projectId, id: { in: [onOutput.id, onInput.id] } },
+        select: { id: true, anchorKind: true, anchorPath: true },
+      });
+      expect(rows.find((row) => row.id === onOutput.id)).toMatchObject({
+        anchorKind: "field",
+        anchorPath: "output",
+      });
+      expect(rows.find((row) => row.id === onInput.id)).toMatchObject({
+        anchorKind: "field",
+        anchorPath: "input",
+      });
+    });
+
+    /** @scenario "Commenting on the trace's own input, output or metadata records which one" */
+    it("records which of the trace's own fields the comment is on", async () => {
+      const created = await Promise.all(
+        ["input", "output", "metadata.environment"].map((path) =>
+          commentOn({
+            traceId: anchoredTraceId,
+            comment: `about ${path}`,
+            anchorKind: "field",
+            anchorId: anchoredTraceId,
+            anchorPath: path,
+          }),
+        ),
+      );
+
+      const rows = await prisma.annotation.findMany({
+        where: { projectId, id: { in: created.map((row) => row.id) } },
+        select: { anchorKind: true, anchorId: true, anchorPath: true },
+      });
+      expect(rows.every((row) => row.anchorId === anchoredTraceId)).toBe(true);
+      expect(rows.map((row) => row.anchorPath).sort()).toEqual([
+        "input",
+        "metadata.environment",
+        "output",
+      ]);
+    });
+
+    /** @scenario "Commenting on one message in a transcript records that message" */
+    it("records the message it was left on and no other", async () => {
+      const messageTraceId = `${TRACE_ID_PREFIX}-message`;
+      await commentOn({
+        traceId: messageTraceId,
+        comment: "this answer went off",
+        anchorKind: "message",
+        anchorId: messageTraceId,
+        anchorPath: "assistant-2-9f1c",
+      });
+
+      const onTrace = await caller.annotation.getByTraceId({
+        projectId,
+        traceId: messageTraceId,
+      });
+      expect(onTrace).toHaveLength(1);
+      expect(onTrace[0]).toMatchObject({
+        anchorKind: "message",
+        anchorId: messageTraceId,
+        anchorPath: "assistant-2-9f1c",
+      });
+      expect(
+        onTrace.filter((row) => row.anchorPath === "assistant-3-1ab2"),
+      ).toHaveLength(0);
+    });
+
+    it("refuses a comment that names a part without saying what kind it is", async () => {
+      await expect(
+        caller.annotation.create({
+          projectId,
+          traceId: anchoredTraceId,
+          comment: "half an anchor",
+          scoreOptions: {},
+          anchorId: "span-search",
+        }),
+      ).rejects.toThrow();
+    });
+
+    /** @scenario "A comment cannot be moved to another part of the trace" */
+    it("keeps the anchor when the comment is edited", async () => {
+      const created = await commentOn({
+        traceId: anchoredTraceId,
+        comment: "the output is wrong",
+        anchorKind: "field",
+        anchorId: "span-immutable",
+        anchorPath: "output",
+      });
+
+      const updated = await caller.annotation.updateByTraceId({
+        id: created.id,
+        projectId,
+        traceId: anchoredTraceId,
+        comment: "the output is wrong, here is why",
+        scoreOptions: {},
+      });
+
+      expect(updated.comment).toBe("the output is wrong, here is why");
+      expect(updated.anchorKind).toBe("field");
+      expect(updated.anchorId).toBe("span-immutable");
+      expect(updated.anchorPath).toBe("output");
+    });
+
+    /** @scenario "A comment about something this build does not recognise still reads" */
+    it("reads a comment about an unrecognised kind of part as a comment about the trace", async () => {
+      const futureTraceId = `${TRACE_ID_PREFIX}-future-anchor`;
+      await prisma.annotation.create({
+        data: {
+          id: nanoid(),
+          projectId,
+          traceId: futureTraceId,
+          comment: "left by a newer build",
+          anchorKind: "gizmo",
+          anchorId: "gizmo-1",
+          anchorPath: "somewhere",
+        },
+      });
+      await commentOn({
+        traceId: futureTraceId,
+        comment: "about the trace",
+      });
+
+      const onTrace = await caller.annotation.getByTraceId({
+        projectId,
+        traceId: futureTraceId,
+      });
+
+      expect(onTrace).toHaveLength(2);
+      expect(
+        onTrace.find((row) => row.comment === "left by a newer build"),
+      ).toMatchObject({
+        anchorKind: null,
+        anchorId: null,
+        anchorPath: null,
+      });
+    });
+
+    /** @scenario "A trace commented only on one of its spans still counts as annotated" */
+    it("counts a trace whose only comment is on a span as annotated", async () => {
+      const spanOnlyTraceId = `${TRACE_ID_PREFIX}-span-only`;
+      mockAddAnnotation.mockClear();
+
+      const created = await commentOn({
+        traceId: spanOnlyTraceId,
+        comment: "this tool call misfired",
+        anchorKind: "span",
+        anchorId: "span-tool",
+      });
+
+      // The has-annotation filter in search reads the ClickHouse sync, and the
+      // trigger filters read getAnnotatedTraceIds. Both answer "has a human
+      // touched this trace", so both count a comment on one of its spans.
+      expect(mockAddAnnotation).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tenantId: projectId,
+          traceId: spanOnlyTraceId,
+          annotationId: created.id,
+        }),
+      );
+      const annotated = await getAnnotatedTraceIds({
+        projectId,
+        startDate: new Date(Date.now() - 60_000),
+        endDate: new Date(Date.now() + 60_000),
+      });
+      expect(annotated).toContain(spanOnlyTraceId);
+    });
+
+    /** @scenario "A comment on one part of a trace never becomes a queue item" */
+    it("creates no queue item for a comment on a part of the trace", async () => {
+      const queuelessTraceId = `${TRACE_ID_PREFIX}-queueless`;
+      for (const spanId of ["span-1", "span-2", "span-3"]) {
+        await commentOn({
+          traceId: queuelessTraceId,
+          comment: `about ${spanId}`,
+          anchorKind: "span",
+          anchorId: spanId,
+        });
+      }
+
+      expect(
+        await prisma.annotationQueueItem.count({
+          where: { projectId, traceId: queuelessTraceId },
+        }),
+      ).toBe(0);
+    });
+
+    /** @scenario "Sending a commented trace to a queue sends the trace once" */
+    it("holds one queue item for a trace carrying three comments on its spans", async () => {
+      const queuedTraceId = `${TRACE_ID_PREFIX}-queued-once`;
+      await prisma.annotationQueueItem.deleteMany({
+        where: { projectId, traceId: queuedTraceId },
+      });
+      for (const spanId of ["span-1", "span-2", "span-3"]) {
+        await commentOn({
+          traceId: queuedTraceId,
+          comment: `about ${spanId}`,
+          anchorKind: "span",
+          anchorId: spanId,
+        });
+      }
+
+      const user = await getTestUser();
+      await caller.annotation.createQueueItem({
+        projectId,
+        traceIds: [queuedTraceId],
+        annotators: [`user-${user.id}`],
+      });
+
+      expect(
+        await prisma.annotationQueueItem.count({
+          where: { projectId, traceId: queuedTraceId },
+        }),
+      ).toBe(1);
+      await prisma.annotationQueueItem.deleteMany({
+        where: { projectId, traceId: queuedTraceId },
+      });
+    });
+
+    describe("given a trace with one comment about it and three about its spans", () => {
+      const floodTraceId = `${TRACE_ID_PREFIX}-flood`;
+
+      beforeAll(async () => {
+        await prisma.annotation.deleteMany({
+          where: { projectId, traceId: floodTraceId },
+        });
+        await commentOn({
+          traceId: floodTraceId,
+          comment: "the whole trace is off",
+        });
+        for (const spanId of ["span-1", "span-2", "span-3"]) {
+          await commentOn({
+            traceId: floodTraceId,
+            comment: `about ${spanId}`,
+            anchorKind: "span",
+            anchorId: spanId,
+          });
+        }
+      });
+
+      /** @scenario "The project's annotations list holds only what was said about whole traces" */
+      /** @scenario "Exporting the annotations list exports the rows the list shows" */
+      it("lists and exports the one comment about the trace", async () => {
+        const listed = await caller.annotation.getAll({ projectId });
+
+        const forTrace = listed.filter((row) => row.traceId === floodTraceId);
+        expect(forTrace).toHaveLength(1);
+        expect(forTrace[0]!.comment).toBe("the whole trace is off");
+        // The export is taken from the rows the list holds, so it carries the
+        // same one row.
+        expect(
+          forTrace.map((row) => ({
+            comment: row.comment,
+            traceId: row.traceId,
+          })),
+        ).toEqual([
+          { comment: "the whole trace is off", traceId: floodTraceId },
+        ]);
+      });
+
+      /** @scenario "A dataset column of annotations carries only the trace-level ones" */
+      it("fills a dataset annotations column with the one comment about the trace", async () => {
+        const traceLevel = await caller.annotation.getByTraceIds({
+          projectId,
+          traceIds: [floodTraceId],
+          anchor: "trace",
+        });
+
+        const [row] = mapTraceToDatasetEntry(
+          {
+            trace_id: floodTraceId,
+            annotations: traceLevel,
+          } as never,
+          {
+            trace_id: { source: "trace_id" },
+            comments: { source: "annotations", key: "comment" },
+          },
+          new Set(),
+        );
+
+        expect(row).toEqual({
+          trace_id: floodTraceId,
+          comments: JSON.stringify(["the whole trace is off"]),
+        });
+      });
+
+      it("reads every comment when the trace's own list asks for them", async () => {
+        const all = await caller.annotation.getByTraceIds({
+          projectId,
+          traceIds: [floodTraceId],
+        });
+
+        expect(all).toHaveLength(4);
+        expect(all.filter((row) => row.anchorKind === "span")).toHaveLength(3);
+      });
+
+      /** @scenario "A queue item carries the comments about its trace" */
+      it("carries the one comment about the trace on the queue item", async () => {
+        await prisma.annotationQueueItem.deleteMany({
+          where: { projectId, traceId: floodTraceId },
+        });
+        const user = await getTestUser();
+        const item = await prisma.annotationQueueItem.create({
+          data: { projectId, traceId: floodTraceId, userId: user.id },
+        });
+
+        const queue = await caller.annotation.getOptimizedAnnotationQueues({
+          projectId,
+          selectedAnnotations: "pending",
+          pageSize: 50,
+          pageOffset: 0,
+        });
+
+        const enriched = queue.assignedQueueItems.find(
+          (queueItem) => queueItem.id === item.id,
+        );
+        expect(enriched?.annotations.map((row) => row.comment)).toEqual([
+          "the whole trace is off",
+        ]);
+        await prisma.annotationQueueItem.deleteMany({
+          where: { projectId, traceId: floodTraceId },
+        });
+      });
+    });
+
+    describe("given a comment on a span's output carrying a suggestion", () => {
+      const suggestionTraceId = `${TRACE_ID_PREFIX}-span-suggestion`;
+
+      const overlayPatchFor = async (forTraceId: string) => {
+        const row = await prisma.traceEditOverlay.findUnique({
+          where: { projectId_traceId: { projectId, traceId: forTraceId } },
+        });
+        return row?.patch as TraceEditOverlayPatch | undefined;
+      };
+
+      /** @scenario "A suggestion left with a comment on a span output becomes that span's correction" */
+      it("records the suggestion and corrects that span's output", async () => {
+        await prisma.traceEditOverlay.deleteMany({
+          where: { projectId, traceId: suggestionTraceId },
+        });
+
+        const created = await commentOn({
+          traceId: suggestionTraceId,
+          comment: "this search should have found Amsterdam",
+          anchorKind: "field",
+          anchorId: "span-search",
+          anchorPath: "output",
+          expectedOutput: "Amsterdam",
+        });
+
+        expect(created.expectedOutput).toBe("Amsterdam");
+        const patch = await overlayPatchFor(suggestionTraceId);
+        expect(patch).toMatchObject({
+          version: 1,
+          spans: [
+            {
+              spanId: "span-search",
+              output: { type: "text", value: "Amsterdam" },
+            },
+          ],
+        });
+        expect(patch?.trace).toBeUndefined();
+      });
+
+      /** @scenario "A field suggested through a comment reaches the dataset" */
+      it("carries the suggested output into the dataset row for that span", async () => {
+        const datasetTraceId = `${TRACE_ID_PREFIX}-span-suggestion-dataset`;
+        await prisma.traceEditOverlay.deleteMany({
+          where: { projectId, traceId: datasetTraceId },
+        });
+        await commentOn({
+          traceId: datasetTraceId,
+          comment: "this search should have found Amsterdam",
+          anchorKind: "field",
+          anchorId: "span-search",
+          anchorPath: "output",
+          expectedOutput: "Amsterdam",
+        });
+
+        const capturedTrace = {
+          trace_id: datasetTraceId,
+          project_id: projectId,
+          metadata: {},
+          timestamps: {
+            started_at: 1_000,
+            inserted_at: 1_000,
+            updated_at: 1_000,
+          },
+          input: { value: "what is the capital of the Netherlands?" },
+          output: { value: "Rotterdam" },
+          spans: [
+            {
+              span_id: "span-search",
+              trace_id: datasetTraceId,
+              project_id: projectId,
+              type: "tool",
+              name: "search",
+              input: { type: "text", value: "capital of the Netherlands" },
+              output: { type: "text", value: "Rotterdam" },
+              timestamps: { started_at: 1_000, finished_at: 1_100 },
+            },
+          ],
+        } as unknown as Trace;
+
+        const patch = await overlayPatchFor(datasetTraceId);
+        const corrected = applyOverlayToTrace({
+          trace: capturedTrace,
+          patch: patch!,
+        });
+
+        const [row] = mapTraceToDatasetEntry(
+          corrected as never,
+          {
+            answer: { source: "spans", key: "search", subkey: "output" },
+          },
+          new Set(),
+        );
+
+        expect(JSON.stringify(row?.answer)).toContain("Amsterdam");
+        expect(JSON.stringify(row?.answer)).not.toContain("Rotterdam");
+        expect(capturedTrace.spans?.[0]?.output).toEqual({
+          type: "text",
+          value: "Rotterdam",
+        });
+      });
+
+      it("leaves the corrected trace output alone", async () => {
+        const besideTraceId = `${TRACE_ID_PREFIX}-span-suggestion-beside`;
+        await prisma.traceEditOverlay.deleteMany({
+          where: { projectId, traceId: besideTraceId },
+        });
+        await caller.traceEditOverlay.upsert({
+          projectId,
+          traceId: besideTraceId,
+          patch: {
+            version: 1,
+            trace: { output: { value: "corrected in the drawer" } },
+            spans: [],
+            deletedSpanIds: [],
+          },
+        });
+
+        await commentOn({
+          traceId: besideTraceId,
+          comment: "this span is wrong too",
+          anchorKind: "field",
+          anchorId: "span-search",
+          anchorPath: "output",
+          expectedOutput: "Amsterdam",
+        });
+
+        expect(await overlayPatchFor(besideTraceId)).toMatchObject({
+          trace: { output: { value: "corrected in the drawer" } },
+          spans: [
+            {
+              spanId: "span-search",
+              output: { type: "text", value: "Amsterdam" },
+            },
+          ],
+        });
+      });
+
+      it("withdraws the span's correction when the suggestion is cleared", async () => {
+        const clearedTraceId = `${TRACE_ID_PREFIX}-span-suggestion-cleared`;
+        await prisma.traceEditOverlay.deleteMany({
+          where: { projectId, traceId: clearedTraceId },
+        });
+
+        const created = await commentOn({
+          traceId: clearedTraceId,
+          comment: "this span is wrong",
+          anchorKind: "field",
+          anchorId: "span-search",
+          anchorPath: "output",
+          expectedOutput: "Amsterdam",
+        });
+        await caller.annotation.updateByTraceId({
+          id: created.id,
+          projectId,
+          traceId: clearedTraceId,
+          comment: "never mind",
+          expectedOutput: "",
+          scoreOptions: {},
+        });
+
+        expect(await overlayPatchFor(clearedTraceId)).toBeUndefined();
+      });
+
+      it("carries no correction for a comment on an attribute row", async () => {
+        const attributeTraceId = `${TRACE_ID_PREFIX}-attribute-suggestion`;
+        await prisma.traceEditOverlay.deleteMany({
+          where: { projectId, traceId: attributeTraceId },
+        });
+
+        await commentOn({
+          traceId: attributeTraceId,
+          comment: "this temperature is too high",
+          anchorKind: "field",
+          anchorId: "span-search",
+          anchorPath: "params.temperature",
+          expectedOutput: "0.1",
+        });
+
+        expect(await overlayPatchFor(attributeTraceId)).toBeUndefined();
+      });
+
+      it("carries no correction for a comment on a message", async () => {
+        const messageTraceId = `${TRACE_ID_PREFIX}-message-suggestion`;
+        await prisma.traceEditOverlay.deleteMany({
+          where: { projectId, traceId: messageTraceId },
+        });
+
+        await commentOn({
+          traceId: messageTraceId,
+          comment: "this message went off",
+          anchorKind: "message",
+          anchorId: messageTraceId,
+          anchorPath: "assistant-2-9f1c",
+          expectedOutput: "something else",
+        });
+
+        expect(await overlayPatchFor(messageTraceId)).toBeUndefined();
+      });
     });
   });
 
