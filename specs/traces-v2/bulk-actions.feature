@@ -365,18 +365,52 @@ Rule: Send selected traces to an annotation queue
     And the dialog closes
 
   @integration
-  Scenario: A successful send confirms and offers a way to open the queues
+  Scenario: A successful send counts what actually became queue items
     Given the dialog is open for 3 selected traces
-    When the send succeeds
+    When the send succeeds and every trace was queued
     Then a confirmation reads "Added to annotation queue"
-    And it says how many traces were sent for annotation
-    And it offers "View queues", which opens the project's annotations page
+    And it says 3 traces were sent for annotation
+
+  # A trace the project no longer holds never becomes a queue item, so saying
+  # "3 sent" after one was dropped would promise work that is not there.
+  @integration
+  Scenario: A send that dropped traces says how many were skipped
+    Given the dialog is open for 3 selected traces
+    When the send queues 2 of them and skips 1
+    Then the confirmation says 2 traces were sent for annotation
+    And it says 1 was skipped because its trace no longer exists
+
+  @integration
+  Scenario: Sending to a single queue offers to open that queue
+    Given the dialog is open and exactly one queue and no people are picked
+    When the send succeeds
+    Then the confirmation offers "View queue", which opens that queue's page
+
+  @integration
+  Scenario: Sending to yourself alone offers to open your inbox
+    Given the dialog is open and the only participant picked is the sender
+    When the send succeeds
+    Then the confirmation offers "View inbox", which opens the sender's own queue
+
+  @integration
+  Scenario: Sending to several participants offers to open the queues
+    Given the dialog is open and both a person and a queue are picked
+    When the send succeeds
+    Then the confirmation offers "View queues", which opens the project's annotations page
 
   @integration
   Scenario: A queue can be created without leaving the dialog
     Given the dialog is open and none of the existing queues fit
     When the user chooses to add a new queue
     Then the new queue drawer opens over the dialog
+
+  # A queue nobody can see yet is a queue nobody can send to: the picker, the
+  # sidebar and the counts all read the same list.
+  @integration
+  Scenario: A queue created here shows up everywhere without a refresh
+    Given the user creates a queue from the new queue drawer
+    When the queue is saved
+    Then the participants picker, the sidebar queue list and the queue counts are refreshed
 
   @integration
   Scenario: A failed send says the traces were not queued

@@ -257,3 +257,22 @@ Feature: Walking an annotation queue into a dataset
       # conversation itself. The saved-suggestion list under a message belongs
       # to the legacy conversation on the trace details Thread tab, and is
       # specified in specs/traces-v2/annotations.feature.
+
+  Rule: Finishing an item only ever finishes the reviewer's own work
+
+    Marking done clears work off a queue. A reviewer reaches the items assigned
+    to them and the items in queues they belong to, so an id from anywhere else
+    finishes nothing.
+
+    @integration
+    Scenario: A reviewer finishes an item on their own queue
+      Given an item assigned to me
+      When I mark it done
+      Then it is recorded as done
+
+    @integration
+    Scenario: Finishing a teammate's queue item is refused
+      Given an item assigned to a teammate I share no queue with
+      When I mark it done
+      Then it is refused
+      And the item is still waiting

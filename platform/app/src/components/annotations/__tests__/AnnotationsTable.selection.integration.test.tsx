@@ -15,8 +15,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
 /**
- * Reviewers curate in the annotations list and send what they judged straight
- * to a dataset, without a CSV detour.
+ * Reviewers curate in the annotations list, send what they judged straight to a
+ * dataset, and take what nobody can review out of the queue.
  * Spec: specs/annotations/annotations-list-selection.feature.
  */
 
@@ -27,26 +27,32 @@ type QueueItem = {
 };
 
 const mocks = vi.hoisted(() => ({
-  items: [] as {
-    id: string;
-    traceId: string;
-    doneAt: Date | null;
-    createdAt: Date;
-    createdByUser: null;
-    annotations: never[];
-    trace: undefined;
-  }[],
-  pageOffset: 0,
+  // One object for the whole file: the real hook memoizes its period, and a
+  // fresh Date per render would make anything keyed on it churn.
+  period: {
+    startDate: new Date("2026-07-09T00:00:00Z"),
+    endDate: new Date("2026-08-08T00:00:00Z"),
+  },
+  items: [] as unknown[],
+  query: {} as Record<string, string>,
   openDrawer: vi.fn(),
   push: vi.fn(),
   requestEnable: vi.fn<() => Promise<boolean>>(),
+  deleteMutate: vi.fn(),
+  deleteOptions: null as {
+    onSuccess?: (result: { deleted: number }) => void;
+  } | null,
+  invalidateQueues: vi.fn(),
+  invalidatePending: vi.fn(),
+  invalidateAssigned: vi.fn(),
+  invalidateQueueCounts: vi.fn(),
+  toastCreate: vi.fn(),
 }));
 
 vi.mock("~/hooks/useAnnotationQueues", () => ({
   useAnnotationQueues: () => ({
     assignedQueueItems: mocks.items,
     totalCount: mocks.items.length,
-    scoreOptions: { data: [] },
     queuesLoading: false,
   }),
 }));
@@ -59,21 +65,51 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   }),
 }));
 vi.mock("~/utils/compat/next-router", () => ({
-  useRouter: () => ({ push: mocks.push, query: {} }),
-}));
-vi.mock("~/components/NavigationFooter", () => ({
-  NavigationFooter: () => null,
-  useNavigationFooter: () => ({
-    pageOffset: mocks.pageOffset,
-    pageSize: 25,
-    nextPage: vi.fn(),
-    prevPage: vi.fn(),
-    changePageSize: vi.fn(),
+  useRouter: () => ({
+    push: mocks.push,
+    query: mocks.query,
+    pathname: "/[project]/annotations",
   }),
 }));
-vi.mock("~/features/traces-v2/components/TraceIdPeek", () => ({
-  TraceIdPeek: () => null,
+vi.mock("~/utils/api", () => ({
+  api: {
+    useUtils: () => ({
+      annotation: {
+        getOptimizedAnnotationQueues: { invalidate: mocks.invalidateQueues },
+        getPendingItemsCount: { invalidate: mocks.invalidatePending },
+        getAssignedItemsCount: { invalidate: mocks.invalidateAssigned },
+        getQueueItemsCounts: { invalidate: mocks.invalidateQueueCounts },
+      },
+    }),
+    annotationScore: {
+      getAll: { useQuery: () => ({ data: [] }) },
+    },
+    annotation: {
+      deleteQueueItems: {
+        useMutation: (options: {
+          onSuccess?: (result: { deleted: number }) => void;
+        }) => {
+          mocks.deleteOptions = options;
+          return { mutate: mocks.deleteMutate, isLoading: false };
+        },
+      },
+    },
+  },
 }));
+vi.mock("~/components/PeriodSelector", () => ({
+  PeriodSelector: () => null,
+  usePeriodSelector: () => ({
+    period: mocks.period,
+    mode: "relative",
+    isDefault: true,
+    setPeriod: vi.fn(),
+    setRelativePeriod: vi.fn(),
+  }),
+}));
+vi.mock("~/components/ui/toaster", () => ({
+  toaster: { create: mocks.toastCreate },
+}));
+vi.mock("~/features/errors", () => ({ showErrorToast: vi.fn() }));
 vi.mock("~/features/langy/components/LangyContextTarget", () => ({
   LangyContextTarget: ({ children }: { children: ReactElement }) => children,
 }));
@@ -91,6 +127,7 @@ vi.mock("~/components/me/usePersonalFeatureGate", () => ({
 }));
 
 import { AnnotationsTable } from "../AnnotationsTable";
+import { groupedAnnotationsToRows } from "../annotationRow";
 
 const setItems = (items: QueueItem[]) => {
   mocks.items = items.map((item) => ({
@@ -102,12 +139,18 @@ const setItems = (items: QueueItem[]) => {
   }));
 };
 
-const renderTable = () =>
-  render(
-    <ChakraProvider value={defaultSystem}>
-      <AnnotationsTable heading="Annotations" />
-    </ChakraProvider>,
-  );
+const queueTable = () => (
+  <ChakraProvider value={defaultSystem}>
+    <AnnotationsTable
+      heading="Annotations"
+      dateColumnLabel="Date queued"
+      showStatusFilter={true}
+      rowTarget="queueItem"
+    />
+  </ChakraProvider>
+);
+
+const renderTable = () => render(queueTable());
 
 const rowCheckbox = (traceId: string) =>
   screen.getByRole("checkbox", { name: `Select trace ${traceId}` });
@@ -120,7 +163,11 @@ const selectionBar = () => screen.queryByTestId("annotations-selection-bar");
 beforeEach(() => {
   mocks.openDrawer.mockClear();
   mocks.push.mockClear();
-  mocks.pageOffset = 0;
+  mocks.query = {};
+  mocks.deleteMutate.mockReset();
+  mocks.deleteOptions = null;
+  mocks.toastCreate.mockClear();
+  mocks.invalidateQueues.mockClear();
   mocks.requestEnable.mockReset();
   mocks.requestEnable.mockResolvedValue(true);
   setItems([
@@ -192,9 +239,9 @@ describe("AnnotationsTable selection", () => {
       });
     });
 
-    describe("when two rows point at the same trace", () => {
-      /** @scenario "Rows that share a trace count once" */
-      it("counts the trace once", () => {
+    describe("when two rows were queued for the same trace", () => {
+      /** @scenario "Two rows queued for the same trace are picked separately" */
+      it("counts both rows", () => {
         setItems([
           { id: "item-1", traceId: "trace-1", doneAt: null },
           { id: "item-2", traceId: "trace-1", doneAt: null },
@@ -204,7 +251,27 @@ describe("AnnotationsTable selection", () => {
 
         fireEvent.click(headerCheckbox());
 
-        expect(selectionBar()).toHaveTextContent("2 selected");
+        expect(selectionBar()).toHaveTextContent("3 selected");
+      });
+
+      /** @scenario "Add to dataset counts a trace shared by two rows once" */
+      it("hands the shared trace to the dataset once", async () => {
+        setItems([
+          { id: "item-1", traceId: "trace-1", doneAt: null },
+          { id: "item-2", traceId: "trace-1", doneAt: null },
+        ]);
+        renderTable();
+
+        fireEvent.click(headerCheckbox());
+        fireEvent.click(
+          screen.getAllByRole("button", { name: /Add to dataset/ })[0]!,
+        );
+
+        await vi.waitFor(() =>
+          expect(mocks.openDrawer).toHaveBeenCalledWith("addDatasetRecord", {
+            selectedTraceIds: ["trace-1"],
+          }),
+        );
       });
     });
 
@@ -216,12 +283,8 @@ describe("AnnotationsTable selection", () => {
         fireEvent.click(rowCheckbox("trace-1"));
         expect(selectionBar()).toBeInTheDocument();
 
-        mocks.pageOffset = 25;
-        view.rerender(
-          <ChakraProvider value={defaultSystem}>
-            <AnnotationsTable heading="Annotations" />
-          </ChakraProvider>,
-        );
+        mocks.query = { pageOffset: "25" };
+        view.rerender(queueTable());
 
         expect(selectionBar()).not.toBeInTheDocument();
       });
@@ -245,7 +308,7 @@ describe("AnnotationsTable selection", () => {
   });
 
   describe("given rows are selected", () => {
-    /** @scenario "The selection bar appears with the count and the action" */
+    /** @scenario "The selection bar appears with the count and the actions" */
     it("shows the count and offers Add to dataset", () => {
       renderTable();
 
@@ -254,8 +317,17 @@ describe("AnnotationsTable selection", () => {
 
       expect(selectionBar()).toHaveTextContent("2 selected");
       expect(
-        screen.getByRole("button", { name: /Add to dataset/ }),
-      ).toBeInTheDocument();
+        screen.getAllByRole("button", { name: /Add to dataset/ }).length,
+      ).toBeGreaterThan(0);
+    });
+
+    /** @scenario "The selection bar offers to remove the selected items from the queue" */
+    it("offers to remove the picked items from the queue", () => {
+      renderTable();
+
+      fireEvent.click(rowCheckbox("trace-1"));
+
+      expect(selectionBar()).toHaveTextContent("Remove from queue");
     });
 
     describe("when the user clicks Add to dataset", () => {
@@ -265,7 +337,9 @@ describe("AnnotationsTable selection", () => {
 
         fireEvent.click(rowCheckbox("trace-1"));
         fireEvent.click(rowCheckbox("trace-3"));
-        fireEvent.click(screen.getByRole("button", { name: /Add to dataset/ }));
+        fireEvent.click(
+          screen.getAllByRole("button", { name: /Add to dataset/ })[0]!,
+        );
 
         await vi.waitFor(() =>
           expect(mocks.openDrawer).toHaveBeenCalledWith("addDatasetRecord", {
@@ -287,7 +361,9 @@ describe("AnnotationsTable selection", () => {
         renderTable();
 
         fireEvent.click(rowCheckbox("trace-1"));
-        fireEvent.click(screen.getByRole("button", { name: /Add to dataset/ }));
+        fireEvent.click(
+          screen.getAllByRole("button", { name: /Add to dataset/ })[0]!,
+        );
 
         await vi.waitFor(() => expect(mocks.requestEnable).toHaveBeenCalled());
         await act(async () => {
@@ -296,6 +372,56 @@ describe("AnnotationsTable selection", () => {
 
         expect(mocks.openDrawer).not.toHaveBeenCalled();
       });
+    });
+
+    describe("when the user removes the selection from the queue", () => {
+      /** @scenario "Removing the selection takes exactly those queue items out" */
+      it("removes exactly the picked queue items and clears the selection", () => {
+        renderTable();
+
+        fireEvent.click(rowCheckbox("trace-1"));
+        fireEvent.click(rowCheckbox("trace-3"));
+        fireEvent.click(
+          screen.getByRole("button", { name: /Remove from queue/ }),
+        );
+
+        expect(mocks.deleteMutate).toHaveBeenCalledWith({
+          projectId: "project-1",
+          queueItemIds: ["item-1", "item-3"],
+        });
+
+        act(() => {
+          mocks.deleteOptions?.onSuccess?.({ deleted: 2 });
+        });
+
+        expect(selectionBar()).not.toBeInTheDocument();
+        expect(mocks.invalidateQueues).toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("given rows on the all annotations page are selected", () => {
+    /** @scenario "The all annotations page never offers to remove from a queue" */
+    it("offers no remove-from-queue action", () => {
+      render(
+        <ChakraProvider value={defaultSystem}>
+          <AnnotationsTable
+            heading="All Annotations"
+            dateColumnLabel="Date annotated"
+            showStatusFilter={false}
+            rowTarget="trace"
+            rows={groupedAnnotationsToRows([
+              { traceId: "trace-1", annotations: [] },
+              { traceId: "trace-2", annotations: [] },
+            ])}
+          />
+        </ChakraProvider>,
+      );
+
+      fireEvent.click(headerCheckbox());
+
+      expect(selectionBar()).toHaveTextContent("2 selected");
+      expect(selectionBar()).not.toHaveTextContent("Remove from queue");
     });
   });
 });

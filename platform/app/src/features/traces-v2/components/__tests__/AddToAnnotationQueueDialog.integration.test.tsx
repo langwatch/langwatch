@@ -15,10 +15,16 @@ import "@testing-library/jest-dom/vitest";
 const mocks = vi.hoisted(() => ({
   mutate: vi.fn(),
   mutationOptions: null as {
-    onSuccess?: () => void;
+    onSuccess?: (result: { created: number; skipped: number }) => void;
     onError?: (error: unknown) => void;
   } | null,
   sendFails: false,
+  result: { created: 3, skipped: 0 },
+  pickedAnnotators: [
+    { id: "user-1", name: "Ana" },
+    { id: "queue-1", name: "Support reviews" },
+  ],
+  sessionUserId: "me",
   invalidatePending: vi.fn(),
   invalidateAssigned: vi.fn(),
   invalidateQueueCounts: vi.fn(),
@@ -39,9 +45,17 @@ vi.mock("~/utils/api", () => ({
       },
     }),
     annotation: {
+      getQueues: {
+        useQuery: () => ({
+          data: [
+            { id: "q1", name: "Support reviews", slug: "support-reviews" },
+            { id: "q2", name: "Sales reviews", slug: "sales-reviews" },
+          ],
+        }),
+      },
       createQueueItem: {
         useMutation: (options: {
-          onSuccess?: () => void;
+          onSuccess?: (result: { created: number; skipped: number }) => void;
           onError?: (error: unknown) => void;
         }) => {
           mocks.mutationOptions = options;
@@ -50,6 +64,10 @@ vi.mock("~/utils/api", () => ({
       },
     },
   },
+}));
+
+vi.mock("~/utils/auth-client", () => ({
+  useSession: () => ({ data: { user: { id: mocks.sessionUserId } } }),
 }));
 
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
@@ -94,12 +112,7 @@ vi.mock("~/components/traces/AddParticipants", () => ({
     <div>
       <button
         type="button"
-        onClick={() =>
-          setAnnotators([
-            { id: "user-1", name: "Ana" },
-            { id: "queue-1", name: "Support reviews" },
-          ])
-        }
+        onClick={() => setAnnotators(mocks.pickedAnnotators)}
       >
         Pick participants
       </button>
@@ -141,12 +154,18 @@ beforeEach(() => {
   mocks.sendFails = false;
   mocks.mutationOptions = null;
   mocks.mutate.mockReset();
+  mocks.result = { created: 3, skipped: 0 };
+  mocks.sessionUserId = "me";
+  mocks.pickedAnnotators = [
+    { id: "user-1", name: "Ana" },
+    { id: "queue-1", name: "Support reviews" },
+  ];
   mocks.mutate.mockImplementation(() => {
     if (mocks.sendFails) {
       mocks.mutationOptions?.onError?.(new Error("boom"));
       return;
     }
-    mocks.mutationOptions?.onSuccess?.();
+    mocks.mutationOptions?.onSuccess?.(mocks.result);
   });
   mocks.invalidatePending.mockClear();
   mocks.invalidateAssigned.mockClear();
@@ -203,25 +222,34 @@ describe("AddToAnnotationQueueDialog", () => {
         expect(onClose).toHaveBeenCalledTimes(1);
       });
 
-      /** @scenario "A successful send confirms and offers a way to open the queues" */
-      it("confirms how many traces were sent and links to the queues", () => {
+      /** @scenario "A successful send counts what actually became queue items" */
+      it("confirms how many traces became queue items", () => {
         renderDialog();
 
         pickAndSend();
 
-        const toast = mocks.toastCreate.mock.calls[0]?.[0];
-        expect(toast).toMatchObject({
+        expect(mocks.toastCreate.mock.calls[0]?.[0]).toMatchObject({
           title: "Added to annotation queue",
           description: "3 traces sent for annotation",
           type: "success",
         });
-        expect(toast.action.label).toBe("View queues");
+      });
 
-        toast.action.onClick();
-        expect(mocks.push).toHaveBeenCalledWith("/acme/annotations");
+      /** @scenario "A send that dropped traces says how many were skipped" */
+      it("says how many were skipped and why", () => {
+        mocks.result = { created: 2, skipped: 1 };
+        renderDialog();
+
+        pickAndSend();
+
+        expect(mocks.toastCreate.mock.calls[0]?.[0]).toMatchObject({
+          description:
+            "2 traces sent for annotation. 1 skipped because its trace no longer exists",
+        });
       });
 
       it("keeps the count readable for a single trace", () => {
+        mocks.result = { created: 1, skipped: 0 };
         renderDialog(["only-one"]);
 
         pickAndSend();
@@ -229,6 +257,60 @@ describe("AddToAnnotationQueueDialog", () => {
         expect(mocks.toastCreate.mock.calls[0]?.[0]).toMatchObject({
           description: "1 trace sent for annotation",
         });
+      });
+
+      /** @scenario "Sending to several participants offers to open the queues" */
+      it("offers the queue listing when the traces went several ways", () => {
+        renderDialog();
+
+        pickAndSend();
+
+        const toast = mocks.toastCreate.mock.calls[0]?.[0];
+        expect(toast.action.label).toBe("View queues");
+
+        toast.action.onClick();
+        expect(mocks.push).toHaveBeenCalledWith("/acme/annotations");
+      });
+
+      /** @scenario "Sending to a single queue offers to open that queue" */
+      it("offers that queue when it was the only participant", () => {
+        mocks.pickedAnnotators = [{ id: "queue-q1", name: "Support reviews" }];
+        renderDialog();
+
+        pickAndSend();
+
+        const toast = mocks.toastCreate.mock.calls[0]?.[0];
+        expect(toast.action.label).toBe("View queue");
+
+        toast.action.onClick();
+        expect(mocks.push).toHaveBeenCalledWith(
+          "/acme/annotations/support-reviews",
+        );
+      });
+
+      /** @scenario "Sending to yourself alone offers to open your inbox" */
+      it("offers the sender's own queue when they sent to themselves", () => {
+        mocks.pickedAnnotators = [{ id: "user-me", name: "Me" }];
+        renderDialog();
+
+        pickAndSend();
+
+        const toast = mocks.toastCreate.mock.calls[0]?.[0];
+        expect(toast.action.label).toBe("View inbox");
+
+        toast.action.onClick();
+        expect(mocks.push).toHaveBeenCalledWith("/acme/annotations/me");
+      });
+
+      it("offers the queue listing when the traces went to a teammate", () => {
+        mocks.pickedAnnotators = [{ id: "user-other", name: "Ana" }];
+        renderDialog();
+
+        pickAndSend();
+
+        expect(mocks.toastCreate.mock.calls[0]?.[0].action.label).toBe(
+          "View queues",
+        );
       });
     });
 

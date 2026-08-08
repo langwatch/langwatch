@@ -10,7 +10,7 @@ import { useLiteMemberGuard } from "~/hooks/useLiteMemberGuard";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useRequiredSession } from "~/hooks/useRequiredSession";
 import { api } from "~/utils/api";
-import { useRouter } from "~/utils/compat/next-router";
+import { usePathname } from "~/utils/compat/next-navigation";
 import { RandomColorAvatar } from "./RandomColorAvatar";
 
 export default function AnnotationsLayout({
@@ -53,7 +53,10 @@ export default function AnnotationsLayout({
     done: <Check width={20} height={20} />,
   };
 
-  const router = useRouter();
+  // The concrete path the browser is on. `router.pathname` is a route PATTERN
+  // ("/[project]/annotations/[slug]"), so comparing it to a built href never
+  // matches and no entry ever reads as the current one.
+  const pathname = usePathname();
   const { openDrawer } = useDrawer();
 
   return (
@@ -91,7 +94,7 @@ export default function AnnotationsLayout({
                 </Text>
               }
               isSelectedAnnotation={
-                router.pathname === "/[project]/annotations"
+                pathname === `/${project?.slug}/annotations`
               }
             >
               Inbox
@@ -99,7 +102,7 @@ export default function AnnotationsLayout({
             <MenuLink
               href={`/${project?.slug}/annotations/me`}
               isSelectedAnnotation={
-                router.pathname === "/[project]/annotations/me"
+                pathname === `/${project?.slug}/annotations/me`
               }
               icon={menuItems.myQueues}
               menuEnd={
@@ -116,7 +119,7 @@ export default function AnnotationsLayout({
               href={`/${project?.slug}/annotations/all`}
               icon={menuItems.all}
               isSelectedAnnotation={
-                router.pathname === "/[project]/annotations/all"
+                pathname === `/${project?.slug}/annotations/all`
               }
             >
               All
@@ -155,8 +158,7 @@ export default function AnnotationsLayout({
                   <MenuLink
                     href={`/${project?.slug}/annotations/${queue.slug}`}
                     isSelectedAnnotation={
-                      router.pathname ===
-                      `/${project?.slug}/annotations/${queue.slug}`
+                      pathname === `/${project?.slug}/annotations/${queue.slug}`
                     }
                     icon={menuItems.queues}
                     menuEnd={

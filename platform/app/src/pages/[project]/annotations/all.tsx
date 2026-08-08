@@ -1,20 +1,27 @@
-import { Button, Container, Heading, HStack, Spacer } from "@chakra-ui/react";
+import { Flex } from "@chakra-ui/react";
 import type { Annotation } from "@prisma/client";
-import Parse from "papaparse";
-import { Download } from "react-feather";
+import { useMemo } from "react";
 import AnnotationsLayout from "~/components/AnnotationsLayout";
+import { AnnotationsTable } from "~/components/annotations/AnnotationsTable";
 import {
-  AnnotationsTable,
   type AnnotationWithUser,
-} from "~/components/annotations/AnnotationsTable";
-import { PeriodSelector, usePeriodSelector } from "~/components/PeriodSelector";
+  groupedAnnotationsToRows,
+} from "~/components/annotations/annotationRow";
+import { usePeriodSelector } from "~/components/PeriodSelector";
 import { useAnnotationsByTraceIds } from "~/hooks/useAnnotationsByTraceIds";
 import { useFilterParams } from "~/hooks/useFilterParams";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { Trace } from "~/server/tracer/types";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
+import { csvFileName, downloadCsv } from "~/utils/downloadCsv";
 import { getSingleQueryParam } from "~/utils/getSingleQueryParam";
+
+type GroupedAnnotation = {
+  traceId: string;
+  trace?: Trace;
+  annotations: AnnotationWithUser[];
+};
 
 export default function Annotations() {
   const { project } = useOrganizationTeamProject();
@@ -37,9 +44,6 @@ export default function Annotations() {
 
   const {
     period: { startDate, endDate },
-    mode,
-    setPeriod,
-    setRelativePeriod,
   } = usePeriodSelector();
 
   // Both queries are declared unconditionally (rules of hooks) and gated
@@ -83,12 +87,6 @@ export default function Annotations() {
     },
   );
 
-  type GroupedAnnotation = {
-    traceId: string;
-    trace?: Trace;
-    annotations: AnnotationWithUser[];
-  };
-
   const groupByTraceId = (dataArray: Annotation[]): GroupedAnnotation[] => {
     const grouped = dataArray.reduce(
       (acc: Record<string, GroupedAnnotation>, item) => {
@@ -102,10 +100,9 @@ export default function Annotations() {
           };
         }
 
-        // Create a proper AnnotationWithUser object that includes all original annotation fields
         const annotationWithUser: AnnotationWithUser = {
-          ...item, // Include all original annotation fields
-          user: (item as any).user, // Include the user data from the query
+          ...item,
+          user: (item as AnnotationWithUser).user,
         };
 
         const groupedAnnotation = acc[item.traceId];
@@ -121,22 +118,26 @@ export default function Annotations() {
     return Object.values(grouped);
   };
 
-  const groupedAnnotations = groupByTraceId(annotations.data ?? []);
+  const rows = useMemo(
+    () => groupedAnnotationsToRows(groupByTraceId(annotations.data ?? [])),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [annotations.data, traces.data],
+  );
 
-  const downloadCSV = () => {
+  const exportAll = () => {
     const fields = [
       "User",
       "Input",
       "Output",
-      "Expected Output",
+      "Expected output",
       "Comment",
       "Trace ID",
       "Rating",
       "Scoring",
-      "Created At",
+      "Created at",
     ];
 
-    const csv =
+    const data =
       annotations?.data?.map((annotation) => {
         const trace = traces.data?.find(
           (trace) => trace.trace_id === annotation.traceId,
@@ -155,59 +156,25 @@ export default function Annotations() {
         ];
       }) ?? [];
 
-    const csvBlob = Parse.unparse({
-      fields: fields,
-      data: csv,
-    });
-
-    const url = window.URL.createObjectURL(new Blob([csvBlob]));
-
-    const link = document.createElement("a");
-    link.href = url;
-    const today = new Date();
-    const formattedDate = today.toISOString().split("T")[0];
-    const fileName = `Traces - ${formattedDate}.csv`;
-    link.setAttribute("download", fileName);
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
+    downloadCsv({ fields, rows: data, fileName: csvFileName("Traces") });
   };
-
-  const tableHeader = (
-    <HStack width="full" align="top">
-      <Heading as={"h1"} size="lg" paddingTop={1}>
-        All Annotations
-      </Heading>
-      <Spacer />
-      <Button
-        minWidth="fit-content"
-        variant="ghost"
-        onClick={() => downloadCSV()}
-      >
-        Export all <Download style={{ marginLeft: "8px" }} />
-      </Button>
-      <PeriodSelector
-        period={{ startDate, endDate }}
-        mode={mode}
-        setPeriod={setPeriod}
-        setRelativePeriod={setRelativePeriod}
-      />
-    </HStack>
-  );
 
   return (
     <AnnotationsLayout>
-      <Container maxW={"calc(100vw - 330px)"} padding={0} margin={0}>
+      <Flex direction="column" flex={1} minWidth={0} height="full">
         <AnnotationsTable
-          groupedAnnotations={groupedAnnotations}
-          allAnnotationsLoading={annotationsLoading || traces.isLoading}
-          heading="Annotations"
-          isDone={true}
-          tableHeader={tableHeader}
+          rows={rows}
+          rowsLoading={annotationsLoading || traces.isLoading}
+          heading="All Annotations"
+          dateColumnLabel="Date annotated"
+          showStatusFilter={false}
+          rowTarget="trace"
+          exportLabel="Export all"
+          onExport={exportAll}
           noDataTitle="No recent annotations yet, change the date range to see more or annotate your messages"
           noDataDescription="Annotate your messages to add more context and improve your analysis."
         />
-      </Container>
+      </Flex>
     </AnnotationsLayout>
   );
 }

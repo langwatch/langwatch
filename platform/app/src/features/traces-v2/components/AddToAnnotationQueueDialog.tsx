@@ -7,6 +7,7 @@ import { toaster } from "~/components/ui/toaster";
 import { showErrorToast } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
+import { useSession } from "~/utils/auth-client";
 import { useRouter } from "~/utils/compat/next-router";
 
 interface AddToAnnotationQueueDialogProps {
@@ -14,6 +15,73 @@ interface AddToAnnotationQueueDialogProps {
   onClose: () => void;
   /** Traces to queue. One from the drawer, many from the selection bar. */
   traceIds: string[];
+}
+
+type Annotator = { id: string; name: string };
+
+const QUEUE_PREFIX = "queue-";
+const USER_PREFIX = "user-";
+
+/**
+ * Where the confirmation takes the sender. Sending to one queue lands on that
+ * queue; sending only to yourself lands on your own inbox; anything wider has
+ * no single destination, so it lands on the queue listing.
+ */
+function destinationFor({
+  annotators,
+  projectSlug,
+  sessionUserId,
+  queueSlugById,
+}: {
+  annotators: Annotator[];
+  projectSlug: string | undefined;
+  sessionUserId: string | undefined;
+  queueSlugById: Map<string, string>;
+}): { label: string; href: string } {
+  const queueIds = annotators
+    .filter((annotator) => annotator.id.startsWith(QUEUE_PREFIX))
+    .map((annotator) => annotator.id.slice(QUEUE_PREFIX.length));
+  const userIds = annotators
+    .filter((annotator) => annotator.id.startsWith(USER_PREFIX))
+    .map((annotator) => annotator.id.slice(USER_PREFIX.length));
+
+  if (queueIds.length === 1 && userIds.length === 0) {
+    const slug = queueSlugById.get(queueIds[0]!);
+    if (slug) {
+      return {
+        label: "View queue",
+        href: `/${projectSlug}/annotations/${slug}`,
+      };
+    }
+  }
+
+  if (
+    userIds.length === 1 &&
+    queueIds.length === 0 &&
+    !!sessionUserId &&
+    userIds[0] === sessionUserId
+  ) {
+    return { label: "View inbox", href: `/${projectSlug}/annotations/me` };
+  }
+
+  return { label: "View queues", href: `/${projectSlug}/annotations` };
+}
+
+/** What actually happened, in the sender's terms. */
+function sentDescription({
+  created,
+  skipped,
+}: {
+  created: number;
+  skipped: number;
+}): string {
+  const sent = `${created} ${created === 1 ? "trace" : "traces"} sent for annotation`;
+  if (skipped === 0) return sent;
+  const reason =
+    skipped === 1
+      ? "1 skipped because its trace no longer exists"
+      : `${skipped} skipped because their traces no longer exist`;
+  return `${sent}. ${reason}`;
 }
 
 /**
@@ -30,15 +98,21 @@ export function AddToAnnotationQueueDialog({
   traceIds,
 }: AddToAnnotationQueueDialogProps) {
   const { project } = useOrganizationTeamProject();
+  const { data: session } = useSession();
   const router = useRouter();
   const utils = api.useUtils();
   const newQueueDrawer = useDisclosure();
-  const [annotators, setAnnotators] = useState<{ id: string; name: string }[]>(
-    [],
+  const [annotators, setAnnotators] = useState<Annotator[]>([]);
+
+  // The picker reads the same query, so this shares its cache rather than
+  // costing a second round trip.
+  const queues = api.annotation.getQueues.useQuery(
+    { projectId: project?.id ?? "" },
+    { enabled: !!project?.id },
   );
 
   const createQueueItem = api.annotation.createQueueItem.useMutation({
-    onSuccess: () => {
+    onSuccess: ({ created, skipped }) => {
       // The sidebar badges and the queue listing all count pending work, so
       // every one of them is stale the moment items land.
       void utils.annotation.getPendingItemsCount.invalidate();
@@ -46,20 +120,27 @@ export function AddToAnnotationQueueDialog({
       void utils.annotation.getQueueItemsCounts.invalidate();
       void utils.annotation.getOptimizedAnnotationQueues.invalidate();
 
+      const destination = destinationFor({
+        annotators,
+        projectSlug: project?.slug,
+        sessionUserId: session?.user?.id,
+        queueSlugById: new Map(
+          (queues.data ?? []).map((queue) => [queue.id, queue.slug]),
+        ),
+      });
+
       setAnnotators([]);
       onClose();
 
       toaster.create({
         title: "Added to annotation queue",
-        description: `${traceIds.length} ${
-          traceIds.length === 1 ? "trace" : "traces"
-        } sent for annotation`,
+        description: sentDescription({ created, skipped }),
         type: "success",
         meta: { closable: true },
         action: {
-          label: "View queues",
+          label: destination.label,
           onClick: () => {
-            void router.push(`/${project?.slug}/annotations`);
+            void router.push(destination.href);
           },
         },
       });

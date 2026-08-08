@@ -1685,5 +1685,69 @@ describe("Annotation CRUD", () => {
         ).not.toBeNull();
       });
     });
+
+    describe("when an item is marked done", () => {
+      /** @scenario "A reviewer finishes an item on their own queue" */
+      it("records the caller's own item as done", async () => {
+        const mine = await createQueueItem("done-mine");
+
+        const result = await caller.annotation.markQueueItemDone({
+          queueItemId: mine.id,
+          projectId,
+        });
+
+        expect(result.doneAt).not.toBeNull();
+        const persisted = await prisma.annotationQueueItem.findFirst({
+          where: { id: mine.id, projectId },
+        });
+        expect(persisted!.doneAt).not.toBeNull();
+      });
+
+      /** @scenario "Finishing a teammate's queue item is refused" */
+      it("leaves an item on someone else's queue waiting", async () => {
+        const theirs = await createQueueItem("done-theirs", viewerUserId);
+
+        await expect(
+          caller.annotation.markQueueItemDone({
+            queueItemId: theirs.id,
+            projectId,
+          }),
+        ).rejects.toThrow();
+
+        const persisted = await prisma.annotationQueueItem.findFirst({
+          where: { id: theirs.id, projectId },
+        });
+        expect(persisted!.doneAt).toBeNull();
+      });
+    });
+
+    describe("when the list is read for a date range", () => {
+      /** @scenario "A picked date range narrows a queue page to when items were queued" */
+      it("returns only the items queued inside the range", async () => {
+        const inside = await createQueueItem("range-inside");
+        const outside = await createQueueItem("range-outside");
+        await prisma.annotationQueueItem.update({
+          where: { id: inside.id, projectId },
+          data: { createdAt: new Date("2026-05-15T00:00:00Z") },
+        });
+        await prisma.annotationQueueItem.update({
+          where: { id: outside.id, projectId },
+          data: { createdAt: new Date("2026-01-01T00:00:00Z") },
+        });
+
+        const result = await caller.annotation.getOptimizedAnnotationQueues({
+          projectId,
+          selectedAnnotations: "pending",
+          pageSize: 100,
+          pageOffset: 0,
+          startDate: new Date("2026-05-01T00:00:00Z"),
+          endDate: new Date("2026-06-01T00:00:00Z"),
+        });
+
+        const ids = result.assignedQueueItems.map((item) => item.id);
+        expect(ids).toContain(inside.id);
+        expect(ids).not.toContain(outside.id);
+      });
+    });
   });
 });

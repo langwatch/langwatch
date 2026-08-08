@@ -260,6 +260,24 @@ const queueItemReferenceFilter = ({
 });
 
 /**
+ * The list's date range, as a `where` fragment. A queue item is dated by when
+ * it was queued, which is what the reviewer sees in the list and filters on.
+ * Empty when no range was asked for, so it spreads into a `where` either way.
+ */
+const queuedAtRangeFilter = ({
+  startDate,
+  endDate,
+}: {
+  startDate?: Date;
+  endDate?: Date;
+}): { createdAt?: { gte?: Date; lte?: Date } } => {
+  const createdAt: { gte?: Date; lte?: Date } = {};
+  if (startDate) createdAt.gte = startDate;
+  if (endDate) createdAt.lte = endDate;
+  return Object.keys(createdAt).length > 0 ? { createdAt } : {};
+};
+
+/**
  * The queue items a reviewer is responsible for: assigned to them directly, or
  * sitting in a queue they belong to. Same reach as the pending and assigned
  * counts, so what the queue page walks and what it hands to a dataset agree.
@@ -674,6 +692,9 @@ export const annotationRouter = createTRPCRouter({
         select: {
           id: true,
           name: true,
+          // The slug is what `/annotations/<slug>` addresses, so anything that
+          // links straight to a queue it just wrote to needs it here.
+          slug: true,
         },
         orderBy: {
           createdAt: "desc",
@@ -889,15 +910,42 @@ export const annotationRouter = createTRPCRouter({
       });
       return { deleted: result.count };
     }),
+  /**
+   * Marks a queue item as reviewed. Scoped to the items the caller is
+   * responsible for, the same reach as marking and removing: finishing a
+   * teammate's item would clear work off a queue that is not the caller's.
+   */
   markQueueItemDone: protectedProcedure
     .input(z.object({ queueItemId: z.string(), projectId: z.string() }))
     .use(checkProjectPermission("annotations:update"))
     .mutation(async ({ ctx, input }) => {
-      return ctx.prisma.annotationQueueItem.update({
-        where: { id: input.queueItemId, projectId: input.projectId },
+      const service = AnnotationService.create({ prisma: ctx.prisma });
+      const organizationId = await service.getProjectOrganizationId({
+        projectId: input.projectId,
+      });
+
+      const result = await ctx.prisma.annotationQueueItem.updateMany({
+        where: {
+          ...callerQueueItemsFilter({
+            projectId: input.projectId,
+            organizationId,
+            userId: ctx.session.user.id,
+          }),
+          id: input.queueItemId,
+        },
         data: {
           doneAt: new Date(),
         },
+      });
+      if (result.count === 0) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Queue item not found",
+        });
+      }
+
+      return ctx.prisma.annotationQueueItem.findFirstOrThrow({
+        where: { id: input.queueItemId, projectId: input.projectId },
       });
     }),
   /**
@@ -1058,6 +1106,10 @@ export const annotationRouter = createTRPCRouter({
         queueId: z.string().optional(),
         showQueueAndUser: z.boolean().optional(),
         allQueueItems: z.boolean().optional(),
+        // The list's date range. A queue item is dated by when it was queued,
+        // which is what the reviewer sees in the list and filters on.
+        startDate: z.date().optional(),
+        endDate: z.date().optional(),
       }),
     )
     .use(checkProjectPermission("annotations:view"))
@@ -1101,6 +1153,7 @@ export const annotationRouter = createTRPCRouter({
             : input.selectedAnnotations === "completed"
               ? { not: null }
               : undefined,
+        ...queuedAtRangeFilter(input),
       };
 
       if (input.queueId) {
