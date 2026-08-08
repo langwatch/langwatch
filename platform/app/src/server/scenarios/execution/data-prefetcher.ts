@@ -19,6 +19,7 @@ import { DEFAULT_MODEL } from "~/utils/constants";
 import { getInputsOutputs } from "../../../optimization_studio/utils/nodeUtils";
 import { resolveModelForFeature } from "../../modelProviders/resolveModelForFeature";
 import { extractSuiteId } from "../../suites/suite-set-id";
+import { parseSuiteTargets } from "../../suites/types";
 import { validateWorkflowAgentMappings } from "./validate-workflow-mappings";
 
 const logger = createLogger("langwatch:scenarios:data-prefetcher");
@@ -43,6 +44,7 @@ import {
   type ChildProcessJobData,
   type CodeAgentData,
   type ExecutionContext,
+  type FieldMapping,
   FieldMappingSchema,
   type HttpAgentData,
   type LiteLLMParams,
@@ -78,13 +80,24 @@ export interface ScenarioFetcher {
  * prefetcher can pick up a run plan's choices without threading them through
  * the event-sourcing queue. Returns null when the run is not part of a suite.
  */
-export interface SuiteModelFetcher {
+export interface SuiteConfigFetcher {
   getBySetId(
     setId: string,
     projectId: string,
   ): Promise<{
     simulatorModel: string | null;
     judgeModel: string | null;
+    /**
+     * The suite's configured targets. Prompt targets carry the bindings from a
+     * scenario source to the prompt's declared inputs; agents keep theirs on
+     * the agent record. Read through the same set-id lookup as the model
+     * overrides, so no binding has to travel through the event queue.
+     */
+    targets?: Array<{
+      type: string;
+      referenceId: string;
+      scenarioMappings?: Record<string, FieldMapping>;
+    }>;
   } | null>;
 }
 
@@ -151,7 +164,10 @@ export type ModelParamsFailureReason =
 
 /** Structured result from model params preparation */
 export type ModelParamsResult =
-  | { success: true; params: LiteLLMParams }
+  | {
+      success: true;
+      params: LiteLLMParams;
+    }
   | { success: false; reason: ModelParamsFailureReason; message: string };
 
 /** Minimal interface for model params preparation */
@@ -162,7 +178,7 @@ export interface ModelParamsProvider {
 /** All dependencies required by prefetchScenarioData */
 export interface DataPrefetcherDependencies {
   scenarioFetcher: ScenarioFetcher;
-  suiteModelFetcher: SuiteModelFetcher;
+  suiteConfigFetcher: SuiteConfigFetcher;
   promptFetcher: PromptFetcher;
   agentFetcher: AgentFetcher;
   workflowVersionFetcher: WorkflowVersionFetcher;
@@ -305,10 +321,23 @@ export async function prefetchScenarioData(
   //     use a smart model independently of the agent under test.
   // ModelNotConfiguredError bubbles as a structured "model not configured"
   // failure with the resolver's message.
-  const suiteOverrides = await deps.suiteModelFetcher.getBySetId(
+  const suiteOverrides = await deps.suiteConfigFetcher.getBySetId(
     context.setId,
     context.projectId,
   );
+
+  // A prompt's bindings are configured on the suite target that paired the
+  // prompt with this run plan, so they arrive with the suite rather than with
+  // the prompt. Agents carry their own on the agent record, already loaded
+  // above.
+  if (adapterData.type === "prompt") {
+    adapterData.scenarioMappings = suiteOverrides?.targets?.find(
+      (candidate) =>
+        candidate.type === "prompt" &&
+        candidate.referenceId === target.referenceId,
+    )?.scenarioMappings;
+  }
+
   let modelForParams: string | undefined;
   let simulatorModel: string;
   let judgeModel: string;
@@ -535,6 +564,10 @@ async function fetchPromptConfigData(
       (m): m is { role: "user" | "assistant"; content: string } =>
         m.role === "user" || m.role === "assistant",
     ),
+    inputs: (prompt.inputs ?? []).map((declared) => ({
+      identifier: declared.identifier,
+      type: String(declared.type),
+    })),
     model: prompt.model ?? undefined,
     temperature: prompt.temperature ?? undefined,
     maxTokens: prompt.maxTokens ?? undefined,
@@ -969,18 +1002,19 @@ export function createDataPrefetcherDependencies(): DataPrefetcherDependencies {
     scenarioFetcher: {
       getById: (params) => scenarioService.getById(params),
     },
-    suiteModelFetcher: {
+    suiteConfigFetcher: {
       getBySetId: async (setId, projectId) => {
         const suiteId = extractSuiteId(setId);
         if (!suiteId) return null;
         const suite = await prisma.simulationSuite.findFirst({
           where: { id: suiteId, projectId },
-          select: { simulatorModel: true, judgeModel: true },
+          select: { simulatorModel: true, judgeModel: true, targets: true },
         });
         if (!suite) return null;
         return {
           simulatorModel: suite.simulatorModel,
           judgeModel: suite.judgeModel,
+          targets: parseSuiteTargets(suite.targets),
         };
       },
     },
@@ -1109,7 +1143,10 @@ export function createDataPrefetcherDependencies(): DataPrefetcherDependencies {
             };
           }
 
-          return { success: true, params: params as LiteLLMParams };
+          return {
+            success: true,
+            params: params as LiteLLMParams,
+          };
         } catch (error) {
           const errorMessage =
             error instanceof Error ? error.message : String(error);
