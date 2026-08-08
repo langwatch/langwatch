@@ -94,7 +94,11 @@ describe("given two consumers reading annotations for the same traces", () => {
       const inputs = queryInputsFor(["trace-b", "trace-a", "trace-b"]);
 
       expect(inputs).toEqual([
-        { projectId: PROJECT_ID, traceIds: ["trace-a", "trace-b"] },
+        {
+          projectId: PROJECT_ID,
+          traceIds: ["trace-a", "trace-b"],
+          anchor: "trace",
+        },
       ]);
     });
   });

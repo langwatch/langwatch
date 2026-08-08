@@ -506,6 +506,13 @@ export function parseContentBlocks(
 }
 
 /**
+ * Joins the fields of a block that has more than one. A control character no
+ * text carries keeps two blocks apart when the fields of one, run together,
+ * would otherwise read the same as the fields of another.
+ */
+const FIELD_SEPARATOR = "\u0000";
+
+/**
  * What a block holds, as one string. Two blocks with the same canonical form
  * are the same block wherever they were read from, and any change to what a
  * block holds changes it.
@@ -516,13 +523,13 @@ function canonicalBlockContent(block: ContentBlock): string {
     case "thinking":
       return block.text;
     case "tool_use":
-      return [block.id ?? "", block.name, describeValue(block.input)].join(" ");
+      return [block.id ?? "", block.name, describeValue(block.input)].join(FIELD_SEPARATOR);
     case "tool_result":
       return [
         block.toolUseId ?? "",
         block.isError ? "error" : "ok",
         describeValue(block.content),
-      ].join(" ");
+      ].join(FIELD_SEPARATOR);
     case "media":
       return describeValue(block.part);
     case "raw":
