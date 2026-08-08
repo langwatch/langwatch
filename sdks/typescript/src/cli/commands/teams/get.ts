@@ -1,7 +1,7 @@
 import chalk from "chalk";
 import { TeamsApiService } from "@/client-sdk/services/teams/teams-api.service";
 import type { CommandResult } from "../../utils/output";
-import { printFacts, runManagement } from "../management/_shared";
+import { asDate, printFacts, runManagement } from "../management/_shared";
 
 export const getTeamCommand = async (
   id: string,
@@ -17,7 +17,7 @@ export const getTeamCommand = async (
         ["Name", chalk.cyan(team.name)],
         ["Slug", team.slug],
         ["Organization", team.organizationId],
-        ["Created", new Date(team.createdAt).toLocaleString()],
+        ["Created", asDate(team.createdAt)],
       ]);
     },
   });

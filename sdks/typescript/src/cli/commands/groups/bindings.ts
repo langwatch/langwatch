@@ -27,7 +27,7 @@ export const listGroupBindingsCommand = async (
     pending: `Fetching bindings of group "${groupId}"...`,
     run: () => new GroupsApiService().listBindings(groupId),
     succeed: (result) =>
-      `Found ${counted(result.data.length, "binding", "bindings")}`,
+      `Found ${counted({ count: result.data.length, singular: "binding", plural: "bindings" })}`,
     table: (result) => {
       if (result.data.length === 0) {
         printEmpty({ what: "group bindings" });
@@ -52,10 +52,13 @@ export const listGroupBindingsCommand = async (
  * Grant the whole group a role at a scope. Everything the group's members are
  * allowed to do beyond their own bindings comes from here.
  */
-export const addGroupBindingCommand = async (
-  groupId: string,
-  options: AddGroupBindingOptions,
-): Promise<CommandResult | void> => {
+export const addGroupBindingCommand = async ({
+  groupId,
+  options,
+}: {
+  groupId: string;
+  options: AddGroupBindingOptions;
+}): Promise<CommandResult | void> => {
   const input = withParsedFlags(() => ({
     role: parseRole(options.role),
     ...(options.customRoleId !== undefined
@@ -68,7 +71,7 @@ export const addGroupBindingCommand = async (
   return runManagement({
     action: "add group binding",
     pending: `Adding a binding to group "${groupId}"...`,
-    run: () => new GroupsApiService().addBinding(groupId, input),
+    run: () => new GroupsApiService().addBinding({ groupId, input }),
     succeed: (binding) =>
       `Bound ${chalk.cyan(binding.role)} at ${binding.scopeType} "${binding.scopeId}"`,
     table: (binding) => {
@@ -81,18 +84,17 @@ export const addGroupBindingCommand = async (
   });
 };
 
-export const removeGroupBindingCommand = async (
-  groupId: string,
-  bindingId: string,
-): Promise<CommandResult | void> =>
+export const removeGroupBindingCommand = async ({
+  groupId,
+  bindingId,
+}: {
+  groupId: string;
+  bindingId: string;
+}): Promise<CommandResult | void> =>
   runManagement({
     action: "remove group binding",
     pending: `Removing binding "${bindingId}" from group "${groupId}"...`,
-    run: async () => ({
-      groupId,
-      bindingId,
-      ...(await new GroupsApiService().removeBinding(groupId, bindingId)),
-    }),
+    run: () => new GroupsApiService().removeBinding({ groupId, bindingId }),
     succeed: () => `Removed binding "${bindingId}" from group "${groupId}"`,
     table: () => {
       console.log();

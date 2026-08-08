@@ -15,6 +15,7 @@ import {
   composeRoleBindingPrincipal,
   ManagementFlagError,
   parseBindingFlags,
+  parseCount,
   parseInvitesJson,
   parseOrganizationRole,
   parsePermissionFlags,
@@ -110,6 +111,14 @@ describe("composeRoleBindingFilters", () => {
       expect(() =>
         composeRoleBindingFilters({ principalId: "user_1" }),
       ).toThrow(/--principal-type/);
+    });
+
+    it("refuses a principal type with no principal id to name", () => {
+      // Dropping the half pair would list every binding in the organization,
+      // which is the opposite of what the caller asked for.
+      expect(() =>
+        composeRoleBindingFilters({ principalType: "user" }),
+      ).toThrow(/--principal-id/);
     });
   });
 
@@ -226,9 +235,43 @@ describe("parseInvitesJson", () => {
       parseInvitesJson('[{"email":"a@b.c","role":"MEMBER"}]'),
     ).toThrow(/no teams/);
   });
+
+  it("refuses a custom role id that is not a role id", () => {
+    const withCustomRoleId = (customRoleId: unknown): string =>
+      JSON.stringify([
+        {
+          email: "a@example.com",
+          role: "MEMBER",
+          teams: [{ teamId: "team_1", role: "CUSTOM", customRoleId }],
+        },
+      ]);
+
+    for (const malformed of [42, {}, [], "", "   "]) {
+      expect(() => parseInvitesJson(withCustomRoleId(malformed))).toThrow(
+        ManagementFlagError,
+      );
+      expect(() => parseInvitesJson(withCustomRoleId(malformed))).toThrow(
+        /customRoleId that is not a role id/,
+      );
+    }
+  });
 });
 
 describe("the single-value parsers", () => {
+  it("reads a whole number and refuses anything a page size cannot be", () => {
+    expect(parseCount("0", "--page")).toBe(0);
+    expect(parseCount("50", "--limit")).toBe(50);
+
+    // "" and " " coerce to 0 through Number, and "0x10" and "1e3" coerce to
+    // numbers nobody typed: all of them are refused by name.
+    for (const malformed of ["", "   ", "-1", "1.5", "abc", "0x10", "1e3"]) {
+      expect(() => parseCount(malformed, "--limit")).toThrow(
+        ManagementFlagError,
+      );
+      expect(() => parseCount(malformed, "--limit")).toThrow(/--limit/);
+    }
+  });
+
   it("normalise the enumerations and name what they expect", () => {
     expect(parseRole("admin")).toBe("ADMIN");
     expect(parseScopeType("project")).toBe("PROJECT");

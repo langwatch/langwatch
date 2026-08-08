@@ -35,7 +35,7 @@ export const listMembersCommand = async (
     pending: "Fetching organization members...",
     run: () => new OrganizationApiService().listMembers(query),
     succeed: (result) =>
-      `Found ${counted(result.totalCount, "member", "members")}`,
+      `Found ${counted({ count: result.totalCount, singular: "member", plural: "members" })}`,
     table: (result) => {
       if (result.members.length === 0) {
         printEmpty({ what: "members" });

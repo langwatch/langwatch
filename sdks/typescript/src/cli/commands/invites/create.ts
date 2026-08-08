@@ -22,7 +22,7 @@ export interface CreateInvitesOptions {
   team?: string[];
   json?: string;
   file?: string;
-  stdin?: boolean;
+  readFromStdin?: boolean;
 }
 
 /** Reads all data from stdin as a string (dataset records add precedent). */
@@ -45,7 +45,7 @@ const readStdin = (): Promise<string> =>
 const resolveInvites = async (
   options: CreateInvitesOptions,
 ): Promise<InviteInput[]> => {
-  const jsonSources = [options.json, options.file, options.stdin].filter(
+  const jsonSources = [options.json, options.file, options.readFromStdin].filter(
     (source) => source !== undefined && source !== false,
   );
   if (jsonSources.length > 1) {
@@ -70,7 +70,7 @@ const resolveInvites = async (
       process.exit(1);
     }
     raw = fs.readFileSync(options.file, "utf-8");
-  } else if (options.stdin) {
+  } else if (options.readFromStdin) {
     raw = await readStdin();
   } else {
     raw = options.json!;
@@ -86,10 +86,10 @@ export const createInvitesCommand = async (
 
   return runManagement({
     action: "create invites",
-    pending: `Creating ${counted(invites.length, "invite", "invites")}...`,
+    pending: `Creating ${counted({ count: invites.length, singular: "invite", plural: "invites" })}...`,
     run: () => new OrganizationApiService().createInvites({ invites }),
     succeed: (result) =>
-      `Created ${counted(result.invites.length, "invite", "invites")}`,
+      `Created ${counted({ count: result.invites.length, singular: "invite", plural: "invites" })}`,
     table: (result) => {
       console.log();
       formatTable({

@@ -23,7 +23,7 @@ export const listTeamMembersCommand = async (
     pending: `Fetching members of team "${teamId}"...`,
     run: () => new TeamsApiService().listMembers(teamId),
     succeed: (result) =>
-      `Found ${counted(result.data.length, "member", "members")}`,
+      `Found ${counted({ count: result.data.length, singular: "member", plural: "members" })}`,
     table: (result) => {
       if (result.data.length === 0) {
         printEmpty({ what: "team members" });
@@ -44,11 +44,15 @@ export const listTeamMembersCommand = async (
     },
   });
 
-export const addTeamMemberCommand = async (
-  teamId: string,
-  userId: string,
-  options: { role?: string } = {},
-): Promise<CommandResult | void> => {
+export const addTeamMemberCommand = async ({
+  teamId,
+  userId,
+  options = {},
+}: {
+  teamId: string;
+  userId: string;
+  options?: { role?: string };
+}): Promise<CommandResult | void> => {
   const role = withParsedFlags(() =>
     options.role !== undefined ? parseRole(options.role) : undefined,
   );
@@ -56,14 +60,11 @@ export const addTeamMemberCommand = async (
   return runManagement({
     action: "add team member",
     pending: `Adding member "${userId}" to team "${teamId}"...`,
-    run: async () => ({
-      teamId,
-      userId,
-      ...(await new TeamsApiService().addMember(teamId, {
-        userId,
-        ...(role !== undefined ? { role } : {}),
-      })),
-    }),
+    run: () =>
+      new TeamsApiService().addMember({
+        teamId,
+        input: { userId, ...(role !== undefined ? { role } : {}) },
+      }),
     succeed: () =>
       `Added member "${userId}" to team "${teamId}"${role ? ` as ${chalk.cyan(role)}` : ""}`,
     table: () => {
@@ -78,18 +79,17 @@ export const addTeamMemberCommand = async (
   });
 };
 
-export const removeTeamMemberCommand = async (
-  teamId: string,
-  userId: string,
-): Promise<CommandResult | void> =>
+export const removeTeamMemberCommand = async ({
+  teamId,
+  userId,
+}: {
+  teamId: string;
+  userId: string;
+}): Promise<CommandResult | void> =>
   runManagement({
     action: "remove team member",
     pending: `Removing member "${userId}" from team "${teamId}"...`,
-    run: async () => ({
-      teamId,
-      userId,
-      ...(await new TeamsApiService().removeMember(teamId, userId)),
-    }),
+    run: () => new TeamsApiService().removeMember({ teamId, userId }),
     succeed: () => `Removed member "${userId}" from team "${teamId}"`,
     table: () => {
       console.log();

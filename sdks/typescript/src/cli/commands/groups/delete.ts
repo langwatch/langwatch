@@ -9,7 +9,7 @@ export const deleteGroupCommand = async (
   runManagement({
     action: "delete group",
     pending: `Deleting group "${id}"...`,
-    run: async () => ({ id, ...(await new GroupsApiService().delete(id)) }),
+    run: () => new GroupsApiService().delete(id),
     succeed: () => `Deleted group "${id}"`,
     table: () => {
       console.log();

@@ -112,8 +112,15 @@ export const printEmpty = ({
 };
 
 /** A count with its noun pluralised, for spinner success lines. */
-export const counted = (count: number, singular: string, plural: string): string =>
-  `${count} ${count === 1 ? singular : plural}`;
+export const counted = ({
+  count,
+  singular,
+  plural,
+}: {
+  count: number;
+  singular: string;
+  plural: string;
+}): string => `${count} ${count === 1 ? singular : plural}`;
 
 /** `—` for a value the platform has not set, so a table never shows "null". */
 export const orDash = (value: string | null | undefined): string =>

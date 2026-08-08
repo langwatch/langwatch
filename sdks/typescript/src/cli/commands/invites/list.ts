@@ -15,7 +15,7 @@ export const listInvitesCommand = async (): Promise<CommandResult | void> =>
     pending: "Fetching invites...",
     run: () => new OrganizationApiService().listInvites(),
     succeed: (result) =>
-      `Found ${counted(result.invites.length, "invite", "invites")}`,
+      `Found ${counted({ count: result.invites.length, singular: "invite", plural: "invites" })}`,
     table: (result) => {
       if (result.invites.length === 0) {
         printEmpty({

@@ -8,10 +8,10 @@
  *
  * CLI-only, and deliberately not exported from the client SDK's public index.
  */
-import { scopedApiKey } from "@/internal/credentialContext";
 import { resolveEndpoint } from "@/internal/endpoint";
 import {
   createManagementRequest,
+  resolveManagementToken,
   type ManagementRequest,
 } from "../_shared/management-request";
 import type {
@@ -105,11 +105,7 @@ export class GroupsApiService {
   constructor(config?: { endpoint?: string; apiKey?: string }) {
     this.#request = createManagementRequest({
       endpoint: resolveEndpoint(config?.endpoint),
-      token:
-        config?.apiKey ??
-        scopedApiKey() ??
-        process.env.LANGWATCH_API_KEY ??
-        "",
+      token: resolveManagementToken({ apiKey: config?.apiKey }),
       errorFactory: ({ message, operation, body }) =>
         new GroupsApiError(message, operation, body),
     });
@@ -141,10 +137,13 @@ export class GroupsApiService {
     });
   }
 
-  async rename(
-    id: string,
-    input: { name: string },
-  ): Promise<{ id: string; name: string; slug: string }> {
+  async rename({
+    id,
+    input,
+  }: {
+    id: string;
+    input: { name: string };
+  }): Promise<{ id: string; name: string; slug: string }> {
     return this.#request({
       operation: `rename group "${id}"`,
       path: `/api/groups/${encodeURIComponent(id)}`,
@@ -168,10 +167,13 @@ export class GroupsApiService {
     });
   }
 
-  async addMember(
-    groupId: string,
-    input: { userId: string },
-  ): Promise<{ success: boolean }> {
+  async addMember({
+    groupId,
+    input,
+  }: {
+    groupId: string;
+    input: { userId: string };
+  }): Promise<{ success: boolean }> {
     return this.#request({
       operation: `add a member to group "${groupId}"`,
       path: `/api/groups/${encodeURIComponent(groupId)}/members`,
@@ -180,10 +182,13 @@ export class GroupsApiService {
     });
   }
 
-  async removeMember(
-    groupId: string,
-    userId: string,
-  ): Promise<{ success: boolean }> {
+  async removeMember({
+    groupId,
+    userId,
+  }: {
+    groupId: string;
+    userId: string;
+  }): Promise<{ success: boolean }> {
     return this.#request({
       operation: `remove member "${userId}" from group "${groupId}"`,
       path: `/api/groups/${encodeURIComponent(groupId)}/members/${encodeURIComponent(userId)}`,
@@ -198,10 +203,13 @@ export class GroupsApiService {
     });
   }
 
-  async addBinding(
-    groupId: string,
-    input: ManagementBindingInput,
-  ): Promise<CreatedGroupBinding> {
+  async addBinding({
+    groupId,
+    input,
+  }: {
+    groupId: string;
+    input: ManagementBindingInput;
+  }): Promise<CreatedGroupBinding> {
     return this.#request({
       operation: `add a binding to group "${groupId}"`,
       path: `/api/groups/${encodeURIComponent(groupId)}/bindings`,
@@ -210,10 +218,13 @@ export class GroupsApiService {
     });
   }
 
-  async removeBinding(
-    groupId: string,
-    bindingId: string,
-  ): Promise<{ success: boolean }> {
+  async removeBinding({
+    groupId,
+    bindingId,
+  }: {
+    groupId: string;
+    bindingId: string;
+  }): Promise<{ success: boolean }> {
     return this.#request({
       operation: `remove binding "${bindingId}" from group "${groupId}"`,
       path: `/api/groups/${encodeURIComponent(groupId)}/bindings/${encodeURIComponent(bindingId)}`,

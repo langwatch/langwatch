@@ -23,20 +23,25 @@ export interface UpdateRoleOptions {
  * grants and adding to it silently would leave nobody able to say what the
  * role means.
  */
-export const updateRoleCommand = async (
-  id: string,
-  options: UpdateRoleOptions,
-): Promise<CommandResult | void> => {
+export const updateRoleCommand = async ({
+  id,
+  options,
+}: {
+  id: string;
+  options: UpdateRoleOptions;
+}): Promise<CommandResult | void> => {
   const permissions = withParsedFlags(() =>
     parsePermissionFlags(options.permission),
   );
 
+  // Keyed on the flag being GIVEN, not on what it parsed to: a caller who
+  // asked to replace the set is asking for exactly the set they named.
   const input: UpdateRoleInput = {
     ...(options.name !== undefined ? { name: options.name } : {}),
     ...(options.description !== undefined
       ? { description: options.description }
       : {}),
-    ...(permissions.length > 0 ? { permissions } : {}),
+    ...(options.permission !== undefined ? { permissions } : {}),
   };
 
   if (Object.keys(input).length === 0) {
@@ -51,7 +56,7 @@ export const updateRoleCommand = async (
   return runManagement({
     action: "update custom role",
     pending: `Updating custom role "${id}"...`,
-    run: () => new RolesApiService().update(id, input),
+    run: () => new RolesApiService().update({ id, input }),
     succeed: (role) => `Updated custom role "${chalk.cyan(role.name)}"`,
     table: (role) => {
       printFacts([

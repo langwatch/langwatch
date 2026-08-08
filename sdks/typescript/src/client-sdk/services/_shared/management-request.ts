@@ -14,6 +14,7 @@
  * `{error, message}`. `handledErrorFrom` reads either, so the caller never has
  * to know which family it is holding.
  */
+import { scopedApiKey } from "@/internal/credentialContext";
 import { formatApiErrorForOperation } from "./format-api-error";
 import { throwIfHandledError } from "./throw-handled-error";
 
@@ -23,6 +24,33 @@ export type ManagementErrorFactory = (params: {
   operation: string;
   body: unknown;
 }) => Error;
+
+/**
+ * How long one management call may hang before it is abandoned. A control
+ * plane that accepts the socket and never answers would otherwise wedge the
+ * command forever, with a spinner and no way out.
+ */
+export const MANAGEMENT_REQUEST_TIMEOUT_MS = 30_000;
+
+/**
+ * The organization credential every management family except the
+ * instance-provisioning one runs with, resolved once rather than in each
+ * constructor. An empty token is refused here so the caller reads what is
+ * missing instead of a 401 from the platform.
+ */
+export const resolveManagementToken = ({
+  apiKey,
+}: {
+  apiKey?: string;
+}): string => {
+  const token = apiKey ?? scopedApiKey() ?? process.env.LANGWATCH_API_KEY;
+  if (!token) {
+    throw new Error(
+      "No API key configured. Set LANGWATCH_API_KEY, run `langwatch login`, or pass apiKey.",
+    );
+  }
+  return token;
+};
 
 export interface ManagementRequestConfig {
   endpoint: string;
@@ -42,6 +70,8 @@ export interface ManagementRequestParams {
   body?: unknown;
   /** Query parameters. Undefined values are left off the URL entirely. */
   query?: Record<string, string | number | boolean | undefined>;
+  /** Caller's own deadline; without one the default timeout applies. */
+  signal?: AbortSignal;
 }
 
 /** `?a=1&b=2` for the values that are actually set, or "" when none are. */
@@ -73,6 +103,7 @@ export const createManagementRequest = ({
     method,
     body,
     query,
+    signal,
   }: ManagementRequestParams): Promise<T> => {
     const response = await fetch(
       `${endpoint}${path}${buildQueryString(query)}`,
@@ -83,15 +114,19 @@ export const createManagementRequest = ({
           "Content-Type": "application/json",
         },
         ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+        signal: signal ?? AbortSignal.timeout(MANAGEMENT_REQUEST_TIMEOUT_MS),
       },
     );
 
     if (!response.ok) {
+      // One read: a body consumed by a failed `json()` cannot be read again,
+      // and the second read would throw past the error handling below.
+      const rawBody = await response.text();
       let parsedBody: unknown;
       try {
-        parsedBody = await response.json();
+        parsedBody = JSON.parse(rawBody);
       } catch {
-        parsedBody = await response.text();
+        parsedBody = rawBody;
       }
       const message = formatApiErrorForOperation({
         operation,

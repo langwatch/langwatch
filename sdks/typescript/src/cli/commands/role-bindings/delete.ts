@@ -9,10 +9,7 @@ export const deleteRoleBindingCommand = async (
   runManagement({
     action: "delete role binding",
     pending: `Deleting role binding "${id}"...`,
-    run: async () => ({
-      id,
-      ...(await new RoleBindingsApiService().delete(id)),
-    }),
+    run: () => new RoleBindingsApiService().delete(id),
     succeed: () => `Deleted role binding "${id}"`,
     table: () => {
       console.log();

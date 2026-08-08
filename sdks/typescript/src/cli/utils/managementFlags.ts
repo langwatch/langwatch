@@ -26,6 +26,7 @@ import {
   type OrganizationRole,
 } from "@/client-sdk/services/_shared/management-types";
 import type { InviteInput } from "@/client-sdk/services/organization/organization-api.service";
+import type { ListRoleBindingsOptions } from "@/client-sdk/services/role-bindings/role-bindings-api.service";
 
 /** A flag value the CLI refuses before it ever reaches the platform. */
 export class ManagementFlagError extends Error {
@@ -37,15 +38,20 @@ export class ManagementFlagError extends Error {
 
 const oneOf = (values: readonly string[]): string => values.join(", ");
 
-/** A non-negative integer flag, refused by name rather than sent as NaN. */
+/**
+ * A non-negative integer flag, refused by name rather than sent as NaN.
+ *
+ * Matched as plain decimal digits rather than run through `Number`, which
+ * reads "" as 0, "0x10" as 16 and "1e3" as 1000: a page size nobody typed.
+ */
 export const parseCount = (value: string, flag: string): number => {
-  const parsed = Number(value);
-  if (!Number.isInteger(parsed) || parsed < 0) {
+  const trimmed = value.trim();
+  if (!/^\d+$/.test(trimmed)) {
     throw new ManagementFlagError(
       `Invalid ${flag} "${value}". Expected a whole number.`,
     );
   }
-  return parsed;
+  return Number(trimmed);
 };
 
 /**
@@ -200,6 +206,23 @@ export const composeInvitesFromFlags = (
   }));
 };
 
+/** A custom role id out of a JSON batch, or undefined when none was given. */
+const parseCustomRoleId = ({
+  value,
+  source,
+}: {
+  value: unknown;
+  source: string;
+}): string | undefined => {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value !== "string" || !value.trim()) {
+    throw new ManagementFlagError(
+      `${source} has a customRoleId that is not a role id. Expected the id of a custom role.`,
+    );
+  }
+  return value.trim();
+};
+
 /**
  * The invite batch a JSON document describes. Both the bare array and the
  * `{ invites: [...] }` envelope are accepted, because the first is what a
@@ -263,15 +286,17 @@ export const parseInvitesJson = (raw: string): InviteInput[] => {
             `Invite ${index + 1} ("${invite.email}") team ${teamIndex + 1} has no teamId.`,
           );
         }
+        const customRoleId = parseCustomRoleId({
+          value: assignment.customRoleId,
+          source: `Invite ${index + 1} ("${invite.email}") team ${teamIndex + 1}`,
+        });
         return {
           teamId: assignment.teamId.trim(),
           role: assertRole(
             typeof assignment.role === "string" ? assignment.role : "",
             `invite ${index + 1} team ${teamIndex + 1}`,
           ),
-          ...(assignment.customRoleId
-            ? { customRoleId: assignment.customRoleId }
-            : {}),
+          ...(customRoleId !== undefined ? { customRoleId } : {}),
         };
       }),
     };
@@ -325,8 +350,8 @@ export const parsePrincipalType = (value: string): RoleBindingPrincipalFlag => {
  */
 export const composeRoleBindingFilters = (
   flags: RoleBindingFilterFlags,
-): Record<string, string | number> => {
-  const filters: Record<string, string | number> = {};
+): ListRoleBindingsOptions => {
+  const filters: ListRoleBindingsOptions = {};
 
   if (flags.principalId !== undefined) {
     if (flags.principalType === undefined) {
@@ -336,6 +361,10 @@ export const composeRoleBindingFilters = (
     }
     filters[PRINCIPAL_FIELD[parsePrincipalType(flags.principalType)]] =
       flags.principalId;
+  } else if (flags.principalType !== undefined) {
+    throw new ManagementFlagError(
+      "--principal-type needs --principal-id to say which principal it names.",
+    );
   }
   if (flags.scopeType !== undefined) {
     filters.scopeType = parseScopeType(flags.scopeType);

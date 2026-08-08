@@ -16,11 +16,7 @@ export const rolePermissionsCommand = async (): Promise<CommandResult | void> =>
     pending: "Fetching the permission catalog...",
     run: () => new RolesApiService().permissions(),
     succeed: (catalog) =>
-      `${counted(catalog.resources.length, "resource", "resources")} × ${counted(
-        catalog.actions.length,
-        "action",
-        "actions",
-      )}`,
+      `${counted({ count: catalog.resources.length, singular: "resource", plural: "resources" })} × ${counted({ count: catalog.actions.length, singular: "action", plural: "actions" })}`,
     table: (catalog) => {
       console.log();
       formatTable({

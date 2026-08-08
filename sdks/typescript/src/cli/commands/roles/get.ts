@@ -1,7 +1,7 @@
 import chalk from "chalk";
 import { RolesApiService } from "@/client-sdk/services/roles/roles-api.service";
 import type { CommandResult } from "../../utils/output";
-import { orDash, printFacts, runManagement } from "../management/_shared";
+import { asDate, orDash, printFacts, runManagement } from "../management/_shared";
 
 export const getRoleCommand = async (
   id: string,
@@ -17,7 +17,7 @@ export const getRoleCommand = async (
         ["Name", chalk.cyan(role.name)],
         ["Description", orDash(role.description)],
         ["Permissions", role.permissions.join(", ")],
-        ["Created", new Date(role.createdAt).toLocaleString()],
+        ["Created", asDate(role.createdAt)],
       ]);
     },
   });

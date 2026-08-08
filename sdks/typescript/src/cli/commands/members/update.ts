@@ -9,16 +9,20 @@ import { orDash, printFacts, runManagement, withParsedFlags } from "../managemen
  * verbs (`members disable` / `members enable`) because the API takes exactly
  * one of the two changes per request.
  */
-export const updateMemberCommand = async (
-  userId: string,
-  options: { role: string },
-): Promise<CommandResult | void> => {
+export const updateMemberCommand = async ({
+  userId,
+  options,
+}: {
+  userId: string;
+  options: { role: string };
+}): Promise<CommandResult | void> => {
   const role = withParsedFlags(() => parseOrganizationRole(options.role));
 
   return runManagement({
     action: "update member",
     pending: `Updating member "${userId}"...`,
-    run: () => new OrganizationApiService().updateMember(userId, { role }),
+    run: () =>
+      new OrganizationApiService().updateMember({ userId, input: { role } }),
     succeed: (member) => `Member "${userId}" is now ${chalk.cyan(member.role)}`,
     table: (member) => {
       printFacts([

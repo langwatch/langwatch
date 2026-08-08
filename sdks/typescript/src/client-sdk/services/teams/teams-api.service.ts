@@ -6,10 +6,10 @@
  *
  * CLI-only, and deliberately not exported from the client SDK's public index.
  */
-import { scopedApiKey } from "@/internal/credentialContext";
 import { resolveEndpoint } from "@/internal/endpoint";
 import {
   createManagementRequest,
+  resolveManagementToken,
   type ManagementRequest,
 } from "../_shared/management-request";
 import type { ManagementRole } from "../_shared/management-types";
@@ -64,11 +64,7 @@ export class TeamsApiService {
   constructor(config?: { endpoint?: string; apiKey?: string }) {
     this.#request = createManagementRequest({
       endpoint: resolveEndpoint(config?.endpoint),
-      token:
-        config?.apiKey ??
-        scopedApiKey() ??
-        process.env.LANGWATCH_API_KEY ??
-        "",
+      token: resolveManagementToken({ apiKey: config?.apiKey }),
       errorFactory: ({ message, operation, body }) =>
         new TeamsApiError(message, operation, body),
     });
@@ -100,7 +96,13 @@ export class TeamsApiService {
     });
   }
 
-  async update(id: string, input: { name?: string }): Promise<Team> {
+  async update({
+    id,
+    input,
+  }: {
+    id: string;
+    input: { name?: string };
+  }): Promise<Team> {
     return this.#request({
       operation: `update team "${id}"`,
       path: `/api/teams/${encodeURIComponent(id)}`,
@@ -124,10 +126,13 @@ export class TeamsApiService {
     });
   }
 
-  async addMember(
-    teamId: string,
-    input: { userId: string; role?: ManagementRole },
-  ): Promise<{ success: boolean }> {
+  async addMember({
+    teamId,
+    input,
+  }: {
+    teamId: string;
+    input: { userId: string; role?: ManagementRole };
+  }): Promise<{ success: boolean }> {
     return this.#request({
       operation: `add a member to team "${teamId}"`,
       path: `/api/teams/${encodeURIComponent(teamId)}/members`,
@@ -136,10 +141,13 @@ export class TeamsApiService {
     });
   }
 
-  async removeMember(
-    teamId: string,
-    userId: string,
-  ): Promise<{ success: boolean }> {
+  async removeMember({
+    teamId,
+    userId,
+  }: {
+    teamId: string;
+    userId: string;
+  }): Promise<{ success: boolean }> {
     return this.#request({
       operation: `remove member "${userId}" from team "${teamId}"`,
       path: `/api/teams/${encodeURIComponent(teamId)}/members/${encodeURIComponent(userId)}`,

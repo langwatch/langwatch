@@ -170,7 +170,13 @@ export class ApiKeysApiService {
     );
   }
 
-  async update(id: string, input: UpdateApiKeyInput): Promise<ApiKeyDetail> {
+  async update({
+    id,
+    input,
+  }: {
+    id: string;
+    input: UpdateApiKeyInput;
+  }): Promise<ApiKeyDetail> {
     return this.request<ApiKeyDetail>(
       `update API key "${id}"`,
       `/api/api-keys/${encodeURIComponent(id)}`,

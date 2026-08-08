@@ -8,14 +8,17 @@ import { printFacts, runManagement } from "../management/_shared";
  * here, and the platform refuses the write rather than letting the two names
  * diverge until the next sync.
  */
-export const renameGroupCommand = async (
-  id: string,
-  options: { name: string },
-): Promise<CommandResult | void> =>
+export const renameGroupCommand = async ({
+  id,
+  name,
+}: {
+  id: string;
+  name: string;
+}): Promise<CommandResult | void> =>
   runManagement({
     action: "rename group",
     pending: `Renaming group "${id}"...`,
-    run: () => new GroupsApiService().rename(id, { name: options.name }),
+    run: () => new GroupsApiService().rename({ id, input: { name } }),
     succeed: (group) => `Renamed group to "${chalk.cyan(group.name)}"`,
     table: (group) => {
       printFacts([

@@ -8,14 +8,18 @@ import { orDash, printFacts, runManagement } from "../management/_shared";
  * boolean, so they share an implementation and differ only in the words.
  * Re-enabling consumes a seat, so it is checked against the plan.
  */
-const setMemberDisabled = async (
-  userId: string,
-  disabled: boolean,
-): Promise<CommandResult | void> =>
+const setMemberDisabled = async ({
+  userId,
+  disabled,
+}: {
+  userId: string;
+  disabled: boolean;
+}): Promise<CommandResult | void> =>
   runManagement({
     action: disabled ? "disable member" : "enable member",
     pending: `${disabled ? "Disabling" : "Enabling"} member "${userId}"...`,
-    run: () => new OrganizationApiService().updateMember(userId, { disabled }),
+    run: () =>
+      new OrganizationApiService().updateMember({ userId, input: { disabled } }),
     succeed: (member) =>
       `Member "${userId}" is now ${member.disabled ? chalk.yellow("disabled") : chalk.green("active")}`,
     table: (member) => {
@@ -30,8 +34,10 @@ const setMemberDisabled = async (
 
 export const disableMemberCommand = (
   userId: string,
-): Promise<CommandResult | void> => setMemberDisabled(userId, true);
+): Promise<CommandResult | void> =>
+  setMemberDisabled({ userId, disabled: true });
 
 export const enableMemberCommand = (
   userId: string,
-): Promise<CommandResult | void> => setMemberDisabled(userId, false);
+): Promise<CommandResult | void> =>
+  setMemberDisabled({ userId, disabled: false });

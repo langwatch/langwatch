@@ -3,10 +3,10 @@
  *
  * CLI-only, and deliberately not exported from the client SDK's public index.
  */
-import { scopedApiKey } from "@/internal/credentialContext";
 import { resolveEndpoint } from "@/internal/endpoint";
 import {
   createManagementRequest,
+  resolveManagementToken,
   type ManagementRequest,
 } from "../_shared/management-request";
 import type {
@@ -95,11 +95,7 @@ export class RoleBindingsApiService {
   constructor(config?: { endpoint?: string; apiKey?: string }) {
     this.#request = createManagementRequest({
       endpoint: resolveEndpoint(config?.endpoint),
-      token:
-        config?.apiKey ??
-        scopedApiKey() ??
-        process.env.LANGWATCH_API_KEY ??
-        "",
+      token: resolveManagementToken({ apiKey: config?.apiKey }),
       errorFactory: ({ message, operation, body }) =>
         new RoleBindingsApiError(message, operation, body),
     });

@@ -20,7 +20,7 @@ export const listScimTokensCommand = async (): Promise<CommandResult | void> =>
     pending: "Fetching SCIM tokens...",
     run: () => new ScimTokensApiService().list(),
     succeed: (result) =>
-      `Found ${counted(result.tokens.length, "SCIM token", "SCIM tokens")}`,
+      `Found ${counted({ count: result.tokens.length, singular: "SCIM token", plural: "SCIM tokens" })}`,
     table: (result) => {
       if (result.tokens.length === 0) {
         printEmpty({

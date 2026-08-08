@@ -13,8 +13,8 @@ import { orDash, printFacts, runManagement } from "../management/_shared";
 export interface UpdateOrganizationOptions {
   name?: string;
   supportContact?: string;
-  presence?: boolean;
-  traceSharing?: boolean;
+  presenceEnabled?: boolean;
+  traceSharingEnabled?: boolean;
 }
 
 /**
@@ -29,11 +29,11 @@ export const updateOrganizationCommand = async (
     ...(options.supportContact !== undefined
       ? { supportContact: options.supportContact }
       : {}),
-    ...(options.presence !== undefined
-      ? { presenceEnabled: options.presence }
+    ...(options.presenceEnabled !== undefined
+      ? { presenceEnabled: options.presenceEnabled }
       : {}),
-    ...(options.traceSharing !== undefined
-      ? { traceSharingEnabled: options.traceSharing }
+    ...(options.traceSharingEnabled !== undefined
+      ? { traceSharingEnabled: options.traceSharingEnabled }
       : {}),
   };
 

@@ -3,20 +3,14 @@ import { OrganizationApiService } from "@/client-sdk/services/organization/organ
 import type { CommandResult } from "../../utils/output";
 import { runManagement } from "../management/_shared";
 
-/**
- * Revoke a pending invite. The response is a bare `{ success }`, so the id is
- * carried alongside it for a machine caller.
- */
+/** Revoke a pending invite. */
 export const revokeInviteCommand = async (
   id: string,
 ): Promise<CommandResult | void> =>
   runManagement({
     action: "revoke invite",
     pending: `Revoking invite "${id}"...`,
-    run: async () => ({
-      id,
-      ...(await new OrganizationApiService().revokeInvite(id)),
-    }),
+    run: () => new OrganizationApiService().revokeInvite(id),
     succeed: () => `Revoked invite "${id}"`,
     table: () => {
       console.log();

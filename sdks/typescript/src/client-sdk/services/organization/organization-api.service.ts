@@ -8,10 +8,10 @@
  * LangWatch instruments and reads data, it does not provision the organization
  * it runs inside.
  */
-import { scopedApiKey } from "@/internal/credentialContext";
 import { resolveEndpoint } from "@/internal/endpoint";
 import {
   createManagementRequest,
+  resolveManagementToken,
   type ManagementRequest,
 } from "../_shared/management-request";
 import type {
@@ -164,11 +164,7 @@ export class OrganizationApiService {
   constructor(config?: { endpoint?: string; apiKey?: string }) {
     this.#request = createManagementRequest({
       endpoint: resolveEndpoint(config?.endpoint),
-      token:
-        config?.apiKey ??
-        scopedApiKey() ??
-        process.env.LANGWATCH_API_KEY ??
-        "",
+      token: resolveManagementToken({ apiKey: config?.apiKey }),
       errorFactory: ({ message, operation, body }) =>
         new OrganizationApiError(message, operation, body),
     });
@@ -213,10 +209,13 @@ export class OrganizationApiService {
     });
   }
 
-  async updateMember(
-    userId: string,
-    input: { role?: OrganizationRole; disabled?: boolean },
-  ): Promise<UpdatedOrganizationMember> {
+  async updateMember({
+    userId,
+    input,
+  }: {
+    userId: string;
+    input: { role?: OrganizationRole; disabled?: boolean };
+  }): Promise<UpdatedOrganizationMember> {
     return this.#request({
       operation: `update member "${userId}"`,
       path: `/api/organization/members/${encodeURIComponent(userId)}`,

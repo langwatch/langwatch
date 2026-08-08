@@ -4,10 +4,10 @@
  *
  * CLI-only, and deliberately not exported from the client SDK's public index.
  */
-import { scopedApiKey } from "@/internal/credentialContext";
 import { resolveEndpoint } from "@/internal/endpoint";
 import {
   createManagementRequest,
+  resolveManagementToken,
   type ManagementRequest,
 } from "../_shared/management-request";
 
@@ -62,11 +62,7 @@ export class RolesApiService {
   constructor(config?: { endpoint?: string; apiKey?: string }) {
     this.#request = createManagementRequest({
       endpoint: resolveEndpoint(config?.endpoint),
-      token:
-        config?.apiKey ??
-        scopedApiKey() ??
-        process.env.LANGWATCH_API_KEY ??
-        "",
+      token: resolveManagementToken({ apiKey: config?.apiKey }),
       errorFactory: ({ message, operation, body }) =>
         new RolesApiError(message, operation, body),
     });
@@ -95,7 +91,13 @@ export class RolesApiService {
     });
   }
 
-  async update(id: string, input: UpdateRoleInput): Promise<CustomRole> {
+  async update({
+    id,
+    input,
+  }: {
+    id: string;
+    input: UpdateRoleInput;
+  }): Promise<CustomRole> {
     return this.#request({
       operation: `update custom role "${id}"`,
       path: `/api/roles/${encodeURIComponent(id)}`,

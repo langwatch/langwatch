@@ -3097,7 +3097,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       },
     ) => {
       const { updateApiKeyCommand: impl } = await import("./commands/api-keys/update.js");
-      return impl(id, options);
+      return impl({ id, options });
     },
   );
 
@@ -3151,7 +3151,18 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       traceSharing?: boolean;
     }) => {
       const { updateOrganizationCommand: impl } = await import("./commands/organization/update.js");
-      return impl(options);
+      return impl({
+        ...(options.name !== undefined ? { name: options.name } : {}),
+        ...(options.supportContact !== undefined
+          ? { supportContact: options.supportContact }
+          : {}),
+        ...(options.presence !== undefined
+          ? { presenceEnabled: options.presence }
+          : {}),
+        ...(options.traceSharing !== undefined
+          ? { traceSharingEnabled: options.traceSharing }
+          : {}),
+      });
     },
   );
 
@@ -3192,7 +3203,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .option("-f, --format <format>", "Output format: text (default) or json", "text"),
     async (userId: string, options: { role: string }) => {
       const { updateMemberCommand: impl } = await import("./commands/members/update.js");
-      return impl(userId, options);
+      return impl({ userId, options });
     },
   );
 
@@ -3280,8 +3291,12 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       file?: string;
       stdin?: boolean;
     }) => {
+      const { stdin, ...rest } = options;
       const { createInvitesCommand: impl } = await import("./commands/invites/create.js");
-      return impl(options);
+      return impl({
+        ...rest,
+        ...(stdin !== undefined ? { readFromStdin: stdin } : {}),
+      });
     },
   );
 
@@ -3344,7 +3359,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .option("-f, --format <format>", "Output format: text (default) or json", "text"),
     async (id: string, options: { name: string }) => {
       const { updateTeamCommand: impl } = await import("./commands/teams/update.js");
-      return impl(id, options);
+      return impl({ id, name: options.name });
     },
   );
 
@@ -3382,7 +3397,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .option("-f, --format <format>", "Output format: text (default) or json", "text"),
     async (teamId: string, userId: string, options: { role?: string }) => {
       const { addTeamMemberCommand: impl } = await import("./commands/teams/members.js");
-      return impl(teamId, userId, options);
+      return impl({ teamId, userId, options });
     },
   );
 
@@ -3393,7 +3408,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .option("-f, --format <format>", "Output format: text (default) or json", "text"),
     async (teamId: string, userId: string) => {
       const { removeTeamMemberCommand: impl } = await import("./commands/teams/members.js");
-      return impl(teamId, userId);
+      return impl({ teamId, userId });
     },
   );
 
@@ -3450,7 +3465,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .option("-f, --format <format>", "Output format: text (default) or json", "text"),
     async (id: string, options: { name: string }) => {
       const { renameGroupCommand: impl } = await import("./commands/groups/rename.js");
-      return impl(id, options);
+      return impl({ id, name: options.name });
     },
   );
 
@@ -3487,7 +3502,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .option("-f, --format <format>", "Output format: text (default) or json", "text"),
     async (groupId: string, userId: string) => {
       const { addGroupMemberCommand: impl } = await import("./commands/groups/members.js");
-      return impl(groupId, userId);
+      return impl({ groupId, userId });
     },
   );
 
@@ -3498,7 +3513,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .option("-f, --format <format>", "Output format: text (default) or json", "text"),
     async (groupId: string, userId: string) => {
       const { removeGroupMemberCommand: impl } = await import("./commands/groups/members.js");
-      return impl(groupId, userId);
+      return impl({ groupId, userId });
     },
   );
 
@@ -3536,7 +3551,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       },
     ) => {
       const { addGroupBindingCommand: impl } = await import("./commands/groups/bindings.js");
-      return impl(groupId, options);
+      return impl({ groupId, options });
     },
   );
 
@@ -3547,7 +3562,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .option("-f, --format <format>", "Output format: text (default) or json", "text"),
     async (groupId: string, bindingId: string) => {
       const { removeGroupBindingCommand: impl } = await import("./commands/groups/bindings.js");
-      return impl(groupId, bindingId);
+      return impl({ groupId, bindingId });
     },
   );
 
@@ -3610,7 +3625,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       options: { name?: string; description?: string; permission?: string[] },
     ) => {
       const { updateRoleCommand: impl } = await import("./commands/roles/update.js");
-      return impl(id, options);
+      return impl({ id, options });
     },
   );
 
@@ -3801,7 +3816,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       const { getOrganizationByIdCommand: impl } = await import(
         "./commands/organizations/get.js"
       );
-      return impl(id, options);
+      return impl({ id, options });
     },
   );
 

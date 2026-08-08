@@ -1,12 +1,15 @@
 import chalk from "chalk";
 import type { CommandResult } from "../../utils/output";
-import { printFacts, runManagement } from "../management/_shared";
+import { asDate, printFacts, runManagement } from "../management/_shared";
 import { instanceAdminService, requireInstanceKey } from "./_shared";
 
-export const getOrganizationByIdCommand = async (
-  id: string,
-  options: { instanceKey?: string } = {},
-): Promise<CommandResult | void> => {
+export const getOrganizationByIdCommand = async ({
+  id,
+  options = {},
+}: {
+  id: string;
+  options?: { instanceKey?: string };
+}): Promise<CommandResult | void> => {
   const instanceKey = requireInstanceKey(options.instanceKey);
 
   return runManagement({
@@ -20,7 +23,7 @@ export const getOrganizationByIdCommand = async (
         ["ID", chalk.gray(result.organization.id)],
         ["Name", chalk.cyan(result.organization.name)],
         ["Slug", result.organization.slug],
-        ["Created", new Date(result.organization.createdAt).toLocaleString()],
+        ["Created", asDate(result.organization.createdAt)],
       ]);
     },
   });

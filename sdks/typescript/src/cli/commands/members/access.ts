@@ -5,7 +5,13 @@ import { formatTable } from "../../utils/formatting";
 import type { CommandResult } from "../../utils/output";
 import { orDash, runManagement } from "../management/_shared";
 
-const bindingRows = (bindings: MemberAccessBinding[], source: string) =>
+const bindingRows = ({
+  bindings,
+  source,
+}: {
+  bindings: MemberAccessBinding[];
+  source: string;
+}) =>
   bindings.map((binding) => ({
     Source: source,
     Role: binding.customRoleName ?? binding.role,
@@ -36,11 +42,12 @@ export const memberAccessCommand = async (
       console.log();
 
       const rows = [
-        ...access.directBindings.flatMap((binding) =>
-          bindingRows([binding], "direct"),
-        ),
+        ...bindingRows({ bindings: access.directBindings, source: "direct" }),
         ...access.groups.flatMap((group) =>
-          bindingRows(group.bindings, `group ${group.name}`),
+          bindingRows({
+            bindings: group.bindings,
+            source: `group ${group.name}`,
+          }),
         ),
       ];
 

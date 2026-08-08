@@ -10,7 +10,7 @@ export const listRolesCommand = async (): Promise<CommandResult | void> =>
     pending: "Fetching custom roles...",
     run: () => new RolesApiService().list(),
     succeed: (result) =>
-      `Found ${counted(result.roles.length, "custom role", "custom roles")}`,
+      `Found ${counted({ count: result.roles.length, singular: "custom role", plural: "custom roles" })}`,
     table: (result) => {
       if (result.roles.length === 0) {
         printEmpty({

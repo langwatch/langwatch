@@ -27,7 +27,8 @@ export const listTeamsCommand = async (
     action: "list teams",
     pending: "Fetching teams...",
     run: () => new TeamsApiService().list(query),
-    succeed: (result) => `Found ${counted(result.data.length, "team", "teams")}`,
+    succeed: (result) =>
+      `Found ${counted({ count: result.pagination.total, singular: "team", plural: "teams" })}`,
     table: (result) => {
       if (result.data.length === 0) {
         printEmpty({

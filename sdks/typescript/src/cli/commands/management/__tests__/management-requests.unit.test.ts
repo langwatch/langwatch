@@ -37,6 +37,16 @@ import { listRoleBindingsCommand } from "../../role-bindings/list";
 import { listRolesCommand } from "../../roles/list";
 import { createScimTokenCommand } from "../../scim-tokens/create";
 import { listTeamsCommand } from "../../teams/list";
+import {
+  CREATED_GROUP_BINDING_RESPONSE,
+  LIST_GROUPS_RESPONSE,
+  LIST_MEMBERS_RESPONSE,
+  LIST_ROLE_BINDINGS_RESPONSE,
+  LIST_ROLES_RESPONSE,
+  LIST_TEAMS_RESPONSE,
+  ORGANIZATION_SETTINGS_RESPONSE,
+  UPDATED_API_KEY_RESPONSE,
+} from "./management-response.fixtures";
 
 const noop = (): void => {
   // intentionally empty
@@ -65,6 +75,10 @@ const lastRequest = (): { url: string; body: unknown; init: RequestInit } =>
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // The real resolver publishes the key it found into the credential holder;
+  // the mock above does not, so the environment stands in as the source the
+  // services read.
+  process.env.LANGWATCH_API_KEY = "test-key";
   logged = [];
   mockFetch = vi.fn();
   global.fetch = mockFetch as unknown as typeof fetch;
@@ -136,27 +150,15 @@ describe("api-keys update", () => {
   describe("when an API key is updated with repeated binding flags and restricted permissions", () => {
     /** @scenario API key update replaces bindings and sets restricted permissions */
     it("sends exactly the bindings given, and restricted mode with those permissions", async () => {
-      respondWith({
-        id: "key_1",
-        name: "Analyst key",
-        description: null,
-        keyType: "service",
-        assignedToUserId: null,
-        createdByUserId: null,
-        permissionMode: "restricted",
-        permissions: ["project:view", "trace:view"],
-        createdAt: "2026-01-01T00:00:00Z",
-        expiresAt: null,
-        lastUsedAt: null,
-        revokedAt: null,
-        roleBindings: [],
-        bindings: [],
-      });
+      respondWith(UPDATED_API_KEY_RESPONSE);
 
-      await updateApiKeyCommand("key_1", {
-        binding: ["CUSTOM:PROJECT:project_1", "VIEWER:TEAM:team_1"],
-        permission: ["project:view", "trace:view"],
-        permissionMode: "restricted",
+      await updateApiKeyCommand({
+        id: "key_1",
+        options: {
+          binding: ["CUSTOM:PROJECT:project_1", "VIEWER:TEAM:team_1"],
+          permission: ["project:view", "trace:view"],
+          permissionMode: "restricted",
+        },
       });
 
       const request = lastRequest();
@@ -237,9 +239,13 @@ describe("invites create", () => {
 
       mockFetch.mockClear();
       respondWith(created);
-      await createInvitesCommand({ stdin: true });
-      const fromStdin = lastRequest();
-      stdinOn.mockRestore();
+      let fromStdin: ReturnType<typeof lastRequest>;
+      try {
+        await createInvitesCommand({ readFromStdin: true });
+        fromStdin = lastRequest();
+      } finally {
+        stdinOn.mockRestore();
+      }
 
       // All three forms produce the same request.
       expect(fromFile.body).toEqual(fromFlags.body);
@@ -261,125 +267,45 @@ describe("every management family", () => {
       }> = [
         {
           name: "organization get",
-          response: {
-            id: "org_1",
-            name: "Acme",
-            slug: "acme",
-            supportContact: null,
-            presenceEnabled: true,
-            traceSharingEnabled: false,
-            primaryIntent: null,
-            s3Endpoint: null,
-            s3AccessKeyId: null,
-            s3Bucket: null,
-            createdAt: "2026-01-01T00:00:00Z",
-            updatedAt: "2026-01-02T00:00:00Z",
-          },
+          response: ORGANIZATION_SETTINGS_RESPONSE,
           run: () => getOrganizationCommand(),
         },
         {
           name: "members list",
-          response: {
-            members: [
-              {
-                userId: "user_1",
-                role: "ADMIN",
-                disabled: false,
-                disabledAt: null,
-                createdAt: "2026-01-01T00:00:00Z",
-                updatedAt: "2026-01-01T00:00:00Z",
-                user: { id: "user_1", name: "Ada", email: "ada@example.com" },
-              },
-            ],
-            totalCount: 1,
-          },
+          response: LIST_MEMBERS_RESPONSE,
           run: () => listMembersCommand(),
         },
         {
           name: "roles list",
-          response: {
-            roles: [
-              {
-                id: "role_1",
-                name: "Analyst",
-                description: null,
-                permissions: ["project:view"],
-                createdAt: "2026-01-01T00:00:00Z",
-                updatedAt: "2026-01-01T00:00:00Z",
-              },
-            ],
-          },
+          response: LIST_ROLES_RESPONSE,
           run: () => listRolesCommand(),
         },
         {
           name: "teams list",
-          response: {
-            data: [
-              {
-                id: "team_1",
-                name: "Platform",
-                slug: "platform",
-                organizationId: "org_1",
-                createdAt: "2026-01-01T00:00:00Z",
-                updatedAt: "2026-01-01T00:00:00Z",
-              },
-            ],
-            pagination: { page: 1, limit: 50, total: 1 },
-          },
+          response: LIST_TEAMS_RESPONSE,
           run: () => listTeamsCommand(),
         },
         {
           name: "groups list",
-          response: {
-            data: [
-              {
-                id: "group_1",
-                name: "Data science",
-                slug: "data-science",
-                externalId: null,
-                scimSource: null,
-                memberCount: 3,
-                bindings: [],
-                createdAt: "2026-01-01T00:00:00Z",
-              },
-            ],
-            pagination: { page: 1, limit: 50, total: 1 },
-          },
+          response: LIST_GROUPS_RESPONSE,
           run: () => listGroupsCommand(),
         },
         {
           name: "groups bindings add",
-          response: {
-            id: "rb_1",
-            role: "MEMBER",
-            scopeType: "PROJECT",
-            scopeId: "project_1",
-          },
+          response: CREATED_GROUP_BINDING_RESPONSE,
           run: () =>
-            addGroupBindingCommand("group_1", {
-              role: "MEMBER",
-              scopeType: "PROJECT",
-              scopeId: "project_1",
+            addGroupBindingCommand({
+              groupId: "group_1",
+              options: {
+                role: "MEMBER",
+                scopeType: "PROJECT",
+                scopeId: "project_1",
+              },
             }),
         },
         {
           name: "role-bindings list",
-          response: {
-            bindings: [
-              {
-                id: "rb_1",
-                principal: { type: "user", id: "user_1", name: "Ada" },
-                role: "ADMIN",
-                customRoleId: null,
-                customRoleName: null,
-                scopeType: "TEAM",
-                scopeId: "team_1",
-                scopeName: "Platform",
-                createdAt: "2026-01-01T00:00:00Z",
-              },
-            ],
-            totalCount: 1,
-          },
+          response: LIST_ROLE_BINDINGS_RESPONSE,
           run: () => listRoleBindingsCommand(),
         },
       ];

@@ -27,7 +27,7 @@ export const listGroupsCommand = async (
     action: "list groups",
     pending: "Fetching groups...",
     run: () => new GroupsApiService().list(query),
-    succeed: (result) => `Found ${counted(result.data.length, "group", "groups")}`,
+    succeed: (result) => `Found ${counted({ count: result.data.length, singular: "group", plural: "groups" })}`,
     table: (result) => {
       if (result.data.length === 0) {
         printEmpty({

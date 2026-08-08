@@ -15,7 +15,7 @@ export const listOrganizationsCommand = async (
     pending: "Fetching organizations...",
     run: () => instanceAdminService(instanceKey).list(),
     succeed: (result) =>
-      `Found ${counted(result.organizations.length, "organization", "organizations")}`,
+      `Found ${counted({ count: result.organizations.length, singular: "organization", plural: "organizations" })}`,
     table: (result) => {
       if (result.organizations.length === 0) {
         printEmpty({

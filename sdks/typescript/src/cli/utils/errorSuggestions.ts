@@ -53,7 +53,6 @@ const FALLBACK_BY_CODE: Record<string, ErrorExplanation> = {
   enterprise_plan_required: {
     suggestions: [
       "This capability is part of the Enterprise plan; upgrade the organization's plan to use it",
-      "meta.feature names which capability was refused",
     ],
     docUrl: `${DOCS}/pricing`,
   },

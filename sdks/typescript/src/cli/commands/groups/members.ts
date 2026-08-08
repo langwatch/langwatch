@@ -12,7 +12,7 @@ export const listGroupMembersCommand = async (
     pending: `Fetching members of group "${groupId}"...`,
     run: () => new GroupsApiService().listMembers(groupId),
     succeed: (result) =>
-      `Found ${counted(result.data.length, "member", "members")}`,
+      `Found ${counted({ count: result.data.length, singular: "member", plural: "members" })}`,
     table: (result) => {
       if (result.data.length === 0) {
         printEmpty({ what: "group members" });
@@ -32,18 +32,17 @@ export const listGroupMembersCommand = async (
     },
   });
 
-export const addGroupMemberCommand = async (
-  groupId: string,
-  userId: string,
-): Promise<CommandResult | void> =>
+export const addGroupMemberCommand = async ({
+  groupId,
+  userId,
+}: {
+  groupId: string;
+  userId: string;
+}): Promise<CommandResult | void> =>
   runManagement({
     action: "add group member",
     pending: `Adding member "${userId}" to group "${groupId}"...`,
-    run: async () => ({
-      groupId,
-      userId,
-      ...(await new GroupsApiService().addMember(groupId, { userId })),
-    }),
+    run: () => new GroupsApiService().addMember({ groupId, input: { userId } }),
     succeed: () => `Added member "${userId}" to group "${groupId}"`,
     table: () => {
       console.log();
@@ -54,18 +53,17 @@ export const addGroupMemberCommand = async (
     },
   });
 
-export const removeGroupMemberCommand = async (
-  groupId: string,
-  userId: string,
-): Promise<CommandResult | void> =>
+export const removeGroupMemberCommand = async ({
+  groupId,
+  userId,
+}: {
+  groupId: string;
+  userId: string;
+}): Promise<CommandResult | void> =>
   runManagement({
     action: "remove group member",
     pending: `Removing member "${userId}" from group "${groupId}"...`,
-    run: async () => ({
-      groupId,
-      userId,
-      ...(await new GroupsApiService().removeMember(groupId, userId)),
-    }),
+    run: () => new GroupsApiService().removeMember({ groupId, userId }),
     succeed: () => `Removed member "${userId}" from group "${groupId}"`,
     table: () => {
       console.log();

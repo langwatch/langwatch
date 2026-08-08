@@ -32,13 +32,18 @@ export interface UpdateApiKeyOptions {
  * reach is the set of bindings it holds, and a flag that only added would make
  * "tighten this key" impossible to express.
  */
-export const updateApiKeyCommand = async (
-  id: string,
-  options: UpdateApiKeyOptions,
-): Promise<CommandResult | void> => {
+export const updateApiKeyCommand = async ({
+  id,
+  options,
+}: {
+  id: string;
+  options: UpdateApiKeyOptions;
+}): Promise<CommandResult | void> => {
   const input = withParsedFlags((): UpdateApiKeyInput => {
     const bindings = parseBindingFlags(options.binding);
     const permissions = parsePermissionFlags(options.permission);
+    // Keyed on the flag being GIVEN, not on what it parsed to: replacing a
+    // key's reach with a smaller set is the reason these flags exist.
     return {
       ...(options.name !== undefined ? { name: options.name } : {}),
       ...(options.description !== undefined
@@ -47,8 +52,8 @@ export const updateApiKeyCommand = async (
       ...(options.permissionMode !== undefined
         ? { permissionMode: parsePermissionMode(options.permissionMode) }
         : {}),
-      ...(permissions.length > 0 ? { permissions } : {}),
-      ...(bindings.length > 0
+      ...(options.permission !== undefined ? { permissions } : {}),
+      ...(options.binding !== undefined
         ? {
             bindings: bindings.map((binding) => ({
               role: binding.role,
@@ -72,7 +77,7 @@ export const updateApiKeyCommand = async (
   return runManagement({
     action: "update API key",
     pending: `Updating API key "${id}"...`,
-    run: () => new ApiKeysApiService().update(id, input),
+    run: () => new ApiKeysApiService().update({ id, input }),
     succeed: (apiKey) => `Updated API key "${chalk.cyan(apiKey.name)}"`,
     table: (apiKey) => {
       printFacts([
