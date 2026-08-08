@@ -811,6 +811,13 @@ const presentations = {
     describe: () =>
       "This member is the only active organization admin. Make somebody else an admin first, then disable them.",
   },
+  cannot_remove_last_admin: {
+    // The third face of the same lockout wall: removal is the irreversible
+    // one, so it gets the same refusal disabling and demoting do.
+    title: "That would leave the organization without an admin",
+    describe: () =>
+      "This member is the only active organization admin. Make somebody else an admin first, then remove them.",
+  },
   cannot_remove_self: {
     title: "You can't remove yourself from the organization",
     describe: () => "Ask another organization admin to make this change.",

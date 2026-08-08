@@ -180,6 +180,34 @@ describe("Feature: Organization provisioning REST API for self-hosted deployment
       ).toBe(1);
     });
 
+    /** @scenario A failed bootstrap key leaves no organization behind */
+    it("compensates a failed key mint so the slug frees up for the retry", async () => {
+      // "Langy session" is a reserved system key name, so the bootstrap key
+      // mint fails after the organization row exists: exactly the partial
+      // failure the compensation is for, forced with no mocks.
+      const failed = await provision({
+        name: "Acme Compensated",
+        slug: `prov-comp-${ns}`,
+        adminApiKeyName: "Langy session",
+      });
+
+      expect(failed.status).toBeGreaterThanOrEqual(400);
+      expect(
+        await prisma.organization.count({
+          where: { slug: `prov-comp-${ns}` },
+        }),
+      ).toBe(0);
+
+      const retried = await provision({
+        name: "Acme Compensated",
+        slug: `prov-comp-${ns}`,
+      });
+      expect(retried.status).toBe(201);
+      expect((await retried.clone().json()).organization.slug).toBe(
+        `prov-comp-${ns}`,
+      );
+    });
+
     /** @scenario Listing organizations requires the instance key */
     it("refuses an unauthenticated list and returns the organizations to the credential", async () => {
       const orgA = await (
@@ -218,6 +246,35 @@ describe("Feature: Organization provisioning REST API for self-hosted deployment
         id: orgA.organization.id,
         slug: `prov-list-a-${ns}`,
       });
+    });
+
+    /** @scenario Fetching a provisioned organization returns what creation reported */
+    it("reads back the id, name and slug creation returned", async () => {
+      const created = await (
+        await provision({ name: "Read Back", slug: `prov-read-${ns}` })
+      ).json();
+
+      const response = await app.request(
+        `/api/organizations/${created.organization.id}`,
+        { headers: instanceHeaders() },
+      );
+
+      expect(response.status).toBe(200);
+      expect((await response.json()).organization).toMatchObject({
+        id: created.organization.id,
+        name: "Read Back",
+        slug: `prov-read-${ns}`,
+      });
+    });
+
+    /** @scenario Fetching an unknown organization id is not found */
+    it("answers 404 for an id that names no organization", async () => {
+      const response = await app.request(
+        `/api/organizations/org_missing-${ns}`,
+        { headers: instanceHeaders() },
+      );
+
+      expect(response.status).toBe(404);
     });
   });
 

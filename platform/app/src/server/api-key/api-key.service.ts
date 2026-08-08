@@ -331,7 +331,11 @@ export class ApiKeyService {
     bindings,
   }: {
     id: string;
-    callerUserId: string;
+    /**
+     * Null when the caller is a service credential. Ownership then never
+     * matches, so a null caller updates a key only through `callerIsAdmin`.
+     */
+    callerUserId: string | null;
     callerIsAdmin: boolean;
     organizationId: string;
     name?: string;
@@ -900,7 +904,11 @@ export class ApiKeyService {
     organizationId,
   }: {
     id: string;
-    callerUserId: string;
+    /**
+     * Null when the caller is a service credential. Ownership then never
+     * matches, so a null caller revokes a key only through `callerIsAdmin`.
+     */
+    callerUserId: string | null;
     callerIsAdmin: boolean;
     organizationId: string;
   }): Promise<ApiKey> {

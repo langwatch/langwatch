@@ -407,6 +407,21 @@ export class OrganizationService {
     return this.repo.listProvisioningSummaries();
   }
 
+  /**
+   * Compensation for a provisioning run that created the organization but
+   * could not finish: without its bootstrap key the organization is
+   * unreachable, and its slug squats every retry as a 409. Removing what the
+   * run created lets the caller simply retry. Provisioning is the only
+   * caller; nothing else may delete an organization through this surface.
+   */
+  async deleteProvisionedOrganization({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<void> {
+    await this.repo.deleteProvisionedOrganization(organizationId);
+  }
+
   /** One organization's provisioning summary, or null when the id is unknown. */
   async getProvisioningSummary(
     organizationId: string,
@@ -662,7 +677,8 @@ export class OrganizationService {
       role: string;
       customRoleId?: string;
     }>;
-    currentUserId: string;
+    /** Null when the actor is a service credential; self checks never match. */
+    currentUserId: string | null;
     planUser?: PlanProviderUser;
   }): Promise<UpdateMemberRoleResult> {
     const { organizationId, userId, role, teamRoleUpdates, currentUserId } =
@@ -759,7 +775,7 @@ export class OrganizationService {
     }>;
     currentMemberships: Array<{ teamId: string; role: TeamUserRole }>;
     organizationTeamIds: string[];
-    currentUserId: string;
+    currentUserId: string | null;
   }): Promise<UpdateMemberRoleResult> {
     const {
       organizationId,

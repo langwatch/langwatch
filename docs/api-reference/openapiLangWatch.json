@@ -1958,7 +1958,7 @@
             "description": "Invalid or missing API key token"
           },
           "403": {
-            "description": "Requested binding exceeds the key owner's own permissions, or the scope does not belong to this organization (api_key_scope_violation)"
+            "description": "Insufficient permissions (requires organization:manage), the requested binding exceeds the key owner's own permissions, or the scope does not belong to this organization (api_key_scope_violation)"
           },
           "404": {
             "description": "API key not found, or not yours to edit (api_key_not_found)"
@@ -36138,16 +36138,80 @@
             }
           },
           "401": {
-            "description": "Invalid instance administrator credential"
+            "description": "Invalid instance administrator credential",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Stable machine-readable code, e.g. organization_slug_taken"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
           },
           "404": {
-            "description": "Organization provisioning is not available: the instance administrator key is not configured, this is a cloud deployment, or (on GET /{id}) the organization does not exist"
+            "description": "Organization provisioning is not available: the instance administrator key is not configured, this is a cloud deployment, or (on GET /{id}) the organization does not exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Stable machine-readable code, e.g. organization_slug_taken"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
           },
           "409": {
-            "description": "An organization with this slug already exists (organization_slug_taken)"
+            "description": "An organization with this slug already exists (organization_slug_taken)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Stable machine-readable code, e.g. organization_slug_taken"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
           },
           "422": {
-            "description": "Validation error"
+            "description": "The request body did not match the schema, for example a slug that is not lowercase letters, numbers and single hyphens",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Stable machine-readable code, e.g. organization_slug_taken"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
           }
         },
         "operationId": "provisionOrganization",
@@ -36229,10 +36293,42 @@
             }
           },
           "401": {
-            "description": "Invalid instance administrator credential"
+            "description": "Invalid instance administrator credential",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Stable machine-readable code, e.g. organization_slug_taken"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
           },
           "404": {
-            "description": "Organization provisioning is not available: the instance administrator key is not configured, this is a cloud deployment, or (on GET /{id}) the organization does not exist"
+            "description": "Organization provisioning is not available: the instance administrator key is not configured, this is a cloud deployment, or (on GET /{id}) the organization does not exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Stable machine-readable code, e.g. organization_slug_taken"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
           }
         },
         "operationId": "listOrganizations",
@@ -36283,10 +36379,42 @@
             }
           },
           "401": {
-            "description": "Invalid instance administrator credential"
+            "description": "Invalid instance administrator credential",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Stable machine-readable code, e.g. organization_slug_taken"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
           },
           "404": {
-            "description": "Organization provisioning is not available: the instance administrator key is not configured, this is a cloud deployment, or (on GET /{id}) the organization does not exist"
+            "description": "Organization provisioning is not available: the instance administrator key is not configured, this is a cloud deployment, or (on GET /{id}) the organization does not exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Stable machine-readable code, e.g. organization_slug_taken"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
           }
         },
         "operationId": "getOrganizationById",
@@ -36575,7 +36703,7 @@
                     "createdAt": {
                       "type": "string"
                     },
-                    "legacyAccessNotice": {
+                    "hasLegacyAccessNotice": {
                       "type": "boolean"
                     }
                   },

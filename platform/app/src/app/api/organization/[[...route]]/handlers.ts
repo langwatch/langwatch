@@ -125,7 +125,7 @@ export const applyMemberRoleChange = async ({
       organizationId,
       userId,
       role,
-      currentUserId: actorUserId ?? "",
+      currentUserId: actorUserId,
       ...(actorUserId ? { planUser: { id: actorUserId } } : {}),
     });
     return result.teamsLeftWithoutAdmin.length > 0

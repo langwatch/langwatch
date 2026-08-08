@@ -30,6 +30,7 @@ import {
 import {
   CannotDemoteLastAdminError,
   CannotDisableLastAdminError,
+  CannotRemoveLastAdminError,
   OrganizationSlugTakenError,
 } from "../errors";
 import type {
@@ -470,6 +471,17 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
     });
   }
 
+  async deleteProvisionedOrganization(organizationId: string): Promise<void> {
+    // Role bindings first: RoleBinding.apiKeyId restricts api-key deletion.
+    await this.prisma.$transaction([
+      this.prisma.roleBinding.deleteMany({ where: { organizationId } }),
+      this.prisma.apiKey.deleteMany({ where: { organizationId } }),
+      this.prisma.promptTag.deleteMany({ where: { organizationId } }),
+      this.prisma.team.deleteMany({ where: { organizationId } }),
+      this.prisma.organization.deleteMany({ where: { id: organizationId } }),
+    ]);
+  }
+
   async findProvisioningSummaryById(
     organizationId: string,
   ): Promise<OrganizationProvisioningSummary | null> {
@@ -809,6 +821,35 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
     const { organizationId, userId } = input;
 
     await this.prisma.$transaction(async (tx) => {
+      const member = await tx.organizationUser.findUnique({
+        where: { userId_organizationId: { userId, organizationId } },
+        select: { role: true, disabledAt: true },
+      });
+
+      if (!member) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Member not found" });
+      }
+
+      // Same guard as disabling or demoting the last admin, and the only
+      // irreversible one of the three: an organization with no admin who can
+      // sign in cannot be recovered from inside the product.
+      if (
+        member.role === OrganizationUserRole.ADMIN &&
+        member.disabledAt === null
+      ) {
+        const activeAdmins = await tx.organizationUser.count({
+          where: {
+            organizationId,
+            role: OrganizationUserRole.ADMIN,
+            disabledAt: null,
+          },
+        });
+
+        if (activeAdmins <= 1) {
+          throw new CannotRemoveLastAdminError();
+        }
+      }
+
       await tx.organizationUser.delete({
         where: {
           userId_organizationId: {

@@ -66,7 +66,7 @@ describe("Feature: Management APIs require an Enterprise plan", () => {
       organizationId: seeded.organization.id,
       role: OrganizationUserRole.MEMBER,
       label: "view-only",
-      withOrgBinding: true,
+      hasOrgBinding: true,
     });
     const memberKey = await ApiKeyService.create(prisma).create({
       name: `mgmt-gate-member-key-${nanoid(6)}`,

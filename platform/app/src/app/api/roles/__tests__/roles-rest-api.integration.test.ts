@@ -169,6 +169,31 @@ describe("Feature: Custom roles REST API", () => {
       ).toBeNull();
     });
 
+    /** @scenario Creating a role with a taken name is refused */
+    it("answers the deterministic conflict instead of minting a second role", async () => {
+      const first = await createRole({
+        name: `Taken Name ${ns}`,
+        permissions: ["project:view"],
+      });
+      expect(first.status).toBe(201);
+
+      const second = await createRole({
+        name: `Taken Name ${ns}`,
+        permissions: ["prompts:manage"],
+      });
+
+      expect(second.status).toBe(409);
+      expect((await second.json()).code).toBe("custom_role_name_taken");
+      expect(
+        await prisma.customRole.count({
+          where: {
+            organizationId: seeded.organization.id,
+            name: `Taken Name ${ns}`,
+          },
+        }),
+      ).toBe(1);
+    });
+
     /** @scenario Fetching a role by id returns it */
     it("returns every field creating the role accepted", async () => {
       const created = await (

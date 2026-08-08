@@ -108,6 +108,26 @@ export class CannotDemoteLastAdminError extends HandledError {
   }
 }
 
+/**
+ * Removing this membership would leave the organization without an active
+ * administrator, the same lockout the disable and demote guards refuse, and
+ * the only irreversible one of the three. Raised by the storage guard itself
+ * so every removal path trips it, and handled so the REST surface answers a
+ * stable 400 instead of an unknown 500.
+ */
+export class CannotRemoveLastAdminError extends HandledError {
+  declare readonly code: "cannot_remove_last_admin";
+
+  constructor() {
+    super(
+      "cannot_remove_last_admin",
+      "Cannot remove the last active administrator of an organization",
+      { httpStatus: 400 },
+    );
+    this.name = "CannotRemoveLastAdminError";
+  }
+}
+
 /** The removal named the caller's own membership. Same guard as disabling. */
 export class CannotRemoveSelfError extends HandledError {
   declare readonly code: "cannot_remove_self";

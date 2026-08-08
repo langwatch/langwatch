@@ -48,6 +48,7 @@ export const APP_ERROR_CODES = [
   "cannot_disable_self",
   "cannot_impersonate_admin",
   "cannot_impersonate_deactivated_user",
+  "cannot_remove_last_admin",
   "cannot_remove_self",
   "cannot_remove_self_as_last_admin",
   "clickhouse_overloaded",

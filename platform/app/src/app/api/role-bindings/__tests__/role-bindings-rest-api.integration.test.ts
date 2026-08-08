@@ -92,7 +92,7 @@ describe("Feature: Role bindings REST API", () => {
       organizationId: seeded.organization.id,
       role: OrganizationUserRole.MEMBER,
       label: "principal",
-      withOrgBinding: true,
+      hasOrgBinding: true,
     });
     memberUserId = member.userId;
 
@@ -276,7 +276,7 @@ describe("Feature: Role bindings REST API", () => {
         organizationId: seeded.organization.id,
         role: OrganizationUserRole.MEMBER,
         label: "team-grant",
-        withOrgBinding: true,
+        hasOrgBinding: true,
       });
 
       const before = await resolveTeamPermission(
@@ -433,7 +433,7 @@ describe("Feature: Role bindings REST API", () => {
         organizationId: seeded.organization.id,
         role: OrganizationUserRole.MEMBER,
         label: "duplicate",
-        withOrgBinding: true,
+        hasOrgBinding: true,
       });
 
       const first = await postBinding({
@@ -473,7 +473,7 @@ describe("Feature: Role bindings REST API", () => {
         organizationId: seeded.organization.id,
         role: OrganizationUserRole.MEMBER,
         label: "workspace-owner",
-        withOrgBinding: true,
+        hasOrgBinding: true,
       });
       const personalTeam = await prisma.team.create({
         data: {
@@ -514,7 +514,7 @@ describe("Feature: Role bindings REST API", () => {
         organizationId: seeded.organization.id,
         role: OrganizationUserRole.MEMBER,
         label: "legacy",
-        withOrgBinding: false,
+        hasOrgBinding: false,
       });
       await prisma.teamUser.create({
         data: {
@@ -533,7 +533,7 @@ describe("Feature: Role bindings REST API", () => {
 
       expect(response.status).toBe(201);
       const body = await response.json();
-      expect(body.legacyAccessNotice).toBe(true);
+      expect(body.hasLegacyAccessNotice).toBe(true);
       expect(
         await prisma.roleBinding.count({
           where: {
@@ -552,7 +552,7 @@ describe("Feature: Role bindings REST API", () => {
         scopeId: teamBId,
       });
       expect(second.status).toBe(201);
-      expect((await second.json()).legacyAccessNotice).toBeUndefined();
+      expect((await second.json()).hasLegacyAccessNotice).toBeUndefined();
     });
   });
 
@@ -565,7 +565,7 @@ describe("Feature: Role bindings REST API", () => {
         organizationId: seeded.organization.id,
         role: OrganizationUserRole.MEMBER,
         label: "delete-grant",
-        withOrgBinding: true,
+        hasOrgBinding: true,
       });
       const created = await (
         await postBinding({

@@ -62,7 +62,7 @@ export function mountResolvedRoutes<TProject>({
       version: null,
       status: "unversioned",
       withdrawn: false,
-      namespaceGuard: true,
+      isNamespaceGuard: true,
       config: null,
     });
   }

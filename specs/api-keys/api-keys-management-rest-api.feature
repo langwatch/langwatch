@@ -70,6 +70,13 @@ Feature: API keys management REST API
     When I fetch a key id that does not exist
     Then the request is refused with code api_key_not_found and status 404
 
+  @integration
+  Scenario: Fetching a key the caller may not read is indistinguishable from an unknown key
+    Given another member of the organization owns an API key
+    And my credential is not an organization admin
+    When I fetch that member's key by id
+    Then the request is refused with code api_key_not_found and status 404
+
   # ============================================================================
   # Update
   # ============================================================================

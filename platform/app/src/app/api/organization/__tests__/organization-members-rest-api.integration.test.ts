@@ -25,6 +25,7 @@ import {
   it,
   vi,
 } from "vitest";
+import { ApiKeyService } from "~/server/api-key/api-key.service";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { PrismaOrganizationRepository } from "~/server/app-layer/organizations/repositories/organization.prisma.repository";
 import { createTestApp } from "~/server/app-layer/presets";
@@ -55,6 +56,7 @@ describe("Feature: Organization members and invites REST API", () => {
   const ns = `org-members-${nanoid(8)}`;
 
   let seeded: ManagementTestOrg;
+  let lastAdminOrg: ManagementTestOrg | undefined;
   let mockGetActivePlan: ReturnType<typeof vi.fn>;
   let teamAId: string;
   let teamBId: string;
@@ -132,8 +134,21 @@ describe("Feature: Organization members and invites REST API", () => {
         ["project", { team: { organizationId: seeded?.organization.id } }],
         ["team", { organizationId: seeded?.organization.id }],
         ["organizationUser", { organizationId: seeded?.organization.id }],
+        ...(lastAdminOrg
+          ? ([
+              ["roleBinding", { organizationId: lastAdminOrg.organization.id }],
+              ["apiKey", { organizationId: lastAdminOrg.organization.id }],
+              [
+                "organizationUser",
+                { organizationId: lastAdminOrg.organization.id },
+              ],
+            ] as const)
+          : []),
         ["user", { email: { endsWith: `-${ns}@example.com` } }],
         ["organization", { id: seeded?.organization.id }],
+        ...(lastAdminOrg
+          ? ([["organization", { id: lastAdminOrg.organization.id }]] as const)
+          : []),
       ]);
     } finally {
       // The suite swapped the global app; leaving its mocked plan provider
@@ -151,7 +166,7 @@ describe("Feature: Organization members and invites REST API", () => {
         organizationId: seeded.organization.id,
         role: OrganizationUserRole.MEMBER,
         label: "list-active",
-        withOrgBinding: true,
+        hasOrgBinding: true,
       });
       const disabled = await seedOrgMember({
         prisma,
@@ -211,7 +226,7 @@ describe("Feature: Organization members and invites REST API", () => {
         organizationId: seeded.organization.id,
         role: OrganizationUserRole.MEMBER,
         label: "two-teams",
-        withOrgBinding: true,
+        hasOrgBinding: true,
       });
       await bindToTeam({
         userId: member.userId,
@@ -248,7 +263,7 @@ describe("Feature: Organization members and invites REST API", () => {
         organizationId: seeded.organization.id,
         role: OrganizationUserRole.MEMBER,
         label: "promote",
-        withOrgBinding: true,
+        hasOrgBinding: true,
       });
 
       const response = await app.request(
@@ -277,7 +292,7 @@ describe("Feature: Organization members and invites REST API", () => {
         organizationId: seeded.organization.id,
         role: OrganizationUserRole.MEMBER,
         label: "disable",
-        withOrgBinding: true,
+        hasOrgBinding: true,
       });
 
       const response = await app.request(
@@ -308,7 +323,7 @@ describe("Feature: Organization members and invites REST API", () => {
         organizationId: seeded.organization.id,
         role: OrganizationUserRole.MEMBER,
         label: "reenable",
-        withOrgBinding: true,
+        hasOrgBinding: true,
       });
       await prisma.organizationUser.update({
         where: {
@@ -388,7 +403,7 @@ describe("Feature: Organization members and invites REST API", () => {
         organizationId: seeded.organization.id,
         role: OrganizationUserRole.MEMBER,
         label: "remove",
-        withOrgBinding: true,
+        hasOrgBinding: true,
       });
 
       const response = await app.request(
@@ -428,6 +443,53 @@ describe("Feature: Organization members and invites REST API", () => {
       ).not.toBeNull();
     });
 
+    /** @scenario Removing the last active admin is refused */
+    it("refuses removing the last active admin, keeping someone who can sign in", async () => {
+      // A fresh organization holds exactly one active admin by construction,
+      // and the acting credential is a service key: it acts as nobody, so the
+      // self guard cannot be what refuses here, only the storage guard can.
+      lastAdminOrg = await seedManagementOrg({ prisma, ns: `lastadmin-${ns}` });
+      const serviceKey = await ApiKeyService.create(prisma).create({
+        name: `mgmt-service-key-lastadmin-${ns}`,
+        userId: null,
+        createdByUserId: lastAdminOrg.adminUserId,
+        organizationId: lastAdminOrg.organization.id,
+        permissionMode: "all",
+        bindings: [
+          {
+            role: TeamUserRole.ADMIN,
+            scopeType: RoleBindingScopeType.ORGANIZATION,
+            scopeId: lastAdminOrg.organization.id,
+          },
+        ],
+      });
+
+      const response = await app.request(
+        `/api/organization/members/${lastAdminOrg.adminUserId}`,
+        {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${serviceKey.token}`,
+            "Content-Type": "application/json",
+          },
+        },
+      );
+
+      expect(response.status).toBe(400);
+      expect((await response.json()).code).toBe("cannot_remove_last_admin");
+
+      expect(
+        await prisma.organizationUser.findUnique({
+          where: {
+            userId_organizationId: {
+              userId: lastAdminOrg.adminUserId,
+              organizationId: lastAdminOrg.organization.id,
+            },
+          },
+        }),
+      ).not.toBeNull();
+    });
+
     /** @scenario A member's access breakdown spans teams and projects */
     it("reports organization, team and project access with its origin", async () => {
       const member = await seedOrgMember({
@@ -436,7 +498,7 @@ describe("Feature: Organization members and invites REST API", () => {
         organizationId: seeded.organization.id,
         role: OrganizationUserRole.MEMBER,
         label: "breakdown",
-        withOrgBinding: true,
+        hasOrgBinding: true,
       });
       const project = await prisma.project.create({
         data: {

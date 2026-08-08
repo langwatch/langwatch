@@ -41,6 +41,13 @@ Feature: Organization provisioning REST API for self-hosted deployments
     Then the request is refused with code organization_slug_taken and status 409
     And no second organization is created
 
+  @integration
+  Scenario: A failed bootstrap key leaves no organization behind
+    When I create an organization whose bootstrap key cannot be created
+    Then the request fails
+    And no organization with that slug remains
+    And retrying the same slug with a valid key name succeeds
+
   # ============================================================================
   # Read
   # ============================================================================
@@ -51,6 +58,18 @@ Feature: Organization provisioning REST API for self-hosted deployments
     When I list organizations without the instance administrator credential
     Then the request is refused with status 401
     And listing them with the credential returns both
+
+  @integration
+  Scenario: Fetching a provisioned organization returns what creation reported
+    Given I created an organization with the instance administrator credential
+    When I fetch it by the id creation returned
+    Then the response status is 200
+    And the id, name and slug match what creation returned
+
+  @integration
+  Scenario: Fetching an unknown organization id is not found
+    When I fetch an organization id that does not exist with the credential
+    Then the request is refused with status 404
 
   # ============================================================================
   # Availability

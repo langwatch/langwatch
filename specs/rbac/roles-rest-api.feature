@@ -38,6 +38,13 @@ Feature: Custom roles REST API
     Then the request is refused with code validation_error and status 422
     And no role is created
 
+  @integration
+  Scenario: Creating a role with a taken name is refused
+    Given a custom role named "Release Manager" exists
+    When I create another role named "Release Manager"
+    Then the request is refused with code custom_role_name_taken and status 409
+    And only one role carries that name
+
   # ============================================================================
   # Read
   # ============================================================================

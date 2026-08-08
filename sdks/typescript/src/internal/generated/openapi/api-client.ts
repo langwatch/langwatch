@@ -2456,7 +2456,7 @@ export interface paths {
         get: operations["getRole"];
         put?: never;
         post?: never;
-        /** @description Delete a custom role. A role that anything still holds — a legacy team assignment or a role binding — answers 409 custom_role_in_use with the counts in meta. */
+        /** @description Delete a custom role. A role that anything still holds, a legacy team assignment or a role binding, answers 409 custom_role_in_use with the counts in meta. */
         delete: operations["deleteRole"];
         options?: never;
         head?: never;
@@ -4410,7 +4410,7 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description Requested binding exceeds the key owner's own permissions, or the scope does not belong to this organization (api_key_scope_violation) */
+            /** @description Insufficient permissions (requires organization:manage), the requested binding exceeds the key owner's own permissions, or the scope does not belong to this organization (api_key_scope_violation) */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -17243,14 +17243,26 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": {
+                        /** @description Stable machine-readable code, e.g. organization_slug_taken */
+                        error?: string;
+                        message?: string;
+                    };
+                };
             };
             /** @description Organization provisioning is not available: the instance administrator key is not configured, this is a cloud deployment, or (on GET /{id}) the organization does not exist */
             404: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": {
+                        /** @description Stable machine-readable code, e.g. organization_slug_taken */
+                        error?: string;
+                        message?: string;
+                    };
+                };
             };
         };
     };
@@ -17301,28 +17313,52 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": {
+                        /** @description Stable machine-readable code, e.g. organization_slug_taken */
+                        error?: string;
+                        message?: string;
+                    };
+                };
             };
             /** @description Organization provisioning is not available: the instance administrator key is not configured, this is a cloud deployment, or (on GET /{id}) the organization does not exist */
             404: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": {
+                        /** @description Stable machine-readable code, e.g. organization_slug_taken */
+                        error?: string;
+                        message?: string;
+                    };
+                };
             };
             /** @description An organization with this slug already exists (organization_slug_taken) */
             409: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": {
+                        /** @description Stable machine-readable code, e.g. organization_slug_taken */
+                        error?: string;
+                        message?: string;
+                    };
+                };
             };
-            /** @description Validation error */
+            /** @description The request body did not match the schema, for example a slug that is not lowercase letters, numbers and single hyphens */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": {
+                        /** @description Stable machine-readable code, e.g. organization_slug_taken */
+                        error?: string;
+                        message?: string;
+                    };
+                };
             };
         };
     };
@@ -17360,14 +17396,26 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": {
+                        /** @description Stable machine-readable code, e.g. organization_slug_taken */
+                        error?: string;
+                        message?: string;
+                    };
+                };
             };
             /** @description Organization provisioning is not available: the instance administrator key is not configured, this is a cloud deployment, or (on GET /{id}) the organization does not exist */
             404: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": {
+                        /** @description Stable machine-readable code, e.g. organization_slug_taken */
+                        error?: string;
+                        message?: string;
+                    };
+                };
             };
         };
     };
@@ -17465,7 +17513,7 @@ export interface operations {
                         scopeId: string;
                         scopeName: string | null;
                         createdAt: string;
-                        legacyAccessNotice?: boolean;
+                        hasLegacyAccessNotice?: boolean;
                     };
                 };
             };

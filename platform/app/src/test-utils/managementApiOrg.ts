@@ -138,7 +138,7 @@ export async function seedOrgMember({
   organizationId,
   role,
   label,
-  withOrgBinding = false,
+  hasOrgBinding = false,
 }: {
   prisma: PrismaClient;
   ns: string;
@@ -151,7 +151,7 @@ export async function seedOrgMember({
    * from TeamUser rows alone. Ignored for `EXTERNAL` members: they never hold
    * an organization-scoped binding.
    */
-  withOrgBinding?: boolean;
+  hasOrgBinding?: boolean;
 }): Promise<{ userId: string; email: string }> {
   const user = await prisma.user.create({
     data: {
@@ -162,7 +162,7 @@ export async function seedOrgMember({
   await prisma.organizationUser.create({
     data: { userId: user.id, organizationId, role },
   });
-  if (withOrgBinding && role !== OrganizationUserRole.EXTERNAL) {
+  if (hasOrgBinding && role !== OrganizationUserRole.EXTERNAL) {
     await prisma.roleBinding.create({
       data: {
         id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),

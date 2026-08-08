@@ -313,6 +313,7 @@ describe("Feature: API keys management REST API", () => {
         expect(body.error).toBe("api_key_not_found");
       });
 
+      /** @scenario Fetching a key the caller may not read is indistinguishable from an unknown key */
       it("reports another member's key as not found for a non-admin", async () => {
         const { apiKey } = await createKey({
           userId: memberUserId,

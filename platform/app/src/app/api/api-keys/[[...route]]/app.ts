@@ -525,7 +525,7 @@ secured
       try {
         await service.update({
           id,
-          callerUserId: callerUserId ?? "",
+          callerUserId,
           callerIsAdmin,
           organizationId: organization.id,
           name: body.name,
@@ -589,7 +589,7 @@ secured
       try {
         await service.revoke({
           id,
-          callerUserId: userId ?? "",
+          callerUserId: userId,
           callerIsAdmin,
           organizationId: organization.id,
         });

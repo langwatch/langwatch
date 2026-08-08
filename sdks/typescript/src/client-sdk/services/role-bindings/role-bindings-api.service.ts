@@ -48,7 +48,7 @@ export interface CreatedRoleBinding extends RoleBinding {
    * access so far derived from legacy team membership, which this write
    * switches off.
    */
-  legacyAccessNotice?: boolean;
+  hasLegacyAccessNotice?: boolean;
 }
 
 /** Every filter is optional; an omitted one is left off the request. */

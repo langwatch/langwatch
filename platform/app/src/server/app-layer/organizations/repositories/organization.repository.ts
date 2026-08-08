@@ -297,7 +297,12 @@ export interface UpdateMemberRoleInput {
     customRoleId?: string;
     origin: TeamRoleUpdateOrigin;
   }>;
-  currentUserId: string;
+  /**
+   * Null when the actor is a service credential rather than a person. Only
+   * self-comparisons read this, and a service credential is never the target
+   * member, so null simply keeps every self branch closed.
+   */
+  currentUserId: string | null;
 }
 
 /**
@@ -382,6 +387,13 @@ export interface OrganizationRepository {
   findProvisioningSummaryById(
     organizationId: string,
   ): Promise<OrganizationProvisioningSummary | null>;
+
+  /**
+   * Removes an organization a provisioning run created but could not finish.
+   * Scoped to what provisioning creates before the first member ever signs
+   * in: role bindings, API keys, prompt tags, teams and the organization row.
+   */
+  deleteProvisionedOrganization(organizationId: string): Promise<void>;
 
   getAllForUser(params: {
     userId: string;
@@ -580,6 +592,10 @@ export class NullOrganizationRepository implements OrganizationRepository {
     _organizationId: string,
   ): Promise<OrganizationProvisioningSummary | null> {
     return null;
+  }
+
+  async deleteProvisionedOrganization(_organizationId: string): Promise<void> {
+    // no-op
   }
 
   async getAllForUser(_params: {

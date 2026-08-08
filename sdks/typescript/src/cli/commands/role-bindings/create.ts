@@ -60,7 +60,7 @@ export const createRoleBindingCommand = async (
         ["Custom role", orDash(binding.customRoleName)],
         ["Scope", `${binding.scopeType} ${binding.scopeName ?? binding.scopeId}`],
       ]);
-      if (binding.legacyAccessNotice) {
+      if (binding.hasLegacyAccessNotice) {
         console.log(
           chalk.yellow(
             "  This is the user's first explicit binding. Access they had through team membership alone no longer applies.",

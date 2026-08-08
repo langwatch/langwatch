@@ -78,6 +78,13 @@ Feature: Organization members and invites REST API
     And that member is still in the organization
 
   @integration
+  Scenario: Removing the last active admin is refused
+    Given the organization has one active admin
+    When I remove that admin
+    Then the request is refused with code cannot_remove_last_admin and status 400
+    And that admin is still in the organization
+
+  @integration
   Scenario: A member's access breakdown spans teams and projects
     Given a member with an organization role, a team binding and a project binding
     When I fetch that member's access breakdown

@@ -168,7 +168,7 @@ export interface MountedRoute {
    * real routes in the Hono route table and MUST be covered by any route
    * policy registry built from this callback.
    */
-  namespaceGuard?: boolean;
+  isNamespaceGuard?: boolean;
   /**
    * The endpoint configuration behind this mount. Withdrawn mounts carry the
    * inherited config (including `meta`); namespace guards carry `null`.

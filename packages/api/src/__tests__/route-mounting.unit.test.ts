@@ -18,7 +18,7 @@ const GUARD_WILDCARD_PATH = `${GUARD_PATH}/*`;
 type Summary = Pick<
   MountedRoute,
   "method" | "path" | "version" | "status" | "withdrawn"
-> & { namespaceGuard: boolean };
+> & { isNamespaceGuard: boolean };
 
 function summarize(route: MountedRoute): Summary {
   return {
@@ -27,7 +27,7 @@ function summarize(route: MountedRoute): Summary {
     version: route.version,
     status: route.status,
     withdrawn: route.withdrawn,
-    namespaceGuard: route.namespaceGuard ?? false,
+    isNamespaceGuard: route.isNamespaceGuard ?? false,
   };
 }
 
@@ -38,7 +38,7 @@ function bySummary(a: Summary, b: Summary): number {
     (a.version ?? "").localeCompare(b.version ?? "") ||
     a.status.localeCompare(b.status) ||
     Number(a.withdrawn) - Number(b.withdrawn) ||
-    Number(a.namespaceGuard) - Number(b.namespaceGuard)
+    Number(a.isNamespaceGuard) - Number(b.isNamespaceGuard)
   );
 }
 
@@ -78,7 +78,7 @@ describe("onRouteMounted", () => {
           version: "2025-03-15",
           status: "stable",
           withdrawn: false,
-          namespaceGuard: false,
+          isNamespaceGuard: false,
         },
         {
           method: "post",
@@ -86,7 +86,7 @@ describe("onRouteMounted", () => {
           version: "2025-03-15",
           status: "stable",
           withdrawn: false,
-          namespaceGuard: false,
+          isNamespaceGuard: false,
         },
         // latest
         {
@@ -95,7 +95,7 @@ describe("onRouteMounted", () => {
           version: "latest",
           status: "latest",
           withdrawn: false,
-          namespaceGuard: false,
+          isNamespaceGuard: false,
         },
         {
           method: "post",
@@ -103,7 +103,7 @@ describe("onRouteMounted", () => {
           version: "latest",
           status: "latest",
           withdrawn: false,
-          namespaceGuard: false,
+          isNamespaceGuard: false,
         },
         // version-namespace guards (the non-wildcard one is a real, enumerable
         // route and MUST be reported so hosts can register a policy for it)
@@ -113,7 +113,7 @@ describe("onRouteMounted", () => {
           version: null,
           status: "unversioned",
           withdrawn: false,
-          namespaceGuard: true,
+          isNamespaceGuard: true,
         },
         {
           method: "all",
@@ -121,7 +121,7 @@ describe("onRouteMounted", () => {
           version: null,
           status: "unversioned",
           withdrawn: false,
-          namespaceGuard: true,
+          isNamespaceGuard: true,
         },
         // bare alias
         {
@@ -130,7 +130,7 @@ describe("onRouteMounted", () => {
           version: null,
           status: "unversioned",
           withdrawn: false,
-          namespaceGuard: false,
+          isNamespaceGuard: false,
         },
         {
           method: "post",
@@ -138,7 +138,7 @@ describe("onRouteMounted", () => {
           version: null,
           status: "unversioned",
           withdrawn: false,
-          namespaceGuard: false,
+          isNamespaceGuard: false,
         },
       ];
 
@@ -157,7 +157,7 @@ describe("onRouteMounted", () => {
         .sort();
       expect(guardPaths).toEqual([GUARD_PATH, GUARD_WILDCARD_PATH].sort());
 
-      for (const route of mounted.filter((r) => !r.namespaceGuard)) {
+      for (const route of mounted.filter((r) => !r.isNamespaceGuard)) {
         expect(route.config).not.toBeNull();
       }
     });

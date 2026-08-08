@@ -9,7 +9,7 @@
  * scope at write time rather than silently never granting (ADR-021).
  *
  * A create for a user whose access until now came only from legacy team
- * membership reports `legacyAccessNotice: true`: their first explicit binding
+ * membership reports `hasLegacyAccessNotice: true`: their first explicit binding
  * switches the team-derived fallback off, which is worth telling the operator
  * even though the write itself is exactly what they asked for.
  */
@@ -64,7 +64,7 @@ const createdBindingSchema = bindingSchema.extend({
    * their access so far derived from legacy team membership, which this
    * write switches off. Informative, never blocking.
    */
-  legacyAccessNotice: z.boolean().optional(),
+  hasLegacyAccessNotice: z.boolean().optional(),
 });
 
 const listQuerySchema = z.object({
@@ -221,7 +221,7 @@ const createBindingHandler = async (
   },
 ) => {
   const organization = organizationOf(c);
-  const legacyAccessNotice = input.userId
+  const hasLegacyAccessNotice = input.userId
     ? await firstBindingDisablesLegacyAccess({
         organizationId: organization.id,
         userId: input.userId,
@@ -252,7 +252,7 @@ const createBindingHandler = async (
   });
   return {
     ...binding,
-    ...(legacyAccessNotice ? { legacyAccessNotice: true } : {}),
+    ...(hasLegacyAccessNotice ? { hasLegacyAccessNotice: true } : {}),
   };
 };
 

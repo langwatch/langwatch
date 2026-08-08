@@ -132,23 +132,54 @@ secured
         ...(body.slug !== undefined ? { slug: body.slug } : {}),
       });
 
-      // The bootstrap credential: an org-scoped service key with an explicit
-      // ORGANIZATION-ADMIN binding, so provisioning can continue through the
-      // management APIs without a browser step.
-      const adminKey = await ApiKeyService.create(prisma).create({
-        name: body.adminApiKeyName ?? "Provisioning admin",
-        userId: null,
-        createdByUserId: null,
-        organizationId: created.organization.id,
-        permissionMode: "all",
-        bindings: [
-          {
-            role: TeamUserRole.ADMIN,
-            scopeType: RoleBindingScopeType.ORGANIZATION,
-            scopeId: created.organization.id,
-          },
-        ],
-      });
+      let adminKey: Awaited<ReturnType<ApiKeyService["create"]>>;
+      let summary: Awaited<
+        ReturnType<OrganizationService["getProvisioningSummary"]>
+      >;
+      try {
+        // The bootstrap credential: an org-scoped service key with an explicit
+        // ORGANIZATION-ADMIN binding, so provisioning can continue through the
+        // management APIs without a browser step.
+        adminKey = await ApiKeyService.create(prisma).create({
+          name: body.adminApiKeyName ?? "Provisioning admin",
+          userId: null,
+          createdByUserId: null,
+          organizationId: created.organization.id,
+          permissionMode: "all",
+          bindings: [
+            {
+              role: TeamUserRole.ADMIN,
+              scopeType: RoleBindingScopeType.ORGANIZATION,
+              scopeId: created.organization.id,
+            },
+          ],
+        });
+
+        summary = await organizationService().getProvisioningSummary(
+          created.organization.id,
+        );
+        if (!summary) {
+          // The slug is the natural key an infrastructure-as-code caller
+          // stores; answering 201 with a blank one moves the failure far
+          // from its cause.
+          throw new Error(
+            `provisioned organization ${created.organization.id} could not be read back`,
+          );
+        }
+      } catch (error) {
+        // Compensate: without its bootstrap key the organization is
+        // unreachable, and the slug would squat every retry as a 409. The
+        // caller must see the original failure, so a failed compensation is
+        // only reported.
+        try {
+          await organizationService().deleteProvisionedOrganization({
+            organizationId: created.organization.id,
+          });
+        } catch (compensationError) {
+          captureException(toError(compensationError));
+        }
+        throw error;
+      }
 
       // Fire-and-forget like every other management audit, but with the
       // rejection handled: `void` alone silences the lint rule and leaves an
@@ -162,17 +193,6 @@ secured
           adminApiKeyId: adminKey.apiKey.id,
         },
       }).catch((error) => captureException(toError(error)));
-
-      const summary = await organizationService().getProvisioningSummary(
-        created.organization.id,
-      );
-      if (!summary) {
-        // The slug is the natural key an infrastructure-as-code caller stores;
-        // answering 201 with a blank one moves the failure far from its cause.
-        throw new Error(
-          `provisioned organization ${created.organization.id} could not be read back`,
-        );
-      }
 
       return c.json(
         {

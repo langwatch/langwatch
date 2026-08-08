@@ -82,7 +82,7 @@ export function createManagementService({
     basePath,
     auth: createOrgAuthMiddleware({ prisma, refusals: "throw" }),
     onRouteMounted: (route) => {
-      if (route.namespaceGuard) {
+      if (route.isNamespaceGuard) {
         registerRoutePolicy({
           method: route.method,
           path: route.path,
