@@ -19,6 +19,7 @@ import {
 } from "@ee/governance/process-manager/gatewayDebits.process";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { holdClickHouseSchemaLockForFile } from "~/server/clickhouse/__tests__/holdSchemaLock";
 import {
   replayGooseMigrationUp,
   replayRollupRebuild,
@@ -81,6 +82,11 @@ function servedRequest(options: {
     occurred_at: Date.now(),
   };
 }
+
+// Held for the whole file. This suite both replays the rollup rebuild and
+// reads the rollup back, and neither the rebuild nor the rollup is scoped to
+// this run's tenant.
+holdClickHouseSchemaLockForFile();
 
 describe("given a blocking budget on traffic the gateway is serving", () => {
   let service: GatewayBudgetService;
