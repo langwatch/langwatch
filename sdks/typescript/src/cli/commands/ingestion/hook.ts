@@ -41,12 +41,12 @@
  * Spec: specs/ai-governance/cli-wrappers/session-context-hook.feature
  */
 
-import { resolveLogsEndpoint } from "@/cli/telemetry/events";
 import {
   type GovernanceConfig,
   loadConfig,
 } from "@/cli/utils/governance/config";
 import { LANGWATCH_SDK_VERSION } from "@/internal/constants";
+import { resolveLogsEndpoint } from "@/internal/endpoint";
 
 import {
   type GitRunner,

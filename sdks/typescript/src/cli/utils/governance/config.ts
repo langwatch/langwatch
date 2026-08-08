@@ -83,6 +83,16 @@ export interface GovernanceConfig {
   shell_rc_preference?: "skip";
 
   /**
+   * Unix epoch (seconds) of the last failed attempt to install the LangWatch
+   * Claude Code plugin. Suppresses the next attempt for a day: a `claude` that
+   * could not install it once is overwhelmingly likely to fail the same way
+   * again, and retrying on every wrapped session would spend a subprocess and a
+   * repository clone each time to learn that. Cleared by a successful install.
+   * Absent = never failed, or the last attempt succeeded.
+   */
+  claude_plugin_last_failure?: number;
+
+  /**
    * Per-wrapped-tool routing mode answer.
    *
    *   "gateway"   — Path A: route the tool's HTTP calls through
