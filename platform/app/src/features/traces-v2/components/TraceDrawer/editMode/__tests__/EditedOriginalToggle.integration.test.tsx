@@ -123,4 +123,18 @@ describe("EditedOriginalToggle", () => {
       });
     });
   });
+
+  describe("given a correction whose author has no name recorded", () => {
+    beforeEach(() => withCorrection(null));
+
+    describe("when the header renders", () => {
+      /** @scenario "The correction names who made it" */
+      it("names nobody rather than crediting a blank", () => {
+        renderToggle();
+
+        expect(screen.getByText("Edited")).toBeInTheDocument();
+        expect(screen.queryByText(/^Edited by/)).not.toBeInTheDocument();
+      });
+    });
+  });
 });

@@ -1,7 +1,7 @@
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import { useMemo, useState } from "react";
 import { Dialog } from "~/components/ui/dialog";
-import { applyOverlayToTraceHeader } from "~/server/traces/edit-overlay/applyTraceEditOverlay";
+import { applyOverlayToTraceHeader } from "~/server/traces/edit-overlay/applyTraceEditOverlayToViews";
 import type { TraceEditOverlayPatch } from "~/server/traces/edit-overlay/traceEditOverlay.schemas";
 import {
   applyOverlayToSpansFull,

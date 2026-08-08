@@ -1,4 +1,5 @@
 import { Box, Button, HStack, Icon, Text, VStack } from "@chakra-ui/react";
+import { createLogger } from "@langwatch/observability";
 import {
   Database,
   Edit3,
@@ -11,6 +12,7 @@ import { PersonalFeatureGateDialog } from "~/components/me/PersonalFeatureGateDi
 import { usePersonalFeatureGate } from "~/components/me/usePersonalFeatureGate";
 import { UserAvatar } from "~/components/UserAvatar";
 import { Popover } from "~/components/ui/popover";
+import { toaster } from "~/components/ui/toaster";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -19,6 +21,8 @@ import { useAnnotationDraftStore } from "../../../stores/annotationDraftStore";
 import { AnnotationPopover } from "./AnnotationPopover";
 
 type AnnotationItem = RouterOutputs["annotation"]["getByTraceIds"][number];
+
+const logger = createLogger("TurnAnnotations");
 
 interface TurnAnnotationProps {
   traceId: string;
@@ -40,7 +44,7 @@ interface TurnAnnotationProps {
    * over it. Set by the thread layout, which has a rail; the bubbles layout
    * has none and keeps its popovers.
    */
-  preferRailComposer?: boolean;
+  shouldUseRailComposer?: boolean;
 }
 
 /**
@@ -52,7 +56,7 @@ export function TurnActionRow({
   traceId,
   output,
   translation,
-  preferRailComposer = false,
+  shouldUseRailComposer = false,
 }: TurnAnnotationProps) {
   const { hasPermission } = useOrganizationTeamProject();
   const { openDrawer } = useDrawer();
@@ -128,7 +132,7 @@ export function TurnActionRow({
       )}
       {canManage && (
         <>
-          {preferRailComposer ? (
+          {shouldUseRailComposer ? (
             <>
               <RailComposerButton
                 icon={Edit3}
@@ -227,7 +231,8 @@ function RailComposerButton({
   icon: typeof Edit3;
   label: string;
   tooltip: string;
-  onOpen: () => void;
+  /** Opening asks the personal-workspace gate first, so it may be async. */
+  onOpen: () => void | Promise<void>;
 }) {
   return (
     <Tooltip content={tooltip} positioning={{ placement: "top" }}>
@@ -236,7 +241,13 @@ function RailComposerButton({
         label={label}
         onClick={(e) => {
           e.stopPropagation();
-          onOpen();
+          void Promise.resolve(onOpen()).catch((error) => {
+            logger.error({ error }, "could not open the annotation composer");
+            toaster.create({
+              title: "Could not open the annotation composer",
+              type: "error",
+            });
+          });
         }}
       />
     </Tooltip>
@@ -309,140 +320,163 @@ export function TurnAnnotationBadges({
   if (annotationCount === 0) return null;
 
   return (
-    <>
-      <Popover.Root
-        open={listOpen}
-        onOpenChange={(e) => setListOpen(e.open)}
-        positioning={{
-          placement: "bottom-end",
-          flip: true,
-          shift: 16,
-          overflowPadding: 16,
-        }}
-      >
-        <Popover.Trigger asChild>
-          <Button
-            variant="ghost"
-            size="2xs"
-            onClick={(e) => e.stopPropagation()}
-            aria-label={`${annotationCount} annotation${
-              annotationCount === 1 ? "" : "s"
-            } on this turn`}
-            flexShrink={0}
-            paddingX={1.5}
-            paddingY={0.5}
-            height="auto"
-            borderRadius="sm"
-            bg="amber.subtle"
-            color="amber.fg"
-            _hover={{ bg: "amber.subtle", filter: "brightness(1.1)" }}
-            gap={1}
-          >
-            <Icon as={MessageSquare} boxSize={3} />
-            <Text textStyle="2xs" fontWeight="600">
-              {annotationCount}
-            </Text>
-            {hasCorrection && (
-              <Icon as={Lightbulb} boxSize={3} color="yellow.fg" />
-            )}
-          </Button>
-        </Popover.Trigger>
-        <Popover.Content
-          width="320px"
-          bg="bg.panel/92"
+    <Popover.Root
+      open={listOpen}
+      onOpenChange={(e) => setListOpen(e.open)}
+      positioning={{
+        placement: "bottom-end",
+        flip: true,
+        shift: 16,
+        overflowPadding: 16,
+      }}
+    >
+      <Popover.Trigger asChild>
+        <Button
+          variant="ghost"
+          size="2xs"
           onClick={(e) => e.stopPropagation()}
+          aria-label={`${annotationCount} annotation${
+            annotationCount === 1 ? "" : "s"
+          } on this turn`}
+          flexShrink={0}
+          paddingX={1.5}
+          paddingY={0.5}
+          height="auto"
+          borderRadius="sm"
+          bg="amber.subtle"
+          color="amber.fg"
+          _hover={{ bg: "amber.subtle", filter: "brightness(1.1)" }}
+          gap={1}
         >
-          <Popover.Arrow />
-          <Popover.Body padding={1.5}>
-            <VStack align="stretch" gap={0.5}>
-              {items.map((a) => (
-                <Box
-                  key={a.id}
-                  role={canEdit ? "button" : undefined}
-                  tabIndex={canEdit ? 0 : undefined}
-                  onClick={
-                    canEdit
-                      ? (e: React.MouseEvent) => {
-                          e.stopPropagation();
-                          setListOpen(false);
-                          setEditingId(a.id);
-                        }
-                      : undefined
-                  }
-                  cursor={canEdit ? "pointer" : "default"}
-                  textAlign="left"
-                  paddingX={2}
-                  paddingY={1.5}
-                  borderRadius="sm"
-                  _hover={canEdit ? { bg: "bg.muted" } : undefined}
-                >
-                  <HStack gap={2} align="start">
-                    <UserAvatar
-                      size="xs"
-                      background="gray.solid"
-                      color="white"
-                      name={a.user?.name ?? a.email ?? "?"}
-                      image={a.user?.image}
-                    />
-                    <VStack align="start" gap={0} flex={1} minWidth={0}>
-                      <HStack gap={1.5} width="full">
-                        <Text textStyle="2xs" fontWeight="600">
-                          {a.user?.name ?? a.email ?? "anonymous"}
-                        </Text>
-                        {a.expectedOutput && (
-                          <Icon
-                            as={Lightbulb}
-                            boxSize={2.5}
-                            color="yellow.fg"
-                          />
-                        )}
-                        <Box flex={1} />
-                        <Text textStyle="2xs" color="fg.subtle">
-                          {new Date(a.createdAt).toLocaleDateString()}
-                        </Text>
-                      </HStack>
-                      {a.comment && (
-                        <Text textStyle="2xs" color="fg.muted" lineClamp={3}>
-                          {a.comment}
-                        </Text>
-                      )}
-                    </VStack>
-                  </HStack>
-                </Box>
-              ))}
-            </VStack>
-          </Popover.Body>
-        </Popover.Content>
-      </Popover.Root>
+          <Icon as={MessageSquare} boxSize={3} />
+          <Text textStyle="2xs" fontWeight="600">
+            {annotationCount}
+          </Text>
+          {hasCorrection && (
+            <Icon as={Lightbulb} boxSize={3} color="yellow.fg" />
+          )}
+        </Button>
+      </Popover.Trigger>
+      <Popover.Content
+        width="320px"
+        bg="bg.panel/92"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <Popover.Arrow />
+        <Popover.Body padding={1.5}>
+          <VStack align="stretch" gap={0.5}>
+            {items.map((a) => (
+              <AnnotationListRow
+                key={a.id}
+                annotation={a}
+                traceId={traceId}
+                output={output}
+                canEdit={canEdit}
+                isEditing={editingId === a.id}
+                onEditingChange={(open) => setEditingId(open ? a.id : null)}
+              />
+            ))}
+          </VStack>
+        </Popover.Body>
+      </Popover.Content>
+    </Popover.Root>
+  );
+}
 
-      {/* Hidden second popover that re-opens for edit. We need a separate
-          AnnotationPopover so opening it doesn't fight the badge popover's
-          state, and we anchor it with a hidden span next to the badge. */}
-      {canEdit && editingId && (
-        <AnnotationPopover
-          traceId={traceId}
-          output={output}
-          mode={
-            items.find((a) => a.id === editingId)?.expectedOutput
-              ? "suggest"
-              : "annotate"
-          }
-          annotationId={editingId}
-          open={!!editingId}
-          onOpenChange={(o) => {
-            if (!o) setEditingId(null);
-          }}
-          trigger={
-            <Box
-              as="span"
-              aria-hidden="true"
-              display="inline-block"
-              width="0"
-              height="0"
-            />
-          }
-        />
-      )}
-    </>
+/**
+ * One annotation in the badge's list, and the way into editing it.
+ *
+ * For a reviewer who may edit, the line itself is the button that opens the
+ * correction popover: it anchors the form where the reviewer was reading, it
+ * answers Enter and Space like any button, and closing hands the keyboard back
+ * to it. For everyone else it is text.
+ */
+function AnnotationListRow({
+  annotation,
+  traceId,
+  output,
+  canEdit,
+  isEditing,
+  onEditingChange,
+}: {
+  annotation: AnnotationItem;
+  traceId: string;
+  output?: string | null;
+  canEdit: boolean;
+  isEditing: boolean;
+  onEditingChange: (open: boolean) => void;
+}) {
+  const summary = <AnnotationListRowSummary annotation={annotation} />;
+
+  if (!canEdit) {
+    return (
+      <Box textAlign="left" paddingX={2} paddingY={1.5} borderRadius="sm">
+        {summary}
+      </Box>
+    );
+  }
+
+  return (
+    <AnnotationPopover
+      traceId={traceId}
+      output={output}
+      mode={annotation.expectedOutput ? "suggest" : "annotate"}
+      annotationId={annotation.id}
+      open={isEditing}
+      onOpenChange={onEditingChange}
+      trigger={
+        <Box
+          as="button"
+          width="full"
+          textAlign="left"
+          cursor="pointer"
+          paddingX={2}
+          paddingY={1.5}
+          borderRadius="sm"
+          _hover={{ bg: "bg.muted" }}
+          onClick={(e: React.MouseEvent) => e.stopPropagation()}
+        >
+          {summary}
+        </Box>
+      }
+    />
+  );
+}
+
+/** Who left the annotation, when, whether it corrects the turn, and what it says. */
+function AnnotationListRowSummary({
+  annotation,
+}: {
+  annotation: AnnotationItem;
+}) {
+  return (
+    <HStack gap={2} align="start">
+      <UserAvatar
+        size="xs"
+        background="gray.solid"
+        color="white"
+        name={annotation.user?.name ?? annotation.email ?? "?"}
+        image={annotation.user?.image}
+      />
+      <VStack align="start" gap={0} flex={1} minWidth={0}>
+        <HStack gap={1.5} width="full">
+          <Text textStyle="2xs" fontWeight="600">
+            {annotation.user?.name ?? annotation.email ?? "anonymous"}
+          </Text>
+          {annotation.expectedOutput && (
+            <Icon as={Lightbulb} boxSize={2.5} color="yellow.fg" />
+          )}
+          <Box flex={1} />
+          <Text textStyle="2xs" color="fg.subtle">
+            {new Date(annotation.createdAt).toLocaleDateString()}
+          </Text>
+        </HStack>
+        {annotation.comment && (
+          <Text textStyle="2xs" color="fg.muted" lineClamp={3}>
+            {annotation.comment}
+          </Text>
+        )}
+      </VStack>
+    </HStack>
   );
 }

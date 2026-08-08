@@ -53,9 +53,9 @@ Feature: Message translation in the trace details drawer
 
   Rule: Conversation tab turns
 
-    The per-turn action row belongs to the conversation view itself, so it
-    behaves the same wherever that view renders: the drawer's Conversation tab
-    and the annotation queue, which reads its trace through the same view.
+    The per-turn action row is part of reading a conversation, so it is offered
+    and behaves the same in both places a conversation is read: the drawer's
+    Conversation tab, and the annotation queue.
 
     Scenario: Per-turn Translate action in the hover action row
       Given the trace drawer is open on the Conversation tab

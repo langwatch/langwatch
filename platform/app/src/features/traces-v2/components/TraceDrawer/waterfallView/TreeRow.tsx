@@ -484,6 +484,23 @@ export const TreeRow = memo(function TreeRow({
                   <ScrollText />
                 </Icon>
               )}
+              {/* The row's green wash and edge tick are colour, which a reader
+                  who cannot separate the hues has nothing to read. The badge
+                  says the same thing in words, the way the deleted one does. */}
+              {isEdited && !isDeletedByCorrection && (
+                <Text
+                  textStyle="2xs"
+                  color="green.fg"
+                  bg="green.subtle"
+                  paddingX={1.5}
+                  borderRadius="sm"
+                  fontWeight="semibold"
+                  flexShrink={0}
+                  lineHeight={1.4}
+                >
+                  Edited
+                </Text>
+              )}
               {/* A span the stored correction removes is still listed while
                   the reader is on the captured trace, and the badge is what
                   tells them the corrected trace does not have it. */}

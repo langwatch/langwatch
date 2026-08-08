@@ -194,6 +194,41 @@ describe("TraceEditOverlayService", () => {
     });
   });
 
+  describe("given a correction that also carries a corrected metadata key", () => {
+    describe("when the corrected output is taken back off", () => {
+      /** @scenario "Clearing the suggestion keeps a corrected metadata key" */
+      it("keeps the metadata and leaves the correction in place", async () => {
+        const { service, deleteRow, upsert } = buildService({
+          version: 1,
+          spans: [],
+          deletedSpanIds: [],
+          trace: {
+            metadata: { labels: ["reviewed"] },
+            output: { value: "the right answer" },
+          },
+        });
+
+        const remaining = await removeOutput(service);
+
+        expect(remaining?.patch.trace).toEqual({
+          metadata: { labels: ["reviewed"] },
+        });
+        expect(deleteRow).not.toHaveBeenCalled();
+        expect(upsert).toHaveBeenCalledWith({
+          projectId: "project-1",
+          traceId: "trace-1",
+          patch: {
+            version: 1,
+            spans: [],
+            deletedSpanIds: [],
+            trace: { metadata: { labels: ["reviewed"] } },
+          },
+          userId: "user-2",
+        });
+      });
+    });
+  });
+
   describe("given a correction that also renames and deletes spans", () => {
     describe("when the corrected output is taken back off", () => {
       /** @scenario "Clearing the suggestion takes the corrected output back off" */

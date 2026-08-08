@@ -1,10 +1,10 @@
 import { useMemo } from "react";
 import type { SpanDetail } from "~/server/api/routers/tracesV2.schemas";
 import {
-  applyOverlayToSpanDetail,
   expandDeletedSpanIds,
   indexSpanPatches,
 } from "~/server/traces/edit-overlay/applyTraceEditOverlay";
+import { applyOverlayToSpanDetail } from "~/server/traces/edit-overlay/applyTraceEditOverlayToViews";
 import type { TraceEditOverlayPatch } from "~/server/traces/edit-overlay/traceEditOverlay.schemas";
 import { api } from "~/utils/api";
 import {

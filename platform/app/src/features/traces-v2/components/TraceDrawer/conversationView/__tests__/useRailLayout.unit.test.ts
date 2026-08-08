@@ -1,17 +1,22 @@
 /**
+ * @vitest-environment jsdom
+ *
  * The rail's two decisions, taken away from the DOM: whether the conversation
  * has a rail at all, and what shape it takes at a given pane width. Both are
  * biased towards keeping the annotations beside the turn.
  * See specs/traces-v2/annotation-rail.feature.
  */
-import { describe, expect, it } from "vitest";
+import { act, renderHook, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   isRailActive,
+  RAIL_GAP_PX,
   RAIL_WIDTH_SLIM_PX,
   RAIL_WIDTH_WIDE_PX,
   resolveRailLayout,
   THREAD_COLUMN_MAX_WIDTH_PX,
   threadColumnMaxWidth,
+  useRailLayout,
 } from "../useRailLayout";
 
 const TURNS = new Set(["trace-1", "trace-2"]);
@@ -134,7 +139,9 @@ describe("given the centered reading column", () => {
         isActive: true,
         layout: { mode: "side", railWidth: RAIL_WIDTH_WIDE_PX },
       }),
-    ).toBe(`${THREAD_COLUMN_MAX_WIDTH_PX + 12 + RAIL_WIDTH_WIDE_PX}px`);
+    ).toBe(
+      `${THREAD_COLUMN_MAX_WIDTH_PX + RAIL_GAP_PX + RAIL_WIDTH_WIDE_PX}px`,
+    );
   });
 
   it("keeps the reading width when the rail is stacked under the turn", () => {
@@ -144,5 +151,69 @@ describe("given the centered reading column", () => {
         layout: { mode: "stacked", railWidth: RAIL_WIDTH_SLIM_PX },
       }),
     ).toBe(`${THREAD_COLUMN_MAX_WIDTH_PX}px`);
+  });
+});
+
+/** A ResizeObserver that does nothing but exist, since jsdom has none. */
+class InertResizeObserver {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+}
+
+/** A scroll container that reports the pane width the test cares about. */
+function scrollerOfWidth(width: number): HTMLElement {
+  const element = document.createElement("div");
+  element.getBoundingClientRect = () => ({ width }) as DOMRect;
+  return element;
+}
+
+describe("given a conversation whose scroller arrives after the first render", () => {
+  const originalResizeObserver = globalThis.ResizeObserver;
+
+  beforeEach(() => {
+    globalThis.ResizeObserver =
+      InertResizeObserver as unknown as typeof ResizeObserver;
+  });
+
+  afterEach(() => {
+    globalThis.ResizeObserver = originalResizeObserver;
+  });
+
+  /** @scenario "A pane too narrow for two columns stacks the rail under the turn" */
+  it("measures it as soon as it is attached", async () => {
+    const { result } = renderHook(() => useRailLayout());
+
+    expect(result.current.layout).toEqual({
+      mode: "side",
+      railWidth: RAIL_WIDTH_WIDE_PX,
+    });
+
+    act(() => {
+      result.current.setScroller(scrollerOfWidth(560));
+    });
+
+    await waitFor(() => expect(result.current.layout.mode).toBe("stacked"));
+  });
+
+  /** @scenario "A narrowing pane slims the rail before moving it" */
+  it("re-measures when a different scroller takes its place", async () => {
+    const { result } = renderHook(() => useRailLayout());
+
+    act(() => {
+      result.current.setScroller(scrollerOfWidth(560));
+    });
+    await waitFor(() => expect(result.current.layout.mode).toBe("stacked"));
+
+    act(() => {
+      result.current.setScroller(scrollerOfWidth(720));
+    });
+
+    await waitFor(() =>
+      expect(result.current.layout).toEqual({
+        mode: "side",
+        railWidth: RAIL_WIDTH_SLIM_PX,
+      }),
+    );
   });
 });

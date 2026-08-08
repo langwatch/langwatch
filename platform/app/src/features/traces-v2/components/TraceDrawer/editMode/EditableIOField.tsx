@@ -60,11 +60,11 @@ export function EditableIOField({
   const value = draft ?? seed;
   const isEdited = draft !== undefined;
 
-  const capturedIsJson = useMemo(() => isJsonText(captured ?? ""), [captured]);
+  const isCapturedJson = useMemo(() => isJsonText(captured ?? ""), [captured]);
   // Only warn when the captured value WAS structured. Warning on prose would
   // fire on every keystroke of a field that was never JSON to begin with.
-  const warnsPlainText =
-    capturedIsJson && value.trim().length > 0 && !isJsonText(value);
+  const isPlainTextWarningVisible =
+    isCapturedJson && value.trim().length > 0 && !isJsonText(value);
 
   const delta = value.length - seed.length;
   const rows = useMemo(
@@ -79,23 +79,7 @@ export function EditableIOField({
   );
 
   if ((captured?.length ?? 0) > IO_DISPLAY_TRUNCATE_AT) {
-    return (
-      <Box>
-        <FieldHeading label={label} />
-        <Box
-          borderWidth="1px"
-          borderColor="border"
-          borderRadius="md"
-          bg="bg.subtle"
-          paddingX={3}
-          paddingY={2}
-        >
-          <Text textStyle="xs" color="fg.muted">
-            This field is too large to edit here
-          </Text>
-        </Box>
-      </Box>
-    );
+    return <TooLargeToEditNotice label={label} />;
   }
 
   return (
@@ -117,7 +101,7 @@ export function EditableIOField({
         borderColor={isEdited ? "green.muted" : "border"}
         bg={isEdited ? "green.subtle" : "bg.panel"}
       />
-      {warnsPlainText && (
+      {isPlainTextWarningVisible && (
         <HStack gap={1.5} marginTop={1} color="orange.fg">
           <Icon as={LuTriangleAlert} boxSize={3} />
           <Text textStyle="2xs">
@@ -125,6 +109,31 @@ export function EditableIOField({
           </Text>
         </HStack>
       )}
+    </Box>
+  );
+}
+
+/**
+ * Stands in for the editor when the captured value runs past what the drawer
+ * renders, so the field says why it cannot be corrected here rather than
+ * offering a textarea seeded with a value cut short.
+ */
+function TooLargeToEditNotice({ label }: { label: string }) {
+  return (
+    <Box>
+      <FieldHeading label={label} />
+      <Box
+        borderWidth="1px"
+        borderColor="border"
+        borderRadius="md"
+        bg="bg.subtle"
+        paddingX={3}
+        paddingY={2}
+      >
+        <Text textStyle="xs" color="fg.muted">
+          This field is too large to edit here
+        </Text>
+      </Box>
     </Box>
   );
 }

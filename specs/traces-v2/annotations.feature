@@ -41,13 +41,18 @@ Feature: Per-turn actions in ConversationView
     And the form is pre-scoped to the second turn's traceId
     And the comment textarea is autofocused
 
+  @integration
   Scenario: In bubbles layout, existing annotations are edited via the badge popover
     Given the conversation is in bubbles layout
     And the second turn's trace already has an annotation
     When the user clicks the `TurnAnnotationBadges` count chip on the second turn
     Then a popover lists existing annotations
-    When the user clicks an annotation row
-    Then `AnnotationPopover` reopens in edit mode pre-filled from that annotation
+    When the user picks an annotation row
+    Then the correction popover opens on that annotation for editing
+    And it is anchored on the row itself, so closing it hands the keyboard back
+    And each row is a button, so a reviewer working from the keyboard picks it the
+    same way
+    And a reviewer who may not write annotations is offered no such control
     # Thread layout edits from the rail instead, in the card's own place.
     # See specs/traces-v2/annotation-rail.feature.
 
@@ -151,6 +156,14 @@ Feature: Per-turn actions in ConversationView
     Given a message whose trace already carries a suggestion
     When I pick that suggestion
     Then the correction popover opens on it for editing
+
+  @integration
+  Scenario: Saving an edit before the annotation is read writes nothing
+    Given I open an annotation for editing
+    And the annotation has not been read back yet
+    When I save
+    Then nothing is written, so the turn does not end up carrying it twice
+    And the save control says it is not ready
 
   # ─── Add to dataset (turn) ─────────────────────────────────────────────
 

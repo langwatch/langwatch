@@ -9,7 +9,7 @@ import type {
   SpanTreeNode,
   TraceHeader,
 } from "~/server/api/routers/tracesV2.schemas";
-import { changedTraceMetadataKeys } from "~/server/traces/edit-overlay/applyTraceEditOverlay";
+import { changedTraceMetadataKeys } from "~/server/traces/edit-overlay/applyTraceEditOverlayToViews";
 import {
   mediaRefBelongsToSide,
   parseMediaRefs,

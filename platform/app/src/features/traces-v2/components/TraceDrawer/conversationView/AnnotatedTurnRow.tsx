@@ -62,7 +62,7 @@ export const AnnotatedTurnRow = memo(function AnnotatedTurnRow({
       annotationItems={annotations}
       // Thread layout writes annotations in the rail, so its actions open the
       // composer there instead of a popover over the conversation.
-      preferRailComposer={layout === "thread"}
+      shouldUseRailComposer={layout === "thread"}
     />
   );
 

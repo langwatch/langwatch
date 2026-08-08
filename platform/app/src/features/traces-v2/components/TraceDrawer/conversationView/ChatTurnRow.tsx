@@ -77,7 +77,7 @@ interface ChatTurnRowProps {
    */
   annotationItems?: AnnotationItem[];
   /** Route Annotate and Suggest to the rail composer instead of a popover. */
-  preferRailComposer?: boolean;
+  shouldUseRailComposer?: boolean;
 }
 
 export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
@@ -94,7 +94,7 @@ export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
   onSelect,
   layout = "bubbles",
   annotationItems = EMPTY_ANNOTATIONS,
-  preferRailComposer = false,
+  shouldUseRailComposer = false,
 }) {
   const handleSelect = useCallback(
     () => onSelect(turn.traceId),
@@ -181,7 +181,7 @@ export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
         // no "opposite side" to anchor the inline actions to — pin them right.
         assistantSide={layout === "thread" ? "right" : assistantSide}
         annotationItems={annotationItems}
-        preferRailComposer={preferRailComposer}
+        shouldUseRailComposer={shouldUseRailComposer}
         translation={{
           isActive: translation.isActive,
           isLoading: translation.isLoading,
@@ -648,7 +648,7 @@ const TurnSeparator: React.FC<{
   onSelect: () => void;
   assistantSide: "left" | "right";
   annotationItems: AnnotationItem[];
-  preferRailComposer: boolean;
+  shouldUseRailComposer: boolean;
   translation: {
     isActive: boolean;
     isLoading: boolean;
@@ -661,7 +661,7 @@ const TurnSeparator: React.FC<{
   onSelect,
   assistantSide,
   annotationItems,
-  preferRailComposer,
+  shouldUseRailComposer,
   translation,
 }) => {
   const annotationsOnLeft = assistantSide === "left";
@@ -721,7 +721,7 @@ const TurnSeparator: React.FC<{
           traceId={turn.traceId}
           output={turn.output}
           translation={translation}
-          preferRailComposer={preferRailComposer}
+          shouldUseRailComposer={shouldUseRailComposer}
         />
       </HStack>
     </Flex>

@@ -19,7 +19,11 @@ export type UpdateAnnotationInput = {
   comment: string;
   isThumbsUp: boolean | null | undefined;
   scoreOptions: JsonValue;
-  expectedOutput: string | null;
+  /**
+   * The suggested output. Omitted when the save did not carry the field at
+   * all, which leaves the stored suggestion alone; `null` withdraws it.
+   */
+  expectedOutput: string | null | undefined;
 };
 
 export type DeleteAnnotationInput = {

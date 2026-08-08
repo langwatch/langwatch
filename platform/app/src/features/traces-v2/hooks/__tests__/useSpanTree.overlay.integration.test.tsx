@@ -8,7 +8,7 @@ import type { TraceEditOverlayPatch } from "~/server/traces/edit-overlay/traceEd
 
 const spans = vi.hoisted(() => ({ current: [] as SpanTreeNode[] }));
 const overlay = vi.hoisted(() => ({
-  current: null as { patch: TraceEditOverlayPatch } | null,
+  current: null as { traceId: string; patch: TraceEditOverlayPatch } | null,
 }));
 
 vi.mock("@tanstack/react-query", () => ({
@@ -20,12 +20,18 @@ vi.mock("@tanstack/react-query", () => ({
   useQueryClient: () => ({ getQueryData: vi.fn(), setQueryData: vi.fn() }),
 }));
 
+// The correction arrives the way the drawer receives it, through the query the
+// real `useTraceEditOverlay` reads, so the hook under test runs against the
+// production overlay hooks rather than a stand-in for them.
 vi.mock("~/utils/api", () => ({
   api: {
     useUtils: () => ({
       tracesV2: { spanTreeDelta: { invalidate: vi.fn() } },
     }),
     tracesV2: { spanTreeDelta: { useQuery: vi.fn() } },
+    traceEditOverlay: {
+      getByTraceId: { useQuery: () => ({ data: overlay.current }) },
+    },
   },
 }));
 
@@ -49,20 +55,9 @@ vi.mock("../useTraceQueryArgs", () => ({
   }),
 }));
 
-vi.mock("../useTraceEditOverlay", () => ({
-  useTraceEditOverlay: () => ({ data: overlay.current }),
-  useAppliedTraceEditPatch: () => appliedPatch(),
-}));
-
 import { useDrawerStore } from "../../stores/drawerStore";
 import { useTraceEditStore } from "../../stores/traceEditStore";
 import { useSpanTree } from "../useSpanTree";
-
-function appliedPatch(): TraceEditOverlayPatch | null {
-  if (useDrawerStore.getState().isEditing) return null;
-  if (useTraceEditStore.getState().overlayView !== "edited") return null;
-  return overlay.current?.patch ?? null;
-}
 
 function node(over: { spanId: string; parentSpanId?: string; name?: string }) {
   return {
@@ -80,6 +75,9 @@ function node(over: { spanId: string; parentSpanId?: string; name?: string }) {
 describe("useSpanTree with a correction", () => {
   beforeEach(() => {
     useTraceEditStore.getState().discard();
+    // `discard` clears the editing session, not which reading is on screen, so
+    // the view a test switches would otherwise carry into the ones after it.
+    useTraceEditStore.getState().setOverlayView("edited");
     useDrawerStore.getState().setIsEditing(false);
     spans.current = [
       node({ spanId: "root" }),
@@ -87,6 +85,7 @@ describe("useSpanTree with a correction", () => {
       node({ spanId: "child", parentSpanId: "tool" }),
     ];
     overlay.current = {
+      traceId: "trace-1",
       patch: {
         version: 1,
         spans: [{ spanId: "root", name: "conversation turn" }],
@@ -147,6 +146,25 @@ describe("useSpanTree with a correction", () => {
     describe("when the span tree is read", () => {
       it("returns the very same array it was given", () => {
         overlay.current = null;
+
+        const { result } = renderHook(() => useSpanTree());
+
+        expect(result.current.data).toBe(spans.current);
+      });
+    });
+  });
+
+  describe("given the previous trace's correction is still in the cache", () => {
+    describe("when the reader has already switched to another trace", () => {
+      it("reads the open trace exactly as captured", () => {
+        overlay.current = {
+          traceId: "trace-0",
+          patch: {
+            version: 1,
+            spans: [{ spanId: "root", name: "the other trace's name" }],
+            deletedSpanIds: ["tool"],
+          },
+        };
 
         const { result } = renderHook(() => useSpanTree());
 

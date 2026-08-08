@@ -539,10 +539,10 @@ const TurnsView: React.FC<{
   // rather than at the top: a long thread otherwise opens scrolled away
   // from the turn the operator clicked in from. Centers once per mount; we
   // don't re-scroll on later navigation so we never fight the user.
-  const scrollRef = useRef<HTMLDivElement>(null);
   const activeRef = useRef<HTMLDivElement>(null);
+  const { layout: railLayout, setScroller } = useRailLayout();
+  const { ref: scrollRef, attachScroller } = useMeasuredScroller(setScroller);
   useCenterActiveTurnOnce({ scrollRef, activeRef });
-  const railLayout = useRailLayout(scrollRef);
 
   if (parsedTurns.length >= VIRTUALIZE_AT) {
     return (
@@ -561,7 +561,7 @@ const TurnsView: React.FC<{
 
   return (
     <Box
-      ref={scrollRef}
+      ref={attachScroller}
       position="relative"
       flex={1}
       overflow="auto"
@@ -605,6 +605,55 @@ const TurnsView: React.FC<{
     </Box>
   );
 };
+
+/**
+ * One ref for the conversation's scroll container. The code that scrolls it and
+ * the virtualizer read the node; the rail has to be told the moment it is
+ * attached, since a conversation swaps scrollers as its turn count crosses the
+ * virtualization threshold.
+ */
+/**
+ * Land on the open trace's turn instead of the top of a long thread. Once per
+ * mount: the virtualizer settles estimated heights as the reader scrolls, but
+ * centering on the index is close enough on open.
+ */
+function useCenterActiveTurnInVirtualizer({
+  virtualizer,
+  parsedTurns,
+  currentTraceId,
+}: {
+  virtualizer: {
+    scrollToIndex: (index: number, options: { align: "center" }) => void;
+  };
+  parsedTurns: ParsedTurn[];
+  currentTraceId: string;
+}) {
+  const hasCentered = useRef(false);
+  useEffect(() => {
+    if (hasCentered.current) return;
+    const activeIndex = parsedTurns.findIndex(
+      (p) => p.turn.traceId === currentTraceId,
+    );
+    if (activeIndex <= 0) return;
+    hasCentered.current = true;
+    virtualizer.scrollToIndex(activeIndex, { align: "center" });
+  }, [parsedTurns, currentTraceId, virtualizer]);
+}
+
+function useMeasuredScroller(setScroller: (node: HTMLElement | null) => void): {
+  ref: RefObject<HTMLDivElement | null>;
+  attachScroller: (node: HTMLDivElement | null) => void;
+} {
+  const ref = useRef<HTMLDivElement>(null);
+  const attachScroller = useCallback(
+    (node: HTMLDivElement | null) => {
+      ref.current = node;
+      setScroller(node);
+    },
+    [setScroller],
+  );
+  return { ref, attachScroller };
+}
 
 /**
  * How wide the centered column may grow. Bubbles span the pane; thread caps
@@ -673,33 +722,31 @@ const VirtualizedTurnsView: React.FC<{
   annotationsByTrace,
   isRailActive,
 }) => {
-  const parentRef = useRef<HTMLDivElement>(null);
-  const railLayout = useRailLayout(parentRef);
+  const { layout: railLayout, setScroller } = useRailLayout();
+  const { ref: scrollerRef, attachScroller } = useMeasuredScroller(setScroller);
   const virtualizer = useVirtualizer({
     count: parsedTurns.length,
-    getScrollElement: () => parentRef.current,
+    getScrollElement: () => scrollerRef.current,
     estimateSize: () => ESTIMATED_TURN_HEIGHT,
     overscan: 4,
     measureElement: (el) => el.getBoundingClientRect().height,
     getItemKey: (index) => parsedTurns[index]!.turn.traceId,
   });
 
-  // Land on the open trace's turn instead of the top of a long thread.
-  // Once per mount; the virtualizer settles estimated heights as the user
-  // scrolls, but centering on the index is close enough on open.
-  const scrolledToActive = useRef(false);
-  useEffect(() => {
-    if (scrolledToActive.current) return;
-    const activeIndex = parsedTurns.findIndex(
-      (p) => p.turn.traceId === currentTraceId,
-    );
-    if (activeIndex <= 0) return;
-    scrolledToActive.current = true;
-    virtualizer.scrollToIndex(activeIndex, { align: "center" });
-  }, [parsedTurns, currentTraceId, virtualizer]);
+  useCenterActiveTurnInVirtualizer({
+    virtualizer,
+    parsedTurns,
+    currentTraceId,
+  });
 
   return (
-    <Box ref={parentRef} flex={1} overflow="auto" paddingX={5} paddingY={4}>
+    <Box
+      ref={attachScroller}
+      flex={1}
+      overflow="auto"
+      paddingX={5}
+      paddingY={4}
+    >
       <Box
         width="full"
         maxWidth={columnMaxWidth({ layout, isRailActive, railLayout })}

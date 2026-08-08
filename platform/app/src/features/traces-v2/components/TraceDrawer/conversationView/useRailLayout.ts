@@ -1,4 +1,4 @@
-import { type RefObject, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import type { Mode } from "./types";
 
 /** How wide the reading column gets before the rail is taken into account. */
@@ -108,14 +108,21 @@ export function threadColumnMaxWidth({
  * it. One ResizeObserver for the whole conversation, throttled to a frame, and
  * state only ever set on a real flip so a resize that changes nothing cannot
  * feed itself another layout pass.
+ *
+ * The scroller is handed in through `setScroller` and held as state, so the
+ * observer attaches whenever the element does. A conversation swaps between a
+ * virtualized and a plain scroller as its turn count crosses the threshold,
+ * and a ref would leave the second one unmeasured for the rest of its life.
  */
-export function useRailLayout(
-  scrollerRef: RefObject<HTMLElement | null>,
-): RailLayout {
+export function useRailLayout(): {
+  layout: RailLayout;
+  setScroller: (node: HTMLElement | null) => void;
+} {
   const [layout, setLayout] = useState<RailLayout>(WIDE_LAYOUT);
+  const [scroller, setScroller] = useState<HTMLElement | null>(null);
 
   useEffect(() => {
-    const el = scrollerRef.current;
+    const el = scroller;
     if (!el || typeof ResizeObserver === "undefined") return;
 
     let frame: number | null = null;
@@ -144,7 +151,7 @@ export function useRailLayout(
       observer.disconnect();
       if (frame !== null) cancelAnimationFrame(frame);
     };
-  }, [scrollerRef]);
+  }, [scroller]);
 
-  return layout;
+  return { layout, setScroller };
 }

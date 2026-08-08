@@ -1,20 +1,4 @@
-/**
- * Reads the system prompt a span records apart from its messages, tolerating
- * both the flat-dotted and the nested attribute shapes the drawer receives.
- */
-function readSystemInstructions(
-  params: Record<string, unknown> | null | undefined,
-): string | null {
-  if (!params) return null;
-  const flat = params["gen_ai.system_instructions"];
-  if (typeof flat === "string" && flat.trim().length > 0) return flat;
-  const genAi = params.gen_ai;
-  if (genAi && typeof genAi === "object" && !Array.isArray(genAi)) {
-    const nested = (genAi as Record<string, unknown>).system_instructions;
-    if (typeof nested === "string" && nested.trim().length > 0) return nested;
-  }
-  return null;
-}
+import { readSystemInstructions } from "~/server/tracer/spanIOStringify";
 
 function isSystemMessageFor({
   message,

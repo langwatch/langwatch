@@ -1,10 +1,8 @@
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
 import { getApp } from "~/server/app-layer/app";
-import {
-  redactPatchForViewer,
-  restoreWithheldEdits,
-} from "~/server/traces/edit-overlay/redactTraceEditOverlayPatch";
+import { redactPatchForViewer } from "~/server/traces/edit-overlay/redactTraceEditOverlayPatch";
+import { restoreWithheldEdits } from "~/server/traces/edit-overlay/restoreWithheldTraceEdits";
 import { traceEditOverlayPatchSchema } from "~/server/traces/edit-overlay/traceEditOverlay.schemas";
 import type { Protections } from "~/server/traces/protections";
 import { checkProjectPermission } from "../rbac";
@@ -76,7 +74,7 @@ export const traceEditOverlayRouter = createTRPCRouter({
       const protections = await getUserProtectionsForProject(ctx, {
         projectId: input.projectId,
       });
-      const windowRedacted = await isTraceWindowRedacted({
+      const isWindowRedacted = await isTraceWindowRedacted({
         projectId: input.projectId,
         traceId: input.traceId,
         protections,
@@ -87,7 +85,7 @@ export const traceEditOverlayRouter = createTRPCRouter({
         patch: redactPatchForViewer({
           patch: overlay.patch,
           protections,
-          windowRedacted,
+          isWindowRedacted,
         }),
       };
     }),
@@ -130,7 +128,7 @@ export const traceEditOverlayRouter = createTRPCRouter({
       const protections = await getUserProtectionsForProject(ctx, {
         projectId: input.projectId,
       });
-      const windowRedacted = await isTraceWindowRedacted({
+      const isWindowRedacted = await isTraceWindowRedacted({
         projectId: input.projectId,
         traceId: input.traceId,
         protections,
@@ -143,7 +141,7 @@ export const traceEditOverlayRouter = createTRPCRouter({
           incoming: input.patch,
           stored: stored.patch,
           protections,
-          windowRedacted,
+          isWindowRedacted,
         }),
         userId: ctx.session.user.id,
       });
@@ -153,7 +151,7 @@ export const traceEditOverlayRouter = createTRPCRouter({
         patch: redactPatchForViewer({
           patch: saved.patch,
           protections,
-          windowRedacted,
+          isWindowRedacted,
         }),
       };
     }),

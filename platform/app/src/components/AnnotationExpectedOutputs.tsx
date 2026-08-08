@@ -53,40 +53,30 @@ export const AnnotationExpectedOutputs = ({
               />
             </Box>
           </Tooltip>
-          <Box
-            as="button"
-            textAlign="left"
-            cursor="pointer"
-            onClick={(event: React.MouseEvent) => {
-              event.stopPropagation();
-              setEditingAnnotationId(annotation.id);
-            }}
-          >
-            <Text>{annotation.expectedOutput}</Text>
-          </Box>
+          {/* The suggestion itself opens the popover, so closing it hands the
+              keyboard back to the line the reviewer came from. */}
+          <AnnotationPopover
+            traceId={traceId}
+            output={output}
+            mode="suggest"
+            annotationId={annotation.id}
+            open={editingAnnotationId === annotation.id}
+            onOpenChange={(open) =>
+              setEditingAnnotationId(open ? annotation.id : null)
+            }
+            trigger={
+              <Box
+                as="button"
+                textAlign="left"
+                cursor="pointer"
+                onClick={(event: React.MouseEvent) => event.stopPropagation()}
+              >
+                <Text>{annotation.expectedOutput}</Text>
+              </Box>
+            }
+          />
         </HStack>
       ))}
-      {editingAnnotationId && (
-        <AnnotationPopover
-          traceId={traceId}
-          output={output}
-          mode="suggest"
-          annotationId={editingAnnotationId}
-          open={true}
-          onOpenChange={(open) => {
-            if (!open) setEditingAnnotationId(null);
-          }}
-          trigger={
-            <Box
-              as="span"
-              aria-hidden="true"
-              display="inline-block"
-              width="0"
-              height="0"
-            />
-          }
-        />
-      )}
     </VStack>
   );
 };

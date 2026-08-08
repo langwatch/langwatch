@@ -128,6 +128,46 @@ describe("AttributeTable editing", () => {
       });
     });
 
+    describe("when an attribute is added with a key that is a parent of one", () => {
+      /** @scenario "Adding an attribute rejects a key that sits inside another one" */
+      it("names the attribute it conflicts with and adds nothing", () => {
+        const onEditAttribute = vi.fn();
+        const { getByLabelText, getByRole, getByText } = renderEditable({
+          onEditAttribute,
+        });
+
+        fireEvent.change(getByLabelText("New attribute name"), {
+          target: { value: "gen_ai.request" },
+        });
+        fireEvent.click(getByRole("button", { name: "Add attribute" }));
+
+        expect(
+          getByText(/This key conflicts with gen_ai\.request\./),
+        ).toBeInTheDocument();
+        expect(onEditAttribute).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when an attribute is added with a key nested under one", () => {
+      /** @scenario "Adding an attribute rejects a key that sits inside another one" */
+      it("names the attribute it conflicts with and adds nothing", () => {
+        const onEditAttribute = vi.fn();
+        const { getByLabelText, getByRole, getByText } = renderEditable({
+          onEditAttribute,
+        });
+
+        fireEvent.change(getByLabelText("New attribute name"), {
+          target: { value: "gen_ai.request.model.family" },
+        });
+        fireEvent.click(getByRole("button", { name: "Add attribute" }));
+
+        expect(
+          getByText("This key conflicts with gen_ai.request.model"),
+        ).toBeInTheDocument();
+        expect(onEditAttribute).not.toHaveBeenCalled();
+      });
+    });
+
     describe("when an attribute is added with a new key", () => {
       /** @scenario "Adding an attribute with a key the span does not have records it" */
       it("records the addition", () => {

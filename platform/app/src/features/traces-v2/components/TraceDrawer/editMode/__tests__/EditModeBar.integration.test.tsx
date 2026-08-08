@@ -219,6 +219,16 @@ describe("EditModeBar", () => {
       });
     });
 
+    describe("when the save is already in flight", () => {
+      /** @scenario "Saving records the correction and leaves edit mode" */
+      it("cannot be asked for again", () => {
+        isSaving = true;
+        renderBar();
+
+        expect(saveButton()).toBeDisabled();
+      });
+    });
+
     describe("when the draft belongs to a trace the drawer left behind", () => {
       /** @scenario "Saving is refused once the drawer moved to another trace" */
       it("writes nothing", async () => {
@@ -237,6 +247,30 @@ describe("EditModeBar", () => {
 
         await waitFor(() => expect(warn).toHaveBeenCalled());
         expect(fetchOverlay).not.toHaveBeenCalled();
+        expect(mutate).not.toHaveBeenCalled();
+        warn.mockRestore();
+      });
+
+      /** @scenario "Saving is refused once the drawer moved to another trace" */
+      it("writes nothing when the drawer moves while the correction is read back", async () => {
+        const warn = vi.spyOn(console, "warn").mockImplementation(() => {
+          // The refusal is logged, not shown: nothing on screen asked for it.
+        });
+        let finishRead: () => void = () => undefined;
+        fetchOverlay.mockImplementation(
+          () =>
+            new Promise((resolve) => {
+              finishRead = () => resolve(null);
+            }),
+        );
+        renderBar();
+
+        fireEvent.click(saveButton());
+        await waitFor(() => expect(fetchOverlay).toHaveBeenCalled());
+        useTraceEditStore.getState().startEditing({ traceId: "trace-2" });
+        finishRead();
+
+        await waitFor(() => expect(warn).toHaveBeenCalled());
         expect(mutate).not.toHaveBeenCalled();
         warn.mockRestore();
       });

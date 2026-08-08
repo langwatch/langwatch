@@ -309,6 +309,14 @@ Feature: Correcting a trace without rewriting it
       Then the captured spans are returned unchanged
       And no correction is fetched at all
 
+    @integration
+    Scenario: A field mapping reads the conversation the way it reads the traces
+      Given a corrected trace that belongs to a conversation
+      When the add-to-dataset drawer maps it
+      Then the conversation behind it is read with corrections
+      And an evaluator being set up on the same trace reads the conversation as
+      it was captured
+
     @unit
     Scenario: A page of traces fetches its corrections in one read
       Given several corrected traces read together
@@ -369,6 +377,13 @@ Feature: Correcting a trace without rewriting it
       Then the trace output correction is gone
       And the span rename is still there
 
+    @unit
+    Scenario: Clearing the suggestion keeps a corrected metadata key
+      Given a trace whose correction sets a metadata key and carries a suggested output
+      When I clear the suggestion on that annotation
+      Then the trace output correction is gone
+      And the metadata correction is still there
+
     @integration
     Scenario: Clearing the only suggestion returns the trace to uncorrected
       Given a trace corrected only through a suggested output
@@ -386,6 +401,13 @@ Feature: Correcting a trace without rewriting it
       Given a trace with a correction and a comment form that carries no suggestion text
       When I save the comment
       Then the correction is still there
+
+    @integration
+    Scenario: A save that never mentions the suggestion keeps the stored one
+      Given an annotation carrying a suggested output
+      When I save it again from a form that has no suggestion field
+      Then the annotation still carries the suggestion
+      And the trace correction is left alone
 
     @integration
     Scenario: An annotator who may only create annotations does not move the correction

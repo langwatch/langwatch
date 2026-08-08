@@ -48,6 +48,13 @@ export function AnnotationCard({
         e.stopPropagation();
         if (isOwn) onEdit();
       }}
+      // The card carries a button's role, so it owes a button's keyboard.
+      onKeyDown={(e: React.KeyboardEvent) => {
+        if (!isOwn || (e.key !== "Enter" && e.key !== " ")) return;
+        e.preventDefault();
+        e.stopPropagation();
+        onEdit();
+      }}
       cursor={isOwn ? "pointer" : "default"}
       borderRadius="md"
       borderWidth="1px"

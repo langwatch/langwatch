@@ -164,9 +164,12 @@ export class TraceEditOverlayService {
     if (!current?.trace?.output) return null;
 
     const { output: _removed, ...remainingTraceEdits } = current.trace;
+    const hasRemainingTraceEdits = Object.values(remainingTraceEdits).some(
+      (value) => value !== undefined,
+    );
     const next: TraceEditOverlayPatch = {
       ...current,
-      ...(remainingTraceEdits.input !== undefined
+      ...(hasRemainingTraceEdits
         ? { trace: remainingTraceEdits }
         : { trace: void 0 }),
     };

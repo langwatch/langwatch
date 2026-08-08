@@ -11,10 +11,8 @@ import { describe, expect, it } from "vitest";
 import type { Span, Trace } from "~/server/tracer/types";
 import type { Protections } from "~/server/traces/protections";
 import { applyOverlayToTrace } from "../applyTraceEditOverlay";
-import {
-  redactPatchForViewer,
-  restoreWithheldEdits,
-} from "../redactTraceEditOverlayPatch";
+import { redactPatchForViewer } from "../redactTraceEditOverlayPatch";
+import { restoreWithheldEdits } from "../restoreWithheldTraceEdits";
 import type { TraceEditOverlayPatch } from "../traceEditOverlay.schemas";
 
 const openProtections: Protections = {
@@ -236,7 +234,7 @@ describe("redacting a correction for its reader", () => {
       const redacted = redactPatchForViewer({
         patch: contentAndStructurePatch,
         protections: openProtections,
-        windowRedacted: true,
+        isWindowRedacted: true,
       });
 
       expect(redacted.trace).toBeUndefined();

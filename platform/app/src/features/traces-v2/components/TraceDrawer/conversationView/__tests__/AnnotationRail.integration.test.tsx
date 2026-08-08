@@ -93,14 +93,14 @@ vi.mock("~/utils/api", () => ({
 vi.mock("../ChatTurnRow", () => ({
   ChatTurnRow: ({
     turn,
-    preferRailComposer,
+    shouldUseRailComposer,
   }: {
     turn: { traceId: string };
-    preferRailComposer?: boolean;
+    shouldUseRailComposer?: boolean;
   }) => (
     <div
       data-testid="chat-turn-row"
-      data-prefers-rail-composer={String(!!preferRailComposer)}
+      data-uses-rail-composer={String(!!shouldUseRailComposer)}
     >
       {turn.traceId}
     </div>
@@ -242,7 +242,7 @@ describe("given the rail is open beside a turn", () => {
     renderRow();
 
     expect(screen.getByTestId("chat-turn-row")).toHaveAttribute(
-      "data-prefers-rail-composer",
+      "data-uses-rail-composer",
       "true",
     );
   });
@@ -293,7 +293,7 @@ describe("given a turn in thread layout, where the rail lives", () => {
           <TurnActionRow
             traceId={TRACE_ID}
             output="the original answer"
-            preferRailComposer
+            shouldUseRailComposer
           />
         </ChakraProvider>,
       );
@@ -315,7 +315,7 @@ describe("given a turn in thread layout, where the rail lives", () => {
           <TurnActionRow
             traceId={TRACE_ID}
             output="the original answer"
-            preferRailComposer
+            shouldUseRailComposer
           />
         </ChakraProvider>,
       );

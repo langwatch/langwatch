@@ -247,4 +247,39 @@ describe("given an annotation the reviewer wrote", () => {
       expect(onEdit).toHaveBeenCalled();
     });
   });
+
+  describe("when the reviewer reaches it with the keyboard", () => {
+    /** @scenario "An annotation is opened from the keyboard the way it is from the mouse" */
+    it.each(["Enter", " "])("opens the composer on %s", (key) => {
+      const onEdit = vi.fn();
+      renderCard({ isOwn: true, onEdit });
+
+      fireEvent.keyDown(screen.getByLabelText("Edit annotation"), { key });
+
+      expect(onEdit).toHaveBeenCalled();
+    });
+
+    it("ignores keys that do not activate a button", () => {
+      const onEdit = vi.fn();
+      renderCard({ isOwn: true, onEdit });
+
+      fireEvent.keyDown(screen.getByLabelText("Edit annotation"), {
+        key: "ArrowDown",
+      });
+
+      expect(onEdit).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe("given an annotation somebody else wrote, reached with the keyboard", () => {
+  /** @scenario "An annotation is opened from the keyboard the way it is from the mouse" */
+  it("stays closed on Enter", () => {
+    const onEdit = vi.fn();
+    const { container } = renderCard({ isOwn: false, onEdit });
+
+    fireEvent.keyDown(container.firstElementChild!, { key: "Enter" });
+
+    expect(onEdit).not.toHaveBeenCalled();
+  });
 });

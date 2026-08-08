@@ -275,6 +275,7 @@ export function DatasetMappingPreview({
                 (selectedDataset.mapping as MappingState | undefined)
               }
               traces={tracesToUse}
+              shouldApplyCorrections
               targetFields={columnTypes.map(({ name }) => name)}
               setDatasetEntries={onRowDataChange}
               setTraceMapping={(newMappingState) => {

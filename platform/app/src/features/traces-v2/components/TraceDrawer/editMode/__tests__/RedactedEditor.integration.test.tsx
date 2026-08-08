@@ -60,9 +60,10 @@ describe("given a span whose input is hidden from the reviewer", () => {
   });
 });
 
+// The control for the case above: without it, a redaction test would pass just
+// as well against a component that never renders an editor at all.
 describe("given a span whose input the reviewer can read", () => {
   describe("when the span is open in edit mode", () => {
-    /** @scenario "A redacted field carries no editor" */
     it("offers the editor", () => {
       renderInput({ redacted: false });
 

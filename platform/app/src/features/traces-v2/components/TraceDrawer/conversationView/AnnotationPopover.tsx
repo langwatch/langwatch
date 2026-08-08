@@ -1,13 +1,9 @@
 import { Popover } from "~/components/ui/popover";
 import { TriggerAnchor } from "~/components/ui/TriggerAnchor";
 import { Tooltip } from "~/components/ui/tooltip";
-import {
-  AnnotateBody,
-  FormFooter,
-  type PopoverAnnotationFormInput,
-  SuggestBody,
-  usePopoverAnnotationForm,
-} from "./AnnotationFormBody";
+import { AnnotateBody, FormFooter, SuggestBody } from "./AnnotationFormBody";
+import type { PopoverAnnotationFormInput } from "./annotationForm.types";
+import { usePopoverAnnotationForm } from "./useAnnotationForm";
 
 interface AnnotationPopoverProps extends PopoverAnnotationFormInput {
   /** The button that opens the popover. */

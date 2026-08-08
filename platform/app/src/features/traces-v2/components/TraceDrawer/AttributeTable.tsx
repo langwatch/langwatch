@@ -1031,6 +1031,31 @@ function AttrSection({
 }
 
 /**
+ * The attribute a new key would collide with in the nested tree, if any.
+ *
+ * Keys are dotted paths, so `gen_ai.operation` and `gen_ai.operation.name`
+ * cannot both hold a value: one is a branch of the other, and rebuilding the
+ * tree keeps whichever came last. Exact duplicates are caught before this.
+ */
+function findNestedKeyConflict({
+  key,
+  existingKeys,
+}: {
+  key: string;
+  existingKeys: Set<string>;
+}): string | undefined {
+  for (const existingKey of existingKeys) {
+    if (
+      existingKey.startsWith(`${key}.`) ||
+      key.startsWith(`${existingKey}.`)
+    ) {
+      return existingKey;
+    }
+  }
+  return undefined;
+}
+
+/**
  * Adds an attribute the trace never recorded. The key check is here rather
  * than on save because a duplicate key would silently overwrite the row above
  * it, and the reviewer would only find out by reading the saved correction.
@@ -1049,6 +1074,11 @@ function AddAttributeRow({
     if (trimmedKey.length === 0) return;
     if (existingKeys.has(trimmedKey)) {
       setError("This key already exists");
+      return;
+    }
+    const nested = findNestedKeyConflict({ key: trimmedKey, existingKeys });
+    if (nested) {
+      setError(`This key conflicts with ${nested}`);
       return;
     }
     if (isKeyEditable?.(trimmedKey) === false) {

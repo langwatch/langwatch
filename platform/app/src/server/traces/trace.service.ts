@@ -298,7 +298,7 @@ export class TraceService {
         patch: redactPatchForViewer({
           patch,
           protections,
-          windowRedacted: trace.redacted_by_visibility_window === true,
+          isWindowRedacted: trace.redacted_by_visibility_window === true,
         }),
       });
       if (next !== trace) changed = true;

@@ -49,14 +49,26 @@ vi.mock("~/server/app-layer/app", () => ({
   }),
 }));
 
+/**
+ * Every trace this suite writes to. The project is shared with other suites,
+ * and corrections live one row per trace, so the sweeps below stay on the
+ * traces this file owns.
+ */
+const TRACE_ID_PREFIX = "test-trace-annotation";
+
 describe("Annotation CRUD", () => {
   const projectId = "test-project-id";
-  const traceId = "test-trace-annotation-integration";
+  const traceId = `${TRACE_ID_PREFIX}-integration`;
   let caller: ReturnType<typeof appRouter.createCaller>;
+
+  const sweepOverlays = () =>
+    prisma.traceEditOverlay.deleteMany({
+      where: { projectId, traceId: { startsWith: TRACE_ID_PREFIX } },
+    });
 
   beforeAll(async () => {
     await prisma.annotation.deleteMany({ where: { projectId } });
-    await prisma.traceEditOverlay.deleteMany({ where: { projectId } });
+    await sweepOverlays();
 
     const user = await getTestUser();
     const ctx = createInnerTRPCContext({
@@ -70,7 +82,7 @@ describe("Annotation CRUD", () => {
 
   afterAll(async () => {
     await prisma.annotation.deleteMany({ where: { projectId } });
-    await prisma.traceEditOverlay.deleteMany({ where: { projectId } });
+    await sweepOverlays();
   });
 
   describe("when creating an annotation", () => {
@@ -387,6 +399,35 @@ describe("Annotation CRUD", () => {
       const after = await overlayFor(staleTraceId);
       expect(after!.patch).toMatchObject({
         trace: { output: { value: "a newer answer" } },
+      });
+      expect(after!.updatedAt).toEqual(before!.updatedAt);
+    });
+
+    /** @scenario "A save that never mentions the suggestion keeps the stored one" */
+    it("keeps the suggestion when the save never mentions it", async () => {
+      const annotateOnlyTraceId = "test-trace-annotation-annotate-only";
+
+      const created = await caller.annotation.create({
+        projectId,
+        traceId: annotateOnlyTraceId,
+        comment: "wrong output",
+        expectedOutput: "the right answer",
+        scoreOptions: {},
+      });
+      const before = await overlayFor(annotateOnlyTraceId);
+
+      const updated = await caller.annotation.updateByTraceId({
+        id: created.id,
+        projectId,
+        traceId: annotateOnlyTraceId,
+        comment: "still wrong, adding a score",
+        scoreOptions: {},
+      });
+
+      expect(updated.expectedOutput).toBe("the right answer");
+      const after = await overlayFor(annotateOnlyTraceId);
+      expect(after!.patch).toMatchObject({
+        trace: { output: { value: "the right answer" } },
       });
       expect(after!.updatedAt).toEqual(before!.updatedAt);
     });

@@ -192,7 +192,7 @@ afterEach(() => {
 });
 
 describe("given a reviewer walking their annotation queue", () => {
-  describe("when the open item's trace belongs to a thread", () => {
+  describe("given the open item's trace belongs to a thread", () => {
     /** @scenario "A queued trace is read as the whole thread it belongs to" */
     it("reads the thread named by the queue item as the conversation", () => {
       renderPage();
@@ -257,7 +257,7 @@ describe("given a reviewer walking their annotation queue", () => {
     });
   });
 
-  describe("when the open item's trace belongs to no thread", () => {
+  describe("given the open item's trace belongs to no thread", () => {
     beforeEach(() => {
       setQueue({});
     });

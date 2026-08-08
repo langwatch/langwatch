@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import type { SpanDetail } from "~/server/api/routers/tracesV2.schemas";
-import { changedSpanFields } from "~/server/traces/edit-overlay/applyTraceEditOverlay";
+import { changedSpanFields } from "~/server/traces/edit-overlay/applyTraceEditOverlayToViews";
 import type { TraceEditSpanField } from "~/server/traces/edit-overlay/traceEditOverlay.schemas";
 import { useSpanDetailCanonical } from "../../../hooks/useSpanDetail";
 import { useAppliedTraceEditPatch } from "../../../hooks/useTraceEditOverlay";

@@ -1,9 +1,7 @@
 import { useMemo } from "react";
 import type { SpanTreeNode } from "~/server/api/routers/tracesV2.schemas";
-import {
-  expandDeletedSpanIds,
-  overlayTouchesSpan,
-} from "~/server/traces/edit-overlay/applyTraceEditOverlay";
+import { expandDeletedSpanIds } from "~/server/traces/edit-overlay/applyTraceEditOverlay";
+import { overlayTouchesSpan } from "~/server/traces/edit-overlay/applyTraceEditOverlayToViews";
 import { useTraceEditOverlay } from "../../../hooks/useTraceEditOverlay";
 import { useDrawerStore } from "../../../stores/drawerStore";
 import { useTraceEditStore } from "../../../stores/traceEditStore";

@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { buildDisplayInput } from "~/server/tracer/spanIOStringify";
+import type { Span } from "~/server/tracer/types";
 import { capturedInputForEditing } from "../spanInputSeed";
 
 const MESSAGES = [
@@ -53,6 +55,85 @@ describe("given a span whose messages carry their own system message", () => {
       });
 
       expect(seed).toBe(recorded);
+    });
+  });
+});
+
+describe("given a span whose system prompt is recorded as content blocks", () => {
+  const spanWith = (params: Record<string, unknown>) =>
+    ({
+      input: { type: "chat_messages", value: MESSAGES },
+      params,
+    }) as unknown as Pick<Span, "input" | "params">;
+
+  const cases: Array<[string, Record<string, unknown>]> = [
+    [
+      "as an array of content blocks",
+      {
+        "gen_ai.system_instructions": [
+          { type: "text", content: SYSTEM_PROMPT },
+        ],
+      },
+    ],
+    [
+      "as content blocks under the nested attribute",
+      {
+        gen_ai: {
+          system_instructions: [{ type: "text", content: SYSTEM_PROMPT }],
+        },
+      },
+    ],
+    [
+      "as a JSON encoded array of content blocks",
+      {
+        "gen_ai.system_instructions": JSON.stringify([
+          { type: "text", content: SYSTEM_PROMPT },
+        ]),
+      },
+    ],
+  ];
+
+  describe.each(cases)("when it arrives %s", (_shape, params) => {
+    /** @scenario "A system prompt recorded as content blocks reads as one prompt" */
+    it("shows the prompt once in front of the messages", () => {
+      expect(buildDisplayInput(spanWith(params))).toBe(displayInput);
+    });
+
+    /** @scenario "A system prompt recorded as content blocks reads as one prompt" */
+    it("keeps the prompt out of what the reviewer saves", () => {
+      const seed = capturedInputForEditing({
+        text: buildDisplayInput(spanWith(params)),
+        params,
+      });
+
+      expect(seed).toBe(JSON.stringify(MESSAGES));
+    });
+  });
+});
+
+describe("given a span whose system prompt is several content blocks", () => {
+  describe("when its input is read", () => {
+    /** @scenario "A system prompt recorded as content blocks reads as one prompt" */
+    it("reads them as one prompt, a line each", () => {
+      const span = {
+        input: { type: "chat_messages", value: MESSAGES },
+        params: {
+          "gen_ai.system_instructions": [
+            { type: "text", content: "You are a weather assistant." },
+            { type: "text", text: "Answer in one word." },
+          ],
+        },
+      } as unknown as Pick<Span, "input" | "params">;
+
+      expect(buildDisplayInput(span)).toBe(
+        JSON.stringify([
+          {
+            role: "system",
+            content: "You are a weather assistant.\nAnswer in one word.",
+          },
+          ...MESSAGES,
+        ]),
+      );
     });
   });
 });

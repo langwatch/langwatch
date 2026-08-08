@@ -22,6 +22,7 @@ import {
   useForm,
 } from "react-hook-form";
 import { useAnnotationCommentStore } from "~/hooks/useAnnotationCommentStore";
+import { useAnnotationInvalidation } from "~/hooks/useAnnotationInvalidation";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { useSession } from "~/utils/auth-client";
@@ -103,12 +104,9 @@ export function AnnotationComment({ key = "" }: { key: string }) {
     }
   }, [getAnnotation.data, action]);
 
-  // The turn badges read one trace at a time; the conversation reads every
-  // turn at once. Both go stale on any write here.
-  const invalidateAnnotationReads = () => {
-    void queryClient.annotation.getByTraceId.invalidate();
-    void queryClient.annotation.getByTraceIds.invalidate();
-  };
+  const invalidateAnnotationReads = useAnnotationInvalidation({
+    traceId: traceId ?? "",
+  });
 
   const onSubmit = (data: Annotation) => {
     const filteredScoreOptions = Object.fromEntries(

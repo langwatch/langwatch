@@ -10,7 +10,13 @@
  * specs/traces-v2/annotations.feature.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  renderHook,
+  screen,
+} from "@testing-library/react";
 import {
   afterEach,
   beforeEach,
@@ -72,6 +78,7 @@ vi.mock("~/utils/api", () => ({
 }));
 
 const { AnnotationPopover } = await import("../AnnotationPopover");
+const { useAnnotationMutations } = await import("../useAnnotationForm");
 
 const TRACE = "trace-1";
 
@@ -138,6 +145,43 @@ describe("given a reviewer suggesting a correction on a trace", () => {
 
       expect(mocks.invalidateAnnotationFeed).toHaveBeenCalled();
     });
+  });
+});
+
+describe("given an annotation opened for editing before its read settles", () => {
+  // `existingAnnotations` stays empty, which is what the read looks like
+  // while it is still in flight.
+
+  /** @scenario "Saving an edit before the annotation is read writes nothing" */
+  it("writes nothing rather than creating a second annotation", () => {
+    const { result } = renderHook(() =>
+      useAnnotationMutations({
+        traceId: TRACE,
+        mode: "suggest",
+        annotationId: "annotation-1",
+        enabled: true,
+        onDone: vi.fn(),
+      }),
+    );
+
+    result.current.save({
+      comment: "",
+      expectedOutput: "a correction",
+      scoreOptions: {},
+    });
+
+    expect(mocks.create).not.toHaveBeenCalled();
+    expect(mocks.update).not.toHaveBeenCalled();
+    expect(result.current.isSaveBlocked).toBe(true);
+  });
+
+  /** @scenario "Saving an edit before the annotation is read writes nothing" */
+  it("says so on the save control", async () => {
+    renderSuggest({ annotationId: "annotation-1" });
+
+    expect(
+      await screen.findByRole("button", { name: "Update" }),
+    ).toBeDisabled();
   });
 });
 

@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { applyOverlayToSpanDetail } from "~/server/traces/edit-overlay/applyTraceEditOverlay";
+import { applyOverlayToSpanDetail } from "~/server/traces/edit-overlay/applyTraceEditOverlayToViews";
 import { api } from "~/utils/api";
 import {
   asSharedQueryResult,

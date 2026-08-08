@@ -2,7 +2,7 @@ import { create } from "zustand";
 import type {
   AnnotationMode,
   ScoreOptions,
-} from "../components/TraceDrawer/conversationView/AnnotationFormBody";
+} from "../components/TraceDrawer/conversationView/annotationForm.types";
 
 /** What the reviewer is writing, and which turn it belongs to. */
 export interface AnnotationDraft {

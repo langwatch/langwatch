@@ -9,15 +9,17 @@ import { describe, expect, it } from "vitest";
 import { datasetSpanSchema } from "~/server/datasets/types";
 import type { Span, Trace } from "~/server/tracer/types";
 import {
+  applyOverlayToTrace,
+  expandDeletedSpanIds,
+} from "../applyTraceEditOverlay";
+import {
   applyOverlayToSpanDetail,
   applyOverlayToSpanTreeNodes,
-  applyOverlayToTrace,
   applyOverlayToTraceHeader,
   changedSpanFields,
   changedTraceMetadataKeys,
-  expandDeletedSpanIds,
   overlayTouchesSpan,
-} from "../applyTraceEditOverlay";
+} from "../applyTraceEditOverlayToViews";
 import type { TraceEditOverlayPatch } from "../traceEditOverlay.schemas";
 
 const span = (overrides: Partial<Span> & Pick<Span, "span_id">): Span =>

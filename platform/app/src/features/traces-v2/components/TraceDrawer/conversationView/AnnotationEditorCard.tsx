@@ -4,14 +4,9 @@ import {
   type AnnotationDraft,
   useAnnotationDraftStore,
 } from "../../../stores/annotationDraftStore";
-import {
-  AnnotateBody,
-  type AnnotationFormState,
-  FormFooter,
-  type ScoreOptions,
-  SuggestBody,
-  useAnnotationMutations,
-} from "./AnnotationFormBody";
+import { AnnotateBody, FormFooter, SuggestBody } from "./AnnotationFormBody";
+import type { AnnotationFormState, ScoreOptions } from "./annotationForm.types";
+import { useAnnotationMutations } from "./useAnnotationForm";
 
 interface AnnotationEditorCardProps {
   draft: AnnotationDraft;
@@ -70,6 +65,7 @@ export function AnnotationEditorCard({
     isSaving: mutations.isSaving,
     isDeleting: mutations.isDeleting,
     hasExisting: mutations.hasExisting,
+    isSaveBlocked: mutations.isSaveBlocked,
     handleSave: () =>
       mutations.save({
         comment: draft.comment,

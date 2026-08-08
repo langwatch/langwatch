@@ -114,7 +114,14 @@ export function useDrawerUrlSync() {
     () => serializePinnedSpansParam(pinnedSpanIds) ?? "",
     [pinnedSpanIds],
   );
-  const isEditingInUrl = params.edit === "1";
+  // The same parser `readUrlState` hydrates through, so what the URL means here
+  // and what it means on a back/forward can never drift apart. A raw `=== "1"`
+  // reads edit mode into a URL the store will never enter it from, and the
+  // effect below then rewrites the URL to settle a disagreement of its own.
+  const isEditingInUrl = parseEditParam({
+    raw: params.edit,
+    traceId: params.traceId,
+  });
 
   useEffect(() => {
     if (!drawerOpenInUrl) return;

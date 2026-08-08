@@ -167,6 +167,13 @@ Feature: Annotation rail beside each conversation turn
       Then a composer opens in the rail carrying that annotation's comment
       And the composer offers to delete the annotation
 
+    @integration
+    Scenario: An annotation is opened from the keyboard the way it is from the mouse
+      Given the turn carries an annotation the reviewer wrote
+      When the reviewer moves to it with the keyboard and presses Enter or Space
+      Then it opens for editing
+      And another reviewer's annotation stays closed on the same keys
+
   Rule: A card shows everything the annotation carries
 
     @integration

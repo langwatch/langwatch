@@ -40,24 +40,39 @@ vi.mock("~/components/ui/tooltip", () => ({
   Tooltip: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 
+// Stands in for the popover, cloning the trigger it was handed the way
+// Popover.Trigger's asChild does, so the test sees the element Zag would
+// anchor on and hand focus back to.
 vi.mock(
   "~/features/traces-v2/components/TraceDrawer/conversationView/AnnotationPopover",
-  () => ({
-    AnnotationPopover: (props: {
-      open: boolean;
-      mode: string;
-      traceId: string;
-      annotationId?: string;
-    }) =>
-      props.open ? (
-        <div
-          data-testid="correction-popover"
-          data-mode={props.mode}
-          data-trace-id={props.traceId}
-          data-annotation-id={props.annotationId ?? ""}
-        />
-      ) : null,
-  }),
+  async () => {
+    const { cloneElement } = await import("react");
+    return {
+      AnnotationPopover: (props: {
+        open: boolean;
+        mode: string;
+        traceId: string;
+        annotationId?: string;
+        trigger: React.ReactElement;
+        onOpenChange: (open: boolean) => void;
+      }) => (
+        <>
+          {cloneElement(props.trigger, {
+            "data-testid": "popover-trigger",
+            onClick: () => props.onOpenChange(true),
+          } as Record<string, unknown>)}
+          {props.open ? (
+            <div
+              data-testid="correction-popover"
+              data-mode={props.mode}
+              data-trace-id={props.traceId}
+              data-annotation-id={props.annotationId ?? ""}
+            />
+          ) : null}
+        </>
+      ),
+    };
+  },
 );
 
 import { AnnotationExpectedOutputs } from "../AnnotationExpectedOutputs";
@@ -98,6 +113,22 @@ describe("given a trace that already carries suggestions", () => {
       expect(screen.getByText("the corrected answer")).toBeInTheDocument();
       expect(screen.getByText("another corrected answer")).toBeInTheDocument();
       expect(screen.queryAllByRole("textbox")).toHaveLength(0);
+    });
+  });
+
+  describe("when the popover is anchored", () => {
+    /** @scenario "Picking a saved suggestion reopens it in the correction popover" */
+    it("hangs each popover off the suggestion it belongs to", () => {
+      renderOutputs();
+
+      const triggers = screen.getAllByTestId("popover-trigger");
+
+      expect(triggers).toHaveLength(2);
+      for (const trigger of triggers) {
+        // A hidden anchor would leave the keyboard nowhere to go on close.
+        expect(trigger.tagName).toBe("BUTTON");
+        expect(trigger).not.toHaveAttribute("aria-hidden");
+      }
     });
   });
 

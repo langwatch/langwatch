@@ -21,8 +21,11 @@ export interface ConversationAnnotations {
  * times over. One subscription here, grouped once, and the query key is stable
  * across callers because the ids are sorted before they become one.
  *
- * `keepPreviousData` keeps the previous conversation's annotations on screen
- * while the next one loads, so moving between turns does not blank the rail.
+ * `keepPreviousData` keeps annotations on screen while a turn list that grew
+ * is re-read, so the rail does not blank between pages. The retained rows are
+ * held to the turns being asked about, because the same retention hands back
+ * the last conversation's annotations while the next one is still loading, and
+ * counting those would credit this conversation with another one's work.
  */
 export function useConversationAnnotations(
   traceIds: string[],
@@ -36,7 +39,11 @@ export function useConversationAnnotations(
     keepPreviousData: true,
   });
 
-  const all = query.data;
+  const requested = useMemo(() => new Set(traceIds), [traceIds]);
+  const all = useMemo(
+    () => query.data.filter((annotation) => requested.has(annotation.traceId)),
+    [query.data, requested],
+  );
 
   const byTrace = useMemo(() => {
     const map = new Map<string, AnnotationByTrace[]>();

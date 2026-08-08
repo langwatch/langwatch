@@ -67,6 +67,21 @@ function useTraceEditDraft() {
   );
 }
 
+/**
+ * Whether the session in the store is the one being saved. The drawer can move
+ * to another trace at any moment, including while the stored correction is read
+ * back, and what it leaves behind belongs to wherever it went: writing that
+ * under this trace's id would attribute one trace's correction to another. The
+ * refusal is logged, not shown, because nothing on screen asked for it.
+ */
+function holdsSessionFor(traceId: string): boolean {
+  if (useTraceEditStore.getState().editingTraceId === traceId) return true;
+  console.warn(
+    "[traces-v2] trace edit save skipped: the session in the store belongs to another trace",
+  );
+  return false;
+}
+
 /** Writing the correction, confirming it, and leaving edit mode behind it. */
 function useSaveTraceEdit({ traceId }: { traceId: string }) {
   const { project } = useOrganizationTeamProject();
@@ -88,46 +103,54 @@ function useSaveTraceEdit({ traceId }: { traceId: string }) {
       showErrorToast({ error, fallbackTitle: "Couldn't save trace edits" }),
   });
 
+  /**
+   * Moves the session onto the correction as it stands right now. The one
+   * adopted when editing started can be minutes old (a suggestion saved in
+   * between writes the same record), and building on a stale one would drop
+   * whatever was stored since. Two people saving in the same instant still
+   * race, and the last write wins; a reviewer racing themselves does not.
+   *
+   * Answers false when the read failed, which is the one case where writing on
+   * top of an unknown baseline would lose someone else's correction.
+   */
+  const rebaseOntoStoredCorrection = useCallback(
+    async ({ projectId }: { projectId: string }) => {
+      setIsRebasing(true);
+      try {
+        const latest = await utils.traceEditOverlay.getByTraceId.fetch(
+          { projectId, traceId },
+          { staleTime: 0 },
+        );
+        if (latest?.patch) {
+          useTraceEditStore
+            .getState()
+            .rebaseBasePatch({ traceId, basePatch: latest.patch });
+        }
+        return true;
+      } catch (error) {
+        showErrorToast({ error, fallbackTitle: "Couldn't save trace edits" });
+        return false;
+      } finally {
+        setIsRebasing(false);
+      }
+    },
+    [traceId, utils],
+  );
+
   const save = useCallback(async () => {
     if (!project) return;
-    // The draft belongs to the trace it was written against. If the drawer has
-    // moved on, saving it here would attribute one trace's correction to
-    // another, so the save is refused rather than guessed at.
-    if (useTraceEditStore.getState().editingTraceId !== traceId) {
-      console.warn(
-        "[traces-v2] trace edit save skipped: the draft belongs to another trace",
-      );
-      return;
-    }
-    // Read the correction back before merging onto it. The one adopted when
-    // editing started can be minutes old (a suggestion saved in between writes
-    // the same record), and building on a stale one would drop whatever was
-    // stored since. Two people saving in the same instant still race, and the
-    // last write wins; a reviewer racing themselves does not.
-    setIsRebasing(true);
-    try {
-      const latest = await utils.traceEditOverlay.getByTraceId.fetch(
-        { projectId: project.id, traceId },
-        { staleTime: 0 },
-      );
-      if (latest?.patch) {
-        useTraceEditStore
-          .getState()
-          .rebaseBasePatch({ traceId, basePatch: latest.patch });
-      }
-    } catch (error) {
-      showErrorToast({ error, fallbackTitle: "Couldn't save trace edits" });
-      return;
-    } finally {
-      setIsRebasing(false);
-    }
+    if (!holdsSessionFor(traceId)) return;
+    if (!(await rebaseOntoStoredCorrection({ projectId: project.id }))) return;
+    // The read above yields, so the drawer can move while it is in flight and
+    // the session has to be claimed again before anything is written.
+    if (!holdsSessionFor(traceId)) return;
 
     upsert.mutate({
       projectId: project.id,
       traceId,
       patch: buildTraceEditPatch(useTraceEditStore.getState()),
     });
-  }, [project, traceId, upsert, utils]);
+  }, [project, rebaseOntoStoredCorrection, traceId, upsert]);
 
   return { save, isSaving: upsert.isLoading || isRebasing };
 }

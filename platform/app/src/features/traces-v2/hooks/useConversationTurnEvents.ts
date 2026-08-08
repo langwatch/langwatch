@@ -23,19 +23,12 @@ export function useConversationTurnEvents(
   const { project } = useOrganizationTeamProject();
   const isReadOnly = useIsReadOnlyTrace();
 
-  // Sorted and joined so two renders of the same thread share a query key,
-  // which is compared structurally.
-  const traceIdsKey = useMemo(
-    () =>
-      turns
-        .map((turn) => turn.traceId)
-        .sort()
-        .join(","),
-    [turns],
-  );
+  // Deduplicated and sorted so two renders of the same thread ask for the same
+  // ids in the same order, which is what lets them share a query key: the key
+  // is compared structurally, not by identity.
   const traceIds = useMemo(
-    () => (traceIdsKey === "" ? [] : traceIdsKey.split(",")),
-    [traceIdsKey],
+    () => [...new Set(turns.map((turn) => turn.traceId))].sort(),
+    [turns],
   );
 
   const timeRange = useMemo(() => {

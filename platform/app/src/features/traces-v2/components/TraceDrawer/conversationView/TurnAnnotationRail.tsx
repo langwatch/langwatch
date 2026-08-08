@@ -40,7 +40,7 @@ export function TurnAnnotationRail({
   // An edit composer takes the place of the card it is editing. It docks at
   // the end instead when there is no card to take the place of: a new
   // annotation, or one this feed has not caught up with yet.
-  const editorTakesACardsPlace =
+  const isEditorReplacingACard =
     !!turnDraft?.annotationId &&
     annotations.some((a) => a.id === turnDraft.annotationId);
 
@@ -84,7 +84,7 @@ export function TurnAnnotationRail({
         ),
       )}
 
-      {turnDraft && !editorTakesACardsPlace && (
+      {turnDraft && !isEditorReplacingACard && (
         <AnnotationEditorCard draft={turnDraft} output={output} />
       )}
 

@@ -93,8 +93,8 @@ Feature: Media rendering across trace surfaces
   # A turn's own input and output text is flattened at fold time, so the
   # fold-derived media references are what the thread reads; a turn handed over
   # with its raw payload (a threadless trace fetched on its own) is walked for
-  # media parts instead. The side bubbles layout is unchanged and renders no
-  # media, which is tracked as a follow-up rather than pinned here.
+  # media parts instead. The side bubbles layout renders no media yet, which the
+  # unimplemented scenario below keeps visible rather than leaving as an aside.
 
   @integration
   Scenario: A recording the caller sent renders under the user message
@@ -123,6 +123,12 @@ Feature: Media rendering across trace surfaces
     Given a turn whose input was hidden from this viewer by a privacy rule
     When I read the turn in the conversation thread
     Then the user side shows the redacted marker and no media
+
+  @unimplemented
+  Scenario: A recording is still there after switching to the side bubbles layout
+    Given a turn whose media renders in the conversation thread
+    When I switch the conversation to the side bubbles layout
+    Then the recording is still offered on the side it belongs to
 
   # ===========================================================================
   # Trace summary strips: which side a recording belongs to

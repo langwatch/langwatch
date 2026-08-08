@@ -279,6 +279,13 @@ Feature: Editing a trace in the drawer
       When I open the input editor
       Then the editor shows the messages without the system prompt
 
+    @unit
+    Scenario: A system prompt recorded as content blocks reads as one prompt
+      Given a span whose system prompt is recorded as content blocks
+      When I read its input and open the input editor
+      Then the input panel shows the prompt once in front of the messages
+      And the editor shows the messages without the system prompt
+
   Rule: Attributes are editable as key and value pairs
 
     @integration
@@ -314,6 +321,15 @@ Feature: Editing a trace in the drawer
       When I add an attribute using a key the filter is hiding
       Then I am told the key already exists
       And the attribute is not added
+
+    @integration
+    Scenario: Adding an attribute rejects a key that sits inside another one
+      Given I am editing a span carrying an attribute under a dotted path
+      When I add an attribute whose key is a parent of that path
+      Then I am told which attribute the key conflicts with
+      And the attribute is not added
+      And adding a key nested under an attribute that already holds a value is
+      refused the same way
 
     @unit
     Scenario: An attribute changed before the stored correction arrives keeps it
@@ -512,6 +528,14 @@ Feature: Editing a trace in the drawer
       Given the trace has no correction
       When I open the trace
       Then there is nothing to switch between
+
+    # The tint and the edge tick are the fast signal while scanning. The badge
+    # carries the same fact to a reader who cannot separate the hues.
+    @integration
+    Scenario: A corrected span is marked in the tree
+      Given the trace has a correction that renames a span
+      When I read the corrected trace
+      Then that row is marked as edited in words, not by colour alone
 
     @unit
     Scenario: The captured trace is a choice about the trace in front of me

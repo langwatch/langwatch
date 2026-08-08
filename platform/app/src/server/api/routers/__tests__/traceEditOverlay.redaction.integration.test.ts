@@ -158,6 +158,10 @@ describe("Reading a trace correction", () => {
     // The swapped-in app is put back whatever cleanup reports, so a teardown
     // failure here cannot leak this suite's app into the ones that follow.
     try {
+      // Setup can fail before it has created the rows these filters name.
+      // Running them on an unassigned identifier throws a TypeError that would
+      // replace the real setup failure in the report.
+      if (!project || !organizationId || !adminUserId || !memberUserId) return;
       await cleanupTestRows(prisma, [
         ["traceEditOverlay", { projectId: project.id }],
         ["dataPrivacyPolicy", { organizationId }],
@@ -269,6 +273,12 @@ describe("Reading a trace correction", () => {
 
     it("still lets them remove the whole correction", async () => {
       const member = callerFor(memberUserId);
+      await callerFor(adminUserId).traceEditOverlay.upsert({
+        projectId: project.id,
+        traceId: savedOverTraceId,
+        patch,
+      });
+
       await member.traceEditOverlay.delete({
         projectId: project.id,
         traceId: savedOverTraceId,

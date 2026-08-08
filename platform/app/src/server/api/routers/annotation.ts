@@ -334,7 +334,10 @@ export const annotationRouter = createTRPCRouter({
         comment: input.comment ?? "",
         isThumbsUp: input.isThumbsUp,
         scoreOptions: input.scoreOptions ?? {},
-        expectedOutput: input.expectedOutput ?? null,
+        // A save that does not carry the field leaves the suggestion where it
+        // is, the same way it leaves the trace's correction alone. Only an
+        // explicit null or empty text withdraws it.
+        expectedOutput: input.expectedOutput,
       });
     }),
   getByTraceId: protectedProcedure
